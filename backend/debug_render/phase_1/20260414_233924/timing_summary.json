@@ -1,0 +1,61 @@
+{
+  "phase": "phase_1",
+  "timestamp": "2026-04-14T23:42:07",
+  "overlay_filename": ".\\overlay.mov",
+  "fps": 30,
+  "width": 3840,
+  "height": 2160,
+  "total_frames": 900,
+  "rendered_frames": 900,
+  "sample_frame_indices": [
+    0,
+    225,
+    450,
+    674,
+    899
+  ],
+  "timings": {
+    "composite.elevation": {
+      "count": 900,
+      "total_ms": 5114.89,
+      "avg_ms": 5.683,
+      "max_ms": 9.712
+    },
+    "composite.route": {
+      "count": 900,
+      "total_ms": 79372.239,
+      "avg_ms": 88.191,
+      "max_ms": 120.681
+    },
+    "ffmpeg.write": {
+      "count": 900,
+      "total_ms": 24773.939,
+      "avg_ms": 27.527,
+      "max_ms": 70.507
+    },
+    "frame.draw": {
+      "count": 900,
+      "total_ms": 103383.852,
+      "avg_ms": 114.871,
+      "max_ms": 161.9
+    },
+    "frame.total": {
+      "count": 900,
+      "total_ms": 129620.433,
+      "avg_ms": 144.023,
+      "max_ms": 439.254
+    },
+    "text.dynamic": {
+      "count": 3600,
+      "total_ms": 2214.005,
+      "avg_ms": 0.615,
+      "max_ms": 7.018
+    },
+    "text.static.cache": {
+      "count": 3,
+      "total_ms": 1.64,
+      "avg_ms": 0.547,
+      "max_ms": 0.715
+    }
+  }
+}

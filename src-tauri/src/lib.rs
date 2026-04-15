@@ -1,19 +1,134 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 
 use http_body_util::{BodyExt, Full};
-use hyper::{body::Bytes, Request};
-use hyperlocal::{UnixConnector, Uri};
+use hyper::{body::Bytes, Request, Uri};
 use serde::{Deserialize, Serialize};
+
+#[cfg(unix)]
+use hyperlocal::{UnixConnector, Uri as UnixUri};
+#[cfg(unix)]
 use std::path::Path;
 
+#[cfg(unix)]
 const SOCKET_PATH: &str = "/tmp/cyclemetry.sock";
+const TCP_BACKEND_BASE_URL: &str = "http://127.0.0.1:31337";
 
-/// Make a GET request to the backend via Unix socket
-async fn backend_get(path: &str) -> Result<String, String> {
+fn tcp_uri(path: &str) -> Result<Uri, String> {
+    format!("{}{}", TCP_BACKEND_BASE_URL, path)
+    .parse::<Uri>()
+        .map_err(|e| e.to_string())
+}
+
+async fn backend_get_tcp(path: &str) -> Result<String, String> {
+    let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+        .build_http::<Full<Bytes>>();
+
+    let req = Request::builder()
+        .method("GET")
+        .uri(tcp_uri(path)?)
+        .body(Full::default())
+        .map_err(|e| e.to_string())?;
+
+    let res = client.request(req).await.map_err(|e| e.to_string())?;
+    let body = res.into_body().collect().await.map_err(|e| e.to_string())?;
+    let bytes = body.to_bytes();
+    String::from_utf8(bytes.to_vec()).map_err(|e| e.to_string())
+}
+
+async fn backend_post_tcp(path: &str, body: String) -> Result<String, String> {
+    let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+        .build_http::<Full<Bytes>>();
+
+    let req = Request::builder()
+        .method("POST")
+        .uri(tcp_uri(path)?)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body)))
+        .map_err(|e| e.to_string())?;
+
+    let res = client.request(req).await.map_err(|e| e.to_string())?;
+    let body = res.into_body().collect().await.map_err(|e| e.to_string())?;
+    let bytes = body.to_bytes();
+    String::from_utf8(bytes.to_vec()).map_err(|e| e.to_string())
+}
+
+async fn backend_upload_tcp(file_data: Vec<u8>, filename: String) -> Result<String, String> {
+    let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+        .build_http::<Full<Bytes>>();
+
+    let boundary = "----TauriUploadBoundary";
+    let mut body_bytes = Vec::new();
+    body_bytes.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+    body_bytes.extend_from_slice(
+        format!(
+            "Content-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\n",
+            filename
+        )
+        .as_bytes(),
+    );
+    body_bytes.extend_from_slice(b"Content-Type: application/octet-stream\r\n\r\n");
+    body_bytes.extend_from_slice(&file_data);
+    body_bytes.extend_from_slice(format!("\r\n--{}--\r\n", boundary).as_bytes());
+
+    let req = Request::builder()
+        .method("POST")
+        .uri(tcp_uri("/upload")?)
+        .header(
+            "Content-Type",
+            format!("multipart/form-data; boundary={}", boundary),
+        )
+        .body(Full::new(Bytes::from(body_bytes)))
+        .map_err(|e| e.to_string())?;
+
+    let res = client.request(req).await.map_err(|e| e.to_string())?;
+    let body = res.into_body().collect().await.map_err(|e| e.to_string())?;
+    let bytes = body.to_bytes();
+    String::from_utf8(bytes.to_vec()).map_err(|e| e.to_string())
+}
+
+async fn backend_image_data_tcp(filename: String) -> Result<String, String> {
+    let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+        .build_http::<Full<Bytes>>();
+
+    let path = format!("/images/{}", filename);
+    let req = Request::builder()
+        .method("GET")
+        .uri(tcp_uri(&path)?)
+        .body(Full::default())
+        .map_err(|e| e.to_string())?;
+
+    let res = client.request(req).await.map_err(|e| e.to_string())?;
+    let content_type = res
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "image/png".to_string());
+
+    let body = res.into_body().collect().await.map_err(|e| e.to_string())?;
+    let bytes = body.to_bytes();
+
+    use base64::{engine::general_purpose, Engine as _};
+    let b64 = general_purpose::STANDARD.encode(bytes);
+    Ok(format!("data:{};base64,{}", content_type, b64))
+}
+
+#[cfg(unix)]
+fn socket_transport_available() -> bool {
+    Path::new(SOCKET_PATH).exists()
+}
+
+#[cfg(not(unix))]
+fn socket_transport_available() -> bool {
+    false
+}
+
+#[cfg(unix)]
+async fn backend_get_socket(path: &str) -> Result<String, String> {
     let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
         .build::<_, Full<Bytes>>(UnixConnector);
 
-    let uri = Uri::new(SOCKET_PATH, path);
+    let uri = UnixUri::new(SOCKET_PATH, path);
     let req = Request::builder()
         .method("GET")
         .uri(uri)
@@ -26,12 +141,12 @@ async fn backend_get(path: &str) -> Result<String, String> {
     String::from_utf8(bytes.to_vec()).map_err(|e| e.to_string())
 }
 
-/// Make a POST request to the backend via Unix socket
-async fn backend_post(path: &str, body: String) -> Result<String, String> {
+#[cfg(unix)]
+async fn backend_post_socket(path: &str, body: String) -> Result<String, String> {
     let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
         .build::<_, Full<Bytes>>(UnixConnector);
 
-    let uri = Uri::new(SOCKET_PATH, path);
+    let uri = UnixUri::new(SOCKET_PATH, path);
     let req = Request::builder()
         .method("POST")
         .uri(uri)
@@ -43,6 +158,89 @@ async fn backend_post(path: &str, body: String) -> Result<String, String> {
     let body = res.into_body().collect().await.map_err(|e| e.to_string())?;
     let bytes = body.to_bytes();
     String::from_utf8(bytes.to_vec()).map_err(|e| e.to_string())
+}
+
+#[cfg(unix)]
+async fn backend_upload_socket(file_data: Vec<u8>, filename: String) -> Result<String, String> {
+    let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+        .build::<_, Full<Bytes>>(UnixConnector);
+
+    let boundary = "----TauriUploadBoundary";
+    let mut body_bytes = Vec::new();
+    body_bytes.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+    body_bytes.extend_from_slice(
+        format!(
+            "Content-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\n",
+            filename
+        )
+        .as_bytes(),
+    );
+    body_bytes.extend_from_slice(b"Content-Type: application/octet-stream\r\n\r\n");
+    body_bytes.extend_from_slice(&file_data);
+    body_bytes.extend_from_slice(format!("\r\n--{}--\r\n", boundary).as_bytes());
+
+    let uri = UnixUri::new(SOCKET_PATH, "/upload");
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header(
+            "Content-Type",
+            format!("multipart/form-data; boundary={}", boundary),
+        )
+        .body(Full::new(Bytes::from(body_bytes)))
+        .map_err(|e| e.to_string())?;
+
+    let res = client.request(req).await.map_err(|e| e.to_string())?;
+    let body = res.into_body().collect().await.map_err(|e| e.to_string())?;
+    let bytes = body.to_bytes();
+    String::from_utf8(bytes.to_vec()).map_err(|e| e.to_string())
+}
+
+#[cfg(unix)]
+async fn backend_image_data_socket(filename: String) -> Result<String, String> {
+    let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+        .build::<_, Full<Bytes>>(UnixConnector);
+
+    let path = format!("/images/{}", filename);
+    let uri = UnixUri::new(SOCKET_PATH, &path);
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Full::default())
+        .map_err(|e| e.to_string())?;
+
+    let res = client.request(req).await.map_err(|e| e.to_string())?;
+    let content_type = res
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "image/png".to_string());
+
+    let body = res.into_body().collect().await.map_err(|e| e.to_string())?;
+    let bytes = body.to_bytes();
+
+    use base64::{engine::general_purpose, Engine as _};
+    let b64 = general_purpose::STANDARD.encode(bytes);
+    Ok(format!("data:{};base64,{}", content_type, b64))
+}
+
+async fn backend_get(path: &str) -> Result<String, String> {
+    #[cfg(unix)]
+    if socket_transport_available() {
+        return backend_get_socket(path).await;
+    }
+
+    backend_get_tcp(path).await
+}
+
+async fn backend_post(path: &str, body: String) -> Result<String, String> {
+    #[cfg(unix)]
+    if socket_transport_available() {
+        return backend_post_socket(path, body).await;
+    }
+
+    backend_post_tcp(path, body).await
 }
 
 #[derive(Serialize, Deserialize)]
@@ -99,34 +297,12 @@ async fn backend_load_gpx(path: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn backend_upload(file_data: Vec<u8>, filename: String) -> Result<String, String> {
-    // For file uploads, we need multipart form data
-    // This is more complex; we'll send as base64 for simplicity
-    let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
-        .build::<_, Full<Bytes>>(UnixConnector);
+    #[cfg(unix)]
+    if socket_transport_available() {
+        return backend_upload_socket(file_data, filename).await;
+    }
 
-    // Build multipart boundary
-    let boundary = "----TauriUploadBoundary";
-    let mut body_bytes = Vec::new();
-    
-    // Add file part
-    body_bytes.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
-    body_bytes.extend_from_slice(format!("Content-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\n", filename).as_bytes());
-    body_bytes.extend_from_slice(b"Content-Type: application/octet-stream\r\n\r\n");
-    body_bytes.extend_from_slice(&file_data);
-    body_bytes.extend_from_slice(format!("\r\n--{}--\r\n", boundary).as_bytes());
-
-    let uri = Uri::new(SOCKET_PATH, "/upload");
-    let req = Request::builder()
-        .method("POST")
-        .uri(uri)
-        .header("Content-Type", format!("multipart/form-data; boundary={}", boundary))
-        .body(Full::new(Bytes::from(body_bytes)))
-        .map_err(|e| e.to_string())?;
-
-    let res = client.request(req).await.map_err(|e| e.to_string())?;
-    let body = res.into_body().collect().await.map_err(|e| e.to_string())?;
-    let bytes = body.to_bytes();
-    String::from_utf8(bytes.to_vec()).map_err(|e| e.to_string())
+    backend_upload_tcp(file_data, filename).await
 }
 
 #[tauri::command]
@@ -158,45 +334,26 @@ async fn backend_cancel() -> Result<String, String> {
 
 #[tauri::command]
 fn get_image_url(filename: String) -> String {
-    // Return path for serving from the public directory
-    format!("http://unix:{}/images/{}", SOCKET_PATH, filename)
+    format!("{}/images/{}", TCP_BACKEND_BASE_URL, filename)
 }
 
-/// Check if the backend socket exists and is reachable
 #[tauri::command]
 async fn backend_socket_ready() -> bool {
-    Path::new(SOCKET_PATH).exists()
+    if socket_transport_available() {
+        return true;
+    }
+
+    backend_get_tcp("/api/health").await.is_ok()
 }
 
 #[tauri::command]
 async fn backend_image_data(filename: String) -> Result<String, String> {
-    let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
-        .build::<_, Full<Bytes>>(UnixConnector);
+    #[cfg(unix)]
+    if socket_transport_available() {
+        return backend_image_data_socket(filename).await;
+    }
 
-    let path = format!("/images/{}", filename);
-    let uri = Uri::new(SOCKET_PATH, &path);
-    let req = Request::builder()
-        .method("GET")
-        .uri(uri)
-        .body(Full::default())
-        .map_err(|e| e.to_string())?;
-
-    let res = client.request(req).await.map_err(|e| e.to_string())?;
-    
-    // Check content type
-    let content_type = res.headers()
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "image/png".to_string());
-
-    let body = res.into_body().collect().await.map_err(|e| e.to_string())?;
-    let bytes = body.to_bytes();
-    
-    // Convert to base64 data URL
-    use base64::{Engine as _, engine::general_purpose};
-    let b64 = general_purpose::STANDARD.encode(bytes);
-    Ok(format!("data:{};base64,{}", content_type, b64))
+    backend_image_data_tcp(filename).await
 }
 
 pub fn run() {

@@ -107,7 +107,24 @@ class Activity:
                             pass
                             # print("wtf 2")
                         return 0.0
-            return float(extension.text)
+
+            raw_value = extension.text if extension is not None else None
+            if raw_value is None:
+                return 0.0
+
+            text_value = raw_value.strip()
+            if not text_value:
+                return 0.0
+
+            try:
+                return float(text_value)
+            except (TypeError, ValueError):
+                logging.warning(
+                    "Activity: Non-numeric extension value %r for tags %s; defaulting to 0.0",
+                    raw_value,
+                    tag_map,
+                )
+                return 0.0
 
         data = defaultdict(list)
         track_segment = self.gpx.tracks[0].segments[0]

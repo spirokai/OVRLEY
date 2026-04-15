@@ -1,9 +1,9 @@
 # backend
 
 TODO
+
 - do we need docs for running backend server independently?
 - will prioritize this if move away from docker compose
-
 
 <!--
 
@@ -29,7 +29,18 @@ ORRrrrr.. uv run -- flask --app app:app run -p 3001
 ```
 ----------
 
-- [ffmpeg](https://FFmpeg.org/) # TODO - maybe move this to pip?
+- [ffmpeg](https://FFmpeg.org/) if you want to use a system installation
+- `imageio-ffmpeg` can provide a bundled fallback binary in development
+
+Video rendering needs an `ffmpeg` executable. Cyclemetry now looks for it in this order:
+
+1. `CYCLEMETRY_FFMPEG` or `FFMPEG_BINARY`
+2. A bundled binary in frozen builds
+3. A local `backend/ffmpeg(.exe)` file
+4. `ffmpeg` on `PATH`
+5. The Python package `imageio-ffmpeg`
+
+On Windows, if you already have ffmpeg installed but want to force a specific binary, set `CYCLEMETRY_FFMPEG` to the full path of `ffmpeg.exe`.
 
 # Run Flask server locally
 

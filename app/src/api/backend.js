@@ -3,8 +3,10 @@
  * Uses Tauri invoke() for Unix socket (production) or fetch() for development
  */
 
-// Check if we're running in Tauri
-const isTauri = () => typeof window.__TAURI__ !== 'undefined'
+// Check if the Tauri IPC runtime is actually available.
+const isTauri = () =>
+  typeof window !== 'undefined' &&
+  typeof window.__TAURI_INTERNALS__ !== 'undefined'
 
 /**
  * Lazy import of Tauri invoke

@@ -163,6 +163,77 @@ export default function ControlPanel({ config, onConfigChange, onApply }) {
 
   const status = getStatus()
 
+  const renderTemplateSelector = () => (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-red-500" />
+          <h3 className="font-semibold text-sm">Template</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge
+            variant={
+              status === 'Modified'
+                ? 'secondary'
+                : status === 'Draft'
+                  ? 'outline'
+                  : 'default'
+            }
+            className={
+              status === 'Modified'
+                ? 'bg-orange-500/10 text-orange-500 border-orange-500/20'
+                : ''
+            }
+          >
+            {status}
+          </Badge>
+          {(status === 'Modified' || status === 'Draft') && config && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-red-500 hover:bg-red-500/10"
+              onClick={handleSaveTemplate}
+            >
+              <Save className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:bg-zinc-800"
+            onClick={handleOpenFolder}
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+      <Select
+        value={loadedTemplateFilename || ''}
+        onValueChange={handleTemplateChange}
+      >
+        <SelectTrigger className="w-full">
+          <div className="truncate text-left">
+            <SelectValue placeholder="Select a template..." />
+          </div>
+        </SelectTrigger>
+        <SelectContent>
+          {templates.map((t) => (
+            <SelectItem key={t.id} value={t.id}>
+              {t.name} {t.type === 'user' && '(User)'}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {!templates.length && (
+        <p className="text-xs text-muted-foreground">
+          No templates loaded yet. If this stays empty, the backend template
+          list failed to load.
+        </p>
+      )}
+    </div>
+  )
+
   // Handle template selection
   const handleTemplateChange = async (templateId) => {
     if (!templateId) return
@@ -319,8 +390,17 @@ export default function ControlPanel({ config, onConfigChange, onApply }) {
 
   if (!config) {
     return (
-      <div className="p-6 text-muted-foreground text-sm">
-        Select a template to edit
+      <div className="p-6 space-y-6">
+        {renderTemplateSelector()}
+        <Separator />
+
+        <div className="text-sm text-muted-foreground space-y-2">
+          <p>Select a template to edit.</p>
+          <p>
+            The template picker is above. Choosing one will load its settings
+            and start the preview flow.
+          </p>
+        </div>
       </div>
     )
   }
@@ -550,67 +630,7 @@ export default function ControlPanel({ config, onConfigChange, onApply }) {
   return (
     <div className="p-6 space-y-6">
       {/* Template Selector & Status */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-red-500" />
-            <h3 className="font-semibold text-sm">Template</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge
-              variant={
-                status === 'Modified'
-                  ? 'secondary'
-                  : status === 'Draft'
-                    ? 'outline'
-                    : 'default'
-              }
-              className={
-                status === 'Modified'
-                  ? 'bg-orange-500/10 text-orange-500 border-orange-500/20'
-                  : ''
-              }
-            >
-              {status}
-            </Badge>
-            {(status === 'Modified' || status === 'Draft') && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-red-500 hover:bg-red-500/10"
-                onClick={handleSaveTemplate}
-              >
-                <Save className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-muted-foreground hover:bg-zinc-800"
-              onClick={handleOpenFolder}
-            >
-              <FolderOpen className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-        <Select
-          value={loadedTemplateFilename || ''}
-          onValueChange={handleTemplateChange}
-        >
-          <SelectTrigger className="w-full">
-            <div className="truncate text-left">
-              <SelectValue placeholder="Select a template..." />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            {templates.map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.name} {t.type === 'user' && '(User)'}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {renderTemplateSelector()}
 
       <Separator />
 

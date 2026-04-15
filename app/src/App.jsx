@@ -2,7 +2,6 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import useStore from './store/useStore'
 import './index.css'
 import * as backend from './api/backend'
-import { open } from '@tauri-apps/plugin-dialog'
 
 // UI components
 import { Button } from '@/components/ui/button'
@@ -34,6 +33,20 @@ const logSidecar = (message) => {
     window.__SIDECAR_DEBUG__.logs.shift()
   }
 }
+
+const hasTauriRuntime = () =>
+  typeof window !== 'undefined' &&
+  typeof window.__TAURI_INTERNALS__ !== 'undefined'
+
+const selectBrowserGpxFile = () =>
+  new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.gpx'
+    input.onchange = () => resolve(input.files?.[0] ?? null)
+    input.oncancel = () => resolve(null)
+    input.click()
+  })
 
 // Sidecar readiness monitoring
 // Spinner
@@ -88,7 +101,7 @@ function App() {
   // Sidecar readiness monitoring
   useEffect(() => {
     const checkInitialBackend = async () => {
-      if (typeof window.__TAURI__ === 'undefined') {
+      if (!hasTauriRuntime()) {
         setBackendStatus('connected')
         return
       }
@@ -260,21 +273,23 @@ function App() {
   // Handle GPX file selection
   const handleGpxFileOpen = async () => {
     try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: 'GPX', extensions: ['gpx'] }],
-        title: 'Select GPX Activity',
-      })
+      const { default: saveFileFromPath } = await import('./api/gpxUtils')
+      const selected = hasTauriRuntime()
+        ? await (async () => {
+            const { open } = await import('@tauri-apps/plugin-dialog')
+            return open({
+              multiple: false,
+              filters: [{ name: 'GPX', extensions: ['gpx'] }],
+              title: 'Select GPX Activity',
+            })
+          })()
+        : await selectBrowserGpxFile()
 
       if (!selected) return
 
       setGeneratingImage(true)
       setImageError(false)
 
-      // In Tauri v2, open returns the path as a string (or null)
-      // We need to pass this path to the backend
-      const { default: saveFileFromPath } = await import('./api/gpxUtils')
-      // Assuming gpxUtils can handle a path string
       await saveFileFromPath(selected)
 
       // Refresh preview after gpx load

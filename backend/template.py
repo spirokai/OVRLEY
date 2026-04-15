@@ -1,6 +1,8 @@
 import json
 import os
 
+import constant
+
 
 def merge_configs(parent_config, child_config):
     # not handling nested - not sure if will need to in the future
@@ -63,9 +65,11 @@ def build_configs(filename):
     # TODO CLEAN
     template = None
     # TODO handle more gracefully
-    # this handles both locally running with templates in template folder and api call when templates are stored in tmp directory.
+    # Resolve filename inputs against bundled template directories when needed.
     if not os.path.exists(filename):
-        filename = "./../templates/" + filename
+        bundled_path = constant.FIND_BUNDLED_TEMPLATE(filename)
+        if bundled_path:
+            filename = bundled_path
     with open(filename, "r") as f:
         template = json.load(f)
 

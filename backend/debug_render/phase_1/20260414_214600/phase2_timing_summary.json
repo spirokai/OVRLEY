@@ -1,0 +1,73 @@
+{
+  "phase": "phase_1",
+  "timestamp": "2026-04-14T21:51:08",
+  "overlay_filename": ".\\overlay.mov",
+  "fps": 30,
+  "width": 3840,
+  "height": 2160,
+  "total_frames": 900,
+  "rendered_frames": 900,
+  "sample_frame_indices": [
+    0,
+    225,
+    450,
+    674,
+    899
+  ],
+  "timings": {
+    "ffmpeg.write": {
+      "count": 900,
+      "total_ms": 21107.279,
+      "avg_ms": 23.453,
+      "max_ms": 41.837
+    },
+    "frame.draw": {
+      "count": 900,
+      "total_ms": 282072.671,
+      "avg_ms": 313.414,
+      "max_ms": 394.735
+    },
+    "frame.total": {
+      "count": 900,
+      "total_ms": 304640.874,
+      "avg_ms": 338.49,
+      "max_ms": 615.104
+    },
+    "plot.dynamic.course": {
+      "count": 900,
+      "total_ms": 155609.093,
+      "avg_ms": 172.899,
+      "max_ms": 233.96
+    },
+    "plot.dynamic.elevation": {
+      "count": 900,
+      "total_ms": 58171.532,
+      "avg_ms": 64.635,
+      "max_ms": 84.711
+    },
+    "plot.static.course": {
+      "count": 1,
+      "total_ms": 147.412,
+      "avg_ms": 147.412,
+      "max_ms": 147.412
+    },
+    "plot.static.elevation": {
+      "count": 1,
+      "total_ms": 69.533,
+      "avg_ms": 69.533,
+      "max_ms": 69.533
+    },
+    "text.dynamic": {
+      "count": 3600,
+      "total_ms": 2877.619,
+      "avg_ms": 0.799,
+      "max_ms": 13.558
+    },
+    "text.static.cache": {
+      "count": 3,
+      "total_ms": 1.766,
+      "avg_ms": 0.589,
+      "max_ms": 0.633
+    }
+  }
+}

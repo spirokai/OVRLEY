@@ -3,6 +3,9 @@ import os
 import tempfile
 
 
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 def WRITE_DIR():
     """Get the base directory for writing files - uses temp dir when running as frozen bundle."""
     if getattr(sys, "frozen", False):
@@ -41,6 +44,34 @@ def TEMPLATES_DIR():
     templates = os.path.join(WRITE_DIR(), "templates")
     os.makedirs(templates, exist_ok=True)
     return templates
+
+
+def BUNDLED_TEMPLATE_DIRS():
+    """Get directories that may contain bundled templates."""
+    candidate_dirs = []
+
+    if getattr(sys, "frozen", False):
+        candidate_dirs.append(os.path.join(sys._MEIPASS, "templates"))
+    else:
+        candidate_dirs.append(os.path.join(os.path.dirname(BACKEND_DIR), "templates"))
+        candidate_dirs.append(os.path.join(BACKEND_DIR, "templates"))
+
+    existing_dirs = []
+    for directory in candidate_dirs:
+        normalized = os.path.normpath(directory)
+        if os.path.isdir(normalized) and normalized not in existing_dirs:
+            existing_dirs.append(normalized)
+
+    return existing_dirs
+
+
+def FIND_BUNDLED_TEMPLATE(filename):
+    """Resolve a bundled template file path if it exists."""
+    for directory in BUNDLED_TEMPLATE_DIRS():
+        path = os.path.join(directory, filename)
+        if os.path.isfile(path):
+            return path
+    return None
 
 
 def FONTS_DIR():
@@ -126,3 +157,14 @@ DEFAULT_MARGIN = 0.1
 DEFAULT_POINT_WEIGHT = 80
 DEFAULT_OPACITY = 1
 DEFAULT_COLOR = "#ffffff"
+
+# Geometry preparation defaults
+DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX = 1.0
+DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER = 1.0
+DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER = 2.0
+DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER = 2.5
+DEFAULT_ELEVATION_MARKER_SCALE = 2.5
+DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER = 2.5
+DEFAULT_ROUTE_BACKGROUND_OPACITY_SCALE = 0.75
+DEFAULT_ROUTE_LAYER_SUPERSAMPLE = 4
+ENABLE_ROUTE_BACKGROUND_LAYER = True

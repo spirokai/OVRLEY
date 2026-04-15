@@ -7,6 +7,7 @@ import shutil
 import time
 import uuid
 import sys
+import tempfile
 
 # Framework imports
 from flask import Flask, jsonify, request, make_response
@@ -39,7 +40,11 @@ backend_ready = False
 # Configure logging to both stdout and file for debugging sidecar
 log_handlers = [logging.StreamHandler(sys.stdout)]
 try:
-    log_handlers.append(logging.FileHandler("/tmp/cyclemetry_startup.log", mode="w"))
+    log_handlers.append(
+        logging.FileHandler(
+            os.path.join(tempfile.gettempdir(), "cyclemetry_startup.log"), mode="w"
+        )
+    )
 except Exception:
     pass
 
@@ -103,11 +108,11 @@ def get_template(filename):
         return send_from_directory(constant.TEMPLATES_DIR(), filename)
 
     # 2. Try bundled templates
-    bundled_dir = os.path.join(BASE_DIR, "templates")
-    if os.path.exists(os.path.join(bundled_dir, filename)):
+    bundled_path = constant.FIND_BUNDLED_TEMPLATE(filename)
+    if bundled_path:
         from flask import send_from_directory
 
-        return send_from_directory(bundled_dir, filename)
+        return send_from_directory(os.path.dirname(bundled_path), filename)
 
     return make_response(jsonify({"error": "Template not found"}), 404)
 
@@ -129,7 +134,7 @@ def load_gpx():
         shutil.copy2(path, dest_path)
 
         # Analyze the GPX file
-        from scene import Activity
+        from activity import Activity
 
         activity = Activity(dest_path)
         duration_seconds = len(activity.time) if hasattr(activity, "time") else 0
@@ -162,7 +167,7 @@ def upload():
 
         # Analyze the GPX file to get metadata
         try:
-            from scene import Activity
+            from activity import Activity
             activity = Activity(path)
             duration_seconds = len(activity.time) if hasattr(activity, "time") else 0
 
@@ -209,6 +214,18 @@ def cleanup_old_previews():
                         logging.warning(f"Failed to remove old preview {filename}: {e}")
     except Exception as e:
         logging.warning(f"Error during preview cleanup: {e}")
+
+
+def open_path_in_system(path: str) -> None:
+    """Open a file or directory with the platform file manager/default handler."""
+    import subprocess
+
+    if sys.platform == "darwin":
+        subprocess.run(["open", path], check=False)
+    elif sys.platform == "win32":
+        os.startfile(path)
+    else:
+        subprocess.run(["xdg-open", path], check=False)
 
 
 @app.route("/api/demo", methods=["POST"])
@@ -373,8 +390,7 @@ def open_downloads():
         downloads_dir = constant.DOWNLOADS_DIR()
         # Ensure it exists before opening
         os.makedirs(downloads_dir, exist_ok=True)
-        # Use 'open' command on macOS
-        os.system(f'open "{downloads_dir}"')
+        open_path_in_system(downloads_dir)
         return jsonify({"message": "Folder opened"})
     except Exception as e:
         logging.error(f"Error opening folder: {e}")
@@ -401,7 +417,7 @@ def open_video():
 
     try:
         logging.info(f"Opening video: {video_path}")
-        os.system(f'open "{video_path}"')
+        open_path_in_system(video_path)
         return jsonify({"message": "Video opened"})
     except Exception as e:
         logging.error(f"Error opening video: {e}")
@@ -724,10 +740,13 @@ def list_templates():
     templates = []
 
     # 1. List bundled templates
-    bundled_dir = os.path.join(BASE_DIR, "templates")
-    if os.path.exists(bundled_dir):
+    bundled_seen = set()
+    for bundled_dir in constant.BUNDLED_TEMPLATE_DIRS():
         for f in os.listdir(bundled_dir):
             if f.endswith(".json"):
+                if f in bundled_seen:
+                    continue
+                bundled_seen.add(f)
                 templates.append(
                     {
                         "id": f,
@@ -849,6 +868,7 @@ def prewarm_backend():
 
 
 if __name__ == "__main__":
+    import socket
     import threading
 
     # Start parent watcher thread
@@ -859,14 +879,17 @@ if __name__ == "__main__":
     prewarm_thread = threading.Thread(target=prewarm_backend, daemon=True)
     prewarm_thread.start()
 
-    # Check if we should use Unix socket (production) or TCP port (development)
-    # Default to socket mode if running as a frozen bundle (sidecar)
+    # Use Unix sockets only on Unix-like systems. Windows falls back to loopback TCP.
     is_frozen = getattr(sys, "frozen", False)
-    use_socket = is_frozen or os.getenv("CYCLEMETRY_USE_SOCKET", "").lower() in (
+    socket_requested = is_frozen or os.getenv("CYCLEMETRY_USE_SOCKET", "").lower() in (
         "1",
         "true",
         "yes",
     )
+    use_socket = socket_requested and os.name != "nt" and hasattr(socket, "AF_UNIX")
+
+    if socket_requested and not use_socket:
+        logging.info("Unix sockets unavailable on this platform, falling back to TCP")
 
     if use_socket:
         # Production/Socket mode: Use Unix socket to avoid port conflicts
