@@ -2,19 +2,34 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import useStore from './store/useStore'
 import './index.css'
 import * as backend from './api/backend'
+import { applyGlobalDefaults } from './lib/config-utils'
 
 // UI components
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import ControlPanel from '@/components/ControlPanel'
 import ErrorAlert from '@/components/ErrorAlert'
 import RenderProgressOverlay from '@/components/RenderProgressOverlay'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 // Icons
-import { Upload, Play, Activity, FolderOpen } from 'lucide-react'
+import {
+  Upload,
+  Play,
+  Activity,
+  FolderOpen,
+  Sparkles,
+  Save,
+} from 'lucide-react'
 
 // Global state for sidecar
 window.__SIDECAR_DEBUG__ = {
@@ -77,6 +92,7 @@ function Spinner({ className = 'h-4 w-4' }) {
 function App() {
   const {
     config,
+    globalDefaults,
     setConfig,
     imageFilename,
     generatingImage,
@@ -92,11 +108,22 @@ function App() {
     setLastRenderedConfig,
     autoRender,
     setAutoRender,
+    templates,
+    fetchTemplates,
+    loadedTemplateFilename,
+    setLoadedTemplateFilename,
+    lastSavedConfig,
+    setLastSavedConfig,
   } = useStore()
 
   const [backendStatus, setBackendStatus] = useState('connecting')
   const [backendReady, setBackendReady] = useState(false)
   const [imageError, setImageError] = useState(false)
+
+  // Fetch templates once
+  useEffect(() => {
+    fetchTemplates()
+  }, [fetchTemplates])
 
   // Sidecar readiness monitoring
   useEffect(() => {
@@ -149,11 +176,78 @@ function App() {
     return () => clearInterval(interval)
   }, [backendStatus])
 
+  // Template management
+  const handleTemplateChange = async (filename) => {
+    if (!filename) return
+    try {
+      setGeneratingImage(true)
+      const data = await backend.loadTemplate(filename)
+      setLoadedTemplateFilename(filename)
+      setConfig(data)
+      setLastSavedConfig(data)
+
+      // Auto-refresh preview with new template
+      handleGeneratePreview(data)
+    } catch (err) {
+      console.error('Failed to load template:', err)
+      setErrorMessage(`Failed to load template: ${err.message}`)
+    } finally {
+      setGeneratingImage(false)
+    }
+  }
+
+  const handleSaveTemplate = async () => {
+    let filename = loadedTemplateFilename
+
+    // If draft or built-in, prompt for new name
+    const currentTemplate = templates.find((t) => t.id === filename)
+    if (!filename || currentTemplate?.type === 'built-in') {
+      const name = prompt(
+        'Enter a name for your new template:',
+        filename?.replace('.json', '') || 'my_template',
+      )
+      if (!name) return
+      filename = name.toLowerCase().replace(/\s+/g, '_')
+      if (!filename.endsWith('.json')) filename += '.json'
+    }
+
+    try {
+      await backend.saveTemplate(filename, config)
+      setLoadedTemplateFilename(filename)
+      setLastSavedConfig(config)
+      fetchTemplates() // Refresh list
+    } catch (err) {
+      console.error('Failed to save template:', err)
+      setErrorMessage(`Failed to save template: ${err.message}`)
+    }
+  }
+
+  const handleOpenFolder = async () => {
+    try {
+      await backend.openTemplatesFolder()
+    } catch (err) {
+      console.error('Failed to open folder:', err)
+    }
+  }
+
+  const getStatus = () => {
+    if (!loadedTemplateFilename) return 'Draft'
+    if (!lastSavedConfig) return 'Saved'
+    const isModified =
+      JSON.stringify(config) !== JSON.stringify(lastSavedConfig)
+    return isModified ? 'Modified' : 'Saved'
+  }
+
+  const status = getStatus()
+
   // Generate preview
   const handleGeneratePreview = useCallback(
     async (configOverride = null) => {
-      const currentConfig = configOverride || config
-      if (!currentConfig) return
+      const baseConfig = configOverride || config
+      if (!baseConfig) return
+
+      // Apply global defaults before sending to backend
+      const currentConfig = applyGlobalDefaults(baseConfig, globalDefaults)
 
       try {
         setGeneratingImage(true)
@@ -188,6 +282,7 @@ function App() {
       config,
       gpxFilename,
       selectedSecond,
+      globalDefaults,
       setGeneratingImage,
       setErrorMessage,
       setImageFilename,
@@ -236,6 +331,7 @@ function App() {
     }
   }, [
     config,
+    globalDefaults,
     autoRender,
     hasUnrenderedChanges,
     generatingImage,
@@ -309,21 +405,87 @@ function App() {
       <ErrorAlert />
       <RenderProgressOverlay />
       {/* Header */}
-      <header className="relative z-50 border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0">
+      <header className="relative z-50 border-b border-border bg-card/50 backdrop-blur-sm shrink-0">
         <div className="flex items-center justify-between px-6 py-3">
-          {/* Left - Logo & Template */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
               <img
                 src="/logo192.png"
                 alt="Cyclemetry"
                 className="w-8 h-8 rounded-lg"
               />
-              <div>
+              <div className="hidden sm:block">
                 <h1 className="font-semibold text-sm">Cyclemetry</h1>
-                <p className="text-xs text-muted-foreground">
-                  GPX Overlay Editor
+                <p className="text-[10px] text-muted-foreground">
+                  Overlay Editor
                 </p>
+              </div>
+            </div>
+
+            <div className="h-8 w-px bg-zinc-800/50" />
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Select
+                  value={loadedTemplateFilename || ''}
+                  onValueChange={handleTemplateChange}
+                >
+                  <SelectTrigger className="w-56 h-8 text-xs border-zinc-700/50 bg-zinc-900/30">
+                    <div className="flex items-center gap-2 truncate">
+                      <Sparkles className="h-3 w-3 text-red-500 shrink-0" />
+                      <SelectValue placeholder="Select Template..." />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name} {t.type === 'user' && '(User)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Badge
+                  variant={
+                    status === 'Modified'
+                      ? 'secondary'
+                      : status === 'Draft'
+                        ? 'outline'
+                        : 'default'
+                  }
+                  className={`text-[10px] h-5 ${
+                    status === 'Modified'
+                      ? 'bg-orange-500/10 text-orange-500 border-orange-500/20'
+                      : ''
+                  }`}
+                >
+                  {status}
+                </Badge>
+              </div>
+
+              <div className="flex items-center gap-1">
+                {(status === 'Modified' || status === 'Draft') && config && (
+                  <SimpleTooltip side="bottom" content="Save Template">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                      onClick={handleSaveTemplate}
+                    >
+                      <Save className="h-4 w-4" />
+                    </Button>
+                  </SimpleTooltip>
+                )}
+                <SimpleTooltip side="bottom" content="Open Templates Folder">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-zinc-800"
+                    onClick={handleOpenFolder}
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                  </Button>
+                </SimpleTooltip>
               </div>
             </div>
           </div>
@@ -338,7 +500,7 @@ function App() {
                 onClick={handleGpxFileOpen}
               >
                 <Activity className="h-3.5 w-3.5" />
-                <span className="max-w-[100px] truncate">
+                <span className="max-w-25 truncate">
                   {gpxFilename === 'demo.gpxinit'
                     ? 'Load GPX'
                     : gpxFilename || 'Load GPX'}

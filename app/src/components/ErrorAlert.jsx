@@ -12,7 +12,7 @@ function ErrorAlert() {
   }
 
   return (
-    <div className="fixed top-4 right-4 z-[100] max-w-md animate-in fade-in slide-in-from-top-4 duration-300">
+    <div className="fixed top-4 right-4 z-100 max-w-md animate-in fade-in slide-in-from-top-4 duration-300">
       <Alert
         variant="destructive"
         className="relative pr-12 shadow-lg border-2"

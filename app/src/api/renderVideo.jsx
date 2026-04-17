@@ -1,14 +1,53 @@
 import useStore from '../store/useStore'
 import * as backend from './backend'
+import { applyGlobalDefaults } from '../lib/config-utils'
+
+// Helper to convert HH:MM:SS to seconds
+function timeToSeconds(timeStr) {
+  if (!timeStr) return 0
+  const parts = timeStr.split(':').map(Number)
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  }
+  if (parts.length === 2) {
+    return parts[0] * 60 + parts[1]
+  }
+  return parts[0] || 0
+}
 
 export default async function renderVideo() {
   try {
-    const { gpxFilename, config, setRenderingVideo, setVideoFilename } =
-      useStore.getState()
+    const {
+      gpxFilename,
+      config: baseConfig,
+      globalDefaults,
+      updateRate,
+      exportRange,
+      setRenderingVideo,
+      setVideoFilename,
+    } = useStore.getState()
 
     // Validate we have required data
-    if (!config || !config.scene) {
+    if (!baseConfig || !baseConfig.scene) {
       throw new Error('No valid config available')
+    }
+
+    // Apply global defaults and overrides
+    const config = applyGlobalDefaults(baseConfig, globalDefaults)
+
+    // Apply performance and range overrides
+    if (config.scene) {
+      config.scene.update_rate = updateRate
+
+      // Apply export range override if custom
+      if (exportRange.type === 'custom') {
+        const start = timeToSeconds(exportRange.fromTime)
+        const end = timeToSeconds(exportRange.toTime)
+        if (end > start) {
+          config.scene.start = start
+          config.scene.end = end
+        }
+      }
     }
 
     if (!gpxFilename) {
@@ -30,6 +69,7 @@ export default async function renderVideo() {
       start: config?.scene?.start,
       end: config?.scene?.end,
       duration: (config?.scene?.end || 0) - (config?.scene?.start || 0),
+      updateRate: config?.scene?.update_rate,
     })
 
     const data = await backend.renderVideo(config, gpxFilename)
