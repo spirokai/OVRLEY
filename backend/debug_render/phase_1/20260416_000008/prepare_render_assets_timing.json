@@ -1,0 +1,137 @@
+{
+  "started_at": "2026-04-16T00:00:08.578",
+  "events": [
+    {
+      "name": "build_font_cache",
+      "started_at": "2026-04-16T00:00:08.578",
+      "ended_at": "2026-04-16T00:00:08.578",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.geometry",
+      "started_at": "2026-04-16T00:00:08.578",
+      "ended_at": "2026-04-16T00:00:08.579",
+      "duration_ms": 1.0
+    },
+    {
+      "name": "build_route_cache.layers",
+      "started_at": "2026-04-16T00:00:08.579",
+      "ended_at": "2026-04-16T00:00:08.913",
+      "duration_ms": 333.884
+    },
+    {
+      "name": "build_route_cache.rotated_background_layer",
+      "started_at": "2026-04-16T00:00:08.913",
+      "ended_at": "2026-04-16T00:00:08.973",
+      "duration_ms": 60.012
+    },
+    {
+      "name": "build_route_cache.rotated_completed_layer",
+      "started_at": "2026-04-16T00:00:08.973",
+      "ended_at": "2026-04-16T00:00:09.034",
+      "duration_ms": 61.014
+    },
+    {
+      "name": "build_route_cache.display_points",
+      "started_at": "2026-04-16T00:00:09.034",
+      "ended_at": "2026-04-16T00:00:09.034",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.marker_sprite",
+      "started_at": "2026-04-16T00:00:09.034",
+      "ended_at": "2026-04-16T00:00:09.034",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.bucket_masks",
+      "started_at": "2026-04-16T00:00:09.034",
+      "ended_at": "2026-04-16T00:00:09.061",
+      "duration_ms": 27.025
+    },
+    {
+      "name": "build_route_cache.frame_states",
+      "started_at": "2026-04-16T00:00:09.061",
+      "ended_at": "2026-04-16T00:00:09.065",
+      "duration_ms": 4.014
+    },
+    {
+      "name": "build_route_cache",
+      "started_at": "2026-04-16T00:00:08.578",
+      "ended_at": "2026-04-16T00:00:09.065",
+      "duration_ms": 486.949
+    },
+    {
+      "name": "build_elevation_cache.geometry",
+      "started_at": "2026-04-16T00:00:09.065",
+      "ended_at": "2026-04-16T00:00:09.065",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.layers",
+      "started_at": "2026-04-16T00:00:09.065",
+      "ended_at": "2026-04-16T00:00:09.067",
+      "duration_ms": 1.994
+    },
+    {
+      "name": "build_elevation_cache.rotated_background_layer",
+      "started_at": "2026-04-16T00:00:09.067",
+      "ended_at": "2026-04-16T00:00:09.067",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.rotated_completed_layer",
+      "started_at": "2026-04-16T00:00:09.067",
+      "ended_at": "2026-04-16T00:00:09.067",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.marker_sprite",
+      "started_at": "2026-04-16T00:00:09.067",
+      "ended_at": "2026-04-16T00:00:09.067",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.frame_states",
+      "started_at": "2026-04-16T00:00:09.067",
+      "ended_at": "2026-04-16T00:00:09.068",
+      "duration_ms": 0.705
+    },
+    {
+      "name": "build_elevation_cache",
+      "started_at": "2026-04-16T00:00:09.065",
+      "ended_at": "2026-04-16T00:00:09.068",
+      "duration_ms": 2.994
+    },
+    {
+      "name": "create_base_image",
+      "started_at": "2026-04-16T00:00:09.068",
+      "ended_at": "2026-04-16T00:00:09.071",
+      "duration_ms": 3.002
+    },
+    {
+      "name": "draw_static_label:MPH",
+      "started_at": "2026-04-16T00:00:09.076",
+      "ended_at": "2026-04-16T00:00:09.080",
+      "duration_ms": 4.001
+    },
+    {
+      "name": "draw_static_label:KMH",
+      "started_at": "2026-04-16T00:00:09.080",
+      "ended_at": "2026-04-16T00:00:09.080",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "draw_static_label:Grad.",
+      "started_at": "2026-04-16T00:00:09.081",
+      "ended_at": "2026-04-16T00:00:09.081",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "prepare_render_assets.total",
+      "started_at": "2026-04-16T00:00:08.578",
+      "ended_at": "2026-04-16T00:00:09.081",
+      "duration_ms": 502.948
+    }
+  ]
+}

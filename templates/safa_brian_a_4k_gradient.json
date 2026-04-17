@@ -8,8 +8,13 @@
     "decimal_rounding": 0,
     "fps": 30,
     "opacity": 0.5,
-    "start": 0,
-    "end": 1000
+    "start": 600,
+    "end": 630,
+    "ffmpeg": {
+      "prores_profile": "4444",
+      "qscale": 4,
+      "threads": 0
+    }
   },
   "labels": [
     {

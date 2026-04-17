@@ -1,0 +1,40 @@
+{
+  "count": 900,
+  "sample": [
+    {
+      "progress01": 0.0,
+      "marker_x": 121.64468269895104,
+      "marker_y": 436.21106196442395,
+      "segment_index": 1,
+      "bucket_index": 0
+    },
+    {
+      "progress01": 0.2949139783070742,
+      "marker_x": 376.38863858753655,
+      "marker_y": 418.9602136429113,
+      "segment_index": 5,
+      "bucket_index": 37
+    },
+    {
+      "progress01": 0.5442367641723389,
+      "marker_x": 572.040507560637,
+      "marker_y": 500.6795260059475,
+      "segment_index": 8,
+      "bucket_index": 69
+    },
+    {
+      "progress01": 0.7823398583031389,
+      "marker_x": 703.5604772375411,
+      "marker_y": 658.5134484966192,
+      "segment_index": 13,
+      "bucket_index": 99
+    },
+    {
+      "progress01": 0.9991523226345975,
+      "marker_x": 870.3101556433787,
+      "marker_y": 740.3542410588357,
+      "segment_index": 16,
+      "bucket_index": 127
+    }
+  ]
+}

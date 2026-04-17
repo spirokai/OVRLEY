@@ -3,13 +3,11 @@ import sys
 print("DEBUG: gradient.py imports starting", file=sys.stderr)
 sys.stderr.flush()
 
-import gpxpy
 import numpy as np
 
 print("DEBUG: numpy in gradient imported", file=sys.stderr)
 sys.stderr.flush()
 
-from gpxpy.geo import Location
 from scipy.signal import savgol_filter
 
 print("DEBUG: scipy.signal imported", file=sys.stderr)
@@ -28,13 +26,45 @@ sys.stderr.flush()
 
 def gradient(point, previous_point):
     if previous_point:
-        location = Location(point.latitude, point.longitude, point.elevation)
-        previous_location = Location(
-            previous_point.latitude, previous_point.longitude, previous_point.elevation
+        if point.elevation is None or previous_point.elevation is None:
+            return None
+        horizontal_distance_m = point.distance_2d(previous_point) or 0.0
+        if horizontal_distance_m <= 0:
+            return 0.0
+        elevation_delta_m = point.elevation - previous_point.elevation
+        return (elevation_delta_m / horizontal_distance_m) * 100.0
+
+
+def derive_gradients(elevations, cumulative_distances_m):
+    if not elevations:
+        return []
+    if len(elevations) == 1 or len(cumulative_distances_m) != len(elevations):
+        return [0.0 for _ in elevations]
+
+    gradients = []
+    last_index = len(elevations) - 1
+    for index in range(len(elevations)):
+        if index == 0:
+            left_index = 0
+            right_index = 1
+        elif index == last_index:
+            left_index = last_index - 1
+            right_index = last_index
+        else:
+            left_index = index - 1
+            right_index = index + 1
+
+        horizontal_distance_m = (
+            cumulative_distances_m[right_index] - cumulative_distances_m[left_index]
         )
-        return gpxpy.geo.elevation_angle(
-            location1=previous_location, location2=location
-        )
+        if horizontal_distance_m <= 0:
+            gradients.append(0.0)
+            continue
+
+        elevation_delta_m = elevations[right_index] - elevations[left_index]
+        gradients.append((elevation_delta_m / horizontal_distance_m) * 100.0)
+
+    return gradients
 
 
 def handle_outliers(gradients):
@@ -77,5 +107,4 @@ def smooth_gradients(gradients):
     gradients.insert(0, 2 * gradients[0] - gradients[1])
     gradients = handle_outliers(gradients)
     gradients = lowess_smooth(gradients)
-    scale_factor = 1.747
-    return [ii * scale_factor for ii in gradients]
+    return gradients

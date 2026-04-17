@@ -119,11 +119,9 @@ def demo_frame(gpx_filename, config, second, headless=True):
         if "end" in configs["scene"]:
             end = configs["scene"]["end"]
         else:
-            attributes = activity.valid_attributes
-            if attributes:
-                end = len(getattr(activity, attributes[0]))
-            else:
-                logging.warning("No valid attributes found, using default end value")
+            end = activity.integer_duration_seconds()
+            if end <= 0:
+                logging.warning("No valid duration found, using default end value")
                 end = 69
     except Exception as e:
         logging.error("demo_frame")
@@ -156,18 +154,19 @@ def demo_frame(gpx_filename, config, second, headless=True):
     try:
         scene.build_figures()
         # Convert absolute second to relative second (after trim)
-        duration = end - start
+        duration = activity.duration_seconds()
         if duration <= 0:
             error_msg = f"Invalid duration: start={start}, end={end}. End must be greater than start."
             logging.error(f"demo_frame: {error_msg}")
             return {"error": error_msg, "error_code": "INVALID_DURATION"}
 
-        relative_second = max(0, min(second - start, duration - 1))
+        max_preview_second = max(0, int(duration) - 1)
+        relative_second = max(0, min(second - start, max_preview_second))
         logging.info(
             f"Rendering demo at second {second} (relative: {relative_second}, range: 0-{duration}, start={start}, end={end})"
         )
 
-        if relative_second < 0 or relative_second >= duration:
+        if relative_second < 0 or relative_second >= max(duration, 1):
             error_msg = f"Selected second {second} is outside the activity range ({start}-{end})"
             logging.error(f"demo_frame: {error_msg}")
             return {"error": error_msg, "error_code": "SECOND_OUT_OF_RANGE"}

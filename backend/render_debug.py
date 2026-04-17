@@ -76,7 +76,9 @@ class RenderPreparationTrace:
                 "name": name,
                 "started_at": started_at.isoformat(timespec="milliseconds"),
                 "ended_at": ended_at.isoformat(timespec="milliseconds"),
-                "duration_ms": round((ended_at.timestamp() - started_at.timestamp()) * 1000, 3),
+                "duration_ms": round(
+                    (ended_at.timestamp() - started_at.timestamp()) * 1000, 3
+                ),
             }
         )
 
@@ -118,9 +120,7 @@ class RenderDebugOptions:
                 constant.WRITE_DIR(), "debug_render", phase_name, timestamp
             )
 
-        save_sample_frames = enabled and debug_config.get(
-            "save_sample_frames", True
-        )
+        save_sample_frames = enabled and debug_config.get("save_sample_frames", True)
         write_timing_summary = enabled and debug_config.get(
             "write_timing_summary", True
         )
@@ -181,6 +181,7 @@ def build_timing_payload(
     total_frames,
     rendered_frames,
     sample_frame_indices,
+    total_time_taken=None,
 ):
     return {
         "phase": "phase_1",
@@ -191,6 +192,9 @@ def build_timing_payload(
         "height": scene_config.get("height"),
         "total_frames": total_frames,
         "rendered_frames": rendered_frames,
+        "total_time_taken": round(total_time_taken, 3)
+        if total_time_taken is not None
+        else None,
         "sample_frame_indices": sorted(sample_frame_indices),
         "timings": profiler.summary(),
     }

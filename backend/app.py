@@ -137,7 +137,7 @@ def load_gpx():
         from activity import Activity
 
         activity = Activity(dest_path)
-        duration_seconds = len(activity.time) if hasattr(activity, "time") else 0
+        duration_seconds = activity.integer_duration_seconds()
 
         logging.info(f"GPX loaded from path: {path}, duration: {duration_seconds}s")
 
@@ -168,8 +168,9 @@ def upload():
         # Analyze the GPX file to get metadata
         try:
             from activity import Activity
+
             activity = Activity(path)
-            duration_seconds = len(activity.time) if hasattr(activity, "time") else 0
+            duration_seconds = activity.integer_duration_seconds()
 
             logging.info(
                 f"GPX uploaded: {file.filename}, duration: {duration_seconds}s"
@@ -611,22 +612,22 @@ def render_video():
 
         # Create activity and scene
         activity = Activity(gpx_path)
-        scene = Scene(activity, config)
 
         # Get start and end from config, with defaults
         start = config.get("scene", {}).get("start", 0)
-        end = config.get("scene", {}).get("end", len(activity.time) - 1)
+        end = config.get("scene", {}).get("end", activity.integer_duration_seconds())
 
         # Trim and interpolate activity data
         activity.trim(start, end)
+        scene = Scene(activity, config)
         activity.interpolate(scene.fps)
 
         # Build figures if needed
         scene.build_figures()
 
         # Calculate total frames
-        duration = end - start
-        total_frames = duration * scene.fps
+        duration = activity.duration_seconds()
+        total_frames = scene.total_frame_count(duration)
         video_render_progress["total"] = total_frames
         video_render_progress["message"] = f"Rendering {total_frames} frames..."
 
@@ -655,7 +656,7 @@ def render_video():
         # Render the video
         logging.info(f"Rendering video from second {start} to {end}")
         scene.render_video(
-            end - start, progress_callback=update_progress, cancel_check=should_cancel
+            duration, progress_callback=update_progress, cancel_check=should_cancel
         )
 
         # Get the output filename from config or use default

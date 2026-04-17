@@ -1,0 +1,80 @@
+{
+  "phase": "phase_1",
+  "timestamp": "2026-04-15T23:12:40",
+  "overlay_filename": ".\\overlay.mov",
+  "fps": 30,
+  "width": 3840,
+  "height": 2160,
+  "total_frames": 900,
+  "rendered_frames": 900,
+  "total_time_taken": 40.259,
+  "sample_frame_indices": [
+    0,
+    225,
+    450,
+    674,
+    899
+  ],
+  "timings": {
+    "composite.elevation": {
+      "count": 900,
+      "total_ms": 6080.177,
+      "avg_ms": 6.756,
+      "max_ms": 21.115
+    },
+    "composite.route": {
+      "count": 900,
+      "total_ms": 8744.036,
+      "avg_ms": 9.716,
+      "max_ms": 34.908
+    },
+    "encoder.queue_wait": {
+      "count": 901,
+      "total_ms": 5743.864,
+      "avg_ms": 6.375,
+      "max_ms": 282.981
+    },
+    "encoder.serialize": {
+      "count": 900,
+      "total_ms": 27842.493,
+      "avg_ms": 30.936,
+      "max_ms": 72.794
+    },
+    "ffmpeg.write": {
+      "count": 900,
+      "total_ms": 3981.38,
+      "avg_ms": 4.424,
+      "max_ms": 32.7
+    },
+    "frame.draw": {
+      "count": 900,
+      "total_ms": 36371.215,
+      "avg_ms": 40.412,
+      "max_ms": 88.819
+    },
+    "frame.total": {
+      "count": 900,
+      "total_ms": 38833.462,
+      "avg_ms": 43.148,
+      "max_ms": 320.526
+    },
+    "queue.put_wait": {
+      "count": 900,
+      "total_ms": 27.164,
+      "avg_ms": 0.03,
+      "max_ms": 0.127
+    },
+    "text.dynamic": {
+      "count": 3600,
+      "total_ms": 3137.429,
+      "avg_ms": 0.872,
+      "max_ms": 18.393
+    },
+    "text.static.cache": {
+      "count": 3,
+      "total_ms": 6.011,
+      "avg_ms": 2.004,
+      "max_ms": 5.121
+    }
+  }
+}

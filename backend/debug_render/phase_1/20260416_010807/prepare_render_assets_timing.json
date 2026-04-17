@@ -1,0 +1,143 @@
+{
+  "started_at": "2026-04-16T01:08:07.345",
+  "events": [
+    {
+      "name": "build_font_cache",
+      "started_at": "2026-04-16T01:08:07.345",
+      "ended_at": "2026-04-16T01:08:07.345",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.geometry",
+      "started_at": "2026-04-16T01:08:07.345",
+      "ended_at": "2026-04-16T01:08:07.348",
+      "duration_ms": 2.991
+    },
+    {
+      "name": "build_route_cache.layers",
+      "started_at": "2026-04-16T01:08:07.348",
+      "ended_at": "2026-04-16T01:08:07.486",
+      "duration_ms": 138.055
+    },
+    {
+      "name": "build_route_cache.rotated_background_layer",
+      "started_at": "2026-04-16T01:08:07.486",
+      "ended_at": "2026-04-16T01:08:07.486",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.rotated_completed_layer",
+      "started_at": "2026-04-16T01:08:07.486",
+      "ended_at": "2026-04-16T01:08:07.486",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.display_points",
+      "started_at": "2026-04-16T01:08:07.486",
+      "ended_at": "2026-04-16T01:08:07.486",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.marker_sprite",
+      "started_at": "2026-04-16T01:08:07.486",
+      "ended_at": "2026-04-16T01:08:07.487",
+      "duration_ms": 0.998
+    },
+    {
+      "name": "build_route_cache.bucket_masks",
+      "started_at": "2026-04-16T01:08:07.487",
+      "ended_at": "2026-04-16T01:08:07.506",
+      "duration_ms": 19.009
+    },
+    {
+      "name": "build_route_cache.frame_states",
+      "started_at": "2026-04-16T01:08:07.506",
+      "ended_at": "2026-04-16T01:08:07.620",
+      "duration_ms": 114.085
+    },
+    {
+      "name": "build_route_cache",
+      "started_at": "2026-04-16T01:08:07.345",
+      "ended_at": "2026-04-16T01:08:07.620",
+      "duration_ms": 275.138
+    },
+    {
+      "name": "build_elevation_cache.geometry",
+      "started_at": "2026-04-16T01:08:07.620",
+      "ended_at": "2026-04-16T01:08:07.620",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.layers",
+      "started_at": "2026-04-16T01:08:07.620",
+      "ended_at": "2026-04-16T01:08:07.625",
+      "duration_ms": 5.008
+    },
+    {
+      "name": "build_elevation_cache.rotated_background_layer",
+      "started_at": "2026-04-16T01:08:07.625",
+      "ended_at": "2026-04-16T01:08:07.625",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.rotated_completed_layer",
+      "started_at": "2026-04-16T01:08:07.625",
+      "ended_at": "2026-04-16T01:08:07.625",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.marker_sprite",
+      "started_at": "2026-04-16T01:08:07.625",
+      "ended_at": "2026-04-16T01:08:07.625",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.frame_states",
+      "started_at": "2026-04-16T01:08:07.625",
+      "ended_at": "2026-04-16T01:08:07.708",
+      "duration_ms": 82.615
+    },
+    {
+      "name": "build_elevation_cache",
+      "started_at": "2026-04-16T01:08:07.620",
+      "ended_at": "2026-04-16T01:08:07.708",
+      "duration_ms": 87.623
+    },
+    {
+      "name": "create_base_image",
+      "started_at": "2026-04-16T01:08:07.708",
+      "ended_at": "2026-04-16T01:08:07.712",
+      "duration_ms": 4.001
+    },
+    {
+      "name": "draw_static_label:MPH",
+      "started_at": "2026-04-16T01:08:07.712",
+      "ended_at": "2026-04-16T01:08:07.718",
+      "duration_ms": 6.067
+    },
+    {
+      "name": "draw_static_label:PWR",
+      "started_at": "2026-04-16T01:08:07.718",
+      "ended_at": "2026-04-16T01:08:07.718",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "draw_static_label:RPM",
+      "started_at": "2026-04-16T01:08:07.718",
+      "ended_at": "2026-04-16T01:08:07.718",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "draw_static_label:BPM",
+      "started_at": "2026-04-16T01:08:07.718",
+      "ended_at": "2026-04-16T01:08:07.719",
+      "duration_ms": 0.934
+    },
+    {
+      "name": "prepare_render_assets.total",
+      "started_at": "2026-04-16T01:08:07.345",
+      "ended_at": "2026-04-16T01:08:07.779",
+      "duration_ms": 433.873
+    }
+  ]
+}

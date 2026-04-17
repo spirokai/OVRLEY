@@ -39,6 +39,7 @@ export function applyGlobalDefaults(config, globals) {
     newConfig.values.forEach((value) => {
       if (!value.font) value.font = globals.font_values
       if (!value.color) value.color = globals.color_values
+      if (value.icon_color === undefined) value.icon_color = globals.color_icons
       if (value.opacity === undefined) value.opacity = globals.opacity
 
       // Shadow & Border fallbacks
@@ -80,4 +81,108 @@ export function applyGlobalDefaults(config, globals) {
   }
 
   return newConfig
+}
+
+export function syncGlobalDefaultsToConfig(
+  config,
+  globals,
+  changedKeys = null,
+) {
+  if (!config || !globals) return config
+
+  const changedKeySet = changedKeys ? new Set(changedKeys) : null
+  const shouldApply = (key) => !changedKeySet || changedKeySet.has(key)
+  const nextConfig = JSON.parse(JSON.stringify(config))
+
+  if (nextConfig.labels) {
+    nextConfig.labels.forEach((label) => {
+      if (shouldApply('font_text')) {
+        label.font = globals.font_text
+        label.font_family = globals.font_text
+      }
+      if (shouldApply('color_text')) {
+        label.color = globals.color_text
+      }
+      if (shouldApply('border_color')) {
+        label.border_color = globals.border_color
+      }
+      if (shouldApply('border_thickness')) {
+        label.border_thickness = globals.border_thickness
+      }
+      if (shouldApply('border_strength')) {
+        label.border_strength = globals.border_strength
+      }
+      if (shouldApply('border_distance')) {
+        label.border_distance = globals.border_distance
+      }
+      if (shouldApply('shadow_color')) {
+        label.shadow_color = globals.shadow_color
+      }
+      if (shouldApply('shadow_strength')) {
+        label.shadow_strength = globals.shadow_strength
+      }
+      if (shouldApply('shadow_distance')) {
+        label.shadow_distance = globals.shadow_distance
+      }
+    })
+  }
+
+  if (nextConfig.values) {
+    nextConfig.values.forEach((value) => {
+      if (shouldApply('font_values')) {
+        value.font = globals.font_values
+        value.font_family = globals.font_values
+      }
+      if (shouldApply('color_values')) {
+        value.color = globals.color_values
+      }
+      if (shouldApply('color_icons') && Object.hasOwn(value, 'icon_color')) {
+        value.icon_color = globals.color_icons
+      }
+      if (shouldApply('border_color')) {
+        value.border_color = globals.border_color
+      }
+      if (shouldApply('border_thickness')) {
+        value.border_thickness = globals.border_thickness
+      }
+      if (shouldApply('border_strength')) {
+        value.border_strength = globals.border_strength
+      }
+      if (shouldApply('border_distance')) {
+        value.border_distance = globals.border_distance
+      }
+      if (shouldApply('shadow_color')) {
+        value.shadow_color = globals.shadow_color
+      }
+      if (shouldApply('shadow_strength')) {
+        value.shadow_strength = globals.shadow_strength
+      }
+      if (shouldApply('shadow_distance')) {
+        value.shadow_distance = globals.shadow_distance
+      }
+    })
+  }
+
+  if (nextConfig.plots) {
+    nextConfig.plots.forEach((plot) => {
+      if (shouldApply('color_values') && Object.hasOwn(plot, 'color')) {
+        plot.color = globals.color_values
+      }
+      if (shouldApply('shadow_color')) {
+        plot.shadow_color = globals.shadow_color
+      }
+      if (shouldApply('shadow_strength')) {
+        plot.shadow_strength = globals.shadow_strength
+      }
+      if (shouldApply('shadow_distance')) {
+        plot.shadow_distance = globals.shadow_distance
+      }
+    })
+  }
+
+  if (nextConfig.scene && shouldApply('scale')) {
+    nextConfig.scene.scale = globals.scale
+  }
+
+  return nextConfig
 }

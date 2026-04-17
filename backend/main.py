@@ -9,12 +9,12 @@ from template import build_configs
 def render_overlay(gpx_filename, template_filename):
     activity = Activity(gpx_filename)
     template = build_configs(template_filename)
-    scene = Scene(activity, template)
     start, end = template["scene"]["start"], template["scene"]["end"]
     activity.trim(start, end)
+    scene = Scene(activity, template)
     activity.interpolate(scene.fps)
     scene.build_figures()
-    scene.render_video(end - start)
+    scene.render_video(activity.duration_seconds())
 
 
 if __name__ == "__main__":

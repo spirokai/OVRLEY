@@ -345,3 +345,23 @@ export async function saveTemplate(filename, config) {
 export async function openTemplatesFolder() {
   return apiCall('POST', 'backend_open_templates', {}, '/api/open-templates')
 }
+
+export async function getDefaultTemplateSavePath(filename) {
+  const invoke = await getInvoke()
+  if (!invoke) {
+    throw new Error(
+      'Native template save path is only available in desktop app',
+    )
+  }
+
+  return invoke('default_template_save_path', { filename })
+}
+
+export async function writeTemplateFile(path, contents) {
+  const invoke = await getInvoke()
+  if (!invoke) {
+    throw new Error('Native template save is only available in desktop app')
+  }
+
+  return invoke('write_template_file', { path, contents })
+}

@@ -1,0 +1,131 @@
+{
+  "started_at": "2026-04-15T23:02:20.328",
+  "events": [
+    {
+      "name": "build_font_cache",
+      "started_at": "2026-04-15T23:02:20.328",
+      "ended_at": "2026-04-15T23:02:20.328",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.geometry",
+      "started_at": "2026-04-15T23:02:20.328",
+      "ended_at": "2026-04-15T23:02:20.330",
+      "duration_ms": 2.0
+    },
+    {
+      "name": "build_route_cache.layers",
+      "started_at": "2026-04-15T23:02:20.330",
+      "ended_at": "2026-04-15T23:02:20.639",
+      "duration_ms": 309.071
+    },
+    {
+      "name": "build_route_cache.rotated_background_layer",
+      "started_at": "2026-04-15T23:02:20.639",
+      "ended_at": "2026-04-15T23:02:20.710",
+      "duration_ms": 71.015
+    },
+    {
+      "name": "build_route_cache.rotated_completed_layer",
+      "started_at": "2026-04-15T23:02:20.710",
+      "ended_at": "2026-04-15T23:02:20.784",
+      "duration_ms": 74.017
+    },
+    {
+      "name": "build_route_cache.display_points",
+      "started_at": "2026-04-15T23:02:20.784",
+      "ended_at": "2026-04-15T23:02:20.784",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.marker_sprite",
+      "started_at": "2026-04-15T23:02:20.784",
+      "ended_at": "2026-04-15T23:02:20.785",
+      "duration_ms": 1.0
+    },
+    {
+      "name": "build_route_cache.frame_states",
+      "started_at": "2026-04-15T23:02:20.785",
+      "ended_at": "2026-04-15T23:02:20.790",
+      "duration_ms": 5.001
+    },
+    {
+      "name": "build_route_cache",
+      "started_at": "2026-04-15T23:02:20.328",
+      "ended_at": "2026-04-15T23:02:20.790",
+      "duration_ms": 462.104
+    },
+    {
+      "name": "build_elevation_cache.geometry",
+      "started_at": "2026-04-15T23:02:20.790",
+      "ended_at": "2026-04-15T23:02:20.791",
+      "duration_ms": 1.001
+    },
+    {
+      "name": "build_elevation_cache.layers",
+      "started_at": "2026-04-15T23:02:20.791",
+      "ended_at": "2026-04-15T23:02:20.795",
+      "duration_ms": 4.0
+    },
+    {
+      "name": "build_elevation_cache.rotated_background_layer",
+      "started_at": "2026-04-15T23:02:20.795",
+      "ended_at": "2026-04-15T23:02:20.795",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.rotated_completed_layer",
+      "started_at": "2026-04-15T23:02:20.795",
+      "ended_at": "2026-04-15T23:02:20.795",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.marker_sprite",
+      "started_at": "2026-04-15T23:02:20.795",
+      "ended_at": "2026-04-15T23:02:20.795",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.frame_states",
+      "started_at": "2026-04-15T23:02:20.795",
+      "ended_at": "2026-04-15T23:02:20.796",
+      "duration_ms": 1.001
+    },
+    {
+      "name": "build_elevation_cache",
+      "started_at": "2026-04-15T23:02:20.790",
+      "ended_at": "2026-04-15T23:02:20.796",
+      "duration_ms": 6.002
+    },
+    {
+      "name": "create_base_image",
+      "started_at": "2026-04-15T23:02:20.796",
+      "ended_at": "2026-04-15T23:02:20.800",
+      "duration_ms": 4.001
+    },
+    {
+      "name": "draw_static_label:MPH",
+      "started_at": "2026-04-15T23:02:20.804",
+      "ended_at": "2026-04-15T23:02:20.809",
+      "duration_ms": 5.002
+    },
+    {
+      "name": "draw_static_label:KMH",
+      "started_at": "2026-04-15T23:02:20.809",
+      "ended_at": "2026-04-15T23:02:20.809",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "draw_static_label:Grad.",
+      "started_at": "2026-04-15T23:02:20.809",
+      "ended_at": "2026-04-15T23:02:20.810",
+      "duration_ms": 1.0
+    },
+    {
+      "name": "prepare_render_assets.total",
+      "started_at": "2026-04-15T23:02:20.328",
+      "ended_at": "2026-04-15T23:02:20.810",
+      "duration_ms": 482.109
+    }
+  ]
+}

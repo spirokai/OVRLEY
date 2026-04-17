@@ -1,32 +1,6 @@
-import { useState, useMemo, useEffect } from 'react'
-import {
-  Gauge,
-  Mountain,
-  Map,
-  TrendingUp,
-  Tag,
-  Trash2,
-  Clock,
-  Zap,
-  Activity,
-  RotateCcw,
-  Move,
-  Type,
-  Palette,
-  Timer,
-  Thermometer,
-} from 'lucide-react'
-import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
-import { BlurInput } from '@/components/ui/blur-input'
-import { Slider } from '@/components/ui/slider'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { useEffect, useMemo, useState } from 'react'
+import { RotateCcw, Tag, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import {
   Accordion,
@@ -35,164 +9,202 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import useStore from '../store/useStore'
-import { Button } from '@/components/ui/button'
+import ElevationWidgetEditor from './widgets/ElevationWidgetEditor'
+import GradientWidgetEditor from './widgets/GradientWidgetEditor'
+import MetricWidgetEditor from './widgets/MetricWidgetEditor'
+import RouteMapWidgetEditor from './widgets/RouteMapWidgetEditor'
+import TemperatureWidgetEditor from './widgets/TemperatureWidgetEditor'
+import TextWidgetEditor from './widgets/TextWidgetEditor'
+import TimeWidgetEditor from './widgets/TimeWidgetEditor'
+import {
+  createLabelDefaults,
+  createMetricValueDefaults,
+  createPlotDefaults,
+  clamp,
+  parseInteger,
+  QUICKMENU_ITEMS,
+  TYPE_ICONS,
+  TYPE_LABELS,
+} from './widgets/widgetDefinitions'
+import { PositionSection } from './widgets/widgetEditorSections'
 
-const QUICKMENU_ITEMS = [
-  { type: 'label', icon: Type, label: 'Text' },
-  { type: 'speed', icon: Gauge, label: 'Speed' },
-  { type: 'elevation', icon: Mountain, label: 'Elev.' },
-  { type: 'heartrate', icon: Activity, label: 'HR' },
-  { type: 'power', icon: Zap, label: 'Power' },
-  { type: 'cadence', icon: Timer, label: 'Cadence' },
-  { type: 'time', icon: Clock, label: 'Time' },
-  { type: 'temperature', icon: Thermometer, label: 'Temp.' },
-  { type: 'gradient', icon: TrendingUp, label: 'Grad.' },
-  { type: 'course', icon: Map, label: 'Map' },
-]
+function renderWidgetEditor(widget, updateWidgetData, setNumericField) {
+  if (widget.type === 'label') {
+    return (
+      <TextWidgetEditor widget={widget} updateWidgetData={updateWidgetData} />
+    )
+  }
 
-const TYPE_LABELS = {
-  label: 'Text',
-  speed: 'Speed',
-  elevation: 'Elevation',
-  heartrate: 'Heart Rate',
-  power: 'Power',
-  cadence: 'Cadence',
-  time: 'Time',
-  temperature: 'Temperature',
-  gradient: 'Gradient',
-  course: 'Route Map',
+  if (['speed', 'heartrate', 'cadence', 'power'].includes(widget.type)) {
+    return (
+      <MetricWidgetEditor
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        setNumericField={setNumericField}
+      />
+    )
+  }
+
+  if (widget.type === 'time') {
+    return (
+      <TimeWidgetEditor
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        setNumericField={setNumericField}
+      />
+    )
+  }
+
+  if (widget.type === 'temperature') {
+    return (
+      <TemperatureWidgetEditor
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        setNumericField={setNumericField}
+      />
+    )
+  }
+
+  if (widget.type === 'gradient') {
+    return (
+      <GradientWidgetEditor
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+      />
+    )
+  }
+
+  if (widget.type === 'course') {
+    return (
+      <RouteMapWidgetEditor
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        setNumericField={setNumericField}
+      />
+    )
+  }
+
+  if (widget.type === 'elevation') {
+    return (
+      <ElevationWidgetEditor
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        setNumericField={setNumericField}
+      />
+    )
+  }
+
+  return null
 }
-
-const TYPE_ICONS = {
-  label: Type,
-  speed: Gauge,
-  elevation: Mountain,
-  heartrate: Activity,
-  power: Zap,
-  cadence: Timer,
-  time: Clock,
-  temperature: Thermometer,
-  gradient: TrendingUp,
-  course: Map,
-}
-
-const FONTS = [
-  { id: 'Arial.ttf', name: 'Arial' },
-  { id: 'Evogria.otf', name: 'Evogria' },
-  { id: 'Furore.otf', name: 'Furore' },
-]
 
 export default function SidebarWidgetsTab() {
-  const { config, setConfig } = useStore()
+  const { config, setConfig, globalDefaults } = useStore()
   const [activeWidgetId, setActiveWidgetId] = useState(null)
 
-  // Flatten and group widgets
   const widgets = useMemo(() => {
     if (!config) return []
+
     const all = []
 
-    // Labels
-    ;(config.labels || []).forEach((item, i) => {
+    ;(config.labels || []).forEach((item, index) => {
       all.push({
-        id: `label-${i}`,
+        id: `label-${index}`,
         type: 'label',
         category: 'labels',
-        index: i,
+        index,
         name: item.text || 'Text',
         data: item,
       })
     })
-
-    // Values
-    ;(config.values || []).forEach((item, i) => {
+    ;(config.values || []).forEach((item, index) => {
       all.push({
-        id: `value-${i}`,
+        id: `value-${index}`,
         type: item.value,
         category: 'values',
-        index: i,
+        index,
+        name: TYPE_LABELS[item.value] || item.value,
+        data: item,
+      })
+    })
+    ;(config.plots || []).forEach((item, index) => {
+      all.push({
+        id: `plot-${index}`,
+        type: item.value,
+        category: 'plots',
+        index,
         name: TYPE_LABELS[item.value] || item.value,
         data: item,
       })
     })
 
-    // Plots
-    ;(config.plots || []).forEach((item, i) => {
-      all.push({
-        id: `plot-${i}`,
-        type: item.value,
-        category: 'plots',
-        index: i,
-        name: `${TYPE_LABELS[item.value] || item.value} Chart`,
-        data: item,
-      })
-    })
-
-    // Group by type and sort alphabetically by type name
-    const grouped = all.reduce((acc, widget) => {
+    const grouped = all.reduce((accumulator, widget) => {
       const typeName = TYPE_LABELS[widget.type] || widget.type
-      if (!acc[typeName]) acc[typeName] = []
-      acc[typeName].push(widget)
-      return acc
+      if (!accumulator[typeName]) accumulator[typeName] = []
+      accumulator[typeName].push(widget)
+      return accumulator
     }, {})
 
-    // Sort group names alphabetically
-    const sortedTypes = Object.keys(grouped).sort()
-
-    // Flatten back with group info
-    const result = []
-    sortedTypes.forEach((typeName, idx) => {
-      grouped[typeName].forEach((widget) => {
-        result.push({
+    return Object.keys(grouped)
+      .sort()
+      .flatMap((typeName, groupIndex) =>
+        grouped[typeName].map((widget, widgetIndex) => ({
           ...widget,
-          isFirstInGroup: widget === grouped[typeName][0],
-          isLastInGroup:
-            widget === grouped[typeName][grouped[typeName].length - 1],
-          showSeparator: idx > 0 && widget === grouped[typeName][0],
-        })
-      })
-    })
-
-    return result
+          showSeparator: groupIndex > 0 && widgetIndex === 0,
+        })),
+      )
   }, [config])
 
-  // Set default active widget ONLY when the list changes or on mount
   useEffect(() => {
-    if (widgets.length > 0) {
-      if (!activeWidgetId) {
-        setActiveWidgetId(widgets[0].id)
-      } else {
-        // Ensure the activeWidgetId still exists
-        if (!widgets.find((w) => w.id === activeWidgetId)) {
-          setActiveWidgetId(widgets[0].id)
-        }
-      }
+    if (widgets.length === 0) {
+      if (activeWidgetId !== null) setActiveWidgetId(null)
+      return
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widgets.length]) // Removed activeWidgetId from deps to allow manual collapse
+
+    if (!activeWidgetId) {
+      setActiveWidgetId(widgets[widgets.length - 1].id)
+      return
+    }
+
+    if (!widgets.some((widget) => widget.id === activeWidgetId)) {
+      setActiveWidgetId(widgets[0].id)
+    }
+  }, [widgets, activeWidgetId])
+
+  const updateWidgetData = (id, updates) => {
+    const widget = widgets.find((item) => item.id === id)
+    if (!widget) return
+
+    const nextConfig = JSON.parse(JSON.stringify(config))
+    nextConfig[widget.category][widget.index] = {
+      ...nextConfig[widget.category][widget.index],
+      ...updates,
+    }
+    setConfig(nextConfig)
+  }
+
+  const setNumericField = (widgetId, key, rawValue, options = {}) => {
+    const { fallback = 0, min, max } = options
+    const parsed = parseInteger(rawValue, fallback)
+    const nextValue =
+      min !== undefined || max !== undefined
+        ? clamp(parsed, min ?? parsed, max ?? parsed)
+        : parsed
+
+    updateWidgetData(widgetId, { [key]: nextValue })
+  }
 
   const addWidget = (type) => {
-    const newConfig = JSON.parse(JSON.stringify(config))
+    const nextConfig = JSON.parse(JSON.stringify(config))
     let newId = ''
 
     if (type === 'label') {
-      if (!newConfig.labels) newConfig.labels = []
-      const newItem = {
-        x: 100,
-        y: 100,
-        font_size: 60,
-        text: 'New Text',
-        font_family: 'Arial.ttf',
-        color: '#ffffff',
-        opacity: 1,
-      }
-      newConfig.labels.push(newItem)
-      newId = `label-${newConfig.labels.length - 1}`
+      if (!nextConfig.labels) nextConfig.labels = []
+      nextConfig.labels.push(createLabelDefaults(globalDefaults))
+      newId = `label-${nextConfig.labels.length - 1}`
     } else if (
       [
         'speed',
-        'elevation',
         'gradient',
-        'course',
         'heartrate',
         'power',
         'cadence',
@@ -200,110 +212,52 @@ export default function SidebarWidgetsTab() {
         'temperature',
       ].includes(type)
     ) {
-      if (['course', 'elevation', 'gradient'].includes(type)) {
-        if (!newConfig.plots) newConfig.plots = []
-        const newItem = {
-          value: type,
-          x: 100,
-          y: 100,
-          width: 400,
-          height: 200,
-          color: '#ffffff',
-          opacity: 1,
-        }
-        newConfig.plots.push(newItem)
-        newId = `plot-${newConfig.plots.length - 1}`
-      } else {
-        if (!newConfig.values) newConfig.values = []
-        const newItem = {
-          x: 100,
-          y: 100,
-          font_size: 100,
-          value: type,
-          unit: 'metric',
-          font_family: 'Furore.otf',
-          color: '#ffffff',
-          opacity: 1,
-          prefix: '',
-          suffix: '',
-          decimals: 0,
-        }
-        newConfig.values.push(newItem)
-        newId = `value-${newConfig.values.length - 1}`
-      }
+      if (!nextConfig.values) nextConfig.values = []
+      nextConfig.values.push(createMetricValueDefaults(type, globalDefaults))
+      newId = `value-${nextConfig.values.length - 1}`
+    } else if (['course', 'elevation'].includes(type)) {
+      if (!nextConfig.plots) nextConfig.plots = []
+      nextConfig.plots.push(createPlotDefaults(type, globalDefaults))
+      newId = `plot-${nextConfig.plots.length - 1}`
     }
 
-    setConfig(newConfig)
+    setConfig(nextConfig)
     if (newId) setActiveWidgetId(newId)
   }
 
   const deleteWidget = (id) => {
-    const widget = widgets.find((w) => w.id === id)
+    const widget = widgets.find((item) => item.id === id)
     if (!widget) return
 
-    const newConfig = JSON.parse(JSON.stringify(config))
-    newConfig[widget.category] = newConfig[widget.category].filter(
-      (_, i) => i !== widget.index,
+    const nextConfig = JSON.parse(JSON.stringify(config))
+    nextConfig[widget.category] = nextConfig[widget.category].filter(
+      (_, index) => index !== widget.index,
     )
 
-    setConfig(newConfig)
-  }
-
-  const updateWidgetData = (id, updates) => {
-    const widget = widgets.find((w) => w.id === id)
-    if (!widget) return
-
-    const newConfig = JSON.parse(JSON.stringify(config))
-    newConfig[widget.category][widget.index] = {
-      ...newConfig[widget.category][widget.index],
-      ...updates,
-    }
-    setConfig(newConfig)
+    setConfig(nextConfig)
   }
 
   const resetWidget = (id) => {
-    const widget = widgets.find((w) => w.id === id)
+    const widget = widgets.find((item) => item.id === id)
     if (!widget) return
 
-    let defaults = { x: 100, y: 100 }
     if (widget.type === 'label') {
-      defaults = {
-        ...defaults,
-        font_size: 60,
-        text: 'Text',
-        font_family: 'Arial.ttf',
-        color: '#ffffff',
-        opacity: 1,
-      }
-    } else if (widget.category === 'plots') {
-      defaults = {
-        ...defaults,
-        width: 400,
-        height: 200,
-        color: '#ffffff',
-        opacity: 1,
-      }
-    } else {
-      defaults = {
-        ...defaults,
-        font_size: 100,
-        font_family: 'Furore.otf',
-        color: '#ffffff',
-        opacity: 1,
-        prefix: '',
-        suffix: '',
-        decimals: 0,
-      }
+      updateWidgetData(id, createLabelDefaults(globalDefaults))
+      return
     }
 
-    updateWidgetData(id, defaults)
+    if (widget.type === 'course' || widget.type === 'elevation') {
+      updateWidgetData(id, createPlotDefaults(widget.type, globalDefaults))
+      return
+    }
+
+    updateWidgetData(id, createMetricValueDefaults(widget.type, globalDefaults))
   }
 
   if (!config) return null
 
   return (
     <div className="space-y-6">
-      {/* Quickmenu */}
       <div className="space-y-3">
         <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
           Quick Add
@@ -325,7 +279,6 @@ export default function SidebarWidgetsTab() {
 
       <Separator className="bg-zinc-800/50" />
 
-      {/* Widget Accordion */}
       <div className="space-y-3">
         <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
           Active Widgets
@@ -340,18 +293,20 @@ export default function SidebarWidgetsTab() {
         ) : (
           <Accordion
             type="single"
-            collapsible
-            value={activeWidgetId}
-            onValueChange={setActiveWidgetId}
+            value={activeWidgetId || undefined}
+            onValueChange={(value) =>
+              setActiveWidgetId(value || widgets[0]?.id || null)
+            }
             className="space-y-1"
           >
             {widgets.map((widget) => {
               const Icon = TYPE_ICONS[widget.type] || Tag
+
               return (
                 <div key={widget.id}>
-                  {widget.showSeparator && (
+                  {widget.showSeparator ? (
                     <Separator className="my-3 bg-zinc-800/30" />
-                  )}
+                  ) : null}
                   <AccordionItem
                     value={widget.id}
                     className="border border-zinc-800/50 rounded-lg bg-zinc-900/30 overflow-hidden data-[state=open]:border-red-500/30 data-[state=open]:bg-red-500/5 transition-all"
@@ -366,9 +321,6 @@ export default function SidebarWidgetsTab() {
                             <span className="text-xs font-semibold text-zinc-200 truncate w-full text-left">
                               {widget.name}
                             </span>
-                            {/* <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-bold">
-                              {widget.category.slice(0, -1)}
-                            </span> */}
                           </div>
                         </div>
                       </AccordionTrigger>
@@ -377,8 +329,8 @@ export default function SidebarWidgetsTab() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-zinc-500 hover:text-red-500 hover:bg-red-500/10"
-                          onClick={(e) => {
-                            e.stopPropagation()
+                          onClick={(event) => {
+                            event.stopPropagation()
                             deleteWidget(widget.id)
                           }}
                         >
@@ -399,327 +351,15 @@ export default function SidebarWidgetsTab() {
                         </Button>
 
                         <div className="space-y-4 pt-2">
-                          {/* Position Controls */}
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <Move className="h-3.5 w-3.5 text-red-500" />
-                              <h5 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                Position
-                              </h5>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1">
-                                <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                  X Position
-                                </Label>
-                                <BlurInput
-                                  type="number"
-                                  value={widget.data.x}
-                                  onChange={(e) =>
-                                    updateWidgetData(widget.id, {
-                                      x: parseInt(e.target.value) || 0,
-                                    })
-                                  }
-                                  className="h-8 text-xs bg-zinc-950/50 border-zinc-800"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                  Y Position
-                                </Label>
-                                <BlurInput
-                                  type="number"
-                                  value={widget.data.y}
-                                  onChange={(e) =>
-                                    updateWidgetData(widget.id, {
-                                      y: parseInt(e.target.value) || 0,
-                                    })
-                                  }
-                                  className="h-8 text-xs bg-zinc-950/50 border-zinc-800"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Dimensions for Plots */}
-                          {widget.category === 'plots' && (
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2">
-                                <TrendingUp className="h-3.5 w-3.5 text-red-500" />
-                                <h5 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                  Dimensions
-                                </h5>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                  <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                    Width
-                                  </Label>
-                                  <BlurInput
-                                    type="number"
-                                    value={widget.data.width}
-                                    onChange={(e) =>
-                                      updateWidgetData(widget.id, {
-                                        width: parseInt(e.target.value) || 0,
-                                      })
-                                    }
-                                    className="h-8 text-xs bg-zinc-950/50 border-zinc-800"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                    Height
-                                  </Label>
-                                  <BlurInput
-                                    type="number"
-                                    value={widget.data.height}
-                                    onChange={(e) =>
-                                      updateWidgetData(widget.id, {
-                                        height: parseInt(e.target.value) || 0,
-                                      })
-                                    }
-                                    className="h-8 text-xs bg-zinc-950/50 border-zinc-800"
-                                  />
-                                </div>
-                              </div>
-                            </div>
+                          <PositionSection
+                            widget={widget}
+                            setNumericField={setNumericField}
+                          />
+                          {renderWidgetEditor(
+                            widget,
+                            updateWidgetData,
+                            setNumericField,
                           )}
-
-                          {/* Typography for Labels and Values */}
-                          {(widget.category === 'labels' ||
-                            widget.category === 'values') && (
-                            <div className="space-y-4">
-                              <div className="flex items-center gap-2">
-                                <Type className="h-3.5 w-3.5 text-red-500" />
-                                <h5 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                  Content & Font
-                                </h5>
-                              </div>
-
-                              {widget.type === 'label' && (
-                                <div className="space-y-1">
-                                  <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                    Text Content
-                                  </Label>
-                                  <BlurInput
-                                    value={widget.data.text}
-                                    onChange={(e) =>
-                                      updateWidgetData(widget.id, {
-                                        text: e.target.value,
-                                      })
-                                    }
-                                    className="h-8 text-xs bg-zinc-950/50 border-zinc-800"
-                                  />
-                                </div>
-                              )}
-
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                  <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                    Font Family
-                                  </Label>
-                                  <Select
-                                    value={
-                                      widget.data.font_family || 'Arial.ttf'
-                                    }
-                                    onValueChange={(v) =>
-                                      updateWidgetData(widget.id, {
-                                        font_family: v,
-                                      })
-                                    }
-                                  >
-                                    <SelectTrigger className="h-8 text-xs bg-zinc-950/50 border-zinc-800">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {FONTS.map((f) => (
-                                        <SelectItem key={f.id} value={f.id}>
-                                          {f.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                    Font Size
-                                  </Label>
-                                  <BlurInput
-                                    type="number"
-                                    value={widget.data.font_size}
-                                    onChange={(e) =>
-                                      updateWidgetData(widget.id, {
-                                        font_size:
-                                          parseInt(e.target.value) || 8,
-                                      })
-                                    }
-                                    className="h-8 text-xs bg-zinc-950/50 border-zinc-800"
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Slider
-                                  min={8}
-                                  max={300}
-                                  step={1}
-                                  value={[widget.data.font_size]}
-                                  onValueChange={([v]) =>
-                                    updateWidgetData(widget.id, {
-                                      font_size: v,
-                                    })
-                                  }
-                                  className="py-2"
-                                />
-                              </div>
-
-                              {widget.category === 'values' && (
-                                <>
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1">
-                                      <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                        Prefix
-                                      </Label>
-                                      <BlurInput
-                                        value={widget.data.prefix || ''}
-                                        onChange={(e) =>
-                                          updateWidgetData(widget.id, {
-                                            prefix: e.target.value,
-                                          })
-                                        }
-                                        className="h-8 text-xs bg-zinc-950/50 border-zinc-800"
-                                        placeholder="e.g. Speed:"
-                                      />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                        Suffix
-                                      </Label>
-                                      <BlurInput
-                                        value={widget.data.suffix || ''}
-                                        onChange={(e) =>
-                                          updateWidgetData(widget.id, {
-                                            suffix: e.target.value,
-                                          })
-                                        }
-                                        className="h-8 text-xs bg-zinc-950/50 border-zinc-800"
-                                        placeholder="e.g. km/h"
-                                      />
-                                    </div>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1">
-                                      <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                        Decimals
-                                      </Label>
-                                      <BlurInput
-                                        type="number"
-                                        min={0}
-                                        max={3}
-                                        value={widget.data.decimals ?? 0}
-                                        onChange={(e) =>
-                                          updateWidgetData(widget.id, {
-                                            decimals:
-                                              parseInt(e.target.value) || 0,
-                                          })
-                                        }
-                                        className="h-8 text-xs bg-zinc-950/50 border-zinc-800"
-                                      />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                        Unit System
-                                      </Label>
-                                      <Select
-                                        value={widget.data.unit || 'metric'}
-                                        onValueChange={(v) =>
-                                          updateWidgetData(widget.id, {
-                                            unit: v,
-                                          })
-                                        }
-                                      >
-                                        <SelectTrigger className="h-8 text-xs bg-zinc-950/50 border-zinc-800">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="metric">
-                                            Metric
-                                          </SelectItem>
-                                          <SelectItem value="imperial">
-                                            Imperial
-                                          </SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Appearance / Colors */}
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <Palette className="h-3.5 w-3.5 text-red-500" />
-                              <h5 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                                Appearance
-                              </h5>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-2">
-                                <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                  Color
-                                </Label>
-                                <div className="flex gap-2">
-                                  <Input
-                                    type="color"
-                                    value={widget.data.color || '#ffffff'}
-                                    onChange={(e) =>
-                                      updateWidgetData(widget.id, {
-                                        color: e.target.value,
-                                      })
-                                    }
-                                    className="w-10 h-8 p-1 bg-zinc-950 border-zinc-800 cursor-pointer"
-                                  />
-                                  <BlurInput
-                                    value={widget.data.color || '#ffffff'}
-                                    onChange={(e) =>
-                                      updateWidgetData(widget.id, {
-                                        color: e.target.value,
-                                      })
-                                    }
-                                    className="h-8 text-xs font-mono bg-zinc-950/50 border-zinc-800 flex-1"
-                                  />
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <Label className="text-[9px] text-zinc-500 uppercase font-bold">
-                                    Opacity
-                                  </Label>
-                                  <span className="text-[10px] font-mono text-zinc-400">
-                                    {Math.round(
-                                      (widget.data.opacity || 1) * 100,
-                                    )}
-                                    %
-                                  </span>
-                                </div>
-                                <Slider
-                                  min={0}
-                                  max={1}
-                                  step={0.05}
-                                  value={[widget.data.opacity || 1]}
-                                  onValueChange={([v]) =>
-                                    updateWidgetData(widget.id, {
-                                      opacity: v,
-                                    })
-                                  }
-                                  className="py-2"
-                                />
-                              </div>
-                            </div>
-                          </div>
                         </div>
                       </div>
                     </AccordionContent>

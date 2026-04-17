@@ -3,6 +3,15 @@ import useStore from './store/useStore'
 import './index.css'
 import * as backend from './api/backend'
 import { applyGlobalDefaults } from './lib/config-utils'
+import {
+  createTemplateFilePayload,
+  createTemplateState,
+  downloadTemplateFile,
+  normalizeTemplateFilePayload,
+  sanitizeTemplateFilename,
+  stringifyTemplateFile,
+  templateStatesEqual,
+} from './lib/template-snapshot'
 
 // UI components
 import { Button } from '@/components/ui/button'
@@ -57,11 +66,26 @@ const selectBrowserGpxFile = () =>
   new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = '.gpx'
+    input.accept = '.gpx,.fit'
     input.onchange = () => resolve(input.files?.[0] ?? null)
     input.oncancel = () => resolve(null)
     input.click()
   })
+
+const selectBrowserTemplateFile = () =>
+  new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json,application/json'
+    input.onchange = () => resolve(input.files?.[0] ?? null)
+    input.oncancel = () => resolve(null)
+    input.click()
+  })
+
+const getFilenameFromPath = (path) => {
+  const segments = String(path || '').split(/[/\\]/)
+  return segments[segments.length - 1] || 'cyclemetry_template.json'
+}
 
 // Sidecar readiness monitoring
 // Spinner
@@ -110,10 +134,15 @@ function App() {
     setAutoRender,
     templates,
     fetchTemplates,
+    updateRate,
+    exportRange,
+    aspectRatio,
     loadedTemplateFilename,
-    setLoadedTemplateFilename,
-    lastSavedConfig,
-    setLastSavedConfig,
+    loadedTemplateSource,
+    setLoadedTemplate,
+    hydrateTemplateState,
+    lastSavedTemplateState,
+    setLastSavedTemplateState,
   } = useStore()
 
   const [backendStatus, setBackendStatus] = useState('connecting')
@@ -179,15 +208,29 @@ function App() {
   // Template management
   const handleTemplateChange = async (filename) => {
     if (!filename) return
+
     try {
       setGeneratingImage(true)
-      const data = await backend.loadTemplate(filename)
-      setLoadedTemplateFilename(filename)
-      setConfig(data)
-      setLastSavedConfig(data)
+      const data = await backend.getTemplate(filename)
+      const templateState = createTemplateState({
+        config: data,
+        globalDefaults,
+        updateRate,
+        exportRange,
+        aspectRatio,
+      })
 
-      // Auto-refresh preview with new template
-      handleGeneratePreview(data)
+      hydrateTemplateState(templateState, {
+        filename,
+        source: 'backend',
+      })
+      setLastSavedTemplateState(templateState)
+
+      // Auto-refresh preview with new template.
+      // await handleGeneratePreview({
+      //   config: data,
+      //   globalDefaults: templateState.settings.globalDefaults,
+      // })
     } catch (err) {
       console.error('Failed to load template:', err)
       setErrorMessage(`Failed to load template: ${err.message}`)
@@ -197,57 +240,125 @@ function App() {
   }
 
   const handleSaveTemplate = async () => {
-    let filename = loadedTemplateFilename
-
-    // If draft or built-in, prompt for new name
-    const currentTemplate = templates.find((t) => t.id === filename)
-    if (!filename || currentTemplate?.type === 'built-in') {
-      const name = prompt(
-        'Enter a name for your new template:',
-        filename?.replace('.json', '') || 'my_template',
-      )
-      if (!name) return
-      filename = name.toLowerCase().replace(/\s+/g, '_')
-      if (!filename.endsWith('.json')) filename += '.json'
-    }
+    const suggestedFilename = sanitizeTemplateFilename(
+      loadedTemplateFilename || 'my_template',
+    )
 
     try {
-      await backend.saveTemplate(filename, config)
-      setLoadedTemplateFilename(filename)
-      setLastSavedConfig(config)
-      fetchTemplates() // Refresh list
+      const payload = createTemplateFilePayload(
+        {
+          config,
+          globalDefaults,
+          updateRate,
+          exportRange,
+          aspectRatio,
+        },
+        {
+          name: suggestedFilename.replace(/\.json$/i, ''),
+        },
+      )
+      const templateContents = stringifyTemplateFile(payload)
+
+      if (hasTauriRuntime()) {
+        const { save } = await import('@tauri-apps/plugin-dialog')
+        const defaultPath =
+          await backend.getDefaultTemplateSavePath(suggestedFilename)
+        const selectedPath = await save({
+          title: 'Save Template',
+          defaultPath,
+          filters: [
+            {
+              name: 'Cyclemetry Template',
+              extensions: ['json'],
+            },
+          ],
+        })
+
+        if (!selectedPath) return
+
+        await backend.writeTemplateFile(selectedPath, templateContents)
+
+        const savedFilename = sanitizeTemplateFilename(
+          getFilenameFromPath(selectedPath),
+        )
+        setLoadedTemplate(savedFilename, 'file')
+        setLastSavedTemplateState(currentTemplateState)
+        return
+      }
+
+      downloadTemplateFile(payload, suggestedFilename)
+      setLoadedTemplate(suggestedFilename, 'file')
+      setLastSavedTemplateState(currentTemplateState)
     } catch (err) {
       console.error('Failed to save template:', err)
       setErrorMessage(`Failed to save template: ${err.message}`)
     }
   }
 
-  const handleOpenFolder = async () => {
+  const handleImportTemplate = async () => {
     try {
-      await backend.openTemplatesFolder()
+      const file = await selectBrowserTemplateFile()
+      if (!file) return
+
+      const rawText = await file.text()
+      const parsedTemplate = JSON.parse(rawText)
+      const normalizedTemplate = normalizeTemplateFilePayload(parsedTemplate, {
+        globalDefaults,
+        updateRate,
+        exportRange,
+        aspectRatio,
+      })
+      const { name: _templateName, ...templateState } = normalizedTemplate
+      const importedFilename = sanitizeTemplateFilename(
+        normalizedTemplate.name || file.name,
+      )
+
+      hydrateTemplateState(templateState, {
+        filename: importedFilename,
+        source: 'file',
+      })
+      setLastSavedTemplateState(templateState)
+
+      // Auto-refresh preview with imported template.
+      // await handleGeneratePreview({
+      //   config: templateState.config,
+      //   globalDefaults: templateState.settings.globalDefaults,
+      // })
     } catch (err) {
-      console.error('Failed to open folder:', err)
+      console.error('Failed to import template:', err)
+      setErrorMessage(`Failed to import template: ${err.message}`)
     }
   }
 
-  const getStatus = () => {
-    if (!loadedTemplateFilename) return 'Draft'
-    if (!lastSavedConfig) return 'Saved'
-    const isModified =
-      JSON.stringify(config) !== JSON.stringify(lastSavedConfig)
-    return isModified ? 'Modified' : 'Saved'
-  }
-
-  const status = getStatus()
+  const currentTemplateState = createTemplateState({
+    config,
+    globalDefaults,
+    updateRate,
+    exportRange,
+    aspectRatio,
+  })
+  const status = !config
+    ? null
+    : !lastSavedTemplateState
+      ? 'Draft'
+      : templateStatesEqual(currentTemplateState, lastSavedTemplateState)
+        ? 'Saved'
+        : 'Modified'
+  const showTemplateStatus = status === 'Draft' || status === 'Modified'
 
   // Generate preview
   const handleGeneratePreview = useCallback(
-    async (configOverride = null) => {
-      const baseConfig = configOverride || config
+    async (templateOverride = null) => {
+      const baseConfig = templateOverride?.config || config
+      const effectiveGlobalDefaults =
+        templateOverride?.globalDefaults || globalDefaults
       if (!baseConfig) return
 
       // Apply global defaults before sending to backend
-      const currentConfig = applyGlobalDefaults(baseConfig, globalDefaults)
+      const currentConfig = applyGlobalDefaults(
+        baseConfig,
+        effectiveGlobalDefaults,
+      )
 
       try {
         setGeneratingImage(true)
@@ -375,8 +486,8 @@ function App() {
             const { open } = await import('@tauri-apps/plugin-dialog')
             return open({
               multiple: false,
-              filters: [{ name: 'GPX', extensions: ['gpx'] }],
-              title: 'Select GPX Activity',
+              filters: [{ name: 'Activity Files', extensions: ['gpx', 'fit'] }],
+              title: 'Select GPX/FIT Activity',
             })
           })()
         : await selectBrowserGpxFile()
@@ -426,14 +537,38 @@ function App() {
 
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="md"
+                  className="gap-2 h-9 px-5 mr-4 border-zinc-700/50 hover:bg-zinc-800/50 text-muted-foreground hover:text-foreground"
+                  onClick={handleGpxFileOpen}
+                >
+                  <Activity className="h-3.5 w-3.5" />
+                  <span className="max-w-28 truncate">
+                    {gpxFilename === 'demo.gpxinit'
+                      ? 'Load GPX/FIT'
+                      : gpxFilename || 'Load GPX/FIT'}
+                  </span>
+                </Button>
+
                 <Select
-                  value={loadedTemplateFilename || ''}
+                  value={
+                    loadedTemplateSource === 'backend'
+                      ? loadedTemplateFilename || ''
+                      : ''
+                  }
                   onValueChange={handleTemplateChange}
                 >
                   <SelectTrigger className="w-56 h-8 text-xs border-zinc-700/50 bg-zinc-900/30">
                     <div className="flex items-center gap-2 truncate">
                       <Sparkles className="h-3 w-3 text-red-500 shrink-0" />
-                      <SelectValue placeholder="Select Template..." />
+                      <SelectValue
+                        placeholder={
+                          loadedTemplateSource === 'file'
+                            ? loadedTemplateFilename || 'Imported Template'
+                            : 'Select Template...'
+                        }
+                      />
                     </div>
                   </SelectTrigger>
                   <SelectContent>
@@ -445,69 +580,49 @@ function App() {
                   </SelectContent>
                 </Select>
 
-                <Badge
-                  variant={
-                    status === 'Modified'
-                      ? 'secondary'
-                      : status === 'Draft'
-                        ? 'outline'
-                        : 'default'
-                  }
-                  className={`text-[10px] h-5 ${
-                    status === 'Modified'
-                      ? 'bg-orange-500/10 text-orange-500 border-orange-500/20'
-                      : ''
-                  }`}
-                >
-                  {status}
-                </Badge>
-              </div>
-
-              <div className="flex items-center gap-1">
-                {(status === 'Modified' || status === 'Draft') && config && (
-                  <SimpleTooltip side="bottom" content="Save Template">
+                <div className="flex items-center gap-1">
+                  {showTemplateStatus && config && (
+                    <SimpleTooltip side="bottom" content="Save Template">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                        onClick={handleSaveTemplate}
+                      >
+                        <Save className="h-4 w-4" />
+                      </Button>
+                    </SimpleTooltip>
+                  )}
+                  <SimpleTooltip side="bottom" content="Import Template JSON">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
-                      onClick={handleSaveTemplate}
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-zinc-800"
+                      onClick={handleImportTemplate}
                     >
-                      <Save className="h-4 w-4" />
+                      <FolderOpen className="h-4 w-4" />
                     </Button>
                   </SimpleTooltip>
-                )}
-                <SimpleTooltip side="bottom" content="Open Templates Folder">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-zinc-800"
-                    onClick={handleOpenFolder}
+                </div>
+
+                {showTemplateStatus ? (
+                  <Badge
+                    variant={status === 'Modified' ? 'secondary' : 'outline'}
+                    className={`text-[10px] h-5 ${
+                      status === 'Modified'
+                        ? 'bg-orange-500/10 text-orange-500 border-orange-500/20'
+                        : ''
+                    }`}
                   >
-                    <FolderOpen className="h-4 w-4" />
-                  </Button>
-                </SimpleTooltip>
+                    {status}
+                  </Badge>
+                ) : null}
               </div>
             </div>
           </div>
 
           {/* Right - Actions & Status */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 h-8 px-3 border-zinc-700/50 hover:bg-zinc-800/50 text-muted-foreground hover:text-foreground"
-                onClick={handleGpxFileOpen}
-              >
-                <Activity className="h-3.5 w-3.5" />
-                <span className="max-w-25 truncate">
-                  {gpxFilename === 'demo.gpxinit'
-                    ? 'Load GPX'
-                    : gpxFilename || 'Load GPX'}
-                </span>
-              </Button>
-            </div>
-
             <SimpleTooltip
               side="bottom"
               content={

@@ -1,13 +1,18 @@
-import gc
 import math
 import os
 import shutil
 from subprocess import PIPE, Popen
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import perf_counter
 
-from plot import get_line_color, get_line_width, get_opacity, get_point_color, get_point_weight
+from plot import (
+    get_line_color,
+    get_line_width,
+    get_opacity,
+    get_point_color,
+    get_point_weight,
+)
 
 import constant
 
@@ -17,7 +22,9 @@ def resolve_ffmpeg_binary():
 
     candidate_paths = []
 
-    env_override = os.environ.get("CYCLEMETRY_FFMPEG") or os.environ.get("FFMPEG_BINARY")
+    env_override = os.environ.get("CYCLEMETRY_FFMPEG") or os.environ.get(
+        "FFMPEG_BINARY"
+    )
     if env_override:
         candidate_paths.append(env_override)
 
@@ -51,6 +58,7 @@ def resolve_ffmpeg_binary():
         "package imageio-ffmpeg."
     )
 
+
 # Lazy imports for:
 # from frame import Frame
 # from plot import build_figure
@@ -69,14 +77,20 @@ class Scene:
         self.frames = []
 
     def render_video(self, seconds, progress_callback=None, cancel_check=None):
-        self.build_frames(seconds)
-        self.export_video(progress_callback, cancel_check)
+        self.export_video(seconds, progress_callback, cancel_check)
 
     def render_demo(self, seconds, second):
         import matplotlib.pyplot as plt
 
         try:
-            self.build_frame(seconds, second, 0)
+            total_frames = self.total_frame_count(seconds)
+            frame_index = min(
+                max(0, round(second * self.fps)), max(total_frames - 1, 0)
+            )
+            frame_second, frame_number = self.frame_time_components(frame_index)
+            self.frames.append(
+                self.build_frame(total_frames, frame_second, frame_number)
+            )
             self.draw_frames()
         finally:
             # Always close all matplotlib figures to prevent memory leaks
@@ -119,12 +133,62 @@ class Scene:
                 f"Legacy plot figure generation is no longer supported for '{attribute}'."
             )
 
-    def export_video(self, progress_callback=None, cancel_check=None):
+    def append_ffmpeg_option(self, args, flag, value):
+        if value is None or value == "":
+            return
+        args.extend([flag, str(value)])
+
+    def build_ffmpeg_settings(self, overlay_filename):
+        scene_config = self.template.get("scene", {})
+        ffmpeg_config = scene_config.get("ffmpeg", {})
+        if not isinstance(ffmpeg_config, dict):
+            ffmpeg_config = {}
+
+        codec_name = ffmpeg_config.get("codec", "prores_ks")
+        loglevel = str(ffmpeg_config.get("loglevel", "info"))
+        pixel_format_out = ffmpeg_config.get("pix_fmt", "yuva444p10le")
+
+        output_args = ["-c:v", str(codec_name)]
+        self.append_ffmpeg_option(output_args, "-threads", ffmpeg_config.get("threads"))
+
+        if codec_name == "prores_ks":
+            self.append_ffmpeg_option(
+                output_args, "-profile:v", ffmpeg_config.get("prores_profile")
+            )
+            self.append_ffmpeg_option(
+                output_args, "-qscale:v", ffmpeg_config.get("qscale")
+            )
+            self.append_ffmpeg_option(
+                output_args, "-bits_per_mb", ffmpeg_config.get("bits_per_mb")
+            )
+            self.append_ffmpeg_option(
+                output_args, "-mbs_per_slice", ffmpeg_config.get("mbs_per_slice")
+            )
+            self.append_ffmpeg_option(
+                output_args, "-vendor", ffmpeg_config.get("vendor")
+            )
+            self.append_ffmpeg_option(
+                output_args, "-alpha_bits", ffmpeg_config.get("alpha_bits")
+            )
+
+        extra_output_args = ffmpeg_config.get("output_args", [])
+        if isinstance(extra_output_args, (list, tuple)):
+            output_args.extend(str(arg) for arg in extra_output_args)
+
+        output_args.extend(["-pix_fmt", str(pixel_format_out), "-y", overlay_filename])
+        return {
+            "loglevel": loglevel,
+            "output_args": output_args,
+        }
+
+    def export_video(self, seconds, progress_callback=None, cancel_check=None):
         from render_debug import (
             RenderDebugOptions,
             RenderProfiler,
             build_timing_payload,
         )
+
+        export_started_at = perf_counter()
 
         overlay_filename = (
             self.template["scene"]["overlay_filename"]
@@ -137,6 +201,7 @@ class Scene:
             self.template["scene"]["width"],
             self.template["scene"]["height"],
         )
+        frame_queue_maxsize = 4
 
         # Ensure dimensions are even (required by most codecs including ProRes)
         if width % 2 != 0:
@@ -153,6 +218,8 @@ class Scene:
             render_debug=render_debug,
             render_profiler=render_profiler,
         )
+        render_assets.initialize_frame_buffer_pool(frame_queue_maxsize + 1)
+        total_frames = self.total_frame_count(seconds)
 
         # FFmpeg command to encode video from raw frames
         # Input parameters (must come before -i)
@@ -161,25 +228,20 @@ class Scene:
         pixel_format_in = ["-pix_fmt", "rgba"]
         size = ["-s", f"{width}x{height}"]
 
-        # Output parameters
-        codec = ["-c:v", "prores_ks"]  # helps with transparency
-        pixel_format_out = ["-pix_fmt", "yuva444p10le"]  # Required for ProRes + Alpha
-        output = ["-y", overlay_filename]
+        ffmpeg_settings = self.build_ffmpeg_settings(overlay_filename)
 
         ffmpeg_bin = resolve_ffmpeg_binary()
         logging.info(f"Using ffmpeg binary: {ffmpeg_bin}")
 
         ffmpeg_cmd = (
             [ffmpeg_bin]
-            + ["-loglevel", "info"]  # Show more info for debugging
+            + ["-loglevel", ffmpeg_settings["loglevel"]]
             + fmt
             + size
             + pixel_format_in
             + framerate
             + ["-i", "-"]
-            + codec
-            + pixel_format_out
-            + output
+            + ffmpeg_settings["output_args"]
         )
 
         logging.info(
@@ -195,7 +257,9 @@ class Scene:
                 "/bin",
             ]
             current_path = env.get("PATH", "")
-            env["PATH"] = os.pathsep.join(extra_paths + ([current_path] if current_path else []))
+            env["PATH"] = os.pathsep.join(
+                extra_paths + ([current_path] if current_path else [])
+            )
 
         try:
             p = Popen(ffmpeg_cmd, stdin=PIPE, stderr=PIPE, stdout=PIPE, env=env)
@@ -203,11 +267,51 @@ class Scene:
             logging.error(f"Failed to start ffmpeg process: {e}")
             raise Exception(f"Could not start ffmpeg: {str(e)}")
         # Threaded monitoring of ffmpeg stderr to track progress and prevent deadlocks
+        import queue
         import threading
         import re
 
         encoded_frames = 0
         io_lock = threading.Lock()
+        stop_event = threading.Event()
+        frame_queue = queue.Queue(maxsize=frame_queue_maxsize)
+        queue_sentinel = object()
+        encoder_error = {"exception": None}
+
+        def set_encoder_error(exception):
+            with io_lock:
+                if encoder_error["exception"] is None:
+                    encoder_error["exception"] = exception
+            stop_event.set()
+
+        def raise_if_encoder_failed():
+            with io_lock:
+                exception = encoder_error["exception"]
+            if exception is not None:
+                raise exception
+
+        def queue_frame_payload(payload):
+            while True:
+                raise_if_encoder_failed()
+                if stop_event.is_set():
+                    raise Exception(
+                        "Rendering stopped before frame payload could be queued"
+                    )
+                try:
+                    with render_profiler.measure("queue.put_wait"):
+                        frame_queue.put(payload, timeout=0.1)
+                    return
+                except queue.Full:
+                    continue
+
+        def signal_encoder_shutdown():
+            while encoder_thread.is_alive():
+                try:
+                    frame_queue.put(queue_sentinel, timeout=0.1)
+                    return
+                except queue.Full:
+                    raise_if_encoder_failed()
+                    continue
 
         def monitor_ffmpeg(process):
             nonlocal encoded_frames
@@ -232,74 +336,110 @@ class Scene:
                 if "error" in line_str.lower() or "warning" in line_str.lower():
                     logging.info(f"ffmpeg: {line_str.strip()}")
 
-        monitor_thread = threading.Thread(target=monitor_ffmpeg, args=(p,), daemon=True)
-        monitor_thread.start()
-
-        # Sequential rendering - memory efficient, no multiprocessing overhead
-        logging.info(f"Rendering {len(self.frames)} frames sequentially")
-        sample_frame_indices = render_debug.sample_frame_indices(len(self.frames))
-        rendered_frames = 0
-
-        for idx, frame in enumerate(self.frames):
-            frame_loop_start = perf_counter()
-            # Check for cancellation
-            if cancel_check and cancel_check():
-                logging.info("Rendering cancelled by user")
-                p.stdin.close()
-                p.terminate()
-                p.wait()
-                if os.path.exists(overlay_filename):
-                    os.remove(overlay_filename)
-                raise Exception("Rendering cancelled by user")
-
-            # Check if ffmpeg is still alive
-            if p.poll() is not None:
-                # Capture any remaining output
-                monitor_thread.join(timeout=1)
-                # stderr_output = "See logs above"
-                logging.error(f"ffmpeg process died unexpectedly at frame {idx}")
-                raise Exception(f"ffmpeg died (exit {p.returncode})")
-
-            # Render frame and pipe directly to ffmpeg
+        def encoder_worker(process):
             try:
-                with render_profiler.measure("frame.draw"):
-                    image = frame.draw(
-                        self.template,
-                        self.figs,
-                        render_assets=render_assets,
-                        render_profiler=render_profiler,
-                    )
-                if idx in sample_frame_indices:
-                    render_debug.save_sample_frame(idx, image)
-                with render_profiler.measure("ffmpeg.write"):
-                    p.stdin.write(image.tobytes())
-                rendered_frames += 1
+                while True:
+                    with render_profiler.measure("encoder.queue_wait"):
+                        payload = frame_queue.get()
+                    try:
+                        if payload is queue_sentinel:
+                            if process.stdin and not process.stdin.closed:
+                                process.stdin.close()
+                            return
+                        with render_profiler.measure("encoder.serialize"):
+                            frame_bytes = payload.tobytes()
+                        with render_profiler.measure("ffmpeg.write"):
+                            process.stdin.write(frame_bytes)
+                    finally:
+                        if payload is not queue_sentinel:
+                            if not render_assets.release_frame_image(
+                                payload
+                            ) and hasattr(payload, "close"):
+                                payload.close()
+                        frame_queue.task_done()
             except BrokenPipeError:
                 logging.error("Broken pipe when writing to ffmpeg")
-                raise Exception("ffmpeg pipe broken - video encoding failed")
-            finally:
-                render_profiler.record("frame.total", perf_counter() - frame_loop_start)
+                set_encoder_error(
+                    Exception("ffmpeg pipe broken - video encoding failed")
+                )
+            except Exception as exception:
+                logging.error(f"Encoder thread failed: {exception}")
+                set_encoder_error(exception)
 
-            # Progress callback
-            if progress_callback:
-                current_enc = 0
-                with io_lock:
-                    current_enc = encoded_frames
+        monitor_thread = threading.Thread(target=monitor_ffmpeg, args=(p,), daemon=True)
+        monitor_thread.start()
+        encoder_thread = threading.Thread(target=encoder_worker, args=(p,), daemon=True)
+        encoder_thread.start()
 
-                # Pass both generation progress and encoding progress
-                # Callback signature: (current_gen, total_gen, current_enc)
+        # Render on the main thread and feed a bounded queue consumed by the encoder thread.
+        logging.info(f"Rendering {total_frames} frames with bounded encode queue")
+        sample_frame_indices = render_debug.sample_frame_indices(total_frames)
+        rendered_frames = 0
+
+        try:
+            for idx, frame in enumerate(self.iter_frames(seconds)):
+                frame_loop_start = perf_counter()
+
+                # Check for cancellation
+                if cancel_check and cancel_check():
+                    logging.info("Rendering cancelled by user")
+                    raise Exception("Rendering cancelled by user")
+
+                # Check if ffmpeg is still alive
+                if p.poll() is not None:
+                    logging.error(f"ffmpeg process died unexpectedly at frame {idx}")
+                    raise Exception(f"ffmpeg died (exit {p.returncode})")
+
+                raise_if_encoder_failed()
+
                 try:
-                    progress_callback(idx + 1, len(self.frames), current_enc)
-                except TypeError:
-                    # Fallback for old signature
-                    progress_callback(idx + 1, len(self.frames))
+                    with render_profiler.measure("frame.draw"):
+                        image = frame.draw(
+                            self.template,
+                            self.figs,
+                            render_assets=render_assets,
+                            render_profiler=render_profiler,
+                        )
+                    if idx in sample_frame_indices:
+                        render_debug.save_sample_frame(idx, image)
+                    queue_frame_payload(image)
+                    rendered_frames += 1
+                finally:
+                    render_profiler.record(
+                        "frame.total", perf_counter() - frame_loop_start
+                    )
 
-            # Force garbage collection every 30 frames to manage memory
-            if (idx + 1) % 30 == 0:
-                gc.collect()
+                # Progress callback
+                if progress_callback:
+                    current_enc = 0
+                    with io_lock:
+                        current_enc = encoded_frames
 
-        # Close stdin to signal EOF to ffmpeg
-        p.stdin.close()
+                    # Pass both generation progress and encoding progress
+                    # Callback signature: (current_gen, total_gen, current_enc)
+                    try:
+                        progress_callback(idx + 1, total_frames, current_enc)
+                    except TypeError:
+                        # Fallback for old signature
+                        progress_callback(idx + 1, total_frames)
+
+            signal_encoder_shutdown()
+            encoder_thread.join()
+            raise_if_encoder_failed()
+        except Exception:
+            stop_event.set()
+            try:
+                signal_encoder_shutdown()
+            except Exception:
+                pass
+            if p.poll() is None:
+                p.terminate()
+                p.wait()
+            monitor_thread.join(timeout=1)
+            encoder_thread.join(timeout=1)
+            if os.path.exists(overlay_filename):
+                os.remove(overlay_filename)
+            raise
 
         # Wait for ffmpeg to finish
         p.wait()
@@ -316,9 +456,10 @@ class Scene:
             render_profiler,
             self.template.get("scene", {}),
             overlay_filename,
-            len(self.frames),
+            total_frames,
             rendered_frames,
             sample_frame_indices,
+            total_time_taken=perf_counter() - export_started_at,
         )
         logging.info("Render timing summary: %s", timing_payload["timings"])
         if render_debug.write_timing_summary:
@@ -350,6 +491,313 @@ class Scene:
         ended_at = datetime.now()
         prepare_trace.add_event(step_name, started_at, ended_at)
         return result
+
+    def clip_dirty_box(self, left, top, right, bottom, width, height):
+        clipped_left = max(0, int(math.floor(left)))
+        clipped_top = max(0, int(math.floor(top)))
+        clipped_right = min(width, int(math.ceil(right)))
+        clipped_bottom = min(height, int(math.ceil(bottom)))
+        if clipped_right <= clipped_left or clipped_bottom <= clipped_top:
+            return None
+        return (clipped_left, clipped_top, clipped_right, clipped_bottom)
+
+    def build_dirty_region(self, base_image, left, top, right, bottom, width, height):
+        from render_assets import DirtyRegion
+
+        box = self.clip_dirty_box(left, top, right, bottom, width, height)
+        if box is None:
+            return None
+        return DirtyRegion(box=box, background=base_image.crop(box))
+
+    def build_dirty_regions(self, base_image, boxes, width, height):
+        return [
+            region
+            for region in (
+                self.build_dirty_region(
+                    base_image, left, top, right, bottom, width, height
+                )
+                for left, top, right, bottom in boxes
+            )
+            if region is not None
+        ]
+
+    def union_layer_bbox(self, *layers):
+        bbox = None
+        for layer in layers:
+            if layer is None:
+                continue
+            layer_bbox = layer.getbbox()
+            if layer_bbox is None:
+                continue
+            if bbox is None:
+                bbox = layer_bbox
+                continue
+            bbox = (
+                min(bbox[0], layer_bbox[0]),
+                min(bbox[1], layer_bbox[1]),
+                max(bbox[2], layer_bbox[2]),
+                max(bbox[3], layer_bbox[3]),
+            )
+        return bbox
+
+    def widget_marker_padding(self, marker_sprite):
+        if marker_sprite is None:
+            return (0, 0)
+        marker_width, marker_height = marker_sprite.size
+        return (marker_width, marker_height)
+
+    def measure_text_block(self, draw, font, texts):
+        min_left = 0
+        min_top = 0
+        max_right = 0
+        max_bottom = 0
+        for text in texts:
+            if not text:
+                continue
+            left, top, right, bottom = draw.multiline_textbbox((0, 0), text, font=font)
+            min_left = min(min_left, left)
+            min_top = min(min_top, top)
+            max_right = max(max_right, right)
+            max_bottom = max(max_bottom, bottom)
+        return (min_left, min_top, max_right, max_bottom)
+
+    def build_widget_content_dirty_region(
+        self,
+        base_image,
+        width,
+        height,
+        widget_x,
+        widget_y,
+        content_bbox,
+        marker_sprite,
+    ):
+        if content_bbox is None:
+            return None
+
+        pad_x, pad_y = self.widget_marker_padding(marker_sprite)
+        return self.build_dirty_region(
+            base_image,
+            widget_x + content_bbox[0] - pad_x,
+            widget_y + content_bbox[1] - pad_y,
+            widget_x + content_bbox[2] + pad_x,
+            widget_y + content_bbox[3] + pad_y,
+            width,
+            height,
+        )
+
+    def build_route_content_dirty_region(self, base_image, width, height, route_cache):
+        if route_cache is None:
+            return None
+
+        content_bbox = self.union_layer_bbox(
+            route_cache.rotated_background_layer or route_cache.background_layer,
+            route_cache.rotated_completed_layer or route_cache.completed_layer,
+        )
+        return self.build_widget_content_dirty_region(
+            base_image,
+            width,
+            height,
+            route_cache.widget_x,
+            route_cache.widget_y,
+            content_bbox,
+            route_cache.marker_sprite,
+        )
+
+    def build_elevation_label_dirty_region(
+        self,
+        base_image,
+        width,
+        height,
+        font_cache,
+        elevation_cache,
+    ):
+        from PIL import Image, ImageDraw
+
+        from frame import Frame
+
+        if elevation_cache is None:
+            return None
+
+        background_layer = (
+            elevation_cache.rotated_background_layer or elevation_cache.background_layer
+        )
+        if background_layer is None:
+            return None
+
+        label_style = elevation_cache.label_style
+        if label_style is None:
+            return None
+
+        label_texts = {
+            frame_state.label_text
+            for frame_state in elevation_cache.frame_states
+            if frame_state.label_text
+        }
+        if not label_texts:
+            return None
+
+        measure_image = Image.new("RGBA", (1, 1))
+        draw = ImageDraw.Draw(measure_image)
+        font = Frame("", width, height, 0, 0).get_cached_font(
+            font_cache,
+            label_style.font_path,
+            label_style.font_size,
+        )
+        text_left, text_top, text_right, text_bottom = self.measure_text_block(
+            draw, font, label_texts
+        )
+        padding = 4
+        background_width, background_height = background_layer.size
+
+        left = elevation_cache.widget_x + label_style.x_offset + text_left - padding
+        top = elevation_cache.widget_y + label_style.y_offset + text_top - padding
+        right = (
+            elevation_cache.widget_x
+            + background_width
+            + label_style.x_offset
+            + text_right
+            + padding
+        )
+        bottom = (
+            elevation_cache.widget_y
+            + background_height
+            + label_style.y_offset
+            + text_bottom
+            + padding
+        )
+
+        return self.build_dirty_region(
+            base_image, left, top, right, bottom, width, height
+        )
+
+    def build_elevation_content_dirty_region(
+        self,
+        base_image,
+        width,
+        height,
+        elevation_cache,
+    ):
+        if elevation_cache is None:
+            return None
+
+        content_bbox = self.union_layer_bbox(
+            elevation_cache.rotated_background_layer
+            or elevation_cache.background_layer,
+            elevation_cache.rotated_completed_layer or elevation_cache.completed_layer,
+        )
+        return self.build_widget_content_dirty_region(
+            base_image,
+            width,
+            height,
+            elevation_cache.widget_x,
+            elevation_cache.widget_y,
+            content_bbox,
+            elevation_cache.marker_sprite,
+        )
+
+    def format_dynamic_value_text(self, attribute, value, config, scene_config):
+        decimal_rounding = config.get("decimal_rounding")
+        if decimal_rounding is None:
+            decimal_rounding = scene_config.get("decimal_rounding")
+
+        if "unit" in config:
+            unit = config["unit"]
+            if attribute == constant.ATTR_SPEED:
+                if unit == constant.UNIT_IMPERIAL:
+                    value *= constant.MPH_CONVERSION
+                elif unit == constant.UNIT_METRIC:
+                    value *= constant.KMH_CONVERSION
+            elif attribute == constant.ATTR_ELEVATION:
+                if unit == constant.UNIT_IMPERIAL:
+                    value *= constant.FT_CONVERSION
+
+        if (
+            attribute == constant.ATTR_TIME
+            and "hours_offset" in config
+            and "time_format" in config
+        ):
+            hours_offset = config.get("hours_offset", 0)
+            time_format = config.get(
+                "time_format", scene_config.get("time_format", "%H:%M")
+            )
+            try:
+                time_value = (
+                    value
+                    if isinstance(value, datetime)
+                    else datetime.fromisoformat(str(value))
+                )
+                time_value = time_value + timedelta(hours=hours_offset)
+                return time_value.strftime(time_format)
+            except ValueError:
+                return str(value)
+
+        if isinstance(value, (int, float)) and decimal_rounding is not None:
+            if decimal_rounding == 0:
+                value = int(value)
+            else:
+                value = round(float(value), decimal_rounding)
+
+        value = str(value)
+        if "suffix" in config:
+            value += config["suffix"]
+        return value
+
+    def build_dynamic_value_dirty_regions(
+        self, base_image, width, height, render_assets
+    ):
+        from PIL import Image, ImageDraw
+
+        from frame import Frame
+
+        scene_config = self.template.get("scene", {})
+        value_configs = self.template.get("values", [])
+        if not value_configs:
+            return []
+
+        measure_image = Image.new("RGBA", (1, 1))
+        draw = ImageDraw.Draw(measure_image)
+        frame = Frame("", width, height, 0, 0)
+        dirty_regions = []
+
+        for config in value_configs:
+            attribute = config.get("value")
+            if attribute not in self.activity.valid_attributes:
+                continue
+
+            values = getattr(self.activity, attribute, [])
+            if attribute == constant.ATTR_TIME:
+                values = getattr(self.activity, "frame_timestamps", values)
+            if not values:
+                continue
+
+            rendered_texts = {
+                self.format_dynamic_value_text(attribute, value, config, scene_config)
+                for value in values
+            }
+            if not rendered_texts:
+                continue
+
+            font_name = config.get("font", scene_config.get("font", "Arial.ttf"))
+            font_size = config.get("font_size", scene_config.get("font_size", 32))
+            font = frame.get_cached_font(render_assets.font_cache, font_name, font_size)
+            text_left, text_top, text_right, text_bottom = self.measure_text_block(
+                draw, font, rendered_texts
+            )
+            padding = 4
+
+            region = self.build_dirty_region(
+                base_image,
+                config["x"] + text_left - padding,
+                config["y"] + text_top - padding,
+                config["x"] + text_right + padding,
+                config["y"] + text_bottom + padding,
+                width,
+                height,
+            )
+            if region is not None:
+                dirty_regions.append(region)
+
+        return dirty_regions
 
     def get_plot_config(self, attribute):
         for config in self.template.get("plots", []):
@@ -435,7 +883,9 @@ class Scene:
         return fitted
 
     def project_course_points(self, config):
-        course_points = getattr(self.activity, constant.ATTR_COURSE, [])
+        course_points = getattr(self.activity, "sample_course_points", None)
+        if course_points is None:
+            course_points = getattr(self.activity, constant.ATTR_COURSE, [])
         if not course_points:
             return []
 
@@ -476,10 +926,21 @@ class Scene:
         return sampled
 
     def get_elevation_raw_points(self):
-        elevations = getattr(self.activity, constant.ATTR_ELEVATION, [])
+        elevations = getattr(self.activity, "sample_elevations", None)
+        if elevations is None:
+            elevations = getattr(self.activity, constant.ATTR_ELEVATION, [])
         if not elevations:
             return []
-        return [(index, elevation) for index, elevation in enumerate(elevations)]
+
+        distance_progress = getattr(self.activity, "sample_distance_progress", [])
+        if distance_progress and len(distance_progress) == len(elevations):
+            return list(zip(distance_progress, elevations))
+
+        last_index = max(len(elevations) - 1, 1)
+        return [
+            (index / last_index, elevation)
+            for index, elevation in enumerate(elevations)
+        ]
 
     def project_elevation_points(self, config):
         raw_points = self.get_elevation_raw_points()
@@ -505,11 +966,11 @@ class Scene:
         min_elevation = min(point[1] for point in downsampled_points)
         max_elevation = max(point[1] for point in downsampled_points)
         elevation_span = max(max_elevation - min_elevation, 1e-9)
-        last_index = max(downsampled_points[-1][0], 1)
+        last_progress = max(downsampled_points[-1][0], 1e-9)
 
         normalized_points = []
-        for sample_index, elevation in downsampled_points:
-            progress01 = sample_index / last_index
+        for sample_progress, elevation in downsampled_points:
+            progress01 = sample_progress / last_progress
             normalized_elevation = (elevation - min_elevation) / elevation_span
             point_x = config["width"] * margin + inner_width * progress01
             point_y = config["height"] - (
@@ -598,25 +1059,74 @@ class Scene:
             cumulative_progress=self.cumulative_progress_for_points(simplified_points),
         )
 
+    def total_frame_count(self, seconds):
+        interpolated_frames = self.interpolated_frame_count()
+        if interpolated_frames > 0:
+            return interpolated_frames
+        if seconds is None:
+            return 0
+        return max(0, round(seconds * self.fps))
+
+    def route_reveal_bucket_count(self, config):
+        configured_count = self.get_numeric_render_setting(
+            config,
+            "route_reveal_bucket_count",
+            128,
+            cast_type=int,
+        )
+        configured_count = max(2, configured_count)
+        interpolated_frames = self.interpolated_frame_count()
+        if interpolated_frames <= 0:
+            return configured_count
+        return max(2, min(interpolated_frames, configured_count))
+
+    def interpolated_frame_count(self):
+        frame_elapsed_seconds = getattr(self.activity, "frame_elapsed_seconds", [])
+        if frame_elapsed_seconds:
+            return len(frame_elapsed_seconds)
+        for attribute in self.activity.valid_attributes:
+            if attribute in constant.NO_INTERPOLATE_ATTRIBUTES:
+                continue
+            return len(getattr(self.activity, attribute))
+        return 0
+
+    def frame_time_components(self, frame_index):
+        return frame_index // self.fps, frame_index % self.fps
+
+    def frame_activity_index(self, frame_index, last_index):
+        return min(frame_index, last_index)
+
+    def elevation_label_text(self, elevation_value, config):
+        text = ""
+        for unit in config["units"]:
+            value = elevation_value * constant.ELEVATION_CONVERSION_MAP[unit]
+            if "decimal_rounding" in config.keys():
+                if config["decimal_rounding"] == 0:
+                    value = int(value)
+                else:
+                    value = round(float(value), config["decimal_rounding"])
+            text += (
+                f"{value}{constant.DEFAULT_SUFFIX_MAP[constant.ATTR_ELEVATION][unit]}\n"
+            )
+        return text.rstrip()
+
     def build_route_frame_states(self, route_cache):
         from render_assets import RouteFrameState
 
-        if route_cache is None or not self.frames:
+        if route_cache is None:
             return []
 
-        raw_points = self.project_course_points(route_cache.source_config)
-        if not raw_points:
+        if route_cache.geometry is None or not route_cache.geometry.points:
             return []
 
-        raw_cumulative_progress = self.cumulative_progress_for_points(raw_points)
-        last_index = max(len(raw_points) - 1, 1)
+        frame_progress = getattr(self.activity, "frame_distance_progress", [])
+        total_frames = self.interpolated_frame_count()
         frame_states = []
-        for frame in self.frames:
-            activity_index = min(
-                frame.second * self.fps + frame.frame_number,
-                last_index,
-            )
-            progress01 = raw_cumulative_progress[activity_index]
+        for frame_index in range(total_frames):
+            if frame_progress:
+                progress01 = frame_progress[min(frame_index, len(frame_progress) - 1)]
+            else:
+                progress01 = frame_index / max(total_frames - 1, 1)
             segment_index, marker_x, marker_y = self.route_position_at_progress(
                 route_cache.geometry.points,
                 route_cache.cumulative_progress,
@@ -636,7 +1146,10 @@ class Scene:
                     marker_x=marker_x,
                     marker_y=marker_y,
                     segment_index=segment_index,
-                    bucket_index=0,
+                    bucket_index=min(
+                        route_cache.bucket_count - 1,
+                        round(progress01 * max(route_cache.bucket_count - 1, 1)),
+                    ),
                 )
             )
         return frame_states
@@ -644,7 +1157,7 @@ class Scene:
     def build_elevation_frame_states(self, elevation_cache):
         from render_assets import ElevationFrameState
 
-        if elevation_cache is None or not self.frames:
+        if elevation_cache is None:
             return []
 
         elevations = getattr(self.activity, constant.ATTR_ELEVATION, [])
@@ -655,18 +1168,20 @@ class Scene:
         min_elevation = min(elevations)
         max_elevation = max(elevations)
         span = max(max_elevation - min_elevation, 1e-9)
-        last_index = max(len(elevations) - 1, 1)
         margin = config.get("margin", 0.0)
         inner_width = config["width"] * (1.0 - 2.0 * margin)
         inner_height = config["height"] * (1.0 - 2.0 * margin)
+        total_frames = self.interpolated_frame_count()
+        last_index = max(len(elevations) - 1, 1)
+        frame_progress = getattr(self.activity, "frame_distance_progress", [])
 
         frame_states = []
-        for frame in self.frames:
-            activity_index = min(
-                frame.second * self.fps + frame.frame_number,
-                last_index,
-            )
-            progress01 = activity_index / last_index
+        for frame_index in range(total_frames):
+            activity_index = self.frame_activity_index(frame_index, last_index)
+            if frame_progress:
+                progress01 = frame_progress[min(frame_index, len(frame_progress) - 1)]
+            else:
+                progress01 = frame_index / max(total_frames - 1, 1)
             elevation_value = elevations[activity_index]
             marker_x = config["width"] * margin + inner_width * progress01
             normalized_elevation = (elevation_value - min_elevation) / span
@@ -674,7 +1189,7 @@ class Scene:
                 config["height"] * margin + inner_height * normalized_elevation
             )
             label_text = (
-                frame.profile_label_text(config["point_label"])
+                self.elevation_label_text(elevation_value, config["point_label"])
                 if "point_label" in config
                 else None
             )
@@ -689,7 +1204,9 @@ class Scene:
             )
         return frame_states
 
-    def color_with_scaled_opacity(self, color, opacity_scale=1.0, opacity_override=None):
+    def color_with_scaled_opacity(
+        self, color, opacity_scale=1.0, opacity_override=None
+    ):
         from PIL import ImageColor
 
         rgba = list(ImageColor.getcolor(color, "RGBA"))
@@ -710,8 +1227,12 @@ class Scene:
         translated_x = x_value - center_x
         translated_y = y_value - center_y
 
-        rotated_x = translated_x * math.cos(angle_rad) - translated_y * math.sin(angle_rad)
-        rotated_y = translated_x * math.sin(angle_rad) + translated_y * math.cos(angle_rad)
+        rotated_x = translated_x * math.cos(angle_rad) - translated_y * math.sin(
+            angle_rad
+        )
+        rotated_y = translated_x * math.sin(angle_rad) + translated_y * math.cos(
+            angle_rad
+        )
 
         corners = [
             (-center_x, -center_y),
@@ -762,7 +1283,9 @@ class Scene:
             (widget_width * scale, widget_height * scale),
             (0, 0, 0, 0),
         )
-        scaled_points = [(x_value * scale, y_value * scale) for x_value, y_value in points]
+        scaled_points = [
+            (x_value * scale, y_value * scale) for x_value, y_value in points
+        ]
         ImageDraw.Draw(scaled_image).line(
             scaled_points,
             fill=self.color_with_scaled_opacity(color, opacity_scale=opacity_scale),
@@ -781,7 +1304,9 @@ class Scene:
         for point_config in point_configs:
             radius = max(
                 2,
-                round(math.sqrt(max(get_point_weight(point_config), 1)) * max(scale, 0.1)),
+                round(
+                    math.sqrt(max(get_point_weight(point_config), 1)) * max(scale, 0.1)
+                ),
             )
             layers.append((radius, point_config))
 
@@ -795,9 +1320,18 @@ class Scene:
         draw = ImageDraw.Draw(sprite)
 
         for index, (radius, point_config) in enumerate(layers):
-            color = get_point_color(point_config) if "color" in point_config else default_color
+            color = (
+                get_point_color(point_config)
+                if "color" in point_config
+                else default_color
+            )
             opacity = point_config.get("opacity", 1.0)
-            bounds = (center - radius, center - radius, center + radius, center + radius)
+            bounds = (
+                center - radius,
+                center - radius,
+                center + radius,
+                center + radius,
+            )
 
             # Render the largest layers as thin rings; only the smallest layer is solid.
             if index < len(layers) - 1:
@@ -811,14 +1345,20 @@ class Scene:
         return sprite, (center, center)
 
     def build_route_layers(self, route_cache):
-        if route_cache is None or not route_cache.geometry or len(route_cache.geometry.points) < 2:
+        if (
+            route_cache is None
+            or not route_cache.geometry
+            or len(route_cache.geometry.points) < 2
+        ):
             return None, None
 
         config = route_cache.source_config
         line_color = get_line_color(config)
         line_width = max(
             1,
-            round(get_line_width(config) * constant.DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER),
+            round(
+                get_line_width(config) * constant.DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER
+            ),
         )
         background = None
         if constant.ENABLE_ROUTE_BACKGROUND_LAYER:
@@ -912,7 +1452,11 @@ class Scene:
     def build_route_bucket_assets(self, route_cache, representative_only=False):
         from PIL import Image
 
-        if route_cache is None or not route_cache.geometry or len(route_cache.geometry.points) < 2:
+        if (
+            route_cache is None
+            or not route_cache.geometry
+            or len(route_cache.geometry.points) < 2
+        ):
             return None
 
         bucket_indices = range(route_cache.bucket_count)
@@ -924,7 +1468,11 @@ class Scene:
                 (route_cache.bucket_count * 3) // 4,
                 route_cache.bucket_count - 1,
             }
-            bucket_indices = sorted(index for index in sample_indices if 0 <= index < route_cache.bucket_count)
+            bucket_indices = sorted(
+                index
+                for index in sample_indices
+                if 0 <= index < route_cache.bucket_count
+            )
 
         overlays = {}
         line_color = get_line_color(route_cache.source_config)
@@ -967,6 +1515,60 @@ class Scene:
 
         return [overlays[index] for index in range(route_cache.bucket_count)]
 
+    def build_route_bucket_masks(self, route_cache, representative_only=False):
+        from PIL import Image, ImageDraw
+
+        if (
+            route_cache is None
+            or not route_cache.geometry
+            or len(route_cache.display_points) < 2
+        ):
+            return None
+
+        route_layer_for_mask = (
+            route_cache.rotated_completed_layer or route_cache.completed_layer
+        )
+        if route_layer_for_mask is None:
+            return None
+
+        bucket_indices = range(route_cache.bucket_count)
+        if representative_only:
+            sample_indices = {
+                0,
+                route_cache.bucket_count // 4,
+                route_cache.bucket_count // 2,
+                (route_cache.bucket_count * 3) // 4,
+                route_cache.bucket_count - 1,
+            }
+            bucket_indices = sorted(
+                index
+                for index in sample_indices
+                if 0 <= index < route_cache.bucket_count
+            )
+
+        masks = {}
+        for bucket_index in bucket_indices:
+            progress_limit = bucket_index / max(route_cache.bucket_count - 1, 1)
+            mask = Image.new("L", route_layer_for_mask.size, 0)
+            points = self.route_points_for_progress(
+                route_cache.display_points,
+                route_cache.geometry.cumulative_progress,
+                progress_limit,
+            )
+            if len(points) >= 2:
+                ImageDraw.Draw(mask).line(
+                    points,
+                    fill=255,
+                    width=max(1, round(route_cache.line_width)),
+                    joint="curve",
+                )
+            masks[bucket_index] = mask
+
+        if representative_only:
+            return masks
+
+        return [masks[index] for index in range(route_cache.bucket_count)]
+
     def build_elevation_layers(self, elevation_cache):
         from PIL import Image, ImageDraw
 
@@ -982,7 +1584,8 @@ class Scene:
         line_width = max(
             1,
             round(
-                get_line_width(config) * constant.DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER
+                get_line_width(config)
+                * constant.DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER
             ),
         )
         fill_opacity = get_opacity(config.get("fill", {})) if "fill" in config else 0.0
@@ -1063,8 +1666,6 @@ class Scene:
             )
 
     def build_route_cache(self, prepare_trace=None):
-        from PIL import Image
-
         from render_assets import RouteWidgetCache
 
         config = self.get_plot_config(constant.ATTR_COURSE)
@@ -1084,8 +1685,8 @@ class Scene:
             widget_width=config["width"],
             widget_height=config["height"],
             rotation_deg=config.get("rotation", 0),
-            render_mode="incremental_mask",
-            bucket_count=0,
+            render_mode="bucket_mask",
+            bucket_count=self.route_reveal_bucket_count(config),
             background_layer=None,
             completed_layer=None,
             rotated_background_layer=None,
@@ -1094,19 +1695,23 @@ class Scene:
             marker_anchor=(0, 0),
             line_width=max(
                 1,
-                round(get_line_width(config) * constant.DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER),
+                round(
+                    get_line_width(config)
+                    * constant.DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER
+                ),
             ),
             simplified_points=geometry.points,
             cumulative_progress=geometry.cumulative_progress,
             display_points=geometry.points,
             bucket_masks=None,
             bucket_overlays=None,
-            reveal_mask=None,
         )
-        route_cache.background_layer, route_cache.completed_layer = self.measure_prepare_step(
-            prepare_trace,
-            "build_route_cache.layers",
-            lambda: self.build_route_layers(route_cache),
+        route_cache.background_layer, route_cache.completed_layer = (
+            self.measure_prepare_step(
+                prepare_trace,
+                "build_route_cache.layers",
+                lambda: self.build_route_layers(route_cache),
+            )
         )
         route_cache.rotated_background_layer = self.measure_prepare_step(
             prepare_trace,
@@ -1140,23 +1745,20 @@ class Scene:
             if route_cache.rotation_deg != 0
             else list(route_cache.geometry.points),
         )
-        route_layer_for_mask = route_cache.rotated_completed_layer or route_cache.completed_layer
-        route_cache.reveal_mask = self.measure_prepare_step(
-            prepare_trace,
-            "build_route_cache.reveal_mask",
-            lambda: Image.new(
-                "L",
-                route_layer_for_mask.size if route_layer_for_mask is not None else (0, 0),
-                0,
-            ),
+        route_cache.marker_sprite, route_cache.marker_anchor = (
+            self.measure_prepare_step(
+                prepare_trace,
+                "build_route_cache.marker_sprite",
+                lambda: self.build_marker_sprite(
+                    config.get("points", []),
+                    get_line_color(config),
+                ),
+            )
         )
-        route_cache.marker_sprite, route_cache.marker_anchor = self.measure_prepare_step(
+        route_cache.bucket_masks = self.measure_prepare_step(
             prepare_trace,
-            "build_route_cache.marker_sprite",
-            lambda: self.build_marker_sprite(
-                config.get("points", []),
-                get_line_color(config),
-            ),
+            "build_route_cache.bucket_masks",
+            lambda: self.build_route_bucket_masks(route_cache),
         )
         route_cache.frame_states = self.measure_prepare_step(
             prepare_trace,
@@ -1181,9 +1783,15 @@ class Scene:
         point_label = config.get("point_label")
         if point_label:
             label_style = ElevationLabelStyle(
-                font_path=point_label.get("font", self.template["scene"].get("font", "Arial.ttf")),
-                font_size=point_label.get("font_size", self.template["scene"].get("font_size", 32)),
-                color=point_label.get("color", config.get("color", constant.DEFAULT_COLOR)),
+                font_path=point_label.get(
+                    "font", self.template["scene"].get("font", "Arial.ttf")
+                ),
+                font_size=point_label.get(
+                    "font_size", self.template["scene"].get("font_size", 32)
+                ),
+                color=point_label.get(
+                    "color", config.get("color", constant.DEFAULT_COLOR)
+                ),
                 x_offset=point_label.get("x_offset", 0),
                 y_offset=point_label.get("y_offset", 0),
                 units=point_label.get("units", [constant.UNIT_METRIC]),
@@ -1207,10 +1815,12 @@ class Scene:
             simplified_points=geometry.points,
             label_style=label_style,
         )
-        elevation_cache.background_layer, elevation_cache.completed_layer = self.measure_prepare_step(
-            prepare_trace,
-            "build_elevation_cache.layers",
-            lambda: self.build_elevation_layers(elevation_cache),
+        elevation_cache.background_layer, elevation_cache.completed_layer = (
+            self.measure_prepare_step(
+                prepare_trace,
+                "build_elevation_cache.layers",
+                lambda: self.build_elevation_layers(elevation_cache),
+            )
         )
         elevation_cache.rotated_background_layer = self.measure_prepare_step(
             prepare_trace,
@@ -1228,14 +1838,16 @@ class Scene:
                 elevation_cache.rotation_deg,
             ),
         )
-        elevation_cache.marker_sprite, elevation_cache.marker_anchor = self.measure_prepare_step(
-            prepare_trace,
-            "build_elevation_cache.marker_sprite",
-            lambda: self.build_marker_sprite(
-                config.get("points", []),
-                get_line_color(config),
-                scale=constant.DEFAULT_ELEVATION_MARKER_SCALE,
-            ),
+        elevation_cache.marker_sprite, elevation_cache.marker_anchor = (
+            self.measure_prepare_step(
+                prepare_trace,
+                "build_elevation_cache.marker_sprite",
+                lambda: self.build_marker_sprite(
+                    config.get("points", []),
+                    get_line_color(config),
+                    scale=constant.DEFAULT_ELEVATION_MARKER_SCALE,
+                ),
+            )
         )
         elevation_cache.frame_states = self.measure_prepare_step(
             prepare_trace,
@@ -1244,7 +1856,9 @@ class Scene:
         )
         return elevation_cache
 
-    def save_geometry_preview(self, filename, widget_width, widget_height, points, color, render_debug):
+    def save_geometry_preview(
+        self, filename, widget_width, widget_height, points, color, render_debug
+    ):
         from PIL import Image, ImageDraw
 
         if not render_debug:
@@ -1302,12 +1916,16 @@ class Scene:
             lambda: Image.new("RGBA", (width, height)),
         )
 
-        if "labels" in self.template.keys() and len(self.frames) > 0:
+        if "labels" in self.template.keys():
+            from frame import Frame
+
+            static_frame = Frame("", width, height, 0, 0)
             for config in self.template["labels"]:
                 if render_profiler:
+
                     def draw_static_label():
                         with render_profiler.measure("text.static.cache"):
-                            return self.frames[0].draw_value(
+                            return static_frame.draw_value(
                                 render_assets.base_image,
                                 config["text"],
                                 config,
@@ -1324,7 +1942,7 @@ class Scene:
                     render_assets.base_image = self.measure_prepare_step(
                         prepare_trace,
                         f"draw_static_label:{config['text']}",
-                        lambda config=config: self.frames[0].draw_value(
+                        lambda config=config: static_frame.draw_value(
                             render_assets.base_image,
                             config["text"],
                             config,
@@ -1341,7 +1959,46 @@ class Scene:
                 f"Legacy plot rendering is no longer supported for '{attribute}'."
             )
 
-        prepare_trace.add_event("prepare_render_assets.total", prepare_started, datetime.now())
+        render_assets.dirty_regions = []
+        route_content_region = self.build_route_content_dirty_region(
+            render_assets.base_image,
+            width,
+            height,
+            render_assets.route_cache,
+        )
+        if route_content_region is not None:
+            render_assets.dirty_regions.append(route_content_region)
+
+        elevation_content_region = self.build_elevation_content_dirty_region(
+            render_assets.base_image,
+            width,
+            height,
+            render_assets.elevation_cache,
+        )
+        if elevation_content_region is not None:
+            render_assets.dirty_regions.append(elevation_content_region)
+
+        elevation_label_region = self.build_elevation_label_dirty_region(
+            render_assets.base_image,
+            width,
+            height,
+            render_assets.font_cache,
+            render_assets.elevation_cache,
+        )
+        if elevation_label_region is not None:
+            render_assets.dirty_regions.append(elevation_label_region)
+        render_assets.dirty_regions.extend(
+            self.build_dynamic_value_dirty_regions(
+                render_assets.base_image,
+                width,
+                height,
+                render_assets,
+            )
+        )
+
+        prepare_trace.add_event(
+            "prepare_render_assets.total", prepare_started, datetime.now()
+        )
 
         if render_debug:
             render_debug.save_image("base_image.png", render_assets.base_image)
@@ -1417,10 +2074,13 @@ class Scene:
                                 0,
                                 len(render_assets.elevation_cache.frame_states) // 4,
                                 len(render_assets.elevation_cache.frame_states) // 2,
-                                (len(render_assets.elevation_cache.frame_states) * 3) // 4,
+                                (len(render_assets.elevation_cache.frame_states) * 3)
+                                // 4,
                                 len(render_assets.elevation_cache.frame_states) - 1,
                             ]
-                            if 0 <= index < len(render_assets.elevation_cache.frame_states)
+                            if 0
+                            <= index
+                            < len(render_assets.elevation_cache.frame_states)
                         ],
                     },
                 )
@@ -1470,18 +2130,31 @@ class Scene:
     def frame_attribute_data(self, second: int, frame_number: int):
         attribute_data = {}
         valid_attributes = self.activity.valid_attributes
+        frame_index = second * self.fps + frame_number
         for attribute in valid_attributes:
-            if attribute in constant.NO_INTERPOLATE_ATTRIBUTES:
+            if attribute == constant.ATTR_TIME:
+                frame_timestamps = getattr(self.activity, "frame_timestamps", [])
+                raw_times = getattr(self.activity, attribute, [])
+                if frame_timestamps:
+                    attribute_data[attribute] = frame_timestamps[
+                        min(frame_index, len(frame_timestamps) - 1)
+                    ]
+                elif raw_times:
+                    attribute_data[attribute] = raw_times[
+                        min(second, len(raw_times) - 1)
+                    ]
+                else:
+                    attribute_data[attribute] = None
+            elif attribute in constant.NO_INTERPOLATE_ATTRIBUTES:
                 attribute_data[attribute] = getattr(self.activity, attribute)[second]
             else:
                 attribute_data[attribute] = getattr(self.activity, attribute)[
-                    second * self.fps + frame_number
+                    min(frame_index, len(getattr(self.activity, attribute)) - 1)
                 ]
         return attribute_data
 
-    def build_frame(self, seconds, second, frame_number):
-        num_frames = seconds * self.fps
-        frame_digits = int(math.log10(num_frames - 2)) + 1
+    def build_frame(self, total_frames, second, frame_number):
+        frame_digits = max(1, len(str(max(total_frames - 1, 0))))
         from frame import Frame
 
         frame = Frame(
@@ -1497,9 +2170,14 @@ class Scene:
         frame_data = self.frame_attribute_data(second, frame_number)
         for attribute in frame.valid_attributes:
             setattr(frame, attribute, frame_data[attribute])
-        self.frames.append(frame)
+        return frame
+
+    def iter_frames(self, seconds):
+        total_frames = self.total_frame_count(seconds)
+        for frame_index in range(total_frames):
+            second, frame_number = self.frame_time_components(frame_index)
+            yield self.build_frame(total_frames, second, frame_number)
 
     def build_frames(self, seconds):
-        for second in range(seconds):
-            for frame_number in range(self.fps):
-                self.build_frame(seconds, second, frame_number)
+        for frame in self.iter_frames(seconds):
+            self.frames.append(frame)

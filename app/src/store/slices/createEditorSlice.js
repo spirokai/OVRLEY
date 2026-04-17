@@ -1,0 +1,156 @@
+import {
+  beginConfigUpdate,
+  cloneSerializable,
+  endConfigUpdateSoon,
+  hasSerializableChanged,
+  isConfigUpdateInProgress,
+  readStoredConfig,
+  readStoredInt,
+  updateConfigPersistence,
+} from '../store-utils'
+
+export function createEditorSlice(set, get) {
+  return {
+    editor: null,
+    hasUnrenderedChanges: false,
+    lastRenderedConfig: null,
+    dummyDurationSeconds: readStoredInt('dummyDurationSeconds', 73),
+    startSecond: readStoredInt('startSecond', 0),
+    endSecond: readStoredInt('endSecond', 73),
+    selectedSecond: readStoredInt('selectedSecond', 0),
+    config: readStoredConfig(),
+    autoRender: localStorage.getItem('autoRender') === 'true',
+
+    setConfig: (val) => {
+      const currentState = get()
+      const isDifferent = currentState.lastRenderedConfig
+        ? hasSerializableChanged(val, currentState.lastRenderedConfig)
+        : false
+
+      localStorage.setItem('editorConfig', JSON.stringify(val))
+
+      const wasUpdating = beginConfigUpdate()
+
+      set((state) => {
+        state.config = val
+
+        if (val.scene) {
+          const hasExistingTimeline =
+            state.startSecond !== 0 ||
+            state.endSecond !== state.dummyDurationSeconds
+
+          if (!hasExistingTimeline) {
+            if (val.scene.start !== undefined) {
+              state.startSecond = val.scene.start
+            }
+            if (val.scene.end !== undefined) {
+              state.endSecond = val.scene.end
+              state.dummyDurationSeconds = val.scene.end
+            }
+            if (val.scene.start !== undefined) {
+              state.selectedSecond = val.scene.start
+            }
+          } else {
+            if (
+              val.scene.start !== undefined &&
+              val.scene.start !== state.startSecond
+            ) {
+              state.startSecond = val.scene.start
+              localStorage.setItem('startSecond', val.scene.start.toString())
+            }
+            if (
+              val.scene.end !== undefined &&
+              val.scene.end !== state.endSecond
+            ) {
+              state.endSecond = val.scene.end
+              state.dummyDurationSeconds = val.scene.end
+              localStorage.setItem('endSecond', val.scene.end.toString())
+              localStorage.setItem(
+                'dummyDurationSeconds',
+                val.scene.end.toString(),
+              )
+            }
+          }
+        }
+
+        if (!wasUpdating) {
+          state.hasUnrenderedChanges = isDifferent
+        }
+      })
+
+      endConfigUpdateSoon()
+    },
+
+    setHasUnrenderedChanges: (val) =>
+      set((state) => {
+        state.hasUnrenderedChanges = val
+      }),
+
+    setLastRenderedConfig: (config) =>
+      set((state) => {
+        state.lastRenderedConfig = cloneSerializable(config)
+      }),
+
+    setAutoRender: (val) => {
+      localStorage.setItem('autoRender', val.toString())
+      set((state) => {
+        state.autoRender = val
+      })
+    },
+
+    setDummyDurationSeconds: (duration) => {
+      localStorage.setItem('dummyDurationSeconds', duration.toString())
+      set((state) => {
+        state.dummyDurationSeconds = duration
+      })
+    },
+
+    setStartSecond: (second) => {
+      localStorage.setItem('startSecond', second.toString())
+
+      const state = get()
+      if (state.startSecond === second) return
+
+      set((draft) => {
+        draft.startSecond = second
+
+        if (!isConfigUpdateInProgress() && draft.config && draft.config.scene) {
+          if (draft.config.scene.start === second) return
+
+          draft.config.scene.start = second
+          updateConfigPersistence(draft)
+        }
+      })
+    },
+
+    setEndSecond: (second) => {
+      localStorage.setItem('endSecond', second.toString())
+
+      const state = get()
+      if (state.endSecond === second) return
+
+      set((draft) => {
+        draft.endSecond = second
+
+        if (!isConfigUpdateInProgress() && draft.config && draft.config.scene) {
+          if (draft.config.scene.end === second) return
+
+          draft.config.scene.end = second
+          updateConfigPersistence(draft)
+        }
+      })
+    },
+
+    setSelectedSecond: (second) => {
+      localStorage.setItem('selectedSecond', second.toString())
+      set((state) => {
+        state.selectedSecond = second
+      })
+    },
+
+    setEditor: (editor) =>
+      set((state) => {
+        state.editor = editor
+      }),
+  }
+}

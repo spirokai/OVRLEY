@@ -64,9 +64,138 @@ This plan outlines the steps to refactor the frontend of `cyclemetry-reloaded` t
 
 #### [NEW] app/src/components/SidebarWidgetsTab.jsx
 
+All these options must be supported for the widgets:
+
+# Text Widget
+
+-Font size (slider+input)
+-Color (color picker)
+-Text (text input)
+
+# Speed/Heart rate/Cadence/Power Widgets
+
+-Icon display (switch)
+-Icon color (color picker)
+-Icon size (slider)
+-Icon offset x and y
+-Font size (slider+input)
+-Font color (color picker)
+-Display units (switch)
+-Units for speed (dropdown; kmh, mph, kn, m/s)
+
+# Time & Date Widget
+
+-Format (dropdown with different formats displayed as DD-MM-YYYY, 24 and 12h time formats etc)
+-Include format options with only date, only time, or mixed
+-Font size (slider+input)
+-Icon display (switch)
+-Icon color (color picker)
+-Icon size (slider)
+-Icon offset x and y
+
+# Gradient/Slope Widget
+
+-Value font size (slider+input)
+-Value offset (slider)
+-Value color (color picker)
+-Triangle color positive/negative (2 color pickers)
+-Show sign (switch)
+-Display +/- (switch)
+-Decimals (slider 0-2)
+-Display triangle shape (switch)
+-Triangle shape width (slider)
+
+# Temperature Widget
+
+-Icon display (switch)
+-Icon color (color picker)
+-Icon size (slider)
+-Icon offset x and y (slider)
+-Font size (slider+input)
+-Font color (color picker)
+-Display units (switch)
+-Units C/F (switch with units inside)
+
+# Route Map
+
+-Line thickness (slider 0-20) - separately for completed/not completed
+-Line color (color picker) - separately for completed/not completed
+-Line opacity (slider 0-100) - separately for completed/not completed
+-Marker size (slider 0-50)
+-Marker color (color picker)
+-Marker opacity (slider 0-100)
+-Map rotation (0-360 degrees, number input, or some slider?)
+
+# Elevation profile
+
+-Line thickness (slider 0-20) - separately for completed/not completed
+-Line color (color picker) - separately for completed/not completed
+-Line opacity (slider 0-100) - separately for completed/not completed
+-Marker size (slider 0-50)
+-Marker color (color picker)
+-Marker opacity (slider 0-100)
+-Show elevation metric (switch)
+-Show elevation imperial (switch)
+-Offset for both elevation labels (x,y with respect to the marker; slider)
+
 ---
 
-### Phase 4: Interactive Overlay Editor (Canvas)
+### Phase 4: Template handling
+
+**Goal**: Ensure saving and loading templates works.
+
+- **Save templates**: Templates should be saved via the element in the header of the app into the local folder "Documents/Cyclemetry" or its macOS equivalent (provide a suggestion here). ALL settings from "settings" tab and "widgets" tab should be saved, including canvas size and resolution and rendering settings as a json/xml (whatever is most approporiate).
+- **Load templates**: Templates should be loaded via the element in the header of the app. ALL the global and widget settings should be loaded and recovered in the sidebar from the template
+- **Draft badge**: The current draft badge should be display only if a template has been modified after loading (or never saved). i.e. if there are changes to be saved
+- **Global settings**: Changeing the colors in the "settings" tab of the sidebar should change the color of the respective properties in widgets. E.g. changing "values" color should change speed/temperature/heartrate/cadence/power etc outputs; changing "labels" color should change color of all labels and text, changing "icons" color should change color of all icons in widgets. Do not link the opacity to anything, that should be a separate property for now.
+
+#### [MODIFY] app/src/components/TemplateEditor.jsx
+
+#### [MODIFY] app/src/components/TemplatesSection.jsx
+
+#### [MODIFY] app/src/store/useStore.js
+
+---
+
+### Phase 5: GPX/FIT Handling
+
+**Goal**: Parse incoming GPX and FIT data directly on the frontend.
+
+- **Data Parsing**: Frontend parsing for both GPX and FIT (using `fit-file-parser`). Both file types should produce identical data format after parsing.
+- **GPX parsing**: The project contains some form of data parsing, although not sure if in front end or back end. Check this and reuse this code. In any case, both GPX and FIT parsing must be done by the front end. Back end will eventually receive only the clean data and template layout.
+- **Preview Readiness**: Store parsed data to allow future preview/filtering.
+- **Schema**: The data should following the existing schema being fed into the python backend to ensure backwards compatibility of code.
+- **Supported data**: The following data must supported. Check official SDK/API of GPX/FIT to understand the format. Some of the data is not commonly supported by GPX but they are typically supported within the <extensions> tag. The following data must be supported:
+  General metadata of the activity
+  Latitude / Longitude
+  Course/heading
+  Altitude
+  Timestamp
+  Speed
+  Pace
+  Distance
+  Vertical speed
+  Heart rate
+  Cadence
+  Power
+  Left/right balance
+  Torque
+  Ground contact time
+  Vertical oscillation
+  Stride length
+  Temperature
+  Air pressure
+  Slope/gradient
+  Stroke rate (rowing)
+  G-Force
+
+#### [MODIFY] app/src/api/gpxUtils.jsx
+
+#### [NEW] app/src/api/fitParserUtils.js
+
+---
+
+### Phase 6: Interactive Overlay Editor (Canvas)
 
 **Goal**: Replace the static preview with an interactive `react-moveable` canvas.
 
@@ -79,19 +208,6 @@ This plan outlines the steps to refactor the frontend of `cyclemetry-reloaded` t
 
 #### [NEW] app/src/components/OverlayEditor.jsx
 
----
-
-### Phase 5: GPX/FIT Handling
-
-**Goal**: Parse incoming GPX and FIT data directly on the frontend.
-
-- **Data Parsing**: Frontend parsing for both GPX and FIT (using `fit-file-parser`).
-- **Preview Readiness**: Store parsed data to allow future preview/filtering.
-
-#### [MODIFY] app/src/api/gpxUtils.jsx
-
-#### [NEW] app/src/api/fitParserUtils.js
-
 ## Verification Plan
 
 ### Manual Verification Steps (After Each Phase)
@@ -99,5 +215,6 @@ This plan outlines the steps to refactor the frontend of `cyclemetry-reloaded` t
 **Phase 1**: Confirm Zustand state structure in DevTools; verify no backend files were touched.
 **Phase 2**: Verify Tab switching and Aspect Ratio locking; test reset icons in global settings.
 **Phase 3**: Verify Quickmenu widget creation and Accordion functionality.
-**Phase 4**: Test dragging/resizing on the canvas; verify guides appear; check performance (no lag during drag).
+**Phase 4**: Test saving/loading templates and global settings default color affect all widgets.
 **Phase 5**: Upload GPX and FIT files; verify successful parsing in console/store.
+**Phase 6**: Test dragging/resizing on the canvas; verify guides appear; check performance (no lag during drag).

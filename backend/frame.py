@@ -161,7 +161,9 @@ class Frame:
         marker_left = round(marker_x - marker_anchor[0])
         marker_top = round(marker_y - marker_anchor[1])
         marker_layer.paste(sprite, (marker_left, marker_top), sprite)
-        rotated_marker_layer = marker_layer.rotate(rotation_deg, resample=3, expand=True)
+        rotated_marker_layer = marker_layer.rotate(
+            rotation_deg, resample=3, expand=True
+        )
         img.paste(rotated_marker_layer, (widget_x, widget_y), rotated_marker_layer)
         return img
 
@@ -172,8 +174,12 @@ class Frame:
         translated_x = x_value - center_x
         translated_y = y_value - center_y
 
-        rotated_x = translated_x * math.cos(angle_rad) - translated_y * math.sin(angle_rad)
-        rotated_y = translated_x * math.sin(angle_rad) + translated_y * math.cos(angle_rad)
+        rotated_x = translated_x * math.cos(angle_rad) - translated_y * math.sin(
+            angle_rad
+        )
+        rotated_y = translated_x * math.sin(angle_rad) + translated_y * math.cos(
+            angle_rad
+        )
 
         corners = [
             (-center_x, -center_y),
@@ -193,7 +199,9 @@ class Frame:
 
         return rotated_x - min_x, rotated_y - min_y
 
-    def composite_elevation_widget(self, img, elevation_cache, render_assets=None, render_profiler=None):
+    def composite_elevation_widget(
+        self, img, elevation_cache, render_assets=None, render_profiler=None
+    ):
         if elevation_cache is None or not elevation_cache.frame_states:
             return img
 
@@ -217,10 +225,12 @@ class Frame:
             marker_y = state.marker_y
         else:
             background_layer = (
-                elevation_cache.rotated_background_layer or elevation_cache.background_layer
+                elevation_cache.rotated_background_layer
+                or elevation_cache.background_layer
             )
             completed_layer = (
-                elevation_cache.rotated_completed_layer or elevation_cache.completed_layer
+                elevation_cache.rotated_completed_layer
+                or elevation_cache.completed_layer
             )
             widget_x = elevation_cache.widget_x
             widget_y = elevation_cache.widget_y
@@ -238,10 +248,16 @@ class Frame:
         if completed_layer is not None:
             reveal_width = max(
                 1,
-                min(completed_layer.width, round(completed_layer.width * state.progress01)),
+                min(
+                    completed_layer.width,
+                    round(completed_layer.width * state.progress01),
+                ),
             )
-            completed_crop = completed_layer.crop((0, 0, reveal_width, completed_layer.height))
-            img.paste(completed_crop, (widget_x, widget_y), completed_crop)
+            img.alpha_composite(
+                completed_layer,
+                dest=(widget_x, widget_y),
+                source=(0, 0, reveal_width, completed_layer.height),
+            )
 
         if elevation_cache.marker_sprite is not None:
             img = self.paste_widget_marker(
@@ -289,41 +305,16 @@ class Frame:
         self.append_route_point(points, (state.marker_x, state.marker_y))
         return points
 
-    def build_route_delta_points(self, route_cache, previous_state, state):
-        points = []
-        self.append_route_point(points, (previous_state.marker_x, previous_state.marker_y))
-
-        for point in route_cache.display_points[previous_state.segment_index : state.segment_index]:
-            self.append_route_point(points, point)
-
-        self.append_route_point(points, (state.marker_x, state.marker_y))
-        return points
-
-    def update_route_reveal_mask(self, route_cache, state_index, completed_layer):
+    def build_route_reveal_mask(self, route_cache, state_index, completed_layer):
         from PIL import Image, ImageDraw
 
         if completed_layer is None:
             return None
 
-        if (
-            route_cache.reveal_mask is None
-            or route_cache.reveal_mask.size != completed_layer.size
-        ):
-            route_cache.reveal_mask = Image.new("L", completed_layer.size, 0)
-            route_cache.last_revealed_state_index = -1
-
         state = route_cache.frame_states[state_index]
-        draw = ImageDraw.Draw(route_cache.reveal_mask)
-
-        if state_index != route_cache.last_revealed_state_index + 1:
-            route_cache.reveal_mask = Image.new("L", completed_layer.size, 0)
-            draw = ImageDraw.Draw(route_cache.reveal_mask)
-            points = self.build_route_prefix_points(route_cache, state)
-        elif route_cache.last_revealed_state_index >= 0:
-            previous_state = route_cache.frame_states[route_cache.last_revealed_state_index]
-            points = self.build_route_delta_points(route_cache, previous_state, state)
-        else:
-            points = self.build_route_prefix_points(route_cache, state)
+        reveal_mask = Image.new("L", completed_layer.size, 0)
+        draw = ImageDraw.Draw(reveal_mask)
+        points = self.build_route_prefix_points(route_cache, state)
 
         if len(points) >= 2:
             draw.line(
@@ -333,10 +324,11 @@ class Frame:
                 joint="curve",
             )
 
-        route_cache.last_revealed_state_index = state_index
-        return route_cache.reveal_mask
+        return reveal_mask
 
-    def composite_route_widget(self, img, route_cache, render_assets=None, render_profiler=None):
+    def composite_route_widget(
+        self, img, route_cache, render_assets=None, render_profiler=None
+    ):
         if route_cache is None or not route_cache.frame_states:
             return img
 
@@ -356,8 +348,12 @@ class Frame:
             marker_x = state.marker_x
             marker_y = state.marker_y
         else:
-            background_layer = route_cache.rotated_background_layer or route_cache.background_layer
-            completed_layer = route_cache.rotated_completed_layer or route_cache.completed_layer
+            background_layer = (
+                route_cache.rotated_background_layer or route_cache.background_layer
+            )
+            completed_layer = (
+                route_cache.rotated_completed_layer or route_cache.completed_layer
+            )
             widget_x = route_cache.widget_x
             widget_y = route_cache.widget_y
             marker_x = state.marker_x
@@ -366,7 +362,15 @@ class Frame:
         if background_layer is not None:
             img.paste(background_layer, (widget_x, widget_y), background_layer)
 
-        reveal_mask = self.update_route_reveal_mask(route_cache, state_index, completed_layer)
+        reveal_mask = None
+        if route_cache.bucket_masks:
+            reveal_mask = route_cache.bucket_masks[state.bucket_index]
+        else:
+            reveal_mask = self.build_route_reveal_mask(
+                route_cache,
+                state_index,
+                completed_layer,
+            )
         if completed_layer is not None and reveal_mask is not None:
             img.paste(completed_layer, (widget_x, widget_y), reveal_mask)
 
@@ -435,7 +439,16 @@ class Frame:
 
         # Use base_image if provided, otherwise create new
         if base_image is not None:
-            img = base_image.copy()
+            if (
+                render_assets is not None
+                and render_assets.frame_buffer_pool is not None
+            ):
+                img = render_assets.acquire_frame_image(render_profiler=render_profiler)
+            else:
+                start = perf_counter()
+                img = base_image.copy()
+                if render_profiler:
+                    render_profiler.record("base.copy", perf_counter() - start)
         else:
             from PIL import Image
 
@@ -463,9 +476,7 @@ class Frame:
                         font_cache=font_cache,
                     )
                     if render_profiler:
-                        render_profiler.record(
-                            "text.dynamic", perf_counter() - start
-                        )
+                        render_profiler.record("text.dynamic", perf_counter() - start)
 
         # Only draw static elements if no base_image provided
         if base_image is None:
@@ -480,9 +491,7 @@ class Frame:
                         font_cache=font_cache,
                     )
                     if render_profiler:
-                        render_profiler.record(
-                            "text.static", perf_counter() - start
-                        )
+                        render_profiler.record("text.static", perf_counter() - start)
             if "plots" in configs.keys():
                 for config in configs["plots"]:
                     attribute = config["value"]
@@ -495,9 +504,14 @@ class Frame:
                             render_profiler=render_profiler,
                         )
                         if render_profiler:
-                            render_profiler.record("composite.route", perf_counter() - start)
+                            render_profiler.record(
+                                "composite.route", perf_counter() - start
+                            )
                         continue
-                    if attribute == constant.ATTR_ELEVATION and render_assets is not None:
+                    if (
+                        attribute == constant.ATTR_ELEVATION
+                        and render_assets is not None
+                    ):
                         start = perf_counter()
                         img = self.composite_elevation_widget(
                             img,
@@ -533,7 +547,9 @@ class Frame:
                     render_profiler=render_profiler,
                 )
                 if render_profiler:
-                    render_profiler.record("composite.elevation", perf_counter() - start)
+                    render_profiler.record(
+                        "composite.elevation", perf_counter() - start
+                    )
         return img
 
     def profile_label_text(self, config):

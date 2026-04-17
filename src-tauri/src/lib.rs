@@ -3,6 +3,8 @@
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Bytes, Request, Uri};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use tauri::Manager;
 
 #[cfg(unix)]
 use hyperlocal::{UnixConnector, Uri as UnixUri};
@@ -356,6 +358,30 @@ async fn backend_image_data(filename: String) -> Result<String, String> {
     backend_image_data_tcp(filename).await
 }
 
+#[tauri::command]
+fn default_template_save_path(
+    app: tauri::AppHandle,
+    filename: String,
+) -> Result<String, String> {
+    let mut path = app.path().document_dir().map_err(|e| e.to_string())?;
+    path.push("Cyclemetry");
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    path.push(filename);
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn write_template_file(path: String, contents: String) -> Result<String, String> {
+    let path_buf = PathBuf::from(&path);
+
+    if let Some(parent) = path_buf.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    std::fs::write(&path_buf, contents).map_err(|e| e.to_string())?;
+    Ok(path)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -376,7 +402,9 @@ pub fn run() {
             backend_upload,
             backend_socket_ready,
             get_image_url,
-            backend_image_data
+            backend_image_data,
+            default_template_save_path,
+            write_template_file
         ])
         .setup(|app| {
             // Spawn the python sidecar

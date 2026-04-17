@@ -1,10 +1,36 @@
 from dataclasses import dataclass, field
+from time import perf_counter
 from typing import Any
 
 
 @dataclass
 class FontCache:
     by_key: dict[tuple[str, int], object] = field(default_factory=dict)
+
+
+@dataclass
+class DirtyRegion:
+    box: tuple[int, int, int, int]
+    background: Any
+
+
+class FrameBufferPool:
+    def __init__(self, buffers):
+        import queue
+
+        self.available = queue.Queue(maxsize=len(buffers))
+        self.buffer_ids = {id(buffer) for buffer in buffers}
+        for buffer in buffers:
+            self.available.put(buffer)
+
+    def acquire(self):
+        return self.available.get()
+
+    def release(self, image):
+        if id(image) not in self.buffer_ids:
+            return False
+        self.available.put(image)
+        return True
 
 
 @dataclass
@@ -66,8 +92,6 @@ class RouteWidgetCache:
     display_points: list[tuple[float, float]]
     bucket_masks: list[Any] | None
     bucket_overlays: list[Any] | None
-    reveal_mask: Any | None
-    last_revealed_state_index: int = -1
     frame_states: list[RouteFrameState] = field(default_factory=list)
 
 
@@ -98,3 +122,33 @@ class RenderAssets:
     route_cache: RouteWidgetCache | None = None
     elevation_cache: ElevationWidgetCache | None = None
     plot_backgrounds: dict[str, tuple[Any, dict]] = field(default_factory=dict)
+    dirty_regions: list[DirtyRegion] = field(default_factory=list)
+    frame_buffer_pool: FrameBufferPool | None = None
+
+    def initialize_frame_buffer_pool(self, pool_size):
+        if self.base_image is None or pool_size <= 0:
+            return
+        self.frame_buffer_pool = FrameBufferPool(
+            [self.base_image.copy() for _ in range(pool_size)]
+        )
+
+    def acquire_frame_image(self, render_profiler=None):
+        if self.base_image is None:
+            return None
+        if self.frame_buffer_pool is None:
+            return self.base_image.copy()
+
+        image = self.frame_buffer_pool.acquire()
+        if self.dirty_regions:
+            started_at = perf_counter()
+            for region in self.dirty_regions:
+                left, top, _, _ = region.box
+                image.paste(region.background, (left, top))
+            if render_profiler is not None:
+                render_profiler.record("base.restore", perf_counter() - started_at)
+        return image
+
+    def release_frame_image(self, image):
+        if self.frame_buffer_pool is None:
+            return False
+        return self.frame_buffer_pool.release(image)
