@@ -512,11 +512,11 @@ function App() {
   }
 
   return (
-    <div className="h-screen dark flex flex-col bg-[#0a0a0a] text-foreground">
+    <div className="h-screen flex flex-col bg-background text-foreground">
       <ErrorAlert />
       <RenderProgressOverlay />
       {/* Header */}
-      <header className="relative z-50 border-b border-border bg-card/50 backdrop-blur-sm shrink-0">
+      <header className="relative z-50 shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
         <div className="flex items-center justify-between px-6 py-3">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
@@ -533,14 +533,14 @@ function App() {
               </div>
             </div>
 
-            <div className="h-8 w-px bg-zinc-800/50" />
+            <div className="h-8 w-px bg-border/60" />
 
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="md"
-                  className="gap-2 h-9 px-5 mr-4 border-zinc-700/50 hover:bg-zinc-800/50 text-muted-foreground hover:text-foreground"
+                  className="mr-4 h-9 gap-2 border-border/70 px-5 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
                   onClick={handleGpxFileOpen}
                 >
                   <Activity className="h-3.5 w-3.5" />
@@ -559,9 +559,9 @@ function App() {
                   }
                   onValueChange={handleTemplateChange}
                 >
-                  <SelectTrigger className="w-56 h-8 text-xs border-zinc-700/50 bg-zinc-900/30">
+                  <SelectTrigger className="h-8 w-56 bg-surface text-xs border-border/70">
                     <div className="flex items-center gap-2 truncate">
-                      <Sparkles className="h-3 w-3 text-red-500 shrink-0" />
+                      <Sparkles className="h-3 w-3 shrink-0 text-primary" />
                       <SelectValue
                         placeholder={
                           loadedTemplateSource === 'file'
@@ -586,7 +586,7 @@ function App() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                        className="h-8 w-8 text-muted-foreground hover:bg-surface-accent-soft hover:text-primary"
                         onClick={handleSaveTemplate}
                       >
                         <Save className="h-4 w-4" />
@@ -597,7 +597,7 @@ function App() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-zinc-800"
+                      className="h-8 w-8 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
                       onClick={handleImportTemplate}
                     >
                       <FolderOpen className="h-4 w-4" />
@@ -610,7 +610,7 @@ function App() {
                     variant={status === 'Modified' ? 'secondary' : 'outline'}
                     className={`text-[10px] h-5 ${
                       status === 'Modified'
-                        ? 'bg-orange-500/10 text-orange-500 border-orange-500/20'
+                        ? 'border-accent-border bg-surface-accent-soft text-primary'
                         : ''
                     }`}
                   >
@@ -642,8 +642,8 @@ function App() {
                 size="sm"
                 className={`gap-2 h-8 px-3 transition-all duration-300 relative ${
                   hasUnrenderedChanges
-                    ? 'border-red-500 bg-red-500/10 text-foreground ring-1 ring-red-500/50'
-                    : 'border-red-500/30 hover:border-red-500/50 hover:bg-red-500/5'
+                    ? 'border-accent-border bg-surface-accent-soft text-foreground ring-1 ring-ring/50'
+                    : 'border-accent-border/70 hover:border-accent-border hover:bg-surface-accent-soft'
                 }`}
                 onClick={() => handleGeneratePreview()}
                 disabled={
@@ -654,14 +654,14 @@ function App() {
                   <Spinner className="h-3.5 w-3.5" />
                 ) : (
                   <Upload
-                    className={`h-3.5 w-3.5 ${hasUnrenderedChanges ? 'text-red-400' : 'text-red-500'}`}
+                    className={`h-3.5 w-3.5 ${hasUnrenderedChanges ? 'text-highlight' : 'text-primary'}`}
                   />
                 )}
                 <span>Refresh Preview</span>
                 {hasUnrenderedChanges && !generatingImage && (
                   <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-highlight opacity-75"></span>
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary"></span>
                   </span>
                 )}
               </Button>
@@ -695,7 +695,7 @@ function App() {
             >
               <Button
                 size="sm"
-                className="bg-red-600 hover:bg-red-700 text-white"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
                 disabled={
                   !config || renderingVideo || backendStatus !== 'connected'
                 }
@@ -713,7 +713,7 @@ function App() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 h-8 px-3 border-red-500/30 hover:border-red-500/50 hover:bg-red-500/5 text-muted-foreground hover:text-foreground"
+                className="h-8 gap-2 border-accent-border/70 px-3 text-muted-foreground hover:border-accent-border hover:bg-surface-accent-soft hover:text-foreground"
                 disabled={backendStatus !== 'connected'}
                 onClick={handleOpenDownloads}
               >
@@ -759,7 +759,7 @@ function App() {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Preview - Left */}
-        <div className="flex-1 flex items-center justify-center p-8 bg-[#0a0a0a]">
+        <div className="flex flex-1 items-center justify-center bg-background p-8">
           {generatingImage && (
             <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
               <div className="flex flex-col items-center gap-2">
@@ -776,13 +776,13 @@ function App() {
               <img
                 src={imageFilename}
                 alt="Preview"
-                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl border border-zinc-800 bg-grid-transparent"
+                className="max-h-full max-w-full rounded-lg border border-border/70 bg-grid-transparent object-contain shadow-2xl"
                 onError={() => setImageError(true)}
               />
               {config?.scene && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2">
-                  <div className="px-3 py-1 rounded-full bg-zinc-950/80 backdrop-blur-sm border border-zinc-700">
-                    <span className="text-xs font-medium text-zinc-400">
+                  <div className="rounded-full border border-border/70 bg-surface-overlay px-3 py-1 backdrop-blur-sm">
+                    <span className="text-xs font-medium text-muted-foreground">
                       {config.scene.width} × {config.scene.height}
                     </span>
                   </div>
@@ -793,7 +793,7 @@ function App() {
             <div className="flex flex-col items-center gap-4 text-center">
               {backendStatus === 'connecting' ? (
                 <>
-                  <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-elevated">
                     <Spinner className="h-6 w-6" />
                   </div>
                   <div>
@@ -811,9 +811,9 @@ function App() {
                 </>
               ) : backendStatus === 'error' ? (
                 <>
-                  <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center border border-destructive/20">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full border border-accent-border bg-surface-accent-soft">
                     <svg
-                      className="w-8 h-8 text-destructive"
+                      className="h-8 w-8 text-primary"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -838,7 +838,7 @@ function App() {
                         setBackendStatus('connecting')
                         strikesRef.current = 0
                       }}
-                      className="border-red-500/30 hover:bg-red-500/10"
+                      className="border-accent-border/70 hover:bg-surface-accent-soft"
                     >
                       Retry Connection
                     </Button>
@@ -846,9 +846,9 @@ function App() {
                 </>
               ) : (
                 <>
-                  <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-elevated">
                     <svg
-                      className="w-8 h-8 text-muted-foreground"
+                      className="h-8 w-8 text-muted-foreground"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -874,7 +874,7 @@ function App() {
         </div>
 
         {/* Control Panel - Right */}
-        <div className="w-96 border-l border-border bg-card/30 backdrop-blur-sm overflow-y-auto">
+        <div className="w-96 overflow-y-auto border-l border-border/70 bg-card/60 backdrop-blur-sm">
           <ControlPanel
             config={config}
             onConfigChange={setConfig}

@@ -1,9 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-@custom-variant dark (&:is(.dark *));
-
-/* Dark theme base */
 :root {
   font-family:
     system-ui,
@@ -15,52 +12,152 @@
   font-weight: 400;
 
   color-scheme: dark;
-  color: #e5e5e5;
-  background-color: #0a0a0a;
+  color: #afeeee;
+  background-color: #00293b;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --theme-color-background: #00111b;
+  --theme-color-accent: #c65102;
+  --theme-color-aqua: #40e0d0;
+  --theme-color-ice: #afeeee;
+  --theme-color-teal: #005b5b;
+  --background: var(--theme-color-background);
+  --foreground: var(--theme-color-ice);
+  --card: color-mix(
+    in srgb,
+    var(--theme-color-background) 78%,
+    var(--theme-color-teal) 22%
+  );
+  --card-foreground: var(--theme-color-ice);
+  --popover: color-mix(
+    in srgb,
+    var(--theme-color-background) 82%,
+    var(--theme-color-teal) 18%
+  );
+  --popover-foreground: var(--theme-color-ice);
+  --primary: var(--theme-color-accent);
+  --primary-foreground: var(--theme-color-background);
+  --secondary: color-mix(
+    in srgb,
+    var(--theme-color-background) 72%,
+    var(--theme-color-teal) 28%
+  );
+  --secondary-foreground: var(--theme-color-ice);
+  --muted: color-mix(
+    in srgb,
+    var(--theme-color-background) 88%,
+    var(--theme-color-teal) 12%
+  );
+  --muted-foreground: color-mix(
+    in srgb,
+    var(--theme-color-ice) 72%,
+    var(--theme-color-aqua) 28%
+  );
+  --accent: var(--theme-color-aqua);
+  --accent-foreground: var(--theme-color-background);
+  --destructive: var(--theme-color-accent);
+  --border: color-mix(
+    in srgb,
+    var(--theme-color-background) 52%,
+    var(--theme-color-ice) 48%
+  );
+  --input: color-mix(
+    in srgb,
+    var(--theme-color-background) 70%,
+    var(--theme-color-teal) 30%
+  );
+  --ring: color-mix(
+    in srgb,
+    var(--theme-color-accent) 70%,
+    var(--theme-color-aqua) 30%
+  );
+  --chart-1: var(--theme-color-accent);
+  --chart-2: var(--theme-color-aqua);
+  --chart-3: var(--theme-color-teal);
+  --chart-4: var(--theme-color-ice);
+  --chart-5: color-mix(
+    in srgb,
+    var(--theme-color-accent) 45%,
+    var(--theme-color-aqua) 55%
+  );
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--theme-color-ice);
+  --sidebar-primary: var(--theme-color-accent);
+  --sidebar-primary-foreground: var(--theme-color-background);
+  --sidebar-accent: var(--theme-color-aqua);
+  --sidebar-accent-foreground: var(--theme-color-background);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  --surface: color-mix(
+    in srgb,
+    var(--theme-color-background) 84%,
+    var(--theme-color-teal) 16%
+  );
+  --surface-elevated: color-mix(
+    in srgb,
+    var(--theme-color-background) 80%,
+    var(--theme-color-teal) 20%
+  );
+  --surface-strong: color-mix(
+    in srgb,
+    var(--theme-color-background) 72%,
+    var(--theme-color-teal) 28%
+  );
+  --surface-overlay: color-mix(
+    in srgb,
+    var(--theme-color-background) 92%,
+    transparent
+  );
+  --surface-tooltip: color-mix(
+    in srgb,
+    var(--theme-color-background) 64%,
+    var(--theme-color-teal) 36%
+  );
+  --surface-accent-soft: color-mix(
+    in srgb,
+    var(--theme-color-background) 86%,
+    var(--theme-color-accent) 14%
+  );
+  --surface-accent-strong: color-mix(
+    in srgb,
+    var(--theme-color-background) 74%,
+    var(--theme-color-accent) 26%
+  );
+  --surface-highlight: color-mix(
+    in srgb,
+    var(--theme-color-background) 76%,
+    var(--theme-color-aqua) 24%
+  );
+  --surface-highlight-soft: color-mix(
+    in srgb,
+    var(--theme-color-background) 88%,
+    var(--theme-color-aqua) 12%
+  );
+  --accent-border: color-mix(
+    in srgb,
+    var(--theme-color-background) 48%,
+    var(--theme-color-accent) 52%
+  );
+  --highlight: var(--theme-color-aqua);
+  --highlight-foreground: var(--theme-color-background);
+  --support: var(--theme-color-teal);
+  --support-foreground: var(--theme-color-ice);
+  --grid-line: color-mix(
+    in srgb,
+    var(--theme-color-background) 66%,
+    var(--theme-color-aqua) 34%
+  );
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #0a0a0a;
+  background-color: var(--background);
 }
 
 #root {
@@ -107,40 +204,21 @@ body {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-strong: var(--surface-strong);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-tooltip: var(--surface-tooltip);
+  --color-surface-accent-soft: var(--surface-accent-soft);
+  --color-surface-accent-strong: var(--surface-accent-strong);
+  --color-surface-highlight: var(--surface-highlight);
+  --color-surface-highlight-soft: var(--surface-highlight-soft);
+  --color-accent-border: var(--accent-border);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-support: var(--support);
+  --color-support-foreground: var(--support-foreground);
+  --color-grid-line: var(--grid-line);
 }
 
 @layer base {
@@ -150,14 +228,25 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+
+  input[type='number'] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 }
 
 .bg-grid-transparent {
   background-image:
-    linear-gradient(45deg, #222 25%, transparent 25%),
-    linear-gradient(-45deg, #222 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #222 75%),
-    linear-gradient(-45deg, transparent 75%, #222 75%);
+    linear-gradient(45deg, var(--grid-line) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--grid-line) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--grid-line) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--grid-line) 75%);
   background-size: 20px 20px;
   background-position:
     0 0,

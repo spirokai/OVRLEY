@@ -10,6 +10,7 @@ import {
   OpacitySection,
   SectionHeading,
 } from './widgetEditorSections'
+import { getThemeColor } from '@/lib/theme'
 
 export default function ElevationWidgetEditor({
   widget,
@@ -43,7 +44,7 @@ export default function ElevationWidgetEditor({
         <div className="grid grid-cols-2 gap-3">
           <ColorField
             label="Done Line Color"
-            value={widget.data.completed_line_color || '#ffffff'}
+            value={widget.data.completed_line_color || getThemeColor('ice')}
             onChange={(value) =>
               updateWidgetData(widget.id, {
                 completed_line_color: value,
@@ -53,7 +54,7 @@ export default function ElevationWidgetEditor({
           />
           <ColorField
             label="Remaining Line Color"
-            value={widget.data.remaining_line_color || '#71717a'}
+            value={widget.data.remaining_line_color || getThemeColor('teal')}
             onChange={(value) =>
               updateWidgetData(widget.id, { remaining_line_color: value })
             }
@@ -112,7 +113,7 @@ export default function ElevationWidgetEditor({
         </div>
         <ColorField
           label="Marker Color"
-          value={widget.data.marker_color || '#ffffff'}
+          value={widget.data.marker_color || getThemeColor('aqua')}
           onChange={(value) =>
             updateWidgetData(widget.id, { marker_color: value })
           }

@@ -268,16 +268,16 @@ export default function SidebarWidgetsTab() {
               key={item.type}
               variant="outline"
               size="icon"
-              className="h-12 w-full bg-zinc-900/50 border-zinc-800 hover:bg-red-500/10 hover:border-red-500/50 transition-all group"
+              className="h-12 w-full border-border/70 bg-surface transition-all group hover:border-accent-border hover:bg-surface-accent-soft"
               onClick={() => addWidget(item.type)}
             >
-              <item.icon className="h-5 w-5 text-zinc-400 group-hover:text-red-500" />
+              <item.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
             </Button>
           ))}
         </div>
       </div>
 
-      <Separator className="bg-zinc-800/50" />
+      <Separator className="bg-border/60" />
 
       <div className="space-y-3">
         <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
@@ -285,7 +285,7 @@ export default function SidebarWidgetsTab() {
         </h4>
 
         {widgets.length === 0 ? (
-          <div className="text-center py-8 border border-dashed border-zinc-800 rounded-lg">
+          <div className="rounded-lg border border-dashed border-border/70 py-8 text-center">
             <p className="text-xs text-muted-foreground">
               No widgets added yet.
             </p>
@@ -305,20 +305,20 @@ export default function SidebarWidgetsTab() {
               return (
                 <div key={widget.id}>
                   {widget.showSeparator ? (
-                    <Separator className="my-3 bg-zinc-800/30" />
+                    <Separator className="my-3 bg-border/40" />
                   ) : null}
                   <AccordionItem
                     value={widget.id}
-                    className="border border-zinc-800/50 rounded-lg bg-zinc-900/30 overflow-hidden data-[state=open]:border-red-500/30 data-[state=open]:bg-red-500/5 transition-all"
+                    className="overflow-hidden rounded-lg border border-border/60 bg-surface/80 transition-all data-[state=open]:border-accent-border data-[state=open]:bg-surface-accent-soft"
                   >
                     <div className="relative group">
-                      <AccordionTrigger className="w-full px-3 py-2.5 pr-10 hover:no-underline transition-colors group">
+                      <AccordionTrigger className="group w-full px-3 py-2.5 pr-10 transition-colors hover:no-underline data-[state=open]:text-primary">
                         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                          <div className="shrink-0 w-7 h-7 rounded bg-zinc-800/50 flex items-center justify-center group-hover:bg-red-500/20 transition-colors">
-                            <Icon className="h-3.5 w-3.5 text-zinc-400 group-hover:text-red-500" />
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-surface-strong transition-colors group-hover:bg-surface-accent-strong group-data-[state=open]:bg-surface-accent-strong">
+                            <Icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-data-[state=open]:text-primary" />
                           </div>
                           <div className="flex flex-col items-start gap-0.5 min-w-0 flex-1">
-                            <span className="text-xs font-semibold text-zinc-200 truncate w-full text-left">
+                            <span className="w-full truncate text-left text-xs font-semibold text-foreground group-data-[state=open]:text-primary">
                               {widget.name}
                             </span>
                           </div>
@@ -328,7 +328,7 @@ export default function SidebarWidgetsTab() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-zinc-500 hover:text-red-500 hover:bg-red-500/10"
+                          className="h-7 w-7 text-muted-foreground group-data-[state=open]/item:text-primary hover:bg-surface-accent-soft hover:text-primary"
                           onClick={(event) => {
                             event.stopPropagation()
                             deleteWidget(widget.id)
@@ -339,12 +339,12 @@ export default function SidebarWidgetsTab() {
                       </div>
                     </div>
 
-                    <AccordionContent className="px-4 pb-4 pt-2 border-t border-zinc-800/50">
+                    <AccordionContent className="border-t border-border/60 px-4 pb-4 pt-2 group-data-[state=open]/item:border-accent-border">
                       <div className="relative">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="absolute -top-1 -right-1 h-6 w-6 text-zinc-600 hover:text-zinc-200"
+                          className="absolute top-1 -right-1 h-6 w-6 text-muted-foreground hover:text-foreground"
                           onClick={() => resetWidget(widget.id)}
                         >
                           <RotateCcw className="h-3 w-3" />

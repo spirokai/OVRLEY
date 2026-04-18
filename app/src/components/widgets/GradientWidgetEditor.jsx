@@ -5,6 +5,7 @@ import {
   SectionHeading,
 } from './widgetEditorSections'
 import { TrendingUp } from 'lucide-react'
+import { getThemeColor } from '@/lib/theme'
 
 export default function GradientWidgetEditor({ widget, updateWidgetData }) {
   const valueOffset = widget.data.value_offset ?? 0
@@ -37,14 +38,16 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
         <div className="grid grid-cols-2 gap-3">
           <ColorField
             label="Triangle + Color"
-            value={widget.data.triangle_positive_color || '#22c55e'}
+            value={widget.data.triangle_positive_color || getThemeColor('aqua')}
             onChange={(value) =>
               updateWidgetData(widget.id, { triangle_positive_color: value })
             }
           />
           <ColorField
             label="Triangle - Color"
-            value={widget.data.triangle_negative_color || '#ef4444'}
+            value={
+              widget.data.triangle_negative_color || getThemeColor('accent')
+            }
             onChange={(value) =>
               updateWidgetData(widget.id, { triangle_negative_color: value })
             }

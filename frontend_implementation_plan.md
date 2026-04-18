@@ -162,10 +162,10 @@ All these options must be supported for the widgets:
 **Goal**: Parse incoming GPX and FIT data directly on the frontend.
 
 - **Data Parsing**: Frontend parsing for both GPX and FIT (using `fit-file-parser`). Both file types should produce identical data format after parsing.
-- **GPX parsing**: The project contains some form of data parsing, although not sure if in front end or back end. Check this and reuse this code. In any case, both GPX and FIT parsing must be done by the front end. Back end will eventually receive only the clean data and template layout.
+- **GPX parsing**: The project contains some form of data parsing, although not sure if in front end or back end. Check this and reuse this code. In any case, both GPX and FIT parsing MUST be done by the front end. Back end will eventually receive only the clean data and the template layout.
 - **Preview Readiness**: Store parsed data to allow future preview/filtering.
-- **Schema**: The data should following the existing schema being fed into the python backend to ensure backwards compatibility of code.
-- **Supported data**: The following data must supported. Check official SDK/API of GPX/FIT to understand the format. Some of the data is not commonly supported by GPX but they are typically supported within the <extensions> tag. The following data must be supported:
+- **Schema**: The data should following the existing schema that is currently being fed into the python backend to ensure backwards compatibility of code.
+- **Supported data**: The following data must supported. Check official SDK/API of GPX/FIT to understand the format. Some of the data is not commonly supported by GPX but they are typically supported within the <extensions> tag. All the following data MUST be supported:
   General metadata of the activity
   Latitude / Longitude
   Course/heading
@@ -188,6 +188,8 @@ All these options must be supported for the widgets:
   Slope/gradient
   Stroke rate (rowing)
   G-Force
+
+- **Debugging**: Create a debugging output so I can verify the parsing from both formats.
 
 #### [MODIFY] app/src/api/gpxUtils.jsx
 

@@ -108,7 +108,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     <div className="mt-4 space-y-8 outline-none pb-10">
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
-          <Video className="h-4 w-4 text-red-500" />
+          <Video className="h-4 w-4 text-primary" />
           <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
             Overlay
           </h4>
@@ -259,7 +259,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <Palette className="h-4 w-4 text-red-500" />
+            <Palette className="h-4 w-4 text-primary" />
             <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
               Global Styles
             </h4>
@@ -267,7 +267,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-zinc-800"
+            className="h-6 w-6 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
             onClick={() => resetGlobalDefaults()}
           >
             <RotateCcw className="h-3 w-3" />
@@ -328,7 +328,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                 onChange={(e) =>
                   setGlobalDefault('color_values', e.target.value)
                 }
-                className="w-8 h-8 p-0 border border-zinc-800 rounded cursor-pointer shrink-0 overflow-hidden"
+                className="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded border border-border/70 p-0"
               />
               <span className="text-[10px] font-mono opacity-50 uppercase">
                 {globalDefaults.color_values.slice(1, 4)}
@@ -342,7 +342,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                 type="color"
                 value={globalDefaults.color_text}
                 onChange={(e) => setGlobalDefault('color_text', e.target.value)}
-                className="w-8 h-8 p-0 border border-zinc-800 rounded cursor-pointer shrink-0 overflow-hidden"
+                className="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded border border-border/70 p-0"
               />
               <span className="text-[10px] font-mono opacity-50 uppercase">
                 {globalDefaults.color_text.slice(1, 4)}
@@ -358,7 +358,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                 onChange={(e) =>
                   setGlobalDefault('color_icons', e.target.value)
                 }
-                className="w-8 h-8 p-0 border border-zinc-800 rounded cursor-pointer shrink-0 overflow-hidden"
+                className="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded border border-border/70 p-0"
               />
               <span className="text-[10px] font-mono opacity-50 uppercase">
                 {globalDefaults.color_icons.slice(1, 4)}
@@ -377,7 +377,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                 onChange={(e) =>
                   setGlobalDefault('border_color', e.target.value)
                 }
-                className="w-8 h-8 p-0 border border-zinc-800 rounded cursor-pointer shrink-0 overflow-hidden"
+                className="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded border border-border/70 p-0"
               />
               <span className="text-[10px] font-mono opacity-50 uppercase">
                 {globalDefaults.border_color}
@@ -393,7 +393,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                 onChange={(e) =>
                   setGlobalDefault('shadow_color', e.target.value)
                 }
-                className="w-8 h-8 p-0 border border-zinc-800 rounded cursor-pointer shrink-0 overflow-hidden"
+                className="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded border border-border/70 p-0"
               />
               <span className="text-[10px] font-mono opacity-50 uppercase">
                 {globalDefaults.shadow_color.slice(0, 7)}
@@ -406,7 +406,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           <div className="space-y-3 pt-2">
             <div className="flex justify-between items-center">
               <Label className="text-xs">Global Opacity</Label>
-              <span className="text-[10px] text-muted-foreground bg-zinc-800 px-1.5 py-0.5 rounded">
+              <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 {Math.round(globalDefaults.opacity * 100)}%
               </span>
             </div>
@@ -421,7 +421,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <Label className="text-xs">Global Scale</Label>
-              <span className="text-[10px] text-muted-foreground bg-zinc-800 px-1.5 py-0.5 rounded">
+              <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 {globalDefaults.scale.toFixed(2)}x
               </span>
             </div>
@@ -436,7 +436,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <Label className="text-xs">Border Thickness</Label>
-              <span className="text-[10px] text-muted-foreground bg-zinc-800 px-1.5 py-0.5 rounded">
+              <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 {globalDefaults.border_thickness}px
               </span>
             </div>
@@ -485,7 +485,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
 
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
-          <Sparkles className="h-4 w-4 text-red-500" />
+          <Sparkles className="h-4 w-4 text-primary" />
           <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
             Export
           </h4>
@@ -493,15 +493,15 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
         </div>
 
         <div className="space-y-4">
-          <div className="p-4 rounded-lg bg-red-500/5 border border-red-500/10 space-y-3">
+          <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Gauge className="h-4 w-4 text-red-500" />
+                <Gauge className="h-4 w-4 text-primary" />
                 <Label className="text-xs font-semibold">
                   Widget Update Rate
                 </Label>
               </div>
-              <span className="text-[10px] font-mono text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">
+              <span className="rounded bg-surface-accent-strong px-1.5 py-0.5 text-[10px] font-mono text-highlight">
                 Update 1/{updateRate}
               </span>
             </div>
@@ -509,7 +509,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
               value={updateRate.toString()}
               onValueChange={(v) => setUpdateRate(parseInt(v))}
             >
-              <TabsList className="w-full grid grid-cols-4 h-8 bg-zinc-950/50 p-0.5">
+              <TabsList className="grid h-8 w-full grid-cols-4 bg-surface p-0.5">
                 <TabsTrigger value="1" className="text-[10px] cursor-pointer">
                   1/1
                 </TabsTrigger>

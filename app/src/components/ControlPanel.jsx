@@ -8,7 +8,7 @@ export default function ControlPanel({ config, onConfigChange }) {
     <div className="flex flex-col h-full bg-card/10">
       <Tabs defaultValue="settings" className="flex-1 flex flex-col min-h-0">
         <div className="px-4 pt-4 shrink-0">
-          <TabsList className="w-full grid grid-cols-2 bg-zinc-900/50 p-1">
+          <TabsList className="grid w-full grid-cols-2 bg-surface p-1">
             <TabsTrigger
               value="settings"
               className="text-xs gap-2 cursor-pointer"

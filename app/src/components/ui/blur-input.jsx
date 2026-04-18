@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
@@ -11,6 +12,7 @@ export function BlurInput({
 }) {
   const [value, setValue] = useState(initialValue)
   const inputRef = useRef(null)
+  const isNumberInput = props.type === 'number'
 
   useEffect(() => {
     setValue(initialValue)
@@ -37,7 +39,21 @@ export function BlurInput({
     props.onKeyDown?.(e)
   }
 
-  return (
+  const handleStep = (direction) => {
+    if (!inputRef.current) {
+      return
+    }
+
+    if (direction === 'up') {
+      inputRef.current.stepUp()
+    } else {
+      inputRef.current.stepDown()
+    }
+
+    setValue(inputRef.current.value)
+  }
+
+  const inputElement = (
     <Input
       {...props}
       ref={inputRef}
@@ -47,9 +63,44 @@ export function BlurInput({
       onKeyDown={handleKeyDown}
       className={cn(
         'transition-colors',
-        value !== initialValue && 'border-yellow-500/50 bg-yellow-500/5',
+        value !== initialValue && 'border-accent-border bg-surface-accent-soft',
+        isNumberInput &&
+          'pr-11 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
         className,
       )}
     />
   )
+
+  if (isNumberInput) {
+    return (
+      <div className="relative">
+        {inputElement}
+        <div className="absolute inset-y-1 right-1 flex w-5 flex-col overflow-hidden rounded border border-none bg-surface-strong">
+          <button
+            type="button"
+            className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleStep('up')}
+            disabled={props.disabled}
+            aria-label="Increase value"
+          >
+            <ChevronUp className="h-3 w-3" />
+          </button>
+          <div className="h-px bg-border/60" />
+          <button
+            type="button"
+            className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleStep('down')}
+            disabled={props.disabled}
+            aria-label="Decrease value"
+          >
+            <ChevronDown className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return inputElement
 }

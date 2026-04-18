@@ -10,6 +10,7 @@ import {
   Type,
   Zap,
 } from 'lucide-react'
+import { getThemeColor } from '@/lib/theme'
 
 export const QUICKMENU_ITEMS = [
   { type: 'label', icon: Type, label: 'Text' },
@@ -76,7 +77,7 @@ export function createLabelDefaults(globalDefaults) {
     font_family: font,
     font_size: 60,
     text: 'New Text',
-    color: getGlobalColor(globalDefaults, 'color_text', '#ffffff'),
+    color: getGlobalColor(globalDefaults, 'color_text', getThemeColor('ice')),
     opacity: globalDefaults?.opacity ?? 1,
   }
 }
@@ -90,13 +91,17 @@ export function createMetricValueDefaults(type, globalDefaults) {
     font,
     font_family: font,
     font_size: type === 'time' ? 72 : type === 'gradient' ? 96 : 100,
-    color: getGlobalColor(globalDefaults, 'color_values', '#ffffff'),
+    color: getGlobalColor(globalDefaults, 'color_values', getThemeColor('ice')),
     opacity: globalDefaults?.opacity ?? 1,
     prefix: '',
     suffix: '',
     decimals: 0,
     show_icon: type !== 'gradient',
-    icon_color: getGlobalColor(globalDefaults, 'color_icons', '#ffffff'),
+    icon_color: getGlobalColor(
+      globalDefaults,
+      'color_icons',
+      getThemeColor('aqua'),
+    ),
     icon_size: 28,
     icon_offset_x: 0,
     icon_offset_y: 0,
@@ -105,8 +110,8 @@ export function createMetricValueDefaults(type, globalDefaults) {
     temperature_unit: 'celsius',
     format: 'time-24',
     value_offset: 0,
-    triangle_positive_color: '#22c55e',
-    triangle_negative_color: '#ef4444',
+    triangle_positive_color: getThemeColor('aqua'),
+    triangle_negative_color: getThemeColor('accent'),
     show_sign: true,
     show_triangle: true,
     triangle_width: 24,
@@ -130,26 +135,30 @@ export function createPlotDefaults(type, globalDefaults) {
   if (type === 'course') {
     return {
       ...base,
-      color: getGlobalColor(globalDefaults, 'color_values', '#ffffff'),
-      completed_line_color: '#ffffff',
+      color: getGlobalColor(
+        globalDefaults,
+        'color_values',
+        getThemeColor('ice'),
+      ),
+      completed_line_color: getThemeColor('ice'),
       completed_line_opacity: 100,
-      remaining_line_color: '#71717a',
+      remaining_line_color: getThemeColor('teal'),
       remaining_line_opacity: 35,
       marker_size: 18,
-      marker_color: '#ffffff',
+      marker_color: getThemeColor('aqua'),
       marker_opacity: 100,
     }
   }
 
   return {
     ...base,
-    color: getGlobalColor(globalDefaults, 'color_values', '#ffffff'),
-    completed_line_color: '#ffffff',
+    color: getGlobalColor(globalDefaults, 'color_values', getThemeColor('ice')),
+    completed_line_color: getThemeColor('ice'),
     completed_line_opacity: 100,
-    remaining_line_color: '#71717a',
+    remaining_line_color: getThemeColor('teal'),
     remaining_line_opacity: 35,
     marker_size: 16,
-    marker_color: '#ffffff',
+    marker_color: getThemeColor('aqua'),
     marker_opacity: 100,
     show_elevation_metric: true,
     show_elevation_imperial: false,

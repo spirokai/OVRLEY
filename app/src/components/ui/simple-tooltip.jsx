@@ -22,8 +22,8 @@ export function SimpleTooltip({
 
   const arrowClasses =
     side === 'top'
-      ? 'top-full border-t-zinc-950'
-      : 'bottom-full border-b-zinc-950'
+      ? 'top-full border-t-surface-tooltip'
+      : 'bottom-full border-b-surface-tooltip'
 
   return (
     <div
@@ -34,7 +34,7 @@ export function SimpleTooltip({
       {children}
       {show && (
         <div
-          className={`absolute ${sideClasses} px-2.5 py-1.5 bg-zinc-950 text-zinc-50 text-xs rounded shadow-2xl border border-zinc-700/50 whitespace-nowrap z-[1000] pointer-events-none animate-in fade-in zoom-in-95 duration-200`}
+          className={`absolute ${sideClasses} z-[1000] whitespace-nowrap rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-xs text-foreground shadow-2xl pointer-events-none animate-in fade-in zoom-in-95 duration-200`}
         >
           {content}
           {/* Arrow */}

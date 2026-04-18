@@ -48,10 +48,10 @@ export const TEMPERATURE_UNITS = [
   { value: 'fahrenheit', label: 'F' },
 ]
 
-export const CONTROL_CLASS = 'h-9 text-xs bg-zinc-950/50 border-zinc-800'
+export const CONTROL_CLASS = 'h-9 border-border/70 bg-surface text-xs'
 const COLOR_PICKER_CLASS =
-  'h-9 w-11 rounded-md p-1 bg-zinc-950 border-zinc-800 cursor-pointer'
-const FIELD_LABEL_CLASS = 'text-[9px] text-zinc-500 uppercase font-bold'
+  'h-9 w-11 cursor-pointer rounded-md border border-border/70 bg-surface-strong p-1'
+const FIELD_LABEL_CLASS = 'text-[9px] text-muted-foreground uppercase font-bold'
 
 export function FieldBlock({ label, children, className }) {
   return (
@@ -155,7 +155,7 @@ export function SliderField({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <Label className={FIELD_LABEL_CLASS}>{label}</Label>
-        <span className="text-[10px] font-mono text-zinc-400">
+        <span className="text-[10px] font-mono text-muted-foreground">
           {valueDisplay}
         </span>
       </div>
@@ -175,8 +175,8 @@ export function SliderField({
 
 export function ToggleField({ label, checked, onCheckedChange }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-zinc-800/50 bg-zinc-950/30 px-3 py-2">
-      <p className="text-xs font-medium text-zinc-200">{label}</p>
+    <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-surface/80 px-3 py-2">
+      <p className="text-xs font-medium text-foreground">{label}</p>
       <Switch checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   )
@@ -193,8 +193,8 @@ export function UnitsControlRow({
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 items-end">
-      <div className="flex items-center justify-between gap-3 rounded-md border border-zinc-800/50 bg-zinc-950/30 px-3 h-9">
-        <p className="text-xs font-medium text-zinc-200">{label}</p>
+      <div className="flex h-9 items-center justify-between gap-3 rounded-md border border-border/60 bg-surface/80 px-3">
+        <p className="text-xs font-medium text-foreground">{label}</p>
         <Switch checked={checked} onCheckedChange={onCheckedChange} />
       </div>
       <SelectField

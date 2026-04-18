@@ -10,12 +10,13 @@ import {
   ToggleField,
 } from './widgetFormControls'
 import { getWidgetFont } from './widgetDefinitions'
+import { getThemeColor } from '@/lib/theme'
 
 export function SectionHeading({ icon: Icon, title }) {
   return (
     <div className="flex items-center gap-2">
-      <Icon className="h-3.5 w-3.5 text-red-500" />
-      <h5 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+      <Icon className="h-3.5 w-3.5 text-primary" />
+      <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         {title}
       </h5>
     </div>
@@ -116,7 +117,7 @@ export function FontSection({
         />
         <ColorField
           label={colorLabel}
-          value={widget.data.color || '#ffffff'}
+          value={widget.data.color || getThemeColor('ice')}
           onChange={(value) => updateWidgetData(widget.id, { color: value })}
         />
       </div>
@@ -159,7 +160,7 @@ export function IconSection({
       <div className="grid grid-cols-2 gap-3">
         <ColorField
           label="Icon Color"
-          value={widget.data.icon_color || '#ffffff'}
+          value={widget.data.icon_color || getThemeColor('aqua')}
           onChange={(value) =>
             updateWidgetData(widget.id, { icon_color: value })
           }
