@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import useStore from './store/useStore'
 import './index.css'
 import * as backend from './api/backend'
@@ -24,9 +24,11 @@ import {
 } from '@/components/ui/select'
 import ControlPanel from '@/components/ControlPanel'
 import OverlayEditor from '@/components/OverlayEditor'
+import OverlayPlayer from '@/components/OverlayPlayer'
 import ErrorAlert from '@/components/ErrorAlert'
 import RenderProgressOverlay from '@/components/RenderProgressOverlay'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import useBackendStatus, { hasTauriRuntime } from '@/hooks/useBackendStatus'
 
 // Icons
 import {
@@ -45,28 +47,6 @@ import {
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
-
-// Global state for sidecar
-window.__SIDECAR_DEBUG__ = {
-  status: 'initializing',
-  error: null,
-  pid: null,
-  logs: [],
-  startTime: null,
-}
-
-const logSidecar = (message) => {
-  const timestamp = new Date().toISOString()
-  console.log(`[Sidecar] ${message}`)
-  window.__SIDECAR_DEBUG__.logs.push(`[${timestamp}] ${message}`)
-  if (window.__SIDECAR_DEBUG__.logs.length > 50) {
-    window.__SIDECAR_DEBUG__.logs.shift()
-  }
-}
-
-const hasTauriRuntime = () =>
-  typeof window !== 'undefined' &&
-  typeof window.__TAURI_INTERNALS__ !== 'undefined'
 
 const selectBrowserGpxFile = () =>
   new Promise((resolve) => {
@@ -120,31 +100,34 @@ function Spinner({ className = 'h-4 w-4' }) {
 }
 
 function App() {
-  const {
-    config,
-    globalDefaults,
-    setConfig,
-    generatingImage,
-    renderingVideo,
-    setGeneratingImage,
-    setRenderProgress,
-    gpxFilename,
-    setErrorMessage,
-    templates,
-    fetchTemplates,
-    updateRate,
-    exportRange,
-    aspectRatio,
-    loadedTemplateFilename,
-    loadedTemplateSource,
-    setLoadedTemplate,
-    hydrateTemplateState,
-    lastSavedTemplateState,
-    setLastSavedTemplateState,
-  } = useStore()
+  const config = useStore((state) => state.config)
+  const globalDefaults = useStore((state) => state.globalDefaults)
+  const setConfig = useStore((state) => state.setConfig)
+  const generatingImage = useStore((state) => state.generatingImage)
+  const renderingVideo = useStore((state) => state.renderingVideo)
+  const setGeneratingImage = useStore((state) => state.setGeneratingImage)
+  const setRenderProgress = useStore((state) => state.setRenderProgress)
+  const gpxFilename = useStore((state) => state.gpxFilename)
+  const setErrorMessage = useStore((state) => state.setErrorMessage)
+  const templates = useStore((state) => state.templates)
+  const fetchTemplates = useStore((state) => state.fetchTemplates)
+  const updateRate = useStore((state) => state.updateRate)
+  const exportRange = useStore((state) => state.exportRange)
+  const aspectRatio = useStore((state) => state.aspectRatio)
+  const loadedTemplateFilename = useStore(
+    (state) => state.loadedTemplateFilename,
+  )
+  const loadedTemplateSource = useStore((state) => state.loadedTemplateSource)
+  const setLoadedTemplate = useStore((state) => state.setLoadedTemplate)
+  const hydrateTemplateState = useStore((state) => state.hydrateTemplateState)
+  const lastSavedTemplateState = useStore(
+    (state) => state.lastSavedTemplateState,
+  )
+  const setLastSavedTemplateState = useStore(
+    (state) => state.setLastSavedTemplateState,
+  )
 
-  const [backendStatus, setBackendStatus] = useState('connecting')
-  const [backendReady, setBackendReady] = useState(false)
+  const { backendStatus, backendReady } = useBackendStatus()
   const [editorZoomLevel, setEditorZoomLevel] = useState(1)
   const [editorBackgroundMode, setEditorBackgroundMode] = useState(
     () => localStorage.getItem('overlayBackgroundMode') || 'checker',
@@ -158,57 +141,6 @@ function App() {
   useEffect(() => {
     fetchTemplates()
   }, [fetchTemplates])
-
-  // Sidecar readiness monitoring
-  useEffect(() => {
-    const checkInitialBackend = async () => {
-      if (!hasTauriRuntime()) {
-        setBackendStatus('connected')
-        return
-      }
-
-      try {
-        // Just check if socket exists or health check passes
-        const socketExists = await backend.socketReady()
-        if (socketExists) {
-          await backend.healthCheck()
-          setBackendStatus('connected')
-        } else {
-          logSidecar('Backend not yet ready, waiting for sidecar to start...')
-        }
-      } catch {
-        logSidecar('Backend not yet reachable')
-      }
-    }
-
-    checkInitialBackend()
-  }, [])
-
-  // Health polling with retry logic
-  const strikesRef = useRef(0)
-  useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const health = await backend.healthCheck()
-        setBackendStatus('connected')
-        if (health && typeof health.ready !== 'undefined') {
-          setBackendReady(health.ready)
-        }
-        strikesRef.current = 0
-      } catch {
-        strikesRef.current++
-        // Be much more patient during initial connection (180 seconds)
-        const threshold = backendStatus === 'connecting' ? 90 : 8
-        if (strikesRef.current >= threshold && backendStatus !== 'error') {
-          setBackendStatus('error')
-        }
-      }
-    }
-
-    const interval = setInterval(checkHealth, 2000)
-    checkHealth()
-    return () => clearInterval(interval)
-  }, [backendStatus])
 
   // Template management
   const handleTemplateChange = async (filename) => {
@@ -335,20 +267,30 @@ function App() {
     }
   }
 
-  const currentTemplateState = createTemplateState({
-    config,
-    globalDefaults,
-    updateRate,
-    exportRange,
-    aspectRatio,
-  })
-  const status = !config
-    ? null
-    : !lastSavedTemplateState
-      ? 'Draft'
-      : templateStatesEqual(currentTemplateState, lastSavedTemplateState)
-        ? 'Saved'
-        : 'Modified'
+  const currentTemplateState = useMemo(
+    () =>
+      createTemplateState({
+        config,
+        globalDefaults,
+        updateRate,
+        exportRange,
+        aspectRatio,
+      }),
+    [config, globalDefaults, updateRate, exportRange, aspectRatio],
+  )
+  const status = useMemo(() => {
+    if (!config) {
+      return null
+    }
+
+    if (!lastSavedTemplateState) {
+      return 'Draft'
+    }
+
+    return templateStatesEqual(currentTemplateState, lastSavedTemplateState)
+      ? 'Saved'
+      : 'Modified'
+  }, [config, currentTemplateState, lastSavedTemplateState])
   const showTemplateStatus = status === 'Draft' || status === 'Modified'
   const sceneWidth = config?.scene?.width || 1920
   const sceneHeight = config?.scene?.height || 1080
@@ -692,7 +634,7 @@ function App() {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Preview - Left */}
-        <div className="relative flex min-w-0 flex-1 bg-background">
+        <div className="relative flex min-w-0 flex-1 flex-col bg-background">
           {generatingImage && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
               <div className="flex flex-col items-center gap-2">
@@ -703,14 +645,17 @@ function App() {
               </div>
             </div>
           )}
-          <OverlayEditor
-            config={config}
-            globalDefaults={globalDefaults}
-            onConfigChange={setConfig}
-            zoomLevel={editorZoomLevel}
-            onZoomLevelChange={setEditorZoomLevel}
-            backgroundMode={editorBackgroundMode}
-          />
+          <div className="min-h-0 flex-1">
+            <OverlayEditor
+              config={config}
+              globalDefaults={globalDefaults}
+              onConfigChange={setConfig}
+              zoomLevel={editorZoomLevel}
+              onZoomLevelChange={setEditorZoomLevel}
+              backgroundMode={editorBackgroundMode}
+            />
+          </div>
+          <OverlayPlayer />
         </div>
 
         {/* Control Panel - Right */}

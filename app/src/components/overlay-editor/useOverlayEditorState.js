@@ -11,12 +11,40 @@ import {
   getSceneSize,
 } from './utils'
 
-function clearDraftWidget(setDraftWidgets, widgetId) {
-  setDraftWidgets((current) => {
-    const next = { ...current }
-    delete next[widgetId]
-    return next
-  })
+function clearLiveWidgetDraft(draftWidgetsRef, widgetId) {
+  delete draftWidgetsRef.current[widgetId]
+}
+
+function applyLiveWidgetStyles(target, widget, draft, globalScale) {
+  if (!target || !widget) {
+    return
+  }
+
+  const nextX = draft.x ?? widget.data.x ?? 0
+  const nextY = draft.y ?? widget.data.y ?? 0
+  const nextWidth = draft.width ?? widget.data.width
+  const nextHeight = draft.height ?? widget.data.height
+  const nextRotation =
+    draft.rotation ??
+    (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
+  const nextScale = (draft.scale ?? 1) * globalScale
+
+  target.style.left = `${nextX}px`
+  target.style.top = `${nextY}px`
+
+  if (typeof nextWidth === 'number') {
+    target.style.width = `${nextWidth}px`
+  }
+
+  if (typeof nextHeight === 'number') {
+    target.style.height = `${nextHeight}px`
+  }
+
+  target.style.transform =
+    buildWidgetTransform({
+      rotation: nextRotation,
+      scale: nextScale,
+    }) || ''
 }
 
 export default function useOverlayEditorState({
@@ -26,7 +54,9 @@ export default function useOverlayEditorState({
   zoomLevel,
   onZoomLevelChange,
 }) {
-  const { selectedWidgetId, setSelectedWidgetId, selectedSecond } = useStore()
+  const selectedWidgetId = useStore((state) => state.selectedWidgetId)
+  const setSelectedWidgetId = useStore((state) => state.setSelectedWidgetId)
+  const selectedSecond = useStore((state) => state.selectedSecond)
   const viewportRef = useRef(null)
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
@@ -34,7 +64,6 @@ export default function useOverlayEditorState({
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const [sceneElement, setSceneElement] = useState(null)
   const [widgetNodes, setWidgetNodes] = useState({})
-  const [draftWidgets, setDraftWidgets] = useState({})
 
   const activity = getCurrentParsedActivity()
   const resolvedConfig = useMemo(
@@ -62,12 +91,8 @@ export default function useOverlayEditorState({
   )
 
   useEffect(() => {
-    setDraftWidgets({})
+    draftWidgetsRef.current = {}
   }, [resolvedConfig])
-
-  useEffect(() => {
-    draftWidgetsRef.current = draftWidgets
-  }, [draftWidgets])
 
   useEffect(() => {
     const viewportNode = viewportRef.current
@@ -105,10 +130,14 @@ export default function useOverlayEditorState({
   const selectedTarget = selectedWidgetId
     ? widgetNodes[selectedWidgetId] || null
     : null
-  const elementGuidelines = widgets
-    .filter((widget) => widget.id !== selectedWidgetId)
-    .map((widget) => widgetNodes[widget.id])
-    .filter(Boolean)
+  const elementGuidelines = useMemo(
+    () =>
+      widgets
+        .filter((widget) => widget.id !== selectedWidgetId)
+        .map((widget) => widgetNodes[widget.id])
+        .filter(Boolean),
+    [selectedWidgetId, widgetNodes, widgets],
+  )
 
   useEffect(() => {
     if (!moveableRef.current || !selectedTarget) return undefined
@@ -178,19 +207,20 @@ export default function useOverlayEditorState({
         x: selectedWidget.data.x ?? 0,
         y: selectedWidget.data.y ?? 0,
       }
+      draftWidgetsRef.current[selectedWidget.id] = {}
     },
-    onDrag: ({ beforeTranslate }) => {
+    onDrag: ({ beforeTranslate, target }) => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
 
-      setDraftWidgets((current) => ({
-        ...current,
-        [origin.id]: {
-          ...current[origin.id],
-          x: origin.x + beforeTranslate[0],
-          y: origin.y + beforeTranslate[1],
-        },
-      }))
+      const nextDraft = {
+        ...draftWidgetsRef.current[origin.id],
+        x: origin.x + beforeTranslate[0],
+        y: origin.y + beforeTranslate[1],
+      }
+
+      draftWidgetsRef.current[origin.id] = nextDraft
+      applyLiveWidgetStyles(target, selectedWidget, nextDraft, globalScale)
     },
     onDragEnd: () => {
       const origin = interactionStartRef.current
@@ -204,7 +234,7 @@ export default function useOverlayEditorState({
         })
       }
 
-      clearDraftWidget(setDraftWidgets, origin.id)
+      clearLiveWidgetDraft(draftWidgetsRef, origin.id)
       interactionStartRef.current = null
     },
     onResizeStart: ({ dragStart }) => {
@@ -222,8 +252,9 @@ export default function useOverlayEditorState({
         height: selectedWidget.data.height ?? 0,
         markerSize: selectedWidget.data.marker_size ?? null,
       }
+      draftWidgetsRef.current[selectedWidget.id] = {}
     },
-    onResize: ({ width, height, drag }) => {
+    onResize: ({ width, height, drag, target }) => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
 
@@ -239,26 +270,24 @@ export default function useOverlayEditorState({
           ? undefined
           : clamp(Math.round(origin.markerSize * markerScale), 0, 400)
 
-      if (drag.target) {
-        drag.target.style.left = `${nextX}px`
-        drag.target.style.top = `${nextY}px`
-        drag.target.style.width = `${nextWidth}px`
-        drag.target.style.height = `${nextHeight}px`
+      const nextDraft = {
+        ...draftWidgetsRef.current[origin.id],
+        x: nextX,
+        y: nextY,
+        width: nextWidth,
+        height: nextHeight,
+        ...(nextMarkerSize === undefined
+          ? {}
+          : { marker_size: nextMarkerSize }),
       }
 
-      setDraftWidgets((current) => ({
-        ...current,
-        [origin.id]: {
-          ...current[origin.id],
-          x: nextX,
-          y: nextY,
-          width: nextWidth,
-          height: nextHeight,
-          ...(nextMarkerSize === undefined
-            ? {}
-            : { marker_size: nextMarkerSize }),
-        },
-      }))
+      draftWidgetsRef.current[origin.id] = nextDraft
+      applyLiveWidgetStyles(
+        target ?? drag.target,
+        selectedWidget,
+        nextDraft,
+        globalScale,
+      )
     },
     onResizeEnd: () => {
       const origin = interactionStartRef.current
@@ -277,7 +306,7 @@ export default function useOverlayEditorState({
         })
       }
 
-      clearDraftWidget(setDraftWidgets, origin.id)
+      clearLiveWidgetDraft(draftWidgetsRef, origin.id)
       interactionStartRef.current = null
     },
     onScaleStart: ({ dragStart }) => {
@@ -299,20 +328,21 @@ export default function useOverlayEditorState({
           selectedWidget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
         valueOffset: selectedWidget.data.value_offset ?? 0,
       }
+      draftWidgetsRef.current[selectedWidget.id] = {}
     },
-    onScale: ({ scale, drag }) => {
+    onScale: ({ scale, drag, target }) => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
 
-      setDraftWidgets((current) => ({
-        ...current,
-        [origin.id]: {
-          ...current[origin.id],
-          x: origin.x + drag.beforeTranslate[0],
-          y: origin.y + drag.beforeTranslate[1],
-          scale: Math.max(scale[0], scale[1]),
-        },
-      }))
+      const nextDraft = {
+        ...draftWidgetsRef.current[origin.id],
+        x: origin.x + drag.beforeTranslate[0],
+        y: origin.y + drag.beforeTranslate[1],
+        scale: Math.max(scale[0], scale[1]),
+      }
+
+      draftWidgetsRef.current[origin.id] = nextDraft
+      applyLiveWidgetStyles(target, selectedWidget, nextDraft, globalScale)
     },
     onScaleEnd: () => {
       const origin = interactionStartRef.current
@@ -358,7 +388,7 @@ export default function useOverlayEditorState({
         })
       }
 
-      clearDraftWidget(setDraftWidgets, origin.id)
+      clearLiveWidgetDraft(draftWidgetsRef, origin.id)
       interactionStartRef.current = null
     },
     onRotateStart: () => {
@@ -370,6 +400,7 @@ export default function useOverlayEditorState({
         y: selectedWidget.data.y ?? 0,
         rotation: selectedWidget.data.rotation ?? 0,
       }
+      draftWidgetsRef.current[selectedWidget.id] = {}
     },
     onRotate: ({ beforeRotate, drag, target }) => {
       const origin = interactionStartRef.current
@@ -378,28 +409,15 @@ export default function useOverlayEditorState({
       const nextX = origin.x + (drag?.beforeTranslate?.[0] ?? 0)
       const nextY = origin.y + (drag?.beforeTranslate?.[1] ?? 0)
       const nextRotation = beforeRotate
-      const currentDraft = draftWidgetsRef.current[origin.id] || {}
-      const scale = (currentDraft.scale ?? 1) * globalScale
-
-      if (target) {
-        target.style.left = `${nextX}px`
-        target.style.top = `${nextY}px`
-        target.style.transform =
-          buildWidgetTransform({
-            scale,
-            rotation: nextRotation,
-          }) || ''
+      const nextDraft = {
+        ...draftWidgetsRef.current[origin.id],
+        x: nextX,
+        y: nextY,
+        rotation: nextRotation,
       }
 
-      setDraftWidgets((current) => ({
-        ...current,
-        [origin.id]: {
-          ...current[origin.id],
-          x: nextX,
-          y: nextY,
-          rotation: nextRotation,
-        },
-      }))
+      draftWidgetsRef.current[origin.id] = nextDraft
+      applyLiveWidgetStyles(target, selectedWidget, nextDraft, globalScale)
     },
     onRotateEnd: () => {
       const origin = interactionStartRef.current
@@ -417,7 +435,7 @@ export default function useOverlayEditorState({
         })
       }
 
-      clearDraftWidget(setDraftWidgets, origin.id)
+      clearLiveWidgetDraft(draftWidgetsRef, origin.id)
       interactionStartRef.current = null
     },
   }
@@ -428,7 +446,6 @@ export default function useOverlayEditorState({
     canRotateSelected,
     canScaleSelected,
     displayScale,
-    draftWidgets,
     elementGuidelines,
     globalOpacity,
     globalScale,

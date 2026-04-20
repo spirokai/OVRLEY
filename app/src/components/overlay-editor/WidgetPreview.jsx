@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH, WIDGET_ICONS } from './constants'
 import {
   areaToSvg,
@@ -205,21 +206,39 @@ function OverlayTextWidget({ widget, globalOpacity }) {
 function OverlayRouteWidget({ widget, activity, sampleIndex, globalOpacity }) {
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
-  const points = normalizeRoutePoints(
-    activity?.sample_course_points || [],
-    width,
-    height,
+  const points = useMemo(
+    () =>
+      normalizeRoutePoints(activity?.sample_course_points || [], width, height),
+    [activity?.sample_course_points, width, height],
   )
   const completedIndex = getCompletedIndex(points.length, sampleIndex)
-  const completedPoints = points.slice(0, completedIndex + 1)
-  const remainingPoints = points.slice(completedIndex)
+  const completedPoints = useMemo(
+    () => points.slice(0, completedIndex + 1),
+    [completedIndex, points],
+  )
+  const remainingPoints = useMemo(
+    () => points.slice(completedIndex),
+    [completedIndex, points],
+  )
   const markerPoint = points[completedIndex] || points[points.length - 1]
+  const remainingSvgPoints = useMemo(
+    () => pointsToSvg(remainingPoints.length > 1 ? remainingPoints : points),
+    [points, remainingPoints],
+  )
+  const completedSvgPoints = useMemo(
+    () =>
+      pointsToSvg(
+        completedPoints.length > 1 ? completedPoints : points.slice(0, 2),
+      ),
+    [completedPoints, points],
+  )
 
   return (
     <svg
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
+      className="block h-full w-full"
       style={{ opacity: getWidgetOpacity(widget.data, globalOpacity) }}
     >
       <g>
@@ -230,9 +249,7 @@ function OverlayRouteWidget({ widget, activity, sampleIndex, globalOpacity }) {
           strokeWidth={widget.data.remaining_line_width ?? 6}
           strokeLinejoin="round"
           strokeLinecap="round"
-          points={pointsToSvg(
-            remainingPoints.length > 1 ? remainingPoints : points,
-          )}
+          points={remainingSvgPoints}
         />
         <polyline
           fill="none"
@@ -241,9 +258,7 @@ function OverlayRouteWidget({ widget, activity, sampleIndex, globalOpacity }) {
           strokeWidth={widget.data.completed_line_width ?? 6}
           strokeLinejoin="round"
           strokeLinecap="round"
-          points={pointsToSvg(
-            completedPoints.length > 1 ? completedPoints : points.slice(0, 2),
-          )}
+          points={completedSvgPoints}
         />
         {markerPoint ? (
           <circle
@@ -267,16 +282,41 @@ function OverlayElevationWidget({
 }) {
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
-  const points = normalizeElevationPoints(
-    activity?.sample_elevations || [],
-    width,
-    height,
+  const points = useMemo(
+    () =>
+      normalizeElevationPoints(
+        activity?.sample_elevations || [],
+        width,
+        height,
+      ),
+    [activity?.sample_elevations, width, height],
   )
   const completedIndex = getCompletedIndex(points.length, sampleIndex)
-  const completedPoints = points.slice(0, completedIndex + 1)
-  const remainingPoints = points.slice(completedIndex)
+  const completedPoints = useMemo(
+    () => points.slice(0, completedIndex + 1),
+    [completedIndex, points],
+  )
+  const remainingPoints = useMemo(
+    () => points.slice(completedIndex),
+    [completedIndex, points],
+  )
   const markerPoint = points[completedIndex] || points[points.length - 1]
   const elevationValue = getSampleValue(activity, 'elevation', sampleIndex)
+  const areaSvgPoints = useMemo(
+    () => areaToSvg(points, width, height),
+    [height, points, width],
+  )
+  const remainingSvgPoints = useMemo(
+    () => pointsToSvg(remainingPoints.length > 1 ? remainingPoints : points),
+    [points, remainingPoints],
+  )
+  const completedSvgPoints = useMemo(
+    () =>
+      pointsToSvg(
+        completedPoints.length > 1 ? completedPoints : points.slice(0, 2),
+      ),
+    [completedPoints, points],
+  )
   const metricLabel =
     elevationValue === null || elevationValue === undefined
       ? '-- m'
@@ -295,9 +335,14 @@ function OverlayElevationWidget({
         opacity: getWidgetOpacity(widget.data, globalOpacity),
       }}
     >
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        className="block h-full w-full"
+      >
         <polygon
-          points={areaToSvg(points, width, height)}
+          points={areaSvgPoints}
           fill={widget.data.remaining_line_color || '#005b5b'}
           fillOpacity={0.12}
         />
@@ -308,9 +353,7 @@ function OverlayElevationWidget({
           strokeWidth={widget.data.remaining_line_width ?? 6}
           strokeLinejoin="round"
           strokeLinecap="round"
-          points={pointsToSvg(
-            remainingPoints.length > 1 ? remainingPoints : points,
-          )}
+          points={remainingSvgPoints}
         />
         <polyline
           fill="none"
@@ -319,9 +362,7 @@ function OverlayElevationWidget({
           strokeWidth={widget.data.completed_line_width ?? 6}
           strokeLinejoin="round"
           strokeLinecap="round"
-          points={pointsToSvg(
-            completedPoints.length > 1 ? completedPoints : points.slice(0, 2),
-          )}
+          points={completedSvgPoints}
         />
         {markerPoint ? (
           <circle
@@ -362,12 +403,7 @@ function OverlayElevationWidget({
   )
 }
 
-export default function WidgetPreview({
-  widget,
-  activity,
-  sampleIndex,
-  globalOpacity,
-}) {
+function WidgetPreview({ widget, activity, sampleIndex, globalOpacity }) {
   if (widget.type === 'label') {
     return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} />
   }
@@ -403,3 +439,12 @@ export default function WidgetPreview({
     />
   )
 }
+
+export default memo(
+  WidgetPreview,
+  (previousProps, nextProps) =>
+    previousProps.widget === nextProps.widget &&
+    previousProps.activity === nextProps.activity &&
+    previousProps.sampleIndex === nextProps.sampleIndex &&
+    previousProps.globalOpacity === nextProps.globalOpacity,
+)

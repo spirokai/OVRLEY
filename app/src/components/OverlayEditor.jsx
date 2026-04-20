@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { LayoutGrid } from 'lucide-react'
 import OverlayCanvas from './overlay-editor/OverlayCanvas'
 import OverlayMoveable from './overlay-editor/OverlayMoveable'
@@ -21,7 +22,7 @@ function EmptyOverlayState() {
   )
 }
 
-export default function OverlayEditor({
+function OverlayEditor({
   config,
   globalDefaults,
   onConfigChange,
@@ -35,7 +36,6 @@ export default function OverlayEditor({
     canRotateSelected,
     canScaleSelected,
     displayScale,
-    draftWidgets,
     elementGuidelines,
     globalOpacity,
     globalScale,
@@ -89,7 +89,6 @@ export default function OverlayEditor({
           >
             <OverlayCanvas
               widgets={widgets}
-              draftWidgets={draftWidgets}
               globalScale={globalScale}
               globalOpacity={globalOpacity}
               activity={activity}
@@ -118,3 +117,5 @@ export default function OverlayEditor({
     </div>
   )
 }
+
+export default memo(OverlayEditor)

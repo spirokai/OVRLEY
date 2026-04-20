@@ -143,9 +143,21 @@ export function createEditorSlice(set, get) {
     },
 
     setSelectedSecond: (second) => {
-      localStorage.setItem('selectedSecond', second.toString())
+      const nextSecond = Number(second)
+      const safeSecond = Number.isFinite(nextSecond) ? nextSecond : 0
+
+      localStorage.setItem('selectedSecond', safeSecond.toString())
       set((state) => {
-        state.selectedSecond = second
+        state.selectedSecond = safeSecond
+      })
+    },
+
+    setSelectedSecondTransient: (second) => {
+      const nextSecond = Number(second)
+      const safeSecond = Number.isFinite(nextSecond) ? nextSecond : 0
+
+      set((state) => {
+        state.selectedSecond = safeSecond
       })
     },
 
