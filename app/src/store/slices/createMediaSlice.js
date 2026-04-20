@@ -8,6 +8,7 @@ export function createMediaSlice(set) {
     imageFilename: localStorage.getItem('imageFilename') || null,
     videoFilename: localStorage.getItem('videoFilename') || null,
     gpxFilename: localStorage.getItem('gpxFilename') || null,
+    activitySummary: null,
     renderProgress: { ...DEFAULT_RENDER_PROGRESS },
 
     setGeneratingImage: (generating) =>
@@ -60,28 +61,38 @@ export function createMediaSlice(set) {
       set((state) => {
         state.gpxFilename = filename
       })
-
-      const isLikelyGpx =
-        typeof filename === 'string' &&
-        (filename.endsWith('.gpx') || filename.startsWith('http'))
-      if (!isLikelyGpx) return
-
-      try {
-        const response = await fetch(filename)
-        const fileBlob = await response.blob()
-        const reader = new FileReader()
-        reader.onloadend = () => {}
-        reader.readAsDataURL(fileBlob)
-      } catch {
-        console.warn(
-          'setGpxFilename: could not fetch GPX file contents (expected for demo)',
-        )
-      }
     },
 
     setGpxFilenameFromFile: (file) => {
       set((state) => {
         state.gpxFilename = file?.name || null
+      })
+    },
+
+    setActivitySummary: (activity) => {
+      set((state) => {
+        if (!activity) {
+          state.activitySummary = null
+          return
+        }
+
+        state.activitySummary = {
+          durationSeconds: activity.metadata?.duration_seconds ?? 0,
+          endTime: activity.metadata?.end_time ?? null,
+          extendedAttributes: activity.extended_attributes || [],
+          fileFormat: activity.file_format || null,
+          fileName: activity.file_name || null,
+          sampleCount: activity.metadata?.sample_count ?? 0,
+          startTime: activity.metadata?.start_time ?? null,
+          totalDistanceMeters: activity.metadata?.total_distance_m ?? 0,
+          validAttributes: activity.valid_attributes || [],
+        }
+      })
+    },
+
+    clearActivitySummary: () => {
+      set((state) => {
+        state.activitySummary = null
       })
     },
   }

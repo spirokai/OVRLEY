@@ -3,6 +3,7 @@
 
 :root {
   font-family:
+    Ubuntu,
     system-ui,
     -apple-system,
     'Segoe UI',
@@ -10,6 +11,9 @@
     sans-serif;
   line-height: 1.5;
   font-weight: 400;
+  font-size: 16px;
+  text-transform: uppercase;
+  font-optical-sizing: auto;
 
   color-scheme: dark;
   color: #afeeee;

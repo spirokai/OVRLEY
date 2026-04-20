@@ -230,54 +230,6 @@ export async function openVideo(filename) {
 }
 
 /**
- * Upload GPX file
- */
-export async function uploadGpx(file) {
-  const invoke = await getInvoke()
-  if (invoke) {
-    try {
-      const ready = await invoke('backend_socket_ready')
-      if (ready) {
-        const buffer = await file.arrayBuffer()
-        const fileData = Array.from(new Uint8Array(buffer))
-        const result = await invoke('backend_upload', {
-          fileData,
-          filename: file.name,
-        })
-        return JSON.parse(result)
-      }
-    } catch (e) {
-      console.warn('Tauri upload failed, falling back to fetch', e)
-    }
-  }
-
-  const formData = new FormData()
-  formData.append('file', file)
-  const response = await fetch('http://localhost:31337/upload', {
-    method: 'POST',
-    body: formData,
-  })
-  return response.json()
-}
-
-/**
- * Load GPX file from absolute path (Tauri native dialog)
- */
-export async function loadGpxFromPath(path) {
-  const invoke = await getInvoke()
-  if (invoke) {
-    try {
-      const result = await invoke('backend_load_gpx', { path })
-      return JSON.parse(result)
-    } catch (e) {
-      console.error('Tauri load_gpx failed:', e)
-      throw e
-    }
-  }
-  throw new Error('Native file loading only available in desktop app')
-}
-
-/**
  * Get image URL for a preview/video filename
  */
 export async function getImageUrl(filename) {
@@ -364,4 +316,30 @@ export async function writeTemplateFile(path, contents) {
   }
 
   return invoke('write_template_file', { path, contents })
+}
+
+export async function writeParseDebugFile(filename, contents) {
+  const invoke = await getInvoke()
+  if (invoke) {
+    return invoke('write_parse_debug_file', { filename, contents })
+  }
+
+  const response = await fetch('/api/parse-debug', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ filename, contents }),
+  })
+
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => null)
+    throw new Error(
+      errorPayload?.error ||
+        `Failed to write parse debug file: ${response.status}`,
+    )
+  }
+
+  const data = await response.json()
+  return data.path
 }

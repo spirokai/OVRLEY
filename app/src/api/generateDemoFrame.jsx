@@ -1,3 +1,4 @@
+import { getCurrentParsedActivity } from './activityCache'
 import useStore from '../store/useStore'
 import * as backend from './backend'
 
@@ -16,6 +17,8 @@ export default async function generateDemoFrame(config) {
 
     const configToSend = config ?? storeConfig
 
+    const parsedActivity = getCurrentParsedActivity()
+
     // Validate we have required data
     if (!configToSend || !configToSend.scene) {
       console.error('No valid config available')
@@ -26,6 +29,12 @@ export default async function generateDemoFrame(config) {
       console.error('No GPX file selected')
       throw new Error(
         "Please load a GPX file first. Click 'Load Demo Activity' or upload your own GPX file.",
+      )
+    }
+
+    if (parsedActivity && gpxFilename !== 'demo.gpxinit') {
+      throw new Error(
+        'Preview for frontend-parsed activities is not wired to the backend renderer yet. Demo activity preview still works.',
       )
     }
 

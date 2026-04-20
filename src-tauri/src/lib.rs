@@ -382,6 +382,19 @@ fn write_template_file(path: String, contents: String) -> Result<String, String>
     Ok(path)
 }
 
+#[tauri::command]
+fn write_parse_debug_file(filename: String, contents: String) -> Result<String, String> {
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.pop();
+    path.push("app");
+    path.push("debug");
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    path.push(filename);
+
+    std::fs::write(&path, contents).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -404,7 +417,8 @@ pub fn run() {
             get_image_url,
             backend_image_data,
             default_template_save_path,
-            write_template_file
+            write_template_file,
+            write_parse_debug_file
         ])
         .setup(|app| {
             // Spawn the python sidecar

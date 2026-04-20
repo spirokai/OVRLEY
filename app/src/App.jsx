@@ -481,16 +481,7 @@ function App() {
   const handleGpxFileOpen = async () => {
     try {
       const { default: saveFileFromPath } = await import('./api/gpxUtils')
-      const selected = hasTauriRuntime()
-        ? await (async () => {
-            const { open } = await import('@tauri-apps/plugin-dialog')
-            return open({
-              multiple: false,
-              filters: [{ name: 'Activity Files', extensions: ['gpx', 'fit'] }],
-              title: 'Select GPX/FIT Activity',
-            })
-          })()
-        : await selectBrowserGpxFile()
+      const selected = await selectBrowserGpxFile()
 
       if (!selected) return
 
@@ -538,9 +529,7 @@ function App() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
-                  size="md"
-                  className="mr-4 h-9 gap-2 border-border/70 px-5 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+                  className="mr-4 h-9 gap-2 border-border/70 px-5 "
                   onClick={handleGpxFileOpen}
                 >
                   <Activity className="h-3.5 w-3.5" />

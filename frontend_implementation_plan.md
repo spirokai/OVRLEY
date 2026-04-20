@@ -189,7 +189,7 @@ All these options must be supported for the widgets:
   Stroke rate (rowing)
   G-Force
 
-- **Debugging**: Create a debugging output so I can verify the parsing from both formats.
+- **Debugging**: Create a debugging json output everytime a file is parsed, so I can verify the parsing from both formats.
 
 #### [MODIFY] app/src/api/gpxUtils.jsx
 
@@ -199,12 +199,15 @@ All these options must be supported for the widgets:
 
 ### Phase 6: Interactive Overlay Editor (Canvas)
 
-**Goal**: Replace the static preview with an interactive `react-moveable` canvas.
+**Goal**: Replace the static preview of the widgets from the store with an interactive `react-moveable` canvas.
 
-- **Canvas Implementation**: A 2D workspace reflecting the aspect ratio/resolution.
-- **react-moveable**: Implement dragging, resizing, and snapping with automatic guidelines.
+- **Canvas Implementation**: A 2D workspace reflecting the aspect ratio/resolution. Add a switch in the canvas area that will switch between black and checkeredboard appearance.
+- **Zooming**: Implement mouse scroll zoom in/out of the entire canvas with widgets.
+- **react-moveable**: Implement widget dragging, resizing, and snapping with automatic guidelines. The widgets must respect the styling settings from the store.
+- **Parsed Activity**: Already stored in the store, can be used for visualization
 - **Text Resizing**: Dragging the corner of a text label calculates and updates the `font_size`.
 - **Performance**: Use `onDragEnd` and `onResizeEnd` to commit state changes.
+- **Code split**: Ensure the code is maintainable, clean with clear concern separation. You are allowed to create a new folder and files for this. Do not atomize the code to mini files.
 
 #### [MODIFY] app/src/App.jsx
 

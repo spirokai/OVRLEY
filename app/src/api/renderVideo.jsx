@@ -1,3 +1,4 @@
+import { getCurrentParsedActivity } from './activityCache'
 import useStore from '../store/useStore'
 import * as backend from './backend'
 import { applyGlobalDefaults } from '../lib/config-utils'
@@ -27,6 +28,8 @@ export default async function renderVideo() {
       setVideoFilename,
     } = useStore.getState()
 
+    const parsedActivity = getCurrentParsedActivity()
+
     // Validate we have required data
     if (!baseConfig || !baseConfig.scene) {
       throw new Error('No valid config available')
@@ -52,6 +55,12 @@ export default async function renderVideo() {
 
     if (!gpxFilename) {
       throw new Error('No GPX file selected')
+    }
+
+    if (parsedActivity && gpxFilename !== 'demo.gpxinit') {
+      throw new Error(
+        'Render for frontend-parsed activities is not connected to the legacy backend renderer yet.',
+      )
     }
 
     if (config.scene.start === undefined || config.scene.end === undefined) {
