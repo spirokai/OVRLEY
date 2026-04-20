@@ -36,6 +36,17 @@ export function BlurInput({
     if (e.key === 'Enter') {
       inputRef.current?.blur()
     }
+
+    if (isNumberInput && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      requestAnimationFrame(() => {
+        if (!inputRef.current) return
+
+        const nextValue = inputRef.current.value
+        setValue(nextValue)
+        onChange?.({ target: { value: nextValue } })
+      })
+    }
+
     props.onKeyDown?.(e)
   }
 
@@ -50,7 +61,9 @@ export function BlurInput({
       inputRef.current.stepDown()
     }
 
-    setValue(inputRef.current.value)
+    const nextValue = inputRef.current.value
+    setValue(nextValue)
+    onChange?.({ target: { value: nextValue } })
   }
 
   const inputElement = (

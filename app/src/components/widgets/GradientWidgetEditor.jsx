@@ -10,7 +10,7 @@ import { getThemeColor } from '@/lib/theme'
 export default function GradientWidgetEditor({ widget, updateWidgetData }) {
   const valueOffset = widget.data.value_offset ?? 0
   const decimals = widget.data.decimals ?? 0
-  const triangleWidth = widget.data.triangle_width ?? 24
+  const triangleWidth = widget.data.triangle_width ?? 72
 
   return (
     <>
@@ -83,7 +83,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
             label="Indicator Width"
             value={triangleWidth}
             min={0}
-            max={100}
+            max={240}
             step={1}
             valueDisplay={`${triangleWidth}px`}
             onSliderChange={(value) =>

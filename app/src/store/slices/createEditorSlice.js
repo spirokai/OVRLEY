@@ -12,6 +12,7 @@ import {
 export function createEditorSlice(set, get) {
   return {
     editor: null,
+    selectedWidgetId: null,
     hasUnrenderedChanges: false,
     lastRenderedConfig: null,
     dummyDurationSeconds: readStoredInt('dummyDurationSeconds', 73),
@@ -151,6 +152,11 @@ export function createEditorSlice(set, get) {
     setEditor: (editor) =>
       set((state) => {
         state.editor = editor
+      }),
+
+    setSelectedWidgetId: (widgetId) =>
+      set((state) => {
+        state.selectedWidgetId = widgetId
       }),
   }
 }

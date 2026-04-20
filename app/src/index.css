@@ -29,6 +29,7 @@
   --theme-color-aqua: #40e0d0;
   --theme-color-ice: #afeeee;
   --theme-color-teal: #005b5b;
+  --moveable-color: var(--theme-color-accent) !important;
   --background: var(--theme-color-background);
   --foreground: var(--theme-color-ice);
   --card: color-mix(
@@ -257,4 +258,61 @@ body {
     0 10px,
     10px -10px,
     -10px 0px;
+}
+
+.bg-overlay-grid-muted {
+  background-image:
+    linear-gradient(
+      45deg,
+      color-mix(in srgb, var(--grid-line) 32%, transparent) 25%,
+      transparent 15%
+    ),
+    linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--grid-line) 32%, transparent) 25%,
+      transparent 15%
+    ),
+    linear-gradient(
+      45deg,
+      transparent 75%,
+      color-mix(in srgb, var(--grid-line) 32%, transparent) 75%
+    ),
+    linear-gradient(
+      -45deg,
+      transparent 75%,
+      color-mix(in srgb, var(--grid-line) 32%, transparent) 75%
+    );
+  background-size: 40px 40px;
+  background-position:
+    0 0,
+    0 20px,
+    20px -20px,
+    -20px 0;
+}
+
+.moveable-bold,
+.moveable-control,
+.moveable-normal,
+.moveable-direction,
+.moveable-rotation-line {
+  background-color: var(--theme-color-accent) !important;
+}
+
+/* control box points */
+
+.moveable-control {
+  height: 8px !important;
+  width: 8px !important;
+  margin-top: -4px !important;
+  margin-left: -4px !important;
+}
+
+.moveable-direction,
+.moveable-rotation-control {
+  border-color: var(--theme-color-accent) !important;
+}
+
+/* dashed guides */
+.moveable-dashed {
+  border-color: var(--theme-color-ice) !important;
 }

@@ -114,7 +114,7 @@ export function createMetricValueDefaults(type, globalDefaults) {
     triangle_negative_color: getThemeColor('accent'),
     show_sign: true,
     show_triangle: true,
-    triangle_width: 24,
+    triangle_width: 72,
     unit: 'metric',
   }
 }

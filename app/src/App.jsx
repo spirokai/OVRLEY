@@ -1,8 +1,7 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import useStore from './store/useStore'
 import './index.css'
 import * as backend from './api/backend'
-import { applyGlobalDefaults } from './lib/config-utils'
 import {
   createTemplateFilePayload,
   createTemplateState,
@@ -16,8 +15,6 @@ import {
 // UI components
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -26,19 +23,28 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import ControlPanel from '@/components/ControlPanel'
+import OverlayEditor from '@/components/OverlayEditor'
 import ErrorAlert from '@/components/ErrorAlert'
 import RenderProgressOverlay from '@/components/RenderProgressOverlay'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 // Icons
 import {
-  Upload,
   Play,
   Activity,
   FolderOpen,
   Sparkles,
   Save,
+  LayoutGrid,
+  Square,
+  Minus,
+  ZoomIn,
+  RotateCcw,
 } from 'lucide-react'
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value))
+}
 
 // Global state for sidecar
 window.__SIDECAR_DEBUG__ = {
@@ -118,20 +124,12 @@ function App() {
     config,
     globalDefaults,
     setConfig,
-    imageFilename,
     generatingImage,
     renderingVideo,
     setGeneratingImage,
-    setImageFilename,
     setRenderProgress,
     gpxFilename,
-    selectedSecond,
     setErrorMessage,
-    hasUnrenderedChanges,
-    setHasUnrenderedChanges,
-    setLastRenderedConfig,
-    autoRender,
-    setAutoRender,
     templates,
     fetchTemplates,
     updateRate,
@@ -147,7 +145,14 @@ function App() {
 
   const [backendStatus, setBackendStatus] = useState('connecting')
   const [backendReady, setBackendReady] = useState(false)
-  const [imageError, setImageError] = useState(false)
+  const [editorZoomLevel, setEditorZoomLevel] = useState(1)
+  const [editorBackgroundMode, setEditorBackgroundMode] = useState(
+    () => localStorage.getItem('overlayBackgroundMode') || 'checker',
+  )
+
+  useEffect(() => {
+    localStorage.setItem('overlayBackgroundMode', editorBackgroundMode)
+  }, [editorBackgroundMode])
 
   // Fetch templates once
   useEffect(() => {
@@ -345,62 +350,8 @@ function App() {
         ? 'Saved'
         : 'Modified'
   const showTemplateStatus = status === 'Draft' || status === 'Modified'
-
-  // Generate preview
-  const handleGeneratePreview = useCallback(
-    async (templateOverride = null) => {
-      const baseConfig = templateOverride?.config || config
-      const effectiveGlobalDefaults =
-        templateOverride?.globalDefaults || globalDefaults
-      if (!baseConfig) return
-
-      // Apply global defaults before sending to backend
-      const currentConfig = applyGlobalDefaults(
-        baseConfig,
-        effectiveGlobalDefaults,
-      )
-
-      try {
-        setGeneratingImage(true)
-        setImageError(false)
-        const data = await backend.generateDemo(
-          currentConfig,
-          gpxFilename || 'demo.gpxinit',
-          selectedSecond,
-        )
-
-        if (data.error) {
-          setErrorMessage(`Preview failed: ${data.error}`)
-          setImageError(true)
-        } else {
-          const imageUrl = await backend.getImageUrl(data.filename)
-          setImageFilename(imageUrl)
-          setHasUnrenderedChanges(false)
-          setLastRenderedConfig(currentConfig)
-        }
-      } catch (err) {
-        console.error('Error generating preview:', err)
-        setErrorMessage(
-          `Failed to connect to backend: ${
-            err.message || String(err) || 'Unknown error'
-          }`,
-        )
-      } finally {
-        setGeneratingImage(false)
-      }
-    },
-    [
-      config,
-      gpxFilename,
-      selectedSecond,
-      globalDefaults,
-      setGeneratingImage,
-      setErrorMessage,
-      setImageFilename,
-      setHasUnrenderedChanges,
-      setLastRenderedConfig,
-    ],
-  )
+  const sceneWidth = config?.scene?.width || 1920
+  const sceneHeight = config?.scene?.height || 1080
 
   // Render progress polling
   useEffect(() => {
@@ -425,30 +376,6 @@ function App() {
     pollProgress()
     return () => clearInterval(interval)
   }, [renderingVideo, setRenderProgress])
-
-  // Auto-render effect
-  useEffect(() => {
-    if (
-      autoRender &&
-      config &&
-      hasUnrenderedChanges &&
-      !generatingImage &&
-      backendStatus === 'connected'
-    ) {
-      const timer = setTimeout(() => {
-        handleGeneratePreview()
-      }, 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [
-    config,
-    globalDefaults,
-    autoRender,
-    hasUnrenderedChanges,
-    generatingImage,
-    backendStatus,
-    handleGeneratePreview,
-  ])
 
   // Load template
 
@@ -486,12 +413,8 @@ function App() {
       if (!selected) return
 
       setGeneratingImage(true)
-      setImageError(false)
 
       await saveFileFromPath(selected)
-
-      // Refresh preview after gpx load
-      await handleGeneratePreview()
     } catch (err) {
       console.error('GPX selection failed:', err)
       useStore
@@ -610,66 +533,87 @@ function App() {
             </div>
           </div>
 
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 backdrop-blur-sm shadow-lg">
+              <SimpleTooltip side="bottom" content="Checkered background">
+                <Button
+                  type="button"
+                  variant={
+                    editorBackgroundMode === 'checker' ? 'default' : 'ghost'
+                  }
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setEditorBackgroundMode('checker')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </SimpleTooltip>
+              <SimpleTooltip side="bottom" content="Black background">
+                <Button
+                  type="button"
+                  variant={
+                    editorBackgroundMode === 'black' ? 'default' : 'ghost'
+                  }
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setEditorBackgroundMode('black')}
+                >
+                  <Square className="h-4 w-4" />
+                </Button>
+              </SimpleTooltip>
+              <div className="mx-1 h-5 w-px bg-border/70" />
+              <SimpleTooltip side="bottom" content="Zoom out">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() =>
+                    setEditorZoomLevel((current) =>
+                      clamp(Number((current - 0.1).toFixed(2)), 0.35, 4),
+                    )
+                  }
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+              </SimpleTooltip>
+              <div className="min-w-14 text-center text-xs font-semibold text-muted-foreground">
+                {Math.round(editorZoomLevel * 100)}%
+              </div>
+              <SimpleTooltip side="bottom" content="Zoom in">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() =>
+                    setEditorZoomLevel((current) =>
+                      clamp(Number((current + 0.1).toFixed(2)), 0.35, 4),
+                    )
+                  }
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+              </SimpleTooltip>
+              <SimpleTooltip side="bottom" content="Reset zoom">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setEditorZoomLevel(1)}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </SimpleTooltip>
+            </div>
+            <div className="rounded-full border border-border/70 bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm shadow-lg">
+              {sceneWidth} × {sceneHeight}
+            </div>
+          </div>
+
           {/* Right - Actions & Status */}
           <div className="flex items-center gap-3">
-            <SimpleTooltip
-              side="bottom"
-              content={
-                !config
-                  ? 'Load a template or GPX first'
-                  : backendStatus !== 'connected'
-                    ? 'Backend offline'
-                    : !hasUnrenderedChanges
-                      ? 'No changes to render'
-                      : generatingImage
-                        ? 'Generating preview...'
-                        : null
-              }
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                className={`gap-2 h-8 px-3 transition-all duration-300 relative ${
-                  hasUnrenderedChanges
-                    ? 'border-accent-border bg-surface-accent-soft text-foreground ring-1 ring-ring/50'
-                    : 'border-accent-border/70 hover:border-accent-border hover:bg-surface-accent-soft'
-                }`}
-                onClick={() => handleGeneratePreview()}
-                disabled={
-                  generatingImage || !config || backendStatus !== 'connected'
-                }
-              >
-                {generatingImage ? (
-                  <Spinner className="h-3.5 w-3.5" />
-                ) : (
-                  <Upload
-                    className={`h-3.5 w-3.5 ${hasUnrenderedChanges ? 'text-highlight' : 'text-primary'}`}
-                  />
-                )}
-                <span>Refresh Preview</span>
-                {hasUnrenderedChanges && !generatingImage && (
-                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-highlight opacity-75"></span>
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary"></span>
-                  </span>
-                )}
-              </Button>
-            </SimpleTooltip>
-
-            <div className="flex items-center gap-2 mr-1">
-              <Switch
-                id="auto-render"
-                checked={autoRender}
-                onCheckedChange={setAutoRender}
-              />
-              <Label
-                htmlFor="auto-render"
-                className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer"
-              >
-                Auto
-              </Label>
-            </div>
-
             <SimpleTooltip
               side="bottom"
               content={
@@ -748,127 +692,30 @@ function App() {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Preview - Left */}
-        <div className="flex flex-1 items-center justify-center bg-background p-8">
+        <div className="relative flex min-w-0 flex-1 bg-background">
           {generatingImage && (
-            <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
               <div className="flex flex-col items-center gap-2">
                 <Spinner className="h-8 w-8" />
                 <span className="text-sm text-muted-foreground">
-                  Generating preview...
+                  Loading editor data...
                 </span>
               </div>
             </div>
           )}
-
-          {imageFilename && !imageError ? (
-            <div className="relative">
-              <img
-                src={imageFilename}
-                alt="Preview"
-                className="max-h-full max-w-full rounded-lg border border-border/70 bg-grid-transparent object-contain shadow-2xl"
-                onError={() => setImageError(true)}
-              />
-              {config?.scene && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2">
-                  <div className="rounded-full border border-border/70 bg-surface-overlay px-3 py-1 backdrop-blur-sm">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {config.scene.width} × {config.scene.height}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-4 text-center">
-              {backendStatus === 'connecting' ? (
-                <>
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-elevated">
-                    <Spinner className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="font-medium">
-                      {strikesRef.current > 5
-                        ? 'Still starting up...'
-                        : 'Starting Backend'}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {strikesRef.current > 5
-                        ? 'This is taking a bit longer than usual, please hang tight.'
-                        : 'Please wait...'}
-                    </p>
-                  </div>
-                </>
-              ) : backendStatus === 'error' ? (
-                <>
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full border border-accent-border bg-surface-accent-soft">
-                    <svg
-                      className="h-8 w-8 text-primary"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium">Backend Connection Issue</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      The server is taking longer than expected to respond.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setBackendStatus('connecting')
-                        strikesRef.current = 0
-                      }}
-                      className="border-accent-border/70 hover:bg-surface-accent-soft"
-                    >
-                      Retry Connection
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-elevated">
-                    <svg
-                      className="h-8 w-8 text-muted-foreground"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium">No Preview</p>
-                    <p className="text-sm text-muted-foreground">
-                      Select a template to start
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+          <OverlayEditor
+            config={config}
+            globalDefaults={globalDefaults}
+            onConfigChange={setConfig}
+            zoomLevel={editorZoomLevel}
+            onZoomLevelChange={setEditorZoomLevel}
+            backgroundMode={editorBackgroundMode}
+          />
         </div>
 
         {/* Control Panel - Right */}
-        <div className="w-96 overflow-y-auto border-l border-border/70 bg-card/60 backdrop-blur-sm">
-          <ControlPanel
-            config={config}
-            onConfigChange={setConfig}
-            onApply={(updatedConfig) => handleGeneratePreview(updatedConfig)}
-          />
+        <div className="w-96 min-w-96 max-w-96 shrink-0 overflow-y-auto border-l border-border/70 bg-card/60 backdrop-blur-sm">
+          <ControlPanel config={config} onConfigChange={setConfig} />
         </div>
       </div>
     </div>

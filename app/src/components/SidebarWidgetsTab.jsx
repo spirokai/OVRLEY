@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { RotateCcw, Tag, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -26,6 +26,13 @@ import {
   TYPE_ICONS,
   TYPE_LABELS,
 } from './widgets/widgetDefinitions'
+import {
+  buildConfigWidgets,
+  deleteWidgetInConfig,
+  groupWidgetsForSidebar,
+  replaceWidgetInConfig,
+  updateWidgetInConfig,
+} from '@/lib/widget-config'
 import { PositionSection } from './widgets/widgetEditorSections'
 
 function renderWidgetEditor(widget, updateWidgetData, setNumericField) {
@@ -98,88 +105,36 @@ function renderWidgetEditor(widget, updateWidgetData, setNumericField) {
 }
 
 export default function SidebarWidgetsTab() {
-  const { config, setConfig, globalDefaults } = useStore()
-  const [activeWidgetId, setActiveWidgetId] = useState(null)
+  const {
+    config,
+    setConfig,
+    globalDefaults,
+    selectedWidgetId,
+    setSelectedWidgetId,
+  } = useStore()
 
   const widgets = useMemo(() => {
-    if (!config) return []
-
-    const all = []
-
-    ;(config.labels || []).forEach((item, index) => {
-      all.push({
-        id: `label-${index}`,
-        type: 'label',
-        category: 'labels',
-        index,
-        name: item.text || 'Text',
-        data: item,
-      })
-    })
-    ;(config.values || []).forEach((item, index) => {
-      all.push({
-        id: `value-${index}`,
-        type: item.value,
-        category: 'values',
-        index,
-        name: TYPE_LABELS[item.value] || item.value,
-        data: item,
-      })
-    })
-    ;(config.plots || []).forEach((item, index) => {
-      all.push({
-        id: `plot-${index}`,
-        type: item.value,
-        category: 'plots',
-        index,
-        name: TYPE_LABELS[item.value] || item.value,
-        data: item,
-      })
-    })
-
-    const grouped = all.reduce((accumulator, widget) => {
-      const typeName = TYPE_LABELS[widget.type] || widget.type
-      if (!accumulator[typeName]) accumulator[typeName] = []
-      accumulator[typeName].push(widget)
-      return accumulator
-    }, {})
-
-    return Object.keys(grouped)
-      .sort()
-      .flatMap((typeName, groupIndex) =>
-        grouped[typeName].map((widget, widgetIndex) => ({
-          ...widget,
-          showSeparator: groupIndex > 0 && widgetIndex === 0,
-        })),
-      )
+    return groupWidgetsForSidebar(buildConfigWidgets(config), TYPE_LABELS)
   }, [config])
 
   useEffect(() => {
     if (widgets.length === 0) {
-      if (activeWidgetId !== null) setActiveWidgetId(null)
+      if (selectedWidgetId !== null) setSelectedWidgetId(null)
       return
     }
 
-    if (!activeWidgetId) {
-      setActiveWidgetId(widgets[widgets.length - 1].id)
+    if (!selectedWidgetId) {
+      setSelectedWidgetId(widgets[widgets.length - 1].id)
       return
     }
 
-    if (!widgets.some((widget) => widget.id === activeWidgetId)) {
-      setActiveWidgetId(widgets[0].id)
+    if (!widgets.some((widget) => widget.id === selectedWidgetId)) {
+      setSelectedWidgetId(widgets[0].id)
     }
-  }, [widgets, activeWidgetId])
+  }, [widgets, selectedWidgetId, setSelectedWidgetId])
 
   const updateWidgetData = (id, updates) => {
-    const widget = widgets.find((item) => item.id === id)
-    if (!widget) return
-
-    const nextConfig = JSON.parse(JSON.stringify(config))
-    nextConfig[widget.category][widget.index] = {
-      ...nextConfig[widget.category][widget.index],
-      ...updates,
-    }
-    setConfig(nextConfig)
+    setConfig(updateWidgetInConfig(config, id, updates))
   }
 
   const setNumericField = (widgetId, key, rawValue, options = {}) => {
@@ -222,19 +177,11 @@ export default function SidebarWidgetsTab() {
     }
 
     setConfig(nextConfig)
-    if (newId) setActiveWidgetId(newId)
+    if (newId) setSelectedWidgetId(newId)
   }
 
   const deleteWidget = (id) => {
-    const widget = widgets.find((item) => item.id === id)
-    if (!widget) return
-
-    const nextConfig = JSON.parse(JSON.stringify(config))
-    nextConfig[widget.category] = nextConfig[widget.category].filter(
-      (_, index) => index !== widget.index,
-    )
-
-    setConfig(nextConfig)
+    setConfig(deleteWidgetInConfig(config, id))
   }
 
   const resetWidget = (id) => {
@@ -242,16 +189,30 @@ export default function SidebarWidgetsTab() {
     if (!widget) return
 
     if (widget.type === 'label') {
-      updateWidgetData(id, createLabelDefaults(globalDefaults))
+      setConfig(
+        replaceWidgetInConfig(config, id, createLabelDefaults(globalDefaults)),
+      )
       return
     }
 
     if (widget.type === 'course' || widget.type === 'elevation') {
-      updateWidgetData(id, createPlotDefaults(widget.type, globalDefaults))
+      setConfig(
+        replaceWidgetInConfig(
+          config,
+          id,
+          createPlotDefaults(widget.type, globalDefaults),
+        ),
+      )
       return
     }
 
-    updateWidgetData(id, createMetricValueDefaults(widget.type, globalDefaults))
+    setConfig(
+      replaceWidgetInConfig(
+        config,
+        id,
+        createMetricValueDefaults(widget.type, globalDefaults),
+      ),
+    )
   }
 
   if (!config) return null
@@ -293,9 +254,9 @@ export default function SidebarWidgetsTab() {
         ) : (
           <Accordion
             type="single"
-            value={activeWidgetId || undefined}
+            value={selectedWidgetId || undefined}
             onValueChange={(value) =>
-              setActiveWidgetId(value || widgets[0]?.id || null)
+              setSelectedWidgetId(value || widgets[0]?.id || null)
             }
             className="space-y-1"
           >
