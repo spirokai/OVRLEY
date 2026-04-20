@@ -201,9 +201,9 @@ All these options must be supported for the widgets:
 
 **Goal**: Replace the static preview of the widgets from the store with an interactive `react-moveable` canvas.
 
-- **Canvas Implementation**: A 2D workspace reflecting the aspect ratio/resolution. Add a switch in the canvas area that will switch between black and checkeredboard appearance.
+- **Canvas Implementation**: A 2D workspace reflecting the aspect ratio/resolution. Add a switch in the canvas area that will switch between black and checkeredboard appearance; the default is checkered.
 - **Zooming**: Implement mouse scroll zoom in/out of the entire canvas with widgets.
-- **react-moveable**: Implement widget dragging, resizing, and snapping with automatic guidelines. The widgets must respect the styling settings from the store.
+- **react-moveable**: Implement widget dragging, resizing, and snapping with automatic guidelines. Each active widget in the store must be represented on the canvas; the widgets must respect the styling settings from the store.
 - **Parsed Activity**: Already stored in the store, can be used for visualization
 - **Text Resizing**: Dragging the corner of a text label calculates and updates the `font_size`.
 - **Performance**: Use `onDragEnd` and `onResizeEnd` to commit state changes.
