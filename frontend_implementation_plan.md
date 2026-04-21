@@ -213,6 +213,38 @@ All these options must be supported for the widgets:
 
 #### [NEW] app/src/components/OverlayEditor.jsx
 
+### Phase 7: Live Preview Editor (Canvas)
+
+**Goal**: Introduce a basic player controls at the bottom of the editor window with play, stop, pause, reset buttons, timeline, progress indicator, total (and recorded) time and ability to drag the timestamp.
+
+- **Implementation**: This will NOT play a video. This will essentially play the parsed activity data in real time (per second) and stream the "current frame" to the widget values so that so the live values are previewed in real time.
+- **Package vs. home-brewed**: Evaluate whether we should use an existing package or code this in-house. Consider cons/pros.
+- **Route map/Elevation profile**: Consider how to approach their rendering in real time in this editor (do not worry about eventual export by backend) to maximize performance. Consider we need both done and remaining lines in different colors/opacities. Do we prerender them as polylines/svg? Use masks?
+- **Preview and react-moveable interaction**: Should we pause the preview as soon as a widget is edited/moved? Can we not pause without suffering major performance problems?
+
+#### [NEW] app/src/components/OverlayPlayer.jsx
+
+### Phase 8: Debugging & Polish
+
+**Goal**: Debug unexpected dragging behavior and add more customization options.
+
+> [!IMPORTANT] Ask clarifying questions if needed, do not guess anything.
+
+-assess if interpolation of the parsed data to 24-60 fps for live preview in the editor is viable and will be performant in a browser since it will increase the rate of DOM update 24-60 fold. This approach would respect the fps setting in global settings and widget update rate (e.g. 1/2 would interpolate to half the framerate).
+-allow overflow of control boxes from canvas
+-paint area underneath elevation profile curve as it progress; add settings to elevation profile widget - color done/remaining, opacity done/remaining
+-allow scaling y axis of elevation profile; add setting to elevation profile widget. Right now even relatively flat route looks quite hilly
+-maintain aspect ratio of the route map at all times
+-resizing of all widgets is behaving weirdly; only bottom right corner works without jittering but when I make widget smaller, and release and end the resize, the widget jumps to way smaller size; when I upscale the widget, it also does not end up with the size that it was when I released the resize - is that conflict of react-moveable and onResizeEnd? Clicking the widget one more time after finishing the resizing scales it back to the "correct" size it was at the end of the resize. Is this just a visual bug? Is this a memo issue?
+-dragging other corners (both upper, or bottom left) results in lot of horizontal or vertical jitter as if the widget constantly resizes vertically/horizontally during the drag
+-weird diagonal lines in every other row of the checkerboard background (lighter squares)
+
+### Phase 9: Final debugging
+
+-Gradient triangle changes position between negative and positive values. The triangle for positive gradient is way below the label/value, negative is more or less in the right spot. They should share the same horizontal line (0deg)
+-Some desync between elevation profile and the elevation label, the profile is going up, but the label says the altitude is decreasing. Is the label showing real altitude, or calculated from the smoothing? In any case, there is some discrepancy.
+-When changing widget update rate in the sidebar, the entire UI becomes unresponsive. mouseover changes styles, but I can't move sliders, open dropdowns, play the preview anything. I assume it is computing the new interpolation (that changes with the update rate), but this computation also happens during the activity loading/parsing and it takes 3-4 seconds, so it should be quite fast and not lock up the UI indefinitely. What's the source of this hang up?
+
 ## Verification Plan
 
 ### Manual Verification Steps (After Each Phase)

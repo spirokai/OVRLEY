@@ -9,6 +9,8 @@ import {
   formatTimeValue,
   getCombinedTextShadow,
   getCompletedIndex,
+  getDistanceProgress,
+  getPointAtProgress,
   getPreviewFontFamily,
   getSampleValue,
   getWidgetOpacity,
@@ -16,6 +18,10 @@ import {
   normalizeRoutePoints,
   pointsToSvg,
 } from './utils'
+
+function pointsEqual(left, right) {
+  return left?.[0] === right?.[0] && left?.[1] === right?.[1]
+}
 
 function OverlayMetricWidget({ widget, activity, sampleIndex, globalOpacity }) {
   const Icon = WIDGET_ICONS[widget.type]
@@ -211,16 +217,36 @@ function OverlayRouteWidget({ widget, activity, sampleIndex, globalOpacity }) {
       normalizeRoutePoints(activity?.sample_course_points || [], width, height),
     [activity?.sample_course_points, width, height],
   )
-  const completedIndex = getCompletedIndex(points.length, sampleIndex)
-  const completedPoints = useMemo(
-    () => points.slice(0, completedIndex + 1),
-    [completedIndex, points],
+  const progress01 = getDistanceProgress(activity, sampleIndex)
+  const completedIndex = getCompletedIndex(
+    points.length,
+    sampleIndex,
+    progress01,
   )
-  const remainingPoints = useMemo(
-    () => points.slice(completedIndex),
-    [completedIndex, points],
-  )
-  const markerPoint = points[completedIndex] || points[points.length - 1]
+  const markerPoint =
+    getPointAtProgress(points, progress01) ||
+    points[completedIndex] ||
+    points[points.length - 1]
+  const completedPoints = useMemo(() => {
+    const nextPoints = points.slice(0, completedIndex + 1)
+    if (
+      markerPoint &&
+      !pointsEqual(nextPoints[nextPoints.length - 1], markerPoint)
+    ) {
+      nextPoints.push(markerPoint)
+    }
+    return nextPoints
+  }, [completedIndex, markerPoint, points])
+  const remainingPoints = useMemo(() => {
+    const tailStart = Math.min(completedIndex + 1, points.length - 1)
+    const tail = points.slice(tailStart)
+
+    if (!markerPoint) {
+      return tail.length ? tail : points.slice(completedIndex)
+    }
+
+    return pointsEqual(markerPoint, tail[0]) ? tail : [markerPoint, ...tail]
+  }, [completedIndex, markerPoint, points])
   const remainingSvgPoints = useMemo(
     () => pointsToSvg(remainingPoints.length > 1 ? remainingPoints : points),
     [points, remainingPoints],
@@ -282,30 +308,64 @@ function OverlayElevationWidget({
 }) {
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
+  const clipId = `${widget.id}-completed-area`
+  const remainingAreaColor =
+    widget.data.area_remaining_color ||
+    widget.data.remaining_line_color ||
+    '#005b5b'
+  const completedAreaColor =
+    widget.data.area_completed_color ||
+    widget.data.completed_line_color ||
+    '#afeeee'
+  const remainingAreaOpacity = (widget.data.area_remaining_opacity ?? 12) / 100
+  const completedAreaOpacity = (widget.data.area_completed_opacity ?? 24) / 100
   const points = useMemo(
     () =>
       normalizeElevationPoints(
         activity?.sample_elevations || [],
         width,
         height,
+        18,
+        widget.data.y_scale ?? 1,
       ),
-    [activity?.sample_elevations, width, height],
+    [activity?.sample_elevations, height, widget.data.y_scale, width],
   )
-  const completedIndex = getCompletedIndex(points.length, sampleIndex)
-  const completedPoints = useMemo(
-    () => points.slice(0, completedIndex + 1),
-    [completedIndex, points],
+  const progress01 = getDistanceProgress(activity, sampleIndex)
+  const completedIndex = getCompletedIndex(
+    points.length,
+    sampleIndex,
+    progress01,
   )
-  const remainingPoints = useMemo(
-    () => points.slice(completedIndex),
-    [completedIndex, points],
-  )
-  const markerPoint = points[completedIndex] || points[points.length - 1]
+  const markerPoint =
+    getPointAtProgress(points, progress01) ||
+    points[completedIndex] ||
+    points[points.length - 1]
+  const completedPoints = useMemo(() => {
+    const nextPoints = points.slice(0, completedIndex + 1)
+    if (
+      markerPoint &&
+      !pointsEqual(nextPoints[nextPoints.length - 1], markerPoint)
+    ) {
+      nextPoints.push(markerPoint)
+    }
+    return nextPoints
+  }, [completedIndex, markerPoint, points])
+  const remainingPoints = useMemo(() => {
+    const tailStart = Math.min(completedIndex + 1, points.length - 1)
+    const tail = points.slice(tailStart)
+
+    if (!markerPoint) {
+      return tail.length ? tail : points.slice(completedIndex)
+    }
+
+    return pointsEqual(markerPoint, tail[0]) ? tail : [markerPoint, ...tail]
+  }, [completedIndex, markerPoint, points])
   const elevationValue = getSampleValue(activity, 'elevation', sampleIndex)
   const areaSvgPoints = useMemo(
     () => areaToSvg(points, width, height),
     [height, points, width],
   )
+  const completedAreaWidth = markerPoint ? markerPoint[0] : 0
   const remainingSvgPoints = useMemo(
     () => pointsToSvg(remainingPoints.length > 1 ? remainingPoints : points),
     [points, remainingPoints],
@@ -341,10 +401,21 @@ function OverlayElevationWidget({
         viewBox={`0 0 ${width} ${height}`}
         className="block h-full w-full"
       >
+        <defs>
+          <clipPath id={clipId}>
+            <rect x="0" y="0" width={completedAreaWidth} height={height} />
+          </clipPath>
+        </defs>
         <polygon
           points={areaSvgPoints}
-          fill={widget.data.remaining_line_color || '#005b5b'}
-          fillOpacity={0.12}
+          fill={remainingAreaColor}
+          fillOpacity={remainingAreaOpacity}
+        />
+        <polygon
+          points={areaSvgPoints}
+          fill={completedAreaColor}
+          fillOpacity={completedAreaOpacity}
+          clipPath={`url(#${clipId})`}
         />
         <polyline
           fill="none"

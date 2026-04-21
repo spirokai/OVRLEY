@@ -21,6 +21,9 @@ export default function ElevationWidgetEditor({
     widget.data.completed_line_width ?? widget.data.remaining_line_width ?? 6
   const completedLineOpacity = widget.data.completed_line_opacity ?? 100
   const remainingLineOpacity = widget.data.remaining_line_opacity ?? 35
+  const completedAreaOpacity = widget.data.area_completed_opacity ?? 24
+  const remainingAreaOpacity = widget.data.area_remaining_opacity ?? 12
+  const yScale = widget.data.y_scale ?? 1
 
   return (
     <>
@@ -84,6 +87,59 @@ export default function ElevationWidgetEditor({
             }
           />
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <ColorField
+            label="Done Area Color"
+            value={widget.data.area_completed_color || getThemeColor('ice')}
+            onChange={(value) =>
+              updateWidgetData(widget.id, { area_completed_color: value })
+            }
+          />
+          <ColorField
+            label="Remaining Area Color"
+            value={widget.data.area_remaining_color || getThemeColor('teal')}
+            onChange={(value) =>
+              updateWidgetData(widget.id, { area_remaining_color: value })
+            }
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <SliderField
+            label="Done Area Opacity"
+            value={completedAreaOpacity}
+            min={0}
+            max={100}
+            step={1}
+            valueDisplay={`${completedAreaOpacity}%`}
+            onSliderChange={(value) =>
+              updateWidgetData(widget.id, { area_completed_opacity: value })
+            }
+          />
+          <SliderField
+            label="Remaining Area Opacity"
+            value={remainingAreaOpacity}
+            min={0}
+            max={100}
+            step={1}
+            valueDisplay={`${remainingAreaOpacity}%`}
+            onSliderChange={(value) =>
+              updateWidgetData(widget.id, { area_remaining_opacity: value })
+            }
+          />
+        </div>
+        <SliderField
+          label="Vertical Scale"
+          value={yScale}
+          min={0.25}
+          max={2}
+          step={0.05}
+          valueDisplay={`${yScale.toFixed(2)}x`}
+          onSliderChange={(value) =>
+            updateWidgetData(widget.id, {
+              y_scale: Number(value.toFixed(2)),
+            })
+          }
+        />
       </div>
       <div className="space-y-4">
         <SectionHeading icon={Mountain} title="Marker & Labels" />

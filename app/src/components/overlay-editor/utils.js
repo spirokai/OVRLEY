@@ -4,6 +4,17 @@ export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+export function getElapsedSeries(activity) {
+  const frameElapsedSeries = activity?.frame_elapsed_seconds
+  if (Array.isArray(frameElapsedSeries) && frameElapsedSeries.length) {
+    return frameElapsedSeries
+  }
+
+  return Array.isArray(activity?.sample_elapsed_seconds)
+    ? activity.sample_elapsed_seconds
+    : []
+}
+
 export function getSceneSize(config) {
   return {
     width: config?.scene?.width || 1920,
@@ -68,7 +79,7 @@ export function getCombinedTextShadow(data) {
 }
 
 export function findClosestSampleIndex(activity, selectedSecond) {
-  const elapsedSeries = activity?.sample_elapsed_seconds || []
+  const elapsedSeries = getElapsedSeries(activity)
   if (!elapsedSeries.length) return 0
 
   let low = 0
@@ -97,6 +108,31 @@ export function getSampleValue(activity, key, sampleIndex) {
   }
 
   return series[sampleIndex] ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
+}
+
+export function getDistanceProgress(activity, sampleIndex) {
+  const distanceProgressSeries =
+    activity?.frame_distance_progress?.length > 0
+      ? activity.frame_distance_progress
+      : activity?.sample_distance_progress?.length > 0
+        ? activity.sample_distance_progress
+        : null
+
+  if (distanceProgressSeries) {
+    const progressValue =
+      distanceProgressSeries[
+        clamp(sampleIndex, 0, distanceProgressSeries.length - 1)
+      ]
+
+    return clamp(Number(progressValue) || 0, 0, 1)
+  }
+
+  const elapsedSeries = getElapsedSeries(activity)
+  if (elapsedSeries.length <= 1) {
+    return 0
+  }
+
+  return clamp(sampleIndex / (elapsedSeries.length - 1), 0, 1)
 }
 
 export function formatSpeed(value, unit) {
@@ -231,23 +267,34 @@ export function normalizeRoutePoints(points, width, height, padding = 18) {
   }
 
   const latitudes = validPoints.map(([latitude]) => latitude)
-  const longitudes = validPoints.map(([, longitude]) => longitude)
+  const meanLatitude =
+    latitudes.reduce((sum, latitude) => sum + latitude, 0) / latitudes.length
+  const meanLatitudeRadians = meanLatitude * (Math.PI / 180)
+  const projectedPoints = validPoints.map(([latitude, longitude]) => [
+    latitude,
+    longitude * Math.cos(meanLatitudeRadians),
+  ])
+  const projectedLongitudes = projectedPoints.map(([, longitude]) => longitude)
   const minLatitude = Math.min(...latitudes)
   const maxLatitude = Math.max(...latitudes)
-  const minLongitude = Math.min(...longitudes)
-  const maxLongitude = Math.max(...longitudes)
+  const minLongitude = Math.min(...projectedLongitudes)
+  const maxLongitude = Math.max(...projectedLongitudes)
   const usableWidth = Math.max(width - padding * 2, 1)
   const usableHeight = Math.max(height - padding * 2, 1)
   const longitudeRange = Math.max(maxLongitude - minLongitude, 0.000001)
   const latitudeRange = Math.max(maxLatitude - minLatitude, 0.000001)
-  const scaleX = usableWidth / longitudeRange
-  const scaleY = usableHeight / latitudeRange
-  const offsetX = (width - usableWidth) / 2
-  const offsetY = (height - usableHeight) / 2
+  const scale = Math.min(
+    usableWidth / longitudeRange,
+    usableHeight / latitudeRange,
+  )
+  const contentWidth = longitudeRange * scale
+  const contentHeight = latitudeRange * scale
+  const offsetX = (width - contentWidth) / 2
+  const offsetY = (height - contentHeight) / 2
 
-  return validPoints.map(([latitude, longitude]) => {
-    const x = offsetX + (longitude - minLongitude) * scaleX
-    const y = height - (offsetY + (latitude - minLatitude) * scaleY)
+  return projectedPoints.map(([latitude, longitude]) => {
+    const x = offsetX + (longitude - minLongitude) * scale
+    const y = height - (offsetY + (latitude - minLatitude) * scale)
     return [x, y]
   })
 }
@@ -266,7 +313,13 @@ export function buildWidgetTransform({ scale = 1, rotation = 0 }) {
   return transforms.length ? transforms.join(' ') : undefined
 }
 
-export function normalizeElevationPoints(values, width, height, padding = 18) {
+export function normalizeElevationPoints(
+  values,
+  width,
+  height,
+  padding = 18,
+  verticalScale = 1,
+) {
   const usableValues = values.filter((value) => Number.isFinite(value))
   if (!usableValues.length) {
     return [
@@ -284,19 +337,46 @@ export function normalizeElevationPoints(values, width, height, padding = 18) {
     usableValues.length > 1
       ? (width - padding * 2) / (usableValues.length - 1)
       : 0
+  const safeVerticalScale = clamp(Number(verticalScale) || 1, 0.2, 4)
 
   return usableValues.map((value, index) => {
     const x = padding + index * step
-    const y =
-      height -
-      padding -
-      ((value - minimum) / amplitude) * (height - padding * 2)
+    const normalized = amplitude <= 0 ? 0.5 : (value - minimum) / amplitude
+    const centered = clamp((normalized - 0.5) * safeVerticalScale + 0.5, 0, 1)
+    const y = height - padding - centered * (height - padding * 2)
     return [x, y]
   })
 }
 
 export function pointsToSvg(points) {
   return points.map(([x, y]) => `${x},${y}`).join(' ')
+}
+
+export function getPointAtProgress(points, progress01) {
+  if (!points.length) {
+    return null
+  }
+
+  if (points.length === 1) {
+    return points[0]
+  }
+
+  const clampedProgress = clamp(Number(progress01) || 0, 0, 1)
+  const scaledIndex = clampedProgress * (points.length - 1)
+  const startIndex = Math.floor(scaledIndex)
+  const endIndex = Math.min(startIndex + 1, points.length - 1)
+  const mix = scaledIndex - startIndex
+  const startPoint = points[startIndex]
+  const endPoint = points[endIndex]
+
+  if (!startPoint || !endPoint) {
+    return points[Math.min(startIndex, points.length - 1)] || null
+  }
+
+  return [
+    startPoint[0] + (endPoint[0] - startPoint[0]) * mix,
+    startPoint[1] + (endPoint[1] - startPoint[1]) * mix,
+  ]
 }
 
 export function areaToSvg(points, width, height, padding = 18) {
@@ -308,7 +388,12 @@ export function areaToSvg(points, width, height, padding = 18) {
   ].join(' ')
 }
 
-export function getCompletedIndex(totalPoints, sampleIndex) {
+export function getCompletedIndex(totalPoints, sampleIndex, progress01) {
   if (totalPoints <= 1) return 0
+
+  if (Number.isFinite(progress01)) {
+    return clamp(Math.floor(progress01 * (totalPoints - 1)), 0, totalPoints - 1)
+  }
+
   return clamp(sampleIndex, 0, totalPoints - 1)
 }

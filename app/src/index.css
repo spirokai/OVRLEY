@@ -264,30 +264,21 @@ body {
   background-image:
     linear-gradient(
       45deg,
-      color-mix(in srgb, var(--grid-line) 32%, transparent) 25%,
-      transparent 15%
+      color-mix(in srgb, var(--grid-line) 20%, transparent) 25%,
+      transparent 25%,
+      transparent 75%,
+      color-mix(in srgb, var(--grid-line) 20%, transparent) 75%,
+      color-mix(in srgb, var(--grid-line) 20%, transparent)
     ),
     linear-gradient(
       -45deg,
-      color-mix(in srgb, var(--grid-line) 32%, transparent) 25%,
-      transparent 15%
-    ),
-    linear-gradient(
-      45deg,
+      color-mix(in srgb, var(--grid-line) 20%, transparent) 25%,
+      transparent 25%,
       transparent 75%,
-      color-mix(in srgb, var(--grid-line) 32%, transparent) 75%
-    ),
-    linear-gradient(
-      -45deg,
-      transparent 75%,
-      color-mix(in srgb, var(--grid-line) 32%, transparent) 75%
+      color-mix(in srgb, var(--grid-line) 20%, transparent) 75%,
+      color-mix(in srgb, var(--grid-line) 20%, transparent)
     );
-  background-size: 40px 40px;
-  background-position:
-    0 0,
-    0 20px,
-    20px -20px,
-    -20px 0;
+  background-size: 32px 32px;
 }
 
 .moveable-bold,

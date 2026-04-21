@@ -13,6 +13,8 @@ export function createEditorSlice(set, get) {
   return {
     editor: null,
     selectedWidgetId: null,
+    previewInterpolationEnabled:
+      localStorage.getItem('previewInterpolationEnabled') !== 'false',
     hasUnrenderedChanges: false,
     lastRenderedConfig: null,
     dummyDurationSeconds: readStoredInt('dummyDurationSeconds', 73),
@@ -158,6 +160,13 @@ export function createEditorSlice(set, get) {
 
       set((state) => {
         state.selectedSecond = safeSecond
+      })
+    },
+
+    setPreviewInterpolationEnabled: (enabled) => {
+      localStorage.setItem('previewInterpolationEnabled', enabled.toString())
+      set((state) => {
+        state.previewInterpolationEnabled = enabled
       })
     },
 

@@ -8,6 +8,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import { getCurrentParsedActivity } from '../api/activityCache'
 import useStore from '../store/useStore'
 import ElevationWidgetEditor from './widgets/ElevationWidgetEditor'
 import GradientWidgetEditor from './widgets/GradientWidgetEditor'
@@ -112,6 +113,7 @@ export default function SidebarWidgetsTab() {
     selectedWidgetId,
     setSelectedWidgetId,
   } = useStore()
+  const parsedActivity = getCurrentParsedActivity()
 
   const widgets = useMemo(() => {
     return groupWidgetsForSidebar(buildConfigWidgets(config), TYPE_LABELS)
@@ -172,7 +174,11 @@ export default function SidebarWidgetsTab() {
       newId = `value-${nextConfig.values.length - 1}`
     } else if (['course', 'elevation'].includes(type)) {
       if (!nextConfig.plots) nextConfig.plots = []
-      nextConfig.plots.push(createPlotDefaults(type, globalDefaults))
+      nextConfig.plots.push(
+        createPlotDefaults(type, globalDefaults, {
+          coursePoints: parsedActivity?.sample_course_points,
+        }),
+      )
       newId = `plot-${nextConfig.plots.length - 1}`
     }
 

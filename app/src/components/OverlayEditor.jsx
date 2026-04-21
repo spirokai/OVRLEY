@@ -41,6 +41,7 @@ function OverlayEditor({
     globalScale,
     handleWheel,
     handlers,
+    maintainAspectRatio,
     moveableRef,
     resolvedConfig,
     sampleIndex,
@@ -107,6 +108,7 @@ function OverlayEditor({
               canResizeSelected={canResizeSelected}
               canScaleSelected={canScaleSelected}
               canRotateSelected={canRotateSelected}
+              maintainAspectRatio={maintainAspectRatio}
               elementGuidelines={elementGuidelines}
               sceneSize={sceneSize}
               handlers={handlers}

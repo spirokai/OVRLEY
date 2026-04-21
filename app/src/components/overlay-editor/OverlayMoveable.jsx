@@ -7,6 +7,7 @@ export default function OverlayMoveable({
   canResizeSelected,
   canScaleSelected,
   canRotateSelected,
+  maintainAspectRatio,
   elementGuidelines,
   sceneSize,
   handlers,
@@ -31,16 +32,12 @@ export default function OverlayMoveable({
       snappable
       snapThreshold={8}
       snapGap
-      keepRatio={false}
+      keepRatio={maintainAspectRatio}
+      useResizeObserver
+      useMutationObserver
       elementGuidelines={elementGuidelines}
       horizontalGuidelines={[0, sceneSize.height / 2, sceneSize.height]}
       verticalGuidelines={[0, sceneSize.width / 2, sceneSize.width]}
-      bounds={{
-        left: 0,
-        top: 0,
-        right: sceneSize.width,
-        bottom: sceneSize.height,
-      }}
       zoom={1}
       onDragStart={handlers.onDragStart}
       onDrag={handlers.onDrag}

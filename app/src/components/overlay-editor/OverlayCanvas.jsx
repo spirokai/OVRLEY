@@ -86,12 +86,12 @@ export default function OverlayCanvas({
     >
       <div
         className={cn(
-          'absolute inset-0 overflow-hidden rounded-md shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)]',
+          'pointer-events-none absolute inset-0 rounded-md shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)]',
           backgroundMode === 'checker' && 'bg-overlay-grid-muted',
         )}
         style={{ backgroundColor: '#000000' }}
-      >
-        <div className="absolute inset-0 " />
+      />
+      <div className="absolute inset-0 overflow-visible">
         {widgets.map((widget) => {
           return (
             <OverlayCanvasWidget

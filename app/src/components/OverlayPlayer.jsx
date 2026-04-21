@@ -4,6 +4,7 @@ import useStore from '@/store/useStore'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import { getEffectivePreviewFps } from './overlay-editor/previewInterpolation'
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
@@ -26,9 +27,11 @@ function formatTimelineTime(value) {
 
 export default function OverlayPlayer() {
   const activitySummary = useStore((state) => state.activitySummary)
+  const sceneFps = useStore((state) => state.config?.scene?.fps ?? 30)
   const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
   const endSecond = useStore((state) => state.endSecond)
   const selectedSecond = useStore((state) => state.selectedSecond)
+  const updateRate = useStore((state) => state.updateRate)
   const setSelectedSecond = useStore((state) => state.setSelectedSecond)
   const setSelectedSecondTransient = useStore(
     (state) => state.setSelectedSecondTransient,
@@ -39,6 +42,7 @@ export default function OverlayPlayer() {
     startedSecond: 0,
   })
   const totalDurationRef = useRef(0)
+  const previewFrameRef = useRef(-1)
 
   const totalDuration = useMemo(() => {
     const metadataDuration = Number(activitySummary?.durationSeconds) || 0
@@ -54,6 +58,10 @@ export default function OverlayPlayer() {
 
   const hasActivity = Boolean(activitySummary && totalDuration > 0)
   const clampedPlayhead = clamp(Number(selectedSecond) || 0, 0, totalDuration)
+  const effectivePreviewFps = useMemo(
+    () => getEffectivePreviewFps(sceneFps, updateRate),
+    [sceneFps, updateRate],
+  )
 
   useEffect(() => {
     totalDurationRef.current = totalDuration
@@ -77,9 +85,11 @@ export default function OverlayPlayer() {
   useEffect(() => {
     if (!isPlaying || !hasActivity) return undefined
 
-    const intervalId = window.setInterval(() => {
+    let animationFrameId = 0
+
+    const tick = (now) => {
       const elapsedSeconds =
-        (performance.now() - playbackAnchorRef.current.startedAtMs) / 1000
+        (now - playbackAnchorRef.current.startedAtMs) / 1000
       const nextSecond =
         playbackAnchorRef.current.startedSecond + elapsedSeconds
       const safeDuration = totalDurationRef.current
@@ -91,14 +101,26 @@ export default function OverlayPlayer() {
           startedAtMs: 0,
           startedSecond: safeDuration,
         }
+        previewFrameRef.current = -1
         return
       }
 
-      setSelectedSecondTransient(clamp(nextSecond, 0, safeDuration))
-    }, 250)
+      const frameIndex = Math.floor(nextSecond * effectivePreviewFps)
 
-    return () => window.clearInterval(intervalId)
-  }, [hasActivity, isPlaying, setSelectedSecondTransient])
+      if (frameIndex !== previewFrameRef.current) {
+        previewFrameRef.current = frameIndex
+        setSelectedSecondTransient(
+          clamp(frameIndex / effectivePreviewFps, 0, safeDuration),
+        )
+      }
+
+      animationFrameId = window.requestAnimationFrame(tick)
+    }
+
+    animationFrameId = window.requestAnimationFrame(tick)
+
+    return () => window.cancelAnimationFrame(animationFrameId)
+  }, [effectivePreviewFps, hasActivity, isPlaying, setSelectedSecondTransient])
 
   const handlePlay = () => {
     if (!hasActivity) return
@@ -108,6 +130,7 @@ export default function OverlayPlayer() {
       startedAtMs: performance.now(),
       startedSecond: initialSecond,
     }
+    previewFrameRef.current = -1
     setSelectedSecondTransient(initialSecond)
     setIsPlaying(true)
   }
@@ -117,6 +140,7 @@ export default function OverlayPlayer() {
       startedAtMs: 0,
       startedSecond: clampedPlayhead,
     }
+    previewFrameRef.current = -1
     setIsPlaying(false)
     setSelectedSecond(clampedPlayhead)
   }
@@ -126,12 +150,14 @@ export default function OverlayPlayer() {
       startedAtMs: 0,
       startedSecond: 0,
     }
+    previewFrameRef.current = -1
     setIsPlaying(false)
     setSelectedSecond(0)
   }
   const handleTimelineChange = ([nextValue]) => {
     const nextSecond = clamp(nextValue, 0, totalDuration)
     setSelectedSecondTransient(nextSecond)
+    previewFrameRef.current = -1
 
     if (isPlaying) {
       playbackAnchorRef.current = {
@@ -143,6 +169,7 @@ export default function OverlayPlayer() {
 
   const handleTimelineCommit = ([nextValue]) => {
     const nextSecond = clamp(nextValue, 0, totalDuration)
+    previewFrameRef.current = -1
     setSelectedSecond(nextSecond)
 
     if (isPlaying) {
@@ -154,7 +181,13 @@ export default function OverlayPlayer() {
   }
 
   return (
-    <div className="shrink-0 border-border/70 bg-black/30 px-5 py-4 backdrop-blur-sm">
+    <div
+      className={
+        hasActivity
+          ? 'shrink-0 border-border/70 bg-black/30 px-5 py-4 backdrop-blur-sm'
+          : 'hidden'
+      }
+    >
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1.5 rounded-2xl border border-border/70 p-1 shadow-sm">
           <SimpleTooltip side="top" content="Play live preview">
@@ -215,12 +248,6 @@ export default function OverlayPlayer() {
           </span>
         </div>
       </div>
-
-      {!hasActivity ? (
-        <p className="mt-3 text-xs text-muted-foreground">
-          Load a GPX or FIT activity to preview live widget values over time.
-        </p>
-      ) : null}
     </div>
   )
 }

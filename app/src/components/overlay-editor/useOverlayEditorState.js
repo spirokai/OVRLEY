@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentParsedActivity } from '../../api/activityCache'
 import useStore from '../../store/useStore'
-import { buildConfigWidgets, updateWidgetInConfig } from '@/lib/widget-config'
+import {
+  buildConfigWidgets,
+  deleteWidgetInConfig,
+  updateWidgetInConfig,
+} from '@/lib/widget-config'
 import { applyGlobalDefaults } from '@/lib/config-utils'
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from './constants'
+import { buildPreviewActivity } from './previewInterpolation'
 import {
   buildWidgetTransform,
   clamp,
@@ -13,6 +18,16 @@ import {
 
 function clearLiveWidgetDraft(draftWidgetsRef, widgetId) {
   delete draftWidgetsRef.current[widgetId]
+}
+
+function isEditableElement(target) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return Boolean(
+    target.closest('input, textarea, select, [contenteditable="true"]'),
+  )
 }
 
 function applyLiveWidgetStyles(target, widget, draft, globalScale) {
@@ -57,6 +72,10 @@ export default function useOverlayEditorState({
   const selectedWidgetId = useStore((state) => state.selectedWidgetId)
   const setSelectedWidgetId = useStore((state) => state.setSelectedWidgetId)
   const selectedSecond = useStore((state) => state.selectedSecond)
+  const updateRate = useStore((state) => state.updateRate)
+  const previewInterpolationEnabled = useStore(
+    (state) => state.previewInterpolationEnabled,
+  )
   const viewportRef = useRef(null)
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
@@ -65,7 +84,7 @@ export default function useOverlayEditorState({
   const [sceneElement, setSceneElement] = useState(null)
   const [widgetNodes, setWidgetNodes] = useState({})
 
-  const activity = getCurrentParsedActivity()
+  const sourceActivity = getCurrentParsedActivity()
   const resolvedConfig = useMemo(
     () =>
       applyGlobalDefaults(config, {
@@ -82,6 +101,25 @@ export default function useOverlayEditorState({
   const sceneSize = useMemo(
     () => getSceneSize(resolvedConfig),
     [resolvedConfig],
+  )
+  const activity = useMemo(
+    () =>
+      buildPreviewActivity({
+        activity: sourceActivity,
+        startSecond: resolvedConfig?.scene?.start,
+        endSecond: resolvedConfig?.scene?.end,
+        fps: resolvedConfig?.scene?.fps,
+        updateRate,
+        enabled: previewInterpolationEnabled,
+      }),
+    [
+      previewInterpolationEnabled,
+      resolvedConfig?.scene?.end,
+      resolvedConfig?.scene?.fps,
+      resolvedConfig?.scene?.start,
+      sourceActivity,
+      updateRate,
+    ],
   )
   const globalOpacity = globalDefaults?.opacity ?? 1
   const globalScale = globalDefaults?.scale ?? 1
@@ -160,6 +198,7 @@ export default function useOverlayEditorState({
     selectedWidget && selectedWidget.category !== 'plots',
   )
   const canRotateSelected = selectedWidget?.type === 'course'
+  const maintainAspectRatio = selectedWidget?.type === 'course'
 
   const widgetRefCallbacks = useMemo(
     () =>
@@ -197,6 +236,35 @@ export default function useOverlayEditorState({
       clamp(Number((current + delta).toFixed(2)), 0.35, 4),
     )
   }
+
+  useEffect(() => {
+    if (!selectedWidgetId || !resolvedConfig) {
+      return undefined
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Delete') {
+        return
+      }
+
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isEditableElement(event.target)
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      onConfigChange(deleteWidgetInConfig(resolvedConfig, selectedWidgetId))
+      setSelectedWidgetId(null)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onConfigChange, resolvedConfig, selectedWidgetId, setSelectedWidgetId])
 
   const handlers = {
     onDragStart: () => {
@@ -451,6 +519,7 @@ export default function useOverlayEditorState({
     globalScale,
     handleWheel,
     handlers,
+    maintainAspectRatio,
     moveableRef,
     resolvedConfig,
     sampleIndex,

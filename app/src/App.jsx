@@ -476,7 +476,7 @@ function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 backdrop-blur-sm shadow-lg">
+            <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-card/80 p-1 backdrop-blur-sm shadow-lg">
               <SimpleTooltip side="bottom" content="Checkered background">
                 <Button
                   type="button"

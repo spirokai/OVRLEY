@@ -68,6 +68,46 @@ export function getGlobalColor(globalDefaults, key, fallback) {
   return globalDefaults?.[key] || fallback
 }
 
+function getCourseWidgetDimensions(coursePoints) {
+  const validPoints = (coursePoints || []).filter(
+    ([latitude, longitude]) =>
+      Number.isFinite(latitude) && Number.isFinite(longitude),
+  )
+
+  if (validPoints.length < 2) {
+    return { width: 400, height: 200 }
+  }
+
+  const meanLatitudeRadians =
+    (validPoints.reduce((sum, [latitude]) => sum + latitude, 0) /
+      validPoints.length) *
+    (Math.PI / 180)
+  const projectedX = validPoints.map(
+    ([, longitude]) => longitude * Math.cos(meanLatitudeRadians),
+  )
+  const projectedY = validPoints.map(([latitude]) => latitude)
+  const spanX = Math.max(
+    Math.max(...projectedX) - Math.min(...projectedX),
+    1e-6,
+  )
+  const spanY = Math.max(
+    Math.max(...projectedY) - Math.min(...projectedY),
+    1e-6,
+  )
+
+  if (spanX >= spanY) {
+    return {
+      width: 400,
+      height: Math.max(Math.round((400 * spanY) / spanX), 80),
+    }
+  }
+
+  return {
+    width: Math.max(Math.round((400 * spanX) / spanY), 80),
+    height: 400,
+  }
+}
+
 export function createLabelDefaults(globalDefaults) {
   const font = globalDefaults?.font_text || 'Arial.ttf'
   return {
@@ -119,13 +159,17 @@ export function createMetricValueDefaults(type, globalDefaults) {
   }
 }
 
-export function createPlotDefaults(type, globalDefaults) {
+export function createPlotDefaults(type, globalDefaults, options = {}) {
+  const courseDimensions =
+    type === 'course'
+      ? getCourseWidgetDimensions(options.coursePoints)
+      : { width: 400, height: 200 }
   const base = {
     x: 100,
     y: 100,
     value: type,
-    width: 400,
-    height: 200,
+    width: courseDimensions.width,
+    height: courseDimensions.height,
     opacity: globalDefaults?.opacity ?? 1,
     rotation: 0,
     completed_line_width: 6,
@@ -157,11 +201,16 @@ export function createPlotDefaults(type, globalDefaults) {
     completed_line_opacity: 100,
     remaining_line_color: getThemeColor('teal'),
     remaining_line_opacity: 35,
+    area_completed_color: getThemeColor('ice'),
+    area_completed_opacity: 24,
+    area_remaining_color: getThemeColor('teal'),
+    area_remaining_opacity: 12,
     marker_size: 16,
     marker_color: getThemeColor('aqua'),
     marker_opacity: 100,
     show_elevation_metric: true,
     show_elevation_imperial: false,
+    y_scale: 1,
     metric_label_offset_x: 0,
     metric_label_offset_y: 0,
     imperial_label_offset_x: 0,
