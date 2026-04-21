@@ -105,6 +105,7 @@ function OverlayEditor({
               moveableRef={moveableRef}
               selectedTarget={selectedTarget}
               sceneElement={sceneElement}
+              displayScale={displayScale}
               canResizeSelected={canResizeSelected}
               canScaleSelected={canScaleSelected}
               canRotateSelected={canRotateSelected}

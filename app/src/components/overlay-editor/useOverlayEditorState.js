@@ -56,6 +56,63 @@ function applyLiveWidgetStyles(target, widget, draft, globalScale) {
     }) || ''
 }
 
+function applyLiveScalePositionStyles(target, widget, draft, globalScale) {
+  if (!target || !widget) {
+    return
+  }
+
+  const baseX = widget.data.x ?? 0
+  const baseY = widget.data.y ?? 0
+  const nextTranslateX = (draft.x ?? baseX) - baseX
+  const nextTranslateY = (draft.y ?? baseY) - baseY
+  const nextRotation =
+    draft.rotation ??
+    (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
+  const transforms = [`translate(${nextTranslateX}px, ${nextTranslateY}px)`]
+
+  if (nextRotation) {
+    transforms.push(`rotate(${nextRotation}deg)`)
+  }
+
+  if (globalScale !== 1) {
+    transforms.push(`scale(${globalScale})`)
+  }
+
+  target.style.left = `${baseX}px`
+  target.style.top = `${baseY}px`
+  target.style.transform = transforms.join(' ')
+}
+
+function buildScaledWidgetDataDraft(origin, scaleFactor) {
+  const nextFontSize = clamp(
+    Math.round((origin.fontSize || 60) * scaleFactor),
+    8,
+    400,
+  )
+  const nextIconSize = clamp(
+    Math.round((origin.iconSize || 28) * scaleFactor),
+    0,
+    400,
+  )
+  const nextIconOffsetX = Math.round((origin.iconOffsetX || 0) * scaleFactor)
+  const nextIconOffsetY = Math.round((origin.iconOffsetY || 0) * scaleFactor)
+  const nextTriangleWidth = clamp(
+    Math.round(origin.triangleWidth * scaleFactor),
+    0,
+    600,
+  )
+  const nextValueOffset = Math.round((origin.valueOffset || 0) * scaleFactor)
+
+  return {
+    font_size: nextFontSize,
+    icon_size: nextIconSize,
+    icon_offset_x: nextIconOffsetX,
+    icon_offset_y: nextIconOffsetY,
+    triangle_width: nextTriangleWidth,
+    value_offset: nextValueOffset,
+  }
+}
+
 export default function useOverlayEditorState({
   config,
   globalDefaults,
@@ -70,6 +127,8 @@ export default function useOverlayEditorState({
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
   const draftWidgetsRef = useRef({})
+  const scalePreviewFrameRef = useRef(null)
+  const [liveWidgetDrafts, setLiveWidgetDrafts] = useState({})
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const [sceneElement, setSceneElement] = useState(null)
   const [widgetNodes, setWidgetNodes] = useState({})
@@ -119,7 +178,29 @@ export default function useOverlayEditorState({
 
   useEffect(() => {
     draftWidgetsRef.current = {}
+    setLiveWidgetDrafts({})
   }, [resolvedConfig])
+
+  const setLiveWidgetDraft = (widgetId, nextDraft) => {
+    draftWidgetsRef.current[widgetId] = nextDraft
+    setLiveWidgetDrafts((current) => ({
+      ...current,
+      [widgetId]: nextDraft,
+    }))
+  }
+
+  const clearWidgetDraft = (widgetId) => {
+    clearLiveWidgetDraft(draftWidgetsRef, widgetId)
+    setLiveWidgetDrafts((current) => {
+      if (!current[widgetId]) {
+        return current
+      }
+
+      const next = { ...current }
+      delete next[widgetId]
+      return next
+    })
+  }
 
   useEffect(() => {
     const viewportNode = viewportRef.current
@@ -146,9 +227,28 @@ export default function useOverlayEditorState({
   }, [viewportSize, sceneSize])
 
   const displayScale = fitScale * zoomLevel
+  const renderedWidgets = useMemo(
+    () =>
+      widgets.map((widget) => {
+        const draft = liveWidgetDrafts[widget.id]
+        if (!draft) {
+          return widget
+        }
+
+        return {
+          ...widget,
+          data: {
+            ...widget.data,
+            ...draft,
+          },
+        }
+      }),
+    [liveWidgetDrafts, widgets],
+  )
   const selectedWidget = useMemo(
-    () => widgets.find((widget) => widget.id === selectedWidgetId) || null,
-    [widgets, selectedWidgetId],
+    () =>
+      renderedWidgets.find((widget) => widget.id === selectedWidgetId) || null,
+    [renderedWidgets, selectedWidgetId],
   )
   const selectedWidgetDataSignature = useMemo(
     () => JSON.stringify(selectedWidget?.data ?? null),
@@ -187,7 +287,8 @@ export default function useOverlayEditorState({
     selectedWidget && selectedWidget.category !== 'plots',
   )
   const canRotateSelected = selectedWidget?.type === 'course'
-  const maintainAspectRatio = selectedWidget?.type === 'course'
+  const maintainAspectRatio =
+    selectedWidget?.type === 'course' || canScaleSelected
 
   const widgetRefCallbacks = useMemo(
     () =>
@@ -276,7 +377,7 @@ export default function useOverlayEditorState({
         y: origin.y + beforeTranslate[1],
       }
 
-      draftWidgetsRef.current[origin.id] = nextDraft
+      setLiveWidgetDraft(origin.id, nextDraft)
       applyLiveWidgetStyles(target, selectedWidget, nextDraft, globalScale)
     },
     onDragEnd: () => {
@@ -291,7 +392,7 @@ export default function useOverlayEditorState({
         })
       }
 
-      clearLiveWidgetDraft(draftWidgetsRef, origin.id)
+      clearWidgetDraft(origin.id)
       interactionStartRef.current = null
     },
     onResizeStart: ({ dragStart }) => {
@@ -338,7 +439,7 @@ export default function useOverlayEditorState({
           : { marker_size: nextMarkerSize }),
       }
 
-      draftWidgetsRef.current[origin.id] = nextDraft
+      setLiveWidgetDraft(origin.id, nextDraft)
       applyLiveWidgetStyles(
         target ?? drag.target,
         selectedWidget,
@@ -363,10 +464,10 @@ export default function useOverlayEditorState({
         })
       }
 
-      clearLiveWidgetDraft(draftWidgetsRef, origin.id)
+      clearWidgetDraft(origin.id)
       interactionStartRef.current = null
     },
-    onScaleStart: ({ dragStart }) => {
+    onScaleStart: ({ dragStart, target }) => {
       if (!selectedWidget) return
 
       if (dragStart) {
@@ -384,68 +485,105 @@ export default function useOverlayEditorState({
         triangleWidth:
           selectedWidget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
         valueOffset: selectedWidget.data.value_offset ?? 0,
+        renderedWidth: target?.offsetWidth ?? selectedTarget?.offsetWidth ?? 0,
+        renderedHeight:
+          target?.offsetHeight ?? selectedTarget?.offsetHeight ?? 0,
       }
       draftWidgetsRef.current[selectedWidget.id] = {}
     },
-    onScale: ({ scale, drag, target }) => {
+    onScale: ({ scale, direction, target }) => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
+      const uniformScale = Number.isFinite(scale?.[0])
+        ? scale[0]
+        : Number.isFinite(scale?.[1])
+          ? scale[1]
+          : 1
 
       const nextDraft = {
         ...draftWidgetsRef.current[origin.id],
-        x: origin.x + drag.beforeTranslate[0],
-        y: origin.y + drag.beforeTranslate[1],
-        scale: Math.max(scale[0], scale[1]),
+        scale_direction: direction,
+        ...buildScaledWidgetDataDraft(origin, uniformScale),
       }
 
       draftWidgetsRef.current[origin.id] = nextDraft
-      applyLiveWidgetStyles(target, selectedWidget, nextDraft, globalScale)
+      setLiveWidgetDraft(
+        origin.id,
+        buildScaledWidgetDataDraft(origin, uniformScale),
+      )
+
+      if (scalePreviewFrameRef.current) {
+        cancelAnimationFrame(scalePreviewFrameRef.current)
+      }
+
+      scalePreviewFrameRef.current = requestAnimationFrame(() => {
+        const targetNode = target ?? selectedTarget
+        if (!targetNode) return
+
+        const measuredWidth = targetNode.offsetWidth
+        const measuredHeight = targetNode.offsetHeight
+        const measuredDraft = {
+          ...draftWidgetsRef.current[origin.id],
+          x:
+            origin.x +
+            (direction?.[0] === -1 ? origin.renderedWidth - measuredWidth : 0),
+          y:
+            origin.y +
+            (direction?.[1] === -1
+              ? origin.renderedHeight - measuredHeight
+              : 0),
+        }
+
+        draftWidgetsRef.current[origin.id] = measuredDraft
+        applyLiveScalePositionStyles(
+          targetNode,
+          selectedWidget,
+          measuredDraft,
+          globalScale,
+        )
+      })
     },
     onScaleEnd: () => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
 
+      if (scalePreviewFrameRef.current) {
+        cancelAnimationFrame(scalePreviewFrameRef.current)
+        scalePreviewFrameRef.current = null
+      }
+
       const draft = draftWidgetsRef.current[origin.id]
       if (draft) {
-        const scaleFactor = draft.scale ?? 1
-        const nextFontSize = clamp(
-          Math.round((origin.fontSize || 60) * scaleFactor),
-          8,
-          400,
-        )
-        const nextIconSize = clamp(
-          Math.round((origin.iconSize || 28) * scaleFactor),
-          0,
-          400,
-        )
-        const nextIconOffsetX = Math.round(
-          (origin.iconOffsetX || 0) * scaleFactor,
-        )
-        const nextIconOffsetY = Math.round(
-          (origin.iconOffsetY || 0) * scaleFactor,
-        )
-        const nextTriangleWidth = clamp(
-          Math.round(origin.triangleWidth * scaleFactor),
-          0,
-          600,
-        )
-        const nextValueOffset = Math.round(
-          (origin.valueOffset || 0) * scaleFactor,
-        )
+        const targetNode = selectedTarget
+        const measuredWidth =
+          targetNode?.offsetWidth ?? origin.renderedWidth ?? 0
+        const measuredHeight =
+          targetNode?.offsetHeight ?? origin.renderedHeight ?? 0
+        const finalDirection = Array.isArray(draft.scale_direction)
+          ? draft.scale_direction
+          : [1, 1]
+        const finalX =
+          origin.x +
+          (finalDirection[0] === -1 ? origin.renderedWidth - measuredWidth : 0)
+        const finalY =
+          origin.y +
+          (finalDirection[1] === -1
+            ? origin.renderedHeight - measuredHeight
+            : 0)
 
         commitWidgetUpdate(origin.id, {
-          x: Math.round(draft.x ?? origin.x),
-          y: Math.round(draft.y ?? origin.y),
-          font_size: nextFontSize,
-          icon_size: nextIconSize,
-          icon_offset_x: nextIconOffsetX,
-          icon_offset_y: nextIconOffsetY,
-          triangle_width: nextTriangleWidth,
-          value_offset: nextValueOffset,
+          x: Math.round(finalX),
+          y: Math.round(finalY),
+          font_size: draft.font_size ?? origin.fontSize ?? 60,
+          icon_size: draft.icon_size ?? origin.iconSize ?? 28,
+          icon_offset_x: draft.icon_offset_x ?? origin.iconOffsetX ?? 0,
+          icon_offset_y: draft.icon_offset_y ?? origin.iconOffsetY ?? 0,
+          triangle_width: draft.triangle_width ?? origin.triangleWidth ?? 0,
+          value_offset: draft.value_offset ?? origin.valueOffset ?? 0,
         })
       }
 
-      clearLiveWidgetDraft(draftWidgetsRef, origin.id)
+      clearWidgetDraft(origin.id)
       interactionStartRef.current = null
     },
     onRotateStart: () => {
@@ -473,7 +611,7 @@ export default function useOverlayEditorState({
         rotation: nextRotation,
       }
 
-      draftWidgetsRef.current[origin.id] = nextDraft
+      setLiveWidgetDraft(origin.id, nextDraft)
       applyLiveWidgetStyles(target, selectedWidget, nextDraft, globalScale)
     },
     onRotateEnd: () => {
@@ -492,7 +630,7 @@ export default function useOverlayEditorState({
         })
       }
 
-      clearLiveWidgetDraft(draftWidgetsRef, origin.id)
+      clearWidgetDraft(origin.id)
       interactionStartRef.current = null
     },
   }
@@ -520,6 +658,6 @@ export default function useOverlayEditorState({
     selectedWidget,
     viewportRef,
     widgetRefCallbacks,
-    widgets,
+    widgets: renderedWidgets,
   }
 }

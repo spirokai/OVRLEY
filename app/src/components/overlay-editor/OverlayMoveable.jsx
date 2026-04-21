@@ -4,6 +4,7 @@ export default function OverlayMoveable({
   moveableRef,
   selectedTarget,
   sceneElement,
+  displayScale,
   canResizeSelected,
   canScaleSelected,
   canRotateSelected,
@@ -38,7 +39,7 @@ export default function OverlayMoveable({
       elementGuidelines={elementGuidelines}
       horizontalGuidelines={[0, sceneSize.height / 2, sceneSize.height]}
       verticalGuidelines={[0, sceneSize.width / 2, sceneSize.width]}
-      zoom={1}
+      zoom={displayScale}
       onDragStart={handlers.onDragStart}
       onDrag={handlers.onDrag}
       onDragEnd={handlers.onDragEnd}
