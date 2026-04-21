@@ -3,16 +3,21 @@ import { DEFAULT_GRADIENT_TRIANGLE_WIDTH, WIDGET_ICONS } from './constants'
 import {
   areaToSvg,
   buildGradientTrianglePath,
+  clamp,
   formatGradientValue,
   formatSpeed,
   formatTemperature,
   formatTimeValue,
   getCombinedTextShadow,
-  getCompletedIndex,
-  getDistanceProgress,
+  getDistanceProgressAtElapsed,
+  getInterpolatedActivityValue,
+  getInterpolatedSeriesValue,
+  getInterpolatedTimeValue,
+  getPointAtMetricProgress,
+  getPointAtX,
   getPointAtProgress,
   getPreviewFontFamily,
-  getSampleValue,
+  getSeriesValueAtProgress,
   getWidgetOpacity,
   normalizeElevationPoints,
   normalizeRoutePoints,
@@ -23,7 +28,12 @@ function pointsEqual(left, right) {
   return left?.[0] === right?.[0] && left?.[1] === right?.[1]
 }
 
-function OverlayMetricWidget({ widget, activity, sampleIndex, globalOpacity }) {
+function OverlayMetricWidget({
+  widget,
+  activity,
+  previewSecond,
+  globalOpacity,
+}) {
   const Icon = WIDGET_ICONS[widget.type]
   const fontSize = widget.data.font_size ?? 60
   const fontFamily = getPreviewFontFamily(
@@ -47,27 +57,35 @@ function OverlayMetricWidget({ widget, activity, sampleIndex, globalOpacity }) {
       widget.data.speed_unit ||
       (widget.data.unit === 'imperial' ? 'mph' : 'kmh')
     const formatted = formatSpeed(
-      getSampleValue(activity, 'speed', sampleIndex),
+      getInterpolatedActivityValue(activity, 'speed', previewSecond),
       speedUnit,
     )
     valueText = formatted.value
     unitText = formatted.units
   } else if (widget.type === 'heartrate') {
-    const value = getSampleValue(activity, 'heartrate', sampleIndex)
+    const value = getInterpolatedActivityValue(
+      activity,
+      'heartrate',
+      previewSecond,
+    )
     valueText =
       value === null || value === undefined
         ? '--'
         : Math.round(value).toString()
     unitText = 'BPM'
   } else if (widget.type === 'cadence') {
-    const value = getSampleValue(activity, 'cadence', sampleIndex)
+    const value = getInterpolatedActivityValue(
+      activity,
+      'cadence',
+      previewSecond,
+    )
     valueText =
       value === null || value === undefined
         ? '--'
         : Math.round(value).toString()
     unitText = 'RPM'
   } else if (widget.type === 'power') {
-    const value = getSampleValue(activity, 'power', sampleIndex)
+    const value = getInterpolatedActivityValue(activity, 'power', previewSecond)
     valueText =
       value === null || value === undefined
         ? '--'
@@ -76,21 +94,24 @@ function OverlayMetricWidget({ widget, activity, sampleIndex, globalOpacity }) {
   } else if (widget.type === 'time') {
     valueText = formatTimeValue(
       widget.data.format || 'time-24',
-      getSampleValue(activity, 'time', sampleIndex),
+      getInterpolatedTimeValue(activity, previewSecond),
     )
   } else if (widget.type === 'temperature') {
     const formatted = formatTemperature(
-      getSampleValue(activity, 'temperature', sampleIndex),
+      getInterpolatedActivityValue(activity, 'temperature', previewSecond),
       widget.data.temperature_unit || 'celsius',
     )
     valueText = formatted.value
     unitText = formatted.units
   } else if (widget.type === 'gradient') {
-    valueText = `${formatGradientValue(widget, getSampleValue(activity, 'gradient', sampleIndex))}%`
+    valueText = `${formatGradientValue(
+      widget,
+      getInterpolatedActivityValue(activity, 'gradient', previewSecond),
+    )}%`
   }
 
   const currentGradientValue = Number(
-    getSampleValue(activity, 'gradient', sampleIndex) ?? 0,
+    getInterpolatedActivityValue(activity, 'gradient', previewSecond) ?? 0,
   )
   const iconSize = widget.data.icon_size ?? 28
   const iconWrapperStyle = {
@@ -209,26 +230,60 @@ function OverlayTextWidget({ widget, globalOpacity }) {
   )
 }
 
-function OverlayRouteWidget({ widget, activity, sampleIndex, globalOpacity }) {
+function OverlayRouteWidget({
+  widget,
+  activity,
+  previewSecond,
+  globalOpacity,
+}) {
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
+  const routeSamples = useMemo(() => {
+    const coursePoints = Array.isArray(activity?.sample_course_points)
+      ? activity.sample_course_points
+      : []
+    const distanceProgress = Array.isArray(activity?.sample_distance_progress)
+      ? activity.sample_distance_progress
+      : []
+
+    return coursePoints.reduce((result, point, index) => {
+      if (
+        !Array.isArray(point) ||
+        !Number.isFinite(point[0]) ||
+        !Number.isFinite(point[1])
+      ) {
+        return result
+      }
+
+      result.push({
+        point,
+        progress: clamp(Number(distanceProgress[index]) || 0, 0, 1),
+      })
+      return result
+    }, [])
+  }, [activity])
   const points = useMemo(
     () =>
-      normalizeRoutePoints(activity?.sample_course_points || [], width, height),
-    [activity?.sample_course_points, width, height],
+      normalizeRoutePoints(
+        routeSamples.map((sample) => sample.point),
+        width,
+        height,
+      ),
+    [routeSamples, width, height],
   )
-  const progress01 = getDistanceProgress(activity, sampleIndex)
-  const completedIndex = getCompletedIndex(
-    points.length,
-    sampleIndex,
-    progress01,
+  const pointProgress = useMemo(
+    () => routeSamples.map((sample) => sample.progress),
+    [routeSamples],
   )
+  const progress01 = getDistanceProgressAtElapsed(activity, previewSecond)
   const markerPoint =
+    getPointAtMetricProgress(points, pointProgress, progress01) ||
     getPointAtProgress(points, progress01) ||
-    points[completedIndex] ||
     points[points.length - 1]
   const completedPoints = useMemo(() => {
-    const nextPoints = points.slice(0, completedIndex + 1)
+    const nextPoints = points.filter(
+      (_, index) => (pointProgress[index] ?? 0) <= progress01,
+    )
     if (
       markerPoint &&
       !pointsEqual(nextPoints[nextPoints.length - 1], markerPoint)
@@ -236,17 +291,18 @@ function OverlayRouteWidget({ widget, activity, sampleIndex, globalOpacity }) {
       nextPoints.push(markerPoint)
     }
     return nextPoints
-  }, [completedIndex, markerPoint, points])
+  }, [markerPoint, pointProgress, points, progress01])
   const remainingPoints = useMemo(() => {
-    const tailStart = Math.min(completedIndex + 1, points.length - 1)
-    const tail = points.slice(tailStart)
+    const tail = points.filter(
+      (_, index) => (pointProgress[index] ?? 0) >= progress01,
+    )
 
     if (!markerPoint) {
-      return tail.length ? tail : points.slice(completedIndex)
+      return tail.length ? tail : points
     }
 
     return pointsEqual(markerPoint, tail[0]) ? tail : [markerPoint, ...tail]
-  }, [completedIndex, markerPoint, points])
+  }, [markerPoint, pointProgress, points, progress01])
   const remainingSvgPoints = useMemo(
     () => pointsToSvg(remainingPoints.length > 1 ? remainingPoints : points),
     [points, remainingPoints],
@@ -303,9 +359,10 @@ function OverlayRouteWidget({ widget, activity, sampleIndex, globalOpacity }) {
 function OverlayElevationWidget({
   widget,
   activity,
-  sampleIndex,
+  previewSecond,
   globalOpacity,
 }) {
+  const PROFILE_PADDING = 18
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
   const clipId = `${widget.id}-completed-area`
@@ -319,63 +376,75 @@ function OverlayElevationWidget({
     '#afeeee'
   const remainingAreaOpacity = (widget.data.area_remaining_opacity ?? 12) / 100
   const completedAreaOpacity = (widget.data.area_completed_opacity ?? 24) / 100
+  const profileElevations = useMemo(() => {
+    if (
+      Array.isArray(activity?.sample_elevations) &&
+      activity.sample_elevations.length
+    ) {
+      return activity.sample_elevations
+    }
+
+    return Array.isArray(activity?.elevation) ? activity.elevation : []
+  }, [activity])
+  const profileDistanceProgress = useMemo(
+    () =>
+      Array.isArray(activity?.sample_distance_progress)
+        ? activity.sample_distance_progress
+        : [],
+    [activity],
+  )
   const points = useMemo(
     () =>
       normalizeElevationPoints(
-        activity?.sample_elevations || [],
+        profileElevations,
         width,
         height,
-        18,
+        PROFILE_PADDING,
         widget.data.y_scale ?? 1,
+        profileDistanceProgress,
       ),
-    [activity?.sample_elevations, height, widget.data.y_scale, width],
+    [
+      PROFILE_PADDING,
+      height,
+      profileDistanceProgress,
+      profileElevations,
+      widget.data.y_scale,
+      width,
+    ],
   )
-  const progress01 = getDistanceProgress(activity, sampleIndex)
-  const completedIndex = getCompletedIndex(
-    points.length,
-    sampleIndex,
-    progress01,
-  )
-  const markerPoint =
-    getPointAtProgress(points, progress01) ||
-    points[completedIndex] ||
-    points[points.length - 1]
-  const completedPoints = useMemo(() => {
-    const nextPoints = points.slice(0, completedIndex + 1)
-    if (
-      markerPoint &&
-      !pointsEqual(nextPoints[nextPoints.length - 1], markerPoint)
-    ) {
-      nextPoints.push(markerPoint)
-    }
-    return nextPoints
-  }, [completedIndex, markerPoint, points])
-  const remainingPoints = useMemo(() => {
-    const tailStart = Math.min(completedIndex + 1, points.length - 1)
-    const tail = points.slice(tailStart)
+  const progress01 = getDistanceProgressAtElapsed(activity, previewSecond)
+  const markerX =
+    PROFILE_PADDING + progress01 * Math.max(width - PROFILE_PADDING * 2, 0)
+  const markerPoint = getPointAtX(points, markerX) || points[points.length - 1]
+  const completedPoints = points.filter((point) => point[0] <= markerX)
+  if (
+    markerPoint &&
+    !pointsEqual(completedPoints[completedPoints.length - 1], markerPoint)
+  ) {
+    completedPoints.push(markerPoint)
+  }
 
-    if (!markerPoint) {
-      return tail.length ? tail : points.slice(completedIndex)
-    }
-
-    return pointsEqual(markerPoint, tail[0]) ? tail : [markerPoint, ...tail]
-  }, [completedIndex, markerPoint, points])
-  const elevationValue = getSampleValue(activity, 'elevation', sampleIndex)
+  const remainingTail = points.filter((point) => point[0] >= markerX)
+  const remainingPoints =
+    !markerPoint || pointsEqual(markerPoint, remainingTail[0])
+      ? remainingTail
+      : [markerPoint, ...remainingTail]
+  const elevationValue =
+    getInterpolatedSeriesValue(
+      profileDistanceProgress,
+      profileElevations,
+      progress01,
+    ) ?? getSeriesValueAtProgress(profileElevations, progress01)
   const areaSvgPoints = useMemo(
-    () => areaToSvg(points, width, height),
-    [height, points, width],
+    () => areaToSvg(points, width, height, PROFILE_PADDING),
+    [PROFILE_PADDING, height, points, width],
   )
   const completedAreaWidth = markerPoint ? markerPoint[0] : 0
-  const remainingSvgPoints = useMemo(
-    () => pointsToSvg(remainingPoints.length > 1 ? remainingPoints : points),
-    [points, remainingPoints],
+  const remainingSvgPoints = pointsToSvg(
+    remainingPoints.length > 1 ? remainingPoints : points,
   )
-  const completedSvgPoints = useMemo(
-    () =>
-      pointsToSvg(
-        completedPoints.length > 1 ? completedPoints : points.slice(0, 2),
-      ),
-    [completedPoints, points],
+  const completedSvgPoints = pointsToSvg(
+    completedPoints.length > 1 ? completedPoints : points.slice(0, 2),
   )
   const metricLabel =
     elevationValue === null || elevationValue === undefined
@@ -474,7 +543,7 @@ function OverlayElevationWidget({
   )
 }
 
-function WidgetPreview({ widget, activity, sampleIndex, globalOpacity }) {
+function WidgetPreview({ widget, activity, previewSecond, globalOpacity }) {
   if (widget.type === 'label') {
     return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} />
   }
@@ -484,7 +553,7 @@ function WidgetPreview({ widget, activity, sampleIndex, globalOpacity }) {
       <OverlayRouteWidget
         widget={widget}
         activity={activity}
-        sampleIndex={sampleIndex}
+        previewSecond={previewSecond}
         globalOpacity={globalOpacity}
       />
     )
@@ -495,7 +564,7 @@ function WidgetPreview({ widget, activity, sampleIndex, globalOpacity }) {
       <OverlayElevationWidget
         widget={widget}
         activity={activity}
-        sampleIndex={sampleIndex}
+        previewSecond={previewSecond}
         globalOpacity={globalOpacity}
       />
     )
@@ -505,7 +574,7 @@ function WidgetPreview({ widget, activity, sampleIndex, globalOpacity }) {
     <OverlayMetricWidget
       widget={widget}
       activity={activity}
-      sampleIndex={sampleIndex}
+      previewSecond={previewSecond}
       globalOpacity={globalOpacity}
     />
   )
@@ -516,6 +585,6 @@ export default memo(
   (previousProps, nextProps) =>
     previousProps.widget === nextProps.widget &&
     previousProps.activity === nextProps.activity &&
-    previousProps.sampleIndex === nextProps.sampleIndex &&
+    previousProps.previewSecond === nextProps.previewSecond &&
     previousProps.globalOpacity === nextProps.globalOpacity,
 )

@@ -21,6 +21,20 @@ const NUMERIC_PREVIEW_KEYS = [
   'vertical_speed',
 ]
 
+const WIDGET_PREVIEW_DEPENDENCIES = {
+  cadence: ['cadence'],
+  course: ['course', 'frame_distance_progress'],
+  elevation: ['elevation', 'frame_distance_progress'],
+  gradient: ['gradient'],
+  heartrate: ['heartrate'],
+  power: ['power'],
+  speed: ['speed'],
+  temperature: ['temperature'],
+  time: ['time'],
+}
+
+const previewActivityCache = new WeakMap()
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
@@ -183,6 +197,17 @@ export function getEffectivePreviewFps(fps, updateRate) {
   return Math.max(safeSceneFps / safeUpdateRate, 1)
 }
 
+export function getRequiredPreviewKeys(widgets) {
+  const requiredKeys = new Set()
+
+  widgets.forEach((widget) => {
+    const dependencies = WIDGET_PREVIEW_DEPENDENCIES[widget.type] || []
+    dependencies.forEach((key) => requiredKeys.add(key))
+  })
+
+  return [...requiredKeys].sort()
+}
+
 export function buildPreviewActivity({
   activity,
   startSecond,
@@ -190,6 +215,7 @@ export function buildPreviewActivity({
   fps,
   updateRate,
   enabled,
+  requiredKeys = [],
 }) {
   if (!enabled || !activity) {
     return activity
@@ -219,6 +245,19 @@ export function buildPreviewActivity({
   }
 
   const effectivePreviewFps = getEffectivePreviewFps(fps, updateRate)
+  const requiredKeySignature = [...requiredKeys].sort().join('|')
+  const cacheKey = [
+    safeStart,
+    safeEnd,
+    effectivePreviewFps,
+    requiredKeySignature,
+  ].join(':')
+  const cachedByActivity = previewActivityCache.get(activity)
+
+  if (cachedByActivity?.has(cacheKey)) {
+    return cachedByActivity.get(cacheKey)
+  }
+
   const frameElapsedSeconds = buildTargetTimes(
     safeStart,
     safeEnd,
@@ -232,18 +271,41 @@ export function buildPreviewActivity({
   const previewActivity = {
     ...activity,
     frame_elapsed_seconds: frameElapsedSeconds,
-    frame_timestamps: interpolateTimeSeries(activity, frameElapsedSeconds),
-    time: interpolateTimeSeries(activity, frameElapsedSeconds),
-    frame_distance_progress: interpolateSortedNumericSeries(
+  }
+
+  const requestedKeys = requiredKeys.length
+    ? new Set(requiredKeys)
+    : new Set([
+        ...NUMERIC_PREVIEW_KEYS,
+        'course',
+        'frame_distance_progress',
+        'time',
+      ])
+
+  if (requestedKeys.has('time')) {
+    const interpolatedTimeSeries = interpolateTimeSeries(
+      activity,
+      frameElapsedSeconds,
+    )
+    previewActivity.frame_timestamps = interpolatedTimeSeries
+    previewActivity.time = interpolatedTimeSeries
+  }
+
+  if (requestedKeys.has('frame_distance_progress')) {
+    previewActivity.frame_distance_progress = interpolateSortedNumericSeries(
       elapsedSeries,
       Array.isArray(activity.sample_distance_progress)
         ? activity.sample_distance_progress
         : [],
       frameElapsedSeconds,
-    ),
+    )
   }
 
   NUMERIC_PREVIEW_KEYS.forEach((key) => {
+    if (!requestedKeys.has(key)) {
+      return
+    }
+
     if (!Array.isArray(activity[key])) {
       return
     }
@@ -255,12 +317,18 @@ export function buildPreviewActivity({
     )
   })
 
-  if (Array.isArray(activity.course)) {
+  if (requestedKeys.has('course') && Array.isArray(activity.course)) {
     previewActivity.course = interpolateCourseSeries(
       elapsedSeries,
       activity.course,
       frameElapsedSeconds,
     )
+  }
+
+  const nextCachedByActivity = cachedByActivity || new Map()
+  nextCachedByActivity.set(cacheKey, previewActivity)
+  if (!cachedByActivity) {
+    previewActivityCache.set(activity, nextCachedByActivity)
   }
 
   return previewActivity

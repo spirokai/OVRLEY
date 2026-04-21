@@ -11,7 +11,7 @@ const OverlayCanvasWidget = memo(
     globalScale,
     globalOpacity,
     activity,
-    sampleIndex,
+    previewSecond,
     registerNode,
     setSelectedWidgetId,
   }) {
@@ -48,7 +48,7 @@ const OverlayCanvasWidget = memo(
         <WidgetPreview
           widget={widget}
           activity={activity}
-          sampleIndex={sampleIndex}
+          previewSecond={previewSecond}
           globalOpacity={globalOpacity}
         />
       </div>
@@ -59,7 +59,7 @@ const OverlayCanvasWidget = memo(
     previousProps.globalScale === nextProps.globalScale &&
     previousProps.globalOpacity === nextProps.globalOpacity &&
     previousProps.activity === nextProps.activity &&
-    previousProps.sampleIndex === nextProps.sampleIndex &&
+    previousProps.previewSecond === nextProps.previewSecond &&
     previousProps.registerNode === nextProps.registerNode,
 )
 
@@ -68,7 +68,7 @@ export default function OverlayCanvas({
   globalScale,
   globalOpacity,
   activity,
-  sampleIndex,
+  previewSecond,
   backgroundMode,
   sceneSize,
   setSceneElement,
@@ -100,7 +100,7 @@ export default function OverlayCanvas({
               globalScale={globalScale}
               globalOpacity={globalOpacity}
               activity={activity}
-              sampleIndex={sampleIndex}
+              previewSecond={previewSecond}
               registerNode={widgetRefCallbacks[widget.id]}
               setSelectedWidgetId={setSelectedWidgetId}
             />

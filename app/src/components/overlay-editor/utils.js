@@ -110,6 +110,131 @@ export function getSampleValue(activity, key, sampleIndex) {
   return series[sampleIndex] ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
 }
 
+export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
+  if (!Array.isArray(xValues) || !Array.isArray(yValues) || !xValues.length) {
+    return null
+  }
+
+  const safeTargetX = Number(targetX)
+  if (!Number.isFinite(safeTargetX)) {
+    return null
+  }
+
+  let firstValidIndex = -1
+  let lastValidIndex = -1
+
+  for (let index = 0; index < xValues.length; index += 1) {
+    if (Number.isFinite(xValues[index]) && Number.isFinite(yValues[index])) {
+      firstValidIndex = index
+      break
+    }
+  }
+
+  if (firstValidIndex === -1) {
+    return null
+  }
+
+  for (let index = yValues.length - 1; index >= 0; index -= 1) {
+    if (Number.isFinite(xValues[index]) && Number.isFinite(yValues[index])) {
+      lastValidIndex = index
+      break
+    }
+  }
+
+  if (safeTargetX <= xValues[firstValidIndex]) {
+    return Number(yValues[firstValidIndex])
+  }
+
+  if (safeTargetX >= xValues[lastValidIndex]) {
+    return Number(yValues[lastValidIndex])
+  }
+
+  let leftIndex = firstValidIndex
+  let rightIndex = firstValidIndex
+
+  for (let index = firstValidIndex + 1; index <= lastValidIndex; index += 1) {
+    const nextX = Number(xValues[index])
+    const nextY = Number(yValues[index])
+    if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
+      continue
+    }
+
+    if (nextX >= safeTargetX) {
+      rightIndex = index
+      break
+    }
+
+    leftIndex = index
+  }
+
+  const leftX = Number(xValues[leftIndex])
+  const rightX = Number(xValues[rightIndex])
+  const leftY = Number(yValues[leftIndex])
+  const rightY = Number(yValues[rightIndex])
+
+  if (
+    !Number.isFinite(leftX) ||
+    !Number.isFinite(rightX) ||
+    !Number.isFinite(leftY) ||
+    !Number.isFinite(rightY)
+  ) {
+    return null
+  }
+
+  if (rightIndex === leftIndex || rightX === leftX) {
+    return leftY
+  }
+
+  const ratio = (safeTargetX - leftX) / (rightX - leftX)
+  return leftY + (rightY - leftY) * ratio
+}
+
+export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
+  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
+    ? activity.sample_elapsed_seconds
+    : []
+  const series = activity?.[key]
+
+  if (!Array.isArray(series) || !elapsedSeries.length) {
+    return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
+  }
+
+  const interpolatedValue = getInterpolatedSeriesValue(
+    elapsedSeries,
+    series,
+    elapsedSecond,
+  )
+
+  return interpolatedValue ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
+}
+
+export function getInterpolatedTimeValue(activity, elapsedSecond) {
+  const sourceStartTimeMs = Date.parse(activity?.source_start_time || '')
+  if (Number.isFinite(sourceStartTimeMs)) {
+    return new Date(
+      sourceStartTimeMs + Math.max(elapsedSecond, 0) * 1000,
+    ).toISOString()
+  }
+
+  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
+    ? activity.sample_elapsed_seconds
+    : []
+  const timeSeries = Array.isArray(activity?.time) ? activity.time : []
+  const numericTimeSeries = timeSeries.map((value) => {
+    const parsed = Date.parse(value || '')
+    return Number.isFinite(parsed) ? parsed : null
+  })
+  const interpolatedTimeMs = getInterpolatedSeriesValue(
+    elapsedSeries,
+    numericTimeSeries,
+    elapsedSecond,
+  )
+
+  return Number.isFinite(interpolatedTimeMs)
+    ? new Date(interpolatedTimeMs).toISOString()
+    : DEFAULT_ACTIVITY_PREVIEW.time
+}
+
 export function getDistanceProgress(activity, sampleIndex) {
   const distanceProgressSeries =
     activity?.frame_distance_progress?.length > 0
@@ -133,6 +258,45 @@ export function getDistanceProgress(activity, sampleIndex) {
   }
 
   return clamp(sampleIndex / (elapsedSeries.length - 1), 0, 1)
+}
+
+export function getDistanceProgressAtElapsed(activity, elapsedSecond) {
+  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
+    ? activity.sample_elapsed_seconds
+    : []
+  const distanceProgressSeries = Array.isArray(
+    activity?.sample_distance_progress,
+  )
+    ? activity.sample_distance_progress
+    : []
+
+  const interpolatedProgress = getInterpolatedSeriesValue(
+    elapsedSeries,
+    distanceProgressSeries,
+    elapsedSecond,
+  )
+
+  if (Number.isFinite(interpolatedProgress)) {
+    return clamp(interpolatedProgress, 0, 1)
+  }
+
+  if (elapsedSeries.length <= 1) {
+    return 0
+  }
+
+  const safeElapsed = clamp(
+    Number(elapsedSecond) || 0,
+    elapsedSeries[0] ?? 0,
+    elapsedSeries[elapsedSeries.length - 1] ?? 0,
+  )
+  const totalElapsed =
+    (elapsedSeries[elapsedSeries.length - 1] ?? 0) - (elapsedSeries[0] ?? 0)
+
+  if (totalElapsed <= 0) {
+    return 0
+  }
+
+  return clamp((safeElapsed - (elapsedSeries[0] ?? 0)) / totalElapsed, 0, 1)
 }
 
 export function formatSpeed(value, unit) {
@@ -237,13 +401,43 @@ export function formatGradientValue(widget, value) {
 
 export function buildGradientTrianglePath(value, width, height) {
   const normalized = clamp(Math.abs(Number(value) || 0) / 15, 0.12, 1)
-  const rise = Math.max(height * normalized, 2)
+  const centeredHeight = Math.max(height * 0.88, 4)
+  const rise = Math.max((centeredHeight / 2) * normalized, 2)
+  const centerY = height / 2
 
   if (Number(value) >= 0) {
-    return `M 0 ${height} L ${width} ${height} L ${width} ${height - rise} Z`
+    return `M 0 ${centerY} L ${width} ${centerY} L ${width} ${centerY - rise} Z`
   }
 
-  return `M 0 0 L ${width} 0 L ${width} ${rise} Z`
+  return `M 0 ${centerY} L ${width} ${centerY} L ${width} ${centerY + rise} Z`
+}
+
+export function getSeriesValueAtProgress(series, progress01) {
+  if (!Array.isArray(series) || !series.length) {
+    return null
+  }
+
+  const clampedProgress = clamp(Number(progress01) || 0, 0, 1)
+  const scaledIndex = clampedProgress * (series.length - 1)
+  const startIndex = Math.floor(scaledIndex)
+  const endIndex = Math.min(startIndex + 1, series.length - 1)
+  const mix = scaledIndex - startIndex
+  const startValue = Number(series[startIndex])
+  const endValue = Number(series[endIndex])
+
+  if (!Number.isFinite(startValue) && !Number.isFinite(endValue)) {
+    return null
+  }
+
+  if (!Number.isFinite(startValue)) {
+    return endValue
+  }
+
+  if (!Number.isFinite(endValue)) {
+    return startValue
+  }
+
+  return startValue + (endValue - startValue) * mix
 }
 
 function buildFallbackRoute(width, height) {
@@ -319,9 +513,24 @@ export function normalizeElevationPoints(
   height,
   padding = 18,
   verticalScale = 1,
+  progressValues = [],
 ) {
-  const usableValues = values.filter((value) => Number.isFinite(value))
-  if (!usableValues.length) {
+  const samples = values.reduce((result, value, index) => {
+    if (!Number.isFinite(value)) {
+      return result
+    }
+
+    const progressValue = Number(progressValues[index])
+    result.push({
+      progress: Number.isFinite(progressValue)
+        ? clamp(progressValue, 0, 1)
+        : null,
+      value: Number(value),
+    })
+    return result
+  }, [])
+
+  if (!samples.length) {
     return [
       [padding, height - padding],
       [width * 0.32, height * 0.55],
@@ -330,18 +539,24 @@ export function normalizeElevationPoints(
     ]
   }
 
+  const usableValues = samples.map((sample) => sample.value)
   const minimum = Math.min(...usableValues)
   const maximum = Math.max(...usableValues)
   const amplitude = Math.max(maximum - minimum, 1)
-  const step =
-    usableValues.length > 1
-      ? (width - padding * 2) / (usableValues.length - 1)
-      : 0
+  const usableWidth = Math.max(width - padding * 2, 1)
+  const fallbackStep =
+    samples.length > 1 ? usableWidth / (samples.length - 1) : 0
+  const hasUsableProgress = samples.some((sample) =>
+    Number.isFinite(sample.progress),
+  )
   const safeVerticalScale = clamp(Number(verticalScale) || 1, 0.2, 4)
 
-  return usableValues.map((value, index) => {
-    const x = padding + index * step
-    const normalized = amplitude <= 0 ? 0.5 : (value - minimum) / amplitude
+  return samples.map((sample, index) => {
+    const x = hasUsableProgress
+      ? padding + (sample.progress ?? 0) * usableWidth
+      : padding + index * fallbackStep
+    const normalized =
+      amplitude <= 0 ? 0.5 : (sample.value - minimum) / amplitude
     const centered = clamp((normalized - 0.5) * safeVerticalScale + 0.5, 0, 1)
     const y = height - padding - centered * (height - padding * 2)
     return [x, y]
@@ -377,6 +592,152 @@ export function getPointAtProgress(points, progress01) {
     startPoint[0] + (endPoint[0] - startPoint[0]) * mix,
     startPoint[1] + (endPoint[1] - startPoint[1]) * mix,
   ]
+}
+
+export function getPointAtMetricProgress(
+  points,
+  progressValues,
+  targetProgress,
+) {
+  if (
+    !Array.isArray(points) ||
+    !Array.isArray(progressValues) ||
+    !points.length
+  ) {
+    return null
+  }
+
+  const safeTargetProgress = clamp(Number(targetProgress) || 0, 0, 1)
+  let firstValidIndex = -1
+  let lastValidIndex = -1
+
+  for (let index = 0; index < points.length; index += 1) {
+    if (
+      points[index] &&
+      Number.isFinite(points[index][0]) &&
+      Number.isFinite(points[index][1]) &&
+      Number.isFinite(progressValues[index])
+    ) {
+      firstValidIndex = index
+      break
+    }
+  }
+
+  if (firstValidIndex === -1) {
+    return getPointAtProgress(points, safeTargetProgress)
+  }
+
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    if (
+      points[index] &&
+      Number.isFinite(points[index][0]) &&
+      Number.isFinite(points[index][1]) &&
+      Number.isFinite(progressValues[index])
+    ) {
+      lastValidIndex = index
+      break
+    }
+  }
+
+  if (safeTargetProgress <= progressValues[firstValidIndex]) {
+    return points[firstValidIndex]
+  }
+
+  if (safeTargetProgress >= progressValues[lastValidIndex]) {
+    return points[lastValidIndex]
+  }
+
+  let leftIndex = firstValidIndex
+  let rightIndex = firstValidIndex
+
+  for (let index = firstValidIndex + 1; index <= lastValidIndex; index += 1) {
+    const nextProgress = Number(progressValues[index])
+    if (!Number.isFinite(nextProgress)) {
+      continue
+    }
+
+    if (nextProgress >= safeTargetProgress) {
+      rightIndex = index
+      break
+    }
+
+    leftIndex = index
+  }
+
+  const leftProgress = Number(progressValues[leftIndex])
+  const rightProgress = Number(progressValues[rightIndex])
+  const leftPoint = points[leftIndex]
+  const rightPoint = points[rightIndex]
+
+  if (
+    !Number.isFinite(leftProgress) ||
+    !Number.isFinite(rightProgress) ||
+    !leftPoint ||
+    !rightPoint
+  ) {
+    return null
+  }
+
+  if (rightIndex === leftIndex || rightProgress === leftProgress) {
+    return leftPoint
+  }
+
+  const ratio =
+    (safeTargetProgress - leftProgress) / (rightProgress - leftProgress)
+
+  return [
+    leftPoint[0] + (rightPoint[0] - leftPoint[0]) * ratio,
+    leftPoint[1] + (rightPoint[1] - leftPoint[1]) * ratio,
+  ]
+}
+
+export function getPointAtX(points, targetX) {
+  if (!points.length) {
+    return null
+  }
+
+  if (points.length === 1) {
+    return points[0]
+  }
+
+  const safeTargetX = Number(targetX)
+  if (!Number.isFinite(safeTargetX)) {
+    return null
+  }
+
+  if (safeTargetX <= points[0][0]) {
+    return points[0]
+  }
+
+  const lastPoint = points[points.length - 1]
+  if (safeTargetX >= lastPoint[0]) {
+    return lastPoint
+  }
+
+  for (let index = 1; index < points.length; index += 1) {
+    const leftPoint = points[index - 1]
+    const rightPoint = points[index]
+    if (!leftPoint || !rightPoint) {
+      continue
+    }
+
+    if (rightPoint[0] < safeTargetX) {
+      continue
+    }
+
+    const deltaX = rightPoint[0] - leftPoint[0]
+    if (!Number.isFinite(deltaX) || deltaX === 0) {
+      return rightPoint
+    }
+
+    const ratio = (safeTargetX - leftPoint[0]) / deltaX
+    return [
+      leftPoint[0] + (rightPoint[0] - leftPoint[0]) * ratio,
+      leftPoint[1] + (rightPoint[1] - leftPoint[1]) * ratio,
+    ]
+  }
+
+  return lastPoint
 }
 
 export function areaToSvg(points, width, height, padding = 18) {

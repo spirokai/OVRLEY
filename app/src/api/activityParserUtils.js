@@ -524,6 +524,31 @@ function combineSeries(directSeries, derivedSeries) {
   }
 }
 
+function combineSeriesPreferDerived(derivedSeries, directSeries) {
+  const combinedSeries = derivedSeries.map(
+    (value, index) => value ?? directSeries[index] ?? null,
+  )
+
+  const derivedCount = derivedSeries.filter((value) => value !== null).length
+  const directFallbackCount = combinedSeries.filter(
+    (value, index) => value !== null && derivedSeries[index] === null,
+  ).length
+
+  let source = 'missing'
+  if (derivedCount > 0 && directFallbackCount > 0) {
+    source = 'mixed'
+  } else if (derivedCount > 0) {
+    source = 'derived'
+  } else if (directFallbackCount > 0) {
+    source = 'direct'
+  }
+
+  return {
+    series: combinedSeries,
+    source,
+  }
+}
+
 function buildMetricCoverage(metricSeriesMap) {
   return Object.fromEntries(
     Object.entries(metricSeriesMap).map(([metric, descriptor]) => {
@@ -634,7 +659,10 @@ export function finalizeParsedActivity({
       directMetrics.g_force,
       rawSamples.map(() => null),
     ),
-    gradient: combineSeries(directMetrics.gradient, derivedGradient),
+    gradient: combineSeriesPreferDerived(
+      derivedGradient,
+      directMetrics.gradient,
+    ),
     ground_contact_time: combineSeries(
       directMetrics.ground_contact_time,
       rawSamples.map(() => null),

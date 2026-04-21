@@ -44,7 +44,7 @@ function OverlayEditor({
     maintainAspectRatio,
     moveableRef,
     resolvedConfig,
-    sampleIndex,
+    previewSecond,
     sceneElement,
     sceneSize,
     selectedTarget,
@@ -93,7 +93,7 @@ function OverlayEditor({
               globalScale={globalScale}
               globalOpacity={globalOpacity}
               activity={activity}
-              sampleIndex={sampleIndex}
+              previewSecond={previewSecond}
               backgroundMode={backgroundMode}
               sceneSize={sceneSize}
               setSceneElement={setSceneElement}

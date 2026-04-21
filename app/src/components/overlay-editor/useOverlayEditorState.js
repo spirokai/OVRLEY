@@ -8,13 +8,7 @@ import {
 } from '@/lib/widget-config'
 import { applyGlobalDefaults } from '@/lib/config-utils'
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from './constants'
-import { buildPreviewActivity } from './previewInterpolation'
-import {
-  buildWidgetTransform,
-  clamp,
-  findClosestSampleIndex,
-  getSceneSize,
-} from './utils'
+import { buildWidgetTransform, clamp, getSceneSize } from './utils'
 
 function clearLiveWidgetDraft(draftWidgetsRef, widgetId) {
   delete draftWidgetsRef.current[widgetId]
@@ -72,10 +66,6 @@ export default function useOverlayEditorState({
   const selectedWidgetId = useStore((state) => state.selectedWidgetId)
   const setSelectedWidgetId = useStore((state) => state.setSelectedWidgetId)
   const selectedSecond = useStore((state) => state.selectedSecond)
-  const updateRate = useStore((state) => state.updateRate)
-  const previewInterpolationEnabled = useStore(
-    (state) => state.previewInterpolationEnabled,
-  )
   const viewportRef = useRef(null)
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
@@ -102,31 +92,30 @@ export default function useOverlayEditorState({
     () => getSceneSize(resolvedConfig),
     [resolvedConfig],
   )
-  const activity = useMemo(
-    () =>
-      buildPreviewActivity({
-        activity: sourceActivity,
-        startSecond: resolvedConfig?.scene?.start,
-        endSecond: resolvedConfig?.scene?.end,
-        fps: resolvedConfig?.scene?.fps,
-        updateRate,
-        enabled: previewInterpolationEnabled,
-      }),
-    [
-      previewInterpolationEnabled,
-      resolvedConfig?.scene?.end,
-      resolvedConfig?.scene?.fps,
-      resolvedConfig?.scene?.start,
-      sourceActivity,
-      updateRate,
-    ],
-  )
+  const activity = sourceActivity
   const globalOpacity = globalDefaults?.opacity ?? 1
   const globalScale = globalDefaults?.scale ?? 1
-  const sampleIndex = useMemo(
-    () => findClosestSampleIndex(activity, selectedSecond),
-    [activity, selectedSecond],
-  )
+  const previewSecond = useMemo(() => {
+    const rawSecond = Number(selectedSecond) || 0
+    const startSecond = Number(resolvedConfig?.scene?.start) || 0
+    const activityEndSecond = Number(
+      sourceActivity?.trim_end_seconds ??
+        sourceActivity?.metadata?.duration_seconds ??
+        startSecond,
+    )
+    const sceneEndSecond = Number(resolvedConfig?.scene?.end)
+    const maxSecond = Number.isFinite(sceneEndSecond)
+      ? Math.min(sceneEndSecond, activityEndSecond)
+      : activityEndSecond
+
+    return clamp(rawSecond, startSecond, Math.max(maxSecond, startSecond))
+  }, [
+    resolvedConfig?.scene?.end,
+    resolvedConfig?.scene?.start,
+    selectedSecond,
+    sourceActivity?.metadata?.duration_seconds,
+    sourceActivity?.trim_end_seconds,
+  ])
 
   useEffect(() => {
     draftWidgetsRef.current = {}
@@ -522,7 +511,7 @@ export default function useOverlayEditorState({
     maintainAspectRatio,
     moveableRef,
     resolvedConfig,
-    sampleIndex,
+    previewSecond,
     sceneElement,
     sceneSize,
     selectedTarget,
