@@ -1,29 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 
-function ensureSidecarDebugState() {
+function ensureBackendDebugState() {
   if (typeof window === 'undefined') {
     return null
   }
 
-  if (!window.__SIDECAR_DEBUG__) {
-    window.__SIDECAR_DEBUG__ = {
+  if (!window.__BACKEND_DEBUG__) {
+    window.__BACKEND_DEBUG__ = {
       status: 'initializing',
       error: null,
-      pid: null,
       logs: [],
       startTime: null,
     }
   }
 
-  return window.__SIDECAR_DEBUG__
+  return window.__BACKEND_DEBUG__
 }
 
-function logSidecar(message) {
-  const debugState = ensureSidecarDebugState()
+function logBackend(message) {
+  const debugState = ensureBackendDebugState()
   const timestamp = new Date().toISOString()
 
-  console.log(`[Sidecar] ${message}`)
+  console.log(`[Backend] ${message}`)
 
   if (!debugState) {
     return
@@ -35,8 +34,8 @@ function logSidecar(message) {
   }
 }
 
-function updateSidecarStatus(status, error = null) {
-  const debugState = ensureSidecarDebugState()
+function updateBackendStatus(status, error = null) {
+  const debugState = ensureBackendDebugState()
   if (!debugState) {
     return
   }
@@ -62,7 +61,7 @@ export default function useBackendStatus() {
   const strikesRef = useRef(0)
 
   useEffect(() => {
-    updateSidecarStatus(statusRef.current)
+    updateBackendStatus(statusRef.current)
 
     if (!isTauriRuntime) {
       setBackendReady(true)
@@ -74,7 +73,7 @@ export default function useBackendStatus() {
     const updateStatus = (nextStatus, error = null) => {
       statusRef.current = nextStatus
       setBackendStatus(nextStatus)
-      updateSidecarStatus(nextStatus, error)
+      updateBackendStatus(nextStatus, error)
     }
 
     const pollBackend = async () => {
@@ -84,7 +83,9 @@ export default function useBackendStatus() {
           strikesRef.current += 1
 
           if (strikesRef.current === 1) {
-            logSidecar('Backend not yet ready, waiting for sidecar to start...')
+            logBackend(
+              'Backend not yet ready, waiting for Rust commands to respond...',
+            )
           }
 
           const threshold = statusRef.current === 'connecting' ? 90 : 8
@@ -92,7 +93,7 @@ export default function useBackendStatus() {
             strikesRef.current >= threshold &&
             statusRef.current !== 'error'
           ) {
-            updateStatus('error', 'Backend socket not available')
+            updateStatus('error', 'Backend bridge not available')
             setBackendReady(false)
           }
           return

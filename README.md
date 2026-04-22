@@ -48,17 +48,8 @@ pnpm install
 ### Running Locally
 
 ```bash
-# Run both frontend & backend concurrently (Development Mode - TCP)
+# Run the Tauri app with the frontend dev server
 pnpm dev
-```
-
-### Testing Production (Unix Socket Mode)
-
-To verify the port-less Unix domain socket communication locally:
-
-```bash
-# Build sidecar and run in socket mode
-pnpm buildtest
 ```
 
 ## Videos Made With Cyclemetry
