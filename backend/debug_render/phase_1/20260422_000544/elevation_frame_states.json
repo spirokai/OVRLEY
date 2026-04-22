@@ -1,0 +1,40 @@
+{
+  "count": 900,
+  "sample": [
+    {
+      "progress01": 0.0,
+      "marker_x": 0.0,
+      "marker_y": 650.0,
+      "elevation_m": 414.72746785191816,
+      "label_text": null
+    },
+    {
+      "progress01": 0.24847965970053598,
+      "marker_x": 323.0235576106968,
+      "marker_y": 534.6123487491948,
+      "elevation_m": 414.7531195583857,
+      "label_text": null
+    },
+    {
+      "progress01": 0.49695931940107196,
+      "marker_x": 646.0471152213936,
+      "marker_y": 419.2246974983897,
+      "elevation_m": 414.7787712648533,
+      "label_text": null
+    },
+    {
+      "progress01": 0.745438979101608,
+      "marker_x": 969.0706728320903,
+      "marker_y": 303.8370462473288,
+      "elevation_m": 414.8044229713209,
+      "label_text": null
+    },
+    {
+      "progress01": 0.9988598879678358,
+      "marker_x": 1298.5178543581865,
+      "marker_y": 0.0,
+      "elevation_m": 414.87196866308096,
+      "label_text": null
+    }
+  ]
+}
