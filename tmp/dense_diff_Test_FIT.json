@@ -1,0 +1,83 @@
+{
+  "frame_count_equal": true,
+  "series": {
+    "speed": {
+      "max_abs_error": 0.0,
+      "mismatch_count": 0,
+      "length_equal": true,
+      "pass": true,
+      "max_rel_error": 0.0
+    },
+    "elevation": {
+      "max_abs_error": 0.0,
+      "mismatch_count": 0,
+      "length_equal": true,
+      "pass": true,
+      "max_rel_error": 0.0
+    },
+    "gradient": {
+      "max_abs_error": 0.0,
+      "mismatch_count": 0,
+      "length_equal": true,
+      "pass": true,
+      "max_rel_error": 0.0
+    },
+    "heartrate": {
+      "max_abs_error": 0.0,
+      "mismatch_count": 0,
+      "length_equal": true,
+      "pass": true,
+      "max_rel_error": 0.0
+    },
+    "cadence": {
+      "max_abs_error": 0.0,
+      "mismatch_count": 0,
+      "length_equal": true,
+      "pass": true,
+      "max_rel_error": 0.0
+    },
+    "power": {
+      "max_abs_error": 0.0,
+      "mismatch_count": 0,
+      "length_equal": true,
+      "pass": true,
+      "max_rel_error": 0.0
+    },
+    "temperature": {
+      "max_abs_error": 0.0,
+      "mismatch_count": 0,
+      "length_equal": true,
+      "pass": true,
+      "max_rel_error": 0.0
+    },
+    "course_lat": {
+      "max_abs_error": 7.105427357601002e-15,
+      "mismatch_count": 0,
+      "length_equal": true,
+      "pass": true
+    },
+    "course_lon": {
+      "max_abs_error": 0.0,
+      "mismatch_count": 0,
+      "length_equal": true,
+      "pass": true
+    },
+    "time": {
+      "mismatch_count": 0,
+      "pass": true
+    }
+  },
+  "frame_elapsed_seconds": {
+    "max_abs_error": 0.0,
+    "mismatch_count": 0,
+    "length_equal": true,
+    "pass": true
+  },
+  "frame_distance_progress": {
+    "max_abs_error": 0.0,
+    "mismatch_count": 0,
+    "length_equal": true,
+    "pass": true
+  },
+  "pass": true
+}

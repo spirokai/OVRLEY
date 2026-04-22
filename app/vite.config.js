@@ -78,6 +78,10 @@ function parseDebugWritePlugin() {
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss(), parseDebugWritePlugin()],
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
   build: {
     target: 'es2020',
     modulePreload: {

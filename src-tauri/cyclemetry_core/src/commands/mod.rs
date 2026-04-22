@@ -1,4 +1,4 @@
-use crate::activity::parse_activity_json;
+use crate::activity::{build_dense_activity_report, parse_activity_json};
 use crate::config::parse_config_json;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
@@ -88,13 +88,15 @@ pub fn backend_health(paths: &AppPaths) -> HealthResponse {
 pub fn backend_demo(config_json: &str, parsed_activity_json: &str, second: u32) -> Result<Value, String> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
-    Ok(stub_demo_response(config, parsed_activity, second))
+    let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
+    Ok(stub_demo_response(&config, &dense_activity, second))
 }
 
 pub fn backend_render(config_json: &str, parsed_activity_json: &str) -> Result<Value, String> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
-    Ok(stub_render_response(config, parsed_activity))
+    let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
+    Ok(stub_render_response(&config, &dense_activity))
 }
 
 pub fn backend_progress(progress: &RenderProgress) -> RenderProgress {

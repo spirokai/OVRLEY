@@ -36,4 +36,12 @@ const useStore = create(
     : storeInitializer,
 )
 
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  window.useStore = useStore
+  window.__CYCLEMETRY_STORE__ = useStore
+  console.info(
+    '[Cyclemetry] Store exposed as window.useStore and window.__CYCLEMETRY_STORE__',
+  )
+}
+
 export default useStore
