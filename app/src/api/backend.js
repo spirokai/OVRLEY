@@ -1,6 +1,6 @@
 /**
- * Backend API module - handles communication with Python backend
- * Uses Tauri invoke() for Unix socket (production) or fetch() for development
+ * Backend API module - talks directly to Rust in Tauri.
+ * Web fallback still uses localhost during non-Tauri development.
  */
 
 // Check if the Tauri IPC runtime is actually available.
@@ -50,31 +50,11 @@ async function apiCall(
 ) {
   const invoke = await getInvoke()
 
-  // If in Tauri, try the Rust bridge (which uses Unix socket)
+  // In Tauri, call Rust directly. No sidecar/socket probing remains.
   if (invoke) {
     try {
-      // Check if socket is ready on the Rust side
-      const ready = await invoke('backend_socket_ready')
-      if (ready) {
-        console.log(`[Backend] Socket READY. Invoking: ${tauriCmd}`)
-        try {
-          const result = await invoke(tauriCmd, tauriArgs)
-          return JSON.parse(result)
-        } catch (invokeErr) {
-          console.error(`[Backend] INVOKE FAILED for ${tauriCmd}:`, invokeErr)
-          // Don't fall back to fetch if the socket COMMAND failed (the backend is reached but errored)
-          throw invokeErr
-        }
-      } else {
-        console.warn(
-          `[Backend] Socket NOT READY for ${tauriCmd}. Backend might still be starting.`,
-        )
-        // In Tauri mode, we ONLY use the socket. Falling back to localhost:31337
-        // will usually fail because the backend is in socket mode anyway.
-        throw new Error(
-          'Backend server is still starting or unreachable (socket not found)',
-        )
-      }
+      const result = await invoke(tauriCmd, tauriArgs)
+      return JSON.parse(result)
     } catch (e) {
       console.error(`[Backend] Tauri bridge error for ${tauriCmd}:`, e)
       // Normalize errors to standard Error objects
@@ -140,16 +120,12 @@ export async function healthCheck() {
 }
 
 /**
- * Check if socket exists (fast check before health)
+ * Check if the native backend bridge is available
  */
 export async function socketReady() {
   const invoke = await getInvoke()
   if (invoke) {
-    try {
-      return await invoke('backend_socket_ready')
-    } catch {
-      return false
-    }
+    return true
   }
   return false
 }
@@ -157,19 +133,20 @@ export async function socketReady() {
 /**
  * Generate demo preview frame
  */
-export async function generateDemo(config, gpx_filename, second) {
+export async function generateDemo(config, parsedActivity, second) {
   const safeConfig = safeJsonStringify(config)
+  const safeParsedActivity = safeJsonStringify(parsedActivity)
   return apiCall(
     'POST',
     'backend_demo',
     {
-      config: safeConfig,
-      gpxFilename: gpx_filename,
+      configJson: safeConfig,
+      parsedActivityJson: safeParsedActivity,
       second,
     },
     '/api/demo',
     {
-      body: safeJsonStringify({ config, gpx_filename, second }),
+      body: safeJsonStringify({ config, parsedActivity, second }),
     },
   )
 }
@@ -177,18 +154,19 @@ export async function generateDemo(config, gpx_filename, second) {
 /**
  * Start video render
  */
-export async function renderVideo(config, gpx_filename) {
+export async function renderVideo(config, parsedActivity) {
   const safeConfig = safeJsonStringify(config)
+  const safeParsedActivity = safeJsonStringify(parsedActivity)
   return apiCall(
     'POST',
     'backend_render',
     {
-      config: safeConfig,
-      gpxFilename: gpx_filename,
+      configJson: safeConfig,
+      parsedActivityJson: safeParsedActivity,
     },
     '/api/render-video',
     {
-      body: safeJsonStringify({ config, gpx_filename }),
+      body: safeJsonStringify({ config, parsedActivity }),
     },
   )
 }
@@ -236,11 +214,7 @@ export async function getImageUrl(filename) {
   const invoke = await getInvoke()
   if (invoke) {
     try {
-      const ready = await invoke('backend_socket_ready')
-      if (ready) {
-        // Fetch image data as base64 from the backend via Rust proxy
-        return await invoke('backend_image_data', { filename })
-      }
+      return await invoke('backend_image_data', { filename })
     } catch (e) {
       console.warn(
         'Failed to fetch image data via Tauri, falling back to fetch',

@@ -19,7 +19,6 @@ function timeToSeconds(timeStr) {
 export default async function renderVideo() {
   try {
     const {
-      gpxFilename,
       config: baseConfig,
       globalDefaults,
       updateRate,
@@ -53,14 +52,8 @@ export default async function renderVideo() {
       }
     }
 
-    if (!gpxFilename) {
-      throw new Error('No GPX file selected')
-    }
-
-    if (parsedActivity && gpxFilename !== 'demo.gpxinit') {
-      throw new Error(
-        'Render for frontend-parsed activities is not connected to the legacy backend renderer yet.',
-      )
+    if (!parsedActivity) {
+      throw new Error('No parsed activity available')
     }
 
     if (config.scene.start === undefined || config.scene.end === undefined) {
@@ -74,14 +67,13 @@ export default async function renderVideo() {
     setRenderingVideo(true)
 
     console.log('📤 Sending video render request:', {
-      gpx: gpxFilename,
       start: config?.scene?.start,
       end: config?.scene?.end,
       duration: (config?.scene?.end || 0) - (config?.scene?.start || 0),
       updateRate: config?.scene?.update_rate,
     })
 
-    const data = await backend.renderVideo(config, gpxFilename)
+    const data = await backend.renderVideo(config, parsedActivity)
 
     if (data.error) {
       // Check for cancellation

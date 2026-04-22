@@ -8,7 +8,6 @@ let isGenerating = false
 export default async function generateDemoFrame(config) {
   try {
     const {
-      gpxFilename,
       setImageFilename,
       setGeneratingImage,
       config: storeConfig,
@@ -25,17 +24,8 @@ export default async function generateDemoFrame(config) {
       return
     }
 
-    if (!gpxFilename) {
-      console.error('No GPX file selected')
-      throw new Error(
-        "Please load a GPX file first. Click 'Load Demo Activity' or upload your own GPX file.",
-      )
-    }
-
-    if (parsedActivity && gpxFilename !== 'demo.gpxinit') {
-      throw new Error(
-        'Preview for frontend-parsed activities is not wired to the backend renderer yet. Demo activity preview still works.',
-      )
+    if (!parsedActivity) {
+      throw new Error('No parsed activity available for preview')
     }
 
     // If already generating, skip this request
@@ -48,7 +38,6 @@ export default async function generateDemoFrame(config) {
     setGeneratingImage(true)
 
     console.log('📤 Sending demo request:', {
-      gpx: gpxFilename,
       second: selectedSecond,
       start: configToSend?.scene?.start,
       end: configToSend?.scene?.end,
@@ -56,7 +45,7 @@ export default async function generateDemoFrame(config) {
 
     const data = await backend.generateDemo(
       configToSend,
-      gpxFilename,
+      parsedActivity,
       selectedSecond,
     )
 
@@ -89,19 +78,8 @@ export default async function generateDemoFrame(config) {
     if (error.name !== 'AbortError') {
       console.error('Error generating demo frame:', error)
 
-      // Check if backend is still starting up (within grace period)
-      const startupTime = window.__SIDECAR_DEBUG__?.startTime
-        ? Date.now() - window.__SIDECAR_DEBUG__.startTime
-        : 0
-      const isStartingUp = startupTime < 20000 // 20 second grace period
-
-      // Only show error to user if backend is not starting up
-      if (!isStartingUp) {
-        const { setErrorMessage } = useStore.getState()
-        setErrorMessage(error.message || 'Failed to generate preview')
-      } else {
-        console.log('Suppressing error during backend startup:', error.message)
-      }
+      const { setErrorMessage } = useStore.getState()
+      setErrorMessage(error.message || 'Failed to generate preview')
 
       // Don't re-throw - we've handled it by setting the error state
     }
