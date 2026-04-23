@@ -104,7 +104,7 @@ pub fn backend_demo(
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
     let filename = "demo_preview.png";
     let output_path = paths.public_dir.join(filename);
-    render_preview_to_path(paths, &config, &dense_activity, second, &output_path)?;
+    render_preview_to_path(paths, &config, &parsed_activity, &dense_activity, second, &output_path)?;
     Ok(stub_demo_response(filename))
 }
 

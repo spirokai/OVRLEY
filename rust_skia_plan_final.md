@@ -343,6 +343,18 @@ Test procedure:
 5. Generate geometry comparison outputs if available:
    - Rust writes `route_geometry_data.json` and `elevation_geometry_data.json`
    - compare extents, point counts, and marker positions against Python debug artifacts
+6. Generate Rust preview frames at fixed seconds 600, 607, 615, 622, 629 using parsed activity "velkonocne blbnutie z Zugu" in app/debug and:
+
+```powershell
+cargo run --bin render_preview -- --config templates\safa_brian_a_4k_gradient.json --payload app\debug\<fixture>.json --second 600 --out tmp\rust_preview_600.png
+```
+
+7. Generat Python preview frames at fixed seconds 600, 607, 615, 622, 629 using:
+   Ensure this generate the timing_summary.json in backend/debug_render which will be used as a baseline.
+
+```powershell
+   uv run main.py demo -gpx "uploads\2025-04-21_2180810019_Velkonocne blbnutie z Zugu.gpx" -template ..\templates\safa_brian_a_4k_gradient.json -second 600
+```
 
 Required non-visual checks for Phase 4:
 

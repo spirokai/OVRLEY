@@ -1,14 +1,18 @@
 pub mod format;
 pub mod surface;
 pub mod text;
+pub mod widgets;
 
-use crate::activity::schema::DenseActivityReport;
+use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::render::format::{format_value, frame_index_for_second};
 use crate::render::surface::{create_surface, write_surface_png};
 use crate::render::text::{draw_text, label_style, value_style};
+use crate::render::widgets::{
+    draw_elevation_widget, draw_route_widget, prepare_render_assets, WidgetRenderReport,
+};
 use serde_json::{json, Value};
 use skia_safe::Image;
 use std::collections::{BTreeMap, HashMap};
@@ -38,6 +42,8 @@ pub struct PreviewRenderReport {
     pub value_count: usize,
     pub label_count: usize,
     pub label_cache_status: String,
+    pub route_widget: Option<WidgetRenderReport>,
+    pub elevation_widget: Option<WidgetRenderReport>,
     pub prepare_timings: BTreeMap<String, TimingBucket>,
     pub frame_timings: BTreeMap<String, TimingBucket>,
     pub preview_only_timings: BTreeMap<String, TimingBucket>,
@@ -46,17 +52,19 @@ pub struct PreviewRenderReport {
 pub fn render_preview_to_path(
     paths: &AppPaths,
     config: &RenderConfig,
+    activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     second: u32,
     out_path: &Path,
 ) -> Result<(), String> {
-    render_preview_with_report(paths, config, dense_activity, second, out_path)
+    render_preview_with_report(paths, config, activity, dense_activity, second, out_path)
         .map(|report| report.0)
 }
 
 pub fn render_preview_with_report(
     paths: &AppPaths,
     config: &RenderConfig,
+    activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     second: u32,
     out_path: &Path,
@@ -72,6 +80,8 @@ pub fn render_preview_with_report(
 
     let (labels_image, label_cache_status) =
         cached_labels_image(paths, config, width, height, scale, &mut prepare_profiler)?;
+    let prepared_assets =
+        prepare_render_assets(config, activity, dense_activity, &mut prepare_profiler)?;
 
     let mut surface = create_surface(width, height)?;
     preview_profiler.measure("preview.surface.create_clear", || {
@@ -91,6 +101,20 @@ pub fn render_preview_with_report(
             let style = value_style(&config.scene, value, scale);
             draw_text(surface.canvas(), &text, &style, &paths.font_dirs);
         }
+    });
+    let route_widget = prepared_assets
+        .route_cache
+        .as_ref()
+        .and_then(|cache| draw_route_widget(surface.canvas(), cache, frame_index, &mut frame_profiler));
+    let elevation_widget = prepared_assets.elevation_cache.as_ref().and_then(|cache| {
+        draw_elevation_widget(
+            surface.canvas(),
+            paths,
+            config.scene.font.as_deref(),
+            cache,
+            frame_index,
+            &mut frame_profiler,
+        )
     });
     frame_profiler.record_ms("frame.draw", frame_started.elapsed().as_secs_f64() * 1000.0);
 
@@ -136,6 +160,8 @@ pub fn render_preview_with_report(
             LabelCacheStatus::Hit => "hit".to_string(),
             LabelCacheStatus::Miss => "miss".to_string(),
         },
+        route_widget,
+        elevation_widget,
         prepare_timings,
         frame_timings,
         preview_only_timings,

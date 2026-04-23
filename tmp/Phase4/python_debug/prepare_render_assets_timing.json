@@ -1,0 +1,137 @@
+{
+  "started_at": "2026-04-23T22:28:20.048",
+  "events": [
+    {
+      "name": "build_font_cache",
+      "started_at": "2026-04-23T22:28:20.048",
+      "ended_at": "2026-04-23T22:28:20.048",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.geometry",
+      "started_at": "2026-04-23T22:28:20.048",
+      "ended_at": "2026-04-23T22:28:20.048",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.layers",
+      "started_at": "2026-04-23T22:28:20.048",
+      "ended_at": "2026-04-23T22:28:20.370",
+      "duration_ms": 321.07
+    },
+    {
+      "name": "build_route_cache.rotated_background_layer",
+      "started_at": "2026-04-23T22:28:20.370",
+      "ended_at": "2026-04-23T22:28:20.429",
+      "duration_ms": 59.015
+    },
+    {
+      "name": "build_route_cache.rotated_completed_layer",
+      "started_at": "2026-04-23T22:28:20.429",
+      "ended_at": "2026-04-23T22:28:20.486",
+      "duration_ms": 57.012
+    },
+    {
+      "name": "build_route_cache.display_points",
+      "started_at": "2026-04-23T22:28:20.486",
+      "ended_at": "2026-04-23T22:28:20.486",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.marker_sprite",
+      "started_at": "2026-04-23T22:28:20.486",
+      "ended_at": "2026-04-23T22:28:20.486",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_route_cache.bucket_masks",
+      "started_at": "2026-04-23T22:28:20.486",
+      "ended_at": "2026-04-23T22:28:20.510",
+      "duration_ms": 24.006
+    },
+    {
+      "name": "build_route_cache.frame_states",
+      "started_at": "2026-04-23T22:28:20.510",
+      "ended_at": "2026-04-23T22:28:20.514",
+      "duration_ms": 4.0
+    },
+    {
+      "name": "build_route_cache",
+      "started_at": "2026-04-23T22:28:20.048",
+      "ended_at": "2026-04-23T22:28:20.514",
+      "duration_ms": 465.103
+    },
+    {
+      "name": "build_elevation_cache.geometry",
+      "started_at": "2026-04-23T22:28:20.514",
+      "ended_at": "2026-04-23T22:28:20.514",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.layers",
+      "started_at": "2026-04-23T22:28:20.514",
+      "ended_at": "2026-04-23T22:28:20.515",
+      "duration_ms": 1.001
+    },
+    {
+      "name": "build_elevation_cache.rotated_background_layer",
+      "started_at": "2026-04-23T22:28:20.515",
+      "ended_at": "2026-04-23T22:28:20.515",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.rotated_completed_layer",
+      "started_at": "2026-04-23T22:28:20.515",
+      "ended_at": "2026-04-23T22:28:20.515",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.marker_sprite",
+      "started_at": "2026-04-23T22:28:20.515",
+      "ended_at": "2026-04-23T22:28:20.515",
+      "duration_ms": 0.0
+    },
+    {
+      "name": "build_elevation_cache.frame_states",
+      "started_at": "2026-04-23T22:28:20.515",
+      "ended_at": "2026-04-23T22:28:20.516",
+      "duration_ms": 1.0
+    },
+    {
+      "name": "build_elevation_cache",
+      "started_at": "2026-04-23T22:28:20.514",
+      "ended_at": "2026-04-23T22:28:20.516",
+      "duration_ms": 2.001
+    },
+    {
+      "name": "create_base_image",
+      "started_at": "2026-04-23T22:28:20.516",
+      "ended_at": "2026-04-23T22:28:20.521",
+      "duration_ms": 5.002
+    },
+    {
+      "name": "draw_static_label:MPH",
+      "started_at": "2026-04-23T22:28:20.525",
+      "ended_at": "2026-04-23T22:28:20.542",
+      "duration_ms": 17.004
+    },
+    {
+      "name": "draw_static_label:KMH",
+      "started_at": "2026-04-23T22:28:20.542",
+      "ended_at": "2026-04-23T22:28:20.543",
+      "duration_ms": 1.0
+    },
+    {
+      "name": "draw_static_label:Grad.",
+      "started_at": "2026-04-23T22:28:20.543",
+      "ended_at": "2026-04-23T22:28:20.544",
+      "duration_ms": 1.0
+    },
+    {
+      "name": "prepare_render_assets.total",
+      "started_at": "2026-04-23T22:28:20.048",
+      "ended_at": "2026-04-23T22:28:20.549",
+      "duration_ms": 500.111
+    }
+  ]
+}

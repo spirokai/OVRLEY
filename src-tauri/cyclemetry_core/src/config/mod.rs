@@ -157,6 +157,166 @@ pub struct RenderConfig {
     pub extra: BTreeMap<String, Value>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct MarkerPointConfig {
+    #[serde(default)]
+    pub weight: Option<f32>,
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub opacity: Option<f32>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct LineStyleConfig {
+    #[serde(default)]
+    pub width: Option<f32>,
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub opacity: Option<f32>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct FillStyleConfig {
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub opacity: Option<f32>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct PointLabelConfig {
+    #[serde(default)]
+    pub font: Option<String>,
+    #[serde(default)]
+    pub font_size: Option<f32>,
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub x_offset: Option<f32>,
+    #[serde(default)]
+    pub y_offset: Option<f32>,
+    #[serde(default)]
+    pub units: Vec<String>,
+    #[serde(default)]
+    pub decimal_rounding: Option<i32>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CoursePlotConfig {
+    pub x: f32,
+    pub y: f32,
+    pub width: u32,
+    pub height: u32,
+    #[serde(default)]
+    pub rotation: f32,
+    #[serde(default)]
+    pub opacity: Option<f32>,
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub margin: Option<f32>,
+    #[serde(default)]
+    pub completed_line_width: Option<f32>,
+    #[serde(default)]
+    pub completed_line_color: Option<String>,
+    #[serde(default)]
+    pub completed_line_opacity: Option<f32>,
+    #[serde(default)]
+    pub remaining_line_width: Option<f32>,
+    #[serde(default)]
+    pub remaining_line_color: Option<String>,
+    #[serde(default)]
+    pub remaining_line_opacity: Option<f32>,
+    #[serde(default)]
+    pub marker_size: Option<f32>,
+    #[serde(default)]
+    pub marker_color: Option<String>,
+    #[serde(default)]
+    pub marker_opacity: Option<f32>,
+    #[serde(default)]
+    pub line: Option<LineStyleConfig>,
+    #[serde(default)]
+    pub points: Vec<MarkerPointConfig>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ElevationPlotConfig {
+    pub x: f32,
+    pub y: f32,
+    pub width: u32,
+    pub height: u32,
+    #[serde(default)]
+    pub rotation: f32,
+    #[serde(default)]
+    pub opacity: Option<f32>,
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub margin: Option<f32>,
+    #[serde(default)]
+    pub completed_line_width: Option<f32>,
+    #[serde(default)]
+    pub completed_line_color: Option<String>,
+    #[serde(default)]
+    pub completed_line_opacity: Option<f32>,
+    #[serde(default)]
+    pub remaining_line_width: Option<f32>,
+    #[serde(default)]
+    pub remaining_line_color: Option<String>,
+    #[serde(default)]
+    pub remaining_line_opacity: Option<f32>,
+    #[serde(default)]
+    pub marker_size: Option<f32>,
+    #[serde(default)]
+    pub marker_color: Option<String>,
+    #[serde(default)]
+    pub marker_opacity: Option<f32>,
+    #[serde(default)]
+    pub area_completed_color: Option<String>,
+    #[serde(default)]
+    pub area_completed_opacity: Option<f32>,
+    #[serde(default)]
+    pub area_remaining_color: Option<String>,
+    #[serde(default)]
+    pub area_remaining_opacity: Option<f32>,
+    #[serde(default)]
+    pub show_elevation_metric: Option<bool>,
+    #[serde(default)]
+    pub show_elevation_imperial: Option<bool>,
+    #[serde(default)]
+    pub y_scale: Option<f32>,
+    #[serde(default)]
+    pub metric_label_offset_x: Option<f32>,
+    #[serde(default)]
+    pub metric_label_offset_y: Option<f32>,
+    #[serde(default)]
+    pub imperial_label_offset_x: Option<f32>,
+    #[serde(default)]
+    pub imperial_label_offset_y: Option<f32>,
+    #[serde(default)]
+    pub line: Option<LineStyleConfig>,
+    #[serde(default)]
+    pub fill: Option<FillStyleConfig>,
+    #[serde(default)]
+    pub points: Vec<MarkerPointConfig>,
+    #[serde(default)]
+    pub point_label: Option<PointLabelConfig>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 pub fn parse_config_json(input: &str) -> Result<RenderConfig, String> {
     let config: RenderConfig =
         serde_json::from_str(input).map_err(|error| format!("Invalid config JSON: {error}"))?;
@@ -170,4 +330,46 @@ pub fn parse_config_json(input: &str) -> Result<RenderConfig, String> {
         ));
     }
     Ok(config)
+}
+
+impl RenderConfig {
+    pub fn course_plot(&self) -> Result<Option<CoursePlotConfig>, String> {
+        self.parse_plot("course")
+    }
+
+    pub fn elevation_plot(&self) -> Result<Option<ElevationPlotConfig>, String> {
+        self.parse_plot("elevation")
+    }
+
+    fn parse_plot<T>(&self, value_key: &str) -> Result<Option<T>, String>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        let Some(raw_plot) = find_plot_value(&self.plots, value_key) else {
+            return Ok(None);
+        };
+        serde_json::from_value(raw_plot.clone())
+            .map(Some)
+            .map_err(|error| format!("Invalid {value_key} plot config: {error}"))
+    }
+}
+
+fn find_plot_value<'a>(plots: &'a Value, value_key: &str) -> Option<&'a Value> {
+    match plots {
+        Value::Array(items) => items.iter().find(|item| {
+            item.get("value")
+                .and_then(Value::as_str)
+                .map(|value| value == value_key)
+                .unwrap_or(false)
+        }),
+        Value::Object(map) => map.get(value_key).or_else(|| {
+            map.values().find(|item| {
+                item.get("value")
+                    .and_then(Value::as_str)
+                    .map(|value| value == value_key)
+                    .unwrap_or(false)
+            })
+        }),
+        _ => None,
+    }
 }

@@ -173,8 +173,14 @@ fn main() -> Result<(), String> {
                 .map_err(|error| format!("Failed to create {}: {error}", parent.display()))?;
         }
 
-        let (_, report) =
-            render_preview_with_report(&paths, &config, &dense_activity, second, &target_out_path)?;
+        let (_, report) = render_preview_with_report(
+            &paths,
+            &config,
+            &activity,
+            &dense_activity,
+            second,
+            &target_out_path,
+        )?;
         reports.push(report);
     }
     let summary = summarize_reports(reports);

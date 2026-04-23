@@ -77,7 +77,7 @@
       "line": {
         "width": 1.75
       },
-      "rotation": 95,
+      "rotation": 15,
       "points": [
         {
           "weight": 80
@@ -90,7 +90,7 @@
     },
     {
       "value": "elevation",
-      "x": -209,
+      "x": 40,
       "y": 1435,
       "width": 1300,
       "height": 650,
@@ -104,7 +104,7 @@
       },
       "points": [
         {
-          "weight": 14,
+          "weight": 60,
           "opacity": 1,
           "label": "Furore.otf font, round 0, xoffset 20, y_offset20, font size 12.5, units metric and imperial - these are really just moving values"
         }
