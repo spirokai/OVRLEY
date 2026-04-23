@@ -371,7 +371,14 @@ Recorded artifacts for Phase 4:
 - Write raw `rgba` frames to FFmpeg stdin exactly as today.
 - Preserve template-configurable FFmpeg options under `scene.ffmpeg`.
 - Implement dropdown menu in global settings of frontend to allow selection of different codecs with alpha channel. Primary one will be prores_ks (Prores4444), the other options must include HEVC(H.265), prores_videotoolbox (if device is macOS), and prores_vulkan (ensure FFMPEG8.1 is used, and see the source code to derive the invocation: https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/vulkan_prores.c)
-- Runtime timings must separately report surface creation/clear, static label cache lookup/draw, dynamic value draw, pixel extraction, queue wait, and ffmpeg write
+- Runtime timings must mirror the Python baseline lifecycle rather than arbitrary Rust internals:
+  - one-time preparation goes to `prepare_render_assets_timing.json`, including `create_base_image`, route/elevation cache setup, static label cache population, and `prepare_render_assets.total`
+  - per-frame steady-state work goes to `timing_summary.json`, with top-level `frame.draw` wrapping only work that Python measured inside `Frame.draw(...)`
+  - restoring the pre-rendered static layer must map to Python `base.restore`/`base.copy`, not to `text.static.cache`
+  - dynamic text drawing must map to Python `text.dynamic`
+  - route/elevation compositing and elevation point labels must keep the Python bucket names `composite.route`, `composite.elevation`, and `text.elevation_label`
+  - queue backpressure and encoder blocking must keep the Python bucket names `queue.put_wait`, `encoder.queue_wait`, and `ffmpeg.write`
+  - any preview-only work such as PNG encoding, preview surface allocation, or debug image writing must be reported separately under a clearly non-baseline namespace and excluded from Rust-vs-Python timing comparisons
 - Implement progress reporting and cancellation semantics compatible with the current frontend.
 - Keep output locations and open-folder/open-video behavior unchanged.
 

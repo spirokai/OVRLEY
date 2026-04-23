@@ -5,12 +5,13 @@ pub mod text;
 use crate::activity::schema::DenseActivityReport;
 use crate::commands::AppPaths;
 use crate::config::RenderConfig;
+use crate::debug::{RenderProfiler, TimingBucket};
 use crate::render::format::{format_value, frame_index_for_second};
 use crate::render::surface::{create_surface, write_surface_png};
 use crate::render::text::{draw_text, label_style, value_style};
 use serde_json::{json, Value};
-use skia_safe::{Data, Image};
-use std::collections::HashMap;
+use skia_safe::Image;
+use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
@@ -37,6 +38,9 @@ pub struct PreviewRenderReport {
     pub value_count: usize,
     pub label_count: usize,
     pub label_cache_status: String,
+    pub prepare_timings: BTreeMap<String, TimingBucket>,
+    pub frame_timings: BTreeMap<String, TimingBucket>,
+    pub preview_only_timings: BTreeMap<String, TimingBucket>,
 }
 
 pub fn render_preview_to_path(
@@ -46,7 +50,8 @@ pub fn render_preview_to_path(
     second: u32,
     out_path: &Path,
 ) -> Result<(), String> {
-    render_preview_with_report(paths, config, dense_activity, second, out_path).map(|report| report.0)
+    render_preview_with_report(paths, config, dense_activity, second, out_path)
+        .map(|report| report.0)
 }
 
 pub fn render_preview_with_report(
@@ -56,37 +61,63 @@ pub fn render_preview_with_report(
     second: u32,
     out_path: &Path,
 ) -> Result<((), PreviewRenderReport), String> {
-    let total_started = Instant::now();
     let width = config.scene.width.unwrap_or(1920);
     let height = config.scene.height.unwrap_or(1080);
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let frame_index = frame_index_for_second(config, dense_activity, second);
+    let mut prepare_profiler = RenderProfiler::default();
+    let mut frame_profiler = RenderProfiler::default();
+    let mut preview_profiler = RenderProfiler::default();
+    let total_started = Instant::now();
 
-    let surface_started = Instant::now();
-    let mut surface = create_surface(width, height)?;
-    surface.canvas().clear(skia_safe::Color::TRANSPARENT);
-    let surface_ms = surface_started.elapsed().as_secs_f64() * 1000.0;
-
-    let label_started = Instant::now();
     let (labels_image, label_cache_status) =
-        cached_labels_image(paths, config, width, height, scale)?;
-    if let Some(labels_image) = labels_image {
-        surface.canvas().draw_image(&labels_image, (0, 0), None);
-    }
-    let label_layer_ms = label_started.elapsed().as_secs_f64() * 1000.0;
+        cached_labels_image(paths, config, width, height, scale, &mut prepare_profiler)?;
 
-    let value_started = Instant::now();
-    for value in &config.values {
-        let text = format_value(config, value, dense_activity, frame_index);
-        let style = value_style(&config.scene, value, scale);
-        draw_text(surface.canvas(), &text, &style, &paths.font_dirs);
-    }
-    let value_draw_ms = value_started.elapsed().as_secs_f64() * 1000.0;
+    let mut surface = create_surface(width, height)?;
+    preview_profiler.measure("preview.surface.create_clear", || {
+        surface.canvas().clear(skia_safe::Color::TRANSPARENT);
+    });
 
-    let png_started = Instant::now();
-    write_surface_png(&mut surface, out_path)
-        .map_err(|error| format!("Failed to render preview frame: {error}"))?;
-    let png_write_ms = png_started.elapsed().as_secs_f64() * 1000.0;
+    let frame_started = Instant::now();
+    frame_profiler.measure("base.restore", || {
+        if let Some(labels_image) = &labels_image {
+            surface.canvas().draw_image(labels_image, (0, 0), None);
+        }
+    });
+
+    frame_profiler.measure("text.dynamic", || {
+        for value in &config.values {
+            let text = format_value(config, value, dense_activity, frame_index);
+            let style = value_style(&config.scene, value, scale);
+            draw_text(surface.canvas(), &text, &style, &paths.font_dirs);
+        }
+    });
+    frame_profiler.record_ms("frame.draw", frame_started.elapsed().as_secs_f64() * 1000.0);
+
+    preview_profiler.measure("preview.png_write", || {
+        write_surface_png(&mut surface, out_path)
+            .map_err(|error| format!("Failed to render preview frame: {error}"))
+    })?;
+
+    let prepare_timings = prepare_profiler.summary();
+    let frame_timings = frame_profiler.summary();
+    let preview_only_timings = preview_profiler.summary();
+    let surface_ms = preview_only_timings
+        .get("preview.surface.create_clear")
+        .map(|bucket| bucket.total_ms)
+        .unwrap_or(0.0);
+    let label_layer_ms = frame_timings
+        .get("base.restore")
+        .map(|bucket| bucket.total_ms)
+        .unwrap_or(0.0);
+    let value_draw_ms = frame_timings
+        .get("text.dynamic")
+        .map(|bucket| bucket.total_ms)
+        .unwrap_or(0.0);
+    let png_write_ms = preview_only_timings
+        .get("preview.png_write")
+        .map(|bucket| bucket.total_ms)
+        .unwrap_or(0.0);
 
     let report = PreviewRenderReport {
         second,
@@ -105,6 +136,9 @@ pub fn render_preview_with_report(
             LabelCacheStatus::Hit => "hit".to_string(),
             LabelCacheStatus::Miss => "miss".to_string(),
         },
+        prepare_timings,
+        frame_timings,
+        preview_only_timings,
     };
 
     Ok(((), report))
@@ -116,53 +150,63 @@ fn cached_labels_image(
     width: u32,
     height: u32,
     scale: f32,
+    prepare_profiler: &mut RenderProfiler,
 ) -> Result<(Option<Image>, LabelCacheStatus), String> {
     if config.labels.is_empty() {
         return Ok((None, LabelCacheStatus::None));
     }
 
-    static CACHE: OnceLock<Mutex<HashMap<u64, Vec<u8>>>> = OnceLock::new();
+    static CACHE: OnceLock<Mutex<HashMap<u64, Image>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     let cache_key = labels_cache_key(config, width, height, scale)?;
 
     if let Ok(cache) = cache.lock() {
-        if let Some(bytes) = cache.get(&cache_key) {
-            return Ok((
-                Image::from_encoded(Data::new_copy(bytes)),
-                LabelCacheStatus::Hit,
-            ));
+        if let Some(image) = cache.get(&cache_key) {
+            return Ok((Some(image.clone()), LabelCacheStatus::Hit));
         }
     }
 
-    let mut surface = create_surface(width, height)?;
-    surface.canvas().clear(skia_safe::Color::TRANSPARENT);
-    for label in &config.labels {
-        let style = label_style(&config.scene, label, scale);
-        draw_text(surface.canvas(), &label.text, &style, &paths.font_dirs);
-    }
+    let prepare_started = Instant::now();
+    let mut surface =
+        prepare_profiler.measure("create_base_image", || create_surface(width, height))?;
+    prepare_profiler.measure("prepare.surface.clear", || {
+        surface.canvas().clear(skia_safe::Color::TRANSPARENT);
+    });
+    prepare_profiler.measure("text.static.cache", || {
+        for label in &config.labels {
+            let style = label_style(&config.scene, label, scale);
+            draw_text(surface.canvas(), &label.text, &style, &paths.font_dirs);
+        }
+    });
     let image = surface.image_snapshot();
-    let encoded = image
-        .encode(None, skia_safe::EncodedImageFormat::PNG, 100)
-        .ok_or_else(|| "Failed to encode cached label layer".to_string())?;
-    let bytes = encoded.as_bytes().to_vec();
+    prepare_profiler.record_ms(
+        "prepare_render_assets.total",
+        prepare_started.elapsed().as_secs_f64() * 1000.0,
+    );
 
     if let Ok(mut cache) = cache.lock() {
-        cache.insert(cache_key, bytes.clone());
+        cache.insert(cache_key, image.clone());
     }
 
-    Ok((
-        Image::from_encoded(Data::new_copy(&bytes)),
-        LabelCacheStatus::Miss,
-    ))
+    Ok((Some(image), LabelCacheStatus::Miss))
 }
 
-fn labels_cache_key(config: &RenderConfig, width: u32, height: u32, scale: f32) -> Result<u64, String> {
+fn labels_cache_key(
+    config: &RenderConfig,
+    width: u32,
+    height: u32,
+    scale: f32,
+) -> Result<u64, String> {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     width.hash(&mut hasher);
     height.hash(&mut hasher);
     scale.to_bits().hash(&mut hasher);
-    serde_json::to_string(&config.scene).map_err(|error| error.to_string())?.hash(&mut hasher);
-    serde_json::to_string(&config.labels).map_err(|error| error.to_string())?.hash(&mut hasher);
+    serde_json::to_string(&config.scene)
+        .map_err(|error| error.to_string())?
+        .hash(&mut hasher);
+    serde_json::to_string(&config.labels)
+        .map_err(|error| error.to_string())?
+        .hash(&mut hasher);
     Ok(hasher.finish())
 }
 

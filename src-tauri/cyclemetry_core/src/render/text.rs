@@ -25,14 +25,31 @@ pub fn label_style(scene: &SceneConfig, label: &LabelConfig, scale: f32) -> Reso
     ResolvedTextStyle {
         x: label.x * scale,
         y: label.y * scale,
-        font_name: label.font.clone().or(label.font_family.clone()).or_else(|| scene.font.clone()),
+        font_name: label
+            .font
+            .clone()
+            .or(label.font_family.clone())
+            .or_else(|| scene.font.clone()),
         font_size: label.font_size.or(scene.font_size).unwrap_or(32.0) * scale,
-        color: parse_color(label.color.as_deref().or(scene.color.as_deref()).unwrap_or("#ffffff"), label.opacity.or(scene.opacity).unwrap_or(1.0)),
+        color: parse_color(
+            label
+                .color
+                .as_deref()
+                .or(scene.color.as_deref())
+                .unwrap_or("#ffffff"),
+            label.opacity.or(scene.opacity).unwrap_or(1.0),
+        ),
         opacity: label.opacity.or(scene.opacity).unwrap_or(1.0),
-        shadow_color: label.shadow_color.as_deref().map(|color| parse_color(color, label.opacity.or(scene.opacity).unwrap_or(1.0))),
+        shadow_color: label
+            .shadow_color
+            .as_deref()
+            .map(|color| parse_color(color, label.opacity.or(scene.opacity).unwrap_or(1.0))),
         shadow_strength: label.shadow_strength.unwrap_or(0.0) * scale,
         shadow_distance: label.shadow_distance.unwrap_or(0.0) * scale,
-        border_color: label.border_color.as_deref().map(|color| parse_color(color, label.opacity.or(scene.opacity).unwrap_or(1.0))),
+        border_color: label
+            .border_color
+            .as_deref()
+            .map(|color| parse_color(color, label.opacity.or(scene.opacity).unwrap_or(1.0))),
         border_thickness: label.border_thickness.unwrap_or(0.0) * scale,
         border_distance: label.border_distance.unwrap_or(1.0).max(1.0) * scale,
     }
@@ -42,14 +59,31 @@ pub fn value_style(scene: &SceneConfig, value: &ValueConfig, scale: f32) -> Reso
     ResolvedTextStyle {
         x: value.x * scale,
         y: (value.y + value.value_offset.unwrap_or(0.0)) * scale,
-        font_name: value.font.clone().or(value.font_family.clone()).or_else(|| scene.font.clone()),
+        font_name: value
+            .font
+            .clone()
+            .or(value.font_family.clone())
+            .or_else(|| scene.font.clone()),
         font_size: value.font_size.or(scene.font_size).unwrap_or(32.0) * scale,
-        color: parse_color(value.color.as_deref().or(scene.color.as_deref()).unwrap_or("#ffffff"), value.opacity.or(scene.opacity).unwrap_or(1.0)),
+        color: parse_color(
+            value
+                .color
+                .as_deref()
+                .or(scene.color.as_deref())
+                .unwrap_or("#ffffff"),
+            value.opacity.or(scene.opacity).unwrap_or(1.0),
+        ),
         opacity: value.opacity.or(scene.opacity).unwrap_or(1.0),
-        shadow_color: value.shadow_color.as_deref().map(|color| parse_color(color, value.opacity.or(scene.opacity).unwrap_or(1.0))),
+        shadow_color: value
+            .shadow_color
+            .as_deref()
+            .map(|color| parse_color(color, value.opacity.or(scene.opacity).unwrap_or(1.0))),
         shadow_strength: value.shadow_strength.unwrap_or(0.0) * scale,
         shadow_distance: value.shadow_distance.unwrap_or(0.0) * scale,
-        border_color: value.border_color.as_deref().map(|color| parse_color(color, value.opacity.or(scene.opacity).unwrap_or(1.0))),
+        border_color: value
+            .border_color
+            .as_deref()
+            .map(|color| parse_color(color, value.opacity.or(scene.opacity).unwrap_or(1.0))),
         border_thickness: value.border_thickness.unwrap_or(0.0) * scale,
         border_distance: value.border_distance.unwrap_or(1.0).max(1.0) * scale,
     }
@@ -71,7 +105,16 @@ pub fn draw_text(canvas: &Canvas, text: &str, style: &ResolvedTextStyle, font_di
             let paint = text_paint(border_color);
             for step in 1..=steps {
                 let offset = step as f32 * style.border_distance.max(1.0);
-                for (dx, dy) in [(-offset, 0.0), (offset, 0.0), (0.0, -offset), (0.0, offset), (-offset, -offset), (offset, -offset), (-offset, offset), (offset, offset)] {
+                for (dx, dy) in [
+                    (-offset, 0.0),
+                    (offset, 0.0),
+                    (0.0, -offset),
+                    (0.0, offset),
+                    (-offset, -offset),
+                    (offset, -offset),
+                    (-offset, offset),
+                    (offset, offset),
+                ] {
                     canvas.draw_str(text, Point::new(style.x + dx, baseline + dy), &font, &paint);
                 }
             }
@@ -84,7 +127,11 @@ pub fn draw_text(canvas: &Canvas, text: &str, style: &ResolvedTextStyle, font_di
         let shadow_offset = style.shadow_distance;
         for blur_step in 0..passes {
             let spread = blur_step as f32 * 0.4;
-            for (dx, dy) in [(shadow_offset, shadow_offset), (shadow_offset + spread, shadow_offset), (shadow_offset, shadow_offset + spread)] {
+            for (dx, dy) in [
+                (shadow_offset, shadow_offset),
+                (shadow_offset + spread, shadow_offset),
+                (shadow_offset, shadow_offset + spread),
+            ] {
                 canvas.draw_str(text, Point::new(style.x + dx, baseline + dy), &font, &paint);
             }
         }

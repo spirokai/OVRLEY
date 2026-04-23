@@ -4,11 +4,17 @@ use std::path::{Path, PathBuf};
 pub fn resolve_ffmpeg_binary(repo_root: &Path) -> Result<PathBuf, String> {
     let mut candidate_paths = Vec::new();
 
-    if let Some(env_override) = env::var_os("CYCLEMETRY_FFMPEG").or_else(|| env::var_os("FFMPEG_BINARY")) {
+    if let Some(env_override) =
+        env::var_os("CYCLEMETRY_FFMPEG").or_else(|| env::var_os("FFMPEG_BINARY"))
+    {
         candidate_paths.push(PathBuf::from(env_override));
     }
 
-    let local_name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+    let local_name = if cfg!(windows) {
+        "ffmpeg.exe"
+    } else {
+        "ffmpeg"
+    };
     candidate_paths.push(repo_root.join("backend").join(local_name));
 
     for candidate in candidate_paths {

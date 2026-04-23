@@ -1,4 +1,7 @@
-use super::schema::{CourseSeries, DenseActivityReport, DenseSeriesReport, NumericSeries, TimeSeries, TrimmedActivity};
+use super::schema::{
+    CourseSeries, DenseActivityReport, DenseSeriesReport, NumericSeries, TimeSeries,
+    TrimmedActivity,
+};
 use chrono::{DateTime, SecondsFormat, Utc};
 
 fn collect_valid_numeric_points(x_values: &[f64], y_values: &[Option<f64>]) -> Vec<(f64, f64)> {
@@ -52,8 +55,14 @@ pub fn interpolate_course_value(
     course_series: &CourseSeries,
     target_x: f64,
 ) -> (Option<f64>, Option<f64>) {
-    let latitudes = course_series.iter().map(|point| point.0).collect::<Vec<_>>();
-    let longitudes = course_series.iter().map(|point| point.1).collect::<Vec<_>>();
+    let latitudes = course_series
+        .iter()
+        .map(|point| point.0)
+        .collect::<Vec<_>>();
+    let longitudes = course_series
+        .iter()
+        .map(|point| point.1)
+        .collect::<Vec<_>>();
     (
         interpolate_numeric_series_value(x_values, &latitudes, target_x),
         interpolate_numeric_series_value(x_values, &longitudes, target_x),
@@ -141,8 +150,9 @@ fn interpolate_time_series(
             .iter()
             .map(|target| {
                 Some(
-                    (start_time + chrono::TimeDelta::milliseconds((target * 1000.0).round() as i64))
-                        .to_rfc3339_opts(SecondsFormat::Millis, true),
+                    (start_time
+                        + chrono::TimeDelta::milliseconds((target * 1000.0).round() as i64))
+                    .to_rfc3339_opts(SecondsFormat::Millis, true),
                 )
             })
             .collect();
@@ -155,7 +165,11 @@ fn interpolate_time_series(
 }
 
 pub fn densify_activity(trimmed: &TrimmedActivity, fps: f64) -> DenseActivityReport {
-    let duration = trimmed.sample_elapsed_seconds.last().copied().unwrap_or_default();
+    let duration = trimmed
+        .sample_elapsed_seconds
+        .last()
+        .copied()
+        .unwrap_or_default();
     let frame_elapsed_seconds = build_target_x_values(duration, fps);
     let frame_distance_progress = if trimmed.sample_distance_progress.is_empty() {
         Vec::new()
@@ -183,13 +197,41 @@ pub fn densify_activity(trimmed: &TrimmedActivity, fps: f64) -> DenseActivityRep
         frame_elapsed_seconds: frame_elapsed_seconds.clone(),
         frame_distance_progress,
         series: DenseSeriesReport {
-            speed: interpolate_numeric_series(&trimmed.sample_elapsed_seconds, &trimmed.speed, &frame_elapsed_seconds),
-            elevation: interpolate_numeric_series(&trimmed.sample_elapsed_seconds, &trimmed.elevation, &frame_elapsed_seconds),
-            gradient: interpolate_numeric_series(&trimmed.sample_elapsed_seconds, &trimmed.gradient, &frame_elapsed_seconds),
-            heartrate: interpolate_numeric_series(&trimmed.sample_elapsed_seconds, &trimmed.heartrate, &frame_elapsed_seconds),
-            cadence: interpolate_numeric_series(&trimmed.sample_elapsed_seconds, &trimmed.cadence, &frame_elapsed_seconds),
-            power: interpolate_numeric_series(&trimmed.sample_elapsed_seconds, &trimmed.power, &frame_elapsed_seconds),
-            temperature: interpolate_numeric_series(&trimmed.sample_elapsed_seconds, &trimmed.temperature, &frame_elapsed_seconds),
+            speed: interpolate_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.speed,
+                &frame_elapsed_seconds,
+            ),
+            elevation: interpolate_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.elevation,
+                &frame_elapsed_seconds,
+            ),
+            gradient: interpolate_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.gradient,
+                &frame_elapsed_seconds,
+            ),
+            heartrate: interpolate_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.heartrate,
+                &frame_elapsed_seconds,
+            ),
+            cadence: interpolate_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.cadence,
+                &frame_elapsed_seconds,
+            ),
+            power: interpolate_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.power,
+                &frame_elapsed_seconds,
+            ),
+            temperature: interpolate_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.temperature,
+                &frame_elapsed_seconds,
+            ),
             course_lat,
             course_lon,
             time,

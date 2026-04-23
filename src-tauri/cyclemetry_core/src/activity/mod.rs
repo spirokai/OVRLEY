@@ -9,15 +9,16 @@ use crate::config::RenderConfig;
 use serde_json::Value;
 
 pub fn parse_activity_json(input: &str) -> Result<ParsedActivity, String> {
-    let value: Value =
-        serde_json::from_str(input).map_err(|error| format!("Invalid parsedActivity JSON: {error}"))?;
+    let value: Value = serde_json::from_str(input)
+        .map_err(|error| format!("Invalid parsedActivity JSON: {error}"))?;
 
     if value.get("parsed_activity").is_some() {
         serde_json::from_value::<DebugPayload>(value)
             .map(|payload| payload.parsed_activity)
             .map_err(|error| format!("Invalid parsedActivity debug payload: {error}"))
     } else {
-        serde_json::from_value(value).map_err(|error| format!("Invalid parsedActivity payload: {error}"))
+        serde_json::from_value(value)
+            .map_err(|error| format!("Invalid parsedActivity payload: {error}"))
     }
 }
 
@@ -38,12 +39,18 @@ mod tests {
 
     fn repo_root() -> PathBuf {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        manifest_dir.parent().unwrap().parent().unwrap().to_path_buf()
+        manifest_dir
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf()
     }
 
     fn fixture(name: &str) -> String {
         let path = repo_root().join("app").join("debug").join(name);
-        fs::read_to_string(&path).unwrap_or_else(|error| panic!("Failed to read {}: {error}", path.display()))
+        fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("Failed to read {}: {error}", path.display()))
     }
 
     #[test]
@@ -57,7 +64,14 @@ mod tests {
 
         assert_eq!(report.frame_count, 147360);
         assert_eq!(report.frame_elapsed_seconds.first().copied(), Some(0.0));
-        assert!(report.frame_elapsed_seconds.last().copied().unwrap_or_default() < 4912.0);
+        assert!(
+            report
+                .frame_elapsed_seconds
+                .last()
+                .copied()
+                .unwrap_or_default()
+                < 4912.0
+        );
         assert_eq!(report.series.speed.len(), report.frame_count);
         assert_eq!(report.series.course_lat.len(), report.frame_count);
     }
@@ -74,7 +88,14 @@ mod tests {
             let report = build_dense_activity_report(&activity, &config).unwrap();
             assert_eq!(report.frame_count, expected_frames);
             assert_eq!(report.frame_elapsed_seconds.first().copied(), Some(0.0));
-            assert!(report.frame_elapsed_seconds.last().copied().unwrap_or_default() < 29.5);
+            assert!(
+                report
+                    .frame_elapsed_seconds
+                    .last()
+                    .copied()
+                    .unwrap_or_default()
+                    < 29.5
+            );
             assert_eq!(report.series.time.len(), expected_frames);
         }
     }

@@ -41,9 +41,15 @@ fn trim_numeric_series(
     trimmed
 }
 
-pub fn trim_activity(activity: &ParsedActivity, start: f64, end: f64) -> Result<TrimmedActivity, String> {
+pub fn trim_activity(
+    activity: &ParsedActivity,
+    start: f64,
+    end: f64,
+) -> Result<TrimmedActivity, String> {
     if activity.sample_elapsed_seconds.len() < 2 {
-        return Err("parsedActivity must contain at least two sample_elapsed_seconds values".to_string());
+        return Err(
+            "parsedActivity must contain at least two sample_elapsed_seconds values".to_string(),
+        );
     }
 
     let duration = activity.trim_end_seconds.max(
@@ -58,7 +64,8 @@ pub fn trim_activity(activity: &ParsedActivity, start: f64, end: f64) -> Result<
     let elapsed = &activity.sample_elapsed_seconds;
     let (start_inner_index, end_inner_index) = split_trim_indices(elapsed, start, end);
 
-    let mut trimmed_elapsed = Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
+    let mut trimmed_elapsed =
+        Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
     trimmed_elapsed.push(0.0);
     trimmed_elapsed.extend(
         elapsed[start_inner_index..end_inner_index]
@@ -76,8 +83,10 @@ pub fn trim_activity(activity: &ParsedActivity, start: f64, end: f64) -> Result<
             .copied()
             .map(Some)
             .collect::<Vec<_>>();
-        let start_progress = interpolate_numeric_series_value(elapsed, &source, start).unwrap_or(0.0);
-        let end_progress = interpolate_numeric_series_value(elapsed, &source, end).unwrap_or(start_progress);
+        let start_progress =
+            interpolate_numeric_series_value(elapsed, &source, start).unwrap_or(0.0);
+        let end_progress =
+            interpolate_numeric_series_value(elapsed, &source, end).unwrap_or(start_progress);
         let mut trimmed = Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
         trimmed.push(Some(start_progress));
         trimmed.extend(
@@ -109,7 +118,10 @@ pub fn trim_activity(activity: &ParsedActivity, start: f64, end: f64) -> Result<
         .source_start_time
         .as_deref()
         .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
-        .map(|value| (value + chrono::TimeDelta::milliseconds((start * 1000.0).round() as i64)).with_timezone(&Utc))
+        .map(|value| {
+            (value + chrono::TimeDelta::milliseconds((start * 1000.0).round() as i64))
+                .with_timezone(&Utc)
+        })
         .map(|value| value.to_rfc3339_opts(SecondsFormat::Millis, true));
 
     Ok(TrimmedActivity {
@@ -117,17 +129,67 @@ pub fn trim_activity(activity: &ParsedActivity, start: f64, end: f64) -> Result<
         sample_elapsed_seconds: trimmed_elapsed,
         sample_distance_progress: trimmed_distance_progress,
         course,
-        elevation: trim_numeric_series(elapsed, &activity.elevation, start, end, start_inner_index, end_inner_index),
-        speed: trim_numeric_series(elapsed, &activity.speed, start, end, start_inner_index, end_inner_index),
-        heartrate: trim_numeric_series(elapsed, &activity.heartrate, start, end, start_inner_index, end_inner_index),
-        cadence: trim_numeric_series(elapsed, &activity.cadence, start, end, start_inner_index, end_inner_index),
-        power: trim_numeric_series(elapsed, &activity.power, start, end, start_inner_index, end_inner_index),
-        temperature: trim_numeric_series(elapsed, &activity.temperature, start, end, start_inner_index, end_inner_index),
-        gradient: trim_numeric_series(elapsed, &activity.gradient, start, end, start_inner_index, end_inner_index),
+        elevation: trim_numeric_series(
+            elapsed,
+            &activity.elevation,
+            start,
+            end,
+            start_inner_index,
+            end_inner_index,
+        ),
+        speed: trim_numeric_series(
+            elapsed,
+            &activity.speed,
+            start,
+            end,
+            start_inner_index,
+            end_inner_index,
+        ),
+        heartrate: trim_numeric_series(
+            elapsed,
+            &activity.heartrate,
+            start,
+            end,
+            start_inner_index,
+            end_inner_index,
+        ),
+        cadence: trim_numeric_series(
+            elapsed,
+            &activity.cadence,
+            start,
+            end,
+            start_inner_index,
+            end_inner_index,
+        ),
+        power: trim_numeric_series(
+            elapsed,
+            &activity.power,
+            start,
+            end,
+            start_inner_index,
+            end_inner_index,
+        ),
+        temperature: trim_numeric_series(
+            elapsed,
+            &activity.temperature,
+            start,
+            end,
+            start_inner_index,
+            end_inner_index,
+        ),
+        gradient: trim_numeric_series(
+            elapsed,
+            &activity.gradient,
+            start,
+            end,
+            start_inner_index,
+            end_inner_index,
+        ),
         time: {
             let start_value = interpolate_time_series_value(elapsed, &activity.time, start);
             let end_value = interpolate_time_series_value(elapsed, &activity.time, end);
-            let mut trimmed = Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
+            let mut trimmed =
+                Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
             trimmed.push(start_value);
             trimmed.extend_from_slice(&activity.time[start_inner_index..end_inner_index]);
             trimmed.push(end_value);

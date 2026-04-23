@@ -1,8 +1,10 @@
 use cyclemetry_core::activity::{build_dense_activity_report, parse_activity_json};
 use cyclemetry_core::commands::AppPaths;
 use cyclemetry_core::config::parse_config_json;
+use cyclemetry_core::debug::TimingBucket;
 use cyclemetry_core::render::{render_preview_with_report, PreviewRenderReport};
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -62,7 +64,37 @@ struct PreviewBatchSummary {
     label_layer_ms_avg: f64,
     value_draw_ms_avg: f64,
     png_write_ms_avg: f64,
+    prepare_timings_avg: BTreeMap<String, TimingBucket>,
+    frame_timings_avg: BTreeMap<String, TimingBucket>,
+    preview_only_timings_avg: BTreeMap<String, TimingBucket>,
     reports: Vec<PreviewRenderReport>,
+}
+
+fn average_timing_buckets(
+    reports: &[PreviewRenderReport],
+    extractor: fn(&PreviewRenderReport) -> &BTreeMap<String, TimingBucket>,
+) -> BTreeMap<String, TimingBucket> {
+    let mut combined: BTreeMap<String, TimingBucket> = BTreeMap::new();
+    for report in reports {
+        for (name, bucket) in extractor(report) {
+            let entry = combined.entry(name.clone()).or_default();
+            entry.count += 1;
+            entry.total_ms += bucket.total_ms;
+            if bucket.max_ms > entry.max_ms {
+                entry.max_ms = bucket.max_ms;
+            }
+        }
+    }
+
+    for bucket in combined.values_mut() {
+        bucket.avg_ms = if bucket.count == 0 {
+            0.0
+        } else {
+            bucket.total_ms / f64::from(bucket.count)
+        };
+    }
+
+    combined
 }
 
 fn summarize_reports(reports: Vec<PreviewRenderReport>) -> PreviewBatchSummary {
@@ -93,6 +125,11 @@ fn summarize_reports(reports: Vec<PreviewRenderReport>) -> PreviewBatchSummary {
         label_layer_ms_avg: average(|report| report.label_layer_ms),
         value_draw_ms_avg: average(|report| report.value_draw_ms),
         png_write_ms_avg: average(|report| report.png_write_ms),
+        prepare_timings_avg: average_timing_buckets(&reports, |report| &report.prepare_timings),
+        frame_timings_avg: average_timing_buckets(&reports, |report| &report.frame_timings),
+        preview_only_timings_avg: average_timing_buckets(&reports, |report| {
+            &report.preview_only_timings
+        }),
         reports,
     }
 }

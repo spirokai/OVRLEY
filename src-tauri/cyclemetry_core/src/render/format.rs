@@ -2,23 +2,40 @@ use crate::activity::schema::DenseActivityReport;
 use crate::config::{RenderConfig, ValueConfig};
 use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
 
-pub fn frame_index_for_second(config: &RenderConfig, dense_activity: &DenseActivityReport, second: u32) -> usize {
+pub fn frame_index_for_second(
+    config: &RenderConfig,
+    dense_activity: &DenseActivityReport,
+    second: u32,
+) -> usize {
     if dense_activity.frame_count == 0 {
         return 0;
     }
 
-    let relative_second = (f64::from(second) - config.scene.start)
-        .clamp(0.0, config.scene.end - config.scene.start);
+    let relative_second =
+        (f64::from(second) - config.scene.start).clamp(0.0, config.scene.end - config.scene.start);
     let index = (relative_second * config.scene.fps).round() as isize;
     index.clamp(0, dense_activity.frame_count.saturating_sub(1) as isize) as usize
 }
 
-pub fn format_value(config: &RenderConfig, value_config: &ValueConfig, dense_activity: &DenseActivityReport, frame_index: usize) -> String {
+pub fn format_value(
+    config: &RenderConfig,
+    value_config: &ValueConfig,
+    dense_activity: &DenseActivityReport,
+    frame_index: usize,
+) -> String {
     let raw = raw_value(value_config.value.as_str(), dense_activity, frame_index);
     let mut formatted = match value_config.value.as_str() {
         "speed" => format_speed(config, value_config, raw),
         "temperature" => format_temperature(config, value_config, raw),
-        "time" => format_time(config, value_config, dense_activity.series.time.get(frame_index).and_then(|value| value.as_deref())),
+        "time" => format_time(
+            config,
+            value_config,
+            dense_activity
+                .series
+                .time
+                .get(frame_index)
+                .and_then(|value| value.as_deref()),
+        ),
         "gradient" => format_gradient(config, value_config, raw),
         "elevation" => format_elevation(config, value_config, raw),
         _ => format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
@@ -36,20 +53,58 @@ pub fn format_value(config: &RenderConfig, value_config: &ValueConfig, dense_act
 
 fn raw_value(key: &str, dense_activity: &DenseActivityReport, frame_index: usize) -> Option<f64> {
     match key {
-        "speed" => dense_activity.series.speed.get(frame_index).copied().flatten(),
-        "elevation" => dense_activity.series.elevation.get(frame_index).copied().flatten(),
-        "gradient" => dense_activity.series.gradient.get(frame_index).copied().flatten(),
-        "heartrate" => dense_activity.series.heartrate.get(frame_index).copied().flatten(),
-        "cadence" => dense_activity.series.cadence.get(frame_index).copied().flatten(),
-        "power" => dense_activity.series.power.get(frame_index).copied().flatten(),
-        "temperature" => dense_activity.series.temperature.get(frame_index).copied().flatten(),
+        "speed" => dense_activity
+            .series
+            .speed
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        "elevation" => dense_activity
+            .series
+            .elevation
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        "gradient" => dense_activity
+            .series
+            .gradient
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        "heartrate" => dense_activity
+            .series
+            .heartrate
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        "cadence" => dense_activity
+            .series
+            .cadence
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        "power" => dense_activity
+            .series
+            .power
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        "temperature" => dense_activity
+            .series
+            .temperature
+            .get(frame_index)
+            .copied()
+            .flatten(),
         _ => None,
     }
 }
 
 fn format_speed(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f64>) -> String {
     let Some(speed_mps) = raw else {
-        return missing_value_with_units(value_config.show_units.unwrap_or(false), speed_units(value_config));
+        return missing_value_with_units(
+            value_config.show_units.unwrap_or(false),
+            speed_units(value_config),
+        );
     };
     let unit = speed_unit_key(value_config);
     let (factor, units) = match unit {
@@ -58,7 +113,10 @@ fn format_speed(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f
         "mps" => (1.0, "M/S"),
         _ => (3.6, "KM/H"),
     };
-    let mut text = format_number(speed_mps * factor, effective_decimals(config, value_config, Some(0)));
+    let mut text = format_number(
+        speed_mps * factor,
+        effective_decimals(config, value_config, Some(0)),
+    );
     if value_config.show_units.unwrap_or(false) {
         text.push(' ');
         text.push_str(units);
@@ -66,10 +124,20 @@ fn format_speed(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f
     text
 }
 
-fn format_temperature(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f64>) -> String {
-    let unit = value_config.temperature_unit.as_deref().unwrap_or("celsius");
+fn format_temperature(
+    config: &RenderConfig,
+    value_config: &ValueConfig,
+    raw: Option<f64>,
+) -> String {
+    let unit = value_config
+        .temperature_unit
+        .as_deref()
+        .unwrap_or("celsius");
     let Some(temp_c) = raw else {
-        return missing_value_with_units(value_config.show_units.unwrap_or(false), if unit == "fahrenheit" { "F" } else { "C" });
+        return missing_value_with_units(
+            value_config.show_units.unwrap_or(false),
+            if unit == "fahrenheit" { "F" } else { "C" },
+        );
     };
     let (value, units) = if unit == "fahrenheit" {
         ((temp_c * 9.0 / 5.0) + 32.0, "F")
@@ -107,7 +175,11 @@ fn format_gradient(config: &RenderConfig, value_config: &ValueConfig, raw: Optio
     } else {
         ""
     };
-    let prefix = if value_config.show_sign.unwrap_or(true) { sign } else { "" };
+    let prefix = if value_config.show_sign.unwrap_or(true) {
+        sign
+    } else {
+        ""
+    };
     format!("{prefix}{magnitude}%")
 }
 
@@ -118,12 +190,17 @@ fn format_time(config: &RenderConfig, value_config: &ValueConfig, raw: Option<&s
     let Ok(parsed) = DateTime::parse_from_rfc3339(raw) else {
         return raw.to_string();
     };
-    let adjusted = parsed.with_timezone(&Utc) + Duration::hours(value_config.hours_offset.unwrap_or(0) as i64);
+    let adjusted =
+        parsed.with_timezone(&Utc) + Duration::hours(value_config.hours_offset.unwrap_or(0) as i64);
 
     if let Some(format_key) = value_config.format.as_deref() {
         return format_time_key(format_key, adjusted);
     }
-    if let Some(strftime) = value_config.time_format.as_deref().or(config.scene.time_format.as_deref()) {
+    if let Some(strftime) = value_config
+        .time_format
+        .as_deref()
+        .or(config.scene.time_format.as_deref())
+    {
         return adjusted.format(strftime).to_string();
     }
 
@@ -164,15 +241,26 @@ fn format_time_key(format_key: &str, value: DateTime<Utc>) -> String {
     }
 }
 
-fn format_generic_numeric(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f64>) -> Option<String> {
+fn format_generic_numeric(
+    config: &RenderConfig,
+    value_config: &ValueConfig,
+    raw: Option<f64>,
+) -> Option<String> {
     raw.map(|value| format_number(value, effective_decimals(config, value_config, None)))
 }
 
-fn effective_decimals(config: &RenderConfig, value_config: &ValueConfig, default: Option<usize>) -> usize {
+fn effective_decimals(
+    config: &RenderConfig,
+    value_config: &ValueConfig,
+    default: Option<usize>,
+) -> usize {
     if let Some(decimals) = value_config.decimals {
         return decimals;
     }
-    if let Some(rounding) = value_config.decimal_rounding.or(config.scene.decimal_rounding) {
+    if let Some(rounding) = value_config
+        .decimal_rounding
+        .or(config.scene.decimal_rounding)
+    {
         return rounding.max(0) as usize;
     }
     default.unwrap_or(0)
@@ -227,9 +315,14 @@ mod tests {
 
     #[test]
     fn formats_time_key_variants() {
-        let timestamp = DateTime::parse_from_rfc3339("2025-04-21T13:05:00Z").unwrap().to_utc();
+        let timestamp = DateTime::parse_from_rfc3339("2025-04-21T13:05:00Z")
+            .unwrap()
+            .to_utc();
         assert_eq!(format_time_key("time-24", timestamp), "13:05");
         assert_eq!(format_time_key("time-12", timestamp), "01:05 PM");
-        assert_eq!(format_time_key("date-dd-mmm-yyyy", timestamp), "21 APR 2025");
+        assert_eq!(
+            format_time_key("date-dd-mmm-yyyy", timestamp),
+            "21 APR 2025"
+        );
     }
 }

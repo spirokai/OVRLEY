@@ -32,10 +32,11 @@ impl AppPaths {
         let public_dir = backend_dir.join("public");
         let uploads_dir = backend_dir.join("uploads");
         let user_templates_dir = backend_dir.join("templates");
-        let bundled_templates_dirs = vec![repo_root.join("templates"), backend_dir.join("templates")]
-            .into_iter()
-            .filter(|path| path.is_dir())
-            .collect();
+        let bundled_templates_dirs =
+            vec![repo_root.join("templates"), backend_dir.join("templates")]
+                .into_iter()
+                .filter(|path| path.is_dir())
+                .collect();
         let downloads_dir = downloads_cyclemetry_dir();
 
         Self {
@@ -58,7 +59,8 @@ impl AppPaths {
             &self.user_templates_dir,
             &self.downloads_dir,
         ] {
-            fs::create_dir_all(dir).map_err(|error| format!("Failed to create {}: {error}", dir.display()))?;
+            fs::create_dir_all(dir)
+                .map_err(|error| format!("Failed to create {}: {error}", dir.display()))?;
         }
         Ok(())
     }
@@ -91,7 +93,12 @@ pub fn backend_health(paths: &AppPaths) -> HealthResponse {
     }
 }
 
-pub fn backend_demo(paths: &AppPaths, config_json: &str, parsed_activity_json: &str, second: u32) -> Result<Value, String> {
+pub fn backend_demo(
+    paths: &AppPaths,
+    config_json: &str,
+    parsed_activity_json: &str,
+    second: u32,
+) -> Result<Value, String> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
@@ -165,7 +172,10 @@ pub fn backend_list_templates(paths: &AppPaths) -> Result<Value, String> {
         if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if !matches!(path.extension().and_then(|value| value.to_str()), Some("json")) {
+                if !matches!(
+                    path.extension().and_then(|value| value.to_str()),
+                    Some("json")
+                ) {
                     continue;
                 }
                 let Some(filename) = path.file_name().and_then(|value| value.to_str()) else {
@@ -182,7 +192,10 @@ pub fn backend_list_templates(paths: &AppPaths) -> Result<Value, String> {
     if let Ok(entries) = fs::read_dir(&paths.user_templates_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if !matches!(path.extension().and_then(|value| value.to_str()), Some("json")) {
+            if !matches!(
+                path.extension().and_then(|value| value.to_str()),
+                Some("json")
+            ) {
                 continue;
             }
             let Some(filename) = path.file_name().and_then(|value| value.to_str()) else {
@@ -214,7 +227,11 @@ pub fn backend_get_template(paths: &AppPaths, filename: &str) -> Result<String, 
         .map_err(|error| format!("Failed to read {}: {error}", bundled_path.display()))
 }
 
-pub fn backend_save_template(paths: &AppPaths, filename: &str, config_json: &str) -> Result<Value, String> {
+pub fn backend_save_template(
+    paths: &AppPaths,
+    filename: &str,
+    config_json: &str,
+) -> Result<Value, String> {
     let normalized = ensure_json_filename(filename);
     let config = parse_config_json(config_json)?;
     let destination = paths.user_templates_dir.join(&normalized);
@@ -256,7 +273,8 @@ pub fn backend_open_video(paths: &AppPaths, filename: &str) -> Result<Value, Str
 
 pub fn backend_image_data(paths: &AppPaths, filename: &str) -> Result<String, String> {
     let path = paths.public_dir.join(filename);
-    let bytes = fs::read(&path).map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
+    let bytes =
+        fs::read(&path).map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
     let content_type = match path.extension().and_then(|value| value.to_str()) {
         Some("png") => "image/png",
         Some("jpg") | Some("jpeg") => "image/jpeg",
