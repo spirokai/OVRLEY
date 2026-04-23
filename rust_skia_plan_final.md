@@ -391,7 +391,7 @@ Recorded artifacts for Phase 4:
   - route/elevation compositing and elevation point labels must keep the Python bucket names `composite.route`, `composite.elevation`, and `text.elevation_label`
   - queue backpressure and encoder blocking must keep the Python bucket names `queue.put_wait`, `encoder.queue_wait`, and `ffmpeg.write`
   - any preview-only work such as PNG encoding, preview surface allocation, or debug image writing must be reported separately under a clearly non-baseline namespace and excluded from Rust-vs-Python timing comparisons
-- Implement progress reporting and cancellation semantics compatible with the current frontend.
+- Implement progress reporting and cancellation semantics compatible with the current frontend. Make progress reporting more intelligent so that it does not include the initialization/cold start and perhaps include some sort of moving average/exponential weighing/whatever industry standard for estimate completion time would be.
 - Keep output locations and open-folder/open-video behavior unchanged.
 
 Decision:
