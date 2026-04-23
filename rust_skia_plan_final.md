@@ -443,6 +443,108 @@ Recorded artifacts for Phase 5:
 - Python/Rust `ffprobe` JSON
 - final Rust `.mov`
 
+### Optional Phase 6: Browser-hosted build from the same repo
+
+This phase is optional and does not change the success criteria for Phases 1-5. Its goal is to support two build targets from the same repository:
+
+- desktop app: current Tauri shell with native Rust binary
+- hosted web app: browser UI with shared Rust data/geometry core plus a browser-specific CanvasKit renderer
+
+Decision:
+
+- Reuse the Rust core for non-rendering logic and rendering preparation, but do not assume native `rust-skia` is the browser rendering path.
+- Use CanvasKit as the browser renderer because Skia's official web deployment path is CanvasKit rather than native `rust-skia`.
+- Code splitting in the frontend is recommended for startup and bundle size, but the required architectural split is primarily:
+  - shared Rust core for activity/config/render preparation
+  - native `rust-skia` renderer for Tauri/desktop
+  - browser-specific CanvasKit renderer for hosted web
+- Browser export must not depend on desktop-only process spawning, filesystem assumptions, or FFmpeg stdin piping.
+- Browser encode/output format may differ from desktop if required by browser APIs. Desktop ProRes 4444 remains the native target; web export uses the best browser-supported alpha-capable path available at implementation time.
+
+Implementation:
+
+- Refactor `cyclemetry_core` into target-aware layers:
+  - `core`: activity processing, config normalization, value formatting, route/elevation geometry preparation, frame orchestration
+  - `render_model`: target-neutral render instructions and prepared geometry with no dependency on Tauri, Skia native surfaces, or browser APIs
+  - `host_native`: FFmpeg process, native file IO, OS integration
+  - `host_web`: `wasm-bindgen` entrypoints, browser memory transfer, worker messaging, browser download/export helpers
+- Keep desktop-specific commands in `src-tauri/src/lib.rs`; add a separate wasm crate or wasm target entrypoint that exposes:
+  - `init_renderer(config_json, parsed_activity_json)`
+  - `build_preview_scene(second) -> render instruction payload`
+  - `build_frame_batch(start_frame, count) -> transferable render instruction payload`
+  - `cancel_render()`
+- Move long-running browser render work off the main thread:
+  - run wasm preparation logic inside a Web Worker
+  - transfer render-model payloads or compact geometry/series buffers via `postMessage` with transferable `ArrayBuffer`s
+  - keep UI preview/progress in the existing app shell
+- Make the browser renderer consume the shared render model using CanvasKit:
+  - map text, paths, fills, markers, opacity, transforms, and cached static layers onto CanvasKit APIs
+  - load and register the same fonts in the browser where licensing and packaging allow
+  - keep visual parity targets at the level of rendered output, not identical renderer internals
+- Isolate rendering backend assumptions so browser builds can swap native-only pieces cleanly:
+  - avoid direct use of `std::fs`, subprocess APIs, and blocking thread models inside shared render code
+  - gate target-specific modules with Cargo features and `cfg(target_arch = "wasm32")`
+  - keep image/frame intent as an explicit intermediate representation so desktop `rust-skia` and browser CanvasKit can consume the same prepared scene
+- Add a web export path that consumes rendered frames in-browser:
+  - prefer browser-native encoding APIs such as WebCodecs where supported
+  - provide a fallback path such as PNG frame sequence or canvas-recorded video if required
+  - keep export capability detection explicit in the UI so unsupported browser/codec combinations fail predictably
+- Update the frontend build so web-only heavy modules load lazily:
+  - lazy-load CanvasKit and wasm preparation modules only when preview or export is requested
+  - keep editor-only routes/components separate from render/export worker code and CanvasKit bootstrap code
+  - load desktop-only API wrappers only in the Tauri build
+
+Acceptance:
+
+- The repo can produce both:
+  - a Tauri desktop build using the native Rust path
+  - a hosted web build using shared Rust wasm preparation plus CanvasKit rendering
+- Shared fixtures produce matching dense activity outputs between native and wasm builds within existing Phase 2 tolerances.
+- Shared preview frames from desktop `rust-skia` and browser CanvasKit are visually equivalent within Phase 3/4 image-diff thresholds, allowing small documented text/raster differences.
+- Browser preview remains responsive while rendering is active.
+- Browser export completes without server-side rendering.
+- Desktop-only integrations are not bundled into the hosted web build.
+
+Test procedure:
+
+1. Build desktop target:
+   ```powershell
+   cargo tauri build
+   ```
+2. Build web target from the same repo:
+   ```powershell
+   cd app
+   pnpm build
+   ```
+   and ensure the wasm artifact is included only in the hosted web output path.
+3. For one shared fixture/config pair, generate dense outputs from:
+   - native Rust
+   - wasm Rust in a browser test harness
+4. Compare numeric outputs with the existing Phase 2 comparison tooling and tolerances.
+5. Generate browser and desktop preview frames for the same sample seconds:
+   - `600`
+   - `607`
+   - `615`
+   - `622`
+   - `629`
+6. Compare browser/native preview frames with the same image diff tooling used earlier.
+7. Run a manual browser export check in at least:
+   - Chromium-based browser
+   - Safari if macOS support is required
+8. Verify:
+   - render work happens in a worker, not the UI thread
+   - cancellation stops further frame production
+   - produced artifact downloads successfully
+   - unsupported encode paths surface a clear UI message
+
+Recorded artifacts for Optional Phase 6:
+
+- wasm/native dense JSON comparisons
+- desktop `rust-skia` vs browser CanvasKit preview PNGs or equivalent captured frames
+- bundle analysis showing deferred wasm/render chunks
+- browser export capability matrix by browser
+- manual test notes for cancellation, responsiveness, and artifact download
+
 ### Deferred phase: GPU Skia
 
 Explicitly defer GPU Skia. Do not include it in the initial rewrite plan, code layout, or acceptance criteria beyond leaving room for a future `SurfaceBackend` abstraction.
@@ -470,6 +572,6 @@ Explicitly defer GPU Skia. Do not include it in the initial rewrite plan, code l
 - The rewrite target is **desktop export parity**, not browser reuse.
 - `parsedActivity` from the frontend is trusted input and the only activity source for rendering.
 - Rust CPU Skia is the only renderer in v1 of the rewrite.
-- `prores_ks` remains the default encoder; hardware or Vulkan ProRes experiments are out of scope.
+- `prores_ks` remains the default encoder
 - Template compatibility includes current bundled templates and current frontend-generated templates, even when they use both legacy and newer field shapes.
 - Unknown or weakly specified visual differences are resolved in favor of matching the current shipped Python output, not the editor preview.
