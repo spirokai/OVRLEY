@@ -27,6 +27,8 @@ impl Default for RenderProgress {
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct TimingBucket {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alt_name: Option<String>,
     pub count: u32,
     pub total_ms: f64,
     pub avg_ms: f64,

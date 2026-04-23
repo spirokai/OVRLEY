@@ -1,16 +1,17 @@
 use super::common::{
     absolute_distance_progress_for_frame, distance, draw_marker, draw_polyline, fit_points_to_widget,
-    marker_layers_from_points, normalize_opacity, point_at_metric_progress, widget_render_report,
-    with_widget_transform, DEFAULT_COLOR, DEFAULT_LINE_WIDTH, DEFAULT_MARGIN,
+    fallback_marker_points, legacy_line_width, marker_layers_from_points, marker_size_from_weights,
+    normalize_opacity, plot_base_color, point_at_metric_progress, resolve_style_color,
+    widget_render_report, with_widget_transform, DEFAULT_MARGIN,
     DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER,
     DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
 };
 use super::types::{
-    empty_extra, NormalizedRoutePlot, RouteFrameState, RouteSample, RouteWidgetCache,
-    WidgetGeometry, WidgetRenderReport,
+    NormalizedRoutePlot, RouteFrameState, RouteSample, RouteWidgetCache, WidgetGeometry,
+    WidgetRenderReport,
 };
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::{CoursePlotConfig, MarkerPointConfig, RenderConfig};
+use crate::config::{CoursePlotConfig, RenderConfig};
 use crate::debug::RenderProfiler;
 use skia_safe::Canvas;
 
@@ -94,20 +95,19 @@ pub(crate) fn draw_route_widget(
 }
 
 fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> NormalizedRoutePlot {
-    let base_color = plot.color.clone().unwrap_or_else(|| DEFAULT_COLOR.to_string());
-    let legacy_width = plot
-        .line
-        .as_ref()
-        .and_then(|line| line.width)
-        .unwrap_or(DEFAULT_LINE_WIDTH)
-        * DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER;
-    let marker_size = plot.marker_size.unwrap_or_else(|| {
-        plot.points
-            .iter()
-            .filter_map(|point| point.weight)
-            .map(|weight| weight.sqrt())
-            .fold(18.0, f32::max)
-    });
+    let base_color = plot_base_color(plot.color.as_deref());
+    let legacy_width = legacy_line_width(
+        plot.line.as_ref().and_then(|line| line.width),
+        DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER,
+    );
+    let marker_size = plot
+        .marker_size
+        .unwrap_or_else(|| marker_size_from_weights(&plot.points, 18.0, f32::sqrt));
+    let marker_color = plot
+        .marker_color
+        .clone()
+        .unwrap_or_else(|| base_color.clone());
+    let marker_opacity = normalize_opacity(plot.marker_opacity.or(plot.opacity), 1.0);
 
     NormalizedRoutePlot {
         x: plot.x,
@@ -117,11 +117,11 @@ fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> Norm
         rotation: plot.rotation,
         margin: plot.margin.unwrap_or(DEFAULT_MARGIN),
         remaining_line_width: plot.remaining_line_width.unwrap_or(legacy_width),
-        remaining_line_color: plot
-            .remaining_line_color
-            .clone()
-            .or_else(|| plot.line.as_ref().and_then(|line| line.color.clone()))
-            .unwrap_or_else(|| base_color.clone()),
+        remaining_line_color: resolve_style_color(
+            plot.remaining_line_color.as_ref(),
+            plot.line.as_ref().and_then(|line| line.color.as_ref()),
+            &base_color,
+        ),
         remaining_line_opacity: normalize_opacity(
             plot.remaining_line_opacity
                 .or_else(|| plot.line.as_ref().and_then(|line| line.opacity))
@@ -129,11 +129,11 @@ fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> Norm
             0.75,
         ),
         completed_line_width: plot.completed_line_width.unwrap_or(legacy_width),
-        completed_line_color: plot
-            .completed_line_color
-            .clone()
-            .or_else(|| plot.line.as_ref().and_then(|line| line.color.clone()))
-            .unwrap_or_else(|| base_color.clone()),
+        completed_line_color: resolve_style_color(
+            plot.completed_line_color.as_ref(),
+            plot.line.as_ref().and_then(|line| line.color.as_ref()),
+            &base_color,
+        ),
         completed_line_opacity: normalize_opacity(
             plot.completed_line_opacity
                 .or_else(|| plot.line.as_ref().and_then(|line| line.opacity))
@@ -141,18 +141,9 @@ fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> Norm
             1.0,
         ),
         marker_size,
-        marker_color: plot.marker_color.clone().unwrap_or_else(|| base_color.clone()),
-        marker_opacity: normalize_opacity(plot.marker_opacity.or(plot.opacity), 1.0),
-        marker_points: if plot.points.is_empty() {
-            vec![MarkerPointConfig {
-                weight: Some(marker_size.powi(2)),
-                color: Some(plot.marker_color.clone().unwrap_or_else(|| base_color.clone())),
-                opacity: Some(normalize_opacity(plot.marker_opacity.or(plot.opacity), 1.0)),
-                extra: empty_extra(),
-            }]
-        } else {
-            plot.points.clone()
-        },
+        marker_color: marker_color.clone(),
+        marker_opacity,
+        marker_points: fallback_marker_points(&plot.points, marker_size, &marker_color, marker_opacity),
     }
 }
 

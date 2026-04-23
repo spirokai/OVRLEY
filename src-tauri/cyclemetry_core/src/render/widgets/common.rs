@@ -308,6 +308,55 @@ pub(crate) fn marker_layers_from_points(points: &[MarkerPointConfig]) -> Vec<Mar
     layers
 }
 
+pub(crate) fn plot_base_color(color: Option<&str>) -> String {
+    color.unwrap_or(DEFAULT_COLOR).to_string()
+}
+
+pub(crate) fn legacy_line_width(line_width: Option<f32>, multiplier: f32) -> f32 {
+    line_width.unwrap_or(DEFAULT_LINE_WIDTH) * multiplier
+}
+
+pub(crate) fn marker_size_from_weights(
+    points: &[MarkerPointConfig],
+    default_size: f32,
+    weight_to_radius: impl Fn(f32) -> f32,
+) -> f32 {
+    points
+        .iter()
+        .filter_map(|point| point.weight)
+        .map(weight_to_radius)
+        .fold(default_size, f32::max)
+}
+
+pub(crate) fn fallback_marker_points(
+    points: &[MarkerPointConfig],
+    marker_size: f32,
+    marker_color: &str,
+    marker_opacity: f32,
+) -> Vec<MarkerPointConfig> {
+    if points.is_empty() {
+        vec![MarkerPointConfig {
+            weight: Some(marker_size.powi(2)),
+            color: Some(marker_color.to_string()),
+            opacity: Some(marker_opacity),
+            extra: super::types::empty_extra(),
+        }]
+    } else {
+        points.to_vec()
+    }
+}
+
+pub(crate) fn resolve_style_color(
+    explicit_color: Option<&String>,
+    inherited_color: Option<&String>,
+    base_color: &str,
+) -> String {
+    explicit_color
+        .cloned()
+        .or_else(|| inherited_color.cloned())
+        .unwrap_or_else(|| base_color.to_string())
+}
+
 pub(crate) fn path_from_points(
     points: &[(f32, f32)],
     close_path: bool,

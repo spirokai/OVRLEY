@@ -11,7 +11,8 @@ use crate::render::format::{format_value, frame_index_for_second};
 use crate::render::surface::{create_surface, write_surface_png};
 use crate::render::text::{draw_text, label_style, value_style};
 use crate::render::widgets::{
-    draw_elevation_widget, draw_route_widget, prepare_render_assets, WidgetRenderReport,
+    draw_elevation_widget, draw_route_widget, prepare_render_assets, PreparedRenderAssets,
+    WidgetRenderReport,
 };
 use serde_json::{json, Value};
 use skia_safe::Image;
@@ -88,44 +89,38 @@ pub fn render_preview_with_report(
         surface.canvas().clear(skia_safe::Color::TRANSPARENT);
     });
 
-    let frame_started = Instant::now();
-    frame_profiler.measure("base.restore", || {
-        if let Some(labels_image) = &labels_image {
-            surface.canvas().draw_image(labels_image, (0, 0), None);
-        }
-    });
-
-    frame_profiler.measure("text.dynamic", || {
-        for value in &config.values {
-            let text = format_value(config, value, dense_activity, frame_index);
-            let style = value_style(&config.scene, value, scale);
-            draw_text(surface.canvas(), &text, &style, &paths.font_dirs);
-        }
-    });
-    let route_widget = prepared_assets
-        .route_cache
-        .as_ref()
-        .and_then(|cache| draw_route_widget(surface.canvas(), cache, frame_index, &mut frame_profiler));
-    let elevation_widget = prepared_assets.elevation_cache.as_ref().and_then(|cache| {
-        draw_elevation_widget(
-            surface.canvas(),
-            paths,
-            config.scene.font.as_deref(),
-            cache,
-            frame_index,
-            &mut frame_profiler,
-        )
-    });
-    frame_profiler.record_ms("frame.draw", frame_started.elapsed().as_secs_f64() * 1000.0);
+    let (route_widget, elevation_widget) = render_frame_to_surface(
+        surface.canvas(),
+        paths,
+        config,
+        dense_activity,
+        &prepared_assets,
+        frame_index,
+        scale,
+        labels_image.as_ref(),
+        &mut frame_profiler,
+    );
 
     preview_profiler.measure("preview.png_write", || {
         write_surface_png(&mut surface, out_path)
             .map_err(|error| format!("Failed to render preview frame: {error}"))
     })?;
 
-    let prepare_timings = prepare_profiler.summary();
-    let frame_timings = frame_profiler.summary();
-    let preview_only_timings = preview_profiler.summary();
+    let prepare_timings = annotate_timing_aliases(prepare_profiler.summary(), &[(
+        "prepare.surface.clear",
+        "surface.clear",
+    )]);
+    let frame_timings = annotate_timing_aliases(frame_profiler.summary(), &[(
+        "base.restore",
+        "base.copy",
+    )]);
+    let preview_only_timings = annotate_timing_aliases(
+        preview_profiler.summary(),
+        &[
+            ("preview.surface.create_clear", "surface.clear"),
+            ("preview.png_write", "png.write"),
+        ],
+    );
     let surface_ms = preview_only_timings
         .get("preview.surface.create_clear")
         .map(|bucket| bucket.total_ms)
@@ -168,6 +163,62 @@ pub fn render_preview_with_report(
     };
 
     Ok(((), report))
+}
+
+fn render_frame_to_surface(
+    canvas: &skia_safe::Canvas,
+    paths: &AppPaths,
+    config: &RenderConfig,
+    dense_activity: &DenseActivityReport,
+    prepared_assets: &PreparedRenderAssets,
+    frame_index: usize,
+    scale: f32,
+    labels_image: Option<&Image>,
+    frame_profiler: &mut RenderProfiler,
+) -> (Option<WidgetRenderReport>, Option<WidgetRenderReport>) {
+    let frame_started = Instant::now();
+    frame_profiler.measure("base.restore", || {
+        if let Some(labels_image) = labels_image {
+            canvas.draw_image(labels_image, (0, 0), None);
+        }
+    });
+
+    frame_profiler.measure("text.dynamic", || {
+        for value in &config.values {
+            let text = format_value(config, value, dense_activity, frame_index);
+            let style = value_style(&config.scene, value, scale);
+            draw_text(canvas, &text, &style, &paths.font_dirs);
+        }
+    });
+
+    let route_widget = prepared_assets
+        .route_cache
+        .as_ref()
+        .and_then(|cache| draw_route_widget(canvas, cache, frame_index, frame_profiler));
+    let elevation_widget = prepared_assets.elevation_cache.as_ref().and_then(|cache| {
+        draw_elevation_widget(
+            canvas,
+            paths,
+            config.scene.font.as_deref(),
+            cache,
+            frame_index,
+            frame_profiler,
+        )
+    });
+    frame_profiler.record_ms("frame.draw", frame_started.elapsed().as_secs_f64() * 1000.0);
+    (route_widget, elevation_widget)
+}
+
+fn annotate_timing_aliases(
+    mut timings: BTreeMap<String, TimingBucket>,
+    aliases: &[(&str, &str)],
+) -> BTreeMap<String, TimingBucket> {
+    for (bucket_name, alt_name) in aliases {
+        if let Some(bucket) = timings.get_mut(*bucket_name) {
+            bucket.alt_name = Some((*alt_name).to_string());
+        }
+    }
+    timings
 }
 
 fn cached_labels_image(

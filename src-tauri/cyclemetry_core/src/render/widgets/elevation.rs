@@ -1,17 +1,19 @@
 use super::common::{
     absolute_distance_progress_for_frame, draw_area, draw_marker, draw_polyline,
-    format_elevation_label, interpolate_optional_numeric_series, marker_layers_from_points,
-    normalize_opacity, point_at_metric_progress, point_at_progress_x, rotate_point_to_canvas,
-    widget_render_report, with_widget_transform, DEFAULT_COLOR, DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER,
-    DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER, DEFAULT_ELEVATION_MARKER_SCALE, DEFAULT_LINE_WIDTH,
+    fallback_marker_points, format_elevation_label, interpolate_optional_numeric_series,
+    legacy_line_width, marker_layers_from_points, marker_size_from_weights, normalize_opacity,
+    plot_base_color, point_at_metric_progress, point_at_progress_x, resolve_style_color,
+    rotate_point_to_canvas, widget_render_report, with_widget_transform,
+    DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER, DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER,
+    DEFAULT_ELEVATION_MARKER_SCALE,
 };
 use super::types::{
-    empty_extra, ElevationFrameState, ElevationWidgetCache, NormalizedElevationPlot,
-    WidgetGeometry, WidgetRenderReport,
+    ElevationFrameState, ElevationWidgetCache, NormalizedElevationPlot, WidgetGeometry,
+    WidgetRenderReport,
 };
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::commands::AppPaths;
-use crate::config::{ElevationPlotConfig, MarkerPointConfig, RenderConfig};
+use crate::config::{ElevationPlotConfig, RenderConfig};
 use crate::debug::RenderProfiler;
 use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};
 use skia_safe::Canvas;
@@ -229,21 +231,22 @@ fn normalize_elevation_plot(
     config: &RenderConfig,
     plot: &ElevationPlotConfig,
 ) -> NormalizedElevationPlot {
-    let base_color = plot.color.clone().unwrap_or_else(|| DEFAULT_COLOR.to_string());
-    let legacy_width = plot
-        .line
-        .as_ref()
-        .and_then(|line| line.width)
-        .unwrap_or(DEFAULT_LINE_WIDTH)
-        * DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER;
+    let base_color = plot_base_color(plot.color.as_deref());
+    let legacy_width = legacy_line_width(
+        plot.line.as_ref().and_then(|line| line.width),
+        DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER,
+    );
     let marker_size = plot.marker_size.unwrap_or_else(|| {
-        plot.points
-            .iter()
-            .filter_map(|point| point.weight)
-            .map(|weight| weight.sqrt() * DEFAULT_ELEVATION_MARKER_SCALE.sqrt())
-            .fold(16.0, f32::max)
+        marker_size_from_weights(&plot.points, 16.0, |weight| {
+            weight.sqrt() * DEFAULT_ELEVATION_MARKER_SCALE.sqrt()
+        })
     });
     let point_label = plot.point_label.clone().unwrap_or_default();
+    let marker_color = plot
+        .marker_color
+        .clone()
+        .unwrap_or_else(|| base_color.clone());
+    let marker_opacity = normalize_opacity(plot.marker_opacity.or(plot.opacity), 1.0);
 
     NormalizedElevationPlot {
         x: plot.x,
@@ -254,11 +257,11 @@ fn normalize_elevation_plot(
         margin: plot.margin.unwrap_or(0.0),
         y_scale: plot.y_scale.unwrap_or(1.0).clamp(0.2, 4.0),
         remaining_line_width: plot.remaining_line_width.unwrap_or(legacy_width),
-        remaining_line_color: plot
-            .remaining_line_color
-            .clone()
-            .or_else(|| plot.line.as_ref().and_then(|line| line.color.clone()))
-            .unwrap_or_else(|| base_color.clone()),
+        remaining_line_color: resolve_style_color(
+            plot.remaining_line_color.as_ref(),
+            plot.line.as_ref().and_then(|line| line.color.as_ref()),
+            &base_color,
+        ),
         remaining_line_opacity: normalize_opacity(
             plot.remaining_line_opacity
                 .or_else(|| plot.line.as_ref().and_then(|line| line.opacity))
@@ -266,22 +269,22 @@ fn normalize_elevation_plot(
             1.0,
         ),
         completed_line_width: plot.completed_line_width.unwrap_or(legacy_width),
-        completed_line_color: plot
-            .completed_line_color
-            .clone()
-            .or_else(|| plot.line.as_ref().and_then(|line| line.color.clone()))
-            .unwrap_or_else(|| base_color.clone()),
+        completed_line_color: resolve_style_color(
+            plot.completed_line_color.as_ref(),
+            plot.line.as_ref().and_then(|line| line.color.as_ref()),
+            &base_color,
+        ),
         completed_line_opacity: normalize_opacity(
             plot.completed_line_opacity
                 .or_else(|| plot.line.as_ref().and_then(|line| line.opacity))
                 .or(plot.opacity),
             1.0,
         ),
-        area_remaining_color: plot
-            .area_remaining_color
-            .clone()
-            .or_else(|| plot.fill.as_ref().and_then(|fill| fill.color.clone()))
-            .unwrap_or_else(|| base_color.clone()),
+        area_remaining_color: resolve_style_color(
+            plot.area_remaining_color.as_ref(),
+            plot.fill.as_ref().and_then(|fill| fill.color.as_ref()),
+            &base_color,
+        ),
         area_remaining_opacity: normalize_opacity(
             plot.area_remaining_opacity.or_else(|| {
                 plot.fill
@@ -291,29 +294,20 @@ fn normalize_elevation_plot(
             }),
             0.12,
         ),
-        area_completed_color: plot
-            .area_completed_color
-            .clone()
-            .or_else(|| plot.fill.as_ref().and_then(|fill| fill.color.clone()))
-            .unwrap_or_else(|| base_color.clone()),
+        area_completed_color: resolve_style_color(
+            plot.area_completed_color.as_ref(),
+            plot.fill.as_ref().and_then(|fill| fill.color.as_ref()),
+            &base_color,
+        ),
         area_completed_opacity: normalize_opacity(
             plot.area_completed_opacity
                 .or_else(|| plot.fill.as_ref().and_then(|fill| fill.opacity)),
             0.24,
         ),
         marker_size,
-        marker_color: plot.marker_color.clone().unwrap_or_else(|| base_color.clone()),
-        marker_opacity: normalize_opacity(plot.marker_opacity.or(plot.opacity), 1.0),
-        marker_points: if plot.points.is_empty() {
-            vec![MarkerPointConfig {
-                weight: Some(marker_size.powi(2)),
-                color: Some(plot.marker_color.clone().unwrap_or_else(|| base_color.clone())),
-                opacity: Some(normalize_opacity(plot.marker_opacity.or(plot.opacity), 1.0)),
-                extra: empty_extra(),
-            }]
-        } else {
-            plot.points.clone()
-        },
+        marker_color: marker_color.clone(),
+        marker_opacity,
+        marker_points: fallback_marker_points(&plot.points, marker_size, &marker_color, marker_opacity),
         show_elevation_metric: plot.show_elevation_metric.unwrap_or(false),
         show_elevation_imperial: plot.show_elevation_imperial.unwrap_or(false),
         metric_label_offset_x: plot.metric_label_offset_x.or(point_label.x_offset).unwrap_or(0.0),

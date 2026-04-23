@@ -26,8 +26,9 @@ pub fn build_dense_activity_report(
     activity: &ParsedActivity,
     config: &RenderConfig,
 ) -> Result<DenseActivityReport, String> {
-    let trimmed = trim_activity(activity, config.scene.start, config.scene.end)?;
-    Ok(densify_activity(&trimmed, config.scene.fps))
+    let requirements = config.render_data_requirements()?;
+    let trimmed = trim_activity(activity, config.scene.start, config.scene.end, &requirements)?;
+    Ok(densify_activity(&trimmed, config.scene.fps, &requirements))
 }
 
 #[cfg(test)]
@@ -57,7 +58,10 @@ mod tests {
     fn builds_dense_report_for_full_fixture() {
         let activity = parse_activity_json(&fixture("Test_GPX-parse-debug.json")).unwrap();
         let config = parse_config_json(
-            r#"{"scene":{"fps":30,"start":0,"end":4912,"width":3840,"height":2160}}"#,
+            r#"{
+                "scene":{"fps":30,"start":0,"end":4912,"width":3840,"height":2160},
+                "values":[{"value":"speed","x":0,"y":0}]
+            }"#,
         )
         .unwrap();
         let report = build_dense_activity_report(&activity, &config).unwrap();
@@ -73,7 +77,7 @@ mod tests {
                 < 4912.0
         );
         assert_eq!(report.series.speed.len(), report.frame_count);
-        assert_eq!(report.series.course_lat.len(), report.frame_count);
+        assert!(report.series.course_lat.is_empty());
     }
 
     #[test]
@@ -82,7 +86,10 @@ mod tests {
 
         for (fps, expected_frames) in [(24.0, 708usize), (30.0, 885usize), (60.0, 1770usize)] {
             let config = parse_config_json(&format!(
-                r#"{{"scene":{{"fps":{fps},"start":600.25,"end":629.75}}}}"#
+                r#"{{
+                    "scene":{{"fps":{fps},"start":600.25,"end":629.75}},
+                    "values":[{{"value":"time","x":0,"y":0}}]
+                }}"#
             ))
             .unwrap();
             let report = build_dense_activity_report(&activity, &config).unwrap();
@@ -96,7 +103,30 @@ mod tests {
                     .unwrap_or_default()
                     < 29.5
             );
-            assert_eq!(report.series.time.len(), expected_frames);
+            assert!(report.series.time.is_empty());
         }
+    }
+
+    #[test]
+    fn only_densifies_series_requested_by_template() {
+        let activity = parse_activity_json(&fixture("Test_FIT-parse-debug.json")).unwrap();
+        let config = parse_config_json(
+            r#"{
+                "scene":{"fps":30,"start":600,"end":630},
+                "values":[{"value":"speed","x":0,"y":0}],
+                "plots":{"course":{"value":"course","x":0,"y":0,"width":200,"height":100}}
+            }"#,
+        )
+        .unwrap();
+
+        let report = build_dense_activity_report(&activity, &config).unwrap();
+
+        assert_eq!(report.series.speed.len(), report.frame_count);
+        assert!(report.series.elevation.is_empty());
+        assert!(report.series.gradient.is_empty());
+        assert!(report.series.time.is_empty());
+        assert!(report.series.course_lat.is_empty());
+        assert!(report.series.course_lon.is_empty());
+        assert_eq!(report.frame_distance_progress.len(), report.frame_count);
     }
 }

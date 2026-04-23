@@ -2,6 +2,7 @@ use super::interpolate::{
     interpolate_course_value, interpolate_numeric_series_value, interpolate_time_series_value,
 };
 use super::schema::{ParsedActivity, TrimmedActivity};
+use crate::config::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
 
 fn validate_trim_window(duration: f64, start: f64, end: f64) -> Result<(), String> {
@@ -45,6 +46,7 @@ pub fn trim_activity(
     activity: &ParsedActivity,
     start: f64,
     end: f64,
+    requirements: &RenderDataRequirements,
 ) -> Result<TrimmedActivity, String> {
     if activity.sample_elapsed_seconds.len() < 2 {
         return Err(
@@ -74,7 +76,9 @@ pub fn trim_activity(
     );
     trimmed_elapsed.push(end - start);
 
-    let mut trimmed_distance_progress = if activity.sample_distance_progress.is_empty() {
+    let mut trimmed_distance_progress = if !requirements.distance_progress
+        || activity.sample_distance_progress.is_empty()
+    {
         Vec::new()
     } else {
         let source = activity
@@ -107,12 +111,17 @@ pub fn trim_activity(
         trimmed_distance_progress = Vec::new();
     }
 
-    let start_course = interpolate_course_value(elapsed, &activity.course, start);
-    let end_course = interpolate_course_value(elapsed, &activity.course, end);
-    let mut course = Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
-    course.push(start_course);
-    course.extend_from_slice(&activity.course[start_inner_index..end_inner_index]);
-    course.push(end_course);
+    let course = if requirements.course {
+        let start_course = interpolate_course_value(elapsed, &activity.course, start);
+        let end_course = interpolate_course_value(elapsed, &activity.course, end);
+        let mut course = Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
+        course.push(start_course);
+        course.extend_from_slice(&activity.course[start_inner_index..end_inner_index]);
+        course.push(end_course);
+        course
+    } else {
+        Vec::new()
+    };
 
     let start_time = activity
         .source_start_time
@@ -129,63 +138,91 @@ pub fn trim_activity(
         sample_elapsed_seconds: trimmed_elapsed,
         sample_distance_progress: trimmed_distance_progress,
         course,
-        elevation: trim_numeric_series(
-            elapsed,
-            &activity.elevation,
-            start,
-            end,
-            start_inner_index,
-            end_inner_index,
-        ),
-        speed: trim_numeric_series(
-            elapsed,
-            &activity.speed,
-            start,
-            end,
-            start_inner_index,
-            end_inner_index,
-        ),
-        heartrate: trim_numeric_series(
-            elapsed,
-            &activity.heartrate,
-            start,
-            end,
-            start_inner_index,
-            end_inner_index,
-        ),
-        cadence: trim_numeric_series(
-            elapsed,
-            &activity.cadence,
-            start,
-            end,
-            start_inner_index,
-            end_inner_index,
-        ),
-        power: trim_numeric_series(
-            elapsed,
-            &activity.power,
-            start,
-            end,
-            start_inner_index,
-            end_inner_index,
-        ),
-        temperature: trim_numeric_series(
-            elapsed,
-            &activity.temperature,
-            start,
-            end,
-            start_inner_index,
-            end_inner_index,
-        ),
-        gradient: trim_numeric_series(
-            elapsed,
-            &activity.gradient,
-            start,
-            end,
-            start_inner_index,
-            end_inner_index,
-        ),
-        time: {
+        elevation: if requirements.elevation {
+            trim_numeric_series(
+                elapsed,
+                &activity.elevation,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        speed: if requirements.speed {
+            trim_numeric_series(
+                elapsed,
+                &activity.speed,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        heartrate: if requirements.heartrate {
+            trim_numeric_series(
+                elapsed,
+                &activity.heartrate,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        cadence: if requirements.cadence {
+            trim_numeric_series(
+                elapsed,
+                &activity.cadence,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        power: if requirements.power {
+            trim_numeric_series(
+                elapsed,
+                &activity.power,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        temperature: if requirements.temperature {
+            trim_numeric_series(
+                elapsed,
+                &activity.temperature,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        gradient: if requirements.gradient {
+            trim_numeric_series(
+                elapsed,
+                &activity.gradient,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        time: if requirements.time {
             let start_value = interpolate_time_series_value(elapsed, &activity.time, start);
             let end_value = interpolate_time_series_value(elapsed, &activity.time, end);
             let mut trimmed =
@@ -194,6 +231,8 @@ pub fn trim_activity(
             trimmed.extend_from_slice(&activity.time[start_inner_index..end_inner_index]);
             trimmed.push(end_value);
             trimmed
+        } else {
+            Vec::new()
         },
     })
 }

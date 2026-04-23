@@ -157,6 +157,20 @@ pub struct RenderConfig {
     pub extra: BTreeMap<String, Value>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RenderDataRequirements {
+    pub speed: bool,
+    pub elevation: bool,
+    pub gradient: bool,
+    pub heartrate: bool,
+    pub cadence: bool,
+    pub power: bool,
+    pub temperature: bool,
+    pub time: bool,
+    pub distance_progress: bool,
+    pub course: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct MarkerPointConfig {
     #[serde(default)]
@@ -333,6 +347,35 @@ pub fn parse_config_json(input: &str) -> Result<RenderConfig, String> {
 }
 
 impl RenderConfig {
+    pub fn render_data_requirements(&self) -> Result<RenderDataRequirements, String> {
+        let mut requirements = RenderDataRequirements::default();
+
+        for value in &self.values {
+            match value.value.as_str() {
+                "speed" => requirements.speed = true,
+                "elevation" => requirements.elevation = true,
+                "gradient" => requirements.gradient = true,
+                "heartrate" => requirements.heartrate = true,
+                "cadence" => requirements.cadence = true,
+                "power" => requirements.power = true,
+                "temperature" => requirements.temperature = true,
+                "time" => requirements.time = true,
+                _ => {}
+            }
+        }
+
+        if self.course_plot()?.is_some() {
+            requirements.distance_progress = true;
+        }
+
+        if self.elevation_plot()?.is_some() {
+            requirements.elevation = true;
+            requirements.distance_progress = true;
+        }
+
+        Ok(requirements)
+    }
+
     pub fn course_plot(&self) -> Result<Option<CoursePlotConfig>, String> {
         self.parse_plot("course")
     }
