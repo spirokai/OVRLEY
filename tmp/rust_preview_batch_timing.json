@@ -1,0 +1,90 @@
+{
+  "frame_count": 5,
+  "seconds": [
+    600,
+    607,
+    615,
+    622,
+    629
+  ],
+  "total_ms_sum": 1920.4893000000002,
+  "total_ms_avg": 384.09786,
+  "total_ms_min": 299.333,
+  "total_ms_max": 565.12,
+  "surface_ms_avg": 6.33572,
+  "label_layer_ms_avg": 75.17096000000001,
+  "value_draw_ms_avg": 0.88642,
+  "png_write_ms_avg": 301.69890000000004,
+  "reports": [
+    {
+      "second": 600,
+      "frame_index": 0,
+      "width": 3840,
+      "height": 2160,
+      "total_ms": 565.12,
+      "surface_ms": 4.5619,
+      "label_layer_ms": 283.7191,
+      "value_draw_ms": 1.9700999999999997,
+      "png_write_ms": 274.8627,
+      "value_count": 4,
+      "label_count": 3,
+      "label_cache_status": "miss"
+    },
+    {
+      "second": 607,
+      "frame_index": 210,
+      "width": 3840,
+      "height": 2160,
+      "total_ms": 413.79909999999995,
+      "surface_ms": 6.018800000000001,
+      "label_layer_ms": 24.120800000000003,
+      "value_draw_ms": 0.6582,
+      "png_write_ms": 382.9965,
+      "value_count": 4,
+      "label_count": 3,
+      "label_cache_status": "hit"
+    },
+    {
+      "second": 615,
+      "frame_index": 450,
+      "width": 3840,
+      "height": 2160,
+      "total_ms": 330.5964,
+      "surface_ms": 9.0651,
+      "label_layer_ms": 24.8725,
+      "value_draw_ms": 0.8863,
+      "png_write_ms": 295.7679,
+      "value_count": 4,
+      "label_count": 3,
+      "label_cache_status": "hit"
+    },
+    {
+      "second": 622,
+      "frame_index": 660,
+      "width": 3840,
+      "height": 2160,
+      "total_ms": 299.333,
+      "surface_ms": 6.5845,
+      "label_layer_ms": 24.2181,
+      "value_draw_ms": 0.6134,
+      "png_write_ms": 267.9094,
+      "value_count": 4,
+      "label_count": 3,
+      "label_cache_status": "hit"
+    },
+    {
+      "second": 629,
+      "frame_index": 870,
+      "width": 3840,
+      "height": 2160,
+      "total_ms": 311.6408,
+      "surface_ms": 5.4483,
+      "label_layer_ms": 18.924300000000002,
+      "value_draw_ms": 0.30410000000000004,
+      "png_write_ms": 286.95799999999997,
+      "value_count": 4,
+      "label_count": 3,
+      "label_cache_status": "hit"
+    }
+  ]
+}

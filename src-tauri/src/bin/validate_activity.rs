@@ -24,8 +24,8 @@ fn main() -> Result<(), String> {
     let activity = parse_activity_json(&payload_json)?;
     let config = parse_config_json(&config_json)?;
     let report = build_dense_activity_report(&activity, &config)?;
-    let output =
-        serde_json::to_string_pretty(&report).map_err(|error| format!("Failed to serialize report: {error}"))?;
+    let output = serde_json::to_string_pretty(&report)
+        .map_err(|error| format!("Failed to serialize report: {error}"))?;
 
     if let Some(parent) = out_path.parent() {
         fs::create_dir_all(parent)

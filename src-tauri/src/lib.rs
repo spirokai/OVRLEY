@@ -1,5 +1,4 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-
 use cyclemetry_core::commands::{self, AppPaths};
 use cyclemetry_core::debug::RenderProgress;
 use std::path::PathBuf;
@@ -30,7 +29,8 @@ async fn backend_demo(
     parsed_activity_json: String,
     second: u32,
 ) -> Result<String, String> {
-    let response = commands::backend_demo(&config_json, &parsed_activity_json, second)?;
+    let response =
+        commands::backend_demo(&app_paths()?, &config_json, &parsed_activity_json, second)?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
@@ -120,10 +120,7 @@ async fn backend_image_data(filename: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn default_template_save_path(
-    app: tauri::AppHandle,
-    filename: String,
-) -> Result<String, String> {
+fn default_template_save_path(app: tauri::AppHandle, filename: String) -> Result<String, String> {
     let mut path = app.path().document_dir().map_err(|e| e.to_string())?;
     path.push("Cyclemetry");
     std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;

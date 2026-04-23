@@ -366,9 +366,12 @@ Recorded artifacts for Phase 4:
   - dedicated writer thread
   - stderr progress monitor
   - cancel flag
+- Static label cache must store a render-ready in-memory representation, not PNG-encoded bytes
+- Preview PNG rendering remains decoupled from production encode path
 - Write raw `rgba` frames to FFmpeg stdin exactly as today.
 - Preserve template-configurable FFmpeg options under `scene.ffmpeg`.
 - Implement dropdown menu in global settings of frontend to allow selection of different codecs with alpha channel. Primary one will be prores_ks (Prores4444), the other options must include HEVC(H.265), prores_videotoolbox (if device is macOS), and prores_vulkan (ensure FFMPEG8.1 is used, and see the source code to derive the invocation: https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/vulkan_prores.c)
+- Runtime timings must separately report surface creation/clear, static label cache lookup/draw, dynamic value draw, pixel extraction, queue wait, and ffmpeg write
 - Implement progress reporting and cancellation semantics compatible with the current frontend.
 - Keep output locations and open-folder/open-video behavior unchanged.
 

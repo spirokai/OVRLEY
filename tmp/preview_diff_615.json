@@ -1,0 +1,25 @@
+{
+  "left_dimensions": [
+    3840,
+    2160
+  ],
+  "right_dimensions": [
+    3840,
+    2160
+  ],
+  "dimensions_equal": true,
+  "mean_abs_channel_error": 3.1750225151909723,
+  "max_abs_channel_error": 255,
+  "changed_pixel_ratio": 0.041232277199074074,
+  "changed_pixel_count": 341997,
+  "total_pixel_count": 8294400,
+  "changed_bbox": {
+    "left": 0,
+    "top": 66,
+    "right": 1090,
+    "bottom": 2131,
+    "width": 1091,
+    "height": 2066
+  },
+  "pass": false
+}

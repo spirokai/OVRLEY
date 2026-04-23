@@ -2,7 +2,7 @@ use crate::activity::{build_dense_activity_report, parse_activity_json};
 use crate::config::parse_config_json;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
-use crate::render::{stub_demo_response, stub_render_response};
+use crate::render::{render_preview_to_path, stub_demo_response, stub_render_response};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
@@ -14,6 +14,7 @@ use std::process::Command;
 pub struct AppPaths {
     pub repo_root: PathBuf,
     pub backend_dir: PathBuf,
+    pub font_dirs: Vec<PathBuf>,
     pub public_dir: PathBuf,
     pub uploads_dir: PathBuf,
     pub user_templates_dir: PathBuf,
@@ -24,6 +25,10 @@ pub struct AppPaths {
 impl AppPaths {
     pub fn from_repo_root(repo_root: PathBuf) -> Self {
         let backend_dir = repo_root.join("backend");
+        let font_dirs = vec![repo_root.join("fonts"), backend_dir.join("fonts")]
+            .into_iter()
+            .filter(|path| path.is_dir())
+            .collect();
         let public_dir = backend_dir.join("public");
         let uploads_dir = backend_dir.join("uploads");
         let user_templates_dir = backend_dir.join("templates");
@@ -36,6 +41,7 @@ impl AppPaths {
         Self {
             repo_root,
             backend_dir,
+            font_dirs,
             public_dir,
             uploads_dir,
             user_templates_dir,
@@ -85,11 +91,14 @@ pub fn backend_health(paths: &AppPaths) -> HealthResponse {
     }
 }
 
-pub fn backend_demo(config_json: &str, parsed_activity_json: &str, second: u32) -> Result<Value, String> {
+pub fn backend_demo(paths: &AppPaths, config_json: &str, parsed_activity_json: &str, second: u32) -> Result<Value, String> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
-    Ok(stub_demo_response(&config, &dense_activity, second))
+    let filename = "demo_preview.png";
+    let output_path = paths.public_dir.join(filename);
+    render_preview_to_path(paths, &config, &dense_activity, second, &output_path)?;
+    Ok(stub_demo_response(filename))
 }
 
 pub fn backend_render(config_json: &str, parsed_activity_json: &str) -> Result<Value, String> {
