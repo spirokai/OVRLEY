@@ -10,6 +10,8 @@ src-tauri/binaries/
 backend/dist/
 backend/build/
 backend/.venv/
+ffmpeg/
+.ffmpeg/
 
 # App specifics
 next/

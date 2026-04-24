@@ -2,7 +2,8 @@ use crate::activity::{build_dense_activity_report, parse_activity_json};
 use crate::config::parse_config_json;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
-use crate::render::{render_preview_to_path, stub_demo_response, stub_render_response};
+use crate::encode::video::{render_video, RenderController};
+use crate::render::{render_preview_to_path, stub_demo_response};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
@@ -108,23 +109,50 @@ pub fn backend_demo(
     Ok(stub_demo_response(filename))
 }
 
-pub fn backend_render(config_json: &str, parsed_activity_json: &str) -> Result<Value, String> {
+pub fn backend_render(
+    paths: &AppPaths,
+    controller: &RenderController,
+    config_json: &str,
+    parsed_activity_json: &str,
+) -> Result<Value, String> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
-    Ok(stub_render_response(&config, &dense_activity))
+    controller.try_start(
+        dense_activity.frame_count as u32,
+        "Preparing render assets...",
+    )?;
+
+    let controller_clone = controller.clone();
+    let paths = paths.clone();
+    std::thread::spawn(move || {
+        match render_video(&paths, &config, &parsed_activity, &dense_activity, &controller_clone) {
+            Ok(filename) => controller_clone.finish_success(filename),
+            Err(error) => {
+                let cancelled = error.to_lowercase().contains("cancelled");
+                controller_clone.finish_error(error, cancelled);
+            }
+        }
+    });
+
+    Ok(json!({
+        "started": true
+    }))
 }
 
-pub fn backend_progress(progress: &RenderProgress) -> RenderProgress {
-    progress.clone()
+pub fn backend_progress(controller: &RenderController) -> RenderProgress {
+    controller.progress()
 }
 
-pub fn backend_cancel(progress: &mut RenderProgress) -> Value {
-    progress.status = "cancelled".to_string();
-    progress.message = "No active render. Phase 1 keeps rendering stubbed.".to_string();
+pub fn backend_cancel(controller: &RenderController) -> Value {
+    let had_active_render = controller.cancel();
     json!({
         "success": true,
-        "message": progress.message
+        "message": if had_active_render {
+            "Cancellation requested"
+        } else {
+            "No active render"
+        }
     })
 }
 

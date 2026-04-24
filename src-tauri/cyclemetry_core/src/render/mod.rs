@@ -8,7 +8,7 @@ use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::render::format::{format_value, frame_index_for_second};
-use crate::render::surface::{create_surface, write_surface_png};
+use crate::render::surface::{create_surface, read_surface_rgba, write_surface_png};
 use crate::render::text::{draw_text, label_style, value_style};
 use crate::render::widgets::{
     draw_elevation_widget, draw_route_widget, prepare_render_assets, PreparedRenderAssets,
@@ -52,8 +52,8 @@ pub struct PreviewRenderReport {
 
 #[derive(Clone)]
 pub struct PreparedPreviewAssets {
-    labels_image: Option<Image>,
-    prepared_assets: PreparedRenderAssets,
+    pub(crate) labels_image: Option<Image>,
+    pub(crate) prepared_assets: PreparedRenderAssets,
 }
 
 pub fn prepare_preview_assets(
@@ -142,13 +142,7 @@ pub fn render_preview_with_prepared_assets(
     let mut preview_profiler = RenderProfiler::default();
     let total_started = Instant::now();
 
-    let mut surface = create_surface(width, height)?;
-    preview_profiler.measure("preview.surface.create_clear", || {
-        surface.canvas().clear(skia_safe::Color::TRANSPARENT);
-    });
-
-    let (route_widget, elevation_widget) = render_frame_to_surface(
-        surface.canvas(),
+    let (mut surface, route_widget, elevation_widget) = render_frame_surface(
         paths,
         config,
         dense_activity,
@@ -157,7 +151,8 @@ pub fn render_preview_with_prepared_assets(
         scale,
         prepared_preview_assets.labels_image.as_ref(),
         &mut frame_profiler,
-    );
+        Some(&mut preview_profiler),
+    )?;
 
     preview_profiler.measure("preview.png_write", || {
         write_surface_png(&mut surface, out_path)
@@ -217,6 +212,76 @@ pub fn render_preview_with_prepared_assets(
     };
 
     Ok(((), report))
+}
+
+pub fn render_frame_rgba(
+    paths: &AppPaths,
+    config: &RenderConfig,
+    dense_activity: &DenseActivityReport,
+    prepared_assets: &PreparedRenderAssets,
+    frame_index: usize,
+    scale: f32,
+    labels_image: Option<&Image>,
+    frame_profiler: &mut RenderProfiler,
+) -> Result<Vec<u8>, String> {
+    let width = config.scene.width.unwrap_or(1920);
+    let height = config.scene.height.unwrap_or(1080);
+    let (mut surface, _, _) = render_frame_surface(
+        paths,
+        config,
+        dense_activity,
+        prepared_assets,
+        frame_index,
+        scale,
+        labels_image,
+        frame_profiler,
+        None,
+    )?;
+    frame_profiler.measure("surface.readback_rgba", || {
+        read_surface_rgba(&mut surface, width, height)
+    })
+}
+
+fn render_frame_surface(
+    paths: &AppPaths,
+    config: &RenderConfig,
+    dense_activity: &DenseActivityReport,
+    prepared_assets: &PreparedRenderAssets,
+    frame_index: usize,
+    scale: f32,
+    labels_image: Option<&Image>,
+    frame_profiler: &mut RenderProfiler,
+    mut preview_profiler: Option<&mut RenderProfiler>,
+) -> Result<(skia_safe::Surface, Option<WidgetRenderReport>, Option<WidgetRenderReport>), String> {
+    let width = config.scene.width.unwrap_or(1920);
+    let height = config.scene.height.unwrap_or(1080);
+    let mut surface = if preview_profiler.is_some() {
+        create_surface(width, height)?
+    } else {
+        frame_profiler.measure("surface.create", || create_surface(width, height))?
+    };
+    if let Some(profiler) = preview_profiler.as_mut() {
+        profiler.measure("preview.surface.create_clear", || {
+            surface.canvas().clear(skia_safe::Color::TRANSPARENT);
+        });
+    } else {
+        frame_profiler.measure("surface.clear", || {
+            surface.canvas().clear(skia_safe::Color::TRANSPARENT);
+        });
+    }
+
+    let widgets = render_frame_to_surface(
+        surface.canvas(),
+        paths,
+        config,
+        dense_activity,
+        prepared_assets,
+        frame_index,
+        scale,
+        labels_image,
+        frame_profiler,
+    );
+    Ok((surface, widgets.0, widgets.1))
 }
 
 fn render_frame_to_surface(

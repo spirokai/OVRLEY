@@ -47,6 +47,7 @@ export function createTemplateState({
   globalDefaults,
   updateRate,
   exportRange,
+  exportCodec,
   aspectRatio,
 }) {
   return {
@@ -61,6 +62,7 @@ export function createTemplateState({
         ...DEFAULT_EXPORT_RANGE,
         ...(cloneSerializable(exportRange) || {}),
       },
+      exportCodec: exportCodec || 'prores_ks',
       aspectRatio: aspectRatio || '16:9',
     },
   }
@@ -90,6 +92,8 @@ export function normalizeTemplateFilePayload(rawTemplate, fallbackState = {}) {
         updateRate: rawTemplate.settings.updateRate ?? fallbackState.updateRate,
         exportRange:
           rawTemplate.settings.exportRange || fallbackState.exportRange,
+        exportCodec:
+          rawTemplate.settings.exportCodec || fallbackState.exportCodec,
         aspectRatio:
           rawTemplate.settings.aspectRatio || fallbackState.aspectRatio,
       }),
@@ -104,6 +108,7 @@ export function normalizeTemplateFilePayload(rawTemplate, fallbackState = {}) {
         globalDefaults: fallbackState.globalDefaults,
         updateRate: fallbackState.updateRate,
         exportRange: fallbackState.exportRange,
+        exportCodec: fallbackState.exportCodec,
         aspectRatio: fallbackState.aspectRatio,
       }),
       name: rawTemplate.name || null,

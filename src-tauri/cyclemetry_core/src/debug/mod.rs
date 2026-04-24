@@ -10,6 +10,8 @@ pub struct RenderProgress {
     pub status: String,
     pub message: String,
     pub estimated_seconds_remaining: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
 }
 
 impl Default for RenderProgress {
@@ -21,6 +23,7 @@ impl Default for RenderProgress {
             status: "idle".to_string(),
             message: String::new(),
             estimated_seconds_remaining: None,
+            filename: None,
         }
     }
 }

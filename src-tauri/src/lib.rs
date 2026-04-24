@@ -1,12 +1,11 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 use cyclemetry_core::commands::{self, AppPaths};
-use cyclemetry_core::debug::RenderProgress;
+use cyclemetry_core::encode::video::RenderController;
 use std::path::PathBuf;
-use std::sync::Mutex;
 use tauri::Manager;
 
 struct BackendState {
-    progress: Mutex<RenderProgress>,
+    render_controller: RenderController,
 }
 
 fn app_paths() -> Result<AppPaths, String> {
@@ -36,17 +35,22 @@ async fn backend_demo(
 
 #[tauri::command]
 async fn backend_render(
+    state: tauri::State<'_, BackendState>,
     config_json: String,
     parsed_activity_json: String,
 ) -> Result<String, String> {
-    let response = commands::backend_render(&config_json, &parsed_activity_json)?;
+    let response = commands::backend_render(
+        &app_paths()?,
+        &state.render_controller,
+        &config_json,
+        &parsed_activity_json,
+    )?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 async fn backend_progress(state: tauri::State<'_, BackendState>) -> Result<String, String> {
-    let progress = state.progress.lock().map_err(|error| error.to_string())?;
-    let response = commands::backend_progress(&progress);
+    let response = commands::backend_progress(&state.render_controller);
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
@@ -99,8 +103,7 @@ async fn backend_open_templates() -> Result<String, String> {
 
 #[tauri::command]
 async fn backend_cancel(state: tauri::State<'_, BackendState>) -> Result<String, String> {
-    let mut progress = state.progress.lock().map_err(|error| error.to_string())?;
-    let response = commands::backend_cancel(&mut progress);
+    let response = commands::backend_cancel(&state.render_controller);
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
@@ -156,7 +159,7 @@ fn write_parse_debug_file(filename: String, contents: String) -> Result<String, 
 pub fn run() {
     tauri::Builder::default()
         .manage(BackendState {
-            progress: Mutex::new(RenderProgress::default()),
+            render_controller: RenderController::default(),
         })
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![

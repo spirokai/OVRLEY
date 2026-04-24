@@ -29,6 +29,8 @@ export const DEFAULT_RENDER_PROGRESS = {
   status: 'idle',
   message: '',
   estimatedSecondsRemaining: null,
+  encoded: 0,
+  filename: null,
 }
 
 export function readStoredJson(key, fallback) {
@@ -119,6 +121,7 @@ export function readStoredTemplateSettings() {
       ...DEFAULT_EXPORT_RANGE,
       ...(readStoredJson('exportRange', {}) || {}),
     },
+    exportCodec: localStorage.getItem('exportCodec') || 'prores_ks',
     globalDefaults: {
       ...DEFAULT_GLOBAL_DEFAULTS,
       ...(readStoredJson('globalDefaults', {}) || {}),

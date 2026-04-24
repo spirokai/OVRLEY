@@ -67,6 +67,8 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     setUpdateRate,
     exportRange,
     setExportRange,
+    exportCodec,
+    setExportCodec,
     aspectRatio,
     setAspectRatio,
     resetGlobalDefaults,
@@ -494,6 +496,18 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
 
         <div className="space-y-4">
           <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold">Export Codec</Label>
+              <Select value={exportCodec} onValueChange={setExportCodec}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="prores_ks">ProRes 4444</SelectItem>
+                  <SelectItem value="libvpx-vp9">VP9 with alpha</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Gauge className="h-4 w-4 text-primary" />

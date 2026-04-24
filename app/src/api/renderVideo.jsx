@@ -23,8 +23,10 @@ export default async function renderVideo() {
       globalDefaults,
       updateRate,
       exportRange,
+      exportCodec,
       setRenderingVideo,
       setVideoFilename,
+      setRenderProgress,
     } = useStore.getState()
 
     const parsedActivity = getCurrentParsedActivity()
@@ -40,6 +42,20 @@ export default async function renderVideo() {
     // Apply performance and range overrides
     if (config.scene) {
       config.scene.update_rate = updateRate
+      config.scene.ffmpeg = {
+        ...(config.scene.ffmpeg || {}),
+        codec: exportCodec || 'prores_ks',
+      }
+
+      if ((exportCodec || 'prores_ks') === 'prores_ks') {
+        config.scene.ffmpeg.prores_profile =
+          config.scene.ffmpeg.prores_profile || '4444'
+        config.scene.ffmpeg.pix_fmt =
+          config.scene.ffmpeg.pix_fmt || 'yuva444p10le'
+      } else if ((exportCodec || 'prores_ks') === 'libvpx-vp9') {
+        config.scene.ffmpeg.pix_fmt =
+          config.scene.ffmpeg.pix_fmt || 'yuva420p'
+      }
 
       // Apply export range override if custom
       if (exportRange.type === 'custom') {
@@ -65,6 +81,15 @@ export default async function renderVideo() {
     }
 
     setRenderingVideo(true)
+    setRenderProgress({
+      current: 0,
+      total: 0,
+      encoded: 0,
+      status: 'rendering',
+      message: 'Starting render...',
+      estimatedSecondsRemaining: null,
+      filename: null,
+    })
 
     console.log('📤 Sending video render request:', {
       start: config?.scene?.start,
@@ -84,27 +109,13 @@ export default async function renderVideo() {
       throw new Error(data.error)
     }
 
-    const videoFilename = data.filename
-
-    if (videoFilename) {
-      setVideoFilename(videoFilename)
-
-      // Tell backend to open the video in default player
-      try {
-        await backend.openVideo(videoFilename)
-      } catch (e) {
-        console.error('Error calling open-video:', e)
-      }
-
-      return { success: true, filename: videoFilename }
+    if (data.started) {
+      return { success: true, started: true }
     }
 
-    throw new Error('No video filename returned')
+    throw new Error('Render did not start')
   } catch (error) {
     console.error('Error in renderVideo:', error)
     throw error
-  } finally {
-    const { setRenderingVideo } = useStore.getState()
-    setRenderingVideo(false)
   }
 }

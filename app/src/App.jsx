@@ -107,12 +107,16 @@ function App() {
   const renderingVideo = useStore((state) => state.renderingVideo)
   const setGeneratingImage = useStore((state) => state.setGeneratingImage)
   const setRenderProgress = useStore((state) => state.setRenderProgress)
+  const renderProgress = useStore((state) => state.renderProgress)
+  const setRenderingVideo = useStore((state) => state.setRenderingVideo)
+  const setVideoFilename = useStore((state) => state.setVideoFilename)
   const gpxFilename = useStore((state) => state.gpxFilename)
   const setErrorMessage = useStore((state) => state.setErrorMessage)
   const templates = useStore((state) => state.templates)
   const fetchTemplates = useStore((state) => state.fetchTemplates)
   const updateRate = useStore((state) => state.updateRate)
   const exportRange = useStore((state) => state.exportRange)
+  const exportCodec = useStore((state) => state.exportCodec)
   const aspectRatio = useStore((state) => state.aspectRatio)
   const loadedTemplateFilename = useStore(
     (state) => state.loadedTemplateFilename,
@@ -154,6 +158,7 @@ function App() {
         globalDefaults,
         updateRate,
         exportRange,
+        exportCodec,
         aspectRatio,
       })
 
@@ -188,6 +193,7 @@ function App() {
           globalDefaults,
           updateRate,
           exportRange,
+          exportCodec,
           aspectRatio,
         },
         {
@@ -243,6 +249,7 @@ function App() {
         globalDefaults,
         updateRate,
         exportRange,
+        exportCodec,
         aspectRatio,
       })
       const { name: _templateName, ...templateState } = normalizedTemplate
@@ -274,9 +281,10 @@ function App() {
         globalDefaults,
         updateRate,
         exportRange,
+        exportCodec,
         aspectRatio,
       }),
-    [config, globalDefaults, updateRate, exportRange, aspectRatio],
+    [config, globalDefaults, updateRate, exportRange, exportCodec, aspectRatio],
   )
   const status = useMemo(() => {
     if (!config) {
@@ -305,9 +313,11 @@ function App() {
         setRenderProgress({
           current: data.current || 0,
           total: data.total || 0,
+          encoded: data.encoded || 0,
           status: data.status || 'rendering',
           message: data.message || '',
           estimatedSecondsRemaining: data.estimated_seconds_remaining,
+          filename: data.filename || null,
         })
       } catch (err) {
         console.error('Error polling render progress:', err)
@@ -318,6 +328,38 @@ function App() {
     pollProgress()
     return () => clearInterval(interval)
   }, [renderingVideo, setRenderProgress])
+
+  useEffect(() => {
+    if (!renderingVideo) return
+
+    const { status, filename } = renderProgress
+    if (status === 'complete' && filename) {
+      setVideoFilename(filename)
+      setRenderingVideo(false)
+      backend.openVideo(filename).catch((error) => {
+        console.error('Error calling open-video:', error)
+      })
+      return
+    }
+
+    if (status === 'cancelled') {
+      setRenderingVideo(false)
+      return
+    }
+
+    if (status === 'error') {
+      setRenderingVideo(false)
+      if (renderProgress.message) {
+        setErrorMessage(renderProgress.message)
+      }
+    }
+  }, [
+    renderingVideo,
+    renderProgress,
+    setErrorMessage,
+    setRenderingVideo,
+    setVideoFilename,
+  ])
 
   // Load template
 

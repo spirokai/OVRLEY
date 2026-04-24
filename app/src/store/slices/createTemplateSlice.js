@@ -13,6 +13,7 @@ import {
 const {
   updateRate: initialUpdateRate,
   exportRange: initialExportRange,
+  exportCodec: initialExportCodec,
   globalDefaults: initialGlobalDefaults,
   aspectRatio: initialAspectRatio,
 } = readStoredTemplateSettings()
@@ -26,6 +27,7 @@ export function createTemplateSlice(set, get) {
     templates: [],
     updateRate: initialUpdateRate,
     exportRange: initialExportRange,
+    exportCodec: initialExportCodec,
     globalDefaults: initialGlobalDefaults,
     aspectRatio: initialAspectRatio,
     lastSavedTemplateState: readStoredJson('lastSavedTemplateState', null),
@@ -65,6 +67,13 @@ export function createTemplateSlice(set, get) {
         state.exportRange = { ...state.exportRange, ...range }
         persistSerializable('exportRange', state.exportRange)
       }),
+
+    setExportCodec: (codec) => {
+      localStorage.setItem('exportCodec', codec)
+      set((state) => {
+        state.exportCodec = codec
+      })
+    },
 
     setGlobalDefault: (key, value) => {
       const nextDefaults = { ...get().globalDefaults, [key]: value }
@@ -130,12 +139,14 @@ export function createTemplateSlice(set, get) {
         ...DEFAULT_EXPORT_RANGE,
         ...(nextSettings.exportRange || {}),
       }
+      const nextExportCodec = nextSettings.exportCodec || 'prores_ks'
       const nextAspectRatio = nextSettings.aspectRatio || '16:9'
       const nextUpdateRate = nextSettings.updateRate || 1
 
       localStorage.setItem('editorConfig', JSON.stringify(nextConfig))
       persistSerializable('globalDefaults', nextGlobalDefaults)
       persistSerializable('exportRange', nextExportRange)
+      localStorage.setItem('exportCodec', nextExportCodec)
       localStorage.setItem('aspectRatio', nextAspectRatio)
       localStorage.setItem('updateRate', nextUpdateRate.toString())
       localStorage.setItem('loadedTemplateFilename', filename || '')
@@ -146,6 +157,7 @@ export function createTemplateSlice(set, get) {
         state.config = nextConfig
         state.globalDefaults = nextGlobalDefaults
         state.exportRange = nextExportRange
+        state.exportCodec = nextExportCodec
         state.aspectRatio = nextAspectRatio
         state.updateRate = nextUpdateRate
         state.loadedTemplateFilename = filename

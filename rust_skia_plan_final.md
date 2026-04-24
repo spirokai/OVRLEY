@@ -465,107 +465,215 @@ Recorded artifacts for Phase 5:
 - Python/Rust `ffprobe` JSON
 - final Rust `.mov`
 
-### Optional Phase 6: Browser-hosted build from the same repo
+### Phase 6: Performance optimization and parity recovery
 
-This phase is optional and does not change the success criteria for Phases 1-5. Its goal is to support two build targets from the same repository:
+This phase is dedicated to eliminating the current Phase 5 regression versus Python and driving the Rust renderer to clear, repeatable wins on both 1080p and 4K templates. The focus is not feature growth. The focus is removing unnecessary full-frame memory work, aligning the runtime lifecycle more closely with the Python architecture where it helps, and proving each optimization with timing artifacts.
 
-- desktop app: current Tauri shell with native Rust binary
-- hosted web app: browser UI with shared Rust data/geometry core plus a browser-specific CanvasKit renderer
+Measured motivation from the current Rust implementation:
+
+- 1080p `new_template.json`:
+  - `frame.draw` is about `7.5 ms/frame`
+  - `surface.clear` is about `3.4 ms/frame`
+  - `surface.readback_rgba` is about `4.2 ms/frame`
+  - total is about `15.6 ms/frame`
+- 4K `safa_brian_a_4k_gradient.json`:
+  - `frame.draw` is about `15.9 ms/frame`
+  - `surface.clear` is about `14.8 ms/frame`
+  - `surface.readback_rgba` is about `16.5 ms/frame`
+  - `ffmpeg.write` is about `4.5 ms/frame`
+  - total is about `48.9 ms/frame`
+- The writer thread spends most of its time in `encoder.queue_wait`, which means the encoder is usually waiting on frame production rather than blocking the renderer.
 
 Decision:
 
-- Reuse the Rust core for non-rendering logic and rendering preparation, but do not assume native `rust-skia` is the browser rendering path.
-- Use CanvasKit as the browser renderer because Skia's official web deployment path is CanvasKit rather than native `rust-skia`.
-- Code splitting in the frontend is recommended for startup and bundle size, but the required architectural split is primarily:
-  - shared Rust core for activity/config/render preparation
-  - native `rust-skia` renderer for Tauri/desktop
-  - browser-specific CanvasKit renderer for hosted web
-- Browser export must not depend on desktop-only process spawning, filesystem assumptions, or FFmpeg stdin piping.
-- Browser encode/output format may differ from desktop if required by browser APIs. Desktop ProRes 4444 remains the native target; web export uses the best browser-supported alpha-capable path available at implementation time.
+- Treat `surface.clear` and `surface.readback_rgba` as the primary Phase 6 bottlenecks.
+- Optimize in descending order of measured impact, not architectural elegance.
+- Preserve Phase 5 timing buckets and add new production buckets only when they explain performance without breaking Python comparability.
+- Keep preview-only work and debug image writing outside baseline comparisons.
+- Do not introduce GPU Skia in this phase.
 
 Implementation:
 
-- Refactor `cyclemetry_core` into target-aware layers:
-  - `core`: activity processing, config normalization, value formatting, route/elevation geometry preparation, frame orchestration
-  - `render_model`: target-neutral render instructions and prepared geometry with no dependency on Tauri, Skia native surfaces, or browser APIs
-  - `host_native`: FFmpeg process, native file IO, OS integration
-  - `host_web`: `wasm-bindgen` entrypoints, browser memory transfer, worker messaging, browser download/export helpers
-- Keep desktop-specific commands in `src-tauri/src/lib.rs`; add a separate wasm crate or wasm target entrypoint that exposes:
-  - `init_renderer(config_json, parsed_activity_json)`
-  - `build_preview_scene(second) -> render instruction payload`
-  - `build_frame_batch(start_frame, count) -> transferable render instruction payload`
-  - `cancel_render()`
-- Move long-running browser render work off the main thread:
-  - run wasm preparation logic inside a Web Worker
-  - transfer render-model payloads or compact geometry/series buffers via `postMessage` with transferable `ArrayBuffer`s
-  - keep UI preview/progress in the existing app shell
-- Make the browser renderer consume the shared render model using CanvasKit:
-  - map text, paths, fills, markers, opacity, transforms, and cached static layers onto CanvasKit APIs
-  - load and register the same fonts in the browser where licensing and packaging allow
-  - keep visual parity targets at the level of rendered output, not identical renderer internals
-- Isolate rendering backend assumptions so browser builds can swap native-only pieces cleanly:
-  - avoid direct use of `std::fs`, subprocess APIs, and blocking thread models inside shared render code
-  - gate target-specific modules with Cargo features and `cfg(target_arch = "wasm32")`
-  - keep image/frame intent as an explicit intermediate representation so desktop `rust-skia` and browser CanvasKit can consume the same prepared scene
-- Add a web export path that consumes rendered frames in-browser:
-  - prefer browser-native encoding APIs such as WebCodecs where supported
-  - provide a fallback path such as PNG frame sequence or canvas-recorded video if required
-  - keep export capability detection explicit in the UI so unsupported browser/codec combinations fail predictably
-- Update the frontend build so web-only heavy modules load lazily:
-  - lazy-load CanvasKit and wasm preparation modules only when preview or export is requested
-  - keep editor-only routes/components separate from render/export worker code and CanvasKit bootstrap code
-  - load desktop-only API wrappers only in the Tauri build
+- Step 1. Establish a locked performance baseline before optimization.
+  - Freeze one benchmark matrix:
+    - `templates/new_template.json` with `Test_FIT-parse-debug.json`
+    - `templates/safa_brian_a_4k_gradient.json` with the same payload
+  - Record at least 3 repeated runs per case and save:
+    - total wall time
+    - `prepare_render_assets_timing.json`
+    - `timing_summary.json`
+    - ffprobe output
+  - Use the median run as the comparison baseline for each optimization step.
+
+- Step 2. Eliminate per-frame full-surface clear where possible.
+  - Replace the current `surface.clear` + redraw approach with a reusable base image restore path that mirrors Python `base.restore`.
+  - Maintain a render-ready static layer for:
+    - transparent background
+    - cached labels
+    - any other fully static content that does not depend on frame index
+  - Evaluate two native strategies:
+    - draw a cached base `Image` onto the frame surface every frame
+    - render into a reusable caller-owned buffer and restore from a copied pristine base buffer
+  - Keep the faster of the two.
+  - Requirement:
+    - `surface.clear` must disappear from the hot path or fall below `10%` of `frame.total`.
+
+- Step 3. Remove or drastically reduce Skia readback cost.
+  - Stop treating the rendered frame as something that must always be copied out with `read_pixels()`.
+  - Prototype and compare these approaches:
+    - raster surface backed by caller-owned RGBA memory reused across frames
+    - bitmap/pixmap-backed drawing where FFmpeg-ready bytes already exist in writable memory
+    - direct access to raster pixels via Skia peek/pixmap APIs when safe and stable
+  - The target architecture is:
+    - render directly into a reusable RGBA frame buffer
+    - hand that buffer to the encoder queue without a second full-frame copy
+  - Requirement:
+    - `surface.readback_rgba` must either disappear or fall below `2 ms/frame` at 1080p and below `6 ms/frame` at 4K.
+
+- Step 4. Introduce explicit reusable frame-buffer pools.
+  - Replace per-frame transient pixel ownership with a bounded pool sized to the encoder queue plus one render slot.
+  - Reuse:
+    - Skia surfaces or bitmaps
+    - backing RGBA buffers
+    - any scratch memory needed by route/elevation compositing
+  - The render thread should acquire a free frame buffer, render into it, enqueue it, and reclaim it after the writer finishes.
+  - Requirement:
+    - no per-frame heap allocation of full-frame RGBA buffers on steady-state hot path.
+
+- Step 5. Minimize format conversion and alpha conversion work.
+  - Audit whether the current raster surface format forces conversion when producing FFmpeg input.
+  - Ensure the steady-state render target is as close as possible to the FFmpeg input format:
+    - packed `rgba`
+    - expected alpha handling
+    - no avoidable premultiply/unpremultiply conversions
+  - If Skia must use premultiplied alpha internally, measure whether a custom fast conversion on caller-owned buffers is cheaper than `read_pixels()`.
+  - Requirement:
+    - no hidden full-frame format conversion should remain unmeasured.
+
+- Step 6. Refine base-layer restore architecture rather than redrawing static content.
+  - Expand the current static label cache into a full-frame reusable render state:
+    - static label layer
+    - optional static widget background layers if they are truly frame-invariant
+    - static route/elevation layers where only reveals and markers are dynamic
+  - Ensure the per-frame draw path does only:
+    - restore base
+    - dynamic values
+    - dynamic route reveal and marker
+    - dynamic elevation reveal, marker, and labels
+  - Requirement:
+    - `frame.draw` at 4K for `safa_brian_a_4k_gradient.json` should stay stable or improve; Phase 6 must not shift work back into draw just to hide it elsewhere.
+
+- Step 7. Keep debug/sample work off the benchmark hot path.
+  - Make `debug.sample_frame_write` fully optional and disabled in benchmark mode.
+  - Any benchmark CLI or test harness used for Rust-vs-Python timing comparisons must:
+    - disable sample PNG writing
+    - disable preview-only instrumentation
+    - still emit machine-readable timing JSON
+  - Requirement:
+    - final Phase 6 benchmark numbers must exclude debug frame emission from the critical path.
+
+- Step 8. Improve measurement granularity without breaking comparability.
+  - Keep Phase 5 baseline buckets:
+    - `frame.draw`
+    - `base.restore`
+    - `text.dynamic`
+    - `composite.route`
+    - `composite.elevation`
+    - `text.elevation_label`
+    - `queue.put_wait`
+    - `encoder.queue_wait`
+    - `ffmpeg.write`
+  - Keep additional Rust-only analysis buckets in a clearly non-baseline namespace or clearly documented production namespace:
+    - `surface.create`
+    - `surface.restore`
+    - `surface.readback_rgba`
+    - `buffer.acquire_wait`
+    - `buffer.release_wait`
+    - `debug.sample_frame_write`
+  - Update comparison tooling so Python-vs-Rust timing diffs compare only the shared bucket set by default and report Rust-only buckets separately.
+
+- Step 10. Tune FFmpeg only after frame-production costs are reduced.
+  - Continue using `prores_ks` with default Rust fallback:
+    - `qscale=4`
+    - `threads=0`
+  - Only once clear/readback costs have been reduced, run a narrow encoder tuning sweep for:
+    - `qscale`
+    - `threads`
+    - `pix_fmt`
+    - `prores_profile`
+  - The goal is to confirm that frame production, not encoder tuning, is the main unlock.
+
+- Step 9. Hardening and cutover cleanup.
+  - Fix the current output-copy error handling so successful renders are not reported as failed when copying to Downloads is blocked.
+  - Keep final output success independent from secondary copy-to-downloads best effort.
+  - Only after Phase 6 acceptance passes:
+    - remove remaining Python renderer dependencies from the main desktop path
+    - keep Python only as a benchmark/parity harness until explicitly retired
+
+Optimization order and expected impact:
+
+1. render into reusable caller-owned RGBA buffers
+2. replace `surface.clear` with base restore or base buffer copy
+3. eliminate full-frame readback copies
+4. reuse frame buffers across bounded queue slots
+5. audit and minimize format conversion
+6. disable debug work in benchmark path
+7. encoder tuning last
 
 Acceptance:
 
-- The repo can produce both:
-  - a Tauri desktop build using the native Rust path
-  - a hosted web build using shared Rust wasm preparation plus CanvasKit rendering
-- Shared fixtures produce matching dense activity outputs between native and wasm builds within existing Phase 2 tolerances.
-- Shared preview frames from desktop `rust-skia` and browser CanvasKit are visually equivalent within Phase 3/4 image-diff thresholds, allowing small documented text/raster differences.
-- Browser preview remains responsive while rendering is active.
-- Browser export completes without server-side rendering.
-- Desktop-only integrations are not bundled into the hosted web build.
+- Rust beats the current Python baseline on the same machine for both:
+  - `templates/new_template.json`
+  - `templates/safa_brian_a_4k_gradient.json`
+- 1080p target:
+  - median `total_time_taken` improves materially versus current Phase 5
+  - `surface.readback_rgba` is no longer a top-two cost bucket
+- 4K target:
+  - end-to-end wall clock is no worse than Python and the target is to beat it
+  - combined `surface.clear` + `surface.readback_rgba` is reduced by at least `40%` from the current Phase 5 median
+- `queue.put_wait` remains low, indicating the renderer is not stalled on the encoder queue.
+- `encoder.queue_wait` remaining high is acceptable if end-to-end total improves, because that means the encoder is no longer the bottleneck.
+- Render output remains visually within the existing Phase 3/4 parity thresholds.
+- Progress reporting and cancellation semantics remain unchanged from the user’s perspective.
 
 Test procedure:
 
-1. Build desktop target:
+1. We have already established Phase 5 baselines for:
+   - `new_template.json`
+   - `safa_brian_a_4k_gradient.json`
+2. For each optimization branch or milestone:
    ```powershell
-   cargo tauri build
+   cargo run --bin render_video -- --config templates\new_template.json --payload app\debug\Test_FIT-parse-debug.json
+   cargo run --bin render_video -- --config templates\safa_brian_a_4k_gradient.json --payload app\debug\Test_FIT-parse-debug.json
    ```
-2. Build web target from the same repo:
-   ```powershell
-   cd app
-   pnpm build
-   ```
-   and ensure the wasm artifact is included only in the hosted web output path.
-3. For one shared fixture/config pair, generate dense outputs from:
-   - native Rust
-   - wasm Rust in a browser test harness
-4. Compare numeric outputs with the existing Phase 2 comparison tooling and tolerances.
-5. Generate browser and desktop preview frames for the same sample seconds:
-   - `600`
-   - `607`
-   - `615`
-   - `622`
-   - `629`
-6. Compare browser/native preview frames with the same image diff tooling used earlier.
-7. Run a manual browser export check in at least:
-   - Chromium-based browser
-   - Safari if macOS support is required
-8. Verify:
-   - render work happens in a worker, not the UI thread
-   - cancellation stops further frame production
-   - produced artifact downloads successfully
-   - unsupported encode paths surface a clear UI message
+3. Save into tmp\Phase6:
+   - final `.mov`
+   - `prepare_render_assets_timing.json`
+   - `timing_summary.json`
+   - ffprobe JSON
+4. Compare against the locked baseline medians.
+5. For each milestone, record:
+   - delta in `total_time_taken`
+   - delta in `frame.total`
+   - delta in `frame.draw`
+   - delta in `surface.clear`
+   - delta in `surface.readback_rgba`
+   - delta in `ffmpeg.write`
+6. Run visual regression checks on the same sampled frames already used in earlier phases.
+7. Run a cancel test after the major buffer/surface architecture changes to ensure resource reuse does not leak or deadlock.
 
-Recorded artifacts for Optional Phase 6:
+Recorded artifacts for Phase 6:
 
-- wasm/native dense JSON comparisons
-- desktop `rust-skia` vs browser CanvasKit preview PNGs or equivalent captured frames
-- bundle analysis showing deferred wasm/render chunks
-- browser export capability matrix by browser
-- manual test notes for cancellation, responsiveness, and artifact download
+- median baseline reports for 1080p and 4K
+- per-milestone `timing_summary.json`
+- per-milestone `prepare_render_assets_timing.json`
+- ffprobe JSONs
+- final optimized `.mov` outputs
+- optimization notes documenting which surface/buffer strategy won and why
+
+### Deferred optional phase: Browser-hosted build from the same repo
+
+This work is explicitly deferred until after desktop performance optimization. If revisited later, it should start from the optimized native architecture produced by Phase 6 rather than the current Phase 5 frame pipeline.
 
 ### Deferred phase: GPU Skia
 

@@ -1,0 +1,80 @@
+{
+  "phase": "phase_5",
+  "timestamp": "2026-04-24T21:57:10",
+  "overlay_filename": "H:\\tools\\cyclemetry\\backend\\public\\video_1777060610.mov",
+  "fps": 30.0,
+  "width": 1920,
+  "height": 1080,
+  "total_frames": 900,
+  "rendered_frames": 900,
+  "total_time_taken": 20.387,
+  "sample_frame_indices": [
+    0,
+    225,
+    450,
+    675,
+    899
+  ],
+  "timings": {
+    "base.restore": {
+      "count": 900,
+      "total_ms": 1333.1019999999983,
+      "avg_ms": 1.4812244444444425,
+      "max_ms": 28.8516
+    },
+    "composite.elevation": {
+      "count": 900,
+      "total_ms": 6414.935299999994,
+      "avg_ms": 7.127705888888882,
+      "max_ms": 32.6729
+    },
+    "composite.route": {
+      "count": 900,
+      "total_ms": 454.90929999999963,
+      "avg_ms": 0.5054547777777774,
+      "max_ms": 12.2959
+    },
+    "encoder.queue_wait": {
+      "count": 901,
+      "total_ms": 18993.12920000002,
+      "avg_ms": 21.080054605993364,
+      "max_ms": 139.5315
+    },
+    "ffmpeg.write": {
+      "count": 900,
+      "total_ms": 909.6225999999991,
+      "avg_ms": 1.0106917777777769,
+      "max_ms": 3.4128000000000003
+    },
+    "frame.draw": {
+      "count": 900,
+      "total_ms": 9141.224500000004,
+      "avg_ms": 10.156916111111116,
+      "max_ms": 38.036500000000004
+    },
+    "frame.total": {
+      "count": 900,
+      "total_ms": 20215.01570000002,
+      "avg_ms": 22.46112855555558,
+      "max_ms": 139.50809999999998
+    },
+    "queue.put_wait": {
+      "count": 900,
+      "total_ms": 93.7183,
+      "avg_ms": 0.10413144444444444,
+      "max_ms": 4.0701
+    },
+    "text.dynamic": {
+      "count": 900,
+      "total_ms": 755.1320000000002,
+      "avg_ms": 0.8390355555555558,
+      "max_ms": 17.453799999999998
+    },
+    "text.elevation_label": {
+      "count": 900,
+      "total_ms": 39.20720000000001,
+      "avg_ms": 0.043563555555555564,
+      "max_ms": 22.0711
+    }
+  }
+}
