@@ -382,7 +382,7 @@ Recorded artifacts for Phase 4:
 - Preview PNG rendering remains decoupled from production encode path
 - Write raw `rgba` frames to FFmpeg stdin exactly as today.
 - Preserve template-configurable FFmpeg options under `scene.ffmpeg`.
-- Implement dropdown menu in global settings of frontend to allow selection of different codecs with alpha channel. Primary one will be prores_ks (Prores4444), the other options must include HEVC(H.265), prores_videotoolbox (if device is macOS), and prores_vulkan (ensure FFMPEG8.1 is used, and see the source code to derive the invocation: https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/vulkan_prores.c)
+- Implement dropdown menu in global settings of frontend to allow selection of different codecs with alpha channel. Primary one will be prores_ks (Prores4444; see the current Python implementation for invocation), the other options must include HEVC(H.265 with alpha), prores_videotoolbox (if device is macOS), and prores_vulkan (ensure FFMPEG8.1 is used, and see the source code to derive the invocation: https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/vulkan_prores.c)
 - Runtime timings must mirror the Python baseline lifecycle rather than arbitrary Rust internals:
   - one-time preparation goes to `prepare_render_assets_timing.json`, including `create_base_image`, route/elevation cache setup, static label cache population, and `prepare_render_assets.total`
   - per-frame steady-state work goes to `timing_summary.json`, with top-level `frame.draw` wrapping only work that Python measured inside `Frame.draw(...)`
