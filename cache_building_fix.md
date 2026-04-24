@@ -67,7 +67,7 @@ Bring Rust route/elevation cache preparation down to the same order of magnitude
 - Use the same full-activity template/activity pair that exposed the issue:
 
 ```powershell
-cargo run --bin render_preview -- --config ..\tmp\new_template_render_config.json --payload ..\app\debug\2025-04-21_2180810019_Velkonocne_blbnutie_z_Zugu-parse-debug.json --seconds 600,607,615,622,629 --out ..\tmp\Phase4\rust-fix\template_previe_600.png --timing-out ..\tmp\Phase4\rust-fix\template_preview_batch_timing.json
+cargo run --bin render_preview -- --config ..\templates\new_template.json --payload ..\app\debug\2025-04-21_2180810019_Velkonocne_blbnutie_z_Zugu-parse-debug.json --seconds 600,607,615,622,629 --out ..\tmp\Phase4\rust-fix\template_previe_600.png --timing-out ..\tmp\Phase4\rust-fix\template_preview_batch_timing.json
 ```
 
 - Success criteria:

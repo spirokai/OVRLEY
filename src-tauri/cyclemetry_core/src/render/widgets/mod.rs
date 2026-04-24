@@ -20,15 +20,22 @@ pub fn prepare_render_assets(
     let mut assets = PreparedRenderAssets::default();
 
     if let Some(route_plot) = config.course_plot()? {
-        assets.route_cache = Some(prepare_profiler.measure("build_route_cache", || {
-            route::prepare_route_cache(config, activity, dense_activity, &route_plot)
-        })?);
+        assets.route_cache = Some(route::prepare_route_cache(
+            config,
+            activity,
+            dense_activity,
+            &route_plot,
+            prepare_profiler,
+        )?);
     }
 
     if let Some(elevation_plot) = config.elevation_plot()? {
-        assets.elevation_cache = Some(prepare_profiler.measure(
-            "build_elevation_cache",
-            || elevation::prepare_elevation_cache(config, activity, dense_activity, &elevation_plot),
+        assets.elevation_cache = Some(elevation::prepare_elevation_cache(
+            config,
+            activity,
+            dense_activity,
+            &elevation_plot,
+            prepare_profiler,
         )?);
     }
 

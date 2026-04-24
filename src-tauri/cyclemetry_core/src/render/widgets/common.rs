@@ -65,73 +65,93 @@ pub(crate) fn fit_points_to_widget(
         .collect()
 }
 
-pub(crate) fn absolute_distance_progress_for_frame(
+fn interpolate_numeric_points(points: &[(f64, f64)], target_x: f64) -> Option<f64> {
+    if points.is_empty() {
+        return None;
+    }
+    if target_x <= points[0].0 {
+        return Some(points[0].1);
+    }
+    let last_index = points.len() - 1;
+    if target_x >= points[last_index].0 {
+        return Some(points[last_index].1);
+    }
+
+    let right_index = points.partition_point(|(x, _)| *x < target_x);
+    if right_index == 0 {
+        return Some(points[0].1);
+    }
+    if right_index >= points.len() {
+        return Some(points[last_index].1);
+    }
+
+    let (left_x, left_y) = points[right_index - 1];
+    let (right_x, right_y) = points[right_index];
+    let delta = (right_x - left_x).max(f64::EPSILON);
+    let mix = (target_x - left_x) / delta;
+    Some(left_y + (right_y - left_y) * mix)
+}
+
+fn interpolate_numeric_series_many(
+    x_values: &[f64],
+    y_values: &[f64],
+    target_x_values: &[f64],
+) -> Vec<f32> {
+    let valid_points = x_values
+        .iter()
+        .copied()
+        .zip(y_values.iter().copied())
+        .filter(|(x, y)| x.is_finite() && y.is_finite())
+        .collect::<Vec<_>>();
+    if valid_points.is_empty() {
+        return vec![0.0; target_x_values.len()];
+    }
+
+    target_x_values
+        .iter()
+        .map(|target_x| interpolate_numeric_points(&valid_points, *target_x).unwrap_or(0.0) as f32)
+        .collect()
+}
+
+pub(crate) fn frame_progress_values(
     config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
-    frame_index: usize,
-) -> f32 {
-    let absolute_second = config.scene.start
-        + dense_activity
+) -> Vec<f32> {
+    let total_frames = dense_activity.frame_count.max(1);
+    if dense_activity.frame_distance_progress.len() == total_frames {
+        return dense_activity
+            .frame_distance_progress
+            .iter()
+            .map(|value| value.unwrap_or_default().clamp(0.0, 1.0) as f32)
+            .collect();
+    }
+
+    if activity.sample_elapsed_seconds.len() >= 2
+        && activity.sample_distance_progress.len() >= 2
+        && !dense_activity.frame_elapsed_seconds.is_empty()
+    {
+        let target_elapsed_seconds = dense_activity
             .frame_elapsed_seconds
-            .get(frame_index)
-            .copied()
-            .unwrap_or_default();
-    interpolate_progress_at_elapsed(activity, absolute_second)
-}
-
-pub(crate) fn interpolate_progress_at_elapsed(
-    activity: &ParsedActivity,
-    elapsed_second: f64,
-) -> f32 {
-    let elapsed = &activity.sample_elapsed_seconds;
-    let progress = &activity.sample_distance_progress;
-    if elapsed.len() >= 2 && progress.len() >= 2 {
-        if let Some(value) = interpolate_numeric_series(elapsed, progress, elapsed_second) {
-            return value.clamp(0.0, 1.0) as f32;
-        }
+            .iter()
+            .map(|elapsed| config.scene.start + *elapsed)
+            .collect::<Vec<_>>();
+        return interpolate_numeric_series_many(
+            &activity.sample_elapsed_seconds,
+            &activity.sample_distance_progress,
+            &target_elapsed_seconds,
+        )
+        .into_iter()
+        .map(|value| value.clamp(0.0, 1.0))
+        .collect();
     }
 
-    let first = elapsed.first().copied().unwrap_or(0.0);
-    let last = elapsed.last().copied().unwrap_or(first);
-    let duration = (last - first).max(1e-9);
-    ((elapsed_second - first) / duration).clamp(0.0, 1.0) as f32
-}
-
-pub(crate) fn interpolate_numeric_series(
-    x_values: &[f64],
-    y_values: &[f64],
-    target_x: f64,
-) -> Option<f64> {
-    if x_values.len() != y_values.len() || x_values.is_empty() {
-        return None;
+    if total_frames == 1 {
+        return vec![0.0];
     }
-    if target_x <= x_values[0] {
-        return Some(y_values[0]);
-    }
-    let last_index = x_values.len() - 1;
-    if target_x >= x_values[last_index] {
-        return Some(y_values[last_index]);
-    }
-
-    for index in 1..x_values.len() {
-        let left_x = x_values[index - 1];
-        let right_x = x_values[index];
-        let left_y = y_values[index - 1];
-        let right_y = y_values[index];
-        if !left_x.is_finite() || !right_x.is_finite() || !left_y.is_finite() || !right_y.is_finite()
-        {
-            continue;
-        }
-        if right_x < target_x {
-            continue;
-        }
-        let delta = (right_x - left_x).max(f64::EPSILON);
-        let mix = (target_x - left_x) / delta;
-        return Some(left_y + (right_y - left_y) * mix);
-    }
-
-    Some(y_values[last_index])
+    (0..total_frames)
+        .map(|frame_index| frame_index as f32 / (total_frames - 1) as f32)
+        .collect()
 }
 
 pub(crate) fn interpolate_optional_numeric_series(
@@ -168,41 +188,53 @@ pub(crate) fn interpolate_optional_numeric_series(
     Some(valid[last_index].1)
 }
 
-pub(crate) fn point_at_metric_progress(
+pub(crate) fn point_at_metric_progress_with_cursor(
     points: &[(f32, f32)],
     progress_values: &[f32],
     target_progress: f32,
+    cursor: &mut usize,
 ) -> Option<(usize, f32, f32)> {
     if points.is_empty() || progress_values.len() != points.len() {
         return None;
     }
-    let safe_target = target_progress.clamp(0.0, 1.0);
-    if safe_target <= progress_values[0] {
+
+    if points.len() == 1 {
+        *cursor = 0;
         return Some((0, points[0].0, points[0].1));
     }
+
+    let safe_target = target_progress.clamp(0.0, 1.0);
     let last_index = points.len() - 1;
+    if safe_target <= progress_values[0] {
+        *cursor = 0;
+        return Some((1, points[0].0, points[0].1));
+    }
     if safe_target >= progress_values[last_index] {
+        *cursor = last_index.saturating_sub(1);
         return Some((last_index, points[last_index].0, points[last_index].1));
     }
 
-    for index in 1..points.len() {
-        let left_progress = progress_values[index - 1];
-        let right_progress = progress_values[index];
-        if right_progress < safe_target {
-            continue;
-        }
-        let span = (right_progress - left_progress).max(1e-6);
-        let mix = (safe_target - left_progress) / span;
-        let left_point = points[index - 1];
-        let right_point = points[index];
-        return Some((
-            index,
-            left_point.0 + (right_point.0 - left_point.0) * mix,
-            left_point.1 + (right_point.1 - left_point.1) * mix,
-        ));
+    while *cursor + 1 < progress_values.len() && progress_values[*cursor + 1] < safe_target {
+        *cursor += 1;
     }
 
-    Some((last_index, points[last_index].0, points[last_index].1))
+    while *cursor > 0 && progress_values[*cursor] > safe_target {
+        *cursor -= 1;
+    }
+
+    let left_index = (*cursor).min(last_index.saturating_sub(1));
+    let right_index = (left_index + 1).min(last_index);
+    let left_progress = progress_values[left_index];
+    let right_progress = progress_values[right_index];
+    let span = (right_progress - left_progress).max(1e-6);
+    let mix = (safe_target - left_progress) / span;
+    let left_point = points[left_index];
+    let right_point = points[right_index];
+    Some((
+        right_index,
+        left_point.0 + (right_point.0 - left_point.0) * mix,
+        left_point.1 + (right_point.1 - left_point.1) * mix,
+    ))
 }
 
 pub(crate) fn point_at_progress_x(

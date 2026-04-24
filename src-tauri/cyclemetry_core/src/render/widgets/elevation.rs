@@ -1,8 +1,8 @@
 use super::common::{
-    absolute_distance_progress_for_frame, draw_area, draw_marker, draw_polyline,
-    fallback_marker_points, format_elevation_label, interpolate_optional_numeric_series,
-    legacy_line_width, marker_layers_from_points, marker_size_from_weights, normalize_opacity,
-    plot_base_color, point_at_metric_progress, point_at_progress_x, resolve_style_color,
+    draw_area, draw_marker, draw_polyline, fallback_marker_points, format_elevation_label,
+    frame_progress_values, interpolate_optional_numeric_series, legacy_line_width,
+    marker_layers_from_points, marker_size_from_weights, normalize_opacity, plot_base_color,
+    point_at_metric_progress_with_cursor, point_at_progress_x, resolve_style_color,
     rotate_point_to_canvas, widget_render_report, with_widget_transform,
     DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER, DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER,
     DEFAULT_ELEVATION_MARKER_SCALE,
@@ -17,17 +17,28 @@ use crate::config::{ElevationPlotConfig, RenderConfig};
 use crate::debug::RenderProfiler;
 use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};
 use skia_safe::Canvas;
+use std::time::Instant;
 
 pub(crate) fn prepare_elevation_cache(
     config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     plot: &ElevationPlotConfig,
+    prepare_profiler: &mut RenderProfiler,
 ) -> Result<ElevationWidgetCache, String> {
+    let prepare_started = Instant::now();
     let plot = normalize_elevation_plot(config, plot);
-    let geometry = build_elevation_geometry(&plot, activity)?;
+    let geometry = prepare_profiler.measure("build_elevation_cache.geometry", || {
+        build_elevation_geometry(&plot, activity)
+    })?;
     let marker_layers = marker_layers_from_points(&plot.marker_points);
-    let frame_states = build_elevation_frame_states(config, activity, dense_activity, &geometry);
+    let frame_states = prepare_profiler.measure("build_elevation_cache.frame_states", || {
+        build_elevation_frame_states(config, activity, dense_activity, &geometry)
+    });
+    prepare_profiler.record_ms(
+        "build_elevation_cache",
+        prepare_started.elapsed().as_secs_f64() * 1000.0,
+    );
 
     Ok(ElevationWidgetCache {
         plot,
@@ -359,21 +370,36 @@ fn build_elevation_frame_states(
     dense_activity: &DenseActivityReport,
     geometry: &WidgetGeometry,
 ) -> Vec<ElevationFrameState> {
-    let total_frames = dense_activity.frame_count.max(1);
+    let frame_progress = frame_progress_values(config, activity, dense_activity);
+    let fallback_elevations = if dense_activity.series.elevation.len() == frame_progress.len() {
+        None
+    } else {
+        Some(interpolate_elevation_for_progresses(activity, &frame_progress))
+    };
+    let mut progress_cursor = 0usize;
 
-    (0..total_frames)
-        .map(|frame_index| {
-            let progress01 =
-                absolute_distance_progress_for_frame(config, activity, dense_activity, frame_index);
-            let (_, marker_x, marker_y) = point_at_metric_progress(
+    frame_progress
+        .into_iter()
+        .enumerate()
+        .map(|(frame_index, progress01)| {
+            let (_, marker_x, marker_y) = point_at_metric_progress_with_cursor(
                 &geometry.points,
                 &geometry.progress_values,
                 progress01,
+                &mut progress_cursor,
             )
             .or_else(|| point_at_progress_x(&geometry.points, progress01))
             .unwrap_or((0, 0.0, 0.0));
-            let elevation_m = interpolated_elevation_at_progress(activity, progress01)
-                .or_else(|| dense_activity.series.elevation.get(frame_index).and_then(|value| *value))
+            let elevation_m = dense_activity
+                .series
+                .elevation
+                .get(frame_index)
+                .and_then(|value| *value)
+                .or_else(|| {
+                    fallback_elevations
+                        .as_ref()
+                        .and_then(|values| values.get(frame_index).copied())
+                })
                 .unwrap_or(0.0);
             ElevationFrameState {
                 progress01,
@@ -498,7 +524,10 @@ fn build_elevation_completed_points(
     result
 }
 
-fn interpolated_elevation_at_progress(activity: &ParsedActivity, progress01: f32) -> Option<f64> {
+fn interpolate_elevation_for_progresses(
+    activity: &ParsedActivity,
+    frame_progresses: &[f32],
+) -> Vec<f64> {
     let elevations = if activity.sample_elevations.is_empty() {
         &activity.elevation
     } else {
@@ -506,8 +535,14 @@ fn interpolated_elevation_at_progress(activity: &ParsedActivity, progress01: f32
     };
     let progress_values = &activity.sample_distance_progress;
     if elevations.is_empty() || progress_values.is_empty() {
-        return None;
+        return vec![0.0; frame_progresses.len()];
     }
 
-    interpolate_optional_numeric_series(progress_values, elevations, progress01 as f64)
+    frame_progresses
+        .iter()
+        .map(|progress01| {
+            interpolate_optional_numeric_series(progress_values, elevations, *progress01 as f64)
+                .unwrap_or(0.0)
+        })
+        .collect()
 }

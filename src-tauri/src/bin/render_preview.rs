@@ -2,7 +2,10 @@ use cyclemetry_core::activity::{build_dense_activity_report, parse_activity_json
 use cyclemetry_core::commands::AppPaths;
 use cyclemetry_core::config::parse_config_json;
 use cyclemetry_core::debug::TimingBucket;
-use cyclemetry_core::render::{render_preview_with_report, PreviewRenderReport};
+use cyclemetry_core::render::{
+    prepare_preview_assets, render_preview_with_prepared_assets, LabelCacheStatus,
+    PreviewRenderReport,
+};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -152,8 +155,10 @@ fn main() -> Result<(), String> {
     let dense_activity = build_dense_activity_report(&activity, &config)?;
 
     let paths = AppPaths::from_repo_root(repo_root()?);
+    let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
+        prepare_preview_assets(&paths, &config, &activity, &dense_activity)?;
     let mut reports = Vec::with_capacity(seconds.len());
-    for second in seconds {
+    for (index, second) in seconds.into_iter().enumerate() {
         let target_out_path = if reports.is_empty() {
             out_path.clone()
         } else {
@@ -173,12 +178,30 @@ fn main() -> Result<(), String> {
                 .map_err(|error| format!("Failed to create {}: {error}", parent.display()))?;
         }
 
-        let (_, report) = render_preview_with_report(
+        let prepare_timings_for_frame = if index == 0 {
+            prepare_timings.clone()
+        } else {
+            BTreeMap::new()
+        };
+        let per_frame_label_cache_status = if index == 0 {
+            label_cache_status
+        } else {
+            match label_cache_status {
+                LabelCacheStatus::None => LabelCacheStatus::None,
+                LabelCacheStatus::Hit | LabelCacheStatus::Miss => LabelCacheStatus::Hit,
+            }
+        };
+        let extra_total_ms = if index == 0 { prepare_total_ms } else { 0.0 };
+
+        let (_, report) = render_preview_with_prepared_assets(
             &paths,
             &config,
-            &activity,
             &dense_activity,
+            &prepared_preview_assets,
             second,
+            prepare_timings_for_frame,
+            per_frame_label_cache_status,
+            extra_total_ms,
             &target_out_path,
         )?;
         reports.push(report);

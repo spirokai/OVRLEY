@@ -43,6 +43,7 @@ pub(crate) struct RouteFrameState {
     pub(crate) progress01: f32,
     pub(crate) marker_x: f32,
     pub(crate) marker_y: f32,
+    pub(crate) segment_index: usize,
 }
 
 #[derive(Clone, Debug)]

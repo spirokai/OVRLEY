@@ -1,7 +1,7 @@
 use super::common::{
-    absolute_distance_progress_for_frame, distance, draw_marker, draw_polyline, fit_points_to_widget,
-    fallback_marker_points, legacy_line_width, marker_layers_from_points, marker_size_from_weights,
-    normalize_opacity, plot_base_color, point_at_metric_progress, resolve_style_color,
+    distance, draw_marker, draw_polyline, fallback_marker_points, fit_points_to_widget,
+    frame_progress_values, legacy_line_width, marker_layers_from_points, marker_size_from_weights,
+    normalize_opacity, plot_base_color, point_at_metric_progress_with_cursor, resolve_style_color,
     widget_render_report, with_widget_transform, DEFAULT_MARGIN,
     DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER,
     DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
@@ -14,17 +14,27 @@ use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::{CoursePlotConfig, RenderConfig};
 use crate::debug::RenderProfiler;
 use skia_safe::Canvas;
+use std::time::Instant;
 
 pub(crate) fn prepare_route_cache(
     config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     plot: &CoursePlotConfig,
+    prepare_profiler: &mut RenderProfiler,
 ) -> Result<RouteWidgetCache, String> {
+    let prepare_started = Instant::now();
     let plot = normalize_route_plot(config, plot);
-    let geometry = build_route_geometry(&plot, activity)?;
+    let geometry =
+        prepare_profiler.measure("build_route_cache.geometry", || build_route_geometry(&plot, activity))?;
     let marker_layers = marker_layers_from_points(&plot.marker_points);
-    let frame_states = build_route_frame_states(config, activity, &geometry, dense_activity);
+    let frame_states = prepare_profiler.measure("build_route_cache.frame_states", || {
+        build_route_frame_states(config, activity, &geometry, dense_activity)
+    });
+    prepare_profiler.record_ms(
+        "build_route_cache",
+        prepare_started.elapsed().as_secs_f64() * 1000.0,
+    );
 
     Ok(RouteWidgetCache {
         plot,
@@ -190,21 +200,23 @@ fn build_route_frame_states(
     geometry: &WidgetGeometry,
     dense_activity: &DenseActivityReport,
 ) -> Vec<RouteFrameState> {
-    let total_frames = dense_activity.frame_count.max(1);
-    (0..total_frames)
-        .map(|frame_index| {
-            let progress01 =
-                absolute_distance_progress_for_frame(config, activity, dense_activity, frame_index);
-            let (_, marker_x, marker_y) = point_at_metric_progress(
+    let frame_progress = frame_progress_values(config, activity, dense_activity);
+    let mut progress_cursor = 0usize;
+    frame_progress
+        .into_iter()
+        .map(|progress01| {
+            let (segment_index, marker_x, marker_y) = point_at_metric_progress_with_cursor(
                 &geometry.points,
                 &geometry.progress_values,
                 progress01,
+                &mut progress_cursor,
             )
             .unwrap_or_else(|| route_position_at_progress(&geometry.points, progress01));
             RouteFrameState {
                 progress01,
                 marker_x,
                 marker_y,
+                segment_index,
             }
         })
         .collect()
@@ -318,17 +330,24 @@ fn build_route_prefix_points(
     geometry: &WidgetGeometry,
     state: &RouteFrameState,
 ) -> Vec<(f32, f32)> {
-    let mut points = geometry
-        .points
-        .iter()
-        .zip(geometry.progress_values.iter())
-        .filter_map(|(point, progress)| (*progress <= state.progress01).then_some(*point))
-        .collect::<Vec<_>>();
-    if points.is_empty()
-        || distance(
-            *points.last().unwrap_or(&(f32::MIN, f32::MIN)),
-            (state.marker_x, state.marker_y),
-        ) > 1e-3
+    if geometry.points.is_empty() {
+        return Vec::new();
+    }
+
+    let last_point = *geometry.points.last().unwrap_or(&(state.marker_x, state.marker_y));
+    let mut points = if distance(last_point, (state.marker_x, state.marker_y)) <= 1e-3 {
+        geometry.points.clone()
+    } else {
+        let prefix_len = state.segment_index.min(geometry.points.len());
+        geometry.points[..prefix_len].to_vec()
+    };
+    if points.is_empty() {
+        points.push(geometry.points[0]);
+    }
+    if distance(
+        *points.last().unwrap_or(&(f32::MIN, f32::MIN)),
+        (state.marker_x, state.marker_y),
+    ) > 1e-3
     {
         points.push((state.marker_x, state.marker_y));
     }

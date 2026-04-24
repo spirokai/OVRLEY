@@ -50,6 +50,44 @@ pub struct PreviewRenderReport {
     pub preview_only_timings: BTreeMap<String, TimingBucket>,
 }
 
+#[derive(Clone)]
+pub struct PreparedPreviewAssets {
+    labels_image: Option<Image>,
+    prepared_assets: PreparedRenderAssets,
+}
+
+pub fn prepare_preview_assets(
+    paths: &AppPaths,
+    config: &RenderConfig,
+    activity: &ParsedActivity,
+    dense_activity: &DenseActivityReport,
+) -> Result<(PreparedPreviewAssets, LabelCacheStatus, BTreeMap<String, TimingBucket>, f64), String>
+{
+    let width = config.scene.width.unwrap_or(1920);
+    let height = config.scene.height.unwrap_or(1080);
+    let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
+    let mut prepare_profiler = RenderProfiler::default();
+    let prepare_started = Instant::now();
+    let (labels_image, label_cache_status) =
+        cached_labels_image(paths, config, width, height, scale, &mut prepare_profiler)?;
+    let prepared_assets =
+        prepare_render_assets(config, activity, dense_activity, &mut prepare_profiler)?;
+    let prepare_timings = annotate_timing_aliases(prepare_profiler.summary(), &[(
+        "prepare.surface.clear",
+        "surface.clear",
+    )]);
+
+    Ok((
+        PreparedPreviewAssets {
+            labels_image,
+            prepared_assets,
+        },
+        label_cache_status,
+        prepare_timings,
+        prepare_started.elapsed().as_secs_f64() * 1000.0,
+    ))
+}
+
 pub fn render_preview_to_path(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -70,19 +108,39 @@ pub fn render_preview_with_report(
     second: u32,
     out_path: &Path,
 ) -> Result<((), PreviewRenderReport), String> {
+    let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
+        prepare_preview_assets(paths, config, activity, dense_activity)?;
+    render_preview_with_prepared_assets(
+        paths,
+        config,
+        dense_activity,
+        &prepared_preview_assets,
+        second,
+        prepare_timings,
+        label_cache_status,
+        prepare_total_ms,
+        out_path,
+    )
+}
+
+pub fn render_preview_with_prepared_assets(
+    paths: &AppPaths,
+    config: &RenderConfig,
+    dense_activity: &DenseActivityReport,
+    prepared_preview_assets: &PreparedPreviewAssets,
+    second: u32,
+    prepare_timings: BTreeMap<String, TimingBucket>,
+    label_cache_status: LabelCacheStatus,
+    extra_total_ms: f64,
+    out_path: &Path,
+) -> Result<((), PreviewRenderReport), String> {
     let width = config.scene.width.unwrap_or(1920);
     let height = config.scene.height.unwrap_or(1080);
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let frame_index = frame_index_for_second(config, dense_activity, second);
-    let mut prepare_profiler = RenderProfiler::default();
     let mut frame_profiler = RenderProfiler::default();
     let mut preview_profiler = RenderProfiler::default();
     let total_started = Instant::now();
-
-    let (labels_image, label_cache_status) =
-        cached_labels_image(paths, config, width, height, scale, &mut prepare_profiler)?;
-    let prepared_assets =
-        prepare_render_assets(config, activity, dense_activity, &mut prepare_profiler)?;
 
     let mut surface = create_surface(width, height)?;
     preview_profiler.measure("preview.surface.create_clear", || {
@@ -94,10 +152,10 @@ pub fn render_preview_with_report(
         paths,
         config,
         dense_activity,
-        &prepared_assets,
+        &prepared_preview_assets.prepared_assets,
         frame_index,
         scale,
-        labels_image.as_ref(),
+        prepared_preview_assets.labels_image.as_ref(),
         &mut frame_profiler,
     );
 
@@ -106,10 +164,6 @@ pub fn render_preview_with_report(
             .map_err(|error| format!("Failed to render preview frame: {error}"))
     })?;
 
-    let prepare_timings = annotate_timing_aliases(prepare_profiler.summary(), &[(
-        "prepare.surface.clear",
-        "surface.clear",
-    )]);
     let frame_timings = annotate_timing_aliases(frame_profiler.summary(), &[(
         "base.restore",
         "base.copy",
@@ -143,7 +197,7 @@ pub fn render_preview_with_report(
         frame_index,
         width,
         height,
-        total_ms: total_started.elapsed().as_secs_f64() * 1000.0,
+        total_ms: total_started.elapsed().as_secs_f64() * 1000.0 + extra_total_ms,
         surface_ms,
         label_layer_ms,
         value_draw_ms,
