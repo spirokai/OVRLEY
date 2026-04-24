@@ -7,13 +7,13 @@ import { buildWidgetTransform } from './utils'
 
 const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({
+    activity,
+    globalOpacity,
     widget,
     globalScale,
-    globalOpacity,
-    activity,
     previewSecond,
     registerNode,
-    setSelectedWidgetId,
+    handleWidgetMouseDown,
   }) {
     const x = widget.data.x ?? 0
     const y = widget.data.y ?? 0
@@ -26,6 +26,7 @@ const OverlayCanvasWidget = memo(
     return (
       <div
         ref={registerNode}
+        data-widget-id={widget.id}
         className="group absolute cursor-move select-none rounded-xl border border-transparent transition-shadow"
         style={{
           left: x,
@@ -37,8 +38,7 @@ const OverlayCanvasWidget = memo(
             widget.type === 'course' ? 'center center' : 'top left',
         }}
         onMouseDown={(event) => {
-          event.stopPropagation()
-          setSelectedWidgetId(widget.id)
+          handleWidgetMouseDown(event, widget.id)
         }}
       >
         <div className="absolute -top-7 left-0 flex items-center gap-1 rounded-full border border-border/70 bg-card/80 px-2 py-1 text-[10px] font-semibold text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
@@ -60,7 +60,8 @@ const OverlayCanvasWidget = memo(
     previousProps.globalOpacity === nextProps.globalOpacity &&
     previousProps.activity === nextProps.activity &&
     previousProps.previewSecond === nextProps.previewSecond &&
-    previousProps.registerNode === nextProps.registerNode,
+    previousProps.registerNode === nextProps.registerNode &&
+    previousProps.handleWidgetMouseDown === nextProps.handleWidgetMouseDown,
 )
 
 export default function OverlayCanvas({
@@ -72,13 +73,16 @@ export default function OverlayCanvas({
   backgroundMode,
   sceneSize,
   setSceneElement,
+  selectionRect,
+  handleSceneMouseDown,
+  handleWidgetMouseDown,
   widgetRefCallbacks,
-  setSelectedWidgetId,
 }) {
   return (
     <div
       ref={setSceneElement}
       className="relative overflow-visible"
+      onMouseDown={handleSceneMouseDown}
       style={{
         width: sceneSize.width,
         height: sceneSize.height,
@@ -102,11 +106,22 @@ export default function OverlayCanvas({
               activity={activity}
               previewSecond={previewSecond}
               registerNode={widgetRefCallbacks[widget.id]}
-              setSelectedWidgetId={setSelectedWidgetId}
+              handleWidgetMouseDown={handleWidgetMouseDown}
             />
           )
         })}
       </div>
+      {selectionRect ? (
+        <div
+          className="pointer-events-none absolute border border-primary/70 bg-primary/10"
+          style={{
+            left: selectionRect.x,
+            top: selectionRect.y,
+            width: selectionRect.width,
+            height: selectionRect.height,
+          }}
+        />
+      ) : null}
     </div>
   )
 }

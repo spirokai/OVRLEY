@@ -593,7 +593,7 @@ function App() {
                 onClick={handleOpenDownloads}
               >
                 <FolderOpen className="h-3.5 w-3.5" />
-                <span>Downloads</span>
+                <span>Overlays</span>
               </Button>
             </SimpleTooltip>
 

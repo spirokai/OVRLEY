@@ -39,6 +39,8 @@ function OverlayEditor({
     elementGuidelines,
     globalOpacity,
     globalScale,
+    handleSceneMouseDown,
+    handleWidgetMouseDown,
     handleWheel,
     handlers,
     maintainAspectRatio,
@@ -48,8 +50,9 @@ function OverlayEditor({
     sceneElement,
     sceneSize,
     selectedTarget,
+    selectedTargets,
+    selectionRect,
     setSceneElement,
-    setSelectedWidgetId,
     viewportRef,
     widgetRefCallbacks,
     widgets,
@@ -97,13 +100,16 @@ function OverlayEditor({
               backgroundMode={backgroundMode}
               sceneSize={sceneSize}
               setSceneElement={setSceneElement}
+              selectionRect={selectionRect}
+              handleSceneMouseDown={handleSceneMouseDown}
+              handleWidgetMouseDown={handleWidgetMouseDown}
               widgetRefCallbacks={widgetRefCallbacks}
-              setSelectedWidgetId={setSelectedWidgetId}
             />
 
             <OverlayMoveable
               moveableRef={moveableRef}
               selectedTarget={selectedTarget}
+              selectedTargets={selectedTargets}
               sceneElement={sceneElement}
               displayScale={displayScale}
               canResizeSelected={canResizeSelected}

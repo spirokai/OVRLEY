@@ -86,6 +86,44 @@ export function updateWidgetInConfig(config, widgetId, updates) {
   return nextConfig
 }
 
+export function updateWidgetsInConfig(config, updatesById) {
+  if (!config || !updatesById || typeof updatesById !== 'object') {
+    return config
+  }
+
+  const widgetUpdates = Object.entries(updatesById).filter(
+    ([, updates]) => updates && typeof updates === 'object',
+  )
+  if (!widgetUpdates.length) {
+    return config
+  }
+
+  const widgetsById = Object.fromEntries(
+    buildConfigWidgets(config).map((widget) => [widget.id, widget]),
+  )
+  const nextConfig = cloneConfig(config)
+  let hasChanges = false
+
+  widgetUpdates.forEach(([widgetId, updates]) => {
+    const widget = widgetsById[widgetId]
+    const currentWidget = widget
+      ? nextConfig[widget.category]?.[widget.index]
+      : null
+
+    if (!widget || !currentWidget) {
+      return
+    }
+
+    nextConfig[widget.category][widget.index] = {
+      ...currentWidget,
+      ...updates,
+    }
+    hasChanges = true
+  })
+
+  return hasChanges ? nextConfig : config
+}
+
 export function replaceWidgetInConfig(config, widgetId, nextWidgetData) {
   if (!config) return config
 
@@ -109,6 +147,44 @@ export function deleteWidgetInConfig(config, widgetId) {
   nextConfig[widget.category] = (nextConfig[widget.category] || []).filter(
     (_, index) => index !== widget.index,
   )
+
+  return nextConfig
+}
+
+export function deleteWidgetsInConfig(config, widgetIds) {
+  if (!config || !Array.isArray(widgetIds) || !widgetIds.length) {
+    return config
+  }
+
+  const idsToDelete = new Set(widgetIds)
+  const indexesByCategory = buildConfigWidgets(config).reduce(
+    (accumulator, widget) => {
+      if (!idsToDelete.has(widget.id)) {
+        return accumulator
+      }
+
+      if (!accumulator[widget.category]) {
+        accumulator[widget.category] = new Set()
+      }
+
+      accumulator[widget.category].add(widget.index)
+      return accumulator
+    },
+    {},
+  )
+
+  const categories = Object.keys(indexesByCategory)
+  if (!categories.length) {
+    return config
+  }
+
+  const nextConfig = cloneConfig(config)
+  categories.forEach((category) => {
+    const indexes = indexesByCategory[category]
+    nextConfig[category] = (nextConfig[category] || []).filter(
+      (_, index) => !indexes.has(index),
+    )
+  })
 
   return nextConfig
 }

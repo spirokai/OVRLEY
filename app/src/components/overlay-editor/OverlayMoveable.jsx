@@ -3,6 +3,7 @@ import Moveable from 'react-moveable'
 export default function OverlayMoveable({
   moveableRef,
   selectedTarget,
+  selectedTargets,
   sceneElement,
   displayScale,
   canResizeSelected,
@@ -13,7 +14,9 @@ export default function OverlayMoveable({
   sceneSize,
   handlers,
 }) {
-  if (!selectedTarget || !sceneElement) {
+  const isGroupSelection = selectedTargets.length > 1
+
+  if ((!selectedTarget && !selectedTargets.length) || !sceneElement) {
     return null
   }
 
@@ -21,10 +24,13 @@ export default function OverlayMoveable({
     <Moveable
       ref={moveableRef}
       className="cyclemetry-moveable"
-      target={selectedTarget}
+      target={selectedTarget || undefined}
+      targets={selectedTargets.length ? selectedTargets : undefined}
       container={sceneElement}
       origin={false}
       edge={false}
+      groupable={isGroupSelection}
+      passDragArea={isGroupSelection}
       draggable
       resizable={canResizeSelected}
       scalable={canScaleSelected}
@@ -43,6 +49,9 @@ export default function OverlayMoveable({
       onDragStart={handlers.onDragStart}
       onDrag={handlers.onDrag}
       onDragEnd={handlers.onDragEnd}
+      onDragGroupStart={handlers.onDragGroupStart}
+      onDragGroup={handlers.onDragGroup}
+      onDragGroupEnd={handlers.onDragGroupEnd}
       onResizeStart={handlers.onResizeStart}
       onResize={handlers.onResize}
       onResizeEnd={handlers.onResizeEnd}

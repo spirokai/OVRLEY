@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentParsedActivity } from '../../api/activityCache'
 import useStore from '../../store/useStore'
 import {
   buildConfigWidgets,
-  deleteWidgetInConfig,
+  deleteWidgetsInConfig,
   updateWidgetInConfig,
+  updateWidgetsInConfig,
 } from '@/lib/widget-config'
 import { applyGlobalDefaults } from '@/lib/config-utils'
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from './constants'
@@ -12,6 +13,12 @@ import { buildWidgetTransform, clamp, getSceneSize } from './utils'
 
 function clearLiveWidgetDraft(draftWidgetsRef, widgetId) {
   delete draftWidgetsRef.current[widgetId]
+}
+
+function clearLiveWidgetDrafts(draftWidgetsRef, widgetIds) {
+  widgetIds.forEach((widgetId) => {
+    delete draftWidgetsRef.current[widgetId]
+  })
 }
 
 function isEditableElement(target) {
@@ -22,6 +29,54 @@ function isEditableElement(target) {
   return Boolean(
     target.closest('input, textarea, select, [contenteditable="true"]'),
   )
+}
+
+function hasSelectionModifier(event) {
+  return event.metaKey || event.ctrlKey || event.shiftKey
+}
+
+function buildSelectionRect(start, end) {
+  const left = Math.min(start.x, end.x)
+  const top = Math.min(start.y, end.y)
+  const right = Math.max(start.x, end.x)
+  const bottom = Math.max(start.y, end.y)
+
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  }
+}
+
+function rectanglesIntersect(firstRect, secondRect) {
+  return !(
+    firstRect.x + firstRect.width < secondRect.x ||
+    secondRect.x + secondRect.width < firstRect.x ||
+    firstRect.y + firstRect.height < secondRect.y ||
+    secondRect.y + secondRect.height < firstRect.y
+  )
+}
+
+function normalizeSelectionIds(widgetIds, orderedWidgetIds) {
+  const idSet = new Set(widgetIds.filter(Boolean))
+  return orderedWidgetIds.filter((widgetId) => idSet.has(widgetId))
+}
+
+function getPrimarySelectionId(widgetIds, preferredId = null) {
+  if (preferredId && widgetIds.includes(preferredId)) {
+    return preferredId
+  }
+
+  return widgetIds[widgetIds.length - 1] ?? null
+}
+
+function getWidgetIdFromTarget(target) {
+  if (!(target instanceof HTMLElement)) {
+    return null
+  }
+
+  return target.dataset.widgetId || null
 }
 
 function applyLiveWidgetStyles(target, widget, draft, globalScale) {
@@ -128,10 +183,16 @@ export default function useOverlayEditorState({
   const interactionStartRef = useRef(null)
   const draftWidgetsRef = useRef({})
   const scalePreviewFrameRef = useRef(null)
+  const selectionSyncRef = useRef(false)
+  const marqueeCleanupRef = useRef(null)
+  const marqueeSelectionRef = useRef(null)
+  const groupDragCleanupRef = useRef(null)
   const [liveWidgetDrafts, setLiveWidgetDrafts] = useState({})
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const [sceneElement, setSceneElement] = useState(null)
   const [widgetNodes, setWidgetNodes] = useState({})
+  const [selectedWidgetIds, setSelectedWidgetIds] = useState([])
+  const [selectionRect, setSelectionRect] = useState(null)
 
   const sourceActivity = getCurrentParsedActivity()
   const resolvedConfig = useMemo(
@@ -189,6 +250,17 @@ export default function useOverlayEditorState({
     }))
   }
 
+  const setLiveWidgetDraftsBatch = (nextDraftsById) => {
+    Object.entries(nextDraftsById).forEach(([widgetId, nextDraft]) => {
+      draftWidgetsRef.current[widgetId] = nextDraft
+    })
+
+    setLiveWidgetDrafts((current) => ({
+      ...current,
+      ...nextDraftsById,
+    }))
+  }
+
   const clearWidgetDraft = (widgetId) => {
     clearLiveWidgetDraft(draftWidgetsRef, widgetId)
     setLiveWidgetDrafts((current) => {
@@ -199,6 +271,25 @@ export default function useOverlayEditorState({
       const next = { ...current }
       delete next[widgetId]
       return next
+    })
+  }
+
+  const clearWidgetDrafts = (widgetIds) => {
+    clearLiveWidgetDrafts(draftWidgetsRef, widgetIds)
+    setLiveWidgetDrafts((current) => {
+      const next = { ...current }
+      let changed = false
+
+      widgetIds.forEach((widgetId) => {
+        if (!next[widgetId]) {
+          return
+        }
+
+        delete next[widgetId]
+        changed = true
+      })
+
+      return changed ? next : current
     })
   }
 
@@ -215,6 +306,14 @@ export default function useOverlayEditorState({
     resizeObserver.observe(viewportNode)
     return () => resizeObserver.disconnect()
   }, [])
+
+  useEffect(
+    () => () => {
+      marqueeCleanupRef.current?.()
+      groupDragCleanupRef.current?.()
+    },
+    [],
+  )
 
   const fitScale = useMemo(() => {
     const safeWidth = Math.max(viewportSize.width - 72, 1)
@@ -245,29 +344,129 @@ export default function useOverlayEditorState({
       }),
     [liveWidgetDrafts, widgets],
   )
-  const selectedWidget = useMemo(
+  const renderedWidgetMap = useMemo(
     () =>
-      renderedWidgets.find((widget) => widget.id === selectedWidgetId) || null,
-    [renderedWidgets, selectedWidgetId],
+      Object.fromEntries(renderedWidgets.map((widget) => [widget.id, widget])),
+    [renderedWidgets],
   )
-  const selectedWidgetDataSignature = useMemo(
-    () => JSON.stringify(selectedWidget?.data ?? null),
-    [selectedWidget],
+  const orderedWidgetIds = useMemo(
+    () => renderedWidgets.map((widget) => widget.id),
+    [renderedWidgets],
   )
-  const selectedTarget = selectedWidgetId
-    ? widgetNodes[selectedWidgetId] || null
+
+  const setSelectionState = (widgetIds) => {
+    setSelectedWidgetIds(normalizeSelectionIds(widgetIds, orderedWidgetIds))
+  }
+
+  const syncPrimarySelectionId = useCallback(
+    (nextPrimaryId) => {
+      if (selectedWidgetId === nextPrimaryId) {
+        selectionSyncRef.current = false
+        return
+      }
+
+      selectionSyncRef.current = true
+      setSelectedWidgetId(nextPrimaryId)
+    },
+    [selectedWidgetId, setSelectedWidgetId],
+  )
+
+  const commitSelection = (widgetIds, preferredId = null) => {
+    const normalizedIds = normalizeSelectionIds(widgetIds, orderedWidgetIds)
+    const nextPrimaryId = getPrimarySelectionId(normalizedIds, preferredId)
+
+    setSelectedWidgetIds(normalizedIds)
+    syncPrimarySelectionId(nextPrimaryId)
+  }
+
+  useEffect(() => {
+    if (selectionSyncRef.current) {
+      selectionSyncRef.current = false
+      return
+    }
+
+    setSelectedWidgetIds(
+      normalizeSelectionIds(
+        selectedWidgetId ? [selectedWidgetId] : [],
+        orderedWidgetIds,
+      ),
+    )
+  }, [orderedWidgetIds, selectedWidgetId])
+
+  useEffect(() => {
+    const normalizedIds = normalizeSelectionIds(
+      selectedWidgetIds,
+      orderedWidgetIds,
+    )
+    const selectionChanged =
+      normalizedIds.length !== selectedWidgetIds.length ||
+      normalizedIds.some(
+        (widgetId, index) => widgetId !== selectedWidgetIds[index],
+      )
+
+    if (!selectionChanged) {
+      return
+    }
+
+    const nextPrimaryId = getPrimarySelectionId(normalizedIds, selectedWidgetId)
+    setSelectedWidgetIds(normalizedIds)
+    syncPrimarySelectionId(nextPrimaryId)
+  }, [
+    orderedWidgetIds,
+    selectedWidgetId,
+    selectedWidgetIds,
+    setSelectedWidgetId,
+    syncPrimarySelectionId,
+  ])
+
+  const selectedWidgets = useMemo(
+    () =>
+      selectedWidgetIds
+        .map((widgetId) => renderedWidgetMap[widgetId])
+        .filter(Boolean),
+    [renderedWidgetMap, selectedWidgetIds],
+  )
+  const primarySelectedWidgetId = getPrimarySelectionId(
+    selectedWidgetIds,
+    selectedWidgetId,
+  )
+  const selectedWidget = primarySelectedWidgetId
+    ? renderedWidgetMap[primarySelectedWidgetId] || null
     : null
+  const selectedWidgetDataSignature = useMemo(
+    () => JSON.stringify(selectedWidgets.map((widget) => widget?.data ?? null)),
+    [selectedWidgets],
+  )
+  const isGroupSelection = selectedWidgetIds.length > 1
+  const selectedTarget =
+    !isGroupSelection && primarySelectedWidgetId
+      ? widgetNodes[primarySelectedWidgetId] || null
+      : null
+  const selectedTargets = useMemo(
+    () =>
+      isGroupSelection
+        ? selectedWidgetIds
+            .map((widgetId) => widgetNodes[widgetId])
+            .filter(Boolean)
+        : [],
+    [isGroupSelection, selectedWidgetIds, widgetNodes],
+  )
   const elementGuidelines = useMemo(
     () =>
       widgets
-        .filter((widget) => widget.id !== selectedWidgetId)
+        .filter((widget) => !selectedWidgetIds.includes(widget.id))
         .map((widget) => widgetNodes[widget.id])
         .filter(Boolean),
-    [selectedWidgetId, widgetNodes, widgets],
+    [selectedWidgetIds, widgetNodes, widgets],
   )
 
   useEffect(() => {
-    if (!moveableRef.current || !selectedTarget) return undefined
+    if (
+      !moveableRef.current ||
+      (!selectedTarget && selectedTargets.length === 0)
+    ) {
+      return undefined
+    }
 
     const frameId = requestAnimationFrame(() => {
       moveableRef.current?.updateRect()
@@ -275,20 +474,22 @@ export default function useOverlayEditorState({
 
     return () => cancelAnimationFrame(frameId)
   }, [
-    selectedTarget,
-    selectedWidgetId,
-    selectedWidgetDataSignature,
-    globalScale,
     displayScale,
+    globalScale,
+    selectedTarget,
+    selectedTargets,
+    selectedWidgetDataSignature,
   ])
 
-  const canResizeSelected = selectedWidget?.category === 'plots'
+  const canResizeSelected =
+    !isGroupSelection && selectedWidget?.category === 'plots'
   const canScaleSelected = Boolean(
-    selectedWidget && selectedWidget.category !== 'plots',
+    !isGroupSelection && selectedWidget && selectedWidget.category !== 'plots',
   )
-  const canRotateSelected = selectedWidget?.type === 'course'
+  const canRotateSelected =
+    !isGroupSelection && selectedWidget?.type === 'course'
   const maintainAspectRatio =
-    selectedWidget?.type === 'course' || canScaleSelected
+    !isGroupSelection && (selectedWidget?.type === 'course' || canScaleSelected)
 
   const widgetRefCallbacks = useMemo(
     () =>
@@ -319,6 +520,11 @@ export default function useOverlayEditorState({
     onConfigChange(updateWidgetInConfig(resolvedConfig, widgetId, updates))
   }
 
+  const commitWidgetUpdates = (updatesById) => {
+    if (!resolvedConfig) return
+    onConfigChange(updateWidgetsInConfig(resolvedConfig, updatesById))
+  }
+
   const handleWheel = (event) => {
     event.preventDefault()
     const delta = event.deltaY < 0 ? 0.1 : -0.1
@@ -328,7 +534,7 @@ export default function useOverlayEditorState({
   }
 
   useEffect(() => {
-    if (!selectedWidgetId || !resolvedConfig) {
+    if (!selectedWidgetIds.length || !resolvedConfig) {
       return undefined
     }
 
@@ -348,13 +554,282 @@ export default function useOverlayEditorState({
       }
 
       event.preventDefault()
-      onConfigChange(deleteWidgetInConfig(resolvedConfig, selectedWidgetId))
-      setSelectedWidgetId(null)
+      onConfigChange(deleteWidgetsInConfig(resolvedConfig, selectedWidgetIds))
+      setSelectedWidgetIds([])
+      syncPrimarySelectionId(null)
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onConfigChange, resolvedConfig, selectedWidgetId, setSelectedWidgetId])
+  }, [
+    onConfigChange,
+    resolvedConfig,
+    selectedWidgetIds,
+    setSelectedWidgetId,
+    syncPrimarySelectionId,
+  ])
+
+  const getScenePoint = (clientX, clientY) => {
+    if (!sceneElement) {
+      return null
+    }
+
+    const sceneBounds = sceneElement.getBoundingClientRect()
+    return {
+      x: clamp((clientX - sceneBounds.left) / displayScale, 0, sceneSize.width),
+      y: clamp((clientY - sceneBounds.top) / displayScale, 0, sceneSize.height),
+    }
+  }
+
+  const getIntersectedWidgetIds = (nextSelectionRect) => {
+    if (!sceneElement) {
+      return []
+    }
+
+    const sceneBounds = sceneElement.getBoundingClientRect()
+
+    return orderedWidgetIds.filter((widgetId) => {
+      const node = widgetNodes[widgetId]
+      if (!node) {
+        return false
+      }
+
+      const nodeBounds = node.getBoundingClientRect()
+      const nodeRect = {
+        x: (nodeBounds.left - sceneBounds.left) / displayScale,
+        y: (nodeBounds.top - sceneBounds.top) / displayScale,
+        width: nodeBounds.width / displayScale,
+        height: nodeBounds.height / displayScale,
+      }
+
+      return rectanglesIntersect(nextSelectionRect, nodeRect)
+    })
+  }
+
+  const handleWidgetMouseDown = (event, widgetId) => {
+    event.stopPropagation()
+
+    if (event.button !== 0) {
+      return
+    }
+
+    const isSelected = selectedWidgetIds.includes(widgetId)
+    if (hasSelectionModifier(event)) {
+      const nextIds = isSelected
+        ? selectedWidgetIds.filter((selectedId) => selectedId !== widgetId)
+        : [...selectedWidgetIds, widgetId]
+      const nextPrimaryId = isSelected
+        ? getPrimarySelectionId(
+            nextIds,
+            selectedWidgetId === widgetId ? null : selectedWidgetId,
+          )
+        : widgetId
+
+      commitSelection(nextIds, nextPrimaryId)
+      return
+    }
+
+    if (isSelected && selectedWidgetIds.length > 1) {
+      const startPoint = getScenePoint(event.clientX, event.clientY)
+      if (!startPoint) {
+        return
+      }
+
+      event.preventDefault()
+      groupDragCleanupRef.current?.()
+
+      interactionStartRef.current = {
+        type: 'group-widget-drag',
+        startPoint,
+        widgetsById: Object.fromEntries(
+          selectedWidgets.map((widget) => [
+            widget.id,
+            {
+              x: widget.data.x ?? 0,
+              y: widget.data.y ?? 0,
+            },
+          ]),
+        ),
+      }
+
+      selectedWidgetIds.forEach((selectedId) => {
+        draftWidgetsRef.current[selectedId] = {}
+      })
+
+      const handleWindowMouseMove = (moveEvent) => {
+        const nextPoint = getScenePoint(moveEvent.clientX, moveEvent.clientY)
+        const origin = interactionStartRef.current
+
+        if (origin?.type !== 'group-widget-drag' || !nextPoint) {
+          return
+        }
+
+        const deltaX = nextPoint.x - origin.startPoint.x
+        const deltaY = nextPoint.y - origin.startPoint.y
+        const nextDraftsById = {}
+
+        selectedWidgetIds.forEach((selectedId) => {
+          const widget = renderedWidgetMap[selectedId]
+          const widgetOrigin = origin.widgetsById[selectedId]
+          const node = widgetNodes[selectedId]
+
+          if (!widget || !widgetOrigin || !node) {
+            return
+          }
+
+          const nextDraft = {
+            ...draftWidgetsRef.current[selectedId],
+            x: widgetOrigin.x + deltaX,
+            y: widgetOrigin.y + deltaY,
+          }
+
+          nextDraftsById[selectedId] = nextDraft
+          applyLiveWidgetStyles(node, widget, nextDraft, globalScale)
+        })
+
+        if (Object.keys(nextDraftsById).length) {
+          setLiveWidgetDraftsBatch(nextDraftsById)
+        }
+      }
+
+      const handleWindowMouseUp = () => {
+        const origin = interactionStartRef.current
+        if (origin?.type !== 'group-widget-drag') {
+          return
+        }
+
+        const updatesById = selectedWidgetIds.reduce(
+          (accumulator, selectedId) => {
+            const draft = draftWidgetsRef.current[selectedId]
+            const widgetOrigin = origin.widgetsById[selectedId]
+
+            if (!draft || !widgetOrigin) {
+              return accumulator
+            }
+
+            accumulator[selectedId] = {
+              x: Math.round(draft.x ?? widgetOrigin.x),
+              y: Math.round(draft.y ?? widgetOrigin.y),
+            }
+            return accumulator
+          },
+          {},
+        )
+
+        if (Object.keys(updatesById).length) {
+          commitWidgetUpdates(updatesById)
+        }
+
+        clearWidgetDrafts(selectedWidgetIds)
+        interactionStartRef.current = null
+        groupDragCleanupRef.current?.()
+      }
+
+      groupDragCleanupRef.current = () => {
+        window.removeEventListener('mousemove', handleWindowMouseMove)
+        window.removeEventListener('mouseup', handleWindowMouseUp)
+        groupDragCleanupRef.current = null
+      }
+
+      window.addEventListener('mousemove', handleWindowMouseMove)
+      window.addEventListener('mouseup', handleWindowMouseUp)
+      return
+    }
+
+    if (selectedWidgetIds.length === 1 && selectedWidgetId === widgetId) {
+      return
+    }
+
+    commitSelection([widgetId], widgetId)
+  }
+
+  const handleSceneMouseDown = (event) => {
+    if (event.button !== 0) {
+      return
+    }
+
+    const startPoint = getScenePoint(event.clientX, event.clientY)
+    if (!startPoint) {
+      return
+    }
+
+    event.preventDefault()
+    marqueeCleanupRef.current?.()
+
+    const additive = hasSelectionModifier(event)
+    const baseIds = additive ? selectedWidgetIds : []
+    marqueeSelectionRef.current = {
+      additive,
+      baseIds,
+      hasMoved: false,
+      previewIds: baseIds,
+      startPoint,
+    }
+
+    setSelectionRect({
+      x: startPoint.x,
+      y: startPoint.y,
+      width: 0,
+      height: 0,
+    })
+
+    const handleWindowMouseMove = (moveEvent) => {
+      const nextPoint = getScenePoint(moveEvent.clientX, moveEvent.clientY)
+      const gesture = marqueeSelectionRef.current
+      if (!nextPoint || !gesture) {
+        return
+      }
+
+      const nextRect = buildSelectionRect(gesture.startPoint, nextPoint)
+      const hasMoved = nextRect.width > 2 || nextRect.height > 2
+      const hitIds = hasMoved ? getIntersectedWidgetIds(nextRect) : []
+      const nextIds = additive
+        ? normalizeSelectionIds([...baseIds, ...hitIds], orderedWidgetIds)
+        : hitIds
+
+      marqueeSelectionRef.current = {
+        ...gesture,
+        hasMoved,
+        previewIds: nextIds,
+      }
+
+      setSelectionRect(nextRect)
+      if (hasMoved) {
+        setSelectionState(nextIds)
+      }
+    }
+
+    const handleWindowMouseUp = () => {
+      const gesture = marqueeSelectionRef.current
+
+      marqueeCleanupRef.current?.()
+      marqueeSelectionRef.current = null
+      setSelectionRect(null)
+
+      if (!gesture) {
+        return
+      }
+
+      if (!gesture.hasMoved) {
+        commitSelection(gesture.baseIds, selectedWidgetId)
+        return
+      }
+
+      commitSelection(
+        gesture.previewIds,
+        getPrimarySelectionId(gesture.previewIds, selectedWidgetId),
+      )
+    }
+
+    marqueeCleanupRef.current = () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove)
+      window.removeEventListener('mouseup', handleWindowMouseUp)
+      marqueeCleanupRef.current = null
+    }
+
+    window.addEventListener('mousemove', handleWindowMouseMove)
+    window.addEventListener('mouseup', handleWindowMouseUp)
+  }
 
   const handlers = {
     onDragStart: () => {
@@ -364,6 +839,7 @@ export default function useOverlayEditorState({
         id: selectedWidget.id,
         x: selectedWidget.data.x ?? 0,
         y: selectedWidget.data.y ?? 0,
+        type: 'single-drag',
       }
       draftWidgetsRef.current[selectedWidget.id] = {}
     },
@@ -395,6 +871,81 @@ export default function useOverlayEditorState({
       clearWidgetDraft(origin.id)
       interactionStartRef.current = null
     },
+    onDragGroupStart: () => {
+      if (!selectedWidgets.length) return
+
+      interactionStartRef.current = {
+        type: 'group-drag',
+        widgetsById: Object.fromEntries(
+          selectedWidgets.map((widget) => [
+            widget.id,
+            {
+              x: widget.data.x ?? 0,
+              y: widget.data.y ?? 0,
+            },
+          ]),
+        ),
+      }
+
+      selectedWidgetIds.forEach((widgetId) => {
+        draftWidgetsRef.current[widgetId] = {}
+      })
+    },
+    onDragGroup: ({ events }) => {
+      const origin = interactionStartRef.current
+      if (origin?.type !== 'group-drag') return
+
+      const nextDraftsById = {}
+
+      events.forEach((childEvent) => {
+        const widgetId = getWidgetIdFromTarget(childEvent.target)
+        const widget = widgetId ? renderedWidgetMap[widgetId] : null
+        const widgetOrigin = widgetId ? origin.widgetsById[widgetId] : null
+
+        if (!widgetId || !widget || !widgetOrigin) {
+          return
+        }
+
+        const nextDraft = {
+          ...draftWidgetsRef.current[widgetId],
+          x: widgetOrigin.x + childEvent.beforeTranslate[0],
+          y: widgetOrigin.y + childEvent.beforeTranslate[1],
+        }
+
+        nextDraftsById[widgetId] = nextDraft
+        applyLiveWidgetStyles(childEvent.target, widget, nextDraft, globalScale)
+      })
+
+      if (Object.keys(nextDraftsById).length) {
+        setLiveWidgetDraftsBatch(nextDraftsById)
+      }
+    },
+    onDragGroupEnd: () => {
+      const origin = interactionStartRef.current
+      if (origin?.type !== 'group-drag') return
+
+      const updatesById = selectedWidgetIds.reduce((accumulator, widgetId) => {
+        const draft = draftWidgetsRef.current[widgetId]
+        const widgetOrigin = origin.widgetsById[widgetId]
+
+        if (!draft || !widgetOrigin) {
+          return accumulator
+        }
+
+        accumulator[widgetId] = {
+          x: Math.round(draft.x ?? widgetOrigin.x),
+          y: Math.round(draft.y ?? widgetOrigin.y),
+        }
+        return accumulator
+      }, {})
+
+      if (Object.keys(updatesById).length) {
+        commitWidgetUpdates(updatesById)
+      }
+
+      clearWidgetDrafts(selectedWidgetIds)
+      interactionStartRef.current = null
+    },
     onResizeStart: ({ dragStart }) => {
       if (!selectedWidget) return
 
@@ -409,6 +960,7 @@ export default function useOverlayEditorState({
         width: selectedWidget.data.width ?? 0,
         height: selectedWidget.data.height ?? 0,
         markerSize: selectedWidget.data.marker_size ?? null,
+        type: 'resize',
       }
       draftWidgetsRef.current[selectedWidget.id] = {}
     },
@@ -488,6 +1040,7 @@ export default function useOverlayEditorState({
         renderedWidth: target?.offsetWidth ?? selectedTarget?.offsetWidth ?? 0,
         renderedHeight:
           target?.offsetHeight ?? selectedTarget?.offsetHeight ?? 0,
+        type: 'scale',
       }
       draftWidgetsRef.current[selectedWidget.id] = {}
     },
@@ -594,6 +1147,7 @@ export default function useOverlayEditorState({
         x: selectedWidget.data.x ?? 0,
         y: selectedWidget.data.y ?? 0,
         rotation: selectedWidget.data.rotation ?? 0,
+        type: 'rotate',
       }
       draftWidgetsRef.current[selectedWidget.id] = {}
     },
@@ -644,18 +1198,22 @@ export default function useOverlayEditorState({
     elementGuidelines,
     globalOpacity,
     globalScale,
+    handleSceneMouseDown,
     handleWheel,
+    handleWidgetMouseDown,
     handlers,
     maintainAspectRatio,
     moveableRef,
-    resolvedConfig,
     previewSecond,
+    resolvedConfig,
     sceneElement,
     sceneSize,
     selectedTarget,
-    setSceneElement,
-    setSelectedWidgetId,
+    selectedTargets,
     selectedWidget,
+    selectedWidgetIds,
+    selectionRect,
+    setSceneElement,
     viewportRef,
     widgetRefCallbacks,
     widgets: renderedWidgets,

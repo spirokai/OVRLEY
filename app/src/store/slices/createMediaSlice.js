@@ -1,13 +1,15 @@
 import { DEFAULT_RENDER_PROGRESS } from '../store-utils'
 
 export function createMediaSlice(set) {
+  localStorage.removeItem('gpxFilename')
+
   return {
     generatingImage: false,
     renderingVideo: false,
     errorMessage: null,
     imageFilename: localStorage.getItem('imageFilename') || null,
     videoFilename: localStorage.getItem('videoFilename') || null,
-    gpxFilename: localStorage.getItem('gpxFilename') || null,
+    gpxFilename: null,
     activitySummary: null,
     renderProgress: { ...DEFAULT_RENDER_PROGRESS },
 
@@ -57,7 +59,6 @@ export function createMediaSlice(set) {
     },
 
     setGpxFilename: async (filename) => {
-      localStorage.setItem('gpxFilename', filename)
       set((state) => {
         state.gpxFilename = filename
       })

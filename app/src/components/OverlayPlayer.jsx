@@ -10,6 +10,18 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+function isPlaybackShortcutTarget(target) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return Boolean(
+    target.closest(
+      'input, textarea, select, button, a, [role="slider"], [contenteditable="true"]',
+    ),
+  )
+}
+
 function formatTimelineTime(value) {
   const safeValue = Math.max(0, Math.floor(Number(value) || 0))
   const hours = Math.floor(safeValue / 3600)
@@ -179,6 +191,74 @@ export default function OverlayPlayer() {
       }
     }
   }
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (
+        event.repeat ||
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        !hasActivity ||
+        isPlaybackShortcutTarget(event.target)
+      ) {
+        return
+      }
+
+      if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
+        event.preventDefault()
+        const direction = event.code === 'ArrowRight' ? 1 : -1
+        const nextSecond = clamp(clampedPlayhead + direction, 0, totalDuration)
+
+        playbackAnchorRef.current = {
+          startedAtMs: 0,
+          startedSecond: nextSecond,
+        }
+        previewFrameRef.current = -1
+        setIsPlaying(false)
+        setSelectedSecond(nextSecond)
+        return
+      }
+
+      if (event.code !== 'Space' || !hasActivity) {
+        return
+      }
+
+      event.preventDefault()
+
+      if (isPlaying) {
+        playbackAnchorRef.current = {
+          startedAtMs: 0,
+          startedSecond: clampedPlayhead,
+        }
+        previewFrameRef.current = -1
+        setIsPlaying(false)
+        setSelectedSecond(clampedPlayhead)
+        return
+      }
+
+      const initialSecond =
+        clampedPlayhead >= totalDuration ? 0 : clampedPlayhead
+      playbackAnchorRef.current = {
+        startedAtMs: performance.now(),
+        startedSecond: initialSecond,
+      }
+      previewFrameRef.current = -1
+      setSelectedSecondTransient(initialSecond)
+      setIsPlaying(true)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [
+    clampedPlayhead,
+    hasActivity,
+    isPlaying,
+    setSelectedSecond,
+    setSelectedSecondTransient,
+    totalDuration,
+  ])
 
   return (
     <div
