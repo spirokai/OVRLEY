@@ -186,8 +186,9 @@ export default function useOverlayEditorState({
   const selectionSyncRef = useRef(false)
   const marqueeCleanupRef = useRef(null)
   const marqueeSelectionRef = useRef(null)
-  const groupDragCleanupRef = useRef(null)
   const [liveWidgetDrafts, setLiveWidgetDrafts] = useState({})
+  const [isGroupDragActive, setIsGroupDragActive] = useState(false)
+  const [groupDragSelectionIds, setGroupDragSelectionIds] = useState([])
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const [sceneElement, setSceneElement] = useState(null)
   const [widgetNodes, setWidgetNodes] = useState({})
@@ -240,6 +241,8 @@ export default function useOverlayEditorState({
   useEffect(() => {
     draftWidgetsRef.current = {}
     setLiveWidgetDrafts({})
+    setIsGroupDragActive(false)
+    setGroupDragSelectionIds([])
   }, [resolvedConfig])
 
   const setLiveWidgetDraft = (widgetId, nextDraft) => {
@@ -310,7 +313,6 @@ export default function useOverlayEditorState({
   useEffect(
     () => () => {
       marqueeCleanupRef.current?.()
-      groupDragCleanupRef.current?.()
     },
     [],
   )
@@ -379,7 +381,24 @@ export default function useOverlayEditorState({
     syncPrimarySelectionId(nextPrimaryId)
   }
 
+  const effectiveSelectedWidgetIds = useMemo(
+    () =>
+      isGroupDragActive
+        ? normalizeSelectionIds(groupDragSelectionIds, orderedWidgetIds)
+        : selectedWidgetIds,
+    [
+      groupDragSelectionIds,
+      isGroupDragActive,
+      orderedWidgetIds,
+      selectedWidgetIds,
+    ],
+  )
+
   useEffect(() => {
+    if (isGroupDragActive) {
+      return
+    }
+
     if (selectionSyncRef.current) {
       selectionSyncRef.current = false
       return
@@ -391,9 +410,13 @@ export default function useOverlayEditorState({
         orderedWidgetIds,
       ),
     )
-  }, [orderedWidgetIds, selectedWidgetId])
+  }, [isGroupDragActive, orderedWidgetIds, selectedWidgetId])
 
   useEffect(() => {
+    if (isGroupDragActive) {
+      return
+    }
+
     const normalizedIds = normalizeSelectionIds(
       selectedWidgetIds,
       orderedWidgetIds,
@@ -412,6 +435,7 @@ export default function useOverlayEditorState({
     setSelectedWidgetIds(normalizedIds)
     syncPrimarySelectionId(nextPrimaryId)
   }, [
+    isGroupDragActive,
     orderedWidgetIds,
     selectedWidgetId,
     selectedWidgetIds,
@@ -421,13 +445,13 @@ export default function useOverlayEditorState({
 
   const selectedWidgets = useMemo(
     () =>
-      selectedWidgetIds
+      effectiveSelectedWidgetIds
         .map((widgetId) => renderedWidgetMap[widgetId])
         .filter(Boolean),
-    [renderedWidgetMap, selectedWidgetIds],
+    [effectiveSelectedWidgetIds, renderedWidgetMap],
   )
   const primarySelectedWidgetId = getPrimarySelectionId(
-    selectedWidgetIds,
+    effectiveSelectedWidgetIds,
     selectedWidgetId,
   )
   const selectedWidget = primarySelectedWidgetId
@@ -437,7 +461,7 @@ export default function useOverlayEditorState({
     () => JSON.stringify(selectedWidgets.map((widget) => widget?.data ?? null)),
     [selectedWidgets],
   )
-  const isGroupSelection = selectedWidgetIds.length > 1
+  const isGroupSelection = effectiveSelectedWidgetIds.length > 1
   const selectedTarget =
     !isGroupSelection && primarySelectedWidgetId
       ? widgetNodes[primarySelectedWidgetId] || null
@@ -445,19 +469,19 @@ export default function useOverlayEditorState({
   const selectedTargets = useMemo(
     () =>
       isGroupSelection
-        ? selectedWidgetIds
+        ? effectiveSelectedWidgetIds
             .map((widgetId) => widgetNodes[widgetId])
             .filter(Boolean)
         : [],
-    [isGroupSelection, selectedWidgetIds, widgetNodes],
+    [effectiveSelectedWidgetIds, isGroupSelection, widgetNodes],
   )
   const elementGuidelines = useMemo(
     () =>
       widgets
-        .filter((widget) => !selectedWidgetIds.includes(widget.id))
+        .filter((widget) => !effectiveSelectedWidgetIds.includes(widget.id))
         .map((widget) => widgetNodes[widget.id])
         .filter(Boolean),
-    [selectedWidgetIds, widgetNodes, widgets],
+    [effectiveSelectedWidgetIds, widgetNodes, widgets],
   )
 
   useEffect(() => {
@@ -630,109 +654,11 @@ export default function useOverlayEditorState({
     }
 
     if (isSelected && selectedWidgetIds.length > 1) {
-      const startPoint = getScenePoint(event.clientX, event.clientY)
-      if (!startPoint) {
-        return
-      }
-
       event.preventDefault()
-      groupDragCleanupRef.current?.()
-
-      interactionStartRef.current = {
-        type: 'group-widget-drag',
-        startPoint,
-        widgetsById: Object.fromEntries(
-          selectedWidgets.map((widget) => [
-            widget.id,
-            {
-              x: widget.data.x ?? 0,
-              y: widget.data.y ?? 0,
-            },
-          ]),
-        ),
-      }
-
-      selectedWidgetIds.forEach((selectedId) => {
-        draftWidgetsRef.current[selectedId] = {}
-      })
-
-      const handleWindowMouseMove = (moveEvent) => {
-        const nextPoint = getScenePoint(moveEvent.clientX, moveEvent.clientY)
-        const origin = interactionStartRef.current
-
-        if (origin?.type !== 'group-widget-drag' || !nextPoint) {
-          return
-        }
-
-        const deltaX = nextPoint.x - origin.startPoint.x
-        const deltaY = nextPoint.y - origin.startPoint.y
-        const nextDraftsById = {}
-
-        selectedWidgetIds.forEach((selectedId) => {
-          const widget = renderedWidgetMap[selectedId]
-          const widgetOrigin = origin.widgetsById[selectedId]
-          const node = widgetNodes[selectedId]
-
-          if (!widget || !widgetOrigin || !node) {
-            return
-          }
-
-          const nextDraft = {
-            ...draftWidgetsRef.current[selectedId],
-            x: widgetOrigin.x + deltaX,
-            y: widgetOrigin.y + deltaY,
-          }
-
-          nextDraftsById[selectedId] = nextDraft
-          applyLiveWidgetStyles(node, widget, nextDraft, globalScale)
-        })
-
-        if (Object.keys(nextDraftsById).length) {
-          setLiveWidgetDraftsBatch(nextDraftsById)
-        }
-      }
-
-      const handleWindowMouseUp = () => {
-        const origin = interactionStartRef.current
-        if (origin?.type !== 'group-widget-drag') {
-          return
-        }
-
-        const updatesById = selectedWidgetIds.reduce(
-          (accumulator, selectedId) => {
-            const draft = draftWidgetsRef.current[selectedId]
-            const widgetOrigin = origin.widgetsById[selectedId]
-
-            if (!draft || !widgetOrigin) {
-              return accumulator
-            }
-
-            accumulator[selectedId] = {
-              x: Math.round(draft.x ?? widgetOrigin.x),
-              y: Math.round(draft.y ?? widgetOrigin.y),
-            }
-            return accumulator
-          },
-          {},
-        )
-
-        if (Object.keys(updatesById).length) {
-          commitWidgetUpdates(updatesById)
-        }
-
-        clearWidgetDrafts(selectedWidgetIds)
-        interactionStartRef.current = null
-        groupDragCleanupRef.current?.()
-      }
-
-      groupDragCleanupRef.current = () => {
-        window.removeEventListener('mousemove', handleWindowMouseMove)
-        window.removeEventListener('mouseup', handleWindowMouseUp)
-        groupDragCleanupRef.current = null
-      }
-
-      window.addEventListener('mousemove', handleWindowMouseMove)
-      window.addEventListener('mouseup', handleWindowMouseUp)
+      const draggedWidgetIds = [...selectedWidgetIds]
+      setIsGroupDragActive(true)
+      setGroupDragSelectionIds(draggedWidgetIds)
+      moveableRef.current?.dragStart(event.nativeEvent, event.currentTarget)
       return
     }
 
@@ -874,8 +800,12 @@ export default function useOverlayEditorState({
     onDragGroupStart: () => {
       if (!selectedWidgets.length) return
 
+      const draggedWidgetIds = [...effectiveSelectedWidgetIds]
+      setIsGroupDragActive(true)
+      setGroupDragSelectionIds(draggedWidgetIds)
       interactionStartRef.current = {
         type: 'group-drag',
+        widgetIds: draggedWidgetIds,
         widgetsById: Object.fromEntries(
           selectedWidgets.map((widget) => [
             widget.id,
@@ -887,7 +817,7 @@ export default function useOverlayEditorState({
         ),
       }
 
-      selectedWidgetIds.forEach((widgetId) => {
+      draggedWidgetIds.forEach((widgetId) => {
         draftWidgetsRef.current[widgetId] = {}
       })
     },
@@ -924,7 +854,10 @@ export default function useOverlayEditorState({
       const origin = interactionStartRef.current
       if (origin?.type !== 'group-drag') return
 
-      const updatesById = selectedWidgetIds.reduce((accumulator, widgetId) => {
+      const draggedWidgetIds = origin.widgetIds?.length
+        ? [...origin.widgetIds]
+        : [...groupDragSelectionIds]
+      const updatesById = draggedWidgetIds.reduce((accumulator, widgetId) => {
         const draft = draftWidgetsRef.current[widgetId]
         const widgetOrigin = origin.widgetsById[widgetId]
 
@@ -943,7 +876,9 @@ export default function useOverlayEditorState({
         commitWidgetUpdates(updatesById)
       }
 
-      clearWidgetDrafts(selectedWidgetIds)
+      clearWidgetDrafts(draggedWidgetIds)
+      setIsGroupDragActive(false)
+      setGroupDragSelectionIds([])
       interactionStartRef.current = null
     },
     onResizeStart: ({ dragStart }) => {
@@ -1208,6 +1143,7 @@ export default function useOverlayEditorState({
     resolvedConfig,
     sceneElement,
     sceneSize,
+    isGroupDragActive,
     selectedTarget,
     selectedTargets,
     selectedWidget,

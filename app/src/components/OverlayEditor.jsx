@@ -43,6 +43,7 @@ function OverlayEditor({
     handleWidgetMouseDown,
     handleWheel,
     handlers,
+    isGroupDragActive,
     maintainAspectRatio,
     moveableRef,
     resolvedConfig,
@@ -110,6 +111,7 @@ function OverlayEditor({
               moveableRef={moveableRef}
               selectedTarget={selectedTarget}
               selectedTargets={selectedTargets}
+              isGroupDragActive={isGroupDragActive}
               sceneElement={sceneElement}
               displayScale={displayScale}
               canResizeSelected={canResizeSelected}

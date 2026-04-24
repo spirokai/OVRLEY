@@ -4,6 +4,7 @@ export default function OverlayMoveable({
   moveableRef,
   selectedTarget,
   selectedTargets,
+  isGroupDragActive,
   sceneElement,
   displayScale,
   canResizeSelected,
@@ -31,6 +32,7 @@ export default function OverlayMoveable({
       edge={false}
       groupable={isGroupSelection}
       passDragArea={isGroupSelection}
+      hideChildMoveableDefaultLines={isGroupDragActive && isGroupSelection}
       draggable
       resizable={canResizeSelected}
       scalable={canScaleSelected}
