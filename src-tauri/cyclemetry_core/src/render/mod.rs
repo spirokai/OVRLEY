@@ -8,7 +8,7 @@ use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::render::format::{format_value, frame_index_for_second};
-use crate::render::surface::{create_surface, read_surface_rgba, write_surface_png};
+use crate::render::surface::{create_surface, wrap_rgba_surface, write_surface_png};
 use crate::render::text::{draw_text, label_style, value_style};
 use crate::render::widgets::{
     draw_elevation_widget, draw_route_widget, prepare_render_assets, PreparedRenderAssets,
@@ -56,13 +56,26 @@ pub struct PreparedPreviewAssets {
     pub(crate) prepared_assets: PreparedRenderAssets,
 }
 
+pub struct RenderTarget<'a> {
+    pub pixels: &'a mut [u8],
+    pub width: u32,
+    pub height: u32,
+}
+
 pub fn prepare_preview_assets(
     paths: &AppPaths,
     config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
-) -> Result<(PreparedPreviewAssets, LabelCacheStatus, BTreeMap<String, TimingBucket>, f64), String>
-{
+) -> Result<
+    (
+        PreparedPreviewAssets,
+        LabelCacheStatus,
+        BTreeMap<String, TimingBucket>,
+        f64,
+    ),
+    String,
+> {
     let width = config.scene.width.unwrap_or(1920);
     let height = config.scene.height.unwrap_or(1080);
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
@@ -70,12 +83,14 @@ pub fn prepare_preview_assets(
     let prepare_started = Instant::now();
     let (labels_image, label_cache_status) =
         cached_labels_image(paths, config, width, height, scale, &mut prepare_profiler)?;
-    let prepared_assets =
+    let mut prepared_assets =
         prepare_render_assets(config, activity, dense_activity, &mut prepare_profiler)?;
-    let prepare_timings = annotate_timing_aliases(prepare_profiler.summary(), &[(
-        "prepare.surface.clear",
-        "surface.clear",
-    )]);
+    prepared_assets.base_rgba =
+        prepare_base_rgba(paths, config, width, height, scale, &mut prepare_profiler)?;
+    let prepare_timings = annotate_timing_aliases(
+        prepare_profiler.summary(),
+        &[("prepare.surface.clear", "surface.clear")],
+    );
 
     Ok((
         PreparedPreviewAssets {
@@ -159,10 +174,8 @@ pub fn render_preview_with_prepared_assets(
             .map_err(|error| format!("Failed to render preview frame: {error}"))
     })?;
 
-    let frame_timings = annotate_timing_aliases(frame_profiler.summary(), &[(
-        "base.restore",
-        "base.copy",
-    )]);
+    let frame_timings =
+        annotate_timing_aliases(frame_profiler.summary(), &[("base.restore", "base.copy")]);
     let preview_only_timings = annotate_timing_aliases(
         preview_profiler.summary(),
         &[
@@ -222,11 +235,34 @@ pub fn render_frame_rgba(
     frame_index: usize,
     scale: f32,
     labels_image: Option<&Image>,
+    target: RenderTarget<'_>,
     frame_profiler: &mut RenderProfiler,
-) -> Result<Vec<u8>, String> {
-    let width = config.scene.width.unwrap_or(1920);
-    let height = config.scene.height.unwrap_or(1080);
-    let (mut surface, _, _) = render_frame_surface(
+) -> Result<(), String> {
+    let width = target.width;
+    let height = target.height;
+    let mut labels_image = labels_image;
+    if let Some(base_rgba) = prepared_assets
+        .base_rgba
+        .as_ref()
+        .filter(|base_rgba| base_rgba.len() == target.pixels.len())
+    {
+        let started = Instant::now();
+        target.pixels.copy_from_slice(base_rgba);
+        let restore_ms = started.elapsed().as_secs_f64() * 1000.0;
+        frame_profiler.record_ms("base.restore", restore_ms);
+        frame_profiler.record_ms("surface.restore", restore_ms);
+        labels_image = None;
+    } else {
+        frame_profiler.measure("surface.clear", || {
+            target.pixels.fill(0);
+        });
+    }
+
+    let mut surface = frame_profiler.measure("surface.create", || {
+        wrap_rgba_surface(width, height, target.pixels)
+    })?;
+    let _ = render_frame_to_surface(
+        surface.canvas(),
         paths,
         config,
         dense_activity,
@@ -235,11 +271,8 @@ pub fn render_frame_rgba(
         scale,
         labels_image,
         frame_profiler,
-        None,
-    )?;
-    frame_profiler.measure("surface.readback_rgba", || {
-        read_surface_rgba(&mut surface, width, height)
-    })
+    );
+    Ok(())
 }
 
 fn render_frame_surface(
@@ -252,7 +285,14 @@ fn render_frame_surface(
     labels_image: Option<&Image>,
     frame_profiler: &mut RenderProfiler,
     mut preview_profiler: Option<&mut RenderProfiler>,
-) -> Result<(skia_safe::Surface, Option<WidgetRenderReport>, Option<WidgetRenderReport>), String> {
+) -> Result<
+    (
+        skia_safe::Surface,
+        Option<WidgetRenderReport>,
+        Option<WidgetRenderReport>,
+    ),
+    String,
+> {
     let width = config.scene.width.unwrap_or(1920);
     let height = config.scene.height.unwrap_or(1080);
     let mut surface = if preview_profiler.is_some() {
@@ -296,11 +336,11 @@ fn render_frame_to_surface(
     frame_profiler: &mut RenderProfiler,
 ) -> (Option<WidgetRenderReport>, Option<WidgetRenderReport>) {
     let frame_started = Instant::now();
-    frame_profiler.measure("base.restore", || {
-        if let Some(labels_image) = labels_image {
+    if let Some(labels_image) = labels_image {
+        frame_profiler.measure("base.restore", || {
             canvas.draw_image(labels_image, (0, 0), None);
-        }
-    });
+        });
+    }
 
     frame_profiler.measure("text.dynamic", || {
         for value in &config.values {
@@ -385,6 +425,33 @@ fn cached_labels_image(
     }
 
     Ok((Some(image), LabelCacheStatus::Miss))
+}
+
+pub fn prepare_base_rgba(
+    paths: &AppPaths,
+    config: &RenderConfig,
+    width: u32,
+    height: u32,
+    scale: f32,
+    prepare_profiler: &mut RenderProfiler,
+) -> Result<Option<Vec<u8>>, String> {
+    let row_bytes = (width as usize) * 4;
+    let mut pixels = vec![0u8; row_bytes * (height as usize)];
+    if config.labels.is_empty() {
+        return Ok(Some(pixels));
+    }
+
+    let mut surface = prepare_profiler.measure("create_base_image", || {
+        wrap_rgba_surface(width, height, pixels.as_mut_slice())
+    })?;
+    prepare_profiler.measure("text.static.cache", || {
+        for label in &config.labels {
+            let style = label_style(&config.scene, label, scale);
+            draw_text(surface.canvas(), &label.text, &style, &paths.font_dirs);
+        }
+    });
+    drop(surface);
+    Ok(Some(pixels))
 }
 
 fn labels_cache_key(

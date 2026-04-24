@@ -3,9 +3,7 @@ use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, RenderProgress, TimingBucket};
 use crate::encode::ffmpeg::{build_ffmpeg_settings, resolve_ffmpeg_binary};
-use crate::render::{
-    prepare_preview_assets, render_frame_rgba, LabelCacheStatus,
-};
+use crate::render::{prepare_preview_assets, render_frame_rgba, LabelCacheStatus, RenderTarget};
 use chrono::Local;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -14,7 +12,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::mpsc::{self, Receiver, SyncSender, TrySendError};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -40,7 +38,10 @@ impl Default for RenderController {
 
 impl RenderController {
     pub fn progress(&self) -> RenderProgress {
-        self.progress.lock().map(|value| value.clone()).unwrap_or_default()
+        self.progress
+            .lock()
+            .map(|value| value.clone())
+            .unwrap_or_default()
     }
 
     pub fn cancel(&self) -> bool {
@@ -79,7 +80,13 @@ impl RenderController {
         Ok(())
     }
 
-    pub fn set_frame_progress(&self, current: u32, total: u32, encoded: u32, estimate: Option<u64>) {
+    pub fn set_frame_progress(
+        &self,
+        current: u32,
+        total: u32,
+        encoded: u32,
+        estimate: Option<u64>,
+    ) {
         if let Ok(mut progress) = self.progress.lock() {
             progress.current = current;
             progress.total = total;
@@ -148,6 +155,10 @@ struct PrepareTimingSummary {
     label_cache_status: String,
 }
 
+struct FrameBuffer {
+    pixels: Vec<u8>,
+}
+
 pub fn render_video(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -181,7 +192,16 @@ pub fn render_video(
     let mut aggregate_profiler = RenderProfiler::default();
     let render_started = Instant::now();
 
-    let (sender, receiver) = mpsc::sync_channel::<Vec<u8>>(FRAME_QUEUE_SIZE);
+    let frame_byte_len = (width as usize) * (height as usize) * 4;
+    let (sender, receiver) = mpsc::sync_channel::<FrameBuffer>(FRAME_QUEUE_SIZE);
+    let (free_sender, free_receiver) = mpsc::sync_channel::<FrameBuffer>(FRAME_QUEUE_SIZE + 1);
+    for _ in 0..(FRAME_QUEUE_SIZE + 1) {
+        free_sender
+            .send(FrameBuffer {
+                pixels: vec![0u8; frame_byte_len],
+            })
+            .map_err(|_| "Failed to initialize frame buffer pool".to_string())?;
+    }
     let mut command = Command::new(&ffmpeg_bin);
     command
         .arg("-loglevel")
@@ -220,9 +240,14 @@ pub fn render_video(
     let encoded_frames_for_monitor = encoded_frames.clone();
     let monitor_thread = thread::spawn(move || monitor_ffmpeg(stderr, encoded_frames_for_monitor));
     let cancel_flag_for_writer = cancel_flag.clone();
-    let writer_thread = thread::spawn(move || writer_worker(stdin, receiver, cancel_flag_for_writer));
+    let writer_thread =
+        thread::spawn(move || writer_worker(stdin, receiver, free_sender, cancel_flag_for_writer));
 
-    let sample_frame_indices = sample_frame_indices(total_frames as usize);
+    let sample_frame_indices = if render_sample_frames_enabled() {
+        sample_frame_indices(total_frames as usize)
+    } else {
+        Vec::new()
+    };
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let mut estimator = ProgressEstimator::default();
     let mut rendered_frames = 0u32;
@@ -236,22 +261,36 @@ pub fn render_video(
         }
 
         let frame_started = Instant::now();
-        let frame_bytes = render_frame_rgba(
+        let mut frame_buffer =
+            acquire_frame_buffer(&free_receiver, &cancel_flag, &mut aggregate_profiler)?;
+        render_frame_rgba(
             paths,
             config,
             dense_activity,
             &prepared_preview_assets.prepared_assets,
             frame_index,
             scale,
-            prepared_preview_assets.labels_image.as_ref(),
+            None,
+            RenderTarget {
+                width,
+                height,
+                pixels: frame_buffer.pixels.as_mut_slice(),
+            },
             &mut aggregate_profiler,
         )?;
         if sample_frame_indices.contains(&frame_index) {
             aggregate_profiler.measure("debug.sample_frame_write", || {
-                write_sample_frame(&ffmpeg_bin, &debug_dir, width, height, &frame_bytes, frame_index)
+                write_sample_frame(
+                    &ffmpeg_bin,
+                    &debug_dir,
+                    width,
+                    height,
+                    frame_buffer.pixels.as_slice(),
+                    frame_index,
+                )
             })?;
         }
-        queue_frame(&sender, frame_bytes, &cancel_flag, &mut aggregate_profiler)?;
+        queue_frame(&sender, frame_buffer, &cancel_flag, &mut aggregate_profiler)?;
         rendered_frames += 1;
         let frame_ms = frame_started.elapsed().as_secs_f64() * 1000.0;
         aggregate_profiler.record_ms("frame.total", frame_ms);
@@ -302,18 +341,20 @@ pub fn render_video(
         sample_frame_indices,
         merged_timings,
     )?;
-    copy_output_to_downloads(paths, &output_path, &public_filename)?;
+    if let Err(error) = copy_output_to_downloads(paths, &output_path, &public_filename) {
+        eprintln!("{error}");
+    }
     Ok(public_filename)
 }
 
 fn queue_frame(
-    sender: &SyncSender<Vec<u8>>,
-    frame_bytes: Vec<u8>,
+    sender: &SyncSender<FrameBuffer>,
+    frame_buffer: FrameBuffer,
     cancel_flag: &AtomicBool,
     profiler: &mut RenderProfiler,
 ) -> Result<(), String> {
     let started = Instant::now();
-    let mut payload = frame_bytes;
+    let mut payload = frame_buffer;
     loop {
         if cancel_flag.load(Ordering::SeqCst) {
             return Err("Rendering cancelled".to_string());
@@ -341,7 +382,8 @@ struct WriterResult {
 
 fn writer_worker(
     mut stdin: std::process::ChildStdin,
-    receiver: Receiver<Vec<u8>>,
+    receiver: Receiver<FrameBuffer>,
+    free_sender: SyncSender<FrameBuffer>,
     cancel_flag: Arc<AtomicBool>,
 ) -> Result<WriterResult, String> {
     let mut profiler = RenderProfiler::default();
@@ -369,13 +411,21 @@ fn writer_worker(
         }
         let write_started = Instant::now();
         stdin
-            .write_all(&frame)
+            .write_all(frame.pixels.as_slice())
             .map_err(|error| format!("Failed writing frame to ffmpeg: {error}"))?;
         profiler.record_ms(
             "ffmpeg.write",
             write_started.elapsed().as_secs_f64() * 1000.0,
         );
         written_frames += 1;
+        let release_started = Instant::now();
+        free_sender
+            .send(frame)
+            .map_err(|_| "Frame buffer pool disconnected".to_string())?;
+        profiler.record_ms(
+            "buffer.release_wait",
+            release_started.elapsed().as_secs_f64() * 1000.0,
+        );
     }
     stdin.flush().map_err(|error| error.to_string())?;
     Ok(WriterResult {
@@ -419,7 +469,10 @@ fn write_prepare_summary(
             LabelCacheStatus::Miss => "miss".to_string(),
         },
     };
-    write_json(debug_dir.join("prepare_render_assets_timing.json"), &summary)
+    write_json(
+        debug_dir.join("prepare_render_assets_timing.json"),
+        &summary,
+    )
 }
 
 fn write_timing_summary(
@@ -433,7 +486,7 @@ fn write_timing_summary(
     timings: BTreeMap<String, TimingBucket>,
 ) -> Result<(), String> {
     let summary = TimingSummary {
-        phase: "phase_5".to_string(),
+        phase: "phase_6".to_string(),
         timestamp: iso_timestamp_now(),
         overlay_filename: output_path.to_string_lossy().to_string(),
         fps: config.scene.fps,
@@ -479,7 +532,11 @@ fn write_json<T: Serialize>(path: PathBuf, payload: &T) -> Result<(), String> {
     fs::write(&path, json).map_err(|error| format!("Failed to write {}: {error}", path.display()))
 }
 
-fn copy_output_to_downloads(paths: &AppPaths, output_path: &Path, filename: &str) -> Result<(), String> {
+fn copy_output_to_downloads(
+    paths: &AppPaths,
+    output_path: &Path,
+    filename: &str,
+) -> Result<(), String> {
     let destination = paths.downloads_dir.join(filename);
     fs::copy(output_path, &destination)
         .map_err(|error| format!("Failed to copy {}: {error}", destination.display()))?;
@@ -491,9 +548,10 @@ fn create_debug_dir(paths: &AppPaths) -> Result<PathBuf, String> {
         .repo_root
         .join("backend")
         .join("debug_render")
-        .join("phase_5")
+        .join("phase_6")
         .join(timestamp_slug()?);
-    fs::create_dir_all(&dir).map_err(|error| format!("Failed to create {}: {error}", dir.display()))?;
+    fs::create_dir_all(&dir)
+        .map_err(|error| format!("Failed to create {}: {error}", dir.display()))?;
     Ok(dir)
 }
 
@@ -522,6 +580,39 @@ fn sample_frame_indices(total_frames: usize) -> Vec<usize> {
     indices.sort_unstable();
     indices.dedup();
     indices
+}
+
+fn render_sample_frames_enabled() -> bool {
+    matches!(
+        std::env::var("CYCLEMETRY_SAMPLE_FRAMES").ok().as_deref(),
+        Some("1" | "true" | "TRUE" | "yes" | "YES")
+    )
+}
+
+fn acquire_frame_buffer(
+    receiver: &Receiver<FrameBuffer>,
+    cancel_flag: &AtomicBool,
+    profiler: &mut RenderProfiler,
+) -> Result<FrameBuffer, String> {
+    let started = Instant::now();
+    loop {
+        if cancel_flag.load(Ordering::SeqCst) {
+            return Err("Rendering cancelled".to_string());
+        }
+        match receiver.recv_timeout(Duration::from_millis(25)) {
+            Ok(buffer) => {
+                profiler.record_ms(
+                    "buffer.acquire_wait",
+                    started.elapsed().as_secs_f64() * 1000.0,
+                );
+                return Ok(buffer);
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => {
+                return Err("Frame buffer pool disconnected".to_string());
+            }
+        }
+    }
 }
 
 fn write_sample_frame(
@@ -562,7 +653,10 @@ fn write_sample_frame(
     if status.success() {
         Ok(())
     } else {
-        Err(format!("Failed to write sample frame {}", png_path.display()))
+        Err(format!(
+            "Failed to write sample frame {}",
+            png_path.display()
+        ))
     }
 }
 

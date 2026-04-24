@@ -12,7 +12,7 @@ pub(crate) const DEFAULT_MARGIN: f32 = 0.1;
 pub(crate) const DEFAULT_POINT_WEIGHT: f32 = 80.0;
 pub(crate) const DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX: f32 = 1.0;
 pub(crate) const DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER: f32 = 1.0;
-pub(crate) const DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER: f32 = 2.0;
+pub(crate) const DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER: f32 = 1.0;
 pub(crate) const DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER: f32 = 2.5;
 pub(crate) const DEFAULT_ELEVATION_MARKER_SCALE: f32 = 2.5;
 pub(crate) const DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER: f32 = 2.5;
@@ -41,9 +41,15 @@ pub(crate) fn fit_points_to_widget(
     }
 
     let min_x = points.iter().map(|(x, _)| *x).fold(f32::INFINITY, f32::min);
-    let max_x = points.iter().map(|(x, _)| *x).fold(f32::NEG_INFINITY, f32::max);
+    let max_x = points
+        .iter()
+        .map(|(x, _)| *x)
+        .fold(f32::NEG_INFINITY, f32::max);
     let min_y = points.iter().map(|(_, y)| *y).fold(f32::INFINITY, f32::min);
-    let max_y = points.iter().map(|(_, y)| *y).fold(f32::NEG_INFINITY, f32::max);
+    let max_y = points
+        .iter()
+        .map(|(_, y)| *y)
+        .fold(f32::NEG_INFINITY, f32::max);
     let inner_width = (width * (1.0 - 2.0 * margin)).max(1.0);
     let inner_height = (height * (1.0 - 2.0 * margin)).max(1.0);
     let span_x = (max_x - min_x).max(1e-6);
@@ -311,7 +317,10 @@ pub(crate) fn draw_marker(
     for layer in layers {
         let mut paint = Paint::default();
         paint.set_anti_alias(true);
-        paint.set_color(crate::render::text::parse_color(&layer.color, layer.opacity));
+        paint.set_color(crate::render::text::parse_color(
+            &layer.color,
+            layer.opacity,
+        ));
         if layer.solid_fill {
             paint.set_style(skia_safe::paint::Style::Fill);
             canvas.draw_circle(Point::new(x, y), layer.radius, &paint);
@@ -327,8 +336,16 @@ pub(crate) fn marker_layers_from_points(points: &[MarkerPointConfig]) -> Vec<Mar
     let mut layers = points
         .iter()
         .map(|point| MarkerLayer {
-            radius: point.weight.unwrap_or(DEFAULT_POINT_WEIGHT).max(1.0).sqrt().max(2.0),
-            color: point.color.clone().unwrap_or_else(|| DEFAULT_COLOR.to_string()),
+            radius: point
+                .weight
+                .unwrap_or(DEFAULT_POINT_WEIGHT)
+                .max(1.0)
+                .sqrt()
+                .max(2.0),
+            color: point
+                .color
+                .clone()
+                .unwrap_or_else(|| DEFAULT_COLOR.to_string()),
             opacity: normalize_opacity(point.opacity, 1.0),
             solid_fill: false,
         })
@@ -454,7 +471,10 @@ pub(crate) fn rotate_point_to_canvas(
     let translated_y = y - center_y;
     let rotated_x = translated_x * radians.cos() - translated_y * radians.sin();
     let rotated_y = translated_x * radians.sin() + translated_y * radians.cos();
-    (widget_x + rotated_x + center_x, widget_y + rotated_y + center_y)
+    (
+        widget_x + rotated_x + center_x,
+        widget_y + rotated_y + center_y,
+    )
 }
 
 pub(crate) fn widget_render_report(

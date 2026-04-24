@@ -318,11 +318,22 @@ fn normalize_elevation_plot(
         marker_size,
         marker_color: marker_color.clone(),
         marker_opacity,
-        marker_points: fallback_marker_points(&plot.points, marker_size, &marker_color, marker_opacity),
+        marker_points: fallback_marker_points(
+            &plot.points,
+            marker_size,
+            &marker_color,
+            marker_opacity,
+        ),
         show_elevation_metric: plot.show_elevation_metric.unwrap_or(false),
         show_elevation_imperial: plot.show_elevation_imperial.unwrap_or(false),
-        metric_label_offset_x: plot.metric_label_offset_x.or(point_label.x_offset).unwrap_or(0.0),
-        metric_label_offset_y: plot.metric_label_offset_y.or(point_label.y_offset).unwrap_or(-28.0),
+        metric_label_offset_x: plot
+            .metric_label_offset_x
+            .or(point_label.x_offset)
+            .unwrap_or(0.0),
+        metric_label_offset_y: plot
+            .metric_label_offset_y
+            .or(point_label.y_offset)
+            .unwrap_or(-28.0),
         imperial_label_offset_x: plot.imperial_label_offset_x.unwrap_or(0.0),
         imperial_label_offset_y: plot.imperial_label_offset_y.unwrap_or(6.0),
         label_font: point_label.font.or_else(|| config.scene.font.clone()),
@@ -331,7 +342,9 @@ fn normalize_elevation_plot(
             .or(config.scene.font_size)
             .unwrap_or(12.5),
         label_color: point_label.color.unwrap_or_else(|| base_color.clone()),
-        label_decimal_rounding: point_label.decimal_rounding.or(config.scene.decimal_rounding),
+        label_decimal_rounding: point_label
+            .decimal_rounding
+            .or(config.scene.decimal_rounding),
         legacy_label_units: point_label.units,
     }
 }
@@ -374,7 +387,10 @@ fn build_elevation_frame_states(
     let fallback_elevations = if dense_activity.series.elevation.len() == frame_progress.len() {
         None
     } else {
-        Some(interpolate_elevation_for_progresses(activity, &frame_progress))
+        Some(interpolate_elevation_for_progresses(
+            activity,
+            &frame_progress,
+        ))
     };
     let mut progress_cursor = 0usize;
 
@@ -451,11 +467,17 @@ fn downsample_elevation_points(points: &[(f32, f64)], target_count: usize) -> Ve
             .len()
             .min((bucket_index + bucket_size).floor() as usize);
         let bucket = &points[start_index..end_index.max(start_index + 1)];
-        if let Some(min_point) = bucket.iter().copied().min_by(|left, right| left.1.total_cmp(&right.1))
+        if let Some(min_point) = bucket
+            .iter()
+            .copied()
+            .min_by(|left, right| left.1.total_cmp(&right.1))
         {
             sampled.push(min_point);
         }
-        if let Some(max_point) = bucket.iter().copied().max_by(|left, right| left.1.total_cmp(&right.1))
+        if let Some(max_point) = bucket
+            .iter()
+            .copied()
+            .max_by(|left, right| left.1.total_cmp(&right.1))
         {
             sampled.push(max_point);
         }

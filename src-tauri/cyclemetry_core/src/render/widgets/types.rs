@@ -29,6 +29,7 @@ pub struct WidgetRenderReport {
 pub struct PreparedRenderAssets {
     pub(crate) route_cache: Option<RouteWidgetCache>,
     pub(crate) elevation_cache: Option<ElevationWidgetCache>,
+    pub(crate) base_rgba: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug)]

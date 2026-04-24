@@ -671,9 +671,331 @@ Recorded artifacts for Phase 6:
 - final optimized `.mov` outputs
 - optimization notes documenting which surface/buffer strategy won and why
 
+### Phase 7: Route/elevation cached composition and draw-path collapse
+
+This phase is dedicated to removing the remaining per-frame vector redraw cost of the route and elevation widgets. Phase 6 proved that the old full-frame clear and readback costs can be reduced substantially, but also showed that the Rust renderer still spends too much time rebuilding and redrawing route/elevation geometry every frame, especially for the elevation widget at 4K. The focus here is to move the widget architecture closer to the proven legacy Python approach: pre-render static widget imagery once, precompute reveal/composition state once, and keep the frame-time path limited to lightweight compositing plus marker and label updates where unavoidable.
+
+Measured motivation from the current Phase 6 implementation:
+
+- 1080p `new_template.json` after the first Phase 6 pass:
+  - `composite.elevation` is about `5.7 ms/frame`
+  - `composite.route` is about `0.48 ms/frame`
+  - `frame.draw` is about `10.2 ms/frame`
+- 4K `safa_brian_a_4k_gradient.json` after the first Phase 6 pass:
+  - `composite.elevation` is about `19.6 ms/frame`
+  - `composite.route` is about `1.55 ms/frame`
+  - `frame.draw` is about `22.4 ms/frame`
+- A 50% reduction in elevation point budget helped, but only partially:
+  - 1080p `composite.elevation` improved to about `4.4 ms/frame`
+  - 4K `composite.elevation` improved to about `17.9 ms/frame`
+- The legacy Python renderer is faster in this area not because Pillow is inherently faster than Skia, but because the Python path pre-renders:
+  - route background and completed layers
+  - elevation background and completed layers
+  - rotated variants of those layers
+  - marker sprites
+  - route reveal masks / reveal buckets
+  - elevation label text
+  - dirty-region restore patches
+
+Decision:
+
+- Treat route/elevation per-frame vector redraw as the primary post-Phase-6 bottleneck.
+- Preserve the current Phase 6 buffer-pool / no-readback architecture unless a later measurement proves it incompatible with fast compositing.
+- Prefer cached image composition over repeated path reconstruction for both widgets.
+- Match the old Python bucket names where possible so Phase 7 results remain comparable to both Python and Phase 6 Rust reports.
+- Keep preview rendering functional, but optimize the production video path first.
+
+Implementation:
+
+- Step 1. Add explicit cached widget layer types to Rust render assets.
+  - Expand `PreparedRenderAssets` and widget cache structs so route/elevation caches can hold:
+    - background layer
+    - completed layer
+    - rotated background layer
+    - rotated completed layer
+    - marker sprite
+    - marker anchor
+    - route reveal masks or route reveal overlays
+    - optional representative debug images for validation only
+  - Route and elevation caches must separate:
+    - geometry state used for prepare-time construction
+    - frame state used for marker/reveal lookup
+    - image layers used in steady-state render
+
+- Step 2. Build pre-rendered route layers during prepare.
+  - During route cache preparation:
+    - render remaining/background route line once into a widget-local layer
+    - render completed route line once into a widget-local layer
+    - pre-rotate both layers if rotation is non-zero
+    - pre-render marker sprite once
+  - Preserve current route geometry simplification, but use it only to generate the cached layers and frame states, not to redraw the route every frame.
+  - Requirement:
+    - `draw_route_widget()` in steady-state must stop rebuilding and stroking route paths each frame.
+
+- Step 3. Build pre-rendered elevation layers during prepare.
+  - During elevation cache preparation:
+    - render the remaining elevation area + line once into a widget-local background layer
+    - render the completed elevation area + line once into a widget-local completed layer
+    - pre-rotate both layers if rotation is non-zero
+    - pre-render marker sprite once
+  - Preserve the existing elevation geometry generation only as prepare-time input.
+  - Requirement:
+    - `draw_elevation_widget()` in steady-state must stop redrawing both fills and both lines every frame.
+
+- Step 4. Precompute reveal strategy for route.
+  - Port the old Python reveal strategy into Rust and evaluate two options:
+    - bucketed reveal masks
+    - bucketed reveal overlays
+  - Route reveal should be selected by precomputed bucket or precomputed frame index mapping, not by rebuilding prefix points and re-stroking the line every frame.
+  - Bucket count should be configurable from scene/render settings if needed, with a sensible default tied to widget size and frame count.
+  - Requirement:
+    - route reveal selection in the hot path must be O(1) lookup plus image composition.
+
+- Step 5. Precompute reveal strategy for elevation.
+  - Evaluate the two practical strategies already proven conceptually in the Python path:
+    - reveal width crop from a pre-rendered completed elevation layer
+    - bucketed reveal overlays if crop/composite is visually insufficient
+  - The first implementation should prefer crop-based reveal for simplicity if it preserves parity.
+  - If the crop-based approach is not visually correct for all templates, introduce bucketed completed overlays analogous to route.
+  - Requirement:
+    - per-frame elevation rendering must reduce to:
+      - composite background layer
+      - composite completed reveal layer or crop
+      - draw/paste marker
+      - draw/paste labels if enabled
+
+- Step 6. Precompute marker sprites and avoid procedural marker redraw in hot path.
+  - Route and elevation currently rebuild marker circles procedurally through Skia every frame.
+  - Replace this with pre-rendered widget-local marker sprites, including layered/ring styles matching current templates.
+  - Marker placement should become:
+    - integer or subpixel position lookup from frame state
+    - image draw/paste at that position
+  - Requirement:
+    - marker rendering should no longer contribute materially to `composite.route` or `composite.elevation`.
+
+- Step 7. Precompute elevation label strings and measure text placement separately.
+  - Expand `ElevationFrameState` to include optional preformatted label text, matching the legacy Python path.
+  - If label drawing remains expensive after composition caching, evaluate:
+    - cached glyph/text blobs for unique label strings
+    - pre-rendered text sprites for metric/imperial label variants
+  - Keep the timing bucket name `text.elevation_label` for the actual draw/paste work.
+  - Requirement:
+    - no per-frame string formatting should remain on the elevation hot path.
+
+- Step 8. Add widget-local compositing helpers rather than full vector redraw helpers.
+  - Introduce render helpers dedicated to:
+    - compositing widget layers onto the main frame surface
+    - cropping reveal regions
+    - applying rotation-aware widget-local offsets
+    - drawing/pasting pre-rendered marker sprites
+  - Keep geometry/path-building helpers only in prepare-time code.
+  - Requirement:
+    - frame-time widget functions should operate on cached images and frame indices, not rebuild `SkPath`s from long point arrays.
+
+- Step 9. Reintroduce dirty-region-aware base restore where it wins.
+  - Phase 6 replaced the costly `surface.clear` and full readback path, but still restores the full base frame every time.
+  - Revisit the Python dirty-region philosophy specifically for dynamic widget/value regions:
+    - restore only route widget region
+    - restore only elevation widget region
+    - restore only dynamic text regions
+  - Evaluate two implementations:
+    - CPU copy of rectangular RGBA regions from the pristine base buffer
+    - widget-local cached layers composited over a transparent frame without full-frame restore
+  - Keep whichever is faster and simpler to reason about.
+  - Requirement:
+    - `base.restore` or `surface.restore` should not grow as widget caching is introduced.
+
+- Step 10. Preserve benchmark hygiene and timing comparability.
+  - Keep shared buckets:
+    - `base.restore`
+    - `text.dynamic`
+    - `composite.route`
+    - `composite.elevation`
+    - `text.elevation_label`
+    - `queue.put_wait`
+    - `encoder.queue_wait`
+    - `ffmpeg.write`
+  - Rust-only buckets may include:
+    - `prepare.route.layers`
+    - `prepare.route.reveal_masks`
+    - `prepare.elevation.layers`
+    - `prepare.elevation.reveal_overlays`
+    - `marker.sprite.prepare`
+    - `widget.composite.route`
+    - `widget.composite.elevation`
+  - Keep debug image generation optional and disabled for benchmark runs.
+
+- Step 11. Validate parity while optimizing.
+  - Reuse the existing sampled-frame parity checks from Phases 4-6.
+  - Specifically validate:
+    - route reveal correctness across 0/25/50/75/100%
+    - elevation reveal correctness across the same checkpoints
+    - rotated route layers
+    - marker positioning
+    - elevation labels
+  - If bucketing introduces visible reveal stepping, increase bucket count or switch reveal strategy rather than accepting parity loss.
+
+Optimization order and expected impact:
+
+1. pre-render elevation background/completed layers
+2. switch elevation reveal to cached crop/composition
+3. pre-render route background/completed layers
+4. switch route reveal to cached masks/overlays
+5. pre-render marker sprites
+6. precompute elevation label strings
+7. re-evaluate dirty-region restore versus full-frame restore
+
+Acceptance:
+
+- Rust steady-state widget rendering is no longer dominated by repeated route/elevation path redraw.
+- 1080p target:
+  - `composite.elevation` should drop materially from current Phase 6 numbers, with a target below `3 ms/frame`
+  - `frame.draw` should improve correspondingly
+- 4K target:
+  - `composite.elevation` should drop materially from current Phase 6 numbers, with a target below `10 ms/frame`
+  - `composite.route` should remain low, ideally below `1 ms/frame`
+  - `frame.draw` should improve materially versus the current Phase 6 median
+- Route/elevation output remains within existing visual parity thresholds from Phases 4-6.
+- Encoder-side buckets may remain unchanged; the success criterion here is reducing render-side widget cost.
+
+Test procedure:
+
+1. Run the same benchmark matrix used in Phase 6:
+   ```powershell
+   cargo run --bin render_video -- --config templates\new_template.json --payload app\debug\Test_FIT-parse-debug.json
+   cargo run --bin render_video -- --config templates\safa_brian_a_4k_gradient.json --payload app\debug\Test_FIT-parse-debug.json
+   ```
+2. Save into `tmp\Phase7`:
+   - final `.mov`
+   - `prepare_render_assets_timing.json`
+   - `timing_summary.json`
+   - any widget-debug images or JSONs used for validation
+3. Compare against:
+   - Phase 6 median baselines
+   - the most recent reduced-point experiments if relevant
+4. For each milestone, record:
+   - delta in `frame.draw`
+   - delta in `composite.route`
+   - delta in `composite.elevation`
+   - delta in `text.elevation_label`
+   - delta in `base.restore`
+   - delta in total wall clock
+5. Run sampled-frame visual diffs for:
+   - route widget representative frames
+   - elevation widget representative frames
+   - full preview frames at fixed benchmark seconds
+6. Re-run a cancel test after cached layer composition is introduced to ensure no deadlocks or resource leaks in the pooled-buffer path.
+
+Recorded artifacts for Phase 7:
+
+- per-template `timing_summary.json`
+- per-template `prepare_render_assets_timing.json`
+- final `.mov` outputs
+- route/elevation sampled PNGs
+- optional widget-debug layers and reveal-mask previews
+- optimization notes documenting which cached composition strategy won and why
+
 ### Deferred optional phase: Browser-hosted build from the same repo
 
-This work is explicitly deferred until after desktop performance optimization. If revisited later, it should start from the optimized native architecture produced by Phase 6 rather than the current Phase 5 frame pipeline.
+This phase is optional and does not change the success criteria for Phases 1-5. Its goal is to support two build targets from the same repository. Some parts of the Rust rendering-encoding architecture might be outdated in this plan. Please verify everything.
+
+- desktop app: current Tauri shell with native Rust binary
+- hosted web app: browser UI with shared Rust data/geometry core plus a browser-specific CanvasKit renderer
+
+Decision:
+
+- Reuse the Rust core for non-rendering logic and rendering preparation, but do not assume native `rust-skia` is the browser rendering path.
+- Use CanvasKit as the browser renderer because Skia's official web deployment path is CanvasKit rather than native `rust-skia`.
+- Code splitting in the frontend is recommended for startup and bundle size, but the required architectural split is primarily:
+  - shared Rust core for activity/config/render preparation
+  - native `rust-skia` renderer for Tauri/desktop
+  - browser-specific CanvasKit renderer for hosted web
+- Browser export must not depend on desktop-only process spawning, filesystem assumptions, or FFmpeg stdin piping.
+- Browser encode/output format may differ from desktop if required by browser APIs. Desktop ProRes 4444 remains the native target; web export uses the best browser-supported alpha-capable path available at implementation time.
+
+Implementation:
+
+- Refactor `cyclemetry_core` into target-aware layers:
+  - `core`: activity processing, config normalization, value formatting, route/elevation geometry preparation, frame orchestration
+  - `render_model`: target-neutral render instructions and prepared geometry with no dependency on Tauri, Skia native surfaces, or browser APIs
+  - `host_native`: FFmpeg process, native file IO, OS integration
+  - `host_web`: `wasm-bindgen` entrypoints, browser memory transfer, worker messaging, browser download/export helpers
+- Keep desktop-specific commands in `src-tauri/src/lib.rs`; add a separate wasm crate or wasm target entrypoint that exposes:
+  - `init_renderer(config_json, parsed_activity_json)`
+  - `build_preview_scene(second) -> render instruction payload`
+  - `build_frame_batch(start_frame, count) -> transferable render instruction payload`
+  - `cancel_render()`
+- Move long-running browser render work off the main thread:
+  - run wasm preparation logic inside a Web Worker
+  - transfer render-model payloads or compact geometry/series buffers via `postMessage` with transferable `ArrayBuffer`s
+  - keep UI preview/progress in the existing app shell
+- Make the browser renderer consume the shared render model using CanvasKit:
+  - map text, paths, fills, markers, opacity, transforms, and cached static layers onto CanvasKit APIs
+  - load and register the same fonts in the browser where licensing and packaging allow
+  - keep visual parity targets at the level of rendered output, not identical renderer internals
+- Isolate rendering backend assumptions so browser builds can swap native-only pieces cleanly:
+  - avoid direct use of `std::fs`, subprocess APIs, and blocking thread models inside shared render code
+  - gate target-specific modules with Cargo features and `cfg(target_arch = "wasm32")`
+  - keep image/frame intent as an explicit intermediate representation so desktop `rust-skia` and browser CanvasKit can consume the same prepared scene
+- Add a web export path that consumes rendered frames in-browser:
+  - prefer browser-native encoding APIs such as WebCodecs where supported
+  - provide a fallback path such as PNG frame sequence or canvas-recorded video if required
+  - keep export capability detection explicit in the UI so unsupported browser/codec combinations fail predictably
+- Update the frontend build so web-only heavy modules load lazily:
+  - lazy-load CanvasKit and wasm preparation modules only when preview or export is requested
+  - keep editor-only routes/components separate from render/export worker code and CanvasKit bootstrap code
+  - load desktop-only API wrappers only in the Tauri build
+
+Acceptance:
+
+- The repo can produce both:
+  - a Tauri desktop build using the native Rust path
+  - a hosted web build using shared Rust wasm preparation plus CanvasKit rendering
+- Shared fixtures produce matching dense activity outputs between native and wasm builds within existing Phase 2 tolerances.
+- Shared preview frames from desktop `rust-skia` and browser CanvasKit are visually equivalent within Phase 3/4 image-diff thresholds, allowing small documented text/raster differences.
+- Browser preview remains responsive while rendering is active.
+- Browser export completes without server-side rendering.
+- Desktop-only integrations are not bundled into the hosted web build.
+
+Test procedure:
+
+1. Build desktop target:
+   ```powershell
+   cargo tauri build
+   ```
+2. Build web target from the same repo:
+   ```powershell
+   cd app
+   pnpm build
+   ```
+   and ensure the wasm artifact is included only in the hosted web output path.
+3. For one shared fixture/config pair, generate dense outputs from:
+   - native Rust
+   - wasm Rust in a browser test harness
+4. Compare numeric outputs with the existing Phase 2 comparison tooling and tolerances.
+5. Generate browser and desktop preview frames for the same sample seconds:
+   - `600`
+   - `607`
+   - `615`
+   - `622`
+   - `629`
+6. Compare browser/native preview frames with the same image diff tooling used earlier.
+7. Run a manual browser export check in at least:
+   - Chromium-based browser
+   - Safari if macOS support is required
+8. Verify:
+   - render work happens in a worker, not the UI thread
+   - cancellation stops further frame production
+   - produced artifact downloads successfully
+   - unsupported encode paths surface a clear UI message
+
+Recorded artifacts for Optional Phase 6:
+
+- wasm/native dense JSON comparisons
+- desktop `rust-skia` vs browser CanvasKit preview PNGs or equivalent captured frames
+- bundle analysis showing deferred wasm/render chunks
+- browser export capability matrix by browser
+- manual test notes for cancellation, responsiveness, and artifact download
 
 ### Deferred phase: GPU Skia
 

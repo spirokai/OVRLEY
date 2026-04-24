@@ -25,8 +25,9 @@ pub(crate) fn prepare_route_cache(
 ) -> Result<RouteWidgetCache, String> {
     let prepare_started = Instant::now();
     let plot = normalize_route_plot(config, plot);
-    let geometry =
-        prepare_profiler.measure("build_route_cache.geometry", || build_route_geometry(&plot, activity))?;
+    let geometry = prepare_profiler.measure("build_route_cache.geometry", || {
+        build_route_geometry(&plot, activity)
+    })?;
     let marker_layers = marker_layers_from_points(&plot.marker_points);
     let frame_states = prepare_profiler.measure("build_route_cache.frame_states", || {
         build_route_frame_states(config, activity, &geometry, dense_activity)
@@ -153,7 +154,12 @@ fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> Norm
         marker_size,
         marker_color: marker_color.clone(),
         marker_opacity,
-        marker_points: fallback_marker_points(&plot.points, marker_size, &marker_color, marker_opacity),
+        marker_points: fallback_marker_points(
+            &plot.points,
+            marker_size,
+            &marker_color,
+            marker_opacity,
+        ),
     }
 }
 
@@ -176,7 +182,8 @@ fn build_route_geometry(
         plot.margin,
         true,
     );
-    let tolerance = DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX * DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER;
+    let tolerance =
+        DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX * DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER;
     let fitted_samples = route_samples
         .iter()
         .zip(fitted.iter())
@@ -248,7 +255,8 @@ fn project_course_samples(activity: &ParsedActivity) -> Vec<RouteSample> {
                 .copied()
                 .filter(|value| value.is_finite())
                 .unwrap_or_else(|| {
-                    index as f64 / activity.sample_course_points.len().saturating_sub(1).max(1) as f64
+                    index as f64
+                        / activity.sample_course_points.len().saturating_sub(1).max(1) as f64
                 })
                 .clamp(0.0, 1.0) as f32,
         })
@@ -275,8 +283,11 @@ fn simplify_route_samples(points: &[RouteSample], tolerance: f32) -> Vec<RouteSa
     let mut max_distance = 0.0f32;
     let mut split_index = 0usize;
     for index in 1..points.len() - 1 {
-        let distance =
-            perpendicular_distance(points[index].point, points[0].point, points.last().unwrap().point);
+        let distance = perpendicular_distance(
+            points[index].point,
+            points[0].point,
+            points.last().unwrap().point,
+        );
         if distance > max_distance {
             max_distance = distance;
             split_index = index;
@@ -334,7 +345,10 @@ fn build_route_prefix_points(
         return Vec::new();
     }
 
-    let last_point = *geometry.points.last().unwrap_or(&(state.marker_x, state.marker_y));
+    let last_point = *geometry
+        .points
+        .last()
+        .unwrap_or(&(state.marker_x, state.marker_y));
     let mut points = if distance(last_point, (state.marker_x, state.marker_y)) <= 1e-3 {
         geometry.points.clone()
     } else {
