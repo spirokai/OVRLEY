@@ -754,64 +754,73 @@ export function normalizeElevationPoints(
   const safeTargetDensity = clamp(Number(targetDensity) || 0.75, 0.1, 2)
   const safeSimplifyTolerance = clamp(Number(simplifyTolerancePx) || 0, 0, 8)
 
-  const downsampleElevationSamples = (inputSamples, targetCount) => {
-    if (inputSamples.length <= targetCount || targetCount < 3) {
-      return inputSamples.map((sample) => ({ ...sample, preserve: true }))
-    }
+  const smoothElevationSamples = (inputSamples) => {
+    const coefficients = [-36, 9, 44, 69, 84, 89, 84, 69, 44, 9, -36]
+    const radius = Math.floor(coefficients.length / 2)
 
-    const bucketCount = Math.max(1, Math.floor(targetCount / 2))
-    const bucketSize = inputSamples.length / bucketCount
-    const selectedIndexes = [{ index: 0, preserve: true }]
-    let bucketIndex = 0
+    return inputSamples.map((sample, index) => {
+      let total = 0
+      let coefficientTotal = 0
 
-    while (Math.floor(bucketIndex) < inputSamples.length - 1) {
-      const start = Math.floor(bucketIndex)
-      const end = Math.max(
-        start + 1,
-        Math.min(inputSamples.length, Math.floor(bucketIndex + bucketSize)),
-      )
-      const bucket = inputSamples.slice(start, end)
-      if (bucket.length === 0) {
-        bucketIndex += Math.max(bucketSize, 1)
-        continue
+      for (let offset = -radius; offset <= radius; offset += 1) {
+        const neighborIndex = index + offset
+        if (neighborIndex < 0 || neighborIndex >= inputSamples.length) {
+          continue
+        }
+
+        const neighborValue = inputSamples[neighborIndex].value
+        if (!Number.isFinite(neighborValue)) {
+          continue
+        }
+
+        const coefficient = coefficients[offset + radius]
+        total += neighborValue * coefficient
+        coefficientTotal += coefficient
       }
 
-      const representativeIndex = start + Math.floor(bucket.length / 2)
-      const minIndex =
-        start +
-        bucket.reduce(
-          (bestIndex, sample, index, items) =>
-            sample.value < items[bestIndex].value ? index : bestIndex,
-          0,
-        )
-      const maxIndex =
-        start +
-        bucket.reduce(
-          (bestIndex, sample, index, items) =>
-            sample.value > items[bestIndex].value ? index : bestIndex,
-          0,
-        )
+      return {
+        ...sample,
+        value:
+          Math.abs(coefficientTotal) <= Number.EPSILON
+            ? sample.value
+            : total / coefficientTotal,
+        preserve: index === 0 || index === inputSamples.length - 1,
+      }
+    })
+  }
 
-      selectedIndexes.push(
-        { index: representativeIndex, preserve: false },
-        { index: minIndex, preserve: true },
-        { index: maxIndex, preserve: true },
-      )
-      bucketIndex += Math.max(bucketSize, 1)
+  const downsampleElevationSamples = (inputSamples, targetCount) => {
+    if (inputSamples.length <= targetCount || targetCount < 3) {
+      return inputSamples.map((sample, index) => ({
+        ...sample,
+        preserve: index === 0 || index === inputSamples.length - 1,
+      }))
     }
 
-    selectedIndexes.push({ index: inputSamples.length - 1, preserve: true })
-    const dedupedIndexes = [
-      ...new Map(
-        selectedIndexes
-          .sort((left, right) => left.index - right.index)
-          .map((item) => [item.index, item]),
-      ).values(),
-    ]
-    return dedupedIndexes.map(({ index, preserve }) => ({
-      ...inputSamples[index],
-      preserve,
-    }))
+    const smoothedSamples = smoothElevationSamples(inputSamples)
+    const lastIndex = smoothedSamples.length - 1
+    const selectedSamples = []
+
+    for (let sampleIndex = 0; sampleIndex < targetCount; sampleIndex += 1) {
+      const sourceIndex = Math.round(
+        (sampleIndex * lastIndex) / Math.max(targetCount - 1, 1),
+      )
+      const nextSample = smoothedSamples[Math.min(sourceIndex, lastIndex)]
+      if (
+        selectedSamples.length > 0 &&
+        selectedSamples[selectedSamples.length - 1].progress ===
+          nextSample.progress
+      ) {
+        continue
+      }
+      selectedSamples.push(nextSample)
+    }
+
+    if (selectedSamples.length === 1 && smoothedSamples.length > 1) {
+      selectedSamples.push(smoothedSamples[smoothedSamples.length - 1])
+    }
+
+    return selectedSamples
   }
 
   const simplifyProjectedPoints = (inputPoints, tolerance) => {

@@ -396,7 +396,7 @@ fn build_elevation_geometry(
         points: simplified.iter().map(|sample| sample.point).collect(),
         source_point_count: raw_points.len(),
         simplification: format!(
-            "extrema_density_{:.2}_rdp_px_{:.2}",
+            "sg11_density_{:.2}_rdp_px_{:.2}",
             plot.target_density, plot.simplify_tolerance_px
         ),
     })
@@ -492,74 +492,93 @@ fn downsample_elevation_points(
     if points.len() <= target_count || target_count < 3 {
         return points
             .iter()
-            .map(|(progress01, elevation)| ReducedElevationPoint {
+            .enumerate()
+            .map(|(index, (progress01, elevation))| ReducedElevationPoint {
                 progress01: *progress01,
                 elevation: *elevation,
-                preserve: true,
+                preserve: index == 0 || index + 1 == points.len(),
             })
             .collect();
     }
 
-    let bucket_count = (target_count / 2).max(1);
-    let bucket_size = points.len() as f64 / bucket_count as f64;
-    let mut selected_indexes = Vec::with_capacity(target_count);
-    selected_indexes.push((0usize, true));
+    let smoothed = smooth_elevation_points(points);
+    select_evenly_spaced_elevation_points(&smoothed, target_count)
+}
 
-    let mut bucket_index = 0.0f64;
-    while (bucket_index as usize) < points.len().saturating_sub(1) {
-        let start = bucket_index as usize;
-        let end = points
-            .len()
-            .min((bucket_index + bucket_size).floor() as usize)
-            .max(start + 1);
-        let bucket = &points[start..end];
-        if bucket.is_empty() {
-            bucket_index += bucket_size.max(1.0);
-            continue;
-        }
+fn smooth_elevation_points(points: &[(f32, f64)]) -> Vec<ReducedElevationPoint> {
+    const COEFFICIENTS: [f64; 11] = [
+        -36.0, 9.0, 44.0, 69.0, 84.0, 89.0, 84.0, 69.0, 44.0, 9.0, -36.0,
+    ];
+    let radius = COEFFICIENTS.len() / 2;
 
-        let representative_index = start + bucket.len() / 2;
-        let min_index = start
-            + bucket
-                .iter()
-                .enumerate()
-                .min_by(|left, right| left.1 .1.total_cmp(&right.1 .1))
-                .map(|(index, _)| index)
-                .unwrap_or(0);
-        let max_index = start
-            + bucket
-                .iter()
-                .enumerate()
-                .max_by(|left, right| left.1 .1.total_cmp(&right.1 .1))
-                .map(|(index, _)| index)
-                .unwrap_or(0);
+    points
+        .iter()
+        .enumerate()
+        .map(|(index, (progress01, elevation))| {
+            let mut total = 0.0f64;
+            let mut coefficient_total = 0.0f64;
 
-        let mut bucket_indexes = vec![
-            (representative_index, false),
-            (min_index, true),
-            (max_index, true),
-        ];
-        bucket_indexes.sort_unstable_by_key(|(index, _)| *index);
-        bucket_indexes.dedup();
-        selected_indexes.extend(bucket_indexes);
-        bucket_index += bucket_size.max(1.0);
-    }
+            for (offset, coefficient) in COEFFICIENTS.iter().enumerate() {
+                let neighbor_index = index as isize + offset as isize - radius as isize;
+                if neighbor_index < 0 || neighbor_index >= points.len() as isize {
+                    continue;
+                }
+                let neighbor_value = points[neighbor_index as usize].1;
+                if !neighbor_value.is_finite() {
+                    continue;
+                }
+                total += neighbor_value * coefficient;
+                coefficient_total += coefficient;
+            }
 
-    selected_indexes.push((points.len() - 1, true));
-    selected_indexes.sort_unstable_by_key(|(index, _)| *index);
-    selected_indexes.dedup();
-    selected_indexes
-        .into_iter()
-        .filter_map(|(index, preserve)| {
-            points
-                .get(index)
-                .map(|(progress01, elevation)| ReducedElevationPoint {
-                    progress01: *progress01,
-                    elevation: *elevation,
-                    preserve,
-                })
+            let smoothed_elevation = if coefficient_total.abs() <= f64::EPSILON {
+                *elevation
+            } else {
+                total / coefficient_total
+            };
+
+            ReducedElevationPoint {
+                progress01: *progress01,
+                elevation: smoothed_elevation,
+                preserve: index == 0 || index + 1 == points.len(),
+            }
         })
         .collect()
+}
+
+fn select_evenly_spaced_elevation_points(
+    points: &[ReducedElevationPoint],
+    target_count: usize,
+) -> Vec<ReducedElevationPoint> {
+    if points.len() <= target_count {
+        return points.to_vec();
+    }
+
+    let mut selected = Vec::with_capacity(target_count);
+    let last_index = points.len() - 1;
+    for sample_index in 0..target_count {
+        let source_index = ((sample_index as f64 * last_index as f64)
+            / (target_count.saturating_sub(1).max(1) as f64))
+            .round() as usize;
+        if let Some(point) = points.get(source_index.min(last_index)).copied() {
+            if selected
+                .last()
+                .map(|last: &ReducedElevationPoint| {
+                    (last.progress01 - point.progress01).abs() <= f32::EPSILON
+                })
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            selected.push(point);
+        }
+    }
+
+    if selected.len() == 1 && points.len() > 1 {
+        selected.push(*points.last().unwrap());
+    }
+
+    selected
 }
 
 #[derive(Clone, Copy)]
