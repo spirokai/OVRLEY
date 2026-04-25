@@ -503,8 +503,19 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="prores_ks">ProRes 4444</SelectItem>
-                  <SelectItem value="libvpx-vp9">VP9 with alpha</SelectItem>
+                  <SelectItem value="prores_ks">ProRes 4444 (CPU)</SelectItem>
+                  <SelectItem value="prores_ks_vulkan">
+                    ProRes Vulkan (GPU/8.1)
+                  </SelectItem>
+                  <SelectItem value="prores_videotoolbox">
+                    ProRes VideoToolbox (macOS)
+                  </SelectItem>
+                  <SelectItem value="hevc_alpha">
+                    HEVC with alpha (H.265)
+                  </SelectItem>
+                  <SelectItem value="libvpx-vp9">
+                    VP9 with alpha (WebM)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

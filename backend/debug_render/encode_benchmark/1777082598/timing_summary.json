@@ -1,0 +1,20 @@
+{
+  "phase": "encode_benchmark",
+  "timestamp": "2026-04-25T04:03:41",
+  "overlay_filename": "H:\\tools\\cyclemetry\\backend\\public\\encode_benchmark_1777082598.mov",
+  "fps": 30.0,
+  "width": 3840,
+  "height": 2160,
+  "total_frames": 900,
+  "rendered_frames": 900,
+  "total_time_taken": 23.231,
+  "sample_frame_indices": [],
+  "timings": {
+    "ffmpeg.process_total": {
+      "count": 1,
+      "total_ms": 23231.0782,
+      "avg_ms": 23231.0782,
+      "max_ms": 23231.0782
+    }
+  }
+}

@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-const FRAME_QUEUE_SIZE: usize = 4;
+const FRAME_QUEUE_SIZE: usize = 12;
 
 #[derive(Clone)]
 pub struct RenderController {
@@ -166,11 +166,11 @@ pub fn render_video(
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> Result<String, String> {
-    let ffmpeg_settings = build_ffmpeg_settings(&config.scene.ffmpeg)?;
+    let ffmpeg_settings = finalize_ffmpeg_settings(build_ffmpeg_settings(&config.scene.ffmpeg)?);
     let width = make_even(config.scene.width.unwrap_or(1920));
     let height = make_even(config.scene.height.unwrap_or(1080));
     let total_frames = dense_activity.frame_count as u32;
-    let debug_dir = create_debug_dir(paths)?;
+    let debug_dir = create_debug_dir(paths, "phase_6")?;
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
         prepare_preview_assets(paths, config, activity, dense_activity)?;
     write_prepare_summary(
@@ -187,6 +187,7 @@ pub fn render_video(
     );
     let output_path = paths.public_dir.join(&public_filename);
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
+    let input_pix_fmt = ffmpeg_input_pix_fmt();
     let encoded_frames = Arc::new(AtomicU32::new(0));
     let cancel_flag = controller.cancel_flag.clone();
     let mut aggregate_profiler = RenderProfiler::default();
@@ -202,32 +203,15 @@ pub fn render_video(
             })
             .map_err(|_| "Failed to initialize frame buffer pool".to_string())?;
     }
-    let mut command = Command::new(&ffmpeg_bin);
-    command
-        .arg("-loglevel")
-        .arg(&ffmpeg_settings.loglevel)
-        .arg("-f")
-        .arg("rawvideo")
-        .arg("-s")
-        .arg(format!("{width}x{height}"))
-        .arg("-pix_fmt")
-        .arg("rgba")
-        .arg("-r")
-        .arg(config.scene.fps.to_string())
-        .arg("-i")
-        .arg("-")
-        .args(&ffmpeg_settings.output_args)
-        .arg("-pix_fmt")
-        .arg(&ffmpeg_settings.pix_fmt)
-        .arg("-y")
-        .arg(&output_path)
-        .stdin(Stdio::piped())
-        .stderr(Stdio::piped())
-        .stdout(Stdio::null());
-
-    let mut child = command
-        .spawn()
-        .map_err(|error| format!("Could not start ffmpeg: {error}"))?;
+    let mut child = spawn_ffmpeg_process(
+        &ffmpeg_bin,
+        &ffmpeg_settings,
+        &output_path,
+        width,
+        height,
+        config.scene.fps,
+        &input_pix_fmt,
+    )?;
 
     let stderr = child
         .stderr
@@ -287,6 +271,7 @@ pub fn render_video(
                     height,
                     frame_buffer.pixels.as_slice(),
                     frame_index,
+                    &input_pix_fmt,
                 )
             })?;
         }
@@ -331,10 +316,11 @@ pub fn render_video(
 
     let total_time_taken = render_started.elapsed().as_secs_f64();
     let merged_timings = merge_timing_maps(aggregate_profiler.summary(), writer_result.timings);
-    write_timing_summary(
+    write_timing_summary_with_phase(
         &debug_dir,
         config,
         &output_path,
+        "phase_6",
         total_frames,
         rendered_frames,
         total_time_taken,
@@ -345,6 +331,18 @@ pub fn render_video(
         eprintln!("{error}");
     }
     Ok(public_filename)
+}
+
+fn finalize_ffmpeg_settings(
+    mut ffmpeg_settings: crate::encode::ffmpeg::FfmpegSettings,
+) -> crate::encode::ffmpeg::FfmpegSettings {
+    if ffmpeg_settings.codec == "prores_ks_vulkan"
+        && !ffmpeg_settings.output_args.iter().any(|value| value == "-async_depth")
+    {
+        ffmpeg_settings.output_args.push("-async_depth".to_string());
+        ffmpeg_settings.output_args.push("4".to_string());
+    }
+    ffmpeg_settings
 }
 
 fn queue_frame(
@@ -373,6 +371,59 @@ fn queue_frame(
             }
         }
     }
+}
+
+fn spawn_ffmpeg_process(
+    ffmpeg_bin: &Path,
+    ffmpeg_settings: &crate::encode::ffmpeg::FfmpegSettings,
+    output_path: &Path,
+    width: u32,
+    height: u32,
+    fps: f64,
+    input_pix_fmt: &str,
+) -> Result<std::process::Child, String> {
+    let mut command = Command::new(ffmpeg_bin);
+    command.arg("-loglevel").arg(&ffmpeg_settings.loglevel);
+
+    if !ffmpeg_settings.hw_init_args.is_empty() {
+        command.args(&ffmpeg_settings.hw_init_args);
+    }
+
+    command
+        .arg("-f")
+        .arg("rawvideo")
+        .arg("-s")
+        .arg(format!("{width}x{height}"))
+        .arg("-pix_fmt")
+        .arg(input_pix_fmt)
+        .arg("-r")
+        .arg(fps.to_string())
+        .arg("-i")
+        .arg("-");
+
+    if let Some(filters) = &ffmpeg_settings.filters {
+        command.arg("-vf").arg(filters);
+    }
+
+    command
+        .args(&ffmpeg_settings.output_args)
+        .args(
+            ffmpeg_settings
+                .muxer
+                .iter()
+                .flat_map(|muxer| ["-f".to_string(), muxer.clone()]),
+        )
+        .arg("-pix_fmt")
+        .arg(&ffmpeg_settings.pix_fmt)
+        .arg("-y")
+        .arg(output_path)
+        .stdin(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdout(Stdio::null());
+
+    command
+        .spawn()
+        .map_err(|error| format!("Could not start ffmpeg: {error}"))
 }
 
 struct WriterResult {
@@ -475,10 +526,11 @@ fn write_prepare_summary(
     )
 }
 
-fn write_timing_summary(
+fn write_timing_summary_with_phase(
     debug_dir: &Path,
     config: &RenderConfig,
     output_path: &Path,
+    phase: &str,
     total_frames: u32,
     rendered_frames: u32,
     total_time_taken: f64,
@@ -486,7 +538,7 @@ fn write_timing_summary(
     timings: BTreeMap<String, TimingBucket>,
 ) -> Result<(), String> {
     let summary = TimingSummary {
-        phase: "phase_6".to_string(),
+        phase: phase.to_string(),
         timestamp: iso_timestamp_now(),
         overlay_filename: output_path.to_string_lossy().to_string(),
         fps: config.scene.fps,
@@ -543,12 +595,12 @@ fn copy_output_to_downloads(
     Ok(())
 }
 
-fn create_debug_dir(paths: &AppPaths) -> Result<PathBuf, String> {
+fn create_debug_dir(paths: &AppPaths, phase: &str) -> Result<PathBuf, String> {
     let dir = paths
         .repo_root
         .join("backend")
         .join("debug_render")
-        .join("phase_6")
+        .join(phase)
         .join(timestamp_slug()?);
     fs::create_dir_all(&dir)
         .map_err(|error| format!("Failed to create {}: {error}", dir.display()))?;
@@ -622,6 +674,7 @@ fn write_sample_frame(
     height: u32,
     rgba: &[u8],
     frame_index: usize,
+    input_pix_fmt: &str,
 ) -> Result<(), String> {
     let png_path = debug_dir.join(format!("sample_{frame_index:04}.png"));
     let mut command = Command::new(ffmpeg_bin);
@@ -631,7 +684,7 @@ fn write_sample_frame(
         .arg("-f")
         .arg("rawvideo")
         .arg("-pix_fmt")
-        .arg("rgba")
+        .arg(input_pix_fmt)
         .arg("-s")
         .arg(format!("{width}x{height}"))
         .arg("-i")
@@ -666,6 +719,16 @@ fn make_even(value: u32) -> u32 {
     } else {
         value + 1
     }
+}
+
+fn ffmpeg_input_pix_fmt() -> String {
+    std::env::var("CYCLEMETRY_INPUT_PIX_FMT").unwrap_or_else(|_| {
+        if cfg!(target_endian = "little") {
+            "rgba".to_string()
+        } else {
+            "rgba".to_string()
+        }
+    })
 }
 
 #[derive(Default)]

@@ -1,4 +1,4 @@
-use skia_safe::{surfaces, AlphaType, Borrows, ColorType, EncodedImageFormat, ImageInfo, Surface};
+use skia_safe::{surfaces, Borrows, EncodedImageFormat, ImageInfo, Surface};
 use std::path::Path;
 
 pub fn create_surface(width: u32, height: u32) -> Result<Surface, String> {
@@ -6,24 +6,24 @@ pub fn create_surface(width: u32, height: u32) -> Result<Surface, String> {
         .ok_or_else(|| format!("Failed to create raster surface {width}x{height}"))
 }
 
-pub fn rgba_image_info(width: u32, height: u32) -> ImageInfo {
+pub fn native_n32_image_info(width: u32, height: u32) -> ImageInfo {
     ImageInfo::new(
         (width as i32, height as i32),
-        ColorType::RGBA8888,
-        AlphaType::Unpremul,
+        skia_safe::ColorType::RGBA8888,
+        skia_safe::AlphaType::Unpremul,
         None,
     )
 }
 
-pub fn wrap_rgba_surface<'pixels>(
+pub fn wrap_native_surface<'pixels>(
     width: u32,
     height: u32,
     pixels: &'pixels mut [u8],
 ) -> Result<Borrows<'pixels, Surface>, String> {
-    let info = rgba_image_info(width, height);
+    let info = native_n32_image_info(width, height);
     let row_bytes = (width as usize) * 4;
     surfaces::wrap_pixels(&info, pixels, row_bytes, None)
-        .ok_or_else(|| format!("Failed to wrap RGBA surface {width}x{height}"))
+        .ok_or_else(|| format!("Failed to wrap native n32 surface {width}x{height}"))
 }
 
 pub fn write_surface_png(surface: &mut Surface, path: &Path) -> Result<(), String> {

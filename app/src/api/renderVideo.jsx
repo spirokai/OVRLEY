@@ -52,9 +52,13 @@ export default async function renderVideo() {
           config.scene.ffmpeg.prores_profile || '4444'
         config.scene.ffmpeg.pix_fmt =
           config.scene.ffmpeg.pix_fmt || 'yuva444p10le'
+      } else if ((exportCodec || 'prores_ks') === 'prores_ks_vulkan') {
+        config.scene.ffmpeg.prores_profile =
+          config.scene.ffmpeg.prores_profile || '4'
+        config.scene.ffmpeg.alpha_bits =
+          config.scene.ffmpeg.alpha_bits || 16
       } else if ((exportCodec || 'prores_ks') === 'libvpx-vp9') {
-        config.scene.ffmpeg.pix_fmt =
-          config.scene.ffmpeg.pix_fmt || 'yuva420p'
+        config.scene.ffmpeg.pix_fmt = config.scene.ffmpeg.pix_fmt || 'yuva420p'
       }
 
       // Apply export range override if custom

@@ -1,0 +1,98 @@
+{
+  "phase": "phase_6",
+  "timestamp": "2026-04-25T12:11:04",
+  "overlay_filename": "H:\\tools\\cyclemetry\\backend\\public\\video_1777111832.mov",
+  "fps": 30.0,
+  "width": 3840,
+  "height": 2160,
+  "total_frames": 900,
+  "rendered_frames": 900,
+  "total_time_taken": 32.766,
+  "sample_frame_indices": [],
+  "timings": {
+    "base.restore": {
+      "count": 900,
+      "total_ms": 2864.3068,
+      "avg_ms": 3.182563111111111,
+      "max_ms": 9.4515
+    },
+    "buffer.acquire_wait": {
+      "count": 900,
+      "total_ms": 22030.660299999992,
+      "avg_ms": 24.478511444444436,
+      "max_ms": 174.38219999999998
+    },
+    "buffer.release_wait": {
+      "count": 900,
+      "total_ms": 9.891500000000006,
+      "avg_ms": 0.010990555555555562,
+      "max_ms": 0.027800000000000002
+    },
+    "composite.elevation": {
+      "count": 900,
+      "total_ms": 3917.8152999999984,
+      "avg_ms": 4.3531281111111095,
+      "max_ms": 9.2198
+    },
+    "composite.route": {
+      "count": 900,
+      "total_ms": 584.6605999999998,
+      "avg_ms": 0.6496228888888886,
+      "max_ms": 1.4787
+    },
+    "encoder.queue_wait": {
+      "count": 901,
+      "total_ms": 19.70160000000056,
+      "avg_ms": 0.021866370699223706,
+      "max_ms": 18.6687
+    },
+    "ffmpeg.write": {
+      "count": 900,
+      "total_ms": 32173.683100000013,
+      "avg_ms": 35.748536777777794,
+      "max_ms": 308.2316
+    },
+    "frame.draw": {
+      "count": 900,
+      "total_ms": 6875.993099999991,
+      "avg_ms": 7.639992333333323,
+      "max_ms": 14.5945
+    },
+    "frame.total": {
+      "count": 900,
+      "total_ms": 31799.737299999982,
+      "avg_ms": 35.333041444444426,
+      "max_ms": 182.7202
+    },
+    "queue.put_wait": {
+      "count": 900,
+      "total_ms": 0.7727000000000032,
+      "avg_ms": 0.000858555555555559,
+      "max_ms": 0.0063
+    },
+    "surface.create": {
+      "count": 900,
+      "total_ms": 8.531600000000005,
+      "avg_ms": 0.00947955555555556,
+      "max_ms": 0.0558
+    },
+    "surface.restore": {
+      "count": 900,
+      "total_ms": 2864.3068,
+      "avg_ms": 3.182563111111111,
+      "max_ms": 9.4515
+    },
+    "text.dynamic": {
+      "count": 900,
+      "total_ms": 2282.2157000000007,
+      "avg_ms": 2.535795222222223,
+      "max_ms": 5.0569
+    },
+    "text.elevation_label": {
+      "count": 900,
+      "total_ms": 21.839100000000006,
+      "avg_ms": 0.02426566666666667,
+      "max_ms": 2.7137
+    }
+  }
+}

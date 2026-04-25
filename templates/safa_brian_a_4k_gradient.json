@@ -11,9 +11,7 @@
     "start": 600,
     "end": 630,
     "ffmpeg": {
-      "prores_profile": "4444",
-      "qscale": 4,
-      "threads": 0
+      "vendor": "apl0"
     }
   },
   "labels": [

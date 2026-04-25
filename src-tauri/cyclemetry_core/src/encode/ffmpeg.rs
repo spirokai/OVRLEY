@@ -18,6 +18,7 @@ pub fn resolve_ffmpeg_binary(repo_root: &Path) -> Result<PathBuf, String> {
         "ffmpeg"
     };
     candidate_paths.push(repo_root.join("backend").join(local_name));
+    candidate_paths.push(repo_root.join(".ffmpeg").join(local_name));
 
     for candidate in candidate_paths {
         if candidate.is_file() {
@@ -49,6 +50,9 @@ pub struct FfmpegSettings {
     pub pix_fmt: String,
     pub output_args: Vec<String>,
     pub extension: String,
+    pub muxer: Option<String>,
+    pub hw_init_args: Vec<String>,
+    pub filters: Option<String>,
 }
 
 pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, String> {
@@ -63,6 +67,10 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
         .and_then(Value::as_str)
         .unwrap_or("info")
         .to_string();
+    let container_override = object
+        .and_then(|map| map.get("container"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
 
     match codec.as_str() {
         "prores_ks" => {
@@ -121,7 +129,121 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
                 loglevel,
                 pix_fmt,
                 output_args,
-                extension: "mov".to_string(),
+                extension: container_override
+                    .clone()
+                    .unwrap_or_else(|| "mov".to_string()),
+                muxer: container_override,
+                hw_init_args: Vec::new(),
+                filters: None,
+            })
+        }
+        "prores_ks_vulkan" => {
+            let pix_fmt = "vulkan".to_string();
+            let mut output_args = vec!["-c:v".to_string(), "prores_ks_vulkan".to_string()];
+            append_ffmpeg_option(
+                &mut output_args,
+                "-profile:v",
+                object.and_then(|map| map.get("prores_profile")),
+            );
+            if !output_args.iter().any(|value| value == "-profile:v") {
+                output_args.push("-profile:v".to_string());
+                output_args.push("4".to_string()); // Default to 4444 for alpha parity
+            }
+            append_ffmpeg_option(
+                &mut output_args,
+                "-bits_per_mb",
+                object.and_then(|map| map.get("bits_per_mb")),
+            );
+            append_ffmpeg_option(
+                &mut output_args,
+                "-mbs_per_slice",
+                object.and_then(|map| map.get("mbs_per_slice")),
+            );
+            append_ffmpeg_option(
+                &mut output_args,
+                "-vendor",
+                object.and_then(|map| map.get("vendor")),
+            );
+            if !output_args.iter().any(|value| value == "-vendor") {
+                output_args.push("-vendor".to_string());
+                output_args.push("apl0".to_string());
+            }
+            append_ffmpeg_option(
+                &mut output_args,
+                "-alpha_bits",
+                object.and_then(|map| map.get("alpha_bits")),
+            );
+            if !output_args.iter().any(|value| value == "-alpha_bits") {
+                output_args.push("-alpha_bits".to_string());
+                output_args.push("16".to_string());
+            }
+            append_extra_output_args(&mut output_args, ffmpeg_config);
+
+            Ok(FfmpegSettings {
+                codec,
+                loglevel,
+                pix_fmt,
+                output_args,
+                extension: container_override
+                    .clone()
+                    .unwrap_or_else(|| "mov".to_string()),
+                muxer: container_override,
+                hw_init_args: vec![
+                    "-init_hw_device".to_string(),
+                    "vulkan=vk".to_string(),
+                    "-filter_hw_device".to_string(),
+                    "vk".to_string(),
+                ],
+                filters: Some(
+                    "format=pix_fmts=rgba:color_spaces=bt709:color_ranges=tv,hwupload,scale_vulkan=format=yuva444p10le:out_range=tv,format=pix_fmts=vulkan".to_string(),
+                ),
+            })
+        }
+        "prores_videotoolbox" => {
+            let pix_fmt = object
+                .and_then(|map| map.get("pix_fmt"))
+                .and_then(Value::as_str)
+                .unwrap_or("yuv422p10le")
+                .to_string();
+            let mut output_args = vec!["-c:v".to_string(), "prores_videotoolbox".to_string()];
+            append_ffmpeg_option(
+                &mut output_args,
+                "-profile:v",
+                object.and_then(|map| map.get("prores_profile")),
+            );
+            append_extra_output_args(&mut output_args, ffmpeg_config);
+
+            Ok(FfmpegSettings {
+                codec,
+                loglevel,
+                pix_fmt,
+                output_args,
+                extension: container_override
+                    .clone()
+                    .unwrap_or_else(|| "mov".to_string()),
+                muxer: container_override,
+                hw_init_args: Vec::new(),
+                filters: None,
+            })
+        }
+        "hevc_alpha" => {
+            let pix_fmt = "yuva420p".to_string();
+            let mut output_args = vec!["-c:v".to_string(), "libx265".to_string()];
+            output_args.push("-tag:v".to_string());
+            output_args.push("hvc1".to_string());
+            append_extra_output_args(&mut output_args, ffmpeg_config);
+
+            Ok(FfmpegSettings {
+                codec,
+                loglevel,
+                pix_fmt,
+                output_args,
+                extension: container_override
+                    .clone()
+                    .unwrap_or_else(|| "mov".to_string()),
+                muxer: container_override,
+                hw_init_args: Vec::new(),
+                filters: None,
             })
         }
         "libvpx-vp9" => {
@@ -188,11 +310,16 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
                 loglevel,
                 pix_fmt,
                 output_args,
-                extension: "webm".to_string(),
+                extension: container_override
+                    .clone()
+                    .unwrap_or_else(|| "webm".to_string()),
+                muxer: container_override,
+                hw_init_args: Vec::new(),
+                filters: None,
             })
         }
         other => Err(format!(
-            "Unsupported scene.ffmpeg.codec '{other}'. Supported codecs are prores_ks and libvpx-vp9."
+            "Unsupported scene.ffmpeg.codec '{other}'. Supported codecs are prores_ks, prores_ks_vulkan, prores_videotoolbox, hevc_alpha, and libvpx-vp9."
         )),
     }
 }

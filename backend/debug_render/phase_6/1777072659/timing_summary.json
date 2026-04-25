@@ -1,0 +1,86 @@
+{
+  "phase": "phase_6",
+  "timestamp": "2026-04-25T01:18:01",
+  "overlay_filename": "H:\\tools\\cyclemetry\\backend\\public\\video_1777072659.mov",
+  "fps": 30.0,
+  "width": 3840,
+  "height": 2160,
+  "total_frames": 900,
+  "rendered_frames": 900,
+  "total_time_taken": 21.348,
+  "sample_frame_indices": [],
+  "timings": {
+    "base.restore": {
+      "count": 900,
+      "total_ms": 8763.6149,
+      "avg_ms": 9.73734988888889,
+      "max_ms": 20.7826
+    },
+    "buffer.acquire_wait": {
+      "count": 900,
+      "total_ms": 8638.673199999992,
+      "avg_ms": 9.59852577777777,
+      "max_ms": 56.0471
+    },
+    "buffer.release_wait": {
+      "count": 900,
+      "total_ms": 9.958399999999996,
+      "avg_ms": 0.011064888888888885,
+      "max_ms": 0.0782
+    },
+    "composite.route": {
+      "count": 900,
+      "total_ms": 1829.3968000000004,
+      "avg_ms": 2.0326631111111118,
+      "max_ms": 29.8421
+    },
+    "encoder.queue_wait": {
+      "count": 901,
+      "total_ms": 11.964099999999947,
+      "avg_ms": 0.013278690344062094,
+      "max_ms": 10.7873
+    },
+    "ffmpeg.write": {
+      "count": 900,
+      "total_ms": 21158.29430000001,
+      "avg_ms": 23.5092158888889,
+      "max_ms": 51.954899999999995
+    },
+    "frame.draw": {
+      "count": 900,
+      "total_ms": 3578.189200000001,
+      "avg_ms": 3.975765777777779,
+      "max_ms": 31.4723
+    },
+    "frame.total": {
+      "count": 900,
+      "total_ms": 21087.358199999995,
+      "avg_ms": 23.430397999999993,
+      "max_ms": 64.028
+    },
+    "queue.put_wait": {
+      "count": 900,
+      "total_ms": 3.662900000000004,
+      "avg_ms": 0.004069888888888894,
+      "max_ms": 0.0207
+    },
+    "surface.create": {
+      "count": 900,
+      "total_ms": 21.883299999999977,
+      "avg_ms": 0.02431477777777775,
+      "max_ms": 0.4556
+    },
+    "surface.restore": {
+      "count": 900,
+      "total_ms": 8763.6149,
+      "avg_ms": 9.73734988888889,
+      "max_ms": 20.7826
+    },
+    "text.dynamic": {
+      "count": 900,
+      "total_ms": 1718.2846000000002,
+      "avg_ms": 1.9092051111111112,
+      "max_ms": 15.3927
+    }
+  }
+}

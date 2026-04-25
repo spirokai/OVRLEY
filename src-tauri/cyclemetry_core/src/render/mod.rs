@@ -8,7 +8,7 @@ use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::render::format::{format_value, frame_index_for_second};
-use crate::render::surface::{create_surface, wrap_rgba_surface, write_surface_png};
+use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
 use crate::render::text::{draw_text, label_style, value_style};
 use crate::render::widgets::{
     draw_elevation_widget, draw_route_widget, prepare_render_assets, PreparedRenderAssets,
@@ -259,7 +259,7 @@ pub fn render_frame_rgba(
     }
 
     let mut surface = frame_profiler.measure("surface.create", || {
-        wrap_rgba_surface(width, height, target.pixels)
+        wrap_native_surface(width, height, target.pixels)
     })?;
     let _ = render_frame_to_surface(
         surface.canvas(),
@@ -442,7 +442,7 @@ pub fn prepare_base_rgba(
     }
 
     let mut surface = prepare_profiler.measure("create_base_image", || {
-        wrap_rgba_surface(width, height, pixels.as_mut_slice())
+        wrap_native_surface(width, height, pixels.as_mut_slice())
     })?;
     prepare_profiler.measure("text.static.cache", || {
         for label in &config.labels {

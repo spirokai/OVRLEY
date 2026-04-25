@@ -1,0 +1,56 @@
+{
+  "phase": "encode_benchmark",
+  "timestamp": "2026-04-25T03:19:38",
+  "overlay_filename": "H:\\tools\\cyclemetry\\backend\\public\\encode_benchmark_1777079895.mov",
+  "fps": 30.0,
+  "width": 3840,
+  "height": 2160,
+  "total_frames": 900,
+  "rendered_frames": 900,
+  "total_time_taken": 83.057,
+  "sample_frame_indices": [],
+  "timings": {
+    "buffer.acquire_wait": {
+      "count": 900,
+      "total_ms": 80460.33100000002,
+      "avg_ms": 89.4003677777778,
+      "max_ms": 518.2776
+    },
+    "buffer.release_wait": {
+      "count": 900,
+      "total_ms": 3.785800000000006,
+      "avg_ms": 0.004206444444444451,
+      "max_ms": 0.0334
+    },
+    "encoder.queue_wait": {
+      "count": 901,
+      "total_ms": 0.48280000000000184,
+      "avg_ms": 0.0005358490566037756,
+      "max_ms": 0.0040999999999999995
+    },
+    "ffmpeg.write": {
+      "count": 900,
+      "total_ms": 81005.2297000001,
+      "avg_ms": 90.00581077777788,
+      "max_ms": 518.2741
+    },
+    "frame.total": {
+      "count": 900,
+      "total_ms": 80495.45290000005,
+      "avg_ms": 89.43939211111116,
+      "max_ms": 518.28
+    },
+    "prepare.synthetic_buffers": {
+      "count": 1,
+      "total_ms": 22.717399999999998,
+      "avg_ms": 22.717399999999998,
+      "max_ms": 22.717399999999998
+    },
+    "queue.put_wait": {
+      "count": 900,
+      "total_ms": 32.03489999999971,
+      "avg_ms": 0.03559433333333301,
+      "max_ms": 11.0007
+    }
+  }
+}
