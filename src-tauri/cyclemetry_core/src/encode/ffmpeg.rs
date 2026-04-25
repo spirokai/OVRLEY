@@ -195,7 +195,7 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
                     "vk".to_string(),
                 ],
                 filters: Some(
-                    "format=pix_fmts=rgba:color_spaces=bt709:color_ranges=tv,hwupload,scale_vulkan=format=yuva444p10le:out_range=tv,format=pix_fmts=vulkan".to_string(),
+                    "hwupload,scale_vulkan=format=yuva444p10le:out_range=tv".to_string(),
                 ),
             })
         }

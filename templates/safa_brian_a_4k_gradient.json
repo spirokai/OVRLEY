@@ -11,6 +11,7 @@
     "start": 600,
     "end": 630,
     "ffmpeg": {
+      "mbs_per_slice": 2,
       "vendor": "apl0"
     }
   },
