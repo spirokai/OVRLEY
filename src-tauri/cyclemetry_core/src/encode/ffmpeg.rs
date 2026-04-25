@@ -263,15 +263,11 @@ fn append_extra_output_args(args: &mut Vec<String>, ffmpeg_config: &Value) {
         .and_then(|map| map.get("output_args"))
         .and_then(Value::as_array);
     if let Some(extra_args) = extra_args {
-        args.extend(
-            extra_args
-                .iter()
-                .filter_map(|value| match value {
-                    Value::String(text) => Some(text.clone()),
-                    Value::Number(number) => Some(number.to_string()),
-                    Value::Bool(boolean) => Some(if *boolean { "1" } else { "0" }.to_string()),
-                    _ => None,
-                }),
-        );
+        args.extend(extra_args.iter().filter_map(|value| match value {
+            Value::String(text) => Some(text.clone()),
+            Value::Number(number) => Some(number.to_string()),
+            Value::Bool(boolean) => Some(if *boolean { "1" } else { "0" }.to_string()),
+            _ => None,
+        }));
     }
 }

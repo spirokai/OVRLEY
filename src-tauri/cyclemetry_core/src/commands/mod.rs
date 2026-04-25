@@ -111,7 +111,14 @@ pub fn backend_demo(
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
     let filename = "demo_preview.png";
     let output_path = paths.public_dir.join(filename);
-    render_preview_to_path(paths, &config, &parsed_activity, &dense_activity, second, &output_path)?;
+    render_preview_to_path(
+        paths,
+        &config,
+        &parsed_activity,
+        &dense_activity,
+        second,
+        &output_path,
+    )?;
     Ok(stub_demo_response(filename))
 }
 
@@ -132,7 +139,13 @@ pub fn backend_render(
     let controller_clone = controller.clone();
     let paths = paths.clone();
     std::thread::spawn(move || {
-        match render_video(&paths, &config, &parsed_activity, &dense_activity, &controller_clone) {
+        match render_video(
+            &paths,
+            &config,
+            &parsed_activity,
+            &dense_activity,
+            &controller_clone,
+        ) {
             Ok(filename) => controller_clone.finish_success(filename),
             Err(error) => {
                 let cancelled = error.to_lowercase().contains("cancelled");

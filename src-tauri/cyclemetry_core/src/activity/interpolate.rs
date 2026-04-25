@@ -188,17 +188,16 @@ pub fn densify_activity(
         .copied()
         .unwrap_or_default();
     let frame_elapsed_seconds = build_target_x_values(duration, fps);
-    let frame_distance_progress = if !requirements.distance_progress
-        || trimmed.sample_distance_progress.is_empty()
-    {
-        Vec::new()
-    } else {
-        interpolate_numeric_series(
-            &trimmed.sample_elapsed_seconds,
-            &trimmed.sample_distance_progress,
-            &frame_elapsed_seconds,
-        )
-    };
+    let frame_distance_progress =
+        if !requirements.distance_progress || trimmed.sample_distance_progress.is_empty() {
+            Vec::new()
+        } else {
+            interpolate_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.sample_distance_progress,
+                &frame_elapsed_seconds,
+            )
+        };
     let (course_lat, course_lon) = if requirements.course && !trimmed.course.is_empty() {
         interpolate_course_series(
             &trimmed.sample_elapsed_seconds,

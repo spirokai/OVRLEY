@@ -27,7 +27,12 @@ pub fn build_dense_activity_report(
     config: &RenderConfig,
 ) -> Result<DenseActivityReport, String> {
     let requirements = config.render_data_requirements()?;
-    let trimmed = trim_activity(activity, config.scene.start, config.scene.end, &requirements)?;
+    let trimmed = trim_activity(
+        activity,
+        config.scene.start,
+        config.scene.end,
+        &requirements,
+    )?;
     Ok(densify_activity(&trimmed, config.scene.fps, &requirements))
 }
 

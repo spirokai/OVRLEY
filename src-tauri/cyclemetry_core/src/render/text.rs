@@ -1,5 +1,9 @@
 use crate::config::{LabelConfig, SceneConfig, ValueConfig};
-use skia_safe::{Canvas, Color, Font, FontMgr, FontStyle, Paint, Point, Typeface};
+use skia_safe::{
+    image_filters,
+    paint::{Join, Style},
+    Canvas, Color, Font, FontMgr, FontStyle, Paint, Point, Typeface,
+};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -100,39 +104,27 @@ pub fn draw_text(canvas: &Canvas, text: &str, style: &ResolvedTextStyle, font_di
     let baseline = style.y - metrics.ascent;
 
     if let Some(border_color) = style.border_color {
-        let steps = style.border_thickness.round().max(0.0) as i32;
-        if steps > 0 {
-            let paint = text_paint(border_color);
-            for step in 1..=steps {
-                let offset = step as f32 * style.border_distance.max(1.0);
-                for (dx, dy) in [
-                    (-offset, 0.0),
-                    (offset, 0.0),
-                    (0.0, -offset),
-                    (0.0, offset),
-                    (-offset, -offset),
-                    (offset, -offset),
-                    (-offset, offset),
-                    (offset, offset),
-                ] {
-                    canvas.draw_str(text, Point::new(style.x + dx, baseline + dy), &font, &paint);
-                }
-            }
+        if style.border_thickness > 0.0 {
+            let mut paint = text_paint(border_color);
+            paint.set_style(Style::Stroke);
+            paint.set_stroke_width(style.border_thickness);
+            paint.set_stroke_join(Join::Round);
+            canvas.draw_str(text, Point::new(style.x, baseline), &font, &paint);
         }
     }
 
     if let Some(shadow_color) = style.shadow_color {
-        let paint = text_paint(shadow_color);
-        let passes = style.shadow_strength.round().max(1.0) as i32;
-        let shadow_offset = style.shadow_distance;
-        for blur_step in 0..passes {
-            let spread = blur_step as f32 * 0.4;
-            for (dx, dy) in [
-                (shadow_offset, shadow_offset),
-                (shadow_offset + spread, shadow_offset),
-                (shadow_offset, shadow_offset + spread),
-            ] {
-                canvas.draw_str(text, Point::new(style.x + dx, baseline + dy), &font, &paint);
+        if style.shadow_strength > 0.0 || style.shadow_distance != 0.0 {
+            if let Some(shadow_filter) = image_filters::drop_shadow_only(
+                (style.shadow_distance, style.shadow_distance),
+                (style.shadow_strength, style.shadow_strength),
+                shadow_color,
+                None,
+                None,
+            ) {
+                let mut paint = text_paint(style.color);
+                paint.set_image_filter(shadow_filter);
+                canvas.draw_str(text, Point::new(style.x, baseline), &font, &paint);
             }
         }
     }

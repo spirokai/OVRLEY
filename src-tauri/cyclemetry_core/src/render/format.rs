@@ -1,6 +1,6 @@
 use crate::activity::schema::DenseActivityReport;
 use crate::config::{RenderConfig, ValueConfig};
-use chrono::{DateTime, Datelike, Duration, Local, Timelike, TimeZone};
+use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
 
 pub fn frame_index_for_second(
     config: &RenderConfig,
@@ -190,8 +190,8 @@ fn format_time(config: &RenderConfig, value_config: &ValueConfig, raw: Option<&s
     let Ok(parsed) = DateTime::parse_from_rfc3339(raw) else {
         return raw.to_string();
     };
-    let adjusted =
-        parsed.with_timezone(&Local) + Duration::hours(value_config.hours_offset.unwrap_or(0) as i64);
+    let adjusted = parsed.with_timezone(&Local)
+        + Duration::hours(value_config.hours_offset.unwrap_or(0) as i64);
 
     if let Some(format_key) = value_config.format.as_deref() {
         return format_time_key(format_key, adjusted);

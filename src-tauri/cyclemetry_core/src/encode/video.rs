@@ -341,7 +341,10 @@ fn finalize_ffmpeg_settings(
     mut ffmpeg_settings: crate::encode::ffmpeg::FfmpegSettings,
 ) -> crate::encode::ffmpeg::FfmpegSettings {
     if ffmpeg_settings.codec == "prores_ks_vulkan"
-        && !ffmpeg_settings.output_args.iter().any(|value| value == "-async_depth")
+        && !ffmpeg_settings
+            .output_args
+            .iter()
+            .any(|value| value == "-async_depth")
     {
         ffmpeg_settings.output_args.push("-async_depth".to_string());
         ffmpeg_settings.output_args.push("4".to_string());
