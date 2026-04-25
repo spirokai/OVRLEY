@@ -216,6 +216,7 @@ That min/max bucketing is the main reason the elevation profile looks harsher th
 3. Preserve extrema where needed so steep climbs/descents do not disappear.
 4. Keep the marker/reveal logic independent from the geometry simplification method.
 5. Add a debug comparison artifact path so the old and new elevation geometry can be compared on the same activity/template.
+6. Ensure that the preview displays the same data/matches what will be rendered.
 
 ### Validation
 

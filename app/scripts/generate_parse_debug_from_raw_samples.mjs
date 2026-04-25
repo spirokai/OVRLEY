@@ -33,13 +33,7 @@ async function main() {
   const outPath = path.resolve(process.cwd(), args[outIndex + 1])
 
   const payload = JSON.parse(await fs.readFile(rawPath, 'utf-8'))
-  const { parsedActivity } = finalizeParsedActivity(payload)
-  const debugPayload = {
-    generated_at: new Date().toISOString(),
-    file_name: payload.fileName,
-    file_format: payload.fileFormat,
-    parsed_activity: parsedActivity,
-  }
+  const { debugPayload } = finalizeParsedActivity(payload)
 
   await fs.mkdir(path.dirname(outPath), { recursive: true })
   await fs.writeFile(outPath, JSON.stringify(debugPayload, null, 2), 'utf-8')

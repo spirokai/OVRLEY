@@ -1,0 +1,67 @@
+{
+  "total_ms": 12.3496,
+  "timings": {
+    "build_elevation_cache": {
+      "count": 1,
+      "total_ms": 1.8708,
+      "avg_ms": 1.8708,
+      "max_ms": 1.8708
+    },
+    "build_elevation_cache.frame_states": {
+      "count": 1,
+      "total_ms": 0.06559999999999999,
+      "avg_ms": 0.06559999999999999,
+      "max_ms": 0.06559999999999999
+    },
+    "build_elevation_cache.geometry": {
+      "count": 1,
+      "total_ms": 1.7937999999999998,
+      "avg_ms": 1.7937999999999998,
+      "max_ms": 1.7937999999999998
+    },
+    "build_route_cache": {
+      "count": 1,
+      "total_ms": 2.5906000000000002,
+      "avg_ms": 2.5906000000000002,
+      "max_ms": 2.5906000000000002
+    },
+    "build_route_cache.frame_states": {
+      "count": 1,
+      "total_ms": 0.0903,
+      "avg_ms": 0.0903,
+      "max_ms": 0.0903
+    },
+    "build_route_cache.geometry": {
+      "count": 1,
+      "total_ms": 2.4861000000000004,
+      "avg_ms": 2.4861000000000004,
+      "max_ms": 2.4861000000000004
+    },
+    "create_base_image": {
+      "count": 2,
+      "total_ms": 0.0207,
+      "avg_ms": 0.01035,
+      "max_ms": 0.0176
+    },
+    "prepare.surface.clear": {
+      "alt_name": "surface.clear",
+      "count": 1,
+      "total_ms": 4.4527,
+      "avg_ms": 4.4527,
+      "max_ms": 4.4527
+    },
+    "prepare_render_assets.total": {
+      "count": 1,
+      "total_ms": 5.0517,
+      "avg_ms": 5.0517,
+      "max_ms": 5.0517
+    },
+    "text.static.cache": {
+      "count": 2,
+      "total_ms": 3.1834000000000002,
+      "avg_ms": 1.5917000000000001,
+      "max_ms": 2.6164
+    }
+  },
+  "label_cache_status": "miss"
+}

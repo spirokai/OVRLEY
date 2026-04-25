@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct WidgetGeometryReport {
     pub point_count: usize,
+    pub source_point_count: usize,
+    pub simplification: String,
     pub bbox: [f32; 4],
     pub widget_width: u32,
     pub widget_height: u32,
@@ -37,6 +39,8 @@ pub(crate) struct WidgetGeometry {
     pub(crate) points: Vec<(f32, f32)>,
     pub(crate) bbox: (f32, f32, f32, f32),
     pub(crate) progress_values: Vec<f32>,
+    pub(crate) source_point_count: usize,
+    pub(crate) simplification: &'static str,
 }
 
 #[derive(Clone, Debug)]

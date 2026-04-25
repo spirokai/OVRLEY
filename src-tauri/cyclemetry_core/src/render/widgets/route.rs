@@ -203,6 +203,8 @@ fn build_route_geometry(
         bbox: (0.0, 0.0, plot.width as f32, plot.height as f32),
         progress_values: simplified.iter().map(|sample| sample.progress01).collect(),
         points: simplified.iter().map(|sample| sample.point).collect(),
+        source_point_count: route_samples.len(),
+        simplification: "rdp_px_1.0",
     })
 }
 

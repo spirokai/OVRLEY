@@ -381,6 +381,8 @@ fn build_elevation_geometry(
         bbox: (0.0, 0.0, plot.width as f32, plot.height as f32),
         progress_values: downsampled.iter().map(|(progress, _)| *progress).collect(),
         points: fitted,
+        source_point_count: raw_points.len(),
+        simplification: "lttb_profile",
     })
 }
 
@@ -461,41 +463,65 @@ fn raw_elevation_points(activity: &ParsedActivity) -> Vec<(f32, f64)> {
 }
 
 fn downsample_elevation_points(points: &[(f32, f64)], target_count: usize) -> Vec<(f32, f64)> {
-    if points.len() <= target_count {
+    if points.len() <= target_count || target_count < 3 {
         return points.to_vec();
     }
 
-    let bucket_size = points.len() as f32 / ((target_count / 2).max(1) as f32);
-    let mut sampled = vec![points[0]];
-    let mut bucket_index = 0.0f32;
-    while (bucket_index as usize) < points.len().saturating_sub(1) {
-        let start_index = bucket_index as usize;
-        let end_index = points
-            .len()
-            .min((bucket_index + bucket_size).floor() as usize);
-        let bucket = &points[start_index..end_index.max(start_index + 1)];
-        if let Some(min_point) = bucket
+    let bucket_size = (points.len() - 2) as f64 / (target_count - 2) as f64;
+    let mut sampled = Vec::with_capacity(target_count);
+    let mut a = 0usize;
+    sampled.push(points[a]);
+
+    for bucket_index in 0..(target_count - 2) {
+        let avg_start = ((bucket_index + 1) as f64 * bucket_size).floor() as usize + 1;
+        let avg_end = ((bucket_index + 2) as f64 * bucket_size).floor() as usize + 1;
+        let avg_range_end = avg_end.min(points.len());
+        let avg_range_start = avg_start.min(avg_range_end.saturating_sub(1));
+
+        let average = if avg_range_start < avg_range_end {
+            let range = &points[avg_range_start..avg_range_end];
+            let (sum_x, sum_y) = range.iter().fold((0.0f64, 0.0f64), |(sx, sy), (x, y)| {
+                (sx + *x as f64, sy + *y)
+            });
+            let count = range.len() as f64;
+            (sum_x / count, sum_y / count)
+        } else {
+            let fallback = points[points.len() - 1];
+            (fallback.0 as f64, fallback.1)
+        };
+
+        let range_start = (bucket_index as f64 * bucket_size).floor() as usize + 1;
+        let range_end = ((bucket_index + 1) as f64 * bucket_size).floor() as usize + 1;
+        let candidate_start = range_start.min(points.len().saturating_sub(2));
+        let candidate_end = range_end.min(points.len().saturating_sub(1));
+
+        let point_a = points[a];
+        let mut next_a = candidate_start;
+        let mut max_area = -1.0f64;
+
+        for (offset, point_b) in points[candidate_start..candidate_end.max(candidate_start + 1)]
             .iter()
-            .copied()
-            .min_by(|left, right| left.1.total_cmp(&right.1))
+            .enumerate()
         {
-            sampled.push(min_point);
+            let area = triangle_area(point_a, *point_b, average);
+            if area > max_area {
+                max_area = area;
+                next_a = candidate_start + offset;
+            }
         }
-        if let Some(max_point) = bucket
-            .iter()
-            .copied()
-            .max_by(|left, right| left.1.total_cmp(&right.1))
-        {
-            sampled.push(max_point);
-        }
-        bucket_index += bucket_size.max(1.0);
+
+        a = next_a;
+        sampled.push(points[a]);
     }
     sampled.push(*points.last().unwrap_or(&points[0]));
-    sampled.sort_by(|left, right| left.0.total_cmp(&right.0));
-    sampled.dedup_by(|left, right| {
-        (left.0 - right.0).abs() <= f32::EPSILON && (left.1 - right.1).abs() <= f64::EPSILON
-    });
     sampled
+}
+
+fn triangle_area(point_a: (f32, f64), point_b: (f32, f64), point_c: (f64, f64)) -> f64 {
+    (((point_a.0 as f64 - point_c.0) * (point_b.1 - point_a.1))
+        - ((point_a.0 as f64 - point_b.0 as f64) * (point_c.1 - point_a.1)))
+        .abs()
+        * 0.5
 }
 
 fn project_elevation_points(

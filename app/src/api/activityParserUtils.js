@@ -566,6 +566,229 @@ function buildMetricCoverage(metricSeriesMap) {
   )
 }
 
+function median(values) {
+  if (!values.length) return null
+  const sorted = [...values].sort((left, right) => left - right)
+  const middle = Math.floor(sorted.length / 2)
+  if (sorted.length % 2 === 0) {
+    return (sorted[middle - 1] + sorted[middle]) / 2
+  }
+  return sorted[middle]
+}
+
+function lowerHalfMedian(values) {
+  if (!values.length) return null
+  const sorted = [...values].sort((left, right) => left - right)
+  const cutoff = Math.max(1, Math.ceil(sorted.length / 2))
+  return median(sorted.slice(0, cutoff))
+}
+
+function timestampMs(value) {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  const time = date.getTime()
+  return Number.isFinite(time) ? time : null
+}
+
+function cloneRawSample(sample) {
+  return { ...sample }
+}
+
+function zeroFilledIdleSample(sample, elapsedSeconds, timestampMsValue) {
+  const synthetic = cloneRawSample(sample)
+  synthetic.elapsedSeconds = roundValue(elapsedSeconds, 3)
+  synthetic.timestamp =
+    timestampMsValue === null ? null : new Date(timestampMsValue).toISOString()
+  synthetic.speed = 0
+  synthetic.cadence = 0
+  synthetic.power = 0
+  synthetic.strokeRate = 0
+  synthetic.verticalSpeed = 0
+  synthetic.gForce = 0
+  synthetic.gradient = 0
+  synthetic.pace = null
+  synthetic.torque = null
+  synthetic.strideLength = null
+  synthetic.groundContactTime = null
+  synthetic.verticalOscillation = null
+  synthetic.syntheticIdle = true
+  return synthetic
+}
+
+function estimateRecordingIntervalSeconds(rawSamples) {
+  const deltas = []
+  let previousElapsed = null
+  let previousTimestampMs = null
+
+  rawSamples.forEach((sample) => {
+    const elapsed = safeNumber(sample.elapsedSeconds)
+    if (isFiniteNumber(elapsed) && isFiniteNumber(previousElapsed)) {
+      const delta = elapsed - previousElapsed
+      if (delta > 0 && delta <= 10) deltas.push(delta)
+      previousElapsed = elapsed
+    } else if (isFiniteNumber(elapsed)) {
+      previousElapsed = elapsed
+    }
+
+    const currentTimestampMs = timestampMs(sample.timestamp)
+    if (currentTimestampMs !== null && previousTimestampMs !== null) {
+      const delta = (currentTimestampMs - previousTimestampMs) / 1000
+      if (delta > 0 && delta <= 10) deltas.push(delta)
+      previousTimestampMs = currentTimestampMs
+    } else if (currentTimestampMs !== null) {
+      previousTimestampMs = currentTimestampMs
+    }
+  })
+
+  return lowerHalfMedian(deltas) ?? 1
+}
+
+function elapsedSecondsForSample(sample, fallbackOriginTimestampMs) {
+  const explicit = safeNumber(sample.elapsedSeconds)
+  if (isFiniteNumber(explicit)) return explicit
+
+  const timeMs = timestampMs(sample.timestamp)
+  if (timeMs !== null && fallbackOriginTimestampMs !== null) {
+    return (timeMs - fallbackOriginTimestampMs) / 1000
+  }
+
+  return null
+}
+
+function distanceMetersForPair(previousSample, currentSample) {
+  const previousDistance = safeNumber(previousSample.distance)
+  const currentDistance = safeNumber(currentSample.distance)
+  if (isFiniteNumber(previousDistance) && isFiniteNumber(currentDistance)) {
+    return Math.max(0, currentDistance - previousDistance)
+  }
+
+  return haversineDistanceMeters(
+    safeNumber(previousSample.latitude),
+    safeNumber(previousSample.longitude),
+    safeNumber(currentSample.latitude),
+    safeNumber(currentSample.longitude),
+  )
+}
+
+function insertIdleGapSamples(rawSamples) {
+  if (rawSamples.length < 2) {
+    return {
+      rawSamples,
+      gapDebug: {
+        detected_gaps: [],
+        inserted_sample_count: 0,
+        recording_interval_seconds: 1,
+      },
+    }
+  }
+
+  const originTimestampMs = rawSamples
+    .map((sample) => timestampMs(sample.timestamp))
+    .find((value) => value !== null)
+  const recordingIntervalSeconds = Math.max(
+    0.2,
+    estimateRecordingIntervalSeconds(rawSamples),
+  )
+  const gapThresholdSeconds = Math.max(3, recordingIntervalSeconds * 3)
+  const stationaryDistanceThresholdMeters = Math.max(
+    5,
+    recordingIntervalSeconds * 2.5,
+  )
+  const detectedGaps = []
+  const filledSamples = [cloneRawSample(rawSamples[0])]
+  let insertedSampleCount = 0
+
+  for (let index = 1; index < rawSamples.length; index += 1) {
+    const previousSample = rawSamples[index - 1]
+    const currentSample = rawSamples[index]
+    const previousElapsed = elapsedSecondsForSample(
+      previousSample,
+      originTimestampMs,
+    )
+    const currentElapsed = elapsedSecondsForSample(
+      currentSample,
+      originTimestampMs,
+    )
+    const elapsedDelta =
+      isFiniteNumber(previousElapsed) && isFiniteNumber(currentElapsed)
+        ? currentElapsed - previousElapsed
+        : null
+
+    let insertedForGap = 0
+    if (isFiniteNumber(elapsedDelta) && elapsedDelta > gapThresholdSeconds) {
+      const distanceDelta = distanceMetersForPair(previousSample, currentSample)
+      if (distanceDelta <= stationaryDistanceThresholdMeters) {
+        const previousTimestampMs = timestampMs(previousSample.timestamp)
+        const currentTimestampMs = timestampMs(currentSample.timestamp)
+        const maxInsertionCount =
+          Math.floor(elapsedDelta / recordingIntervalSeconds) - 1
+
+        for (
+          let insertIndex = 1;
+          insertIndex <= maxInsertionCount;
+          insertIndex += 1
+        ) {
+          const syntheticElapsed =
+            previousElapsed + recordingIntervalSeconds * insertIndex
+          if (syntheticElapsed >= currentElapsed - 1e-6) break
+
+          let syntheticTimestampMs = null
+          if (
+            previousTimestampMs !== null &&
+            currentTimestampMs !== null &&
+            currentTimestampMs > previousTimestampMs
+          ) {
+            syntheticTimestampMs = Math.min(
+              currentTimestampMs,
+              previousTimestampMs +
+                Math.round(recordingIntervalSeconds * 1000 * insertIndex),
+            )
+          }
+
+          filledSamples.push(
+            zeroFilledIdleSample(
+              previousSample,
+              syntheticElapsed,
+              syntheticTimestampMs,
+            ),
+          )
+          insertedForGap += 1
+        }
+      }
+    }
+
+    if (insertedForGap > 0) {
+      detectedGaps.push({
+        start_index: index - 1,
+        end_index: index,
+        start_elapsed_seconds: roundValue(previousElapsed, 3),
+        end_elapsed_seconds: roundValue(currentElapsed, 3),
+        gap_seconds: roundValue(elapsedDelta, 3),
+        inserted_samples: insertedForGap,
+        start_timestamp: safeTimestamp(previousSample.timestamp),
+        end_timestamp: safeTimestamp(currentSample.timestamp),
+      })
+      insertedSampleCount += insertedForGap
+    }
+
+    filledSamples.push(cloneRawSample(currentSample))
+  }
+
+  return {
+    rawSamples: filledSamples,
+    gapDebug: {
+      detected_gaps: detectedGaps,
+      inserted_sample_count: insertedSampleCount,
+      recording_interval_seconds: roundValue(recordingIntervalSeconds, 3),
+      gap_threshold_seconds: roundValue(gapThresholdSeconds, 3),
+      stationary_distance_threshold_m: roundValue(
+        stationaryDistanceThresholdMeters,
+        3,
+      ),
+    },
+  }
+}
+
 export function finalizeParsedActivity({
   fileName,
   fileFormat,
@@ -574,18 +797,22 @@ export function finalizeParsedActivity({
   options = {},
 }) {
   const useLegacyGpxDerivations = options.useLegacyGpxDerivations === true
-  const timeSeries = rawSamples.map((sample) => safeTimestamp(sample.timestamp))
-  const courseSeries = rawSamples.map((sample) => {
+  const { rawSamples: normalizedRawSamples, gapDebug } =
+    insertIdleGapSamples(rawSamples)
+  const timeSeries = normalizedRawSamples.map((sample) =>
+    safeTimestamp(sample.timestamp),
+  )
+  const courseSeries = normalizedRawSamples.map((sample) => {
     const latitude = safeNumber(sample.latitude)
     const longitude = safeNumber(sample.longitude)
     return [latitude, longitude]
   })
-  const directDistanceSeries = rawSamples.map((sample) =>
+  const directDistanceSeries = normalizedRawSamples.map((sample) =>
     safeNumber(sample.distance),
   )
   const distanceSeries = buildDistanceSeries(courseSeries, directDistanceSeries)
-  const elapsedSeries = buildElapsedSeries(rawSamples, timeSeries)
-  const elevationBaseSeries = rawSamples.map((sample) =>
+  const elapsedSeries = buildElapsedSeries(normalizedRawSamples, timeSeries)
+  const elevationBaseSeries = normalizedRawSamples.map((sample) =>
     safeNumber(sample.elevation),
   )
   const normalizedElevationSeries = useLegacyGpxDerivations
@@ -593,32 +820,42 @@ export function finalizeParsedActivity({
     : elevationBaseSeries
 
   const directMetrics = {
-    air_pressure: rawSamples.map((sample) => safeNumber(sample.airPressure)),
-    altitude: rawSamples.map((sample) => safeNumber(sample.altitude)),
-    cadence: rawSamples.map((sample) => safeNumber(sample.cadence)),
+    air_pressure: normalizedRawSamples.map((sample) =>
+      safeNumber(sample.airPressure),
+    ),
+    altitude: normalizedRawSamples.map((sample) => safeNumber(sample.altitude)),
+    cadence: normalizedRawSamples.map((sample) => safeNumber(sample.cadence)),
     distance: distanceSeries,
     elevation: normalizedElevationSeries,
-    g_force: rawSamples.map((sample) => safeNumber(sample.gForce)),
-    gradient: rawSamples.map((sample) => safeNumber(sample.gradient)),
-    ground_contact_time: rawSamples.map((sample) =>
+    g_force: normalizedRawSamples.map((sample) => safeNumber(sample.gForce)),
+    gradient: normalizedRawSamples.map((sample) => safeNumber(sample.gradient)),
+    ground_contact_time: normalizedRawSamples.map((sample) =>
       safeNumber(sample.groundContactTime),
     ),
-    heading: rawSamples.map((sample) => safeNumber(sample.heading)),
-    heartrate: rawSamples.map((sample) => safeNumber(sample.heartrate)),
-    left_right_balance: rawSamples.map(
+    heading: normalizedRawSamples.map((sample) => safeNumber(sample.heading)),
+    heartrate: normalizedRawSamples.map((sample) =>
+      safeNumber(sample.heartrate),
+    ),
+    left_right_balance: normalizedRawSamples.map(
       (sample) => sample.leftRightBalance ?? null,
     ),
-    pace: rawSamples.map((sample) => safeNumber(sample.pace)),
-    power: rawSamples.map((sample) => safeNumber(sample.power)),
-    speed: rawSamples.map((sample) => safeNumber(sample.speed)),
-    stride_length: rawSamples.map((sample) => safeNumber(sample.strideLength)),
-    stroke_rate: rawSamples.map((sample) => safeNumber(sample.strokeRate)),
-    temperature: rawSamples.map((sample) => safeNumber(sample.temperature)),
-    torque: rawSamples.map((sample) => safeNumber(sample.torque)),
-    vertical_oscillation: rawSamples.map((sample) =>
+    pace: normalizedRawSamples.map((sample) => safeNumber(sample.pace)),
+    power: normalizedRawSamples.map((sample) => safeNumber(sample.power)),
+    speed: normalizedRawSamples.map((sample) => safeNumber(sample.speed)),
+    stride_length: normalizedRawSamples.map((sample) =>
+      safeNumber(sample.strideLength),
+    ),
+    stroke_rate: normalizedRawSamples.map((sample) =>
+      safeNumber(sample.strokeRate),
+    ),
+    temperature: normalizedRawSamples.map((sample) =>
+      safeNumber(sample.temperature),
+    ),
+    torque: normalizedRawSamples.map((sample) => safeNumber(sample.torque)),
+    vertical_oscillation: normalizedRawSamples.map((sample) =>
       safeNumber(sample.verticalOscillation),
     ),
-    vertical_speed: rawSamples.map((sample) =>
+    vertical_speed: normalizedRawSamples.map((sample) =>
       safeNumber(sample.verticalSpeed),
     ),
   }
@@ -643,21 +880,21 @@ export function finalizeParsedActivity({
   const metricSeriesMap = {
     air_pressure: combineSeries(
       directMetrics.air_pressure,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     altitude: combineSeries(directMetrics.altitude, directMetrics.elevation),
     cadence: combineSeries(
       directMetrics.cadence,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     distance: { series: directMetrics.distance, source: 'direct' },
     elevation: combineSeries(
       directMetrics.elevation,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     g_force: combineSeries(
       directMetrics.g_force,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     gradient: combineSeriesPreferDerived(
       derivedGradient,
@@ -665,39 +902,39 @@ export function finalizeParsedActivity({
     ),
     ground_contact_time: combineSeries(
       directMetrics.ground_contact_time,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     heading: combineSeries(directMetrics.heading, derivedHeading),
     heartrate: combineSeries(
       directMetrics.heartrate,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     left_right_balance: combineSeries(
       directMetrics.left_right_balance,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     pace: combineSeries(directMetrics.pace, derivedPace),
     power: combineSeries(
       directMetrics.power,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     speed: combineSeries(directMetrics.speed, derivedSpeed),
     stride_length: combineSeries(
       directMetrics.stride_length,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     stroke_rate: combineSeries(
       directMetrics.stroke_rate,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     temperature: combineSeries(
       directMetrics.temperature,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     torque: combineSeries(directMetrics.torque, derivedTorque),
     vertical_oscillation: combineSeries(
       directMetrics.vertical_oscillation,
-      rawSamples.map(() => null),
+      normalizedRawSamples.map(() => null),
     ),
     vertical_speed: combineSeries(
       directMetrics.vertical_speed,
@@ -739,7 +976,9 @@ export function finalizeParsedActivity({
       start_time: startTime,
       end_time: endTime,
       total_distance_m: roundValue(totalDistanceMeters, 3) ?? 0,
-      sample_count: rawSamples.length,
+      sample_count: normalizedRawSamples.length,
+      original_sample_count: rawSamples.length,
+      inserted_idle_sample_count: gapDebug.inserted_sample_count,
     },
     metric_units: METRIC_UNITS,
     coverage,
@@ -785,6 +1024,7 @@ export function finalizeParsedActivity({
       generated_at: new Date().toISOString(),
       file_name: fileName,
       file_format: fileFormat,
+      idle_gap_fill: gapDebug,
       parsed_activity: parsedActivity,
     },
   }
