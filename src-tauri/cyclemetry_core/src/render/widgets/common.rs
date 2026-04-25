@@ -8,7 +8,6 @@ use skia_safe::{Canvas, Paint, PaintCap, PaintJoin, Path as SkPath, Point};
 
 pub(crate) const DEFAULT_COLOR: &str = "#ffffff";
 pub(crate) const DEFAULT_LINE_WIDTH: f32 = 1.75;
-pub(crate) const DEFAULT_MARGIN: f32 = 0.1;
 pub(crate) const DEFAULT_POINT_WEIGHT: f32 = 80.0;
 pub(crate) const DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX: f32 = 1.0;
 pub(crate) const DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER: f32 = 1.0;
@@ -29,11 +28,11 @@ pub(crate) fn distance(left: (f32, f32), right: (f32, f32)) -> f32 {
     ((right.0 - left.0).powi(2) + (right.1 - left.1).powi(2)).sqrt()
 }
 
-pub(crate) fn fit_points_to_widget(
+pub(crate) fn fit_points_to_widget_with_inset(
     points: &[(f32, f32)],
     width: f32,
     height: f32,
-    margin: f32,
+    inset_px: f32,
     invert_y: bool,
 ) -> Vec<(f32, f32)> {
     if points.is_empty() {
@@ -50,8 +49,9 @@ pub(crate) fn fit_points_to_widget(
         .iter()
         .map(|(_, y)| *y)
         .fold(f32::NEG_INFINITY, f32::max);
-    let inner_width = (width * (1.0 - 2.0 * margin)).max(1.0);
-    let inner_height = (height * (1.0 - 2.0 * margin)).max(1.0);
+    let safe_inset = inset_px.max(0.0).min(width.min(height) * 0.45);
+    let inner_width = (width - safe_inset * 2.0).max(1.0);
+    let inner_height = (height - safe_inset * 2.0).max(1.0);
     let span_x = (max_x - min_x).max(1e-6);
     let span_y = (max_y - min_y).max(1e-6);
     let scale = (inner_width / span_x).min(inner_height / span_y);

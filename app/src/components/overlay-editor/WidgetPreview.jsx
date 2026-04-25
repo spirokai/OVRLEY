@@ -20,7 +20,7 @@ import {
   getSeriesValueAtProgress,
   getWidgetOpacity,
   normalizeElevationPoints,
-  normalizeRoutePoints,
+  normalizeRouteGeometry,
   pointsToSvg,
 } from './utils'
 
@@ -262,26 +262,37 @@ function OverlayRouteWidget({
       return result
     }, [])
   }, [activity])
-  const points = useMemo(
+  const routeGeometry = useMemo(
     () =>
-      normalizeRoutePoints(
-        routeSamples.map((sample) => sample.point),
+      normalizeRouteGeometry(
+        routeSamples,
         width,
         height,
+        widget.data.target_density ?? 1,
+        widget.data.simplify_tolerance_px ?? 1,
+        widget.data.remaining_line_width ?? 6,
+        widget.data.completed_line_width ?? 6,
+        widget.data.marker_size ?? 18,
       ),
-    [routeSamples, width, height],
+    [
+      widget.data.completed_line_width,
+      widget.data.marker_size,
+      widget.data.remaining_line_width,
+      height,
+      routeSamples,
+      widget.data.target_density,
+      widget.data.simplify_tolerance_px,
+      width,
+    ],
   )
-  const pointProgress = useMemo(
-    () => routeSamples.map((sample) => sample.progress),
-    [routeSamples],
-  )
+  const pointProgress = routeGeometry.progressValues
   const progress01 = getDistanceProgressAtElapsed(activity, previewSecond)
   const markerPoint =
-    getPointAtMetricProgress(points, pointProgress, progress01) ||
-    getPointAtProgress(points, progress01) ||
-    points[points.length - 1]
+    getPointAtMetricProgress(routeGeometry.points, pointProgress, progress01) ||
+    getPointAtProgress(routeGeometry.points, progress01) ||
+    routeGeometry.points[routeGeometry.points.length - 1]
   const completedPoints = useMemo(() => {
-    const nextPoints = points.filter(
+    const nextPoints = routeGeometry.points.filter(
       (_, index) => (pointProgress[index] ?? 0) <= progress01,
     )
     if (
@@ -291,28 +302,33 @@ function OverlayRouteWidget({
       nextPoints.push(markerPoint)
     }
     return nextPoints
-  }, [markerPoint, pointProgress, points, progress01])
+  }, [markerPoint, pointProgress, progress01, routeGeometry.points])
   const remainingPoints = useMemo(() => {
-    const tail = points.filter(
+    const tail = routeGeometry.points.filter(
       (_, index) => (pointProgress[index] ?? 0) >= progress01,
     )
 
     if (!markerPoint) {
-      return tail.length ? tail : points
+      return tail.length ? tail : routeGeometry.points
     }
 
     return pointsEqual(markerPoint, tail[0]) ? tail : [markerPoint, ...tail]
-  }, [markerPoint, pointProgress, points, progress01])
+  }, [markerPoint, pointProgress, progress01, routeGeometry.points])
   const remainingSvgPoints = useMemo(
-    () => pointsToSvg(remainingPoints.length > 1 ? remainingPoints : points),
-    [points, remainingPoints],
+    () =>
+      pointsToSvg(
+        remainingPoints.length > 1 ? remainingPoints : routeGeometry.points,
+      ),
+    [remainingPoints, routeGeometry.points],
   )
   const completedSvgPoints = useMemo(
     () =>
       pointsToSvg(
-        completedPoints.length > 1 ? completedPoints : points.slice(0, 2),
+        completedPoints.length > 1
+          ? completedPoints
+          : routeGeometry.points.slice(0, 2),
       ),
-    [completedPoints, points],
+    [completedPoints, routeGeometry.points],
   )
 
   return (

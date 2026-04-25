@@ -240,6 +240,10 @@ pub struct CoursePlotConfig {
     #[serde(default)]
     pub margin: Option<f32>,
     #[serde(default)]
+    pub simplify_tolerance_px: Option<f32>,
+    #[serde(default)]
+    pub target_density: Option<f32>,
+    #[serde(default)]
     pub completed_line_width: Option<f32>,
     #[serde(default)]
     pub completed_line_color: Option<String>,

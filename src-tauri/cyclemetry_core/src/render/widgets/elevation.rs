@@ -382,9 +382,10 @@ fn build_elevation_geometry(
     let projected_samples = downsampled
         .iter()
         .zip(projected.iter())
-        .map(|((progress, _), point)| ElevationSample {
+        .map(|(sample, point)| ElevationSample {
             point: *point,
-            progress01: *progress,
+            progress01: sample.progress01,
+            preserve: sample.preserve,
         })
         .collect::<Vec<_>>();
     let simplified = simplify_elevation_samples(&projected_samples, plot.simplify_tolerance_px);
@@ -395,7 +396,7 @@ fn build_elevation_geometry(
         points: simplified.iter().map(|sample| sample.point).collect(),
         source_point_count: raw_points.len(),
         simplification: format!(
-            "lttb_density_{:.2}_rdp_px_{:.2}",
+            "extrema_density_{:.2}_rdp_px_{:.2}",
             plot.target_density, plot.simplify_tolerance_px
         ),
     })
@@ -477,75 +478,130 @@ fn raw_elevation_points(activity: &ParsedActivity) -> Vec<(f32, f64)> {
         .collect()
 }
 
-fn downsample_elevation_points(points: &[(f32, f64)], target_count: usize) -> Vec<(f32, f64)> {
-    if points.len() <= target_count || target_count < 3 {
-        return points.to_vec();
-    }
-
-    let bucket_size = (points.len() - 2) as f64 / (target_count - 2) as f64;
-    let mut sampled = Vec::with_capacity(target_count);
-    let mut a = 0usize;
-    sampled.push(points[a]);
-
-    for bucket_index in 0..(target_count - 2) {
-        let avg_start = ((bucket_index + 1) as f64 * bucket_size).floor() as usize + 1;
-        let avg_end = ((bucket_index + 2) as f64 * bucket_size).floor() as usize + 1;
-        let avg_range_end = avg_end.min(points.len());
-        let avg_range_start = avg_start.min(avg_range_end.saturating_sub(1));
-
-        let average = if avg_range_start < avg_range_end {
-            let range = &points[avg_range_start..avg_range_end];
-            let (sum_x, sum_y) = range.iter().fold((0.0f64, 0.0f64), |(sx, sy), (x, y)| {
-                (sx + *x as f64, sy + *y)
-            });
-            let count = range.len() as f64;
-            (sum_x / count, sum_y / count)
-        } else {
-            let fallback = points[points.len() - 1];
-            (fallback.0 as f64, fallback.1)
-        };
-
-        let range_start = (bucket_index as f64 * bucket_size).floor() as usize + 1;
-        let range_end = ((bucket_index + 1) as f64 * bucket_size).floor() as usize + 1;
-        let candidate_start = range_start.min(points.len().saturating_sub(2));
-        let candidate_end = range_end.min(points.len().saturating_sub(1));
-
-        let point_a = points[a];
-        let mut next_a = candidate_start;
-        let mut max_area = -1.0f64;
-
-        for (offset, point_b) in points[candidate_start..candidate_end.max(candidate_start + 1)]
-            .iter()
-            .enumerate()
-        {
-            let area = triangle_area(point_a, *point_b, average);
-            if area > max_area {
-                max_area = area;
-                next_a = candidate_start + offset;
-            }
-        }
-
-        a = next_a;
-        sampled.push(points[a]);
-    }
-    sampled.push(*points.last().unwrap_or(&points[0]));
-    sampled
+#[derive(Clone, Copy)]
+struct ReducedElevationPoint {
+    progress01: f32,
+    elevation: f64,
+    preserve: bool,
 }
 
-fn triangle_area(point_a: (f32, f64), point_b: (f32, f64), point_c: (f64, f64)) -> f64 {
-    (((point_a.0 as f64 - point_c.0) * (point_b.1 - point_a.1))
-        - ((point_a.0 as f64 - point_b.0 as f64) * (point_c.1 - point_a.1)))
-        .abs()
-        * 0.5
+fn downsample_elevation_points(
+    points: &[(f32, f64)],
+    target_count: usize,
+) -> Vec<ReducedElevationPoint> {
+    if points.len() <= target_count || target_count < 3 {
+        return points
+            .iter()
+            .map(|(progress01, elevation)| ReducedElevationPoint {
+                progress01: *progress01,
+                elevation: *elevation,
+                preserve: true,
+            })
+            .collect();
+    }
+
+    let bucket_count = (target_count / 2).max(1);
+    let bucket_size = points.len() as f64 / bucket_count as f64;
+    let mut selected_indexes = Vec::with_capacity(target_count);
+    selected_indexes.push((0usize, true));
+
+    let mut bucket_index = 0.0f64;
+    while (bucket_index as usize) < points.len().saturating_sub(1) {
+        let start = bucket_index as usize;
+        let end = points
+            .len()
+            .min((bucket_index + bucket_size).floor() as usize)
+            .max(start + 1);
+        let bucket = &points[start..end];
+        if bucket.is_empty() {
+            bucket_index += bucket_size.max(1.0);
+            continue;
+        }
+
+        let representative_index = start + bucket.len() / 2;
+        let min_index = start
+            + bucket
+                .iter()
+                .enumerate()
+                .min_by(|left, right| left.1 .1.total_cmp(&right.1 .1))
+                .map(|(index, _)| index)
+                .unwrap_or(0);
+        let max_index = start
+            + bucket
+                .iter()
+                .enumerate()
+                .max_by(|left, right| left.1 .1.total_cmp(&right.1 .1))
+                .map(|(index, _)| index)
+                .unwrap_or(0);
+
+        let mut bucket_indexes = vec![
+            (representative_index, false),
+            (min_index, true),
+            (max_index, true),
+        ];
+        bucket_indexes.sort_unstable_by_key(|(index, _)| *index);
+        bucket_indexes.dedup();
+        selected_indexes.extend(bucket_indexes);
+        bucket_index += bucket_size.max(1.0);
+    }
+
+    selected_indexes.push((points.len() - 1, true));
+    selected_indexes.sort_unstable_by_key(|(index, _)| *index);
+    selected_indexes.dedup();
+    selected_indexes
+        .into_iter()
+        .filter_map(|(index, preserve)| {
+            points
+                .get(index)
+                .map(|(progress01, elevation)| ReducedElevationPoint {
+                    progress01: *progress01,
+                    elevation: *elevation,
+                    preserve,
+                })
+        })
+        .collect()
 }
 
 #[derive(Clone, Copy)]
 struct ElevationSample {
     point: (f32, f32),
     progress01: f32,
+    preserve: bool,
 }
 
 fn simplify_elevation_samples(points: &[ElevationSample], tolerance: f32) -> Vec<ElevationSample> {
+    if points.len() <= 2 || tolerance <= 0.0 {
+        return points.to_vec();
+    }
+
+    let preserved_indexes = points
+        .iter()
+        .enumerate()
+        .filter_map(|(index, point)| point.preserve.then_some(index))
+        .collect::<Vec<_>>();
+    if preserved_indexes.len() >= 2 {
+        let mut result = Vec::new();
+        for window in preserved_indexes.windows(2) {
+            let start = window[0];
+            let end = window[1];
+            let simplified_segment =
+                simplify_elevation_samples_segment(&points[start..=end], tolerance);
+            if result.is_empty() {
+                result.extend(simplified_segment);
+            } else {
+                result.extend(simplified_segment.into_iter().skip(1));
+            }
+        }
+        return result;
+    }
+
+    simplify_elevation_samples_segment(points, tolerance)
+}
+
+fn simplify_elevation_samples_segment(
+    points: &[ElevationSample],
+    tolerance: f32,
+) -> Vec<ElevationSample> {
     if points.len() <= 2 || tolerance <= 0.0 {
         return points.to_vec();
     }
@@ -580,13 +636,13 @@ fn simplify_elevation_samples(points: &[ElevationSample], tolerance: f32) -> Vec
         return vec![points[0], *points.last().unwrap()];
     }
 
-    let left = simplify_elevation_samples(&points[..=split_index], tolerance);
-    let right = simplify_elevation_samples(&points[split_index..], tolerance);
+    let left = simplify_elevation_samples_segment(&points[..=split_index], tolerance);
+    let right = simplify_elevation_samples_segment(&points[split_index..], tolerance);
     [left[..left.len() - 1].to_vec(), right].concat()
 }
 
 fn project_elevation_points(
-    points: &[(f32, f64)],
+    points: &[ReducedElevationPoint],
     width: f32,
     height: f32,
     margin: f32,
@@ -594,11 +650,11 @@ fn project_elevation_points(
 ) -> Vec<(f32, f32)> {
     let min_elevation = points
         .iter()
-        .map(|(_, elevation)| *elevation)
+        .map(|point| point.elevation)
         .fold(f64::INFINITY, f64::min);
     let max_elevation = points
         .iter()
-        .map(|(_, elevation)| *elevation)
+        .map(|point| point.elevation)
         .fold(f64::NEG_INFINITY, f64::max);
     let span = (max_elevation - min_elevation).max(1e-9);
     let inner_width = (width * (1.0 - 2.0 * margin)).max(1.0);
@@ -606,9 +662,9 @@ fn project_elevation_points(
 
     points
         .iter()
-        .map(|(progress, elevation)| {
-            let progress01 = (*progress).clamp(0.0, 1.0);
-            let normalized = ((*elevation - min_elevation) / span) as f32;
+        .map(|point| {
+            let progress01 = point.progress01.clamp(0.0, 1.0);
+            let normalized = ((point.elevation - min_elevation) / span) as f32;
             let centered = ((normalized - 0.5) * y_scale + 0.5).clamp(0.0, 1.0);
             let point_x = width * margin + inner_width * progress01;
             let point_y = height - (height * margin + inner_height * centered);

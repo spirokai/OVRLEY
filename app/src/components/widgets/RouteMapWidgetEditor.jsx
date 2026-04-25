@@ -19,6 +19,8 @@ export default function RouteMapWidgetEditor({
   const markerSize = widget.data.marker_size ?? 18
   const markerOpacity = widget.data.marker_opacity ?? 100
   const rotation = widget.data.rotation ?? 0
+  const simplifyTolerance = widget.data.simplify_tolerance_px ?? 1
+  const targetDensity = widget.data.target_density ?? 1
 
   return (
     <>
@@ -55,6 +57,34 @@ export default function RouteMapWidgetEditor({
             value={widget.data.remaining_line_color || getThemeColor('teal')}
             onChange={(value) =>
               updateWidgetData(widget.id, { remaining_line_color: value })
+            }
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <SliderField
+            label="Simplify Tolerance"
+            value={simplifyTolerance}
+            min={0}
+            max={4}
+            step={0.05}
+            valueDisplay={`${simplifyTolerance.toFixed(2)}px`}
+            onSliderChange={(value) =>
+              updateWidgetData(widget.id, {
+                simplify_tolerance_px: Number(value.toFixed(2)),
+              })
+            }
+          />
+          <SliderField
+            label="Target Density"
+            value={targetDensity}
+            min={0.25}
+            max={1.5}
+            step={0.05}
+            valueDisplay={`${targetDensity.toFixed(2)}x`}
+            onSliderChange={(value) =>
+              updateWidgetData(widget.id, {
+                target_density: Number(value.toFixed(2)),
+              })
             }
           />
         </div>

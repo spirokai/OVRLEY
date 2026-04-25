@@ -188,6 +188,8 @@ export function createPlotDefaults(type, globalDefaults, options = {}) {
       completed_line_opacity: 100,
       remaining_line_color: getThemeColor('teal'),
       remaining_line_opacity: 35,
+      simplify_tolerance_px: 1,
+      target_density: 1,
       marker_size: 18,
       marker_color: getThemeColor('aqua'),
       marker_opacity: 100,

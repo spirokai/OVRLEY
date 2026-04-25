@@ -286,18 +286,6 @@ function applyFixedSavitzkyGolay(values, coefficients) {
   })
 }
 
-function smoothElevationSeriesLegacy(elevationSeries) {
-  const populatedSamples = elevationSeries.filter(isFiniteNumber).length
-  if (populatedSamples < 3) {
-    return elevationSeries.map((value) => roundValue(value, 3))
-  }
-
-  return applyFixedSavitzkyGolay(
-    elevationSeries,
-    [-36, 9, 44, 69, 84, 89, 84, 69, 44, 9, -36],
-  )
-}
-
 function smoothGradientInputSeriesLegacy(elevationSeries) {
   const populatedSamples = elevationSeries.filter(isFiniteNumber).length
   if (populatedSamples < 3) {
@@ -815,9 +803,6 @@ export function finalizeParsedActivity({
   const elevationBaseSeries = normalizedRawSamples.map((sample) =>
     safeNumber(sample.elevation),
   )
-  const normalizedElevationSeries = useLegacyGpxDerivations
-    ? smoothElevationSeriesLegacy(elevationBaseSeries)
-    : elevationBaseSeries
 
   const directMetrics = {
     air_pressure: normalizedRawSamples.map((sample) =>
@@ -826,7 +811,7 @@ export function finalizeParsedActivity({
     altitude: normalizedRawSamples.map((sample) => safeNumber(sample.altitude)),
     cadence: normalizedRawSamples.map((sample) => safeNumber(sample.cadence)),
     distance: distanceSeries,
-    elevation: normalizedElevationSeries,
+    elevation: elevationBaseSeries,
     g_force: normalizedRawSamples.map((sample) => safeNumber(sample.gForce)),
     gradient: normalizedRawSamples.map((sample) => safeNumber(sample.gradient)),
     ground_contact_time: normalizedRawSamples.map((sample) =>

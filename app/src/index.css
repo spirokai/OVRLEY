@@ -307,12 +307,12 @@ body {
 
 /* control box points */
 
-.moveable-control {
+/* .moveable-control {
   height: 8px !important;
   width: 8px !important;
   margin-top: -4px !important;
   margin-left: -4px !important;
-}
+} */
 
 .moveable-direction,
 .moveable-rotation-control {

@@ -1,8 +1,8 @@
 use super::common::{
-    distance, draw_marker, draw_polyline, fallback_marker_points, fit_points_to_widget,
+    distance, draw_marker, draw_polyline, fallback_marker_points, fit_points_to_widget_with_inset,
     frame_progress_values, legacy_line_width, marker_layers_from_points, marker_size_from_weights,
     normalize_opacity, plot_base_color, point_at_metric_progress_with_cursor, resolve_style_color,
-    scale_marker_points, widget_render_report, with_widget_transform, DEFAULT_MARGIN,
+    scale_marker_points, widget_render_report, with_widget_transform,
     DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER,
     DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
 };
@@ -131,7 +131,10 @@ fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> Norm
         width: scaled_width,
         height: scaled_height,
         rotation: plot.rotation,
-        margin: plot.margin.unwrap_or(DEFAULT_MARGIN),
+        simplify_tolerance_px: plot.simplify_tolerance_px.unwrap_or(
+            DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX * DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER,
+        ),
+        target_density: plot.target_density.unwrap_or(1.0).clamp(0.1, 2.0),
         remaining_line_width: plot.remaining_line_width.unwrap_or(legacy_width),
         remaining_line_color: resolve_style_color(
             plot.remaining_line_color.as_ref(),
@@ -180,15 +183,14 @@ fn build_route_geometry(
         .iter()
         .map(|sample| sample.point)
         .collect::<Vec<_>>();
-    let fitted = fit_points_to_widget(
+    let stroke_inset = route_geometry_inset_px(plot);
+    let fitted = fit_points_to_widget_with_inset(
         &projected,
         plot.width as f32,
         plot.height as f32,
-        plot.margin,
+        stroke_inset,
         true,
     );
-    let tolerance =
-        DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX * DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER;
     let fitted_samples = route_samples
         .iter()
         .zip(fitted.iter())
@@ -197,15 +199,26 @@ fn build_route_geometry(
             progress01: sample.progress01,
         })
         .collect::<Vec<_>>();
-    let simplified = simplify_route_samples(&fitted_samples, tolerance.max(0.05));
+    let target_count = ((plot.width as f32) * plot.target_density).round().max(2.0) as usize;
+    let downsampled =
+        downsample_route_samples(&fitted_samples, target_count.min(fitted_samples.len()));
+    let simplified = simplify_route_samples(&downsampled, plot.simplify_tolerance_px.max(0.05));
 
     Ok(WidgetGeometry {
         bbox: (0.0, 0.0, plot.width as f32, plot.height as f32),
         progress_values: simplified.iter().map(|sample| sample.progress01).collect(),
         points: simplified.iter().map(|sample| sample.point).collect(),
         source_point_count: route_samples.len(),
-        simplification: "rdp_px_1.0".to_string(),
+        simplification: format!(
+            "lttb_density_{:.2}_rdp_px_{:.2}",
+            plot.target_density, plot.simplify_tolerance_px
+        ),
     })
+}
+
+fn route_geometry_inset_px(plot: &NormalizedRoutePlot) -> f32 {
+    let line_inset = (plot.remaining_line_width.max(plot.completed_line_width) * 0.5).max(0.0);
+    plot.marker_size.max(line_inset) + 1.0
 }
 
 fn build_route_frame_states(
@@ -308,6 +321,69 @@ fn simplify_route_samples(points: &[RouteSample], tolerance: f32) -> Vec<RouteSa
     let left = simplify_route_samples(&points[..=split_index], tolerance);
     let right = simplify_route_samples(&points[split_index..], tolerance);
     [left[..left.len() - 1].to_vec(), right].concat()
+}
+
+fn downsample_route_samples(points: &[RouteSample], target_count: usize) -> Vec<RouteSample> {
+    if points.len() <= target_count || target_count < 3 {
+        return points.to_vec();
+    }
+
+    let bucket_size = (points.len() - 2) as f64 / (target_count - 2) as f64;
+    let mut sampled = Vec::with_capacity(target_count);
+    let mut a = 0usize;
+    sampled.push(points[a]);
+
+    for bucket_index in 0..(target_count - 2) {
+        let avg_start = ((bucket_index + 1) as f64 * bucket_size).floor() as usize + 1;
+        let avg_end = ((bucket_index + 2) as f64 * bucket_size).floor() as usize + 1;
+        let avg_range_end = avg_end.min(points.len());
+        let avg_range_start = avg_start.min(avg_range_end.saturating_sub(1));
+
+        let average = if avg_range_start < avg_range_end {
+            let range = &points[avg_range_start..avg_range_end];
+            let (sum_x, sum_y) = range.iter().fold((0.0f64, 0.0f64), |(sx, sy), sample| {
+                (sx + sample.point.0 as f64, sy + sample.point.1 as f64)
+            });
+            let count = range.len() as f64;
+            (sum_x / count, sum_y / count)
+        } else {
+            let fallback = points[points.len() - 1];
+            (fallback.point.0 as f64, fallback.point.1 as f64)
+        };
+
+        let range_start = (bucket_index as f64 * bucket_size).floor() as usize + 1;
+        let range_end = ((bucket_index + 1) as f64 * bucket_size).floor() as usize + 1;
+        let candidate_start = range_start.min(points.len().saturating_sub(2));
+        let candidate_end = range_end.min(points.len().saturating_sub(1));
+
+        let point_a = points[a];
+        let mut next_a = candidate_start;
+        let mut max_area = -1.0f64;
+
+        for (offset, point_b) in points[candidate_start..candidate_end.max(candidate_start + 1)]
+            .iter()
+            .enumerate()
+        {
+            let area = triangle_area(point_a.point, point_b.point, average);
+            if area > max_area {
+                max_area = area;
+                next_a = candidate_start + offset;
+            }
+        }
+
+        a = next_a;
+        sampled.push(points[a]);
+    }
+
+    sampled.push(*points.last().unwrap_or(&points[0]));
+    sampled
+}
+
+fn triangle_area(point_a: (f32, f32), point_b: (f32, f32), point_c: (f64, f64)) -> f64 {
+    (((point_a.0 as f64 - point_c.0) * (point_b.1 as f64 - point_a.1 as f64))
+        - ((point_a.0 as f64 - point_b.0 as f64) * (point_c.1 - point_a.1 as f64)))
+        .abs()
+        * 0.5
 }
 
 fn route_position_at_progress(points: &[(f32, f32)], progress_limit: f32) -> (usize, f32, f32) {
