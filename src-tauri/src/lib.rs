@@ -23,6 +23,12 @@ async fn backend_health() -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn backend_current_os() -> Result<String, String> {
+    let response = commands::backend_current_os();
+    serde_json::to_string(&response).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 async fn backend_demo(
     config_json: String,
     parsed_activity_json: String,
@@ -164,6 +170,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             backend_health,
+            backend_current_os,
             backend_demo,
             backend_render,
             backend_progress,

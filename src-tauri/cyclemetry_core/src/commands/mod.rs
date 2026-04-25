@@ -94,6 +94,12 @@ pub fn backend_health(paths: &AppPaths) -> HealthResponse {
     }
 }
 
+pub fn backend_current_os() -> Value {
+    json!({
+        "os": std::env::consts::OS
+    })
+}
+
 pub fn backend_demo(
     paths: &AppPaths,
     config_json: &str,

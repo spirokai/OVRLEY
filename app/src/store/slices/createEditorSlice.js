@@ -48,7 +48,6 @@ export function createEditorSlice(set, get) {
             }
             if (val.scene.end !== undefined) {
               state.endSecond = val.scene.end
-              state.dummyDurationSeconds = val.scene.end
             }
             if (val.scene.start !== undefined) {
               state.selectedSecond = val.scene.start
@@ -66,12 +65,7 @@ export function createEditorSlice(set, get) {
               val.scene.end !== state.endSecond
             ) {
               state.endSecond = val.scene.end
-              state.dummyDurationSeconds = val.scene.end
               localStorage.setItem('endSecond', val.scene.end.toString())
-              localStorage.setItem(
-                'dummyDurationSeconds',
-                val.scene.end.toString(),
-              )
             }
           }
         }

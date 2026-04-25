@@ -41,7 +41,6 @@ export default function OverlayPlayer() {
   const activitySummary = useStore((state) => state.activitySummary)
   const sceneFps = useStore((state) => state.config?.scene?.fps ?? 30)
   const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
-  const endSecond = useStore((state) => state.endSecond)
   const selectedSecond = useStore((state) => state.selectedSecond)
   const updateRate = useStore((state) => state.updateRate)
   const setSelectedSecond = useStore((state) => state.setSelectedSecond)
@@ -60,13 +59,8 @@ export default function OverlayPlayer() {
     const metadataDuration = Number(activitySummary?.durationSeconds) || 0
     const fallbackDuration = Number(dummyDurationSeconds) || 0
 
-    return Math.max(
-      metadataDuration,
-      fallbackDuration,
-      Number(endSecond) || 0,
-      0,
-    )
-  }, [activitySummary?.durationSeconds, dummyDurationSeconds, endSecond])
+    return Math.max(metadataDuration, fallbackDuration, 0)
+  }, [activitySummary?.durationSeconds, dummyDurationSeconds])
 
   const hasActivity = Boolean(activitySummary && totalDuration > 0)
   const clampedPlayhead = clamp(Number(selectedSecond) || 0, 0, totalDuration)

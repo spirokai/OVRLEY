@@ -76,7 +76,7 @@ pub fn trim_activity(
     );
     trimmed_elapsed.push(end - start);
 
-    let mut trimmed_distance_progress = if !requirements.distance_progress
+    let trimmed_distance_progress = if !requirements.distance_progress
         || activity.sample_distance_progress.is_empty()
     {
         Vec::new()
@@ -100,16 +100,8 @@ pub fn trim_activity(
                 .map(Some),
         );
         trimmed.push(Some(end_progress));
-        let span = (end_progress - start_progress).max(1e-9);
         trimmed
-            .into_iter()
-            .map(|value| value.map(|point| (point - start_progress) / span))
-            .collect::<Vec<_>>()
     };
-
-    if trimmed_distance_progress.is_empty() {
-        trimmed_distance_progress = Vec::new();
-    }
 
     let course = if requirements.course {
         let start_course = interpolate_course_value(elapsed, &activity.course, start);

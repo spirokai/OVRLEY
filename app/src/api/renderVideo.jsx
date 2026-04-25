@@ -55,10 +55,7 @@ export default async function renderVideo() {
       } else if ((exportCodec || 'prores_ks') === 'prores_ks_vulkan') {
         config.scene.ffmpeg.prores_profile =
           config.scene.ffmpeg.prores_profile || '4'
-        config.scene.ffmpeg.alpha_bits =
-          config.scene.ffmpeg.alpha_bits || 16
-      } else if ((exportCodec || 'prores_ks') === 'libvpx-vp9') {
-        config.scene.ffmpeg.pix_fmt = config.scene.ffmpeg.pix_fmt || 'yuva420p'
+        config.scene.ffmpeg.alpha_bits = config.scene.ffmpeg.alpha_bits || 16
       }
 
       // Apply export range override if custom

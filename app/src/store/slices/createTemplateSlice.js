@@ -19,6 +19,18 @@ const {
 } = readStoredTemplateSettings()
 
 export function createTemplateSlice(set, get) {
+  const normalizePlatformCodec = (codec, platformOs) => {
+    if (codec === 'libvpx-vp9' || codec === 'hevc_alpha') {
+      return 'prores_ks'
+    }
+
+    if (codec === 'prores_videotoolbox' && platformOs !== 'macos') {
+      return 'prores_ks'
+    }
+
+    return codec || 'prores_ks'
+  }
+
   return {
     communityTemplateFilename: null,
     loadedTemplateFilename:
@@ -27,7 +39,8 @@ export function createTemplateSlice(set, get) {
     templates: [],
     updateRate: initialUpdateRate,
     exportRange: initialExportRange,
-    exportCodec: initialExportCodec,
+    exportCodec: normalizePlatformCodec(initialExportCodec, 'unknown'),
+    platformOs: 'unknown',
     globalDefaults: initialGlobalDefaults,
     aspectRatio: initialAspectRatio,
     lastSavedTemplateState: readStoredJson('lastSavedTemplateState', null),
@@ -69,10 +82,23 @@ export function createTemplateSlice(set, get) {
       }),
 
     setExportCodec: (codec) => {
-      localStorage.setItem('exportCodec', codec)
+      const nextCodec = normalizePlatformCodec(codec, get().platformOs)
+      localStorage.setItem('exportCodec', nextCodec)
       set((state) => {
-        state.exportCodec = codec
+        state.exportCodec = nextCodec
       })
+    },
+
+    setPlatformOs: (platformOs) => {
+      const nextPlatformOs = platformOs || 'unknown'
+      set((state) => {
+        state.platformOs = nextPlatformOs
+        state.exportCodec = normalizePlatformCodec(
+          state.exportCodec,
+          nextPlatformOs,
+        )
+      })
+      localStorage.setItem('exportCodec', get().exportCodec)
     },
 
     setGlobalDefault: (key, value) => {
@@ -139,7 +165,10 @@ export function createTemplateSlice(set, get) {
         ...DEFAULT_EXPORT_RANGE,
         ...(nextSettings.exportRange || {}),
       }
-      const nextExportCodec = nextSettings.exportCodec || 'prores_ks'
+      const nextExportCodec = normalizePlatformCodec(
+        nextSettings.exportCodec || 'prores_ks',
+        get().platformOs,
+      )
       const nextAspectRatio = nextSettings.aspectRatio || '16:9'
       const nextUpdateRate = nextSettings.updateRate || 1
 
@@ -179,12 +208,7 @@ export function createTemplateSlice(set, get) {
 
           if (nextConfig.scene.end !== undefined) {
             state.endSecond = nextConfig.scene.end
-            state.dummyDurationSeconds = nextConfig.scene.end
             localStorage.setItem('endSecond', nextConfig.scene.end.toString())
-            localStorage.setItem(
-              'dummyDurationSeconds',
-              nextConfig.scene.end.toString(),
-            )
           }
         }
 

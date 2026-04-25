@@ -1,6 +1,6 @@
 use crate::activity::schema::DenseActivityReport;
 use crate::config::{RenderConfig, ValueConfig};
-use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration, Local, Timelike, TimeZone};
 
 pub fn frame_index_for_second(
     config: &RenderConfig,
@@ -191,7 +191,7 @@ fn format_time(config: &RenderConfig, value_config: &ValueConfig, raw: Option<&s
         return raw.to_string();
     };
     let adjusted =
-        parsed.with_timezone(&Utc) + Duration::hours(value_config.hours_offset.unwrap_or(0) as i64);
+        parsed.with_timezone(&Local) + Duration::hours(value_config.hours_offset.unwrap_or(0) as i64);
 
     if let Some(format_key) = value_config.format.as_deref() {
         return format_time_key(format_key, adjusted);
@@ -207,7 +207,11 @@ fn format_time(config: &RenderConfig, value_config: &ValueConfig, raw: Option<&s
     format_time_key("time-24", adjusted)
 }
 
-fn format_time_key(format_key: &str, value: DateTime<Utc>) -> String {
+fn format_time_key<Tz>(format_key: &str, value: DateTime<Tz>) -> String
+where
+    Tz: TimeZone,
+    Tz::Offset: std::fmt::Display,
+{
     let day = format!("{:02}", value.day());
     let month = format!("{:02}", value.month());
     let year = value.year();

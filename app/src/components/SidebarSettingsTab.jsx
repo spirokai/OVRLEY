@@ -68,6 +68,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     exportRange,
     setExportRange,
     exportCodec,
+    platformOs,
     setExportCodec,
     aspectRatio,
     setAspectRatio,
@@ -75,6 +76,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
   } = useStore()
 
   const scene = config?.scene
+  const isVideoToolboxAvailable = platformOs === 'macos'
 
   const [resId, setResId] = useState(() => {
     if (!scene) return '1080p'
@@ -507,14 +509,11 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                   <SelectItem value="prores_ks_vulkan">
                     ProRes Vulkan (GPU/8.1)
                   </SelectItem>
-                  <SelectItem value="prores_videotoolbox">
+                  <SelectItem
+                    value="prores_videotoolbox"
+                    disabled={!isVideoToolboxAvailable}
+                  >
                     ProRes VideoToolbox (macOS)
-                  </SelectItem>
-                  <SelectItem value="hevc_alpha">
-                    HEVC with alpha (H.265)
-                  </SelectItem>
-                  <SelectItem value="libvpx-vp9">
-                    VP9 with alpha (WebM)
                   </SelectItem>
                 </SelectContent>
               </Select>

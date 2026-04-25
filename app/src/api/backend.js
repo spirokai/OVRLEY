@@ -171,6 +171,35 @@ export async function renderVideo(config, parsedActivity) {
   )
 }
 
+function detectBrowserPlatformOs() {
+  const platform =
+    navigator.userAgentData?.platform ||
+    navigator.platform ||
+    navigator.userAgent
+
+  if (/mac/i.test(platform)) {
+    return 'macos'
+  }
+  if (/win/i.test(platform)) {
+    return 'windows'
+  }
+  if (/linux/i.test(platform)) {
+    return 'linux'
+  }
+
+  return 'unknown'
+}
+
+export async function getPlatformInfo() {
+  const invoke = await getInvoke()
+  if (invoke) {
+    const payload = await invoke('backend_current_os')
+    return typeof payload === 'string' ? JSON.parse(payload) : payload
+  }
+
+  return { os: detectBrowserPlatformOs() }
+}
+
 /**
  * Get render progress
  */

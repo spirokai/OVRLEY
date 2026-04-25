@@ -129,4 +129,33 @@ mod tests {
         assert!(report.series.course_lon.is_empty());
         assert_eq!(report.frame_distance_progress.len(), report.frame_count);
     }
+
+    #[test]
+    fn trimmed_exports_keep_absolute_distance_progress() {
+        let activity = parse_activity_json(&fixture("Test_FIT-parse-debug.json")).unwrap();
+        let config = parse_config_json(
+            r#"{
+                "scene":{"fps":30,"start":600,"end":630},
+                "plots":{"course":{"value":"course","x":0,"y":0,"width":200,"height":100}}
+            }"#,
+        )
+        .unwrap();
+
+        let report = build_dense_activity_report(&activity, &config).unwrap();
+
+        let first_progress = report
+            .frame_distance_progress
+            .first()
+            .and_then(|value| *value)
+            .unwrap_or_default();
+        let last_progress = report
+            .frame_distance_progress
+            .last()
+            .and_then(|value| *value)
+            .unwrap_or_default();
+
+        assert!(first_progress > 0.0);
+        assert!(last_progress > first_progress);
+        assert!(last_progress < 1.0);
+    }
 }

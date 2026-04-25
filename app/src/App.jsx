@@ -120,6 +120,7 @@ function App() {
   const exportRange = useStore((state) => state.exportRange)
   const exportCodec = useStore((state) => state.exportCodec)
   const aspectRatio = useStore((state) => state.aspectRatio)
+  const setPlatformOs = useStore((state) => state.setPlatformOs)
   const loadedTemplateFilename = useStore(
     (state) => state.loadedTemplateFilename,
   )
@@ -142,6 +143,26 @@ function App() {
   useEffect(() => {
     localStorage.setItem('overlayBackgroundMode', editorBackgroundMode)
   }, [editorBackgroundMode])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const hydratePlatformOs = async () => {
+      try {
+        const platformInfo = await backend.getPlatformInfo()
+        if (!cancelled) {
+          setPlatformOs(platformInfo?.os || 'unknown')
+        }
+      } catch (error) {
+        console.error('Failed to read platform info:', error)
+      }
+    }
+
+    hydratePlatformOs()
+    return () => {
+      cancelled = true
+    }
+  }, [setPlatformOs])
 
   // Fetch templates once
   useEffect(() => {

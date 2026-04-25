@@ -28,6 +28,7 @@ export default function useOverlayEditorState({
   const selectedWidgetId = useStore((state) => state.selectedWidgetId)
   const setSelectedWidgetId = useStore((state) => state.setSelectedWidgetId)
   const selectedSecond = useStore((state) => state.selectedSecond)
+  const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
   const viewportRef = useRef(null)
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
@@ -75,21 +76,20 @@ export default function useOverlayEditorState({
   const globalScale = globalDefaults?.scale ?? 1
   const previewSecond = useMemo(() => {
     const rawSecond = Number(selectedSecond) || 0
-    const startSecond = Number(resolvedConfig?.scene?.start) || 0
-    const activityEndSecond = Number(
+    const activityDuration = Number(
       sourceActivity?.trim_end_seconds ??
         sourceActivity?.metadata?.duration_seconds ??
-        startSecond,
+        dummyDurationSeconds ??
+        0,
     )
-    const sceneEndSecond = Number(resolvedConfig?.scene?.end)
-    const maxSecond = Number.isFinite(sceneEndSecond)
-      ? Math.min(sceneEndSecond, activityEndSecond)
-      : activityEndSecond
+    const maxSecond = Math.max(
+      Number.isFinite(activityDuration) ? activityDuration : 0,
+      0,
+    )
 
-    return clamp(rawSecond, startSecond, Math.max(maxSecond, startSecond))
+    return clamp(rawSecond, 0, maxSecond)
   }, [
-    resolvedConfig?.scene?.end,
-    resolvedConfig?.scene?.start,
+    dummyDurationSeconds,
     selectedSecond,
     sourceActivity?.metadata?.duration_seconds,
     sourceActivity?.trim_end_seconds,
