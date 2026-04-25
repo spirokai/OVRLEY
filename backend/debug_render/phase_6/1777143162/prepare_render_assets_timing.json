@@ -1,0 +1,31 @@
+{
+  "total_ms": 127.4941,
+  "timings": {
+    "create_base_image": {
+      "count": 2,
+      "total_ms": 0.0337,
+      "avg_ms": 0.01685,
+      "max_ms": 0.0313
+    },
+    "prepare.surface.clear": {
+      "alt_name": "surface.clear",
+      "count": 1,
+      "total_ms": 0.217,
+      "avg_ms": 0.217,
+      "max_ms": 0.217
+    },
+    "prepare_render_assets.total": {
+      "count": 1,
+      "total_ms": 126.977,
+      "avg_ms": 126.977,
+      "max_ms": 126.977
+    },
+    "text.static.cache": {
+      "count": 2,
+      "total_ms": 127.10340000000001,
+      "avg_ms": 63.551700000000004,
+      "max_ms": 126.7085
+    }
+  },
+  "label_cache_status": "miss"
+}

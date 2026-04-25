@@ -23,6 +23,7 @@ export const DEFAULT_CONFIG = {
 }
 
 export const DEFAULT_RENDER_PROGRESS = {
+  renderId: null,
   current: 0,
   total: 0,
   percent: 0,

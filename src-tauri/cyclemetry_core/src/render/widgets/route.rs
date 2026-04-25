@@ -2,7 +2,7 @@ use super::common::{
     distance, draw_marker, draw_polyline, fallback_marker_points, fit_points_to_widget,
     frame_progress_values, legacy_line_width, marker_layers_from_points, marker_size_from_weights,
     normalize_opacity, plot_base_color, point_at_metric_progress_with_cursor, resolve_style_color,
-    widget_render_report, with_widget_transform, DEFAULT_MARGIN,
+    scale_marker_points, widget_render_report, with_widget_transform, DEFAULT_MARGIN,
     DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER,
     DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
 };
@@ -106,25 +106,30 @@ pub(crate) fn draw_route_widget(
 }
 
 fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> NormalizedRoutePlot {
+    let scale = _config.scene.scale.unwrap_or(1.0).max(0.1);
     let base_color = plot_base_color(plot.color.as_deref());
     let legacy_width = legacy_line_width(
         plot.line.as_ref().and_then(|line| line.width),
         DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER,
-    );
+    ) * scale;
     let marker_size = plot
         .marker_size
-        .unwrap_or_else(|| marker_size_from_weights(&plot.points, 18.0, f32::sqrt));
+        .unwrap_or_else(|| marker_size_from_weights(&plot.points, 18.0, f32::sqrt))
+        * scale;
     let marker_color = plot
         .marker_color
         .clone()
         .unwrap_or_else(|| base_color.clone());
     let marker_opacity = normalize_opacity(plot.marker_opacity.or(plot.opacity), 1.0);
+    let scaled_width = ((plot.width as f32) * scale).round().max(1.0) as u32;
+    let scaled_height = ((plot.height as f32) * scale).round().max(1.0) as u32;
+    let scaled_points = scale_marker_points(&plot.points, scale);
 
     NormalizedRoutePlot {
         x: plot.x,
         y: plot.y,
-        width: plot.width,
-        height: plot.height,
+        width: scaled_width,
+        height: scaled_height,
         rotation: plot.rotation,
         margin: plot.margin.unwrap_or(DEFAULT_MARGIN),
         remaining_line_width: plot.remaining_line_width.unwrap_or(legacy_width),
@@ -155,7 +160,7 @@ fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> Norm
         marker_color: marker_color.clone(),
         marker_opacity,
         marker_points: fallback_marker_points(
-            &plot.points,
+            &scaled_points,
             marker_size,
             &marker_color,
             marker_opacity,

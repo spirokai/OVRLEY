@@ -108,6 +108,8 @@ function App() {
   const setGeneratingImage = useStore((state) => state.setGeneratingImage)
   const setRenderProgress = useStore((state) => state.setRenderProgress)
   const renderProgress = useStore((state) => state.renderProgress)
+  const activeRenderId = useStore((state) => state.activeRenderId)
+  const setActiveRenderId = useStore((state) => state.setActiveRenderId)
   const setRenderingVideo = useStore((state) => state.setRenderingVideo)
   const setVideoFilename = useStore((state) => state.setVideoFilename)
   const gpxFilename = useStore((state) => state.gpxFilename)
@@ -310,7 +312,16 @@ function App() {
     const pollProgress = async () => {
       try {
         const data = await backend.getRenderProgress()
+        const expectedRenderId = useStore.getState().activeRenderId
+        if (
+          expectedRenderId === null ||
+          expectedRenderId === undefined ||
+          data.render_id !== expectedRenderId
+        ) {
+          return
+        }
         setRenderProgress({
+          renderId: data.render_id ?? null,
           current: data.current || 0,
           total: data.total || 0,
           encoded: data.encoded || 0,
@@ -333,8 +344,13 @@ function App() {
     if (!renderingVideo) return
 
     const { status, filename } = renderProgress
+    if (renderProgress.renderId !== activeRenderId) {
+      return
+    }
+
     if (status === 'complete' && filename) {
       setVideoFilename(filename)
+      setActiveRenderId(null)
       setRenderingVideo(false)
       backend.openVideo(filename).catch((error) => {
         console.error('Error calling open-video:', error)
@@ -343,11 +359,13 @@ function App() {
     }
 
     if (status === 'cancelled') {
+      setActiveRenderId(null)
       setRenderingVideo(false)
       return
     }
 
     if (status === 'error') {
+      setActiveRenderId(null)
       setRenderingVideo(false)
       if (renderProgress.message) {
         setErrorMessage(renderProgress.message)
@@ -356,7 +374,9 @@ function App() {
   }, [
     renderingVideo,
     renderProgress,
+    activeRenderId,
     setErrorMessage,
+    setActiveRenderId,
     setRenderingVideo,
     setVideoFilename,
   ])

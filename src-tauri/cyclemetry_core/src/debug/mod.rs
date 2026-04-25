@@ -4,6 +4,7 @@ use std::time::Instant;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct RenderProgress {
+    pub render_id: u64,
     pub current: u32,
     pub total: u32,
     pub encoded: u32,
@@ -17,6 +18,7 @@ pub struct RenderProgress {
 impl Default for RenderProgress {
     fn default() -> Self {
         Self {
+            render_id: 0,
             current: 0,
             total: 0,
             encoded: 0,

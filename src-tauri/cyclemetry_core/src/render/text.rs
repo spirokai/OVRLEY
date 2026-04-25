@@ -23,8 +23,8 @@ pub struct ResolvedTextStyle {
 
 pub fn label_style(scene: &SceneConfig, label: &LabelConfig, scale: f32) -> ResolvedTextStyle {
     ResolvedTextStyle {
-        x: label.x * scale,
-        y: label.y * scale,
+        x: label.x,
+        y: label.y,
         font_name: label
             .font
             .clone()
@@ -57,8 +57,8 @@ pub fn label_style(scene: &SceneConfig, label: &LabelConfig, scale: f32) -> Reso
 
 pub fn value_style(scene: &SceneConfig, value: &ValueConfig, scale: f32) -> ResolvedTextStyle {
     ResolvedTextStyle {
-        x: value.x * scale,
-        y: (value.y + value.value_offset.unwrap_or(0.0)) * scale,
+        x: value.x,
+        y: value.y + value.value_offset.unwrap_or(0.0),
         font_name: value
             .font
             .clone()

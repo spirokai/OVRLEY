@@ -3,7 +3,7 @@ use super::common::{
     frame_progress_values, interpolate_optional_numeric_series, legacy_line_width,
     marker_layers_from_points, marker_size_from_weights, normalize_opacity, plot_base_color,
     point_at_metric_progress_with_cursor, point_at_progress_x, resolve_style_color,
-    rotate_point_to_canvas, widget_render_report, with_widget_transform,
+    rotate_point_to_canvas, scale_marker_points, widget_render_report, with_widget_transform,
     DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER, DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER,
     DEFAULT_ELEVATION_MARKER_SCALE,
 };
@@ -242,28 +242,32 @@ fn normalize_elevation_plot(
     config: &RenderConfig,
     plot: &ElevationPlotConfig,
 ) -> NormalizedElevationPlot {
+    let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let base_color = plot_base_color(plot.color.as_deref());
     let legacy_width = legacy_line_width(
         plot.line.as_ref().and_then(|line| line.width),
         DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER,
-    );
+    ) * scale;
     let marker_size = plot.marker_size.unwrap_or_else(|| {
         marker_size_from_weights(&plot.points, 16.0, |weight| {
             weight.sqrt() * DEFAULT_ELEVATION_MARKER_SCALE.sqrt()
         })
-    });
+    }) * scale;
     let point_label = plot.point_label.clone().unwrap_or_default();
     let marker_color = plot
         .marker_color
         .clone()
         .unwrap_or_else(|| base_color.clone());
     let marker_opacity = normalize_opacity(plot.marker_opacity.or(plot.opacity), 1.0);
+    let scaled_width = ((plot.width as f32) * scale).round().max(1.0) as u32;
+    let scaled_height = ((plot.height as f32) * scale).round().max(1.0) as u32;
+    let scaled_points = scale_marker_points(&plot.points, scale);
 
     NormalizedElevationPlot {
         x: plot.x,
         y: plot.y,
-        width: plot.width,
-        height: plot.height,
+        width: scaled_width,
+        height: scaled_height,
         rotation: plot.rotation,
         margin: plot.margin.unwrap_or(0.0),
         y_scale: plot.y_scale.unwrap_or(1.0).clamp(0.2, 4.0),
@@ -319,7 +323,7 @@ fn normalize_elevation_plot(
         marker_color: marker_color.clone(),
         marker_opacity,
         marker_points: fallback_marker_points(
-            &plot.points,
+            &scaled_points,
             marker_size,
             &marker_color,
             marker_opacity,
@@ -329,18 +333,21 @@ fn normalize_elevation_plot(
         metric_label_offset_x: plot
             .metric_label_offset_x
             .or(point_label.x_offset)
-            .unwrap_or(0.0),
+            .unwrap_or(0.0)
+            * scale,
         metric_label_offset_y: plot
             .metric_label_offset_y
             .or(point_label.y_offset)
-            .unwrap_or(-28.0),
-        imperial_label_offset_x: plot.imperial_label_offset_x.unwrap_or(0.0),
-        imperial_label_offset_y: plot.imperial_label_offset_y.unwrap_or(6.0),
+            .unwrap_or(-28.0)
+            * scale,
+        imperial_label_offset_x: plot.imperial_label_offset_x.unwrap_or(0.0) * scale,
+        imperial_label_offset_y: plot.imperial_label_offset_y.unwrap_or(6.0) * scale,
         label_font: point_label.font.or_else(|| config.scene.font.clone()),
         label_font_size: point_label
             .font_size
             .or(config.scene.font_size)
-            .unwrap_or(12.5),
+            .unwrap_or(12.5)
+            * scale,
         label_color: point_label.color.unwrap_or_else(|| base_color.clone()),
         label_decimal_rounding: point_label
             .decimal_rounding

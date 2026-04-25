@@ -11,6 +11,7 @@ export function createMediaSlice(set) {
     videoFilename: localStorage.getItem('videoFilename') || null,
     gpxFilename: null,
     activitySummary: null,
+    activeRenderId: null,
     renderProgress: { ...DEFAULT_RENDER_PROGRESS },
 
     setGeneratingImage: (generating) =>
@@ -23,6 +24,11 @@ export function createMediaSlice(set) {
         state.renderingVideo = rendering
       }),
 
+    setActiveRenderId: (renderId) =>
+      set((state) => {
+        state.activeRenderId = renderId
+      }),
+
     setRenderProgress: (progress) => {
       const percent =
         progress.total > 0
@@ -30,7 +36,11 @@ export function createMediaSlice(set) {
           : 0
 
       set((state) => {
-        state.renderProgress = { ...progress, percent }
+        state.renderProgress = {
+          ...DEFAULT_RENDER_PROGRESS,
+          ...progress,
+          percent,
+        }
       })
     },
 

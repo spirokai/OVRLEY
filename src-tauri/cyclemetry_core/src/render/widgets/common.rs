@@ -395,6 +395,25 @@ pub(crate) fn fallback_marker_points(
     }
 }
 
+pub(crate) fn scale_marker_points(
+    points: &[MarkerPointConfig],
+    scale: f32,
+) -> Vec<MarkerPointConfig> {
+    if (scale - 1.0).abs() <= f32::EPSILON {
+        return points.to_vec();
+    }
+
+    let weight_scale = scale * scale;
+    points
+        .iter()
+        .cloned()
+        .map(|mut point| {
+            point.weight = point.weight.map(|weight| (weight * weight_scale).max(1.0));
+            point
+        })
+        .collect()
+}
+
 pub(crate) fn resolve_style_color(
     explicit_color: Option<&String>,
     inherited_color: Option<&String>,

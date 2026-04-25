@@ -1,0 +1,80 @@
+{
+  "phase": "phase_6",
+  "timestamp": "2026-04-25T20:52:42",
+  "overlay_filename": "H:\\tools\\cyclemetry\\backend\\public\\video_1777143162.mov",
+  "fps": 30.0,
+  "width": 960,
+  "height": 320,
+  "total_frames": 30,
+  "rendered_frames": 30,
+  "total_time_taken": 0.058,
+  "sample_frame_indices": [],
+  "timings": {
+    "base.restore": {
+      "count": 30,
+      "total_ms": 5.663100000000001,
+      "avg_ms": 0.18877000000000002,
+      "max_ms": 0.2773
+    },
+    "buffer.acquire_wait": {
+      "count": 30,
+      "total_ms": 20.410499999999995,
+      "avg_ms": 0.6803499999999999,
+      "max_ms": 11.4021
+    },
+    "buffer.release_wait": {
+      "count": 30,
+      "total_ms": 0.05459999999999998,
+      "avg_ms": 0.0018199999999999994,
+      "max_ms": 0.0063
+    },
+    "encoder.queue_wait": {
+      "count": 31,
+      "total_ms": 0.24629999999999996,
+      "avg_ms": 0.00794516129032258,
+      "max_ms": 0.23809999999999998
+    },
+    "ffmpeg.write": {
+      "count": 30,
+      "total_ms": 35.99190000000001,
+      "avg_ms": 1.1997300000000002,
+      "max_ms": 13.603900000000001
+    },
+    "frame.draw": {
+      "count": 30,
+      "total_ms": 0.020799999999999996,
+      "avg_ms": 0.0006933333333333332,
+      "max_ms": 0.0015999999999999999
+    },
+    "frame.total": {
+      "count": 30,
+      "total_ms": 26.327400000000008,
+      "avg_ms": 0.8775800000000002,
+      "max_ms": 11.5529
+    },
+    "queue.put_wait": {
+      "count": 30,
+      "total_ms": 0.012399999999999998,
+      "avg_ms": 0.00041333333333333326,
+      "max_ms": 0.005699999999999999
+    },
+    "surface.create": {
+      "count": 30,
+      "total_ms": 0.042100000000000005,
+      "avg_ms": 0.0014033333333333335,
+      "max_ms": 0.0054
+    },
+    "surface.restore": {
+      "count": 30,
+      "total_ms": 5.663100000000001,
+      "avg_ms": 0.18877000000000002,
+      "max_ms": 0.2773
+    },
+    "text.dynamic": {
+      "count": 30,
+      "total_ms": 0.0028999999999999985,
+      "avg_ms": 0.00009666666666666661,
+      "max_ms": 0.0005
+    }
+  }
+}

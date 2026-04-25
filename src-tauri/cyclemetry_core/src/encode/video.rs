@@ -24,6 +24,7 @@ pub struct RenderController {
     progress: Arc<Mutex<RenderProgress>>,
     cancel_flag: Arc<AtomicBool>,
     running: Arc<AtomicBool>,
+    next_render_id: Arc<AtomicU32>,
 }
 
 impl Default for RenderController {
@@ -32,6 +33,7 @@ impl Default for RenderController {
             progress: Arc::new(Mutex::new(RenderProgress::default())),
             cancel_flag: Arc::new(AtomicBool::new(false)),
             running: Arc::new(AtomicBool::new(false)),
+            next_render_id: Arc::new(AtomicU32::new(0)),
         }
     }
 }
@@ -57,7 +59,7 @@ impl RenderController {
         self.running.load(Ordering::SeqCst)
     }
 
-    pub fn try_start(&self, total_frames: u32, message: &str) -> Result<(), String> {
+    pub fn try_start(&self, total_frames: u32, message: &str) -> Result<u64, String> {
         if self
             .running
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -66,8 +68,10 @@ impl RenderController {
             return Err("A render is already in progress".to_string());
         }
         self.cancel_flag.store(false, Ordering::SeqCst);
+        let render_id = self.next_render_id.fetch_add(1, Ordering::SeqCst) as u64 + 1;
         if let Ok(mut progress) = self.progress.lock() {
             *progress = RenderProgress {
+                render_id,
                 current: 0,
                 total: total_frames,
                 encoded: 0,
@@ -77,7 +81,7 @@ impl RenderController {
                 filename: None,
             };
         }
-        Ok(())
+        Ok(render_id)
     }
 
     pub fn set_frame_progress(
@@ -187,7 +191,7 @@ pub fn render_video(
     );
     let output_path = paths.public_dir.join(&public_filename);
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
-    let input_pix_fmt = ffmpeg_input_pix_fmt();
+    let input_pix_fmt = ffmpeg_input_pix_fmt(&ffmpeg_settings.codec);
     let encoded_frames = Arc::new(AtomicU32::new(0));
     let cancel_flag = controller.cancel_flag.clone();
     let mut aggregate_profiler = RenderProfiler::default();
@@ -721,13 +725,10 @@ fn make_even(value: u32) -> u32 {
     }
 }
 
-fn ffmpeg_input_pix_fmt() -> String {
+fn ffmpeg_input_pix_fmt(codec: &str) -> String {
     std::env::var("CYCLEMETRY_INPUT_PIX_FMT").unwrap_or_else(|_| {
-        if cfg!(target_endian = "little") {
-            "rgba".to_string()
-        } else {
-            "rgba".to_string()
-        }
+        let _ = codec;
+        "rgba".to_string()
     })
 }
 

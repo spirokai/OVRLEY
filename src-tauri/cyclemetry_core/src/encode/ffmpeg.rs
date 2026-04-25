@@ -159,6 +159,10 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
                 "-mbs_per_slice",
                 object.and_then(|map| map.get("mbs_per_slice")),
             );
+            if !output_args.iter().any(|value| value == "-mbs_per_slice") {
+                output_args.push("-mbs_per_slice".to_string());
+                output_args.push("2".to_string());
+            }
             append_ffmpeg_option(
                 &mut output_args,
                 "-vendor",
@@ -194,9 +198,7 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
                     "-filter_hw_device".to_string(),
                     "vk".to_string(),
                 ],
-                filters: Some(
-                    "hwupload,scale_vulkan=format=yuva444p10le:out_range=tv".to_string(),
-                ),
+                filters: Some("format=yuva444p10le,hwupload".to_string()),
             })
         }
         "prores_videotoolbox" => {

@@ -24,8 +24,8 @@ export default async function renderVideo() {
       updateRate,
       exportRange,
       exportCodec,
+      setActiveRenderId,
       setRenderingVideo,
-      setVideoFilename,
       setRenderProgress,
     } = useStore.getState()
 
@@ -85,7 +85,9 @@ export default async function renderVideo() {
     }
 
     setRenderingVideo(true)
+    setActiveRenderId(null)
     setRenderProgress({
+      renderId: null,
       current: 0,
       total: 0,
       encoded: 0,
@@ -114,11 +116,26 @@ export default async function renderVideo() {
     }
 
     if (data.started) {
+      setActiveRenderId(data.render_id ?? null)
       return { success: true, started: true }
     }
 
     throw new Error('Render did not start')
   } catch (error) {
+    const { setActiveRenderId, setRenderingVideo, setRenderProgress } =
+      useStore.getState()
+    setActiveRenderId(null)
+    setRenderingVideo(false)
+    setRenderProgress({
+      renderId: null,
+      current: 0,
+      total: 0,
+      encoded: 0,
+      status: 'error',
+      message: error.message || 'Render failed to start',
+      estimatedSecondsRemaining: null,
+      filename: null,
+    })
     console.error('Error in renderVideo:', error)
     throw error
   }

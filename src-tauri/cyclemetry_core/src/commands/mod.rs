@@ -118,7 +118,7 @@ pub fn backend_render(
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
-    controller.try_start(
+    let render_id = controller.try_start(
         dense_activity.frame_count as u32,
         "Preparing render assets...",
     )?;
@@ -136,7 +136,8 @@ pub fn backend_render(
     });
 
     Ok(json!({
-        "started": true
+        "started": true,
+        "render_id": render_id
     }))
 }
 

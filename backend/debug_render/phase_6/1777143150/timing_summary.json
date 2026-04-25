@@ -1,0 +1,80 @@
+{
+  "phase": "phase_6",
+  "timestamp": "2026-04-25T20:52:31",
+  "overlay_filename": "H:\\tools\\cyclemetry\\backend\\public\\video_1777143150.mov",
+  "fps": 30.0,
+  "width": 960,
+  "height": 320,
+  "total_frames": 30,
+  "rendered_frames": 30,
+  "total_time_taken": 0.805,
+  "sample_frame_indices": [],
+  "timings": {
+    "base.restore": {
+      "count": 30,
+      "total_ms": 5.3024000000000004,
+      "avg_ms": 0.1767466666666667,
+      "max_ms": 0.2718
+    },
+    "buffer.acquire_wait": {
+      "count": 30,
+      "total_ms": 637.7844000000001,
+      "avg_ms": 21.259480000000003,
+      "max_ms": 381.9694
+    },
+    "buffer.release_wait": {
+      "count": 30,
+      "total_ms": 0.08730000000000004,
+      "avg_ms": 0.0029100000000000016,
+      "max_ms": 0.011899999999999999
+    },
+    "encoder.queue_wait": {
+      "count": 31,
+      "total_ms": 0.24780000000000008,
+      "avg_ms": 0.007993548387096776,
+      "max_ms": 0.2249
+    },
+    "ffmpeg.write": {
+      "count": 30,
+      "total_ms": 678.2092999999999,
+      "avg_ms": 22.60697666666666,
+      "max_ms": 382.19
+    },
+    "frame.draw": {
+      "count": 30,
+      "total_ms": 0.025400000000000002,
+      "avg_ms": 0.0008466666666666668,
+      "max_ms": 0.0034000000000000002
+    },
+    "frame.total": {
+      "count": 30,
+      "total_ms": 643.4511,
+      "avg_ms": 21.44837,
+      "max_ms": 382.1716
+    },
+    "queue.put_wait": {
+      "count": 30,
+      "total_ms": 0.017,
+      "avg_ms": 0.0005666666666666667,
+      "max_ms": 0.006
+    },
+    "surface.create": {
+      "count": 30,
+      "total_ms": 0.06999999999999999,
+      "avg_ms": 0.002333333333333333,
+      "max_ms": 0.0135
+    },
+    "surface.restore": {
+      "count": 30,
+      "total_ms": 5.3024000000000004,
+      "avg_ms": 0.1767466666666667,
+      "max_ms": 0.2718
+    },
+    "text.dynamic": {
+      "count": 30,
+      "total_ms": 0.004099999999999999,
+      "avg_ms": 0.0001366666666666666,
+      "max_ms": 0.0012
+    }
+  }
+}
