@@ -312,6 +312,10 @@ pub struct ElevationPlotConfig {
     #[serde(default)]
     pub y_scale: Option<f32>,
     #[serde(default)]
+    pub simplify_tolerance_px: Option<f32>,
+    #[serde(default)]
+    pub target_density: Option<f32>,
+    #[serde(default)]
     pub metric_label_offset_x: Option<f32>,
     #[serde(default)]
     pub metric_label_offset_y: Option<f32>,

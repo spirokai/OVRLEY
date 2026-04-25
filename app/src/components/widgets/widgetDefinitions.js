@@ -211,6 +211,8 @@ export function createPlotDefaults(type, globalDefaults, options = {}) {
     show_elevation_metric: true,
     show_elevation_imperial: false,
     y_scale: 1,
+    simplify_tolerance_px: 1,
+    target_density: 0.75,
     metric_label_offset_x: 0,
     metric_label_offset_y: 0,
     imperial_label_offset_x: 0,

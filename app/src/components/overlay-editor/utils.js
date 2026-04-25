@@ -514,6 +514,8 @@ export function normalizeElevationPoints(
   padding = 18,
   verticalScale = 1,
   progressValues = [],
+  targetDensity = 0.75,
+  simplifyTolerancePx = 1,
 ) {
   const samples = values.reduce((result, value, index) => {
     if (!Number.isFinite(value)) {
@@ -544,23 +546,156 @@ export function normalizeElevationPoints(
   const maximum = Math.max(...usableValues)
   const amplitude = Math.max(maximum - minimum, 1)
   const usableWidth = Math.max(width - padding * 2, 1)
-  const fallbackStep =
-    samples.length > 1 ? usableWidth / (samples.length - 1) : 0
   const hasUsableProgress = samples.some((sample) =>
     Number.isFinite(sample.progress),
   )
   const safeVerticalScale = clamp(Number(verticalScale) || 1, 0.2, 4)
+  const safeTargetDensity = clamp(Number(targetDensity) || 0.75, 0.1, 2)
+  const safeSimplifyTolerance = clamp(Number(simplifyTolerancePx) || 0, 0, 8)
 
-  return samples.map((sample, index) => {
+  const downsampleElevationSamples = (inputSamples, targetCount) => {
+    if (inputSamples.length <= targetCount || targetCount < 3) {
+      return inputSamples
+    }
+
+    const bucketSize = (inputSamples.length - 2) / (targetCount - 2)
+    const sampled = [inputSamples[0]]
+    let a = 0
+
+    for (let bucketIndex = 0; bucketIndex < targetCount - 2; bucketIndex += 1) {
+      const avgStart = Math.floor((bucketIndex + 1) * bucketSize) + 1
+      const avgEnd = Math.min(
+        inputSamples.length,
+        Math.floor((bucketIndex + 2) * bucketSize) + 1,
+      )
+      const avgRangeStart = Math.min(avgStart, Math.max(avgEnd - 1, 0))
+      const avgRange = inputSamples.slice(avgRangeStart, avgEnd)
+      const average =
+        avgRange.length > 0
+          ? {
+              progress:
+                avgRange.reduce(
+                  (sum, sample) => sum + (sample.progress ?? 0),
+                  0,
+                ) / avgRange.length,
+              value:
+                avgRange.reduce((sum, sample) => sum + sample.value, 0) /
+                avgRange.length,
+            }
+          : inputSamples[inputSamples.length - 1]
+
+      const rangeStart = Math.floor(bucketIndex * bucketSize) + 1
+      const rangeEnd = Math.min(
+        inputSamples.length - 1,
+        Math.floor((bucketIndex + 1) * bucketSize) + 1,
+      )
+      const candidateStart = Math.min(rangeStart, inputSamples.length - 2)
+      const candidateEnd = Math.max(candidateStart + 1, rangeEnd)
+
+      let nextA = candidateStart
+      let maxArea = -1
+      for (
+        let candidateIndex = candidateStart;
+        candidateIndex < candidateEnd;
+        candidateIndex += 1
+      ) {
+        const pointA = inputSamples[a]
+        const pointB = inputSamples[candidateIndex]
+        const area =
+          Math.abs(
+            ((pointA.progress ?? 0) - (average.progress ?? 0)) *
+              (pointB.value - pointA.value) -
+              ((pointA.progress ?? 0) - (pointB.progress ?? 0)) *
+                ((average.value ?? 0) - pointA.value),
+          ) * 0.5
+        if (area > maxArea) {
+          maxArea = area
+          nextA = candidateIndex
+        }
+      }
+
+      a = nextA
+      sampled.push(inputSamples[a])
+    }
+
+    sampled.push(inputSamples[inputSamples.length - 1])
+    return sampled
+  }
+
+  const simplifyProjectedPoints = (inputPoints, tolerance) => {
+    if (inputPoints.length <= 2 || tolerance <= 0) {
+      return inputPoints
+    }
+
+    const perpendicularDistance = (point, start, end) => {
+      const [x0, y0] = point.point
+      const [x1, y1] = start.point
+      const [x2, y2] = end.point
+      const dx = x2 - x1
+      const dy = y2 - y1
+      if (Math.abs(dx) <= Number.EPSILON && Math.abs(dy) <= Number.EPSILON) {
+        return Math.hypot(x0 - x1, y0 - y1)
+      }
+      return (
+        Math.abs(dy * x0 - dx * y0 + x2 * y1 - y2 * x1) / Math.hypot(dx, dy)
+      )
+    }
+
+    let maxDistance = 0
+    let splitIndex = 0
+    for (let index = 1; index < inputPoints.length - 1; index += 1) {
+      const distance = perpendicularDistance(
+        inputPoints[index],
+        inputPoints[0],
+        inputPoints[inputPoints.length - 1],
+      )
+      if (distance > maxDistance) {
+        maxDistance = distance
+        splitIndex = index
+      }
+    }
+
+    if (maxDistance <= tolerance) {
+      return [inputPoints[0], inputPoints[inputPoints.length - 1]]
+    }
+
+    const left = simplifyProjectedPoints(
+      inputPoints.slice(0, splitIndex + 1),
+      tolerance,
+    )
+    const right = simplifyProjectedPoints(
+      inputPoints.slice(splitIndex),
+      tolerance,
+    )
+    return [...left.slice(0, -1), ...right]
+  }
+
+  const targetCount = Math.max(
+    2,
+    Math.min(samples.length, Math.round(width * safeTargetDensity)),
+  )
+  const downsampledSamples = downsampleElevationSamples(samples, targetCount)
+  const downsampledFallbackStep =
+    downsampledSamples.length > 1
+      ? usableWidth / (downsampledSamples.length - 1)
+      : 0
+  const projectedPoints = downsampledSamples.map((sample, index) => {
     const x = hasUsableProgress
       ? padding + (sample.progress ?? 0) * usableWidth
-      : padding + index * fallbackStep
+      : padding + index * downsampledFallbackStep
     const normalized =
       amplitude <= 0 ? 0.5 : (sample.value - minimum) / amplitude
     const centered = clamp((normalized - 0.5) * safeVerticalScale + 0.5, 0, 1)
     const y = height - padding - centered * (height - padding * 2)
-    return [x, y]
+    return {
+      point: [x, y],
+      progress: sample.progress,
+    }
   })
+
+  return simplifyProjectedPoints(projectedPoints, safeSimplifyTolerance).map(
+    ({ point }) => point,
+  )
 }
 
 export function pointsToSvg(points) {

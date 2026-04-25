@@ -204,7 +204,7 @@ fn build_route_geometry(
         progress_values: simplified.iter().map(|sample| sample.progress01).collect(),
         points: simplified.iter().map(|sample| sample.point).collect(),
         source_point_count: route_samples.len(),
-        simplification: "rdp_px_1.0",
+        simplification: "rdp_px_1.0".to_string(),
     })
 }
 

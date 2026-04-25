@@ -271,6 +271,8 @@ fn normalize_elevation_plot(
         rotation: plot.rotation,
         margin: plot.margin.unwrap_or(0.0),
         y_scale: plot.y_scale.unwrap_or(1.0).clamp(0.2, 4.0),
+        simplify_tolerance_px: plot.simplify_tolerance_px.unwrap_or(1.0).clamp(0.0, 8.0),
+        target_density: plot.target_density.unwrap_or(0.75).clamp(0.1, 2.0),
         remaining_line_width: plot.remaining_line_width.unwrap_or(legacy_width),
         remaining_line_color: resolve_style_color(
             plot.remaining_line_color.as_ref(),
@@ -365,24 +367,37 @@ fn build_elevation_geometry(
         return Err("Elevation plot requires elevation samples".to_string());
     }
 
-    let target_count = ((plot.width as f32) * DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER)
-        .round()
-        .max(2.0) as usize;
+    let target_count =
+        ((plot.width as f32) * DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER * plot.target_density)
+            .round()
+            .max(2.0) as usize;
     let downsampled = downsample_elevation_points(&raw_points, target_count.min(raw_points.len()));
-    let fitted = project_elevation_points(
+    let projected = project_elevation_points(
         &downsampled,
         plot.width as f32,
         plot.height as f32,
         plot.margin,
         plot.y_scale,
     );
+    let projected_samples = downsampled
+        .iter()
+        .zip(projected.iter())
+        .map(|((progress, _), point)| ElevationSample {
+            point: *point,
+            progress01: *progress,
+        })
+        .collect::<Vec<_>>();
+    let simplified = simplify_elevation_samples(&projected_samples, plot.simplify_tolerance_px);
 
     Ok(WidgetGeometry {
         bbox: (0.0, 0.0, plot.width as f32, plot.height as f32),
-        progress_values: downsampled.iter().map(|(progress, _)| *progress).collect(),
-        points: fitted,
+        progress_values: simplified.iter().map(|sample| sample.progress01).collect(),
+        points: simplified.iter().map(|sample| sample.point).collect(),
         source_point_count: raw_points.len(),
-        simplification: "lttb_profile",
+        simplification: format!(
+            "lttb_density_{:.2}_rdp_px_{:.2}",
+            plot.target_density, plot.simplify_tolerance_px
+        ),
     })
 }
 
@@ -522,6 +537,52 @@ fn triangle_area(point_a: (f32, f64), point_b: (f32, f64), point_c: (f64, f64)) 
         - ((point_a.0 as f64 - point_b.0 as f64) * (point_c.1 - point_a.1)))
         .abs()
         * 0.5
+}
+
+#[derive(Clone, Copy)]
+struct ElevationSample {
+    point: (f32, f32),
+    progress01: f32,
+}
+
+fn simplify_elevation_samples(points: &[ElevationSample], tolerance: f32) -> Vec<ElevationSample> {
+    if points.len() <= 2 || tolerance <= 0.0 {
+        return points.to_vec();
+    }
+
+    fn perpendicular_distance(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> f32 {
+        let (x0, y0) = point;
+        let (x1, y1) = start;
+        let (x2, y2) = end;
+        let dx = x2 - x1;
+        let dy = y2 - y1;
+        if dx.abs() <= f32::EPSILON && dy.abs() <= f32::EPSILON {
+            return ((x0 - x1).powi(2) + (y0 - y1).powi(2)).sqrt();
+        }
+        (dy * x0 - dx * y0 + x2 * y1 - y2 * x1).abs() / (dx * dx + dy * dy).sqrt()
+    }
+
+    let mut max_distance = 0.0f32;
+    let mut split_index = 0usize;
+    for index in 1..points.len() - 1 {
+        let distance = perpendicular_distance(
+            points[index].point,
+            points[0].point,
+            points.last().unwrap().point,
+        );
+        if distance > max_distance {
+            max_distance = distance;
+            split_index = index;
+        }
+    }
+
+    if max_distance <= tolerance {
+        return vec![points[0], *points.last().unwrap()];
+    }
+
+    let left = simplify_elevation_samples(&points[..=split_index], tolerance);
+    let right = simplify_elevation_samples(&points[split_index..], tolerance);
+    [left[..left.len() - 1].to_vec(), right].concat()
 }
 
 fn project_elevation_points(

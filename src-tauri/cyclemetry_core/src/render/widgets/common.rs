@@ -520,7 +520,7 @@ pub(crate) fn widget_render_report(
         geometry: WidgetGeometryReport {
             point_count: geometry.points.len(),
             source_point_count: geometry.source_point_count,
-            simplification: geometry.simplification.to_string(),
+            simplification: geometry.simplification.clone(),
             bbox: [
                 geometry.bbox.0,
                 geometry.bbox.1,

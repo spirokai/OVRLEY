@@ -40,7 +40,7 @@ pub(crate) struct WidgetGeometry {
     pub(crate) bbox: (f32, f32, f32, f32),
     pub(crate) progress_values: Vec<f32>,
     pub(crate) source_point_count: usize,
-    pub(crate) simplification: &'static str,
+    pub(crate) simplification: String,
 }
 
 #[derive(Clone, Debug)]
@@ -112,6 +112,8 @@ pub(crate) struct NormalizedElevationPlot {
     pub(crate) rotation: f32,
     pub(crate) margin: f32,
     pub(crate) y_scale: f32,
+    pub(crate) simplify_tolerance_px: f32,
+    pub(crate) target_density: f32,
     pub(crate) remaining_line_width: f32,
     pub(crate) remaining_line_color: String,
     pub(crate) remaining_line_opacity: f32,

@@ -24,6 +24,8 @@ export default function ElevationWidgetEditor({
   const completedAreaOpacity = widget.data.area_completed_opacity ?? 24
   const remainingAreaOpacity = widget.data.area_remaining_opacity ?? 12
   const yScale = widget.data.y_scale ?? 1
+  const simplifyTolerance = widget.data.simplify_tolerance_px ?? 1
+  const targetDensity = widget.data.target_density ?? 0.75
 
   return (
     <>
@@ -140,6 +142,34 @@ export default function ElevationWidgetEditor({
             })
           }
         />
+        <div className="grid grid-cols-2 gap-3">
+          <SliderField
+            label="Simplify Tolerance"
+            value={simplifyTolerance}
+            min={0}
+            max={4}
+            step={0.05}
+            valueDisplay={`${simplifyTolerance.toFixed(2)}px`}
+            onSliderChange={(value) =>
+              updateWidgetData(widget.id, {
+                simplify_tolerance_px: Number(value.toFixed(2)),
+              })
+            }
+          />
+          <SliderField
+            label="Target Density"
+            value={targetDensity}
+            min={0.25}
+            max={1.5}
+            step={0.05}
+            valueDisplay={`${targetDensity.toFixed(2)}x`}
+            onSliderChange={(value) =>
+              updateWidgetData(widget.id, {
+                target_density: Number(value.toFixed(2)),
+              })
+            }
+          />
+        </div>
       </div>
       <div className="space-y-4">
         <SectionHeading icon={Mountain} title="Marker & Labels" />
