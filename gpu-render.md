@@ -4,74 +4,97 @@ This document outlines the strategy for migrating to a highly optimized, Zero-Co
 
 ## 1. Goal Description
 
-The objective is to eliminate the current bottleneck (CPU rendering and memory transfer) for hardware-accelerated encode jobs by moving the entire pipeline to the GPU. 
+The objective is to eliminate the current bottleneck (CPU rendering and memory transfer) for hardware-accelerated encode jobs by moving the entire pipeline to the GPU.
 
-By utilizing Skia's Vulkan backend and integrating FFmpeg at the memory level (Zero-Copy), the video frame data will never leave the GPU (VRAM) between the rendering step and the final encoding step. This is the industry-standard approach for maximum throughput and minimal latency.
+By utilizing Skia's Vulkan backend and integrating FFmpeg at the memory level (Zero-Copy), the video frame data will never leave the GPU (VRAM) between the rendering step and the final encoding step.
 
 > [!IMPORTANT]
-> **Parallel Pathway:** This new GPU renderer must be implemented as a parallel, optional pathway. The existing CPU-based Skia rendering pipeline and FFmpeg CLI subprocess architecture must remain fully intact and available. If the user opts to use a CPU-based encoder (e.g., the regular `prores_ks`), the application should gracefully fall back to the current CPU renderer.
+> **Parallel Pathway & Fallback:** This GPU renderer is an optional pathway. We will build a **clean backend abstraction** to switch between CPU and GPU pipelines. The application must gracefully fall back to the existing CPU renderer if Vulkan init fails, encoder compatibility fails, memory allocation fails, TDR (device loss) occurs, or if a CPU encoder is explicitly chosen by the user.
 
 ## 2. Architecture Decisions & Constraints
 
-Based on the requirement for maximum performance and a true "Zero-Copy" architecture, we have solidified the following technical decisions:
+Based on a rigorous technical assessment of Skia and FFmpeg interoperability, we have solidified the following technical constraints:
 
-1. **Vulkan Initialization (`ash`)**: We will use the `ash` crate. It is the de-facto industry standard for Vulkan in Rust. It provides the low-level control required to manually create the Vulkan `Instance`, `Device`, and `Queue`, which we need to share between Skia and the video encoder.
-2. **Separation of Concerns (New Files Only)**: To ensure the existing CPU pipeline remains completely untouched and stable, all new code implemented for this plan must be placed in entirely new files with a `_gpu.rs` suffix (e.g., `video_gpu.rs`, `surface_gpu.rs`). We will avoid modifying the existing core render files wherever possible.
-3. **Zero-Copy Pixel Delivery (In-Process FFmpeg)**: 
-   - *The Challenge*: You cannot pass raw Vulkan GPU texture handles to a separate FFmpeg CLI process via `stdin`.
-   - *The Solution*: To achieve true zero-copy for the GPU pathway, we will use an in-process FFmpeg integration. Since you have the **shared developer libraries** (`.lib`, `.dll`, `.h`) for your custom FFmpeg 8.1 build, we can link Rust directly to them using `ffmpeg-next` (or raw bindings). 
-   - *The Flow*: We will initialize a Vulkan `AVHWDeviceContext` in `libavutil`. We pass this Vulkan device to Skia. Skia renders directly to a Vulkan texture. We then wrap this texture in an `AVFrame` (with `AV_PIX_FMT_VULKAN`) and pass it directly to the `prores_ks_vulkan` encoder. **The pixels never touch the CPU or system RAM.**
-3. **Thread Context Management**: We will use a **Single Vulkan Device with Synchronized Queue Submissions**. Creating multiple Vulkan Devices can cause severe VRAM overhead and context-switching penalties. Instead, we will initialize one Vulkan Physical/Logical Device. Each parallel rendering thread will have its own Skia `DirectContext`, but they will share the Vulkan Device and synchronize their command buffer submissions to the GPU's hardware queue using a lightweight Mutex.
+1. **Vulkan Device Ownership:** Rust/`ash` will own the Vulkan device creation. Both Skia (`GrDirectContext`) and FFmpeg (`AVHWDeviceContext`) will _borrow_ this device by importing the exact same handles.
+2. **Image Ownership & `AVHWFramesContext` Configuration**: We must explicitly define who creates the `VkImage`.
+   - **Hypothesis**: FFmpeg allocates the image via `av_hwframe_get_buffer`. We configure `AVHWFramesContext` with `format=AV_PIX_FMT_VULKAN`, `sw_format` (e.g., `AV_PIX_FMT_YUVA444P10LE` or `AV_PIX_FMT_RGBA`), optimal tiling, and necessary usage flags (`COLOR_ATTACHMENT`, `TRANSFER_SRC`).
+   - **Constraint**: We must validate that FFmpeg-allocated images can actually be wrapped as Skia render targets. If Skia rejects the layout constraints or usage flags, we will pivot to **Skia-owned images** (Skia allocates `VkImage` with `BackendTexture` and we import it into FFmpeg via custom `AVVkFrame` wrapping). This decision will be definitively settled in Phase 1.
+3. **Synchronization & Layout Transitions**: We must explicitly manage GPU serialization without stalling the CPU.
+   - **Transitions**: Skia will likely leave the image in `COLOR_ATTACHMENT_OPTIMAL` or `GENERAL`. We must inject explicit Vulkan pipeline barriers to transition to the layout required by FFmpeg/`AVVkFrame`.
+   - **Primitives**: We will extract Skia's internal flush semaphores (if exposed) or manually insert Vulkan binary/timeline semaphores and pass them into the `AVVkFrame` struct so FFmpeg's hardware context waits on the GPU, not the CPU. Queue family ownership transfers will be handled if Skia and FFmpeg end up on different hardware queues.
+4. **Format Pipeline & Alpha Handling**: ProRes 4444 expects **straight alpha** (e.g., `yuva444p10le`), while Skia renders **premultiplied** RGBA8888 (or F16). We will not rely on implicit FFmpeg format conversions.
+   - **Strategy**: Default to an **Explicit GPU shader pass** to convert Skia's premultiplied RGBA output into straight alpha (and potentially do the RGB -> YUV conversion if `prores_ks_vulkan` requires it) inside Vulkan before handing the frame to FFmpeg.
+5. **Separation of Concerns (New Files Only)**: To ensure the existing CPU pipeline remains completely untouched and stable, all new code implemented for this plan must be placed in entirely new files with a `-gpu.rs` suffix (e.g., `video-gpu.rs`, `surface-gpu.rs`). The logic in these files must explicitly **mirror** how the existing `video.rs` and `create_surface` work, providing an identical API surface but powered by the GPU.
 
-## 3. Proposed Changes (Assuming Option B via FFI)
+## 3. Implementation Phases
 
-### Phase 1: Dependency & FFmpeg Shared Build Setup
+### Phase 1: Minimal Proof-of-Concept (PoC) Technical Spike
 
-Before modifying Cargo dependencies, we must set up the FFmpeg 8.1 shared libraries so the Rust compiler can link them.
+Before modifying the main pipeline, we must prove the central claim ("Pixels never touch CPU/RAM") with a standalone feasibility spike.
 
-**1. File Extraction:** You will need to extract the following specific files from your shared FFmpeg 8.1 build into a dedicated folder (e.g., `src-tauri/ffmpeg-dev`):
-- **C Headers (`.h` files):** The entire `include` folder containing `libavcodec/`, `libavformat/`, `libavutil/`, `libswscale/`, and `libhwcontext/` directories.
-- **Link Libraries (`.lib` or `.dll.a` files):**
-  - `avcodec.lib` (Video encoding logic)
-  - `avformat.lib` (Multiplexing the `.mov` container)
-  - `avutil.lib` (Hardware device contexts, `AVFrame` memory management, Vulkan context)
-  - `swscale.lib` (Color space and pixel format utilities)
-- **Runtime Libraries (`.dll` files):**
-  - `avcodec-*.dll`, `avformat-*.dll`, `avutil-*.dll`, and `swscale-*.dll`. 
-  - *Note: These DLLs must be placed in your `target/debug` and `target/release` folders (or alongside the final application `.exe`) so Windows can load them when the app runs.*
+1. Create a Vulkan device with `ash`.
+2. Create an FFmpeg Vulkan HW device from the same `ash` handles.
+3. Test **Image Ownership**: Try allocating an `AVVkFrame` via FFmpeg and wrapping it in Skia. If Skia rejects the usage flags/tiling, immediately pivot to Skia-allocation -> FFmpeg-wrapping.
+4. Test **Synchronization**: Flush Skia, extract/create a Vulkan Semaphore, transition the `VkImage` layout to `GENERAL` or `SHADER_READ`, and pass the semaphore to FFmpeg.
+5. Test **Format/Alpha**: Run an explicit Skia shader pass to convert premultiplied RGBA to straight alpha YUVA.
+6. Encode that one frame with `prores_ks_vulkan`.
+7. Verify alpha blending, colors, and confirm via profiling that zero hidden CPU copies occurred.
 
-**2. Cargo Configuration:**
-**`src-tauri/cyclemetry_core/Cargo.toml`**
+### Phase 2: Dependency & FFmpeg Shared Build Setup
+
+**1. File Extraction:** Extract the specific files from your shared FFmpeg 8.1 build into `src-tauri/ffmpeg-dev`:
+
+- **C Headers:** The entire `include` folder (`libavcodec/`, `libavformat/`, etc.).
+- **Link Libraries:** `avcodec.lib`, `avformat.lib`, `avutil.lib`, `swscale.lib`.
+- **Runtime Libraries:** The corresponding `.dll` files.
+
+**2. Cargo Configuration (`src-tauri/cyclemetry_core/Cargo.toml`)**
+
 - Add `ash` for Vulkan bindings.
-- Add `ffmpeg-next` (configured via environment variables to point to the `ffmpeg-dev` folder created above).
+- Add `ffmpeg-sys-next` (configured via env vars to point to `ffmpeg-dev`).
 - Enable `vulkan` features for `skia-safe`.
 
-### Phase 2: Shared Vulkan Context Initialization
-**`src-tauri/cyclemetry_core/src/render/vulkan_gpu.rs` (NEW)**
-- Initialize the Vulkan `Instance`, `PhysicalDevice`, and `Device` via `ash`.
-- Initialize an FFmpeg `AVHWDeviceContext` from the `ash` Vulkan handles.
-- Provide a thread-safe wrapper so multiple Skia instances can access the device.
+**3. Windows Packaging**
 
-### Phase 3: Skia GPU Surface & Rendering
-**`src-tauri/cyclemetry_core/src/render/surface_gpu.rs` (NEW)**
-- Implement `create_gpu_surface` (mirroring `create_surface` from the CPU side).
-- Allocate a Vulkan texture via FFmpeg's `av_hwframe_get_buffer`, import the texture into Skia via `skia_safe::gpu::BackendRenderTarget`, and wrap it in a Skia `Surface`.
+- Update Tauri build scripts to ensure the FFmpeg `.dll`s are copied into the final build output directory, matching the MSVC ABI and DLL search paths.
 
-### Phase 4: Zero-Copy Encoding Pipeline
-**`src-tauri/cyclemetry_core/src/encode/video_gpu.rs` (NEW)**
-- **Implement** a new direct `libavcodec` encoding loop for the GPU pathway (mirroring `video.rs` but without subprocesses):
-  1. Skia renders to the `AVFrame` Vulkan texture.
-  2. `avcodec_send_frame()` sends the Vulkan `AVFrame` to the `prores_ks_vulkan` encoder.
-  3. `avcodec_receive_packet()` retrieves the encoded ProRes packets.
-  4. Write packets directly to the output `.mov` file using `libavformat`.
+### Phase 3: Shared Vulkan Context Initialization
 
-## 4. Verification Plan
+**`src-tauri/cyclemetry_core/src/render/vulkan-gpu.rs` (NEW)**
 
-### Automated / Diagnostic Tests
-- Monitor VRAM usage during `cargo run --bin parallel_render` to ensure no memory leaks occur with the shared Vulkan context.
-- Verify `timing_summary.json` shows rendering times in the low milliseconds (under 5ms per frame) and zero CPU-to-GPU transfer times (`queue_wait` and `ffmpeg.write` will be replaced by API calls).
-- Verify that standard CPU renders still complete successfully without triggering the Vulkan pipeline.
+- Initialize Vulkan `Instance`, `PhysicalDevice`, and `Device` via `ash`.
+- Initialize `AVHWDeviceContext` from the `ash` handles.
+- Implement the strict fallback triggers defined in Section 1.
 
-### Visual Verification
-- Produce a sample test render to verify Skia's GPU text rendering and path rasterization look visually identical to the CPU implementation.
-- Check alpha channel blending to ensure no unpremultiplied alpha regressions occurred.
+### Phase 4: Skia GPU Surface & Rendering
+
+**`src-tauri/cyclemetry_core/src/render/surface-gpu.rs` (NEW)**
+
+- Implement `create_gpu_surface`, meticulously **mirroring** the API and behavior of `create_surface` from `surface.rs`.
+- Implement the allocation strategy determined in Phase 1 (FFmpeg-owned or Skia-owned).
+- Execute the explicit GPU shader pass for premul -> straight alpha conversion.
+- Inject Vulkan layout transition barriers and extract semaphores during `DirectContext::flush`.
+
+### Phase 5: Zero-Copy Encoding Pipeline
+
+**`src-tauri/cyclemetry_core/src/encode/video-gpu.rs` (NEW)**
+
+- **Implement** a new encoding loop that **mirrors** the orchestration, parallel thread spawning, and `RenderController` progress tracking of `video.rs`, but replaces the subprocess CLI logic with direct `libavcodec` encoding via `ffmpeg-sys-next`.
+- Push the Vulkan semaphores and hardware frames into `avcodec_send_frame()`.
+- Manage the hardware frame pool lifecycle based on the ownership strategy from Phase 1.
+
+## 4. Verification & Profiling Plan
+
+We cannot assume an "under 5ms" render target without proving it. The `timing_summary.json` must be heavily instrumented to measure:
+
+- CPU Scene preparation time
+- Skia recording time (CPU)
+- GPU render submission time
+- GPU completion/wait time (fences)
+- Encoder queue wait
+- Encode time (GPU)
+- Mux write time (Disk IO)
+
+**Visual Verification:**
+
+- Cross-reference alpha channel edges (transparent boundaries) against CPU renders to guarantee no premultiplied/straight alpha regressions occurred during the explicit GPU shader pass.
