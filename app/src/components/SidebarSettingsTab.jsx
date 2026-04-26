@@ -505,15 +505,15 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="prores_ks">ProRes 4444 (CPU)</SelectItem>
+                  <SelectItem value="prores_ks">ProRes (CPU)</SelectItem>
                   <SelectItem value="prores_ks_vulkan">
-                    ProRes Vulkan (GPU/8.1)
+                    ProRes Vulkan (GPU)
                   </SelectItem>
                   <SelectItem
                     value="prores_videotoolbox"
                     disabled={!isVideoToolboxAvailable}
                   >
-                    ProRes VideoToolbox (macOS)
+                    ProRes (macOS)
                   </SelectItem>
                 </SelectContent>
               </Select>
