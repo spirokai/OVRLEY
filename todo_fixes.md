@@ -1,0 +1,14 @@
+-global scaling interacting with resizing
+-after changing preview text to svg, the shadows are not applied in the preview
+-moveable lines and control points too thin and small in Tauri, ok in browser
+-fix gradient widget, including the triangle indicator
+-parity of map/elevation - bring skia render into preview?
+-add system fonts, separate group from "recommended fonts"
+-remove horizontal lines from widget list
+-move rendering options to render modal
+-stylize color picker from radix primitives, without alpha
+-polish the widget stylizing options, especially naming
+-add a button for a new template
+-make ui responsive/scale, use dynamic font-size to scale the ui
+
+-test 2 concurrent render+encode streams with vulkan

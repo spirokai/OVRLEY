@@ -61,7 +61,7 @@ export default function RenderProgressOverlay() {
           </div>
           <div>
             <h2 className="text-xl font-bold text-foreground">
-              {isFinalizing ? 'Finalizing Video' : 'Generating Video'}
+              {isFinalizing ? 'Finalizing Video' : 'Generating Overlay'}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">{subMessage}</p>
           </div>
