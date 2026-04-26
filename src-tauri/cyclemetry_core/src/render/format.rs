@@ -2,6 +2,24 @@ use crate::activity::schema::DenseActivityReport;
 use crate::config::{RenderConfig, ValueConfig};
 use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MetricIconKind {
+    Gauge,
+    Activity,
+    Timer,
+    Zap,
+    Clock3,
+    Thermometer,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MetricDisplayParts {
+    pub value_text: String,
+    pub unit_text: Option<String>,
+    pub show_icon: bool,
+    pub icon_kind: Option<MetricIconKind>,
+}
+
 pub fn frame_index_for_second(
     config: &RenderConfig,
     dense_activity: &DenseActivityReport,
@@ -97,6 +115,123 @@ fn raw_value(key: &str, dense_activity: &DenseActivityReport, frame_index: usize
             .flatten(),
         _ => None,
     }
+}
+
+pub fn format_metric_parts(
+    config: &RenderConfig,
+    value_config: &ValueConfig,
+    dense_activity: &DenseActivityReport,
+    frame_index: usize,
+) -> Option<MetricDisplayParts> {
+    let raw = raw_value(value_config.value.as_str(), dense_activity, frame_index);
+    let (mut value_text, unit_text, icon_kind) = match value_config.value.as_str() {
+        "speed" => {
+            let unit = speed_units(value_config).to_string();
+            let value_text = raw
+                .map(|speed_mps| {
+                    let factor = match speed_unit_key(value_config) {
+                        "mph" | "imperial" => 2.23694,
+                        "kn" => 1.943844,
+                        "mps" => 1.0,
+                        _ => 3.6,
+                    };
+                    format_number(
+                        speed_mps * factor,
+                        effective_decimals(config, value_config, Some(0)),
+                    )
+                })
+                .unwrap_or_else(|| "--".to_string());
+            let unit_text = value_config.show_units.unwrap_or(true).then_some(unit);
+            (value_text, unit_text, Some(MetricIconKind::Gauge))
+        }
+        "temperature" => {
+            let unit = value_config
+                .temperature_unit
+                .as_deref()
+                .unwrap_or("celsius");
+            let (value_text, unit_text) = match raw {
+                Some(temp_c) if unit == "fahrenheit" => (
+                    format_number(
+                        (temp_c * 9.0 / 5.0) + 32.0,
+                        effective_decimals(config, value_config, Some(0)),
+                    ),
+                    value_config
+                        .show_units
+                        .unwrap_or(true)
+                        .then_some("F".to_string()),
+                ),
+                Some(temp_c) => (
+                    format_number(temp_c, effective_decimals(config, value_config, Some(0))),
+                    value_config
+                        .show_units
+                        .unwrap_or(true)
+                        .then_some("C".to_string()),
+                ),
+                None => (
+                    "--".to_string(),
+                    value_config
+                        .show_units
+                        .unwrap_or(true)
+                        .then_some(if unit == "fahrenheit" { "F" } else { "C" }.to_string()),
+                ),
+            };
+            (value_text, unit_text, Some(MetricIconKind::Thermometer))
+        }
+        "heartrate" => (
+            format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
+            value_config
+                .show_units
+                .unwrap_or(false)
+                .then_some("BPM".to_string()),
+            Some(MetricIconKind::Activity),
+        ),
+        "cadence" => (
+            format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
+            value_config
+                .show_units
+                .unwrap_or(false)
+                .then_some("RPM".to_string()),
+            Some(MetricIconKind::Timer),
+        ),
+        "power" => (
+            format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
+            value_config
+                .show_units
+                .unwrap_or(false)
+                .then_some("W".to_string()),
+            Some(MetricIconKind::Zap),
+        ),
+        "time" => (
+            format_time(
+                config,
+                value_config,
+                dense_activity
+                    .series
+                    .time
+                    .get(frame_index)
+                    .and_then(|value| value.as_deref()),
+            ),
+            None,
+            Some(MetricIconKind::Clock3),
+        ),
+        _ => return None,
+    };
+
+    if let Some(prefix) = &value_config.prefix {
+        value_text = format!("{prefix}{value_text}");
+    }
+    if let Some(suffix) = &value_config.suffix {
+        value_text.push_str(suffix);
+    }
+
+    Some(MetricDisplayParts {
+        value_text,
+        unit_text,
+        show_icon: value_config
+            .show_icon
+            .unwrap_or(value_config.value != "gradient"),
+        icon_kind,
+    })
 }
 
 fn format_speed(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f64>) -> String {
@@ -314,8 +449,11 @@ fn missing_value_with_units(show_units: bool, units: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::format_time_key;
+    use super::{format_metric_parts, format_time_key, MetricIconKind};
+    use crate::activity::schema::{DenseActivityReport, DenseSeriesReport};
+    use crate::config::{RenderConfig, SceneConfig, ValueConfig};
     use chrono::DateTime;
+    use serde_json::json;
 
     #[test]
     fn formats_time_key_variants() {
@@ -328,5 +466,95 @@ mod tests {
             format_time_key("date-dd-mmm-yyyy", timestamp),
             "21 APR 2025"
         );
+    }
+
+    #[test]
+    fn formats_metric_parts_for_speed() {
+        let config = RenderConfig {
+            scene: SceneConfig {
+                width: None,
+                height: None,
+                fps: 30.0,
+                start: 0.0,
+                end: 1.0,
+                font: None,
+                font_size: None,
+                color: None,
+                decimal_rounding: None,
+                overlay_filename: None,
+                ffmpeg: json!({}),
+                opacity: None,
+                scale: None,
+                time_format: None,
+                extra: Default::default(),
+            },
+            labels: vec![],
+            values: vec![],
+            plots: json!([]),
+            extra: Default::default(),
+        };
+        let value = ValueConfig {
+            value: "speed".to_string(),
+            x: 0.0,
+            y: 0.0,
+            font: None,
+            font_family: None,
+            font_size: None,
+            color: None,
+            opacity: None,
+            suffix: None,
+            prefix: None,
+            unit: None,
+            hours_offset: None,
+            time_format: None,
+            format: None,
+            decimal_rounding: None,
+            decimals: Some(0),
+            show_icon: None,
+            icon_color: None,
+            icon_size: None,
+            icon_offset_x: None,
+            icon_offset_y: None,
+            show_units: Some(true),
+            speed_unit: Some("kmh".to_string()),
+            temperature_unit: None,
+            value_offset: None,
+            triangle_positive_color: None,
+            triangle_negative_color: None,
+            show_sign: None,
+            show_triangle: None,
+            triangle_width: None,
+            shadow_color: None,
+            shadow_strength: None,
+            shadow_distance: None,
+            border_color: None,
+            border_thickness: None,
+            border_strength: None,
+            border_distance: None,
+            extra: Default::default(),
+        };
+        let dense = DenseActivityReport {
+            frame_count: 1,
+            frame_elapsed_seconds: vec![0.0],
+            frame_distance_progress: vec![Some(0.0)],
+            series: DenseSeriesReport {
+                speed: vec![Some(10.0)],
+                elevation: vec![],
+                gradient: vec![],
+                heartrate: vec![],
+                cadence: vec![],
+                power: vec![],
+                temperature: vec![],
+                course_lat: vec![],
+                course_lon: vec![],
+                time: vec![],
+            },
+        };
+
+        let parts = format_metric_parts(&config, &value, &dense, 0).unwrap();
+        assert_eq!(parts.value_text, "36");
+        assert_eq!(parts.unit_text.as_deref(), Some("KM/H"));
+        assert_eq!(parts.icon_kind, Some(MetricIconKind::Gauge));
+        assert!(parts.show_icon);
     }
 }

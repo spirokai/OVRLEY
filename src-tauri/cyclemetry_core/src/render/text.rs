@@ -15,6 +15,7 @@ pub struct ResolvedTextStyle {
     pub y: f32,
     pub font_name: Option<String>,
     pub font_size: f32,
+    pub line_height: f32,
     pub color: Color,
     pub opacity: f32,
     pub shadow_color: Option<Color>,
@@ -23,6 +24,17 @@ pub struct ResolvedTextStyle {
     pub border_color: Option<Color>,
     pub border_thickness: f32,
     pub border_distance: f32,
+}
+
+#[derive(Clone, Debug)]
+pub struct MeasuredText {
+    pub width: f32,
+    pub bounds_left: f32,
+    pub bounds_top: f32,
+    pub bounds_right: f32,
+    pub bounds_bottom: f32,
+    pub ascent: f32,
+    pub descent: f32,
 }
 
 pub fn label_style(scene: &SceneConfig, label: &LabelConfig, scale: f32) -> ResolvedTextStyle {
@@ -35,6 +47,7 @@ pub fn label_style(scene: &SceneConfig, label: &LabelConfig, scale: f32) -> Reso
             .or(label.font_family.clone())
             .or_else(|| scene.font.clone()),
         font_size: label.font_size.or(scene.font_size).unwrap_or(32.0) * scale,
+        line_height: label.font_size.or(scene.font_size).unwrap_or(32.0) * scale * 0.92,
         color: parse_color(
             label
                 .color
@@ -69,6 +82,7 @@ pub fn value_style(scene: &SceneConfig, value: &ValueConfig, scale: f32) -> Reso
             .or(value.font_family.clone())
             .or_else(|| scene.font.clone()),
         font_size: value.font_size.or(scene.font_size).unwrap_or(32.0) * scale,
+        line_height: value.font_size.or(scene.font_size).unwrap_or(32.0) * scale * 0.92,
         color: parse_color(
             value
                 .color
@@ -98,10 +112,8 @@ pub fn draw_text(canvas: &Canvas, text: &str, style: &ResolvedTextStyle, font_di
         return;
     }
 
-    let typeface = resolve_typeface(font_dirs, style.font_name.as_deref());
-    let font = Font::from_typeface(typeface, style.font_size);
-    let (_, metrics) = font.metrics();
-    let baseline = style.y - metrics.ascent;
+    let font = resolve_font(font_dirs, style.font_name.as_deref(), style.font_size);
+    let baseline = baseline_for_text_top_with_line_height(text, style.y, &font, style.line_height);
 
     if let Some(border_color) = style.border_color {
         if style.border_thickness > 0.0 {
@@ -131,6 +143,58 @@ pub fn draw_text(canvas: &Canvas, text: &str, style: &ResolvedTextStyle, font_di
 
     let paint = text_paint(style.color);
     canvas.draw_str(text, Point::new(style.x, baseline), &font, &paint);
+}
+
+pub fn resolve_font(font_dirs: &[PathBuf], name: Option<&str>, font_size: f32) -> Font {
+    let typeface = resolve_typeface(font_dirs, name);
+    Font::from_typeface(typeface, font_size)
+}
+
+pub fn baseline_for_top(top_y: f32, font: &Font) -> f32 {
+    let (_, metrics) = font.metrics();
+    top_y - metrics.ascent
+}
+
+pub fn baseline_for_top_with_line_height(top_y: f32, font: &Font, line_height: f32) -> f32 {
+    let (_, metrics) = font.metrics();
+    let leading_offset = (line_height - font.size()) * 0.5;
+    top_y + leading_offset - metrics.ascent
+}
+
+pub fn baseline_for_text_top_with_line_height(
+    text: &str,
+    top_y: f32,
+    font: &Font,
+    line_height: f32,
+) -> f32 {
+    let (_, bounds) = font.measure_str(text, None);
+    let glyph_height = (bounds.bottom - bounds.top).abs();
+
+    if glyph_height <= f32::EPSILON {
+        return baseline_for_top_with_line_height(top_y, font, line_height);
+    }
+
+    let linebox_offset = (line_height - glyph_height) * 0.5;
+    top_y + linebox_offset - bounds.top
+}
+
+pub fn measure_text(text: &str, style: &ResolvedTextStyle, font_dirs: &[PathBuf]) -> MeasuredText {
+    let font = resolve_font(font_dirs, style.font_name.as_deref(), style.font_size);
+    measure_text_with_font(text, &font)
+}
+
+pub fn measure_text_with_font(text: &str, font: &Font) -> MeasuredText {
+    let (width, bounds) = font.measure_str(text, None);
+    let (_, metrics) = font.metrics();
+    MeasuredText {
+        width,
+        bounds_left: bounds.left,
+        bounds_top: bounds.top,
+        bounds_right: bounds.right,
+        bounds_bottom: bounds.bottom,
+        ascent: metrics.ascent,
+        descent: metrics.descent,
+    }
 }
 
 pub fn parse_color(input: &str, opacity: f32) -> Color {

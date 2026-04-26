@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react'
-import { DEFAULT_GRADIENT_TRIANGLE_WIDTH, WIDGET_ICONS } from './constants'
+import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from './constants'
+import { METRIC_ICON_SVGS } from './metricWidgetAssets'
 import {
   areaToSvg,
   buildGradientTrianglePath,
@@ -13,12 +14,16 @@ import {
   getInterpolatedActivityValue,
   getInterpolatedSeriesValue,
   getInterpolatedTimeValue,
+  getMetricWidgetLayout,
+  getPreviewTextBaseline,
   getPointAtMetricProgress,
   getPointAtX,
   getPointAtProgress,
   getPreviewFontFamily,
   getSeriesValueAtProgress,
   getWidgetOpacity,
+  METRIC_WIDGET_LINE_HEIGHT,
+  measurePreviewText,
   normalizeElevationPoints,
   normalizeRouteGeometry,
   pointsToSvg,
@@ -28,26 +33,51 @@ function pointsEqual(left, right) {
   return left?.[0] === right?.[0] && left?.[1] === right?.[1]
 }
 
+function PreviewSvgText({
+  text,
+  x = 0,
+  baseline,
+  color,
+  fontFamily,
+  fontSize,
+  opacity,
+  textShadow,
+  borderColor,
+  borderThickness,
+}) {
+  return (
+    <text
+      x={x}
+      y={baseline}
+      fill={color}
+      fontFamily={fontFamily}
+      fontSize={fontSize}
+      opacity={opacity}
+      paintOrder="stroke fill"
+      stroke={borderColor || 'none'}
+      strokeWidth={borderThickness || 0}
+      style={{
+        textShadow,
+      }}
+    >
+      {text}
+    </text>
+  )
+}
+
 function OverlayMetricWidget({
   widget,
   activity,
   previewSecond,
   globalOpacity,
 }) {
-  const Icon = WIDGET_ICONS[widget.type]
   const fontSize = widget.data.font_size ?? 60
   const fontFamily = getPreviewFontFamily(
     widget.data.font || widget.data.font_family,
   )
   const color = widget.data.color || '#ffffff'
-  const textStyle = {
-    color,
-    fontFamily,
-    fontSize,
-    lineHeight: 0.92,
-    opacity: getWidgetOpacity(widget.data, globalOpacity),
-    textShadow: getCombinedTextShadow(widget.data),
-  }
+  const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)
+  const textShadow = getCombinedTextShadow(widget.data)
 
   let valueText = '--'
   let unitText = ''
@@ -114,29 +144,118 @@ function OverlayMetricWidget({
     getInterpolatedActivityValue(activity, 'gradient', previewSecond) ?? 0,
   )
   const iconSize = widget.data.icon_size ?? 28
-  const iconWrapperStyle = {
-    marginRight: Math.max(fontSize * 0.08, 8),
-    transform: `translate(${widget.data.icon_offset_x ?? 0}px, ${widget.data.icon_offset_y ?? 0}px)`,
-    opacity: getWidgetOpacity(widget.data, globalOpacity),
-  }
-  const iconStyle = {
-    color: widget.data.icon_color || '#40e0d0',
-    width: iconSize,
-    height: iconSize,
-    display: 'block',
-  }
   const showUnits =
     widget.data.show_units ?? ['speed', 'temperature'].includes(widget.type)
   const showIcon = widget.data.show_icon ?? widget.type !== 'gradient'
+  const metricLayout = useMemo(
+    () =>
+      widget.type === 'gradient'
+        ? null
+        : getMetricWidgetLayout({
+            fontSize,
+            fontFamily,
+            valueText,
+            unitText,
+            showIcon: Boolean(showIcon && METRIC_ICON_SVGS[widget.type]),
+            showUnits,
+            iconSize,
+          }),
+    [
+      fontFamily,
+      fontSize,
+      iconSize,
+      showIcon,
+      showUnits,
+      unitText,
+      valueText,
+      widget.type,
+    ],
+  )
   const gradientValueOffset =
     widget.type === 'gradient' ? (widget.data.value_offset ?? 0) : 0
+
+  if (widget.type !== 'gradient' && metricLayout) {
+    const iconSvg = METRIC_ICON_SVGS[widget.type]
+
+    return (
+      <div
+        className="relative"
+        style={{
+          width: metricLayout.width,
+          height: metricLayout.height,
+        }}
+      >
+        <div
+          className="relative"
+          style={{
+            width: metricLayout.width,
+            height: metricLayout.height,
+            transform: `translateY(${widget.data.value_offset ?? 0}px)`,
+          }}
+        >
+          {metricLayout.icon && iconSvg ? (
+            <div
+              className="metric-icon absolute"
+              style={{
+                left: metricLayout.icon.left + (widget.data.icon_offset_x ?? 0),
+                top: metricLayout.icon.top + (widget.data.icon_offset_y ?? 0),
+                width: metricLayout.icon.size,
+                height: metricLayout.icon.size,
+                color: widget.data.icon_color || '#40e0d0',
+                opacity: widgetOpacity,
+              }}
+              dangerouslySetInnerHTML={{ __html: iconSvg }}
+            />
+          ) : null}
+          <svg
+            width={metricLayout.width}
+            height={metricLayout.height}
+            viewBox={`0 0 ${metricLayout.width} ${metricLayout.height}`}
+            className="absolute left-0 top-0 block overflow-visible"
+          >
+            <PreviewSvgText
+              text={valueText}
+              x={metricLayout.value.left}
+              baseline={metricLayout.value.baseline}
+              color={color}
+              fontFamily={fontFamily}
+              fontSize={fontSize}
+              opacity={widgetOpacity}
+              textShadow={textShadow}
+              borderColor={widget.data.border_color}
+              borderThickness={widget.data.border_thickness}
+            />
+            {metricLayout.units ? (
+              <PreviewSvgText
+                text={unitText}
+                x={metricLayout.units.left}
+                baseline={metricLayout.units.baseline}
+                color={color}
+                fontFamily={fontFamily}
+                fontSize={metricLayout.units.fontSize}
+                opacity={widgetOpacity}
+                textShadow={textShadow}
+                borderColor={widget.data.border_color}
+                borderThickness={widget.data.border_thickness}
+              />
+            ) : null}
+          </svg>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="inline-flex w-max flex-col items-center gap-2">
       <div
         className="inline-flex items-center gap-2 whitespace-nowrap"
         style={{
-          ...textStyle,
+          color,
+          fontFamily,
+          fontSize,
+          lineHeight: METRIC_WIDGET_LINE_HEIGHT,
+          opacity: widgetOpacity,
+          textShadow,
           ...(widget.type === 'gradient'
             ? {
                 marginTop: Math.max(gradientValueOffset, 0),
@@ -147,20 +266,13 @@ function OverlayMetricWidget({
               }),
         }}
       >
-        {showIcon && Icon ? (
-          <span
-            className="inline-flex shrink-0 self-center"
-            style={iconWrapperStyle}
-          >
-            <Icon style={iconStyle} />
-          </span>
-        ) : null}
         <div className="inline-flex items-end gap-2">
           <span>{valueText}</span>
           {showUnits && unitText ? (
             <span
               style={{
                 fontSize: Math.max(fontSize * 0.28, 12),
+                lineHeight: METRIC_WIDGET_LINE_HEIGHT,
                 opacity: 'inherit',
               }}
             >
@@ -210,23 +322,45 @@ function OverlayMetricWidget({
 
 function OverlayTextWidget({ widget, globalOpacity }) {
   const fontSize = widget.data.font_size ?? 60
+  const fontFamily = getPreviewFontFamily(
+    widget.data.font || widget.data.font_family,
+  )
+  const color = widget.data.color || '#ffffff'
+  const opacity = getWidgetOpacity(widget.data, globalOpacity)
+  const textShadow = getCombinedTextShadow(widget.data)
+  const text = widget.data.text || 'TEXT'
+  const lineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
+  const measurement = useMemo(
+    () => measurePreviewText(text, fontSize, fontFamily),
+    [fontFamily, fontSize, text],
+  )
+  const baseline = getPreviewTextBaseline({
+    top: 0,
+    lineHeight,
+    ascent: measurement.ascent,
+    descent: measurement.descent,
+    glyphHeight: measurement.glyphHeight,
+  })
 
   return (
-    <div
-      className="whitespace-nowrap"
-      style={{
-        color: widget.data.color || '#ffffff',
-        fontFamily: getPreviewFontFamily(
-          widget.data.font || widget.data.font_family,
-        ),
-        fontSize,
-        lineHeight: 0.92,
-        opacity: getWidgetOpacity(widget.data, globalOpacity),
-        textShadow: getCombinedTextShadow(widget.data),
-      }}
+    <svg
+      width={measurement.width}
+      height={lineHeight}
+      viewBox={`0 0 ${measurement.width} ${lineHeight}`}
+      className="block overflow-visible"
     >
-      {widget.data.text || 'TEXT'}
-    </div>
+      <PreviewSvgText
+        text={text}
+        baseline={baseline}
+        color={color}
+        fontFamily={fontFamily}
+        fontSize={fontSize}
+        opacity={opacity}
+        textShadow={textShadow}
+        borderColor={widget.data.border_color}
+        borderThickness={widget.data.border_thickness}
+      />
+    </svg>
   )
 }
 

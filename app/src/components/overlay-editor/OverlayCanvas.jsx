@@ -90,7 +90,7 @@ export default function OverlayCanvas({
     >
       <div
         className={cn(
-          'pointer-events-none absolute inset-0 rounded-md shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)]',
+          'pointer-events-none absolute inset-0 rounded-sm shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)] border border-red-500',
           backgroundMode === 'checker' && 'bg-overlay-grid-muted',
         )}
         style={{ backgroundColor: '#000000' }}

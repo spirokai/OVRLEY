@@ -143,6 +143,7 @@ pub(crate) fn draw_elevation_widget(
                     .clone()
                     .or_else(|| scene_font.map(ToOwned::to_owned)),
                 font_size: elevation_cache.plot.label_font_size,
+                line_height: elevation_cache.plot.label_font_size * 0.92,
                 color: parse_color(&elevation_cache.plot.label_color, 1.0),
                 opacity: 1.0,
                 shadow_color: None,
@@ -172,6 +173,7 @@ pub(crate) fn draw_elevation_widget(
                     .clone()
                     .or_else(|| scene_font.map(ToOwned::to_owned)),
                 font_size: elevation_cache.plot.label_font_size,
+                line_height: elevation_cache.plot.label_font_size * 0.92,
                 color: parse_color(&elevation_cache.plot.label_color, 1.0),
                 opacity: 1.0,
                 shadow_color: None,
@@ -212,6 +214,7 @@ pub(crate) fn draw_elevation_widget(
                     .clone()
                     .or_else(|| scene_font.map(ToOwned::to_owned)),
                 font_size: elevation_cache.plot.label_font_size,
+                line_height: elevation_cache.plot.label_font_size * 0.92,
                 color: parse_color(&elevation_cache.plot.label_color, 1.0),
                 opacity: 1.0,
                 shadow_color: None,

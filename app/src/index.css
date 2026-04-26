@@ -323,3 +323,9 @@ body {
 .moveable-dashed {
   border-color: var(--theme-color-ice) !important;
 }
+
+.metric-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

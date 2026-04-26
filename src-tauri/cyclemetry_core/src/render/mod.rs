@@ -11,8 +11,8 @@ use crate::render::format::{format_value, frame_index_for_second};
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
 use crate::render::text::{draw_text, label_style, value_style};
 use crate::render::widgets::{
-    draw_elevation_widget, draw_route_widget, prepare_render_assets, PreparedRenderAssets,
-    WidgetRenderReport,
+    draw_elevation_widget, draw_metric_value_widget_with_config, draw_route_widget,
+    prepare_render_assets, PreparedRenderAssets, WidgetRenderReport,
 };
 use serde_json::{json, Value};
 use skia_safe::Image;
@@ -344,8 +344,20 @@ fn render_frame_to_surface(
 
     frame_profiler.measure("text.dynamic", || {
         for value in &config.values {
-            let text = format_value(config, value, dense_activity, frame_index);
             let style = value_style(&config.scene, value, scale);
+            if draw_metric_value_widget_with_config(
+                canvas,
+                config,
+                value,
+                &style,
+                dense_activity,
+                frame_index,
+                scale,
+                &paths.font_dirs,
+            ) {
+                continue;
+            }
+            let text = format_value(config, value, dense_activity, frame_index);
             draw_text(canvas, &text, &style, &paths.font_dirs);
         }
     });

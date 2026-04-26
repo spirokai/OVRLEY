@@ -1,5 +1,9 @@
 import { DEFAULT_ACTIVITY_PREVIEW, FONT_FAMILY_MAP } from './constants'
 
+export const METRIC_WIDGET_LINE_HEIGHT = 0.92
+export const METRIC_WIDGET_OUTER_GAP_PX = 8
+export const METRIC_WIDGET_UNITS_GAP_PX = 8
+
 export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
@@ -24,6 +28,159 @@ export function getSceneSize(config) {
 
 export function getPreviewFontFamily(fontName) {
   return FONT_FAMILY_MAP[fontName] || FONT_FAMILY_MAP['Arial.ttf']
+}
+
+let metricMeasureContext = null
+
+function getMetricMeasureContext() {
+  if (metricMeasureContext) {
+    return metricMeasureContext
+  }
+
+  const canvas = document.createElement('canvas')
+  metricMeasureContext = canvas.getContext('2d')
+  return metricMeasureContext
+}
+
+export function measurePreviewText(text, fontSize, fontFamily) {
+  if (!text) {
+    return {
+      width: 0,
+      glyphHeight: 0,
+      ascent: 0,
+      descent: 0,
+      boundsLeft: 0,
+      boundsRight: 0,
+    }
+  }
+
+  const context = getMetricMeasureContext()
+  if (!context) {
+    return {
+      width: 0,
+      glyphHeight: 0,
+      ascent: 0,
+      descent: 0,
+      boundsLeft: 0,
+      boundsRight: 0,
+    }
+  }
+
+  context.font = `${fontSize}px ${fontFamily}`
+  const metrics = context.measureText(text)
+  const ascent = metrics.actualBoundingBoxAscent || 0
+  const descent = metrics.actualBoundingBoxDescent || 0
+  const glyphHeight = ascent + descent
+
+  return {
+    width: metrics.width,
+    glyphHeight,
+    ascent,
+    descent,
+    boundsLeft: metrics.actualBoundingBoxLeft || 0,
+    boundsRight: metrics.actualBoundingBoxRight || metrics.width,
+  }
+}
+
+export function getPreviewTextBaseline({
+  top = 0,
+  lineHeight,
+  ascent,
+  descent: _descent,
+  glyphHeight,
+}) {
+  if (!glyphHeight) {
+    return top + lineHeight
+  }
+
+  return top + ((lineHeight - glyphHeight) / 2 + ascent)
+}
+
+export function getMetricWidgetLayout({
+  fontSize,
+  fontFamily,
+  valueText,
+  unitText,
+  showIcon,
+  showUnits,
+  iconSize,
+}) {
+  const valueLineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
+  const unitsFontSize = Math.max(fontSize * 0.28, 12)
+  const unitsLineHeight = unitsFontSize * METRIC_WIDGET_LINE_HEIGHT
+  const iconMarginRight = Math.max(fontSize * 0.08, 8)
+  const valueMeasure = measurePreviewText(valueText, fontSize, fontFamily)
+  const showUnitText = Boolean(showUnits && unitText)
+  const unitsMeasure = showUnitText
+    ? measurePreviewText(unitText, unitsFontSize, fontFamily)
+    : {
+        width: 0,
+        glyphHeight: 0,
+        ascent: 0,
+        descent: 0,
+        boundsLeft: 0,
+        boundsRight: 0,
+      }
+  const textGroupHeight = showUnitText
+    ? Math.max(valueLineHeight, unitsLineHeight)
+    : valueLineHeight
+  const rowHeight = Math.max(showIcon ? iconSize : 0, textGroupHeight)
+  const textGroupLeft = showIcon
+    ? iconSize + METRIC_WIDGET_OUTER_GAP_PX + iconMarginRight
+    : 0
+  const textGroupTop = (rowHeight - textGroupHeight) / 2
+  const textGroupBottom = textGroupTop + textGroupHeight
+  const valueTop =
+    textGroupBottom - (valueLineHeight + valueMeasure.glyphHeight) / 2
+  const unitsTop =
+    textGroupBottom - (unitsLineHeight + unitsMeasure.glyphHeight) / 2
+  const unitsLeft =
+    textGroupLeft + valueMeasure.width + METRIC_WIDGET_UNITS_GAP_PX
+  const width = showUnitText
+    ? unitsLeft + unitsMeasure.width
+    : textGroupLeft + valueMeasure.width
+
+  return {
+    icon: showIcon
+      ? {
+          left: 0,
+          top: (rowHeight - iconSize) / 2,
+          size: iconSize,
+        }
+      : null,
+    value: {
+      left: textGroupLeft,
+      top: valueTop,
+      baseline: getPreviewTextBaseline({
+        top: valueTop,
+        lineHeight: valueLineHeight,
+        ascent: valueMeasure.ascent,
+        descent: valueMeasure.descent,
+        glyphHeight: valueMeasure.glyphHeight,
+      }),
+      width: valueMeasure.width,
+      lineHeight: valueLineHeight,
+    },
+    units: showUnitText
+      ? {
+          left: unitsLeft,
+          top: unitsTop,
+          baseline: getPreviewTextBaseline({
+            top: unitsTop,
+            lineHeight: unitsLineHeight,
+            ascent: unitsMeasure.ascent,
+            descent: unitsMeasure.descent,
+            glyphHeight: unitsMeasure.glyphHeight,
+          }),
+          width: unitsMeasure.width,
+          fontSize: unitsFontSize,
+          lineHeight: unitsLineHeight,
+        }
+      : null,
+    width,
+    height: rowHeight,
+    unitsFontSize,
+  }
 }
 
 export function getWidgetOpacity(data, globalOpacity = 1) {

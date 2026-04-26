@@ -2,6 +2,7 @@ mod common;
 mod elevation;
 mod route;
 mod types;
+mod value;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::RenderConfig;
@@ -10,6 +11,7 @@ use crate::debug::RenderProfiler;
 pub(crate) use elevation::draw_elevation_widget;
 pub(crate) use route::draw_route_widget;
 pub use types::{PreparedRenderAssets, WidgetRenderReport};
+pub(crate) use value::draw_metric_value_widget_with_config;
 
 pub fn prepare_render_assets(
     config: &RenderConfig,
