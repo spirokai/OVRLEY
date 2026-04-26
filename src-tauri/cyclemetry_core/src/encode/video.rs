@@ -163,6 +163,88 @@ struct FrameBuffer {
     pixels: Vec<u8>,
 }
 
+pub fn run_parallel_renders(
+    paths: &AppPaths,
+    configs: Vec<RenderConfig>,
+    activity: &ParsedActivity,
+    reports: Vec<DenseActivityReport>,
+) -> Result<Duration, String> {
+    if configs.len() != reports.len() {
+        return Err("Configs and reports vectors must have the same length".to_string());
+    }
+
+    let start_time = Instant::now();
+    let mut handles = Vec::new();
+
+    for (i, (config, report)) in configs.into_iter().zip(reports.into_iter()).enumerate() {
+        let paths_clone = paths.clone();
+        let activity_clone = activity.clone();
+        let controller = RenderController::default();
+        controller.try_start(report.frame_count as u32, &format!("Parallel Render {}", i + 1))?;
+
+        let handle = std::thread::spawn(move || {
+            render_video(
+                &paths_clone,
+                &config,
+                &activity_clone,
+                &report,
+                &controller,
+            )
+        });
+        handles.push(handle);
+    }
+
+    let mut filenames = Vec::new();
+    for handle in handles {
+        let filename = handle
+            .join()
+            .map_err(|_| "Parallel render thread panicked".to_string())??;
+        filenames.push(filename);
+    }
+
+    // Stitch the videos
+    let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
+    let output_filename = format!("parallel_stitch_{}.mov", timestamp_nanos()?);
+    let output_path = paths.public_dir.join(&output_filename);
+
+    let list_path = paths.repo_root.join("backend/temp_concat_list.txt");
+    let mut list_content = String::new();
+    for filename in filenames {
+        list_content.push_str(&format!(
+            "file '{}'\n",
+            paths.public_dir.join(filename).display().to_string().replace('\\', "/")
+        ));
+    }
+    fs::write(&list_path, list_content).map_err(|e| format!("Failed to write concat list: {e}"))?;
+
+    let status = Command::new(&ffmpeg_bin)
+        .arg("-f")
+        .arg("concat")
+        .arg("-safe")
+        .arg("0")
+        .arg("-i")
+        .arg(&list_path)
+        .arg("-c")
+        .arg("copy")
+        .arg("-y")
+        .arg(&output_path)
+        .status()
+        .map_err(|e| format!("Failed to run ffmpeg concat: {e}"))?;
+
+    let _ = fs::remove_file(&list_path);
+
+    if !status.success() {
+        return Err(format!("FFmpeg concat failed with status {status}"));
+    }
+
+    // Copy to downloads too
+    if let Err(error) = copy_output_to_downloads(paths, &output_path, &output_filename) {
+        eprintln!("Failed to copy stitched video to downloads: {error}");
+    }
+
+    Ok(start_time.elapsed())
+}
+
 pub fn render_video(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -186,7 +268,7 @@ pub fn render_video(
 
     let public_filename = format!(
         "video_{}.{}",
-        timestamp_seconds()?,
+        timestamp_nanos()?,
         ffmpeg_settings.extension
     );
     let output_path = paths.public_dir.join(&public_filename);
@@ -615,13 +697,13 @@ fn create_debug_dir(paths: &AppPaths, phase: &str) -> Result<PathBuf, String> {
 }
 
 fn timestamp_slug() -> Result<String, String> {
-    Ok(timestamp_seconds()?.to_string())
+    Ok(timestamp_nanos()?.to_string())
 }
 
-fn timestamp_seconds() -> Result<u64, String> {
+fn timestamp_nanos() -> Result<u128, String> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
+        .map(|duration| duration.as_nanos())
         .map_err(|error| error.to_string())
 }
 
