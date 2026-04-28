@@ -6,6 +6,7 @@ use crate::encode::video::{render_video, RenderController};
 use crate::render::{render_preview_to_path, stub_demo_response};
 use serde::Serialize;
 use serde_json::{json, Value};
+use skia_safe::FontMgr;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -98,6 +99,19 @@ pub fn backend_current_os() -> Value {
     json!({
         "os": std::env::consts::OS
     })
+}
+
+pub fn backend_list_system_fonts() -> Value {
+    let mut fonts: Vec<String> = FontMgr::default()
+        .family_names()
+        .map(|name| name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .collect();
+
+    fonts.sort_by_key(|name| name.to_lowercase());
+    fonts.dedup_by(|current, next| current.eq_ignore_ascii_case(next));
+
+    Value::Array(fonts.into_iter().map(Value::String).collect())
 }
 
 pub fn backend_demo(
