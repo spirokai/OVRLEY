@@ -341,7 +341,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             <Slider
               min={0}
               max={1}
-              step={0.05}
+              step={0.01}
               value={[globalDefaults.opacity]}
               onValueChange={([v]) => setGlobalDefault('opacity', v)}
             />
@@ -356,7 +356,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             <Slider
               min={0.5}
               max={2}
-              step={0.05}
+              step={0.01}
               value={[globalDefaults.scale]}
               onValueChange={([v]) => setGlobalDefault('scale', v)}
             />
