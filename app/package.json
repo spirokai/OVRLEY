@@ -29,6 +29,7 @@
     "immer": "^11.1.4",
     "lodash": "^4.17.21",
     "lucide-react": "^0.562.0",
+    "radix-ui": "^1.4.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-moveable": "^0.56.0",

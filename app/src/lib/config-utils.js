@@ -43,9 +43,7 @@ export function applyGlobalDefaults(config, globals) {
     newConfig.values.forEach((value) => {
       if (!value.font) value.font = globals.font_values
       if (!value.font_family)
-        value.font_family = getFontFamilyName(
-          value.font || globals.font_values,
-        )
+        value.font_family = getFontFamilyName(value.font || globals.font_values)
       if (!value.color) value.color = globals.color_values
       if (value.icon_color === undefined) value.icon_color = globals.color_icons
       if (value.opacity === undefined) value.opacity = globals.opacity

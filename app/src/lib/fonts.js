@@ -15,7 +15,8 @@ export function getRecommendedFont(value) {
   return (
     RECOMMENDED_FONTS.find(
       (font) =>
-        normalizeFontKey(font.id) === key || normalizeFontKey(font.name) === key,
+        normalizeFontKey(font.id) === key ||
+        normalizeFontKey(font.name) === key,
     ) || null
   )
 }

@@ -1,3 +1,5 @@
+import { normalizeColorFields } from './color-utils'
+
 export const TEMPLATE_FILE_FORMAT = 'cyclemetry-template'
 export const TEMPLATE_FILE_VERSION = 1
 
@@ -19,7 +21,7 @@ export const DEFAULT_GLOBAL_DEFAULTS = {
   border_thickness: 0,
   border_strength: 0,
   border_distance: 0,
-  shadow_color: '#00000066',
+  shadow_color: '#000000',
   shadow_strength: 0,
   shadow_distance: 0,
   opacity: 1,
@@ -55,7 +57,7 @@ export function createTemplateState({
     settings: {
       globalDefaults: {
         ...DEFAULT_GLOBAL_DEFAULTS,
-        ...(cloneSerializable(globalDefaults) || {}),
+        ...normalizeColorFields(cloneSerializable(globalDefaults) || {}),
       },
       updateRate: Number.isFinite(updateRate) ? updateRate : 1,
       exportRange: {

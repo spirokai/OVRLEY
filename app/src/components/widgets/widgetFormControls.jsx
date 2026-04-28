@@ -1,5 +1,6 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
@@ -10,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import HexColorPicker from '@/components/ui/hex-color-picker'
 import { cn } from '@/lib/utils'
 
 export const FONTS = [
@@ -49,8 +51,6 @@ export const TEMPERATURE_UNITS = [
 ]
 
 export const CONTROL_CLASS = 'h-9 border-border/70 bg-surface text-xs'
-const COLOR_PICKER_CLASS =
-  'h-9 w-11 cursor-pointer rounded-md border border-border/70 bg-surface-strong p-1'
 const FIELD_LABEL_CLASS = 'text-[9px] text-muted-foreground uppercase font-bold'
 
 export function FieldBlock({ label, children, className }) {
@@ -125,19 +125,11 @@ export function ColorField({ label, value, onChange }) {
   return (
     <div className="space-y-2">
       <Label className={FIELD_LABEL_CLASS}>{label}</Label>
-      <div className="flex gap-2">
-        <Input
-          type="color"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={COLOR_PICKER_CLASS}
-        />
-        <BlurInput
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={cn(CONTROL_CLASS, 'flex-1 font-mono')}
-        />
-      </div>
+      <HexColorPicker
+        value={value}
+        onChange={onChange}
+        triggerClassName="justify-start"
+      />
     </div>
   )
 }

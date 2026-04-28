@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
-import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -16,6 +14,7 @@ import { Video, Palette, RotateCcw, Sparkles, Gauge } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import FontSelectField from '@/components/ui/font-select-field'
+import HexColorPicker from '@/components/ui/hex-color-picker'
 import useAvailableFonts from '@/hooks/useAvailableFonts'
 import useStore from '../store/useStore'
 
@@ -61,18 +60,12 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     setGlobalDefault,
     updateRate,
     setUpdateRate,
-    exportRange,
-    setExportRange,
-    exportCodec,
-    platformOs,
-    setExportCodec,
     aspectRatio,
     setAspectRatio,
     resetGlobalDefaults,
   } = useStore()
 
   const scene = config?.scene
-  const isVideoToolboxAvailable = platformOs === 'macos'
   const systemFonts = useAvailableFonts()
 
   const [resId, setResId] = useState(() => {
@@ -294,84 +287,46 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-2">
             <Label className="text-xs">Values</Label>
-            <div className="flex gap-1 items-center">
-              <Input
-                type="color"
-                value={globalDefaults.color_values}
-                onChange={(e) =>
-                  setGlobalDefault('color_values', e.target.value)
-                }
-                className="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded border border-border/70 p-0"
-              />
-              <span className="text-[10px] font-mono opacity-50 uppercase">
-                {globalDefaults.color_values.slice(1, 4)}
-              </span>
-            </div>
+            <HexColorPicker
+              value={globalDefaults.color_values}
+              onChange={(value) => setGlobalDefault('color_values', value)}
+              valueClassName="text-[10px] tracking-[0.16em]"
+            />
           </div>
           <div className="space-y-2">
             <Label className="text-xs">Labels</Label>
-            <div className="flex gap-1 items-center">
-              <Input
-                type="color"
-                value={globalDefaults.color_text}
-                onChange={(e) => setGlobalDefault('color_text', e.target.value)}
-                className="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded border border-border/70 p-0"
-              />
-              <span className="text-[10px] font-mono opacity-50 uppercase">
-                {globalDefaults.color_text.slice(1, 4)}
-              </span>
-            </div>
+            <HexColorPicker
+              value={globalDefaults.color_text}
+              onChange={(value) => setGlobalDefault('color_text', value)}
+              valueClassName="text-[10px] tracking-[0.16em]"
+            />
           </div>
           <div className="space-y-2">
             <Label className="text-xs">Icons</Label>
-            <div className="flex gap-1 items-center">
-              <Input
-                type="color"
-                value={globalDefaults.color_icons}
-                onChange={(e) =>
-                  setGlobalDefault('color_icons', e.target.value)
-                }
-                className="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded border border-border/70 p-0"
-              />
-              <span className="text-[10px] font-mono opacity-50 uppercase">
-                {globalDefaults.color_icons.slice(1, 4)}
-              </span>
-            </div>
+            <HexColorPicker
+              value={globalDefaults.color_icons}
+              onChange={(value) => setGlobalDefault('color_icons', value)}
+              valueClassName="text-[10px] tracking-[0.16em]"
+            />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 pt-2">
           <div className="space-y-2">
             <Label className="text-xs">Border Color</Label>
-            <div className="flex gap-2 items-center">
-              <Input
-                type="color"
-                value={globalDefaults.border_color}
-                onChange={(e) =>
-                  setGlobalDefault('border_color', e.target.value)
-                }
-                className="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded border border-border/70 p-0"
-              />
-              <span className="text-[10px] font-mono opacity-50 uppercase">
-                {globalDefaults.border_color}
-              </span>
-            </div>
+            <HexColorPicker
+              value={globalDefaults.border_color}
+              onChange={(value) => setGlobalDefault('border_color', value)}
+              valueClassName="text-[10px] tracking-[0.16em]"
+            />
           </div>
           <div className="space-y-2">
             <Label className="text-xs">Shadow Color</Label>
-            <div className="flex gap-2 items-center">
-              <Input
-                type="color"
-                value={globalDefaults.shadow_color}
-                onChange={(e) =>
-                  setGlobalDefault('shadow_color', e.target.value)
-                }
-                className="h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded border border-border/70 p-0"
-              />
-              <span className="text-[10px] font-mono opacity-50 uppercase">
-                {globalDefaults.shadow_color.slice(0, 7)}
-              </span>
-            </div>
+            <HexColorPicker
+              value={globalDefaults.shadow_color}
+              onChange={(value) => setGlobalDefault('shadow_color', value)}
+              valueClassName="text-[10px] tracking-[0.16em]"
+            />
           </div>
         </div>
 
@@ -467,26 +422,6 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
 
         <div className="space-y-4">
           <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">Export Codec</Label>
-              <Select value={exportCodec} onValueChange={setExportCodec}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="prores_ks">ProRes (CPU)</SelectItem>
-                  <SelectItem value="prores_ks_vulkan">
-                    ProRes Vulkan (GPU)
-                  </SelectItem>
-                  <SelectItem
-                    value="prores_videotoolbox"
-                    disabled={!isVideoToolboxAvailable}
-                  >
-                    ProRes (macOS)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Gauge className="h-4 w-4 text-primary" />
@@ -517,57 +452,6 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-xs font-medium">
-                  Custom Export Range
-                </Label>
-                <p className="text-[10px] text-muted-foreground">
-                  Export specific section only
-                </p>
-              </div>
-              <Switch
-                checked={exportRange.type === 'custom'}
-                onCheckedChange={(checked) =>
-                  setExportRange({ type: checked ? 'custom' : 'all' })
-                }
-              />
-            </div>
-            {exportRange.type === 'custom' && (
-              <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-right-1 duration-200">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-[10px] text-muted-foreground uppercase font-bold">
-                      From (Time or Sec)
-                    </Label>
-                    <BlurInput
-                      value={exportRange.fromTime}
-                      onChange={(e) =>
-                        setExportRange({ fromTime: e.target.value })
-                      }
-                      className="h-8 text-xs font-mono"
-                      placeholder="00:00:00 or 800"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[10px] text-muted-foreground uppercase font-bold">
-                      To (Time or Sec)
-                    </Label>
-                    <BlurInput
-                      value={exportRange.toTime}
-                      onChange={(e) =>
-                        setExportRange({ toTime: e.target.value })
-                      }
-                      className="h-8 text-xs font-mono"
-                      placeholder="00:00:00 or 900"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

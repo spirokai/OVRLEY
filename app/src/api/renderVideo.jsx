@@ -16,7 +16,7 @@ function timeToSeconds(timeStr) {
   return parts[0] || 0
 }
 
-export default async function renderVideo() {
+export default async function renderVideo(overrides = {}) {
   try {
     const {
       config: baseConfig,
@@ -28,40 +28,48 @@ export default async function renderVideo() {
       setRenderingVideo,
       setRenderProgress,
     } = useStore.getState()
+    const overrideConfig = overrides.config
+    const overrideUpdateRate = overrides.updateRate
+    const overrideExportRange = overrides.exportRange
+    const overrideExportCodec = overrides.exportCodec
 
     const parsedActivity = getCurrentParsedActivity()
+    const activeConfig = overrideConfig || baseConfig
+    const activeUpdateRate = overrideUpdateRate ?? updateRate
+    const activeExportRange = overrideExportRange ?? exportRange
+    const activeExportCodec = overrideExportCodec ?? exportCodec
 
     // Validate we have required data
-    if (!baseConfig || !baseConfig.scene) {
+    if (!activeConfig || !activeConfig.scene) {
       throw new Error('No valid config available')
     }
 
     // Apply global defaults and overrides
-    const config = applyGlobalDefaults(baseConfig, globalDefaults)
+    const config = applyGlobalDefaults(activeConfig, globalDefaults)
 
     // Apply performance and range overrides
     if (config.scene) {
-      config.scene.update_rate = updateRate
+      config.scene.update_rate = activeUpdateRate
       config.scene.ffmpeg = {
         ...(config.scene.ffmpeg || {}),
-        codec: exportCodec || 'prores_ks',
+        codec: activeExportCodec || 'prores_ks',
       }
 
-      if ((exportCodec || 'prores_ks') === 'prores_ks') {
+      if ((activeExportCodec || 'prores_ks') === 'prores_ks') {
         config.scene.ffmpeg.prores_profile =
           config.scene.ffmpeg.prores_profile || '4444'
         config.scene.ffmpeg.pix_fmt =
           config.scene.ffmpeg.pix_fmt || 'yuva444p10le'
-      } else if ((exportCodec || 'prores_ks') === 'prores_ks_vulkan') {
+      } else if ((activeExportCodec || 'prores_ks') === 'prores_ks_vulkan') {
         config.scene.ffmpeg.prores_profile =
           config.scene.ffmpeg.prores_profile || '4'
         config.scene.ffmpeg.alpha_bits = config.scene.ffmpeg.alpha_bits || 16
       }
 
       // Apply export range override if custom
-      if (exportRange.type === 'custom') {
-        const start = timeToSeconds(exportRange.fromTime)
-        const end = timeToSeconds(exportRange.toTime)
+      if (activeExportRange.type === 'custom') {
+        const start = timeToSeconds(activeExportRange.fromTime)
+        const end = timeToSeconds(activeExportRange.toTime)
         if (end > start) {
           config.scene.start = start
           config.scene.end = end

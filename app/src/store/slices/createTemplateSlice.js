@@ -1,6 +1,8 @@
 import * as backend from '../../api/backend'
+import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
 import { syncGlobalDefaultsToConfig } from '../../lib/config-utils'
 import {
+  cloneSerializable,
   DEFAULT_CONFIG,
   DEFAULT_EXPORT_RANGE,
   DEFAULT_GLOBAL_DEFAULTS,
@@ -102,7 +104,12 @@ export function createTemplateSlice(set, get) {
     },
 
     setGlobalDefault: (key, value) => {
-      const nextDefaults = { ...get().globalDefaults, [key]: value }
+      const nextDefaults = {
+        ...get().globalDefaults,
+        [key]: isColorFieldKey(key)
+          ? normalizeColorFields({ [key]: value })[key]
+          : value,
+      }
 
       set((state) => {
         state.globalDefaults = nextDefaults
@@ -124,6 +131,52 @@ export function createTemplateSlice(set, get) {
       localStorage.setItem('aspectRatio', ratio)
       set((state) => {
         state.aspectRatio = ratio
+      })
+    },
+
+    createNewTemplate: () => {
+      const nextConfig = cloneSerializable(DEFAULT_CONFIG)
+      const nextGlobalDefaults = { ...DEFAULT_GLOBAL_DEFAULTS }
+      const nextExportRange = { ...DEFAULT_EXPORT_RANGE }
+      const nextExportCodec = 'prores_ks'
+      const nextAspectRatio = '16:9'
+      const nextUpdateRate = 1
+
+      localStorage.setItem('editorConfig', JSON.stringify(nextConfig))
+      persistSerializable('globalDefaults', nextGlobalDefaults)
+      persistSerializable('exportRange', nextExportRange)
+      localStorage.setItem('exportCodec', nextExportCodec)
+      localStorage.setItem('aspectRatio', nextAspectRatio)
+      localStorage.setItem('updateRate', nextUpdateRate.toString())
+      localStorage.setItem('loadedTemplateFilename', '')
+      localStorage.setItem('loadedTemplateSource', '')
+      localStorage.setItem('startSecond', nextConfig.scene.start.toString())
+      localStorage.setItem('selectedSecond', nextConfig.scene.start.toString())
+      localStorage.setItem('endSecond', nextConfig.scene.end.toString())
+      persistSerializable('lastSavedTemplateState', null)
+
+      set((state) => {
+        state.communityTemplateFilename = null
+        state.config = nextConfig
+        state.globalDefaults = nextGlobalDefaults
+        state.exportRange = nextExportRange
+        state.exportCodec = nextExportCodec
+        state.aspectRatio = nextAspectRatio
+        state.updateRate = nextUpdateRate
+        state.loadedTemplateFilename = null
+        state.loadedTemplateSource = null
+        state.lastSavedTemplateState = null
+        state.startSecond = nextConfig.scene.start
+        state.selectedSecond = nextConfig.scene.start
+        state.endSecond = nextConfig.scene.end
+
+        if (state.lastRenderedConfig) {
+          state.hasUnrenderedChanges =
+            JSON.stringify(nextConfig) !==
+            JSON.stringify(state.lastRenderedConfig)
+        } else {
+          state.hasUnrenderedChanges = true
+        }
       })
     },
 
@@ -159,7 +212,7 @@ export function createTemplateSlice(set, get) {
       const nextSettings = templateState?.settings || {}
       const nextGlobalDefaults = {
         ...DEFAULT_GLOBAL_DEFAULTS,
-        ...(nextSettings.globalDefaults || {}),
+        ...normalizeColorFields(nextSettings.globalDefaults || {}),
       }
       const nextExportRange = {
         ...DEFAULT_EXPORT_RANGE,

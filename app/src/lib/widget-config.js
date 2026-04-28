@@ -1,3 +1,5 @@
+import { normalizeColorFields } from './color-utils'
+
 export function cloneConfig(config) {
   return JSON.parse(JSON.stringify(config))
 }
@@ -80,7 +82,7 @@ export function updateWidgetInConfig(config, widgetId, updates) {
 
   nextConfig[widget.category][widget.index] = {
     ...currentWidget,
-    ...updates,
+    ...normalizeColorFields(updates),
   }
 
   return nextConfig
@@ -116,7 +118,7 @@ export function updateWidgetsInConfig(config, updatesById) {
 
     nextConfig[widget.category][widget.index] = {
       ...currentWidget,
-      ...updates,
+      ...normalizeColorFields(updates),
     }
     hasChanges = true
   })

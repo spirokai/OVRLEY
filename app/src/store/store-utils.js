@@ -2,6 +2,7 @@ import {
   DEFAULT_EXPORT_RANGE,
   DEFAULT_GLOBAL_DEFAULTS,
 } from '../lib/template-snapshot'
+import { normalizeColorFields } from '../lib/color-utils'
 
 let isUpdatingFromConfig = false
 let isUpdatingFromTimeline = false
@@ -125,7 +126,7 @@ export function readStoredTemplateSettings() {
     exportCodec: localStorage.getItem('exportCodec') || 'prores_ks',
     globalDefaults: {
       ...DEFAULT_GLOBAL_DEFAULTS,
-      ...(readStoredJson('globalDefaults', {}) || {}),
+      ...normalizeColorFields(readStoredJson('globalDefaults', {}) || {}),
     },
     aspectRatio: localStorage.getItem('aspectRatio') || '16:9',
   }
