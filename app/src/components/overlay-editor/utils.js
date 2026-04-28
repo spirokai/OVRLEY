@@ -27,7 +27,7 @@ export function getSceneSize(config) {
 }
 
 export function getPreviewFontFamily(fontName) {
-  return FONT_FAMILY_MAP[fontName] || FONT_FAMILY_MAP['Arial.ttf']
+  return FONT_FAMILY_MAP[fontName] || fontName || FONT_FAMILY_MAP['Arial.ttf']
 }
 
 let metricMeasureContext = null

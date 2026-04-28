@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { BlurInput } from '@/components/ui/blur-input'
@@ -15,13 +15,9 @@ import { Separator } from '@/components/ui/separator'
 import { Video, Palette, RotateCcw, Sparkles, Gauge } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import FontSelectField from '@/components/ui/font-select-field'
+import useAvailableFonts from '@/hooks/useAvailableFonts'
 import useStore from '../store/useStore'
-
-const FONTS = [
-  { id: 'Arial.ttf', name: 'Arial' },
-  { id: 'Evogria.otf', name: 'Evogria' },
-  { id: 'Furore.otf', name: 'Furore' },
-]
 
 const ASPECT_RATIOS = [
   { id: '16:9', name: 'Widescreen (16:9)' },
@@ -77,6 +73,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
 
   const scene = config?.scene
   const isVideoToolboxAvailable = platformOs === 'macos'
+  const systemFonts = useAvailableFonts()
 
   const [resId, setResId] = useState(() => {
     if (!scene) return '1080p'
@@ -280,46 +277,18 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
         <Separator className="flex-1 mb-4" />
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">
-              Value Font
-            </Label>
-            <Select
-              value={globalDefaults.font_values}
-              onValueChange={(v) => setGlobalDefault('font_values', v)}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FONTS.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">
-              Label Font
-            </Label>
-            <Select
-              value={globalDefaults.font_text}
-              onValueChange={(v) => setGlobalDefault('font_text', v)}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FONTS.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <FontSelectField
+            label="Value Font"
+            value={globalDefaults.font_values}
+            onValueChange={(v) => setGlobalDefault('font_values', v)}
+            systemFonts={systemFonts}
+          />
+          <FontSelectField
+            label="Label Font"
+            value={globalDefaults.font_text}
+            onValueChange={(v) => setGlobalDefault('font_text', v)}
+            systemFonts={systemFonts}
+          />
         </div>
 
         <div className="grid grid-cols-3 gap-3">

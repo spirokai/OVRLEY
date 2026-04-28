@@ -13,9 +13,13 @@ import {
 
 export const FONT_FAMILY_MAP = {
   'Arial.ttf': 'Arial, Helvetica, sans-serif',
+  Arial: 'Arial, Helvetica, sans-serif',
   'Evogria.otf':
     '"Evogria", Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif',
+  Evogria:
+    '"Evogria", Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif',
   'Furore.otf': '"Furore", "Arial Black", Impact, sans-serif',
+  Furore: '"Furore", "Arial Black", Impact, sans-serif',
 }
 
 export const WIDGET_ICONS = {

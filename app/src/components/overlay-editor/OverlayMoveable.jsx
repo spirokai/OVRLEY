@@ -16,6 +16,7 @@ export default function OverlayMoveable({
   handlers,
 }) {
   const isGroupSelection = selectedTargets.length > 1
+  const moveableZoom = displayScale > 0 ? 1 / displayScale : 1
 
   if ((!selectedTarget && !selectedTargets.length) || !sceneElement) {
     return null
@@ -47,7 +48,7 @@ export default function OverlayMoveable({
       elementGuidelines={elementGuidelines}
       horizontalGuidelines={[0, sceneSize.height / 2, sceneSize.height]}
       verticalGuidelines={[0, sceneSize.width / 2, sceneSize.width]}
-      zoom={displayScale}
+      zoom={moveableZoom}
       onDragStart={handlers.onDragStart}
       onDrag={handlers.onDrag}
       onDragEnd={handlers.onDragEnd}

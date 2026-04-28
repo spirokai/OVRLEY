@@ -54,10 +54,10 @@ export function groupWidgetsForSidebar(widgets, typeLabels) {
 
   return Object.keys(grouped)
     .sort()
-    .flatMap((typeName, groupIndex) =>
+    .flatMap((typeName) =>
       grouped[typeName].map((widget, widgetIndex) => ({
         ...widget,
-        showSeparator: groupIndex > 0 && widgetIndex === 0,
+        groupLabel: widgetIndex === 0 ? typeName : null,
       })),
     )
 }

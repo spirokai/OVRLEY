@@ -1,7 +1,6 @@
 import { Move, Palette, TrendingUp, Type } from 'lucide-react'
 import {
   ColorField,
-  FONTS,
   NumberField,
   SelectField,
   SliderField,
@@ -9,6 +8,9 @@ import {
   TIME_FORMATS,
   ToggleField,
 } from './widgetFormControls'
+import FontSelectField from '@/components/ui/font-select-field'
+import useAvailableFonts from '@/hooks/useAvailableFonts'
+import { createFontSelection } from '@/lib/fonts'
 import { getWidgetFont } from './widgetDefinitions'
 import { getThemeColor } from '@/lib/theme'
 
@@ -79,6 +81,7 @@ export function FontSection({
   showFormatSelect = false,
 }) {
   const fontSize = widget.data.font_size ?? 60
+  const systemFonts = useAvailableFonts()
 
   return (
     <div className="space-y-4">
@@ -104,16 +107,15 @@ export function FontSection({
       ) : null}
 
       <div className="grid grid-cols-2 gap-3">
-        <SelectField
+        <FontSelectField
           label="Font Family"
           value={getWidgetFont(widget)}
           onValueChange={(value) =>
-            updateWidgetData(widget.id, {
-              font: value,
-              font_family: value,
-            })
+            updateWidgetData(widget.id, createFontSelection(value))
           }
-          options={FONTS.map((font) => ({ value: font.id, label: font.name }))}
+          systemFonts={systemFonts}
+          triggerClassName="h-9 border-border/70 bg-surface text-xs"
+          labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
         />
         <ColorField
           label={colorLabel}

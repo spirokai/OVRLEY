@@ -3,6 +3,8 @@
  * This allows the user to set a "theme" in the Global tab and have it apply to all elements
  * that don't have explicit overrides.
  */
+import { createFontSelection, getFontFamilyName } from './fonts'
+
 export function applyGlobalDefaults(config, globals) {
   if (!config || !globals) return config
 
@@ -13,6 +15,8 @@ export function applyGlobalDefaults(config, globals) {
   if (newConfig.labels) {
     newConfig.labels.forEach((label) => {
       if (!label.font) label.font = globals.font_text
+      if (!label.font_family)
+        label.font_family = getFontFamilyName(label.font || globals.font_text)
       if (!label.color) label.color = globals.color_text
       if (label.opacity === undefined) label.opacity = globals.opacity
 
@@ -38,6 +42,10 @@ export function applyGlobalDefaults(config, globals) {
   if (newConfig.values) {
     newConfig.values.forEach((value) => {
       if (!value.font) value.font = globals.font_values
+      if (!value.font_family)
+        value.font_family = getFontFamilyName(
+          value.font || globals.font_values,
+        )
       if (!value.color) value.color = globals.color_values
       if (value.icon_color === undefined) value.icon_color = globals.color_icons
       if (value.opacity === undefined) value.opacity = globals.opacity
@@ -97,8 +105,7 @@ export function syncGlobalDefaultsToConfig(
   if (nextConfig.labels) {
     nextConfig.labels.forEach((label) => {
       if (shouldApply('font_text')) {
-        label.font = globals.font_text
-        label.font_family = globals.font_text
+        Object.assign(label, createFontSelection(globals.font_text))
       }
       if (shouldApply('color_text')) {
         label.color = globals.color_text
@@ -130,8 +137,7 @@ export function syncGlobalDefaultsToConfig(
   if (nextConfig.values) {
     nextConfig.values.forEach((value) => {
       if (shouldApply('font_values')) {
-        value.font = globals.font_values
-        value.font_family = globals.font_values
+        Object.assign(value, createFontSelection(globals.font_values))
       }
       if (shouldApply('color_values')) {
         value.color = globals.color_values

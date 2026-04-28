@@ -11,6 +11,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { getThemeColor } from '@/lib/theme'
+import { createFontSelection } from '@/lib/fonts'
 
 export const QUICKMENU_ITEMS = [
   { type: 'label', icon: Type, label: 'Text' },
@@ -110,11 +111,11 @@ function getCourseWidgetDimensions(coursePoints) {
 
 export function createLabelDefaults(globalDefaults) {
   const font = globalDefaults?.font_text || 'Arial.ttf'
+  const fontSelection = createFontSelection(font)
   return {
     x: 100,
     y: 100,
-    font,
-    font_family: font,
+    ...fontSelection,
     font_size: 60,
     text: 'New Text',
     color: getGlobalColor(globalDefaults, 'color_text', getThemeColor('ice')),
@@ -124,12 +125,12 @@ export function createLabelDefaults(globalDefaults) {
 
 export function createMetricValueDefaults(type, globalDefaults) {
   const font = globalDefaults?.font_values || 'Furore.otf'
+  const fontSelection = createFontSelection(font)
   return {
     x: 100,
     y: 100,
     value: type,
-    font,
-    font_family: font,
+    ...fontSelection,
     font_size: type === 'time' ? 72 : type === 'gradient' ? 96 : 100,
     color: getGlobalColor(globalDefaults, 'color_values', getThemeColor('ice')),
     opacity: globalDefaults?.opacity ?? 1,

@@ -200,6 +200,42 @@ export async function getPlatformInfo() {
   return { os: detectBrowserPlatformOs() }
 }
 
+function sortFontNames(fonts) {
+  return [...new Set(fonts.filter(Boolean))]
+    .map((font) => font.trim())
+    .filter(Boolean)
+    .sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: 'base' }),
+    )
+}
+
+export async function listAvailableFonts() {
+  const invoke = await getInvoke()
+  if (invoke) {
+    const payload = await invoke('backend_list_system_fonts')
+    const fonts = typeof payload === 'string' ? JSON.parse(payload) : payload
+    return Array.isArray(fonts) ? sortFontNames(fonts) : []
+  }
+
+  if (
+    typeof window !== 'undefined' &&
+    typeof window.queryLocalFonts === 'function'
+  ) {
+    try {
+      const fonts = await window.queryLocalFonts()
+      return sortFontNames(
+        fonts.map(
+          (font) => font.family || font.fullName || font.postscriptName || '',
+        ),
+      )
+    } catch (error) {
+      console.warn('Local font access unavailable in browser:', error)
+    }
+  }
+
+  return []
+}
+
 /**
  * Get render progress
  */
