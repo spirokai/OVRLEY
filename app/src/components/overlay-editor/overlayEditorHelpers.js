@@ -139,10 +139,10 @@ export function getWidgetIdFromTarget(target) {
  * @param {*} target - Target object, element, or value being updated.
  * @param {*} widget - Widget definition being rendered or edited.
  * @param {*} draft - Value for draft.
- * @param {*} globalScale - Scale factor applied to the overlay preview.
+ * @param {*} _globalScale - Scale factor applied to the overlay preview.
  * @returns {*} Result produced by the helper.
  */
-export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
+export function applyLiveWidgetStyles(target, widget, draft, _globalScale) {
   if (!target || !widget) {
     return
   }
@@ -154,23 +154,22 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
   const nextRotation =
     draft.rotation ??
     (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
-  const nextScale = (draft.scale ?? 1) * globalScale
+  const visualScale = Number.isFinite(_globalScale) ? _globalScale : 1
 
   target.style.left = `${nextX}px`
   target.style.top = `${nextY}px`
 
   if (typeof nextWidth === 'number') {
-    target.style.width = `${nextWidth}px`
+    target.style.width = `${nextWidth * visualScale}px`
   }
 
   if (typeof nextHeight === 'number') {
-    target.style.height = `${nextHeight}px`
+    target.style.height = `${nextHeight * visualScale}px`
   }
 
   target.style.transform =
     buildWidgetTransform({
       rotation: nextRotation,
-      scale: nextScale,
     }) || ''
 }
 
@@ -187,7 +186,7 @@ export function applyLiveScalePositionStyles(
   target,
   widget,
   draft,
-  globalScale,
+  _globalScale,
 ) {
   if (!target || !widget) {
     return
@@ -204,10 +203,6 @@ export function applyLiveScalePositionStyles(
 
   if (nextRotation) {
     transforms.push(`rotate(${nextRotation}deg)`)
-  }
-
-  if (globalScale !== 1) {
-    transforms.push(`scale(${globalScale})`)
   }
 
   target.style.left = `${baseX}px`

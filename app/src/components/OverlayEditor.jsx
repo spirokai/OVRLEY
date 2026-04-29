@@ -114,6 +114,7 @@ function OverlayEditor({
             <OverlayCanvas
               widgets={widgets}
               globalScale={globalScale}
+              displayScale={displayScale}
               globalOpacity={globalOpacity}
               activity={activity}
               previewSecond={previewSecond}

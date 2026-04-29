@@ -201,10 +201,12 @@ export default function useOverlayMoveableHandlers({
       const origin = interactionStartRef.current
       if (!origin?.id) return
 
+      const safeGlobalScale =
+        Number.isFinite(globalScale) && globalScale > 0 ? globalScale : 1
       const nextX = origin.x + drag.beforeTranslate[0]
       const nextY = origin.y + drag.beforeTranslate[1]
-      const nextWidth = Math.max(width, 8)
-      const nextHeight = Math.max(height, 8)
+      const nextWidth = Math.max(width / safeGlobalScale, 8)
+      const nextHeight = Math.max(height / safeGlobalScale, 8)
       const widthScale = origin.width ? nextWidth / origin.width : 1
       const heightScale = origin.height ? nextHeight / origin.height : 1
       const markerScale = (widthScale + heightScale) / 2
