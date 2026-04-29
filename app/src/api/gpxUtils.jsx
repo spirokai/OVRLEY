@@ -193,6 +193,67 @@ function parseGpxActivityFile(file, textContent) {
   })
 }
 
+async function parseActivityFile(file) {
+  return file.name.toLowerCase().endsWith('.fit')
+    ? parseFitActivityFile(file)
+    : parseGpxActivityFile(file, await file.text())
+}
+
+function syncSceneDurationWithActivity(durationSeconds, storeState) {
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    console.warn('Parsed activity did not produce a duration value')
+    return
+  }
+
+  const wholeSeconds = Math.floor(durationSeconds)
+  const {
+    config,
+    setConfig,
+    setDummyDurationSeconds,
+    setEndSecond,
+    setSelectedSecond,
+    setStartSecond,
+  } = storeState
+
+  console.log('Setting activity duration:', durationSeconds, 'seconds')
+  setDummyDurationSeconds(wholeSeconds)
+  setStartSecond(0)
+  setEndSecond(wholeSeconds)
+  setSelectedSecond(0)
+
+  if (config) {
+    setConfig({
+      ...config,
+      scene: {
+        ...config.scene,
+        start: 0,
+        end: wholeSeconds,
+      },
+    })
+  }
+}
+
+async function applyParsedActivityToStore({
+  filename,
+  parsedActivity,
+  debugPayload,
+  storeState,
+}) {
+  const { setActivitySummary, setGpxFilename } = storeState
+
+  setGpxFilename(filename)
+  setCurrentActivityCache(parsedActivity, debugPayload)
+  setActivitySummary(parsedActivity)
+  const debugPath = await persistDebugPayload(filename, debugPayload)
+  console.log('Parse debug JSON written:', debugPath)
+  console.log('Activity filename set in store:', filename)
+
+  syncSceneDurationWithActivity(
+    parsedActivity?.metadata?.duration_seconds || 0,
+    storeState,
+  )
+}
+
 async function ensureFileObject(fileOrPath) {
   if (fileOrPath instanceof File) return fileOrPath
 
@@ -204,73 +265,38 @@ async function ensureFileObject(fileOrPath) {
 export default async function saveFile(fileOrPath) {
   const file = await ensureFileObject(fileOrPath)
   const filename = file.name
-  const lowerFilename = filename.toLowerCase()
 
-  console.log('📤 Starting GPX processing:', {
+  console.log('Starting activity processing:', {
     source: 'file',
     filename,
   })
 
   try {
-    const {
-      clearActivitySummary,
-      setActivitySummary,
-      setDummyDurationSeconds,
-      setEndSecond,
-      setGpxFilename,
-      setStartSecond,
-      setSelectedSecond,
-    } = useStore.getState()
+    const storeState = useStore.getState()
+    const { clearActivitySummary } = storeState
 
     clearCurrentActivityCache()
     clearActivitySummary()
 
-    const parseResult = lowerFilename.endsWith('.fit')
-      ? await parseFitActivityFile(file)
-      : await parseGpxActivityFile(file, await file.text())
+    const { parsedActivity, debugPayload } = await parseActivityFile(file)
 
-    const { parsedActivity, debugPayload } = parseResult
-
-    console.log('✅ Frontend activity parse successful:', {
+    console.log('Frontend activity parse successful:', {
       durationSeconds: parsedActivity?.metadata?.duration_seconds,
       format: parsedActivity?.file_format,
       samples: parsedActivity?.metadata?.sample_count,
       validAttributes: parsedActivity?.valid_attributes,
     })
 
-    setGpxFilename(filename)
-    setCurrentActivityCache(parsedActivity, debugPayload)
-    setActivitySummary(parsedActivity)
-    const debugPath = await persistDebugPayload(filename, debugPayload)
-    console.log('✅ Parse debug JSON written:', debugPath)
-    console.log('✅ Activity filename set in store:', filename)
-
-    const durationSeconds = parsedActivity?.metadata?.duration_seconds || 0
-    if (durationSeconds > 0) {
-      console.log('✅ Setting activity duration:', durationSeconds, 'seconds')
-      setDummyDurationSeconds(Math.floor(durationSeconds))
-      setStartSecond(0)
-      setEndSecond(Math.floor(durationSeconds))
-      setSelectedSecond(0)
-    } else {
-      console.warn('⚠️ Parsed activity did not produce a duration value')
-    }
-
-    const { config, setConfig } = useStore.getState()
-    if (config && durationSeconds > 0) {
-      setConfig({
-        ...config,
-        scene: {
-          ...config.scene,
-          start: 0,
-          end: Math.floor(durationSeconds),
-        },
-      })
-    }
+    await applyParsedActivityToStore({
+      filename,
+      parsedActivity,
+      debugPayload,
+      storeState,
+    })
 
     return parsedActivity
   } catch (error) {
-    console.error('❌ Activity parse error:', {
+    console.error('Activity parse error:', {
       message: error.message,
       stack: error.stack,
     })
