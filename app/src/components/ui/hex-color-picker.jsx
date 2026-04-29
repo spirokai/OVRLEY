@@ -136,7 +136,7 @@ export default function HexColorPicker({
         >
           <div className="space-y-4">
             <ColorPickerArea
-              className="h-40 w-full overflow-hidden rounded-lg border border-border/60"
+              className="h-40 w-full overflow-hidden rounded-sm border border-border/60"
               onPointerDown={() => {
                 areaDraggingRef.current = true
               }}
