@@ -1,3 +1,7 @@
+/**
+ * Supports widget editing flows related to widget editor sections.
+ */
+
 import { Move, Palette, TrendingUp, Type } from 'lucide-react'
 import {
   ColorField,
@@ -14,6 +18,14 @@ import { createFontSelection } from '@/lib/fonts'
 import { getWidgetFont } from './widgetDefinitions'
 import { getThemeColor } from '@/lib/theme'
 
+/**
+ * Renders the section heading component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.Icon - Value for icon.
+ * @param {*} props.title - Value for title.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function SectionHeading({ icon: Icon, title }) {
   return (
     <div className="flex items-center gap-2">
@@ -25,6 +37,14 @@ export function SectionHeading({ icon: Icon, title }) {
   )
 }
 
+/**
+ * Renders the position section component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.setNumericField - Value for set numeric field.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function PositionSection({ widget, setNumericField }) {
   return (
     <div className="space-y-3">
@@ -45,6 +65,14 @@ export function PositionSection({ widget, setNumericField }) {
   )
 }
 
+/**
+ * Renders the dimensions section component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.setNumericField - Value for set numeric field.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function DimensionsSection({ widget, setNumericField }) {
   return (
     <div className="space-y-3">
@@ -69,6 +97,21 @@ export function DimensionsSection({ widget, setNumericField }) {
   )
 }
 
+/**
+ * Renders the font section component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.updateWidgetData - Value for update widget data.
+ * @param {*} props.title - Value for title.
+ * @param {*} props.showTextInput - Boolean flag for show text input.
+ * @param {*} props.fontSizeLabel - Value for font size label.
+ * @param {*} props.sizeMin - Value for size min.
+ * @param {*} props.sizeMax - Value for size max.
+ * @param {*} props.colorLabel - Value for color label.
+ * @param {*} props.showFormatSelect - Boolean flag for show format select.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function FontSection({
   widget,
   updateWidgetData,
@@ -139,6 +182,18 @@ export function FontSection({
   )
 }
 
+/**
+ * Renders the icon section component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.updateWidgetData - Value for update widget data.
+ * @param {*} props.setNumericField - Value for set numeric field.
+ * @param {*} props.title - Value for title.
+ * @param {*} props.showUnitsToggle - Boolean flag for show units toggle.
+ * @param {*} props.unitsField - Value for units field.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function IconSection({
   widget,
   updateWidgetData,
@@ -211,6 +266,14 @@ export function IconSection({
   )
 }
 
+/**
+ * Renders the opacity section component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.updateWidgetData - Value for update widget data.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function OpacitySection({ widget, updateWidgetData }) {
   const opacity = Math.round((widget.data.opacity ?? 1) * 100)
 

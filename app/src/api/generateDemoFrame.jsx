@@ -1,3 +1,7 @@
+/**
+ * Implements API helpers for generate demo frame.
+ */
+
 import { getCurrentParsedActivity } from './activityCache'
 import useStore from '../store/useStore'
 import * as backend from './backend'
@@ -5,6 +9,12 @@ import * as backend from './backend'
 // Track if a request is in progress to prevent duplicate calls
 let isGenerating = false
 
+/**
+ * Handles generate demo frame.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 export default async function generateDemoFrame(config) {
   try {
     const {

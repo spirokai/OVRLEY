@@ -1,7 +1,15 @@
+/**
+ * Renders the reset button portion of the application interface.
+ */
+
 import React, { useState } from 'react'
 import Button from 'react-bootstrap/Button'
 import Modal from 'react-bootstrap/Modal'
 
+/**
+ * Renders the reset button component.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ResetButton() {
   const [showModal, setShowModal] = useState(false)
 

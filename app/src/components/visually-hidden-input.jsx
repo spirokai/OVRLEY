@@ -1,8 +1,18 @@
+/**
+ * Renders the visually hidden input portion of the application interface.
+ */
+
 /* eslint-disable react-hooks/refs */
 
 'use client'
 import * as React from 'react'
 
+/**
+ * Renders the visually hidden input component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function VisuallyHiddenInput(props) {
   const {
     control,

@@ -1,3 +1,7 @@
+/**
+ * Provides overlay editor helpers for use overlay editor state.
+ */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentParsedActivity } from '../../api/activityCache'
 import useStore from '../../store/useStore'
@@ -18,6 +22,84 @@ import {
 import { clamp, getSceneSize } from './utils'
 import useWidgetDraftState from './useWidgetDraftState'
 
+/**
+ * Handles resolve preview second.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.dummyDurationSeconds - Numeric dummy duration seconds value.
+ * @param {*} options.selectedSecond - Value for selected second.
+ * @param {*} options.sourceActivity - Value for source activity.
+ * @returns {*} Result produced by the helper.
+ */
+function resolvePreviewSecond({
+  dummyDurationSeconds,
+  selectedSecond,
+  sourceActivity,
+}) {
+  const rawSecond = Number(selectedSecond) || 0
+  const activityDuration = Number(
+    sourceActivity?.trim_end_seconds ??
+      sourceActivity?.metadata?.duration_seconds ??
+      dummyDurationSeconds ??
+      0,
+  )
+  const maxSecond = Math.max(
+    Number.isFinite(activityDuration) ? activityDuration : 0,
+    0,
+  )
+
+  return clamp(rawSecond, 0, maxSecond)
+}
+
+/**
+ * Handles merge drafts into widgets.
+ *
+ * @param {*} widgets - Widget collection in the current template.
+ * @param {*} liveWidgetDrafts - Value for live widget drafts.
+ * @returns {object} Result produced by the helper.
+ */
+function mergeDraftsIntoWidgets(widgets, liveWidgetDrafts) {
+  return widgets.map((widget) => {
+    const draft = liveWidgetDrafts[widget.id]
+    if (!draft) {
+      return widget
+    }
+
+    return {
+      ...widget,
+      data: {
+        ...widget.data,
+        ...draft,
+      },
+    }
+  })
+}
+
+/**
+ * Handles selection ids changed.
+ *
+ * @param {*} leftIds - Value for left ids.
+ * @param {*} rightIds - Value for right ids.
+ * @returns {*} Result produced by the helper.
+ */
+function selectionIdsChanged(leftIds, rightIds) {
+  return (
+    leftIds.length !== rightIds.length ||
+    leftIds.some((widgetId, index) => widgetId !== rightIds[index])
+  )
+}
+
+/**
+ * Provides overlay editor state state and actions.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.config - Overlay template configuration data.
+ * @param {*} options.globalDefaults - Value for global defaults.
+ * @param {*} options.onConfigChange - Callback invoked to config change.
+ * @param {*} options.zoomLevel - Current editor zoom level.
+ * @param {*} options.onZoomLevelChange - Callback invoked to zoom level change.
+ * @returns {object} Result produced by the helper.
+ */
 export default function useOverlayEditorState({
   config,
   globalDefaults,
@@ -75,25 +157,12 @@ export default function useOverlayEditorState({
   const globalOpacity = globalDefaults?.opacity ?? 1
   const globalScale = globalDefaults?.scale ?? 1
   const previewSecond = useMemo(() => {
-    const rawSecond = Number(selectedSecond) || 0
-    const activityDuration = Number(
-      sourceActivity?.trim_end_seconds ??
-        sourceActivity?.metadata?.duration_seconds ??
-        dummyDurationSeconds ??
-        0,
-    )
-    const maxSecond = Math.max(
-      Number.isFinite(activityDuration) ? activityDuration : 0,
-      0,
-    )
-
-    return clamp(rawSecond, 0, maxSecond)
-  }, [
-    dummyDurationSeconds,
-    selectedSecond,
-    sourceActivity?.metadata?.duration_seconds,
-    sourceActivity?.trim_end_seconds,
-  ])
+    return resolvePreviewSecond({
+      dummyDurationSeconds,
+      selectedSecond,
+      sourceActivity,
+    })
+  }, [dummyDurationSeconds, selectedSecond, sourceActivity])
 
   useEffect(() => {
     resetWidgetDrafts()
@@ -134,21 +203,7 @@ export default function useOverlayEditorState({
 
   const displayScale = fitScale * zoomLevel
   const renderedWidgets = useMemo(
-    () =>
-      widgets.map((widget) => {
-        const draft = liveWidgetDrafts[widget.id]
-        if (!draft) {
-          return widget
-        }
-
-        return {
-          ...widget,
-          data: {
-            ...widget.data,
-            ...draft,
-          },
-        }
-      }),
+    () => mergeDraftsIntoWidgets(widgets, liveWidgetDrafts),
     [liveWidgetDrafts, widgets],
   )
   const renderedWidgetMap = useMemo(
@@ -226,11 +281,10 @@ export default function useOverlayEditorState({
       selectedWidgetIds,
       orderedWidgetIds,
     )
-    const selectionChanged =
-      normalizedIds.length !== selectedWidgetIds.length ||
-      normalizedIds.some(
-        (widgetId, index) => widgetId !== selectedWidgetIds[index],
-      )
+    const selectionChanged = selectionIdsChanged(
+      normalizedIds,
+      selectedWidgetIds,
+    )
 
     if (!selectionChanged) {
       return

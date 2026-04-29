@@ -1,3 +1,7 @@
+/**
+ * Implements API helpers for gpx utils.
+ */
+
 import useStore from '../store/useStore'
 import {
   clearCurrentActivityCache,
@@ -7,6 +11,12 @@ import * as backend from './backend'
 import { finalizeParsedActivity, safeNumber } from './activityParserUtils'
 import parseFitActivityFile from './fitParserUtils'
 
+/**
+ * Handles sanitize debug filename.
+ *
+ * @param {*} filename - Target filename for the operation.
+ * @returns {*} Result produced by the helper.
+ */
 function sanitizeDebugFilename(filename) {
   const normalizedBase = String(filename || 'activity')
     .replace(/\.[^/.]+$/, '')
@@ -17,12 +27,25 @@ function sanitizeDebugFilename(filename) {
   return `${normalizedBase || 'activity'}-parse-debug.json`
 }
 
+/**
+ * Handles persist debug payload.
+ *
+ * @param {*} filename - Target filename for the operation.
+ * @param {*} payload - Structured payload produced by the helper.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 async function persistDebugPayload(filename, payload) {
   const debugFilename = sanitizeDebugFilename(filename)
   const contents = JSON.stringify(payload, null, 2)
   return backend.writeParseDebugFile(debugFilename, contents)
 }
 
+/**
+ * Normalizes extension key.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function normalizeExtensionKey(value) {
   return String(value || '')
     .trim()
@@ -30,6 +53,13 @@ function normalizeExtensionKey(value) {
     .replace(/[^a-z0-9]+/g, '')
 }
 
+/**
+ * Handles collect leaf extension values.
+ *
+ * @param {*} element - Value for element.
+ * @param {*} target - Target object, element, or value being updated.
+ * @returns {*} Result produced by the helper.
+ */
 function collectLeafExtensionValues(element, target) {
   const childElements = Array.from(element.children || [])
   if (!childElements.length) {
@@ -44,6 +74,13 @@ function collectLeafExtensionValues(element, target) {
   childElements.forEach((child) => collectLeafExtensionValues(child, target))
 }
 
+/**
+ * Reads track point metric.
+ *
+ * @param {*} extensionValues - Value for extension values.
+ * @param {*} aliases - Alternate metric keys to inspect.
+ * @returns {*} Requested value or structure.
+ */
 function readTrackPointMetric(extensionValues, aliases) {
   for (const alias of aliases) {
     const normalizedAlias = normalizeExtensionKey(alias)
@@ -58,6 +95,13 @@ function readTrackPointMetric(extensionValues, aliases) {
   return null
 }
 
+/**
+ * Parses gpx activity file.
+ *
+ * @param {*} file - File object being loaded or saved.
+ * @param {*} textContent - Value for text content.
+ * @returns {object} Result produced by the helper.
+ */
 function parseGpxActivityFile(file, textContent) {
   const parser = new DOMParser()
   const documentNode = parser.parseFromString(textContent, 'application/xml')
@@ -193,6 +237,96 @@ function parseGpxActivityFile(file, textContent) {
   })
 }
 
+/**
+ * Parses activity file.
+ *
+ * @param {*} file - File object being loaded or saved.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
+async function parseActivityFile(file) {
+  return file.name.toLowerCase().endsWith('.fit')
+    ? parseFitActivityFile(file)
+    : parseGpxActivityFile(file, await file.text())
+}
+
+/**
+ * Synchronizes scene duration with activity.
+ *
+ * @param {*} durationSeconds - Numeric duration seconds value.
+ * @param {*} storeState - Current store snapshot used for synchronization.
+ * @returns {*} Result produced by the helper.
+ */
+function syncSceneDurationWithActivity(durationSeconds, storeState) {
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    console.warn('Parsed activity did not produce a duration value')
+    return
+  }
+
+  const wholeSeconds = Math.floor(durationSeconds)
+  const {
+    config,
+    setConfig,
+    setDummyDurationSeconds,
+    setEndSecond,
+    setSelectedSecond,
+    setStartSecond,
+  } = storeState
+
+  console.log('Setting activity duration:', durationSeconds, 'seconds')
+  setDummyDurationSeconds(wholeSeconds)
+  setStartSecond(0)
+  setEndSecond(wholeSeconds)
+  setSelectedSecond(0)
+
+  if (config) {
+    setConfig({
+      ...config,
+      scene: {
+        ...config.scene,
+        start: 0,
+        end: wholeSeconds,
+      },
+    })
+  }
+}
+
+/**
+ * Applies parsed activity to store.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.filename - Target filename for the operation.
+ * @param {*} options.parsedActivity - Normalized activity payload used by the app.
+ * @param {*} options.debugPayload - Value for debug payload.
+ * @param {*} options.storeState - Current store snapshot used for synchronization.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
+async function applyParsedActivityToStore({
+  filename,
+  parsedActivity,
+  debugPayload,
+  storeState,
+}) {
+  const { setActivitySummary, setGpxFilename } = storeState
+
+  setGpxFilename(filename)
+  setCurrentActivityCache(parsedActivity, debugPayload)
+  setActivitySummary(parsedActivity)
+  const debugPath = await persistDebugPayload(filename, debugPayload)
+  console.log('Parse debug JSON written:', debugPath)
+  console.log('Activity filename set in store:', filename)
+
+  syncSceneDurationWithActivity(
+    parsedActivity?.metadata?.duration_seconds || 0,
+    storeState,
+  )
+}
+
+/**
+ * Handles ensure file object.
+ *
+ * @param {*} fileOrPath - File object or path pointing to an activity file.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 async function ensureFileObject(fileOrPath) {
   if (fileOrPath instanceof File) return fileOrPath
 
@@ -201,76 +335,47 @@ async function ensureFileObject(fileOrPath) {
   )
 }
 
+/**
+ * Handles save file.
+ *
+ * @param {*} fileOrPath - File object or path pointing to an activity file.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 export default async function saveFile(fileOrPath) {
   const file = await ensureFileObject(fileOrPath)
   const filename = file.name
-  const lowerFilename = filename.toLowerCase()
 
-  console.log('📤 Starting GPX processing:', {
+  console.log('Starting activity processing:', {
     source: 'file',
     filename,
   })
 
   try {
-    const {
-      clearActivitySummary,
-      setActivitySummary,
-      setDummyDurationSeconds,
-      setEndSecond,
-      setGpxFilename,
-      setStartSecond,
-      setSelectedSecond,
-    } = useStore.getState()
+    const storeState = useStore.getState()
+    const { clearActivitySummary } = storeState
 
     clearCurrentActivityCache()
     clearActivitySummary()
 
-    const parseResult = lowerFilename.endsWith('.fit')
-      ? await parseFitActivityFile(file)
-      : await parseGpxActivityFile(file, await file.text())
+    const { parsedActivity, debugPayload } = await parseActivityFile(file)
 
-    const { parsedActivity, debugPayload } = parseResult
-
-    console.log('✅ Frontend activity parse successful:', {
+    console.log('Frontend activity parse successful:', {
       durationSeconds: parsedActivity?.metadata?.duration_seconds,
       format: parsedActivity?.file_format,
       samples: parsedActivity?.metadata?.sample_count,
       validAttributes: parsedActivity?.valid_attributes,
     })
 
-    setGpxFilename(filename)
-    setCurrentActivityCache(parsedActivity, debugPayload)
-    setActivitySummary(parsedActivity)
-    const debugPath = await persistDebugPayload(filename, debugPayload)
-    console.log('✅ Parse debug JSON written:', debugPath)
-    console.log('✅ Activity filename set in store:', filename)
-
-    const durationSeconds = parsedActivity?.metadata?.duration_seconds || 0
-    if (durationSeconds > 0) {
-      console.log('✅ Setting activity duration:', durationSeconds, 'seconds')
-      setDummyDurationSeconds(Math.floor(durationSeconds))
-      setStartSecond(0)
-      setEndSecond(Math.floor(durationSeconds))
-      setSelectedSecond(0)
-    } else {
-      console.warn('⚠️ Parsed activity did not produce a duration value')
-    }
-
-    const { config, setConfig } = useStore.getState()
-    if (config && durationSeconds > 0) {
-      setConfig({
-        ...config,
-        scene: {
-          ...config.scene,
-          start: 0,
-          end: Math.floor(durationSeconds),
-        },
-      })
-    }
+    await applyParsedActivityToStore({
+      filename,
+      parsedActivity,
+      debugPayload,
+      storeState,
+    })
 
     return parsedActivity
   } catch (error) {
-    console.error('❌ Activity parse error:', {
+    console.error('Activity parse error:', {
       message: error.message,
       stack: error.stack,
     })

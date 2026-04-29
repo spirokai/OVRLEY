@@ -1,3 +1,14 @@
+/**
+ * Provides shared color utils utilities for the app.
+ */
+
+/**
+ * Normalizes hex color.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} fallback - Fallback value returned when input is invalid.
+ * @returns {*} Derived data structure for downstream use.
+ */
 export function normalizeHexColor(value, fallback = '#000000') {
   if (typeof value !== 'string') {
     return fallback
@@ -33,10 +44,22 @@ export function normalizeHexColor(value, fallback = '#000000') {
   return fallback
 }
 
+/**
+ * Checks whether is color field key.
+ *
+ * @param {*} key - Lookup key for the requested value.
+ * @returns {boolean} Whether the condition is satisfied.
+ */
 export function isColorFieldKey(key) {
   return key === 'color' || key.endsWith('_color') || key.startsWith('color_')
 }
 
+/**
+ * Normalizes color fields.
+ *
+ * @param {*} record - Value for record.
+ * @returns {*} Derived data structure for downstream use.
+ */
 export function normalizeColorFields(record) {
   if (!record || typeof record !== 'object') {
     return record

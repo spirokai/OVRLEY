@@ -1,3 +1,7 @@
+/**
+ * Provides shared theme utilities for the app.
+ */
+
 const THEME_COLOR_VARS = {
   background: '--theme-color-background',
   accent: '--theme-color-accent',
@@ -6,6 +10,12 @@ const THEME_COLOR_VARS = {
   teal: '--theme-color-teal',
 }
 
+/**
+ * Returns theme color.
+ *
+ * @param {*} name - Value for name.
+ * @returns {*} Requested value or structure.
+ */
 export function getThemeColor(name) {
   const variableName = THEME_COLOR_VARS[name] || name
 

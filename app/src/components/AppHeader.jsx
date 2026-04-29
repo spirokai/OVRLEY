@@ -1,0 +1,290 @@
+/**
+ * Renders the app header portion of the application interface.
+ */
+
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import {
+  Activity,
+  FilePlus2,
+  FolderOpen,
+  LayoutGrid,
+  Minus,
+  Play,
+  RotateCcw,
+  Save,
+  Sparkles,
+  Square,
+  ZoomIn,
+} from 'lucide-react'
+
+/**
+ * Renders the app header component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.activityControls - Activity control state and handlers.
+ * @param {*} props.backendStatus - Current backend status.
+ * @param {*} props.editorControls - Editor control state and handlers.
+ * @param {*} props.onOpenDownloads - Callback invoked to open downloads.
+ * @param {*} props.renderControls - Render control state and handlers.
+ * @param {*} props.sceneHeight - Numeric scene height value.
+ * @param {*} props.sceneWidth - Numeric scene width value.
+ * @param {*} props.templateControls - Template control state and handlers.
+ * @returns {JSX.Element} Rendered component output.
+ */
+export default function AppHeader({
+  activityControls,
+  backendStatus,
+  editorControls,
+  onOpenDownloads,
+  renderControls,
+  sceneHeight,
+  sceneWidth,
+  templateControls,
+}) {
+  const { activityLabel, onOpenActivityFile } = activityControls
+  const {
+    backgroundMode,
+    onResetZoom,
+    onSetBackgroundMode,
+    onZoomIn,
+    onZoomOut,
+    zoomLevel,
+  } = editorControls
+  const {
+    onOpenRenderDialog,
+    renderDisabled,
+    renderTooltipContent,
+    renderingVideo,
+  } = renderControls
+  const {
+    config,
+    handleCreateNewTemplate,
+    handleImportTemplate,
+    handleSaveTemplate,
+    handleTemplateChange,
+    loadedTemplateFilename,
+    loadedTemplateSource,
+    showTemplateStatus,
+    status,
+    templates,
+  } = templateControls
+
+  return (
+    <header className="relative z-50 shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
+      <div className="flex items-center justify-between px-6 py-3">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+            <img
+              src="/logo192.png"
+              alt="Cyclemetry"
+              className="w-8 h-8 rounded-lg"
+            />
+            <div className="hidden sm:block">
+              <h1 className="font-semibold text-sm">Cyclemetry</h1>
+              <p className="text-[10px] text-muted-foreground">
+                Overlay Editor
+              </p>
+            </div>
+          </div>
+
+          <div className="h-8 w-px bg-border/60" />
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Button
+                className="mr-4 h-9 gap-2 border-border/70 px-5 "
+                onClick={onOpenActivityFile}
+              >
+                <Activity className="h-3.5 w-3.5" />
+                <span className="max-w-28 truncate">{activityLabel}</span>
+              </Button>
+
+              <Select
+                value={
+                  loadedTemplateSource === 'backend'
+                    ? loadedTemplateFilename || ''
+                    : ''
+                }
+                onValueChange={handleTemplateChange}
+              >
+                <SelectTrigger className="h-8 w-56 bg-surface text-xs border-border/70">
+                  <div className="flex items-center gap-2 truncate">
+                    <Sparkles className="h-3 w-3 shrink-0 text-primary" />
+                    <SelectValue
+                      placeholder={
+                        loadedTemplateSource === 'file'
+                          ? loadedTemplateFilename || 'Imported Template'
+                          : 'Select Template...'
+                      }
+                    />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name} {template.type === 'user' && '(User)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="flex items-center gap-1">
+                <SimpleTooltip side="bottom" content="New Template">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+                    onClick={handleCreateNewTemplate}
+                  >
+                    <FilePlus2 className="h-4 w-4" />
+                  </Button>
+                </SimpleTooltip>
+                {showTemplateStatus && config && (
+                  <SimpleTooltip side="bottom" content="Save Template">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:bg-surface-accent-soft hover:text-primary"
+                      onClick={handleSaveTemplate}
+                    >
+                      <Save className="h-4 w-4" />
+                    </Button>
+                  </SimpleTooltip>
+                )}
+                <SimpleTooltip side="bottom" content="Import Template JSON">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+                    onClick={handleImportTemplate}
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                  </Button>
+                </SimpleTooltip>
+              </div>
+
+              {showTemplateStatus ? (
+                <Badge
+                  variant={status === 'Modified' ? 'secondary' : 'outline'}
+                  className={`text-[10px] h-5 ${
+                    status === 'Modified'
+                      ? 'border-accent-border bg-surface-accent-soft text-primary'
+                      : ''
+                  }`}
+                >
+                  {status}
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-card/80 p-1 backdrop-blur-sm shadow-lg">
+            <SimpleTooltip side="bottom" content="Checkered background">
+              <Button
+                type="button"
+                variant={backgroundMode === 'checker' ? 'default' : 'ghost'}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => onSetBackgroundMode('checker')}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </SimpleTooltip>
+            <SimpleTooltip side="bottom" content="Black background">
+              <Button
+                type="button"
+                variant={backgroundMode === 'black' ? 'default' : 'ghost'}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => onSetBackgroundMode('black')}
+              >
+                <Square className="h-4 w-4" />
+              </Button>
+            </SimpleTooltip>
+            <div className="mx-1 h-5 w-px bg-border/70" />
+            <SimpleTooltip side="bottom" content="Zoom out">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onZoomOut}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+            </SimpleTooltip>
+            <div className="min-w-14 text-center text-xs font-semibold text-muted-foreground">
+              {Math.round(zoomLevel * 100)}%
+            </div>
+            <SimpleTooltip side="bottom" content="Zoom in">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onZoomIn}
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </SimpleTooltip>
+            <SimpleTooltip side="bottom" content="Reset zoom">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onResetZoom}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </SimpleTooltip>
+          </div>
+          <div className="rounded-full border border-border/70 bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm shadow-lg">
+            {sceneWidth} &times; {sceneHeight}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <SimpleTooltip side="bottom" content={renderTooltipContent}>
+            <Button
+              size="sm"
+              className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+              disabled={renderDisabled}
+              onClick={onOpenRenderDialog}
+            >
+              <Play className="mr-2 h-4 w-4" />
+              {renderingVideo ? 'Rendering...' : 'Render'}
+            </Button>
+          </SimpleTooltip>
+
+          <SimpleTooltip
+            side="bottom"
+            content={backendStatus !== 'connected' ? 'Backend offline' : null}
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-2 border-accent-border/70 px-3 text-muted-foreground hover:border-accent-border hover:bg-surface-accent-soft hover:text-foreground"
+              disabled={backendStatus !== 'connected'}
+              onClick={onOpenDownloads}
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+              <span>Overlays</span>
+            </Button>
+          </SimpleTooltip>
+        </div>
+      </div>
+    </header>
+  )
+}

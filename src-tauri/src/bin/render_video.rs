@@ -78,21 +78,40 @@ fn main() -> Result<(), String> {
     let activity = parse_activity_json(&payload_json)?;
     let mut config = parse_config_json(&config_json)?;
     set_ffmpeg_string(&mut config, "codec", read_optional_arg("--codec", &args))?;
-    set_ffmpeg_string(&mut config, "container", read_optional_arg("--container", &args))?;
-    set_ffmpeg_string(&mut config, "pix_fmt", read_optional_arg("--pix-fmt", &args))?;
+    set_ffmpeg_string(
+        &mut config,
+        "container",
+        read_optional_arg("--container", &args),
+    )?;
+    set_ffmpeg_string(
+        &mut config,
+        "pix_fmt",
+        read_optional_arg("--pix-fmt", &args),
+    )?;
     set_ffmpeg_string(
         &mut config,
         "prores_profile",
         read_optional_arg("--prores-profile", &args),
     )?;
-    set_ffmpeg_string(&mut config, "loglevel", read_optional_arg("--loglevel", &args))?;
-    set_ffmpeg_u64(&mut config, "threads", read_optional_arg("--threads", &args))?;
+    set_ffmpeg_string(
+        &mut config,
+        "loglevel",
+        read_optional_arg("--loglevel", &args),
+    )?;
+    set_ffmpeg_u64(
+        &mut config,
+        "threads",
+        read_optional_arg("--threads", &args),
+    )?;
     let dense_activity = build_dense_activity_report(&activity, &config)?;
     let paths = AppPaths::from_repo_root(repo_root()?);
     paths.ensure_dirs()?;
 
     let controller = RenderController::default();
-    controller.try_start(dense_activity.frame_count as u32, "Preparing render assets...")?;
+    controller.try_start(
+        dense_activity.frame_count as u32,
+        "Preparing render assets...",
+    )?;
     let filename = render_video(&paths, &config, &activity, &dense_activity, &controller)?;
     controller.finish_success(filename.clone());
     println!("{{\"filename\":\"{filename}\"}}");

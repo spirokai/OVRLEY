@@ -1,3 +1,7 @@
+/**
+ * Provides reusable hex color picker UI primitives for the application.
+ */
+
 import { useEffect, useRef, useState } from 'react'
 import {
   ColorPicker,
@@ -23,6 +27,20 @@ const DEFAULT_PRESET_COLORS = [
 ]
 const AREA_COMMIT_DEBOUNCE_MS = 0
 
+/**
+ * Renders the hex color picker component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.value - Input value processed by the helper.
+ * @param {*} props.onChange - Callback invoked to change.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.triggerClassName - Value for trigger class name.
+ * @param {*} props.valueClassName - Value for value class name.
+ * @param {*} props.swatchClassName - Value for swatch class name.
+ * @param {*} props.presetColors - Value for preset colors.
+ * @param {*} props.showValue - Boolean flag for show value.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function HexColorPicker({
   value,
   onChange,

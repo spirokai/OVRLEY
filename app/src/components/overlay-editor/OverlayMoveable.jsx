@@ -1,5 +1,28 @@
+/**
+ * Provides overlay editor helpers for overlay moveable.
+ */
+
 import Moveable from 'react-moveable'
 
+/**
+ * Renders the overlay moveable component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.moveableRef - Value for moveable ref.
+ * @param {*} props.selectedTarget - Value for selected target.
+ * @param {*} props.selectedTargets - Value for selected targets.
+ * @param {*} props.isGroupDragActive - Boolean flag for is group drag active.
+ * @param {*} props.sceneElement - Value for scene element.
+ * @param {*} props.displayScale - Value for display scale.
+ * @param {*} props.canResizeSelected - Value for can resize selected.
+ * @param {*} props.canScaleSelected - Value for can scale selected.
+ * @param {*} props.canRotateSelected - Value for can rotate selected.
+ * @param {*} props.maintainAspectRatio - Value for maintain aspect ratio.
+ * @param {*} props.elementGuidelines - Value for element guidelines.
+ * @param {*} props.sceneSize - Numeric scene size value.
+ * @param {*} props.handlers - Value for handlers.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function OverlayMoveable({
   moveableRef,
   selectedTarget,

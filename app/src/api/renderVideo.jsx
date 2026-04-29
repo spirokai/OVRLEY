@@ -1,9 +1,20 @@
+/**
+ * Implements API helpers for render video.
+ */
+
 import { getCurrentParsedActivity } from './activityCache'
 import useStore from '../store/useStore'
 import * as backend from './backend'
 import { applyGlobalDefaults } from '../lib/config-utils'
 
 // Helper to convert HH:MM:SS to seconds
+
+/**
+ * Handles time to seconds.
+ *
+ * @param {*} timeStr - Value for time str.
+ * @returns {*} Result produced by the helper.
+ */
 function timeToSeconds(timeStr) {
   if (!timeStr) return 0
   const parts = timeStr.split(':').map(Number)
@@ -16,6 +27,12 @@ function timeToSeconds(timeStr) {
   return parts[0] || 0
 }
 
+/**
+ * Renders video.
+ *
+ * @param {*} overrides - Value for overrides.
+ * @returns {Promise<object>} Promise resolving to the operation result.
+ */
 export default async function renderVideo(overrides = {}) {
   try {
     const {

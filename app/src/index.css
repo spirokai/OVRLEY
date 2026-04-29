@@ -17,7 +17,8 @@
   font-display: swap;
 }
 
-:root {
+:root,
+.radix-themes {
   font-family:
     Ubuntu,
     system-ui,
@@ -28,6 +29,7 @@
   line-height: 1.5;
   font-weight: 400;
   font-size: clamp(13px, 0.5vw + 8px, 16px);
+  --scaling: 2;
   text-transform: uppercase;
   font-optical-sizing: auto;
 

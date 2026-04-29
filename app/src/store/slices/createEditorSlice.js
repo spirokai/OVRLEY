@@ -1,3 +1,7 @@
+/**
+ * Creates the create editor slice Zustand slice used by the application store.
+ */
+
 import {
   beginConfigUpdate,
   cloneSerializable,
@@ -9,6 +13,13 @@ import {
   updateConfigPersistence,
 } from '../store-utils'
 
+/**
+ * Creates editor slice.
+ *
+ * @param {*} set - Zustand setter callback.
+ * @param {*} get - Value for get.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function createEditorSlice(set, get) {
   return {
     editor: null,

@@ -1,3 +1,7 @@
+/**
+ * Provides reusable button UI primitives for the application.
+ */
+
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cva } from 'class-variance-authority'
@@ -35,6 +39,16 @@ const buttonVariants = cva(
   },
 )
 
+/**
+ * Renders the button component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.variant - Value for variant.
+ * @param {*} props.size - Numeric size value.
+ * @param {*} props.asChild - Value for as child.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Button({
   className,
   variant = 'default',

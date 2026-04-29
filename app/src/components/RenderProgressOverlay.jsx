@@ -1,9 +1,17 @@
+/**
+ * Renders the render progress overlay portion of the application interface.
+ */
+
 import React, { useState } from 'react'
 import useStore from '../store/useStore'
 import { Progress } from '@/components/ui/progress'
 import { Loader2, Timer, Film } from 'lucide-react'
 import { cancelRender } from '../api/backend'
 
+/**
+ * Renders the render progress overlay component.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function RenderProgressOverlay() {
   const { renderingVideo, renderProgress } = useStore()
   const [isCancelling, setIsCancelling] = useState(false)

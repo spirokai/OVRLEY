@@ -1,3 +1,7 @@
+/**
+ * Creates the create template slice Zustand slice used by the application store.
+ */
+
 import * as backend from '../../api/backend'
 import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
 import { syncGlobalDefaultsToConfig } from '../../lib/config-utils'
@@ -20,6 +24,13 @@ const {
   aspectRatio: initialAspectRatio,
 } = readStoredTemplateSettings()
 
+/**
+ * Creates template slice.
+ *
+ * @param {*} set - Zustand setter callback.
+ * @param {*} get - Value for get.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function createTemplateSlice(set, get) {
   const normalizePlatformCodec = (codec, platformOs) => {
     if (codec === 'libvpx-vp9' || codec === 'hevc_alpha') {
@@ -31,6 +42,66 @@ export function createTemplateSlice(set, get) {
     }
 
     return codec || 'prores_ks'
+  }
+
+  const persistTemplateIdentity = (filename, source) => {
+    localStorage.setItem('loadedTemplateFilename', filename || '')
+    localStorage.setItem('loadedTemplateSource', source || '')
+  }
+
+  const persistTemplateSettings = ({
+    config,
+    globalDefaults,
+    exportRange,
+    exportCodec,
+    aspectRatio,
+    updateRate,
+    filename = null,
+    source = null,
+  }) => {
+    localStorage.setItem('editorConfig', JSON.stringify(config))
+    persistSerializable('globalDefaults', globalDefaults)
+    persistSerializable('exportRange', exportRange)
+    localStorage.setItem('exportCodec', exportCodec)
+    localStorage.setItem('aspectRatio', aspectRatio)
+    localStorage.setItem('updateRate', updateRate.toString())
+    persistTemplateIdentity(filename, source)
+  }
+
+  const syncTimelineStorage = (scene) => {
+    if (!scene) return
+
+    if (scene.start !== undefined) {
+      localStorage.setItem('startSecond', scene.start.toString())
+      localStorage.setItem('selectedSecond', scene.start.toString())
+    }
+
+    if (scene.end !== undefined) {
+      localStorage.setItem('endSecond', scene.end.toString())
+    }
+  }
+
+  const applySceneTimingToState = (state, scene) => {
+    if (!scene) return
+
+    if (scene.start !== undefined) {
+      state.startSecond = scene.start
+      state.selectedSecond = scene.start
+    }
+
+    if (scene.end !== undefined) {
+      state.endSecond = scene.end
+    }
+  }
+
+  const updateUnrenderedChanges = (state, nextConfig) => {
+    if (state.lastRenderedConfig) {
+      state.hasUnrenderedChanges =
+        JSON.stringify(nextConfig) !== JSON.stringify(state.lastRenderedConfig)
+      return
+    }
+
+    state.hasUnrenderedChanges = true
   }
 
   return {
@@ -142,17 +213,15 @@ export function createTemplateSlice(set, get) {
       const nextAspectRatio = '16:9'
       const nextUpdateRate = 1
 
-      localStorage.setItem('editorConfig', JSON.stringify(nextConfig))
-      persistSerializable('globalDefaults', nextGlobalDefaults)
-      persistSerializable('exportRange', nextExportRange)
-      localStorage.setItem('exportCodec', nextExportCodec)
-      localStorage.setItem('aspectRatio', nextAspectRatio)
-      localStorage.setItem('updateRate', nextUpdateRate.toString())
-      localStorage.setItem('loadedTemplateFilename', '')
-      localStorage.setItem('loadedTemplateSource', '')
-      localStorage.setItem('startSecond', nextConfig.scene.start.toString())
-      localStorage.setItem('selectedSecond', nextConfig.scene.start.toString())
-      localStorage.setItem('endSecond', nextConfig.scene.end.toString())
+      persistTemplateSettings({
+        config: nextConfig,
+        globalDefaults: nextGlobalDefaults,
+        exportRange: nextExportRange,
+        exportCodec: nextExportCodec,
+        aspectRatio: nextAspectRatio,
+        updateRate: nextUpdateRate,
+      })
+      syncTimelineStorage(nextConfig.scene)
       persistSerializable('lastSavedTemplateState', null)
 
       set((state) => {
@@ -166,17 +235,8 @@ export function createTemplateSlice(set, get) {
         state.loadedTemplateFilename = null
         state.loadedTemplateSource = null
         state.lastSavedTemplateState = null
-        state.startSecond = nextConfig.scene.start
-        state.selectedSecond = nextConfig.scene.start
-        state.endSecond = nextConfig.scene.end
-
-        if (state.lastRenderedConfig) {
-          state.hasUnrenderedChanges =
-            JSON.stringify(nextConfig) !==
-            JSON.stringify(state.lastRenderedConfig)
-        } else {
-          state.hasUnrenderedChanges = true
-        }
+        applySceneTimingToState(state, nextConfig.scene)
+        updateUnrenderedChanges(state, nextConfig)
       })
     },
 
@@ -197,8 +257,7 @@ export function createTemplateSlice(set, get) {
     },
 
     setLoadedTemplate: (filename, source = null) => {
-      localStorage.setItem('loadedTemplateFilename', filename || '')
-      localStorage.setItem('loadedTemplateSource', source || '')
+      persistTemplateIdentity(filename, source)
       set((state) => {
         state.communityTemplateFilename = null
         state.loadedTemplateFilename = filename
@@ -225,14 +284,17 @@ export function createTemplateSlice(set, get) {
       const nextAspectRatio = nextSettings.aspectRatio || '16:9'
       const nextUpdateRate = nextSettings.updateRate || 1
 
-      localStorage.setItem('editorConfig', JSON.stringify(nextConfig))
-      persistSerializable('globalDefaults', nextGlobalDefaults)
-      persistSerializable('exportRange', nextExportRange)
-      localStorage.setItem('exportCodec', nextExportCodec)
-      localStorage.setItem('aspectRatio', nextAspectRatio)
-      localStorage.setItem('updateRate', nextUpdateRate.toString())
-      localStorage.setItem('loadedTemplateFilename', filename || '')
-      localStorage.setItem('loadedTemplateSource', source || '')
+      persistTemplateSettings({
+        config: nextConfig,
+        globalDefaults: nextGlobalDefaults,
+        exportRange: nextExportRange,
+        exportCodec: nextExportCodec,
+        aspectRatio: nextAspectRatio,
+        updateRate: nextUpdateRate,
+        filename,
+        source,
+      })
+      syncTimelineStorage(nextConfig.scene)
 
       set((state) => {
         state.communityTemplateFilename = null
@@ -245,33 +307,8 @@ export function createTemplateSlice(set, get) {
         state.loadedTemplateFilename = filename
         state.loadedTemplateSource = source
 
-        if (nextConfig.scene) {
-          if (nextConfig.scene.start !== undefined) {
-            state.startSecond = nextConfig.scene.start
-            state.selectedSecond = nextConfig.scene.start
-            localStorage.setItem(
-              'startSecond',
-              nextConfig.scene.start.toString(),
-            )
-            localStorage.setItem(
-              'selectedSecond',
-              nextConfig.scene.start.toString(),
-            )
-          }
-
-          if (nextConfig.scene.end !== undefined) {
-            state.endSecond = nextConfig.scene.end
-            localStorage.setItem('endSecond', nextConfig.scene.end.toString())
-          }
-        }
-
-        if (state.lastRenderedConfig) {
-          state.hasUnrenderedChanges =
-            JSON.stringify(nextConfig) !==
-            JSON.stringify(state.lastRenderedConfig)
-        } else {
-          state.hasUnrenderedChanges = true
-        }
+        applySceneTimingToState(state, nextConfig.scene)
+        updateUnrenderedChanges(state, nextConfig)
       })
     },
 

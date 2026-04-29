@@ -1,8 +1,22 @@
+/**
+ * Provides reusable blur input UI primitives for the application.
+ */
+
 import { useState, useEffect, useRef } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
+/**
+ * Renders the blur input component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.initialValue - Value for initial value.
+ * @param {*} props.onChange - Callback invoked to change.
+ * @param {*} props.onBlur - Callback invoked to blur.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function BlurInput({
   value: initialValue,
   onChange,

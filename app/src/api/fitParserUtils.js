@@ -1,6 +1,17 @@
+/**
+ * Implements API helpers for fit parser utils.
+ */
+
 import FitParser from 'fit-file-parser'
 import { finalizeParsedActivity, safeNumber } from './activityParserUtils'
 
+/**
+ * Returns optional record value.
+ *
+ * @param {*} record - Value for record.
+ * @param {*} keys - Lookup keys to inspect in priority order.
+ * @returns {*} Requested value or structure.
+ */
 function getOptionalRecordValue(record, keys) {
   for (const key of keys) {
     if (record[key] !== undefined && record[key] !== null) {
@@ -11,6 +22,12 @@ function getOptionalRecordValue(record, keys) {
   return null
 }
 
+/**
+ * Parses fit activity file.
+ *
+ * @param {*} file - File object being loaded or saved.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 export default async function parseFitActivityFile(file) {
   const fitParser = new FitParser({
     elapsedRecordField: true,

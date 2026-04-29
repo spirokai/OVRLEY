@@ -1,10 +1,17 @@
+/**
+ * Provides shared compose refs utilities for the app.
+ */
+
 /* eslint-disable react-hooks/exhaustive-deps */
 
 import * as React from 'react'
 
 /**
- * Set a given ref to a given value
- * This utility takes care of different types of refs: callback refs and RefObject(s)
+ * Sets ref.
+ *
+ * @param {React.Ref<*>} ref - Forwarded React ref.
+ * @param {*} value - Input value processed by the helper.
+ * @returns {*} Result produced by the helper.
  */
 function setRef(ref, value) {
   if (typeof ref === 'function') {
@@ -17,8 +24,10 @@ function setRef(ref, value) {
 }
 
 /**
- * A utility to compose multiple refs together
- * Accepts callback refs and RefObject(s)
+ * Handles compose refs.
+ *
+ * @param {*} refs - Value for refs.
+ * @returns {*} Result produced by the helper.
  */
 function composeRefs(...refs) {
   return (node) => {
@@ -51,8 +60,10 @@ function composeRefs(...refs) {
 }
 
 /**
- * A custom hook that composes multiple refs
- * Accepts callback refs and RefObject(s)
+ * Provides composed refs state and actions.
+ *
+ * @param {*} refs - Value for refs.
+ * @returns {*} Result produced by the helper.
  */
 function useComposedRefs(...refs) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: we want to memoize by all values

@@ -1,3 +1,7 @@
+/**
+ * Provides reusable font select field UI primitives for the application.
+ */
+
 import { useMemo } from 'react'
 import { Label } from '@/components/ui/label'
 import {
@@ -16,6 +20,18 @@ import {
   RECOMMENDED_FONTS,
 } from '@/lib/fonts'
 
+/**
+ * Renders the font select field component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.label - Field or UI label text.
+ * @param {*} props.value - Input value processed by the helper.
+ * @param {*} props.onValueChange - Callback invoked to value change.
+ * @param {*} props.systemFonts - Value for system fonts.
+ * @param {*} props.triggerClassName - Value for trigger class name.
+ * @param {*} props.labelClassName - Value for label class name.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function FontSelectField({
   label,
   value,

@@ -1,10 +1,16 @@
 /**
- * Merges global defaults into a configuration object.
- * This allows the user to set a "theme" in the Global tab and have it apply to all elements
- * that don't have explicit overrides.
+ * Provides shared config utils utilities for the app.
  */
+
 import { createFontSelection, getFontFamilyName } from './fonts'
 
+/**
+ * Applies global defaults.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} globals - Global defaults merged into widgets.
+ * @returns {*} Result produced by the helper.
+ */
 export function applyGlobalDefaults(config, globals) {
   if (!config || !globals) return config
 
@@ -89,6 +95,14 @@ export function applyGlobalDefaults(config, globals) {
   return newConfig
 }
 
+/**
+ * Synchronizes global defaults to config.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} globals - Global defaults merged into widgets.
+ * @param {*} changedKeys - Value for changed keys.
+ * @returns {*} Result produced by the helper.
+ */
 export function syncGlobalDefaultsToConfig(
   config,
   globals,

@@ -1,3 +1,7 @@
+/**
+ * Renders the sidebar widgets tab portion of the application interface.
+ */
+
 import { useEffect, useMemo } from 'react'
 import { RotateCcw, Tag, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -36,6 +40,14 @@ import {
 } from '@/lib/widget-config'
 import { PositionSection } from './widgets/widgetEditorSections'
 
+/**
+ * Renders widget editor.
+ *
+ * @param {*} widget - Widget definition being rendered or edited.
+ * @param {*} updateWidgetData - Value for update widget data.
+ * @param {*} setNumericField - Value for set numeric field.
+ * @returns {*} Result produced by the helper.
+ */
 function renderWidgetEditor(widget, updateWidgetData, setNumericField) {
   if (widget.type === 'label') {
     return (
@@ -105,6 +117,10 @@ function renderWidgetEditor(widget, updateWidgetData, setNumericField) {
   return null
 }
 
+/**
+ * Renders the sidebar widgets tab component.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function SidebarWidgetsTab() {
   const {
     config,

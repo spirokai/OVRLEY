@@ -1,3 +1,7 @@
+/**
+ * Provides shared template snapshot utilities for the app.
+ */
+
 import { normalizeColorFields } from './color-utils'
 
 export const TEMPLATE_FILE_FORMAT = 'cyclemetry-template'
@@ -28,11 +32,23 @@ export const DEFAULT_GLOBAL_DEFAULTS = {
   scale: 1,
 }
 
+/**
+ * Handles clone serializable.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {*} Result produced by the helper.
+ */
 function cloneSerializable(value) {
   if (value === undefined) return undefined
   return JSON.parse(JSON.stringify(value))
 }
 
+/**
+ * Handles sanitize template filename.
+ *
+ * @param {*} name - Value for name.
+ * @returns {*} Result produced by the helper.
+ */
 export function sanitizeTemplateFilename(name) {
   const normalized = String(name || 'cyclemetry_template')
     .trim()
@@ -44,6 +60,18 @@ export function sanitizeTemplateFilename(name) {
   return `${normalized || 'cyclemetry_template'}.json`
 }
 
+/**
+ * Creates template state.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.config - Overlay template configuration data.
+ * @param {*} options.globalDefaults - Value for global defaults.
+ * @param {*} options.updateRate - Metric sampling rate used during export.
+ * @param {*} options.exportRange - Requested export start and end bounds.
+ * @param {*} options.exportCodec - Selected export codec identifier.
+ * @param {*} options.aspectRatio - Value for aspect ratio.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function createTemplateState({
   config,
   globalDefaults,
@@ -70,6 +98,13 @@ export function createTemplateState({
   }
 }
 
+/**
+ * Creates template file payload.
+ *
+ * @param {*} state - Value for state.
+ * @param {*} meta - Value for meta.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function createTemplateFilePayload(state, meta = {}) {
   return {
     format: TEMPLATE_FILE_FORMAT,
@@ -80,6 +115,13 @@ export function createTemplateFilePayload(state, meta = {}) {
   }
 }
 
+/**
+ * Normalizes template file payload.
+ *
+ * @param {*} rawTemplate - Value for raw template.
+ * @param {*} fallbackState - Value for fallback state.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function normalizeTemplateFilePayload(rawTemplate, fallbackState = {}) {
   if (!rawTemplate || typeof rawTemplate !== 'object') {
     throw new Error('Template file is empty or invalid.')
@@ -120,14 +162,34 @@ export function normalizeTemplateFilePayload(rawTemplate, fallbackState = {}) {
   throw new Error('Unsupported template file format.')
 }
 
+/**
+ * Handles template states equal.
+ *
+ * @param {*} left - Left-hand comparison value.
+ * @param {*} right - Right-hand comparison value.
+ * @returns {*} Result produced by the helper.
+ */
 export function templateStatesEqual(left, right) {
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
+/**
+ * Handles stringify template file.
+ *
+ * @param {*} payload - Structured payload produced by the helper.
+ * @returns {*} Result produced by the helper.
+ */
 export function stringifyTemplateFile(payload) {
   return JSON.stringify(payload, null, 2)
 }
 
+/**
+ * Handles download template file.
+ *
+ * @param {*} payload - Structured payload produced by the helper.
+ * @param {*} filename - Target filename for the operation.
+ * @returns {*} Result produced by the helper.
+ */
 export function downloadTemplateFile(payload, filename) {
   const blob = new Blob([stringifyTemplateFile(payload)], {
     type: 'application/json',

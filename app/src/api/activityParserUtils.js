@@ -1,3 +1,18 @@
+/**
+ * Implements API helpers for activity parser utils.
+ */
+
+import {
+  buildDistanceSeries,
+  buildElapsedSeries,
+  buildProgressSeries,
+  insertIdleGapSamples,
+} from './activityGapUtils'
+import {
+  buildMetricCoverage,
+  deriveActivityMetricSeries,
+} from './activityMetricSeries'
+
 export const CORE_ACTIVITY_ATTRIBUTES = [
   'cadence',
   'course',
@@ -49,16 +64,35 @@ const METRIC_UNITS = {
   vertical_speed: 'mps',
 }
 
+/**
+ * Checks whether is finite number.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {boolean} Whether the condition is satisfied.
+ */
 function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
+/**
+ * Handles round value.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} digits - Value for digits.
+ * @returns {number} Result produced by the helper.
+ */
 function roundValue(value, digits = 6) {
   if (!isFiniteNumber(value)) return null
   const scale = 10 ** digits
   return Math.round(value * scale) / scale
 }
 
+/**
+ * Handles safe number.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {number} Result produced by the helper.
+ */
 export function safeNumber(value) {
   if (value === null || value === undefined || value === '') {
     return null
@@ -78,6 +112,12 @@ export function safeNumber(value) {
   return null
 }
 
+/**
+ * Handles safe timestamp.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {number} Result produced by the helper.
+ */
 export function safeTimestamp(value) {
   if (!value) return null
   const date = value instanceof Date ? value : new Date(value)
@@ -85,6 +125,15 @@ export function safeTimestamp(value) {
   return date.toISOString()
 }
 
+/**
+ * Handles haversine distance meters.
+ *
+ * @param {*} lat1 - Value for lat1.
+ * @param {*} lon1 - Value for lon1.
+ * @param {*} lat2 - Value for lat2.
+ * @param {*} lon2 - Value for lon2.
+ * @returns {*} Result produced by the helper.
+ */
 export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   if (
     !isFiniteNumber(lat1) ||
@@ -109,6 +158,13 @@ export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   return earthRadiusMeters * c
 }
 
+/**
+ * Handles calculate bearing degrees.
+ *
+ * @param {*} fromPoint - Value for from point.
+ * @param {*} toPoint - Value for to point.
+ * @returns {*} Result produced by the helper.
+ */
 function calculateBearingDegrees(fromPoint, toPoint) {
   if (!fromPoint || !toPoint) return null
 
@@ -135,799 +191,54 @@ function calculateBearingDegrees(fromPoint, toPoint) {
   return (bearing + 360) % 360
 }
 
-function buildDistanceSeries(coursePoints, directDistanceSeries) {
-  const distanceSeries = []
-  let totalDistanceMeters = 0
-
-  for (let index = 0; index < coursePoints.length; index += 1) {
-    const directDistance = directDistanceSeries[index]
-    if (isFiniteNumber(directDistance)) {
-      totalDistanceMeters = Math.max(totalDistanceMeters, directDistance)
-      distanceSeries.push(roundValue(totalDistanceMeters, 3))
-      continue
-    }
-
-    const previousPoint = index > 0 ? coursePoints[index - 1] : null
-    const currentPoint = coursePoints[index]
-    if (index > 0) {
-      totalDistanceMeters += haversineDistanceMeters(
-        previousPoint?.[0],
-        previousPoint?.[1],
-        currentPoint?.[0],
-        currentPoint?.[1],
-      )
-    }
-
-    distanceSeries.push(roundValue(totalDistanceMeters, 3))
-  }
-
-  return distanceSeries
-}
-
-function buildElapsedSeries(rawSamples, timeSeries) {
-  const explicitElapsed = rawSamples.map((sample) =>
-    safeNumber(sample.elapsedSeconds),
-  )
-  const hasExplicitElapsed = explicitElapsed.some(isFiniteNumber)
-
-  if (hasExplicitElapsed) {
-    const elapsedSeries = []
-    let lastValue = 0
-
-    for (let index = 0; index < explicitElapsed.length; index += 1) {
-      const currentExplicit = explicitElapsed[index]
-      if (isFiniteNumber(currentExplicit)) {
-        lastValue = Math.max(lastValue, currentExplicit)
-        elapsedSeries.push(roundValue(lastValue, 3))
-        continue
-      }
-
-      if (index === 0) {
-        elapsedSeries.push(0)
-        continue
-      }
-
-      lastValue = elapsedSeries[index - 1]
-      elapsedSeries.push(roundValue(lastValue, 3))
-    }
-
-    return elapsedSeries
-  }
-
-  const validTimestamps = timeSeries.map((value) =>
-    value ? new Date(value) : null,
-  )
-  const origin = validTimestamps.find(
-    (value) => value && Number.isFinite(value.getTime()),
-  )
-
-  if (!origin) {
-    return rawSamples.map((_, index) => roundValue(index, 3))
-  }
-
-  let lastValue = 0
-  return validTimestamps.map((timestamp, index) => {
-    if (!timestamp || !Number.isFinite(timestamp.getTime())) {
-      lastValue = index === 0 ? 0 : lastValue
-      return roundValue(lastValue, 3)
-    }
-
-    const nextValue = Math.max(
-      0,
-      (timestamp.getTime() - origin.getTime()) / 1000,
-    )
-
-    if (nextValue <= lastValue && index > 0) {
-      lastValue += 0.001
-      return roundValue(lastValue, 3)
-    }
-
-    lastValue = nextValue
-    return roundValue(nextValue, 3)
-  })
-}
-
-function buildProgressSeries(distanceSeries) {
-  const totalDistanceMeters = distanceSeries[distanceSeries.length - 1] ?? 0
-  if (!isFiniteNumber(totalDistanceMeters) || totalDistanceMeters <= 0) {
-    return distanceSeries.map(() => 0)
-  }
-
-  return distanceSeries.map((value) =>
-    roundValue(value / totalDistanceMeters, 6),
-  )
-}
-
-function smoothElevationSeries(elevationSeries, radius = 2) {
-  return elevationSeries.map((value, index) => {
-    if (!isFiniteNumber(value)) return null
-
-    let total = 0
-    let count = 0
-    for (
-      let neighborIndex = Math.max(0, index - radius);
-      neighborIndex <= Math.min(elevationSeries.length - 1, index + radius);
-      neighborIndex += 1
-    ) {
-      const neighborValue = elevationSeries[neighborIndex]
-      if (!isFiniteNumber(neighborValue)) continue
-      total += neighborValue
-      count += 1
-    }
-
-    return count > 0 ? roundValue(total / count, 3) : null
-  })
-}
-
-function applyFixedSavitzkyGolay(values, coefficients) {
-  const radius = Math.floor(coefficients.length / 2)
-  return values.map((value, index) => {
-    if (!isFiniteNumber(value)) return null
-
-    let total = 0
-    let coefficientTotal = 0
-    for (let offset = -radius; offset <= radius; offset += 1) {
-      const neighborIndex = index + offset
-      if (neighborIndex < 0 || neighborIndex >= values.length) continue
-
-      const neighborValue = values[neighborIndex]
-      if (!isFiniteNumber(neighborValue)) continue
-
-      const coefficient = coefficients[offset + radius]
-      total += neighborValue * coefficient
-      coefficientTotal += coefficient
-    }
-
-    if (!coefficientTotal) {
-      return roundValue(value, 3)
-    }
-
-    return roundValue(total / coefficientTotal, 3)
-  })
-}
-
-function smoothGradientInputSeriesLegacy(elevationSeries) {
-  const populatedSamples = elevationSeries.filter(isFiniteNumber).length
-  if (populatedSamples < 3) {
-    return elevationSeries.map((value) => roundValue(value, 3))
-  }
-
-  return applyFixedSavitzkyGolay(elevationSeries, [-2, 3, 6, 7, 6, 3, -2])
-}
-
-function deriveGradientSeries(elevationSeries, distanceSeries) {
-  const smoothedElevation = smoothElevationSeries(elevationSeries)
-  const gradientSeries = []
-  let lastGradient = 0
-
-  for (let index = 0; index < distanceSeries.length; index += 1) {
-    const currentDistance = distanceSeries[index]
-    if (!isFiniteNumber(currentDistance)) {
-      gradientSeries.push(null)
-      continue
-    }
-
-    let leftIndex = index
-    while (leftIndex > 0 && currentDistance - distanceSeries[leftIndex] < 5) {
-      leftIndex -= 1
-    }
-
-    let rightIndex = index
-    while (
-      rightIndex < distanceSeries.length - 1 &&
-      distanceSeries[rightIndex] - currentDistance < 5
-    ) {
-      rightIndex += 1
-    }
-
-    const leftDistance = distanceSeries[leftIndex]
-    const rightDistance = distanceSeries[rightIndex]
-    const leftElevation = smoothedElevation[leftIndex]
-    const rightElevation = smoothedElevation[rightIndex]
-
-    if (
-      !isFiniteNumber(leftDistance) ||
-      !isFiniteNumber(rightDistance) ||
-      !isFiniteNumber(leftElevation) ||
-      !isFiniteNumber(rightElevation)
-    ) {
-      gradientSeries.push(roundValue(lastGradient, 3))
-      continue
-    }
-
-    const horizontalDistance = rightDistance - leftDistance
-    if (horizontalDistance < 1) {
-      gradientSeries.push(roundValue(lastGradient, 3))
-      continue
-    }
-
-    const nextGradient = Math.max(
-      -30,
-      Math.min(
-        30,
-        ((rightElevation - leftElevation) / horizontalDistance) * 100,
-      ),
-    )
-    lastGradient = nextGradient
-    gradientSeries.push(roundValue(nextGradient, 3))
-  }
-
-  return gradientSeries
-}
-
-function deriveLegacyGradientSeries(elevationSeries, distanceSeries) {
-  if (!elevationSeries.length) {
-    return []
-  }
-
-  if (
-    elevationSeries.length === 1 ||
-    distanceSeries.length !== elevationSeries.length
-  ) {
-    return elevationSeries.map(() => 0)
-  }
-
-  const gradientInputElevations =
-    smoothGradientInputSeriesLegacy(elevationSeries)
-  const gradients = []
-  const lastIndex = elevationSeries.length - 1
-
-  for (let index = 0; index < elevationSeries.length; index += 1) {
-    const leftIndex = index === 0 ? 0 : index - 1
-    const rightIndex = index === lastIndex ? lastIndex : index + 1
-
-    const leftDistance = distanceSeries[leftIndex]
-    const rightDistance = distanceSeries[rightIndex]
-    const leftElevation = gradientInputElevations[leftIndex]
-    const rightElevation = gradientInputElevations[rightIndex]
-
-    if (
-      !isFiniteNumber(leftDistance) ||
-      !isFiniteNumber(rightDistance) ||
-      !isFiniteNumber(leftElevation) ||
-      !isFiniteNumber(rightElevation)
-    ) {
-      gradients.push(0)
-      continue
-    }
-
-    const horizontalDistance = rightDistance - leftDistance
-    if (horizontalDistance <= 0) {
-      gradients.push(0)
-      continue
-    }
-
-    gradients.push(
-      roundValue(
-        ((rightElevation - leftElevation) / horizontalDistance) * 100,
-        3,
-      ) ?? 0,
-    )
-  }
-
-  return gradients
-}
-
-function deriveHeadingSeries(courseSeries) {
-  let lastHeading = null
-
-  return courseSeries.map((point, index) => {
-    const previousPoint = index > 0 ? courseSeries[index - 1] : null
-    const nextPoint =
-      index < courseSeries.length - 1 ? courseSeries[index + 1] : null
-    const heading =
-      calculateBearingDegrees(previousPoint, point) ??
-      calculateBearingDegrees(point, nextPoint) ??
-      lastHeading
-
-    if (isFiniteNumber(heading)) {
-      lastHeading = heading
-      return roundValue(heading, 3)
-    }
-
-    return null
-  })
-}
-
-function deriveNumericRateSeries(numeratorSeries, elapsedSeries) {
-  const derivedSeries = []
-  let lastValue = null
-
-  for (let index = 0; index < numeratorSeries.length; index += 1) {
-    if (index === 0) {
-      derivedSeries.push(null)
-      continue
-    }
-
-    const previousValue = numeratorSeries[index - 1]
-    const currentValue = numeratorSeries[index]
-    const previousElapsed = elapsedSeries[index - 1]
-    const currentElapsed = elapsedSeries[index]
-
-    if (
-      !isFiniteNumber(previousValue) ||
-      !isFiniteNumber(currentValue) ||
-      !isFiniteNumber(previousElapsed) ||
-      !isFiniteNumber(currentElapsed)
-    ) {
-      derivedSeries.push(lastValue)
-      continue
-    }
-
-    const elapsedDelta = currentElapsed - previousElapsed
-    if (elapsedDelta <= 0) {
-      derivedSeries.push(lastValue)
-      continue
-    }
-
-    lastValue = (currentValue - previousValue) / elapsedDelta
-    derivedSeries.push(roundValue(lastValue, 6))
-  }
-
-  return derivedSeries
-}
-
-function derivePaceSeries(speedSeries) {
-  return speedSeries.map((speed) => {
-    if (!isFiniteNumber(speed) || speed <= 0) return null
-    return roundValue(1000 / speed, 3)
-  })
-}
-
-function deriveTorqueSeries(powerSeries, cadenceSeries) {
-  return powerSeries.map((power, index) => {
-    const cadence = cadenceSeries[index]
-    if (!isFiniteNumber(power) || !isFiniteNumber(cadence) || cadence <= 0) {
-      return null
-    }
-
-    const angularVelocity = (2 * Math.PI * cadence) / 60
-    if (!isFiniteNumber(angularVelocity) || angularVelocity <= 0) return null
-    return roundValue(power / angularVelocity, 6)
-  })
-}
-
-function combineSeries(directSeries, derivedSeries) {
-  const combinedSeries = directSeries.map(
-    (value, index) => value ?? derivedSeries[index] ?? null,
-  )
-
-  const directCount = directSeries.filter((value) => value !== null).length
-  const derivedOnlyCount = combinedSeries.filter(
-    (value, index) => value !== null && directSeries[index] === null,
-  ).length
-
-  let source = 'missing'
-  if (directCount > 0 && derivedOnlyCount > 0) {
-    source = 'mixed'
-  } else if (directCount > 0) {
-    source = 'direct'
-  } else if (derivedOnlyCount > 0) {
-    source = 'derived'
-  }
-
+/**
+ * Creates activity helpers.
+ * @returns {object} Derived data structure for downstream use.
+ */
+function createActivityHelpers() {
   return {
-    series: combinedSeries,
-    source,
+    calculateBearingDegrees,
+    haversineDistanceMeters,
+    isFiniteNumber,
+    roundValue,
+    safeNumber,
+    safeTimestamp,
   }
 }
 
-function combineSeriesPreferDerived(derivedSeries, directSeries) {
-  const combinedSeries = derivedSeries.map(
-    (value, index) => value ?? directSeries[index] ?? null,
-  )
-
-  const derivedCount = derivedSeries.filter((value) => value !== null).length
-  const directFallbackCount = combinedSeries.filter(
-    (value, index) => value !== null && derivedSeries[index] === null,
-  ).length
-
-  let source = 'missing'
-  if (derivedCount > 0 && directFallbackCount > 0) {
-    source = 'mixed'
-  } else if (derivedCount > 0) {
-    source = 'derived'
-  } else if (directFallbackCount > 0) {
-    source = 'direct'
-  }
-
-  return {
-    series: combinedSeries,
-    source,
-  }
+/**
+ * Builds course series.
+ *
+ * @param {*} rawSamples - Raw activity samples from the source file.
+ * @returns {*} Derived data structure for downstream use.
+ */
+function buildCourseSeries(rawSamples) {
+  return rawSamples.map((sample) => [
+    safeNumber(sample.latitude),
+    safeNumber(sample.longitude),
+  ])
 }
 
-function buildMetricCoverage(metricSeriesMap) {
-  return Object.fromEntries(
-    Object.entries(metricSeriesMap).map(([metric, descriptor]) => {
-      const values = descriptor.series
-      const availableCount = values.filter((value) => value !== null).length
-      return [
-        metric,
-        {
-          source: descriptor.source,
-          availableCount,
-          totalSamples: values.length,
-        },
-      ]
-    }),
-  )
+/**
+ * Builds time series.
+ *
+ * @param {*} rawSamples - Raw activity samples from the source file.
+ * @returns {*} Derived data structure for downstream use.
+ */
+function buildTimeSeries(rawSamples) {
+  return rawSamples.map((sample) => safeTimestamp(sample.timestamp))
 }
 
-function median(values) {
-  if (!values.length) return null
-  const sorted = [...values].sort((left, right) => left - right)
-  const middle = Math.floor(sorted.length / 2)
-  if (sorted.length % 2 === 0) {
-    return (sorted[middle - 1] + sorted[middle]) / 2
-  }
-  return sorted[middle]
-}
-
-function lowerHalfMedian(values) {
-  if (!values.length) return null
-  const sorted = [...values].sort((left, right) => left - right)
-  const cutoff = Math.max(1, Math.ceil(sorted.length / 2))
-  return median(sorted.slice(0, cutoff))
-}
-
-function timestampMs(value) {
-  if (!value) return null
-  const date = value instanceof Date ? value : new Date(value)
-  const time = date.getTime()
-  return Number.isFinite(time) ? time : null
-}
-
-function cloneRawSample(sample) {
-  return { ...sample }
-}
-
-function zeroFilledIdleSample(sample, elapsedSeconds, timestampMsValue) {
-  const synthetic = cloneRawSample(sample)
-  synthetic.elapsedSeconds = roundValue(elapsedSeconds, 3)
-  synthetic.timestamp =
-    timestampMsValue === null ? null : new Date(timestampMsValue).toISOString()
-  synthetic.speed = 0
-  synthetic.cadence = 0
-  synthetic.power = 0
-  synthetic.strokeRate = 0
-  synthetic.verticalSpeed = 0
-  synthetic.gForce = 0
-  synthetic.gradient = 0
-  synthetic.pace = null
-  synthetic.torque = null
-  synthetic.strideLength = null
-  synthetic.groundContactTime = null
-  synthetic.verticalOscillation = null
-  synthetic.syntheticIdle = true
-  return synthetic
-}
-
-function estimateRecordingIntervalSeconds(rawSamples) {
-  const deltas = []
-  let previousElapsed = null
-  let previousTimestampMs = null
-
-  rawSamples.forEach((sample) => {
-    const elapsed = safeNumber(sample.elapsedSeconds)
-    if (isFiniteNumber(elapsed) && isFiniteNumber(previousElapsed)) {
-      const delta = elapsed - previousElapsed
-      if (delta > 0 && delta <= 10) deltas.push(delta)
-      previousElapsed = elapsed
-    } else if (isFiniteNumber(elapsed)) {
-      previousElapsed = elapsed
-    }
-
-    const currentTimestampMs = timestampMs(sample.timestamp)
-    if (currentTimestampMs !== null && previousTimestampMs !== null) {
-      const delta = (currentTimestampMs - previousTimestampMs) / 1000
-      if (delta > 0 && delta <= 10) deltas.push(delta)
-      previousTimestampMs = currentTimestampMs
-    } else if (currentTimestampMs !== null) {
-      previousTimestampMs = currentTimestampMs
-    }
-  })
-
-  return lowerHalfMedian(deltas) ?? 1
-}
-
-function elapsedSecondsForSample(sample, fallbackOriginTimestampMs) {
-  const explicit = safeNumber(sample.elapsedSeconds)
-  if (isFiniteNumber(explicit)) return explicit
-
-  const timeMs = timestampMs(sample.timestamp)
-  if (timeMs !== null && fallbackOriginTimestampMs !== null) {
-    return (timeMs - fallbackOriginTimestampMs) / 1000
-  }
-
-  return null
-}
-
-function distanceMetersForPair(previousSample, currentSample) {
-  const previousDistance = safeNumber(previousSample.distance)
-  const currentDistance = safeNumber(currentSample.distance)
-  if (isFiniteNumber(previousDistance) && isFiniteNumber(currentDistance)) {
-    return Math.max(0, currentDistance - previousDistance)
-  }
-
-  return haversineDistanceMeters(
-    safeNumber(previousSample.latitude),
-    safeNumber(previousSample.longitude),
-    safeNumber(currentSample.latitude),
-    safeNumber(currentSample.longitude),
-  )
-}
-
-function insertIdleGapSamples(rawSamples) {
-  if (rawSamples.length < 2) {
-    return {
-      rawSamples,
-      gapDebug: {
-        detected_gaps: [],
-        inserted_sample_count: 0,
-        recording_interval_seconds: 1,
-      },
-    }
-  }
-
-  const originTimestampMs = rawSamples
-    .map((sample) => timestampMs(sample.timestamp))
-    .find((value) => value !== null)
-  const recordingIntervalSeconds = Math.max(
-    0.2,
-    estimateRecordingIntervalSeconds(rawSamples),
-  )
-  const gapThresholdSeconds = Math.max(3, recordingIntervalSeconds * 3)
-  const stationaryDistanceThresholdMeters = Math.max(
-    5,
-    recordingIntervalSeconds * 2.5,
-  )
-  const detectedGaps = []
-  const filledSamples = [cloneRawSample(rawSamples[0])]
-  let insertedSampleCount = 0
-
-  for (let index = 1; index < rawSamples.length; index += 1) {
-    const previousSample = rawSamples[index - 1]
-    const currentSample = rawSamples[index]
-    const previousElapsed = elapsedSecondsForSample(
-      previousSample,
-      originTimestampMs,
-    )
-    const currentElapsed = elapsedSecondsForSample(
-      currentSample,
-      originTimestampMs,
-    )
-    const elapsedDelta =
-      isFiniteNumber(previousElapsed) && isFiniteNumber(currentElapsed)
-        ? currentElapsed - previousElapsed
-        : null
-
-    let insertedForGap = 0
-    if (isFiniteNumber(elapsedDelta) && elapsedDelta > gapThresholdSeconds) {
-      const distanceDelta = distanceMetersForPair(previousSample, currentSample)
-      if (distanceDelta <= stationaryDistanceThresholdMeters) {
-        const previousTimestampMs = timestampMs(previousSample.timestamp)
-        const currentTimestampMs = timestampMs(currentSample.timestamp)
-        const maxInsertionCount =
-          Math.floor(elapsedDelta / recordingIntervalSeconds) - 1
-
-        for (
-          let insertIndex = 1;
-          insertIndex <= maxInsertionCount;
-          insertIndex += 1
-        ) {
-          const syntheticElapsed =
-            previousElapsed + recordingIntervalSeconds * insertIndex
-          if (syntheticElapsed >= currentElapsed - 1e-6) break
-
-          let syntheticTimestampMs = null
-          if (
-            previousTimestampMs !== null &&
-            currentTimestampMs !== null &&
-            currentTimestampMs > previousTimestampMs
-          ) {
-            syntheticTimestampMs = Math.min(
-              currentTimestampMs,
-              previousTimestampMs +
-                Math.round(recordingIntervalSeconds * 1000 * insertIndex),
-            )
-          }
-
-          filledSamples.push(
-            zeroFilledIdleSample(
-              previousSample,
-              syntheticElapsed,
-              syntheticTimestampMs,
-            ),
-          )
-          insertedForGap += 1
-        }
-      }
-    }
-
-    if (insertedForGap > 0) {
-      detectedGaps.push({
-        start_index: index - 1,
-        end_index: index,
-        start_elapsed_seconds: roundValue(previousElapsed, 3),
-        end_elapsed_seconds: roundValue(currentElapsed, 3),
-        gap_seconds: roundValue(elapsedDelta, 3),
-        inserted_samples: insertedForGap,
-        start_timestamp: safeTimestamp(previousSample.timestamp),
-        end_timestamp: safeTimestamp(currentSample.timestamp),
-      })
-      insertedSampleCount += insertedForGap
-    }
-
-    filledSamples.push(cloneRawSample(currentSample))
-  }
-
-  return {
-    rawSamples: filledSamples,
-    gapDebug: {
-      detected_gaps: detectedGaps,
-      inserted_sample_count: insertedSampleCount,
-      recording_interval_seconds: roundValue(recordingIntervalSeconds, 3),
-      gap_threshold_seconds: roundValue(gapThresholdSeconds, 3),
-      stationary_distance_threshold_m: roundValue(
-        stationaryDistanceThresholdMeters,
-        3,
-      ),
-    },
-  }
-}
-
-export function finalizeParsedActivity({
-  fileName,
-  fileFormat,
-  metadata = {},
-  rawSamples = [],
-  options = {},
-}) {
-  const useLegacyGpxDerivations = options.useLegacyGpxDerivations === true
-  const { rawSamples: normalizedRawSamples, gapDebug } =
-    insertIdleGapSamples(rawSamples)
-  const timeSeries = normalizedRawSamples.map((sample) =>
-    safeTimestamp(sample.timestamp),
-  )
-  const courseSeries = normalizedRawSamples.map((sample) => {
-    const latitude = safeNumber(sample.latitude)
-    const longitude = safeNumber(sample.longitude)
-    return [latitude, longitude]
-  })
-  const directDistanceSeries = normalizedRawSamples.map((sample) =>
-    safeNumber(sample.distance),
-  )
-  const distanceSeries = buildDistanceSeries(courseSeries, directDistanceSeries)
-  const elapsedSeries = buildElapsedSeries(normalizedRawSamples, timeSeries)
-  const elevationBaseSeries = normalizedRawSamples.map((sample) =>
-    safeNumber(sample.elevation),
-  )
-
-  const directMetrics = {
-    air_pressure: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.airPressure),
-    ),
-    altitude: normalizedRawSamples.map((sample) => safeNumber(sample.altitude)),
-    cadence: normalizedRawSamples.map((sample) => safeNumber(sample.cadence)),
-    distance: distanceSeries,
-    elevation: elevationBaseSeries,
-    g_force: normalizedRawSamples.map((sample) => safeNumber(sample.gForce)),
-    gradient: normalizedRawSamples.map((sample) => safeNumber(sample.gradient)),
-    ground_contact_time: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.groundContactTime),
-    ),
-    heading: normalizedRawSamples.map((sample) => safeNumber(sample.heading)),
-    heartrate: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.heartrate),
-    ),
-    left_right_balance: normalizedRawSamples.map(
-      (sample) => sample.leftRightBalance ?? null,
-    ),
-    pace: normalizedRawSamples.map((sample) => safeNumber(sample.pace)),
-    power: normalizedRawSamples.map((sample) => safeNumber(sample.power)),
-    speed: normalizedRawSamples.map((sample) => safeNumber(sample.speed)),
-    stride_length: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.strideLength),
-    ),
-    stroke_rate: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.strokeRate),
-    ),
-    temperature: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.temperature),
-    ),
-    torque: normalizedRawSamples.map((sample) => safeNumber(sample.torque)),
-    vertical_oscillation: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.verticalOscillation),
-    ),
-    vertical_speed: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.verticalSpeed),
-    ),
-  }
-
-  const derivedSpeed = deriveNumericRateSeries(distanceSeries, elapsedSeries)
-  const derivedHeading = deriveHeadingSeries(courseSeries)
-  const derivedGradient = useLegacyGpxDerivations
-    ? deriveLegacyGradientSeries(directMetrics.elevation, distanceSeries)
-    : deriveGradientSeries(directMetrics.elevation, distanceSeries)
-  const derivedVerticalSpeed = deriveNumericRateSeries(
-    directMetrics.elevation,
-    elapsedSeries,
-  )
-  const derivedPace = derivePaceSeries(
-    directMetrics.speed.map((value, index) => value ?? derivedSpeed[index]),
-  )
-  const derivedTorque = deriveTorqueSeries(
-    directMetrics.power,
-    directMetrics.cadence,
-  )
-
-  const metricSeriesMap = {
-    air_pressure: combineSeries(
-      directMetrics.air_pressure,
-      normalizedRawSamples.map(() => null),
-    ),
-    altitude: combineSeries(directMetrics.altitude, directMetrics.elevation),
-    cadence: combineSeries(
-      directMetrics.cadence,
-      normalizedRawSamples.map(() => null),
-    ),
-    distance: { series: directMetrics.distance, source: 'direct' },
-    elevation: combineSeries(
-      directMetrics.elevation,
-      normalizedRawSamples.map(() => null),
-    ),
-    g_force: combineSeries(
-      directMetrics.g_force,
-      normalizedRawSamples.map(() => null),
-    ),
-    gradient: combineSeriesPreferDerived(
-      derivedGradient,
-      directMetrics.gradient,
-    ),
-    ground_contact_time: combineSeries(
-      directMetrics.ground_contact_time,
-      normalizedRawSamples.map(() => null),
-    ),
-    heading: combineSeries(directMetrics.heading, derivedHeading),
-    heartrate: combineSeries(
-      directMetrics.heartrate,
-      normalizedRawSamples.map(() => null),
-    ),
-    left_right_balance: combineSeries(
-      directMetrics.left_right_balance,
-      normalizedRawSamples.map(() => null),
-    ),
-    pace: combineSeries(directMetrics.pace, derivedPace),
-    power: combineSeries(
-      directMetrics.power,
-      normalizedRawSamples.map(() => null),
-    ),
-    speed: combineSeries(directMetrics.speed, derivedSpeed),
-    stride_length: combineSeries(
-      directMetrics.stride_length,
-      normalizedRawSamples.map(() => null),
-    ),
-    stroke_rate: combineSeries(
-      directMetrics.stroke_rate,
-      normalizedRawSamples.map(() => null),
-    ),
-    temperature: combineSeries(
-      directMetrics.temperature,
-      normalizedRawSamples.map(() => null),
-    ),
-    torque: combineSeries(directMetrics.torque, derivedTorque),
-    vertical_oscillation: combineSeries(
-      directMetrics.vertical_oscillation,
-      normalizedRawSamples.map(() => null),
-    ),
-    vertical_speed: combineSeries(
-      directMetrics.vertical_speed,
-      derivedVerticalSpeed,
-    ),
-  }
-
-  const validAttributes = CORE_ACTIVITY_ATTRIBUTES.filter((attribute) => {
+/**
+ * Builds valid attributes.
+ *
+ * @param {*} metricSeriesMap - Metric series keyed by metric identifier.
+ * @param {*} courseSeries - Value for course series.
+ * @param {*} timeSeries - Timestamp series for the activity.
+ * @returns {*} Derived data structure for downstream use.
+ */
+function buildValidAttributes(metricSeriesMap, courseSeries, timeSeries) {
+  return CORE_ACTIVITY_ATTRIBUTES.filter((attribute) => {
     if (attribute === 'course') {
       return courseSeries.some(
         ([latitude, longitude]) =>
@@ -941,16 +252,83 @@ export function finalizeParsedActivity({
 
     return metricSeriesMap[attribute].series.some((value) => value !== null)
   })
+}
 
-  const extendedAttributes = EXTENDED_ACTIVITY_ATTRIBUTES.filter((attribute) =>
+/**
+ * Builds extended attributes.
+ *
+ * @param {*} metricSeriesMap - Metric series keyed by metric identifier.
+ * @returns {*} Derived data structure for downstream use.
+ */
+function buildExtendedAttributes(metricSeriesMap) {
+  return EXTENDED_ACTIVITY_ATTRIBUTES.filter((attribute) =>
     metricSeriesMap[attribute].series.some((value) => value !== null),
   )
+}
 
+/**
+ * Handles finalize parsed activity.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.fileName - Value for file name.
+ * @param {*} options.fileFormat - Value for file format.
+ * @param {*} options.metadata - Value for metadata.
+ * @param {*} options.rawSamples - Raw activity samples from the source file.
+ * @returns {object} Result produced by the helper.
+ */
+export function finalizeParsedActivity({
+  fileName,
+  fileFormat,
+  metadata = {},
+  rawSamples = [],
+  options = {},
+}) {
+  const helpers = createActivityHelpers()
+  const useLegacyGpxDerivations = options.useLegacyGpxDerivations === true
+  const { rawSamples: normalizedRawSamples, gapDebug } = insertIdleGapSamples(
+    rawSamples,
+    helpers,
+  )
+  const timeSeries = buildTimeSeries(normalizedRawSamples)
+  const courseSeries = buildCourseSeries(normalizedRawSamples)
+  const directDistanceSeries = normalizedRawSamples.map((sample) =>
+    safeNumber(sample.distance),
+  )
+  const distanceSeries = buildDistanceSeries(
+    courseSeries,
+    directDistanceSeries,
+    helpers,
+  )
+  const elapsedSeries = buildElapsedSeries(
+    normalizedRawSamples,
+    timeSeries,
+    helpers,
+  )
+  const elevationBaseSeries = normalizedRawSamples.map((sample) =>
+    safeNumber(sample.elevation),
+  )
+  const { metricSeriesMap } = deriveActivityMetricSeries({
+    courseSeries,
+    distanceSeries,
+    elevationBaseSeries,
+    elapsedSeries,
+    normalizedRawSamples,
+    useLegacyGpxDerivations,
+    helpers,
+  })
+
+  const validAttributes = buildValidAttributes(
+    metricSeriesMap,
+    courseSeries,
+    timeSeries,
+  )
+  const extendedAttributes = buildExtendedAttributes(metricSeriesMap)
   const durationSeconds = elapsedSeries[elapsedSeries.length - 1] ?? 0
   const totalDistanceMeters = distanceSeries[distanceSeries.length - 1] ?? 0
   const startTime = timeSeries.find(Boolean) ?? null
   const endTime = [...timeSeries].reverse().find(Boolean) ?? null
   const coverage = buildMetricCoverage(metricSeriesMap)
+  const distanceProgressSeries = buildProgressSeries(distanceSeries, helpers)
 
   const parsedActivity = {
     file_name: fileName,
@@ -971,7 +349,7 @@ export function finalizeParsedActivity({
     extended_attributes: extendedAttributes,
     source_start_time: startTime,
     sample_elapsed_seconds: elapsedSeries,
-    sample_distance_progress: buildProgressSeries(distanceSeries),
+    sample_distance_progress: distanceProgressSeries,
     frame_elapsed_seconds: [],
     frame_timestamps: [],
     frame_distance_progress: [],

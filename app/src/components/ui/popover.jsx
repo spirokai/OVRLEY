@@ -1,16 +1,41 @@
+/**
+ * Provides reusable popover UI primitives for the application.
+ */
+
 import * as React from 'react'
 import { Popover as PopoverPrimitive } from 'radix-ui'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * Renders the popover component.
+ *
+ * @param {object} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Popover({ ...props }) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />
 }
 
+/**
+ * Renders the popover trigger component.
+ *
+ * @param {object} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function PopoverTrigger({ ...props }) {
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
 }
 
+/**
+ * Renders the popover content component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.align - Value for align.
+ * @param {*} props.sideOffset - Numeric side offset value.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function PopoverContent({
   className,
   align = 'center',
@@ -33,10 +58,23 @@ function PopoverContent({
   )
 }
 
+/**
+ * Renders the popover anchor component.
+ *
+ * @param {object} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function PopoverAnchor({ ...props }) {
   return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />
 }
 
+/**
+ * Renders the popover header component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function PopoverHeader({ className, ...props }) {
   return (
     <div
@@ -47,6 +85,13 @@ function PopoverHeader({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the popover title component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function PopoverTitle({ className, ...props }) {
   return (
     <div
@@ -57,6 +102,13 @@ function PopoverTitle({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the popover description component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function PopoverDescription({ className, ...props }) {
   return (
     <p

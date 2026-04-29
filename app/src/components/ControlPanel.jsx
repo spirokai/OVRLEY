@@ -1,8 +1,20 @@
+/**
+ * Renders the control panel portion of the application interface.
+ */
+
 import { Settings2, Activity } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import SidebarSettingsTab from './SidebarSettingsTab'
 import SidebarWidgetsTab from './SidebarWidgetsTab'
 
+/**
+ * Renders the control panel component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.config - Overlay template configuration data.
+ * @param {*} props.onConfigChange - Callback invoked to config change.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function ControlPanel({ config, onConfigChange }) {
   return (
     <div className="flex flex-col h-full bg-card/10">
