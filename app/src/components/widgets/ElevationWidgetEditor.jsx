@@ -40,9 +40,9 @@ export default function ElevationWidgetEditor({
     <>
       <DimensionsSection widget={widget} setNumericField={setNumericField} />
       <div className="space-y-4">
-        <SectionHeading icon={Palette} title="Profile Styling" />
+        <SectionHeading icon={Palette} title="Line Styling" />
         <SliderField
-          label="Line Thickness"
+          label="Thickness"
           value={lineWidth}
           min={0}
           max={20}
@@ -57,7 +57,7 @@ export default function ElevationWidgetEditor({
         />
         <div className="grid grid-cols-2 gap-3">
           <ColorField
-            label="Done Line Color"
+            label="Finished Color"
             value={widget.data.completed_line_color || getThemeColor('ice')}
             onChange={(value) =>
               updateWidgetData(widget.id, {
@@ -67,7 +67,7 @@ export default function ElevationWidgetEditor({
             }
           />
           <ColorField
-            label="Remaining Line Color"
+            label="Remaining Color"
             value={widget.data.remaining_line_color || getThemeColor('teal')}
             onChange={(value) =>
               updateWidgetData(widget.id, { remaining_line_color: value })
@@ -76,7 +76,7 @@ export default function ElevationWidgetEditor({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <SliderField
-            label="Done Line Opacity"
+            label="Finished Opacity"
             value={completedLineOpacity}
             min={0}
             max={100}
@@ -87,7 +87,7 @@ export default function ElevationWidgetEditor({
             }
           />
           <SliderField
-            label="Remaining Line Opacity"
+            label="Remaining Opacity"
             value={remainingLineOpacity}
             min={0}
             max={100}
@@ -98,51 +98,11 @@ export default function ElevationWidgetEditor({
             }
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <ColorField
-            label="Done Area Color"
-            value={widget.data.area_completed_color || getThemeColor('ice')}
-            onChange={(value) =>
-              updateWidgetData(widget.id, { area_completed_color: value })
-            }
-          />
-          <ColorField
-            label="Remaining Area Color"
-            value={widget.data.area_remaining_color || getThemeColor('teal')}
-            onChange={(value) =>
-              updateWidgetData(widget.id, { area_remaining_color: value })
-            }
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <SliderField
-            label="Done Area Opacity"
-            value={completedAreaOpacity}
-            min={0}
-            max={100}
-            step={1}
-            valueDisplay={`${completedAreaOpacity}%`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { area_completed_opacity: value })
-            }
-          />
-          <SliderField
-            label="Remaining Area Opacity"
-            value={remainingAreaOpacity}
-            min={0}
-            max={100}
-            step={1}
-            valueDisplay={`${remainingAreaOpacity}%`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { area_remaining_opacity: value })
-            }
-          />
-        </div>
         <SliderField
           label="Vertical Scale"
           value={yScale}
-          min={0.25}
-          max={2}
+          min={0.1}
+          max={3}
           step={0.05}
           valueDisplay={`${yScale.toFixed(2)}x`}
           onSliderChange={(value) =>
@@ -153,7 +113,7 @@ export default function ElevationWidgetEditor({
         />
         <div className="grid grid-cols-2 gap-3">
           <SliderField
-            label="Simplify Tolerance"
+            label="Smoothing"
             value={simplifyTolerance}
             min={0}
             max={4}
@@ -166,7 +126,7 @@ export default function ElevationWidgetEditor({
             }
           />
           <SliderField
-            label="Target Density"
+            label="Data Density"
             value={targetDensity}
             min={0.25}
             max={1.5}
@@ -179,12 +139,55 @@ export default function ElevationWidgetEditor({
             }
           />
         </div>
+        <div className="space-y-4">
+          <SectionHeading icon={Palette} title="Area Styling" />
+          <div className="grid grid-cols-2 gap-3">
+            <ColorField
+              label="Finished Color"
+              value={widget.data.area_completed_color || getThemeColor('ice')}
+              onChange={(value) =>
+                updateWidgetData(widget.id, { area_completed_color: value })
+              }
+            />
+            <ColorField
+              label="Remaining Color"
+              value={widget.data.area_remaining_color || getThemeColor('teal')}
+              onChange={(value) =>
+                updateWidgetData(widget.id, { area_remaining_color: value })
+              }
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <SliderField
+              label="Finished Opacity"
+              value={completedAreaOpacity}
+              min={0}
+              max={100}
+              step={1}
+              valueDisplay={`${completedAreaOpacity}%`}
+              onSliderChange={(value) =>
+                updateWidgetData(widget.id, { area_completed_opacity: value })
+              }
+            />
+            <SliderField
+              label="Remaining Opacity"
+              value={remainingAreaOpacity}
+              min={0}
+              max={100}
+              step={1}
+              valueDisplay={`${remainingAreaOpacity}%`}
+              onSliderChange={(value) =>
+                updateWidgetData(widget.id, { area_remaining_opacity: value })
+              }
+            />
+          </div>
+        </div>
       </div>
       <div className="space-y-4">
         <SectionHeading icon={Mountain} title="Marker & Labels" />
         <div className="grid grid-cols-2 gap-3">
           <SliderField
-            label="Marker Size"
+            label="Size"
             value={widget.data.marker_size ?? 16}
             min={0}
             max={50}
@@ -195,7 +198,7 @@ export default function ElevationWidgetEditor({
             }
           />
           <SliderField
-            label="Marker Opacity"
+            label="Opacity"
             value={widget.data.marker_opacity ?? 100}
             min={0}
             max={100}
@@ -205,14 +208,14 @@ export default function ElevationWidgetEditor({
               updateWidgetData(widget.id, { marker_opacity: value })
             }
           />
+          <ColorField
+            label="Color"
+            value={widget.data.marker_color || getThemeColor('aqua')}
+            onChange={(value) =>
+              updateWidgetData(widget.id, { marker_color: value })
+            }
+          />
         </div>
-        <ColorField
-          label="Marker Color"
-          value={widget.data.marker_color || getThemeColor('aqua')}
-          onChange={(value) =>
-            updateWidgetData(widget.id, { marker_color: value })
-          }
-        />
         <ToggleField
           label="Label Metric"
           checked={widget.data.show_elevation_metric ?? true}

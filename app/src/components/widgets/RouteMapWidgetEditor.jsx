@@ -3,7 +3,7 @@
  */
 
 import { Map, Palette } from 'lucide-react'
-import { ColorField, NumberField, SliderField } from './widgetFormControls'
+import { ColorField, SliderField } from './widgetFormControls'
 import { DimensionsSection, SectionHeading } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 
@@ -34,10 +34,26 @@ export default function RouteMapWidgetEditor({
   return (
     <>
       <DimensionsSection widget={widget} setNumericField={setNumericField} />
+
+      <SliderField
+        label="Map Rotation"
+        value={rotation}
+        min={-180}
+        max={180}
+        step={1}
+        valueDisplay={`${rotation}°`}
+        onSliderChange={(rawValue) =>
+          setNumericField(widget.id, 'rotation', rawValue, {
+            min: -180,
+            max: 180,
+          })
+        }
+      />
+
       <div className="space-y-4">
-        <SectionHeading icon={Palette} title="Path Styling" />
+        <SectionHeading icon={Palette} title="Line Styling" />
         <SliderField
-          label="Line Thickness"
+          label="Thickness"
           value={lineWidth}
           min={0}
           max={20}
@@ -52,7 +68,7 @@ export default function RouteMapWidgetEditor({
         />
         <div className="grid grid-cols-2 gap-3">
           <ColorField
-            label="Done Line Color"
+            label="Finished Color"
             value={widget.data.completed_line_color || getThemeColor('ice')}
             onChange={(value) =>
               updateWidgetData(widget.id, {
@@ -62,7 +78,7 @@ export default function RouteMapWidgetEditor({
             }
           />
           <ColorField
-            label="Remaining Line Color"
+            label="Remaining Color"
             value={widget.data.remaining_line_color || getThemeColor('teal')}
             onChange={(value) =>
               updateWidgetData(widget.id, { remaining_line_color: value })
@@ -71,7 +87,31 @@ export default function RouteMapWidgetEditor({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <SliderField
-            label="Simplify Tolerance"
+            label="Finished Opacity"
+            value={completedLineOpacity}
+            min={0}
+            max={100}
+            step={1}
+            valueDisplay={`${completedLineOpacity}%`}
+            onSliderChange={(value) =>
+              updateWidgetData(widget.id, { completed_line_opacity: value })
+            }
+          />
+          <SliderField
+            label="Remaining Opacity"
+            value={remainingLineOpacity}
+            min={0}
+            max={100}
+            step={1}
+            valueDisplay={`${remainingLineOpacity}%`}
+            onSliderChange={(value) =>
+              updateWidgetData(widget.id, { remaining_line_opacity: value })
+            }
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <SliderField
+            label="Smoothing"
             value={simplifyTolerance}
             min={0}
             max={4}
@@ -84,7 +124,7 @@ export default function RouteMapWidgetEditor({
             }
           />
           <SliderField
-            label="Target Density"
+            label="Data Density"
             value={targetDensity}
             min={0.25}
             max={1.5}
@@ -97,47 +137,30 @@ export default function RouteMapWidgetEditor({
             }
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <SliderField
-            label="Done Line Opacity"
-            value={completedLineOpacity}
-            min={0}
-            max={100}
-            step={1}
-            valueDisplay={`${completedLineOpacity}%`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { completed_line_opacity: value })
-            }
-          />
-          <SliderField
-            label="Remaining Line Opacity"
-            value={remainingLineOpacity}
-            min={0}
-            max={100}
-            step={1}
-            valueDisplay={`${remainingLineOpacity}%`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { remaining_line_opacity: value })
-            }
-          />
-        </div>
       </div>
       <div className="space-y-4">
-        <SectionHeading icon={Map} title="Marker & Rotation" />
+        <SectionHeading icon={Map} title="Marker" />
+        <SliderField
+          label=" Size"
+          value={markerSize}
+          min={0}
+          max={50}
+          step={1}
+          valueDisplay={`${markerSize}px`}
+          onSliderChange={(value) =>
+            updateWidgetData(widget.id, { marker_size: value })
+          }
+        />
         <div className="grid grid-cols-2 gap-3">
-          <SliderField
-            label="Marker Size"
-            value={markerSize}
-            min={0}
-            max={50}
-            step={1}
-            valueDisplay={`${markerSize}px`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { marker_size: value })
+          <ColorField
+            label="Color"
+            value={widget.data.marker_color || getThemeColor('aqua')}
+            onChange={(value) =>
+              updateWidgetData(widget.id, { marker_color: value })
             }
           />
           <SliderField
-            label="Marker Opacity"
+            label="Opacity"
             value={markerOpacity}
             min={0}
             max={100}
@@ -145,27 +168,6 @@ export default function RouteMapWidgetEditor({
             valueDisplay={`${markerOpacity}%`}
             onSliderChange={(value) =>
               updateWidgetData(widget.id, { marker_opacity: value })
-            }
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <ColorField
-            label="Marker Color"
-            value={widget.data.marker_color || getThemeColor('aqua')}
-            onChange={(value) =>
-              updateWidgetData(widget.id, { marker_color: value })
-            }
-          />
-          <NumberField
-            label="Map Rotation"
-            value={rotation}
-            min={0}
-            max={360}
-            onChange={(rawValue) =>
-              setNumericField(widget.id, 'rotation', rawValue, {
-                min: 0,
-                max: 360,
-              })
             }
           />
         </div>
