@@ -280,11 +280,17 @@ export default function useOverlayMoveableHandlers({
     onScale: ({ scale, direction, target }) => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
-      const uniformScale = Number.isFinite(scale?.[0])
+      const rawScale = Number.isFinite(scale?.[0])
         ? scale[0]
         : Number.isFinite(scale?.[1])
           ? scale[1]
           : 1
+      // Moveable reads the CSS `scale(globalScale)` transform on the widget
+      // element and includes it in the reported scale values. Normalize by
+      // dividing out globalScale so it doesn't get permanently baked into
+      // font_size, icon_size, etc.
+      const safeGlobalScale = globalScale > 0 ? globalScale : 1
+      const uniformScale = rawScale / safeGlobalScale
 
       const nextDraft = {
         ...draftWidgetsRef.current[origin.id],

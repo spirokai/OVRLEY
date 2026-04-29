@@ -119,6 +119,7 @@ function OverlayEditor({
               previewSecond={previewSecond}
               backgroundMode={backgroundMode}
               sceneSize={sceneSize}
+              displayScale={displayScale}
               setSceneElement={setSceneElement}
               selectionRect={selectionRect}
               handleSceneMouseDown={handleSceneMouseDown}

@@ -2,7 +2,7 @@
  * Provides overlay editor helpers for widget preview renderers.
  */
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from './constants'
 import { METRIC_ICON_SVGS } from './metricWidgetAssets'
 import {
@@ -57,6 +57,50 @@ function pointsEqual(left, right) {
  */
 function sanitizeSvgId(value) {
   return String(value || 'preview-shadow').replace(/[^a-zA-Z0-9_-]/g, '_')
+}
+
+/**
+ * Returns a version token that changes after the requested font becomes ready.
+ *
+ * @param {*} fontFamily - Font family used by the preview widget.
+ * @param {*} fontSize - Numeric font size value.
+ * @returns {number} Version token for preview re-measurement.
+ */
+function useFontMetricsVersion(fontFamily, fontSize) {
+  const [version, setVersion] = useState(0)
+
+  useEffect(() => {
+    if (
+      typeof document === 'undefined' ||
+      !document.fonts ||
+      typeof document.fonts.load !== 'function'
+    ) {
+      return undefined
+    }
+
+    let cancelled = false
+
+    const refreshMetrics = async () => {
+      try {
+        await Promise.allSettled([
+          document.fonts.load(`${fontSize}px ${fontFamily}`, '0123456789WBMPRK/H'),
+          document.fonts.ready,
+        ])
+      } finally {
+        if (!cancelled) {
+          setVersion((current) => current + 1)
+        }
+      }
+    }
+
+    refreshMetrics()
+
+    return () => {
+      cancelled = true
+    }
+  }, [fontFamily, fontSize])
+
+  return version
 }
 
 /**
@@ -150,6 +194,7 @@ export function OverlayMetricWidget({
   const fontFamily = getPreviewFontFamily(
     widget.data.font || widget.data.font_family,
   )
+  const fontMetricsVersion = useFontMetricsVersion(fontFamily, fontSize)
   const color = widget.data.color || '#ffffff'
   const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)
   const textShadow = getTextShadow(widget.data)
@@ -238,6 +283,7 @@ export function OverlayMetricWidget({
           }),
     [
       fontFamily,
+      fontMetricsVersion,
       fontSize,
       iconSize,
       showIcon,
@@ -254,29 +300,44 @@ export function OverlayMetricWidget({
     const iconSvg = METRIC_ICON_SVGS[widget.type]
     const valueShadowFilterId = sanitizeSvgId(`${widget.id}-value-shadow`)
     const unitsShadowFilterId = sanitizeSvgId(`${widget.id}-units-shadow`)
+    const iconLeft = metricLayout.icon
+      ? metricLayout.icon.left + (widget.data.icon_offset_x ?? 0)
+      : 0
+    const iconTop = metricLayout.icon
+      ? metricLayout.icon.top + (widget.data.icon_offset_y ?? 0)
+      : 0
+    const minX = metricLayout.icon ? Math.min(0, iconLeft) : 0
+    const minY = metricLayout.icon ? Math.min(0, iconTop) : 0
+    const maxX = metricLayout.icon
+      ? Math.max(metricLayout.width, iconLeft + metricLayout.icon.size)
+      : metricLayout.width
+    const maxY = metricLayout.icon
+      ? Math.max(metricLayout.height, iconTop + metricLayout.icon.size)
+      : metricLayout.height
 
     return (
       <div
         className="relative"
         style={{
-          width: metricLayout.width,
-          height: metricLayout.height,
+          width: maxX - minX,
+          height: maxY - minY,
         }}
       >
         <div
-          className="relative"
+          className="absolute"
           style={{
+            left: -minX,
+            top: -minY,
             width: metricLayout.width,
             height: metricLayout.height,
-            transform: `translateY(${widget.data.value_offset ?? 0}px)`,
           }}
         >
           {metricLayout.icon && iconSvg ? (
             <div
               className="metric-icon absolute"
               style={{
-                left: metricLayout.icon.left + (widget.data.icon_offset_x ?? 0),
-                top: metricLayout.icon.top + (widget.data.icon_offset_y ?? 0),
+                left: iconLeft,
+                top: iconTop,
                 width: metricLayout.icon.size,
                 height: metricLayout.icon.size,
                 color: widget.data.icon_color || '#40e0d0',
@@ -413,6 +474,7 @@ export function OverlayTextWidget({ widget, globalOpacity }) {
   const fontFamily = getPreviewFontFamily(
     widget.data.font || widget.data.font_family,
   )
+  const fontMetricsVersion = useFontMetricsVersion(fontFamily, fontSize)
   const color = widget.data.color || '#ffffff'
   const opacity = getWidgetOpacity(widget.data, globalOpacity)
   const shadow = getTextShadowParts(widget.data)
@@ -420,7 +482,7 @@ export function OverlayTextWidget({ widget, globalOpacity }) {
   const lineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const measurement = useMemo(
     () => measurePreviewText(text, fontSize, fontFamily),
-    [fontFamily, fontSize, text],
+    [fontFamily, fontMetricsVersion, fontSize, text],
   )
   const baseline = getPreviewTextBaseline({
     top: 0,

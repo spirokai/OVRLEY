@@ -25,6 +25,7 @@ import { buildWidgetTransform } from './utils'
 const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({
     activity,
+    displayScale,
     globalOpacity,
     widget,
     globalScale,
@@ -33,18 +34,25 @@ const OverlayCanvasWidget = memo(
     handleWidgetMouseDown,
   }) {
     const x = widget.data.x ?? 0
-    const y = widget.data.y ?? 0
+    const valueOffset =
+      widget.category === 'values' && widget.type !== 'gradient'
+        ? (widget.data.value_offset ?? 0)
+        : 0
+    const y = (widget.data.y ?? 0) + valueOffset
     const scale = globalScale
     const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
     const width = widget.data.width
     const height = widget.data.height
     const Icon = WIDGET_ICONS[widget.type] || Type
+    // Counter-scale the badge so it always appears at a fixed screen size,
+    // regardless of the globalScale and displayScale transforms on ancestors.
+    const badgeScale = 0.8 / ((displayScale || 1) * (globalScale || 1))
 
     return (
       <div
         ref={registerNode}
         data-widget-id={widget.id}
-        className="group absolute cursor-move select-none rounded-xl border border-transparent transition-shadow"
+        className="group absolute cursor-move select-none rounded-xl border border-transparent transition-shadow hover:z-50"
         style={{
           left: x,
           top: y,
@@ -58,8 +66,17 @@ const OverlayCanvasWidget = memo(
           handleWidgetMouseDown(event, widget.id)
         }}
       >
-        <div className="absolute -top-7 left-0 flex items-center gap-1 rounded-full border border-border/70 bg-card/80 px-2 py-1 text-[10px] font-semibold text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-          <Icon className="h-3 w-3" />
+        <div
+          className="absolute left-0 flex items-center gap-[0.4rem] rounded-full border border-border/70 bg-card/80 px-[0.5rem] py-[0.2rem] font-semibold text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+          style={{
+            bottom: '100%',
+            marginBottom: 4,
+            fontSize: '0.85rem',
+            transform: `scale(${badgeScale})`,
+            transformOrigin: 'bottom left',
+          }}
+        >
+          <Icon className="h-[0.9rem] w-[0.9rem]" />
           <span>{widget.type}</span>
         </div>
         <WidgetPreview
@@ -75,6 +92,7 @@ const OverlayCanvasWidget = memo(
     previousProps.widget === nextProps.widget &&
     previousProps.globalScale === nextProps.globalScale &&
     previousProps.globalOpacity === nextProps.globalOpacity &&
+    previousProps.displayScale === nextProps.displayScale &&
     previousProps.activity === nextProps.activity &&
     previousProps.previewSecond === nextProps.previewSecond &&
     previousProps.registerNode === nextProps.registerNode &&
@@ -107,6 +125,7 @@ export default function OverlayCanvas({
   previewSecond,
   backgroundMode,
   sceneSize,
+  displayScale,
   setSceneElement,
   selectionRect,
   handleSceneMouseDown,
@@ -138,6 +157,7 @@ export default function OverlayCanvas({
               widget={widget}
               globalScale={globalScale}
               globalOpacity={globalOpacity}
+              displayScale={displayScale}
               activity={activity}
               previewSecond={previewSecond}
               registerNode={widgetRefCallbacks[widget.id]}

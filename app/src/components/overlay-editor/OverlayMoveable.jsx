@@ -29,7 +29,6 @@ export default function OverlayMoveable({
   selectedTargets,
   isGroupDragActive,
   sceneElement,
-  displayScale,
   canResizeSelected,
   canScaleSelected,
   canRotateSelected,
@@ -39,7 +38,9 @@ export default function OverlayMoveable({
   handlers,
 }) {
   const isGroupSelection = selectedTargets.length > 1
-  const moveableZoom = displayScale > 0 ? 1 / displayScale : 1
+  // With rootContainer={document.body}, the Moveable UI is rendered at body
+  // level, not inside the scaled parent container. No zoom compensation needed.
+  const moveableZoom = 1.5
 
   if ((!selectedTarget && !selectedTargets.length) || !sceneElement) {
     return null
@@ -52,6 +53,7 @@ export default function OverlayMoveable({
       target={selectedTarget || undefined}
       targets={selectedTargets.length ? selectedTargets : undefined}
       container={sceneElement}
+      rootContainer={document.body}
       origin={false}
       edge={false}
       groupable={isGroupSelection}
