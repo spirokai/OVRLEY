@@ -1,6 +1,14 @@
+/**
+ * Implements the use App Store Selectors hook and related behavior for the app.
+ */
+
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 
+/**
+ * Provides app shell store state and actions.
+ * @returns {*} Result produced by the helper.
+ */
 export function useAppShellStore() {
   return useStore(
     useShallow((state) => ({
@@ -13,6 +21,10 @@ export function useAppShellStore() {
   )
 }
 
+/**
+ * Provides bootstrap store state and actions.
+ * @returns {*} Result produced by the helper.
+ */
 export function useBootstrapStore() {
   return useStore(
     useShallow((state) => ({
@@ -22,6 +34,10 @@ export function useBootstrapStore() {
   )
 }
 
+/**
+ * Provides activity store state and actions.
+ * @returns {*} Result produced by the helper.
+ */
 export function useActivityStore() {
   return useStore(
     useShallow((state) => ({
@@ -33,6 +49,10 @@ export function useActivityStore() {
   )
 }
 
+/**
+ * Provides template store state and actions.
+ * @returns {*} Result produced by the helper.
+ */
 export function useTemplateStore() {
   return useStore(
     useShallow((state) => ({
@@ -56,6 +76,10 @@ export function useTemplateStore() {
   )
 }
 
+/**
+ * Provides render store state and actions.
+ * @returns {*} Result produced by the helper.
+ */
 export function useRenderStore() {
   return useStore(
     useShallow((state) => ({

@@ -1,7 +1,15 @@
+/**
+ * Implements the use App Bootstrap hook and related behavior for the app.
+ */
+
 import { useEffect } from 'react'
 import * as backend from '@/api/backend'
 import { useBootstrapStore } from '@/hooks/useAppStoreSelectors'
 
+/**
+ * Provides app bootstrap state and actions.
+ * @returns {*} Result produced by the helper.
+ */
 export default function useAppBootstrap() {
   const { fetchTemplates, setPlatformOs } = useBootstrapStore()
 

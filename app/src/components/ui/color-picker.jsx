@@ -1,3 +1,7 @@
+/**
+ * Provides reusable color picker UI primitives for the application.
+ */
+
 /* eslint-disable react-hooks/preserve-manual-memoization */
 
 'use client'
@@ -44,6 +48,13 @@ const INPUT_NAME = 'ColorPickerInput'
 
 const colorFormats = ['hex', 'rgb', 'hsl', 'hsb']
 
+/**
+ * Handles hex to rgb.
+ *
+ * @param {*} hex - Value for hex.
+ * @param {*} alpha - Value for alpha.
+ * @returns {*} Result produced by the helper.
+ */
 function hexToRgb(hex, alpha) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
   return result
@@ -56,6 +67,12 @@ function hexToRgb(hex, alpha) {
     : { r: 0, g: 0, b: 0, a: alpha ?? 1 }
 }
 
+/**
+ * Handles rgb to hex.
+ *
+ * @param {*} color - Value for color.
+ * @returns {*} Result produced by the helper.
+ */
 function rgbToHex(color) {
   const toHex = (n) => {
     const hex = Math.round(n).toString(16)
@@ -64,6 +81,12 @@ function rgbToHex(color) {
   return `#${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`
 }
 
+/**
+ * Handles rgb to hsv.
+ *
+ * @param {*} color - Value for color.
+ * @returns {object} Result produced by the helper.
+ */
 function rgbToHsv(color) {
   const r = color.r / 255
   const g = color.g / 255
@@ -101,6 +124,12 @@ function rgbToHsv(color) {
   }
 }
 
+/**
+ * Handles hsv to rgb.
+ *
+ * @param {*} hsv - Value for hsv.
+ * @returns {object} Result produced by the helper.
+ */
 function hsvToRgb(hsv) {
   const h = hsv.h / 360
   const s = hsv.s / 100
@@ -168,6 +197,13 @@ function hsvToRgb(hsv) {
   }
 }
 
+/**
+ * Handles color to string.
+ *
+ * @param {*} color - Value for color.
+ * @param {*} format - Formatting mode or template key.
+ * @returns {*} Result produced by the helper.
+ */
 function colorToString(color, format = 'hex') {
   switch (format) {
     case 'hex':
@@ -193,6 +229,12 @@ function colorToString(color, format = 'hex') {
   }
 }
 
+/**
+ * Handles rgb to hsl.
+ *
+ * @param {*} color - Value for color.
+ * @returns {object} Result produced by the helper.
+ */
 function rgbToHsl(color) {
   const r = color.r / 255
   const g = color.g / 255
@@ -228,6 +270,13 @@ function rgbToHsl(color) {
   }
 }
 
+/**
+ * Handles hsl to rgb.
+ *
+ * @param {*} hsl - Value for hsl.
+ * @param {*} alpha - Value for alpha.
+ * @returns {object} Result produced by the helper.
+ */
 function hslToRgb(hsl, alpha = 1) {
   const h = hsl.h / 360
   const s = hsl.s / 100
@@ -275,6 +324,12 @@ function hslToRgb(hsl, alpha = 1) {
   }
 }
 
+/**
+ * Parses color string.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {object} Result produced by the helper.
+ */
 function parseColorString(value) {
   const trimmed = value.trim()
 
@@ -370,6 +425,12 @@ function parseColorString(value) {
 
 const StoreContext = React.createContext(null)
 
+/**
+ * Provides store context state and actions.
+ *
+ * @param {*} consumerName - Value for consumer name.
+ * @returns {*} Result produced by the helper.
+ */
 function useStoreContext(consumerName) {
   const context = React.useContext(StoreContext)
   if (!context) {
@@ -378,6 +439,12 @@ function useStoreContext(consumerName) {
   return context
 }
 
+/**
+ * Provides store state and actions.
+ *
+ * @param {*} selector - Value for selector.
+ * @returns {*} Result produced by the helper.
+ */
 function useStore(selector) {
   const store = useStoreContext('useStore')
 
@@ -391,6 +458,12 @@ function useStore(selector) {
 
 const ColorPickerContext = React.createContext(null)
 
+/**
+ * Provides color picker context state and actions.
+ *
+ * @param {*} consumerName - Value for consumer name.
+ * @returns {*} Result produced by the helper.
+ */
 function useColorPickerContext(consumerName) {
   const context = React.useContext(ColorPickerContext)
   if (!context) {
@@ -399,6 +472,12 @@ function useColorPickerContext(consumerName) {
   return context
 }
 
+/**
+ * Renders the color picker component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ColorPicker(props) {
   const {
     value: valueProp,
@@ -518,6 +597,12 @@ function ColorPicker(props) {
   )
 }
 
+/**
+ * Renders the color picker impl component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ColorPickerImpl(props) {
   const {
     value: valueProp,
@@ -619,6 +704,12 @@ function ColorPickerImpl(props) {
   )
 }
 
+/**
+ * Renders the color picker trigger component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ColorPickerTrigger(props) {
   const { asChild, disabled, ...triggerProps } = props
 
@@ -635,6 +726,12 @@ function ColorPickerTrigger(props) {
   )
 }
 
+/**
+ * Renders the color picker content component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ColorPickerContent(props) {
   const { asChild, className, children, ...popoverContentProps } = props
 
@@ -666,6 +763,12 @@ function ColorPickerContent(props) {
   )
 }
 
+/**
+ * Renders the color picker area component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ColorPickerArea(props) {
   const {
     asChild,
@@ -799,6 +902,12 @@ function ColorPickerArea(props) {
   )
 }
 
+/**
+ * Renders the color picker hue slider component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ColorPickerHueSlider(props) {
   const { className, ...sliderProps } = props
 
@@ -843,6 +952,12 @@ function ColorPickerHueSlider(props) {
   )
 }
 
+/**
+ * Renders the color picker alpha slider component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ColorPickerAlphaSlider(props) {
   const { className, ...sliderProps } = props
 
@@ -901,6 +1016,12 @@ function ColorPickerAlphaSlider(props) {
   )
 }
 
+/**
+ * Renders the color picker swatch component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ColorPickerSwatch(props) {
   const { asChild, className, ...swatchProps } = props
 
@@ -955,6 +1076,12 @@ function ColorPickerSwatch(props) {
   )
 }
 
+/**
+ * Renders the color picker eye dropper component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ColorPickerEyeDropper(props) {
   const { size: sizeProp, children, disabled, ...buttonProps } = props
 
@@ -1004,6 +1131,12 @@ function ColorPickerEyeDropper(props) {
   )
 }
 
+/**
+ * Renders the color picker format select component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ColorPickerFormatSelect(props) {
   const { size, disabled, className, ...selectProps } = props
 
@@ -1046,6 +1179,12 @@ function ColorPickerFormatSelect(props) {
   )
 }
 
+/**
+ * Renders the color picker input component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ColorPickerInput(props) {
   const store = useStoreContext(INPUT_NAME)
   const context = useColorPickerContext(INPUT_NAME)
@@ -1125,6 +1264,14 @@ const inputGroupItemVariants = cva(
   },
 )
 
+/**
+ * Renders the input group item component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.position - Value for position.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function InputGroupItem({ className, position, ...props }) {
   return (
     <Input
@@ -1135,6 +1282,12 @@ function InputGroupItem({ className, position, ...props }) {
   )
 }
 
+/**
+ * Renders the hex input component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function HexInput(props) {
   const {
     color,
@@ -1217,6 +1370,12 @@ function HexInput(props) {
   )
 }
 
+/**
+ * Renders the rgb input component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function RgbInput(props) {
   const {
     color,
@@ -1312,6 +1471,12 @@ function RgbInput(props) {
   )
 }
 
+/**
+ * Renders the hsl input component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function HslInput(props) {
   const {
     color,
@@ -1415,6 +1580,12 @@ function HslInput(props) {
   )
 }
 
+/**
+ * Renders the hsb input component.
+ *
+ * @param {*} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function HsbInput(props) {
   const {
     hsv,

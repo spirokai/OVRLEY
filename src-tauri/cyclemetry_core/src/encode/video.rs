@@ -180,16 +180,13 @@ pub fn run_parallel_renders(
         let paths_clone = paths.clone();
         let activity_clone = activity.clone();
         let controller = RenderController::default();
-        controller.try_start(report.frame_count as u32, &format!("Parallel Render {}", i + 1))?;
+        controller.try_start(
+            report.frame_count as u32,
+            &format!("Parallel Render {}", i + 1),
+        )?;
 
         let handle = std::thread::spawn(move || {
-            render_video(
-                &paths_clone,
-                &config,
-                &activity_clone,
-                &report,
-                &controller,
-            )
+            render_video(&paths_clone, &config, &activity_clone, &report, &controller)
         });
         handles.push(handle);
     }
@@ -212,7 +209,12 @@ pub fn run_parallel_renders(
     for filename in filenames {
         list_content.push_str(&format!(
             "file '{}'\n",
-            paths.public_dir.join(filename).display().to_string().replace('\\', "/")
+            paths
+                .public_dir
+                .join(filename)
+                .display()
+                .to_string()
+                .replace('\\', "/")
         ));
     }
     fs::write(&list_path, list_content).map_err(|e| format!("Failed to write concat list: {e}"))?;
@@ -266,11 +268,7 @@ pub fn render_video(
         label_cache_status,
     )?;
 
-    let public_filename = format!(
-        "video_{}.{}",
-        timestamp_nanos()?,
-        ffmpeg_settings.extension
-    );
+    let public_filename = format!("video_{}.{}", timestamp_nanos()?, ffmpeg_settings.extension);
     let output_path = paths.public_dir.join(&public_filename);
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let input_pix_fmt = ffmpeg_input_pix_fmt(&ffmpeg_settings.codec);

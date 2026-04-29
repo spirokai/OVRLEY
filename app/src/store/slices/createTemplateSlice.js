@@ -1,3 +1,7 @@
+/**
+ * Creates the create template slice Zustand slice used by the application store.
+ */
+
 import * as backend from '../../api/backend'
 import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
 import { syncGlobalDefaultsToConfig } from '../../lib/config-utils'
@@ -20,6 +24,13 @@ const {
   aspectRatio: initialAspectRatio,
 } = readStoredTemplateSettings()
 
+/**
+ * Creates template slice.
+ *
+ * @param {*} set - Zustand setter callback.
+ * @param {*} get - Value for get.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function createTemplateSlice(set, get) {
   const normalizePlatformCodec = (codec, platformOs) => {
     if (codec === 'libvpx-vp9' || codec === 'hevc_alpha') {

@@ -1,3 +1,14 @@
+/**
+ * Renders the loading overlay portion of the application interface.
+ */
+
+/**
+ * Renders the spinner component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Spinner({ className = 'h-4 w-4' }) {
   return (
     <svg
@@ -22,6 +33,14 @@ function Spinner({ className = 'h-4 w-4' }) {
   )
 }
 
+/**
+ * Renders the loading overlay component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.label - Field or UI label text.
+ * @param {*} props.show - Value for show.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function LoadingOverlay({
   label = 'Loading editor data...',
   show,

@@ -1,3 +1,7 @@
+/**
+ * Provides overlay editor helpers for constants.
+ */
+
 import {
   Activity,
   Clock3,

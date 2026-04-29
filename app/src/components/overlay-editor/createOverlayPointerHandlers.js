@@ -1,3 +1,7 @@
+/**
+ * Provides overlay editor helpers for create overlay pointer handlers.
+ */
+
 import { clamp } from './utils'
 import {
   buildSelectionRect,
@@ -7,6 +11,16 @@ import {
   rectanglesIntersect,
 } from './overlayEditorHelpers'
 
+/**
+ * Returns scene point.
+ *
+ * @param {*} sceneElement - Value for scene element.
+ * @param {*} displayScale - Value for display scale.
+ * @param {*} sceneSize - Numeric scene size value.
+ * @param {*} clientX - Value for client x.
+ * @param {*} clientY - Value for client y.
+ * @returns {object} Requested value or structure.
+ */
 function getScenePoint(
   sceneElement,
   displayScale,
@@ -25,6 +39,17 @@ function getScenePoint(
   }
 }
 
+/**
+ * Returns intersected widget ids.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.displayScale - Value for display scale.
+ * @param {*} options.nextSelectionRect - Value for next selection rect.
+ * @param {*} options.orderedWidgetIds - Value for ordered widget ids.
+ * @param {*} options.sceneElement - Value for scene element.
+ * @param {*} options.widgetNodes - Value for widget nodes.
+ * @returns {*} Requested value or structure.
+ */
 function getIntersectedWidgetIds({
   displayScale,
   nextSelectionRect,
@@ -56,6 +81,28 @@ function getIntersectedWidgetIds({
   })
 }
 
+/**
+ * Provides overlay pointer handlers state and actions.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.commitSelection - Value for commit selection.
+ * @param {*} options.displayScale - Value for display scale.
+ * @param {*} options.moveableRef - Value for moveable ref.
+ * @param {*} options.marqueeCleanupRef - Value for marquee cleanup ref.
+ * @param {*} options.marqueeSelectionRef - Value for marquee selection ref.
+ * @param {*} options.onZoomLevelChange - Callback invoked to zoom level change.
+ * @param {*} options.orderedWidgetIds - Value for ordered widget ids.
+ * @param {*} options.sceneElement - Value for scene element.
+ * @param {*} options.sceneSize - Numeric scene size value.
+ * @param {*} options.selectedWidgetId - Value for selected widget id.
+ * @param {*} options.selectedWidgetIds - Value for selected widget ids.
+ * @param {*} options.setGroupDragSelectionIds - Value for set group drag selection ids.
+ * @param {*} options.setIsGroupDragActive - Value for set is group drag active.
+ * @param {*} options.setSelectionRect - Value for set selection rect.
+ * @param {*} options.setSelectionState - Value for set selection state.
+ * @param {*} options.widgetNodes - Value for widget nodes.
+ * @returns {object} Result produced by the helper.
+ */
 export default function useOverlayPointerHandlers({
   commitSelection,
   displayScale,

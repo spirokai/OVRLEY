@@ -1,6 +1,14 @@
+/**
+ * Implements the use Backend Status hook and related behavior for the app.
+ */
+
 import { useEffect, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 
+/**
+ * Handles ensure backend debug state.
+ * @returns {*} Result produced by the helper.
+ */
 function ensureBackendDebugState() {
   if (typeof window === 'undefined') {
     return null
@@ -18,6 +26,12 @@ function ensureBackendDebugState() {
   return window.__BACKEND_DEBUG__
 }
 
+/**
+ * Handles log backend.
+ *
+ * @param {*} message - Value for message.
+ * @returns {*} Result produced by the helper.
+ */
 function logBackend(message) {
   const debugState = ensureBackendDebugState()
   const timestamp = new Date().toISOString()
@@ -34,6 +48,13 @@ function logBackend(message) {
   }
 }
 
+/**
+ * Updates backend status.
+ *
+ * @param {*} status - Status value for the current workflow.
+ * @param {*} error - Value for error.
+ * @returns {*} Result produced by the helper.
+ */
 function updateBackendStatus(status, error = null) {
   const debugState = ensureBackendDebugState()
   if (!debugState) {
@@ -44,6 +65,10 @@ function updateBackendStatus(status, error = null) {
   debugState.error = error
 }
 
+/**
+ * Checks whether has tauri runtime.
+ * @returns {boolean} Whether the condition is satisfied.
+ */
 export function hasTauriRuntime() {
   return (
     typeof window !== 'undefined' &&
@@ -51,6 +76,10 @@ export function hasTauriRuntime() {
   )
 }
 
+/**
+ * Provides backend status state and actions.
+ * @returns {object} Result produced by the helper.
+ */
 export default function useBackendStatus() {
   const isTauriRuntime = hasTauriRuntime()
   const [backendStatus, setBackendStatus] = useState(

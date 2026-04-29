@@ -1,3 +1,7 @@
+/**
+ * Provides overlay editor helpers for utils.
+ */
+
 import { DEFAULT_ACTIVITY_PREVIEW } from './constants'
 
 export {
@@ -31,10 +35,24 @@ export {
   measurePreviewText,
 } from './metricTextUtils'
 
+/**
+ * Constrains a value to the provided minimum and maximum bounds.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} min - Lower bound used by the calculation.
+ * @param {*} max - Upper bound used by the calculation.
+ * @returns {number} Result produced by the helper.
+ */
 export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+/**
+ * Returns elapsed series.
+ *
+ * @param {*} activity - Parsed activity data for previews or rendering.
+ * @returns {*} Requested value or structure.
+ */
 export function getElapsedSeries(activity) {
   const frameElapsedSeries = activity?.frame_elapsed_seconds
   if (Array.isArray(frameElapsedSeries) && frameElapsedSeries.length) {
@@ -46,6 +64,12 @@ export function getElapsedSeries(activity) {
     : []
 }
 
+/**
+ * Returns scene size.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @returns {object} Requested value or structure.
+ */
 export function getSceneSize(config) {
   return {
     width: config?.scene?.width || 1920,
@@ -53,6 +77,13 @@ export function getSceneSize(config) {
   }
 }
 
+/**
+ * Finds closest sample index.
+ *
+ * @param {*} activity - Parsed activity data for previews or rendering.
+ * @param {*} selectedSecond - Value for selected second.
+ * @returns {*} Requested value or structure.
+ */
 export function findClosestSampleIndex(activity, selectedSecond) {
   const elapsedSeries = getElapsedSeries(activity)
   if (!elapsedSeries.length) return 0
@@ -76,6 +107,14 @@ export function findClosestSampleIndex(activity, selectedSecond) {
   return result
 }
 
+/**
+ * Returns sample value.
+ *
+ * @param {*} activity - Parsed activity data for previews or rendering.
+ * @param {*} key - Lookup key for the requested value.
+ * @param {*} sampleIndex - Sample index within the activity series.
+ * @returns {*} Requested value or structure.
+ */
 export function getSampleValue(activity, key, sampleIndex) {
   const series = activity?.[key]
   if (!Array.isArray(series)) {
@@ -85,6 +124,14 @@ export function getSampleValue(activity, key, sampleIndex) {
   return series[sampleIndex] ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
 }
 
+/**
+ * Returns interpolated series value.
+ *
+ * @param {*} xValues - Series of x-axis values used for interpolation.
+ * @param {*} yValues - Series of y-axis values used for interpolation.
+ * @param {*} targetX - Value for target x.
+ * @returns {*} Requested value or structure.
+ */
 export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
   if (!Array.isArray(xValues) || !Array.isArray(yValues) || !xValues.length) {
     return null
@@ -164,6 +211,14 @@ export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
   return leftY + (rightY - leftY) * ratio
 }
 
+/**
+ * Returns interpolated activity value.
+ *
+ * @param {*} activity - Parsed activity data for previews or rendering.
+ * @param {*} key - Lookup key for the requested value.
+ * @param {*} elapsedSecond - Elapsed playback time in seconds.
+ * @returns {*} Requested value or structure.
+ */
 export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
     ? activity.sample_elapsed_seconds
@@ -183,6 +238,13 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
   return interpolatedValue ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
 }
 
+/**
+ * Returns interpolated time value.
+ *
+ * @param {*} activity - Parsed activity data for previews or rendering.
+ * @param {*} elapsedSecond - Elapsed playback time in seconds.
+ * @returns {*} Requested value or structure.
+ */
 export function getInterpolatedTimeValue(activity, elapsedSecond) {
   const sourceStartTimeMs = Date.parse(activity?.source_start_time || '')
   if (Number.isFinite(sourceStartTimeMs)) {
@@ -210,6 +272,13 @@ export function getInterpolatedTimeValue(activity, elapsedSecond) {
     : DEFAULT_ACTIVITY_PREVIEW.time
 }
 
+/**
+ * Returns distance progress.
+ *
+ * @param {*} activity - Parsed activity data for previews or rendering.
+ * @param {*} sampleIndex - Sample index within the activity series.
+ * @returns {*} Requested value or structure.
+ */
 export function getDistanceProgress(activity, sampleIndex) {
   const distanceProgressSeries =
     activity?.frame_distance_progress?.length > 0
@@ -235,6 +304,13 @@ export function getDistanceProgress(activity, sampleIndex) {
   return clamp(sampleIndex / (elapsedSeries.length - 1), 0, 1)
 }
 
+/**
+ * Returns distance progress at elapsed.
+ *
+ * @param {*} activity - Parsed activity data for previews or rendering.
+ * @param {*} elapsedSecond - Elapsed playback time in seconds.
+ * @returns {*} Requested value or structure.
+ */
 export function getDistanceProgressAtElapsed(activity, elapsedSecond) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
     ? activity.sample_elapsed_seconds
@@ -274,6 +350,13 @@ export function getDistanceProgressAtElapsed(activity, elapsedSecond) {
   return clamp((safeElapsed - (elapsedSeries[0] ?? 0)) / totalElapsed, 0, 1)
 }
 
+/**
+ * Returns series value at progress.
+ *
+ * @param {*} series - Value for series.
+ * @param {*} progress01 - Normalized progress value between 0 and 1.
+ * @returns {*} Requested value or structure.
+ */
 export function getSeriesValueAtProgress(series, progress01) {
   if (!Array.isArray(series) || !series.length) {
     return null

@@ -1,3 +1,7 @@
+/**
+ * Provides reusable badge UI primitives for the application.
+ */
+
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cva } from 'class-variance-authority'
@@ -25,6 +29,15 @@ const badgeVariants = cva(
   },
 )
 
+/**
+ * Renders the badge component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.variant - Value for variant.
+ * @param {*} props.asChild - Value for as child.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Badge({ className, variant, asChild = false, ...props }) {
   const Comp = asChild ? Slot : 'span'
 

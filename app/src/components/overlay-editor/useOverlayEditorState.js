@@ -1,3 +1,7 @@
+/**
+ * Provides overlay editor helpers for use overlay editor state.
+ */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentParsedActivity } from '../../api/activityCache'
 import useStore from '../../store/useStore'
@@ -18,6 +22,15 @@ import {
 import { clamp, getSceneSize } from './utils'
 import useWidgetDraftState from './useWidgetDraftState'
 
+/**
+ * Handles resolve preview second.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.dummyDurationSeconds - Numeric dummy duration seconds value.
+ * @param {*} options.selectedSecond - Value for selected second.
+ * @param {*} options.sourceActivity - Value for source activity.
+ * @returns {*} Result produced by the helper.
+ */
 function resolvePreviewSecond({
   dummyDurationSeconds,
   selectedSecond,
@@ -38,6 +51,13 @@ function resolvePreviewSecond({
   return clamp(rawSecond, 0, maxSecond)
 }
 
+/**
+ * Handles merge drafts into widgets.
+ *
+ * @param {*} widgets - Widget collection in the current template.
+ * @param {*} liveWidgetDrafts - Value for live widget drafts.
+ * @returns {object} Result produced by the helper.
+ */
 function mergeDraftsIntoWidgets(widgets, liveWidgetDrafts) {
   return widgets.map((widget) => {
     const draft = liveWidgetDrafts[widget.id]
@@ -55,6 +75,13 @@ function mergeDraftsIntoWidgets(widgets, liveWidgetDrafts) {
   })
 }
 
+/**
+ * Handles selection ids changed.
+ *
+ * @param {*} leftIds - Value for left ids.
+ * @param {*} rightIds - Value for right ids.
+ * @returns {*} Result produced by the helper.
+ */
 function selectionIdsChanged(leftIds, rightIds) {
   return (
     leftIds.length !== rightIds.length ||
@@ -62,6 +89,17 @@ function selectionIdsChanged(leftIds, rightIds) {
   )
 }
 
+/**
+ * Provides overlay editor state state and actions.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.config - Overlay template configuration data.
+ * @param {*} options.globalDefaults - Value for global defaults.
+ * @param {*} options.onConfigChange - Callback invoked to config change.
+ * @param {*} options.zoomLevel - Current editor zoom level.
+ * @param {*} options.onZoomLevelChange - Callback invoked to zoom level change.
+ * @returns {object} Result produced by the helper.
+ */
 export default function useOverlayEditorState({
   config,
   globalDefaults,

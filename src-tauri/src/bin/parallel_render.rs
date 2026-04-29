@@ -61,9 +61,8 @@ fn main() -> Result<(), String> {
     }
 
     println!("Starting parallel renders (2 sessions)...");
-    let duration = cyclemetry_core::encode::video::run_parallel_renders(
-        &paths, configs, &activity, reports,
-    )?;
+    let duration =
+        cyclemetry_core::encode::video::run_parallel_renders(&paths, configs, &activity, reports)?;
 
     println!("\nTotal execution time: {:.2}s", duration.as_secs_f64());
 

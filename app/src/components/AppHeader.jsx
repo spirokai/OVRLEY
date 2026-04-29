@@ -1,3 +1,7 @@
+/**
+ * Renders the app header portion of the application interface.
+ */
+
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,6 +26,20 @@ import {
   ZoomIn,
 } from 'lucide-react'
 
+/**
+ * Renders the app header component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.activityControls - Activity control state and handlers.
+ * @param {*} props.backendStatus - Current backend status.
+ * @param {*} props.editorControls - Editor control state and handlers.
+ * @param {*} props.onOpenDownloads - Callback invoked to open downloads.
+ * @param {*} props.renderControls - Render control state and handlers.
+ * @param {*} props.sceneHeight - Numeric scene height value.
+ * @param {*} props.sceneWidth - Numeric scene width value.
+ * @param {*} props.templateControls - Template control state and handlers.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function AppHeader({
   activityControls,
   backendStatus,

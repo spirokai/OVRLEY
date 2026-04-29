@@ -1,6 +1,14 @@
+/**
+ * Implements the use Activity Import hook and related behavior for the app.
+ */
+
 import { useCallback } from 'react'
 import { useActivityStore } from '@/hooks/useAppStoreSelectors'
 
+/**
+ * Handles select browser gpx file.
+ * @returns {*} Result produced by the helper.
+ */
 const selectBrowserGpxFile = () =>
   new Promise((resolve) => {
     const input = document.createElement('input')
@@ -11,6 +19,10 @@ const selectBrowserGpxFile = () =>
     input.click()
   })
 
+/**
+ * Provides activity import state and actions.
+ * @returns {object} Result produced by the helper.
+ */
 export default function useActivityImport() {
   const { gpxFilename, setErrorMessage, setGeneratingImage } =
     useActivityStore()

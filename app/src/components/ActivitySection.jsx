@@ -1,8 +1,16 @@
+/**
+ * Renders the activity section portion of the application interface.
+ */
+
 import React from 'react'
 import useStore from '../store/useStore'
 import LoadGpxButton from './buttons/LoadGpxButton'
 import LoadDemoGpxButton from './buttons/LoadDemoGpxButton'
 
+/**
+ * Renders the activity section component.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ActivitySection() {
   const { gpxFilename, dummyDurationSeconds } = useStore()
   const minutes = Math.floor(dummyDurationSeconds / 60)

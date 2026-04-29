@@ -1,7 +1,20 @@
+/**
+ * Provides reusable input UI primitives for the application.
+ */
+
 import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * Renders the input component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.type - Widget or value type identifier.
+ * @param {React.Ref<*>} ref - Forwarded React ref.
+ * @returns {JSX.Element} Rendered component output.
+ */
 const Input = React.forwardRef(({ className, type, ...props }, ref) => {
   return (
     <input

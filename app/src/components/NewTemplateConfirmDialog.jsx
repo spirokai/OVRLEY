@@ -1,6 +1,19 @@
+/**
+ * Renders the new template confirm dialog portion of the application interface.
+ */
+
 import { FilePlus2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+/**
+ * Renders the new template confirm dialog component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.open - Value for open.
+ * @param {*} props.onCancel - Callback invoked to cancel.
+ * @param {*} props.onConfirm - Callback invoked to confirm.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function NewTemplateConfirmDialog({
   open,
   onCancel,

@@ -149,6 +149,7 @@ pub fn format_metric_parts(
                 .temperature_unit
                 .as_deref()
                 .unwrap_or("celsius");
+            let formatted_unit = temperature_units(unit).to_string();
             let (value_text, unit_text) = match raw {
                 Some(temp_c) if unit == "fahrenheit" => (
                     format_number(
@@ -158,21 +159,21 @@ pub fn format_metric_parts(
                     value_config
                         .show_units
                         .unwrap_or(true)
-                        .then_some("F".to_string()),
+                        .then_some(formatted_unit.clone()),
                 ),
                 Some(temp_c) => (
                     format_number(temp_c, effective_decimals(config, value_config, Some(0))),
                     value_config
                         .show_units
                         .unwrap_or(true)
-                        .then_some("C".to_string()),
+                        .then_some(formatted_unit.clone()),
                 ),
                 None => (
                     "--".to_string(),
                     value_config
                         .show_units
                         .unwrap_or(true)
-                        .then_some(if unit == "fahrenheit" { "F" } else { "C" }.to_string()),
+                        .then_some(formatted_unit),
                 ),
             };
             (value_text, unit_text, Some(MetricIconKind::Thermometer))
@@ -271,13 +272,13 @@ fn format_temperature(
     let Some(temp_c) = raw else {
         return missing_value_with_units(
             value_config.show_units.unwrap_or(false),
-            if unit == "fahrenheit" { "F" } else { "C" },
+            temperature_units(unit),
         );
     };
     let (value, units) = if unit == "fahrenheit" {
-        ((temp_c * 9.0 / 5.0) + 32.0, "F")
+        ((temp_c * 9.0 / 5.0) + 32.0, temperature_units(unit))
     } else {
-        (temp_c, "C")
+        (temp_c, temperature_units(unit))
     };
     let mut text = format_number(value, effective_decimals(config, value_config, Some(0)));
     if value_config.show_units.unwrap_or(false) {
@@ -439,6 +440,14 @@ fn speed_units(value_config: &ValueConfig) -> &'static str {
     }
 }
 
+fn temperature_units(unit: &str) -> &'static str {
+    if unit == "fahrenheit" {
+        "\u{00B0}F"
+    } else {
+        "\u{00B0}C"
+    }
+}
+
 fn missing_value_with_units(show_units: bool, units: &str) -> String {
     if show_units {
         format!("-- {units}")
@@ -555,6 +564,96 @@ mod tests {
         assert_eq!(parts.value_text, "36");
         assert_eq!(parts.unit_text.as_deref(), Some("KM/H"));
         assert_eq!(parts.icon_kind, Some(MetricIconKind::Gauge));
+        assert!(parts.show_icon);
+    }
+
+    #[test]
+    fn formats_metric_parts_for_temperature_with_degree_units() {
+        let config = RenderConfig {
+            scene: SceneConfig {
+                width: None,
+                height: None,
+                fps: 30.0,
+                start: 0.0,
+                end: 1.0,
+                font: None,
+                font_size: None,
+                color: None,
+                decimal_rounding: None,
+                overlay_filename: None,
+                ffmpeg: json!({}),
+                opacity: None,
+                scale: None,
+                time_format: None,
+                extra: Default::default(),
+            },
+            labels: vec![],
+            values: vec![],
+            plots: json!([]),
+            extra: Default::default(),
+        };
+        let value = ValueConfig {
+            value: "temperature".to_string(),
+            x: 0.0,
+            y: 0.0,
+            font: None,
+            font_family: None,
+            font_size: None,
+            color: None,
+            opacity: None,
+            suffix: None,
+            prefix: None,
+            unit: None,
+            hours_offset: None,
+            time_format: None,
+            format: None,
+            decimal_rounding: None,
+            decimals: Some(0),
+            show_icon: None,
+            icon_color: None,
+            icon_size: None,
+            icon_offset_x: None,
+            icon_offset_y: None,
+            show_units: Some(true),
+            speed_unit: None,
+            temperature_unit: Some("fahrenheit".to_string()),
+            value_offset: None,
+            triangle_positive_color: None,
+            triangle_negative_color: None,
+            show_sign: None,
+            show_triangle: None,
+            triangle_width: None,
+            shadow_color: None,
+            shadow_strength: None,
+            shadow_distance: None,
+            border_color: None,
+            border_thickness: None,
+            border_strength: None,
+            border_distance: None,
+            extra: Default::default(),
+        };
+        let dense = DenseActivityReport {
+            frame_count: 1,
+            frame_elapsed_seconds: vec![0.0],
+            frame_distance_progress: vec![Some(0.0)],
+            series: DenseSeriesReport {
+                speed: vec![],
+                elevation: vec![],
+                gradient: vec![],
+                heartrate: vec![],
+                cadence: vec![],
+                power: vec![],
+                temperature: vec![Some(20.0)],
+                course_lat: vec![],
+                course_lon: vec![],
+                time: vec![],
+            },
+        };
+
+        let parts = format_metric_parts(&config, &value, &dense, 0).unwrap();
+        assert_eq!(parts.value_text, "68");
+        assert_eq!(parts.unit_text.as_deref(), Some("\u{00B0}F"));
+        assert_eq!(parts.icon_kind, Some(MetricIconKind::Thermometer));
         assert!(parts.show_icon);
     }
 }

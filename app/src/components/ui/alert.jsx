@@ -1,3 +1,7 @@
+/**
+ * Provides reusable alert UI primitives for the application.
+ */
+
 import * as React from 'react'
 import { cva } from 'class-variance-authority'
 
@@ -19,6 +23,14 @@ const alertVariants = cva(
   },
 )
 
+/**
+ * Renders the alert component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.variant - Value for variant.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Alert({ className, variant, ...props }) {
   return (
     <div
@@ -30,6 +42,13 @@ function Alert({ className, variant, ...props }) {
   )
 }
 
+/**
+ * Renders the alert title component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function AlertTitle({ className, ...props }) {
   return (
     <div
@@ -43,6 +62,13 @@ function AlertTitle({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the alert description component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function AlertDescription({ className, ...props }) {
   return (
     <div

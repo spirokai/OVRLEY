@@ -1,8 +1,19 @@
+/**
+ * Provides reusable switch UI primitives for the application.
+ */
+
 import * as React from 'react'
 import * as SwitchPrimitive from '@radix-ui/react-switch'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * Renders the switch component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Switch({ className, ...props }) {
   return (
     <SwitchPrimitive.Root

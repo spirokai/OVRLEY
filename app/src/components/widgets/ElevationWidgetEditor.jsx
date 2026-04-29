@@ -1,3 +1,7 @@
+/**
+ * Supports widget editing flows related to elevation widget editor.
+ */
+
 import { Mountain, Palette } from 'lucide-react'
 import {
   ColorField,
@@ -12,6 +16,15 @@ import {
 } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 
+/**
+ * Renders the elevation widget editor component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.updateWidgetData - Value for update widget data.
+ * @param {*} props.setNumericField - Value for set numeric field.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function ElevationWidgetEditor({
   widget,
   updateWidgetData,

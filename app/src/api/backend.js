@@ -1,15 +1,20 @@
 /**
- * Backend API module - talks directly to Rust in Tauri.
- * Web fallback still uses localhost during non-Tauri development.
+ * Implements API helpers for backend.
  */
 
 // Check if the Tauri IPC runtime is actually available.
+
+/**
+ * Checks whether is tauri.
+ * @returns {boolean} Whether the condition is satisfied.
+ */
 const isTauri = () =>
   typeof window !== 'undefined' &&
   typeof window.__TAURI_INTERNALS__ !== 'undefined'
 
 /**
- * Lazy import of Tauri invoke
+ * Returns invoke.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 async function getInvoke() {
   if (!isTauri()) return null
@@ -18,7 +23,10 @@ async function getInvoke() {
 }
 
 /**
- * Robust JSON stringify that handles cyclic structures
+ * Serializes data to JSON while safely handling cyclic references.
+ *
+ * @param {*} obj - Value for obj.
+ * @returns {*} Result produced by the helper.
  */
 function safeJsonStringify(obj) {
   try {
@@ -39,7 +47,14 @@ function safeJsonStringify(obj) {
 }
 
 /**
- * Helper to handle calls with fallback
+ * Handles api call.
+ *
+ * @param {*} method - HTTP method used for the backend request.
+ * @param {*} tauriCmd - Tauri command name to invoke.
+ * @param {*} tauriArgs - Argument payload passed to the Tauri command.
+ * @param {*} fetchPath - HTTP endpoint used in browser mode.
+ * @param {*} fetchOptions - Fetch options.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 async function apiCall(
   method,
@@ -113,14 +128,16 @@ async function apiCall(
 }
 
 /**
- * Health check
+ * Handles health check.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function healthCheck() {
   return apiCall('GET', 'backend_health', {}, '/api/health')
 }
 
 /**
- * Check if the native backend bridge is available
+ * Handles socket ready.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function socketReady() {
   const invoke = await getInvoke()
@@ -131,7 +148,12 @@ export async function socketReady() {
 }
 
 /**
- * Generate demo preview frame
+ * Handles generate demo.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} parsedActivity - Normalized activity payload used by the app.
+ * @param {*} second - Preview or export time in seconds.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function generateDemo(config, parsedActivity, second) {
   const safeConfig = safeJsonStringify(config)
@@ -152,7 +174,11 @@ export async function generateDemo(config, parsedActivity, second) {
 }
 
 /**
- * Start video render
+ * Renders video.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} parsedActivity - Normalized activity payload used by the app.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function renderVideo(config, parsedActivity) {
   const safeConfig = safeJsonStringify(config)
@@ -171,6 +197,10 @@ export async function renderVideo(config, parsedActivity) {
   )
 }
 
+/**
+ * Handles detect browser platform os.
+ * @returns {*} Result produced by the helper.
+ */
 function detectBrowserPlatformOs() {
   const platform =
     navigator.userAgentData?.platform ||
@@ -190,6 +220,10 @@ function detectBrowserPlatformOs() {
   return 'unknown'
 }
 
+/**
+ * Returns platform info.
+ * @returns {Promise<object>} Promise resolving to the operation result.
+ */
 export async function getPlatformInfo() {
   const invoke = await getInvoke()
   if (invoke) {
@@ -200,6 +234,12 @@ export async function getPlatformInfo() {
   return { os: detectBrowserPlatformOs() }
 }
 
+/**
+ * Sorts font names.
+ *
+ * @param {*} fonts - Value for fonts.
+ * @returns {*} Result produced by the helper.
+ */
 function sortFontNames(fonts) {
   return [...new Set(fonts.filter(Boolean))]
     .map((font) => font.trim())
@@ -209,6 +249,10 @@ function sortFontNames(fonts) {
     )
 }
 
+/**
+ * Lists available fonts.
+ * @returns {Promise<Array<*>>} Promise resolving to the operation result.
+ */
 export async function listAvailableFonts() {
   const invoke = await getInvoke()
   if (invoke) {
@@ -237,28 +281,34 @@ export async function listAvailableFonts() {
 }
 
 /**
- * Get render progress
+ * Returns render progress.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function getRenderProgress() {
   return apiCall('GET', 'backend_progress', {}, '/api/render-progress')
 }
 
 /**
- * Cancel current video render
+ * Checks whether cancel render.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function cancelRender() {
   return apiCall('POST', 'backend_cancel', {}, '/api/cancel-render')
 }
 
 /**
- * Open downloads folder
+ * Opens downloads.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function openDownloads() {
   return apiCall('POST', 'backend_open_downloads', {}, '/api/open-downloads')
 }
 
 /**
- * Open video file
+ * Opens video.
+ *
+ * @param {*} filename - Target filename for the operation.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function openVideo(filename) {
   return apiCall(
@@ -273,7 +323,10 @@ export async function openVideo(filename) {
 }
 
 /**
- * Get image URL for a preview/video filename
+ * Returns image url.
+ *
+ * @param {*} filename - Target filename for the operation.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function getImageUrl(filename) {
   const invoke = await getInvoke()
@@ -293,14 +346,18 @@ export async function getImageUrl(filename) {
 }
 
 /**
- * List all available templates
+ * Lists templates.
+ * @returns {Promise<Array<*>>} Promise resolving to the operation result.
  */
 export async function listTemplates() {
   return apiCall('GET', 'backend_list_templates', {}, '/api/templates')
 }
 
 /**
- * Get template content
+ * Returns template.
+ *
+ * @param {*} filename - Target filename for the operation.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function getTemplate(filename) {
   return apiCall(
@@ -312,7 +369,11 @@ export async function getTemplate(filename) {
 }
 
 /**
- * Save a template configuration
+ * Handles save template.
+ *
+ * @param {*} filename - Target filename for the operation.
+ * @param {*} config - Overlay template configuration data.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function saveTemplate(filename, config) {
   const safeConfig = safeJsonStringify(config)
@@ -331,12 +392,19 @@ export async function saveTemplate(filename, config) {
 }
 
 /**
- * Open the user templates folder
+ * Opens templates folder.
+ * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function openTemplatesFolder() {
   return apiCall('POST', 'backend_open_templates', {}, '/api/open-templates')
 }
 
+/**
+ * Returns default template save path.
+ *
+ * @param {*} filename - Target filename for the operation.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 export async function getDefaultTemplateSavePath(filename) {
   const invoke = await getInvoke()
   if (!invoke) {
@@ -348,6 +416,13 @@ export async function getDefaultTemplateSavePath(filename) {
   return invoke('default_template_save_path', { filename })
 }
 
+/**
+ * Writes template file.
+ *
+ * @param {*} path - Filesystem path for the target resource.
+ * @param {*} contents - Serialized file contents to write.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 export async function writeTemplateFile(path, contents) {
   const invoke = await getInvoke()
   if (!invoke) {
@@ -357,6 +432,13 @@ export async function writeTemplateFile(path, contents) {
   return invoke('write_template_file', { path, contents })
 }
 
+/**
+ * Writes parse debug file.
+ *
+ * @param {*} filename - Target filename for the operation.
+ * @param {*} contents - Serialized file contents to write.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 export async function writeParseDebugFile(filename, contents) {
   const invoke = await getInvoke()
   if (invoke) {

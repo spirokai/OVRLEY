@@ -1,21 +1,52 @@
+/**
+ * Provides reusable select UI primitives for the application.
+ */
+
 import * as React from 'react'
 import * as SelectPrimitive from '@radix-ui/react-select'
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * Renders the select component.
+ *
+ * @param {object} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Select({ ...props }) {
   return <SelectPrimitive.Root data-slot="select" {...props} />
 }
 
+/**
+ * Renders the select group component.
+ *
+ * @param {object} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function SelectGroup({ ...props }) {
   return <SelectPrimitive.Group data-slot="select-group" {...props} />
 }
 
+/**
+ * Renders the select value component.
+ *
+ * @param {object} props - Component props.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function SelectValue({ ...props }) {
   return <SelectPrimitive.Value data-slot="select-value" {...props} />
 }
 
+/**
+ * Renders the select trigger component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.size - Numeric size value.
+ * @param {*} props.children - Nested React children.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function SelectTrigger({ className, size = 'default', children, ...props }) {
   return (
     <SelectPrimitive.Trigger
@@ -35,6 +66,16 @@ function SelectTrigger({ className, size = 'default', children, ...props }) {
   )
 }
 
+/**
+ * Renders the select content component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.children - Nested React children.
+ * @param {*} props.position - Value for position.
+ * @param {*} props.align - Value for align.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function SelectContent({
   className,
   children,
@@ -72,6 +113,13 @@ function SelectContent({
   )
 }
 
+/**
+ * Renders the select label component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function SelectLabel({ className, ...props }) {
   return (
     <SelectPrimitive.Label
@@ -82,6 +130,14 @@ function SelectLabel({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the select item component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.children - Nested React children.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function SelectItem({ className, children, ...props }) {
   return (
     <SelectPrimitive.Item
@@ -105,6 +161,13 @@ function SelectItem({ className, children, ...props }) {
   )
 }
 
+/**
+ * Renders the select separator component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function SelectSeparator({ className, ...props }) {
   return (
     <SelectPrimitive.Separator
@@ -115,6 +178,13 @@ function SelectSeparator({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the select scroll up button component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function SelectScrollUpButton({ className, ...props }) {
   return (
     <SelectPrimitive.ScrollUpButton
@@ -130,6 +200,13 @@ function SelectScrollUpButton({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the select scroll down button component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function SelectScrollDownButton({ className, ...props }) {
   return (
     <SelectPrimitive.ScrollDownButton

@@ -1,9 +1,20 @@
+/**
+ * Implements the use Render Workflow hook and related behavior for the app.
+ */
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template-snapshot'
 import useStore from '@/store/useStore'
 
+/**
+ * Provides render workflow state and actions.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.backendStatus - Current backend status.
+ * @returns {object} Result produced by the helper.
+ */
 export default function useRenderWorkflow({ backendStatus }) {
   const {
     activitySummary,

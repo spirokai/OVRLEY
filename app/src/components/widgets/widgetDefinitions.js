@@ -1,3 +1,7 @@
+/**
+ * Supports widget editing flows related to widget definitions.
+ */
+
 import {
   Activity,
   Clock,
@@ -52,23 +56,59 @@ export const TYPE_ICONS = {
   course: Map,
 }
 
+/**
+ * Parses integer.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} fallback - Fallback value returned when input is invalid.
+ * @returns {number} Result produced by the helper.
+ */
 export function parseInteger(value, fallback = 0) {
   const parsed = parseInt(value, 10)
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+/**
+ * Constrains a value to the provided minimum and maximum bounds.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} min - Lower bound used by the calculation.
+ * @param {*} max - Upper bound used by the calculation.
+ * @returns {number} Result produced by the helper.
+ */
 export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+/**
+ * Returns widget font.
+ *
+ * @param {*} widget - Widget definition being rendered or edited.
+ * @param {*} fallback - Fallback value returned when input is invalid.
+ * @returns {*} Requested value or structure.
+ */
 export function getWidgetFont(widget, fallback = 'Arial.ttf') {
   return widget.data.font || widget.data.font_family || fallback
 }
 
+/**
+ * Returns global color.
+ *
+ * @param {*} globalDefaults - Value for global defaults.
+ * @param {*} key - Lookup key for the requested value.
+ * @param {*} fallback - Fallback value returned when input is invalid.
+ * @returns {*} Requested value or structure.
+ */
 export function getGlobalColor(globalDefaults, key, fallback) {
   return globalDefaults?.[key] || fallback
 }
 
+/**
+ * Returns course widget dimensions.
+ *
+ * @param {*} coursePoints - Value for course points.
+ * @returns {object} Requested value or structure.
+ */
 function getCourseWidgetDimensions(coursePoints) {
   const validPoints = (coursePoints || []).filter(
     ([latitude, longitude]) =>
@@ -109,6 +149,12 @@ function getCourseWidgetDimensions(coursePoints) {
   }
 }
 
+/**
+ * Creates label defaults.
+ *
+ * @param {*} globalDefaults - Value for global defaults.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function createLabelDefaults(globalDefaults) {
   const font = globalDefaults?.font_text || 'Arial.ttf'
   const fontSelection = createFontSelection(font)
@@ -123,6 +169,13 @@ export function createLabelDefaults(globalDefaults) {
   }
 }
 
+/**
+ * Creates metric value defaults.
+ *
+ * @param {*} type - Widget or value type identifier.
+ * @param {*} globalDefaults - Value for global defaults.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function createMetricValueDefaults(type, globalDefaults) {
   const font = globalDefaults?.font_values || 'Furore.otf'
   const fontSelection = createFontSelection(font)
@@ -160,6 +213,14 @@ export function createMetricValueDefaults(type, globalDefaults) {
   }
 }
 
+/**
+ * Creates plot defaults.
+ *
+ * @param {*} type - Widget or value type identifier.
+ * @param {*} globalDefaults - Value for global defaults.
+ * @param {*} options - Configuration options for the helper.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function createPlotDefaults(type, globalDefaults, options = {}) {
   const courseDimensions =
     type === 'course'

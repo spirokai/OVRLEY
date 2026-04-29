@@ -1,13 +1,35 @@
+/**
+ * Implements the use Editor Shell State hook and related behavior for the app.
+ */
+
 import { useEffect, useState } from 'react'
 
+/**
+ * Constrains a value to the provided minimum and maximum bounds.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} min - Lower bound used by the calculation.
+ * @param {*} max - Upper bound used by the calculation.
+ * @returns {number} Result produced by the helper.
+ */
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+/**
+ * Returns ui scale.
+ *
+ * @param {*} width - Numeric width value.
+ * @returns {*} Requested value or structure.
+ */
 function getUiScale(width) {
   return clamp(Number((width / 1440).toFixed(3)), 0.9, 1.08)
 }
 
+/**
+ * Provides editor shell state state and actions.
+ * @returns {object} Result produced by the helper.
+ */
 export default function useEditorShellState() {
   const [editorZoomLevel, setEditorZoomLevel] = useState(1)
   const [editorBackgroundMode, setEditorBackgroundMode] = useState(

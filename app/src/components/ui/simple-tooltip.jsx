@@ -1,9 +1,18 @@
+/**
+ * Provides reusable simple tooltip UI primitives for the application.
+ */
+
 import React, { useState } from 'react'
 
 /**
- * A simple lightweight tooltip component.
- * Displays content on hover. Works even if children render disabled elements
- * (provided those elements don't block pointer events, which we fixed in button.jsx).
+ * Renders the simple tooltip component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.content - Value for content.
+ * @param {*} props.children - Nested React children.
+ * @param {*} props.side - Value for side.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
  */
 export function SimpleTooltip({
   content,

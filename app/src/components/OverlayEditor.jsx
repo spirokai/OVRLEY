@@ -1,9 +1,17 @@
+/**
+ * Renders the overlay editor portion of the application interface.
+ */
+
 import { memo } from 'react'
 import { LayoutGrid } from 'lucide-react'
 import OverlayCanvas from './overlay-editor/OverlayCanvas'
 import OverlayMoveable from './overlay-editor/OverlayMoveable'
 import useOverlayEditorState from './overlay-editor/useOverlayEditorState'
 
+/**
+ * Renders the empty overlay state component.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function EmptyOverlayState() {
   return (
     <div className="flex h-full items-center justify-center p-8">
@@ -22,6 +30,18 @@ function EmptyOverlayState() {
   )
 }
 
+/**
+ * Renders the overlay editor component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.config - Overlay template configuration data.
+ * @param {*} props.globalDefaults - Value for global defaults.
+ * @param {*} props.onConfigChange - Callback invoked to config change.
+ * @param {*} props.zoomLevel - Current editor zoom level.
+ * @param {*} props.onZoomLevelChange - Callback invoked to zoom level change.
+ * @param {*} props.backgroundMode - Selected canvas background style.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function OverlayEditor({
   config,
   globalDefaults,

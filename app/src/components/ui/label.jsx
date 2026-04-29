@@ -1,8 +1,19 @@
+/**
+ * Provides reusable label UI primitives for the application.
+ */
+
 import * as React from 'react'
 import * as LabelPrimitive from '@radix-ui/react-label'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * Renders the label component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Label({ className, ...props }) {
   return (
     <LabelPrimitive.Root

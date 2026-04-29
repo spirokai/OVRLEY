@@ -1,6 +1,14 @@
+/**
+ * Renders the onboarding state portion of the application interface.
+ */
+
 import React from 'react'
 import Alert from 'react-bootstrap/Alert'
 
+/**
+ * Renders the onboarding state component.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function OnboardingState() {
   return (
     <div className="p-4 text-center bg-light rounded border">

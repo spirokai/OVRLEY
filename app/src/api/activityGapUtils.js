@@ -1,7 +1,23 @@
+/**
+ * Implements API helpers for activity gap utils.
+ */
+
+/**
+ * Handles clone raw sample.
+ *
+ * @param {*} sample - Value for sample.
+ * @returns {object} Result produced by the helper.
+ */
 function cloneRawSample(sample) {
   return { ...sample }
 }
 
+/**
+ * Handles timestamp ms.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {number} Result produced by the helper.
+ */
 function timestampMs(value) {
   if (!value) return null
   const date = value instanceof Date ? value : new Date(value)
@@ -9,6 +25,12 @@ function timestampMs(value) {
   return Number.isFinite(time) ? time : null
 }
 
+/**
+ * Handles median.
+ *
+ * @param {*} values - Input values processed by the helper.
+ * @returns {*} Result produced by the helper.
+ */
 function median(values) {
   if (!values.length) return null
   const sorted = [...values].sort((left, right) => left - right)
@@ -19,6 +41,12 @@ function median(values) {
   return sorted[middle]
 }
 
+/**
+ * Handles lower half median.
+ *
+ * @param {*} values - Input values processed by the helper.
+ * @returns {*} Result produced by the helper.
+ */
 function lowerHalfMedian(values) {
   if (!values.length) return null
   const sorted = [...values].sort((left, right) => left - right)
@@ -26,6 +54,15 @@ function lowerHalfMedian(values) {
   return median(sorted.slice(0, cutoff))
 }
 
+/**
+ * Handles zero filled idle sample.
+ *
+ * @param {*} sample - Value for sample.
+ * @param {*} elapsedSeconds - Numeric elapsed seconds value.
+ * @param {*} timestampMsValue - Value for timestamp ms value.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Result produced by the helper.
+ */
 function zeroFilledIdleSample(
   sample,
   elapsedSeconds,
@@ -53,6 +90,13 @@ function zeroFilledIdleSample(
   return synthetic
 }
 
+/**
+ * Handles estimate recording interval seconds.
+ *
+ * @param {*} rawSamples - Raw activity samples from the source file.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Result produced by the helper.
+ */
 function estimateRecordingIntervalSeconds(rawSamples, helpers) {
   const { isFiniteNumber, safeNumber } = helpers
   const deltas = []
@@ -82,6 +126,14 @@ function estimateRecordingIntervalSeconds(rawSamples, helpers) {
   return lowerHalfMedian(deltas) ?? 1
 }
 
+/**
+ * Handles elapsed seconds for sample.
+ *
+ * @param {*} sample - Value for sample.
+ * @param {*} fallbackOriginTimestampMs - Value for fallback origin timestamp ms.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Result produced by the helper.
+ */
 function elapsedSecondsForSample(sample, fallbackOriginTimestampMs, helpers) {
   const { isFiniteNumber, safeNumber } = helpers
   const explicit = safeNumber(sample.elapsedSeconds)
@@ -95,6 +147,14 @@ function elapsedSecondsForSample(sample, fallbackOriginTimestampMs, helpers) {
   return null
 }
 
+/**
+ * Handles distance meters for pair.
+ *
+ * @param {*} previousSample - Previous activity sample under evaluation.
+ * @param {*} currentSample - Current activity sample under evaluation.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Result produced by the helper.
+ */
 function distanceMetersForPair(previousSample, currentSample, helpers) {
   const { haversineDistanceMeters, isFiniteNumber, safeNumber } = helpers
   const previousDistance = safeNumber(previousSample.distance)
@@ -111,6 +171,14 @@ function distanceMetersForPair(previousSample, currentSample, helpers) {
   )
 }
 
+/**
+ * Builds distance series.
+ *
+ * @param {*} coursePoints - Value for course points.
+ * @param {*} directDistanceSeries - Value for direct distance series.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Derived data structure for downstream use.
+ */
 export function buildDistanceSeries(
   coursePoints,
   directDistanceSeries,
@@ -145,6 +213,14 @@ export function buildDistanceSeries(
   return distanceSeries
 }
 
+/**
+ * Builds elapsed series.
+ *
+ * @param {*} rawSamples - Raw activity samples from the source file.
+ * @param {*} timeSeries - Timestamp series for the activity.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Derived data structure for downstream use.
+ */
 export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
   const { isFiniteNumber, roundValue, safeNumber } = helpers
   const explicitElapsed = rawSamples.map((sample) =>
@@ -209,6 +285,13 @@ export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
   })
 }
 
+/**
+ * Builds progress series.
+ *
+ * @param {*} distanceSeries - Value for distance series.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Derived data structure for downstream use.
+ */
 export function buildProgressSeries(distanceSeries, helpers) {
   const { isFiniteNumber, roundValue } = helpers
   const totalDistanceMeters = distanceSeries[distanceSeries.length - 1] ?? 0
@@ -221,6 +304,13 @@ export function buildProgressSeries(distanceSeries, helpers) {
   )
 }
 
+/**
+ * Handles insert idle gap samples.
+ *
+ * @param {*} rawSamples - Raw activity samples from the source file.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {object} Result produced by the helper.
+ */
 export function insertIdleGapSamples(rawSamples, helpers) {
   const { isFiniteNumber, roundValue, safeTimestamp } = helpers
 

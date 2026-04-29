@@ -1,3 +1,7 @@
+/**
+ * Implements API helpers for gpx utils.
+ */
+
 import useStore from '../store/useStore'
 import {
   clearCurrentActivityCache,
@@ -7,6 +11,12 @@ import * as backend from './backend'
 import { finalizeParsedActivity, safeNumber } from './activityParserUtils'
 import parseFitActivityFile from './fitParserUtils'
 
+/**
+ * Handles sanitize debug filename.
+ *
+ * @param {*} filename - Target filename for the operation.
+ * @returns {*} Result produced by the helper.
+ */
 function sanitizeDebugFilename(filename) {
   const normalizedBase = String(filename || 'activity')
     .replace(/\.[^/.]+$/, '')
@@ -17,12 +27,25 @@ function sanitizeDebugFilename(filename) {
   return `${normalizedBase || 'activity'}-parse-debug.json`
 }
 
+/**
+ * Handles persist debug payload.
+ *
+ * @param {*} filename - Target filename for the operation.
+ * @param {*} payload - Structured payload produced by the helper.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 async function persistDebugPayload(filename, payload) {
   const debugFilename = sanitizeDebugFilename(filename)
   const contents = JSON.stringify(payload, null, 2)
   return backend.writeParseDebugFile(debugFilename, contents)
 }
 
+/**
+ * Normalizes extension key.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function normalizeExtensionKey(value) {
   return String(value || '')
     .trim()
@@ -30,6 +53,13 @@ function normalizeExtensionKey(value) {
     .replace(/[^a-z0-9]+/g, '')
 }
 
+/**
+ * Handles collect leaf extension values.
+ *
+ * @param {*} element - Value for element.
+ * @param {*} target - Target object, element, or value being updated.
+ * @returns {*} Result produced by the helper.
+ */
 function collectLeafExtensionValues(element, target) {
   const childElements = Array.from(element.children || [])
   if (!childElements.length) {
@@ -44,6 +74,13 @@ function collectLeafExtensionValues(element, target) {
   childElements.forEach((child) => collectLeafExtensionValues(child, target))
 }
 
+/**
+ * Reads track point metric.
+ *
+ * @param {*} extensionValues - Value for extension values.
+ * @param {*} aliases - Alternate metric keys to inspect.
+ * @returns {*} Requested value or structure.
+ */
 function readTrackPointMetric(extensionValues, aliases) {
   for (const alias of aliases) {
     const normalizedAlias = normalizeExtensionKey(alias)
@@ -58,6 +95,13 @@ function readTrackPointMetric(extensionValues, aliases) {
   return null
 }
 
+/**
+ * Parses gpx activity file.
+ *
+ * @param {*} file - File object being loaded or saved.
+ * @param {*} textContent - Value for text content.
+ * @returns {object} Result produced by the helper.
+ */
 function parseGpxActivityFile(file, textContent) {
   const parser = new DOMParser()
   const documentNode = parser.parseFromString(textContent, 'application/xml')
@@ -193,12 +237,25 @@ function parseGpxActivityFile(file, textContent) {
   })
 }
 
+/**
+ * Parses activity file.
+ *
+ * @param {*} file - File object being loaded or saved.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 async function parseActivityFile(file) {
   return file.name.toLowerCase().endsWith('.fit')
     ? parseFitActivityFile(file)
     : parseGpxActivityFile(file, await file.text())
 }
 
+/**
+ * Synchronizes scene duration with activity.
+ *
+ * @param {*} durationSeconds - Numeric duration seconds value.
+ * @param {*} storeState - Current store snapshot used for synchronization.
+ * @returns {*} Result produced by the helper.
+ */
 function syncSceneDurationWithActivity(durationSeconds, storeState) {
   if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
     console.warn('Parsed activity did not produce a duration value')
@@ -233,6 +290,16 @@ function syncSceneDurationWithActivity(durationSeconds, storeState) {
   }
 }
 
+/**
+ * Applies parsed activity to store.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.filename - Target filename for the operation.
+ * @param {*} options.parsedActivity - Normalized activity payload used by the app.
+ * @param {*} options.debugPayload - Value for debug payload.
+ * @param {*} options.storeState - Current store snapshot used for synchronization.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 async function applyParsedActivityToStore({
   filename,
   parsedActivity,
@@ -254,6 +321,12 @@ async function applyParsedActivityToStore({
   )
 }
 
+/**
+ * Handles ensure file object.
+ *
+ * @param {*} fileOrPath - File object or path pointing to an activity file.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 async function ensureFileObject(fileOrPath) {
   if (fileOrPath instanceof File) return fileOrPath
 
@@ -262,6 +335,12 @@ async function ensureFileObject(fileOrPath) {
   )
 }
 
+/**
+ * Handles save file.
+ *
+ * @param {*} fileOrPath - File object or path pointing to an activity file.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
 export default async function saveFile(fileOrPath) {
   const file = await ensureFileObject(fileOrPath)
   const filename = file.name

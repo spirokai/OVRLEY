@@ -1,3 +1,7 @@
+/**
+ * Renders the sidebar settings tab portion of the application interface.
+ */
+
 import { useEffect, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
@@ -45,6 +49,12 @@ const RESOLUTIONS = {
   '21:9': [{ id: 'ultra', name: 'Ultrawide (3440x1440)', w: 3440, h: 1440 }],
 }
 
+/**
+ * Handles sanitize number.
+ *
+ * @param {*} val - Value for val.
+ * @returns {*} Result produced by the helper.
+ */
 function sanitizeNumber(val) {
   if (val === undefined || val === null) return val
   const sanitized = val
@@ -54,6 +64,14 @@ function sanitizeNumber(val) {
   return parseInt(sanitized, 10) || 0
 }
 
+/**
+ * Renders the sidebar settings tab component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.config - Overlay template configuration data.
+ * @param {*} props.onConfigChange - Callback invoked to config change.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function SidebarSettingsTab({ config, onConfigChange }) {
   const {
     globalDefaults,

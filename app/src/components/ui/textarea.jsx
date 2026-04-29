@@ -1,7 +1,18 @@
+/**
+ * Provides reusable textarea UI primitives for the application.
+ */
+
 import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * Renders the textarea component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Textarea({ className, ...props }) {
   return (
     <textarea

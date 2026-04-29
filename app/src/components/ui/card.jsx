@@ -1,7 +1,18 @@
+/**
+ * Provides reusable card UI primitives for the application.
+ */
+
 import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * Renders the card component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Card({ className, ...props }) {
   return (
     <div
@@ -15,6 +26,13 @@ function Card({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the card header component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function CardHeader({ className, ...props }) {
   return (
     <div
@@ -28,6 +46,13 @@ function CardHeader({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the card title component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function CardTitle({ className, ...props }) {
   return (
     <div
@@ -38,6 +63,13 @@ function CardTitle({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the card description component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function CardDescription({ className, ...props }) {
   return (
     <div
@@ -48,6 +80,13 @@ function CardDescription({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the card action component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function CardAction({ className, ...props }) {
   return (
     <div
@@ -61,6 +100,13 @@ function CardAction({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the card content component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function CardContent({ className, ...props }) {
   return (
     <div
@@ -71,6 +117,13 @@ function CardContent({ className, ...props }) {
   )
 }
 
+/**
+ * Renders the card footer component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function CardFooter({ className, ...props }) {
   return (
     <div

@@ -1,5 +1,15 @@
+/**
+ * Creates the create media slice Zustand slice used by the application store.
+ */
+
 import { DEFAULT_RENDER_PROGRESS } from '../store-utils'
 
+/**
+ * Creates media slice.
+ *
+ * @param {*} set - Zustand setter callback.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function createMediaSlice(set) {
   localStorage.removeItem('gpxFilename')
 

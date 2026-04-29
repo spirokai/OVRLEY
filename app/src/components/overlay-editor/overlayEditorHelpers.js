@@ -1,16 +1,40 @@
+/**
+ * Provides overlay editor helpers for overlay editor helpers.
+ */
+
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from './constants'
 import { buildWidgetTransform, clamp } from './utils'
 
+/**
+ * Clears live widget draft.
+ *
+ * @param {*} draftWidgetsRef - Value for draft widgets ref.
+ * @param {*} widgetId - Identifier of the target widget.
+ * @returns {*} Result produced by the helper.
+ */
 export function clearLiveWidgetDraft(draftWidgetsRef, widgetId) {
   delete draftWidgetsRef.current[widgetId]
 }
 
+/**
+ * Clears live widget drafts.
+ *
+ * @param {*} draftWidgetsRef - Value for draft widgets ref.
+ * @param {*} widgetIds - Value for widget ids.
+ * @returns {*} Result produced by the helper.
+ */
 export function clearLiveWidgetDrafts(draftWidgetsRef, widgetIds) {
   widgetIds.forEach((widgetId) => {
     delete draftWidgetsRef.current[widgetId]
   })
 }
 
+/**
+ * Checks whether is editable element.
+ *
+ * @param {*} target - Target object, element, or value being updated.
+ * @returns {boolean} Whether the condition is satisfied.
+ */
 export function isEditableElement(target) {
   if (!(target instanceof HTMLElement)) {
     return false
@@ -21,10 +45,23 @@ export function isEditableElement(target) {
   )
 }
 
+/**
+ * Checks whether has selection modifier.
+ *
+ * @param {*} event - DOM or pointer event for the interaction.
+ * @returns {boolean} Whether the condition is satisfied.
+ */
 export function hasSelectionModifier(event) {
   return event.metaKey || event.ctrlKey || event.shiftKey
 }
 
+/**
+ * Builds selection rect.
+ *
+ * @param {*} start - Selection or range start point.
+ * @param {*} end - Selection or range end point.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function buildSelectionRect(start, end) {
   const left = Math.min(start.x, end.x)
   const top = Math.min(start.y, end.y)
@@ -39,6 +76,13 @@ export function buildSelectionRect(start, end) {
   }
 }
 
+/**
+ * Handles rectangles intersect.
+ *
+ * @param {*} firstRect - Value for first rect.
+ * @param {*} secondRect - Value for second rect.
+ * @returns {*} Result produced by the helper.
+ */
 export function rectanglesIntersect(firstRect, secondRect) {
   return !(
     firstRect.x + firstRect.width < secondRect.x ||
@@ -48,11 +92,25 @@ export function rectanglesIntersect(firstRect, secondRect) {
   )
 }
 
+/**
+ * Normalizes selection ids.
+ *
+ * @param {*} widgetIds - Value for widget ids.
+ * @param {*} orderedWidgetIds - Value for ordered widget ids.
+ * @returns {*} Derived data structure for downstream use.
+ */
 export function normalizeSelectionIds(widgetIds, orderedWidgetIds) {
   const idSet = new Set(widgetIds.filter(Boolean))
   return orderedWidgetIds.filter((widgetId) => idSet.has(widgetId))
 }
 
+/**
+ * Returns primary selection id.
+ *
+ * @param {*} widgetIds - Value for widget ids.
+ * @param {*} preferredId - Value for preferred id.
+ * @returns {*} Requested value or structure.
+ */
 export function getPrimarySelectionId(widgetIds, preferredId = null) {
   if (preferredId && widgetIds.includes(preferredId)) {
     return preferredId
@@ -61,6 +119,12 @@ export function getPrimarySelectionId(widgetIds, preferredId = null) {
   return widgetIds[widgetIds.length - 1] ?? null
 }
 
+/**
+ * Returns widget id from target.
+ *
+ * @param {*} target - Target object, element, or value being updated.
+ * @returns {*} Requested value or structure.
+ */
 export function getWidgetIdFromTarget(target) {
   if (!(target instanceof HTMLElement)) {
     return null
@@ -69,6 +133,15 @@ export function getWidgetIdFromTarget(target) {
   return target.dataset.widgetId || null
 }
 
+/**
+ * Applies live widget styles.
+ *
+ * @param {*} target - Target object, element, or value being updated.
+ * @param {*} widget - Widget definition being rendered or edited.
+ * @param {*} draft - Value for draft.
+ * @param {*} globalScale - Scale factor applied to the overlay preview.
+ * @returns {*} Result produced by the helper.
+ */
 export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
   if (!target || !widget) {
     return
@@ -101,6 +174,15 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
     }) || ''
 }
 
+/**
+ * Applies live scale position styles.
+ *
+ * @param {*} target - Target object, element, or value being updated.
+ * @param {*} widget - Widget definition being rendered or edited.
+ * @param {*} draft - Value for draft.
+ * @param {*} globalScale - Scale factor applied to the overlay preview.
+ * @returns {*} Result produced by the helper.
+ */
 export function applyLiveScalePositionStyles(
   target,
   widget,
@@ -133,6 +215,13 @@ export function applyLiveScalePositionStyles(
   target.style.transform = transforms.join(' ')
 }
 
+/**
+ * Builds scaled widget data draft.
+ *
+ * @param {*} origin - Value for origin.
+ * @param {*} scaleFactor - Value for scale factor.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function buildScaledWidgetDataDraft(origin, scaleFactor) {
   const nextFontSize = clamp(
     Math.round((origin.fontSize || 60) * scaleFactor),

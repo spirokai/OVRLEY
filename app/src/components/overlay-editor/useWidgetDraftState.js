@@ -1,9 +1,17 @@
+/**
+ * Provides overlay editor helpers for use widget draft state.
+ */
+
 import { useCallback, useRef, useState } from 'react'
 import {
   clearLiveWidgetDraft,
   clearLiveWidgetDrafts,
 } from './overlayEditorHelpers'
 
+/**
+ * Provides widget draft state state and actions.
+ * @returns {object} Result produced by the helper.
+ */
 export default function useWidgetDraftState() {
   const draftWidgetsRef = useRef({})
   const [liveWidgetDrafts, setLiveWidgetDrafts] = useState({})

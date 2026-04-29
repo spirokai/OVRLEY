@@ -1,9 +1,17 @@
+/**
+ * Renders the error alert portion of the application interface.
+ */
+
 import React from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { AlertCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import useStore from '../store/useStore'
 
+/**
+ * Renders the error alert component.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function ErrorAlert() {
   const { errorMessage, clearError } = useStore()
 

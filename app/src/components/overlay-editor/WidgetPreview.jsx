@@ -1,3 +1,7 @@
+/**
+ * Provides overlay editor helpers for widget preview.
+ */
+
 import { memo } from 'react'
 import {
   OverlayElevationWidget,
@@ -6,6 +10,16 @@ import {
   OverlayTextWidget,
 } from './widgetPreviewRenderers'
 
+/**
+ * Renders the widget preview component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.activity - Parsed activity data for previews or rendering.
+ * @param {*} props.previewSecond - Preview time in seconds.
+ * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function WidgetPreview({ widget, activity, previewSecond, globalOpacity }) {
   if (widget.type === 'label') {
     return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} />

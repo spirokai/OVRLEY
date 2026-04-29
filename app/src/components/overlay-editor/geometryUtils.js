@@ -1,7 +1,26 @@
+/**
+ * Provides overlay editor helpers for geometry utils.
+ */
+
+/**
+ * Constrains a value to the provided minimum and maximum bounds.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} min - Lower bound used by the calculation.
+ * @param {*} max - Upper bound used by the calculation.
+ * @returns {number} Result produced by the helper.
+ */
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+/**
+ * Builds fallback route.
+ *
+ * @param {*} width - Numeric width value.
+ * @param {*} height - Numeric height value.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function buildFallbackRoute(width, height) {
   return [
     [width * 0.12, height * 0.82],
@@ -12,6 +31,16 @@ function buildFallbackRoute(width, height) {
   ]
 }
 
+/**
+ * Handles fit points to widget.
+ *
+ * @param {*} points - Cartesian points used to build geometry.
+ * @param {*} width - Numeric width value.
+ * @param {*} height - Numeric height value.
+ * @param {*} insetPx - Value for inset px.
+ * @param {*} invertY - Value for invert y.
+ * @returns {*} Result produced by the helper.
+ */
 function fitPointsToWidget(points, width, height, insetPx, invertY = true) {
   if (!points.length) {
     return []
@@ -43,6 +72,16 @@ function fitPointsToWidget(points, width, height, insetPx, invertY = true) {
   })
 }
 
+/**
+ * Handles route geometry inset px.
+ *
+ * @param {*} widgetWidth - Numeric widget width value.
+ * @param {*} widgetHeight - Numeric widget height value.
+ * @param {*} lineWidth - Numeric line width value.
+ * @param {*} completedLineWidth - Numeric completed line width value.
+ * @param {*} markerSize - Numeric marker size value.
+ * @returns {*} Result produced by the helper.
+ */
 function routeGeometryInsetPx(
   widgetWidth,
   widgetHeight,
@@ -60,6 +99,13 @@ function routeGeometryInsetPx(
   )
 }
 
+/**
+ * Handles simplify route samples.
+ *
+ * @param {*} samples - Value for samples.
+ * @param {*} tolerance - Simplification tolerance applied to geometry.
+ * @returns {*} Result produced by the helper.
+ */
 function simplifyRouteSamples(samples, tolerance) {
   if (samples.length <= 2 || tolerance <= 0) {
     return samples
@@ -100,6 +146,13 @@ function simplifyRouteSamples(samples, tolerance) {
   return [...left.slice(0, -1), ...right]
 }
 
+/**
+ * Handles downsample route samples.
+ *
+ * @param {*} samples - Value for samples.
+ * @param {*} targetCount - Value for target count.
+ * @returns {*} Result produced by the helper.
+ */
 function downsampleRouteSamples(samples, targetCount) {
   if (samples.length <= targetCount || targetCount < 3) {
     return samples
@@ -168,6 +221,19 @@ function downsampleRouteSamples(samples, targetCount) {
   return sampled
 }
 
+/**
+ * Normalizes route geometry.
+ *
+ * @param {*} samples - Value for samples.
+ * @param {*} width - Numeric width value.
+ * @param {*} height - Numeric height value.
+ * @param {*} targetDensity - Value for target density.
+ * @param {*} simplifyTolerancePx - Value for simplify tolerance px.
+ * @param {*} lineWidth - Numeric line width value.
+ * @param {*} completedLineWidth - Numeric completed line width value.
+ * @param {*} markerSize - Numeric marker size value.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function normalizeRouteGeometry(
   samples,
   width,
@@ -240,6 +306,15 @@ export function normalizeRouteGeometry(
   }
 }
 
+/**
+ * Normalizes route points.
+ *
+ * @param {*} points - Cartesian points used to build geometry.
+ * @param {*} width - Numeric width value.
+ * @param {*} height - Numeric height value.
+ * @param {*} _padding - Numeric padding value.
+ * @returns {*} Derived data structure for downstream use.
+ */
 export function normalizeRoutePoints(points, width, height, _padding = 18) {
   return normalizeRouteGeometry(
     points.map((point, index) => ({
@@ -256,6 +331,14 @@ export function normalizeRoutePoints(points, width, height, _padding = 18) {
   ).points
 }
 
+/**
+ * Builds widget transform.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.scale - Value for scale.
+ * @param {*} options.rotation - Value for rotation.
+ * @returns {*} Derived data structure for downstream use.
+ */
 export function buildWidgetTransform({ scale = 1, rotation = 0 }) {
   const transforms = []
 
@@ -270,6 +353,19 @@ export function buildWidgetTransform({ scale = 1, rotation = 0 }) {
   return transforms.length ? transforms.join(' ') : undefined
 }
 
+/**
+ * Normalizes elevation points.
+ *
+ * @param {*} values - Input values processed by the helper.
+ * @param {*} width - Numeric width value.
+ * @param {*} height - Numeric height value.
+ * @param {*} padding - Numeric padding value.
+ * @param {*} verticalScale - Value for vertical scale.
+ * @param {*} progressValues - Value for progress values.
+ * @param {*} targetDensity - Value for target density.
+ * @param {*} simplifyTolerancePx - Value for simplify tolerance px.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function normalizeElevationPoints(
   values,
   width,
@@ -496,10 +592,23 @@ export function normalizeElevationPoints(
   )
 }
 
+/**
+ * Handles points to svg.
+ *
+ * @param {*} points - Cartesian points used to build geometry.
+ * @returns {*} Result produced by the helper.
+ */
 export function pointsToSvg(points) {
   return points.map(([x, y]) => `${x},${y}`).join(' ')
 }
 
+/**
+ * Returns point at progress.
+ *
+ * @param {*} points - Cartesian points used to build geometry.
+ * @param {*} progress01 - Normalized progress value between 0 and 1.
+ * @returns {*} Requested value or structure.
+ */
 export function getPointAtProgress(points, progress01) {
   if (!points.length) {
     return null
@@ -527,6 +636,14 @@ export function getPointAtProgress(points, progress01) {
   ]
 }
 
+/**
+ * Returns point at metric progress.
+ *
+ * @param {*} points - Cartesian points used to build geometry.
+ * @param {*} progressValues - Value for progress values.
+ * @param {*} targetProgress - Value for target progress.
+ * @returns {*} Requested value or structure.
+ */
 export function getPointAtMetricProgress(
   points,
   progressValues,
@@ -624,6 +741,13 @@ export function getPointAtMetricProgress(
   ]
 }
 
+/**
+ * Returns point at x.
+ *
+ * @param {*} points - Cartesian points used to build geometry.
+ * @param {*} targetX - Value for target x.
+ * @returns {*} Requested value or structure.
+ */
 export function getPointAtX(points, targetX) {
   if (!points.length) {
     return null
@@ -673,6 +797,15 @@ export function getPointAtX(points, targetX) {
   return lastPoint
 }
 
+/**
+ * Handles area to svg.
+ *
+ * @param {*} points - Cartesian points used to build geometry.
+ * @param {*} width - Numeric width value.
+ * @param {*} height - Numeric height value.
+ * @param {*} padding - Numeric padding value.
+ * @returns {*} Result produced by the helper.
+ */
 export function areaToSvg(points, width, height, padding = 18) {
   if (!points.length) return ''
   return [
@@ -682,6 +815,14 @@ export function areaToSvg(points, width, height, padding = 18) {
   ].join(' ')
 }
 
+/**
+ * Returns completed index.
+ *
+ * @param {*} totalPoints - Value for total points.
+ * @param {*} sampleIndex - Sample index within the activity series.
+ * @param {*} progress01 - Normalized progress value between 0 and 1.
+ * @returns {*} Requested value or structure.
+ */
 export function getCompletedIndex(totalPoints, sampleIndex, progress01) {
   if (totalPoints <= 1) return 0
 

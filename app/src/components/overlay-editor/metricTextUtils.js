@@ -1,15 +1,29 @@
+/**
+ * Provides overlay editor helpers for metric text utils.
+ */
+
 import { FONT_FAMILY_MAP } from './constants'
 
 export const METRIC_WIDGET_LINE_HEIGHT = 0.92
 export const METRIC_WIDGET_OUTER_GAP_PX = 8
 export const METRIC_WIDGET_UNITS_GAP_PX = 8
 
+/**
+ * Returns preview font family.
+ *
+ * @param {*} fontName - Selected font asset name.
+ * @returns {*} Requested value or structure.
+ */
 export function getPreviewFontFamily(fontName) {
   return FONT_FAMILY_MAP[fontName] || fontName || FONT_FAMILY_MAP['Arial.ttf']
 }
 
 let metricMeasureContext = null
 
+/**
+ * Returns metric measure context.
+ * @returns {*} Requested value or structure.
+ */
 function getMetricMeasureContext() {
   if (metricMeasureContext) {
     return metricMeasureContext
@@ -20,10 +34,26 @@ function getMetricMeasureContext() {
   return metricMeasureContext
 }
 
+/**
+ * Constrains a value to the provided minimum and maximum bounds.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} min - Lower bound used by the calculation.
+ * @param {*} max - Upper bound used by the calculation.
+ * @returns {number} Result produced by the helper.
+ */
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+/**
+ * Measures preview text.
+ *
+ * @param {*} text - Text content to measure or render.
+ * @param {*} fontSize - Numeric font size value.
+ * @param {*} fontFamily - Font family used for measurement or rendering.
+ * @returns {object} Computed measurement details.
+ */
 export function measurePreviewText(text, fontSize, fontFamily) {
   if (!text) {
     return {
@@ -64,6 +94,17 @@ export function measurePreviewText(text, fontSize, fontFamily) {
   }
 }
 
+/**
+ * Returns preview text baseline.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.top - Value for top.
+ * @param {*} options.lineHeight - Numeric line height value.
+ * @param {*} options.ascent - Value for ascent.
+ * @param {*} options._descent - Value for descent.
+ * @param {*} options.glyphHeight - Numeric glyph height value.
+ * @returns {*} Requested value or structure.
+ */
 export function getPreviewTextBaseline({
   top = 0,
   lineHeight,
@@ -78,6 +119,19 @@ export function getPreviewTextBaseline({
   return top + ((lineHeight - glyphHeight) / 2 + ascent)
 }
 
+/**
+ * Returns metric widget layout.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.fontSize - Numeric font size value.
+ * @param {*} options.fontFamily - Font family used for measurement or rendering.
+ * @param {*} options.valueText - Formatted value text shown in the widget.
+ * @param {*} options.unitText - Value for unit text.
+ * @param {*} options.showIcon - Boolean flag for show icon.
+ * @param {*} options.showUnits - Boolean flag for show units.
+ * @param {*} options.iconSize - Numeric icon size value.
+ * @returns {object} Requested value or structure.
+ */
 export function getMetricWidgetLayout({
   fontSize,
   fontFamily,
@@ -165,10 +219,23 @@ export function getMetricWidgetLayout({
   }
 }
 
+/**
+ * Returns widget opacity.
+ *
+ * @param {*} data - Widget or API data used by the helper.
+ * @param {*} globalOpacity - Global opacity multiplier applied to the widget.
+ * @returns {*} Requested value or structure.
+ */
 export function getWidgetOpacity(data, globalOpacity = 1) {
   return clamp((data?.opacity ?? 1) * globalOpacity, 0, 1)
 }
 
+/**
+ * Returns text shadow.
+ *
+ * @param {*} data - Widget or API data used by the helper.
+ * @returns {*} Requested value or structure.
+ */
 export function getTextShadow(data) {
   const shadowStrength = Number(data?.shadow_strength) || 0
   const shadowDistance = Number(data?.shadow_distance) || 0
@@ -179,6 +246,12 @@ export function getTextShadow(data) {
   return `${shadowDistance}px ${shadowDistance}px ${shadowStrength}px ${shadowColor}`
 }
 
+/**
+ * Returns text outline shadow.
+ *
+ * @param {*} data - Widget or API data used by the helper.
+ * @returns {*} Requested value or structure.
+ */
 export function getTextOutlineShadow(data) {
   const borderThickness = Number(data?.border_thickness) || 0
   const borderColor = data?.border_color
@@ -206,6 +279,12 @@ export function getTextOutlineShadow(data) {
   return layers.join(', ')
 }
 
+/**
+ * Returns combined text shadow.
+ *
+ * @param {*} data - Widget or API data used by the helper.
+ * @returns {*} Requested value or structure.
+ */
 export function getCombinedTextShadow(data) {
   const outlineShadow = getTextOutlineShadow(data)
   const dropShadow = getTextShadow(data)
@@ -217,6 +296,13 @@ export function getCombinedTextShadow(data) {
   return outlineShadow || dropShadow || undefined
 }
 
+/**
+ * Formats speed.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} unit - Selected measurement unit.
+ * @returns {object} Formatted representation of the input.
+ */
 export function formatSpeed(value, unit) {
   const conversions = {
     kmh: { units: 'KM/H', factor: 3.6 },
@@ -237,11 +323,18 @@ export function formatSpeed(value, unit) {
   }
 }
 
+/**
+ * Formats temperature.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} unit - Selected measurement unit.
+ * @returns {object} Formatted representation of the input.
+ */
 export function formatTemperature(value, unit) {
   if (value === null || value === undefined) {
     return {
       value: '--',
-      units: unit === 'fahrenheit' ? 'F' : 'C',
+      units: unit === 'fahrenheit' ? '\u00B0F' : '\u00B0C',
     }
   }
 
@@ -249,20 +342,33 @@ export function formatTemperature(value, unit) {
   if (unit === 'fahrenheit') {
     return {
       value: Math.round((numericValue * 9) / 5 + 32).toString(),
-      units: 'F',
+      units: '\u00B0F',
     }
   }
 
   return {
     value: Math.round(numericValue).toString(),
-    units: 'C',
+    units: '\u00B0C',
   }
 }
 
+/**
+ * Pads a numeric value with a leading zero when needed.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {*} Result produced by the helper.
+ */
 function padNumber(value) {
   return String(value).padStart(2, '0')
 }
 
+/**
+ * Formats time value.
+ *
+ * @param {*} format - Formatting mode or template key.
+ * @param {*} timestamp - Value for timestamp.
+ * @returns {string} Formatted representation of the input.
+ */
 export function formatTimeValue(format, timestamp) {
   if (!timestamp) return '--:--'
 
@@ -305,6 +411,13 @@ export function formatTimeValue(format, timestamp) {
   return formatMap[format] || formatMap['time-24']
 }
 
+/**
+ * Formats gradient value.
+ *
+ * @param {*} widget - Widget definition being rendered or edited.
+ * @param {*} value - Input value processed by the helper.
+ * @returns {string} Formatted representation of the input.
+ */
 export function formatGradientValue(widget, value) {
   if (value === null || value === undefined) return '--'
 
@@ -317,6 +430,14 @@ export function formatGradientValue(widget, value) {
   return `${prefix}${absoluteValue}`
 }
 
+/**
+ * Builds gradient triangle path.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} width - Numeric width value.
+ * @param {*} height - Numeric height value.
+ * @returns {*} Derived data structure for downstream use.
+ */
 export function buildGradientTrianglePath(value, width, height) {
   const normalized = clamp(Math.abs(Number(value) || 0) / 15, 0.12, 1)
   const centeredHeight = Math.max(height * 0.88, 4)

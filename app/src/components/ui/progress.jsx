@@ -1,8 +1,20 @@
+/**
+ * Provides reusable progress UI primitives for the application.
+ */
+
 import * as React from 'react'
 import * as ProgressPrimitive from '@radix-ui/react-progress'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * Renders the progress component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.value - Input value processed by the helper.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Progress({ className, value, ...props }) {
   return (
     <ProgressPrimitive.Root

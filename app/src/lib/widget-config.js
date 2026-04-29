@@ -1,9 +1,25 @@
+/**
+ * Provides shared widget config utilities for the app.
+ */
+
 import { normalizeColorFields } from './color-utils'
 
+/**
+ * Handles clone config.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @returns {*} Result produced by the helper.
+ */
 export function cloneConfig(config) {
   return JSON.parse(JSON.stringify(config))
 }
 
+/**
+ * Builds config widgets.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @returns {*} Derived data structure for downstream use.
+ */
 export function buildConfigWidgets(config) {
   if (!config) return []
 
@@ -43,6 +59,13 @@ export function buildConfigWidgets(config) {
   return widgets
 }
 
+/**
+ * Handles group widgets for sidebar.
+ *
+ * @param {*} widgets - Widget collection in the current template.
+ * @param {*} typeLabels - Value for type labels.
+ * @returns {*} Result produced by the helper.
+ */
 export function groupWidgetsForSidebar(widgets, typeLabels) {
   const grouped = widgets.reduce((accumulator, widget) => {
     const typeName = typeLabels[widget.type] || widget.type
@@ -64,12 +87,27 @@ export function groupWidgetsForSidebar(widgets, typeLabels) {
     )
 }
 
+/**
+ * Finds widget by id.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} widgetId - Identifier of the target widget.
+ * @returns {*} Requested value or structure.
+ */
 export function findWidgetById(config, widgetId) {
   return (
     buildConfigWidgets(config).find((widget) => widget.id === widgetId) || null
   )
 }
 
+/**
+ * Updates widget in config.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} widgetId - Identifier of the target widget.
+ * @param {*} updates - Partial changes to merge into the target.
+ * @returns {*} Result produced by the helper.
+ */
 export function updateWidgetInConfig(config, widgetId, updates) {
   if (!config) return config
 
@@ -88,6 +126,13 @@ export function updateWidgetInConfig(config, widgetId, updates) {
   return nextConfig
 }
 
+/**
+ * Updates widgets in config.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} updatesById - Value for updates by id.
+ * @returns {*} Result produced by the helper.
+ */
 export function updateWidgetsInConfig(config, updatesById) {
   if (!config || !updatesById || typeof updatesById !== 'object') {
     return config
@@ -126,6 +171,14 @@ export function updateWidgetsInConfig(config, updatesById) {
   return hasChanges ? nextConfig : config
 }
 
+/**
+ * Replaces widget in config.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} widgetId - Identifier of the target widget.
+ * @param {*} nextWidgetData - Value for next widget data.
+ * @returns {*} Result produced by the helper.
+ */
 export function replaceWidgetInConfig(config, widgetId, nextWidgetData) {
   if (!config) return config
 
@@ -139,6 +192,13 @@ export function replaceWidgetInConfig(config, widgetId, nextWidgetData) {
   return nextConfig
 }
 
+/**
+ * Deletes widget in config.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} widgetId - Identifier of the target widget.
+ * @returns {*} Result produced by the helper.
+ */
 export function deleteWidgetInConfig(config, widgetId) {
   if (!config) return config
 
@@ -153,6 +213,13 @@ export function deleteWidgetInConfig(config, widgetId) {
   return nextConfig
 }
 
+/**
+ * Deletes widgets in config.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} widgetIds - Value for widget ids.
+ * @returns {*} Result produced by the helper.
+ */
 export function deleteWidgetsInConfig(config, widgetIds) {
   if (!config || !Array.isArray(widgetIds) || !widgetIds.length) {
     return config

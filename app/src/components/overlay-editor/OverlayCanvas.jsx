@@ -1,3 +1,7 @@
+/**
+ * Provides overlay editor helpers for overlay canvas.
+ */
+
 import { memo } from 'react'
 import { Type } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -5,6 +9,19 @@ import { WIDGET_ICONS } from './constants'
 import WidgetPreview from './WidgetPreview'
 import { buildWidgetTransform } from './utils'
 
+/**
+ * Renders the overlay canvas widget component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.activity - Parsed activity data for previews or rendering.
+ * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.globalScale - Scale factor applied to the overlay preview.
+ * @param {*} props.previewSecond - Preview time in seconds.
+ * @param {*} props.registerNode - Value for register node.
+ * @param {*} props.handleWidgetMouseDown - Value for handle widget mouse down.
+ * @returns {JSX.Element} Rendered component output.
+ */
 const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({
     activity,
@@ -64,6 +81,24 @@ const OverlayCanvasWidget = memo(
     previousProps.handleWidgetMouseDown === nextProps.handleWidgetMouseDown,
 )
 
+/**
+ * Renders the overlay canvas component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widgets - Widget collection in the current template.
+ * @param {*} props.globalScale - Scale factor applied to the overlay preview.
+ * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
+ * @param {*} props.activity - Parsed activity data for previews or rendering.
+ * @param {*} props.previewSecond - Preview time in seconds.
+ * @param {*} props.backgroundMode - Selected canvas background style.
+ * @param {*} props.sceneSize - Numeric scene size value.
+ * @param {*} props.setSceneElement - Value for set scene element.
+ * @param {*} props.selectionRect - Current drag-selection rectangle.
+ * @param {*} props.handleSceneMouseDown - Value for handle scene mouse down.
+ * @param {*} props.handleWidgetMouseDown - Value for handle widget mouse down.
+ * @param {*} props.widgetRefCallbacks - Value for widget ref callbacks.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function OverlayCanvas({
   widgets,
   globalScale,

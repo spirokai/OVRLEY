@@ -1,3 +1,7 @@
+/**
+ * Provides overlay editor helpers for widget preview renderers.
+ */
+
 import { useMemo } from 'react'
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from './constants'
 import { METRIC_ICON_SVGS } from './metricWidgetAssets'
@@ -33,10 +37,33 @@ import {
   getSeriesValueAtProgress,
 } from './utils'
 
+/**
+ * Handles points equal.
+ *
+ * @param {*} left - Left-hand comparison value.
+ * @param {*} right - Right-hand comparison value.
+ * @returns {*} Result produced by the helper.
+ */
 function pointsEqual(left, right) {
   return left?.[0] === right?.[0] && left?.[1] === right?.[1]
 }
 
+/**
+ * Renders the preview svg text component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.text - Text content to measure or render.
+ * @param {*} props.x - Horizontal coordinate.
+ * @param {*} props.baseline - Value for baseline.
+ * @param {*} props.color - Value for color.
+ * @param {*} props.fontFamily - Font family used for measurement or rendering.
+ * @param {*} props.fontSize - Numeric font size value.
+ * @param {*} props.opacity - Value for opacity.
+ * @param {*} props.textShadow - Value for text shadow.
+ * @param {*} props.borderColor - Value for border color.
+ * @param {*} props.borderThickness - Value for border thickness.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function PreviewSvgText({
   text,
   x = 0,
@@ -69,6 +96,16 @@ function PreviewSvgText({
   )
 }
 
+/**
+ * Renders the overlay metric widget component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.activity - Parsed activity data for previews or rendering.
+ * @param {*} props.previewSecond - Preview time in seconds.
+ * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function OverlayMetricWidget({
   widget,
   activity,
@@ -324,6 +361,14 @@ export function OverlayMetricWidget({
   )
 }
 
+/**
+ * Renders the overlay text widget component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function OverlayTextWidget({ widget, globalOpacity }) {
   const fontSize = widget.data.font_size ?? 60
   const fontFamily = getPreviewFontFamily(
@@ -368,6 +413,16 @@ export function OverlayTextWidget({ widget, globalOpacity }) {
   )
 }
 
+/**
+ * Renders the overlay route widget component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.activity - Parsed activity data for previews or rendering.
+ * @param {*} props.previewSecond - Preview time in seconds.
+ * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function OverlayRouteWidget({
   widget,
   activity,
@@ -510,6 +565,16 @@ export function OverlayRouteWidget({
   )
 }
 
+/**
+ * Renders the overlay elevation widget component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.activity - Parsed activity data for previews or rendering.
+ * @param {*} props.previewSecond - Preview time in seconds.
+ * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function OverlayElevationWidget({
   widget,
   activity,

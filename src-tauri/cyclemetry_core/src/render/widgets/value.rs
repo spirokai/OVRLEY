@@ -426,10 +426,8 @@ fn tokenize_path_data(data: &str) -> Vec<PathToken> {
         while index < chars.len() {
             let next = chars[index];
             let previous = chars[index - 1];
-            let is_sign_break =
-                (next == '-' || next == '+') && previous != 'e' && previous != 'E';
-            let is_decimal_break =
-                next == '.' && saw_decimal && previous != 'e' && previous != 'E';
+            let is_sign_break = (next == '-' || next == '+') && previous != 'e' && previous != 'E';
+            let is_decimal_break = next == '.' && saw_decimal && previous != 'e' && previous != 'E';
             if next.is_ascii_alphabetic()
                 || next == ','
                 || next.is_ascii_whitespace()
@@ -444,7 +442,11 @@ fn tokenize_path_data(data: &str) -> Vec<PathToken> {
             index += 1;
         }
 
-        if let Ok(number) = chars[start..index].iter().collect::<String>().parse::<f32>() {
+        if let Ok(number) = chars[start..index]
+            .iter()
+            .collect::<String>()
+            .parse::<f32>()
+        {
             tokens.push(PathToken::Number(number));
         }
     }

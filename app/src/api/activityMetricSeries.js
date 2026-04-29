@@ -1,3 +1,15 @@
+/**
+ * Implements API helpers for activity metric series.
+ */
+
+/**
+ * Handles smooth elevation series.
+ *
+ * @param {*} elevationSeries - Value for elevation series.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @param {*} radius - Numeric radius value.
+ * @returns {*} Result produced by the helper.
+ */
 function smoothElevationSeries(elevationSeries, helpers, radius = 2) {
   const { isFiniteNumber, roundValue } = helpers
 
@@ -21,6 +33,14 @@ function smoothElevationSeries(elevationSeries, helpers, radius = 2) {
   })
 }
 
+/**
+ * Applies fixed savitzky golay.
+ *
+ * @param {*} values - Input values processed by the helper.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @param {*} coefficients - Value for coefficients.
+ * @returns {*} Result produced by the helper.
+ */
 function applyFixedSavitzkyGolay(values, helpers, coefficients) {
   const { isFiniteNumber, roundValue } = helpers
   const radius = Math.floor(coefficients.length / 2)
@@ -49,6 +69,13 @@ function applyFixedSavitzkyGolay(values, helpers, coefficients) {
   })
 }
 
+/**
+ * Handles smooth gradient input series legacy.
+ *
+ * @param {*} elevationSeries - Value for elevation series.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Result produced by the helper.
+ */
 function smoothGradientInputSeriesLegacy(elevationSeries, helpers) {
   const { isFiniteNumber, roundValue } = helpers
   const populatedSamples = elevationSeries.filter(isFiniteNumber).length
@@ -63,6 +90,14 @@ function smoothGradientInputSeriesLegacy(elevationSeries, helpers) {
   )
 }
 
+/**
+ * Derives gradient series.
+ *
+ * @param {*} elevationSeries - Value for elevation series.
+ * @param {*} distanceSeries - Value for distance series.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function deriveGradientSeries(elevationSeries, distanceSeries, helpers) {
   const { isFiniteNumber, roundValue } = helpers
   const smoothedElevation = smoothElevationSeries(elevationSeries, helpers)
@@ -124,6 +159,14 @@ function deriveGradientSeries(elevationSeries, distanceSeries, helpers) {
   return gradientSeries
 }
 
+/**
+ * Derives legacy gradient series.
+ *
+ * @param {*} elevationSeries - Value for elevation series.
+ * @param {*} distanceSeries - Value for distance series.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function deriveLegacyGradientSeries(elevationSeries, distanceSeries, helpers) {
   const { isFiniteNumber, roundValue } = helpers
 
@@ -181,6 +224,13 @@ function deriveLegacyGradientSeries(elevationSeries, distanceSeries, helpers) {
   return gradients
 }
 
+/**
+ * Derives heading series.
+ *
+ * @param {*} courseSeries - Value for course series.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function deriveHeadingSeries(courseSeries, helpers) {
   const { calculateBearingDegrees, isFiniteNumber, roundValue } = helpers
   let lastHeading = null
@@ -203,6 +253,14 @@ function deriveHeadingSeries(courseSeries, helpers) {
   })
 }
 
+/**
+ * Derives numeric rate series.
+ *
+ * @param {*} numeratorSeries - Value for numerator series.
+ * @param {*} elapsedSeries - Elapsed time series for the activity.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function deriveNumericRateSeries(numeratorSeries, elapsedSeries, helpers) {
   const { isFiniteNumber, roundValue } = helpers
   const derivedSeries = []
@@ -242,6 +300,13 @@ function deriveNumericRateSeries(numeratorSeries, elapsedSeries, helpers) {
   return derivedSeries
 }
 
+/**
+ * Derives pace series.
+ *
+ * @param {*} speedSeries - Value for speed series.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function derivePaceSeries(speedSeries, helpers) {
   const { isFiniteNumber, roundValue } = helpers
   return speedSeries.map((speed) => {
@@ -250,6 +315,14 @@ function derivePaceSeries(speedSeries, helpers) {
   })
 }
 
+/**
+ * Derives torque series.
+ *
+ * @param {*} powerSeries - Value for power series.
+ * @param {*} cadenceSeries - Value for cadence series.
+ * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function deriveTorqueSeries(powerSeries, cadenceSeries, helpers) {
   const { isFiniteNumber, roundValue } = helpers
   return powerSeries.map((power, index) => {
@@ -264,6 +337,13 @@ function deriveTorqueSeries(powerSeries, cadenceSeries, helpers) {
   })
 }
 
+/**
+ * Combines series.
+ *
+ * @param {*} directSeries - Value for direct series.
+ * @param {*} derivedSeries - Value for derived series.
+ * @returns {object} Result produced by the helper.
+ */
 function combineSeries(directSeries, derivedSeries) {
   const combinedSeries = directSeries.map(
     (value, index) => value ?? derivedSeries[index] ?? null,
@@ -289,6 +369,13 @@ function combineSeries(directSeries, derivedSeries) {
   }
 }
 
+/**
+ * Combines series prefer derived.
+ *
+ * @param {*} derivedSeries - Value for derived series.
+ * @param {*} directSeries - Value for direct series.
+ * @returns {object} Result produced by the helper.
+ */
 function combineSeriesPreferDerived(derivedSeries, directSeries) {
   const combinedSeries = derivedSeries.map(
     (value, index) => value ?? directSeries[index] ?? null,
@@ -314,6 +401,12 @@ function combineSeriesPreferDerived(derivedSeries, directSeries) {
   }
 }
 
+/**
+ * Builds metric coverage.
+ *
+ * @param {*} metricSeriesMap - Metric series keyed by metric identifier.
+ * @returns {*} Derived data structure for downstream use.
+ */
 export function buildMetricCoverage(metricSeriesMap) {
   return Object.fromEntries(
     Object.entries(metricSeriesMap).map(([metric, descriptor]) => {
@@ -331,6 +424,19 @@ export function buildMetricCoverage(metricSeriesMap) {
   )
 }
 
+/**
+ * Derives activity metric series.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.courseSeries - Value for course series.
+ * @param {*} options.distanceSeries - Value for distance series.
+ * @param {*} options.elevationBaseSeries - Value for elevation base series.
+ * @param {*} options.elapsedSeries - Elapsed time series for the activity.
+ * @param {*} options.normalizedRawSamples - Value for normalized raw samples.
+ * @param {*} options.useLegacyGpxDerivations - Value for use legacy gpx derivations.
+ * @param {*} options.helpers - Shared numeric and geospatial helper functions.
+ * @returns {object} Derived data structure for downstream use.
+ */
 export function deriveActivityMetricSeries({
   courseSeries,
   distanceSeries,

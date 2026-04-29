@@ -1,3 +1,7 @@
+/**
+ * Implements API helpers for activity parser utils.
+ */
+
 import {
   buildDistanceSeries,
   buildElapsedSeries,
@@ -60,16 +64,35 @@ const METRIC_UNITS = {
   vertical_speed: 'mps',
 }
 
+/**
+ * Checks whether is finite number.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {boolean} Whether the condition is satisfied.
+ */
 function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
+/**
+ * Handles round value.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} digits - Value for digits.
+ * @returns {number} Result produced by the helper.
+ */
 function roundValue(value, digits = 6) {
   if (!isFiniteNumber(value)) return null
   const scale = 10 ** digits
   return Math.round(value * scale) / scale
 }
 
+/**
+ * Handles safe number.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {number} Result produced by the helper.
+ */
 export function safeNumber(value) {
   if (value === null || value === undefined || value === '') {
     return null
@@ -89,6 +112,12 @@ export function safeNumber(value) {
   return null
 }
 
+/**
+ * Handles safe timestamp.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {number} Result produced by the helper.
+ */
 export function safeTimestamp(value) {
   if (!value) return null
   const date = value instanceof Date ? value : new Date(value)
@@ -96,6 +125,15 @@ export function safeTimestamp(value) {
   return date.toISOString()
 }
 
+/**
+ * Handles haversine distance meters.
+ *
+ * @param {*} lat1 - Value for lat1.
+ * @param {*} lon1 - Value for lon1.
+ * @param {*} lat2 - Value for lat2.
+ * @param {*} lon2 - Value for lon2.
+ * @returns {*} Result produced by the helper.
+ */
 export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   if (
     !isFiniteNumber(lat1) ||
@@ -120,6 +158,13 @@ export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   return earthRadiusMeters * c
 }
 
+/**
+ * Handles calculate bearing degrees.
+ *
+ * @param {*} fromPoint - Value for from point.
+ * @param {*} toPoint - Value for to point.
+ * @returns {*} Result produced by the helper.
+ */
 function calculateBearingDegrees(fromPoint, toPoint) {
   if (!fromPoint || !toPoint) return null
 
@@ -146,6 +191,10 @@ function calculateBearingDegrees(fromPoint, toPoint) {
   return (bearing + 360) % 360
 }
 
+/**
+ * Creates activity helpers.
+ * @returns {object} Derived data structure for downstream use.
+ */
 function createActivityHelpers() {
   return {
     calculateBearingDegrees,
@@ -157,6 +206,12 @@ function createActivityHelpers() {
   }
 }
 
+/**
+ * Builds course series.
+ *
+ * @param {*} rawSamples - Raw activity samples from the source file.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function buildCourseSeries(rawSamples) {
   return rawSamples.map((sample) => [
     safeNumber(sample.latitude),
@@ -164,10 +219,24 @@ function buildCourseSeries(rawSamples) {
   ])
 }
 
+/**
+ * Builds time series.
+ *
+ * @param {*} rawSamples - Raw activity samples from the source file.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function buildTimeSeries(rawSamples) {
   return rawSamples.map((sample) => safeTimestamp(sample.timestamp))
 }
 
+/**
+ * Builds valid attributes.
+ *
+ * @param {*} metricSeriesMap - Metric series keyed by metric identifier.
+ * @param {*} courseSeries - Value for course series.
+ * @param {*} timeSeries - Timestamp series for the activity.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function buildValidAttributes(metricSeriesMap, courseSeries, timeSeries) {
   return CORE_ACTIVITY_ATTRIBUTES.filter((attribute) => {
     if (attribute === 'course') {
@@ -185,12 +254,28 @@ function buildValidAttributes(metricSeriesMap, courseSeries, timeSeries) {
   })
 }
 
+/**
+ * Builds extended attributes.
+ *
+ * @param {*} metricSeriesMap - Metric series keyed by metric identifier.
+ * @returns {*} Derived data structure for downstream use.
+ */
 function buildExtendedAttributes(metricSeriesMap) {
   return EXTENDED_ACTIVITY_ATTRIBUTES.filter((attribute) =>
     metricSeriesMap[attribute].series.some((value) => value !== null),
   )
 }
 
+/**
+ * Handles finalize parsed activity.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.fileName - Value for file name.
+ * @param {*} options.fileFormat - Value for file format.
+ * @param {*} options.metadata - Value for metadata.
+ * @param {*} options.rawSamples - Raw activity samples from the source file.
+ * @returns {object} Result produced by the helper.
+ */
 export function finalizeParsedActivity({
   fileName,
   fileFormat,

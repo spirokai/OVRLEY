@@ -1,3 +1,7 @@
+/**
+ * Composes the main application shell for the Cyclemetry overlay editor.
+ */
+
 import AppHeader from '@/components/AppHeader'
 import ControlPanel from '@/components/ControlPanel'
 import ErrorAlert from '@/components/ErrorAlert'
@@ -16,6 +20,10 @@ import useTemplateManagement from '@/hooks/useTemplateManagement'
 import './index.css'
 import * as backend from './api/backend'
 
+/**
+ * Renders the top-level application shell.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function App() {
   const {
     config,

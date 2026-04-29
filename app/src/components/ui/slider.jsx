@@ -1,3 +1,7 @@
+/**
+ * Provides reusable slider UI primitives for the application.
+ */
+
 'use client'
 
 import * as React from 'react'
@@ -5,6 +9,17 @@ import * as SliderPrimitive from '@radix-ui/react-slider'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * Renders the slider component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.defaultValue - Fallback value used when input is missing.
+ * @param {*} props.value - Input value processed by the helper.
+ * @param {*} props.min - Lower bound used by the calculation.
+ * @param {*} props.max - Upper bound used by the calculation.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function Slider({
   className,
   defaultValue,

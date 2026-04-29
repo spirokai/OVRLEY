@@ -1,3 +1,7 @@
+/**
+ * Implements the use Template Management hook and related behavior for the app.
+ */
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import { hasTauriRuntime } from '@/hooks/useBackendStatus'
@@ -12,6 +16,10 @@ import {
   templateStatesEqual,
 } from '@/lib/template-snapshot'
 
+/**
+ * Handles select browser template file.
+ * @returns {*} Result produced by the helper.
+ */
 const selectBrowserTemplateFile = () =>
   new Promise((resolve) => {
     const input = document.createElement('input')
@@ -22,11 +30,24 @@ const selectBrowserTemplateFile = () =>
     input.click()
   })
 
+/**
+ * Returns filename from path.
+ *
+ * @param {*} path - Filesystem path for the target resource.
+ * @returns {*} Requested value or structure.
+ */
 const getFilenameFromPath = (path) => {
   const segments = String(path || '').split(/[/\\]/)
   return segments[segments.length - 1] || 'cyclemetry_template.json'
 }
 
+/**
+ * Provides template management state and actions.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.onTemplateCreated - Callback invoked to template created.
+ * @returns {object} Result produced by the helper.
+ */
 export default function useTemplateManagement({ onTemplateCreated }) {
   const {
     aspectRatio,

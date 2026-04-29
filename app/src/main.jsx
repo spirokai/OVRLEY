@@ -1,3 +1,7 @@
+/**
+ * Bootstraps the React application and mounts the root component.
+ */
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

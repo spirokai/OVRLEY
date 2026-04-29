@@ -1,3 +1,7 @@
+/**
+ * Renders the render video dialog portion of the application interface.
+ */
+
 import { useEffect, useState } from 'react'
 import { Film, Loader2, Play, Timer, Video } from 'lucide-react'
 import { cancelRender } from '@/api/backend'
@@ -16,6 +20,12 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 
+/**
+ * Formats time.
+ *
+ * @param {*} seconds - Numeric seconds value.
+ * @returns {string} Formatted representation of the input.
+ */
 function formatTime(seconds) {
   if (seconds === null || seconds === undefined) {
     return '--:--'
@@ -26,6 +36,10 @@ function formatTime(seconds) {
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
+/**
+ * Renders the render progress panel component.
+ * @returns {JSX.Element} Rendered component output.
+ */
 function RenderProgressPanel() {
   const renderProgress = useStore((state) => state.renderProgress)
   const [isCancelling, setIsCancelling] = useState(false)
@@ -132,6 +146,17 @@ function RenderProgressPanel() {
   )
 }
 
+/**
+ * Renders the render video dialog component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.phase - Value for phase.
+ * @param {*} props.settings - Value for settings.
+ * @param {*} props.onSettingsChange - Callback invoked to settings change.
+ * @param {*} props.onClose - Callback invoked to close.
+ * @param {*} props.onConfirm - Callback invoked to confirm.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function RenderVideoDialog({
   phase,
   settings,

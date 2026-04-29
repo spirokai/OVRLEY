@@ -1,3 +1,7 @@
+/**
+ * Configures the Vite development and build pipeline for the app.
+ */
+
 import path from 'path'
 import fs from 'fs/promises'
 import { fileURLToPath } from 'url'
@@ -8,6 +12,10 @@ import tailwindcss from '@tailwindcss/vite'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+/**
+ * Parses debug write plugin.
+ * @returns {object} Result produced by the helper.
+ */
 function parseDebugWritePlugin() {
   return {
     name: 'parse-debug-write-plugin',

@@ -1,3 +1,7 @@
+/**
+ * Supports widget editing flows related to gradient widget editor.
+ */
+
 import { ColorField, SliderField, ToggleField } from './widgetFormControls'
 import {
   FontSection,
@@ -7,6 +11,14 @@ import {
 import { TrendingUp } from 'lucide-react'
 import { getThemeColor } from '@/lib/theme'
 
+/**
+ * Renders the gradient widget editor component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.updateWidgetData - Value for update widget data.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function GradientWidgetEditor({ widget, updateWidgetData }) {
   const valueOffset = widget.data.value_offset ?? 0
   const decimals = widget.data.decimals ?? 0

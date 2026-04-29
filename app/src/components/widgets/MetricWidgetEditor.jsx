@@ -1,3 +1,7 @@
+/**
+ * Supports widget editing flows related to metric widget editor.
+ */
+
 import { UnitsControlRow, SPEED_UNITS } from './widgetFormControls'
 import {
   FontSection,
@@ -5,6 +9,15 @@ import {
   OpacitySection,
 } from './widgetEditorSections'
 
+/**
+ * Renders the metric widget editor component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.widget - Widget definition being rendered or edited.
+ * @param {*} props.updateWidgetData - Value for update widget data.
+ * @param {*} props.setNumericField - Value for set numeric field.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function MetricWidgetEditor({
   widget,
   updateWidgetData,

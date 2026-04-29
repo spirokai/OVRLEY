@@ -1,3 +1,7 @@
+/**
+ * Renders the overlay player portion of the application interface.
+ */
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw } from 'lucide-react'
 import useStore from '@/store/useStore'
@@ -6,10 +10,24 @@ import { Slider } from '@/components/ui/slider'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { getEffectivePreviewFps } from './overlay-editor/previewInterpolation'
 
+/**
+ * Constrains a value to the provided minimum and maximum bounds.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @param {*} min - Lower bound used by the calculation.
+ * @param {*} max - Upper bound used by the calculation.
+ * @returns {number} Result produced by the helper.
+ */
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+/**
+ * Checks whether is playback shortcut target.
+ *
+ * @param {*} target - Target object, element, or value being updated.
+ * @returns {boolean} Whether the condition is satisfied.
+ */
 function isPlaybackShortcutTarget(target) {
   if (!(target instanceof HTMLElement)) {
     return false
@@ -22,6 +40,12 @@ function isPlaybackShortcutTarget(target) {
   )
 }
 
+/**
+ * Formats timeline time.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {string} Formatted representation of the input.
+ */
 function formatTimelineTime(value) {
   const safeValue = Math.max(0, Math.floor(Number(value) || 0))
   const hours = Math.floor(safeValue / 3600)
@@ -37,6 +61,10 @@ function formatTimelineTime(value) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
+/**
+ * Renders the overlay player component.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export default function OverlayPlayer() {
   const activitySummary = useStore((state) => state.activitySummary)
   const sceneFps = useStore((state) => state.config?.scene?.fps ?? 30)

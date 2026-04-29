@@ -1,3 +1,7 @@
+/**
+ * Provides reusable accordion UI primitives for the application.
+ */
+
 import * as React from 'react'
 import * as AccordionPrimitive from '@radix-ui/react-accordion'
 import { ChevronDown } from 'lucide-react'
@@ -6,6 +10,14 @@ import { cn } from '@/lib/utils'
 
 const Accordion = AccordionPrimitive.Root
 
+/**
+ * Renders the accordion item component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {React.Ref<*>} ref - Forwarded React ref.
+ * @returns {JSX.Element} Rendered component output.
+ */
 const AccordionItem = React.forwardRef(({ className, ...props }, ref) => (
   <AccordionPrimitive.Item
     ref={ref}
@@ -15,6 +27,15 @@ const AccordionItem = React.forwardRef(({ className, ...props }, ref) => (
 ))
 AccordionItem.displayName = 'AccordionItem'
 
+/**
+ * Renders the accordion trigger component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.children - Nested React children.
+ * @param {React.Ref<*>} ref - Forwarded React ref.
+ * @returns {JSX.Element} Rendered component output.
+ */
 const AccordionTrigger = React.forwardRef(
   ({ className, children, ...props }, ref) => (
     <AccordionPrimitive.Header className="flex">
@@ -34,6 +55,15 @@ const AccordionTrigger = React.forwardRef(
 )
 AccordionTrigger.displayName = AccordionPrimitive.Trigger.displayName
 
+/**
+ * Renders the accordion content component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {*} props.children - Nested React children.
+ * @param {React.Ref<*>} ref - Forwarded React ref.
+ * @returns {JSX.Element} Rendered component output.
+ */
 const AccordionContent = React.forwardRef(
   ({ className, children, ...props }, ref) => (
     <AccordionPrimitive.Content

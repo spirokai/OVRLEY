@@ -1,3 +1,7 @@
+/**
+ * Provides reusable tabs UI primitives for the application.
+ */
+
 import * as React from 'react'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 
@@ -5,6 +9,14 @@ import { cn } from '@/lib/utils'
 
 const Tabs = TabsPrimitive.Root
 
+/**
+ * Renders the tabs list component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {React.Ref<*>} ref - Forwarded React ref.
+ * @returns {JSX.Element} Rendered component output.
+ */
 const TabsList = React.forwardRef(({ className, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
@@ -17,6 +29,14 @@ const TabsList = React.forwardRef(({ className, ...props }, ref) => (
 ))
 TabsList.displayName = TabsPrimitive.List.displayName
 
+/**
+ * Renders the tabs trigger component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {React.Ref<*>} ref - Forwarded React ref.
+ * @returns {JSX.Element} Rendered component output.
+ */
 const TabsTrigger = React.forwardRef(({ className, ...props }, ref) => (
   <TabsPrimitive.Trigger
     ref={ref}
@@ -29,6 +49,14 @@ const TabsTrigger = React.forwardRef(({ className, ...props }, ref) => (
 ))
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
 
+/**
+ * Renders the tabs content component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @param {React.Ref<*>} ref - Forwarded React ref.
+ * @returns {JSX.Element} Rendered component output.
+ */
 const TabsContent = React.forwardRef(({ className, ...props }, ref) => (
   <TabsPrimitive.Content
     ref={ref}

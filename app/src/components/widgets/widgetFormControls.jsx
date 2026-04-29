@@ -1,3 +1,7 @@
+/**
+ * Supports widget editing flows related to widget form controls.
+ */
+
 /* eslint-disable react-refresh/only-export-components */
 
 import { Label } from '@/components/ui/label'
@@ -46,13 +50,22 @@ export const SPEED_UNITS = [
 ]
 
 export const TEMPERATURE_UNITS = [
-  { value: 'celsius', label: 'C' },
-  { value: 'fahrenheit', label: 'F' },
+  { value: 'celsius', label: '\u00B0C' },
+  { value: 'fahrenheit', label: '\u00B0F' },
 ]
 
 export const CONTROL_CLASS = 'h-9 border-border/70 bg-surface text-xs'
 const FIELD_LABEL_CLASS = 'text-[9px] text-muted-foreground uppercase font-bold'
 
+/**
+ * Renders the field block component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.label - Field or UI label text.
+ * @param {*} props.children - Nested React children.
+ * @param {*} props.className - Additional class names to merge into the element.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function FieldBlock({ label, children, className }) {
   return (
     <div className={cn('space-y-1', className)}>
@@ -62,6 +75,17 @@ export function FieldBlock({ label, children, className }) {
   )
 }
 
+/**
+ * Renders the select field component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.label - Field or UI label text.
+ * @param {*} props.value - Input value processed by the helper.
+ * @param {*} props.onValueChange - Callback invoked to value change.
+ * @param {*} props.options - Configuration options for the helper.
+ * @param {*} props.disabled - Value for disabled.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function SelectField({
   label,
   value,
@@ -92,6 +116,16 @@ export function SelectField({
   )
 }
 
+/**
+ * Renders the text field component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.label - Field or UI label text.
+ * @param {*} props.value - Input value processed by the helper.
+ * @param {*} props.onChange - Callback invoked to change.
+ * @param {*} props.placeholder - Value for placeholder.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function TextField({ label, value, onChange, placeholder = '' }) {
   return (
     <FieldBlock label={label}>
@@ -105,6 +139,18 @@ export function TextField({ label, value, onChange, placeholder = '' }) {
   )
 }
 
+/**
+ * Renders the number field component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.label - Field or UI label text.
+ * @param {*} props.value - Input value processed by the helper.
+ * @param {*} props.onChange - Callback invoked to change.
+ * @param {*} props.min - Lower bound used by the calculation.
+ * @param {*} props.max - Upper bound used by the calculation.
+ * @param {*} props.step - Value for step.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function NumberField({ label, value, onChange, min, max, step = 1 }) {
   return (
     <FieldBlock label={label}>
@@ -121,6 +167,15 @@ export function NumberField({ label, value, onChange, min, max, step = 1 }) {
   )
 }
 
+/**
+ * Renders the color field component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.label - Field or UI label text.
+ * @param {*} props.value - Input value processed by the helper.
+ * @param {*} props.onChange - Callback invoked to change.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function ColorField({ label, value, onChange }) {
   return (
     <div className="space-y-2">
@@ -134,6 +189,19 @@ export function ColorField({ label, value, onChange }) {
   )
 }
 
+/**
+ * Renders the slider field component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.label - Field or UI label text.
+ * @param {*} props.value - Input value processed by the helper.
+ * @param {*} props.min - Lower bound used by the calculation.
+ * @param {*} props.max - Upper bound used by the calculation.
+ * @param {*} props.step - Value for step.
+ * @param {*} props.onSliderChange - Callback invoked to slider change.
+ * @param {*} props.valueDisplay - Value for value display.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function SliderField({
   label,
   value,
@@ -165,6 +233,15 @@ export function SliderField({
   )
 }
 
+/**
+ * Renders the toggle field component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.label - Field or UI label text.
+ * @param {*} props.checked - Value for checked.
+ * @param {*} props.onCheckedChange - Callback invoked to checked change.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function ToggleField({ label, checked, onCheckedChange }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-surface/80 px-3 py-2">
@@ -174,6 +251,19 @@ export function ToggleField({ label, checked, onCheckedChange }) {
   )
 }
 
+/**
+ * Renders the units control row component.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.checked - Value for checked.
+ * @param {*} props.onCheckedChange - Callback invoked to checked change.
+ * @param {*} props.label - Field or UI label text.
+ * @param {*} props.value - Input value processed by the helper.
+ * @param {*} props.onValueChange - Callback invoked to value change.
+ * @param {*} props.options - Configuration options for the helper.
+ * @param {*} props.selectLabel - Value for select label.
+ * @returns {JSX.Element} Rendered component output.
+ */
 export function UnitsControlRow({
   checked,
   onCheckedChange,
