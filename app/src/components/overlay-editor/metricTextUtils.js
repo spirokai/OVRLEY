@@ -237,13 +237,31 @@ export function getWidgetOpacity(data, globalOpacity = 1) {
  * @returns {*} Requested value or structure.
  */
 export function getTextShadow(data) {
+  const shadow = getTextShadowParts(data)
+
+  if (!shadow) return undefined
+
+  return `${shadow.distance}px ${shadow.distance}px ${shadow.strength}px ${shadow.color}`
+}
+
+/**
+ * Returns text shadow parts.
+ *
+ * @param {*} data - Widget or API data used by the helper.
+ * @returns {*} Requested value or structure.
+ */
+export function getTextShadowParts(data) {
   const shadowStrength = Number(data?.shadow_strength) || 0
   const shadowDistance = Number(data?.shadow_distance) || 0
   const shadowColor = data?.shadow_color
 
   if (!shadowStrength || !shadowColor) return undefined
 
-  return `${shadowDistance}px ${shadowDistance}px ${shadowStrength}px ${shadowColor}`
+  return {
+    color: shadowColor,
+    distance: shadowDistance,
+    strength: shadowStrength,
+  }
 }
 
 /**

@@ -438,7 +438,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
               </div>
               <Slider
                 min={0}
-                max={100}
+                max={20}
                 step={1}
                 value={[globalDefaults.shadow_strength]}
                 onValueChange={([v]) => setGlobalDefault('shadow_strength', v)}
@@ -453,7 +453,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
               </div>
               <Slider
                 min={0}
-                max={50}
+                max={20}
                 step={1}
                 value={[globalDefaults.shadow_distance]}
                 onValueChange={([v]) => setGlobalDefault('shadow_distance', v)}

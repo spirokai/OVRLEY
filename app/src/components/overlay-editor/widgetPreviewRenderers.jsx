@@ -20,10 +20,11 @@ import {
   formatSpeed,
   formatTemperature,
   formatTimeValue,
-  getCombinedTextShadow,
   getMetricWidgetLayout,
   getPreviewFontFamily,
   getPreviewTextBaseline,
+  getTextShadow,
+  getTextShadowParts,
   getWidgetOpacity,
   METRIC_WIDGET_LINE_HEIGHT,
   measurePreviewText,
@@ -49,6 +50,16 @@ function pointsEqual(left, right) {
 }
 
 /**
+ * Returns a sanitized svg id fragment.
+ *
+ * @param {*} value - Input value processed by the helper.
+ * @returns {string} Sanitized svg id fragment.
+ */
+function sanitizeSvgId(value) {
+  return String(value || 'preview-shadow').replace(/[^a-zA-Z0-9_-]/g, '_')
+}
+
+/**
  * Renders the preview svg text component.
  *
  * @param {object} props - Component props.
@@ -59,7 +70,8 @@ function pointsEqual(left, right) {
  * @param {*} props.fontFamily - Font family used for measurement or rendering.
  * @param {*} props.fontSize - Numeric font size value.
  * @param {*} props.opacity - Value for opacity.
- * @param {*} props.textShadow - Value for text shadow.
+ * @param {*} props.shadow - Structured shadow data for svg filter rendering.
+ * @param {*} props.shadowFilterId - Stable filter id for the text shadow.
  * @param {*} props.borderColor - Value for border color.
  * @param {*} props.borderThickness - Value for border thickness.
  * @returns {JSX.Element} Rendered component output.
@@ -72,27 +84,49 @@ function PreviewSvgText({
   fontFamily,
   fontSize,
   opacity,
-  textShadow,
+  shadow,
+  shadowFilterId,
   borderColor,
   borderThickness,
 }) {
+  const hasShadow = Boolean(shadow && shadowFilterId)
+
   return (
-    <text
-      x={x}
-      y={baseline}
-      fill={color}
-      fontFamily={fontFamily}
-      fontSize={fontSize}
-      opacity={opacity}
-      paintOrder="stroke fill"
-      stroke={borderColor || 'none'}
-      strokeWidth={borderThickness || 0}
-      style={{
-        textShadow,
-      }}
-    >
-      {text}
-    </text>
+    <>
+      {hasShadow ? (
+        <defs>
+          <filter
+            id={shadowFilterId}
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+            colorInterpolationFilters="sRGB"
+          >
+            <feDropShadow
+              dx={shadow.distance}
+              dy={shadow.distance}
+              stdDeviation={shadow.strength}
+              floodColor={shadow.color}
+            />
+          </filter>
+        </defs>
+      ) : null}
+      <text
+        x={x}
+        y={baseline}
+        fill={color}
+        fontFamily={fontFamily}
+        fontSize={fontSize}
+        opacity={opacity}
+        paintOrder="stroke fill"
+        stroke={borderColor || 'none'}
+        strokeWidth={borderThickness || 0}
+        filter={hasShadow ? `url(#${shadowFilterId})` : undefined}
+      >
+        {text}
+      </text>
+    </>
   )
 }
 
@@ -118,7 +152,8 @@ export function OverlayMetricWidget({
   )
   const color = widget.data.color || '#ffffff'
   const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)
-  const textShadow = getCombinedTextShadow(widget.data)
+  const textShadow = getTextShadow(widget.data)
+  const shadow = getTextShadowParts(widget.data)
 
   let valueText = '--'
   let unitText = ''
@@ -217,6 +252,8 @@ export function OverlayMetricWidget({
 
   if (widget.type !== 'gradient' && metricLayout) {
     const iconSvg = METRIC_ICON_SVGS[widget.type]
+    const valueShadowFilterId = sanitizeSvgId(`${widget.id}-value-shadow`)
+    const unitsShadowFilterId = sanitizeSvgId(`${widget.id}-units-shadow`)
 
     return (
       <div
@@ -262,7 +299,8 @@ export function OverlayMetricWidget({
               fontFamily={fontFamily}
               fontSize={fontSize}
               opacity={widgetOpacity}
-              textShadow={textShadow}
+              shadow={shadow}
+              shadowFilterId={valueShadowFilterId}
               borderColor={widget.data.border_color}
               borderThickness={widget.data.border_thickness}
             />
@@ -275,7 +313,8 @@ export function OverlayMetricWidget({
                 fontFamily={fontFamily}
                 fontSize={metricLayout.units.fontSize}
                 opacity={widgetOpacity}
-                textShadow={textShadow}
+                shadow={shadow}
+                shadowFilterId={unitsShadowFilterId}
                 borderColor={widget.data.border_color}
                 borderThickness={widget.data.border_thickness}
               />
@@ -376,7 +415,7 @@ export function OverlayTextWidget({ widget, globalOpacity }) {
   )
   const color = widget.data.color || '#ffffff'
   const opacity = getWidgetOpacity(widget.data, globalOpacity)
-  const textShadow = getCombinedTextShadow(widget.data)
+  const shadow = getTextShadowParts(widget.data)
   const text = widget.data.text || 'TEXT'
   const lineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const measurement = useMemo(
@@ -405,7 +444,8 @@ export function OverlayTextWidget({ widget, globalOpacity }) {
         fontFamily={fontFamily}
         fontSize={fontSize}
         opacity={opacity}
-        textShadow={textShadow}
+        shadow={shadow}
+        shadowFilterId={sanitizeSvgId(`${widget.id}-label-shadow`)}
         borderColor={widget.data.border_color}
         borderThickness={widget.data.border_thickness}
       />
