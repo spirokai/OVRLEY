@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Video, Palette, RotateCcw, Sparkles, Gauge } from 'lucide-react'
+import { Video, Palette, RotateCcw, Gauge } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import FontSelectField from '@/components/ui/font-select-field'
@@ -109,7 +109,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           <Separator className="flex-1" />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 pt-4">
           <div className="space-y-2">
             <Label className="text-[10px] text-muted-foreground uppercase font-bold">
               Aspect Ratio
@@ -146,7 +146,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
 
           <div className="space-y-2">
             <Label className="text-[10px] text-muted-foreground uppercase font-bold">
-              Resolution Preset
+              Resolution
             </Label>
             <Select
               value={resId}
@@ -211,7 +211,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="text-[10px] text-muted-foreground uppercase font-bold">
-              Framerate (FPS)
+              Framerate
             </Label>
             <Select
               value={fpsMode}
@@ -248,6 +248,35 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             </div>
           )}
         </div>
+        <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Gauge className="h-4 w-4 text-primary" />
+              <Label className="text-xs font-semibold">
+                Widget Update Rate
+              </Label>
+            </div>
+          </div>
+          <Tabs
+            value={updateRate.toString()}
+            onValueChange={(v) => setUpdateRate(parseInt(v))}
+          >
+            <TabsList className="grid h-8 w-full grid-cols-4 bg-surface p-0.5">
+              <TabsTrigger value="1" className="text-[10px] cursor-pointer">
+                1/1
+              </TabsTrigger>
+              <TabsTrigger value="2" className="text-[10px] cursor-pointer">
+                1/2
+              </TabsTrigger>
+              <TabsTrigger value="4" className="text-[10px] cursor-pointer">
+                1/4
+              </TabsTrigger>
+              <TabsTrigger value="8" className="text-[10px] cursor-pointer">
+                1/8
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -255,7 +284,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           <div className="flex items-center gap-2">
             <Palette className="h-4 w-4 text-primary" />
             <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-              Global Styles
+              Global Settings
             </h4>
           </div>
           <Button
@@ -271,13 +300,13 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
 
         <div className="grid grid-cols-2 gap-4">
           <FontSelectField
-            label="Value Font"
+            label="Font - Values"
             value={globalDefaults.font_values}
             onValueChange={(v) => setGlobalDefault('font_values', v)}
             systemFonts={systemFonts}
           />
           <FontSelectField
-            label="Label Font"
+            label="Font - Labels"
             value={globalDefaults.font_text}
             onValueChange={(v) => setGlobalDefault('font_text', v)}
             systemFonts={systemFonts}
@@ -311,9 +340,9 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 pt-2">
+        <div className="grid grid-cols-3 gap-4 pt-2">
           <div className="space-y-2">
-            <Label className="text-xs">Border Color</Label>
+            <Label className="text-xs">Borders</Label>
             <HexColorPicker
               value={globalDefaults.border_color}
               onChange={(value) => setGlobalDefault('border_color', value)}
@@ -321,7 +350,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Shadow Color</Label>
+            <Label className="text-xs">Shadows</Label>
             <HexColorPicker
               value={globalDefaults.shadow_color}
               onChange={(value) => setGlobalDefault('shadow_color', value)}
@@ -333,7 +362,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
         <div className="space-y-6 pt-2">
           <div className="space-y-3 pt-2">
             <div className="flex justify-between items-center">
-              <Label className="text-xs">Global Opacity</Label>
+              <Label className="text-xs">Transparency</Label>
               <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 {Math.round(globalDefaults.opacity * 100)}%
               </span>
@@ -348,7 +377,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           </div>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <Label className="text-xs">Global Scale</Label>
+              <Label className="text-xs">Scale</Label>
               <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 {globalDefaults.scale.toFixed(2)}x
               </span>
@@ -407,51 +436,6 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                 onValueChange={([v]) => setGlobalDefault('shadow_distance', v)}
               />
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-            Export
-          </h4>
-          <Separator className="flex-1" />
-        </div>
-
-        <div className="space-y-4">
-          <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Gauge className="h-4 w-4 text-primary" />
-                <Label className="text-xs font-semibold">
-                  Widget Update Rate
-                </Label>
-              </div>
-              <span className="rounded bg-surface-accent-strong px-1.5 py-0.5 text-[10px] font-mono text-highlight">
-                Update 1/{updateRate}
-              </span>
-            </div>
-            <Tabs
-              value={updateRate.toString()}
-              onValueChange={(v) => setUpdateRate(parseInt(v))}
-            >
-              <TabsList className="grid h-8 w-full grid-cols-4 bg-surface p-0.5">
-                <TabsTrigger value="1" className="text-[10px] cursor-pointer">
-                  1/1
-                </TabsTrigger>
-                <TabsTrigger value="2" className="text-[10px] cursor-pointer">
-                  1/2
-                </TabsTrigger>
-                <TabsTrigger value="4" className="text-[10px] cursor-pointer">
-                  1/4
-                </TabsTrigger>
-                <TabsTrigger value="8" className="text-[10px] cursor-pointer">
-                  1/8
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
           </div>
         </div>
       </div>

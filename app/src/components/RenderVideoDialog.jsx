@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Film, Gauge, Loader2, Play, Timer, Video } from 'lucide-react'
+import { Film, Loader2, Play, Timer, Video } from 'lucide-react'
 import { cancelRender } from '@/api/backend'
 import useStore from '@/store/useStore'
 import { Button } from '@/components/ui/button'
@@ -171,7 +171,7 @@ export default function RenderVideoDialog({
       onClick={isProgress ? undefined : onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-2xl border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
+        className="w-full max-w-md rounded-xl border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
         onClick={(event) => event.stopPropagation()}
       >
         {isProgress ? (
@@ -182,194 +182,180 @@ export default function RenderVideoDialog({
               <div className="flex items-center gap-3">
                 <Video className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-semibold text-foreground">
-                  Confirm Render Settings
+                  Select Render Settings
                 </h2>
               </div>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="space-y-4 rounded-xl border border-border/70 bg-surface/70 p-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                    Framerate (FPS)
-                  </Label>
-                  <Select
-                    value={fpsMode}
-                    onValueChange={(value) => {
-                      setFpsMode(value)
-                      if (value !== 'custom') {
-                        onSettingsChange({ fps: parseInt(value, 10) })
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-9 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="24">24 fps</SelectItem>
-                      <SelectItem value="30">30 fps</SelectItem>
-                      <SelectItem value="60">60 fps</SelectItem>
-                      <SelectItem value="custom">Custom</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {fpsMode === 'custom' && (
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                      Custom FPS
-                    </Label>
-                    <BlurInput
-                      type="number"
-                      min={1}
-                      value={settings.fps}
-                      onChange={(event) =>
-                        onSettingsChange({
-                          fps: Math.max(
-                            parseInt(event.target.value, 10) || 1,
-                            1,
-                          ),
-                        })
-                      }
-                      className="h-9 text-xs"
-                    />
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Gauge className="h-4 w-4 text-primary" />
-                      <Label className="text-xs font-semibold">
-                        Widget Update Rate
-                      </Label>
-                    </div>
-                    <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] font-mono text-highlight">
-                      Update 1/{settings.updateRate}
-                    </span>
-                  </div>
-                  <Tabs
-                    value={settings.updateRate.toString()}
-                    onValueChange={(value) =>
-                      onSettingsChange({ updateRate: parseInt(value, 10) })
+            <div className="grid gap-6 lg:grid-cols-1">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Framerate
+                </Label>
+                <Select
+                  value={fpsMode}
+                  onValueChange={(value) => {
+                    setFpsMode(value)
+                    if (value !== 'custom') {
+                      onSettingsChange({ fps: parseInt(value, 10) })
                     }
-                  >
-                    <TabsList className="grid h-8 w-full grid-cols-4 bg-surface p-0.5">
-                      <TabsTrigger value="1" className="text-[10px]">
-                        1/1
-                      </TabsTrigger>
-                      <TabsTrigger value="2" className="text-[10px]">
-                        1/2
-                      </TabsTrigger>
-                      <TabsTrigger value="4" className="text-[10px]">
-                        1/4
-                      </TabsTrigger>
-                      <TabsTrigger value="8" className="text-[10px]">
-                        1/8
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
+                  }}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="24">24 fps</SelectItem>
+                    <SelectItem value="30">30 fps</SelectItem>
+                    <SelectItem value="60">60 fps</SelectItem>
+                    <SelectItem value="custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="space-y-4 rounded-xl border border-border/70 bg-surface/70 p-4">
+              {fpsMode === 'custom' && (
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                    Export Codec
+                    Custom FPS
                   </Label>
-                  <Select
-                    value={settings.exportCodec}
-                    onValueChange={(value) =>
-                      onSettingsChange({ exportCodec: value })
+                  <BlurInput
+                    type="number"
+                    min={1}
+                    value={settings.fps}
+                    onChange={(event) =>
+                      onSettingsChange({
+                        fps: Math.max(parseInt(event.target.value, 10) || 1, 1),
+                      })
                     }
-                  >
-                    <SelectTrigger className="h-9 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="prores_ks">ProRes (CPU)</SelectItem>
-                      <SelectItem value="prores_ks_vulkan">
-                        ProRes Vulkan (GPU)
-                      </SelectItem>
-                      <SelectItem
-                        value="prores_videotoolbox"
-                        disabled={!isVideoToolboxAvailable}
-                      >
-                        ProRes (macOS)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                    className="h-9 text-xs"
+                  />
                 </div>
+              )}
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-xs font-medium">
-                        Custom Export Range
-                      </Label>
-                      <p className="text-[10px] text-muted-foreground">
-                        Export a specific section only
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.exportRange.type === 'custom'}
-                      onCheckedChange={(checked) =>
-                        onSettingsChange({
-                          exportRange: {
-                            ...settings.exportRange,
-                            type: checked ? 'custom' : 'all',
-                          },
-                        })
-                      }
-                    />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs font-semibold">
+                      Widget Update Rate
+                    </Label>
                   </div>
-
-                  {settings.exportRange.type === 'custom' && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                          From
-                        </Label>
-                        <BlurInput
-                          value={settings.exportRange.fromTime}
-                          onChange={(event) =>
-                            onSettingsChange({
-                              exportRange: {
-                                ...settings.exportRange,
-                                fromTime: event.target.value,
-                              },
-                            })
-                          }
-                          className="h-9 text-xs font-mono"
-                          placeholder="00:00:00 or 800"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                          To
-                        </Label>
-                        <BlurInput
-                          value={settings.exportRange.toTime}
-                          onChange={(event) =>
-                            onSettingsChange({
-                              exportRange: {
-                                ...settings.exportRange,
-                                toTime: event.target.value,
-                              },
-                            })
-                          }
-                          className="h-9 text-xs font-mono"
-                          placeholder="00:00:00 or 900"
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
+                <Tabs
+                  value={settings.updateRate.toString()}
+                  onValueChange={(value) =>
+                    onSettingsChange({ updateRate: parseInt(value, 10) })
+                  }
+                >
+                  <TabsList className="grid h-8 w-full grid-cols-4 bg-surface p-0.5">
+                    <TabsTrigger value="1" className="text-[10px]">
+                      1/1
+                    </TabsTrigger>
+                    <TabsTrigger value="2" className="text-[10px]">
+                      1/2
+                    </TabsTrigger>
+                    <TabsTrigger value="4" className="text-[10px]">
+                      1/4
+                    </TabsTrigger>
+                    <TabsTrigger value="8" className="text-[10px]">
+                      1/8
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Export Codec
+                </Label>
+                <Select
+                  value={settings.exportCodec}
+                  onValueChange={(value) =>
+                    onSettingsChange({ exportCodec: value })
+                  }
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="prores_ks">ProRes (CPU)</SelectItem>
+                    <SelectItem value="prores_ks_vulkan">
+                      ProRes Vulkan (GPU)
+                    </SelectItem>
+                    <SelectItem
+                      value="prores_videotoolbox"
+                      disabled={!isVideoToolboxAvailable}
+                    >
+                      ProRes (macOS)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-xs font-medium">
+                      Custom Export Range
+                    </Label>
+                  </div>
+                  <Switch
+                    checked={settings.exportRange.type === 'custom'}
+                    onCheckedChange={(checked) =>
+                      onSettingsChange({
+                        exportRange: {
+                          ...settings.exportRange,
+                          type: checked ? 'custom' : 'all',
+                        },
+                      })
+                    }
+                  />
+                </div>
+
+                {settings.exportRange.type === 'custom' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        From
+                      </Label>
+                      <BlurInput
+                        value={settings.exportRange.fromTime}
+                        onChange={(event) =>
+                          onSettingsChange({
+                            exportRange: {
+                              ...settings.exportRange,
+                              fromTime: event.target.value,
+                            },
+                          })
+                        }
+                        className="h-9 text-xs font-mono"
+                        placeholder="00:00:00 or 800"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        To
+                      </Label>
+                      <BlurInput
+                        value={settings.exportRange.toTime}
+                        onChange={(event) =>
+                          onSettingsChange({
+                            exportRange: {
+                              ...settings.exportRange,
+                              toTime: event.target.value,
+                            },
+                          })
+                        }
+                        className="h-9 text-xs font-mono"
+                        placeholder="00:00:00 or 900"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3">
+            <div className="flex items-center justify-end gap-3 pt-6">
               <Button
                 type="button"
                 variant="outline"

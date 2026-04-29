@@ -120,6 +120,7 @@ function App() {
   const setRenderingVideo = useStore((state) => state.setRenderingVideo)
   const setVideoFilename = useStore((state) => state.setVideoFilename)
   const gpxFilename = useStore((state) => state.gpxFilename)
+  const activitySummary = useStore((state) => state.activitySummary)
   const setErrorMessage = useStore((state) => state.setErrorMessage)
   const templates = useStore((state) => state.templates)
   const fetchTemplates = useStore((state) => state.fetchTemplates)
@@ -145,7 +146,7 @@ function App() {
     (state) => state.setLastSavedTemplateState,
   )
 
-  const { backendStatus, backendReady } = useBackendStatus()
+  const { backendStatus } = useBackendStatus()
   const [editorZoomLevel, setEditorZoomLevel] = useState(1)
   const [showNewTemplateConfirm, setShowNewTemplateConfirm] = useState(false)
   const [renderDialogPhase, setRenderDialogPhase] = useState('closed')
@@ -401,6 +402,21 @@ function App() {
   const showTemplateStatus = status === 'Draft' || status === 'Modified'
   const sceneWidth = config?.scene?.width || 1920
   const sceneHeight = config?.scene?.height || 1080
+  const hasParsedActivity = Boolean(activitySummary)
+  const canRender = Boolean(config && hasParsedActivity)
+  const renderDisabled =
+    !canRender || renderingVideo || backendStatus !== 'connected'
+  const renderTooltipContent = !config
+    ? hasParsedActivity
+      ? 'Load a template'
+      : 'Load a template and GPX/FIT activity'
+    : !hasParsedActivity
+      ? 'Load a GPX/FIT activity'
+      : backendStatus !== 'connected'
+        ? 'Backend offline'
+        : renderingVideo
+          ? 'Rendering already in progress'
+          : null
 
   // Render progress polling
   useEffect(() => {
@@ -491,6 +507,10 @@ function App() {
   })
 
   const openRenderDialog = () => {
+    if (renderDisabled) {
+      return
+    }
+
     setRenderSettingsDraft(buildRenderSettingsDraft())
     setRenderDialogPhase('confirm')
   }
@@ -806,24 +826,11 @@ function App() {
 
             {/* Right - Actions & Status */}
             <div className="flex items-center gap-3">
-              <SimpleTooltip
-                side="bottom"
-                content={
-                  !config
-                    ? 'Load a template first'
-                    : backendStatus !== 'connected'
-                      ? 'Backend offline'
-                      : renderingVideo
-                        ? 'Rendering already in progress'
-                        : null
-                }
-              >
+              <SimpleTooltip side="bottom" content={renderTooltipContent}>
                 <Button
                   size="sm"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
-                  disabled={
-                    !config || renderingVideo || backendStatus !== 'connected'
-                  }
+                  className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+                  disabled={renderDisabled}
                   onClick={openRenderDialog}
                 >
                   <Play className="mr-2 h-4 w-4" />
@@ -840,7 +847,7 @@ function App() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 gap-2 border-accent-border/70 px-3 text-muted-foreground hover:border-accent-border hover:bg-surface-accent-soft hover:text-foreground"
+                  className="h-9 gap-2 border-accent-border/70 px-3 text-muted-foreground hover:border-accent-border hover:bg-surface-accent-soft hover:text-foreground"
                   disabled={backendStatus !== 'connected'}
                   onClick={handleOpenDownloads}
                 >
@@ -848,37 +855,6 @@ function App() {
                   <span>Overlays</span>
                 </Button>
               </SimpleTooltip>
-
-              <div className="h-6 w-px bg-border" />
-
-              {backendStatus === 'connected' && !backendReady && (
-                <Badge
-                  variant="secondary"
-                  className="gap-1.5 transition-all duration-300"
-                >
-                  <Spinner className="h-3 w-3" />
-                  <span>Loading Libs...</span>
-                </Badge>
-              )}
-
-              <div className="flex items-center gap-2">
-                {backendStatus === 'connecting' && <Spinner />}
-                <Badge
-                  variant={
-                    backendStatus === 'connected'
-                      ? 'default'
-                      : backendStatus === 'connecting'
-                        ? 'secondary'
-                        : 'destructive'
-                  }
-                >
-                  {backendStatus === 'connected'
-                    ? 'Connected'
-                    : backendStatus === 'connecting'
-                      ? 'Starting...'
-                      : 'Offline'}
-                </Badge>
-              </div>
             </div>
           </div>
         </header>
