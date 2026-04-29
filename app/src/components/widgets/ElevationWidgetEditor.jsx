@@ -3,14 +3,10 @@
  */
 
 import { Mountain, Palette } from 'lucide-react'
-import {
-  ColorField,
-  NumberField,
-  SliderField,
-  ToggleField,
-} from './widgetFormControls'
+import { ColorField, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection, SectionHeading } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
+import { Label } from '@/components/ui/label'
 
 /**
  * Renders the elevation widget editor component.
@@ -216,51 +212,89 @@ export default function ElevationWidgetEditor({
             }
           />
         </div>
-        <ToggleField
-          label="Label Metric"
-          checked={widget.data.show_elevation_metric ?? true}
-          onCheckedChange={(checked) =>
-            updateWidgetData(widget.id, { show_elevation_metric: checked })
-          }
-        />
-        <ToggleField
-          label="Label Imperial"
-          checked={widget.data.show_elevation_imperial ?? false}
-          onCheckedChange={(checked) =>
-            updateWidgetData(widget.id, { show_elevation_imperial: checked })
-          }
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <NumberField
-            label="Metric Offset X"
-            value={widget.data.metric_label_offset_x ?? 0}
-            onChange={(rawValue) =>
-              setNumericField(widget.id, 'metric_label_offset_x', rawValue)
-            }
-          />
-          <NumberField
-            label="Metric Offset Y"
-            value={widget.data.metric_label_offset_y ?? 0}
-            onChange={(rawValue) =>
-              setNumericField(widget.id, 'metric_label_offset_y', rawValue)
-            }
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <NumberField
-            label="Imperial Offset X"
-            value={widget.data.imperial_label_offset_x ?? 0}
-            onChange={(rawValue) =>
-              setNumericField(widget.id, 'imperial_label_offset_x', rawValue)
-            }
-          />
-          <NumberField
-            label="Imperial Offset Y"
-            value={widget.data.imperial_label_offset_y ?? 0}
-            onChange={(rawValue) =>
-              setNumericField(widget.id, 'imperial_label_offset_y', rawValue)
-            }
-          />
+
+        <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-between items-center gap-2 px-1">
+              <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
+                Metric Label
+              </Label>
+              <ToggleField
+                label="Label Metric"
+                checked={widget.data.show_elevation_metric ?? true}
+                onCheckedChange={(checked) =>
+                  updateWidgetData(widget.id, {
+                    show_elevation_metric: checked,
+                  })
+                }
+              />
+            </div>
+            <SliderField
+              label="Metric Offset X"
+              disabled={!widget.data.show_elevation_metric}
+              value={widget.data.metric_label_offset_x ?? 16}
+              min={-50}
+              max={50}
+              step={1}
+              valueDisplay={`${widget.data.metric_label_offset_x ?? 16}px`}
+              onSliderChange={(value) =>
+                updateWidgetData(widget.id, { metric_label_offset_x: value })
+              }
+            />
+            <SliderField
+              label="Metric Offset Y"
+              disabled={!widget.data.show_elevation_metric}
+              value={widget.data.metric_label_offset_y ?? 16}
+              min={-50}
+              max={50}
+              step={1}
+              valueDisplay={`${widget.data.metric_label_offset_y ?? 16}px`}
+              onSliderChange={(value) =>
+                updateWidgetData(widget.id, { metric_label_offset_y: value })
+              }
+            />
+          </div>
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-between items-center gap-2 px-1">
+              <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
+                Imperial Label
+              </Label>
+              <ToggleField
+                label="Label Imperial"
+                checked={widget.data.show_elevation_imperial ?? false}
+                onCheckedChange={(checked) =>
+                  updateWidgetData(widget.id, {
+                    show_elevation_imperial: checked,
+                  })
+                }
+                s
+              />
+            </div>
+            <SliderField
+              label="Imperial Offset X"
+              disabled={!widget.data.show_elevation_imperial}
+              value={widget.data.imperial_label_offset_x ?? 16}
+              min={-50}
+              max={50}
+              step={1}
+              valueDisplay={`${widget.data.imperial_label_offset_x ?? 16}px`}
+              onSliderChange={(value) =>
+                updateWidgetData(widget.id, { imperial_label_offset_x: value })
+              }
+            />
+            <SliderField
+              label="Imperial Offset Y"
+              disabled={!widget.data.show_elevation_imperial}
+              value={widget.data.imperial_label_offset_y ?? 16}
+              min={-50}
+              max={50}
+              step={1}
+              valueDisplay={`${widget.data.imperial_label_offset_y ?? 16}px`}
+              onSliderChange={(value) =>
+                updateWidgetData(widget.id, { imperial_label_offset_y: value })
+              }
+            />
+          </div>
         </div>
       </div>
     </>

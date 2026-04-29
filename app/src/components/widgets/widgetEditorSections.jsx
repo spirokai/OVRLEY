@@ -330,7 +330,6 @@ export function UnitsControlRow({
             value={value}
             onValueChange={onValueChange}
             options={options}
-            disabled={!checked}
           />
         </div>
       ) : null}

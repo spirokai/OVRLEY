@@ -54,7 +54,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
             updateWidgetData(widget.id, { decimals: value })
           }
         />
-        <div className="flex items-center justify-between rounded-md pl-4 py-2.5 mt-4.5">
+        <div className="flex items-center justify-between rounded-md pl-8 py-2.5 mt-4.5">
           <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
             Show sign
           </Label>

@@ -67,7 +67,7 @@ const OverlayCanvasWidget = memo(
         }}
       >
         <div
-          className="absolute left-0 flex items-center gap-[0.4rem] rounded-full border border-border/70 bg-card/80 px-[0.5rem] py-[0.2rem] font-semibold text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+          className="absolute left-0 flex items-center gap-[0.4rem] rounded-lg border border-border/70 bg-card/80 px-4 py-1 font-semibold text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
           style={{
             bottom: '100%',
             marginBottom: 4,
