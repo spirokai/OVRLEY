@@ -711,7 +711,7 @@ function ColorPickerImpl(props) {
  * @returns {JSX.Element} Rendered component output.
  */
 function ColorPickerTrigger(props) {
-  const { asChild, disabled, ...triggerProps } = props
+  const { asChild, disabled, className, ...triggerProps } = props
 
   const context = useColorPickerContext(TRIGGER_NAME)
 
@@ -721,7 +721,16 @@ function ColorPickerTrigger(props) {
 
   return (
     <PopoverTrigger asChild disabled={isDisabled}>
-      <TriggerPrimitive data-slot="color-picker-trigger" {...triggerProps} />
+      <TriggerPrimitive
+        data-slot="color-picker-trigger"
+        disabled={isDisabled}
+        aria-disabled={isDisabled}
+        className={cn(
+          'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+          className,
+        )}
+        {...triggerProps}
+      />
     </PopoverTrigger>
   )
 }

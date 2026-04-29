@@ -241,23 +241,18 @@ export default function SidebarWidgetsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-          Quick Add
-        </h4>
-        <div className="grid grid-cols-5 gap-3">
-          {QUICKMENU_ITEMS.map((item) => (
-            <Button
-              key={item.type}
-              variant="outline"
-              size="icon"
-              className="h-12 w-full border-border/70 bg-surface transition-all group hover:border-accent-border hover:bg-surface-accent-soft"
-              onClick={() => addWidget(item.type)}
-            >
-              <item.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-            </Button>
-          ))}
-        </div>
+      <div className="grid grid-cols-5 gap-3 pt-4">
+        {QUICKMENU_ITEMS.map((item) => (
+          <Button
+            key={item.type}
+            variant="outline"
+            size="icon"
+            className="h-12 w-full border-border/70 bg-surface transition-all group hover:border-accent-border hover:bg-surface-accent-soft"
+            onClick={() => addWidget(item.type)}
+          >
+            <item.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+          </Button>
+        ))}
       </div>
 
       <Separator className="bg-border/60" />
@@ -289,16 +284,16 @@ export default function SidebarWidgetsTab() {
                 <div key={widget.id} className="space-y-1">
                   <AccordionItem
                     value={widget.id}
-                    className="overflow-hidden rounded-lg border border-border/60 bg-surface/80 transition-all data-[state=open]:border-accent-border data-[state=open]:bg-surface-accent-soft"
+                    className="overflow-hidden rounded-lg border border-border/60 bg-surface/80 transition-all data-[state=open]:border-accent-border data-[state=open]:bg-surface-accent-soft hover:border-primary "
                   >
                     <div className="relative group">
-                      <AccordionTrigger className="group w-full px-3 py-2 pr-10 transition-colors hover:no-underline data-[state=open]:text-primary">
+                      <AccordionTrigger className="group w-full px-3 py-2 pr-10 hover:no-underline data-[state=open]:text-primary hover:text-primary ">
                         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-surface-strong transition-colors group-hover:bg-surface-accent-strong group-data-[state=open]:bg-surface-accent-strong">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-surface-strong group-hover:bg-surface-accent-strong group-data-[state=open]:bg-surface-accent-strong">
                             <Icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-data-[state=open]:text-primary" />
                           </div>
                           <div className="flex flex-col items-start gap-0.5 min-w-0 flex-1">
-                            <span className="w-full truncate text-left text-xs font-semibold text-foreground group-data-[state=open]:text-primary">
+                            <span className="w-full truncate text-left text-xs font-semibold group-data-[state=open]:text-primary">
                               {widget.name}
                             </span>
                           </div>
@@ -319,7 +314,7 @@ export default function SidebarWidgetsTab() {
                       </div>
                     </div>
 
-                    <AccordionContent className="px-4 pb-3 pt-1.5">
+                    <AccordionContent className="px-4 pb-3 pt-1.5 ">
                       <div className="relative">
                         <Button
                           variant="ghost"
@@ -334,6 +329,7 @@ export default function SidebarWidgetsTab() {
                           <PositionSection
                             widget={widget}
                             setNumericField={setNumericField}
+                            updateWidgetData={updateWidgetData}
                           />
                           {renderWidgetEditor(
                             widget,

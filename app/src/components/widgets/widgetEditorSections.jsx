@@ -2,7 +2,7 @@
  * Supports widget editing flows related to widget editor sections.
  */
 
-import { Move, Palette, TrendingUp, Type } from 'lucide-react'
+import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
 import {
   ColorField,
   NumberField,
@@ -28,7 +28,7 @@ import { getThemeColor } from '@/lib/theme'
  */
 export function SectionHeading({ icon: Icon, title }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 pt-2">
       <Icon className="h-3.5 w-3.5 text-primary" />
       <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         {title}
@@ -43,24 +43,38 @@ export function SectionHeading({ icon: Icon, title }) {
  * @param {object} props - Component props.
  * @param {*} props.widget - Widget definition being rendered or edited.
  * @param {*} props.setNumericField - Value for set numeric field.
+ * @param {*} props.updateWidgetData - Value for update widget data.
  * @returns {JSX.Element} Rendered component output.
  */
-export function PositionSection({ widget, setNumericField }) {
+export function PositionSection({ widget, setNumericField, updateWidgetData }) {
+  const opacity = Math.round((widget.data.opacity ?? 1) * 100)
+
   return (
     <div className="space-y-3">
-      <SectionHeading icon={Move} title="Position" />
+      <SectionHeading icon={Move} title="General" />
       <div className="grid grid-cols-2 gap-3">
         <NumberField
-          label="X Position"
+          label="Horizontal Position"
           value={widget.data.x ?? 0}
           onChange={(rawValue) => setNumericField(widget.id, 'x', rawValue)}
         />
         <NumberField
-          label="Y Position"
+          label="Vertical Position"
           value={widget.data.y ?? 0}
           onChange={(rawValue) => setNumericField(widget.id, 'y', rawValue)}
         />
       </div>
+      <SliderField
+        label="Transparency"
+        value={opacity}
+        min={0}
+        max={100}
+        step={1}
+        valueDisplay={`${opacity}%`}
+        onSliderChange={(value) =>
+          updateWidgetData(widget.id, { opacity: value / 100 })
+        }
+      />
     </div>
   )
 }
@@ -149,6 +163,17 @@ export function FontSection({
         />
       ) : null}
 
+      <SliderField
+        label={fontSizeLabel}
+        value={fontSize}
+        min={sizeMin}
+        max={sizeMax}
+        step={1}
+        valueDisplay={`${fontSize}px`}
+        onSliderChange={(value) =>
+          updateWidgetData(widget.id, { font_size: value })
+        }
+      />
       <div className="grid grid-cols-2 gap-3">
         <FontSelectField
           label="Font Family"
@@ -166,18 +191,6 @@ export function FontSection({
           onChange={(value) => updateWidgetData(widget.id, { color: value })}
         />
       </div>
-
-      <SliderField
-        label={fontSizeLabel}
-        value={fontSize}
-        min={sizeMin}
-        max={sizeMax}
-        step={1}
-        valueDisplay={`${fontSize}px`}
-        onSliderChange={(value) =>
-          updateWidgetData(widget.id, { font_size: value })
-        }
-      />
     </div>
   )
 }
@@ -198,7 +211,7 @@ export function IconSection({
   widget,
   updateWidgetData,
   setNumericField,
-  title = 'Icon & Units',
+  title = 'Icon',
   showUnitsToggle = false,
   unitsField = null,
 }) {
@@ -206,25 +219,28 @@ export function IconSection({
 
   return (
     <div className="space-y-4">
-      <SectionHeading icon={Palette} title={title} />
-      <ToggleField
-        label="Display Icon"
-        checked={widget.data.show_icon ?? true}
-        onCheckedChange={(checked) =>
-          updateWidgetData(widget.id, { show_icon: checked })
-        }
-      />
+      <div className="flex w-full justify-between items-center">
+        <SectionHeading icon={Palette} title={title} />
+        <ToggleField
+          checked={widget.data.show_icon ?? true}
+          onCheckedChange={(checked) =>
+            updateWidgetData(widget.id, { show_icon: checked })
+          }
+        />
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <ColorField
-          label="Icon Color"
+          label="Color"
+          disabled={!widget.data.show_icon}
           value={widget.data.icon_color || getThemeColor('aqua')}
           onChange={(value) =>
             updateWidgetData(widget.id, { icon_color: value })
           }
         />
         <SliderField
-          label="Icon Size"
+          label="Size"
           value={iconSize}
+          disabled={!widget.data.show_icon}
           min={0}
           max={100}
           step={1}
@@ -236,14 +252,16 @@ export function IconSection({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <NumberField
-          label="Icon Offset X"
+          disabled={!widget.data.show_icon}
+          label="Horizontal Offset"
           value={widget.data.icon_offset_x ?? 0}
           onChange={(rawValue) =>
             setNumericField(widget.id, 'icon_offset_x', rawValue)
           }
         />
         <NumberField
-          label="Icon Offset Y"
+          disabled={!widget.data.show_icon}
+          label="Vertical Offset"
           value={widget.data.icon_offset_y ?? 0}
           onChange={(rawValue) =>
             setNumericField(widget.id, 'icon_offset_y', rawValue)
@@ -267,30 +285,55 @@ export function IconSection({
 }
 
 /**
- * Renders the opacity section component.
+ * Renders the units control row component.
  *
  * @param {object} props - Component props.
  * @param {*} props.widget - Widget definition being rendered or edited.
  * @param {*} props.updateWidgetData - Value for update widget data.
+ * @param {*} props.checked - Value for checked.
+ * @param {*} props.onCheckedChange - Callback invoked to checked change.
+ * @param {*} props.title - Value for title.
+ * @param {*} props.value - Input value processed by the helper.
+ * @param {*} props.onValueChange - Callback invoked to value change.
+ * @param {*} props.options - Configuration options for the helper.
+ * @param {*} props.selectLabel - Value for select label.
  * @returns {JSX.Element} Rendered component output.
  */
-export function OpacitySection({ widget, updateWidgetData }) {
-  const opacity = Math.round((widget.data.opacity ?? 1) * 100)
+export function UnitsControlRow({
+  widget,
+  updateWidgetData,
+  checked = widget.data.show_units ?? true,
+  onCheckedChange = (nextChecked) =>
+    updateWidgetData(widget.id, { show_units: nextChecked }),
+  title = 'Unit',
+  value,
+  onValueChange,
+  options,
+  selectLabel = 'Unit',
+}) {
+  const showSelect =
+    Array.isArray(options) &&
+    options.length > 0 &&
+    value !== undefined &&
+    typeof onValueChange === 'function'
 
   return (
-    <div className="space-y-3">
-      <SectionHeading icon={Palette} title="Opacity" />
-      <SliderField
-        label="Widget Opacity"
-        value={opacity}
-        min={0}
-        max={100}
-        step={1}
-        valueDisplay={`${opacity}%`}
-        onSliderChange={(value) =>
-          updateWidgetData(widget.id, { opacity: value / 100 })
-        }
-      />
+    <div className="space-y-2">
+      <div className="flex w-full justify-between items-center">
+        <SectionHeading icon={Ruler} title={title} />
+        <ToggleField checked={checked} onCheckedChange={onCheckedChange} />
+      </div>
+      {showSelect ? (
+        <div className="grid grid-cols-2 gap-3">
+          <SelectField
+            label={selectLabel}
+            value={value}
+            onValueChange={onValueChange}
+            options={options}
+            disabled={!checked}
+          />
+        </div>
+      ) : null}
     </div>
   )
 }

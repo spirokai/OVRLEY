@@ -3,11 +3,8 @@
  */
 
 import { ColorField, SliderField, ToggleField } from './widgetFormControls'
-import {
-  FontSection,
-  OpacitySection,
-  SectionHeading,
-} from './widgetEditorSections'
+import { Label } from '@/components/ui/label'
+import { FontSection, SectionHeading } from './widgetEditorSections'
 import { TrendingUp } from 'lucide-react'
 import { getThemeColor } from '@/lib/theme'
 
@@ -29,34 +26,68 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
       <FontSection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        title="Gradient Value"
+        title="Typography"
         fontSizeLabel="Value Font Size"
         colorLabel="Value Color"
       />
 
-      <div className="space-y-4">
-        <SectionHeading icon={TrendingUp} title="Gradient Styling" />
+      <SliderField
+        label="Value Offset"
+        value={valueOffset}
+        min={-200}
+        max={200}
+        step={1}
+        valueDisplay={`${valueOffset}px`}
+        onSliderChange={(value) =>
+          updateWidgetData(widget.id, { value_offset: value })
+        }
+      />
+      <div className="grid grid-cols-2 gap-3">
         <SliderField
-          label="Value Offset"
-          value={valueOffset}
-          min={-200}
-          max={200}
+          label="Decimals"
+          value={decimals}
+          min={0}
+          max={2}
           step={1}
-          valueDisplay={`${valueOffset}px`}
+          valueDisplay={decimals.toString()}
           onSliderChange={(value) =>
-            updateWidgetData(widget.id, { value_offset: value })
+            updateWidgetData(widget.id, { decimals: value })
           }
         />
+        <div className="flex items-center justify-between rounded-md pl-4 py-2.5 mt-4.5">
+          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
+            Show sign
+          </Label>
+          <ToggleField
+            checked={widget.data.show_sign ?? true}
+            onCheckedChange={(checked) =>
+              updateWidgetData(widget.id, { show_sign: checked })
+            }
+          />
+        </div>
+      </div>
+      <div className="space-y-4">
+        <div className="flex w-full justify-between items-center">
+          <SectionHeading icon={TrendingUp} title="Indicator" />
+          <ToggleField
+            checked={widget.data.show_triangle ?? true}
+            onCheckedChange={(checked) =>
+              updateWidgetData(widget.id, { show_triangle: checked })
+            }
+          />
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <ColorField
-            label="Triangle + Color"
+            label="Color Positive"
+            disabled={!widget.data.show_triangle}
             value={widget.data.triangle_positive_color || getThemeColor('aqua')}
             onChange={(value) =>
               updateWidgetData(widget.id, { triangle_positive_color: value })
             }
           />
           <ColorField
-            label="Triangle - Color"
+            label="Color Negative"
+            disabled={!widget.data.show_triangle}
             value={
               widget.data.triangle_negative_color || getThemeColor('accent')
             }
@@ -65,46 +96,20 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
             }
           />
         </div>
-        <ToggleField
-          label="Show Sign"
-          checked={widget.data.show_sign ?? true}
-          onCheckedChange={(checked) =>
-            updateWidgetData(widget.id, { show_sign: checked })
+
+        <SliderField
+          label="Width"
+          disabled={!widget.data.show_triangle}
+          value={triangleWidth}
+          min={0}
+          max={240}
+          step={1}
+          valueDisplay={`${triangleWidth}px`}
+          onSliderChange={(value) =>
+            updateWidgetData(widget.id, { triangle_width: value })
           }
         />
-        <ToggleField
-          label="Triangle Indicator"
-          checked={widget.data.show_triangle ?? true}
-          onCheckedChange={(checked) =>
-            updateWidgetData(widget.id, { show_triangle: checked })
-          }
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <SliderField
-            label="Decimals"
-            value={decimals}
-            min={0}
-            max={2}
-            step={1}
-            valueDisplay={decimals.toString()}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { decimals: value })
-            }
-          />
-          <SliderField
-            label="Indicator Width"
-            value={triangleWidth}
-            min={0}
-            max={240}
-            step={1}
-            valueDisplay={`${triangleWidth}px`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { triangle_width: value })
-            }
-          />
-        </div>
       </div>
-      <OpacitySection widget={widget} updateWidgetData={updateWidgetData} />
     </>
   )
 }

@@ -2,7 +2,7 @@
  * Supports widget editing flows related to text widget editor.
  */
 
-import { FontSection, OpacitySection } from './widgetEditorSections'
+import { FontSection } from './widgetEditorSections'
 
 /**
  * Renders the text widget editor component.
@@ -18,11 +18,10 @@ export default function TextWidgetEditor({ widget, updateWidgetData }) {
       <FontSection
         widget={widget}
         updateWidgetData={updateWidgetData}
-        title="Text Content"
+        title="Typography"
         showTextInput
         colorLabel="Color"
       />
-      <OpacitySection widget={widget} updateWidgetData={updateWidgetData} />
     </>
   )
 }

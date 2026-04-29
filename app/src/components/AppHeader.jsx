@@ -275,7 +275,7 @@ export default function AppHeader({
             <Button
               variant="outline"
               size="sm"
-              className="h-9 gap-2 border-accent-border/70 px-3 text-muted-foreground hover:border-accent-border hover:bg-surface-accent-soft hover:text-foreground"
+              className="h-9 gap-2 border-accent-border/70 px-4 text-muted-foreground hover:border-accent-border hover:bg-surface-accent-soft hover:text-foreground"
               disabled={backendStatus !== 'connected'}
               onClick={onOpenDownloads}
             >

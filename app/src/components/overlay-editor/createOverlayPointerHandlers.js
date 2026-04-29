@@ -123,7 +123,7 @@ export default function useOverlayPointerHandlers({
 }) {
   const handleWheel = (event) => {
     event.preventDefault()
-    const delta = event.deltaY < 0 ? 0.1 : -0.1
+    const delta = event.deltaY < 0 ? 0.05 : -0.05
     onZoomLevelChange((current) =>
       clamp(Number((current + delta).toFixed(2)), 0.35, 4),
     )

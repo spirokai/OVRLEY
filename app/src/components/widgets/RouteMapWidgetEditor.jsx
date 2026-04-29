@@ -4,11 +4,7 @@
 
 import { Map, Palette } from 'lucide-react'
 import { ColorField, NumberField, SliderField } from './widgetFormControls'
-import {
-  DimensionsSection,
-  OpacitySection,
-  SectionHeading,
-} from './widgetEditorSections'
+import { DimensionsSection, SectionHeading } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 
 /**
@@ -174,7 +170,6 @@ export default function RouteMapWidgetEditor({
           />
         </div>
       </div>
-      <OpacitySection widget={widget} updateWidgetData={updateWidgetData} />
     </>
   )
 }

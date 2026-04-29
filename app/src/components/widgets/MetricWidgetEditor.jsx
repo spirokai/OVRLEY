@@ -2,12 +2,12 @@
  * Supports widget editing flows related to metric widget editor.
  */
 
-import { UnitsControlRow, SPEED_UNITS } from './widgetFormControls'
 import {
   FontSection,
   IconSection,
-  OpacitySection,
+  UnitsControlRow,
 } from './widgetEditorSections'
+import { SPEED_UNITS } from './widgetFormControls'
 
 /**
  * Renders the metric widget editor component.
@@ -34,22 +34,32 @@ export default function MetricWidgetEditor({
         unitsField={
           widget.type === 'speed' ? (
             <UnitsControlRow
-              label="Display Units"
+              widget={widget}
+              updateWidgetData={updateWidgetData}
+              title="Unit"
               checked={widget.data.show_units ?? true}
               onCheckedChange={(checked) =>
                 updateWidgetData(widget.id, { show_units: checked })
               }
-              selectLabel="Speed Units"
               value={widget.data.speed_unit || 'kmh'}
               onValueChange={(value) =>
                 updateWidgetData(widget.id, { speed_unit: value })
               }
               options={SPEED_UNITS}
             />
-          ) : null
+          ) : (
+            <UnitsControlRow
+              widget={widget}
+              updateWidgetData={updateWidgetData}
+              title="Unit"
+              checked={widget.data.show_units ?? true}
+              onCheckedChange={(checked) =>
+                updateWidgetData(widget.id, { show_units: checked })
+              }
+            />
+          )
         }
       />
-      <OpacitySection widget={widget} updateWidgetData={updateWidgetData} />
     </>
   )
 }

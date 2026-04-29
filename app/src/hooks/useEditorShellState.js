@@ -61,13 +61,13 @@ export default function useEditorShellState() {
 
   const decreaseZoom = () => {
     setEditorZoomLevel((current) =>
-      clamp(Number((current - 0.1).toFixed(2)), 0.35, 4),
+      clamp(Number((current - 0.05).toFixed(2)), 0.35, 4),
     )
   }
 
   const increaseZoom = () => {
     setEditorZoomLevel((current) =>
-      clamp(Number((current + 0.1).toFixed(2)), 0.35, 4),
+      clamp(Number((current + 0.05).toFixed(2)), 0.35, 4),
     )
   }
 

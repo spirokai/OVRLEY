@@ -2,12 +2,12 @@
  * Supports widget editing flows related to temperature widget editor.
  */
 
-import { TEMPERATURE_UNITS, UnitsControlRow } from './widgetFormControls'
 import {
   FontSection,
   IconSection,
-  OpacitySection,
+  UnitsControlRow,
 } from './widgetEditorSections'
+import { TEMPERATURE_UNITS } from './widgetFormControls'
 
 /**
  * Renders the temperature widget editor component.
@@ -33,12 +33,14 @@ export default function TemperatureWidgetEditor({
         showUnitsToggle
         unitsField={
           <UnitsControlRow
-            label="Display Units"
+            widget={widget}
+            updateWidgetData={updateWidgetData}
+            title="Units"
             checked={widget.data.show_units ?? true}
             onCheckedChange={(checked) =>
               updateWidgetData(widget.id, { show_units: checked })
             }
-            selectLabel="Units"
+            selectLabel="Unit"
             value={widget.data.temperature_unit || 'celsius'}
             onValueChange={(value) =>
               updateWidgetData(widget.id, { temperature_unit: value })
@@ -47,7 +49,6 @@ export default function TemperatureWidgetEditor({
           />
         }
       />
-      <OpacitySection widget={widget} updateWidgetData={updateWidgetData} />
     </>
   )
 }

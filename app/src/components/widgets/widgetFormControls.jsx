@@ -66,10 +66,12 @@ const FIELD_LABEL_CLASS = 'text-[9px] text-muted-foreground uppercase font-bold'
  * @param {*} props.className - Additional class names to merge into the element.
  * @returns {JSX.Element} Rendered component output.
  */
-export function FieldBlock({ label, children, className }) {
+export function FieldBlock({ label, children, className, disabled = false }) {
   return (
     <div className={cn('space-y-1', className)}>
-      <Label className={FIELD_LABEL_CLASS}>{label}</Label>
+      <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
+        {label}
+      </Label>
       {children}
     </div>
   )
@@ -151,11 +153,20 @@ export function TextField({ label, value, onChange, placeholder = '' }) {
  * @param {*} props.step - Value for step.
  * @returns {JSX.Element} Rendered component output.
  */
-export function NumberField({ label, value, onChange, min, max, step = 1 }) {
+export function NumberField({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  disabled = false,
+  step = 1,
+}) {
   return (
-    <FieldBlock label={label}>
+    <FieldBlock label={label} disabled={disabled}>
       <BlurInput
         type="number"
+        disabled={disabled}
         value={value}
         min={min}
         max={max}
@@ -176,13 +187,16 @@ export function NumberField({ label, value, onChange, min, max, step = 1 }) {
  * @param {*} props.onChange - Callback invoked to change.
  * @returns {JSX.Element} Rendered component output.
  */
-export function ColorField({ label, value, onChange }) {
+export function ColorField({ label, value, onChange, disabled = false }) {
   return (
     <div className="space-y-2">
-      <Label className={FIELD_LABEL_CLASS}>{label}</Label>
+      <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
+        {label}
+      </Label>
       <HexColorPicker
         value={value}
         onChange={onChange}
+        disabled={disabled}
         triggerClassName="justify-start"
       />
     </div>
@@ -208,22 +222,26 @@ export function SliderField({
   min,
   max,
   step = 1,
+  disabled = false,
   onSliderChange,
   valueDisplay,
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <Label className={FIELD_LABEL_CLASS}>{label}</Label>
+        <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
+          {label}
+        </Label>
         <span className="text-[10px] font-mono text-muted-foreground">
           {valueDisplay}
         </span>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 px-1">
         <Slider
           min={min}
           max={max}
           step={step}
+          disabled={disabled}
           value={[value]}
           onValueChange={([nextValue]) => onSliderChange(nextValue)}
           className="flex-1 py-2"
@@ -240,52 +258,16 @@ export function SliderField({
  * @param {*} props.label - Field or UI label text.
  * @param {*} props.checked - Value for checked.
  * @param {*} props.onCheckedChange - Callback invoked to checked change.
+ * @param {*} props.className - Additional class names to merge into the element.
  * @returns {JSX.Element} Rendered component output.
  */
-export function ToggleField({ label, checked, onCheckedChange }) {
+export function ToggleField({ checked, onCheckedChange, className }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-surface/80 px-3 py-2">
-      <p className="text-xs font-medium text-foreground">{label}</p>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
-    </div>
-  )
-}
-
-/**
- * Renders the units control row component.
- *
- * @param {object} props - Component props.
- * @param {*} props.checked - Value for checked.
- * @param {*} props.onCheckedChange - Callback invoked to checked change.
- * @param {*} props.label - Field or UI label text.
- * @param {*} props.value - Input value processed by the helper.
- * @param {*} props.onValueChange - Callback invoked to value change.
- * @param {*} props.options - Configuration options for the helper.
- * @param {*} props.selectLabel - Value for select label.
- * @returns {JSX.Element} Rendered component output.
- */
-export function UnitsControlRow({
-  checked,
-  onCheckedChange,
-  label,
-  value,
-  onValueChange,
-  options,
-  selectLabel,
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-3 items-end">
-      <div className="flex h-9 items-center justify-between gap-3 rounded-md border border-border/60 bg-surface/80 px-3">
-        <p className="text-xs font-medium text-foreground">{label}</p>
-        <Switch checked={checked} onCheckedChange={onCheckedChange} />
-      </div>
-      <SelectField
-        label={selectLabel}
-        value={value}
-        onValueChange={onValueChange}
-        options={options}
-        disabled={!checked}
-      />
-    </div>
+    <Switch
+      size="xs"
+      checked={checked}
+      onCheckedChange={onCheckedChange}
+      className={className}
+    />
   )
 }

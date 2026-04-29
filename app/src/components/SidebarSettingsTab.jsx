@@ -26,7 +26,7 @@ const ASPECT_RATIOS = [
   { id: '16:9', name: 'Widescreen (16:9)' },
   { id: '9:16', name: 'Vertical (9:16)' },
   { id: '1:1', name: 'Square (1:1)' },
-  { id: '4:5', name: 'Portrait (4:5)' },
+  { id: '4:3', name: 'Portrait (4:3)' },
   { id: '21:9', name: 'Ultrawide (21:9)' },
   { id: 'custom', name: 'Custom' },
 ]
@@ -45,7 +45,12 @@ const RESOLUTIONS = {
     { id: '1080s', name: '1080p Square (1080x1080)', w: 1080, h: 1080 },
     { id: '2160s', name: '4K Square (2160x2160)', w: 2160, h: 2160 },
   ],
-  '4:5': [{ id: 'insta', name: 'Instagram (1080x1350)', w: 1080, h: 1350 }],
+  '4:3': [
+    { id: 'sxga', name: 'SXGA+ (1400x1050)', w: 1400, h: 1050 },
+    { id: 'uxga', name: 'UXGA (1600x1200)', w: 1600, h: 1200 },
+    { id: 'hires', name: 'XGA (1920x1440)', w: 1920, h: 1440 },
+    { id: 'qxga', name: 'QXGA (2048x1536)', w: 2048, h: 1536 },
+  ],
   '21:9': [{ id: 'ultra', name: 'Ultrawide (3440x1440)', w: 3440, h: 1440 }],
 }
 

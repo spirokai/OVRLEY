@@ -2,11 +2,7 @@
  * Supports widget editing flows related to time widget editor.
  */
 
-import {
-  FontSection,
-  IconSection,
-  OpacitySection,
-} from './widgetEditorSections'
+import { FontSection, IconSection } from './widgetEditorSections'
 
 /**
  * Renders the time widget editor component.
@@ -34,7 +30,6 @@ export default function TimeWidgetEditor({
         updateWidgetData={updateWidgetData}
         setNumericField={setNumericField}
       />
-      <OpacitySection widget={widget} updateWidgetData={updateWidgetData} />
     </>
   )
 }

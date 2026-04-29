@@ -39,6 +39,7 @@ const AREA_COMMIT_DEBOUNCE_MS = 0
  * @param {*} props.swatchClassName - Value for swatch class name.
  * @param {*} props.presetColors - Value for preset colors.
  * @param {*} props.showValue - Boolean flag for show value.
+ * @param {*} props.disabled - Value for disabled.
  * @returns {JSX.Element} Rendered component output.
  */
 export default function HexColorPicker({
@@ -50,6 +51,7 @@ export default function HexColorPicker({
   swatchClassName,
   presetColors = DEFAULT_PRESET_COLORS,
   showValue = true,
+  disabled = false,
 }) {
   const normalizedValue = normalizeHexColor(value)
   const [open, setOpen] = useState(false)
@@ -100,6 +102,7 @@ export default function HexColorPicker({
   return (
     <ColorPicker
       open={open}
+      disabled={disabled}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
           areaDraggingRef.current = false

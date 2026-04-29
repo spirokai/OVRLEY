@@ -9,11 +9,7 @@ import {
   SliderField,
   ToggleField,
 } from './widgetFormControls'
-import {
-  DimensionsSection,
-  OpacitySection,
-  SectionHeading,
-} from './widgetEditorSections'
+import { DimensionsSection, SectionHeading } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 
 /**
@@ -264,7 +260,6 @@ export default function ElevationWidgetEditor({
           />
         </div>
       </div>
-      <OpacitySection widget={widget} updateWidgetData={updateWidgetData} />
     </>
   )
 }
