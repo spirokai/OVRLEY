@@ -4,14 +4,86 @@
 
 import { normalizeColorFields } from './color-utils'
 
+const WIDGET_ID_PATTERN = /^(label|value|plot)-(\d+)$/
+
 /**
- * Handles clone config.
+ * Resolves widget target details directly from a widget id.
+ *
+ * @param {*} widgetId - Identifier of the target widget.
+ * @returns {object|null} Derived data structure for downstream use.
+ */
+function resolveWidgetTarget(widgetId) {
+  const match = WIDGET_ID_PATTERN.exec(String(widgetId || ''))
+  if (!match) {
+    return null
+  }
+
+  const [, prefix, rawIndex] = match
+  const index = Number.parseInt(rawIndex, 10)
+  if (!Number.isInteger(index) || index < 0) {
+    return null
+  }
+
+  const category =
+    prefix === 'label'
+      ? 'labels'
+      : prefix === 'value'
+        ? 'values'
+        : prefix === 'plot'
+          ? 'plots'
+          : null
+
+  if (!category) {
+    return null
+  }
+
+  return {
+    category,
+    id: `${prefix}-${index}`,
+    index,
+  }
+}
+
+/**
+ * Updates a single widget entry immutably while preserving untouched branches.
  *
  * @param {*} config - Overlay template configuration data.
+ * @param {*} widgetId - Identifier of the target widget.
+ * @param {*} updater - Value for updater.
  * @returns {*} Result produced by the helper.
  */
-export function cloneConfig(config) {
-  return JSON.parse(JSON.stringify(config))
+function updateWidgetEntry(config, widgetId, updater) {
+  if (!config || typeof updater !== 'function') {
+    return config
+  }
+
+  const target = resolveWidgetTarget(widgetId)
+  if (!target) {
+    return config
+  }
+
+  const currentCollection = config[target.category]
+  if (!Array.isArray(currentCollection)) {
+    return config
+  }
+
+  const currentWidget = currentCollection[target.index]
+  if (!currentWidget) {
+    return config
+  }
+
+  const nextWidget = updater(currentWidget, target)
+  if (!nextWidget || nextWidget === currentWidget) {
+    return config
+  }
+
+  const nextCollection = [...currentCollection]
+  nextCollection[target.index] = nextWidget
+
+  return {
+    ...config,
+    [target.category]: nextCollection,
+  }
 }
 
 /**
@@ -95,9 +167,27 @@ export function groupWidgetsForSidebar(widgets, typeLabels) {
  * @returns {*} Requested value or structure.
  */
 export function findWidgetById(config, widgetId) {
-  return (
-    buildConfigWidgets(config).find((widget) => widget.id === widgetId) || null
-  )
+  const target = resolveWidgetTarget(widgetId)
+  if (!target) {
+    return null
+  }
+
+  const widgetData = config?.[target.category]?.[target.index]
+  if (!widgetData) {
+    return null
+  }
+
+  return {
+    id: target.id,
+    type: target.category === 'labels' ? 'label' : widgetData.value,
+    category: target.category,
+    index: target.index,
+    name:
+      target.category === 'labels'
+        ? widgetData.text || 'Text'
+        : widgetData.value,
+    data: widgetData,
+  }
 }
 
 /**
@@ -109,21 +199,11 @@ export function findWidgetById(config, widgetId) {
  * @returns {*} Result produced by the helper.
  */
 export function updateWidgetInConfig(config, widgetId, updates) {
-  if (!config) return config
-
-  const widget = findWidgetById(config, widgetId)
-  if (!widget) return config
-
-  const nextConfig = cloneConfig(config)
-  const currentWidget = nextConfig[widget.category]?.[widget.index]
-  if (!currentWidget) return config
-
-  nextConfig[widget.category][widget.index] = {
+  const normalizedUpdates = normalizeColorFields(updates)
+  return updateWidgetEntry(config, widgetId, (currentWidget) => ({
     ...currentWidget,
-    ...normalizeColorFields(updates),
-  }
-
-  return nextConfig
+    ...normalizedUpdates,
+  }))
 }
 
 /**
@@ -145,30 +225,44 @@ export function updateWidgetsInConfig(config, updatesById) {
     return config
   }
 
-  const widgetsById = Object.fromEntries(
-    buildConfigWidgets(config).map((widget) => [widget.id, widget]),
-  )
-  const nextConfig = cloneConfig(config)
+  const nextCollectionsByCategory = new Map()
   let hasChanges = false
 
   widgetUpdates.forEach(([widgetId, updates]) => {
-    const widget = widgetsById[widgetId]
-    const currentWidget = widget
-      ? nextConfig[widget.category]?.[widget.index]
-      : null
-
-    if (!widget || !currentWidget) {
+    const target = resolveWidgetTarget(widgetId)
+    if (!target) {
       return
     }
 
-    nextConfig[widget.category][widget.index] = {
+    const sourceCollection = nextCollectionsByCategory.has(target.category)
+      ? nextCollectionsByCategory.get(target.category)
+      : config[target.category]
+    const currentWidget = Array.isArray(sourceCollection)
+      ? sourceCollection[target.index]
+      : null
+
+    if (!currentWidget) {
+      return
+    }
+
+    const nextWidget = {
       ...currentWidget,
       ...normalizeColorFields(updates),
     }
+    const nextCollection = [...sourceCollection]
+    nextCollection[target.index] = nextWidget
+    nextCollectionsByCategory.set(target.category, nextCollection)
     hasChanges = true
   })
 
-  return hasChanges ? nextConfig : config
+  if (!hasChanges) {
+    return config
+  }
+
+  return {
+    ...config,
+    ...Object.fromEntries(nextCollectionsByCategory),
+  }
 }
 
 /**
@@ -180,16 +274,7 @@ export function updateWidgetsInConfig(config, updatesById) {
  * @returns {*} Result produced by the helper.
  */
 export function replaceWidgetInConfig(config, widgetId, nextWidgetData) {
-  if (!config) return config
-
-  const widget = findWidgetById(config, widgetId)
-  if (!widget) return config
-
-  const nextConfig = cloneConfig(config)
-  if (!nextConfig[widget.category]?.[widget.index]) return config
-
-  nextConfig[widget.category][widget.index] = nextWidgetData
-  return nextConfig
+  return updateWidgetEntry(config, widgetId, () => nextWidgetData)
 }
 
 /**
@@ -202,15 +287,22 @@ export function replaceWidgetInConfig(config, widgetId, nextWidgetData) {
 export function deleteWidgetInConfig(config, widgetId) {
   if (!config) return config
 
-  const widget = findWidgetById(config, widgetId)
-  if (!widget) return config
+  const target = resolveWidgetTarget(widgetId)
+  if (!target) {
+    return config
+  }
 
-  const nextConfig = cloneConfig(config)
-  nextConfig[widget.category] = (nextConfig[widget.category] || []).filter(
-    (_, index) => index !== widget.index,
-  )
+  const currentCollection = config[target.category]
+  if (!Array.isArray(currentCollection) || !currentCollection[target.index]) {
+    return config
+  }
 
-  return nextConfig
+  return {
+    ...config,
+    [target.category]: currentCollection.filter(
+      (_, index) => index !== target.index,
+    ),
+  }
 }
 
 /**
@@ -225,35 +317,32 @@ export function deleteWidgetsInConfig(config, widgetIds) {
     return config
   }
 
-  const idsToDelete = new Set(widgetIds)
-  const indexesByCategory = buildConfigWidgets(config).reduce(
-    (accumulator, widget) => {
-      if (!idsToDelete.has(widget.id)) {
-        return accumulator
-      }
-
-      if (!accumulator[widget.category]) {
-        accumulator[widget.category] = new Set()
-      }
-
-      accumulator[widget.category].add(widget.index)
+  const indexesByCategory = widgetIds.reduce((accumulator, widgetId) => {
+    const target = resolveWidgetTarget(widgetId)
+    if (!target || !config?.[target.category]?.[target.index]) {
       return accumulator
-    },
-    {},
-  )
+    }
+
+    if (!accumulator[target.category]) {
+      accumulator[target.category] = new Set()
+    }
+
+    accumulator[target.category].add(target.index)
+    return accumulator
+  }, {})
 
   const categories = Object.keys(indexesByCategory)
   if (!categories.length) {
     return config
   }
 
-  const nextConfig = cloneConfig(config)
-  categories.forEach((category) => {
-    const indexes = indexesByCategory[category]
-    nextConfig[category] = (nextConfig[category] || []).filter(
-      (_, index) => !indexes.has(index),
-    )
-  })
-
-  return nextConfig
+  return categories.reduce(
+    (nextConfig, category) => ({
+      ...nextConfig,
+      [category]: (nextConfig[category] || []).filter(
+        (_, index) => !indexesByCategory[category].has(index),
+      ),
+    }),
+    config,
+  )
 }

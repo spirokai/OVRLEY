@@ -3,6 +3,221 @@
  */
 
 import { createFontSelection, getFontFamilyName } from './fonts'
+import { getThemeColor } from './theme'
+
+/**
+ * Applies preview overrides to resolved widget data.
+ *
+ * @param {*} data - Value for data.
+ * @param {*} previewOverrides - Value for preview overrides.
+ * @returns {object} Result produced by the helper.
+ */
+function applyPreviewOverrides(data, previewOverrides) {
+  if (!previewOverrides) {
+    return data
+  }
+
+  return {
+    ...data,
+    ...previewOverrides,
+  }
+}
+
+/**
+ * Resolves effective scene data without mutating the original config object.
+ *
+ * @param {*} sceneData - Value for scene data.
+ * @param {*} globals - Global defaults merged into widgets.
+ * @returns {*} Requested value or structure.
+ */
+export function getEffectiveSceneData(sceneData, globals) {
+  if (!sceneData) {
+    return sceneData
+  }
+
+  return {
+    ...sceneData,
+    scale: globals?.scale,
+  }
+}
+
+/**
+ * Resolves effective label widget data without cloning the full config tree.
+ *
+ * @param {*} widgetData - Value for widget data.
+ * @param {*} globals - Global defaults merged into widgets.
+ * @param {*} previewOverrides - Value for preview overrides.
+ * @returns {object} Derived data structure for downstream use.
+ */
+export function getEffectiveLabelData(
+  widgetData = {},
+  globals,
+  previewOverrides = null,
+) {
+  const font = widgetData.font || globals?.font_text
+  const nextData = {
+    ...widgetData,
+  }
+
+  if (!nextData.font && font) {
+    nextData.font = font
+  }
+  if (!nextData.font_family) {
+    nextData.font_family = getFontFamilyName(font || nextData.font_family)
+  }
+  if (!nextData.color) {
+    nextData.color = globals?.color_text || getThemeColor('ice')
+  }
+  if (nextData.opacity === undefined) {
+    nextData.opacity = globals?.opacity
+  }
+  if (nextData.shadow_color === undefined) {
+    nextData.shadow_color = globals?.shadow_color
+  }
+  if (nextData.shadow_strength === undefined) {
+    nextData.shadow_strength = globals?.shadow_strength
+  }
+  if (nextData.shadow_distance === undefined) {
+    nextData.shadow_distance = globals?.shadow_distance
+  }
+  if (nextData.border_color === undefined) {
+    nextData.border_color = globals?.border_color
+  }
+  if (nextData.border_thickness === undefined) {
+    nextData.border_thickness = globals?.border_thickness
+  }
+  if (nextData.border_strength === undefined) {
+    nextData.border_strength = globals?.border_strength
+  }
+  if (nextData.border_distance === undefined) {
+    nextData.border_distance = globals?.border_distance
+  }
+
+  return applyPreviewOverrides(nextData, previewOverrides)
+}
+
+/**
+ * Resolves effective metric widget data without cloning the full config tree.
+ *
+ * @param {*} widgetData - Value for widget data.
+ * @param {*} globals - Global defaults merged into widgets.
+ * @param {*} previewOverrides - Value for preview overrides.
+ * @returns {object} Derived data structure for downstream use.
+ */
+export function getEffectiveValueData(
+  widgetData = {},
+  globals,
+  previewOverrides = null,
+) {
+  const font = widgetData.font || globals?.font_values
+  const nextData = {
+    ...widgetData,
+  }
+
+  if (!nextData.font && font) {
+    nextData.font = font
+  }
+  if (!nextData.font_family) {
+    nextData.font_family = getFontFamilyName(font || nextData.font_family)
+  }
+  if (!nextData.color) {
+    nextData.color = globals?.color_values || getThemeColor('ice')
+  }
+  if (nextData.icon_color === undefined) {
+    nextData.icon_color = globals?.color_icons || getThemeColor('aqua')
+  }
+  if (nextData.opacity === undefined) {
+    nextData.opacity = globals?.opacity
+  }
+  if (nextData.shadow_color === undefined) {
+    nextData.shadow_color = globals?.shadow_color
+  }
+  if (nextData.shadow_strength === undefined) {
+    nextData.shadow_strength = globals?.shadow_strength
+  }
+  if (nextData.shadow_distance === undefined) {
+    nextData.shadow_distance = globals?.shadow_distance
+  }
+  if (nextData.border_color === undefined) {
+    nextData.border_color = globals?.border_color
+  }
+  if (nextData.border_thickness === undefined) {
+    nextData.border_thickness = globals?.border_thickness
+  }
+  if (nextData.border_strength === undefined) {
+    nextData.border_strength = globals?.border_strength
+  }
+  if (nextData.border_distance === undefined) {
+    nextData.border_distance = globals?.border_distance
+  }
+
+  return applyPreviewOverrides(nextData, previewOverrides)
+}
+
+/**
+ * Resolves effective plot widget data without cloning the full config tree.
+ *
+ * @param {*} widgetData - Value for widget data.
+ * @param {*} globals - Global defaults merged into widgets.
+ * @param {*} previewOverrides - Value for preview overrides.
+ * @returns {object} Derived data structure for downstream use.
+ */
+export function getEffectivePlotData(
+  widgetData = {},
+  globals,
+  previewOverrides = null,
+) {
+  const nextData = {
+    ...widgetData,
+  }
+
+  if (!nextData.color) {
+    nextData.color = globals?.color_values || getThemeColor('ice')
+  }
+  if (nextData.opacity === undefined) {
+    nextData.opacity = globals?.opacity
+  }
+  if (nextData.shadow_color === undefined) {
+    nextData.shadow_color = globals?.shadow_color
+  }
+  if (nextData.shadow_strength === undefined) {
+    nextData.shadow_strength = globals?.shadow_strength
+  }
+
+  return applyPreviewOverrides(nextData, previewOverrides)
+}
+
+/**
+ * Resolves effective widget data based on widget category.
+ *
+ * @param {*} widget - Widget definition being rendered or edited.
+ * @param {*} globals - Global defaults merged into widgets.
+ * @param {*} previewOverrides - Value for preview overrides.
+ * @returns {*} Requested value or structure.
+ */
+export function getEffectiveWidgetData(
+  widget,
+  globals,
+  previewOverrides = null,
+) {
+  if (!widget) {
+    return widget
+  }
+
+  if (widget.category === 'labels') {
+    return getEffectiveLabelData(widget.data, globals, previewOverrides)
+  }
+
+  if (widget.category === 'values') {
+    return getEffectiveValueData(widget.data, globals, previewOverrides)
+  }
+
+  if (widget.category === 'plots') {
+    return getEffectivePlotData(widget.data, globals, previewOverrides)
+  }
+
+  return applyPreviewOverrides({ ...widget.data }, previewOverrides)
+}
 
 /**
  * Applies global defaults.
@@ -14,85 +229,19 @@ import { createFontSelection, getFontFamilyName } from './fonts'
 export function applyGlobalDefaults(config, globals) {
   if (!config || !globals) return config
 
-  // Deep clone to avoid mutating the original config in the store
-  const newConfig = JSON.parse(JSON.stringify(config))
-
-  // Apply to labels
-  if (newConfig.labels) {
-    newConfig.labels.forEach((label) => {
-      if (!label.font) label.font = globals.font_text
-      if (!label.font_family)
-        label.font_family = getFontFamilyName(label.font || globals.font_text)
-      if (!label.color) label.color = globals.color_text
-      if (label.opacity === undefined) label.opacity = globals.opacity
-
-      // Shadow & Border fallbacks
-      if (label.shadow_color === undefined)
-        label.shadow_color = globals.shadow_color
-      if (label.shadow_strength === undefined)
-        label.shadow_strength = globals.shadow_strength
-      if (label.shadow_distance === undefined)
-        label.shadow_distance = globals.shadow_distance
-      if (label.border_color === undefined)
-        label.border_color = globals.border_color
-      if (label.border_thickness === undefined)
-        label.border_thickness = globals.border_thickness
-      if (label.border_strength === undefined)
-        label.border_strength = globals.border_strength
-      if (label.border_distance === undefined)
-        label.border_distance = globals.border_distance
-    })
+  return {
+    ...config,
+    labels: Array.isArray(config.labels)
+      ? config.labels.map((label) => getEffectiveLabelData(label, globals))
+      : config.labels,
+    values: Array.isArray(config.values)
+      ? config.values.map((value) => getEffectiveValueData(value, globals))
+      : config.values,
+    plots: Array.isArray(config.plots)
+      ? config.plots.map((plot) => getEffectivePlotData(plot, globals))
+      : config.plots,
+    scene: getEffectiveSceneData(config.scene, globals),
   }
-
-  // Apply to values
-  if (newConfig.values) {
-    newConfig.values.forEach((value) => {
-      if (!value.font) value.font = globals.font_values
-      if (!value.font_family)
-        value.font_family = getFontFamilyName(value.font || globals.font_values)
-      if (!value.color) value.color = globals.color_values
-      if (value.icon_color === undefined) value.icon_color = globals.color_icons
-      if (value.opacity === undefined) value.opacity = globals.opacity
-
-      // Shadow & Border fallbacks
-      if (value.shadow_color === undefined)
-        value.shadow_color = globals.shadow_color
-      if (value.shadow_strength === undefined)
-        value.shadow_strength = globals.shadow_strength
-      if (value.shadow_distance === undefined)
-        value.shadow_distance = globals.shadow_distance
-      if (value.border_color === undefined)
-        value.border_color = globals.border_color
-      if (value.border_thickness === undefined)
-        value.border_thickness = globals.border_thickness
-      if (value.border_strength === undefined)
-        value.border_strength = globals.border_strength
-      if (value.border_distance === undefined)
-        value.border_distance = globals.border_distance
-    })
-  }
-
-  // Apply to plots (charts/maps)
-  if (newConfig.plots) {
-    newConfig.plots.forEach((plot) => {
-      if (!plot.color) plot.color = globals.color_values
-      if (plot.opacity === undefined) plot.opacity = globals.opacity
-
-      // Plots usually only have border or shadow if they are containers,
-      // but we apply it for consistency
-      if (plot.shadow_color === undefined)
-        plot.shadow_color = globals.shadow_color
-      if (plot.shadow_strength === undefined)
-        plot.shadow_strength = globals.shadow_strength
-    })
-  }
-
-  // Global Scale (applied to the scene)
-  if (newConfig.scene) {
-    newConfig.scene.scale = globals.scale
-  }
-
-  return newConfig
 }
 
 /**

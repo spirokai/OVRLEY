@@ -11,7 +11,7 @@ import {
   updateWidgetInConfig,
   updateWidgetsInConfig,
 } from '@/lib/widget-config'
-import { applyGlobalDefaults } from '@/lib/config-utils'
+import { getEffectiveWidgetData } from '@/lib/config-utils'
 import useOverlayMoveableHandlers from './createOverlayMoveableHandlers'
 import useOverlayPointerHandlers from './createOverlayPointerHandlers'
 import {
@@ -136,23 +136,16 @@ export default function useOverlayEditorState({
   } = useWidgetDraftState()
 
   const sourceActivity = getCurrentParsedActivity()
-  const resolvedConfig = useMemo(
-    () =>
-      applyGlobalDefaults(config, {
-        ...globalDefaults,
-        opacity: 1,
-        scale: 1,
-      }),
-    [config, globalDefaults],
-  )
+  const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
   const widgets = useMemo(
-    () => buildConfigWidgets(resolvedConfig),
-    [resolvedConfig],
+    () =>
+      rawWidgets.map((widget) => ({
+        ...widget,
+        data: getEffectiveWidgetData(widget, globalDefaults),
+      })),
+    [globalDefaults, rawWidgets],
   )
-  const sceneSize = useMemo(
-    () => getSceneSize(resolvedConfig),
-    [resolvedConfig],
-  )
+  const sceneSize = useMemo(() => getSceneSize(config), [config])
   const activity = sourceActivity
   const globalOpacity = globalDefaults?.opacity ?? 1
   const globalScale = globalDefaults?.scale ?? 1
@@ -168,7 +161,7 @@ export default function useOverlayEditorState({
     resetWidgetDrafts()
     setIsGroupDragActive(false)
     setGroupDragSelectionIds([])
-  }, [resetWidgetDrafts, resolvedConfig])
+  }, [config, resetWidgetDrafts])
 
   useEffect(() => {
     const viewportNode = viewportRef.current
@@ -399,17 +392,17 @@ export default function useOverlayEditorState({
   )
 
   const commitWidgetUpdate = (widgetId, updates) => {
-    if (!resolvedConfig) return
-    onConfigChange(updateWidgetInConfig(resolvedConfig, widgetId, updates))
+    if (!config) return
+    onConfigChange(updateWidgetInConfig(config, widgetId, updates))
   }
 
   const commitWidgetUpdates = (updatesById) => {
-    if (!resolvedConfig) return
-    onConfigChange(updateWidgetsInConfig(resolvedConfig, updatesById))
+    if (!config) return
+    onConfigChange(updateWidgetsInConfig(config, updatesById))
   }
 
   useEffect(() => {
-    if (!selectedWidgetIds.length || !resolvedConfig) {
+    if (!selectedWidgetIds.length || !config) {
       return undefined
     }
 
@@ -429,7 +422,7 @@ export default function useOverlayEditorState({
       }
 
       event.preventDefault()
-      onConfigChange(deleteWidgetsInConfig(resolvedConfig, selectedWidgetIds))
+      onConfigChange(deleteWidgetsInConfig(config, selectedWidgetIds))
       setSelectedWidgetIds([])
       syncPrimarySelectionId(null)
     }
@@ -437,8 +430,8 @@ export default function useOverlayEditorState({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [
+    config,
     onConfigChange,
-    resolvedConfig,
     selectedWidgetIds,
     setSelectedWidgetId,
     syncPrimarySelectionId,
@@ -501,7 +494,6 @@ export default function useOverlayEditorState({
     maintainAspectRatio,
     moveableRef,
     previewSecond,
-    resolvedConfig,
     sceneElement,
     sceneSize,
     isGroupDragActive,

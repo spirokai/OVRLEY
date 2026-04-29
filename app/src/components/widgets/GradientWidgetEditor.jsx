@@ -27,7 +27,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
         widget={widget}
         updateWidgetData={updateWidgetData}
         title="Typography"
-        fontSizeLabel="Value Font Size"
+        fontSizeLabel="Font Size"
         colorLabel="Value Color"
       />
 

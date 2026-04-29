@@ -20,7 +20,7 @@ function Label({ className, disabled = false, ...props }) {
       data-slot="label"
       data-disabled={disabled}
       className={cn(
-        'pl-2 flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50 cursor-pointer',
+        'pl-1 flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50 cursor-pointer',
         disabled && 'pointer-events-none cursor-not-allowed opacity-50',
         className,
       )}

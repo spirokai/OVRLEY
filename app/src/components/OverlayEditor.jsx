@@ -66,7 +66,6 @@ function OverlayEditor({
     isGroupDragActive,
     maintainAspectRatio,
     moveableRef,
-    resolvedConfig,
     previewSecond,
     sceneElement,
     sceneSize,
@@ -85,7 +84,7 @@ function OverlayEditor({
     onZoomLevelChange,
   })
 
-  if (!resolvedConfig) {
+  if (!config) {
     return <EmptyOverlayState />
   }
 

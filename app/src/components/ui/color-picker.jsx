@@ -726,7 +726,7 @@ function ColorPickerTrigger(props) {
         disabled={isDisabled}
         aria-disabled={isDisabled}
         className={cn(
-          'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+          'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer',
           className,
         )}
         {...triggerProps}
