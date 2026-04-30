@@ -9,7 +9,6 @@ import useStore from '@/store/useStore'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
-import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -19,6 +18,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
+import ExportRangeSettings from '@/components/ExportRangeSettings'
 
 /**
  * Formats time.
@@ -88,7 +88,7 @@ function RenderProgressPanel() {
         </div>
         <div>
           <h2 className="text-xl font-bold text-foreground">
-            {isFinalizing ? 'Finalizing Video' : 'Generating Overlay'}
+            {isFinalizing ? 'Finalizing Video' : 'Exporting Overlay'}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">{subMessage}</p>
         </div>
@@ -323,68 +323,12 @@ export default function RenderVideoDialog({
                 </Select>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-xs font-medium">
-                      Custom Export Range
-                    </Label>
-                  </div>
-                  <Switch
-                    checked={settings.exportRange.type === 'custom'}
-                    onCheckedChange={(checked) =>
-                      onSettingsChange({
-                        exportRange: {
-                          ...settings.exportRange,
-                          type: checked ? 'custom' : 'all',
-                        },
-                      })
-                    }
-                  />
-                </div>
-
-                {settings.exportRange.type === 'custom' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        From
-                      </Label>
-                      <BlurInput
-                        value={settings.exportRange.fromTime}
-                        onChange={(event) =>
-                          onSettingsChange({
-                            exportRange: {
-                              ...settings.exportRange,
-                              fromTime: event.target.value,
-                            },
-                          })
-                        }
-                        className="h-9 text-xs font-mono"
-                        placeholder="00:00:00 or 800"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        To
-                      </Label>
-                      <BlurInput
-                        value={settings.exportRange.toTime}
-                        onChange={(event) =>
-                          onSettingsChange({
-                            exportRange: {
-                              ...settings.exportRange,
-                              toTime: event.target.value,
-                            },
-                          })
-                        }
-                        className="h-9 text-xs font-mono"
-                        placeholder="00:00:00 or 900"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+              <ExportRangeSettings
+                exportRange={settings.exportRange}
+                onExportRangeChange={(exportRange) =>
+                  onSettingsChange({ exportRange })
+                }
+              />
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-6">

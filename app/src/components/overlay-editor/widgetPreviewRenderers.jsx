@@ -3,14 +3,20 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import useStore from '@/store/useStore'
+import {
+  buildScopedElevationSeries,
+  buildScopedRouteSamples,
+  getExportWindowDistanceProgressAtElapsed,
+  resolveExportRangeWindow,
+} from '@/lib/export-range'
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from './constants'
 import { METRIC_ICON_SVGS } from './metricWidgetAssets'
 import {
   areaToSvg,
   getPointAtMetricProgress,
   getPointAtProgress,
-  getPointAtX,
-  normalizeElevationPoints,
+  normalizeElevationGeometry,
   normalizeRouteGeometry,
   pointsToSvg,
 } from './geometryUtils'
@@ -30,7 +36,6 @@ import {
   measurePreviewText,
 } from './metricTextUtils'
 import {
-  clamp,
   getDistanceProgressAtElapsed,
   getInterpolatedActivityValue,
   getInterpolatedSeriesValue,
@@ -83,7 +88,10 @@ function useFontMetricsVersion(fontFamily, fontSize) {
     const refreshMetrics = async () => {
       try {
         await Promise.allSettled([
-          document.fonts.load(`${fontSize}px ${fontFamily}`, '0123456789WBMPRK/H'),
+          document.fonts.load(
+            `${fontSize}px ${fontFamily}`,
+            '0123456789WBMPRK/H',
+          ),
           document.fonts.ready,
         ])
       } finally {
@@ -533,30 +541,19 @@ export function OverlayRouteWidget({
 }) {
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
+  const exportRange = useStore((state) => state.exportRange)
+  const exportWindow = useMemo(
+    () =>
+      resolveExportRangeWindow(
+        activity,
+        exportRange,
+        widget.data.show_full_activity ?? false,
+      ),
+    [activity, exportRange, widget.data.show_full_activity],
+  )
   const routeSamples = useMemo(() => {
-    const coursePoints = Array.isArray(activity?.sample_course_points)
-      ? activity.sample_course_points
-      : []
-    const distanceProgress = Array.isArray(activity?.sample_distance_progress)
-      ? activity.sample_distance_progress
-      : []
-
-    return coursePoints.reduce((result, point, index) => {
-      if (
-        !Array.isArray(point) ||
-        !Number.isFinite(point[0]) ||
-        !Number.isFinite(point[1])
-      ) {
-        return result
-      }
-
-      result.push({
-        point,
-        progress: clamp(Number(distanceProgress[index]) || 0, 0, 1),
-      })
-      return result
-    }, [])
-  }, [activity])
+    return buildScopedRouteSamples(activity, exportWindow)
+  }, [activity, exportWindow])
   const routeGeometry = useMemo(
     () =>
       normalizeRouteGeometry(
@@ -581,7 +578,13 @@ export function OverlayRouteWidget({
     ],
   )
   const pointProgress = routeGeometry.progressValues
-  const progress01 = getDistanceProgressAtElapsed(activity, previewSecond)
+  const progress01 = exportWindow.active
+    ? (getExportWindowDistanceProgressAtElapsed(
+        activity,
+        exportWindow,
+        previewSecond,
+      ) ?? 0)
+    : getDistanceProgressAtElapsed(activity, previewSecond)
   const markerPoint =
     getPointAtMetricProgress(routeGeometry.points, pointProgress, progress01) ||
     getPointAtProgress(routeGeometry.points, progress01) ||
@@ -617,13 +620,8 @@ export function OverlayRouteWidget({
     [remainingPoints, routeGeometry.points],
   )
   const completedSvgPoints = useMemo(
-    () =>
-      pointsToSvg(
-        completedPoints.length > 1
-          ? completedPoints
-          : routeGeometry.points.slice(0, 2),
-      ),
-    [completedPoints, routeGeometry.points],
+    () => pointsToSvg(completedPoints),
+    [completedPoints],
   )
 
   return (
@@ -687,6 +685,16 @@ export function OverlayElevationWidget({
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
   const clipId = `${widget.id}-completed-area`
+  const exportRange = useStore((state) => state.exportRange)
+  const exportWindow = useMemo(
+    () =>
+      resolveExportRangeWindow(
+        activity,
+        exportRange,
+        widget.data.show_full_activity ?? false,
+      ),
+    [activity, exportRange, widget.data.show_full_activity],
+  )
   const remainingAreaColor =
     widget.data.area_remaining_color ||
     widget.data.remaining_line_color ||
@@ -697,26 +705,15 @@ export function OverlayElevationWidget({
     '#afeeee'
   const remainingAreaOpacity = (widget.data.area_remaining_opacity ?? 12) / 100
   const completedAreaOpacity = (widget.data.area_completed_opacity ?? 24) / 100
-  const profileElevations = useMemo(() => {
-    if (
-      Array.isArray(activity?.sample_elevations) &&
-      activity.sample_elevations.length
-    ) {
-      return activity.sample_elevations
-    }
-
-    return Array.isArray(activity?.elevation) ? activity.elevation : []
-  }, [activity])
-  const profileDistanceProgress = useMemo(
-    () =>
-      Array.isArray(activity?.sample_distance_progress)
-        ? activity.sample_distance_progress
-        : [],
-    [activity],
+  const scopedElevationSeries = useMemo(
+    () => buildScopedElevationSeries(activity, exportWindow),
+    [activity, exportWindow],
   )
-  const points = useMemo(
+  const profileElevations = scopedElevationSeries.values
+  const profileDistanceProgress = scopedElevationSeries.progressValues
+  const elevationGeometry = useMemo(
     () =>
-      normalizeElevationPoints(
+      normalizeElevationGeometry(
         profileElevations,
         width,
         height,
@@ -737,11 +734,22 @@ export function OverlayElevationWidget({
       widget.data.y_scale,
     ],
   )
-  const progress01 = getDistanceProgressAtElapsed(activity, previewSecond)
-  const markerX =
-    profilePadding + progress01 * Math.max(width - profilePadding * 2, 0)
-  const markerPoint = getPointAtX(points, markerX) || points[points.length - 1]
-  const completedPoints = points.filter((point) => point[0] <= markerX)
+  const points = elevationGeometry.points
+  const pointProgress = elevationGeometry.progressValues
+  const progress01 = exportWindow.active
+    ? (getExportWindowDistanceProgressAtElapsed(
+        activity,
+        exportWindow,
+        previewSecond,
+      ) ?? 0)
+    : getDistanceProgressAtElapsed(activity, previewSecond)
+  const markerPoint =
+    getPointAtMetricProgress(points, pointProgress, progress01) ||
+    getPointAtProgress(points, progress01) ||
+    points[points.length - 1]
+  const completedPoints = points.filter(
+    (_, index) => (pointProgress[index] ?? 0) <= progress01,
+  )
   if (
     markerPoint &&
     !pointsEqual(completedPoints[completedPoints.length - 1], markerPoint)
@@ -749,7 +757,9 @@ export function OverlayElevationWidget({
     completedPoints.push(markerPoint)
   }
 
-  const remainingTail = points.filter((point) => point[0] >= markerX)
+  const remainingTail = points.filter(
+    (_, index) => (pointProgress[index] ?? 0) >= progress01,
+  )
   const remainingPoints =
     !markerPoint || pointsEqual(markerPoint, remainingTail[0])
       ? remainingTail
@@ -764,13 +774,13 @@ export function OverlayElevationWidget({
     () => areaToSvg(points, width, height, profilePadding),
     [height, points, profilePadding, width],
   )
-  const completedAreaWidth = markerPoint ? markerPoint[0] : 0
+  const completedAreaWidth = markerPoint
+    ? markerPoint[0]
+    : (points[0]?.[0] ?? 0)
   const remainingSvgPoints = pointsToSvg(
     remainingPoints.length > 1 ? remainingPoints : points,
   )
-  const completedSvgPoints = pointsToSvg(
-    completedPoints.length > 1 ? completedPoints : points.slice(0, 2),
-  )
+  const completedSvgPoints = pointsToSvg(completedPoints)
   const metricLabel =
     elevationValue === null || elevationValue === undefined
       ? '-- m'

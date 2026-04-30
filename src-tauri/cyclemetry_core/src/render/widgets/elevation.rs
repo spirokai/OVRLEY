@@ -1,8 +1,9 @@
 use super::common::{
-    draw_area, draw_marker, draw_polyline, fallback_marker_points, format_elevation_label,
-    frame_progress_values, interpolate_optional_numeric_series, legacy_line_width,
-    marker_layers_from_points, marker_size_from_weights, normalize_opacity, plot_base_color,
-    point_at_metric_progress_with_cursor, point_at_progress_x, resolve_style_color,
+    custom_export_range_active, draw_area, draw_marker, draw_polyline, fallback_marker_points,
+    format_elevation_label, frame_progress_values, interpolate_optional_numeric_series,
+    legacy_line_width, marker_layers_from_points, marker_size_from_weights, normalize_opacity,
+    normalize_optional_progress_window, plot_base_color, point_at_metric_progress_with_cursor,
+    point_at_progress_x, relative_distance_frame_progress_values, resolve_style_color,
     rotate_point_to_canvas, scale_marker_points, widget_render_report, with_widget_transform,
     DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER, DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER,
     DEFAULT_ELEVATION_MARKER_SCALE,
@@ -12,8 +13,9 @@ use super::types::{
     WidgetRenderReport,
 };
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
+use crate::activity::trim::trim_activity;
 use crate::commands::AppPaths;
-use crate::config::{ElevationPlotConfig, RenderConfig};
+use crate::config::{ElevationPlotConfig, RenderConfig, RenderDataRequirements};
 use crate::debug::RenderProfiler;
 use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};
 use skia_safe::Canvas;
@@ -27,13 +29,25 @@ pub(crate) fn prepare_elevation_cache(
     prepare_profiler: &mut RenderProfiler,
 ) -> Result<ElevationWidgetCache, String> {
     let prepare_started = Instant::now();
+    let show_full_activity = plot.show_full_activity.unwrap_or(false);
     let plot = normalize_elevation_plot(config, plot);
+    let raw_points = build_elevation_source_points(
+        config,
+        activity,
+        show_full_activity,
+    )?;
     let geometry = prepare_profiler.measure("build_elevation_cache.geometry", || {
-        build_elevation_geometry(&plot, activity)
+        build_elevation_geometry(&plot, &raw_points)
     })?;
     let marker_layers = marker_layers_from_points(&plot.marker_points);
     let frame_states = prepare_profiler.measure("build_elevation_cache.frame_states", || {
-        build_elevation_frame_states(config, activity, dense_activity, &geometry)
+        build_elevation_frame_states(
+            config,
+            activity,
+            dense_activity,
+            &geometry,
+            show_full_activity,
+        )
     });
     prepare_profiler.record_ms(
         "build_elevation_cache",
@@ -363,9 +377,8 @@ fn normalize_elevation_plot(
 
 fn build_elevation_geometry(
     plot: &NormalizedElevationPlot,
-    activity: &ParsedActivity,
+    raw_points: &[(f32, f64)],
 ) -> Result<WidgetGeometry, String> {
-    let raw_points = raw_elevation_points(activity);
     if raw_points.is_empty() {
         return Err("Elevation plot requires elevation samples".to_string());
     }
@@ -410,8 +423,17 @@ fn build_elevation_frame_states(
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     geometry: &WidgetGeometry,
+    show_full_activity: bool,
 ) -> Vec<ElevationFrameState> {
-    let frame_progress = frame_progress_values(config, activity, dense_activity);
+    let frame_progress = if custom_export_range_active(config)
+        && !show_full_activity
+        && !geometry.progress_values.is_empty()
+    {
+        relative_distance_frame_progress_values(config, activity, dense_activity)
+            .unwrap_or_else(|| frame_progress_values(config, activity, dense_activity))
+    } else {
+        frame_progress_values(config, activity, dense_activity)
+    };
     let fallback_elevations = if dense_activity.series.elevation.len() == frame_progress.len() {
         None
     } else {
@@ -455,14 +477,10 @@ fn build_elevation_frame_states(
         .collect()
 }
 
-fn raw_elevation_points(activity: &ParsedActivity) -> Vec<(f32, f64)> {
-    let source = if activity.sample_elevations.is_empty() {
-        &activity.elevation
-    } else {
-        &activity.sample_elevations
-    };
-
-    let progress = &activity.sample_distance_progress;
+fn raw_elevation_points(
+    source: &[Option<f64>],
+    progress: &[f64],
+) -> Vec<(f32, f64)> {
     source
         .iter()
         .enumerate()
@@ -479,6 +497,57 @@ fn raw_elevation_points(activity: &ParsedActivity) -> Vec<(f32, f64)> {
             }
         })
         .collect()
+}
+
+fn raw_elevation_points_with_optional_progress(
+    source: &[Option<f64>],
+    progress_values: &[Option<f64>],
+) -> Vec<(f32, f64)> {
+    let normalized_progress =
+        normalize_optional_progress_window(progress_values).unwrap_or_else(|| {
+            (0..source.len())
+                .map(|index| {
+                    if source.len() > 1 {
+                        index as f64 / (source.len() - 1) as f64
+                    } else {
+                        0.0
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
+
+    raw_elevation_points(source, &normalized_progress)
+}
+
+fn build_elevation_source_points(
+    config: &RenderConfig,
+    activity: &ParsedActivity,
+    show_full_activity: bool,
+) -> Result<Vec<(f32, f64)>, String> {
+    if show_full_activity || !custom_export_range_active(config) {
+        let source = if activity.sample_elevations.is_empty() {
+            &activity.elevation
+        } else {
+            &activity.sample_elevations
+        };
+        return Ok(raw_elevation_points(source, &activity.sample_distance_progress));
+    }
+
+    let trimmed = trim_activity(
+        activity,
+        config.scene.start,
+        config.scene.end,
+        &RenderDataRequirements {
+            distance_progress: true,
+            elevation: true,
+            ..RenderDataRequirements::default()
+        },
+    )?;
+
+    Ok(raw_elevation_points_with_optional_progress(
+        &trimmed.elevation,
+        &trimmed.sample_distance_progress,
+    ))
 }
 
 #[derive(Clone, Copy)]

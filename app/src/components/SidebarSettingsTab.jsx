@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator'
 import { Video, Palette, RotateCcw, Gauge } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import ExportRangeSettings from '@/components/ExportRangeSettings'
 import FontSelectField from '@/components/ui/font-select-field'
 import HexColorPicker from '@/components/ui/hex-color-picker'
 import useAvailableFonts from '@/hooks/useAvailableFonts'
@@ -83,6 +84,8 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     setGlobalDefault,
     updateRate,
     setUpdateRate,
+    exportRange,
+    setExportRange,
     aspectRatio,
     setAspectRatio,
     resetGlobalDefaults,
@@ -299,6 +302,12 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+        </div>
+        <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
+          <ExportRangeSettings
+            exportRange={exportRange}
+            onExportRangeChange={setExportRange}
+          />
         </div>
       </div>
 

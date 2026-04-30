@@ -366,7 +366,7 @@ export function buildWidgetTransform({ scale = 1, rotation = 0 }) {
  * @param {*} simplifyTolerancePx - Value for simplify tolerance px.
  * @returns {object} Derived data structure for downstream use.
  */
-export function normalizeElevationPoints(
+export function normalizeElevationGeometry(
   values,
   width,
   height,
@@ -392,12 +392,18 @@ export function normalizeElevationPoints(
   }, [])
 
   if (!samples.length) {
-    return [
+    const fallbackPoints = [
       [padding, height - padding],
       [width * 0.32, height * 0.55],
       [width * 0.62, height * 0.36],
       [width - padding, height * 0.48],
     ]
+    return {
+      points: fallbackPoints,
+      progressValues: fallbackPoints.map((_, index) =>
+        fallbackPoints.length > 1 ? index / (fallbackPoints.length - 1) : 0,
+      ),
+    }
   }
 
   const usableValues = samples.map((sample) => sample.value)
@@ -582,14 +588,24 @@ export function normalizeElevationPoints(
     const y = height - padding - centered * (height - padding * 2)
     return {
       point: [x, y],
-      progress: sample.progress,
+      progress: Number.isFinite(sample.progress)
+        ? clamp(sample.progress, 0, 1)
+        : downsampledSamples.length > 1
+          ? index / (downsampledSamples.length - 1)
+          : 0,
       preserve: sample.preserve === true,
     }
   })
 
-  return simplifyProjectedPoints(projectedPoints, safeSimplifyTolerance).map(
-    ({ point }) => point,
+  const simplified = simplifyProjectedPoints(
+    projectedPoints,
+    safeSimplifyTolerance,
   )
+
+  return {
+    points: simplified.map(({ point }) => point),
+    progressValues: simplified.map(({ progress }) => progress),
+  }
 }
 
 /**
@@ -742,62 +758,6 @@ export function getPointAtMetricProgress(
 }
 
 /**
- * Returns point at x.
- *
- * @param {*} points - Cartesian points used to build geometry.
- * @param {*} targetX - Value for target x.
- * @returns {*} Requested value or structure.
- */
-export function getPointAtX(points, targetX) {
-  if (!points.length) {
-    return null
-  }
-
-  if (points.length === 1) {
-    return points[0]
-  }
-
-  const safeTargetX = Number(targetX)
-  if (!Number.isFinite(safeTargetX)) {
-    return null
-  }
-
-  if (safeTargetX <= points[0][0]) {
-    return points[0]
-  }
-
-  const lastPoint = points[points.length - 1]
-  if (safeTargetX >= lastPoint[0]) {
-    return lastPoint
-  }
-
-  for (let index = 1; index < points.length; index += 1) {
-    const leftPoint = points[index - 1]
-    const rightPoint = points[index]
-    if (!leftPoint || !rightPoint) {
-      continue
-    }
-
-    if (rightPoint[0] < safeTargetX) {
-      continue
-    }
-
-    const deltaX = rightPoint[0] - leftPoint[0]
-    if (!Number.isFinite(deltaX) || deltaX === 0) {
-      return rightPoint
-    }
-
-    const ratio = (safeTargetX - leftPoint[0]) / deltaX
-    return [
-      leftPoint[0] + (rightPoint[0] - leftPoint[0]) * ratio,
-      leftPoint[1] + (rightPoint[1] - leftPoint[1]) * ratio,
-    ]
-  }
-
-  return lastPoint
-}
-
-/**
  * Handles area to svg.
  *
  * @param {*} points - Cartesian points used to build geometry.
@@ -806,12 +766,12 @@ export function getPointAtX(points, targetX) {
  * @param {*} padding - Numeric padding value.
  * @returns {*} Result produced by the helper.
  */
-export function areaToSvg(points, width, height, padding = 18) {
+export function areaToSvg(points, _width, height, padding = 18) {
   if (!points.length) return ''
   return [
-    `${padding},${height - padding}`,
+    `${points[0][0]},${height - padding}`,
     ...points.map(([x, y]) => `${x},${y}`),
-    `${width - padding},${height - padding}`,
+    `${points[points.length - 1][0]},${height - padding}`,
   ].join(' ')
 }
 

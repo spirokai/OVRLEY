@@ -3,9 +3,10 @@
  */
 
 import { Map, Palette } from 'lucide-react'
-import { ColorField, SliderField } from './widgetFormControls'
+import { ColorField, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection, SectionHeading } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
+import { Label } from '@/components/ui/label'
 
 /**
  * Renders the route map widget editor component.
@@ -52,6 +53,17 @@ export default function RouteMapWidgetEditor({
 
       <div className="space-y-4">
         <SectionHeading icon={Palette} title="Line Styling" />
+        <div className="flex items-center justify-between gap-2 px-1">
+          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
+            Render Full Activity
+          </Label>
+          <ToggleField
+            checked={widget.data.show_full_activity ?? false}
+            onCheckedChange={(checked) =>
+              updateWidgetData(widget.id, { show_full_activity: checked })
+            }
+          />
+        </div>
         <SliderField
           label="Thickness"
           value={lineWidth}

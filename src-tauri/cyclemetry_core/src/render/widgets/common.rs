@@ -160,6 +160,82 @@ pub(crate) fn frame_progress_values(
         .collect()
 }
 
+pub(crate) fn custom_export_range_active(config: &RenderConfig) -> bool {
+    config
+        .scene
+        .extra
+        .get("custom_export_range_active")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false)
+}
+
+pub(crate) fn interpolate_distance_progress_at_elapsed(
+    activity: &ParsedActivity,
+    elapsed_second: f64,
+) -> Option<f64> {
+    let x_values = &activity.sample_elapsed_seconds;
+    let y_values = activity
+        .sample_distance_progress
+        .iter()
+        .copied()
+        .map(Some)
+        .collect::<Vec<_>>();
+    crate::activity::interpolate::interpolate_numeric_series_value(
+        x_values,
+        &y_values,
+        elapsed_second,
+    )
+}
+
+pub(crate) fn relative_distance_frame_progress_values(
+    config: &RenderConfig,
+    activity: &ParsedActivity,
+    dense_activity: &DenseActivityReport,
+) -> Option<Vec<f32>> {
+    let start_progress = interpolate_distance_progress_at_elapsed(activity, config.scene.start)?;
+    let end_progress = interpolate_distance_progress_at_elapsed(activity, config.scene.end)?;
+    let span = end_progress - start_progress;
+    if span <= 0.0 {
+        return None;
+    }
+
+    let frame_progress = frame_progress_values(config, activity, dense_activity);
+    Some(
+        frame_progress
+            .into_iter()
+            .map(|progress| ((progress as f64 - start_progress) / span).clamp(0.0, 1.0) as f32)
+            .collect(),
+    )
+}
+
+pub(crate) fn normalize_optional_progress_window(progress_values: &[Option<f64>]) -> Option<Vec<f64>> {
+    let start = progress_values.iter().find_map(|value| *value)?;
+    let end = progress_values.iter().rev().find_map(|value| *value)?;
+    let span = end - start;
+    if !start.is_finite() || !end.is_finite() || span <= 0.0 {
+        return None;
+    }
+
+    Some(
+        progress_values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .filter(|progress| progress.is_finite())
+                    .map(|progress| ((progress - start) / span).clamp(0.0, 1.0))
+                    .unwrap_or_else(|| {
+                        if progress_values.len() > 1 {
+                            index as f64 / (progress_values.len() - 1) as f64
+                        } else {
+                            0.0
+                        }
+                    })
+            })
+            .collect::<Vec<_>>(),
+    )
+}
+
 pub(crate) fn interpolate_optional_numeric_series(
     x_values: &[f64],
     y_values: &[Option<f64>],

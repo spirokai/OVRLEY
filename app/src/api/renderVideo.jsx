@@ -6,26 +6,7 @@ import { getCurrentParsedActivity } from './activityCache'
 import useStore from '../store/useStore'
 import * as backend from './backend'
 import { applyGlobalDefaults } from '../lib/config-utils'
-
-// Helper to convert HH:MM:SS to seconds
-
-/**
- * Handles time to seconds.
- *
- * @param {*} timeStr - Value for time str.
- * @returns {*} Result produced by the helper.
- */
-function timeToSeconds(timeStr) {
-  if (!timeStr) return 0
-  const parts = timeStr.split(':').map(Number)
-  if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2]
-  }
-  if (parts.length === 2) {
-    return parts[0] * 60 + parts[1]
-  }
-  return parts[0] || 0
-}
+import { timeToSeconds } from '../lib/export-range'
 
 /**
  * Renders video.
@@ -84,12 +65,14 @@ export default async function renderVideo(overrides = {}) {
       }
 
       // Apply export range override if custom
+      config.scene.custom_export_range_active = false
       if (activeExportRange.type === 'custom') {
         const start = timeToSeconds(activeExportRange.fromTime)
         const end = timeToSeconds(activeExportRange.toTime)
         if (end > start) {
           config.scene.start = start
           config.scene.end = end
+          config.scene.custom_export_range_active = true
         }
       }
     }

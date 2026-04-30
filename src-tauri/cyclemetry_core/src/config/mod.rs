@@ -262,6 +262,8 @@ pub struct CoursePlotConfig {
     #[serde(default)]
     pub marker_opacity: Option<f32>,
     #[serde(default)]
+    pub show_full_activity: Option<bool>,
+    #[serde(default)]
     pub line: Option<LineStyleConfig>,
     #[serde(default)]
     pub points: Vec<MarkerPointConfig>,
@@ -309,6 +311,8 @@ pub struct ElevationPlotConfig {
     pub area_remaining_color: Option<String>,
     #[serde(default)]
     pub area_remaining_opacity: Option<f32>,
+    #[serde(default)]
+    pub show_full_activity: Option<bool>,
     #[serde(default)]
     pub show_elevation_metric: Option<bool>,
     #[serde(default)]

@@ -1,8 +1,10 @@
 use super::common::{
-    distance, draw_marker, draw_polyline, fallback_marker_points, fit_points_to_widget_with_inset,
-    frame_progress_values, legacy_line_width, marker_layers_from_points, marker_size_from_weights,
-    normalize_opacity, plot_base_color, point_at_metric_progress_with_cursor, resolve_style_color,
-    scale_marker_points, widget_render_report, with_widget_transform,
+    custom_export_range_active, distance, draw_marker, draw_polyline, fallback_marker_points,
+    fit_points_to_widget_with_inset, frame_progress_values, legacy_line_width,
+    marker_layers_from_points, marker_size_from_weights, normalize_opacity,
+    normalize_optional_progress_window, plot_base_color, point_at_metric_progress_with_cursor,
+    relative_distance_frame_progress_values, resolve_style_color, scale_marker_points,
+    widget_render_report, with_widget_transform,
     DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER,
     DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
 };
@@ -11,7 +13,8 @@ use super::types::{
     WidgetRenderReport,
 };
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::{CoursePlotConfig, RenderConfig};
+use crate::activity::trim::trim_activity;
+use crate::config::{CoursePlotConfig, RenderConfig, RenderDataRequirements};
 use crate::debug::RenderProfiler;
 use skia_safe::Canvas;
 use std::time::Instant;
@@ -24,13 +27,21 @@ pub(crate) fn prepare_route_cache(
     prepare_profiler: &mut RenderProfiler,
 ) -> Result<RouteWidgetCache, String> {
     let prepare_started = Instant::now();
+    let show_full_activity = plot.show_full_activity.unwrap_or(false);
     let plot = normalize_route_plot(config, plot);
+    let route_samples = build_route_samples(config, activity, show_full_activity)?;
     let geometry = prepare_profiler.measure("build_route_cache.geometry", || {
-        build_route_geometry(&plot, activity)
+        build_route_geometry(&plot, &route_samples)
     })?;
     let marker_layers = marker_layers_from_points(&plot.marker_points);
     let frame_states = prepare_profiler.measure("build_route_cache.frame_states", || {
-        build_route_frame_states(config, activity, &geometry, dense_activity)
+        build_route_frame_states(
+            config,
+            activity,
+            &geometry,
+            dense_activity,
+            show_full_activity,
+        )
     });
     prepare_profiler.record_ms(
         "build_route_cache",
@@ -173,9 +184,8 @@ fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> Norm
 
 fn build_route_geometry(
     plot: &NormalizedRoutePlot,
-    activity: &ParsedActivity,
+    route_samples: &[RouteSample],
 ) -> Result<WidgetGeometry, String> {
-    let route_samples = project_course_samples(activity);
     if route_samples.len() < 2 {
         return Err("Route plot requires at least two valid course points".to_string());
     }
@@ -226,8 +236,17 @@ fn build_route_frame_states(
     activity: &ParsedActivity,
     geometry: &WidgetGeometry,
     dense_activity: &DenseActivityReport,
+    show_full_activity: bool,
 ) -> Vec<RouteFrameState> {
-    let frame_progress = frame_progress_values(config, activity, dense_activity);
+    let frame_progress = if custom_export_range_active(config)
+        && !show_full_activity
+        && !geometry.progress_values.is_empty()
+    {
+        relative_distance_frame_progress_values(config, activity, dense_activity)
+            .unwrap_or_else(|| frame_progress_values(config, activity, dense_activity))
+    } else {
+        frame_progress_values(config, activity, dense_activity)
+    };
     let mut progress_cursor = 0usize;
     frame_progress
         .into_iter()
@@ -249,9 +268,37 @@ fn build_route_frame_states(
         .collect()
 }
 
-fn project_course_samples(activity: &ParsedActivity) -> Vec<RouteSample> {
-    let valid_points = activity
-        .sample_course_points
+fn build_route_samples(
+    config: &RenderConfig,
+    activity: &ParsedActivity,
+    show_full_activity: bool,
+) -> Result<Vec<RouteSample>, String> {
+    if show_full_activity || !custom_export_range_active(config) {
+        return Ok(project_course_samples(
+            &activity.sample_course_points,
+            &activity.sample_distance_progress,
+        ));
+    }
+
+    let trimmed = trim_activity(
+        activity,
+        config.scene.start,
+        config.scene.end,
+        &RenderDataRequirements {
+            distance_progress: true,
+            course: true,
+            ..RenderDataRequirements::default()
+        },
+    )?;
+
+    Ok(project_course_samples_with_optional_progress(
+        &trimmed.course,
+        &trimmed.sample_distance_progress,
+    ))
+}
+
+fn project_course_samples(course_points: &[(Option<f64>, Option<f64>)], progress_values: &[f64]) -> Vec<RouteSample> {
+    let valid_points = course_points
         .iter()
         .enumerate()
         .filter_map(|(index, (lat, lon))| match (*lat, *lon) {
@@ -269,18 +316,36 @@ fn project_course_samples(activity: &ParsedActivity) -> Vec<RouteSample> {
         .into_iter()
         .map(|(index, lat, lon)| RouteSample {
             point: ((lon * mean_latitude_radians.cos()) as f32, lat as f32),
-            progress01: activity
-                .sample_distance_progress
+            progress01: progress_values
                 .get(index)
                 .copied()
                 .filter(|value| value.is_finite())
                 .unwrap_or_else(|| {
-                    index as f64
-                        / activity.sample_course_points.len().saturating_sub(1).max(1) as f64
+                    index as f64 / course_points.len().saturating_sub(1).max(1) as f64
                 })
                 .clamp(0.0, 1.0) as f32,
         })
         .collect()
+}
+
+fn project_course_samples_with_optional_progress(
+    course_points: &[(Option<f64>, Option<f64>)],
+    progress_values: &[Option<f64>],
+) -> Vec<RouteSample> {
+    let normalized_progress =
+        normalize_optional_progress_window(progress_values).unwrap_or_else(|| {
+            (0..course_points.len())
+                .map(|index| {
+                    if course_points.len() > 1 {
+                        index as f64 / (course_points.len() - 1) as f64
+                    } else {
+                        0.0
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
+
+    project_course_samples(course_points, &normalized_progress)
 }
 
 fn simplify_route_samples(points: &[RouteSample], tolerance: f32) -> Vec<RouteSample> {
