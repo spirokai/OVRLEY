@@ -339,31 +339,18 @@ export function OverlayMetricWidget({
     const iconTop = metricLayout.icon
       ? metricLayout.icon.top + (widget.data.icon_offset_y ?? 0)
       : 0
-    const minX = metricLayout.icon ? Math.min(0, iconLeft) : 0
-    const minY = metricLayout.icon ? Math.min(0, iconTop) : 0
-    const maxX = metricLayout.icon
-      ? Math.max(metricLayout.width, iconLeft + metricLayout.icon.size)
-      : metricLayout.width
-    const maxY = metricLayout.icon
-      ? Math.max(metricLayout.height, iconTop + metricLayout.icon.size)
-      : metricLayout.height
 
     return (
       <div
         className="relative"
         style={{
-          width: maxX - minX,
-          height: maxY - minY,
+          width: metricLayout.width,
+          height: metricLayout.height,
         }}
       >
         <div
           className="absolute"
-          style={{
-            left: -minX,
-            top: -minY,
-            width: metricLayout.width,
-            height: metricLayout.height,
-          }}
+          style={{ width: metricLayout.width, height: metricLayout.height }}
         >
           {metricLayout.icon && iconSvg ? (
             <div
