@@ -73,9 +73,15 @@ pub fn label_style(scene: &SceneConfig, label: &LabelConfig, scale: f32) -> Reso
 }
 
 pub fn value_style(scene: &SceneConfig, value: &ValueConfig, scale: f32) -> ResolvedTextStyle {
+    let base_y = if value.value == "gradient" {
+        value.y
+    } else {
+        value.y + value.value_offset.unwrap_or(0.0)
+    };
+
     ResolvedTextStyle {
         x: value.x,
-        y: value.y + value.value_offset.unwrap_or(0.0),
+        y: base_y,
         font_name: value
             .font
             .clone()

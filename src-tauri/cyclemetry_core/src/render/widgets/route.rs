@@ -4,9 +4,8 @@ use super::common::{
     marker_layers_from_points, marker_size_from_weights, normalize_opacity,
     normalize_optional_progress_window, plot_base_color, point_at_metric_progress_with_cursor,
     relative_distance_frame_progress_values, resolve_style_color, scale_marker_points,
-    widget_render_report, with_widget_transform,
-    DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER,
-    DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
+    widget_render_report, with_widget_transform, DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER,
+    DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
 };
 use super::types::{
     NormalizedRoutePlot, RouteFrameState, RouteSample, RouteWidgetCache, WidgetGeometry,
@@ -297,7 +296,10 @@ fn build_route_samples(
     ))
 }
 
-fn project_course_samples(course_points: &[(Option<f64>, Option<f64>)], progress_values: &[f64]) -> Vec<RouteSample> {
+fn project_course_samples(
+    course_points: &[(Option<f64>, Option<f64>)],
+    progress_values: &[f64],
+) -> Vec<RouteSample> {
     let valid_points = course_points
         .iter()
         .enumerate()

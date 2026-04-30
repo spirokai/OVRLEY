@@ -33,7 +33,10 @@ impl AppPaths {
             .collect();
         // Keep debug artifacts under src-tauri, but place them inside target so
         // `tauri dev` source watchers do not restart the app on every render write.
-        let debug_render_dir = repo_root.join("src-tauri").join("target").join("debug_render");
+        let debug_render_dir = repo_root
+            .join("src-tauri")
+            .join("target")
+            .join("debug_render");
         let preview_dir = runtime_dir.join("previews");
         let temp_dir = runtime_dir.join("tmp");
         let bundled_templates_dirs = vec![repo_root.join("templates")]

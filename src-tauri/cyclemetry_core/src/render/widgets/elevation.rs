@@ -31,11 +31,7 @@ pub(crate) fn prepare_elevation_cache(
     let prepare_started = Instant::now();
     let show_full_activity = plot.show_full_activity.unwrap_or(false);
     let plot = normalize_elevation_plot(config, plot);
-    let raw_points = build_elevation_source_points(
-        config,
-        activity,
-        show_full_activity,
-    )?;
+    let raw_points = build_elevation_source_points(config, activity, show_full_activity)?;
     let geometry = prepare_profiler.measure("build_elevation_cache.geometry", || {
         build_elevation_geometry(&plot, &raw_points)
     })?;
@@ -477,10 +473,7 @@ fn build_elevation_frame_states(
         .collect()
 }
 
-fn raw_elevation_points(
-    source: &[Option<f64>],
-    progress: &[f64],
-) -> Vec<(f32, f64)> {
+fn raw_elevation_points(source: &[Option<f64>], progress: &[f64]) -> Vec<(f32, f64)> {
     source
         .iter()
         .enumerate()
@@ -530,7 +523,10 @@ fn build_elevation_source_points(
         } else {
             &activity.sample_elevations
         };
-        return Ok(raw_elevation_points(source, &activity.sample_distance_progress));
+        return Ok(raw_elevation_points(
+            source,
+            &activity.sample_distance_progress,
+        ));
     }
 
     let trimmed = trim_activity(

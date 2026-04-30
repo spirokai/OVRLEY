@@ -208,7 +208,9 @@ pub(crate) fn relative_distance_frame_progress_values(
     )
 }
 
-pub(crate) fn normalize_optional_progress_window(progress_values: &[Option<f64>]) -> Option<Vec<f64>> {
+pub(crate) fn normalize_optional_progress_window(
+    progress_values: &[Option<f64>],
+) -> Option<Vec<f64>> {
     let start = progress_values.iter().find_map(|value| *value)?;
     let end = progress_values.iter().rev().find_map(|value| *value)?;
     let span = end - start;

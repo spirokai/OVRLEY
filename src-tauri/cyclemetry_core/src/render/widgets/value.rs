@@ -1,7 +1,7 @@
 use crate::activity::schema::DenseActivityReport;
 use crate::config::{RenderConfig, ValueConfig};
 use crate::render::format::{format_metric_parts, MetricDisplayParts, MetricIconKind};
-use crate::render::text::{draw_text, measure_text, ResolvedTextStyle};
+use crate::render::text::{draw_text, measure_text, parse_color, ResolvedTextStyle};
 use skia_safe::{
     paint::Style, path::ArcSize, Canvas, Paint, PaintCap, PaintJoin, Path, PathDirection, Point,
 };
@@ -13,6 +13,10 @@ const METRIC_WIDGET_LINE_HEIGHT: f32 = 0.92;
 const METRIC_WIDGET_OUTER_GAP_PX: f32 = 8.0;
 const METRIC_WIDGET_UNITS_GAP_PX: f32 = 8.0;
 const MIN_UNITS_FONT_SIZE: f32 = 12.0;
+const GRADIENT_TRIANGLE_GAP_PX: f32 = 8.0;
+const GRADIENT_ZERO_EPSILON: f64 = 0.05;
+const MAX_GRADIENT_ABS_PERCENT: f64 = 25.0;
+const GRADIENT_ZERO_LINE_WIDTH_PX: f32 = 1.0;
 
 #[derive(Clone, Debug)]
 struct ParsedSvgIcon {
@@ -43,11 +47,156 @@ pub(crate) fn draw_metric_value_widget_with_config(
     scale: f32,
     font_dirs: &[PathBuf],
 ) -> bool {
+    if value.value == "gradient" {
+        return draw_gradient_value_widget(
+            canvas,
+            config,
+            value,
+            base_style,
+            dense_activity,
+            frame_index,
+            scale,
+            font_dirs,
+        );
+    }
+
     let Some(parts) = format_metric_parts(config, value, dense_activity, frame_index) else {
         return false;
     };
     draw_metric_parts(canvas, value, base_style, &parts, scale, font_dirs);
     true
+}
+
+fn draw_gradient_value_widget(
+    canvas: &Canvas,
+    config: &RenderConfig,
+    value: &ValueConfig,
+    base_style: &ResolvedTextStyle,
+    dense_activity: &DenseActivityReport,
+    frame_index: usize,
+    scale: f32,
+    font_dirs: &[PathBuf],
+) -> bool {
+    let raw_gradient = dense_activity
+        .series
+        .gradient
+        .get(frame_index)
+        .copied()
+        .flatten();
+    let value_text =
+        crate::render::format::format_value(config, value, dense_activity, frame_index);
+    let value_measure = measure_text(&value_text, base_style, font_dirs);
+    let value_line_height = base_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
+    let value_offset = value.value_offset.unwrap_or(0.0);
+    let triangle_width = value.triangle_width.unwrap_or(72.0).max(0.0) * scale;
+    let max_triangle_height =
+        gradient_triangle_height(Some(MAX_GRADIENT_ABS_PERCENT), triangle_width);
+    let triangle_height = gradient_triangle_height(raw_gradient, triangle_width);
+    let show_triangle = value.show_triangle.unwrap_or(true) && triangle_width > 0.0;
+    let content_width = value_measure
+        .width
+        .max(if show_triangle { triangle_width } else { 0.0 });
+    let value_left = base_style.x + ((content_width - value_measure.width) * 0.5);
+
+    let mut value_style = base_style.clone();
+    value_style.x = value_left;
+    value_style.y = base_style.y + value_offset;
+    value_style.line_height = value_line_height;
+    draw_text(canvas, &value_text, &value_style, font_dirs);
+
+    if !show_triangle {
+        return true;
+    }
+
+    let triangle_top = base_style.y + value_line_height + (GRADIENT_TRIANGLE_GAP_PX * scale);
+    let zero_baseline_y = triangle_top + max_triangle_height;
+    let triangle_left = base_style.x + ((content_width - triangle_width) * 0.5);
+    let triangle_color = if raw_gradient.unwrap_or(0.0) < 0.0 {
+        value
+            .triangle_negative_color
+            .as_deref()
+            .unwrap_or("#c65102")
+    } else {
+        value
+            .triangle_positive_color
+            .as_deref()
+            .unwrap_or("#40e0d0")
+    };
+
+    if gradient_is_zero(raw_gradient) {
+        let mut paint = Paint::default();
+        paint.set_anti_alias(true);
+        paint.set_style(Style::Stroke);
+        paint.set_stroke_width((GRADIENT_ZERO_LINE_WIDTH_PX * scale).max(1.0));
+        paint.set_stroke_cap(PaintCap::Round);
+        paint.set_color(parse_color(triangle_color, base_style.opacity));
+        canvas.draw_line(
+            Point::new(triangle_left, zero_baseline_y),
+            Point::new(triangle_left + triangle_width, zero_baseline_y),
+            &paint,
+        );
+    } else if let Some(path) =
+        build_gradient_triangle_path(raw_gradient, triangle_left, zero_baseline_y, triangle_width)
+    {
+        let mut paint = Paint::default();
+        paint.set_anti_alias(true);
+        paint.set_style(Style::Fill);
+        paint.set_color(parse_color(triangle_color, base_style.opacity));
+        canvas.draw_path(&path, &paint);
+    }
+
+    true
+}
+
+fn gradient_is_zero(raw_gradient: Option<f64>) -> bool {
+    let Some(gradient) = raw_gradient else {
+        return true;
+    };
+    gradient.abs() <= GRADIENT_ZERO_EPSILON
+}
+
+fn gradient_triangle_height(raw_gradient: Option<f64>, triangle_width: f32) -> f32 {
+    if triangle_width <= 0.0 {
+        return 0.0;
+    }
+
+    let Some(gradient) = raw_gradient else {
+        return 0.0;
+    };
+    let magnitude = gradient.abs().min(MAX_GRADIENT_ABS_PERCENT);
+    if magnitude <= GRADIENT_ZERO_EPSILON {
+        return 0.0;
+    }
+
+    let half_angle_radians = ((magnitude * 0.5) as f32).to_radians();
+    triangle_width * half_angle_radians.tan()
+}
+
+fn build_gradient_triangle_path(
+    raw_gradient: Option<f64>,
+    left: f32,
+    baseline_y: f32,
+    width: f32,
+) -> Option<Path> {
+    let height = gradient_triangle_height(raw_gradient, width);
+    if height <= 0.0 {
+        return None;
+    }
+
+    let mut path = Path::new();
+    if raw_gradient.unwrap_or(0.0) > 0.0 {
+        path.move_to(Point::new(left, baseline_y));
+        path.line_to(Point::new(left + width, baseline_y));
+        path.line_to(Point::new(left + width, baseline_y - height));
+    } else if raw_gradient.unwrap_or(0.0) < 0.0 {
+        path.move_to(Point::new(left, baseline_y));
+        path.line_to(Point::new(left + width, baseline_y));
+        path.line_to(Point::new(left + width, baseline_y + height));
+    } else {
+        return None;
+    }
+    path.close();
+    Some(path)
 }
 
 fn draw_metric_parts(
@@ -472,5 +621,23 @@ fn point_from_command(current: Point, x: f32, y: f32, is_relative: bool) -> Poin
         Point::new(current.x + x, current.y + y)
     } else {
         Point::new(x, y)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::gradient_triangle_height;
+
+    #[test]
+    fn gradient_triangle_height_is_zero_for_zero_and_missing_values() {
+        assert_eq!(gradient_triangle_height(None, 72.0), 0.0);
+        assert_eq!(gradient_triangle_height(Some(0.0), 72.0), 0.0);
+    }
+
+    #[test]
+    fn gradient_triangle_height_uses_half_angle_rule() {
+        let expected = (72.0_f32) * (5.0_f32.to_radians().tan());
+        let actual = gradient_triangle_height(Some(10.0), 72.0);
+        assert!((actual - expected).abs() < 0.001);
     }
 }

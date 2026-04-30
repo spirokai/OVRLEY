@@ -18,6 +18,8 @@ export {
 export {
   buildGradientTrianglePath,
   formatGradientValue,
+  getGradientTriangleHeight,
+  getGradientWidgetLayout,
   formatSpeed,
   formatTemperature,
   formatTimeValue,

@@ -7,6 +7,10 @@ import { FONT_FAMILY_MAP } from './constants'
 export const METRIC_WIDGET_LINE_HEIGHT = 0.92
 export const METRIC_WIDGET_OUTER_GAP_PX = 8
 export const METRIC_WIDGET_UNITS_GAP_PX = 8
+export const GRADIENT_WIDGET_TRIANGLE_GAP_PX = 8
+export const GRADIENT_ZERO_EPSILON = 0.05
+export const MAX_GRADIENT_ABS_PERCENT = 25
+export const GRADIENT_ZERO_LINE_WIDTH_PX = 1
 
 /**
  * Returns preview font family.
@@ -449,6 +453,129 @@ export function formatGradientValue(widget, value) {
 }
 
 /**
+ * Returns gradient triangle height.
+ *
+ * @param {*} value - Gradient value in percent.
+ * @param {*} width - Numeric width value.
+ * @returns {number} Derived height for the triangle indicator.
+ */
+export function getGradientTriangleHeight(value, width) {
+  const safeWidth = Math.max(Number(width) || 0, 0)
+  if (safeWidth <= 0) {
+    return 0
+  }
+
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return 0
+  }
+
+  const magnitude = Math.min(Math.abs(numericValue), MAX_GRADIENT_ABS_PERCENT)
+  if (magnitude <= GRADIENT_ZERO_EPSILON) {
+    return 0
+  }
+
+  const halfAngleRadians = (magnitude * 0.5 * Math.PI) / 180
+  return safeWidth * Math.tan(halfAngleRadians)
+}
+
+/**
+ * Returns whether a gradient value should be treated as zero.
+ *
+ * @param {*} value - Gradient value in percent.
+ * @returns {boolean} Whether the indicator should use the zero baseline state.
+ */
+export function isGradientZero(value) {
+  const numericValue = Number(value)
+  return (
+    !Number.isFinite(numericValue) ||
+    Math.abs(numericValue) <= GRADIENT_ZERO_EPSILON
+  )
+}
+
+/**
+ * Returns gradient widget layout.
+ *
+ * @param {object} options - Structured options for the helper.
+ * @param {*} options.fontSize - Numeric font size value.
+ * @param {*} options.fontFamily - Font family used for measurement or rendering.
+ * @param {*} options.valueText - Formatted value text shown in the widget.
+ * @param {*} options.valueOffset - Vertical offset applied to the value anchor.
+ * @param {*} options.gradientValue - Current gradient numeric value.
+ * @param {*} options.triangleWidth - Configured triangle width.
+ * @param {*} options.showTriangle - Boolean flag for triangle visibility.
+ * @returns {object} Requested value or structure.
+ */
+export function getGradientWidgetLayout({
+  fontSize,
+  fontFamily,
+  valueText,
+  valueOffset,
+  gradientValue,
+  triangleWidth,
+  showTriangle,
+}) {
+  const valueLineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
+  const valueMeasure = measurePreviewText(valueText, fontSize, fontFamily)
+  const safeValueOffset = Number(valueOffset) || 0
+  const safeTriangleWidth = Math.max(Number(triangleWidth) || 0, 0)
+  const maxTriangleHeight =
+    showTriangle && safeTriangleWidth > 0
+      ? getGradientTriangleHeight(MAX_GRADIENT_ABS_PERCENT, safeTriangleWidth)
+      : 0
+  const triangleHeight =
+    showTriangle && safeTriangleWidth > 0
+      ? getGradientTriangleHeight(gradientValue, safeTriangleWidth)
+      : 0
+  const indicatorVisible = showTriangle && safeTriangleWidth > 0
+  const contentWidth = Math.max(
+    valueMeasure.width,
+    indicatorVisible ? safeTriangleWidth : 0,
+  )
+  const valueTop = safeValueOffset
+  const indicatorTop = valueLineHeight + GRADIENT_WIDGET_TRIANGLE_GAP_PX
+  const zeroBaseline = indicatorTop + maxTriangleHeight
+  const indicatorHeight = indicatorVisible ? maxTriangleHeight * 2 : 0
+  const rawMinY = Math.min(0, valueTop)
+  const rawMaxY = Math.max(
+    valueTop + valueLineHeight,
+    indicatorVisible
+      ? indicatorTop + indicatorHeight
+      : valueTop + valueLineHeight,
+  )
+  const baseline = getPreviewTextBaseline({
+    top: valueTop - rawMinY,
+    lineHeight: valueLineHeight,
+    ascent: valueMeasure.ascent,
+    descent: valueMeasure.descent,
+    glyphHeight: valueMeasure.glyphHeight,
+  })
+
+  return {
+    width: contentWidth,
+    height: rawMaxY - rawMinY,
+    value: {
+      left: (contentWidth - valueMeasure.width) / 2,
+      top: valueTop - rawMinY,
+      baseline,
+      width: valueMeasure.width,
+      lineHeight: valueLineHeight,
+    },
+    triangle: indicatorVisible
+      ? {
+          left: (contentWidth - safeTriangleWidth) / 2,
+          top: indicatorTop - rawMinY,
+          width: safeTriangleWidth,
+          height: triangleHeight,
+          maxHeight: maxTriangleHeight,
+          baseline: zeroBaseline - rawMinY,
+          isZero: isGradientZero(gradientValue),
+        }
+      : null,
+  }
+}
+
+/**
  * Builds gradient triangle path.
  *
  * @param {*} value - Input value processed by the helper.
@@ -457,14 +584,22 @@ export function formatGradientValue(widget, value) {
  * @returns {*} Derived data structure for downstream use.
  */
 export function buildGradientTrianglePath(value, width, height) {
-  const normalized = clamp(Math.abs(Number(value) || 0) / 15, 0.12, 1)
-  const centeredHeight = Math.max(height * 0.88, 4)
-  const rise = Math.max((centeredHeight / 2) * normalized, 2)
-  const centerY = height / 2
+  const safeWidth = Math.max(Number(width) || 0, 0)
+  const safeHeight = Math.max(Number(height) || 0, 0)
+  const numericValue = Number(value)
 
-  if (Number(value) >= 0) {
-    return `M 0 ${centerY} L ${width} ${centerY} L ${width} ${centerY - rise} Z`
+  if (
+    safeWidth <= 0 ||
+    safeHeight <= 0 ||
+    !Number.isFinite(numericValue) ||
+    Math.abs(numericValue) <= GRADIENT_ZERO_EPSILON
+  ) {
+    return ''
   }
 
-  return `M 0 ${centerY} L ${width} ${centerY} L ${width} ${centerY + rise} Z`
+  if (numericValue > 0) {
+    return `M 0 0 L ${safeWidth} 0 L ${safeWidth} ${-safeHeight} Z`
+  }
+
+  return `M 0 0 L ${safeWidth} 0 L ${safeWidth} ${safeHeight} Z`
 }

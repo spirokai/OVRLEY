@@ -23,6 +23,8 @@ import {
 import {
   buildGradientTrianglePath,
   formatGradientValue,
+  getGradientWidgetLayout,
+  GRADIENT_ZERO_LINE_WIDTH_PX,
   formatSpeed,
   formatTemperature,
   formatTimeValue,
@@ -301,8 +303,31 @@ export function OverlayMetricWidget({
       widget.type,
     ],
   )
-  const gradientValueOffset =
-    widget.type === 'gradient' ? (widget.data.value_offset ?? 0) : 0
+  const gradientLayout = useMemo(
+    () =>
+      widget.type === 'gradient'
+        ? getGradientWidgetLayout({
+            fontSize,
+            fontFamily,
+            valueText,
+            valueOffset: widget.data.value_offset ?? 0,
+            gradientValue: currentGradientValue,
+            triangleWidth:
+              widget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
+            showTriangle: widget.data.show_triangle !== false,
+          })
+        : null,
+    [
+      currentGradientValue,
+      fontFamily,
+      fontSize,
+      valueText,
+      widget.data.show_triangle,
+      widget.data.triangle_width,
+      widget.data.value_offset,
+      widget.type,
+    ],
+  )
 
   if (widget.type !== 'gradient' && metricLayout) {
     const iconSvg = METRIC_ICON_SVGS[widget.type]
@@ -394,77 +419,92 @@ export function OverlayMetricWidget({
     )
   }
 
-  return (
-    <div className="inline-flex w-max flex-col items-center gap-2">
-      <div
-        className="inline-flex items-center gap-2 whitespace-nowrap"
-        style={{
-          color,
-          fontFamily,
-          fontSize,
-          lineHeight: METRIC_WIDGET_LINE_HEIGHT,
-          opacity: widgetOpacity,
-          textShadow,
-          ...(widget.type === 'gradient'
-            ? {
-                marginTop: Math.max(gradientValueOffset, 0),
-                marginBottom: Math.max(-gradientValueOffset, 0),
-              }
-            : {
-                transform: `translateY(${widget.data.value_offset ?? 0}px)`,
-              }),
-        }}
-      >
-        <div className="inline-flex items-end gap-2">
-          <span>{valueText}</span>
-          {showUnits && unitText ? (
-            <span
-              style={{
-                fontSize: Math.max(fontSize * 0.28, 12),
-                lineHeight: METRIC_WIDGET_LINE_HEIGHT,
-                opacity: 'inherit',
-              }}
-            >
-              {unitText}
-            </span>
-          ) : null}
-        </div>
-      </div>
-      {widget.type === 'gradient' && widget.data.show_triangle !== false ? (
-        <div className="flex w-full justify-center">
-          {(() => {
-            const triangleWidth = Math.max(
-              widget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
-              8,
-            )
-            const triangleHeight = Math.max(triangleWidth * 0.42, 8)
+  if (widget.type === 'gradient' && gradientLayout) {
+    const valueShadowFilterId = sanitizeSvgId(`${widget.id}-value-shadow`)
+    const trianglePath = gradientLayout.triangle
+      ? buildGradientTrianglePath(
+          currentGradientValue,
+          gradientLayout.triangle.width,
+          gradientLayout.triangle.height,
+        )
+      : ''
 
-            return (
-              <svg
-                width={triangleWidth}
-                height={triangleHeight}
-                viewBox={`0 0 ${triangleWidth} ${triangleHeight}`}
-                style={{
-                  opacity: getWidgetOpacity(widget.data, globalOpacity),
-                }}
-              >
-                <path
-                  d={buildGradientTrianglePath(
-                    currentGradientValue,
-                    triangleWidth,
-                    triangleHeight,
-                  )}
-                  fill={
-                    currentGradientValue >= 0
-                      ? widget.data.triangle_positive_color || '#40e0d0'
-                      : widget.data.triangle_negative_color || '#c65102'
-                  }
-                />
-              </svg>
-            )
-          })()}
-        </div>
-      ) : null}
+    return (
+      <svg
+        width={gradientLayout.width}
+        height={gradientLayout.height}
+        viewBox={`0 0 ${gradientLayout.width} ${gradientLayout.height}`}
+        className="block overflow-visible"
+      >
+        <PreviewSvgText
+          text={valueText}
+          x={gradientLayout.value.left}
+          baseline={gradientLayout.value.baseline}
+          color={color}
+          fontFamily={fontFamily}
+          fontSize={fontSize}
+          opacity={widgetOpacity}
+          shadow={shadow}
+          shadowFilterId={valueShadowFilterId}
+          borderColor={widget.data.border_color}
+          borderThickness={widget.data.border_thickness}
+        />
+        {gradientLayout.triangle ? (
+          gradientLayout.triangle.isZero ? (
+            <line
+              x1={gradientLayout.triangle.left}
+              y1={gradientLayout.triangle.baseline}
+              x2={gradientLayout.triangle.left + gradientLayout.triangle.width}
+              y2={gradientLayout.triangle.baseline}
+              stroke={widget.data.triangle_positive_color || '#40e0d0'}
+              strokeWidth={GRADIENT_ZERO_LINE_WIDTH_PX}
+              opacity={widgetOpacity}
+              strokeLinecap="round"
+            />
+          ) : trianglePath ? (
+            <path
+              d={trianglePath}
+              transform={`translate(${gradientLayout.triangle.left} ${gradientLayout.triangle.baseline})`}
+              fill={
+                currentGradientValue < 0
+                  ? widget.data.triangle_negative_color || '#c65102'
+                  : widget.data.triangle_positive_color || '#40e0d0'
+              }
+              opacity={widgetOpacity}
+            />
+          ) : null
+        ) : null}
+      </svg>
+    )
+  }
+
+  return (
+    <div
+      className="inline-flex items-center gap-2 whitespace-nowrap"
+      style={{
+        color,
+        fontFamily,
+        fontSize,
+        lineHeight: METRIC_WIDGET_LINE_HEIGHT,
+        opacity: widgetOpacity,
+        textShadow,
+        transform: `translateY(${widget.data.value_offset ?? 0}px)`,
+      }}
+    >
+      <div className="inline-flex items-end gap-2">
+        <span>{valueText}</span>
+        {showUnits && unitText ? (
+          <span
+            style={{
+              fontSize: Math.max(fontSize * 0.28, 12),
+              lineHeight: METRIC_WIDGET_LINE_HEIGHT,
+              opacity: 'inherit',
+            }}
+          >
+            {unitText}
+          </span>
+        ) : null}
+      </div>
     </div>
   )
 }
