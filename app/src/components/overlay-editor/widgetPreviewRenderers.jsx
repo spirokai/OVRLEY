@@ -185,6 +185,37 @@ function PreviewSvgText({
 }
 
 /**
+ * Renders a metric icon inside the preview svg.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.icon - Parsed icon data.
+ * @param {*} props.left - Horizontal coordinate.
+ * @param {*} props.top - Vertical coordinate.
+ * @param {*} props.size - Numeric icon size value.
+ * @param {*} props.color - Stroke color.
+ * @param {*} props.opacity - Opacity value.
+ * @returns {JSX.Element|null} Rendered component output.
+ */
+function PreviewMetricIcon({ icon, left, top, size, color, opacity }) {
+  if (!icon?.innerMarkup || size <= 0) {
+    return null
+  }
+
+  return (
+    <g
+      transform={`translate(${left} ${top}) scale(${size / 24})`}
+      fill="none"
+      stroke={color}
+      strokeWidth={icon.strokeWidth || 2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      opacity={opacity}
+      dangerouslySetInnerHTML={{ __html: icon.innerMarkup }}
+    />
+  )
+}
+
+/**
  * Renders the overlay metric widget component.
  *
  * @param {object} props - Component props.
@@ -352,26 +383,22 @@ export function OverlayMetricWidget({
           className="absolute"
           style={{ width: metricLayout.width, height: metricLayout.height }}
         >
-          {metricLayout.icon && iconSvg ? (
-            <div
-              className="metric-icon absolute"
-              style={{
-                left: iconLeft,
-                top: iconTop,
-                width: metricLayout.icon.size,
-                height: metricLayout.icon.size,
-                color: widget.data.icon_color || '#40e0d0',
-                opacity: widgetOpacity,
-              }}
-              dangerouslySetInnerHTML={{ __html: iconSvg }}
-            />
-          ) : null}
           <svg
             width={metricLayout.width}
             height={metricLayout.height}
             viewBox={`0 0 ${metricLayout.width} ${metricLayout.height}`}
             className="absolute left-0 top-0 block overflow-visible"
           >
+            {metricLayout.icon && iconSvg ? (
+              <PreviewMetricIcon
+                icon={iconSvg}
+                left={iconLeft}
+                top={iconTop}
+                size={metricLayout.icon.size}
+                color={widget.data.icon_color || '#40e0d0'}
+                opacity={widgetOpacity}
+              />
+            ) : null}
             <PreviewSvgText
               text={valueText}
               x={metricLayout.value.left}

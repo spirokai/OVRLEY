@@ -10,23 +10,26 @@ import temperatureIconSvg from '../widgets/icons/widget-temperature.svg?raw'
 import timeIconSvg from '../widgets/icons/widget-time.svg?raw'
 
 /**
- * Normalizes icon svg.
+ * Parses icon svg markup into reusable preview data.
  *
  * @param {*} svgMarkup - Value for svg markup.
- * @returns {*} Derived data structure for downstream use.
+ * @returns {object} Derived data structure for downstream use.
  */
-function normalizeIconSvg(svgMarkup) {
-  return svgMarkup.replace(
-    '<svg ',
-    '<svg width="100%" height="100%" focusable="false" aria-hidden="true" preserveAspectRatio="xMidYMid meet" ',
-  )
+function parseMetricIconSvg(svgMarkup) {
+  const strokeWidthMatch = svgMarkup.match(/stroke-width="([^"]+)"/)
+  const innerMarkupMatch = svgMarkup.match(/<svg[^>]*>([\s\S]*?)<\/svg>/i)
+
+  return {
+    strokeWidth: Number(strokeWidthMatch?.[1] || 2),
+    innerMarkup: (innerMarkupMatch?.[1] || '').trim(),
+  }
 }
 
 export const METRIC_ICON_SVGS = {
-  cadence: normalizeIconSvg(cadenceIconSvg),
-  heartrate: normalizeIconSvg(heartrateIconSvg),
-  power: normalizeIconSvg(powerIconSvg),
-  speed: normalizeIconSvg(speedIconSvg),
-  temperature: normalizeIconSvg(temperatureIconSvg),
-  time: normalizeIconSvg(timeIconSvg),
+  cadence: parseMetricIconSvg(cadenceIconSvg),
+  heartrate: parseMetricIconSvg(heartrateIconSvg),
+  power: parseMetricIconSvg(powerIconSvg),
+  speed: parseMetricIconSvg(speedIconSvg),
+  temperature: parseMetricIconSvg(temperatureIconSvg),
+  time: parseMetricIconSvg(timeIconSvg),
 }
