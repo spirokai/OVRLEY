@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template-snapshot'
+import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
 
 /**
@@ -223,6 +224,13 @@ export default function useRenderWorkflow({ backendStatus }) {
     setUpdateRate(renderSettingsDraft.updateRate)
     setExportCodec(renderSettingsDraft.exportCodec)
     setExportRange(nextExportRange)
+    setActiveRenderId(null)
+    setRenderProgress({
+      ...DEFAULT_RENDER_PROGRESS,
+      status: 'rendering',
+      message: 'Starting render...',
+    })
+    setRenderingVideo(true)
     setRenderDialogPhase('progress')
 
     try {
@@ -245,8 +253,11 @@ export default function useRenderWorkflow({ backendStatus }) {
     config,
     renderSettingsDraft,
     setConfig,
+    setActiveRenderId,
     setExportCodec,
     setExportRange,
+    setRenderProgress,
+    setRenderingVideo,
     setUpdateRate,
   ])
 

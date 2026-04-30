@@ -15,39 +15,38 @@ use std::process::Command;
 #[derive(Clone, Debug)]
 pub struct AppPaths {
     pub repo_root: PathBuf,
-    pub backend_dir: PathBuf,
     pub font_dirs: Vec<PathBuf>,
-    pub public_dir: PathBuf,
-    pub uploads_dir: PathBuf,
-    pub user_templates_dir: PathBuf,
+    pub debug_render_dir: PathBuf,
+    pub preview_dir: PathBuf,
+    pub temp_dir: PathBuf,
     pub bundled_templates_dirs: Vec<PathBuf>,
     pub downloads_dir: PathBuf,
 }
 
 impl AppPaths {
     pub fn from_repo_root(repo_root: PathBuf) -> Self {
-        let backend_dir = repo_root.join("backend");
-        let font_dirs = vec![repo_root.join("fonts"), backend_dir.join("fonts")]
+        let downloads_dir = downloads_cyclemetry_dir();
+        let runtime_dir = downloads_dir.join(".runtime");
+        let font_dirs = vec![repo_root.join("fonts")]
             .into_iter()
             .filter(|path| path.is_dir())
             .collect();
-        let public_dir = backend_dir.join("public");
-        let uploads_dir = backend_dir.join("uploads");
-        let user_templates_dir = backend_dir.join("templates");
-        let bundled_templates_dirs =
-            vec![repo_root.join("templates"), backend_dir.join("templates")]
-                .into_iter()
-                .filter(|path| path.is_dir())
-                .collect();
-        let downloads_dir = downloads_cyclemetry_dir();
+        // Keep debug artifacts under src-tauri, but place them inside target so
+        // `tauri dev` source watchers do not restart the app on every render write.
+        let debug_render_dir = repo_root.join("src-tauri").join("target").join("debug_render");
+        let preview_dir = runtime_dir.join("previews");
+        let temp_dir = runtime_dir.join("tmp");
+        let bundled_templates_dirs = vec![repo_root.join("templates")]
+            .into_iter()
+            .filter(|path| path.is_dir())
+            .collect();
 
         Self {
             repo_root,
-            backend_dir,
             font_dirs,
-            public_dir,
-            uploads_dir,
-            user_templates_dir,
+            debug_render_dir,
+            preview_dir,
+            temp_dir,
             bundled_templates_dirs,
             downloads_dir,
         }
@@ -55,10 +54,9 @@ impl AppPaths {
 
     pub fn ensure_dirs(&self) -> Result<(), String> {
         for dir in [
-            &self.backend_dir,
-            &self.public_dir,
-            &self.uploads_dir,
-            &self.user_templates_dir,
+            &self.debug_render_dir,
+            &self.preview_dir,
+            &self.temp_dir,
             &self.downloads_dir,
         ] {
             fs::create_dir_all(dir)
@@ -124,7 +122,7 @@ pub fn backend_demo(
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
     let filename = "demo_preview.png";
-    let output_path = paths.public_dir.join(filename);
+    let output_path = paths.preview_dir.join(filename);
     render_preview_to_path(
         paths,
         &config,
@@ -190,42 +188,6 @@ pub fn backend_cancel(controller: &RenderController) -> Value {
     })
 }
 
-pub fn backend_load_gpx(paths: &AppPaths, source_path: &str) -> Result<Value, String> {
-    let source = PathBuf::from(source_path);
-    if !source.is_file() {
-        return Err(format!("File not found: {}", source.display()));
-    }
-
-    let filename = source
-        .file_name()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| "Invalid source filename".to_string())?;
-
-    let destination = paths.uploads_dir.join(filename);
-    fs::copy(&source, &destination)
-        .map_err(|error| format!("Failed to copy {}: {error}", source.display()))?;
-
-    Ok(json!({
-        "data": "file loaded",
-        "filename": filename
-    }))
-}
-
-pub fn backend_upload(paths: &AppPaths, file_data: &[u8], filename: &str) -> Result<Value, String> {
-    if filename.trim().is_empty() {
-        return Err("filename is required".to_string());
-    }
-
-    let destination = paths.uploads_dir.join(filename);
-    fs::write(&destination, file_data)
-        .map_err(|error| format!("Failed to write {}: {error}", destination.display()))?;
-
-    Ok(json!({
-        "data": "file uploaded",
-        "filename": filename
-    }))
-}
-
 pub fn backend_list_templates(paths: &AppPaths) -> Result<Value, String> {
     let mut templates = Vec::new();
     let mut seen = BTreeSet::new();
@@ -251,36 +213,11 @@ pub fn backend_list_templates(paths: &AppPaths) -> Result<Value, String> {
         }
     }
 
-    if let Ok(entries) = fs::read_dir(&paths.user_templates_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if !matches!(
-                path.extension().and_then(|value| value.to_str()),
-                Some("json")
-            ) {
-                continue;
-            }
-            let Some(filename) = path.file_name().and_then(|value| value.to_str()) else {
-                continue;
-            };
-            if seen.contains(filename) {
-                continue;
-            }
-            templates.push(template_descriptor(filename, "user"));
-        }
-    }
-
     Ok(Value::Array(templates))
 }
 
 pub fn backend_get_template(paths: &AppPaths, filename: &str) -> Result<String, String> {
     let normalized = ensure_json_filename(filename);
-    let user_path = paths.user_templates_dir.join(&normalized);
-    if user_path.is_file() {
-        return fs::read_to_string(&user_path)
-            .map_err(|error| format!("Failed to read {}: {error}", user_path.display()));
-    }
-
     let bundled_path = paths
         .bundled_template_path(&normalized)
         .ok_or_else(|| format!("Template not found: {normalized}"))?;
@@ -289,41 +226,14 @@ pub fn backend_get_template(paths: &AppPaths, filename: &str) -> Result<String, 
         .map_err(|error| format!("Failed to read {}: {error}", bundled_path.display()))
 }
 
-pub fn backend_save_template(
-    paths: &AppPaths,
-    filename: &str,
-    config_json: &str,
-) -> Result<Value, String> {
-    let normalized = ensure_json_filename(filename);
-    let config = parse_config_json(config_json)?;
-    let destination = paths.user_templates_dir.join(&normalized);
-    let pretty = serde_json::to_string_pretty(&config)
-        .map_err(|error| format!("Failed to serialize template: {error}"))?;
-    fs::write(&destination, pretty)
-        .map_err(|error| format!("Failed to write {}: {error}", destination.display()))?;
-
-    Ok(json!({
-        "message": format!("Template saved to {normalized}"),
-        "filename": normalized
-    }))
-}
-
-pub fn backend_open_templates(paths: &AppPaths) -> Result<Value, String> {
-    open_path_in_system(&paths.user_templates_dir)?;
-    Ok(json!({ "message": "Templates folder opened" }))
-}
-
 pub fn backend_open_downloads(paths: &AppPaths) -> Result<Value, String> {
     open_path_in_system(&paths.downloads_dir)?;
     Ok(json!({ "message": "Folder opened" }))
 }
 
 pub fn backend_open_video(paths: &AppPaths, filename: &str) -> Result<Value, String> {
-    let public_path = paths.public_dir.join(filename);
     let downloads_path = paths.downloads_dir.join(filename);
-    let target = if public_path.is_file() {
-        public_path
-    } else if downloads_path.is_file() {
+    let target = if downloads_path.is_file() {
         downloads_path
     } else {
         return Err(format!("Video file not found: {filename}"));
@@ -334,7 +244,15 @@ pub fn backend_open_video(paths: &AppPaths, filename: &str) -> Result<Value, Str
 }
 
 pub fn backend_image_data(paths: &AppPaths, filename: &str) -> Result<String, String> {
-    let path = paths.public_dir.join(filename);
+    let preview_path = paths.preview_dir.join(filename);
+    let downloads_path = paths.downloads_dir.join(filename);
+    let path = if preview_path.is_file() {
+        preview_path
+    } else if downloads_path.is_file() {
+        downloads_path
+    } else {
+        return Err(format!("Image file not found: {filename}"));
+    };
     let bytes =
         fs::read(&path).map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
     let content_type = match path.extension().and_then(|value| value.to_str()) {

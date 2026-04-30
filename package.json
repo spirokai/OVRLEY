@@ -10,11 +10,9 @@
     "dev:frontend": "cd app && pnpm dev",
     "build:frontend": "cd app && pnpm build",
     "lint:frontend": "cd app && pnpm lint",
-    "lint:backend": "cd backend && uv run ruff check .",
-    "lint": "pnpm lint:frontend && pnpm lint:backend",
+    "lint": "pnpm lint:frontend",
     "format:frontend": "cd app && pnpm format",
-    "format:backend": "cd backend && uv run ruff format .",
-    "format": "pnpm format:frontend && pnpm format:backend"
+    "format": "pnpm format:frontend"
   },
   "keywords": [],
   "author": "",

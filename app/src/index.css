@@ -3,7 +3,7 @@
 
 @font-face {
   font-family: 'Evogria';
-  src: url('../../backend/fonts/Evogria.otf') format('opentype');
+  src: url('../../fonts/Evogria.otf') format('opentype');
   font-style: normal;
   font-weight: 400;
   font-display: swap;
@@ -11,7 +11,7 @@
 
 @font-face {
   font-family: 'Furore';
-  src: url('../../backend/fonts/Furore.otf') format('opentype');
+  src: url('../../fonts/Furore.otf') format('opentype');
   font-style: normal;
   font-weight: 400;
   font-display: swap;

@@ -83,17 +83,19 @@ export function hasTauriRuntime() {
 export default function useBackendStatus() {
   const isTauriRuntime = hasTauriRuntime()
   const [backendStatus, setBackendStatus] = useState(
-    isTauriRuntime ? 'connecting' : 'connected',
+    isTauriRuntime ? 'connecting' : 'error',
   )
-  const [backendReady, setBackendReady] = useState(!isTauriRuntime)
-  const statusRef = useRef(isTauriRuntime ? 'connecting' : 'connected')
+  const [backendReady, setBackendReady] = useState(false)
+  const statusRef = useRef(isTauriRuntime ? 'connecting' : 'error')
   const strikesRef = useRef(0)
 
   useEffect(() => {
     updateBackendStatus(statusRef.current)
 
     if (!isTauriRuntime) {
-      setBackendReady(true)
+      setBackendStatus('error')
+      setBackendReady(false)
+      updateBackendStatus('error', 'Cyclemetry desktop runtime is required')
       return undefined
     }
 

@@ -189,15 +189,22 @@ export default function RenderVideoDialog({
 
   const isProgress = phase === 'progress'
   const isVideoToolboxAvailable = platformOs === 'macos'
+  const handleBackdropPointerDown = (event) => {
+    if (isProgress || event.target !== event.currentTarget) {
+      return
+    }
+
+    onClose()
+  }
 
   return (
     <div
       className="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md"
-      onClick={isProgress ? undefined : onClose}
+      onMouseDown={handleBackdropPointerDown}
     >
       <div
         className="w-full max-w-md rounded-xl border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
-        onClick={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
       >
         {isProgress ? (
           <RenderProgressPanel />

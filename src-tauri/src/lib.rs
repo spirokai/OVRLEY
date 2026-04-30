@@ -79,26 +79,8 @@ async fn backend_open_video(filename: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn backend_load_gpx(path: String) -> Result<String, String> {
-    let response = commands::backend_load_gpx(&app_paths()?, &path)?;
-    serde_json::to_string(&response).map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-async fn backend_upload(file_data: Vec<u8>, filename: String) -> Result<String, String> {
-    let response = commands::backend_upload(&app_paths()?, &file_data, &filename)?;
-    serde_json::to_string(&response).map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 async fn backend_list_templates() -> Result<String, String> {
     let response = commands::backend_list_templates(&app_paths()?)?;
-    serde_json::to_string(&response).map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-async fn backend_save_template(config: String, filename: String) -> Result<String, String> {
-    let response = commands::backend_save_template(&app_paths()?, &filename, &config)?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
@@ -108,25 +90,9 @@ async fn backend_get_template(filename: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn backend_open_templates() -> Result<String, String> {
-    let response = commands::backend_open_templates(&app_paths()?)?;
-    serde_json::to_string(&response).map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 async fn backend_cancel(state: tauri::State<'_, BackendState>) -> Result<String, String> {
     let response = commands::backend_cancel(&state.render_controller);
     serde_json::to_string(&response).map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-fn get_image_url(filename: String) -> String {
-    filename
-}
-
-#[tauri::command]
-async fn backend_socket_ready() -> bool {
-    true
 }
 
 #[tauri::command]
@@ -182,16 +148,10 @@ pub fn run() {
             backend_render,
             backend_progress,
             backend_cancel,
-            backend_load_gpx,
             backend_list_templates,
             backend_get_template,
-            backend_save_template,
-            backend_open_templates,
             backend_open_downloads,
             backend_open_video,
-            backend_upload,
-            backend_socket_ready,
-            get_image_url,
             backend_image_data,
             default_template_save_path,
             write_template_file,

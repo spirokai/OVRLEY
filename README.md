@@ -35,7 +35,6 @@ Currently supported:
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) & [pnpm](https://pnpm.io/)
-- [Python 3.10+](https://www.python.org/) & [uv](https://docs.astral.sh/uv/)
 - [Rust](https://www.rust-lang.org/)
 
 ### Setup

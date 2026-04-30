@@ -7,9 +7,6 @@ build/
 dist/
 target/
 src-tauri/binaries/
-backend/dist/
-backend/build/
-backend/.venv/
 ffmpeg/
 .ffmpeg/
 
@@ -21,4 +18,3 @@ next/
 app/public/preview*.png
 tauri_build.log
 /tmp/cyclemetry.sock
-

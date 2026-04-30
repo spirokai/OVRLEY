@@ -202,15 +202,17 @@ pub fn run_parallel_renders(
     // Stitch the videos
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let output_filename = format!("parallel_stitch_{}.mov", timestamp_nanos()?);
-    let output_path = paths.public_dir.join(&output_filename);
+    let output_path = paths.downloads_dir.join(&output_filename);
 
-    let list_path = paths.repo_root.join("backend/temp_concat_list.txt");
+    let list_path = paths
+        .temp_dir
+        .join(format!("concat_list_{}.txt", timestamp_nanos()?));
     let mut list_content = String::new();
     for filename in filenames {
         list_content.push_str(&format!(
             "file '{}'\n",
             paths
-                .public_dir
+                .downloads_dir
                 .join(filename)
                 .display()
                 .to_string()
@@ -239,11 +241,6 @@ pub fn run_parallel_renders(
         return Err(format!("FFmpeg concat failed with status {status}"));
     }
 
-    // Copy to downloads too
-    if let Err(error) = copy_output_to_downloads(paths, &output_path, &output_filename) {
-        eprintln!("Failed to copy stitched video to downloads: {error}");
-    }
-
     Ok(start_time.elapsed())
 }
 
@@ -269,7 +266,7 @@ pub fn render_video(
     )?;
 
     let public_filename = format!("video_{}.{}", timestamp_nanos()?, ffmpeg_settings.extension);
-    let output_path = paths.public_dir.join(&public_filename);
+    let output_path = paths.downloads_dir.join(&public_filename);
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let input_pix_fmt = ffmpeg_input_pix_fmt(&ffmpeg_settings.codec);
     let encoded_frames = Arc::new(AtomicU32::new(0));
@@ -411,9 +408,6 @@ pub fn render_video(
         sample_frame_indices,
         merged_timings,
     )?;
-    if let Err(error) = copy_output_to_downloads(paths, &output_path, &public_filename) {
-        eprintln!("{error}");
-    }
     Ok(public_filename)
 }
 
@@ -671,24 +665,8 @@ fn write_json<T: Serialize>(path: PathBuf, payload: &T) -> Result<(), String> {
     fs::write(&path, json).map_err(|error| format!("Failed to write {}: {error}", path.display()))
 }
 
-fn copy_output_to_downloads(
-    paths: &AppPaths,
-    output_path: &Path,
-    filename: &str,
-) -> Result<(), String> {
-    let destination = paths.downloads_dir.join(filename);
-    fs::copy(output_path, &destination)
-        .map_err(|error| format!("Failed to copy {}: {error}", destination.display()))?;
-    Ok(())
-}
-
 fn create_debug_dir(paths: &AppPaths, phase: &str) -> Result<PathBuf, String> {
-    let dir = paths
-        .repo_root
-        .join("backend")
-        .join("debug_render")
-        .join(phase)
-        .join(timestamp_slug()?);
+    let dir = paths.debug_render_dir.join(phase).join(timestamp_slug()?);
     fs::create_dir_all(&dir)
         .map_err(|error| format!("Failed to create {}: {error}", dir.display()))?;
     Ok(dir)
