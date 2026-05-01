@@ -118,6 +118,8 @@ function OverlayEditor({
               activity={activity}
               previewSecond={previewSecond}
               backgroundMode={backgroundMode}
+              sceneFont={config.scene?.font}
+              sceneFontSize={config.scene?.font_size}
               sceneSize={sceneSize}
               displayScale={displayScale}
               setSceneElement={setSceneElement}

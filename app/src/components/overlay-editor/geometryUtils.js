@@ -297,7 +297,7 @@ export function normalizeRouteGeometry(
   const downsampled = downsampleRouteSamples(fittedSamples, targetCount)
   const simplified = simplifyRouteSamples(
     downsampled,
-    Math.max(clamp(Number(simplifyTolerancePx) || 1, 0, 8), 0.05),
+    Math.max(Number(simplifyTolerancePx) || 1, 0.05),
   )
 
   return {
@@ -370,7 +370,7 @@ export function normalizeElevationGeometry(
   values,
   width,
   height,
-  padding = 18,
+  margin = 0,
   verticalScale = 1,
   progressValues = [],
   targetDensity = 0.75,
@@ -385,18 +385,21 @@ export function normalizeElevationGeometry(
     result.push({
       progress: Number.isFinite(progressValue)
         ? clamp(progressValue, 0, 1)
-        : null,
+        : values.length > 1
+          ? index / (values.length - 1)
+          : 0,
       value: Number(value),
     })
     return result
   }, [])
 
   if (!samples.length) {
+    const fallbackPadding = 18
     const fallbackPoints = [
-      [padding, height - padding],
+      [fallbackPadding, height - fallbackPadding],
       [width * 0.32, height * 0.55],
       [width * 0.62, height * 0.36],
-      [width - padding, height * 0.48],
+      [width - fallbackPadding, height * 0.48],
     ]
     return {
       points: fallbackPoints,
@@ -406,14 +409,9 @@ export function normalizeElevationGeometry(
     }
   }
 
-  const usableValues = samples.map((sample) => sample.value)
-  const minimum = Math.min(...usableValues)
-  const maximum = Math.max(...usableValues)
-  const amplitude = Math.max(maximum - minimum, 1)
-  const usableWidth = Math.max(width - padding * 2, 1)
-  const hasUsableProgress = samples.some((sample) =>
-    Number.isFinite(sample.progress),
-  )
+  const safeMargin = Number.isFinite(Number(margin)) ? Number(margin) : 0
+  const innerWidth = Math.max(width * (1 - 2 * safeMargin), 1)
+  const innerHeight = Math.max(height * (1 - 2 * safeMargin), 1)
   const safeVerticalScale = clamp(Number(verticalScale) || 1, 0.2, 4)
   const safeTargetDensity = clamp(Number(targetDensity) || 0.75, 0.1, 2)
   const safeSimplifyTolerance = clamp(Number(simplifyTolerancePx) || 0, 0, 8)
@@ -574,25 +572,23 @@ export function normalizeElevationGeometry(
     Math.min(samples.length, Math.round(width * safeTargetDensity)),
   )
   const downsampledSamples = downsampleElevationSamples(samples, targetCount)
-  const downsampledFallbackStep =
-    downsampledSamples.length > 1
-      ? usableWidth / (downsampledSamples.length - 1)
+  const usableValues = downsampledSamples.map((sample) => sample.value)
+  const minimum = Math.min(...usableValues)
+  const maximum = Math.max(...usableValues)
+  const amplitude = Math.max(maximum - minimum, 1e-9)
+
+  const projectedPoints = downsampledSamples.map((sample) => {
+    const progress = Number.isFinite(sample.progress)
+      ? clamp(sample.progress, 0, 1)
       : 0
-  const projectedPoints = downsampledSamples.map((sample, index) => {
-    const x = hasUsableProgress
-      ? padding + (sample.progress ?? 0) * usableWidth
-      : padding + index * downsampledFallbackStep
+    const x = width * safeMargin + innerWidth * progress
     const normalized =
       amplitude <= 0 ? 0.5 : (sample.value - minimum) / amplitude
     const centered = clamp((normalized - 0.5) * safeVerticalScale + 0.5, 0, 1)
-    const y = height - padding - centered * (height - padding * 2)
+    const y = height - (height * safeMargin + innerHeight * centered)
     return {
       point: [x, y],
-      progress: Number.isFinite(sample.progress)
-        ? clamp(sample.progress, 0, 1)
-        : downsampledSamples.length > 1
-          ? index / (downsampledSamples.length - 1)
-          : 0,
+      progress,
       preserve: sample.preserve === true,
     }
   })
@@ -665,6 +661,28 @@ export function getPointAtMetricProgress(
   progressValues,
   targetProgress,
 ) {
+  const result = getPointAtMetricProgressWithIndex(
+    points,
+    progressValues,
+    targetProgress,
+  )
+
+  return result ? result.point : null
+}
+
+/**
+ * Returns point and right-side segment index at metric progress.
+ *
+ * @param {*} points - Cartesian points used to build geometry.
+ * @param {*} progressValues - Value for progress values.
+ * @param {*} targetProgress - Value for target progress.
+ * @returns {*} Requested value or structure.
+ */
+export function getPointAtMetricProgressWithIndex(
+  points,
+  progressValues,
+  targetProgress,
+) {
   if (
     !Array.isArray(points) ||
     !Array.isArray(progressValues) ||
@@ -690,7 +708,8 @@ export function getPointAtMetricProgress(
   }
 
   if (firstValidIndex === -1) {
-    return getPointAtProgress(points, safeTargetProgress)
+    const point = getPointAtProgress(points, safeTargetProgress)
+    return point ? { index: 0, point } : null
   }
 
   for (let index = points.length - 1; index >= 0; index -= 1) {
@@ -706,11 +725,14 @@ export function getPointAtMetricProgress(
   }
 
   if (safeTargetProgress <= progressValues[firstValidIndex]) {
-    return points[firstValidIndex]
+    return {
+      index: Math.min(firstValidIndex + 1, points.length - 1),
+      point: points[firstValidIndex],
+    }
   }
 
   if (safeTargetProgress >= progressValues[lastValidIndex]) {
-    return points[lastValidIndex]
+    return { index: lastValidIndex, point: points[lastValidIndex] }
   }
 
   let leftIndex = firstValidIndex
@@ -745,16 +767,19 @@ export function getPointAtMetricProgress(
   }
 
   if (rightIndex === leftIndex || rightProgress === leftProgress) {
-    return leftPoint
+    return { index: rightIndex, point: leftPoint }
   }
 
   const ratio =
     (safeTargetProgress - leftProgress) / (rightProgress - leftProgress)
 
-  return [
-    leftPoint[0] + (rightPoint[0] - leftPoint[0]) * ratio,
-    leftPoint[1] + (rightPoint[1] - leftPoint[1]) * ratio,
-  ]
+  return {
+    index: rightIndex,
+    point: [
+      leftPoint[0] + (rightPoint[0] - leftPoint[0]) * ratio,
+      leftPoint[1] + (rightPoint[1] - leftPoint[1]) * ratio,
+    ],
+  }
 }
 
 /**
@@ -768,10 +793,11 @@ export function getPointAtMetricProgress(
  */
 export function areaToSvg(points, _width, height, padding = 18) {
   if (!points.length) return ''
+  const baseline = Number.isFinite(padding) ? height - padding : height
   return [
-    `${points[0][0]},${height - padding}`,
+    `${points[0][0]},${baseline}`,
     ...points.map(([x, y]) => `${x},${y}`),
-    `${points[points.length - 1][0]},${height - padding}`,
+    `${points[points.length - 1][0]},${baseline}`,
   ].join(' ')
 }
 

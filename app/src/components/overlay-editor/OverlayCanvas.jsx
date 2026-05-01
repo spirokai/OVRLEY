@@ -30,6 +30,8 @@ const OverlayCanvasWidget = memo(
     widget,
     globalScale,
     previewSecond,
+    sceneFont,
+    sceneFontSize,
     registerNode,
     handleWidgetMouseDown,
   }) {
@@ -63,8 +65,7 @@ const OverlayCanvasWidget = memo(
           width,
           height,
           transform: buildWidgetTransform({ scale, rotation }),
-          transformOrigin:
-            widget.type === 'course' ? 'center center' : 'top left',
+          transformOrigin: 'top left',
         }}
         onMouseDown={(event) => {
           handleWidgetMouseDown(event, widget.id)
@@ -89,6 +90,8 @@ const OverlayCanvasWidget = memo(
           previewSecond={previewSecond}
           globalOpacity={globalOpacity}
           globalScale={globalScale}
+          sceneFont={sceneFont}
+          sceneFontSize={sceneFontSize}
         />
       </div>
     )
@@ -100,6 +103,8 @@ const OverlayCanvasWidget = memo(
     previousProps.displayScale === nextProps.displayScale &&
     previousProps.activity === nextProps.activity &&
     previousProps.previewSecond === nextProps.previewSecond &&
+    previousProps.sceneFont === nextProps.sceneFont &&
+    previousProps.sceneFontSize === nextProps.sceneFontSize &&
     previousProps.registerNode === nextProps.registerNode &&
     previousProps.handleWidgetMouseDown === nextProps.handleWidgetMouseDown,
 )
@@ -129,6 +134,8 @@ export default function OverlayCanvas({
   activity,
   previewSecond,
   backgroundMode,
+  sceneFont,
+  sceneFontSize,
   sceneSize,
   displayScale,
   setSceneElement,
@@ -165,6 +172,8 @@ export default function OverlayCanvas({
               displayScale={displayScale}
               activity={activity}
               previewSecond={previewSecond}
+              sceneFont={sceneFont}
+              sceneFontSize={sceneFontSize}
               registerNode={widgetRefCallbacks[widget.id]}
               handleWidgetMouseDown={handleWidgetMouseDown}
             />

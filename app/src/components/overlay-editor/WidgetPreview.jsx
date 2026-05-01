@@ -26,6 +26,8 @@ function WidgetPreview({
   previewSecond,
   globalOpacity,
   globalScale,
+  sceneFont,
+  sceneFontSize,
 }) {
   if (widget.type === 'label') {
     return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} />
@@ -38,6 +40,9 @@ function WidgetPreview({
         activity={activity}
         previewSecond={previewSecond}
         globalOpacity={globalOpacity}
+        globalScale={globalScale}
+        sceneFont={sceneFont}
+        sceneFontSize={sceneFontSize}
       />
     )
   }
@@ -49,6 +54,9 @@ function WidgetPreview({
         activity={activity}
         previewSecond={previewSecond}
         globalOpacity={globalOpacity}
+        globalScale={globalScale}
+        sceneFont={sceneFont}
+        sceneFontSize={sceneFontSize}
       />
     )
   }
@@ -71,5 +79,7 @@ export default memo(
     previousProps.activity === nextProps.activity &&
     previousProps.previewSecond === nextProps.previewSecond &&
     previousProps.globalOpacity === nextProps.globalOpacity &&
-    previousProps.globalScale === nextProps.globalScale,
+    previousProps.globalScale === nextProps.globalScale &&
+    previousProps.sceneFont === nextProps.sceneFont &&
+    previousProps.sceneFontSize === nextProps.sceneFontSize,
 )
