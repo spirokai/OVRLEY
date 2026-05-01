@@ -46,10 +46,15 @@ const OverlayCanvasWidget = memo(
         ? Math.min(0, -(widget.data.value_offset ?? 0))
         : 0
     const y = (widget.data.y ?? 0) + valueOffset + gradientYOffset
-    const scale = globalScale
+    const isPlotWidget = widget.category === 'plots'
+    const scale = isPlotWidget ? 1 : globalScale
     const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
-    const width = widget.data.width
-    const height = widget.data.height
+    const width = isPlotWidget
+      ? (widget.data.width ?? 0) * (globalScale || 1)
+      : widget.data.width
+    const height = isPlotWidget
+      ? (widget.data.height ?? 0) * (globalScale || 1)
+      : widget.data.height
     const Icon = WIDGET_ICONS[widget.type] || Type
     // Counter-scale the badge so it always appears at a fixed screen size,
     // regardless of the globalScale and displayScale transforms on ancestors.

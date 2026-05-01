@@ -154,17 +154,19 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
   const nextRotation =
     draft.rotation ??
     (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
-  const nextScale = (draft.scale ?? 1) * globalScale
+  const isPlotWidget = widget.category === 'plots'
+  const renderScale = isPlotWidget ? globalScale || 1 : 1
+  const nextScale = (draft.scale ?? 1) * (isPlotWidget ? 1 : globalScale)
 
   target.style.left = `${nextX}px`
   target.style.top = `${nextY}px`
 
   if (typeof nextWidth === 'number') {
-    target.style.width = `${nextWidth}px`
+    target.style.width = `${nextWidth * renderScale}px`
   }
 
   if (typeof nextHeight === 'number') {
-    target.style.height = `${nextHeight}px`
+    target.style.height = `${nextHeight * renderScale}px`
   }
 
   target.style.transform =

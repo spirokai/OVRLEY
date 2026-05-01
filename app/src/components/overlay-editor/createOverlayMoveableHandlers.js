@@ -203,8 +203,12 @@ export default function useOverlayMoveableHandlers({
 
       const nextX = origin.x + drag.beforeTranslate[0]
       const nextY = origin.y + drag.beforeTranslate[1]
-      const nextWidth = Math.max(width, 8)
-      const nextHeight = Math.max(height, 8)
+      const dimensionScale =
+        selectedWidget?.category === 'plots'
+          ? Math.max(Number(globalScale) || 1, 0.1)
+          : 1
+      const nextWidth = Math.max(width / dimensionScale, 8)
+      const nextHeight = Math.max(height / dimensionScale, 8)
       const widthScale = origin.width ? nextWidth / origin.width : 1
       const heightScale = origin.height ? nextHeight / origin.height : 1
       const markerScale = (widthScale + heightScale) / 2
