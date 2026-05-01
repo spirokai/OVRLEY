@@ -877,7 +877,7 @@ export function OverlayRouteWidget({
   const markerSize = Number.isFinite(Number(widget.data.marker_size))
     ? Number(widget.data.marker_size)
     : 18
-  const svgMarkerSize = markerSize / safeGlobalScale
+  const svgMarkerSize = markerSize
   const markerColor = widget.data.marker_color || baseColor
   const markerOpacity = normalizePreviewOpacity(
     widget.data.marker_opacity ?? widget.data.opacity,
@@ -1047,7 +1047,7 @@ export function OverlayElevationWidget({
   const markerSize = Number.isFinite(Number(widget.data.marker_size))
     ? Number(widget.data.marker_size)
     : 16
-  const svgMarkerSize = markerSize / safeGlobalScale
+  const svgMarkerSize = markerSize
   const markerColor = widget.data.marker_color || baseColor
   const markerOpacity = normalizePreviewOpacity(
     widget.data.marker_opacity ?? widget.data.opacity,

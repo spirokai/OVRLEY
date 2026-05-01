@@ -64,7 +64,7 @@ const OverlayCanvasWidget = memo(
       <div
         ref={registerNode}
         data-widget-id={widget.id}
-        className="group absolute cursor-move select-none rounded-xl outline outline-1 outline-transparent transition-shadow hover:z-50"
+        className="group absolute cursor-move select-none rounded-xl outline-1 outline-transparent transition-shadow hover:z-50"
         style={{
           left: x,
           top: y,
