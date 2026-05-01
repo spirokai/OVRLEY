@@ -205,7 +205,7 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
             let pix_fmt = object
                 .and_then(|map| map.get("pix_fmt"))
                 .and_then(Value::as_str)
-                .unwrap_or("yuv422p10le")
+                .unwrap_or("yuva444p10le")
                 .to_string();
             let mut output_args = vec!["-c:v".to_string(), "prores_videotoolbox".to_string()];
             append_ffmpeg_option(
@@ -213,6 +213,10 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
                 "-profile:v",
                 object.and_then(|map| map.get("prores_profile")),
             );
+            if !output_args.iter().any(|value| value == "-profile:v") {
+                output_args.push("-profile:v".to_string());
+                output_args.push("4".to_string()); // Default to 4444 for parity with other ProRes paths
+            }
             append_extra_output_args(&mut output_args, ffmpeg_config);
 
             Ok(FfmpegSettings {
