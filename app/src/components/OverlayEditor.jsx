@@ -120,6 +120,13 @@ function OverlayEditor({
               backgroundMode={backgroundMode}
               sceneFont={config.scene?.font}
               sceneFontSize={config.scene?.font_size}
+              valueFont={
+                config.values?.find((value) => value.font || value.font_family)
+                  ?.font ||
+                config.values?.find((value) => value.font || value.font_family)
+                  ?.font_family ||
+                globalDefaults?.font_values
+              }
               sceneSize={sceneSize}
               displayScale={displayScale}
               setSceneElement={setSceneElement}

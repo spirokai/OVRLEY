@@ -148,7 +148,7 @@ export default function useOverlayEditorState({
   const sceneSize = useMemo(() => getSceneSize(config), [config])
   const activity = sourceActivity
   const globalOpacity = globalDefaults?.opacity ?? 1
-  const globalScale = globalDefaults?.scale ?? 1
+  const globalScale = config?.scene?.scale ?? globalDefaults?.scale ?? 1
   const previewSecond = useMemo(() => {
     return resolvePreviewSecond({
       dummyDurationSeconds,

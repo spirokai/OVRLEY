@@ -183,6 +183,14 @@ export function getEffectivePlotData(
   if (nextData.shadow_strength === undefined) {
     nextData.shadow_strength = globals?.shadow_strength
   }
+  if (nextData.value === 'elevation' && globals?.font_values) {
+    nextData.point_label = {
+      ...(nextData.point_label || {}),
+      ...(!nextData.point_label?.font
+        ? createFontSelection(globals.font_values)
+        : {}),
+    }
+  }
 
   return applyPreviewOverrides(nextData, previewOverrides)
 }
@@ -332,6 +340,12 @@ export function syncGlobalDefaultsToConfig(
 
   if (nextConfig.plots) {
     nextConfig.plots.forEach((plot) => {
+      if (plot.value === 'elevation' && shouldApply('font_values')) {
+        plot.point_label = {
+          ...(plot.point_label || {}),
+          ...createFontSelection(globals.font_values),
+        }
+      }
       if (shouldApply('color_values') && Object.hasOwn(plot, 'color')) {
         plot.color = globals.color_values
       }

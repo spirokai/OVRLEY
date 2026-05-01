@@ -28,6 +28,7 @@ function WidgetPreview({
   globalScale,
   sceneFont,
   sceneFontSize,
+  valueFont,
 }) {
   if (widget.type === 'label') {
     return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} />
@@ -43,6 +44,7 @@ function WidgetPreview({
         globalScale={globalScale}
         sceneFont={sceneFont}
         sceneFontSize={sceneFontSize}
+        valueFont={valueFont}
       />
     )
   }
@@ -57,6 +59,7 @@ function WidgetPreview({
         globalScale={globalScale}
         sceneFont={sceneFont}
         sceneFontSize={sceneFontSize}
+        valueFont={valueFont}
       />
     )
   }
@@ -81,5 +84,6 @@ export default memo(
     previousProps.globalOpacity === nextProps.globalOpacity &&
     previousProps.globalScale === nextProps.globalScale &&
     previousProps.sceneFont === nextProps.sceneFont &&
-    previousProps.sceneFontSize === nextProps.sceneFontSize,
+    previousProps.sceneFontSize === nextProps.sceneFontSize &&
+    previousProps.valueFont === nextProps.valueFont,
 )

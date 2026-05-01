@@ -357,7 +357,10 @@ fn normalize_elevation_plot(
             * scale,
         imperial_label_offset_x: plot.imperial_label_offset_x.unwrap_or(0.0) * scale,
         imperial_label_offset_y: plot.imperial_label_offset_y.unwrap_or(6.0) * scale,
-        label_font: point_label.font.or_else(|| config.scene.font.clone()),
+        label_font: point_label
+            .font
+            .or_else(|| first_value_font(config))
+            .or_else(|| config.scene.font.clone()),
         label_font_size: point_label
             .font_size
             .or(config.scene.font_size)
@@ -369,6 +372,13 @@ fn normalize_elevation_plot(
             .or(config.scene.decimal_rounding),
         legacy_label_units: point_label.units,
     }
+}
+
+fn first_value_font(config: &RenderConfig) -> Option<String> {
+    config
+        .values
+        .iter()
+        .find_map(|value| value.font.clone().or_else(|| value.font_family.clone()))
 }
 
 fn build_elevation_geometry(

@@ -625,8 +625,8 @@ pub(crate) fn format_elevation_label(
     decimal_rounding: Option<i32>,
 ) -> String {
     let (converted, suffix) = match unit {
-        "imperial" => (value_m * 3.28084, " ft"),
-        _ => (value_m, " m"),
+        "imperial" => (value_m * 3.28084, " FT"),
+        _ => (value_m, " M"),
     };
     let value_text = match decimal_rounding {
         Some(0) => format!("{}", converted.round() as i64),

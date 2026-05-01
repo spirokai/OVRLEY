@@ -1006,6 +1006,7 @@ export function OverlayElevationWidget({
   globalScale,
   sceneFont,
   sceneFontSize,
+  valueFont,
 }) {
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
@@ -1057,6 +1058,7 @@ export function OverlayElevationWidget({
   const labelFontFamily = getPreviewFontFamily(
     widget.data.point_label?.font ||
       widget.data.point_label?.font_family ||
+      valueFont ||
       sceneFont ||
       widget.data.font ||
       widget.data.font_family,
@@ -1096,29 +1098,36 @@ export function OverlayElevationWidget({
   )
   const profileElevations = scopedElevationSeries.values
   const profileDistanceProgress = scopedElevationSeries.progressValues
-  const elevationGeometry = useMemo(
-    () =>
-      normalizeElevationGeometry(
-        profileElevations,
-        width,
-        height,
-        widget.data.margin ?? 0,
-        widget.data.y_scale ?? 1,
-        profileDistanceProgress,
-        widget.data.target_density ?? 0.75,
-        widget.data.simplify_tolerance_px ?? 1,
-      ),
-    [
-      height,
-      profileDistanceProgress,
+  const elevationGeometry = useMemo(() => {
+    const scaledGeometry = normalizeElevationGeometry(
       profileElevations,
-      width,
-      widget.data.margin,
-      widget.data.simplify_tolerance_px,
-      widget.data.target_density,
-      widget.data.y_scale,
-    ],
-  )
+      width * safeGlobalScale,
+      height * safeGlobalScale,
+      widget.data.margin ?? 0,
+      widget.data.y_scale ?? 1,
+      profileDistanceProgress,
+      widget.data.target_density ?? 0.75,
+      widget.data.simplify_tolerance_px ?? 1,
+    )
+
+    return {
+      ...scaledGeometry,
+      points: scaledGeometry.points.map(([x, y]) => [
+        x / safeGlobalScale,
+        y / safeGlobalScale,
+      ]),
+    }
+  }, [
+    height,
+    profileDistanceProgress,
+    profileElevations,
+    safeGlobalScale,
+    width,
+    widget.data.margin,
+    widget.data.simplify_tolerance_px,
+    widget.data.target_density,
+    widget.data.y_scale,
+  ])
   const points = elevationGeometry.points
   const pointProgress = elevationGeometry.progressValues
   const progress01 = exportWindow.active
@@ -1160,12 +1169,12 @@ export function OverlayElevationWidget({
   const completedSvgPoints = pointsToSvg(completedPoints)
   const metricLabel =
     elevationValue === null || elevationValue === undefined
-      ? '-- m'
-      : `${Math.round(elevationValue)} m`
+      ? '-- M'
+      : `${Math.round(elevationValue)} M`
   const imperialLabel =
     elevationValue === null || elevationValue === undefined
-      ? '-- ft'
-      : `${Math.round(elevationValue * 3.28084)} ft`
+      ? '-- FT'
+      : `${Math.round(elevationValue * 3.28084)} FT`
   const markerLayers = useMemo(
     () =>
       getPreviewMarkerLayers(

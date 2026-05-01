@@ -32,6 +32,7 @@ const OverlayCanvasWidget = memo(
     previewSecond,
     sceneFont,
     sceneFontSize,
+    valueFont,
     registerNode,
     handleWidgetMouseDown,
   }) {
@@ -92,6 +93,7 @@ const OverlayCanvasWidget = memo(
           globalScale={globalScale}
           sceneFont={sceneFont}
           sceneFontSize={sceneFontSize}
+          valueFont={valueFont}
         />
       </div>
     )
@@ -105,6 +107,7 @@ const OverlayCanvasWidget = memo(
     previousProps.previewSecond === nextProps.previewSecond &&
     previousProps.sceneFont === nextProps.sceneFont &&
     previousProps.sceneFontSize === nextProps.sceneFontSize &&
+    previousProps.valueFont === nextProps.valueFont &&
     previousProps.registerNode === nextProps.registerNode &&
     previousProps.handleWidgetMouseDown === nextProps.handleWidgetMouseDown,
 )
@@ -136,6 +139,7 @@ export default function OverlayCanvas({
   backgroundMode,
   sceneFont,
   sceneFontSize,
+  valueFont,
   sceneSize,
   displayScale,
   setSceneElement,
@@ -174,6 +178,7 @@ export default function OverlayCanvas({
               previewSecond={previewSecond}
               sceneFont={sceneFont}
               sceneFontSize={sceneFontSize}
+              valueFont={valueFont}
               registerNode={widgetRefCallbacks[widget.id]}
               handleWidgetMouseDown={handleWidgetMouseDown}
             />
