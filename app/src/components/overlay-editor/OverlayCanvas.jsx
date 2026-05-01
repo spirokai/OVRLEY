@@ -58,7 +58,8 @@ const OverlayCanvasWidget = memo(
     const Icon = WIDGET_ICONS[widget.type] || Type
     // Counter-scale the badge so it always appears at a fixed screen size,
     // regardless of the globalScale and displayScale transforms on ancestors.
-    const badgeScale = 0.8 / ((displayScale || 1) * (globalScale || 1))
+    const badgeScale =
+      0.8 / ((displayScale || 1) * (isPlotWidget ? 1 : globalScale || 1))
 
     return (
       <div
