@@ -1206,6 +1206,7 @@ export function OverlayElevationWidget({
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
       className="block h-full w-full overflow-visible"
       style={{ opacity: getWidgetOpacity(widget.data, globalOpacity) }}
     >
