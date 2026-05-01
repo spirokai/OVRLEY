@@ -20,7 +20,13 @@ import {
  * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
  * @returns {JSX.Element} Rendered component output.
  */
-function WidgetPreview({ widget, activity, previewSecond, globalOpacity }) {
+function WidgetPreview({
+  widget,
+  activity,
+  previewSecond,
+  globalOpacity,
+  globalScale,
+}) {
   if (widget.type === 'label') {
     return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} />
   }
@@ -53,6 +59,7 @@ function WidgetPreview({ widget, activity, previewSecond, globalOpacity }) {
       activity={activity}
       previewSecond={previewSecond}
       globalOpacity={globalOpacity}
+      globalScale={globalScale}
     />
   )
 }
@@ -63,5 +70,6 @@ export default memo(
     previousProps.widget === nextProps.widget &&
     previousProps.activity === nextProps.activity &&
     previousProps.previewSecond === nextProps.previewSecond &&
-    previousProps.globalOpacity === nextProps.globalOpacity,
+    previousProps.globalOpacity === nextProps.globalOpacity &&
+    previousProps.globalScale === nextProps.globalScale,
 )

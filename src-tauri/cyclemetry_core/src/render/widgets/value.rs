@@ -91,16 +91,24 @@ fn draw_gradient_value_widget(
     let triangle_width = value.triangle_width.unwrap_or(72.0).max(0.0) * scale;
     let max_triangle_height =
         gradient_triangle_height(Some(MAX_GRADIENT_ABS_PERCENT), triangle_width);
-    let triangle_height = gradient_triangle_height(raw_gradient, triangle_width);
     let show_triangle = value.show_triangle.unwrap_or(true) && triangle_width > 0.0;
     let content_width = value_measure
         .width
         .max(if show_triangle { triangle_width } else { 0.0 });
     let value_left = base_style.x + ((content_width - value_measure.width) * 0.5);
+    let triangle_top = base_style.y + value_line_height + (GRADIENT_TRIANGLE_GAP_PX * scale);
+    let zero_baseline_y = triangle_top + max_triangle_height;
+    let value_top = if show_triangle {
+        zero_baseline_y
+            - (value_line_height + (GRADIENT_TRIANGLE_GAP_PX * scale) + max_triangle_height)
+            - value_offset
+    } else {
+        base_style.y - value_offset
+    };
 
     let mut value_style = base_style.clone();
     value_style.x = value_left;
-    value_style.y = base_style.y + value_offset;
+    value_style.y = value_top;
     value_style.line_height = value_line_height;
     draw_text(canvas, &value_text, &value_style, font_dirs);
 
@@ -108,8 +116,6 @@ fn draw_gradient_value_widget(
         return true;
     }
 
-    let triangle_top = base_style.y + value_line_height + (GRADIENT_TRIANGLE_GAP_PX * scale);
-    let zero_baseline_y = triangle_top + max_triangle_height;
     let triangle_left = base_style.x + ((content_width - triangle_width) * 0.5);
     let triangle_color = if raw_gradient.unwrap_or(0.0) < 0.0 {
         value

@@ -230,6 +230,7 @@ export function OverlayMetricWidget({
   activity,
   previewSecond,
   globalOpacity,
+  globalScale,
 }) {
   const fontSize = widget.data.font_size ?? 60
   const fontFamily = getPreviewFontFamily(
@@ -346,12 +347,14 @@ export function OverlayMetricWidget({
             triangleWidth:
               widget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
             showTriangle: widget.data.show_triangle !== false,
+            scale: globalScale || 1,
           })
         : null,
     [
       currentGradientValue,
       fontFamily,
       fontSize,
+      globalScale,
       valueText,
       widget.data.show_triangle,
       widget.data.triangle_width,

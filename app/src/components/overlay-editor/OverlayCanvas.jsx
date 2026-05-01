@@ -38,7 +38,11 @@ const OverlayCanvasWidget = memo(
       widget.category === 'values' && widget.type !== 'gradient'
         ? (widget.data.value_offset ?? 0)
         : 0
-    const y = (widget.data.y ?? 0) + valueOffset
+    const gradientYOffset =
+      widget.type === 'gradient'
+        ? Math.min(0, -(widget.data.value_offset ?? 0))
+        : 0
+    const y = (widget.data.y ?? 0) + valueOffset + gradientYOffset
     const scale = globalScale
     const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
     const width = widget.data.width
@@ -84,6 +88,7 @@ const OverlayCanvasWidget = memo(
           activity={activity}
           previewSecond={previewSecond}
           globalOpacity={globalOpacity}
+          globalScale={globalScale}
         />
       </div>
     )

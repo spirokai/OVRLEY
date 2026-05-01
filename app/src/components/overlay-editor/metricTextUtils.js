@@ -514,10 +514,11 @@ export function getGradientWidgetLayout({
   gradientValue,
   triangleWidth,
   showTriangle,
+  scale,
 }) {
   const valueLineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const valueMeasure = measurePreviewText(valueText, fontSize, fontFamily)
-  const safeValueOffset = Number(valueOffset) || 0
+  const safeValueOffset = (Number(valueOffset) || 0) / (scale || 1)
   const safeTriangleWidth = Math.max(Number(triangleWidth) || 0, 0)
   const maxTriangleHeight =
     showTriangle && safeTriangleWidth > 0
@@ -532,43 +533,46 @@ export function getGradientWidgetLayout({
     valueMeasure.width,
     indicatorVisible ? safeTriangleWidth : 0,
   )
-  const valueTop = safeValueOffset
   const indicatorTop = valueLineHeight + GRADIENT_WIDGET_TRIANGLE_GAP_PX
   const zeroBaseline = indicatorTop + maxTriangleHeight
+  const anchoredValueTop = -safeValueOffset
   const indicatorHeight = indicatorVisible ? maxTriangleHeight * 2 : 0
-  const rawMinY = Math.min(0, valueTop)
+  const rawMinY = Math.min(0, anchoredValueTop)
   const rawMaxY = Math.max(
-    valueTop + valueLineHeight,
+    anchoredValueTop + valueLineHeight,
     indicatorVisible
       ? indicatorTop + indicatorHeight
-      : valueTop + valueLineHeight,
+      : anchoredValueTop + valueLineHeight,
   )
   const baseline = getPreviewTextBaseline({
-    top: valueTop - rawMinY,
+    top: anchoredValueTop,
     lineHeight: valueLineHeight,
     ascent: valueMeasure.ascent,
     descent: valueMeasure.descent,
     glyphHeight: valueMeasure.glyphHeight,
   })
 
+  const yOffset = rawMinY
+
   return {
     width: contentWidth,
     height: rawMaxY - rawMinY,
+    yOffset,
     value: {
       left: (contentWidth - valueMeasure.width) / 2,
-      top: valueTop - rawMinY,
-      baseline,
+      top: anchoredValueTop - yOffset,
+      baseline: baseline - yOffset,
       width: valueMeasure.width,
       lineHeight: valueLineHeight,
     },
     triangle: indicatorVisible
       ? {
           left: (contentWidth - safeTriangleWidth) / 2,
-          top: indicatorTop - rawMinY,
+          top: indicatorTop - yOffset,
           width: safeTriangleWidth,
           height: triangleHeight,
           maxHeight: maxTriangleHeight,
-          baseline: zeroBaseline - rawMinY,
+          baseline: zeroBaseline - yOffset,
           isZero: isGradientZero(gradientValue),
         }
       : null,
