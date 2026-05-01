@@ -100,7 +100,7 @@ fn draw_gradient_value_widget(
     let zero_baseline_y = triangle_top + max_triangle_height;
     let value_top = if show_triangle {
         zero_baseline_y
-            - (value_line_height + (GRADIENT_TRIANGLE_GAP_PX * scale) + max_triangle_height)
+            - (value_line_height + (GRADIENT_TRIANGLE_GAP_PX * scale) + max_triangle_height )
             - value_offset
     } else {
         base_style.y - value_offset

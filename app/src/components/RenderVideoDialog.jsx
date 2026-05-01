@@ -310,6 +310,7 @@ export default function RenderVideoDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="prores_ks">ProRes (CPU)</SelectItem>
+                    <SelectItem value="qtrle">QT RLE (CPU)</SelectItem>
                     <SelectItem value="prores_ks_vulkan">
                       ProRes Vulkan (GPU)
                     </SelectItem>

@@ -1,4 +1,5 @@
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
+use crate::activity::build_dense_activity_report;
 use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, RenderProgress, TimingBucket};
@@ -7,6 +8,7 @@ use crate::render::{prepare_preview_assets, render_frame_rgba, LabelCacheStatus,
 use chrono::Local;
 use serde::Serialize;
 use std::collections::BTreeMap;
+use std::collections::VecDeque;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -52,10 +54,6 @@ impl RenderController {
             progress.status = "cancelled".to_string();
             progress.message = "Cancelling render...".to_string();
         }
-        self.running.load(Ordering::SeqCst)
-    }
-
-    pub fn is_running(&self) -> bool {
         self.running.load(Ordering::SeqCst)
     }
 
@@ -163,6 +161,25 @@ struct FrameBuffer {
     pixels: Vec<u8>,
 }
 
+#[derive(Serialize)]
+struct StitchSummary {
+    timestamp: String,
+    codec: String,
+    total_frames: u32,
+    segments: Vec<SegmentSummary>,
+    concat_output: String,
+    concat_duration_ms: f64,
+}
+
+#[derive(Serialize)]
+struct SegmentSummary {
+    index: usize,
+    start_seconds: f64,
+    end_seconds: f64,
+    frames: u32,
+    filename: String,
+}
+
 pub fn run_parallel_renders(
     paths: &AppPaths,
     configs: Vec<RenderConfig>,
@@ -174,77 +191,100 @@ pub fn run_parallel_renders(
     }
 
     let start_time = Instant::now();
+    let total_jobs = configs.len();
+    let worker_count = estimate_parallel_render_worker_count(total_jobs);
+    let work_queue = Arc::new(Mutex::new(
+        configs
+            .into_iter()
+            .zip(reports.into_iter())
+            .enumerate()
+            .collect::<VecDeque<_>>(),
+    ));
+    let (result_tx, result_rx) = mpsc::channel::<(usize, Result<String, String>)>();
     let mut handles = Vec::new();
 
-    for (i, (config, report)) in configs.into_iter().zip(reports.into_iter()).enumerate() {
+    for _ in 0..worker_count {
         let paths_clone = paths.clone();
         let activity_clone = activity.clone();
-        let controller = RenderController::default();
-        controller.try_start(
-            report.frame_count as u32,
-            &format!("Parallel Render {}", i + 1),
-        )?;
+        let work_queue_clone = work_queue.clone();
+        let result_tx_clone = result_tx.clone();
+        let handle = std::thread::spawn(move || loop {
+            let next_job = {
+                let mut queue = match work_queue_clone.lock() {
+                    Ok(queue) => queue,
+                    Err(_) => return,
+                };
+                queue.pop_front()
+            };
+            let Some((index, (config, report))) = next_job else {
+                return;
+            };
 
-        let handle = std::thread::spawn(move || {
-            render_video(&paths_clone, &config, &activity_clone, &report, &controller)
+            let controller = RenderController::default();
+            let start_result = controller.try_start(
+                report.frame_count as u32,
+                &format!("Parallel Render {}", index + 1),
+            );
+            let result = match start_result {
+                Ok(_) => render_video(&paths_clone, &config, &activity_clone, &report, &controller),
+                Err(error) => Err(error),
+            };
+            let _ = result_tx_clone.send((index, result));
         });
         handles.push(handle);
     }
+    drop(result_tx);
 
-    let mut filenames = Vec::new();
-    for handle in handles {
-        let filename = handle
-            .join()
-            .map_err(|_| "Parallel render thread panicked".to_string())??;
-        filenames.push(filename);
+    let mut filenames = vec![None; total_jobs];
+    for _ in 0..filenames.len() {
+        let (index, result) = result_rx
+            .recv()
+            .map_err(|_| "Parallel render worker channel disconnected".to_string())?;
+        filenames[index] = Some(result?);
     }
 
-    // Stitch the videos
+    for handle in handles {
+        handle
+            .join()
+            .map_err(|_| "Parallel render thread panicked".to_string())?;
+    }
+
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let output_filename = format!("parallel_stitch_{}.mov", timestamp_nanos()?);
     let output_path = paths.downloads_dir.join(&output_filename);
-
-    let list_path = paths
-        .temp_dir
-        .join(format!("concat_list_{}.txt", timestamp_nanos()?));
-    let mut list_content = String::new();
-    for filename in filenames {
-        list_content.push_str(&format!(
-            "file '{}'\n",
-            paths
-                .downloads_dir
-                .join(filename)
-                .display()
-                .to_string()
-                .replace('\\', "/")
-        ));
-    }
-    fs::write(&list_path, list_content).map_err(|e| format!("Failed to write concat list: {e}"))?;
-
-    let status = Command::new(&ffmpeg_bin)
-        .arg("-f")
-        .arg("concat")
-        .arg("-safe")
-        .arg("0")
-        .arg("-i")
-        .arg(&list_path)
-        .arg("-c")
-        .arg("copy")
-        .arg("-y")
-        .arg(&output_path)
-        .status()
-        .map_err(|e| format!("Failed to run ffmpeg concat: {e}"))?;
-
-    let _ = fs::remove_file(&list_path);
-
-    if !status.success() {
-        return Err(format!("FFmpeg concat failed with status {status}"));
-    }
+    let filenames = filenames
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| {
+            "Parallel render finished without producing all output filenames".to_string()
+        })?;
+    concat_video_segments(paths, &ffmpeg_bin, &filenames, &output_path)?;
 
     Ok(start_time.elapsed())
 }
 
+fn estimate_parallel_render_worker_count(total_jobs: usize) -> usize {
+    let logical_cores = std::thread::available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(4);
+    let worker_count = (logical_cores / 4).max(1);
+    worker_count.min(total_jobs.max(1))
+}
+
 pub fn render_video(
+    paths: &AppPaths,
+    config: &RenderConfig,
+    activity: &ParsedActivity,
+    dense_activity: &DenseActivityReport,
+    controller: &RenderController,
+) -> Result<String, String> {
+    if should_parallelize_qtrle(config, dense_activity) {
+        return render_video_segmented_qtrle(paths, config, activity, dense_activity, controller);
+    }
+    render_video_single(paths, config, activity, dense_activity, controller)
+}
+
+fn render_video_single(
     paths: &AppPaths,
     config: &RenderConfig,
     activity: &ParsedActivity,
@@ -268,7 +308,7 @@ pub fn render_video(
     let public_filename = format!("video_{}.{}", timestamp_nanos()?, ffmpeg_settings.extension);
     let output_path = paths.downloads_dir.join(&public_filename);
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
-    let input_pix_fmt = ffmpeg_input_pix_fmt(&ffmpeg_settings.codec);
+    let input_pix_fmt = ffmpeg_input_pix_fmt();
     let encoded_frames = Arc::new(AtomicU32::new(0));
     let cancel_flag = controller.cancel_flag.clone();
     let mut aggregate_profiler = RenderProfiler::default();
@@ -316,58 +356,60 @@ pub fn render_video(
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let mut estimator = ProgressEstimator::default();
     let mut rendered_frames = 0u32;
+    let render_result = (|| -> Result<(), String> {
+        for frame_index in 0..(total_frames as usize) {
+            if cancel_flag.load(Ordering::SeqCst) {
+                break;
+            }
+            if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
+                return Err(format!("ffmpeg exited unexpectedly with status {status}"));
+            }
 
-    for frame_index in 0..(total_frames as usize) {
-        if cancel_flag.load(Ordering::SeqCst) {
-            break;
-        }
-        if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
-            return Err(format!("ffmpeg exited unexpectedly with status {status}"));
-        }
-
-        let frame_started = Instant::now();
-        let mut frame_buffer =
-            acquire_frame_buffer(&free_receiver, &cancel_flag, &mut aggregate_profiler)?;
-        render_frame_rgba(
-            paths,
-            config,
-            dense_activity,
-            &prepared_preview_assets.prepared_assets,
-            frame_index,
-            scale,
-            None,
-            RenderTarget {
-                width,
-                height,
-                pixels: frame_buffer.pixels.as_mut_slice(),
-            },
-            &mut aggregate_profiler,
-        )?;
-        if sample_frame_indices.contains(&frame_index) {
-            aggregate_profiler.measure("debug.sample_frame_write", || {
-                write_sample_frame(
-                    &ffmpeg_bin,
-                    &debug_dir,
+            let frame_started = Instant::now();
+            let mut frame_buffer =
+                acquire_frame_buffer(&free_receiver, &cancel_flag, &mut aggregate_profiler)?;
+            render_frame_rgba(
+                paths,
+                config,
+                dense_activity,
+                &prepared_preview_assets.prepared_assets,
+                frame_index,
+                scale,
+                None,
+                RenderTarget {
                     width,
                     height,
-                    frame_buffer.pixels.as_slice(),
-                    frame_index,
-                    &input_pix_fmt,
-                )
-            })?;
+                    pixels: frame_buffer.pixels.as_mut_slice(),
+                },
+                &mut aggregate_profiler,
+            )?;
+            if sample_frame_indices.contains(&frame_index) {
+                aggregate_profiler.measure("debug.sample_frame_write", || {
+                    write_sample_frame(
+                        &ffmpeg_bin,
+                        &debug_dir,
+                        width,
+                        height,
+                        frame_buffer.pixels.as_slice(),
+                        frame_index,
+                        &input_pix_fmt,
+                    )
+                })?;
+            }
+            queue_frame(&sender, frame_buffer, &cancel_flag, &mut aggregate_profiler)?;
+            rendered_frames += 1;
+            let frame_ms = frame_started.elapsed().as_secs_f64() * 1000.0;
+            aggregate_profiler.record_ms("frame.total", frame_ms);
+            let estimate = estimator.record(rendered_frames, total_frames, frame_ms / 1000.0);
+            controller.set_frame_progress(
+                rendered_frames,
+                total_frames,
+                encoded_frames.load(Ordering::SeqCst),
+                estimate,
+            );
         }
-        queue_frame(&sender, frame_buffer, &cancel_flag, &mut aggregate_profiler)?;
-        rendered_frames += 1;
-        let frame_ms = frame_started.elapsed().as_secs_f64() * 1000.0;
-        aggregate_profiler.record_ms("frame.total", frame_ms);
-        let estimate = estimator.record(rendered_frames, total_frames, frame_ms / 1000.0);
-        controller.set_frame_progress(
-            rendered_frames,
-            total_frames,
-            encoded_frames.load(Ordering::SeqCst),
-            estimate,
-        );
-    }
+        Ok(())
+    })();
 
     drop(sender);
     let writer_result = writer_thread
@@ -378,6 +420,10 @@ pub fn render_video(
         .map_err(|_| "FFmpeg monitor thread panicked".to_string())?;
     let status = child.wait().map_err(|error| error.to_string())?;
 
+    if let Err(error) = render_result {
+        let _ = fs::remove_file(&output_path);
+        return Err(error);
+    }
     if cancel_flag.load(Ordering::SeqCst) {
         let _ = child.kill();
         let _ = fs::remove_file(&output_path);
@@ -409,6 +455,293 @@ pub fn render_video(
         merged_timings,
     )?;
     Ok(public_filename)
+}
+
+fn should_parallelize_qtrle(config: &RenderConfig, dense_activity: &DenseActivityReport) -> bool {
+    config
+        .scene
+        .ffmpeg
+        .as_object()
+        .and_then(|map| map.get("codec"))
+        .and_then(serde_json::Value::as_str)
+        .map(|codec| codec == "qtrle")
+        .unwrap_or(false)
+        && dense_activity.frame_count >= 2
+}
+
+fn render_video_segmented_qtrle(
+    paths: &AppPaths,
+    config: &RenderConfig,
+    activity: &ParsedActivity,
+    dense_activity: &DenseActivityReport,
+    controller: &RenderController,
+) -> Result<String, String> {
+    let total_frames = dense_activity.frame_count as u32;
+    let segment_count = estimate_parallel_render_worker_count(total_frames as usize);
+    if segment_count < 2 {
+        return render_video_single(paths, config, activity, dense_activity, controller);
+    }
+
+    let fps = config.scene.fps.max(f64::EPSILON);
+    let mut segment_configs = Vec::with_capacity(segment_count);
+    let mut segment_reports = Vec::with_capacity(segment_count);
+    for segment_index in 0..segment_count {
+        let start_frame = ((segment_index as u32) * total_frames) / (segment_count as u32);
+        let end_frame = (((segment_index + 1) as u32) * total_frames) / (segment_count as u32);
+        if end_frame <= start_frame {
+            continue;
+        }
+
+        let mut segment_config = config.clone();
+        segment_config.scene.start = config.scene.start + (f64::from(start_frame) / fps);
+        segment_config.scene.end = config.scene.start + (f64::from(end_frame) / fps);
+        let segment_dense = build_dense_activity_report(activity, &segment_config)?;
+        if segment_dense.frame_count == 0 {
+            continue;
+        }
+        segment_configs.push(segment_config);
+        segment_reports.push(segment_dense);
+    }
+
+    let actual_segment_count = segment_configs.len();
+    if actual_segment_count < 2 {
+        return render_video_single(paths, config, activity, dense_activity, controller);
+    }
+    let combined_frames = segment_reports
+        .iter()
+        .map(|report| report.frame_count as u32)
+        .sum::<u32>();
+
+    let child_cancel_flag = controller.cancel_flag.clone();
+    let segment_controllers = segment_reports
+        .iter()
+        .map(|report| child_render_controller(report.frame_count as u32, &child_cancel_flag))
+        .collect::<Vec<_>>();
+
+    enum SegmentEvent {
+        Completed(usize, Result<String, String>),
+    }
+
+    let (tx, rx) = mpsc::channel::<SegmentEvent>();
+    let mut handles = Vec::with_capacity(actual_segment_count);
+    for index in 0..actual_segment_count {
+        let tx = tx.clone();
+        let segment_controller = segment_controllers[index].clone();
+        let segment_paths = paths.clone();
+        let segment_config = segment_configs[index].clone();
+        let segment_activity = activity.clone();
+        let segment_dense = segment_reports[index].clone();
+        let handle = thread::spawn(move || {
+            let result = render_video_single(
+                &segment_paths,
+                &segment_config,
+                &segment_activity,
+                &segment_dense,
+                &segment_controller,
+            );
+            let _ = tx.send(SegmentEvent::Completed(index, result));
+        });
+        handles.push(handle);
+    }
+    drop(tx);
+
+    let mut results = vec![None; actual_segment_count];
+    let mut completed = 0usize;
+    let mut first_error: Option<String> = None;
+
+    while completed < actual_segment_count {
+        let progress_snapshots = segment_controllers
+            .iter()
+            .map(RenderController::progress)
+            .collect::<Vec<_>>();
+        let current = progress_snapshots
+            .iter()
+            .map(|progress| progress.current)
+            .sum::<u32>();
+        let encoded = progress_snapshots
+            .iter()
+            .map(|progress| progress.encoded)
+            .sum::<u32>();
+        let estimate = progress_snapshots
+            .iter()
+            .filter_map(|progress| progress.estimated_seconds_remaining)
+            .max();
+        controller.set_frame_progress(current, combined_frames, encoded, estimate);
+
+        match rx.recv_timeout(Duration::from_millis(200)) {
+            Ok(SegmentEvent::Completed(index, Ok(filename))) => {
+                results[index] = Some(filename);
+                completed += 1;
+            }
+            Ok(SegmentEvent::Completed(_, Err(error))) => {
+                if first_error.is_none() {
+                    first_error = Some(error);
+                    controller.cancel_flag.store(true, Ordering::SeqCst);
+                }
+                completed += 1;
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => {
+                break;
+            }
+        }
+    }
+
+    for handle in handles {
+        handle
+            .join()
+            .map_err(|_| "Segmented qtrle render thread panicked".to_string())?;
+    }
+
+    if let Some(error) = first_error {
+        cleanup_segment_outputs(paths, &results);
+        return Err(error);
+    }
+
+    if controller.cancel_flag.load(Ordering::SeqCst) {
+        cleanup_segment_outputs(paths, &results);
+        return Err("Rendering cancelled".to_string());
+    }
+
+    let segment_filenames = results
+        .iter()
+        .cloned()
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| {
+            cleanup_segment_outputs(paths, &results);
+            "Segmented qtrle render did not produce all output files".to_string()
+        })?;
+
+    controller.set_frame_progress(combined_frames, combined_frames, combined_frames, Some(0));
+
+    let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
+    let public_filename = format!("video_{}.mov", timestamp_nanos()?);
+    let output_path = paths.downloads_dir.join(&public_filename);
+    let concat_started = Instant::now();
+    if let Err(error) = concat_video_segments(paths, &ffmpeg_bin, &segment_filenames, &output_path)
+    {
+        cleanup_segment_outputs(paths, &results);
+        return Err(error);
+    }
+    let concat_duration_ms = concat_started.elapsed().as_secs_f64() * 1000.0;
+    if let Err(error) = write_stitch_summary(
+        paths,
+        config,
+        &public_filename,
+        concat_duration_ms,
+        &segment_configs,
+        &segment_reports,
+        &segment_filenames,
+    ) {
+        cleanup_segment_outputs(paths, &results);
+        return Err(error);
+    }
+    cleanup_segment_outputs(paths, &results);
+    Ok(public_filename)
+}
+
+fn child_render_controller(total_frames: u32, cancel_flag: &Arc<AtomicBool>) -> RenderController {
+    let controller = RenderController {
+        progress: Arc::new(Mutex::new(RenderProgress::default())),
+        cancel_flag: cancel_flag.clone(),
+        running: Arc::new(AtomicBool::new(false)),
+        next_render_id: Arc::new(AtomicU32::new(0)),
+    };
+    let _ = controller.try_start(total_frames, "Segment render");
+    controller
+}
+
+fn cleanup_segment_outputs(paths: &AppPaths, results: &[Option<String>]) {
+    for filename in results.iter().flatten() {
+        let _ = fs::remove_file(paths.downloads_dir.join(filename));
+    }
+}
+
+fn concat_video_segments(
+    paths: &AppPaths,
+    ffmpeg_bin: &Path,
+    filenames: &[String],
+    output_path: &Path,
+) -> Result<(), String> {
+    let list_path = paths
+        .temp_dir
+        .join(format!("concat_list_{}.txt", timestamp_nanos()?));
+    let mut list_content = String::new();
+    for filename in filenames {
+        list_content.push_str(&format!(
+            "file '{}'\n",
+            paths
+                .downloads_dir
+                .join(filename)
+                .display()
+                .to_string()
+                .replace('\\', "/")
+        ));
+    }
+    fs::write(&list_path, list_content).map_err(|e| format!("Failed to write concat list: {e}"))?;
+
+    let status = Command::new(ffmpeg_bin)
+        .arg("-f")
+        .arg("concat")
+        .arg("-safe")
+        .arg("0")
+        .arg("-i")
+        .arg(&list_path)
+        .arg("-c")
+        .arg("copy")
+        .arg("-y")
+        .arg(output_path)
+        .status()
+        .map_err(|e| format!("Failed to run ffmpeg concat: {e}"))?;
+
+    let _ = fs::remove_file(&list_path);
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("FFmpeg concat failed with status {status}"))
+    }
+}
+
+fn write_stitch_summary(
+    paths: &AppPaths,
+    config: &RenderConfig,
+    public_filename: &str,
+    concat_duration_ms: f64,
+    segment_configs: &[RenderConfig],
+    segment_reports: &[DenseActivityReport],
+    filenames: &[String],
+) -> Result<(), String> {
+    let debug_dir = create_debug_dir(paths, "phase_6_stitch")?;
+    let codec = config
+        .scene
+        .ffmpeg
+        .as_object()
+        .and_then(|map| map.get("codec"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("unknown")
+        .to_string();
+    let segment_summaries = segment_configs
+        .iter()
+        .enumerate()
+        .map(|(index, segment_config)| SegmentSummary {
+            index,
+            start_seconds: round3(segment_config.scene.start),
+            end_seconds: round3(segment_config.scene.end),
+            frames: segment_reports[index].frame_count as u32,
+            filename: filenames[index].clone(),
+        })
+        .collect::<Vec<_>>();
+    let total_frames = segment_summaries.iter().map(|segment| segment.frames).sum();
+    let summary = StitchSummary {
+        timestamp: iso_timestamp_now(),
+        codec,
+        total_frames,
+        segments: segment_summaries,
+        concat_output: public_filename.to_string(),
+        concat_duration_ms: round3(concat_duration_ms),
+    };
+    write_json(debug_dir.join("stitch_summary.json"), &summary)
 }
 
 fn finalize_ffmpeg_settings(
@@ -786,11 +1119,8 @@ fn make_even(value: u32) -> u32 {
     }
 }
 
-fn ffmpeg_input_pix_fmt(codec: &str) -> String {
-    std::env::var("CYCLEMETRY_INPUT_PIX_FMT").unwrap_or_else(|_| {
-        let _ = codec;
-        "rgba".to_string()
-    })
+fn ffmpeg_input_pix_fmt() -> String {
+    std::env::var("CYCLEMETRY_INPUT_PIX_FMT").unwrap_or_else(|_| "rgba".to_string())
 }
 
 #[derive(Default)]

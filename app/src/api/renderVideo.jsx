@@ -62,6 +62,8 @@ export default async function renderVideo(overrides = {}) {
         config.scene.ffmpeg.prores_profile =
           config.scene.ffmpeg.prores_profile || '4'
         config.scene.ffmpeg.alpha_bits = config.scene.ffmpeg.alpha_bits || 16
+      } else if ((activeExportCodec || 'prores_ks') === 'qtrle') {
+        config.scene.ffmpeg.pix_fmt = config.scene.ffmpeg.pix_fmt || 'argb'
       }
 
       // Apply export range override if custom

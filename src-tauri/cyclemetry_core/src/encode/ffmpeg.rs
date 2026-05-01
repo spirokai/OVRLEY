@@ -228,8 +228,30 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
                 filters: None,
             })
         }
+        "qtrle" => {
+            let pix_fmt = object
+                .and_then(|map| map.get("pix_fmt"))
+                .and_then(Value::as_str)
+                .unwrap_or("argb")
+                .to_string();
+            let mut output_args = vec!["-c:v".to_string(), "qtrle".to_string()];
+            append_extra_output_args(&mut output_args, ffmpeg_config);
+
+            Ok(FfmpegSettings {
+                codec,
+                loglevel,
+                pix_fmt,
+                output_args,
+                extension: container_override
+                    .clone()
+                    .unwrap_or_else(|| "mov".to_string()),
+                muxer: container_override,
+                hw_init_args: Vec::new(),
+                filters: None,
+            })
+        }
         other => Err(format!(
-            "Unsupported scene.ffmpeg.codec '{other}'. Supported codecs are prores_ks, prores_ks_vulkan, and prores_videotoolbox."
+            "Unsupported scene.ffmpeg.codec '{other}'. Supported codecs are prores_ks, prores_ks_vulkan, prores_videotoolbox, and qtrle."
         )),
     }
 }
