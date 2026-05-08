@@ -15,12 +15,14 @@ import { Label } from '@/components/ui/label'
  * @param {*} props.widget - Widget definition being rendered or edited.
  * @param {*} props.updateWidgetData - Value for update widget data.
  * @param {*} props.setNumericField - Value for set numeric field.
+ * @param {*} props.sceneFontSize - Scene fallback font size.
  * @returns {JSX.Element} Rendered component output.
  */
 export default function ElevationWidgetEditor({
   widget,
   updateWidgetData,
   setNumericField,
+  sceneFontSize,
 }) {
   const lineWidth =
     widget.data.completed_line_width ?? widget.data.remaining_line_width ?? 6
@@ -31,6 +33,15 @@ export default function ElevationWidgetEditor({
   const yScale = widget.data.y_scale ?? 1
   const simplifyTolerance = widget.data.simplify_tolerance_px ?? 1
   const targetDensity = widget.data.target_density ?? 0.75
+  const labelFontSize =
+    widget.data.point_label?.font_size ?? sceneFontSize ?? 12.5
+  const updatePointLabel = (updates) =>
+    updateWidgetData(widget.id, {
+      point_label: {
+        ...(widget.data.point_label ?? {}),
+        ...updates,
+      },
+    })
 
   return (
     <>
@@ -223,6 +234,15 @@ export default function ElevationWidgetEditor({
             }
           />
         </div>
+        <SliderField
+          label="Label Size"
+          value={labelFontSize}
+          min={5}
+          max={50}
+          step={1}
+          valueDisplay={`${labelFontSize}px`}
+          onSliderChange={(value) => updatePointLabel({ font_size: value })}
+        />
 
         <div className="grid grid-cols-2 gap-4 pt-2">
           <div className="flex flex-col gap-4">
@@ -244,8 +264,8 @@ export default function ElevationWidgetEditor({
               label="Metric Offset X"
               disabled={!widget.data.show_elevation_metric}
               value={widget.data.metric_label_offset_x ?? 16}
-              min={-50}
-              max={50}
+              min={-100}
+              max={100}
               step={1}
               valueDisplay={`${widget.data.metric_label_offset_x ?? 16}px`}
               onSliderChange={(value) =>
@@ -256,8 +276,8 @@ export default function ElevationWidgetEditor({
               label="Metric Offset Y"
               disabled={!widget.data.show_elevation_metric}
               value={widget.data.metric_label_offset_y ?? 16}
-              min={-50}
-              max={50}
+              min={-100}
+              max={100}
               step={1}
               valueDisplay={`${widget.data.metric_label_offset_y ?? 16}px`}
               onSliderChange={(value) =>
@@ -285,8 +305,8 @@ export default function ElevationWidgetEditor({
               label="Imperial Offset X"
               disabled={!widget.data.show_elevation_imperial}
               value={widget.data.imperial_label_offset_x ?? 16}
-              min={-50}
-              max={50}
+              min={-100}
+              max={100}
               step={1}
               valueDisplay={`${widget.data.imperial_label_offset_x ?? 16}px`}
               onSliderChange={(value) =>
@@ -297,8 +317,8 @@ export default function ElevationWidgetEditor({
               label="Imperial Offset Y"
               disabled={!widget.data.show_elevation_imperial}
               value={widget.data.imperial_label_offset_y ?? 16}
-              min={-50}
-              max={50}
+              min={-100}
+              max={100}
               step={1}
               valueDisplay={`${widget.data.imperial_label_offset_y ?? 16}px`}
               onSliderChange={(value) =>

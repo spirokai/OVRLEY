@@ -48,7 +48,12 @@ import { PositionSection } from './widgets/widgetEditorSections'
  * @param {*} setNumericField - Value for set numeric field.
  * @returns {*} Result produced by the helper.
  */
-function renderWidgetEditor(widget, updateWidgetData, setNumericField) {
+function renderWidgetEditor(
+  widget,
+  updateWidgetData,
+  setNumericField,
+  sceneFontSize,
+) {
   if (widget.type === 'label') {
     return (
       <TextWidgetEditor widget={widget} updateWidgetData={updateWidgetData} />
@@ -110,6 +115,7 @@ function renderWidgetEditor(widget, updateWidgetData, setNumericField) {
         widget={widget}
         updateWidgetData={updateWidgetData}
         setNumericField={setNumericField}
+        sceneFontSize={sceneFontSize}
       />
     )
   }
@@ -335,6 +341,7 @@ export default function SidebarWidgetsTab() {
                             widget,
                             updateWidgetData,
                             setNumericField,
+                            config?.scene?.font_size,
                           )}
                         </div>
                       </div>

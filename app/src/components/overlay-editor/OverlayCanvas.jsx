@@ -3,9 +3,7 @@
  */
 
 import { memo } from 'react'
-import { Type } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { WIDGET_ICONS } from './constants'
 import WidgetPreview from './WidgetPreview'
 import { buildWidgetTransform } from './utils'
 
@@ -25,7 +23,6 @@ import { buildWidgetTransform } from './utils'
 const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({
     activity,
-    displayScale,
     globalOpacity,
     widget,
     globalScale,
@@ -35,6 +32,7 @@ const OverlayCanvasWidget = memo(
     valueFont,
     registerNode,
     handleWidgetMouseDown,
+    setHoveredWidgetId,
   }) {
     const x = widget.data.x ?? 0
     const valueOffset =
@@ -55,12 +53,6 @@ const OverlayCanvasWidget = memo(
     const height = isPlotWidget
       ? (widget.data.height ?? 0) * (globalScale || 1)
       : widget.data.height
-    const Icon = WIDGET_ICONS[widget.type] || Type
-    // Counter-scale the badge so it always appears at a fixed screen size,
-    // regardless of the globalScale and displayScale transforms on ancestors.
-    const badgeScale =
-      0.8 / ((displayScale || 1) * (isPlotWidget ? 1 : globalScale || 1))
-
     return (
       <div
         ref={registerNode}
@@ -77,20 +69,15 @@ const OverlayCanvasWidget = memo(
         onMouseDown={(event) => {
           handleWidgetMouseDown(event, widget.id)
         }}
+        onMouseEnter={() => {
+          setHoveredWidgetId(widget.id)
+        }}
+        onMouseLeave={() => {
+          setHoveredWidgetId((current) =>
+            current === widget.id ? null : current,
+          )
+        }}
       >
-        <div
-          className="absolute left-0 flex items-center gap-[0.4rem] rounded-lg border border-border/70 bg-card/80 px-4 py-1 font-semibold text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-          style={{
-            bottom: '100%',
-            marginBottom: 4,
-            fontSize: '0.85rem',
-            transform: `scale(${badgeScale})`,
-            transformOrigin: 'bottom left',
-          }}
-        >
-          <Icon className="h-[0.9rem] w-[0.9rem]" />
-          <span>{widget.type}</span>
-        </div>
         <WidgetPreview
           widget={widget}
           activity={activity}
@@ -108,14 +95,14 @@ const OverlayCanvasWidget = memo(
     previousProps.widget === nextProps.widget &&
     previousProps.globalScale === nextProps.globalScale &&
     previousProps.globalOpacity === nextProps.globalOpacity &&
-    previousProps.displayScale === nextProps.displayScale &&
     previousProps.activity === nextProps.activity &&
     previousProps.previewSecond === nextProps.previewSecond &&
     previousProps.sceneFont === nextProps.sceneFont &&
     previousProps.sceneFontSize === nextProps.sceneFontSize &&
     previousProps.valueFont === nextProps.valueFont &&
     previousProps.registerNode === nextProps.registerNode &&
-    previousProps.handleWidgetMouseDown === nextProps.handleWidgetMouseDown,
+    previousProps.handleWidgetMouseDown === nextProps.handleWidgetMouseDown &&
+    previousProps.setHoveredWidgetId === nextProps.setHoveredWidgetId,
 )
 
 /**
@@ -147,11 +134,11 @@ export default function OverlayCanvas({
   sceneFontSize,
   valueFont,
   sceneSize,
-  displayScale,
   setSceneElement,
   selectionRect,
   handleSceneMouseDown,
   handleWidgetMouseDown,
+  setHoveredWidgetId,
   widgetRefCallbacks,
 }) {
   return (
@@ -179,7 +166,6 @@ export default function OverlayCanvas({
               widget={widget}
               globalScale={globalScale}
               globalOpacity={globalOpacity}
-              displayScale={displayScale}
               activity={activity}
               previewSecond={previewSecond}
               sceneFont={sceneFont}
@@ -187,6 +173,7 @@ export default function OverlayCanvas({
               valueFont={valueFont}
               registerNode={widgetRefCallbacks[widget.id]}
               handleWidgetMouseDown={handleWidgetMouseDown}
+              setHoveredWidgetId={setHoveredWidgetId}
             />
           )
         })}

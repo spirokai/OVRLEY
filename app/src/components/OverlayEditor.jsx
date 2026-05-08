@@ -2,11 +2,71 @@
  * Renders the overlay editor portion of the application interface.
  */
 
-import { memo } from 'react'
-import { LayoutGrid } from 'lucide-react'
+import { memo, useMemo, useState } from 'react'
+import { LayoutGrid, Type } from 'lucide-react'
 import OverlayCanvas from './overlay-editor/OverlayCanvas'
 import OverlayMoveable from './overlay-editor/OverlayMoveable'
+import { WIDGET_ICONS } from './overlay-editor/constants'
 import useOverlayEditorState from './overlay-editor/useOverlayEditorState'
+
+function getWidgetSceneOrigin(widget) {
+  const x = widget.data.x ?? 0
+  const valueOffset =
+    widget.category === 'values' && widget.type !== 'gradient'
+      ? (widget.data.value_offset ?? 0)
+      : 0
+  const gradientYOffset =
+    widget.type === 'gradient'
+      ? Math.min(0, -(widget.data.value_offset ?? 0))
+      : 0
+
+  return {
+    x,
+    y: (widget.data.y ?? 0) + valueOffset + gradientYOffset,
+  }
+}
+
+function WidgetBadgeLayer({
+  displayScale,
+  hoveredWidgetId,
+  selectedWidgetIds,
+  widgets,
+}) {
+  const visibleWidgets = useMemo(() => {
+    const visibleIds = new Set(selectedWidgetIds)
+    if (hoveredWidgetId) {
+      visibleIds.add(hoveredWidgetId)
+    }
+
+    return widgets.filter((widget) => visibleIds.has(widget.id))
+  }, [hoveredWidgetId, selectedWidgetIds, widgets])
+
+  if (!visibleWidgets.length) {
+    return null
+  }
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-50 overflow-visible">
+      {visibleWidgets.map((widget) => {
+        const Icon = WIDGET_ICONS[widget.type] || Type
+        const origin = getWidgetSceneOrigin(widget)
+        const left = origin.x * displayScale
+        const top = Math.max(origin.y * displayScale - 24, 0)
+
+        return (
+          <div
+            key={widget.id}
+            className="absolute flex h-5 items-center gap-1 rounded-md border border-border/70 bg-card/90 px-2 text-[11px] font-semibold leading-none text-muted-foreground shadow-sm"
+            style={{ left, top }}
+          >
+            <Icon className="h-3 w-3" />
+            <span>{widget.type}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 /**
  * Renders the empty overlay state component.
@@ -50,6 +110,7 @@ function OverlayEditor({
   onZoomLevelChange,
   backgroundMode,
 }) {
+  const [hoveredWidgetId, setHoveredWidgetId] = useState(null)
   const {
     activity,
     canResizeSelected,
@@ -71,6 +132,7 @@ function OverlayEditor({
     sceneSize,
     selectedTarget,
     selectedTargets,
+    selectedWidgetIds,
     selectionRect,
     setSceneElement,
     viewportRef,
@@ -128,11 +190,11 @@ function OverlayEditor({
                 globalDefaults?.font_values
               }
               sceneSize={sceneSize}
-              displayScale={displayScale}
               setSceneElement={setSceneElement}
               selectionRect={selectionRect}
               handleSceneMouseDown={handleSceneMouseDown}
               handleWidgetMouseDown={handleWidgetMouseDown}
+              setHoveredWidgetId={setHoveredWidgetId}
               widgetRefCallbacks={widgetRefCallbacks}
             />
 
@@ -152,6 +214,12 @@ function OverlayEditor({
               handlers={handlers}
             />
           </div>
+          <WidgetBadgeLayer
+            displayScale={displayScale}
+            hoveredWidgetId={hoveredWidgetId}
+            selectedWidgetIds={selectedWidgetIds}
+            widgets={widgets}
+          />
         </div>
       </div>
     </div>

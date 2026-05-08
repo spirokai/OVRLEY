@@ -12,14 +12,17 @@
     "lint:frontend": "cd app && pnpm lint",
     "lint": "pnpm lint:frontend",
     "format:frontend": "cd app && pnpm format",
-    "format": "pnpm format:frontend"
+    "format": "pnpm format:frontend",
+    "release": "semantic-release"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.25.0",
   "devDependencies": {
-    "@tauri-apps/cli": "^2.9.6"
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@tauri-apps/cli": "^2.9.6",
+    "semantic-release": "^25.0.3"
   },
   "dependencies": {
     "@tauri-apps/plugin-shell": "~2.3.3"
