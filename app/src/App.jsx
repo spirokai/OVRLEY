@@ -1,5 +1,5 @@
 /**
- * Composes the main application shell for the Cyclemetry overlay editor.
+ * Composes the main application shell for the OVRLEY overlay editor.
  */
 
 import AppHeader from '@/components/AppHeader'

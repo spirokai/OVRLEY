@@ -335,13 +335,13 @@ fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIco
                 .get_or_init(|| parse_svg_icon(metric_icon_svg_markup(icon_kind)))
                 .as_ref()
         }
-        MetricIconKind::Activity => {
+        MetricIconKind::Heart => {
             static CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
             CACHE
                 .get_or_init(|| parse_svg_icon(metric_icon_svg_markup(icon_kind)))
                 .as_ref()
         }
-        MetricIconKind::Timer => {
+        MetricIconKind::RefreshCw => {
             static CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
             CACHE
                 .get_or_init(|| parse_svg_icon(metric_icon_svg_markup(icon_kind)))
@@ -374,11 +374,11 @@ fn metric_icon_svg_markup(icon_kind: MetricIconKind) -> &'static str {
             env!("CARGO_MANIFEST_DIR"),
             "/../../app/src/components/widgets/icons/widget-speed.svg"
         )),
-        MetricIconKind::Activity => include_str!(concat!(
+        MetricIconKind::Heart => include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../app/src/components/widgets/icons/widget-heartrate.svg"
         )),
-        MetricIconKind::Timer => include_str!(concat!(
+        MetricIconKind::RefreshCw => include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../app/src/components/widgets/icons/widget-cadence.svg"
         )),

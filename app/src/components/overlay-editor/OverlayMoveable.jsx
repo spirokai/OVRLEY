@@ -4,6 +4,9 @@
 
 import Moveable from 'react-moveable'
 
+const CORNER_RESIZE_DIRECTIONS = ['nw', 'ne', 'se', 'sw']
+const EDGE_RESIZE_DIRECTIONS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+
 /**
  * Renders the overlay moveable component.
  *
@@ -18,6 +21,7 @@ import Moveable from 'react-moveable'
  * @param {*} props.canScaleSelected - Value for can scale selected.
  * @param {*} props.canRotateSelected - Value for can rotate selected.
  * @param {*} props.maintainAspectRatio - Value for maintain aspect ratio.
+ * @param {*} props.showEdgeResizeHandles - Whether to render edge resize handles.
  * @param {*} props.elementGuidelines - Value for element guidelines.
  * @param {*} props.sceneSize - Numeric scene size value.
  * @param {*} props.handlers - Value for handlers.
@@ -33,6 +37,7 @@ export default function OverlayMoveable({
   canScaleSelected,
   canRotateSelected,
   maintainAspectRatio,
+  showEdgeResizeHandles,
   elementGuidelines,
   sceneSize,
   handlers,
@@ -63,7 +68,11 @@ export default function OverlayMoveable({
       resizable={canResizeSelected}
       scalable={canScaleSelected}
       rotatable={canRotateSelected}
-      renderDirections={['nw', 'ne', 'sw', 'se']}
+      renderDirections={
+        showEdgeResizeHandles
+          ? EDGE_RESIZE_DIRECTIONS
+          : CORNER_RESIZE_DIRECTIONS
+      }
       snappable
       snapThreshold={8}
       snapGap

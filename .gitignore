@@ -2,6 +2,7 @@
 .vscode
 # Build artifacts
 *node_modules*
+.pnpm-store/
 *__pycache__*
 build/
 dist/

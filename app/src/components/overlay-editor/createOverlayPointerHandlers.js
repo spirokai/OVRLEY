@@ -137,6 +137,22 @@ export default function useOverlayPointerHandlers({
     }
 
     const isSelected = selectedWidgetIds.includes(widgetId)
+    const isCtrlAxisLockDrag =
+      event.ctrlKey && isSelected && !event.metaKey && !event.shiftKey
+
+    if (isCtrlAxisLockDrag && selectedWidgetIds.length > 1) {
+      event.preventDefault()
+      const draggedWidgetIds = [...selectedWidgetIds]
+      setIsGroupDragActive(true)
+      setGroupDragSelectionIds(draggedWidgetIds)
+      moveableRef.current?.dragStart(event.nativeEvent, event.currentTarget)
+      return
+    }
+
+    if (isCtrlAxisLockDrag) {
+      return
+    }
+
     if (hasSelectionModifier(event)) {
       const nextIds = isSelected
         ? selectedWidgetIds.filter((selectedId) => selectedId !== widgetId)

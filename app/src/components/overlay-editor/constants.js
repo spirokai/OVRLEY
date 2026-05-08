@@ -3,13 +3,13 @@
  */
 
 import {
-  Activity,
   Clock3,
   Gauge,
+  Heart,
   Map,
   Mountain,
+  RefreshCw,
   Thermometer,
-  Timer,
   TrendingUp,
   Type,
   Zap,
@@ -29,8 +29,8 @@ export const FONT_FAMILY_MAP = {
 export const WIDGET_ICONS = {
   label: Type,
   speed: Gauge,
-  heartrate: Activity,
-  cadence: Timer,
+  heartrate: Heart,
+  cadence: RefreshCw,
   power: Zap,
   time: Clock3,
   temperature: Thermometer,

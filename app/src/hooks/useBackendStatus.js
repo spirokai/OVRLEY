@@ -95,7 +95,7 @@ export default function useBackendStatus() {
     if (!isTauriRuntime) {
       setBackendStatus('error')
       setBackendReady(false)
-      updateBackendStatus('error', 'Cyclemetry desktop runtime is required')
+      updateBackendStatus('error', 'OVRLEY desktop runtime is required')
       return undefined
     }
 

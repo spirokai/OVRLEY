@@ -11,6 +11,30 @@ import {
 } from './overlayEditorHelpers'
 import { clamp } from './utils'
 
+const AXIS_LOCK_THRESHOLD = 3
+
+function getAxisLockedTranslate(origin, beforeTranslate, inputEvent) {
+  if (!inputEvent?.ctrlKey) {
+    origin.dragAxisLock = null
+    return beforeTranslate
+  }
+
+  const translateX = beforeTranslate[0] ?? 0
+  const translateY = beforeTranslate[1] ?? 0
+  const absX = Math.abs(translateX)
+  const absY = Math.abs(translateY)
+
+  if (!origin.dragAxisLock) {
+    if (Math.max(absX, absY) < AXIS_LOCK_THRESHOLD) {
+      return [0, 0]
+    }
+
+    origin.dragAxisLock = absX >= absY ? 'x' : 'y'
+  }
+
+  return origin.dragAxisLock === 'x' ? [translateX, 0] : [0, translateY]
+}
+
 /**
  * Provides overlay moveable handlers state and actions.
  *
@@ -67,14 +91,19 @@ export default function useOverlayMoveableHandlers({
       }
       draftWidgetsRef.current[selectedWidget.id] = {}
     },
-    onDrag: ({ beforeTranslate, target }) => {
+    onDrag: ({ beforeTranslate, inputEvent, target }) => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
+      const lockedTranslate = getAxisLockedTranslate(
+        origin,
+        beforeTranslate,
+        inputEvent,
+      )
 
       const nextDraft = {
         ...draftWidgetsRef.current[origin.id],
-        x: origin.x + beforeTranslate[0],
-        y: origin.y + beforeTranslate[1],
+        x: origin.x + lockedTranslate[0],
+        y: origin.y + lockedTranslate[1],
       }
 
       setLiveWidgetDraft(origin.id, nextDraft)
@@ -119,11 +148,16 @@ export default function useOverlayMoveableHandlers({
         draftWidgetsRef.current[widgetId] = {}
       })
     },
-    onDragGroup: ({ events }) => {
+    onDragGroup: ({ events, inputEvent }) => {
       const origin = interactionStartRef.current
       if (origin?.type !== 'group-drag') return
 
       const nextDraftsById = {}
+      const lockedTranslate = getAxisLockedTranslate(
+        origin,
+        events[0]?.beforeTranslate || [0, 0],
+        inputEvent || events[0]?.inputEvent,
+      )
 
       events.forEach((childEvent) => {
         const widgetId = getWidgetIdFromTarget(childEvent.target)
@@ -136,8 +170,8 @@ export default function useOverlayMoveableHandlers({
 
         const nextDraft = {
           ...draftWidgetsRef.current[widgetId],
-          x: widgetOrigin.x + childEvent.beforeTranslate[0],
-          y: widgetOrigin.y + childEvent.beforeTranslate[1],
+          x: widgetOrigin.x + lockedTranslate[0],
+          y: widgetOrigin.y + lockedTranslate[1],
         }
 
         nextDraftsById[widgetId] = nextDraft

@@ -5,8 +5,8 @@ use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MetricIconKind {
     Gauge,
-    Activity,
-    Timer,
+    Heart,
+    RefreshCw,
     Zap,
     Clock3,
     Thermometer,
@@ -184,7 +184,7 @@ pub fn format_metric_parts(
                 .show_units
                 .unwrap_or(false)
                 .then_some("BPM".to_string()),
-            Some(MetricIconKind::Activity),
+            Some(MetricIconKind::Heart),
         ),
         "cadence" => (
             format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
@@ -192,7 +192,7 @@ pub fn format_metric_parts(
                 .show_units
                 .unwrap_or(false)
                 .then_some("RPM".to_string()),
-            Some(MetricIconKind::Timer),
+            Some(MetricIconKind::RefreshCw),
         ),
         "power" => (
             format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),

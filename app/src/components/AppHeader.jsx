@@ -2,12 +2,16 @@
  * Renders the app header portion of the application interface.
  */
 
+import { useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -25,6 +29,65 @@ import {
   Square,
   ZoomIn,
 } from 'lucide-react'
+
+function getTemplateResolution(template) {
+  const width = Number(template.width ?? template.scene?.width)
+  const height = Number(template.height ?? template.scene?.height)
+
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return null
+  }
+
+  return {
+    width,
+    height,
+    label: `${width} x ${height}`,
+    pixels: width * height,
+  }
+}
+
+function getTemplateGroups(templates) {
+  const groupsByKey = new Map()
+
+  templates.forEach((template) => {
+    const resolution = getTemplateResolution(template)
+    const key = resolution ? resolution.label : 'Unknown Resolution'
+    const group = groupsByKey.get(key) || {
+      key,
+      label: key,
+      pixels: resolution?.pixels ?? -1,
+      width: resolution?.width ?? -1,
+      height: resolution?.height ?? -1,
+      templates: [],
+    }
+
+    group.templates.push(template)
+    groupsByKey.set(key, group)
+  })
+
+  return [...groupsByKey.values()]
+    .map((group) => ({
+      ...group,
+      templates: group.templates.sort((left, right) =>
+        left.name.localeCompare(right.name, undefined, {
+          sensitivity: 'base',
+        }),
+      ),
+    }))
+    .sort((left, right) => {
+      if (right.pixels !== left.pixels) return right.pixels - left.pixels
+      if (right.width !== left.width) return right.width - left.width
+      if (right.height !== left.height) return right.height - left.height
+      return left.label.localeCompare(right.label, undefined, {
+        sensitivity: 'base',
+      })
+    })
+}
 
 /**
  * Renders the app header component.
@@ -77,6 +140,10 @@ export default function AppHeader({
     status,
     templates,
   } = templateControls
+  const templateGroups = useMemo(
+    () => getTemplateGroups(templates),
+    [templates],
+  )
 
   return (
     <header className="relative z-50 shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
@@ -85,11 +152,11 @@ export default function AppHeader({
           <div className="flex items-center gap-3">
             <img
               src="/logo192.png"
-              alt="Cyclemetry"
+              alt="OVRLEY"
               className="w-8 h-8 rounded-lg"
             />
             <div className="hidden sm:block">
-              <h1 className="font-semibold text-sm">Cyclemetry</h1>
+              <h1 className="font-semibold text-sm">OVRLEY</h1>
               <p className="text-[10px] text-muted-foreground">
                 Overlay Editor
               </p>
@@ -129,10 +196,18 @@ export default function AppHeader({
                   </div>
                 </SelectTrigger>
                 <SelectContent>
-                  {templates.map((template) => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.name} {template.type === 'user' && '(User)'}
-                    </SelectItem>
+                  {templateGroups.map((group) => (
+                    <SelectGroup key={group.key}>
+                      <SelectLabel className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
+                        <span>{group.label}</span>
+                      </SelectLabel>
+                      <SelectSeparator className="my-0" />
+                      {group.templates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name} {template.type === 'user' && '(User)'}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>
@@ -210,6 +285,17 @@ export default function AppHeader({
                 onClick={() => onSetBackgroundMode('black')}
               >
                 <Square className="h-4 w-4" />
+              </Button>
+            </SimpleTooltip>
+            <SimpleTooltip side="bottom" content="Cream background">
+              <Button
+                type="button"
+                variant={backgroundMode === 'cream' ? 'default' : 'ghost'}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => onSetBackgroundMode('cream')}
+              >
+                <Square className="h-4 w-4 fill-[#f4ead2] text-[#f4ead2]" />
               </Button>
             </SimpleTooltip>
             <div className="mx-1 h-5 w-px bg-border/70" />

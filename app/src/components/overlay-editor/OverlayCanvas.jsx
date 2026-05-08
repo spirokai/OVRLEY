@@ -7,6 +7,12 @@ import { cn } from '@/lib/utils'
 import WidgetPreview from './WidgetPreview'
 import { buildWidgetTransform } from './utils'
 
+const CANVAS_BACKGROUND_COLORS = {
+  black: '#000000',
+  checker: '#000000',
+  cream: '#f4ead2',
+}
+
 /**
  * Renders the overlay canvas widget component.
  *
@@ -153,10 +159,14 @@ export default function OverlayCanvas({
     >
       <div
         className={cn(
-          'pointer-events-none absolute inset-0 rounded-sm shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)] border border-red-500',
+          'pointer-events-none absolute inset-0 rounded-sm shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)] border border-border/50',
           backgroundMode === 'checker' && 'bg-overlay-grid-muted',
         )}
-        style={{ backgroundColor: '#000000' }}
+        style={{
+          backgroundColor:
+            CANVAS_BACKGROUND_COLORS[backgroundMode] ||
+            CANVAS_BACKGROUND_COLORS.black,
+        }}
       />
       <div className="absolute inset-0 overflow-visible">
         {widgets.map((widget) => {

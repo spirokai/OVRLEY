@@ -359,6 +359,8 @@ export default function useOverlayEditorState({
 
   const canResizeSelected =
     !isGroupSelection && selectedWidget?.category === 'plots'
+  const showEdgeResizeHandles =
+    canResizeSelected && selectedWidget?.type === 'elevation'
   const canScaleSelected = Boolean(
     !isGroupSelection && selectedWidget && selectedWidget.category !== 'plots',
   )
@@ -503,6 +505,7 @@ export default function useOverlayEditorState({
     selectedWidgetIds,
     selectionRect,
     setSceneElement,
+    showEdgeResizeHandles,
     viewportRef,
     widgetRefCallbacks,
     widgets: renderedWidgets,

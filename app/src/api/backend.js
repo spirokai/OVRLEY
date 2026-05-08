@@ -29,7 +29,7 @@ async function getInvoke() {
 async function requireInvoke() {
   const invoke = await getInvoke()
   if (!invoke) {
-    throw new Error('Cyclemetry desktop runtime is required.')
+    throw new Error('OVRLEY desktop runtime is required.')
   }
   return invoke
 }

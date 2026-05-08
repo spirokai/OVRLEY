@@ -135,6 +135,7 @@ function OverlayEditor({
     selectedWidgetIds,
     selectionRect,
     setSceneElement,
+    showEdgeResizeHandles,
     viewportRef,
     widgetRefCallbacks,
     widgets,
@@ -209,6 +210,7 @@ function OverlayEditor({
               canScaleSelected={canScaleSelected}
               canRotateSelected={canRotateSelected}
               maintainAspectRatio={maintainAspectRatio}
+              showEdgeResizeHandles={showEdgeResizeHandles}
               elementGuidelines={elementGuidelines}
               sceneSize={sceneSize}
               handlers={handlers}
