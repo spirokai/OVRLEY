@@ -150,17 +150,7 @@ export default function AppHeader({
       <div className="flex items-center justify-between px-6 py-3">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
-            <img
-              src="/logo192.png"
-              alt="OVRLEY"
-              className="w-8 h-8 rounded-lg"
-            />
-            <div className="hidden sm:block">
-              <h1 className="font-semibold text-sm">OVRLEY</h1>
-              <p className="text-[10px] text-muted-foreground">
-                Overlay Editor
-              </p>
-            </div>
+            <img src="/logo.svg" alt="OVRLEY" className="h-5" />
           </div>
 
           <div className="h-8 w-px bg-border/60" />

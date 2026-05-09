@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "cyclemetry",
+  "productName": "OVRLEY",
   "version": "0.1.0",
   "identifier": "com.cyclemetry.desktop",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Cyclemetry",
+        "title": "OVRLEY",
         "width": 1440,
         "height": 900,
         "minWidth": 1100,
