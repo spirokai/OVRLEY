@@ -8,6 +8,7 @@ build/
 dist/
 dist-portable/
 target/
+app/debug/*
 src-tauri/binaries/
 ffmpeg/
 .ffmpeg/
