@@ -2,7 +2,7 @@
  * Provides overlay editor helpers for overlay canvas.
  */
 
-import { memo } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from './constants'
 import WidgetPreview from './WidgetPreview'
@@ -11,50 +11,71 @@ import { buildWidgetTransform } from './utils'
 const CANVAS_BACKGROUND_COLORS = {
   black: '#000000',
   checker: '#000000',
-  cream: '#f4ead2',
+  white: '#f4ead2',
 }
 
-function alignDisplayPixel(value, max) {
-  return Math.min(Math.round(value) + 0.5, Math.max(0.5, Math.round(max) - 0.5))
-}
-
-function CanvasGrid({ displayScale, sceneSize }) {
+const CanvasGrid = memo(function CanvasGrid({ displayScale, sceneSize }) {
+  const canvasRef = useRef(null)
   const sceneGridSize = getEditorGridSize(sceneSize)
   const displayWidth = sceneSize.width * displayScale
   const displayHeight = sceneSize.height * displayScale
-  const path = []
 
-  for (let x = 0; x <= sceneSize.width; x += sceneGridSize) {
-    const displayX = alignDisplayPixel(x * displayScale, displayWidth)
-    path.push(`M ${displayX} 0 V ${displayHeight}`)
-  }
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const context = canvas?.getContext('2d')
 
-  for (let y = 0; y <= sceneSize.height; y += sceneGridSize) {
-    const displayY = alignDisplayPixel(y * displayScale, displayHeight)
-    path.push(`M 0 ${displayY} H ${displayWidth}`)
-  }
+    if (!canvas || !context || displayWidth <= 0 || displayHeight <= 0) {
+      return
+    }
+
+    const pixelRatio = window.devicePixelRatio || 1
+    const bitmapWidth = Math.max(1, Math.round(displayWidth * pixelRatio))
+    const bitmapHeight = Math.max(1, Math.round(displayHeight * pixelRatio))
+
+    canvas.width = bitmapWidth
+    canvas.height = bitmapHeight
+    canvas.style.width = `${displayWidth}px`
+    canvas.style.height = `${displayHeight}px`
+
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+    context.clearRect(0, 0, displayWidth, displayHeight)
+    context.strokeStyle = '#003836'
+    context.lineWidth = 1
+    context.beginPath()
+
+    for (let x = 0; x <= sceneSize.width; x += sceneGridSize) {
+      const displayX = Math.min(
+        Math.round(x * displayScale) + 0.5,
+        Math.max(0.5, Math.round(displayWidth) - 0.5),
+      )
+      context.moveTo(displayX, 0)
+      context.lineTo(displayX, displayHeight)
+    }
+
+    for (let y = 0; y <= sceneSize.height; y += sceneGridSize) {
+      const displayY = Math.min(
+        Math.round(y * displayScale) + 0.5,
+        Math.max(0.5, Math.round(displayHeight) - 0.5),
+      )
+      context.moveTo(0, displayY)
+      context.lineTo(displayWidth, displayY)
+    }
+
+    context.stroke()
+  }, [displayHeight, displayScale, displayWidth, sceneGridSize, sceneSize])
 
   return (
-    <svg
+    <canvas
+      ref={canvasRef}
       className="pointer-events-none absolute inset-0"
-      width={displayWidth}
-      height={displayHeight}
-      viewBox={`0 0 ${displayWidth} ${displayHeight}`}
       aria-hidden="true"
       style={{
         transform: `scale(${1 / displayScale})`,
         transformOrigin: 'top left',
       }}
-    >
-      <path
-        d={path.join(' ')}
-        fill="none"
-        stroke="color-mix(in srgb, var(--theme-color-aqua) 25%, #000000)"
-        strokeWidth="1"
-      />
-    </svg>
+    />
   )
-}
+})
 
 /**
  * Renders the overlay canvas widget component.

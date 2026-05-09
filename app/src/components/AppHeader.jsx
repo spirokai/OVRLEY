@@ -279,13 +279,13 @@ export default function AppHeader({
                 <Square className="h-4 w-4" />
               </Button>
             </SimpleTooltip>
-            <SimpleTooltip side="bottom" content="Cream background">
+            <SimpleTooltip side="bottom" content="White background">
               <Button
                 type="button"
-                variant={backgroundMode === 'cream' ? 'default' : 'ghost'}
+                variant={backgroundMode === 'white' ? 'default' : 'ghost'}
                 size="icon"
                 className="h-8 w-8"
-                onClick={() => onSetBackgroundMode('cream')}
+                onClick={() => onSetBackgroundMode('white')}
               >
                 <Square className="h-4 w-4 fill-[#f4ead2] text-[#f4ead2]" />
               </Button>

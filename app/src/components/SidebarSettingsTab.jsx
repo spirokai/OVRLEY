@@ -86,6 +86,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     setUpdateRate,
     exportRange,
     setExportRange,
+    activitySummary,
     aspectRatio,
     setAspectRatio,
     resetGlobalDefaults,
@@ -303,12 +304,14 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             </TabsList>
           </Tabs>
         </div>
-        <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
-          <ExportRangeSettings
-            exportRange={exportRange}
-            onExportRangeChange={setExportRange}
-          />
-        </div>
+        {activitySummary ? (
+          <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
+            <ExportRangeSettings
+              exportRange={exportRange}
+              onExportRangeChange={setExportRange}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-4">

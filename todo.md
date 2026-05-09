@@ -1,7 +1,5 @@
--add grid display button and snap to grid button
 -handle widget update rate by defining container fps different from real
 
--custom range export in sidebar enabled only if we have parsed activity
 -gradient widget around causes vertical jitter while dragging around
 -add shadows to icons and remaining map route/elevation profile - skia first, frotnend follows
 -height of metric widget selection box does not correspond to the real height. Is that just stale state from font change?
