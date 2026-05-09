@@ -6,10 +6,13 @@
 *__pycache__*
 build/
 dist/
+dist-portable/
 target/
 src-tauri/binaries/
 ffmpeg/
 .ffmpeg/
+vendor/ffmpeg/*
+!vendor/ffmpeg/.gitkeep
 
 # App specifics
 next/

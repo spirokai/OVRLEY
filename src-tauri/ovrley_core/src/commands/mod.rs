@@ -25,27 +25,39 @@ pub struct AppPaths {
 
 impl AppPaths {
     pub fn from_repo_root(repo_root: PathBuf) -> Self {
+        Self::from_roots(repo_root.clone(), repo_root)
+    }
+
+    pub fn from_resource_root(repo_root: PathBuf, resource_root: PathBuf) -> Self {
+        Self::from_roots(repo_root, resource_root)
+    }
+
+    fn from_roots(repo_root: PathBuf, resource_root: PathBuf) -> Self {
         let downloads_dir = downloads_ovrley_dir();
         let runtime_dir = downloads_dir.join(".runtime");
-        let font_dirs = vec![repo_root.join("fonts")]
+        let font_dirs = vec![resource_root.join("fonts"), repo_root.join("fonts")]
             .into_iter()
             .filter(|path| path.is_dir())
             .collect();
-        // Keep debug artifacts under src-tauri, but place them inside target so
-        // `tauri dev` source watchers do not restart the app on every render write.
-        let debug_render_dir = repo_root
-            .join("src-tauri")
-            .join("target")
-            .join("debug_render");
+        // Keep dev debug artifacts under src-tauri/target so `tauri dev`
+        // source watchers do not restart the app on every render write.
+        let debug_render_dir = if resource_root == repo_root {
+            repo_root
+                .join("src-tauri")
+                .join("target")
+                .join("debug_render")
+        } else {
+            runtime_dir.join("debug_render")
+        };
         let preview_dir = runtime_dir.join("previews");
         let temp_dir = runtime_dir.join("tmp");
-        let bundled_templates_dirs = vec![repo_root.join("templates")]
+        let bundled_templates_dirs = vec![resource_root.join("templates"), repo_root.join("templates")]
             .into_iter()
             .filter(|path| path.is_dir())
             .collect();
 
         Self {
-            repo_root,
+            repo_root: resource_root,
             font_dirs,
             debug_render_dir,
             preview_dir,
