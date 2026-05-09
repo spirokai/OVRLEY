@@ -6,6 +6,19 @@ import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Switch } from '@/components/ui/switch'
 
+function sanitizeTimeInput(value) {
+  return String(value)
+    .split(':')
+    .map((part) => part.split(/[.,]/)[0].replace(/\D/g, ''))
+    .join(':')
+}
+
+function preventDecimalInput(event) {
+  if (event.key === '.' || event.key === ',') {
+    event.preventDefault()
+  }
+}
+
 /**
  * Renders the export range settings component.
  *
@@ -43,10 +56,11 @@ export default function ExportRangeSettings({
             </Label>
             <BlurInput
               value={exportRange.fromTime}
+              onKeyDown={preventDecimalInput}
               onChange={(event) =>
                 onExportRangeChange({
                   ...exportRange,
-                  fromTime: event.target.value,
+                  fromTime: sanitizeTimeInput(event.target.value),
                 })
               }
               className="h-9 text-xs font-mono"
@@ -60,10 +74,11 @@ export default function ExportRangeSettings({
             </Label>
             <BlurInput
               value={exportRange.toTime}
+              onKeyDown={preventDecimalInput}
               onChange={(event) =>
                 onExportRangeChange({
                   ...exportRange,
-                  toTime: event.target.value,
+                  toTime: sanitizeTimeInput(event.target.value),
                 })
               }
               className="h-9 text-xs font-mono"

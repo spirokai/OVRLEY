@@ -7,6 +7,10 @@ import useStore from '../store/useStore'
 import * as backend from './backend'
 import { applyGlobalDefaults } from '../lib/config-utils'
 import { timeToSeconds } from '../lib/export-range'
+import {
+  normalizeUpdateRateForFps,
+  sanitizeIntegerFps,
+} from '../lib/update-rate'
 
 /**
  * Renders video.
@@ -47,7 +51,11 @@ export default async function renderVideo(overrides = {}) {
 
     // Apply performance and range overrides
     if (config.scene) {
-      config.scene.update_rate = activeUpdateRate
+      config.scene.fps = sanitizeIntegerFps(config.scene.fps)
+      config.scene.update_rate = normalizeUpdateRateForFps(
+        config.scene.fps,
+        activeUpdateRate,
+      )
       config.scene.ffmpeg = {
         ...(config.scene.ffmpeg || {}),
         codec: activeExportCodec || 'prores_ks',
@@ -69,8 +77,8 @@ export default async function renderVideo(overrides = {}) {
       // Apply export range override if custom
       config.scene.custom_export_range_active = false
       if (activeExportRange.type === 'custom') {
-        const start = timeToSeconds(activeExportRange.fromTime)
-        const end = timeToSeconds(activeExportRange.toTime)
+        const start = Math.trunc(timeToSeconds(activeExportRange.fromTime))
+        const end = Math.trunc(timeToSeconds(activeExportRange.toTime))
         if (end > start) {
           config.scene.start = start
           config.scene.end = end

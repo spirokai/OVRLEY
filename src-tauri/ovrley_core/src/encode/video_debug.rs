@@ -19,9 +19,12 @@ struct TimingSummary {
     timestamp: String,
     overlay_filename: String,
     fps: f64,
+    layout_fps: f64,
+    update_rate: u32,
     width: u32,
     height: u32,
     total_frames: u32,
+    layout_total_frames: u32,
     rendered_frames: u32,
     total_time_taken: f64,
     sample_frame_indices: Vec<usize>,
@@ -40,6 +43,7 @@ struct StitchSummary {
     timestamp: String,
     codec: String,
     total_frames: u32,
+    layout_total_frames: u32,
     segments: Vec<SegmentSummary>,
     concat_output: String,
     concat_duration_ms: f64,
@@ -51,6 +55,7 @@ struct SegmentSummary {
     start_seconds: f64,
     end_seconds: f64,
     frames: u32,
+    layout_frames: u32,
     filename: String,
 }
 
@@ -129,6 +134,7 @@ pub(crate) fn write_timing_summary_with_phase(
     output_path: &Path,
     phase: &str,
     total_frames: u32,
+    layout_total_frames: u32,
     rendered_frames: u32,
     total_time_taken: f64,
     sample_frame_indices: Vec<usize>,
@@ -138,10 +144,13 @@ pub(crate) fn write_timing_summary_with_phase(
         phase: phase.to_string(),
         timestamp: iso_timestamp_now(),
         overlay_filename: output_path.to_string_lossy().to_string(),
-        fps: config.scene.fps,
+        fps: config.container_fps(),
+        layout_fps: config.scene.fps,
+        update_rate: config.widget_update_rate(),
         width: config.scene.width.unwrap_or(1920),
         height: config.scene.height.unwrap_or(1080),
         total_frames,
+        layout_total_frames,
         rendered_frames,
         total_time_taken: round3(total_time_taken),
         sample_frame_indices,
@@ -175,15 +184,24 @@ pub(crate) fn write_stitch_summary(
             index,
             start_seconds: round3(segment_config.scene.start),
             end_seconds: round3(segment_config.scene.end),
-            frames: segment_reports[index].frame_count as u32,
+            frames: rendered_frame_count_for_summary(
+                segment_reports[index].frame_count,
+                config.widget_update_rate() as usize,
+            ),
+            layout_frames: segment_reports[index].frame_count as u32,
             filename: filenames[index].clone(),
         })
         .collect::<Vec<_>>();
     let total_frames = segment_summaries.iter().map(|segment| segment.frames).sum();
+    let layout_total_frames = segment_summaries
+        .iter()
+        .map(|segment| segment.layout_frames)
+        .sum();
     let summary = StitchSummary {
         timestamp: iso_timestamp_now(),
         codec,
         total_frames,
+        layout_total_frames,
         segments: segment_summaries,
         concat_output: public_filename.to_string(),
         concat_duration_ms: round3(concat_duration_ms),
@@ -281,6 +299,14 @@ fn iso_timestamp_now() -> String {
 
 fn round3(value: f64) -> f64 {
     (value * 1000.0).round() / 1000.0
+}
+
+fn rendered_frame_count_for_summary(layout_frame_count: usize, update_rate: usize) -> u32 {
+    if layout_frame_count == 0 {
+        return 0;
+    }
+    let safe_update_rate = update_rate.max(1);
+    (((layout_frame_count - 1) / safe_update_rate) + 1) as u32
 }
 
 fn write_json<T: Serialize>(path: PathBuf, payload: &T) -> Result<(), String> {

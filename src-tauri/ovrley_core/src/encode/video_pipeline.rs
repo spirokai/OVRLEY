@@ -46,7 +46,10 @@ pub(crate) fn render_video_single(
     let ffmpeg_settings = finalize_ffmpeg_settings(build_ffmpeg_settings(&config.scene.ffmpeg)?);
     let width = make_even(config.scene.width.unwrap_or(1920));
     let height = make_even(config.scene.height.unwrap_or(1080));
-    let total_frames = dense_activity.frame_count as u32;
+    let layout_total_frames = dense_activity.frame_count as u32;
+    let update_rate = config.widget_update_rate() as usize;
+    let total_frames = rendered_frame_count(dense_activity.frame_count, update_rate) as u32;
+    let container_fps = config.container_fps();
     let debug_dir = create_debug_dir(paths, "phase_6")?;
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
         prepare_preview_assets(paths, config, activity, dense_activity)?;
@@ -86,7 +89,7 @@ pub(crate) fn render_video_single(
         &output_path,
         width,
         height,
-        config.scene.fps,
+        container_fps,
         &input_pix_fmt,
     )?;
 
@@ -113,7 +116,7 @@ pub(crate) fn render_video_single(
     let mut estimator = ProgressEstimator::default();
     let mut rendered_frames = 0u32;
     let render_result = (|| -> Result<(), String> {
-        for frame_index in 0..(total_frames as usize) {
+        for output_frame_index in 0..(total_frames as usize) {
             if cancel_flag.load(Ordering::SeqCst) {
                 break;
             }
@@ -122,6 +125,7 @@ pub(crate) fn render_video_single(
             }
 
             let frame_started = Instant::now();
+            let frame_index = source_frame_index(output_frame_index, update_rate, dense_activity);
             let mut frame_buffer =
                 acquire_frame_buffer(&free_receiver, &cancel_flag, &mut aggregate_profiler)?;
             render_frame_rgba(
@@ -139,7 +143,7 @@ pub(crate) fn render_video_single(
                 },
                 &mut aggregate_profiler,
             )?;
-            if sample_frames.contains(&frame_index) {
+            if sample_frames.contains(&output_frame_index) {
                 aggregate_profiler.measure("debug.sample_frame_write", || {
                     write_sample_frame(
                         &ffmpeg_bin,
@@ -205,6 +209,7 @@ pub(crate) fn render_video_single(
         &output_path,
         "phase_6",
         total_frames,
+        layout_total_frames,
         rendered_frames,
         total_time_taken,
         sample_frames,
@@ -226,6 +231,25 @@ fn finalize_ffmpeg_settings(
         ffmpeg_settings.output_args.push("4".to_string());
     }
     ffmpeg_settings
+}
+
+pub(crate) fn rendered_frame_count(layout_frame_count: usize, update_rate: usize) -> usize {
+    if layout_frame_count == 0 {
+        return 0;
+    }
+    let safe_update_rate = update_rate.max(1);
+    ((layout_frame_count - 1) / safe_update_rate) + 1
+}
+
+fn source_frame_index(
+    output_frame_index: usize,
+    update_rate: usize,
+    dense_activity: &DenseActivityReport,
+) -> usize {
+    let max_frame_index = dense_activity.frame_count.saturating_sub(1);
+    output_frame_index
+        .saturating_mul(update_rate.max(1))
+        .min(max_frame_index)
 }
 
 fn queue_frame(

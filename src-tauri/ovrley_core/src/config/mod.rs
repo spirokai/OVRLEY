@@ -22,6 +22,8 @@ pub struct SceneConfig {
     #[serde(default)]
     pub overlay_filename: Option<String>,
     #[serde(default)]
+    pub update_rate: Option<u32>,
+    #[serde(default)]
     pub ffmpeg: Value,
     #[serde(default)]
     pub opacity: Option<f32>,
@@ -375,6 +377,23 @@ pub fn parse_config_json(input: &str) -> Result<RenderConfig, String> {
     if config.scene.fps <= 0.0 {
         return Err(format!("Invalid scene.fps: {}", config.scene.fps));
     }
+    if (config.scene.fps.fract()).abs() > f64::EPSILON {
+        return Err(format!(
+            "scene.fps must be an integer for widget update rate support: {}",
+            config.scene.fps
+        ));
+    }
+    if let Some(update_rate) = config.scene.update_rate {
+        if update_rate == 0 {
+            return Err("scene.update_rate must be at least 1".to_string());
+        }
+        let fps = config.scene.fps.round() as u32;
+        if fps % update_rate != 0 {
+            return Err(format!(
+                "scene.update_rate ({update_rate}) must cleanly divide scene.fps ({fps})"
+            ));
+        }
+    }
     if config.scene.end <= config.scene.start {
         return Err(format!(
             "Invalid scene range. scene.end ({}) must be greater than scene.start ({})",
@@ -385,6 +404,14 @@ pub fn parse_config_json(input: &str) -> Result<RenderConfig, String> {
 }
 
 impl RenderConfig {
+    pub fn widget_update_rate(&self) -> u32 {
+        self.scene.update_rate.unwrap_or(1).max(1)
+    }
+
+    pub fn container_fps(&self) -> f64 {
+        self.scene.fps / f64::from(self.widget_update_rate())
+    }
+
     pub fn render_data_requirements(&self) -> Result<RenderDataRequirements, String> {
         let mut requirements = RenderDataRequirements::default();
 

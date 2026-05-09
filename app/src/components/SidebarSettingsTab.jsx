@@ -2,7 +2,7 @@
  * Renders the sidebar settings tab portion of the application interface.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
@@ -21,6 +21,12 @@ import ExportRangeSettings from '@/components/ExportRangeSettings'
 import FontSelectField from '@/components/ui/font-select-field'
 import HexColorPicker from '@/components/ui/hex-color-picker'
 import useAvailableFonts from '@/hooks/useAvailableFonts'
+import {
+  getContainerFps,
+  getUpdateRateOptions,
+  normalizeUpdateRateForFps,
+  sanitizeIntegerFps,
+} from '@/lib/update-rate'
 import useStore from '../store/useStore'
 
 const ASPECT_RATIOS = [
@@ -105,6 +111,14 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
   const [fpsMode, setFpsMode] = useState(
     [24, 30, 60].includes(scene?.fps) ? scene?.fps?.toString() : 'custom',
   )
+  const updateRateOptions = useMemo(
+    () => getUpdateRateOptions(scene?.fps),
+    [scene?.fps],
+  )
+  const containerFps = useMemo(
+    () => getContainerFps(scene?.fps, updateRate),
+    [scene?.fps, updateRate],
+  )
 
   useEffect(() => {
     if (scene) {
@@ -116,6 +130,16 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
       else setFpsMode('custom')
     }
   }, [scene])
+
+  useEffect(() => {
+    const normalizedUpdateRate = normalizeUpdateRateForFps(
+      scene?.fps,
+      updateRate,
+    )
+    if (normalizedUpdateRate !== updateRate) {
+      setUpdateRate(normalizedUpdateRate)
+    }
+  }, [scene?.fps, setUpdateRate, updateRate])
 
   const updateScene = (key, value) => {
     let finalValue = value
@@ -245,7 +269,11 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
               value={fpsMode}
               onValueChange={(v) => {
                 setFpsMode(v)
-                if (v !== 'custom') updateScene('fps', parseInt(v))
+                if (v !== 'custom') {
+                  const fps = sanitizeIntegerFps(v)
+                  setUpdateRate(normalizeUpdateRateForFps(fps, updateRate))
+                  updateScene('fps', fps)
+                }
               }}
             >
               <SelectTrigger className="h-9 text-xs">
@@ -267,10 +295,19 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
               <BlurInput
                 type="number"
                 min={1}
+                step={1}
+                inputMode="numeric"
                 value={scene?.fps ?? 30}
-                onChange={(e) =>
-                  updateScene('fps', parseInt(e.target.value) || 1)
-                }
+                onKeyDown={(event) => {
+                  if (['.', ',', 'e', 'E', '+', '-'].includes(event.key)) {
+                    event.preventDefault()
+                  }
+                }}
+                onChange={(e) => {
+                  const fps = sanitizeIntegerFps(e.target.value)
+                  setUpdateRate(normalizeUpdateRateForFps(fps, updateRate))
+                  updateScene('fps', fps)
+                }}
                 className="h-9 text-xs"
               />
             </div>
@@ -289,21 +326,26 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             value={updateRate.toString()}
             onValueChange={(v) => setUpdateRate(parseInt(v))}
           >
-            <TabsList className="grid h-8 w-full grid-cols-4 bg-surface p-0.5">
-              <TabsTrigger value="1" className="text-[10px] cursor-pointer">
-                1/1
-              </TabsTrigger>
-              <TabsTrigger value="2" className="text-[10px] cursor-pointer">
-                1/2
-              </TabsTrigger>
-              <TabsTrigger value="4" className="text-[10px] cursor-pointer">
-                1/4
-              </TabsTrigger>
-              <TabsTrigger value="8" className="text-[10px] cursor-pointer">
-                1/8
-              </TabsTrigger>
+            <TabsList
+              className="grid h-8 w-full bg-surface p-0.5"
+              style={{
+                gridTemplateColumns: `repeat(${updateRateOptions.length}, minmax(0, 1fr))`,
+              }}
+            >
+              {updateRateOptions.map((rate) => (
+                <TabsTrigger
+                  key={rate}
+                  value={rate.toString()}
+                  className="text-[10px] cursor-pointer"
+                >
+                  1/{rate}
+                </TabsTrigger>
+              ))}
             </TabsList>
           </Tabs>
+          <p className="text-[10px] text-muted-foreground">
+            Output container: {containerFps.toFixed(2).replace(/\.00$/, '')} fps
+          </p>
         </div>
         {activitySummary ? (
           <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">

@@ -2,6 +2,8 @@
  * Provides overlay editor helpers for preview timing.
  */
 
+import { getContainerFps } from '@/lib/update-rate'
+
 /**
  * Returns effective preview fps.
  *
@@ -10,8 +12,5 @@
  * @returns {*} Requested value or structure.
  */
 export function getEffectivePreviewFps(fps, updateRate) {
-  const safeSceneFps = Math.max(Number(fps) || 30, 1)
-  const safeUpdateRate = Math.max(Number(updateRate) || 1, 1)
-
-  return Math.max(safeSceneFps / safeUpdateRate, 1)
+  return getContainerFps(fps, updateRate)
 }

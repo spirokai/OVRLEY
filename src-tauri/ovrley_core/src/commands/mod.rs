@@ -2,6 +2,7 @@ use crate::activity::{build_dense_activity_report, parse_activity_json};
 use crate::config::parse_config_json;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
+use crate::encode::video_pipeline::rendered_frame_count;
 use crate::encode::video::{render_video, RenderController};
 use crate::render::{render_preview_to_path, stub_demo_response};
 use serde::Serialize;
@@ -159,8 +160,10 @@ pub fn backend_render(
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
+    let output_frame_count =
+        rendered_frame_count(dense_activity.frame_count, config.widget_update_rate() as usize);
     let render_id = controller.try_start(
-        dense_activity.frame_count as u32,
+        output_frame_count as u32,
         "Preparing render assets...",
     )?;
 

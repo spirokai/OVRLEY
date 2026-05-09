@@ -6,6 +6,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/lib/template-snapshot'
+import {
+  normalizeUpdateRateForFps,
+  sanitizeIntegerFps,
+} from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
 
@@ -160,18 +164,18 @@ export default function useRenderWorkflow({ backendStatus }) {
     setVideoFilename,
   ])
 
-  const buildRenderSettingsDraft = useCallback(
-    () => ({
-      fps: Math.max(Number(config?.scene?.fps) || 30, 1),
-      updateRate,
+  const buildRenderSettingsDraft = useCallback(() => {
+    const fps = sanitizeIntegerFps(config?.scene?.fps || 30)
+    return {
+      fps,
+      updateRate: normalizeUpdateRateForFps(fps, updateRate),
       exportCodec: exportCodec || 'prores_ks',
       exportRange: {
         ...DEFAULT_EXPORT_RANGE,
         ...(exportRange || {}),
       },
-    }),
-    [config?.scene?.fps, updateRate, exportCodec, exportRange],
-  )
+    }
+  }, [config?.scene?.fps, updateRate, exportCodec, exportRange])
 
   const openRenderDialog = useCallback(() => {
     if (renderDisabled) {
@@ -212,16 +216,21 @@ export default function useRenderWorkflow({ backendStatus }) {
       ...DEFAULT_EXPORT_RANGE,
       ...(renderSettingsDraft.exportRange || {}),
     }
+    const nextFps = sanitizeIntegerFps(renderSettingsDraft.fps || 30)
+    const nextUpdateRate = normalizeUpdateRateForFps(
+      nextFps,
+      renderSettingsDraft.updateRate,
+    )
     const nextConfig = {
       ...config,
       scene: {
         ...config.scene,
-        fps: Math.max(Number(renderSettingsDraft.fps) || 30, 1),
+        fps: nextFps,
       },
     }
 
     setConfig(nextConfig)
-    setUpdateRate(renderSettingsDraft.updateRate)
+    setUpdateRate(nextUpdateRate)
     setExportCodec(renderSettingsDraft.exportCodec)
     setExportRange(nextExportRange)
     setActiveRenderId(null)
@@ -237,7 +246,7 @@ export default function useRenderWorkflow({ backendStatus }) {
       const { default: renderVideo } = await import('../api/renderVideo')
       const result = await renderVideo({
         config: nextConfig,
-        updateRate: renderSettingsDraft.updateRate,
+        updateRate: nextUpdateRate,
         exportRange: nextExportRange,
         exportCodec: renderSettingsDraft.exportCodec,
       })

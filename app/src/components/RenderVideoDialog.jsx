@@ -2,7 +2,7 @@
  * Renders the render video dialog portion of the application interface.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Film, Loader2, Play, Timer, Video } from 'lucide-react'
 import { cancelRender } from '@/api/backend'
 import useStore from '@/store/useStore'
@@ -19,6 +19,12 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import ExportRangeSettings from '@/components/ExportRangeSettings'
+import {
+  getContainerFps,
+  getUpdateRateOptions,
+  normalizeUpdateRateForFps,
+  sanitizeIntegerFps,
+} from '@/lib/update-rate'
 
 /**
  * Formats time.
@@ -169,6 +175,14 @@ export default function RenderVideoDialog({
   const [fpsMode, setFpsMode] = useState(
     [24, 30, 60].includes(settings?.fps) ? settings.fps.toString() : 'custom',
   )
+  const updateRateOptions = useMemo(
+    () => getUpdateRateOptions(settings?.fps),
+    [settings?.fps],
+  )
+  const containerFps = useMemo(
+    () => getContainerFps(settings?.fps, settings?.updateRate),
+    [settings?.fps, settings?.updateRate],
+  )
 
   useEffect(() => {
     if (!settings) {
@@ -182,6 +196,20 @@ export default function RenderVideoDialog({
 
     setFpsMode('custom')
   }, [settings])
+
+  useEffect(() => {
+    if (!settings) {
+      return
+    }
+
+    const normalizedUpdateRate = normalizeUpdateRateForFps(
+      settings.fps,
+      settings.updateRate,
+    )
+    if (normalizedUpdateRate !== settings.updateRate) {
+      onSettingsChange({ updateRate: normalizedUpdateRate })
+    }
+  }, [settings, onSettingsChange])
 
   if (phase === 'closed' || !settings) {
     return null
@@ -229,7 +257,14 @@ export default function RenderVideoDialog({
                   onValueChange={(value) => {
                     setFpsMode(value)
                     if (value !== 'custom') {
-                      onSettingsChange({ fps: parseInt(value, 10) })
+                      const fps = sanitizeIntegerFps(value)
+                      onSettingsChange({
+                        fps,
+                        updateRate: normalizeUpdateRateForFps(
+                          fps,
+                          settings.updateRate,
+                        ),
+                      })
                     }
                   }}
                 >
@@ -253,12 +288,24 @@ export default function RenderVideoDialog({
                   <BlurInput
                     type="number"
                     min={1}
+                    step={1}
+                    inputMode="numeric"
                     value={settings.fps}
-                    onChange={(event) =>
+                    onKeyDown={(event) => {
+                      if (['.', ',', 'e', 'E', '+', '-'].includes(event.key)) {
+                        event.preventDefault()
+                      }
+                    }}
+                    onChange={(event) => {
+                      const fps = sanitizeIntegerFps(event.target.value)
                       onSettingsChange({
-                        fps: Math.max(parseInt(event.target.value, 10) || 1, 1),
+                        fps,
+                        updateRate: normalizeUpdateRateForFps(
+                          fps,
+                          settings.updateRate,
+                        ),
                       })
-                    }
+                    }}
                     className="h-9 text-xs"
                   />
                 </div>
@@ -278,21 +325,27 @@ export default function RenderVideoDialog({
                     onSettingsChange({ updateRate: parseInt(value, 10) })
                   }
                 >
-                  <TabsList className="grid h-8 w-full grid-cols-4 bg-surface p-0.5">
-                    <TabsTrigger value="1" className="text-[10px]">
-                      1/1
-                    </TabsTrigger>
-                    <TabsTrigger value="2" className="text-[10px]">
-                      1/2
-                    </TabsTrigger>
-                    <TabsTrigger value="4" className="text-[10px]">
-                      1/4
-                    </TabsTrigger>
-                    <TabsTrigger value="8" className="text-[10px]">
-                      1/8
-                    </TabsTrigger>
+                  <TabsList
+                    className="grid h-8 w-full bg-surface p-0.5"
+                    style={{
+                      gridTemplateColumns: `repeat(${updateRateOptions.length}, minmax(0, 1fr))`,
+                    }}
+                  >
+                    {updateRateOptions.map((rate) => (
+                      <TabsTrigger
+                        key={rate}
+                        value={rate.toString()}
+                        className="text-[10px]"
+                      >
+                        1/{rate}
+                      </TabsTrigger>
+                    ))}
                   </TabsList>
                 </Tabs>
+                <p className="text-[10px] text-muted-foreground">
+                  Output container:{' '}
+                  {containerFps.toFixed(2).replace(/\.00$/, '')} fps
+                </p>
               </div>
 
               <div className="space-y-2">

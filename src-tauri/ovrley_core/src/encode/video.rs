@@ -5,7 +5,7 @@ use crate::config::RenderConfig;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
 use crate::encode::video_debug::{concat_video_segments, timestamp_nanos, write_stitch_summary};
-use crate::encode::video_pipeline::render_video_single;
+use crate::encode::video_pipeline::{render_video_single, rendered_frame_count};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -173,7 +173,8 @@ pub fn run_parallel_renders(
 
             let controller = RenderController::default();
             let start_result = controller.try_start(
-                report.frame_count as u32,
+                rendered_frame_count(report.frame_count, config.widget_update_rate() as usize)
+                    as u32,
                 &format!("Parallel Render {}", index + 1),
             );
             let result = match start_result {
@@ -244,6 +245,7 @@ fn should_parallelize_qtrle(config: &RenderConfig, dense_activity: &DenseActivit
         .and_then(serde_json::Value::as_str)
         .map(|codec| codec == "qtrle")
         .unwrap_or(false)
+        && integer_second_duration(config).unwrap_or(0) >= 2
         && dense_activity.frame_count >= 2
 }
 
@@ -254,25 +256,21 @@ fn render_video_segmented_qtrle(
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> Result<String, String> {
-    let total_frames = dense_activity.frame_count as u32;
-    let segment_count = estimate_parallel_render_worker_count(total_frames as usize);
+    let Some(total_seconds) = integer_second_duration(config) else {
+        return render_video_single(paths, config, activity, dense_activity, controller);
+    };
+    let segment_count = estimate_parallel_render_worker_count(total_seconds as usize);
     if segment_count < 2 {
         return render_video_single(paths, config, activity, dense_activity, controller);
     }
 
-    let fps = config.scene.fps.max(f64::EPSILON);
     let mut segment_configs = Vec::with_capacity(segment_count);
     let mut segment_reports = Vec::with_capacity(segment_count);
-    for segment_index in 0..segment_count {
-        let start_frame = ((segment_index as u32) * total_frames) / (segment_count as u32);
-        let end_frame = (((segment_index + 1) as u32) * total_frames) / (segment_count as u32);
-        if end_frame <= start_frame {
-            continue;
-        }
-
+    for (segment_start, segment_end) in integer_second_windows(config, total_seconds, segment_count)
+    {
         let mut segment_config = config.clone();
-        segment_config.scene.start = config.scene.start + (f64::from(start_frame) / fps);
-        segment_config.scene.end = config.scene.start + (f64::from(end_frame) / fps);
+        segment_config.scene.start = segment_start;
+        segment_config.scene.end = segment_end;
         let segment_dense = build_dense_activity_report(activity, &segment_config)?;
         if segment_dense.frame_count == 0 {
             continue;
@@ -287,13 +285,21 @@ fn render_video_segmented_qtrle(
     }
     let combined_frames = segment_reports
         .iter()
-        .map(|report| report.frame_count as u32)
+        .map(|report| {
+            rendered_frame_count(report.frame_count, config.widget_update_rate() as usize) as u32
+        })
         .sum::<u32>();
 
     let child_cancel_flag = controller.cancel_flag();
     let segment_controllers = segment_reports
         .iter()
-        .map(|report| child_render_controller(report.frame_count as u32, &child_cancel_flag))
+        .map(|report| {
+            child_render_controller(
+                rendered_frame_count(report.frame_count, config.widget_update_rate() as usize)
+                    as u32,
+                &child_cancel_flag,
+            )
+        })
         .collect::<Vec<_>>();
 
     enum SegmentEvent {
@@ -414,6 +420,39 @@ fn render_video_segmented_qtrle(
     }
     cleanup_segment_outputs(paths, &results);
     Ok(public_filename)
+}
+
+fn integer_second_duration(config: &RenderConfig) -> Option<u32> {
+    let start = config.scene.start.round();
+    let end = config.scene.end.round();
+    if (config.scene.start - start).abs() > 1e-9 || (config.scene.end - end).abs() > 1e-9 {
+        return None;
+    }
+    if end <= start {
+        return None;
+    }
+    Some((end - start) as u32)
+}
+
+fn integer_second_windows(
+    config: &RenderConfig,
+    total_seconds: u32,
+    segment_count: usize,
+) -> Vec<(f64, f64)> {
+    let actual_segment_count = segment_count.min(total_seconds as usize).max(1);
+    let base_seconds = total_seconds / actual_segment_count as u32;
+    let extra_segments = total_seconds % actual_segment_count as u32;
+    let mut cursor = config.scene.start.round();
+    let mut windows = Vec::with_capacity(actual_segment_count);
+
+    for index in 0..actual_segment_count {
+        let segment_seconds = base_seconds + u32::from((index as u32) < extra_segments);
+        let next_cursor = cursor + f64::from(segment_seconds);
+        windows.push((cursor, next_cursor));
+        cursor = next_cursor;
+    }
+
+    windows
 }
 
 fn child_render_controller(total_frames: u32, cancel_flag: &Arc<AtomicBool>) -> RenderController {
