@@ -1,14 +1,8 @@
--handle widget update rate by defining container fps different from real
+- wire in widget update rate by defining container fps based on layout fps, not actual rendered fps
+- The widget update rate means we are skipping the rendering of every n-th frame. That means the target framerate should probably be devisible by n. That will ensure we are always rendering the real values (recorded every full second) and culling only the interpolate values - do I understand this correctly?
+- Assuming previous point is correct - we can provide update rates for predefined fps - 24: 2,4,8; 30: 2,5,10; 60: 2,5,10 - but we also must be able to derive update rates for custom fps somehow - we need to find 3 integers that cleanly devide the custom fps value and span sufficient range so culling makes sense.
+- FPS and update rate then must be passed to renderer so it knows why interpolated values to skip and how to define the container
 
 -height of metric widget selection box does not correspond to the real height. Is that just stale state from font change?
 
-We need to change how we handle ffmpeg integration:
-
-- relocate ffmpeg (currently run from .ffmpeg) to a directory that will provide bin/ffmpeg.exe ("at arms length") in the final build, and more importantly will be compatible with the build process and compiling for both windows and macOS by GitHub actions
-- write a workflow that will manually fire a build process for both Win and macOS using GitHub actions and then provide the build artifacts (exe, dmg) in the release page. Assess what is required to distribute the build as portable, i.e. without installation. At least ffmpeg and its required libraries must be separate from the main binary
-- make sure skia-render can call of ffmpeg is system agnostic and works on both win and macOS
-- create script that will install ffmpeg after "pnpm i" if ffmpeg is missing or version <8.1
-- ask clarifying questions if something is ambiguous
-
--movie load and playback
--H264 and 265 compositing, including gpu-accelerated
+-border thickness, border color, shadow color, shadow strength and shadow distance are supposed to be layout-wide settings. Currently they are scoped inside the json templates per widget. Move this into the "scene" key of templates. Make sure both frontend and skia-backend read these paremeters from scene, not from individual widget parts. If scene does not provide them, assume they values are 0. Modify templates/new_template.json to include these parameters in the scene - this one is used as the testing template.

@@ -11,7 +11,12 @@
     "scale": 2,
     "ffmpeg": {
       "vendor": "ap10"
-    }
+    },
+    "border_color": "#FF0000",
+    "border_thickness": 2,
+    "shadow_color": "#0055FF",
+    "shadow_strength": 3,
+    "shadow_distance": 3
   },
   "labels": [
     {
@@ -23,13 +28,6 @@
       "text": "Kokot",
       "color": "#ffffff",
       "opacity": 1,
-      "border_thickness": 0,
-      "shadow_color": "#d61313",
-      "shadow_strength": 3,
-      "shadow_distance": 0,
-      "border_color": "#ef1668",
-      "border_strength": 0,
-      "border_distance": 0,
       "icon_size": 26,
       "icon_offset_x": 0,
       "icon_offset_y": 0,
@@ -65,14 +63,7 @@
       "show_sign": true,
       "show_triangle": true,
       "triangle_width": 26,
-      "unit": "metric",
-      "border_thickness": 0,
-      "shadow_strength": 3,
-      "shadow_distance": 0,
-      "shadow_color": "#d61313",
-      "border_color": "#ef1668",
-      "border_strength": 0,
-      "border_distance": 0
+      "unit": "metric"
     },
     {
       "x": 319,
@@ -101,14 +92,7 @@
       "show_sign": true,
       "show_triangle": true,
       "triangle_width": 24,
-      "unit": "metric",
-      "border_thickness": 0,
-      "shadow_strength": 3,
-      "shadow_distance": 0,
-      "shadow_color": "#d61313",
-      "border_color": "#ef1668",
-      "border_strength": 0,
-      "border_distance": 0
+      "unit": "metric"
     },
     {
       "x": 133,
@@ -137,14 +121,7 @@
       "show_sign": true,
       "show_triangle": true,
       "triangle_width": 27,
-      "unit": "metric",
-      "shadow_color": "#d61313",
-      "shadow_strength": 3,
-      "shadow_distance": 0,
-      "border_color": "#ef1668",
-      "border_thickness": 0,
-      "border_strength": 0,
-      "border_distance": 0
+      "unit": "metric"
     },
     {
       "x": 126,
@@ -173,14 +150,7 @@
       "show_sign": true,
       "show_triangle": true,
       "triangle_width": 24,
-      "unit": "metric",
-      "shadow_color": "#d61313",
-      "shadow_strength": 3,
-      "shadow_distance": 0,
-      "border_color": "#ef1668",
-      "border_thickness": 0,
-      "border_strength": 0,
-      "border_distance": 0
+      "unit": "metric"
     },
     {
       "x": 133,
@@ -209,14 +179,7 @@
       "show_sign": true,
       "show_triangle": true,
       "triangle_width": 29,
-      "unit": "metric",
-      "shadow_color": "#d61313",
-      "shadow_strength": 3,
-      "shadow_distance": 0,
-      "border_color": "#ef1668",
-      "border_thickness": 0,
-      "border_strength": 0,
-      "border_distance": 0
+      "unit": "metric"
     },
     {
       "x": 252,
@@ -245,14 +208,7 @@
       "show_sign": true,
       "show_triangle": true,
       "triangle_width": 186,
-      "unit": "metric",
-      "shadow_color": "#d61313",
-      "shadow_strength": 3,
-      "shadow_distance": 0,
-      "border_color": "#ef1668",
-      "border_thickness": 0,
-      "border_strength": 0,
-      "border_distance": 0
+      "unit": "metric"
     },
     {
       "x": 133,
@@ -281,14 +237,7 @@
       "show_sign": true,
       "show_triangle": true,
       "triangle_width": 24,
-      "unit": "metric",
-      "shadow_color": "#d61313",
-      "shadow_strength": 3,
-      "shadow_distance": 0,
-      "border_color": "#ef1668",
-      "border_thickness": 0,
-      "border_strength": 0,
-      "border_distance": 0
+      "unit": "metric"
     }
   ],
   "plots": [
@@ -316,9 +265,6 @@
       "metric_label_offset_y": -50,
       "imperial_label_offset_x": 0,
       "imperial_label_offset_y": 0,
-      "shadow_color": "#1347D6",
-      "shadow_strength": 3,
-      "shadow_distance": 3,
       "area_remaining_opacity": 38,
       "area_completed_opacity": 46,
       "y_scale": 0.55,
@@ -341,10 +287,7 @@
       "remaining_line_opacity": 97,
       "marker_size": 6,
       "marker_color": "#40e0d0",
-      "marker_opacity": 100,
-      "shadow_color": "#1347D6",
-      "shadow_strength": 3,
-      "shadow_distance": 3
+      "marker_opacity": 100
     }
   ]
 }

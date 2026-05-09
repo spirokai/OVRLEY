@@ -259,7 +259,7 @@ export function getTextShadowParts(data) {
   const shadowDistance = Number(data?.shadow_distance) || 0
   const shadowColor = data?.shadow_color
 
-  if (!shadowStrength || !shadowColor) return undefined
+  if (!shadowColor || (!shadowStrength && !shadowDistance)) return undefined
 
   return {
     color: shadowColor,

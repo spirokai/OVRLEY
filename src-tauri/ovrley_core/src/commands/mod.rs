@@ -51,10 +51,11 @@ impl AppPaths {
         };
         let preview_dir = runtime_dir.join("previews");
         let temp_dir = runtime_dir.join("tmp");
-        let bundled_templates_dirs = vec![resource_root.join("templates"), repo_root.join("templates")]
-            .into_iter()
-            .filter(|path| path.is_dir())
-            .collect();
+        let bundled_templates_dirs =
+            vec![resource_root.join("templates"), repo_root.join("templates")]
+                .into_iter()
+                .filter(|path| path.is_dir())
+                .collect();
 
         Self {
             repo_root: resource_root,

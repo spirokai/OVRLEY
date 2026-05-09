@@ -124,6 +124,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     }
     onConfigChange({ ...config, scene: { ...config.scene, [key]: finalValue } })
   }
+  const sceneStyleValue = (key, fallback) => scene?.[key] ?? fallback
 
   return (
     <div className="mt-4 space-y-8 outline-none pb-10">
@@ -379,7 +380,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           <div className="space-y-2">
             <Label className="text-xs">Borders</Label>
             <HexColorPicker
-              value={globalDefaults.border_color}
+              value={sceneStyleValue('border_color', '#000000')}
               onChange={(value) => setGlobalDefault('border_color', value)}
               valueClassName="text-[10px] tracking-[0.16em]"
             />
@@ -387,7 +388,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           <div className="space-y-2">
             <Label className="text-xs">Shadows</Label>
             <HexColorPicker
-              value={globalDefaults.shadow_color}
+              value={sceneStyleValue('shadow_color', '#000000')}
               onChange={(value) => setGlobalDefault('shadow_color', value)}
               valueClassName="text-[10px] tracking-[0.16em]"
             />
@@ -429,14 +430,14 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             <div className="flex justify-between items-center">
               <Label className="text-xs">Border Thickness</Label>
               <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                {globalDefaults.border_thickness}px
+                {sceneStyleValue('border_thickness', 0)}px
               </span>
             </div>
             <Slider
               min={0}
               max={20}
               step={1}
-              value={[globalDefaults.border_thickness]}
+              value={[sceneStyleValue('border_thickness', 0)]}
               onValueChange={([v]) => setGlobalDefault('border_thickness', v)}
             />
           </div>
@@ -445,14 +446,14 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
               <div className="flex justify-between items-center">
                 <Label className="text-xs">Shadow Strength</Label>
                 <span className="text-[10px] text-muted-foreground">
-                  {globalDefaults.shadow_strength}
+                  {sceneStyleValue('shadow_strength', 0)}
                 </span>
               </div>
               <Slider
                 min={0}
                 max={20}
                 step={1}
-                value={[globalDefaults.shadow_strength]}
+                value={[sceneStyleValue('shadow_strength', 0)]}
                 onValueChange={([v]) => setGlobalDefault('shadow_strength', v)}
               />
             </div>
@@ -460,14 +461,14 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
               <div className="flex justify-between items-center">
                 <Label className="text-xs">Shadow Distance</Label>
                 <span className="text-[10px] text-muted-foreground">
-                  {globalDefaults.shadow_distance}
+                  {sceneStyleValue('shadow_distance', 0)}
                 </span>
               </div>
               <Slider
                 min={0}
                 max={20}
                 step={1}
-                value={[globalDefaults.shadow_distance]}
+                value={[sceneStyleValue('shadow_distance', 0)]}
                 onValueChange={([v]) => setGlobalDefault('shadow_distance', v)}
               />
             </div>

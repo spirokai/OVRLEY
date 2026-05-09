@@ -376,14 +376,7 @@ fn render_frame_to_surface(
         .as_ref()
         .and_then(|cache| draw_route_widget(canvas, cache, frame_index, frame_profiler));
     let elevation_widget = prepared_assets.elevation_cache.as_ref().and_then(|cache| {
-        draw_elevation_widget(
-            canvas,
-            paths,
-            config.scene.font.as_deref(),
-            cache,
-            frame_index,
-            frame_profiler,
-        )
+        draw_elevation_widget(canvas, paths, config, cache, frame_index, frame_profiler)
     });
     frame_profiler.record_ms("frame.draw", frame_started.elapsed().as_secs_f64() * 1000.0);
     (route_widget, elevation_widget)

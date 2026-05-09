@@ -464,6 +464,7 @@ export function OverlayMetricWidget({
   previewSecond,
   globalOpacity,
   globalScale,
+  sceneStyle,
 }) {
   const fontSize = widget.data.font_size ?? 60
   const fontFamily = getPreviewFontFamily(
@@ -472,8 +473,8 @@ export function OverlayMetricWidget({
   const fontMetricsVersion = useFontMetricsVersion(fontFamily, fontSize)
   const color = widget.data.color || '#ffffff'
   const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)
-  const textShadow = getTextShadow(widget.data)
-  const shadow = getTextShadowParts(widget.data)
+  const textShadow = getTextShadow(sceneStyle)
+  const shadow = getTextShadowParts(sceneStyle)
 
   let valueText = '--'
   let unitText = ''
@@ -645,8 +646,8 @@ export function OverlayMetricWidget({
               opacity={widgetOpacity}
               shadow={shadow}
               shadowFilterId={valueShadowFilterId}
-              borderColor={widget.data.border_color}
-              borderThickness={widget.data.border_thickness}
+              borderColor={sceneStyle?.border_color}
+              borderThickness={sceneStyle?.border_thickness}
             />
             {metricLayout.units ? (
               <PreviewSvgText
@@ -659,8 +660,8 @@ export function OverlayMetricWidget({
                 opacity={widgetOpacity}
                 shadow={shadow}
                 shadowFilterId={unitsShadowFilterId}
-                borderColor={widget.data.border_color}
-                borderThickness={widget.data.border_thickness}
+                borderColor={sceneStyle?.border_color}
+                borderThickness={sceneStyle?.border_thickness}
               />
             ) : null}
           </svg>
@@ -696,8 +697,8 @@ export function OverlayMetricWidget({
           opacity={widgetOpacity}
           shadow={shadow}
           shadowFilterId={valueShadowFilterId}
-          borderColor={widget.data.border_color}
-          borderThickness={widget.data.border_thickness}
+          borderColor={sceneStyle?.border_color}
+          borderThickness={sceneStyle?.border_thickness}
         />
         {gradientLayout.triangle ? (
           gradientLayout.triangle.isZero ? (
@@ -767,7 +768,7 @@ export function OverlayMetricWidget({
  * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
  * @returns {JSX.Element} Rendered component output.
  */
-export function OverlayTextWidget({ widget, globalOpacity }) {
+export function OverlayTextWidget({ widget, globalOpacity, sceneStyle }) {
   const fontSize = widget.data.font_size ?? 60
   const fontFamily = getPreviewFontFamily(
     widget.data.font || widget.data.font_family,
@@ -775,7 +776,7 @@ export function OverlayTextWidget({ widget, globalOpacity }) {
   const fontMetricsVersion = useFontMetricsVersion(fontFamily, fontSize)
   const color = widget.data.color || '#ffffff'
   const opacity = getWidgetOpacity(widget.data, globalOpacity)
-  const shadow = getTextShadowParts(widget.data)
+  const shadow = getTextShadowParts(sceneStyle)
   const text = widget.data.text || 'TEXT'
   const lineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const measurement = useMemo(
@@ -806,8 +807,8 @@ export function OverlayTextWidget({ widget, globalOpacity }) {
         opacity={opacity}
         shadow={shadow}
         shadowFilterId={sanitizeSvgId(`${widget.id}-label-shadow`)}
-        borderColor={widget.data.border_color}
-        borderThickness={widget.data.border_thickness}
+        borderColor={sceneStyle?.border_color}
+        borderThickness={sceneStyle?.border_thickness}
       />
     </svg>
   )
@@ -829,6 +830,7 @@ export function OverlayRouteWidget({
   previewSecond,
   globalOpacity,
   globalScale,
+  sceneStyle,
 }) {
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
@@ -950,6 +952,9 @@ export function OverlayRouteWidget({
       ),
     [markerColor, markerOpacity, svgMarkerSize, widget.data],
   )
+  const shadow = getTextShadowParts(sceneStyle)
+  const shadowFilterId = sanitizeSvgId(`${widget.id}-route-shadow`)
+  const hasShadow = Boolean(shadow)
 
   return (
     <svg
@@ -959,6 +964,25 @@ export function OverlayRouteWidget({
       className="block h-full w-full"
       style={{ opacity: getWidgetOpacity(widget.data, globalOpacity) }}
     >
+      {hasShadow ? (
+        <defs>
+          <filter
+            id={shadowFilterId}
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+            colorInterpolationFilters="sRGB"
+          >
+            <feDropShadow
+              dx={shadow.distance}
+              dy={shadow.distance}
+              stdDeviation={shadow.strength}
+              floodColor={shadow.color}
+            />
+          </filter>
+        </defs>
+      ) : null}
       <g>
         <polyline
           fill="none"
@@ -968,6 +992,7 @@ export function OverlayRouteWidget({
           strokeLinejoin="round"
           strokeLinecap="round"
           points={remainingSvgPoints}
+          filter={hasShadow ? `url(#${shadowFilterId})` : undefined}
         />
         <polyline
           fill="none"
@@ -1006,6 +1031,7 @@ export function OverlayElevationWidget({
   globalScale,
   sceneFont,
   sceneFontSize,
+  sceneStyle,
   valueFont,
 }) {
   const width = Math.max(widget.data.width ?? 320, 80)
@@ -1200,6 +1226,9 @@ export function OverlayElevationWidget({
   const labelColor = widget.data.point_label?.color || baseColor
   const showMetricLabel = widget.data.show_elevation_metric ?? false
   const showImperialLabel = widget.data.show_elevation_imperial ?? false
+  const shadow = getTextShadowParts(sceneStyle)
+  const shadowFilterId = sanitizeSvgId(`${widget.id}-elevation-shadow`)
+  const hasShadow = Boolean(shadow)
 
   return (
     <svg
@@ -1210,6 +1239,25 @@ export function OverlayElevationWidget({
       className="block h-full w-full overflow-visible"
       style={{ opacity: getWidgetOpacity(widget.data, globalOpacity) }}
     >
+      {hasShadow ? (
+        <defs>
+          <filter
+            id={shadowFilterId}
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+            colorInterpolationFilters="sRGB"
+          >
+            <feDropShadow
+              dx={shadow.distance}
+              dy={shadow.distance}
+              stdDeviation={shadow.strength}
+              floodColor={shadow.color}
+            />
+          </filter>
+        </defs>
+      ) : null}
       <polygon
         points={areaSvgPoints}
         fill={remainingAreaColor}
@@ -1223,6 +1271,7 @@ export function OverlayElevationWidget({
         strokeLinejoin="round"
         strokeLinecap="round"
         points={remainingSvgPoints}
+        filter={hasShadow ? `url(#${shadowFilterId})` : undefined}
       />
       <polygon
         points={completedAreaSvgPoints}
@@ -1252,6 +1301,10 @@ export function OverlayElevationWidget({
           fill={labelColor}
           fontFamily={labelFontFamily}
           fontSize={labelFontSize}
+          paintOrder="stroke fill"
+          stroke={sceneStyle?.border_color || 'none'}
+          strokeWidth={sceneStyle?.border_thickness || 0}
+          filter={hasShadow ? `url(#${shadowFilterId})` : undefined}
         >
           {metricLabel}
         </text>
@@ -1265,6 +1318,10 @@ export function OverlayElevationWidget({
           fill={labelColor}
           fontFamily={labelFontFamily}
           fontSize={labelFontSize}
+          paintOrder="stroke fill"
+          stroke={sceneStyle?.border_color || 'none'}
+          strokeWidth={sceneStyle?.border_thickness || 0}
+          filter={hasShadow ? `url(#${shadowFilterId})` : undefined}
         >
           {imperialLabel}
         </text>

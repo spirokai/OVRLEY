@@ -3,6 +3,7 @@
  */
 
 import { normalizeColorFields } from './color-utils'
+import { SCENE_STYLE_KEYS } from './config-utils'
 
 export const TEMPLATE_FILE_FORMAT = 'ovrley-template'
 export const TEMPLATE_FILE_VERSION = 1
@@ -41,6 +42,20 @@ export const DEFAULT_GLOBAL_DEFAULTS = {
 function cloneSerializable(value) {
   if (value === undefined) return undefined
   return JSON.parse(JSON.stringify(value))
+}
+
+function mergeSceneStyleDefaults(globalDefaults, scene) {
+  const sceneDefaults = {}
+  SCENE_STYLE_KEYS.forEach((key) => {
+    if (scene?.[key] !== undefined) {
+      sceneDefaults[key] = scene[key]
+    }
+  })
+
+  return {
+    ...globalDefaults,
+    ...normalizeColorFields(sceneDefaults),
+  }
 }
 
 /**
@@ -149,7 +164,10 @@ export function normalizeTemplateFilePayload(rawTemplate, fallbackState = {}) {
     return {
       ...createTemplateState({
         config: rawTemplate,
-        globalDefaults: fallbackState.globalDefaults,
+        globalDefaults: mergeSceneStyleDefaults(
+          fallbackState.globalDefaults,
+          rawTemplate.scene,
+        ),
         updateRate: fallbackState.updateRate,
         exportRange: fallbackState.exportRange,
         exportCodec: fallbackState.exportCodec,

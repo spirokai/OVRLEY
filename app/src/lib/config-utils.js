@@ -5,6 +5,20 @@
 import { createFontSelection, getFontFamilyName } from './fonts'
 import { getThemeColor } from './theme'
 
+const SCENE_STYLE_DEFAULTS = {
+  border_thickness: 0,
+  shadow_strength: 0,
+  shadow_distance: 0,
+}
+
+export const SCENE_STYLE_KEYS = [
+  'border_color',
+  'border_thickness',
+  'shadow_color',
+  'shadow_strength',
+  'shadow_distance',
+]
+
 /**
  * Applies preview overrides to resolved widget data.
  *
@@ -36,6 +50,7 @@ export function getEffectiveSceneData(sceneData, globals) {
   }
 
   return {
+    ...SCENE_STYLE_DEFAULTS,
     ...sceneData,
     scale: globals?.scale,
   }
@@ -70,27 +85,6 @@ export function getEffectiveLabelData(
   }
   if (nextData.opacity === undefined) {
     nextData.opacity = globals?.opacity
-  }
-  if (nextData.shadow_color === undefined) {
-    nextData.shadow_color = globals?.shadow_color
-  }
-  if (nextData.shadow_strength === undefined) {
-    nextData.shadow_strength = globals?.shadow_strength
-  }
-  if (nextData.shadow_distance === undefined) {
-    nextData.shadow_distance = globals?.shadow_distance
-  }
-  if (nextData.border_color === undefined) {
-    nextData.border_color = globals?.border_color
-  }
-  if (nextData.border_thickness === undefined) {
-    nextData.border_thickness = globals?.border_thickness
-  }
-  if (nextData.border_strength === undefined) {
-    nextData.border_strength = globals?.border_strength
-  }
-  if (nextData.border_distance === undefined) {
-    nextData.border_distance = globals?.border_distance
   }
 
   return applyPreviewOverrides(nextData, previewOverrides)
@@ -129,27 +123,6 @@ export function getEffectiveValueData(
   if (nextData.opacity === undefined) {
     nextData.opacity = globals?.opacity
   }
-  if (nextData.shadow_color === undefined) {
-    nextData.shadow_color = globals?.shadow_color
-  }
-  if (nextData.shadow_strength === undefined) {
-    nextData.shadow_strength = globals?.shadow_strength
-  }
-  if (nextData.shadow_distance === undefined) {
-    nextData.shadow_distance = globals?.shadow_distance
-  }
-  if (nextData.border_color === undefined) {
-    nextData.border_color = globals?.border_color
-  }
-  if (nextData.border_thickness === undefined) {
-    nextData.border_thickness = globals?.border_thickness
-  }
-  if (nextData.border_strength === undefined) {
-    nextData.border_strength = globals?.border_strength
-  }
-  if (nextData.border_distance === undefined) {
-    nextData.border_distance = globals?.border_distance
-  }
 
   return applyPreviewOverrides(nextData, previewOverrides)
 }
@@ -176,12 +149,6 @@ export function getEffectivePlotData(
   }
   if (nextData.opacity === undefined) {
     nextData.opacity = globals?.opacity
-  }
-  if (nextData.shadow_color === undefined) {
-    nextData.shadow_color = globals?.shadow_color
-  }
-  if (nextData.shadow_strength === undefined) {
-    nextData.shadow_strength = globals?.shadow_strength
   }
   if (nextData.value === 'elevation' && globals?.font_values) {
     nextData.point_label = {
@@ -271,6 +238,14 @@ export function syncGlobalDefaultsToConfig(
   const shouldApply = (key) => !changedKeySet || changedKeySet.has(key)
   const nextConfig = JSON.parse(JSON.stringify(config))
 
+  if (nextConfig.scene) {
+    SCENE_STYLE_KEYS.forEach((key) => {
+      if (shouldApply(key)) {
+        nextConfig.scene[key] = globals[key] ?? SCENE_STYLE_DEFAULTS[key] ?? 0
+      }
+    })
+  }
+
   if (nextConfig.labels) {
     nextConfig.labels.forEach((label) => {
       if (shouldApply('font_text')) {
@@ -278,27 +253,6 @@ export function syncGlobalDefaultsToConfig(
       }
       if (shouldApply('color_text')) {
         label.color = globals.color_text
-      }
-      if (shouldApply('border_color')) {
-        label.border_color = globals.border_color
-      }
-      if (shouldApply('border_thickness')) {
-        label.border_thickness = globals.border_thickness
-      }
-      if (shouldApply('border_strength')) {
-        label.border_strength = globals.border_strength
-      }
-      if (shouldApply('border_distance')) {
-        label.border_distance = globals.border_distance
-      }
-      if (shouldApply('shadow_color')) {
-        label.shadow_color = globals.shadow_color
-      }
-      if (shouldApply('shadow_strength')) {
-        label.shadow_strength = globals.shadow_strength
-      }
-      if (shouldApply('shadow_distance')) {
-        label.shadow_distance = globals.shadow_distance
       }
     })
   }
@@ -314,27 +268,6 @@ export function syncGlobalDefaultsToConfig(
       if (shouldApply('color_icons') && Object.hasOwn(value, 'icon_color')) {
         value.icon_color = globals.color_icons
       }
-      if (shouldApply('border_color')) {
-        value.border_color = globals.border_color
-      }
-      if (shouldApply('border_thickness')) {
-        value.border_thickness = globals.border_thickness
-      }
-      if (shouldApply('border_strength')) {
-        value.border_strength = globals.border_strength
-      }
-      if (shouldApply('border_distance')) {
-        value.border_distance = globals.border_distance
-      }
-      if (shouldApply('shadow_color')) {
-        value.shadow_color = globals.shadow_color
-      }
-      if (shouldApply('shadow_strength')) {
-        value.shadow_strength = globals.shadow_strength
-      }
-      if (shouldApply('shadow_distance')) {
-        value.shadow_distance = globals.shadow_distance
-      }
     })
   }
 
@@ -348,15 +281,6 @@ export function syncGlobalDefaultsToConfig(
       }
       if (shouldApply('color_values') && Object.hasOwn(plot, 'color')) {
         plot.color = globals.color_values
-      }
-      if (shouldApply('shadow_color')) {
-        plot.shadow_color = globals.shadow_color
-      }
-      if (shouldApply('shadow_strength')) {
-        plot.shadow_strength = globals.shadow_strength
-      }
-      if (shouldApply('shadow_distance')) {
-        plot.shadow_distance = globals.shadow_distance
       }
     })
   }

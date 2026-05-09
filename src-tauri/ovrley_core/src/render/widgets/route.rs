@@ -115,8 +115,8 @@ pub(crate) fn draw_route_widget(
     ))
 }
 
-fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> NormalizedRoutePlot {
-    let scale = _config.scene.scale.unwrap_or(1.0).max(0.1);
+fn normalize_route_plot(config: &RenderConfig, plot: &CoursePlotConfig) -> NormalizedRoutePlot {
+    let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let base_color = plot_base_color(plot.color.as_deref());
     let legacy_width = legacy_line_width(
         plot.line.as_ref().and_then(|line| line.width),
@@ -158,9 +158,9 @@ fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> Norm
             0.75,
         ),
         remaining_line_shadow: normalize_shadow_style(
-            plot.shadow_color.as_ref(),
-            plot.shadow_strength,
-            plot.shadow_distance,
+            config.scene.shadow_color.as_ref(),
+            config.scene.shadow_strength,
+            config.scene.shadow_distance,
             scale,
         ),
         completed_line_width: plot.completed_line_width.unwrap_or(legacy_width),

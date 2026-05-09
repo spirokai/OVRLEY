@@ -67,11 +67,12 @@ pub(crate) fn prepare_elevation_cache(
 pub(crate) fn draw_elevation_widget(
     canvas: &Canvas,
     paths: &AppPaths,
-    scene_font: Option<&str>,
+    config: &RenderConfig,
     elevation_cache: &ElevationWidgetCache,
     frame_index: usize,
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
+    let scene_scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let state = elevation_cache
         .frame_states
         .get(frame_index.min(elevation_cache.frame_states.len().saturating_sub(1)))?;
@@ -144,17 +145,25 @@ pub(crate) fn draw_elevation_widget(
                     .plot
                     .label_font
                     .clone()
-                    .or_else(|| scene_font.map(ToOwned::to_owned)),
+                    .or_else(|| config.scene.font.clone()),
                 font_size: elevation_cache.plot.label_font_size,
                 line_height: elevation_cache.plot.label_font_size * 0.92,
                 color: parse_color(&elevation_cache.plot.label_color, 1.0),
                 opacity: 1.0,
-                shadow_color: None,
-                shadow_strength: 0.0,
-                shadow_distance: 0.0,
-                border_color: None,
-                border_thickness: 0.0,
-                border_distance: 0.0,
+                shadow_color: config
+                    .scene
+                    .shadow_color
+                    .as_deref()
+                    .map(|color| parse_color(color, 1.0)),
+                shadow_strength: config.scene.shadow_strength.unwrap_or(0.0) * scene_scale,
+                shadow_distance: config.scene.shadow_distance.unwrap_or(0.0) * scene_scale,
+                border_color: config
+                    .scene
+                    .border_color
+                    .as_deref()
+                    .map(|color| parse_color(color, 1.0)),
+                border_thickness: config.scene.border_thickness.unwrap_or(0.0) * scene_scale,
+                border_distance: config.scene.border_distance.unwrap_or(0.0) * scene_scale,
             };
             draw_text(canvas, &text, &style, &paths.font_dirs);
         });
@@ -174,17 +183,25 @@ pub(crate) fn draw_elevation_widget(
                     .plot
                     .label_font
                     .clone()
-                    .or_else(|| scene_font.map(ToOwned::to_owned)),
+                    .or_else(|| config.scene.font.clone()),
                 font_size: elevation_cache.plot.label_font_size,
                 line_height: elevation_cache.plot.label_font_size * 0.92,
                 color: parse_color(&elevation_cache.plot.label_color, 1.0),
                 opacity: 1.0,
-                shadow_color: None,
-                shadow_strength: 0.0,
-                shadow_distance: 0.0,
-                border_color: None,
-                border_thickness: 0.0,
-                border_distance: 0.0,
+                shadow_color: config
+                    .scene
+                    .shadow_color
+                    .as_deref()
+                    .map(|color| parse_color(color, 1.0)),
+                shadow_strength: config.scene.shadow_strength.unwrap_or(0.0) * scene_scale,
+                shadow_distance: config.scene.shadow_distance.unwrap_or(0.0) * scene_scale,
+                border_color: config
+                    .scene
+                    .border_color
+                    .as_deref()
+                    .map(|color| parse_color(color, 1.0)),
+                border_thickness: config.scene.border_thickness.unwrap_or(0.0) * scene_scale,
+                border_distance: config.scene.border_distance.unwrap_or(0.0) * scene_scale,
             };
             draw_text(canvas, &text, &style, &paths.font_dirs);
         });
@@ -215,17 +232,25 @@ pub(crate) fn draw_elevation_widget(
                     .plot
                     .label_font
                     .clone()
-                    .or_else(|| scene_font.map(ToOwned::to_owned)),
+                    .or_else(|| config.scene.font.clone()),
                 font_size: elevation_cache.plot.label_font_size,
                 line_height: elevation_cache.plot.label_font_size * 0.92,
                 color: parse_color(&elevation_cache.plot.label_color, 1.0),
                 opacity: 1.0,
-                shadow_color: None,
-                shadow_strength: 0.0,
-                shadow_distance: 0.0,
-                border_color: None,
-                border_thickness: 0.0,
-                border_distance: 0.0,
+                shadow_color: config
+                    .scene
+                    .shadow_color
+                    .as_deref()
+                    .map(|color| parse_color(color, 1.0)),
+                shadow_strength: config.scene.shadow_strength.unwrap_or(0.0) * scene_scale,
+                shadow_distance: config.scene.shadow_distance.unwrap_or(0.0) * scene_scale,
+                border_color: config
+                    .scene
+                    .border_color
+                    .as_deref()
+                    .map(|color| parse_color(color, 1.0)),
+                border_thickness: config.scene.border_thickness.unwrap_or(0.0) * scene_scale,
+                border_distance: config.scene.border_distance.unwrap_or(0.0) * scene_scale,
             };
             draw_text(canvas, &text, &style, &paths.font_dirs);
         });
@@ -292,9 +317,9 @@ fn normalize_elevation_plot(
             1.0,
         ),
         remaining_line_shadow: normalize_shadow_style(
-            plot.shadow_color.as_ref(),
-            plot.shadow_strength,
-            plot.shadow_distance,
+            config.scene.shadow_color.as_ref(),
+            config.scene.shadow_strength,
+            config.scene.shadow_distance,
             scale,
         ),
         completed_line_width: plot.completed_line_width.unwrap_or(legacy_width),

@@ -149,6 +149,22 @@ export default function useOverlayEditorState({
   const activity = sourceActivity
   const globalOpacity = globalDefaults?.opacity ?? 1
   const globalScale = config?.scene?.scale ?? globalDefaults?.scale ?? 1
+  const sceneStyle = useMemo(
+    () => ({
+      border_color: config?.scene?.border_color,
+      border_thickness: config?.scene?.border_thickness ?? 0,
+      shadow_color: config?.scene?.shadow_color,
+      shadow_strength: config?.scene?.shadow_strength ?? 0,
+      shadow_distance: config?.scene?.shadow_distance ?? 0,
+    }),
+    [
+      config?.scene?.border_color,
+      config?.scene?.border_thickness,
+      config?.scene?.shadow_color,
+      config?.scene?.shadow_distance,
+      config?.scene?.shadow_strength,
+    ],
+  )
   const previewSecond = useMemo(() => {
     return resolvePreviewSecond({
       dummyDurationSeconds,
@@ -497,6 +513,7 @@ export default function useOverlayEditorState({
     moveableRef,
     previewSecond,
     sceneElement,
+    sceneStyle,
     sceneSize,
     isGroupDragActive,
     selectedTarget,

@@ -29,6 +29,20 @@ pub struct SceneConfig {
     pub scale: Option<f32>,
     #[serde(default)]
     pub time_format: Option<String>,
+    #[serde(default)]
+    pub shadow_color: Option<String>,
+    #[serde(default)]
+    pub shadow_strength: Option<f32>,
+    #[serde(default)]
+    pub shadow_distance: Option<f32>,
+    #[serde(default)]
+    pub border_color: Option<String>,
+    #[serde(default)]
+    pub border_thickness: Option<f32>,
+    #[serde(default)]
+    pub border_strength: Option<f32>,
+    #[serde(default)]
+    pub border_distance: Option<f32>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }

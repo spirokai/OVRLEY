@@ -133,6 +133,7 @@ function OverlayEditor({
     moveableRef,
     previewSecond,
     sceneElement,
+    sceneStyle,
     sceneSize,
     selectedTarget,
     selectedTargets,
@@ -190,6 +191,7 @@ function OverlayEditor({
               gridVisible={gridVisible}
               sceneFont={config.scene?.font}
               sceneFontSize={config.scene?.font_size}
+              sceneStyle={sceneStyle}
               valueFont={
                 config.values?.find((value) => value.font || value.font_family)
                   ?.font ||

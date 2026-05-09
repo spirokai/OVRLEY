@@ -2,9 +2,7 @@ use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
-use crate::encode::ffmpeg::{
-    build_ffmpeg_settings, resolve_ffmpeg_binary, suppress_child_console,
-};
+use crate::encode::ffmpeg::{build_ffmpeg_settings, resolve_ffmpeg_binary, suppress_child_console};
 use crate::encode::video::RenderController;
 use crate::encode::video_debug::{
     create_debug_dir, render_sample_frames_enabled, sample_frame_indices, write_prepare_summary,
@@ -59,8 +57,11 @@ pub(crate) fn render_video_single(
         label_cache_status,
     )?;
 
-    let public_filename =
-        format!("video_{}.{}", crate::encode::video_debug::timestamp_nanos()?, ffmpeg_settings.extension);
+    let public_filename = format!(
+        "video_{}.{}",
+        crate::encode::video_debug::timestamp_nanos()?,
+        ffmpeg_settings.extension
+    );
     let output_path = paths.downloads_dir.join(&public_filename);
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let input_pix_fmt = ffmpeg_input_pix_fmt();

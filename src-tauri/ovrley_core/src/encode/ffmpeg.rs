@@ -18,7 +18,13 @@ pub fn resolve_ffmpeg_binary(repo_root: &Path) -> Result<PathBuf, String> {
     } else {
         "ffmpeg"
     };
-    candidate_paths.push(repo_root.join("vendor").join("ffmpeg").join("bin").join(local_name));
+    candidate_paths.push(
+        repo_root
+            .join("vendor")
+            .join("ffmpeg")
+            .join("bin")
+            .join(local_name),
+    );
     candidate_paths.push(repo_root.join("ffmpeg").join("bin").join(local_name));
     candidate_paths.push(repo_root.join(".ffmpeg").join("bin").join(local_name));
     candidate_paths.push(repo_root.join(".ffmpeg").join(local_name));
