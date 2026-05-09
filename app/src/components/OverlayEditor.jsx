@@ -69,6 +69,22 @@ function WidgetBadgeLayer({
 }
 
 /**
+ * Renders the scene resolution badge.
+ *
+ * @param {object} props - Component props.
+ * @param {*} props.height - Current scene height.
+ * @param {*} props.width - Current scene width.
+ * @returns {JSX.Element} Rendered component output.
+ */
+function ResolutionBadge({ height, width }) {
+  return (
+    <div className="pointer-events-none absolute left-2 top-2 z-50 rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
+      {width} &times; {height}
+    </div>
+  )
+}
+
+/**
  * Renders the empty overlay state component.
  * @returns {JSX.Element} Rendered component output.
  */
@@ -100,6 +116,8 @@ function EmptyOverlayState() {
  * @param {*} props.zoomLevel - Current editor zoom level.
  * @param {*} props.onZoomLevelChange - Callback invoked to zoom level change.
  * @param {*} props.backgroundMode - Selected canvas background style.
+ * @param {*} props.gridVisible - Whether to show the editor grid overlay.
+ * @param {*} props.snapToGrid - Whether to snap Moveable to editor grid guides.
  * @returns {JSX.Element} Rendered component output.
  */
 function OverlayEditor({
@@ -109,6 +127,8 @@ function OverlayEditor({
   zoomLevel,
   onZoomLevelChange,
   backgroundMode,
+  gridVisible,
+  snapToGrid,
 }) {
   const [hoveredWidgetId, setHoveredWidgetId] = useState(null)
   const {
@@ -157,7 +177,8 @@ function OverlayEditor({
       className="relative flex h-full flex-1 overflow-hidden"
       onWheel={handleWheel}
     >
-      <div className="flex h-full w-full items-center justify-center overflow-hidden p-8">
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden p-8">
+        <ResolutionBadge height={sceneSize.height} width={sceneSize.width} />
         <div
           className="relative shrink-0"
           style={{
@@ -176,11 +197,13 @@ function OverlayEditor({
           >
             <OverlayCanvas
               widgets={widgets}
+              displayScale={displayScale}
               globalScale={globalScale}
               globalOpacity={globalOpacity}
               activity={activity}
               previewSecond={previewSecond}
               backgroundMode={backgroundMode}
+              gridVisible={gridVisible}
               sceneFont={config.scene?.font}
               sceneFontSize={config.scene?.font_size}
               valueFont={
@@ -213,6 +236,7 @@ function OverlayEditor({
               showEdgeResizeHandles={showEdgeResizeHandles}
               elementGuidelines={elementGuidelines}
               sceneSize={sceneSize}
+              snapToGrid={snapToGrid}
               handlers={handlers}
             />
           </div>

@@ -34,7 +34,7 @@ function shouldEnableStoreDevtools() {
     return false
   }
 
-  return window.localStorage.getItem('cyclemetry:store-devtools') === 'true'
+  return window.localStorage.getItem('ovrley:store-devtools') === 'true'
 }
 
 const storeInitializer = immer(createStoreState)
@@ -42,7 +42,7 @@ const storeInitializer = immer(createStoreState)
 const useStore = create(
   shouldEnableStoreDevtools()
     ? devtools(storeInitializer, {
-        name: 'CyclemetryStore',
+        name: 'OVRLEYStore',
         serialize: {
           replacer: (key, value) =>
             key === 'editor' ? '<<MonacoEditor>>' : value,
@@ -53,9 +53,9 @@ const useStore = create(
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   window.useStore = useStore
-  window.__CYCLEMETRY_STORE__ = useStore
+  window.__OVRLEY_STORE__ = useStore
   console.info(
-    '[Cyclemetry] Store exposed as window.useStore and window.__CYCLEMETRY_STORE__',
+    '[OVRLEY] Store exposed as window.useStore and window.__OVRLEY_STORE__',
   )
 }
 

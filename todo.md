@@ -1,9 +1,5 @@
--move resolution badge to top left corner of the canvas
 -add grid display button and snap to grid button
 -handle widget update rate by defining container fps different from real
-
--change logo to ours
--figure our src-tauri logos, why so many, bro?
 
 -custom range export in sidebar enabled only if we have parsed activity
 -gradient widget around causes vertical jitter while dragging around

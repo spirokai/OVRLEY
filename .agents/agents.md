@@ -1,8 +1,8 @@
-# Cyclemetry Reloaded - Agent Configuration
+# OVRLEY Reloaded - Agent Configuration
 
 ## Project Overview
 
-Cyclemetry is a desktop application designed to create stunning telemetry video overlays from GPX (and eventually FIT) data. It allows users to visualize route tracking, elevation profiles, and rich metrics like speed, power, heart rate, cadence, gradient, and temperature on top of their videos.
+OVRLEY is a desktop application designed to create stunning telemetry video overlays from GPX (and eventually FIT) data. It allows users to visualize route tracking, elevation profiles, and rich metrics like speed, power, heart rate, cadence, gradient, and temperature on top of their videos.
 
 The application is structured as a monorepo consisting of:
 
@@ -82,7 +82,7 @@ Run these commands from the repository root:
 
 - **Local Communication**: The Tauri frontend and Python sidecar communicate over local TCP ports or Unix domain sockets. Ensure these are tightly bound (`127.0.0.1` or secure socket permissions) to prevent local network exposure.
 - **Sidecar Execution**: The Python backend is bundled as a PyInstaller executable. Ensure that only the intended binary is executed by Tauri to prevent arbitrary code execution vulnerabilities.
-- **macOS App Signing**: Currently not signed with an Apple Developer Account. Users must bypass Gatekeeper using `xattr -cr /Applications/Cyclemetry.app`. Be mindful of this when handling executable permissions or modifying the build process.
+- **macOS App Signing**: Currently not signed with an Apple Developer Account. Users must bypass Gatekeeper using `xattr -cr /Applications/OVRLEY.app`. Be mindful of this when handling executable permissions or modifying the build process.
 - **File Access**: The app parses local `.fit` and `.gpx` files and writes large video files. Ensure paths are validated and sanitized to prevent directory traversal or accidental overwrites.
 
 ## AI Agent Directives

@@ -1,7 +1,7 @@
-use cyclemetry_core::activity::{build_dense_activity_report, parse_activity_json};
-use cyclemetry_core::commands::AppPaths;
-use cyclemetry_core::config::parse_config_json;
-use cyclemetry_core::encode::video::{render_video, RenderController};
+use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
+use ovrley_core::commands::AppPaths;
+use ovrley_core::config::parse_config_json;
+use ovrley_core::encode::video::{render_video, RenderController};
 use serde_json::{Map, Number, Value};
 use std::fs;
 use std::path::PathBuf;
@@ -28,7 +28,7 @@ fn repo_root() -> Result<PathBuf, String> {
 }
 
 fn ensure_ffmpeg_object(
-    config: &mut cyclemetry_core::config::RenderConfig,
+    config: &mut ovrley_core::config::RenderConfig,
 ) -> Result<&mut Map<String, Value>, String> {
     if config.scene.ffmpeg.is_null() {
         config.scene.ffmpeg = Value::Object(Map::new());
@@ -41,7 +41,7 @@ fn ensure_ffmpeg_object(
 }
 
 fn set_ffmpeg_string(
-    config: &mut cyclemetry_core::config::RenderConfig,
+    config: &mut ovrley_core::config::RenderConfig,
     key: &str,
     value: Option<String>,
 ) -> Result<(), String> {
@@ -52,7 +52,7 @@ fn set_ffmpeg_string(
 }
 
 fn set_ffmpeg_u64(
-    config: &mut cyclemetry_core::config::RenderConfig,
+    config: &mut ovrley_core::config::RenderConfig,
     key: &str,
     value: Option<String>,
 ) -> Result<(), String> {

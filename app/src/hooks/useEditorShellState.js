@@ -35,6 +35,12 @@ export default function useEditorShellState() {
   const [editorBackgroundMode, setEditorBackgroundMode] = useState(
     () => localStorage.getItem('overlayBackgroundMode') || 'checker',
   )
+  const [editorGridVisible, setEditorGridVisible] = useState(
+    () => localStorage.getItem('overlayGridVisible') === 'true',
+  )
+  const [editorSnapToGrid, setEditorSnapToGrid] = useState(
+    () => localStorage.getItem('overlaySnapToGrid') === 'true',
+  )
   const [uiScale, setUiScale] = useState(() =>
     typeof window === 'undefined' ? 1 : getUiScale(window.innerWidth),
   )
@@ -42,6 +48,14 @@ export default function useEditorShellState() {
   useEffect(() => {
     localStorage.setItem('overlayBackgroundMode', editorBackgroundMode)
   }, [editorBackgroundMode])
+
+  useEffect(() => {
+    localStorage.setItem('overlayGridVisible', String(editorGridVisible))
+  }, [editorGridVisible])
+
+  useEffect(() => {
+    localStorage.setItem('overlaySnapToGrid', String(editorSnapToGrid))
+  }, [editorSnapToGrid])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -78,10 +92,14 @@ export default function useEditorShellState() {
   return {
     decreaseZoom,
     editorBackgroundMode,
+    editorGridVisible,
+    editorSnapToGrid,
     editorZoomLevel,
     increaseZoom,
     resetZoom,
     setEditorBackgroundMode,
+    setEditorGridVisible,
+    setEditorSnapToGrid,
     setEditorZoomLevel,
     uiScale,
   }

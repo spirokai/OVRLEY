@@ -26,4 +26,4 @@ tauri = { version = "2.9.5", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 base64 = "0.22"
-cyclemetry_core = { path = "cyclemetry_core" }
+ovrley_core = { path = "ovrley_core" }

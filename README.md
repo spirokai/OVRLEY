@@ -1,12 +1,12 @@
 <div align="center" style="text-align: center;">
   <img src="/app/public/logo192.png" style="width: 64px; border-radius: 12px;">
-  <h1>Cyclemetry</h1>
+  <h1>OVRLEY</h1>
   <p>
     <b>Create stunning telemetry video overlays from GPX data.</b>
   </p>
 </div>
 
-![The_Tremola_by Safa_Brian](https://github.com/walkersutton/cyclemetry/assets/25811783/71aa4902-dd29-453f-b4a5-a87ddabd2437)
+![The_Tremola_by Safa_Brian](https://github.com/walkersutton/ovrley/assets/25811783/71aa4902-dd29-453f-b4a5-a87ddabd2437)
 
 ## ✨ Features
 
@@ -19,11 +19,11 @@
 
 ## 🚀 Installation
 
-1. Download the latest version for macOS from **[GitHub Releases](https://github.com/walkersutton/cyclemetry/releases)**.
+1. Download the latest version for macOS from **[GitHub Releases](https://github.com/walkersutton/ovrley/releases)**.
 2. You'll need to run this command once to open becuase I'm not paying $100/yr for Apple Developer Account
    
 ```sh
-xattr -cr /Applications/Cyclemetry.app
+xattr -cr /Applications/OVRLEY.app
 ```
 
 
@@ -51,9 +51,9 @@ pnpm install
 pnpm dev
 ```
 
-## Videos Made With Cyclemetry
+## Videos Made With OVRLEY
 
-| [![Testing Cyclemetry By Paolo Tagliaferri](https://img.youtube.com/vi/JmavtEU6Vvo/0.jpg)](https://www.youtube.com/watch?v=JmavtEU6Vvo) | [![Descent into Rincon by Walker Sutton](https://img.youtube.com/vi/i2vdPIfIswc/0.jpg)](https://www.youtube.com/watch?v=i2vdPIfIswc) |
+| [![Testing OVRLEY By Paolo Tagliaferri](https://img.youtube.com/vi/JmavtEU6Vvo/0.jpg)](https://www.youtube.com/watch?v=JmavtEU6Vvo) | [![Descent into Rincon by Walker Sutton](https://img.youtube.com/vi/i2vdPIfIswc/0.jpg)](https://www.youtube.com/watch?v=i2vdPIfIswc) |
 | --- | --- |
 | [![Stunt Descent by Walker Sutton](https://img.youtube.com/vi/96_nwEF-Bfc/0.jpg)](https://www.youtube.com/watch?v=96_nwEF-Bfc) | [![Seward Park Crit by Walker Sutton](https://img.youtube.com/vi/gKugPA0xGhw/0.jpg)](https://www.youtube.com/watch?v=gKugPA0xGhw) |
 | [![Çamköy Tırmanışı ve Yağmurda Sürüş Disiplini by Berkay DEDEOĞLU](https://img.youtube.com/vi/mIcd7nUfpWU/0.jpg)](https://youtu.be/mIcd7nUfpWU?si=aqM1VSgaBr6MmCGa&t=1249) | |

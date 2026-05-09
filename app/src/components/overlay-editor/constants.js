@@ -50,3 +50,18 @@ export const DEFAULT_ACTIVITY_PREVIEW = {
 }
 
 export const DEFAULT_GRADIENT_TRIANGLE_WIDTH = 72
+export const EDITOR_GRID_DIVISIONS = 72
+
+export function getEditorGridSize(sceneSize) {
+  const width = Number(sceneSize?.width)
+  const height = Number(sceneSize?.height)
+
+  if (!Number.isFinite(width) || !Number.isFinite(height)) {
+    return 1
+  }
+
+  return Math.max(
+    1,
+    Math.round(Math.min(width, height) / EDITOR_GRID_DIVISIONS),
+  )
+}

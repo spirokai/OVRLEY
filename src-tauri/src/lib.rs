@@ -1,6 +1,6 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-use cyclemetry_core::commands::{self, AppPaths};
-use cyclemetry_core::encode::video::RenderController;
+use ovrley_core::commands::{self, AppPaths};
+use ovrley_core::encode::video::RenderController;
 use std::path::PathBuf;
 use tauri::Manager;
 
@@ -103,7 +103,7 @@ async fn backend_image_data(filename: String) -> Result<String, String> {
 #[tauri::command]
 fn default_template_save_path(app: tauri::AppHandle, filename: String) -> Result<String, String> {
     let mut path = app.path().document_dir().map_err(|e| e.to_string())?;
-    path.push("Cyclemetry");
+    path.push("OVRLEY");
     std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
     path.push(filename);
     Ok(path.to_string_lossy().to_string())

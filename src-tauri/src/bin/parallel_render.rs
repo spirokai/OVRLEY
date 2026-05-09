@@ -1,6 +1,6 @@
-use cyclemetry_core::activity::{build_dense_activity_report, parse_activity_json};
-use cyclemetry_core::commands::AppPaths;
-use cyclemetry_core::config::parse_config_json;
+use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
+use ovrley_core::commands::AppPaths;
+use ovrley_core::config::parse_config_json;
 use std::fs;
 use std::path::PathBuf;
 
@@ -62,7 +62,7 @@ fn main() -> Result<(), String> {
 
     println!("Starting parallel renders (2 sessions)...");
     let duration =
-        cyclemetry_core::encode::video::run_parallel_renders(&paths, configs, &activity, reports)?;
+        ovrley_core::encode::video::run_parallel_renders(&paths, configs, &activity, reports)?;
 
     println!("\nTotal execution time: {:.2}s", duration.as_secs_f64());
 

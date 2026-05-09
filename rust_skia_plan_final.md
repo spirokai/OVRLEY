@@ -16,7 +16,7 @@ Use the same GPX/template pair for all end-to-end timing comparisons unless a re
 
 ### 1. Activity ownership and contract
 
-Use `parsedActivity` from the frontend as the only backend input. The Rust backend must accept the current frontend payload shape from [activityParserUtils.js](/h:/tools/cyclemetry/app/src/api/activityParserUtils.js:569), including:
+Use `parsedActivity` from the frontend as the only backend input. The Rust backend must accept the current frontend payload shape from [activityParserUtils.js](/h:/tools/ovrley/app/src/api/activityParserUtils.js:569), including:
 
 - core arrays used today: `sample_elapsed_seconds`, `sample_distance_progress`, `sample_course_points`, `sample_elevations`, `course`, `elevation`, `speed`, `heartrate`, `cadence`, `power`, `temperature`, `gradient`, `time`
 - metadata and trim fields: `metadata`, `trim_start_seconds`, `trim_end_seconds`, `source_start_time`
@@ -67,8 +67,8 @@ Decision:
 
 ### Phase 1: Foundation and seam replacement
 
-- Create `src-tauri/cyclemetry_core` with modules: `activity`, `config`, `render`, `encode`, `debug`, `commands`.
-- Move FFmpeg resolution logic from Python into `encode/ffmpeg.rs`, preserving search order from [scene.py](/h:/tools/cyclemetry/backend/scene.py:20).
+- Create `src-tauri/ovrley_core` with modules: `activity`, `config`, `render`, `encode`, `debug`, `commands`.
+- Move FFmpeg resolution logic from Python into `encode/ffmpeg.rs`, preserving search order from [scene.py](/h:/tools/ovrley/backend/scene.py:20).
 - Rewire `src-tauri/src/lib.rs` so all backend commands call Rust directly and no sidecar is spawned.
 - Keep all render commands stubbed except `backend_health`.
 
@@ -86,7 +86,7 @@ Test procedure:
    ```
 2. Verify:
    - app starts
-   - no `cyclemetry-server` child process appears
+   - no `ovrley-server` child process appears
    - `backend_health` returns JSON from Rust
 3. Run:
    ```powershell
@@ -98,7 +98,7 @@ Test procedure:
 ### Phase 2: Activity processing and parity harness
 
 - Implement `activity/schema.rs` for the actual frontend `parsedActivity`.
-- Implement `activity/trim.rs` and `activity/interpolate.rs` to match Python behavior in [backend/activity.py](/h:/tools/cyclemetry/backend/activity.py:312) and [backend/activity.py](/h:/tools/cyclemetry/backend/activity.py:415):
+- Implement `activity/trim.rs` and `activity/interpolate.rs` to match Python behavior in [backend/activity.py](/h:/tools/ovrley/backend/activity.py:312) and [backend/activity.py](/h:/tools/ovrley/backend/activity.py:415):
   - trim by elapsed seconds
   - insert interpolated boundary samples at trim start/end
   - build dense frame arrays using `fps`, `scene.start`, `scene.end`
@@ -293,7 +293,7 @@ Recorded artifacts for Phase 3:
 
 ### Phase 4: Route and elevation widgets
 
-- Port route/elevation cache-building from Python `Scene.prepare_render_assets()` and related geometry code in [scene.py](/h:/tools/cyclemetry/backend/scene.py:1872).
+- Port route/elevation cache-building from Python `Scene.prepare_render_assets()` and related geometry code in [scene.py](/h:/tools/ovrley/backend/scene.py:1872).
 - Keep the same architecture the Python backend already uses:
   - precompute route/elevation geometry once
   - pre-render static backgrounds once
@@ -373,7 +373,7 @@ Recorded artifacts for Phase 4:
 
 ### Phase 5: Full encode pipeline and cutover
 
-- Implement render loop plus FFmpeg pipe in Rust, preserving the proven Python queueing model from [scene.py](/h:/tools/cyclemetry/backend/scene.py:204):
+- Implement render loop plus FFmpeg pipe in Rust, preserving the proven Python queueing model from [scene.py](/h:/tools/ovrley/backend/scene.py:204):
   - bounded frame queue
   - dedicated writer thread
   - stderr progress monitor
@@ -915,7 +915,7 @@ Decision:
 
 Implementation:
 
-- Refactor `cyclemetry_core` into target-aware layers:
+- Refactor `ovrley_core` into target-aware layers:
   - `core`: activity processing, config normalization, value formatting, route/elevation geometry preparation, frame orchestration
   - `render_model`: target-neutral render instructions and prepared geometry with no dependency on Tauri, Skia native surfaces, or browser APIs
   - `host_native`: FFmpeg process, native file IO, OS integration

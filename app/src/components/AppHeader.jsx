@@ -20,7 +20,9 @@ import {
   Activity,
   FilePlus2,
   FolderOpen,
+  Grid3X3,
   LayoutGrid,
+  Magnet,
   Minus,
   Play,
   RotateCcw,
@@ -98,8 +100,6 @@ function getTemplateGroups(templates) {
  * @param {*} props.editorControls - Editor control state and handlers.
  * @param {*} props.onOpenDownloads - Callback invoked to open downloads.
  * @param {*} props.renderControls - Render control state and handlers.
- * @param {*} props.sceneHeight - Numeric scene height value.
- * @param {*} props.sceneWidth - Numeric scene width value.
  * @param {*} props.templateControls - Template control state and handlers.
  * @returns {JSX.Element} Rendered component output.
  */
@@ -109,17 +109,19 @@ export default function AppHeader({
   editorControls,
   onOpenDownloads,
   renderControls,
-  sceneHeight,
-  sceneWidth,
   templateControls,
 }) {
   const { activityLabel, onOpenActivityFile } = activityControls
   const {
     backgroundMode,
+    gridVisible,
     onResetZoom,
     onSetBackgroundMode,
+    onSetGridVisible,
+    onSetSnapToGrid,
     onZoomIn,
     onZoomOut,
+    snapToGrid,
     zoomLevel,
   } = editorControls
   const {
@@ -147,18 +149,18 @@ export default function AppHeader({
 
   return (
     <header className="relative z-50 shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
-      <div className="flex items-center justify-between px-6 py-3">
-        <div className="flex items-center gap-6">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 px-6 py-3">
+        <div className="flex min-w-0 items-center gap-6">
           <div className="flex items-center gap-3">
             <img src="/logo.svg" alt="OVRLEY" className="h-5" />
           </div>
 
           <div className="h-8 w-px bg-border/60" />
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
               <Button
-                className="mr-4 h-9 gap-2 border-border/70 px-5 "
+                className="mr-4 h-9 gap-2 border-border/70 px-5"
                 onClick={onOpenActivityFile}
               >
                 <Activity className="h-3.5 w-3.5" />
@@ -253,7 +255,7 @@ export default function AppHeader({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="justify-self-center">
           <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-card/80 p-1 backdrop-blur-sm shadow-lg">
             <SimpleTooltip side="bottom" content="Checkered background">
               <Button
@@ -325,13 +327,33 @@ export default function AppHeader({
                 <RotateCcw className="h-4 w-4" />
               </Button>
             </SimpleTooltip>
-          </div>
-          <div className="rounded-full border border-border/70 bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm shadow-lg">
-            {sceneWidth} &times; {sceneHeight}
+            <div className="mx-1 h-5 w-px bg-border/70" />
+            <SimpleTooltip side="bottom" content="Grid">
+              <Button
+                type="button"
+                variant={gridVisible ? 'default' : 'ghost'}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => onSetGridVisible(!gridVisible)}
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </Button>
+            </SimpleTooltip>
+            <SimpleTooltip side="bottom" content="Snap to grid">
+              <Button
+                type="button"
+                variant={snapToGrid ? 'default' : 'ghost'}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => onSetSnapToGrid(!snapToGrid)}
+              >
+                <Magnet className="h-4 w-4" />
+              </Button>
+            </SimpleTooltip>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-end gap-3 justify-self-end">
           <SimpleTooltip side="bottom" content={renderTooltipContent}>
             <Button
               size="sm"

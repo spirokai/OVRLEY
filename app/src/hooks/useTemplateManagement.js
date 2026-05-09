@@ -38,7 +38,7 @@ const selectBrowserTemplateFile = () =>
  */
 const getFilenameFromPath = (path) => {
   const segments = String(path || '').split(/[/\\]/)
-  return segments[segments.length - 1] || 'cyclemetry_template.json'
+  return segments[segments.length - 1] || 'ovrley_template.json'
 }
 
 /**
@@ -186,7 +186,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
           defaultPath,
           filters: [
             {
-              name: 'Cyclemetry Template',
+              name: 'OVRLEY Template',
               extensions: ['json'],
             },
           ],

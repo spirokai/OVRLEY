@@ -220,7 +220,7 @@ pub(crate) fn sample_frame_indices(total_frames: usize) -> Vec<usize> {
 
 pub(crate) fn render_sample_frames_enabled() -> bool {
     matches!(
-        std::env::var("CYCLEMETRY_SAMPLE_FRAMES").ok().as_deref(),
+        std::env::var("OVRLEY_SAMPLE_FRAMES").ok().as_deref(),
         Some("1" | "true" | "TRUE" | "yes" | "YES")
     )
 }

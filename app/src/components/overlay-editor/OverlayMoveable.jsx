@@ -3,9 +3,22 @@
  */
 
 import Moveable from 'react-moveable'
+import { getEditorGridSize } from './constants'
 
 const CORNER_RESIZE_DIRECTIONS = ['nw', 'ne', 'se', 'sw']
 const EDGE_RESIZE_DIRECTIONS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+
+function getGridGuidelines(max, gridSize, enabled) {
+  const guidelines = [0, max / 2, max]
+
+  if (enabled) {
+    for (let value = gridSize; value < max; value += gridSize) {
+      guidelines.push(value)
+    }
+  }
+
+  return [...new Set(guidelines)].sort((left, right) => left - right)
+}
 
 /**
  * Renders the overlay moveable component.
@@ -24,6 +37,7 @@ const EDGE_RESIZE_DIRECTIONS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
  * @param {*} props.showEdgeResizeHandles - Whether to render edge resize handles.
  * @param {*} props.elementGuidelines - Value for element guidelines.
  * @param {*} props.sceneSize - Numeric scene size value.
+ * @param {*} props.snapToGrid - Whether to snap Moveable to editor grid guides.
  * @param {*} props.handlers - Value for handlers.
  * @returns {JSX.Element} Rendered component output.
  */
@@ -40,9 +54,11 @@ export default function OverlayMoveable({
   showEdgeResizeHandles,
   elementGuidelines,
   sceneSize,
+  snapToGrid,
   handlers,
 }) {
   const isGroupSelection = selectedTargets.length > 1
+  const gridSize = getEditorGridSize(sceneSize)
   // With rootContainer={document.body}, the Moveable UI is rendered at body
   // level, not inside the scaled parent container. No zoom compensation needed.
   const moveableZoom = 1.5
@@ -54,7 +70,7 @@ export default function OverlayMoveable({
   return (
     <Moveable
       ref={moveableRef}
-      className="cyclemetry-moveable"
+      className="ovrley-moveable"
       target={selectedTarget || undefined}
       targets={selectedTargets.length ? selectedTargets : undefined}
       container={sceneElement}
@@ -80,8 +96,16 @@ export default function OverlayMoveable({
       useResizeObserver
       useMutationObserver
       elementGuidelines={elementGuidelines}
-      horizontalGuidelines={[0, sceneSize.height / 2, sceneSize.height]}
-      verticalGuidelines={[0, sceneSize.width / 2, sceneSize.width]}
+      horizontalGuidelines={getGridGuidelines(
+        sceneSize.height,
+        gridSize,
+        snapToGrid,
+      )}
+      verticalGuidelines={getGridGuidelines(
+        sceneSize.width,
+        gridSize,
+        snapToGrid,
+      )}
       zoom={moveableZoom}
       onDragStart={handlers.onDragStart}
       onDrag={handlers.onDrag}

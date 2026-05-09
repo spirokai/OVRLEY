@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "OVRLEY",
   "version": "0.1.0",
-  "identifier": "com.cyclemetry.desktop",
+  "identifier": "com.ovrley.desktop",
   "build": {
     "frontendDist": "../app/dist",
     "devUrl": "http://localhost:5173",

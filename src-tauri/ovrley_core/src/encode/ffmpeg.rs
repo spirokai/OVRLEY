@@ -7,7 +7,7 @@ pub fn resolve_ffmpeg_binary(repo_root: &Path) -> Result<PathBuf, String> {
     let mut candidate_paths = Vec::new();
 
     if let Some(env_override) =
-        env::var_os("CYCLEMETRY_FFMPEG").or_else(|| env::var_os("FFMPEG_BINARY"))
+        env::var_os("OVRLEY_FFMPEG").or_else(|| env::var_os("FFMPEG_BINARY"))
     {
         candidate_paths.push(PathBuf::from(env_override));
     }
@@ -31,7 +31,7 @@ pub fn resolve_ffmpeg_binary(repo_root: &Path) -> Result<PathBuf, String> {
     }
 
     Err(
-        "ffmpeg executable not found. Install ffmpeg and add it to PATH or set CYCLEMETRY_FFMPEG."
+        "ffmpeg executable not found. Install ffmpeg and add it to PATH or set OVRLEY_FFMPEG."
             .to_string(),
     )
 }

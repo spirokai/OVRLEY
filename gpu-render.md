@@ -1,6 +1,6 @@
 # Parallel Skia GPU (Vulkan) Renderer Implementation Plan v2
 
-This document defines a safer implementation path for a GPU-accelerated Skia renderer with a true zero-copy Vulkan encode path where feasible. The goal remains the same as v1, but the plan is now organized to reduce integration risk, make failures diagnosable, and fit the current Cyclemetry codebase more cleanly.
+This document defines a safer implementation path for a GPU-accelerated Skia renderer with a true zero-copy Vulkan encode path where feasible. The goal remains the same as v1, but the plan is now organized to reduce integration risk, make failures diagnosable, and fit the current OVRLEY codebase more cleanly.
 
 ## 1. Goal
 
@@ -113,8 +113,8 @@ Before any Vulkan work, reshape the pipeline so CPU and GPU backends can coexist
 
 **Likely code areas**
 
-- Shared updates in `src-tauri/cyclemetry_core/src/render/mod.rs`
-- Shared updates in `src-tauri/cyclemetry_core/src/encode/video.rs`
+- Shared updates in `src-tauri/ovrley_core/src/render/mod.rs`
+- Shared updates in `src-tauri/ovrley_core/src/encode/video.rs`
 - New backend-specific files added later as `*_gpu.rs`
 
 **Deliverables**
@@ -233,7 +233,7 @@ After the spikes succeed, implement reusable runtime support in the app codebase
 
 **New file**
 
-- `src-tauri/cyclemetry_core/src/render/vulkan_gpu.rs`
+- `src-tauri/ovrley_core/src/render/vulkan_gpu.rs`
 
 **Work items**
 
@@ -263,7 +263,7 @@ Implement the render side against the new backend abstractions.
 
 **New file**
 
-- `src-tauri/cyclemetry_core/src/render/surface_gpu.rs`
+- `src-tauri/ovrley_core/src/render/surface_gpu.rs`
 
 **Work items**
 
@@ -294,7 +294,7 @@ Implement the encode side with direct FFmpeg FFI, not a subprocess.
 
 **New file**
 
-- `src-tauri/cyclemetry_core/src/encode/video_gpu.rs`
+- `src-tauri/ovrley_core/src/encode/video_gpu.rs`
 
 **Work items**
 

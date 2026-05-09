@@ -18,4 +18,4 @@ next/
 .ruff_cache
 app/public/preview*.png
 tauri_build.log
-/tmp/cyclemetry.sock
+/tmp/ovrley.sock

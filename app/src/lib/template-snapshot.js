@@ -4,7 +4,7 @@
 
 import { normalizeColorFields } from './color-utils'
 
-export const TEMPLATE_FILE_FORMAT = 'cyclemetry-template'
+export const TEMPLATE_FILE_FORMAT = 'ovrley-template'
 export const TEMPLATE_FILE_VERSION = 1
 
 export const DEFAULT_EXPORT_RANGE = {
@@ -50,14 +50,14 @@ function cloneSerializable(value) {
  * @returns {*} Result produced by the helper.
  */
 export function sanitizeTemplateFilename(name) {
-  const normalized = String(name || 'cyclemetry_template')
+  const normalized = String(name || 'ovrley_template')
     .trim()
     .replace(/\.[^/.]+$/, '')
     .replace(/[^a-zA-Z0-9._-]+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '')
 
-  return `${normalized || 'cyclemetry_template'}.json`
+  return `${normalized || 'ovrley_template'}.json`
 }
 
 /**

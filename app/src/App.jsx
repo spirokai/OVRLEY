@@ -42,9 +42,6 @@ function App() {
 
   useAppBootstrap()
 
-  const sceneWidth = config?.scene?.width || 1920
-  const sceneHeight = config?.scene?.height || 1080
-
   const handleOpenDownloads = async () => {
     try {
       await backend.openDownloads()
@@ -86,10 +83,14 @@ function App() {
           backendStatus={backendStatus}
           editorControls={{
             backgroundMode: editorShell.editorBackgroundMode,
+            gridVisible: editorShell.editorGridVisible,
             onResetZoom: editorShell.resetZoom,
             onSetBackgroundMode: editorShell.setEditorBackgroundMode,
+            onSetGridVisible: editorShell.setEditorGridVisible,
+            onSetSnapToGrid: editorShell.setEditorSnapToGrid,
             onZoomIn: editorShell.increaseZoom,
             onZoomOut: editorShell.decreaseZoom,
+            snapToGrid: editorShell.editorSnapToGrid,
             zoomLevel: editorShell.editorZoomLevel,
           }}
           onOpenDownloads={handleOpenDownloads}
@@ -99,8 +100,6 @@ function App() {
             renderTooltipContent: renderWorkflow.renderTooltipContent,
             renderingVideo: renderWorkflow.renderingVideo,
           }}
-          sceneHeight={sceneHeight}
-          sceneWidth={sceneWidth}
           templateControls={{
             config,
             handleCreateNewTemplate: templateManagement.handleCreateNewTemplate,
@@ -126,6 +125,8 @@ function App() {
                 zoomLevel={editorShell.editorZoomLevel}
                 onZoomLevelChange={editorShell.setEditorZoomLevel}
                 backgroundMode={editorShell.editorBackgroundMode}
+                gridVisible={editorShell.editorGridVisible}
+                snapToGrid={editorShell.editorSnapToGrid}
               />
             </div>
             <OverlayPlayer />

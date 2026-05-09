@@ -25,7 +25,7 @@ pub struct AppPaths {
 
 impl AppPaths {
     pub fn from_repo_root(repo_root: PathBuf) -> Self {
-        let downloads_dir = downloads_cyclemetry_dir();
+        let downloads_dir = downloads_ovrley_dir();
         let runtime_dir = downloads_dir.join(".runtime");
         let font_dirs = vec![repo_root.join("fonts")]
             .into_iter()
@@ -303,20 +303,24 @@ fn template_descriptor(path: &Path, filename: &str, template_type: &str) -> Valu
     })
 }
 
-fn downloads_cyclemetry_dir() -> PathBuf {
+fn downloads_ovrley_dir() -> PathBuf {
     let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."));
-    home.join("Downloads").join("Cyclemetry")
+    home.join("Downloads").join("OVRLEY")
 }
 
 fn open_path_in_system(path: &Path) -> Result<(), String> {
+    if cfg!(windows) {
+        Command::new("explorer")
+            .arg(path)
+            .spawn()
+            .map_err(|error| format!("Failed to open {}: {error}", path.display()))?;
+        return Ok(());
+    }
+
     let mut command = if cfg!(target_os = "macos") {
         let mut cmd = Command::new("open");
-        cmd.arg(path);
-        cmd
-    } else if cfg!(windows) {
-        let mut cmd = Command::new("explorer");
         cmd.arg(path);
         cmd
     } else {

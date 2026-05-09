@@ -1,8 +1,8 @@
-use cyclemetry_core::activity::{build_dense_activity_report, parse_activity_json};
-use cyclemetry_core::commands::AppPaths;
-use cyclemetry_core::config::parse_config_json;
-use cyclemetry_core::debug::TimingBucket;
-use cyclemetry_core::render::{
+use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
+use ovrley_core::commands::AppPaths;
+use ovrley_core::config::parse_config_json;
+use ovrley_core::debug::TimingBucket;
+use ovrley_core::render::{
     prepare_preview_assets, render_preview_with_prepared_assets, LabelCacheStatus,
     PreviewRenderReport,
 };

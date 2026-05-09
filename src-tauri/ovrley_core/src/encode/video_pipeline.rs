@@ -433,7 +433,7 @@ fn make_even(value: u32) -> u32 {
 }
 
 fn ffmpeg_input_pix_fmt() -> String {
-    std::env::var("CYCLEMETRY_INPUT_PIX_FMT").unwrap_or_else(|_| "rgba".to_string())
+    std::env::var("OVRLEY_INPUT_PIX_FMT").unwrap_or_else(|_| "rgba".to_string())
 }
 
 impl ProgressEstimator {
