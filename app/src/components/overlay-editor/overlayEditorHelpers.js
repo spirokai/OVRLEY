@@ -134,6 +134,29 @@ export function getWidgetIdFromTarget(target) {
 }
 
 /**
+ * Returns widget scene origin used by editor DOM positioning.
+ *
+ * @param {*} widget - Widget definition being rendered or edited.
+ * @param {*} draft - Optional live widget draft.
+ * @returns {{x: number, y: number}} Widget visual origin.
+ */
+export function getWidgetSceneOrigin(widget, draft = null) {
+  const data = draft ? { ...widget.data, ...draft } : widget.data
+  const x = data.x ?? 0
+  const valueOffset =
+    widget.category === 'values' && widget.type !== 'gradient'
+      ? (data.value_offset ?? 0)
+      : 0
+  const gradientYOffset =
+    widget.type === 'gradient' ? Math.min(0, -(data.value_offset ?? 0)) : 0
+
+  return {
+    x,
+    y: (data.y ?? 0) + valueOffset + gradientYOffset,
+  }
+}
+
+/**
  * Applies live widget styles.
  *
  * @param {*} target - Target object, element, or value being updated.
@@ -147,8 +170,7 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
     return
   }
 
-  const nextX = draft.x ?? widget.data.x ?? 0
-  const nextY = draft.y ?? widget.data.y ?? 0
+  const origin = getWidgetSceneOrigin(widget, draft)
   const nextWidth = draft.width ?? widget.data.width
   const nextHeight = draft.height ?? widget.data.height
   const nextRotation =
@@ -158,8 +180,8 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
   const renderScale = isPlotWidget ? globalScale || 1 : 1
   const nextScale = (draft.scale ?? 1) * (isPlotWidget ? 1 : globalScale)
 
-  target.style.left = `${nextX}px`
-  target.style.top = `${nextY}px`
+  target.style.left = `${origin.x}px`
+  target.style.top = `${origin.y}px`
 
   if (typeof nextWidth === 'number') {
     target.style.width = `${nextWidth * renderScale}px`
@@ -195,10 +217,10 @@ export function applyLiveScalePositionStyles(
     return
   }
 
-  const baseX = widget.data.x ?? 0
-  const baseY = widget.data.y ?? 0
-  const nextTranslateX = (draft.x ?? baseX) - baseX
-  const nextTranslateY = (draft.y ?? baseY) - baseY
+  const baseOrigin = getWidgetSceneOrigin(widget)
+  const draftOrigin = getWidgetSceneOrigin(widget, draft)
+  const nextTranslateX = draftOrigin.x - baseOrigin.x
+  const nextTranslateY = draftOrigin.y - baseOrigin.y
   const nextRotation =
     draft.rotation ??
     (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
@@ -212,8 +234,8 @@ export function applyLiveScalePositionStyles(
     transforms.push(`scale(${globalScale})`)
   }
 
-  target.style.left = `${baseX}px`
-  target.style.top = `${baseY}px`
+  target.style.left = `${baseOrigin.x}px`
+  target.style.top = `${baseOrigin.y}px`
   target.style.transform = transforms.join(' ')
 }
 

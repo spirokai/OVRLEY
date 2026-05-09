@@ -1,6 +1,5 @@
 -handle widget update rate by defining container fps different from real
 
--gradient widget around causes vertical jitter while dragging around
 -add shadows to icons and remaining map route/elevation profile - skia first, frotnend follows
 -height of metric widget selection box does not correspond to the real height. Is that just stale state from font change?
 

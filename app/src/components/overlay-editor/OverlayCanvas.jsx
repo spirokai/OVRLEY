@@ -5,6 +5,7 @@
 import { memo, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from './constants'
+import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 import WidgetPreview from './WidgetPreview'
 import { buildWidgetTransform } from './utils'
 
@@ -104,16 +105,7 @@ const OverlayCanvasWidget = memo(
     handleWidgetMouseDown,
     setHoveredWidgetId,
   }) {
-    const x = widget.data.x ?? 0
-    const valueOffset =
-      widget.category === 'values' && widget.type !== 'gradient'
-        ? (widget.data.value_offset ?? 0)
-        : 0
-    const gradientYOffset =
-      widget.type === 'gradient'
-        ? Math.min(0, -(widget.data.value_offset ?? 0))
-        : 0
-    const y = (widget.data.y ?? 0) + valueOffset + gradientYOffset
+    const origin = getWidgetSceneOrigin(widget)
     const isPlotWidget = widget.category === 'plots'
     const scale = isPlotWidget ? 1 : globalScale
     const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
@@ -129,8 +121,8 @@ const OverlayCanvasWidget = memo(
         data-widget-id={widget.id}
         className="group absolute cursor-move select-none rounded-xl outline-1 outline-transparent transition-shadow hover:z-50"
         style={{
-          left: x,
-          top: y,
+          left: origin.x,
+          top: origin.y,
           width,
           height,
           transform: buildWidgetTransform({ scale, rotation }),

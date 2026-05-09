@@ -2,7 +2,7 @@
  * Renders the overlay player portion of the application interface.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw } from 'lucide-react'
 import useStore from '@/store/useStore'
 import { Button } from '@/components/ui/button'
@@ -76,12 +76,15 @@ export default function OverlayPlayer() {
     (state) => state.setSelectedSecondTransient,
   )
   const [isPlaying, setIsPlaying] = useState(false)
+  const [dragSecond, setDragSecond] = useState(null)
   const playbackAnchorRef = useRef({
     startedAtMs: 0,
     startedSecond: 0,
   })
   const totalDurationRef = useRef(0)
   const previewFrameRef = useRef(-1)
+  const pendingTimelineSecondRef = useRef(null)
+  const timelineChangeFrameRef = useRef(0)
 
   const totalDuration = useMemo(() => {
     const metadataDuration = Number(activitySummary?.durationSeconds) || 0
@@ -92,14 +95,58 @@ export default function OverlayPlayer() {
 
   const hasActivity = Boolean(activitySummary && totalDuration > 0)
   const clampedPlayhead = clamp(Number(selectedSecond) || 0, 0, totalDuration)
+  const displayedPlayhead = clamp(
+    dragSecond === null ? clampedPlayhead : dragSecond,
+    0,
+    totalDuration,
+  )
   const effectivePreviewFps = useMemo(
     () => getEffectivePreviewFps(sceneFps, updateRate),
     [sceneFps, updateRate],
   )
 
+  const cancelPendingTimelineChange = useCallback(() => {
+    if (timelineChangeFrameRef.current) {
+      window.cancelAnimationFrame(timelineChangeFrameRef.current)
+      timelineChangeFrameRef.current = 0
+    }
+
+    pendingTimelineSecondRef.current = null
+  }, [])
+
+  const scheduleTimelinePreviewUpdate = useCallback(
+    (nextSecond) => {
+      pendingTimelineSecondRef.current = nextSecond
+
+      if (timelineChangeFrameRef.current) {
+        return
+      }
+
+      timelineChangeFrameRef.current = window.requestAnimationFrame(() => {
+        timelineChangeFrameRef.current = 0
+        const pendingSecond = pendingTimelineSecondRef.current
+        pendingTimelineSecondRef.current = null
+
+        if (pendingSecond === null) {
+          return
+        }
+
+        setSelectedSecondTransient(pendingSecond)
+      })
+    },
+    [setSelectedSecondTransient],
+  )
+
   useEffect(() => {
     totalDurationRef.current = totalDuration
   }, [totalDuration])
+
+  useEffect(
+    () => () => {
+      cancelPendingTimelineChange()
+    },
+    [cancelPendingTimelineChange],
+  )
 
   useEffect(() => {
     if (!hasActivity) {
@@ -165,6 +212,8 @@ export default function OverlayPlayer() {
       startedSecond: initialSecond,
     }
     previewFrameRef.current = -1
+    cancelPendingTimelineChange()
+    setDragSecond(null)
     setSelectedSecondTransient(initialSecond)
     setIsPlaying(true)
   }
@@ -175,6 +224,8 @@ export default function OverlayPlayer() {
       startedSecond: clampedPlayhead,
     }
     previewFrameRef.current = -1
+    cancelPendingTimelineChange()
+    setDragSecond(null)
     setIsPlaying(false)
     setSelectedSecond(clampedPlayhead)
   }
@@ -185,12 +236,15 @@ export default function OverlayPlayer() {
       startedSecond: 0,
     }
     previewFrameRef.current = -1
+    cancelPendingTimelineChange()
+    setDragSecond(null)
     setIsPlaying(false)
     setSelectedSecond(0)
   }
   const handleTimelineChange = ([nextValue]) => {
     const nextSecond = clamp(nextValue, 0, totalDuration)
-    setSelectedSecondTransient(nextSecond)
+    setDragSecond(nextSecond)
+    scheduleTimelinePreviewUpdate(nextSecond)
     previewFrameRef.current = -1
 
     if (isPlaying) {
@@ -204,6 +258,8 @@ export default function OverlayPlayer() {
   const handleTimelineCommit = ([nextValue]) => {
     const nextSecond = clamp(nextValue, 0, totalDuration)
     previewFrameRef.current = -1
+    cancelPendingTimelineChange()
+    setDragSecond(null)
     setSelectedSecond(nextSecond)
 
     if (isPlaying) {
@@ -238,6 +294,8 @@ export default function OverlayPlayer() {
           startedSecond: nextSecond,
         }
         previewFrameRef.current = -1
+        cancelPendingTimelineChange()
+        setDragSecond(null)
         setIsPlaying(false)
         setSelectedSecond(nextSecond)
         return
@@ -255,6 +313,8 @@ export default function OverlayPlayer() {
           startedSecond: clampedPlayhead,
         }
         previewFrameRef.current = -1
+        cancelPendingTimelineChange()
+        setDragSecond(null)
         setIsPlaying(false)
         setSelectedSecond(clampedPlayhead)
         return
@@ -267,6 +327,8 @@ export default function OverlayPlayer() {
         startedSecond: initialSecond,
       }
       previewFrameRef.current = -1
+      cancelPendingTimelineChange()
+      setDragSecond(null)
       setSelectedSecondTransient(initialSecond)
       setIsPlaying(true)
     }
@@ -275,6 +337,7 @@ export default function OverlayPlayer() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [
     clampedPlayhead,
+    cancelPendingTimelineChange,
     hasActivity,
     isPlaying,
     setSelectedSecond,
@@ -332,14 +395,14 @@ export default function OverlayPlayer() {
 
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-            {formatTimelineTime(clampedPlayhead)}
+            {formatTimelineTime(displayedPlayhead)}
           </span>
           <div className="min-w-0 flex-1">
             <Slider
               min={0}
               max={Math.max(totalDuration, 1)}
               step={0.1}
-              value={[clampedPlayhead]}
+              value={[displayedPlayhead]}
               disabled={!hasActivity}
               onValueChange={handleTimelineChange}
               onValueCommit={handleTimelineCommit}

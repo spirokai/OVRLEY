@@ -7,24 +7,8 @@ import { LayoutGrid, Type } from 'lucide-react'
 import OverlayCanvas from './overlay-editor/OverlayCanvas'
 import OverlayMoveable from './overlay-editor/OverlayMoveable'
 import { WIDGET_ICONS } from './overlay-editor/constants'
+import { getWidgetSceneOrigin } from './overlay-editor/overlayEditorHelpers'
 import useOverlayEditorState from './overlay-editor/useOverlayEditorState'
-
-function getWidgetSceneOrigin(widget) {
-  const x = widget.data.x ?? 0
-  const valueOffset =
-    widget.category === 'values' && widget.type !== 'gradient'
-      ? (widget.data.value_offset ?? 0)
-      : 0
-  const gradientYOffset =
-    widget.type === 'gradient'
-      ? Math.min(0, -(widget.data.value_offset ?? 0))
-      : 0
-
-  return {
-    x,
-    y: (widget.data.y ?? 0) + valueOffset + gradientYOffset,
-  }
-}
 
 function WidgetBadgeLayer({
   displayScale,

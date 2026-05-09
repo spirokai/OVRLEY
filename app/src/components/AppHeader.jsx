@@ -227,7 +227,7 @@ export default function AppHeader({
                     </Button>
                   </SimpleTooltip>
                 )}
-                <SimpleTooltip side="bottom" content="Import Template JSON">
+                <SimpleTooltip side="bottom" content="Import Template">
                   <Button
                     variant="ghost"
                     size="icon"
