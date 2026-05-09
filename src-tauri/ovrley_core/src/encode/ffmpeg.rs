@@ -1,5 +1,6 @@
 use std::env;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use serde_json::Value;
 
@@ -17,8 +18,11 @@ pub fn resolve_ffmpeg_binary(repo_root: &Path) -> Result<PathBuf, String> {
     } else {
         "ffmpeg"
     };
-    candidate_paths.push(repo_root.join("backend").join(local_name));
+    candidate_paths.push(repo_root.join("vendor").join("ffmpeg").join("bin").join(local_name));
+    candidate_paths.push(repo_root.join("ffmpeg").join("bin").join(local_name));
+    candidate_paths.push(repo_root.join(".ffmpeg").join("bin").join(local_name));
     candidate_paths.push(repo_root.join(".ffmpeg").join(local_name));
+    candidate_paths.push(repo_root.join("backend").join(local_name));
 
     for candidate in candidate_paths {
         if candidate.is_file() {
@@ -31,10 +35,21 @@ pub fn resolve_ffmpeg_binary(repo_root: &Path) -> Result<PathBuf, String> {
     }
 
     Err(
-        "ffmpeg executable not found. Install ffmpeg and add it to PATH or set OVRLEY_FFMPEG."
+        "ffmpeg executable not found. Run pnpm install, install ffmpeg on PATH, or set OVRLEY_FFMPEG."
             .to_string(),
     )
 }
+
+#[cfg(windows)]
+pub fn suppress_child_console(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+pub fn suppress_child_console(_command: &mut Command) {}
 
 fn find_in_path(binary_name: &str) -> Option<PathBuf> {
     let path_var = env::var_os("PATH")?;

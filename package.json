@@ -4,9 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "tauri": "tauri",
+    "tauri": "node scripts/tauri.mjs",
+    "postinstall": "node scripts/install-ffmpeg.mjs",
     "dev": "pnpm tauri dev",
-    "build": "tauri build",
+    "build": "pnpm tauri build",
     "dev:frontend": "cd app && pnpm dev",
     "build:frontend": "cd app && pnpm build",
     "lint:frontend": "cd app && pnpm lint",

@@ -2,23 +2,33 @@
 use ovrley_core::commands::{self, AppPaths};
 use ovrley_core::encode::video::RenderController;
 use std::path::PathBuf;
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
 
 struct BackendState {
     render_controller: RenderController,
 }
 
-fn app_paths() -> Result<AppPaths, String> {
+fn source_repo_root() -> PathBuf {
     let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     root.pop();
-    let paths = AppPaths::from_repo_root(root);
+    root
+}
+
+fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
+    let repo_root = source_repo_root();
+    let resource_root = if cfg!(debug_assertions) {
+        repo_root.clone()
+    } else {
+        app.path().resource_dir().map_err(|e| e.to_string())?
+    };
+    let paths = AppPaths::from_resource_root(repo_root, resource_root);
     paths.ensure_dirs()?;
     Ok(paths)
 }
 
 #[tauri::command]
-async fn backend_health() -> Result<String, String> {
-    let response = commands::backend_health(&app_paths()?);
+async fn backend_health(app: AppHandle) -> Result<String, String> {
+    let response = commands::backend_health(&app_paths(&app)?);
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
@@ -36,23 +46,29 @@ async fn backend_list_system_fonts() -> Result<String, String> {
 
 #[tauri::command]
 async fn backend_demo(
+    app: AppHandle,
     config_json: String,
     parsed_activity_json: String,
     second: u32,
 ) -> Result<String, String> {
-    let response =
-        commands::backend_demo(&app_paths()?, &config_json, &parsed_activity_json, second)?;
+    let response = commands::backend_demo(
+        &app_paths(&app)?,
+        &config_json,
+        &parsed_activity_json,
+        second,
+    )?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 async fn backend_render(
+    app: AppHandle,
     state: tauri::State<'_, BackendState>,
     config_json: String,
     parsed_activity_json: String,
 ) -> Result<String, String> {
     let response = commands::backend_render(
-        &app_paths()?,
+        &app_paths(&app)?,
         &state.render_controller,
         &config_json,
         &parsed_activity_json,
@@ -67,26 +83,26 @@ async fn backend_progress(state: tauri::State<'_, BackendState>) -> Result<Strin
 }
 
 #[tauri::command]
-async fn backend_open_downloads() -> Result<String, String> {
-    let response = commands::backend_open_downloads(&app_paths()?)?;
+async fn backend_open_downloads(app: AppHandle) -> Result<String, String> {
+    let response = commands::backend_open_downloads(&app_paths(&app)?)?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-async fn backend_open_video(filename: String) -> Result<String, String> {
-    let response = commands::backend_open_video(&app_paths()?, &filename)?;
+async fn backend_open_video(app: AppHandle, filename: String) -> Result<String, String> {
+    let response = commands::backend_open_video(&app_paths(&app)?, &filename)?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-async fn backend_list_templates() -> Result<String, String> {
-    let response = commands::backend_list_templates(&app_paths()?)?;
+async fn backend_list_templates(app: AppHandle) -> Result<String, String> {
+    let response = commands::backend_list_templates(&app_paths(&app)?)?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-async fn backend_get_template(filename: String) -> Result<String, String> {
-    commands::backend_get_template(&app_paths()?, &filename)
+async fn backend_get_template(app: AppHandle, filename: String) -> Result<String, String> {
+    commands::backend_get_template(&app_paths(&app)?, &filename)
 }
 
 #[tauri::command]
@@ -96,8 +112,8 @@ async fn backend_cancel(state: tauri::State<'_, BackendState>) -> Result<String,
 }
 
 #[tauri::command]
-async fn backend_image_data(filename: String) -> Result<String, String> {
-    commands::backend_image_data(&app_paths()?, &filename)
+async fn backend_image_data(app: AppHandle, filename: String) -> Result<String, String> {
+    commands::backend_image_data(&app_paths(&app)?, &filename)
 }
 
 #[tauri::command]
@@ -123,8 +139,7 @@ fn write_template_file(path: String, contents: String) -> Result<String, String>
 
 #[tauri::command]
 fn write_parse_debug_file(filename: String, contents: String) -> Result<String, String> {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.pop();
+    let mut path = source_repo_root();
     path.push("app");
     path.push("debug");
     std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;

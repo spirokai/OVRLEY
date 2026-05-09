@@ -2,6 +2,7 @@ use crate::activity::schema::DenseActivityReport;
 use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::TimingBucket;
+use crate::encode::ffmpeg::suppress_child_console;
 use crate::render::LabelCacheStatus;
 use chrono::Local;
 use serde::Serialize;
@@ -76,7 +77,9 @@ pub(crate) fn concat_video_segments(
     }
     fs::write(&list_path, list_content).map_err(|e| format!("Failed to write concat list: {e}"))?;
 
-    let status = Command::new(ffmpeg_bin)
+    let mut command = Command::new(ffmpeg_bin);
+    suppress_child_console(&mut command);
+    let status = command
         .arg("-f")
         .arg("concat")
         .arg("-safe")
@@ -236,6 +239,7 @@ pub(crate) fn write_sample_frame(
 ) -> Result<(), String> {
     let png_path = debug_dir.join(format!("sample_{frame_index:04}.png"));
     let mut command = Command::new(ffmpeg_bin);
+    suppress_child_console(&mut command);
     command
         .arg("-loglevel")
         .arg("error")

@@ -2,7 +2,9 @@ use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
-use crate::encode::ffmpeg::{build_ffmpeg_settings, resolve_ffmpeg_binary};
+use crate::encode::ffmpeg::{
+    build_ffmpeg_settings, resolve_ffmpeg_binary, suppress_child_console,
+};
 use crate::encode::video::RenderController;
 use crate::encode::video_debug::{
     create_debug_dir, render_sample_frames_enabled, sample_frame_indices, write_prepare_summary,
@@ -263,6 +265,7 @@ fn spawn_ffmpeg_process(
     input_pix_fmt: &str,
 ) -> Result<std::process::Child, String> {
     let mut command = Command::new(ffmpeg_bin);
+    suppress_child_console(&mut command);
     command.arg("-loglevel").arg(&ffmpeg_settings.loglevel);
 
     if !ffmpeg_settings.hw_init_args.is_empty() {
