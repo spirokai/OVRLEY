@@ -125,6 +125,44 @@ export function getSampleValue(activity, key, sampleIndex) {
   return series[sampleIndex] ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
 }
 
+function isValidInterpolatedSample(xValues, yValues, index) {
+  return Number.isFinite(xValues[index]) && Number.isFinite(yValues[index])
+}
+
+function findNearestValidSampleIndex(xValues, yValues, startIndex, direction) {
+  for (
+    let index = startIndex;
+    index >= 0 && index < xValues.length;
+    index += direction
+  ) {
+    if (isValidInterpolatedSample(xValues, yValues, index)) {
+      return index
+    }
+  }
+
+  return -1
+}
+
+function findFirstIndexAtOrAfter(xValues, targetX, low, high) {
+  let left = low
+  let right = high
+  let result = high
+
+  while (left <= right) {
+    const middle = Math.floor((left + right) / 2)
+    const middleX = Number(xValues[middle])
+
+    if (Number.isFinite(middleX) && middleX >= targetX) {
+      result = middle
+      right = middle - 1
+    } else {
+      left = middle + 1
+    }
+  }
+
+  return result
+}
+
 /**
  * Returns interpolated series value.
  *
@@ -172,23 +210,27 @@ export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
     return Number(yValues[lastValidIndex])
   }
 
-  let leftIndex = firstValidIndex
-  let rightIndex = firstValidIndex
-
-  for (let index = firstValidIndex + 1; index <= lastValidIndex; index += 1) {
-    const nextX = Number(xValues[index])
-    const nextY = Number(yValues[index])
-    if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
-      continue
-    }
-
-    if (nextX >= safeTargetX) {
-      rightIndex = index
-      break
-    }
-
-    leftIndex = index
-  }
+  const insertionIndex = findFirstIndexAtOrAfter(
+    xValues,
+    safeTargetX,
+    firstValidIndex,
+    lastValidIndex,
+  )
+  const rightIndex = findNearestValidSampleIndex(
+    xValues,
+    yValues,
+    insertionIndex,
+    1,
+  )
+  const rightXAtInsertion = Number(xValues[rightIndex])
+  const leftIndex = findNearestValidSampleIndex(
+    xValues,
+    yValues,
+    rightXAtInsertion === safeTargetX
+      ? rightIndex
+      : Math.min(rightIndex - 1, lastValidIndex),
+    -1,
+  )
 
   const leftX = Number(xValues[leftIndex])
   const rightX = Number(xValues[rightIndex])
