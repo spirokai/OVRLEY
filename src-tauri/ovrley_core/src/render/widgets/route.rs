@@ -1,20 +1,22 @@
 use super::common::{
-    custom_export_range_active, distance, draw_marker, draw_polyline, fallback_marker_points,
-    fit_points_to_widget_with_inset, frame_progress_values, legacy_line_width,
-    marker_layers_from_points, marker_size_from_weights, normalize_opacity,
-    normalize_optional_progress_window, plot_base_color, point_at_metric_progress_with_cursor,
-    relative_distance_frame_progress_values, resolve_style_color, scale_marker_points,
-    widget_render_report, with_widget_transform, DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER,
+    custom_export_range_active, distance, draw_marker, draw_polyline, draw_polyline_with_shadow,
+    draw_static_layer, fallback_marker_points, fit_points_to_widget_with_inset,
+    frame_progress_values, legacy_line_width, marker_layers_from_points, marker_size_from_weights,
+    normalize_opacity, normalize_optional_progress_window, normalize_shadow_style, plot_base_color,
+    point_at_metric_progress_with_cursor, relative_distance_frame_progress_values,
+    resolve_style_color, scale_marker_points, static_layer_padding, widget_render_report,
+    with_widget_transform, DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER,
     DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
 };
 use super::types::{
-    NormalizedRoutePlot, RouteFrameState, RouteSample, RouteWidgetCache, WidgetGeometry,
-    WidgetRenderReport,
+    NormalizedRoutePlot, RouteFrameState, RouteSample, RouteWidgetCache, StaticLayer,
+    WidgetGeometry, WidgetRenderReport,
 };
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
 use crate::config::{CoursePlotConfig, RenderConfig, RenderDataRequirements};
 use crate::debug::RenderProfiler;
+use crate::render::surface::create_surface;
 use skia_safe::Canvas;
 use std::time::Instant;
 
@@ -33,6 +35,9 @@ pub(crate) fn prepare_route_cache(
         build_route_geometry(&plot, &route_samples)
     })?;
     let marker_layers = marker_layers_from_points(&plot.marker_points);
+    let remaining_layer = prepare_profiler.measure("build_route_cache.layers", || {
+        build_route_remaining_layer(&plot, &geometry)
+    })?;
     let frame_states = prepare_profiler.measure("build_route_cache.frame_states", || {
         build_route_frame_states(
             config,
@@ -52,6 +57,7 @@ pub(crate) fn prepare_route_cache(
         geometry,
         frame_states,
         marker_layers,
+        remaining_layer,
     })
 }
 
@@ -75,13 +81,7 @@ pub(crate) fn draw_route_widget(
             route_cache.plot.height as f32,
             route_cache.plot.rotation,
             |canvas| {
-                draw_polyline(
-                    canvas,
-                    &route_cache.geometry.points,
-                    &route_cache.plot.remaining_line_color,
-                    route_cache.plot.remaining_line_width,
-                    route_cache.plot.remaining_line_opacity,
-                );
+                draw_static_layer(canvas, route_cache.remaining_layer.as_ref());
                 draw_polyline(
                     canvas,
                     &prefix_points,
@@ -157,6 +157,12 @@ fn normalize_route_plot(_config: &RenderConfig, plot: &CoursePlotConfig) -> Norm
                 .or(plot.opacity),
             0.75,
         ),
+        remaining_line_shadow: normalize_shadow_style(
+            plot.shadow_color.as_ref(),
+            plot.shadow_strength,
+            plot.shadow_distance,
+            scale,
+        ),
         completed_line_width: plot.completed_line_width.unwrap_or(legacy_width),
         completed_line_color: resolve_style_color(
             plot.completed_line_color.as_ref(),
@@ -223,6 +229,41 @@ fn build_route_geometry(
             plot.target_density, plot.simplify_tolerance_px
         ),
     })
+}
+
+fn build_route_remaining_layer(
+    plot: &NormalizedRoutePlot,
+    geometry: &WidgetGeometry,
+) -> Result<Option<StaticLayer>, String> {
+    if geometry.points.len() < 2 {
+        return Ok(None);
+    }
+
+    let padding = static_layer_padding(
+        plot.remaining_line_width,
+        plot.remaining_line_shadow.as_ref(),
+    );
+    let layer_width = plot.width.saturating_add(padding.saturating_mul(2)).max(1);
+    let layer_height = plot.height.saturating_add(padding.saturating_mul(2)).max(1);
+    let mut surface = create_surface(layer_width, layer_height)?;
+    surface.canvas().clear(skia_safe::Color::TRANSPARENT);
+    surface.canvas().save();
+    surface.canvas().translate((padding as f32, padding as f32));
+    draw_polyline_with_shadow(
+        surface.canvas(),
+        &geometry.points,
+        &plot.remaining_line_color,
+        plot.remaining_line_width,
+        plot.remaining_line_opacity,
+        plot.remaining_line_shadow.as_ref(),
+    );
+    surface.canvas().restore();
+
+    Ok(Some(StaticLayer {
+        image: surface.image_snapshot(),
+        x: -(padding as f32),
+        y: -(padding as f32),
+    }))
 }
 
 fn route_geometry_inset_px(plot: &NormalizedRoutePlot) -> f32 {

@@ -1,5 +1,7 @@
 use crate::config::MarkerPointConfig;
+use skia_safe::Image;
 use std::collections::BTreeMap;
+use std::fmt;
 
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct WidgetGeometryReport {
@@ -73,6 +75,7 @@ pub(crate) struct RouteWidgetCache {
     pub(crate) geometry: WidgetGeometry,
     pub(crate) frame_states: Vec<RouteFrameState>,
     pub(crate) marker_layers: Vec<MarkerLayer>,
+    pub(crate) remaining_layer: Option<StaticLayer>,
 }
 
 #[derive(Clone, Debug)]
@@ -81,6 +84,31 @@ pub(crate) struct ElevationWidgetCache {
     pub(crate) geometry: WidgetGeometry,
     pub(crate) frame_states: Vec<ElevationFrameState>,
     pub(crate) marker_layers: Vec<MarkerLayer>,
+    pub(crate) remaining_layer: Option<StaticLayer>,
+}
+
+#[derive(Clone)]
+pub(crate) struct StaticLayer {
+    pub(crate) image: Image,
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+}
+
+impl fmt::Debug for StaticLayer {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("StaticLayer")
+            .field("x", &self.x)
+            .field("y", &self.y)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ShadowStyle {
+    pub(crate) color: String,
+    pub(crate) strength: f32,
+    pub(crate) distance: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -95,6 +123,7 @@ pub(crate) struct NormalizedRoutePlot {
     pub(crate) remaining_line_width: f32,
     pub(crate) remaining_line_color: String,
     pub(crate) remaining_line_opacity: f32,
+    pub(crate) remaining_line_shadow: Option<ShadowStyle>,
     pub(crate) completed_line_width: f32,
     pub(crate) completed_line_color: String,
     pub(crate) completed_line_opacity: f32,
@@ -118,6 +147,7 @@ pub(crate) struct NormalizedElevationPlot {
     pub(crate) remaining_line_width: f32,
     pub(crate) remaining_line_color: String,
     pub(crate) remaining_line_opacity: f32,
+    pub(crate) remaining_line_shadow: Option<ShadowStyle>,
     pub(crate) completed_line_width: f32,
     pub(crate) completed_line_color: String,
     pub(crate) completed_line_opacity: f32,

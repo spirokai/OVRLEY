@@ -12,7 +12,8 @@ use crate::render::surface::{create_surface, wrap_native_surface, write_surface_
 use crate::render::text::{draw_text, label_style, value_style};
 use crate::render::widgets::{
     draw_elevation_widget, draw_metric_value_widget_with_config, draw_route_widget,
-    prepare_render_assets, PreparedRenderAssets, WidgetRenderReport,
+    draw_static_metric_icon_for_value, has_static_metric_icon, prepare_render_assets,
+    PreparedRenderAssets, WidgetRenderReport,
 };
 use serde_json::{json, Value};
 use skia_safe::Image;
@@ -241,6 +242,7 @@ pub fn render_frame_rgba(
     let width = target.width;
     let height = target.height;
     let mut labels_image = labels_image;
+    let mut base_layer_restored = false;
     if let Some(base_rgba) = prepared_assets
         .base_rgba
         .as_ref()
@@ -252,6 +254,7 @@ pub fn render_frame_rgba(
         frame_profiler.record_ms("base.restore", restore_ms);
         frame_profiler.record_ms("surface.restore", restore_ms);
         labels_image = None;
+        base_layer_restored = true;
     } else {
         frame_profiler.measure("surface.clear", || {
             target.pixels.fill(0);
@@ -270,6 +273,7 @@ pub fn render_frame_rgba(
         frame_index,
         scale,
         labels_image,
+        base_layer_restored,
         frame_profiler,
     );
     Ok(())
@@ -319,6 +323,7 @@ fn render_frame_surface(
         frame_index,
         scale,
         labels_image,
+        false,
         frame_profiler,
     );
     Ok((surface, widgets.0, widgets.1))
@@ -333,6 +338,7 @@ fn render_frame_to_surface(
     frame_index: usize,
     scale: f32,
     labels_image: Option<&Image>,
+    base_layer_restored: bool,
     frame_profiler: &mut RenderProfiler,
 ) -> (Option<WidgetRenderReport>, Option<WidgetRenderReport>) {
     let frame_started = Instant::now();
@@ -341,6 +347,8 @@ fn render_frame_to_surface(
             canvas.draw_image(labels_image, (0, 0), None);
         });
     }
+    let static_metric_icons_rendered =
+        config_has_static_metric_icons(config) && (labels_image.is_some() || base_layer_restored);
 
     frame_profiler.measure("text.dynamic", || {
         for value in &config.values {
@@ -354,6 +362,7 @@ fn render_frame_to_surface(
                 frame_index,
                 scale,
                 &paths.font_dirs,
+                static_metric_icons_rendered,
             ) {
                 continue;
             }
@@ -400,7 +409,7 @@ fn cached_labels_image(
     scale: f32,
     prepare_profiler: &mut RenderProfiler,
 ) -> Result<(Option<Image>, LabelCacheStatus), String> {
-    if config.labels.is_empty() {
+    if config.labels.is_empty() && !config_has_static_metric_icons(config) {
         return Ok((None, LabelCacheStatus::None));
     }
 
@@ -425,6 +434,7 @@ fn cached_labels_image(
             let style = label_style(&config.scene, label, scale);
             draw_text(surface.canvas(), &label.text, &style, &paths.font_dirs);
         }
+        draw_static_metric_icons(surface.canvas(), config, scale);
     });
     let image = surface.image_snapshot();
     prepare_profiler.record_ms(
@@ -449,7 +459,7 @@ pub fn prepare_base_rgba(
 ) -> Result<Option<Vec<u8>>, String> {
     let row_bytes = (width as usize) * 4;
     let mut pixels = vec![0u8; row_bytes * (height as usize)];
-    if config.labels.is_empty() {
+    if config.labels.is_empty() && !config_has_static_metric_icons(config) {
         return Ok(Some(pixels));
     }
 
@@ -461,6 +471,7 @@ pub fn prepare_base_rgba(
             let style = label_style(&config.scene, label, scale);
             draw_text(surface.canvas(), &label.text, &style, &paths.font_dirs);
         }
+        draw_static_metric_icons(surface.canvas(), config, scale);
     });
     drop(surface);
     Ok(Some(pixels))
@@ -482,7 +493,21 @@ fn labels_cache_key(
     serde_json::to_string(&config.labels)
         .map_err(|error| error.to_string())?
         .hash(&mut hasher);
+    serde_json::to_string(&config.values)
+        .map_err(|error| error.to_string())?
+        .hash(&mut hasher);
     Ok(hasher.finish())
+}
+
+fn config_has_static_metric_icons(config: &RenderConfig) -> bool {
+    config.values.iter().any(has_static_metric_icon)
+}
+
+fn draw_static_metric_icons(canvas: &skia_safe::Canvas, config: &RenderConfig, scale: f32) {
+    for value in &config.values {
+        let style = value_style(&config.scene, value, scale);
+        draw_static_metric_icon_for_value(canvas, value, &style, scale);
+    }
 }
 
 pub fn stub_demo_response(filename: &str) -> Value {

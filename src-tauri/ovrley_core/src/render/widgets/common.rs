@@ -1,10 +1,11 @@
 use super::types::{
-    MarkerLayer, WidgetFrameReport, WidgetGeometry, WidgetGeometryReport, WidgetRenderReport,
+    MarkerLayer, ShadowStyle, StaticLayer, WidgetFrameReport, WidgetGeometry, WidgetGeometryReport,
+    WidgetRenderReport,
 };
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::MarkerPointConfig;
 use crate::config::RenderConfig;
-use skia_safe::{Canvas, Paint, PaintCap, PaintJoin, Path as SkPath, Point};
+use skia_safe::{image_filters, Canvas, Paint, PaintCap, PaintJoin, Path as SkPath, Point};
 
 pub(crate) const DEFAULT_COLOR: &str = "#ffffff";
 pub(crate) const DEFAULT_LINE_WIDTH: f32 = 1.75;
@@ -339,6 +340,17 @@ pub(crate) fn draw_polyline(
     width: f32,
     opacity: f32,
 ) {
+    draw_polyline_with_shadow(canvas, points, color, width, opacity, None);
+}
+
+pub(crate) fn draw_polyline_with_shadow(
+    canvas: &Canvas,
+    points: &[(f32, f32)],
+    color: &str,
+    width: f32,
+    opacity: f32,
+    shadow: Option<&ShadowStyle>,
+) {
     if points.len() < 2 {
         return;
     }
@@ -350,6 +362,29 @@ pub(crate) fn draw_polyline(
     paint.set_stroke_cap(PaintCap::Round);
     paint.set_stroke_join(PaintJoin::Round);
     paint.set_color(crate::render::text::parse_color(color, opacity));
+
+    if let Some(shadow) = shadow {
+        if shadow.strength > 0.0 || shadow.distance != 0.0 {
+            if let Some(shadow_filter) = image_filters::drop_shadow_only(
+                (shadow.distance, shadow.distance),
+                (shadow.strength, shadow.strength),
+                crate::render::text::parse_color(&shadow.color, opacity),
+                None,
+                None,
+            ) {
+                let mut shadow_paint = Paint::default();
+                shadow_paint.set_anti_alias(true);
+                shadow_paint.set_style(skia_safe::paint::Style::Stroke);
+                shadow_paint.set_stroke_width(width.max(1.0));
+                shadow_paint.set_stroke_cap(PaintCap::Round);
+                shadow_paint.set_stroke_join(PaintJoin::Round);
+                shadow_paint.set_color(crate::render::text::parse_color(color, opacity));
+                shadow_paint.set_image_filter(shadow_filter);
+                canvas.draw_path(&path, &shadow_paint);
+            }
+        }
+    }
+
     canvas.draw_path(&path, &paint);
 }
 
@@ -501,6 +536,38 @@ pub(crate) fn resolve_style_color(
         .cloned()
         .or_else(|| inherited_color.cloned())
         .unwrap_or_else(|| base_color.to_string())
+}
+
+pub(crate) fn normalize_shadow_style(
+    color: Option<&String>,
+    strength: Option<f32>,
+    distance: Option<f32>,
+    scale: f32,
+) -> Option<ShadowStyle> {
+    let color = color?.clone();
+    let strength = strength.unwrap_or(0.0) * scale;
+    let distance = distance.unwrap_or(0.0) * scale;
+    if strength <= 0.0 && distance == 0.0 {
+        return None;
+    }
+    Some(ShadowStyle {
+        color,
+        strength,
+        distance,
+    })
+}
+
+pub(crate) fn static_layer_padding(line_width: f32, shadow: Option<&ShadowStyle>) -> u32 {
+    let shadow_extent = shadow
+        .map(|shadow| shadow.distance.abs() + shadow.strength * 3.0)
+        .unwrap_or(0.0);
+    (line_width.max(1.0) * 0.5 + shadow_extent).ceil().max(0.0) as u32
+}
+
+pub(crate) fn draw_static_layer(canvas: &Canvas, layer: Option<&StaticLayer>) {
+    if let Some(layer) = layer {
+        canvas.draw_image(&layer.image, (layer.x, layer.y), None);
+    }
 }
 
 pub(crate) fn path_from_points(

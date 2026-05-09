@@ -262,6 +262,12 @@ pub struct CoursePlotConfig {
     #[serde(default)]
     pub marker_opacity: Option<f32>,
     #[serde(default)]
+    pub shadow_color: Option<String>,
+    #[serde(default)]
+    pub shadow_strength: Option<f32>,
+    #[serde(default)]
+    pub shadow_distance: Option<f32>,
+    #[serde(default)]
     pub show_full_activity: Option<bool>,
     #[serde(default)]
     pub line: Option<LineStyleConfig>,
@@ -303,6 +309,12 @@ pub struct ElevationPlotConfig {
     pub marker_color: Option<String>,
     #[serde(default)]
     pub marker_opacity: Option<f32>,
+    #[serde(default)]
+    pub shadow_color: Option<String>,
+    #[serde(default)]
+    pub shadow_strength: Option<f32>,
+    #[serde(default)]
+    pub shadow_distance: Option<f32>,
     #[serde(default)]
     pub area_completed_color: Option<String>,
     #[serde(default)]

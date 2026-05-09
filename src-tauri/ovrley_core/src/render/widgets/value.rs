@@ -3,7 +3,8 @@ use crate::config::{RenderConfig, ValueConfig};
 use crate::render::format::{format_metric_parts, MetricDisplayParts, MetricIconKind};
 use crate::render::text::{draw_text, measure_text, parse_color, ResolvedTextStyle};
 use skia_safe::{
-    paint::Style, path::ArcSize, Canvas, Paint, PaintCap, PaintJoin, Path, PathDirection, Point,
+    image_filters, paint::Style, path::ArcSize, Canvas, Color, Paint, PaintCap, PaintJoin, Path,
+    PathDirection, Point,
 };
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -46,6 +47,7 @@ pub(crate) fn draw_metric_value_widget_with_config(
     frame_index: usize,
     scale: f32,
     font_dirs: &[PathBuf],
+    static_icon_rendered: bool,
 ) -> bool {
     if value.value == "gradient" {
         return draw_gradient_value_widget(
@@ -63,7 +65,15 @@ pub(crate) fn draw_metric_value_widget_with_config(
     let Some(parts) = format_metric_parts(config, value, dense_activity, frame_index) else {
         return false;
     };
-    draw_metric_parts(canvas, value, base_style, &parts, scale, font_dirs);
+    draw_metric_parts(
+        canvas,
+        value,
+        base_style,
+        &parts,
+        scale,
+        font_dirs,
+        static_icon_rendered,
+    );
     true
 }
 
@@ -100,7 +110,7 @@ fn draw_gradient_value_widget(
     let zero_baseline_y = triangle_top + max_triangle_height;
     let value_top = if show_triangle {
         zero_baseline_y
-            - (value_line_height + (GRADIENT_TRIANGLE_GAP_PX * scale) + max_triangle_height )
+            - (value_line_height + (GRADIENT_TRIANGLE_GAP_PX * scale) + max_triangle_height)
             - value_offset
     } else {
         base_style.y - value_offset
@@ -212,6 +222,7 @@ fn draw_metric_parts(
     parts: &MetricDisplayParts,
     scale: f32,
     font_dirs: &[PathBuf],
+    static_icon_rendered: bool,
 ) {
     let value_measure = measure_text(&parts.value_text, base_style, font_dirs);
     let value_line_height = base_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
@@ -254,12 +265,15 @@ fn draw_metric_parts(
     value_style.y = value_top;
     value_style.line_height = value_line_height;
 
-    if show_icon {
+    if show_icon && !static_icon_rendered {
         draw_metric_icon(
             canvas,
             parts.icon_kind,
             value.icon_color.as_deref().unwrap_or("#40e0d0"),
             base_style.opacity,
+            base_style.shadow_color,
+            base_style.shadow_strength,
+            base_style.shadow_distance,
             base_style.x + value.icon_offset_x.unwrap_or(0.0) * scale,
             base_style.y
                 + ((row_height - icon_size) * 0.5)
@@ -279,11 +293,56 @@ fn draw_metric_parts(
     }
 }
 
+pub(crate) fn has_static_metric_icon(value: &ValueConfig) -> bool {
+    value.show_icon.unwrap_or(value.value != "gradient")
+        && metric_icon_kind_for_value(value.value.as_str()).is_some()
+}
+
+pub(crate) fn draw_static_metric_icon_for_value(
+    canvas: &Canvas,
+    value: &ValueConfig,
+    base_style: &ResolvedTextStyle,
+    scale: f32,
+) -> bool {
+    let Some(icon_kind) = metric_icon_kind_for_value(value.value.as_str()) else {
+        return false;
+    };
+    if !value.show_icon.unwrap_or(value.value != "gradient") {
+        return false;
+    }
+
+    let icon_size = value.icon_size.unwrap_or(28.0) * scale;
+    if icon_size <= 0.0 {
+        return false;
+    }
+
+    let text_group_height = base_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
+    let row_height = icon_size.max(text_group_height);
+    draw_metric_icon(
+        canvas,
+        Some(icon_kind),
+        value.icon_color.as_deref().unwrap_or("#40e0d0"),
+        base_style.opacity,
+        base_style.shadow_color,
+        base_style.shadow_strength,
+        base_style.shadow_distance,
+        base_style.x + value.icon_offset_x.unwrap_or(0.0) * scale,
+        base_style.y
+            + ((row_height - icon_size) * 0.5)
+            + value.icon_offset_y.unwrap_or(0.0) * scale,
+        icon_size,
+    );
+    true
+}
+
 fn draw_metric_icon(
     canvas: &Canvas,
     icon_kind: Option<MetricIconKind>,
     icon_color: &str,
     widget_opacity: f32,
+    shadow_color: Option<Color>,
+    shadow_strength: f32,
+    shadow_distance: f32,
     x: f32,
     y: f32,
     size: f32,
@@ -297,18 +356,61 @@ fn draw_metric_icon(
     let Some(icon) = parsed_metric_icon(icon_kind) else {
         return;
     };
+    let icon_scale = size / ICON_VIEWBOX_SIZE;
 
+    let paint = metric_icon_paint(
+        icon,
+        crate::render::text::parse_color(icon_color, widget_opacity),
+    );
+
+    canvas.save();
+    canvas.translate((x, y));
+    canvas.scale((icon_scale, icon_scale));
+    if let Some(shadow_color) = shadow_color {
+        if shadow_strength > 0.0 || shadow_distance != 0.0 {
+            let inverse_scale = if icon_scale.abs() <= f32::EPSILON {
+                1.0
+            } else {
+                1.0 / icon_scale
+            };
+            if let Some(shadow_filter) = image_filters::drop_shadow_only(
+                (
+                    shadow_distance * inverse_scale,
+                    shadow_distance * inverse_scale,
+                ),
+                (
+                    shadow_strength * inverse_scale,
+                    shadow_strength * inverse_scale,
+                ),
+                shadow_color,
+                None,
+                None,
+            ) {
+                let mut shadow_paint = metric_icon_paint(
+                    icon,
+                    crate::render::text::parse_color(icon_color, widget_opacity),
+                );
+                shadow_paint.set_image_filter(shadow_filter);
+                draw_metric_icon_primitives(canvas, icon, &shadow_paint);
+            }
+        }
+    }
+    draw_metric_icon_primitives(canvas, icon, &paint);
+    canvas.restore();
+}
+
+fn metric_icon_paint(icon: &ParsedSvgIcon, color: Color) -> Paint {
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
     paint.set_style(Style::Stroke);
     paint.set_stroke_width(icon.stroke_width.max(1.0));
     paint.set_stroke_cap(PaintCap::Round);
     paint.set_stroke_join(PaintJoin::Round);
-    paint.set_color(crate::render::text::parse_color(icon_color, widget_opacity));
+    paint.set_color(color);
+    paint
+}
 
-    canvas.save();
-    canvas.translate((x, y));
-    canvas.scale((size / ICON_VIEWBOX_SIZE, size / ICON_VIEWBOX_SIZE));
+fn draw_metric_icon_primitives(canvas: &Canvas, icon: &ParsedSvgIcon, paint: &Paint) {
     for primitive in &icon.primitives {
         match primitive {
             SvgPrimitive::Path(data) => {
@@ -324,7 +426,18 @@ fn draw_metric_icon(
             }
         }
     }
-    canvas.restore();
+}
+
+fn metric_icon_kind_for_value(value: &str) -> Option<MetricIconKind> {
+    match value {
+        "speed" => Some(MetricIconKind::Gauge),
+        "heartrate" => Some(MetricIconKind::Heart),
+        "cadence" => Some(MetricIconKind::RefreshCw),
+        "power" => Some(MetricIconKind::Zap),
+        "time" => Some(MetricIconKind::Clock3),
+        "temperature" => Some(MetricIconKind::Thermometer),
+        _ => None,
+    }
 }
 
 fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIcon> {
@@ -543,6 +656,22 @@ fn svg_path_to_skia_path(data: &str) -> Option<Path> {
                             end,
                         );
                     }
+                    current = end;
+                }
+            }
+            'C' | 'c' => {
+                let is_relative = command == 'c';
+                while peek_is_number(&tokens, index) {
+                    let x1 = next_number(&tokens, &mut index)?;
+                    let y1 = next_number(&tokens, &mut index)?;
+                    let x2 = next_number(&tokens, &mut index)?;
+                    let y2 = next_number(&tokens, &mut index)?;
+                    let x = next_number(&tokens, &mut index)?;
+                    let y = next_number(&tokens, &mut index)?;
+                    let control1 = point_from_command(current, x1, y1, is_relative);
+                    let control2 = point_from_command(current, x2, y2, is_relative);
+                    let end = point_from_command(current, x, y, is_relative);
+                    path.cubic_to(control1, control2, end);
                     current = end;
                 }
             }

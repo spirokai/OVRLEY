@@ -1,22 +1,24 @@
 use super::common::{
-    custom_export_range_active, draw_area, draw_marker, draw_polyline, fallback_marker_points,
-    format_elevation_label, frame_progress_values, interpolate_optional_numeric_series,
-    legacy_line_width, marker_layers_from_points, marker_size_from_weights, normalize_opacity,
-    normalize_optional_progress_window, plot_base_color, point_at_metric_progress_with_cursor,
+    custom_export_range_active, draw_area, draw_marker, draw_polyline, draw_polyline_with_shadow,
+    draw_static_layer, fallback_marker_points, format_elevation_label, frame_progress_values,
+    interpolate_optional_numeric_series, legacy_line_width, marker_layers_from_points,
+    marker_size_from_weights, normalize_opacity, normalize_optional_progress_window,
+    normalize_shadow_style, plot_base_color, point_at_metric_progress_with_cursor,
     point_at_progress_x, relative_distance_frame_progress_values, resolve_style_color,
-    rotate_point_to_canvas, scale_marker_points, widget_render_report, with_widget_transform,
-    DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER, DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER,
-    DEFAULT_ELEVATION_MARKER_SCALE,
+    rotate_point_to_canvas, scale_marker_points, static_layer_padding, widget_render_report,
+    with_widget_transform, DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER,
+    DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER, DEFAULT_ELEVATION_MARKER_SCALE,
 };
 use super::types::{
-    ElevationFrameState, ElevationWidgetCache, NormalizedElevationPlot, WidgetGeometry,
-    WidgetRenderReport,
+    ElevationFrameState, ElevationWidgetCache, NormalizedElevationPlot, StaticLayer,
+    WidgetGeometry, WidgetRenderReport,
 };
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
 use crate::commands::AppPaths;
 use crate::config::{ElevationPlotConfig, RenderConfig, RenderDataRequirements};
 use crate::debug::RenderProfiler;
+use crate::render::surface::create_surface;
 use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};
 use skia_safe::Canvas;
 use std::time::Instant;
@@ -36,6 +38,9 @@ pub(crate) fn prepare_elevation_cache(
         build_elevation_geometry(&plot, &raw_points)
     })?;
     let marker_layers = marker_layers_from_points(&plot.marker_points);
+    let remaining_layer = prepare_profiler.measure("build_elevation_cache.layers", || {
+        build_elevation_remaining_layer(&plot, &geometry)
+    })?;
     let frame_states = prepare_profiler.measure("build_elevation_cache.frame_states", || {
         build_elevation_frame_states(
             config,
@@ -55,6 +60,7 @@ pub(crate) fn prepare_elevation_cache(
         geometry,
         frame_states,
         marker_layers,
+        remaining_layer,
     })
 }
 
@@ -86,20 +92,7 @@ pub(crate) fn draw_elevation_widget(
             elevation_cache.plot.height as f32,
             elevation_cache.plot.rotation,
             |canvas| {
-                draw_area(
-                    canvas,
-                    &elevation_cache.geometry.points,
-                    baseline_y,
-                    &elevation_cache.plot.area_remaining_color,
-                    elevation_cache.plot.area_remaining_opacity,
-                );
-                draw_polyline(
-                    canvas,
-                    &elevation_cache.geometry.points,
-                    &elevation_cache.plot.remaining_line_color,
-                    elevation_cache.plot.remaining_line_width,
-                    elevation_cache.plot.remaining_line_opacity,
-                );
+                draw_static_layer(canvas, elevation_cache.remaining_layer.as_ref());
                 draw_area(
                     canvas,
                     &completed_points,
@@ -298,6 +291,12 @@ fn normalize_elevation_plot(
                 .or(plot.opacity),
             1.0,
         ),
+        remaining_line_shadow: normalize_shadow_style(
+            plot.shadow_color.as_ref(),
+            plot.shadow_strength,
+            plot.shadow_distance,
+            scale,
+        ),
         completed_line_width: plot.completed_line_width.unwrap_or(legacy_width),
         completed_line_color: resolve_style_color(
             plot.completed_line_color.as_ref(),
@@ -372,6 +371,48 @@ fn normalize_elevation_plot(
             .or(config.scene.decimal_rounding),
         legacy_label_units: point_label.units,
     }
+}
+
+fn build_elevation_remaining_layer(
+    plot: &NormalizedElevationPlot,
+    geometry: &WidgetGeometry,
+) -> Result<Option<StaticLayer>, String> {
+    if geometry.points.len() < 2 {
+        return Ok(None);
+    }
+
+    let padding = static_layer_padding(
+        plot.remaining_line_width,
+        plot.remaining_line_shadow.as_ref(),
+    );
+    let layer_width = plot.width.saturating_add(padding.saturating_mul(2)).max(1);
+    let layer_height = plot.height.saturating_add(padding.saturating_mul(2)).max(1);
+    let mut surface = create_surface(layer_width, layer_height)?;
+    surface.canvas().clear(skia_safe::Color::TRANSPARENT);
+    surface.canvas().save();
+    surface.canvas().translate((padding as f32, padding as f32));
+    draw_area(
+        surface.canvas(),
+        &geometry.points,
+        plot.height as f32,
+        &plot.area_remaining_color,
+        plot.area_remaining_opacity,
+    );
+    draw_polyline_with_shadow(
+        surface.canvas(),
+        &geometry.points,
+        &plot.remaining_line_color,
+        plot.remaining_line_width,
+        plot.remaining_line_opacity,
+        plot.remaining_line_shadow.as_ref(),
+    );
+    surface.canvas().restore();
+
+    Ok(Some(StaticLayer {
+        image: surface.image_snapshot(),
+        x: -(padding as f32),
+        y: -(padding as f32),
+    }))
 }
 
 fn first_value_font(config: &RenderConfig) -> Option<String> {

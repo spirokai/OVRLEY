@@ -11,7 +11,9 @@ use crate::debug::RenderProfiler;
 pub(crate) use elevation::draw_elevation_widget;
 pub(crate) use route::draw_route_widget;
 pub use types::{PreparedRenderAssets, WidgetRenderReport};
-pub(crate) use value::draw_metric_value_widget_with_config;
+pub(crate) use value::{
+    draw_metric_value_widget_with_config, draw_static_metric_icon_for_value, has_static_metric_icon,
+};
 
 pub fn prepare_render_assets(
     config: &RenderConfig,
