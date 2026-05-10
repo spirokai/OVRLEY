@@ -515,7 +515,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                   variant="outline"
                   size="sm"
                   className="h-9 px-3 text-xs"
-                  disabled={!activitySummary || videoSyncOffsetSeconds === 0}
+                  disabled={!activitySummary}
                   onClick={() => computeVideoSync(activitySummary)}
                 >
                   Auto-sync

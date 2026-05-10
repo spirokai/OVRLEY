@@ -179,7 +179,7 @@ When video is imported, add a `backgroundMode: 'video'` option to the background
 Runs `ffmpeg -encoders` and parses output to detect availability of:
 
 - **Software**: `libx264`, `libx265`
-- **NVIDIA**: `h264_nvenc`, `hevc_nvenc`
+- **NVIDIA**: `h264_nvenc`, `hevc_nvenc`, `nvgpu`, `nnvgpu` (full hardware)
 - **Intel QSV**: `h264_qsv`, `hevc_qsv`
 - **AMD/VA-API**: `h264_vaapi`, `hevc_vaapi`
 - **macOS**: `h264_videotoolbox`, `hevc_videotoolbox`
@@ -212,8 +212,8 @@ Restructure the codec selector into two `<SelectGroup>` sections:
 
 - H.264 (CPU) — `libx264`
 - H.265 (CPU) — `libx265`
-- H.264 NVENC (GPU) — `h264_nvenc` (if detected)
-- HEVC NVENC (GPU) — `hevc_nvenc` (if detected)
+- H.264 NVENC (GPU) — `h264_nvenc` (if detected); check nvgpu and nnvgpu
+- HEVC NVENC (GPU) — `hevc_nvenc` (if detected); check nvgpu and nnvgpu
 - H.264 QSV (Intel) — `h264_qsv` (if detected)
 - HEVC QSV (Intel) — `hevc_qsv` (if detected)
 - H.264 VA-API — `h264_vaapi` (if detected, Linux only)
