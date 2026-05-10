@@ -153,7 +153,7 @@ export default function HexColorPicker({
         <ColorPickerContent
           align="start"
           sideOffset={8}
-          className="w-[320px] rounded-2xl border-border/80 bg-card/95 p-4 shadow-2xl shadow-background/40 backdrop-blur-sm"
+          className="w-[320px] rounded-md border-border/80 bg-card/95 p-3 shadow-2xl shadow-background/40 backdrop-blur-sm"
         >
           <div className="space-y-4">
             <ColorPickerArea

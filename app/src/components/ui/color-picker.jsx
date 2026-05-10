@@ -56,7 +56,15 @@ const colorFormats = ['hex', 'rgb', 'hsl', 'hsb']
  * @returns {*} Result produced by the helper.
  */
 function hexToRgb(hex, alpha) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  const normalizedHex = hex.replace(/^#/, '')
+  const expandedHex =
+    normalizedHex.length === 3
+      ? normalizedHex
+          .split('')
+          .map((part) => part.repeat(2))
+          .join('')
+      : normalizedHex
+  const result = /^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(expandedHex)
   return result
     ? {
         r: Number.parseInt(result[1] ?? '0', 16),
@@ -334,11 +342,9 @@ function parseColorString(value) {
   const trimmed = value.trim()
 
   // Parse hex colors
-  if (trimmed.startsWith('#')) {
-    const hexMatch = trimmed.match(/^#([a-fA-F0-9]{3}|[a-fA-F0-9]{6})$/)
-    if (hexMatch) {
-      return hexToRgb(trimmed)
-    }
+  const hexMatch = trimmed.match(/^#?([a-fA-F0-9]{3}|[a-fA-F0-9]{6})$/)
+  if (hexMatch) {
+    return hexToRgb(trimmed)
   }
 
   // Parse rgb/rgba colors
@@ -1304,21 +1310,52 @@ function HexInput(props) {
     context,
     withoutAlpha,
     className,
+    onBlur,
+    onFocus,
     ...inputProps
   } = props
 
   const hexValue = rgbToHex(color)
   const alphaValue = Math.round((color?.a ?? 1) * 100)
+  const [hexDraft, setHexDraft] = React.useState(hexValue)
+  const [isHexFocused, setIsHexFocused] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!isHexFocused) {
+      setHexDraft(hexValue)
+    }
+  }, [hexValue, isHexFocused])
 
   const onHexChange = React.useCallback(
     (event) => {
       const value = event.target.value
+      setHexDraft(value)
+
       const parsedColor = parseColorString(value)
       if (parsedColor) {
         onColorChange({ ...parsedColor, a: color?.a ?? 1 })
       }
     },
     [color, onColorChange],
+  )
+
+  const onHexFocus = React.useCallback(
+    (event) => {
+      setIsHexFocused(true)
+      onFocus?.(event)
+    },
+    [onFocus],
+  )
+
+  const onHexBlur = React.useCallback(
+    (event) => {
+      setIsHexFocused(false)
+
+      const parsedColor = parseColorString(event.target.value)
+      setHexDraft(parsedColor ? rgbToHex(parsedColor) : hexValue)
+      onBlur?.(event)
+    },
+    [hexValue, onBlur],
   )
 
   const onAlphaChange = React.useCallback(
@@ -1339,8 +1376,10 @@ function HexInput(props) {
         {...inputProps}
         placeholder="#000000"
         className={cn('font-mono w-39', className)}
-        value={hexValue}
+        value={hexDraft}
         onChange={onHexChange}
+        onFocus={onHexFocus}
+        onBlur={onHexBlur}
         disabled={context.disabled}
       />
     )
@@ -1357,8 +1396,10 @@ function HexInput(props) {
         {...inputProps}
         placeholder="#000000"
         className="font-mono flex-1"
-        value={hexValue}
+        value={hexDraft}
         onChange={onHexChange}
+        onFocus={onHexFocus}
+        onBlur={onHexBlur}
         disabled={context.disabled}
       />
       <InputGroupItem
