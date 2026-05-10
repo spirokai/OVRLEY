@@ -1,3 +1,10 @@
+//! Single-pass video render pipeline.
+//!
+//! The pipeline prepares reusable Skia assets, renders frames into a bounded
+//! pool of RGBA buffers, and streams those buffers to ffmpeg through stdin. A
+//! separate monitor thread parses ffmpeg stderr for encoded-frame progress,
+//! while the writer thread keeps expensive IO off the render loop.
+
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::commands::AppPaths;
 use crate::config::RenderConfig;
@@ -22,20 +29,27 @@ use std::time::{Duration, Instant};
 
 const FRAME_QUEUE_SIZE: usize = 12;
 
+/// Reusable raw RGBA frame buffer.
 struct FrameBuffer {
+    /// Pixel bytes in row-major RGBA order.
     pixels: Vec<u8>,
 }
 
+/// Result returned by the ffmpeg stdin writer thread.
 struct WriterResult {
+    /// Number of complete frames written to ffmpeg.
     written_frames: u32,
+    /// Writer-side timing buckets.
     timings: BTreeMap<String, TimingBucket>,
 }
 
+/// Exponential moving average estimator for remaining render time.
 #[derive(Default)]
 struct ProgressEstimator {
     ema_seconds_per_frame: Option<f64>,
 }
 
+/// Renders one video output by streaming Skia-rendered frames to ffmpeg.
 pub(crate) fn render_video_single(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -43,6 +57,9 @@ pub(crate) fn render_video_single(
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> Result<String, String> {
+    // The render loop is the producer; ffmpeg stdin is the consumer. A bounded
+    // frame queue plus a free-buffer pool limit peak memory while allowing
+    // encoder IO to overlap with Skia rendering.
     let ffmpeg_settings = finalize_ffmpeg_settings(build_ffmpeg_settings(&config.scene.ffmpeg)?);
     let width = make_even(config.scene.width.unwrap_or(1920));
     let height = make_even(config.scene.height.unwrap_or(1080));
@@ -175,7 +192,7 @@ pub(crate) fn render_video_single(
     let writer_result = writer_thread
         .join()
         .map_err(|_| "Encoder writer thread panicked".to_string())??;
-    let _monitor_result = monitor_thread
+    monitor_thread
         .join()
         .map_err(|_| "FFmpeg monitor thread panicked".to_string())?;
     let status = child.wait().map_err(|error| error.to_string())?;
@@ -218,9 +235,12 @@ pub(crate) fn render_video_single(
     Ok(public_filename)
 }
 
+// Applies pipeline-level defaults that depend on the chosen ffmpeg settings.
 fn finalize_ffmpeg_settings(
     mut ffmpeg_settings: crate::encode::ffmpeg::FfmpegSettings,
 ) -> crate::encode::ffmpeg::FfmpegSettings {
+    // Vulkan ProRes benefits from explicit async depth. Apply it here so the
+    // config builder remains a pure mapping from template JSON.
     if ffmpeg_settings.codec == "prores_ks_vulkan"
         && !ffmpeg_settings
             .output_args
@@ -233,7 +253,10 @@ fn finalize_ffmpeg_settings(
     ffmpeg_settings
 }
 
+/// Computes how many frames will be written after applying frame decimation.
 pub(crate) fn rendered_frame_count(layout_frame_count: usize, update_rate: usize) -> usize {
+    // Decimation keeps the first frame and then every `update_rate`th layout
+    // frame. The +1 form avoids off-by-one loss for non-divisible lengths.
     if layout_frame_count == 0 {
         return 0;
     }
@@ -241,23 +264,29 @@ pub(crate) fn rendered_frame_count(layout_frame_count: usize, update_rate: usize
     ((layout_frame_count - 1) / safe_update_rate) + 1
 }
 
+// Maps an encoded output frame to the source layout frame index.
 fn source_frame_index(
     output_frame_index: usize,
     update_rate: usize,
     dense_activity: &DenseActivityReport,
 ) -> usize {
+    // Map encoded frames back to the denser layout timeline. Clamp to the final
+    // layout frame so short clips and unusual update rates stay valid.
     let max_frame_index = dense_activity.frame_count.saturating_sub(1);
     output_frame_index
         .saturating_mul(update_rate.max(1))
         .min(max_frame_index)
 }
 
+// Sends a completed frame to the writer thread while respecting cancellation.
 fn queue_frame(
     sender: &SyncSender<FrameBuffer>,
     frame_buffer: FrameBuffer,
     cancel_flag: &AtomicBool,
     profiler: &mut RenderProfiler,
 ) -> Result<(), String> {
+    // `try_send` lets us poll the cancel flag while waiting for encoder
+    // backpressure to clear.
     let started = Instant::now();
     let mut payload = frame_buffer;
     loop {
@@ -280,6 +309,7 @@ fn queue_frame(
     }
 }
 
+// Starts ffmpeg configured to accept raw video from stdin.
 fn spawn_ffmpeg_process(
     ffmpeg_bin: &Path,
     ffmpeg_settings: &crate::encode::ffmpeg::FfmpegSettings,
@@ -289,6 +319,8 @@ fn spawn_ffmpeg_process(
     fps: f64,
     input_pix_fmt: &str,
 ) -> Result<std::process::Child, String> {
+    // Feed rawvideo via stdin to avoid writing intermediary frame files. All
+    // arguments are separate argv entries, so user paths are not shell-expanded.
     let mut command = Command::new(ffmpeg_bin);
     suppress_child_console(&mut command);
     command.arg("-loglevel").arg(&ffmpeg_settings.loglevel);
@@ -334,12 +366,15 @@ fn spawn_ffmpeg_process(
         .map_err(|error| format!("Could not start ffmpeg: {error}"))
 }
 
+// Writes queued frame buffers into ffmpeg stdin and returns buffers to the pool.
 fn writer_worker(
     mut stdin: std::process::ChildStdin,
     receiver: Receiver<FrameBuffer>,
     free_sender: SyncSender<FrameBuffer>,
     cancel_flag: Arc<AtomicBool>,
 ) -> Result<WriterResult, String> {
+    // The writer owns ffmpeg stdin. It returns buffers to the free pool after a
+    // successful write so the renderer can reuse allocations across frames.
     let mut profiler = RenderProfiler::default();
     let mut written_frames = 0u32;
     loop {
@@ -388,7 +423,10 @@ fn writer_worker(
     })
 }
 
+// Monitors ffmpeg stderr and updates the encoded-frame counter.
 fn monitor_ffmpeg(stderr: std::process::ChildStderr, encoded_frames: Arc<AtomicU32>) {
+    // ffmpeg progress is emitted on stderr as human-readable status lines. We
+    // parse frame counts opportunistically and ignore unrelated log messages.
     let reader = BufReader::new(stderr);
     for line in reader.lines().map_while(Result::ok) {
         if let Some(frame_index) = parse_ffmpeg_frame(&line) {
@@ -397,7 +435,9 @@ fn monitor_ffmpeg(stderr: std::process::ChildStderr, encoded_frames: Arc<AtomicU
     }
 }
 
+// Extracts a frame count from one ffmpeg status line.
 fn parse_ffmpeg_frame(line: &str) -> Option<u32> {
+    // Accept ffmpeg's padded `frame=  123` status format.
     let marker = "frame=";
     let start = line.find(marker)? + marker.len();
     let digits = line[start..]
@@ -408,10 +448,12 @@ fn parse_ffmpeg_frame(line: &str) -> Option<u32> {
     digits.parse::<u32>().ok()
 }
 
+// Merges timing buckets recorded on separate render/writer threads.
 fn merge_timing_maps(
     mut left: BTreeMap<String, TimingBucket>,
     right: BTreeMap<String, TimingBucket>,
 ) -> BTreeMap<String, TimingBucket> {
+    // Combine render-thread and writer-thread buckets for one summary file.
     for (name, bucket) in right {
         let entry = left.entry(name).or_default();
         entry.count += bucket.count;
@@ -426,11 +468,14 @@ fn merge_timing_maps(
     left
 }
 
+// Waits for a reusable frame buffer from the free-buffer pool.
 fn acquire_frame_buffer(
     receiver: &Receiver<FrameBuffer>,
     cancel_flag: &AtomicBool,
     profiler: &mut RenderProfiler,
 ) -> Result<FrameBuffer, String> {
+    // Timeout polling gives cancellation a chance to interrupt even when all
+    // buffers are currently held by the writer/encoder.
     let started = Instant::now();
     loop {
         if cancel_flag.load(Ordering::SeqCst) {
@@ -452,19 +497,26 @@ fn acquire_frame_buffer(
     }
 }
 
+// Rounds a dimension up to the next even value when needed.
 fn make_even(value: u32) -> u32 {
-    if value % 2 == 0 {
+    // Many ffmpeg encoders require even dimensions. The extra pixel is
+    // transparent because the render target starts cleared/base-filled.
+    if value.is_multiple_of(2) {
         value
     } else {
         value + 1
     }
 }
 
+// Resolves the raw pixel format used for ffmpeg stdin.
 fn ffmpeg_input_pix_fmt() -> String {
+    // Exposed for diagnosing platform-specific pixel-format issues without
+    // recompiling the backend.
     std::env::var("OVRLEY_INPUT_PIX_FMT").unwrap_or_else(|_| "rgba".to_string())
 }
 
 impl ProgressEstimator {
+    /// Records a frame duration and returns an estimated remaining second count.
     fn record(&mut self, current: u32, total: u32, frame_seconds: f64) -> Option<u64> {
         self.ema_seconds_per_frame = Some(match self.ema_seconds_per_frame {
             Some(previous) => previous * 0.85 + frame_seconds * 0.15,

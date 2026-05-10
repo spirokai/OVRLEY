@@ -1,7 +1,15 @@
+//! Metric formatting for dynamic overlay values.
+//!
+//! This module converts densified telemetry samples into display text and
+//! metric-widget parts. It owns unit conversion, date/time formatting variants,
+//! icon selection, and missing-value fallbacks so drawing code can stay focused
+//! on layout.
+
 use crate::activity::schema::DenseActivityReport;
 use crate::config::{RenderConfig, ValueConfig};
 use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
 
+/// Built-in metric icon kinds supported by value widgets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MetricIconKind {
     Gauge,
@@ -12,14 +20,20 @@ pub enum MetricIconKind {
     Thermometer,
 }
 
+/// Split metric text used by icon+value+unit widgets.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MetricDisplayParts {
+    /// Main numeric or time text.
     pub value_text: String,
+    /// Optional unit suffix drawn with a smaller font.
     pub unit_text: Option<String>,
+    /// Whether the metric icon should be drawn.
     pub show_icon: bool,
+    /// Icon kind matching the metric, if supported.
     pub icon_kind: Option<MetricIconKind>,
 }
 
+/// Returns the dense frame index corresponding to an absolute preview second.
 pub fn frame_index_for_second(
     config: &RenderConfig,
     dense_activity: &DenseActivityReport,
@@ -35,6 +49,9 @@ pub fn frame_index_for_second(
     index.clamp(0, dense_activity.frame_count.saturating_sub(1) as isize) as usize
 }
 
+/// Formats a metric value as a single text string.
+///
+/// This path is used for ordinary text values and for gradient value text.
 pub fn format_value(
     config: &RenderConfig,
     value_config: &ValueConfig,
@@ -69,7 +86,10 @@ pub fn format_value(
     formatted
 }
 
+// Looks up one raw numeric sample by metric key and frame index.
 fn raw_value(key: &str, dense_activity: &DenseActivityReport, frame_index: usize) -> Option<f64> {
+    // Series vectors may be empty when the template did not request them.
+    // Treat out-of-range and absent values as missing.
     match key {
         "speed" => dense_activity
             .series
@@ -117,12 +137,15 @@ fn raw_value(key: &str, dense_activity: &DenseActivityReport, frame_index: usize
     }
 }
 
+/// Builds separated value/unit/icon display parts for rich metric widgets.
 pub fn format_metric_parts(
     config: &RenderConfig,
     value_config: &ValueConfig,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
 ) -> Option<MetricDisplayParts> {
+    // Metric widgets need the value and units separately so units can be drawn
+    // at a smaller size while sharing the same raw telemetry formatting rules.
     let raw = raw_value(value_config.value.as_str(), dense_activity, frame_index);
     let (mut value_text, unit_text, icon_kind) = match value_config.value.as_str() {
         "speed" => {
@@ -235,6 +258,7 @@ pub fn format_metric_parts(
     })
 }
 
+// Formats speed with unit conversion and optional unit suffix.
 fn format_speed(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f64>) -> String {
     let Some(speed_mps) = raw else {
         return missing_value_with_units(
@@ -260,6 +284,7 @@ fn format_speed(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f
     text
 }
 
+// Formats temperature as Celsius or Fahrenheit.
 fn format_temperature(
     config: &RenderConfig,
     value_config: &ValueConfig,
@@ -288,6 +313,7 @@ fn format_temperature(
     text
 }
 
+// Formats elevation, converting to feet for imperial templates.
 fn format_elevation(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f64>) -> String {
     let Some(mut value) = raw else {
         return "--".to_string();
@@ -298,6 +324,7 @@ fn format_elevation(config: &RenderConfig, value_config: &ValueConfig, raw: Opti
     format_generic_numeric(config, value_config, Some(value)).unwrap_or_else(|| "--".to_string())
 }
 
+// Formats gradient with sign and percent suffix.
 fn format_gradient(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f64>) -> String {
     let Some(value) = raw else {
         return "--%".to_string();
@@ -319,7 +346,11 @@ fn format_gradient(config: &RenderConfig, value_config: &ValueConfig, raw: Optio
     format!("{prefix}{magnitude}%")
 }
 
+// Formats an RFC 3339 timestamp according to template time settings.
 fn format_time(config: &RenderConfig, value_config: &ValueConfig, raw: Option<&str>) -> String {
+    // Convert to local time for display after applying user-configured offsets.
+    // Invalid strings are returned unchanged so source parser issues remain
+    // visible in previews instead of silently disappearing.
     let Some(raw) = raw else {
         return "--:--".to_string();
     };
@@ -343,6 +374,7 @@ fn format_time(config: &RenderConfig, value_config: &ValueConfig, raw: Option<&s
     format_time_key("time-24", adjusted)
 }
 
+// Applies one of the built-in date/time format presets.
 fn format_time_key<Tz>(format_key: &str, value: DateTime<Tz>) -> String
 where
     Tz: TimeZone,
@@ -381,6 +413,7 @@ where
     }
 }
 
+// Formats a generic numeric metric with the configured decimal precision.
 fn format_generic_numeric(
     config: &RenderConfig,
     value_config: &ValueConfig,
@@ -389,6 +422,7 @@ fn format_generic_numeric(
     raw.map(|value| format_number(value, effective_decimals(config, value_config, None)))
 }
 
+// Resolves the decimal precision for a value from value and scene defaults.
 fn effective_decimals(
     config: &RenderConfig,
     value_config: &ValueConfig,
@@ -406,7 +440,10 @@ fn effective_decimals(
     default.unwrap_or(0)
 }
 
+// Converts a number to display text, trimming unnecessary fractional zeros.
 fn format_number(value: f64, decimals: usize) -> String {
+    // The historical renderer truncated zero-decimal values by casting. Preserve
+    // that behavior for visual compatibility with existing templates.
     if decimals == 0 {
         return (value as i64).to_string();
     }
@@ -423,6 +460,7 @@ fn format_number(value: f64, decimals: usize) -> String {
     text
 }
 
+// Resolves the configured speed unit key.
 fn speed_unit_key(value_config: &ValueConfig) -> &str {
     value_config
         .speed_unit
@@ -431,6 +469,7 @@ fn speed_unit_key(value_config: &ValueConfig) -> &str {
         .unwrap_or("kmh")
 }
 
+// Returns the display unit label for the configured speed unit.
 fn speed_units(value_config: &ValueConfig) -> &'static str {
     match speed_unit_key(value_config) {
         "mph" | "imperial" => "MPH",
@@ -440,6 +479,7 @@ fn speed_units(value_config: &ValueConfig) -> &'static str {
     }
 }
 
+// Returns the display unit label for a temperature unit key.
 fn temperature_units(unit: &str) -> &'static str {
     if unit == "fahrenheit" {
         "\u{00B0}F"
@@ -448,6 +488,7 @@ fn temperature_units(unit: &str) -> &'static str {
     }
 }
 
+// Formats a missing-value placeholder with optional unit text.
 fn missing_value_with_units(show_units: bool, units: &str) -> String {
     if show_units {
         format!("-- {units}")
@@ -465,6 +506,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    // Verifies representative built-in time format presets.
     fn formats_time_key_variants() {
         let timestamp = DateTime::parse_from_rfc3339("2025-04-21T13:05:00Z")
             .unwrap()
@@ -478,6 +520,7 @@ mod tests {
     }
 
     #[test]
+    // Verifies speed metric parts include converted value, units, and icon.
     fn formats_metric_parts_for_speed() {
         let config = RenderConfig {
             scene: SceneConfig {
@@ -576,6 +619,7 @@ mod tests {
     }
 
     #[test]
+    // Verifies temperature metric parts preserve degree-unit display text.
     fn formats_metric_parts_for_temperature_with_degree_units() {
         let config = RenderConfig {
             scene: SceneConfig {

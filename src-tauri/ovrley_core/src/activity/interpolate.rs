@@ -1,3 +1,11 @@
+//! Interpolation and densification for activity telemetry.
+//!
+//! Source activities usually contain unevenly spaced samples, while the renderer
+//! needs values at exact frame times. This module converts trimmed samples into
+//! frame-aligned series using linear interpolation and conservative edge
+//! clamping. Missing values are filtered out before interpolation so sparse
+//! telemetry can still render wherever enough valid samples exist.
+
 use super::schema::{
     CourseSeries, DenseActivityReport, DenseSeriesReport, NumericSeries, TimeSeries,
     TrimmedActivity,
@@ -5,7 +13,10 @@ use super::schema::{
 use crate::config::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
 
+// Builds interpolation points by pairing source x-values with present y-values.
 fn collect_valid_numeric_points(x_values: &[f64], y_values: &[Option<f64>]) -> Vec<(f64, f64)> {
+    // Keep only real y-values while preserving their source x-coordinate. This
+    // lets interpolation bridge gaps without treating missing sensor data as 0.
     x_values
         .iter()
         .copied()
@@ -14,7 +25,11 @@ fn collect_valid_numeric_points(x_values: &[f64], y_values: &[Option<f64>]) -> V
         .collect()
 }
 
+// Resolves one interpolated y-value from a sorted set of `(x, y)` points.
 fn interpolate_points(points: &[(f64, f64)], target_x: f64) -> Option<f64> {
+    // Clamp outside the known domain instead of extrapolating; edge frames
+    // should remain stable even when the trim window starts before the first
+    // valid sensor value or ends after the last one.
     match points.len() {
         0 => None,
         1 => Some(points[0].1),
@@ -42,6 +57,10 @@ fn interpolate_points(points: &[(f64, f64)], target_x: f64) -> Option<f64> {
     }
 }
 
+/// Interpolates a single numeric telemetry value at `target_x`.
+///
+/// The input series must be aligned by index. `None` values are skipped, and
+/// targets outside the valid sample range return the nearest valid edge value.
 pub fn interpolate_numeric_series_value(
     x_values: &[f64],
     y_values: &[Option<f64>],
@@ -51,11 +70,17 @@ pub fn interpolate_numeric_series_value(
     interpolate_points(&points, target_x)
 }
 
+/// Interpolates a latitude/longitude pair at `target_x`.
+///
+/// Latitude and longitude are resolved independently because either component
+/// may be missing in source activity data.
 pub fn interpolate_course_value(
     x_values: &[f64],
     course_series: &CourseSeries,
     target_x: f64,
 ) -> (Option<f64>, Option<f64>) {
+    // Coordinates can be partially missing, so latitude and longitude are
+    // interpolated independently and recombined at the target time.
     let latitudes = course_series
         .iter()
         .map(|point| point.0)
@@ -70,11 +95,17 @@ pub fn interpolate_course_value(
     )
 }
 
+/// Interpolates an RFC 3339 timestamp series at `target_x`.
+///
+/// Invalid timestamp strings are ignored. The returned value is normalized to
+/// UTC with millisecond precision.
 pub fn interpolate_time_series_value(
     x_values: &[f64],
     time_series: &TimeSeries,
     target_x: f64,
 ) -> Option<String> {
+    // Convert timestamps to milliseconds for interpolation, then round back to
+    // a stable RFC 3339 UTC timestamp for serialization.
     let numeric_points = x_values
         .iter()
         .copied()
@@ -94,7 +125,11 @@ pub fn interpolate_time_series_value(
     })
 }
 
+// Builds the per-frame time axis for a scene duration and frame rate.
 fn build_target_x_values(duration: f64, fps: f64) -> Vec<f64> {
+    // A frame exists at t=0, then every 1/fps seconds strictly before duration.
+    // This mirrors video frame timing and avoids generating a duplicate final
+    // frame exactly at the scene end.
     let safe_fps = fps.max(1.0);
     let mut values = Vec::new();
     let mut frame_index = 0usize;
@@ -112,6 +147,7 @@ fn build_target_x_values(duration: f64, fps: f64) -> Vec<f64> {
     values
 }
 
+// Interpolates a numeric series over all target frame times.
 fn interpolate_numeric_series(
     x_values: &[f64],
     y_values: &NumericSeries,
@@ -124,6 +160,7 @@ fn interpolate_numeric_series(
         .collect()
 }
 
+// Interpolates a numeric series only when the template requested it.
 fn densify_optional_numeric_series(
     x_values: &[f64],
     y_values: &NumericSeries,
@@ -136,6 +173,7 @@ fn densify_optional_numeric_series(
     interpolate_numeric_series(x_values, y_values, target_x_values)
 }
 
+// Interpolates latitude and longitude vectors over all target frame times.
 fn interpolate_course_series(
     x_values: &[f64],
     y_values: &CourseSeries,
@@ -149,12 +187,15 @@ fn interpolate_course_series(
     )
 }
 
+// Generates or interpolates timestamps over all target frame times.
 fn interpolate_time_series(
     source_start_time: Option<&str>,
     x_values: &[f64],
     y_values: &TimeSeries,
     target_x_values: &[f64],
 ) -> Vec<Option<String>> {
+    // If the source start is known, generating timestamps from elapsed seconds
+    // avoids drift caused by sparse or missing source timestamp samples.
     if let Some(start_time) = source_start_time
         .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
         .map(|value| value.with_timezone(&Utc))
@@ -177,11 +218,17 @@ fn interpolate_time_series(
         .collect()
 }
 
+/// Converts a trimmed activity into frame-aligned render data.
+///
+/// Only the series requested through [`RenderDataRequirements`] are produced;
+/// all other vectors are left empty to reduce allocation and per-frame work.
 pub fn densify_activity(
     trimmed: &TrimmedActivity,
     fps: f64,
     requirements: &RenderDataRequirements,
 ) -> DenseActivityReport {
+    // Build the canonical frame timeline first. Every enabled series uses this
+    // same target vector so all rendered values and widgets stay frame-aligned.
     let duration = trimmed
         .sample_elapsed_seconds
         .last()

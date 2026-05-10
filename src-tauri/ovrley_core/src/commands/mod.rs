@@ -1,9 +1,17 @@
+//! Backend command implementations used by the Tauri shell.
+//!
+//! Functions in this module are framework-agnostic: they accept plain strings,
+//! paths, and controller references so the Tauri command layer can delegate here
+//! without mixing app-window concerns into render logic. Responsibilities include
+//! runtime path resolution, template IO, preview rendering, video render startup,
+//! progress/cancel plumbing, and small OS integration helpers.
+
 use crate::activity::{build_dense_activity_report, parse_activity_json};
 use crate::config::parse_config_json;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
-use crate::encode::video_pipeline::rendered_frame_count;
 use crate::encode::video::{render_video, RenderController};
+use crate::encode::video_pipeline::rendered_frame_count;
 use crate::render::{render_preview_to_path, stub_demo_response};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -13,27 +21,43 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Filesystem locations used by backend operations.
+///
+/// Paths are derived differently in development and packaged builds, but callers
+/// receive one normalized structure so rendering, templates, fonts, previews,
+/// temporary files, and downloads are always addressed consistently.
 #[derive(Clone, Debug)]
 pub struct AppPaths {
+    /// Root used for bundled runtime assets such as vendor ffmpeg.
     pub repo_root: PathBuf,
+    /// Existing font directories searched before system fonts.
     pub font_dirs: Vec<PathBuf>,
+    /// Directory for timing summaries and sample-frame debug artifacts.
     pub debug_render_dir: PathBuf,
+    /// Directory where preview PNGs are written.
     pub preview_dir: PathBuf,
+    /// Directory for short-lived files such as ffmpeg concat lists.
     pub temp_dir: PathBuf,
+    /// Built-in template directories, searched in precedence order.
     pub bundled_templates_dirs: Vec<PathBuf>,
+    /// User template directory under Documents/OVRLEY.
     pub user_templates_dir: PathBuf,
+    /// Public output directory under Downloads/OVRLEY.
     pub downloads_dir: PathBuf,
 }
 
 impl AppPaths {
+    /// Builds development paths when repo and resources share the same root.
     pub fn from_repo_root(repo_root: PathBuf) -> Self {
         Self::from_roots(repo_root.clone(), repo_root)
     }
 
+    /// Builds packaged-app paths from separate repository and resource roots.
     pub fn from_resource_root(repo_root: PathBuf, resource_root: PathBuf) -> Self {
         Self::from_roots(repo_root, resource_root)
     }
 
+    /// Builds all backend runtime paths from repository and resource roots.
     fn from_roots(repo_root: PathBuf, resource_root: PathBuf) -> Self {
         let downloads_dir = downloads_ovrley_dir();
         let runtime_dir = downloads_dir.join(".runtime");
@@ -72,6 +96,7 @@ impl AppPaths {
         }
     }
 
+    /// Ensures all runtime-writable directories exist.
     pub fn ensure_dirs(&self) -> Result<(), String> {
         for dir in [
             &self.debug_render_dir,
@@ -86,6 +111,7 @@ impl AppPaths {
         Ok(())
     }
 
+    /// Returns the first built-in template path matching `filename`.
     pub fn bundled_template_path(&self, filename: &str) -> Option<PathBuf> {
         self.bundled_templates_dirs
             .iter()
@@ -93,19 +119,25 @@ impl AppPaths {
             .find(|path| path.is_file())
     }
 
+    /// Returns a user template path if it exists.
     pub fn user_template_path(&self, filename: &str) -> Option<PathBuf> {
         let path = self.user_templates_dir.join(filename);
         path.is_file().then_some(path)
     }
 }
 
+/// Health-check response sent to the frontend.
 #[derive(Debug, Serialize)]
 pub struct HealthResponse {
+    /// Machine-readable status string.
     pub status: String,
+    /// Human-readable readiness details, including ffmpeg resolution.
     pub message: String,
+    /// Whether the Rust backend is usable.
     pub ready: bool,
 }
 
+/// Reports backend readiness and ffmpeg discovery state.
 pub fn backend_health(paths: &AppPaths) -> HealthResponse {
     let message = match resolve_ffmpeg_binary(&paths.repo_root) {
         Ok(path) => format!("Rust backend ready; ffmpeg={}", path.display()),
@@ -119,12 +151,14 @@ pub fn backend_health(paths: &AppPaths) -> HealthResponse {
     }
 }
 
+/// Returns the target operating system name for frontend feature gates.
 pub fn backend_current_os() -> Value {
     json!({
         "os": std::env::consts::OS
     })
 }
 
+/// Lists system font family names visible to Skia.
 pub fn backend_list_system_fonts() -> Value {
     let mut fonts: Vec<String> = FontMgr::default()
         .family_names()
@@ -138,6 +172,7 @@ pub fn backend_list_system_fonts() -> Value {
     Value::Array(fonts.into_iter().map(Value::String).collect())
 }
 
+/// Renders a single preview PNG and returns its preview filename.
 pub fn backend_demo(
     paths: &AppPaths,
     config_json: &str,
@@ -160,6 +195,11 @@ pub fn backend_demo(
     Ok(stub_demo_response(filename))
 }
 
+/// Starts a background video render.
+///
+/// The function returns immediately after validating inputs and registering a
+/// render with the controller. Completion, errors, and cancellation are exposed
+/// through [`backend_progress`].
 pub fn backend_render(
     paths: &AppPaths,
     controller: &RenderController,
@@ -169,12 +209,12 @@ pub fn backend_render(
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
-    let output_frame_count =
-        rendered_frame_count(dense_activity.frame_count, config.widget_update_rate() as usize);
-    let render_id = controller.try_start(
-        output_frame_count as u32,
-        "Preparing render assets...",
-    )?;
+    let output_frame_count = rendered_frame_count(
+        dense_activity.frame_count,
+        config.widget_update_rate() as usize,
+    );
+    let render_id =
+        controller.try_start(output_frame_count as u32, "Preparing render assets...")?;
 
     let controller_clone = controller.clone();
     let paths = paths.clone();
@@ -200,10 +240,12 @@ pub fn backend_render(
     }))
 }
 
+/// Returns the current render progress snapshot.
 pub fn backend_progress(controller: &RenderController) -> RenderProgress {
     controller.progress()
 }
 
+/// Requests cancellation of the active render, if one is running.
 pub fn backend_cancel(controller: &RenderController) -> Value {
     let had_active_render = controller.cancel();
     json!({
@@ -216,6 +258,10 @@ pub fn backend_cancel(controller: &RenderController) -> Value {
     })
 }
 
+/// Lists valid built-in and user templates.
+///
+/// Built-in templates are de-duplicated by filename, while user templates are
+/// exposed with a `user:` id prefix to avoid collisions.
 pub fn backend_list_templates(paths: &AppPaths) -> Result<Value, String> {
     let mut templates = Vec::new();
     let mut seen = BTreeSet::new();
@@ -269,6 +315,7 @@ pub fn backend_list_templates(paths: &AppPaths) -> Result<Value, String> {
     Ok(Value::Array(templates))
 }
 
+/// Reads a template by built-in filename, user-prefixed id, or unqualified id.
 pub fn backend_get_template(paths: &AppPaths, filename: &str) -> Result<String, String> {
     let (source, normalized) = parse_template_id(filename);
     let template_path = match source {
@@ -284,11 +331,13 @@ pub fn backend_get_template(paths: &AppPaths, filename: &str) -> Result<String, 
         .map_err(|error| format!("Failed to read {}: {error}", template_path.display()))
 }
 
+/// Opens the public downloads directory in the system file browser.
 pub fn backend_open_downloads(paths: &AppPaths) -> Result<Value, String> {
     open_path_in_system(&paths.downloads_dir)?;
     Ok(json!({ "message": "Folder opened" }))
 }
 
+/// Opens a rendered video from the downloads directory.
 pub fn backend_open_video(paths: &AppPaths, filename: &str) -> Result<Value, String> {
     let downloads_path = paths.downloads_dir.join(filename);
     let target = if downloads_path.is_file() {
@@ -301,6 +350,7 @@ pub fn backend_open_video(paths: &AppPaths, filename: &str) -> Result<Value, Str
     Ok(json!({ "message": "Video opened" }))
 }
 
+/// Reads a preview or downloaded image and returns it as a data URL.
 pub fn backend_image_data(paths: &AppPaths, filename: &str) -> Result<String, String> {
     let preview_path = paths.preview_dir.join(filename);
     let downloads_path = paths.downloads_dir.join(filename);
@@ -332,7 +382,10 @@ enum TemplateSource {
     User,
 }
 
+// Parses a template id into its source namespace and sanitized filename.
 fn parse_template_id(template_id: &str) -> (TemplateSource, String) {
+    // Prefixes are part of the frontend template list API. Unprefixed ids keep
+    // backward compatibility by searching built-ins first, then user files.
     let (source, filename) = if let Some(filename) = template_id.strip_prefix("user:") {
         (TemplateSource::User, filename)
     } else if let Some(filename) = template_id.strip_prefix("built-in:") {
@@ -344,7 +397,10 @@ fn parse_template_id(template_id: &str) -> (TemplateSource, String) {
     (source, ensure_json_filename(filename))
 }
 
+// Normalizes a template filename and ensures it has a `.json` extension.
 fn ensure_json_filename(filename: &str) -> String {
+    // Strip any directory components before resolving inside template roots.
+    // This prevents traversal while still accepting user-provided bare names.
     let safe_filename = Path::new(filename)
         .file_name()
         .and_then(|value| value.to_str())
@@ -357,11 +413,13 @@ fn ensure_json_filename(filename: &str) -> String {
     }
 }
 
+// Reads and parses a template JSON file, returning `None` for invalid files.
 fn read_template_file(path: &Path) -> Option<Value> {
     let text = fs::read_to_string(path).ok()?;
     serde_json::from_str(&text).ok()
 }
 
+// Returns whether a parsed JSON document is an OVRLEY template.
 fn is_app_template(value: &Value) -> bool {
     value
         .get("format")
@@ -370,6 +428,7 @@ fn is_app_template(value: &Value) -> bool {
         .unwrap_or(false)
 }
 
+// Extracts the declared scene resolution from a template JSON document.
 fn read_template_resolution(value: &Value) -> Option<(u64, u64)> {
     let scene = value.get("config").and_then(|config| config.get("scene"))?;
     let width = scene.get("width").and_then(Value::as_u64)?;
@@ -378,7 +437,15 @@ fn read_template_resolution(value: &Value) -> Option<(u64, u64)> {
     Some((width, height))
 }
 
-fn template_descriptor(path: &Path, filename: &str, template_type: &str, id: &str) -> Option<Value> {
+// Builds the frontend list descriptor for one valid template file.
+fn template_descriptor(
+    path: &Path,
+    filename: &str,
+    template_type: &str,
+    id: &str,
+) -> Option<Value> {
+    // Invalid or non-OVRLEY JSON files are silently skipped so users can keep
+    // unrelated notes in the same Documents/OVRLEY directory.
     let value = read_template_file(path)?;
     if !is_app_template(&value) {
         return None;
@@ -394,6 +461,7 @@ fn template_descriptor(path: &Path, filename: &str, template_type: &str, id: &st
     }))
 }
 
+// Returns the user-writable OVRLEY documents directory.
 fn documents_ovrley_dir() -> PathBuf {
     let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)
@@ -401,6 +469,7 @@ fn documents_ovrley_dir() -> PathBuf {
     home.join("Documents").join("OVRLEY")
 }
 
+// Returns the public OVRLEY downloads/output directory.
 fn downloads_ovrley_dir() -> PathBuf {
     let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)
@@ -408,7 +477,10 @@ fn downloads_ovrley_dir() -> PathBuf {
     home.join("Downloads").join("OVRLEY")
 }
 
+// Opens a filesystem path with the operating system's default file launcher.
 fn open_path_in_system(path: &Path) -> Result<(), String> {
+    // Use native platform launchers rather than shell invocation so paths with
+    // spaces are passed as arguments and not interpreted as command text.
     if cfg!(windows) {
         Command::new("explorer")
             .arg(path)
@@ -438,9 +510,12 @@ fn open_path_in_system(path: &Path) -> Result<(), String> {
     }
 }
 
+// Encodes raw bytes as base64 for image data URLs.
 fn base64_encode(bytes: &[u8]) -> String {
+    // Tiny local encoder keeps this crate independent of a base64 dependency
+    // for the single data-URL use case.
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut output = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    let mut output = String::with_capacity(bytes.len().div_ceil(3) * 4);
     let mut chunks = bytes.chunks_exact(3);
 
     for chunk in &mut chunks {

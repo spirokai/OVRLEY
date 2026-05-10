@@ -1,3 +1,9 @@
+//! Elevation profile widget.
+//!
+//! The elevation widget maps distance progress to x coordinates and elevation
+//! to y coordinates, pre-renders the remaining profile/area, then draws the
+//! completed profile, marker, and optional labels on each frame.
+
 use super::common::{
     custom_export_range_active, draw_area, draw_marker, draw_polyline, draw_polyline_with_shadow,
     draw_static_layer, fallback_marker_points, format_elevation_label, frame_progress_values,
@@ -23,6 +29,7 @@ use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};
 use skia_safe::Canvas;
 use std::time::Instant;
 
+/// Prepares cached geometry, static layers, and frame states for an elevation plot.
 pub(crate) fn prepare_elevation_cache(
     config: &RenderConfig,
     activity: &ParsedActivity,
@@ -30,6 +37,8 @@ pub(crate) fn prepare_elevation_cache(
     plot: &ElevationPlotConfig,
     prepare_profiler: &mut RenderProfiler,
 ) -> Result<ElevationWidgetCache, String> {
+    // Preparation owns smoothing, downsampling, simplification, static layers,
+    // and frame-state generation so the render loop stays predictable.
     let prepare_started = Instant::now();
     let show_full_activity = plot.show_full_activity.unwrap_or(false);
     let plot = normalize_elevation_plot(config, plot);
@@ -64,6 +73,7 @@ pub(crate) fn prepare_elevation_cache(
     })
 }
 
+/// Draws the elevation widget for one frame and returns preview diagnostics.
 pub(crate) fn draw_elevation_widget(
     canvas: &Canvas,
     paths: &AppPaths,
@@ -269,10 +279,13 @@ pub(crate) fn draw_elevation_widget(
     ))
 }
 
+// Normalizes elevation plot options into concrete scaled drawing settings.
 fn normalize_elevation_plot(
     config: &RenderConfig,
     plot: &ElevationPlotConfig,
 ) -> NormalizedElevationPlot {
+    // Merge legacy and nested style options and apply scene scale. The internal
+    // plot object contains concrete values only, simplifying draw code.
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let base_color = plot_base_color(plot.color.as_deref());
     let legacy_width = legacy_line_width(
@@ -398,10 +411,13 @@ fn normalize_elevation_plot(
     }
 }
 
+// Builds the cached static layer for the not-yet-completed elevation profile.
 fn build_elevation_remaining_layer(
     plot: &NormalizedElevationPlot,
     geometry: &WidgetGeometry,
 ) -> Result<Option<StaticLayer>, String> {
+    // The remaining area/line does not change per frame, so cache it as a Skia
+    // image with enough padding for stroke and shadow overflow.
     if geometry.points.len() < 2 {
         return Ok(None);
     }
@@ -440,6 +456,7 @@ fn build_elevation_remaining_layer(
     }))
 }
 
+// Returns the first configured value font for legacy elevation labels.
 fn first_value_font(config: &RenderConfig) -> Option<String> {
     config
         .values
@@ -447,10 +464,13 @@ fn first_value_font(config: &RenderConfig) -> Option<String> {
         .find_map(|value| value.font.clone().or_else(|| value.font_family.clone()))
 }
 
+// Builds simplified widget-space geometry for the elevation profile.
 fn build_elevation_geometry(
     plot: &NormalizedElevationPlot,
     raw_points: &[(f32, f64)],
 ) -> Result<WidgetGeometry, String> {
+    // Elevation traces are smoothed and reduced before projection, then RDP is
+    // applied in screen space to remove visually redundant points.
     if raw_points.is_empty() {
         return Err("Elevation plot requires elevation samples".to_string());
     }
@@ -459,7 +479,7 @@ fn build_elevation_geometry(
         ((plot.width as f32) * DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER * plot.target_density)
             .round()
             .max(2.0) as usize;
-    let downsampled = downsample_elevation_points(&raw_points, target_count.min(raw_points.len()));
+    let downsampled = downsample_elevation_points(raw_points, target_count.min(raw_points.len()));
     let projected = project_elevation_points(
         &downsampled,
         plot.width as f32,
@@ -490,6 +510,7 @@ fn build_elevation_geometry(
     })
 }
 
+// Precomputes marker coordinates and elevation values for each render frame.
 fn build_elevation_frame_states(
     config: &RenderConfig,
     activity: &ParsedActivity,
@@ -497,6 +518,8 @@ fn build_elevation_frame_states(
     geometry: &WidgetGeometry,
     show_full_activity: bool,
 ) -> Vec<ElevationFrameState> {
+    // Marker positions follow distance progress; displayed elevation values use
+    // dense frame data when available and fall back to progress interpolation.
     let frame_progress = if custom_export_range_active(config)
         && !show_full_activity
         && !geometry.progress_values.is_empty()
@@ -549,6 +572,7 @@ fn build_elevation_frame_states(
         .collect()
 }
 
+// Extracts finite elevation samples paired with normalized distance progress.
 fn raw_elevation_points(source: &[Option<f64>], progress: &[f64]) -> Vec<(f32, f64)> {
     source
         .iter()
@@ -568,6 +592,7 @@ fn raw_elevation_points(source: &[Option<f64>], progress: &[f64]) -> Vec<(f32, f
         .collect()
 }
 
+// Extracts elevation samples after normalizing optional trimmed progress values.
 fn raw_elevation_points_with_optional_progress(
     source: &[Option<f64>],
     progress_values: &[Option<f64>],
@@ -588,11 +613,14 @@ fn raw_elevation_points_with_optional_progress(
     raw_elevation_points(source, &normalized_progress)
 }
 
+// Selects full-activity or trimmed source elevation samples for geometry.
 fn build_elevation_source_points(
     config: &RenderConfig,
     activity: &ParsedActivity,
     show_full_activity: bool,
 ) -> Result<Vec<(f32, f64)>, String> {
+    // Custom export ranges trim the source samples so the profile itself can
+    // represent only the selected slice unless the template asks for full view.
     if show_full_activity || !custom_export_range_active(config) {
         let source = if activity.sample_elevations.is_empty() {
             &activity.elevation
@@ -623,12 +651,14 @@ fn build_elevation_source_points(
 }
 
 #[derive(Clone, Copy)]
+/// Elevation sample selected for geometry reduction.
 struct ReducedElevationPoint {
     progress01: f32,
     elevation: f64,
     preserve: bool,
 }
 
+// Reduces dense elevation samples before screen-space projection.
 fn downsample_elevation_points(
     points: &[(f32, f64)],
     target_count: usize,
@@ -649,7 +679,10 @@ fn downsample_elevation_points(
     select_evenly_spaced_elevation_points(&smoothed, target_count)
 }
 
+// Smooths elevation samples with a fixed Savitzky-Golay kernel.
 fn smooth_elevation_points(points: &[(f32, f64)]) -> Vec<ReducedElevationPoint> {
+    // Savitzky-Golay coefficients smooth noisy GPS elevation while preserving
+    // overall profile shape better than a simple moving average.
     const COEFFICIENTS: [f64; 11] = [
         -36.0, 9.0, 44.0, 69.0, 84.0, 89.0, 84.0, 69.0, 44.0, 9.0, -36.0,
     ];
@@ -690,6 +723,7 @@ fn smooth_elevation_points(points: &[(f32, f64)]) -> Vec<ReducedElevationPoint> 
         .collect()
 }
 
+// Selects a stable set of evenly spaced smoothed elevation samples.
 fn select_evenly_spaced_elevation_points(
     points: &[ReducedElevationPoint],
     target_count: usize,
@@ -726,12 +760,14 @@ fn select_evenly_spaced_elevation_points(
 }
 
 #[derive(Clone, Copy)]
+/// Projected elevation sample used during screen-space simplification.
 struct ElevationSample {
     point: (f32, f32),
     progress01: f32,
     preserve: bool,
 }
 
+// Simplifies projected elevation samples while preserving protected endpoints.
 fn simplify_elevation_samples(points: &[ElevationSample], tolerance: f32) -> Vec<ElevationSample> {
     if points.len() <= 2 || tolerance <= 0.0 {
         return points.to_vec();
@@ -761,6 +797,7 @@ fn simplify_elevation_samples(points: &[ElevationSample], tolerance: f32) -> Vec
     simplify_elevation_samples_segment(points, tolerance)
 }
 
+// Runs RDP simplification over one continuous elevation segment.
 fn simplify_elevation_samples_segment(
     points: &[ElevationSample],
     tolerance: f32,
@@ -769,6 +806,7 @@ fn simplify_elevation_samples_segment(
         return points.to_vec();
     }
 
+    // Computes perpendicular error used by elevation RDP simplification.
     fn perpendicular_distance(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> f32 {
         let (x0, y0) = point;
         let (x1, y1) = start;
@@ -804,6 +842,7 @@ fn simplify_elevation_samples_segment(
     [left[..left.len() - 1].to_vec(), right].concat()
 }
 
+// Projects reduced elevation samples into widget-space points.
 fn project_elevation_points(
     points: &[ReducedElevationPoint],
     width: f32,
@@ -811,6 +850,8 @@ fn project_elevation_points(
     margin: f32,
     y_scale: f32,
 ) -> Vec<(f32, f32)> {
+    // Normalize elevation into the plot's vertical range, then allow y_scale to
+    // exaggerate or compress the profile around its centerline.
     let min_elevation = points
         .iter()
         .map(|point| point.elevation)
@@ -836,12 +877,15 @@ fn project_elevation_points(
         .collect()
 }
 
+// Builds the completed elevation polyline up to the current marker point.
 fn build_elevation_completed_points(
     points: &[(f32, f32)],
     progress_values: &[f32],
     progress01: f32,
     marker_point: (f32, f32),
 ) -> Vec<(f32, f32)> {
+    // The completed area/path includes all samples up to the current progress
+    // and then the interpolated marker point for a smooth leading edge.
     if points.is_empty() {
         return Vec::new();
     }
@@ -859,10 +903,13 @@ fn build_elevation_completed_points(
     result
 }
 
+// Resolves elevation values for marker labels from progress positions.
 fn interpolate_elevation_for_progresses(
     activity: &ParsedActivity,
     frame_progresses: &[f32],
 ) -> Vec<f64> {
+    // Used when dense elevation was not explicitly requested but labels still
+    // need a value at each marker progress.
     let elevations = if activity.sample_elevations.is_empty() {
         &activity.elevation
     } else {

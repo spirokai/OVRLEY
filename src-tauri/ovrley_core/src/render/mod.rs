@@ -1,6 +1,18 @@
+//! Skia overlay rendering.
+//!
+//! Rendering is split into preparation and per-frame composition. Preparation
+//! resolves static labels, widget geometry, and reusable base pixels. Per-frame
+//! rendering restores that base, draws dynamic metric values, and composites
+//! route/elevation widgets. The same primitives power preview PNG generation
+//! and video frame streaming.
+
+/// Value formatting and metric display helpers.
 pub mod format;
+/// Skia surface allocation and PNG output helpers.
 pub mod surface;
+/// Font resolution, text measurement, and text drawing helpers.
 pub mod text;
+/// Route, elevation, and metric widget rendering.
 pub mod widgets;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
@@ -23,13 +35,18 @@ use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
+/// Indicates whether the static label layer was not needed, reused, or rebuilt.
 #[derive(Clone, Copy, Debug)]
 pub enum LabelCacheStatus {
+    /// No static labels or static icons were present.
     None,
+    /// A previously rendered static label image was reused.
     Hit,
+    /// Static label image was rendered and inserted into the cache.
     Miss,
 }
 
+/// Serializable performance and geometry report for one preview render.
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct PreviewRenderReport {
     pub second: u32,
@@ -51,18 +68,30 @@ pub struct PreviewRenderReport {
     pub preview_only_timings: BTreeMap<String, TimingBucket>,
 }
 
+/// Assets prepared once and reused by preview/video frame rendering.
 #[derive(Clone)]
 pub struct PreparedPreviewAssets {
+    /// Cached static label/icon layer for preview surfaces.
     pub(crate) labels_image: Option<Image>,
+    /// Widget caches and optional base RGBA bytes.
     pub(crate) prepared_assets: PreparedRenderAssets,
 }
 
+/// Mutable raw-pixel render target used by the video encoder pipeline.
 pub struct RenderTarget<'a> {
+    /// RGBA pixel buffer that Skia will draw into.
     pub pixels: &'a mut [u8],
+    /// Target width in pixels.
     pub width: u32,
+    /// Target height in pixels.
     pub height: u32,
 }
 
+/// Prepares all reusable assets needed to render preview or video frames.
+///
+/// The result includes static labels/icons, widget caches, timing buckets, and
+/// total preparation time. Video rendering uses the embedded base RGBA buffer to
+/// avoid redrawing static content every frame.
 pub fn prepare_preview_assets(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -104,6 +133,7 @@ pub fn prepare_preview_assets(
     ))
 }
 
+/// Renders a preview PNG at `second`.
 pub fn render_preview_to_path(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -116,6 +146,7 @@ pub fn render_preview_to_path(
         .map(|report| report.0)
 }
 
+/// Renders a preview PNG and returns a performance report.
 pub fn render_preview_with_report(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -139,6 +170,11 @@ pub fn render_preview_with_report(
     )
 }
 
+/// Renders a preview using already-prepared assets.
+///
+/// This is useful for repeated preview generation where static labels and widget
+/// geometry should be prepared once and reused.
+#[allow(clippy::too_many_arguments)]
 pub fn render_preview_with_prepared_assets(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -228,6 +264,11 @@ pub fn render_preview_with_prepared_assets(
     Ok(((), report))
 }
 
+/// Renders one frame directly into an existing RGBA buffer.
+///
+/// This is the hot path used by video encoding. If prepared base pixels match
+/// the target buffer length, they are copied before dynamic content is drawn.
+#[allow(clippy::too_many_arguments)]
 pub fn render_frame_rgba(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -279,6 +320,8 @@ pub fn render_frame_rgba(
     Ok(())
 }
 
+// Creates an owned Skia surface and renders one preview frame onto it.
+#[allow(clippy::too_many_arguments)]
 fn render_frame_surface(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -297,6 +340,9 @@ fn render_frame_surface(
     ),
     String,
 > {
+    // Preview rendering owns its surface and writes a PNG, while video rendering
+    // wraps caller-owned pixels. This helper is the preview-side equivalent of
+    // `render_frame_rgba`.
     let width = config.scene.width.unwrap_or(1920);
     let height = config.scene.height.unwrap_or(1080);
     let mut surface = if preview_profiler.is_some() {
@@ -329,6 +375,8 @@ fn render_frame_surface(
     Ok((surface, widgets.0, widgets.1))
 }
 
+// Draws all overlay layers for one frame onto an existing Skia canvas.
+#[allow(clippy::too_many_arguments)]
 fn render_frame_to_surface(
     canvas: &skia_safe::Canvas,
     paths: &AppPaths,
@@ -341,6 +389,9 @@ fn render_frame_to_surface(
     base_layer_restored: bool,
     frame_profiler: &mut RenderProfiler,
 ) -> (Option<WidgetRenderReport>, Option<WidgetRenderReport>) {
+    // Draw order is important: static labels/icons first, dynamic metric text,
+    // then plot widgets. Static metric icons can be skipped here when they were
+    // already included in the restored base layer.
     let frame_started = Instant::now();
     if let Some(labels_image) = labels_image {
         frame_profiler.measure("base.restore", || {
@@ -382,6 +433,7 @@ fn render_frame_to_surface(
     (route_widget, elevation_widget)
 }
 
+// Adds legacy alternate names to timing buckets for compatibility with reports.
 fn annotate_timing_aliases(
     mut timings: BTreeMap<String, TimingBucket>,
     aliases: &[(&str, &str)],
@@ -394,6 +446,7 @@ fn annotate_timing_aliases(
     timings
 }
 
+// Returns a cached static label/icon layer or renders a new one.
 fn cached_labels_image(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -402,6 +455,8 @@ fn cached_labels_image(
     scale: f32,
     prepare_profiler: &mut RenderProfiler,
 ) -> Result<(Option<Image>, LabelCacheStatus), String> {
+    // Preview surfaces can reuse a Skia image cache keyed by all inputs that can
+    // affect static text/icon pixels.
     if config.labels.is_empty() && !config_has_static_metric_icons(config) {
         return Ok((None, LabelCacheStatus::None));
     }
@@ -442,6 +497,7 @@ fn cached_labels_image(
     Ok((Some(image), LabelCacheStatus::Miss))
 }
 
+/// Pre-renders static labels/icons into a reusable RGBA base buffer.
 pub fn prepare_base_rgba(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -450,6 +506,9 @@ pub fn prepare_base_rgba(
     scale: f32,
     prepare_profiler: &mut RenderProfiler,
 ) -> Result<Option<Vec<u8>>, String> {
+    // Video rendering copies this base buffer into each frame before drawing
+    // dynamic values. That is faster than asking Skia to redraw static labels on
+    // every frame.
     let row_bytes = (width as usize) * 4;
     let mut pixels = vec![0u8; row_bytes * (height as usize)];
     if config.labels.is_empty() && !config_has_static_metric_icons(config) {
@@ -470,12 +529,15 @@ pub fn prepare_base_rgba(
     Ok(Some(pixels))
 }
 
+// Computes the cache key for the static label/icon layer.
 fn labels_cache_key(
     config: &RenderConfig,
     width: u32,
     height: u32,
     scale: f32,
 ) -> Result<u64, String> {
+    // Include dynamic values because static metric icons are derived from value
+    // configs even though the numeric text itself is drawn every frame.
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     width.hash(&mut hasher);
     height.hash(&mut hasher);
@@ -492,10 +554,12 @@ fn labels_cache_key(
     Ok(hasher.finish())
 }
 
+// Returns whether any value widget contributes an icon to the static layer.
 fn config_has_static_metric_icons(config: &RenderConfig) -> bool {
     config.values.iter().any(has_static_metric_icon)
 }
 
+// Draws metric icons that do not depend on the current frame value.
 fn draw_static_metric_icons(canvas: &skia_safe::Canvas, config: &RenderConfig, scale: f32) {
     for value in &config.values {
         let style = value_style(&config.scene, value, scale);
@@ -503,10 +567,12 @@ fn draw_static_metric_icons(canvas: &skia_safe::Canvas, config: &RenderConfig, s
     }
 }
 
+/// Builds the frontend response payload for a preview render.
 pub fn stub_demo_response(filename: &str) -> Value {
     json!({ "filename": filename })
 }
 
+/// Legacy placeholder response retained for callers that still expect it.
 pub fn stub_render_response(config: &RenderConfig, dense_activity: &DenseActivityReport) -> Value {
     json!({
         "error": "Phase 3 partial: preview rendering is implemented, but video rendering is not implemented yet.",

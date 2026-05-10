@@ -1,3 +1,11 @@
+//! Scene-window trimming for parsed activities.
+//!
+//! Rendering works against a scene-local timeline, but source activity samples
+//! are absolute relative to activity start. This module validates the requested
+//! scene window, interpolates synthetic boundary samples at the exact start/end
+//! positions, and emits a compact [`TrimmedActivity`] containing only data the
+//! active template needs.
+
 use super::interpolate::{
     interpolate_course_value, interpolate_numeric_series_value, interpolate_time_series_value,
 };
@@ -5,7 +13,10 @@ use super::schema::{ParsedActivity, TrimmedActivity};
 use crate::config::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
 
+// Validates that the requested scene window fits inside activity duration.
 fn validate_trim_window(duration: f64, start: f64, end: f64) -> Result<(), String> {
+    // Keep validation messages frontend-friendly because they are surfaced
+    // directly when a user configures an invalid export window.
     if start < 0.0 || start >= duration {
         return Err(format!(
             "Invalid scene start value in config. Value should be at least 0 and less than {duration:.3}. Current value is {start}"
@@ -19,12 +30,16 @@ fn validate_trim_window(duration: f64, start: f64, end: f64) -> Result<(), Strin
     Ok(())
 }
 
+// Finds the source-sample range that lies strictly inside the trim boundaries.
 fn split_trim_indices(elapsed: &[f64], start: f64, end: f64) -> (usize, usize) {
+    // Interior samples exclude values at the synthetic boundaries. Exact start
+    // and end values are added explicitly by interpolation helpers below.
     let start_inner_index = elapsed.partition_point(|value| *value <= start);
     let end_inner_index = elapsed.partition_point(|value| *value < end);
     (start_inner_index, end_inner_index)
 }
 
+// Trims one optional numeric series and adds interpolated boundary samples.
 fn trim_numeric_series(
     elapsed: &[f64],
     data: &[Option<f64>],
@@ -33,6 +48,8 @@ fn trim_numeric_series(
     start_inner_index: usize,
     end_inner_index: usize,
 ) -> Vec<Option<f64>> {
+    // Boundary interpolation preserves continuity when the trim cuts through
+    // the middle of a source sampling interval.
     let start_value = interpolate_numeric_series_value(elapsed, data, start);
     let end_value = interpolate_numeric_series_value(elapsed, data, end);
     let mut trimmed = Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
@@ -42,6 +59,11 @@ fn trim_numeric_series(
     trimmed
 }
 
+/// Trims a parsed activity to a scene range.
+///
+/// The returned timeline starts at `0.0` seconds and ends at `end - start`.
+/// Optional telemetry series are only copied when requested by
+/// [`RenderDataRequirements`].
 pub fn trim_activity(
     activity: &ParsedActivity,
     start: f64,
@@ -81,6 +103,9 @@ pub fn trim_activity(
     {
         Vec::new()
     } else {
+        // Distance progress is absolute to the full activity, not normalized to
+        // the trim. Route/elevation widgets decide later whether they need
+        // absolute progress or trim-relative progress.
         let source = activity
             .sample_distance_progress
             .iter()

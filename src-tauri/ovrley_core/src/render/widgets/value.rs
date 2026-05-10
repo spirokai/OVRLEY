@@ -1,3 +1,10 @@
+//! Dynamic metric value widgets.
+//!
+//! Metric values can render as plain text, icon/value/unit groups, or the
+//! special gradient display with a slope triangle. Icons are loaded from the
+//! frontend SVG assets and parsed into a small subset of Skia primitives so the
+//! Rust renderer visually matches the editor.
+
 use crate::activity::schema::DenseActivityReport;
 use crate::config::{RenderConfig, ValueConfig};
 use crate::render::format::{format_metric_parts, MetricDisplayParts, MetricIconKind};
@@ -19,12 +26,14 @@ const GRADIENT_ZERO_EPSILON: f64 = 0.05;
 const MAX_GRADIENT_ABS_PERCENT: f64 = 25.0;
 const GRADIENT_ZERO_LINE_WIDTH_PX: f32 = 1.0;
 
+/// Parsed SVG icon with enough data for Skia stroke rendering.
 #[derive(Clone, Debug)]
 struct ParsedSvgIcon {
     stroke_width: f32,
     primitives: Vec<SvgPrimitive>,
 }
 
+/// Primitive SVG elements supported by the local icon parser.
 #[derive(Clone, Debug)]
 enum SvgPrimitive {
     Path(String),
@@ -32,12 +41,15 @@ enum SvgPrimitive {
     Circle { cx: f32, cy: f32, r: f32 },
 }
 
+/// Token emitted by the SVG path tokenizer.
 #[derive(Clone, Copy, Debug)]
 enum PathToken {
     Command(char),
     Number(f32),
 }
 
+// Draws a configured metric widget and reports whether it handled the value.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn draw_metric_value_widget_with_config(
     canvas: &Canvas,
     config: &RenderConfig,
@@ -49,6 +61,8 @@ pub(crate) fn draw_metric_value_widget_with_config(
     font_dirs: &[PathBuf],
     static_icon_rendered: bool,
 ) -> bool {
+    // Return false for unsupported values so callers can fall back to generic
+    // formatted text drawing.
     if value.value == "gradient" {
         return draw_gradient_value_widget(
             canvas,
@@ -77,6 +91,8 @@ pub(crate) fn draw_metric_value_widget_with_config(
     true
 }
 
+// Draws the specialized gradient value text and slope triangle.
+#[allow(clippy::too_many_arguments)]
 fn draw_gradient_value_widget(
     canvas: &Canvas,
     config: &RenderConfig,
@@ -87,6 +103,8 @@ fn draw_gradient_value_widget(
     scale: f32,
     font_dirs: &[PathBuf],
 ) -> bool {
+    // Gradient uses a fixed maximum visual height based on the largest allowed
+    // grade, keeping the text and triangle layout stable across frames.
     let raw_gradient = dense_activity
         .series
         .gradient
@@ -164,6 +182,7 @@ fn draw_gradient_value_widget(
     true
 }
 
+// Returns whether a gradient should be rendered as a flat zero line.
 fn gradient_is_zero(raw_gradient: Option<f64>) -> bool {
     let Some(gradient) = raw_gradient else {
         return true;
@@ -171,6 +190,7 @@ fn gradient_is_zero(raw_gradient: Option<f64>) -> bool {
     gradient.abs() <= GRADIENT_ZERO_EPSILON
 }
 
+// Computes the visual triangle height for a gradient percentage.
 fn gradient_triangle_height(raw_gradient: Option<f64>, triangle_width: f32) -> f32 {
     if triangle_width <= 0.0 {
         return 0.0;
@@ -188,6 +208,7 @@ fn gradient_triangle_height(raw_gradient: Option<f64>, triangle_width: f32) -> f
     triangle_width * half_angle_radians.tan()
 }
 
+// Builds the filled triangle path that visualizes positive or negative grade.
 fn build_gradient_triangle_path(
     raw_gradient: Option<f64>,
     left: f32,
@@ -215,6 +236,7 @@ fn build_gradient_triangle_path(
     Some(path)
 }
 
+// Draws the icon, value text, and optional unit text for a metric widget.
 fn draw_metric_parts(
     canvas: &Canvas,
     value: &ValueConfig,
@@ -224,6 +246,8 @@ fn draw_metric_parts(
     font_dirs: &[PathBuf],
     static_icon_rendered: bool,
 ) {
+    // The metric row is manually laid out so icon, value, and units can each use
+    // their own size while sharing one top-left anchor.
     let value_measure = measure_text(&parts.value_text, base_style, font_dirs);
     let value_line_height = base_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
 
@@ -293,17 +317,21 @@ fn draw_metric_parts(
     }
 }
 
+// Returns whether a value contributes an icon that can be cached statically.
 pub(crate) fn has_static_metric_icon(value: &ValueConfig) -> bool {
     value.show_icon.unwrap_or(value.value != "gradient")
         && metric_icon_kind_for_value(value.value.as_str()).is_some()
 }
 
+// Draws one static metric icon for caching in the base layer.
 pub(crate) fn draw_static_metric_icon_for_value(
     canvas: &Canvas,
     value: &ValueConfig,
     base_style: &ResolvedTextStyle,
     scale: f32,
 ) -> bool {
+    // Static icon drawing is used for the cached base layer. Dynamic text is
+    // drawn later, but the icon can be reused every frame.
     let Some(icon_kind) = metric_icon_kind_for_value(value.value.as_str()) else {
         return false;
     };
@@ -335,6 +363,8 @@ pub(crate) fn draw_static_metric_icon_for_value(
     true
 }
 
+// Draws a scaled parsed metric icon with optional shadow.
+#[allow(clippy::too_many_arguments)]
 fn draw_metric_icon(
     canvas: &Canvas,
     icon_kind: Option<MetricIconKind>,
@@ -347,6 +377,9 @@ fn draw_metric_icon(
     y: f32,
     size: f32,
 ) {
+    // Scale the 24x24 SVG viewbox to the requested icon size. Shadow distances
+    // are transformed back through the inverse scale so visual blur stays in
+    // output pixels.
     if size <= 0.0 {
         return;
     }
@@ -399,6 +432,7 @@ fn draw_metric_icon(
     canvas.restore();
 }
 
+// Creates Skia stroke paint for a parsed metric icon.
 fn metric_icon_paint(icon: &ParsedSvgIcon, color: Color) -> Paint {
     let mut paint = Paint::default();
     paint.set_anti_alias(true);
@@ -410,24 +444,26 @@ fn metric_icon_paint(icon: &ParsedSvgIcon, color: Color) -> Paint {
     paint
 }
 
+// Draws parsed SVG icon primitives onto the current canvas.
 fn draw_metric_icon_primitives(canvas: &Canvas, icon: &ParsedSvgIcon, paint: &Paint) {
     for primitive in &icon.primitives {
         match primitive {
             SvgPrimitive::Path(data) => {
                 if let Some(path) = svg_path_to_skia_path(data) {
-                    canvas.draw_path(&path, &paint);
+                    canvas.draw_path(&path, paint);
                 }
             }
             SvgPrimitive::Line { x1, y1, x2, y2 } => {
-                canvas.draw_line(Point::new(*x1, *y1), Point::new(*x2, *y2), &paint);
+                canvas.draw_line(Point::new(*x1, *y1), Point::new(*x2, *y2), paint);
             }
             SvgPrimitive::Circle { cx, cy, r } => {
-                canvas.draw_circle(Point::new(*cx, *cy), *r, &paint);
+                canvas.draw_circle(Point::new(*cx, *cy), *r, paint);
             }
         }
     }
 }
 
+// Maps a telemetry value key to its built-in icon kind.
 fn metric_icon_kind_for_value(value: &str) -> Option<MetricIconKind> {
     match value {
         "speed" => Some(MetricIconKind::Gauge),
@@ -440,7 +476,9 @@ fn metric_icon_kind_for_value(value: &str) -> Option<MetricIconKind> {
     }
 }
 
+// Returns the cached parsed SVG representation for a metric icon.
 fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIcon> {
+    // Each icon is parsed once and cached for the lifetime of the process.
     match icon_kind {
         MetricIconKind::Gauge => {
             static CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
@@ -481,6 +519,7 @@ fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIco
     }
 }
 
+// Returns bundled SVG markup for a metric icon kind.
 fn metric_icon_svg_markup(icon_kind: MetricIconKind) -> &'static str {
     match icon_kind {
         MetricIconKind::Gauge => include_str!(concat!(
@@ -510,7 +549,10 @@ fn metric_icon_svg_markup(icon_kind: MetricIconKind) -> &'static str {
     }
 }
 
+// Parses supported SVG icon markup into local drawing primitives.
 fn parse_svg_icon(svg_markup: &str) -> Option<ParsedSvgIcon> {
+    // The bundled metric icons use a deliberately small SVG subset: paths,
+    // lines, circles, and one shared stroke width.
     let stroke_width = parse_xml_attr(svg_markup, "stroke-width")
         .and_then(|value| value.parse::<f32>().ok())
         .unwrap_or(2.0);
@@ -549,6 +591,7 @@ fn parse_svg_icon(svg_markup: &str) -> Option<ParsedSvgIcon> {
     })
 }
 
+// Extracts a double-quoted XML attribute from a small SVG tag string.
 fn parse_xml_attr<'a>(markup: &'a str, name: &str) -> Option<&'a str> {
     let pattern = format!("{name}=\"");
     let start = markup.find(&pattern)? + pattern.len();
@@ -557,7 +600,10 @@ fn parse_xml_attr<'a>(markup: &'a str, name: &str) -> Option<&'a str> {
     Some(&rest[..end])
 }
 
+// Converts supported SVG path data into a Skia path.
 fn svg_path_to_skia_path(data: &str) -> Option<Path> {
+    // Implement only the path commands emitted by the bundled Lucide-style
+    // icons. Returning None for unsupported commands fails closed.
     let tokens = tokenize_path_data(data);
     if tokens.is_empty() {
         return None;
@@ -686,7 +732,10 @@ fn svg_path_to_skia_path(data: &str) -> Option<Path> {
     Some(path)
 }
 
+// Tokenizes SVG path data into commands and numeric operands.
 fn tokenize_path_data(data: &str) -> Vec<PathToken> {
+    // SVG permits compact number lists such as `M1-2.5`. The tokenizer splits
+    // on command letters, commas/whitespace, signs, and repeated decimals.
     let mut tokens = Vec::new();
     let chars = data.chars().collect::<Vec<_>>();
     let mut index = 0usize;
@@ -738,6 +787,7 @@ fn tokenize_path_data(data: &str) -> Vec<PathToken> {
     tokens
 }
 
+// Consumes the next numeric SVG path token.
 fn next_number(tokens: &[PathToken], index: &mut usize) -> Option<f32> {
     let value = match tokens.get(*index)? {
         PathToken::Number(value) => *value,
@@ -747,10 +797,12 @@ fn next_number(tokens: &[PathToken], index: &mut usize) -> Option<f32> {
     Some(value)
 }
 
+// Returns whether the token at `index` is numeric.
 fn peek_is_number(tokens: &[PathToken], index: usize) -> bool {
     matches!(tokens.get(index), Some(PathToken::Number(_)))
 }
 
+// Resolves absolute or relative SVG path coordinates into a Skia point.
 fn point_from_command(current: Point, x: f32, y: f32, is_relative: bool) -> Point {
     if is_relative {
         Point::new(current.x + x, current.y + y)
@@ -764,12 +816,14 @@ mod tests {
     use super::gradient_triangle_height;
 
     #[test]
+    // Verifies missing and near-zero gradients produce no triangle height.
     fn gradient_triangle_height_is_zero_for_zero_and_missing_values() {
         assert_eq!(gradient_triangle_height(None, 72.0), 0.0);
         assert_eq!(gradient_triangle_height(Some(0.0), 72.0), 0.0);
     }
 
     #[test]
+    // Verifies grade visualization uses the configured half-angle geometry.
     fn gradient_triangle_height_uses_half_angle_rule() {
         let expected = (72.0_f32) * (5.0_f32.to_radians().tan());
         let actual = gradient_triangle_height(Some(10.0), 72.0);

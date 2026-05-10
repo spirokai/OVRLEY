@@ -1,9 +1,21 @@
+//! ffmpeg discovery and argument construction.
+//!
+//! The renderer streams raw frames to ffmpeg, but supported codecs require
+//! different pixel formats, filters, hardware initialization, and container
+//! defaults. This module centralizes those choices and keeps command assembly
+//! deterministic.
+
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use serde_json::Value;
 
+/// Resolves the ffmpeg executable used for previews, encoding, and stitching.
+///
+/// Search order is: explicit environment override, known app-local vendor
+/// locations, then `PATH`. Returning a concrete path lets health checks and
+/// render failures show actionable messages.
 pub fn resolve_ffmpeg_binary(repo_root: &Path) -> Result<PathBuf, String> {
     let mut candidate_paths = Vec::new();
 
@@ -47,6 +59,7 @@ pub fn resolve_ffmpeg_binary(repo_root: &Path) -> Result<PathBuf, String> {
 }
 
 #[cfg(windows)]
+/// Prevents spawned ffmpeg/explorer processes from opening console windows.
 pub fn suppress_child_console(command: &mut Command) {
     use std::os::windows::process::CommandExt;
 
@@ -55,8 +68,10 @@ pub fn suppress_child_console(command: &mut Command) {
 }
 
 #[cfg(not(windows))]
+/// No-op console suppression on platforms without Windows creation flags.
 pub fn suppress_child_console(_command: &mut Command) {}
 
+// Searches the process PATH for a binary with the requested platform filename.
 fn find_in_path(binary_name: &str) -> Option<PathBuf> {
     let path_var = env::var_os("PATH")?;
     env::split_paths(&path_var)
@@ -64,18 +79,32 @@ fn find_in_path(binary_name: &str) -> Option<PathBuf> {
         .find(|candidate| candidate.is_file())
 }
 
+/// Fully resolved ffmpeg settings for one render.
 #[derive(Clone, Debug)]
 pub struct FfmpegSettings {
+    /// Logical codec requested by the template.
     pub codec: String,
+    /// ffmpeg loglevel passed to `-loglevel`.
     pub loglevel: String,
+    /// Output pixel format passed after codec args.
     pub pix_fmt: String,
+    /// Codec-specific output args appended before output path.
     pub output_args: Vec<String>,
+    /// Public output file extension.
     pub extension: String,
+    /// Optional explicit muxer/container passed with `-f`.
     pub muxer: Option<String>,
+    /// Hardware-device setup args required before input declaration.
     pub hw_init_args: Vec<String>,
+    /// Optional video filter graph, such as upload to Vulkan.
     pub filters: Option<String>,
 }
 
+/// Builds validated ffmpeg settings from `scene.ffmpeg`.
+///
+/// Supported codecs are alpha-preserving formats suitable for overlay exports.
+/// Unknown keys are ignored except `output_args`, which appends raw extra args
+/// for advanced users.
 pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, String> {
     let object = ffmpeg_config.as_object();
     let codec = object
@@ -281,7 +310,10 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
     }
 }
 
+// Appends one scalar ffmpeg option from template JSON when present.
 fn append_ffmpeg_option(args: &mut Vec<String>, flag: &str, value: Option<&Value>) {
+    // Accept primitive JSON values only. Complex values are ignored so malformed
+    // template extras cannot produce surprising command-line fragments.
     let Some(value) = value else {
         return;
     };
@@ -304,7 +336,10 @@ fn append_ffmpeg_option(args: &mut Vec<String>, flag: &str, value: Option<&Value
     }
 }
 
+// Appends user-provided extra ffmpeg output arguments from `scene.ffmpeg.output_args`.
 fn append_extra_output_args(args: &mut Vec<String>, ffmpeg_config: &Value) {
+    // `output_args` is an explicit escape hatch, but still limited to primitive
+    // values that can be represented safely as separate argv entries.
     let extra_args = ffmpeg_config
         .as_object()
         .and_then(|map| map.get("output_args"))

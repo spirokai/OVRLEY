@@ -1,3 +1,10 @@
+//! Route/course plot widget.
+//!
+//! The route widget projects latitude/longitude samples into a local 2D plane,
+//! fits and simplifies the path inside the configured widget bounds, caches the
+//! remaining route as a static layer, and draws the completed route plus marker
+//! for each frame.
+
 use super::common::{
     custom_export_range_active, distance, draw_marker, draw_polyline, draw_polyline_with_shadow,
     draw_static_layer, fallback_marker_points, fit_points_to_widget_with_inset,
@@ -20,6 +27,7 @@ use crate::render::surface::create_surface;
 use skia_safe::Canvas;
 use std::time::Instant;
 
+/// Prepares cached geometry, static layers, and frame states for a route plot.
 pub(crate) fn prepare_route_cache(
     config: &RenderConfig,
     activity: &ParsedActivity,
@@ -27,6 +35,8 @@ pub(crate) fn prepare_route_cache(
     plot: &CoursePlotConfig,
     prepare_profiler: &mut RenderProfiler,
 ) -> Result<RouteWidgetCache, String> {
+    // Build all expensive geometry and frame-position data once before the
+    // render loop. Per-frame drawing then only composites cached/static pieces.
     let prepare_started = Instant::now();
     let show_full_activity = plot.show_full_activity.unwrap_or(false);
     let plot = normalize_route_plot(config, plot);
@@ -61,6 +71,7 @@ pub(crate) fn prepare_route_cache(
     })
 }
 
+/// Draws the route widget for one frame and returns preview diagnostics.
 pub(crate) fn draw_route_widget(
     canvas: &Canvas,
     route_cache: &RouteWidgetCache,
@@ -115,7 +126,10 @@ pub(crate) fn draw_route_widget(
     ))
 }
 
+// Normalizes route plot options into concrete scaled drawing settings.
 fn normalize_route_plot(config: &RenderConfig, plot: &CoursePlotConfig) -> NormalizedRoutePlot {
+    // Normalize legacy flat style fields and newer nested styles into one
+    // internal shape. Scale is applied to dimensions and stroke/marker sizes.
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let base_color = plot_base_color(plot.color.as_deref());
     let legacy_width = legacy_line_width(
@@ -187,10 +201,13 @@ fn normalize_route_plot(config: &RenderConfig, plot: &CoursePlotConfig) -> Norma
     }
 }
 
+// Builds simplified widget-space geometry for the route path.
 fn build_route_geometry(
     plot: &NormalizedRoutePlot,
     route_samples: &[RouteSample],
 ) -> Result<WidgetGeometry, String> {
+    // Downsample before RDP simplification to cap work for long activities while
+    // preserving visually important points.
     if route_samples.len() < 2 {
         return Err("Route plot requires at least two valid course points".to_string());
     }
@@ -231,6 +248,7 @@ fn build_route_geometry(
     })
 }
 
+// Builds the cached static layer for the not-yet-completed route.
 fn build_route_remaining_layer(
     plot: &NormalizedRoutePlot,
     geometry: &WidgetGeometry,
@@ -266,11 +284,13 @@ fn build_route_remaining_layer(
     }))
 }
 
+// Computes inset needed to keep route strokes and marker inside widget bounds.
 fn route_geometry_inset_px(plot: &NormalizedRoutePlot) -> f32 {
     let line_inset = (plot.remaining_line_width.max(plot.completed_line_width) * 0.5).max(0.0);
     plot.marker_size.max(line_inset) + 1.0
 }
 
+// Precomputes route marker coordinates for each render frame.
 fn build_route_frame_states(
     config: &RenderConfig,
     activity: &ParsedActivity,
@@ -278,6 +298,9 @@ fn build_route_frame_states(
     dense_activity: &DenseActivityReport,
     show_full_activity: bool,
 ) -> Vec<RouteFrameState> {
+    // Precompute marker positions for all frames. Custom export windows can use
+    // trim-relative distance progress so the marker starts at the beginning of
+    // the exported slice rather than the full activity.
     let frame_progress = if custom_export_range_active(config)
         && !show_full_activity
         && !geometry.progress_values.is_empty()
@@ -308,11 +331,14 @@ fn build_route_frame_states(
         .collect()
 }
 
+// Selects full-activity or trimmed course samples for route geometry.
 fn build_route_samples(
     config: &RenderConfig,
     activity: &ParsedActivity,
     show_full_activity: bool,
 ) -> Result<Vec<RouteSample>, String> {
+    // `show_full_activity` overrides custom export trimming so the full route
+    // remains visible while progress can still follow the selected scene.
     if show_full_activity || !custom_export_range_active(config) {
         return Ok(project_course_samples(
             &activity.sample_course_points,
@@ -337,10 +363,13 @@ fn build_route_samples(
     ))
 }
 
+// Projects latitude/longitude samples into local 2D route samples.
 fn project_course_samples(
     course_points: &[(Option<f64>, Option<f64>)],
     progress_values: &[f64],
 ) -> Vec<RouteSample> {
+    // Use an equirectangular approximation centered on mean latitude. This is
+    // sufficient for small activity routes and avoids a heavy projection crate.
     let valid_points = course_points
         .iter()
         .enumerate()
@@ -371,6 +400,7 @@ fn project_course_samples(
         .collect()
 }
 
+// Projects trimmed course samples after normalizing optional progress values.
 fn project_course_samples_with_optional_progress(
     course_points: &[(Option<f64>, Option<f64>)],
     progress_values: &[Option<f64>],
@@ -391,11 +421,15 @@ fn project_course_samples_with_optional_progress(
     project_course_samples(course_points, &normalized_progress)
 }
 
+// Simplifies route samples using Ramer-Douglas-Peucker.
 fn simplify_route_samples(points: &[RouteSample], tolerance: f32) -> Vec<RouteSample> {
+    // Ramer-Douglas-Peucker simplification keeps endpoints and removes points
+    // whose perpendicular error is below the pixel tolerance.
     if points.len() <= 2 {
         return points.to_vec();
     }
 
+    // Computes perpendicular error used by route RDP simplification.
     fn perpendicular_distance(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> f32 {
         let (x0, y0) = point;
         let (x1, y1) = start;
@@ -431,7 +465,10 @@ fn simplify_route_samples(points: &[RouteSample], tolerance: f32) -> Vec<RouteSa
     [left[..left.len() - 1].to_vec(), right].concat()
 }
 
+// Reduces dense route samples with Largest-Triangle-Three-Buckets.
 fn downsample_route_samples(points: &[RouteSample], target_count: usize) -> Vec<RouteSample> {
+    // Largest-Triangle-Three-Buckets preserves the visible shape better than
+    // uniform sampling when reducing dense route traces.
     if points.len() <= target_count || target_count < 3 {
         return points.to_vec();
     }
@@ -487,6 +524,7 @@ fn downsample_route_samples(points: &[RouteSample], target_count: usize) -> Vec<
     sampled
 }
 
+// Computes triangle area used by Largest-Triangle-Three-Buckets downsampling.
 fn triangle_area(point_a: (f32, f32), point_b: (f32, f32), point_c: (f64, f64)) -> f64 {
     (((point_a.0 as f64 - point_c.0) * (point_b.1 as f64 - point_a.1 as f64))
         - ((point_a.0 as f64 - point_b.0 as f64) * (point_c.1 - point_a.1 as f64)))
@@ -494,6 +532,7 @@ fn triangle_area(point_a: (f32, f32), point_b: (f32, f32), point_c: (f64, f64)) 
         * 0.5
 }
 
+// Falls back to index-based route marker placement when metric progress is unavailable.
 fn route_position_at_progress(points: &[(f32, f32)], progress_limit: f32) -> (usize, f32, f32) {
     if points.is_empty() {
         return (0, 0.0, 0.0);
@@ -528,10 +567,13 @@ fn route_position_at_progress(points: &[(f32, f32)], progress_limit: f32) -> (us
     (last_index, points[last_index].0, points[last_index].1)
 }
 
+// Builds the completed route polyline up to the current marker point.
 fn build_route_prefix_points(
     geometry: &WidgetGeometry,
     state: &RouteFrameState,
 ) -> Vec<(f32, f32)> {
+    // The completed route includes all simplified points before the marker plus
+    // the interpolated marker point itself.
     if geometry.points.is_empty() {
         return Vec::new();
     }

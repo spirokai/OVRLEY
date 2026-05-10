@@ -1,3 +1,9 @@
+//! Shared widget geometry, progress, and drawing helpers.
+//!
+//! Route and elevation widgets use the same marker, polyline, transform,
+//! progress interpolation, and shadow logic. Keeping those pieces here avoids
+//! subtle visual drift between widget implementations.
+
 use super::types::{
     MarkerLayer, ShadowStyle, StaticLayer, WidgetFrameReport, WidgetGeometry, WidgetGeometryReport,
     WidgetRenderReport,
@@ -17,6 +23,7 @@ pub(crate) const DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER: f32 = 2.5;
 pub(crate) const DEFAULT_ELEVATION_MARKER_SCALE: f32 = 2.5;
 pub(crate) const DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER: f32 = 2.5;
 
+// Normalizes opacity from either `0..=1` or legacy `0..=100` input.
 pub(crate) fn normalize_opacity(value: Option<f32>, default: f32) -> f32 {
     match value {
         Some(value) if value > 1.0 => (value / 100.0).clamp(0.0, 1.0),
@@ -25,10 +32,12 @@ pub(crate) fn normalize_opacity(value: Option<f32>, default: f32) -> f32 {
     }
 }
 
+// Computes Euclidean distance between two widget-space points.
 pub(crate) fn distance(left: (f32, f32), right: (f32, f32)) -> f32 {
     ((right.0 - left.0).powi(2) + (right.1 - left.1).powi(2)).sqrt()
 }
 
+// Fits source points into widget bounds while preserving aspect ratio.
 pub(crate) fn fit_points_to_widget_with_inset(
     points: &[(f32, f32)],
     width: f32,
@@ -36,6 +45,8 @@ pub(crate) fn fit_points_to_widget_with_inset(
     inset_px: f32,
     invert_y: bool,
 ) -> Vec<(f32, f32)> {
+    // Preserve aspect ratio and center the fitted route/profile inside the
+    // widget while reserving space for strokes, shadows, and marker radii.
     if points.is_empty() {
         return Vec::new();
     }
@@ -72,6 +83,7 @@ pub(crate) fn fit_points_to_widget_with_inset(
         .collect()
 }
 
+// Interpolates one numeric value from sorted valid points.
 fn interpolate_numeric_points(points: &[(f64, f64)], target_x: f64) -> Option<f64> {
     if points.is_empty() {
         return None;
@@ -99,6 +111,7 @@ fn interpolate_numeric_points(points: &[(f64, f64)], target_x: f64) -> Option<f6
     Some(left_y + (right_y - left_y) * mix)
 }
 
+// Interpolates a numeric series at many target positions.
 fn interpolate_numeric_series_many(
     x_values: &[f64],
     y_values: &[f64],
@@ -120,11 +133,14 @@ fn interpolate_numeric_series_many(
         .collect()
 }
 
+// Returns frame-by-frame progress values used to animate plot markers.
 pub(crate) fn frame_progress_values(
     config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
 ) -> Vec<f32> {
+    // Prefer dense distance progress when available because it maps widget
+    // marker movement to real activity distance rather than elapsed time.
     let total_frames = dense_activity.frame_count.max(1);
     if dense_activity.frame_distance_progress.len() == total_frames {
         return dense_activity
@@ -161,6 +177,7 @@ pub(crate) fn frame_progress_values(
         .collect()
 }
 
+// Returns whether the template is rendering a custom scene subset.
 pub(crate) fn custom_export_range_active(config: &RenderConfig) -> bool {
     config
         .scene
@@ -170,6 +187,7 @@ pub(crate) fn custom_export_range_active(config: &RenderConfig) -> bool {
         .unwrap_or(false)
 }
 
+// Interpolates absolute activity distance progress at an elapsed second.
 pub(crate) fn interpolate_distance_progress_at_elapsed(
     activity: &ParsedActivity,
     elapsed_second: f64,
@@ -188,11 +206,14 @@ pub(crate) fn interpolate_distance_progress_at_elapsed(
     )
 }
 
+// Converts absolute frame progress values into the current trim window.
 pub(crate) fn relative_distance_frame_progress_values(
     config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
 ) -> Option<Vec<f32>> {
+    // Convert absolute activity progress into trim-local progress for custom
+    // export windows, preserving the visual start/end of the selected range.
     let start_progress = interpolate_distance_progress_at_elapsed(activity, config.scene.start)?;
     let end_progress = interpolate_distance_progress_at_elapsed(activity, config.scene.end)?;
     let span = end_progress - start_progress;
@@ -209,9 +230,12 @@ pub(crate) fn relative_distance_frame_progress_values(
     )
 }
 
+// Normalizes optional progress values to a `0.0..=1.0` window.
 pub(crate) fn normalize_optional_progress_window(
     progress_values: &[Option<f64>],
 ) -> Option<Vec<f64>> {
+    // Optional progress appears after trimming. Normalize from the first and
+    // last valid values, filling gaps by index to keep geometry monotonic.
     let start = progress_values.iter().find_map(|value| *value)?;
     let end = progress_values.iter().rev().find_map(|value| *value)?;
     let span = end - start;
@@ -239,6 +263,7 @@ pub(crate) fn normalize_optional_progress_window(
     )
 }
 
+// Interpolates one optional numeric series at a target x-value.
 pub(crate) fn interpolate_optional_numeric_series(
     x_values: &[f64],
     y_values: &[Option<f64>],
@@ -273,12 +298,15 @@ pub(crate) fn interpolate_optional_numeric_series(
     Some(valid[last_index].1)
 }
 
+// Finds an interpolated point for target progress using a reusable search cursor.
 pub(crate) fn point_at_metric_progress_with_cursor(
     points: &[(f32, f32)],
     progress_values: &[f32],
     target_progress: f32,
     cursor: &mut usize,
 ) -> Option<(usize, f32, f32)> {
+    // The cursor is monotonic during frame iteration, making repeated lookups
+    // effectively O(n) across the whole render instead of O(n) per frame.
     if points.is_empty() || progress_values.len() != points.len() {
         return None;
     }
@@ -322,6 +350,7 @@ pub(crate) fn point_at_metric_progress_with_cursor(
     ))
 }
 
+// Selects a point by evenly mapping progress to the point index domain.
 pub(crate) fn point_at_progress_x(
     points: &[(f32, f32)],
     progress01: f32,
@@ -333,6 +362,7 @@ pub(crate) fn point_at_progress_x(
     Some((index, point.0, point.1))
 }
 
+// Draws a stroked polyline without shadow.
 pub(crate) fn draw_polyline(
     canvas: &Canvas,
     points: &[(f32, f32)],
@@ -343,6 +373,7 @@ pub(crate) fn draw_polyline(
     draw_polyline_with_shadow(canvas, points, color, width, opacity, None);
 }
 
+// Draws a stroked polyline with an optional drop shadow.
 pub(crate) fn draw_polyline_with_shadow(
     canvas: &Canvas,
     points: &[(f32, f32)],
@@ -388,6 +419,7 @@ pub(crate) fn draw_polyline_with_shadow(
     canvas.draw_path(&path, &paint);
 }
 
+// Draws a filled area under a polyline down to `baseline_y`.
 pub(crate) fn draw_area(
     canvas: &Canvas,
     points: &[(f32, f32)],
@@ -406,6 +438,7 @@ pub(crate) fn draw_area(
     canvas.draw_path(&path, &paint);
 }
 
+// Draws the configured marker layers or a fallback circular marker.
 pub(crate) fn draw_marker(
     canvas: &Canvas,
     layers: &[MarkerLayer],
@@ -415,6 +448,8 @@ pub(crate) fn draw_marker(
     fallback_radius: f32,
     fallback_opacity: f32,
 ) {
+    // Marker points are rendered largest-to-smallest. The smallest layer is
+    // filled to create a visible center; larger layers become rings.
     if layers.is_empty() {
         let mut paint = Paint::default();
         paint.set_anti_alias(true);
@@ -445,6 +480,7 @@ pub(crate) fn draw_marker(
     }
 }
 
+// Converts marker point config into sorted drawable marker layers.
 pub(crate) fn marker_layers_from_points(points: &[MarkerPointConfig]) -> Vec<MarkerLayer> {
     let mut layers = points
         .iter()
@@ -470,14 +506,17 @@ pub(crate) fn marker_layers_from_points(points: &[MarkerPointConfig]) -> Vec<Mar
     layers
 }
 
+// Resolves the base plot color with a white default.
 pub(crate) fn plot_base_color(color: Option<&str>) -> String {
     color.unwrap_or(DEFAULT_COLOR).to_string()
 }
 
+// Applies the historical line-width multiplier used by plot templates.
 pub(crate) fn legacy_line_width(line_width: Option<f32>, multiplier: f32) -> f32 {
     line_width.unwrap_or(DEFAULT_LINE_WIDTH) * multiplier
 }
 
+// Derives a marker size from configured marker weights.
 pub(crate) fn marker_size_from_weights(
     points: &[MarkerPointConfig],
     default_size: f32,
@@ -490,12 +529,15 @@ pub(crate) fn marker_size_from_weights(
         .fold(default_size, f32::max)
 }
 
+// Supplies marker-point config when a legacy template only has flat marker fields.
 pub(crate) fn fallback_marker_points(
     points: &[MarkerPointConfig],
     marker_size: f32,
     marker_color: &str,
     marker_opacity: f32,
 ) -> Vec<MarkerPointConfig> {
+    // Legacy templates often specify only marker_size/color fields. Convert
+    // those into the newer layered marker representation.
     if points.is_empty() {
         vec![MarkerPointConfig {
             weight: Some(marker_size.powi(2)),
@@ -508,6 +550,7 @@ pub(crate) fn fallback_marker_points(
     }
 }
 
+// Scales marker weights so marker radii track scene scale.
 pub(crate) fn scale_marker_points(
     points: &[MarkerPointConfig],
     scale: f32,
@@ -527,6 +570,7 @@ pub(crate) fn scale_marker_points(
         .collect()
 }
 
+// Resolves explicit, inherited, and base style colors in precedence order.
 pub(crate) fn resolve_style_color(
     explicit_color: Option<&String>,
     inherited_color: Option<&String>,
@@ -538,6 +582,7 @@ pub(crate) fn resolve_style_color(
         .unwrap_or_else(|| base_color.to_string())
 }
 
+// Converts scene shadow fields into a drawable shadow style.
 pub(crate) fn normalize_shadow_style(
     color: Option<&String>,
     strength: Option<f32>,
@@ -557,19 +602,24 @@ pub(crate) fn normalize_shadow_style(
     })
 }
 
+// Computes cached-layer padding needed for strokes and shadows.
 pub(crate) fn static_layer_padding(line_width: f32, shadow: Option<&ShadowStyle>) -> u32 {
+    // Static layers can include shadows that extend beyond the widget bounds.
+    // Padding prevents the cached image from clipping those pixels.
     let shadow_extent = shadow
         .map(|shadow| shadow.distance.abs() + shadow.strength * 3.0)
         .unwrap_or(0.0);
     (line_width.max(1.0) * 0.5 + shadow_extent).ceil().max(0.0) as u32
 }
 
+// Draws a pre-rendered static widget layer if it exists.
 pub(crate) fn draw_static_layer(canvas: &Canvas, layer: Option<&StaticLayer>) {
     if let Some(layer) = layer {
         canvas.draw_image(&layer.image, (layer.x, layer.y), None);
     }
 }
 
+// Builds a Skia path from widget points, optionally closing to a baseline.
 pub(crate) fn path_from_points(
     points: &[(f32, f32)],
     close_path: bool,
@@ -596,6 +646,7 @@ pub(crate) fn path_from_points(
     path
 }
 
+// Applies widget translation and rotation while drawing local widget contents.
 pub(crate) fn with_widget_transform(
     canvas: &Canvas,
     x: f32,
@@ -605,6 +656,8 @@ pub(crate) fn with_widget_transform(
     rotation_deg: f32,
     draw: impl FnOnce(&Canvas),
 ) {
+    // Widget coordinates are local to the plot; rotate around its center after
+    // translating to the configured canvas position.
     canvas.save();
     canvas.translate((x, y));
     if rotation_deg != 0.0 {
@@ -616,6 +669,7 @@ pub(crate) fn with_widget_transform(
     canvas.restore();
 }
 
+// Converts a widget-local point into absolute canvas coordinates.
 pub(crate) fn rotate_point_to_canvas(
     x: f32,
     y: f32,
@@ -625,6 +679,8 @@ pub(crate) fn rotate_point_to_canvas(
     height: f32,
     rotation_deg: f32,
 ) -> (f32, f32) {
+    // Used for preview reports and labels that are drawn outside the widget's
+    // transformed canvas state.
     if rotation_deg == 0.0 {
         return (widget_x + x, widget_y + y);
     }
@@ -641,6 +697,8 @@ pub(crate) fn rotate_point_to_canvas(
     )
 }
 
+// Builds preview diagnostics for a rendered widget frame.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn widget_render_report(
     widget_x: f32,
     widget_y: f32,
@@ -686,6 +744,7 @@ pub(crate) fn widget_render_report(
     }
 }
 
+// Formats a marker elevation label in metric or imperial units.
 pub(crate) fn format_elevation_label(
     value_m: f64,
     unit: &str,

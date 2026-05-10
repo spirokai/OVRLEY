@@ -1,5 +1,16 @@
+//! Activity ingestion and frame-density preparation.
+//!
+//! The frontend supplies parsed GPX/FIT activity data as JSON. This module
+//! accepts both the plain `ParsedActivity` shape and the debug wrapper shape,
+//! validates the render window against the activity duration, and returns a
+//! dense per-frame report containing only the telemetry series required by the
+//! selected template.
+
+/// Interpolation helpers used for numeric, coordinate, and timestamp series.
 pub mod interpolate;
+/// Serializable activity payloads and internal dense/trimmed report types.
 pub mod schema;
+/// Scene-window trimming for parsed activity samples.
 pub mod trim;
 
 use crate::activity::interpolate::densify_activity;
@@ -8,7 +19,11 @@ use crate::activity::trim::trim_activity;
 use crate::config::RenderConfig;
 use serde_json::Value;
 
+/// Parses frontend activity JSON from either production or debug payload shapes.
 pub fn parse_activity_json(input: &str) -> Result<ParsedActivity, String> {
+    // Debug exports wrap the real payload under `parsed_activity`; production
+    // calls pass the payload directly. Accept both to keep diagnostics reusable
+    // in tests and local tooling.
     let value: Value = serde_json::from_str(input)
         .map_err(|error| format!("Invalid parsedActivity JSON: {error}"))?;
 
@@ -22,10 +37,13 @@ pub fn parse_activity_json(input: &str) -> Result<ParsedActivity, String> {
     }
 }
 
+/// Trims and densifies parsed activity data for the provided render config.
 pub fn build_dense_activity_report(
     activity: &ParsedActivity,
     config: &RenderConfig,
 ) -> Result<DenseActivityReport, String> {
+    // Data requirements are derived from the template before trimming so unused
+    // high-cardinality series never get copied or densified.
     let requirements = config.render_data_requirements()?;
     let trimmed = trim_activity(
         activity,
@@ -43,6 +61,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
+    // Resolves the repository root from the crate manifest directory.
     fn repo_root() -> PathBuf {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         manifest_dir
@@ -53,6 +72,7 @@ mod tests {
             .to_path_buf()
     }
 
+    // Loads an activity parser debug fixture by filename.
     fn fixture(name: &str) -> String {
         let path = repo_root().join("app").join("debug").join(name);
         fs::read_to_string(&path)
@@ -60,6 +80,7 @@ mod tests {
     }
 
     #[test]
+    // Verifies that a complete GPX fixture densifies to the expected frame count.
     fn builds_dense_report_for_full_fixture() {
         let activity = parse_activity_json(&fixture("Test_GPX-parse-debug.json")).unwrap();
         let config = parse_config_json(
@@ -86,6 +107,7 @@ mod tests {
     }
 
     #[test]
+    // Verifies non-integer trim windows produce stable frame counts at common FPS values.
     fn trims_non_integer_window_across_multiple_fps() {
         let activity = parse_activity_json(&fixture("Test_FIT-parse-debug.json")).unwrap();
 
@@ -113,6 +135,7 @@ mod tests {
     }
 
     #[test]
+    // Verifies only telemetry required by values/plots is densified.
     fn only_densifies_series_requested_by_template() {
         let activity = parse_activity_json(&fixture("Test_FIT-parse-debug.json")).unwrap();
         let config = parse_config_json(
@@ -136,6 +159,7 @@ mod tests {
     }
 
     #[test]
+    // Verifies trimmed plot progress remains absolute to the full activity.
     fn trimmed_exports_keep_absolute_distance_progress() {
         let activity = parse_activity_json(&fixture("Test_FIT-parse-debug.json")).unwrap();
         let config = parse_config_json(

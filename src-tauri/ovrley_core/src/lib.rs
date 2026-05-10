@@ -1,6 +1,22 @@
+//! Core rendering and encoding library for OVRLEY.
+//!
+//! This crate is the Rust backend used by the Tauri shell. It owns the
+//! production data path from frontend JSON payloads through activity trimming,
+//! per-frame interpolation, Skia overlay rendering, ffmpeg encoding, progress
+//! tracking, and debug artifact generation.
+//!
+//! Public modules are intentionally grouped by responsibility so the Tauri
+//! command layer can stay thin while the testable business logic remains here.
+
+/// Activity JSON contracts plus trim and interpolation utilities.
 pub mod activity;
+/// Backend-facing command helpers used by the Tauri application layer.
 pub mod commands;
+/// Template and scene configuration contracts.
 pub mod config;
+/// Progress and timing diagnostics shared by render and encode code.
 pub mod debug;
+/// Video encoding and ffmpeg integration.
 pub mod encode;
+/// Skia-based overlay rendering.
 pub mod render;

@@ -1,7 +1,19 @@
+//! Overlay widget preparation and drawing.
+//!
+//! Widgets are split into a preparation phase and a per-frame composition phase.
+//! Preparation normalizes template options, projects source telemetry into
+//! widget-local geometry, builds static layers, and precomputes marker states so
+//! video rendering can draw each frame with predictable cost.
+
+/// Shared geometry, style, and drawing helpers for all widgets.
 mod common;
+/// Elevation profile widget implementation.
 mod elevation;
+/// Route/course widget implementation.
 mod route;
+/// Shared widget cache and report types.
 mod types;
+/// Metric value widgets, including icons and gradient triangles.
 mod value;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
@@ -15,6 +27,10 @@ pub(crate) use value::{
     draw_metric_value_widget_with_config, draw_static_metric_icon_for_value, has_static_metric_icon,
 };
 
+/// Prepares all widget-specific caches needed by the active template.
+///
+/// Plot configuration is parsed lazily; absent widgets produce no cache, while
+/// invalid present widgets return an error before rendering starts.
 pub fn prepare_render_assets(
     config: &RenderConfig,
     activity: &ParsedActivity,

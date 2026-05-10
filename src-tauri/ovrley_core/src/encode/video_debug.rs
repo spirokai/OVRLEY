@@ -1,3 +1,9 @@
+//! Debug artifact helpers for video rendering.
+//!
+//! Render diagnostics are written as JSON summaries and optional sample PNGs in
+//! timestamped directories. The files are designed for performance comparison
+//! across phases without coupling the main render loop to reporting details.
+
 use crate::activity::schema::DenseActivityReport;
 use crate::commands::AppPaths;
 use crate::config::RenderConfig;
@@ -14,6 +20,7 @@ use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize)]
+/// Timing summary for one video render phase.
 struct TimingSummary {
     phase: String,
     timestamp: String,
@@ -32,6 +39,7 @@ struct TimingSummary {
 }
 
 #[derive(Serialize)]
+/// Timing summary for the asset-preparation step.
 struct PrepareTimingSummary {
     total_ms: f64,
     timings: BTreeMap<String, TimingBucket>,
@@ -39,6 +47,7 @@ struct PrepareTimingSummary {
 }
 
 #[derive(Serialize)]
+/// Summary for a segmented render stitch operation.
 struct StitchSummary {
     timestamp: String,
     codec: String,
@@ -50,6 +59,7 @@ struct StitchSummary {
 }
 
 #[derive(Serialize)]
+/// Per-segment metadata included in a stitch summary.
 struct SegmentSummary {
     index: usize,
     start_seconds: f64,
@@ -59,12 +69,15 @@ struct SegmentSummary {
     filename: String,
 }
 
+/// Concatenates already-encoded video segments into one output file.
 pub(crate) fn concat_video_segments(
     paths: &AppPaths,
     ffmpeg_bin: &Path,
     filenames: &[String],
     output_path: &Path,
 ) -> Result<(), String> {
+    // Use ffmpeg's concat demuxer with stream copy because each segment is
+    // encoded with the same settings and should not be recompressed.
     let list_path = paths
         .temp_dir
         .join(format!("concat_list_{}.txt", timestamp_nanos()?));
@@ -107,6 +120,7 @@ pub(crate) fn concat_video_segments(
     }
 }
 
+/// Writes preparation timing data for one render.
 pub(crate) fn write_prepare_summary(
     debug_dir: &Path,
     total_ms: f64,
@@ -128,6 +142,8 @@ pub(crate) fn write_prepare_summary(
     )
 }
 
+/// Writes aggregate timing data for one render phase.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn write_timing_summary_with_phase(
     debug_dir: &Path,
     config: &RenderConfig,
@@ -159,6 +175,7 @@ pub(crate) fn write_timing_summary_with_phase(
     write_json(debug_dir.join("timing_summary.json"), &summary)
 }
 
+/// Writes timing and segment metadata for a stitched render.
 pub(crate) fn write_stitch_summary(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -209,6 +226,7 @@ pub(crate) fn write_stitch_summary(
     write_json(debug_dir.join("stitch_summary.json"), &summary)
 }
 
+/// Creates a timestamped debug directory for a render phase.
 pub(crate) fn create_debug_dir(paths: &AppPaths, phase: &str) -> Result<PathBuf, String> {
     let dir = paths.debug_render_dir.join(phase).join(timestamp_slug()?);
     fs::create_dir_all(&dir)
@@ -216,6 +234,7 @@ pub(crate) fn create_debug_dir(paths: &AppPaths, phase: &str) -> Result<PathBuf,
     Ok(dir)
 }
 
+/// Returns the current Unix timestamp in nanoseconds.
 pub(crate) fn timestamp_nanos() -> Result<u128, String> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -223,7 +242,10 @@ pub(crate) fn timestamp_nanos() -> Result<u128, String> {
         .map_err(|error| error.to_string())
 }
 
+/// Selects representative frame indexes for optional sample PNG export.
 pub(crate) fn sample_frame_indices(total_frames: usize) -> Vec<usize> {
+    // Capture coarse milestones so visual debugging is useful without producing
+    // many large image files during long renders.
     if total_frames == 0 {
         return Vec::new();
     }
@@ -239,6 +261,7 @@ pub(crate) fn sample_frame_indices(total_frames: usize) -> Vec<usize> {
     indices
 }
 
+/// Returns whether sample-frame PNG debug output is enabled by environment.
 pub(crate) fn render_sample_frames_enabled() -> bool {
     matches!(
         std::env::var("OVRLEY_SAMPLE_FRAMES").ok().as_deref(),
@@ -246,6 +269,7 @@ pub(crate) fn render_sample_frames_enabled() -> bool {
     )
 }
 
+/// Writes one raw RGBA frame to a PNG sample file through ffmpeg.
 pub(crate) fn write_sample_frame(
     ffmpeg_bin: &Path,
     debug_dir: &Path,
@@ -255,6 +279,8 @@ pub(crate) fn write_sample_frame(
     frame_index: usize,
     input_pix_fmt: &str,
 ) -> Result<(), String> {
+    // Reuse ffmpeg for raw RGBA to PNG conversion so sample images exercise the
+    // same input pixel format as the real encoder path.
     let png_path = debug_dir.join(format!("sample_{frame_index:04}.png"));
     let mut command = Command::new(ffmpeg_bin);
     suppress_child_console(&mut command);
@@ -293,14 +319,17 @@ pub(crate) fn write_sample_frame(
     }
 }
 
+// Formats the current local timestamp for debug summaries.
 fn iso_timestamp_now() -> String {
     Local::now().format("%Y-%m-%dT%H:%M:%S").to_string()
 }
 
+// Rounds a floating-point value to three decimal places.
 fn round3(value: f64) -> f64 {
     (value * 1000.0).round() / 1000.0
 }
 
+// Computes the encoded frame count reported in stitch summaries.
 fn rendered_frame_count_for_summary(layout_frame_count: usize, update_rate: usize) -> u32 {
     if layout_frame_count == 0 {
         return 0;
@@ -309,11 +338,13 @@ fn rendered_frame_count_for_summary(layout_frame_count: usize, update_rate: usiz
     (((layout_frame_count - 1) / safe_update_rate) + 1) as u32
 }
 
+// Serializes a payload as pretty JSON and writes it to disk.
 fn write_json<T: Serialize>(path: PathBuf, payload: &T) -> Result<(), String> {
     let json = serde_json::to_string_pretty(payload).map_err(|error| error.to_string())?;
     fs::write(&path, json).map_err(|error| format!("Failed to write {}: {error}", path.display()))
 }
 
+// Builds a filesystem-safe timestamp slug for debug directories/files.
 fn timestamp_slug() -> Result<String, String> {
     Ok(timestamp_nanos()?.to_string())
 }

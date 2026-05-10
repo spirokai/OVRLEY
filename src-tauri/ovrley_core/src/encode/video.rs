@@ -1,3 +1,10 @@
+//! Render lifecycle orchestration.
+//!
+//! This module coordinates long-running video renders, progress reporting,
+//! cancellation, optional qtrle segmentation, and final segment stitching. The
+//! actual single-pass frame production and ffmpeg streaming are implemented in
+//! `video_pipeline`.
+
 use crate::activity::build_dense_activity_report;
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::commands::AppPaths;
@@ -13,6 +20,11 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+/// Shared render state used by frontend commands and worker threads.
+///
+/// The controller is cheap to clone. Clones share progress, cancellation, and
+/// running-state atomics so background rendering can update status while the UI
+/// polls or requests cancellation.
 #[derive(Clone)]
 pub struct RenderController {
     progress: Arc<Mutex<RenderProgress>>,
@@ -22,6 +34,7 @@ pub struct RenderController {
 }
 
 impl Default for RenderController {
+    /// Creates a controller in the idle state with no active render.
     fn default() -> Self {
         Self {
             progress: Arc::new(Mutex::new(RenderProgress::default())),
@@ -33,6 +46,7 @@ impl Default for RenderController {
 }
 
 impl RenderController {
+    /// Returns a snapshot of the latest progress state.
     pub fn progress(&self) -> RenderProgress {
         self.progress
             .lock()
@@ -40,6 +54,7 @@ impl RenderController {
             .unwrap_or_default()
     }
 
+    /// Requests cancellation and returns whether a render was active.
     pub fn cancel(&self) -> bool {
         self.cancel_flag.store(true, Ordering::SeqCst);
         if let Ok(mut progress) = self.progress.lock() {
@@ -49,6 +64,10 @@ impl RenderController {
         self.running.load(Ordering::SeqCst)
     }
 
+    /// Starts a render if none is currently running.
+    ///
+    /// On success this resets cancellation state, creates a new render id, and
+    /// initializes progress totals. Concurrent starts fail fast.
     pub fn try_start(&self, total_frames: u32, message: &str) -> Result<u64, String> {
         if self
             .running
@@ -74,6 +93,7 @@ impl RenderController {
         Ok(render_id)
     }
 
+    /// Updates producer/encoder frame counts and remaining-time estimate.
     pub fn set_frame_progress(
         &self,
         current: u32,
@@ -94,6 +114,7 @@ impl RenderController {
         }
     }
 
+    /// Marks the active render as complete and stores the output filename.
     pub fn finish_success(&self, filename: String) {
         if let Ok(mut progress) = self.progress.lock() {
             progress.current = progress.total;
@@ -107,6 +128,7 @@ impl RenderController {
         self.cancel_flag.store(false, Ordering::SeqCst);
     }
 
+    /// Marks the active render as failed or cancelled.
     pub fn finish_error(&self, error: String, cancelled: bool) {
         if let Ok(mut progress) = self.progress.lock() {
             progress.status = if cancelled {
@@ -126,11 +148,16 @@ impl RenderController {
         self.cancel_flag.store(false, Ordering::SeqCst);
     }
 
+    /// Returns the shared cancellation flag for internal worker coordination.
     pub(crate) fn cancel_flag(&self) -> Arc<AtomicBool> {
         self.cancel_flag.clone()
     }
 }
 
+/// Renders multiple configs concurrently and stitches their outputs.
+///
+/// This is primarily a diagnostic/benchmark helper. Each segment receives an
+/// independent controller, then ffmpeg concatenates the produced files.
 pub fn run_parallel_renders(
     paths: &AppPaths,
     configs: Vec<RenderConfig>,
@@ -215,7 +242,10 @@ pub fn run_parallel_renders(
     Ok(start_time.elapsed())
 }
 
+// Estimates a conservative number of parallel render workers for the machine.
 fn estimate_parallel_render_worker_count(total_jobs: usize) -> usize {
+    // Rendering is CPU and memory heavy, so use a conservative fraction of
+    // available logical cores instead of saturating the machine.
     let logical_cores = std::thread::available_parallelism()
         .map(|value| value.get())
         .unwrap_or(4);
@@ -223,6 +253,7 @@ fn estimate_parallel_render_worker_count(total_jobs: usize) -> usize {
     worker_count.min(total_jobs.max(1))
 }
 
+/// Renders a video, using segmentation when the selected codec benefits from it.
 pub fn render_video(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -236,7 +267,10 @@ pub fn render_video(
     render_video_single(paths, config, activity, dense_activity, controller)
 }
 
+// Returns whether qtrle rendering should be split into stitched segments.
 fn should_parallelize_qtrle(config: &RenderConfig, dense_activity: &DenseActivityReport) -> bool {
+    // qtrle encoding is comparatively slow and stitch-friendly for integer
+    // second windows, making it the only codec currently segmented.
     config
         .scene
         .ffmpeg
@@ -249,6 +283,7 @@ fn should_parallelize_qtrle(config: &RenderConfig, dense_activity: &DenseActivit
         && dense_activity.frame_count >= 2
 }
 
+// Renders qtrle output as multiple second-aligned segments and stitches them.
 fn render_video_segmented_qtrle(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -256,6 +291,8 @@ fn render_video_segmented_qtrle(
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> Result<String, String> {
+    // Segment renders share the parent cancellation flag while maintaining
+    // independent progress counters. The parent reports aggregate progress.
     let Some(total_seconds) = integer_second_duration(config) else {
         return render_video_single(paths, config, activity, dense_activity, controller);
     };
@@ -422,7 +459,10 @@ fn render_video_segmented_qtrle(
     Ok(public_filename)
 }
 
+// Returns the scene duration when start and end are exact integer seconds.
 fn integer_second_duration(config: &RenderConfig) -> Option<u32> {
+    // Stitching expects clean second boundaries so duplicated or missing frames
+    // are not introduced at segment joins.
     let start = config.scene.start.round();
     let end = config.scene.end.round();
     if (config.scene.start - start).abs() > 1e-9 || (config.scene.end - end).abs() > 1e-9 {
@@ -434,6 +474,7 @@ fn integer_second_duration(config: &RenderConfig) -> Option<u32> {
     Some((end - start) as u32)
 }
 
+// Splits an integer-second scene into balanced contiguous render windows.
 fn integer_second_windows(
     config: &RenderConfig,
     total_seconds: u32,
@@ -455,7 +496,10 @@ fn integer_second_windows(
     windows
 }
 
+// Creates a segment-local controller that shares the parent cancel flag.
 fn child_render_controller(total_frames: u32, cancel_flag: &Arc<AtomicBool>) -> RenderController {
+    // Child controllers reuse the parent cancel flag so any segment failure or
+    // user cancellation can stop all in-flight workers promptly.
     let controller = RenderController {
         progress: Arc::new(Mutex::new(RenderProgress::default())),
         cancel_flag: cancel_flag.clone(),
@@ -466,7 +510,10 @@ fn child_render_controller(total_frames: u32, cancel_flag: &Arc<AtomicBool>) -> 
     controller
 }
 
+// Removes temporary segment output files after stitching or failure.
 fn cleanup_segment_outputs(paths: &AppPaths, results: &[Option<String>]) {
+    // Segment files are implementation details; callers only receive the final
+    // stitched movie. Best-effort cleanup keeps failed renders from piling up.
     for filename in results.iter().flatten() {
         let _ = std::fs::remove_file(paths.downloads_dir.join(filename));
     }
