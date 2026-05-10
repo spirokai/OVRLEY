@@ -26,6 +26,7 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  trackChildren,
   ...props
 }) {
   const _values = React.useMemo(
@@ -63,6 +64,7 @@ function Slider({
             'bg-primary absolute data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full',
           )}
         />
+        {trackChildren}
       </SliderPrimitive.Track>
       {Array.from({ length: _values.length }, (_, index) => (
         <SliderPrimitive.Thumb

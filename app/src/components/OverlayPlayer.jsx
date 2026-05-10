@@ -412,15 +412,6 @@ export default function OverlayPlayer() {
             {formatTimelineTime(displayedPlayhead)}
           </span>
           <div className="relative min-w-0 flex-1">
-            {importedVideoPath && totalDuration > 0 && (
-              <div
-                className="absolute top-1/2 h-1 -translate-y-1/2 rounded-none bg-accent"
-                style={{
-                  left: `${Math.max(0, (videoSyncOffsetSeconds / totalDuration) * 100)}%`,
-                  width: `${Math.min(100, (importedVideoDuration / totalDuration) * 100)}%`,
-                }}
-              />
-            )}
             <Slider
               min={0}
               max={Math.max(totalDuration, 1)}
@@ -429,6 +420,18 @@ export default function OverlayPlayer() {
               disabled={!hasActivity}
               onValueChange={handleTimelineChange}
               onValueCommit={handleTimelineCommit}
+              trackChildren={
+                importedVideoPath &&
+                totalDuration > 0 && (
+                  <div
+                    className="absolute inset-y-0 bg-accent"
+                    style={{
+                      left: `${Math.max(0, (videoSyncOffsetSeconds / totalDuration) * 100)}%`,
+                      width: `${Math.min(100, (importedVideoDuration / totalDuration) * 100)}%`,
+                    }}
+                  />
+                )
+              }
             />
           </div>
           <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
