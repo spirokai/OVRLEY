@@ -21,6 +21,7 @@ pub struct AppPaths {
     pub preview_dir: PathBuf,
     pub temp_dir: PathBuf,
     pub bundled_templates_dirs: Vec<PathBuf>,
+    pub user_templates_dir: PathBuf,
     pub downloads_dir: PathBuf,
 }
 
@@ -57,6 +58,7 @@ impl AppPaths {
                 .into_iter()
                 .filter(|path| path.is_dir())
                 .collect();
+        let user_templates_dir = documents_ovrley_dir();
 
         Self {
             repo_root: resource_root,
@@ -65,6 +67,7 @@ impl AppPaths {
             preview_dir,
             temp_dir,
             bundled_templates_dirs,
+            user_templates_dir,
             downloads_dir,
         }
     }
@@ -74,6 +77,7 @@ impl AppPaths {
             &self.debug_render_dir,
             &self.preview_dir,
             &self.temp_dir,
+            &self.user_templates_dir,
             &self.downloads_dir,
         ] {
             fs::create_dir_all(dir)
@@ -87,6 +91,11 @@ impl AppPaths {
             .iter()
             .map(|dir| dir.join(filename))
             .find(|path| path.is_file())
+    }
+
+    pub fn user_template_path(&self, filename: &str) -> Option<PathBuf> {
+        let path = self.user_templates_dir.join(filename);
+        path.is_file().then_some(path)
     }
 }
 
@@ -227,9 +236,32 @@ pub fn backend_list_templates(paths: &AppPaths) -> Result<Value, String> {
                 if !seen.insert(filename.to_string()) {
                     continue;
                 }
-                if let Some(descriptor) = template_descriptor(&path, filename, "built-in") {
+                if let Some(descriptor) = template_descriptor(&path, filename, "built-in", filename)
+                {
                     templates.push(descriptor);
                 }
+            }
+        }
+    }
+
+    if let Ok(entries) = fs::read_dir(&paths.user_templates_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !matches!(
+                path.extension().and_then(|value| value.to_str()),
+                Some("json")
+            ) {
+                continue;
+            }
+            let Some(filename) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+            let id = format!("user:{filename}");
+            if !seen.insert(id.clone()) {
+                continue;
+            }
+            if let Some(descriptor) = template_descriptor(&path, filename, "user", &id) {
+                templates.push(descriptor);
             }
         }
     }
@@ -238,13 +270,18 @@ pub fn backend_list_templates(paths: &AppPaths) -> Result<Value, String> {
 }
 
 pub fn backend_get_template(paths: &AppPaths, filename: &str) -> Result<String, String> {
-    let normalized = ensure_json_filename(filename);
-    let bundled_path = paths
-        .bundled_template_path(&normalized)
-        .ok_or_else(|| format!("Template not found: {normalized}"))?;
+    let (source, normalized) = parse_template_id(filename);
+    let template_path = match source {
+        TemplateSource::User => paths.user_template_path(&normalized),
+        TemplateSource::BuiltIn => paths.bundled_template_path(&normalized),
+        TemplateSource::Any => paths
+            .bundled_template_path(&normalized)
+            .or_else(|| paths.user_template_path(&normalized)),
+    }
+    .ok_or_else(|| format!("Template not found: {normalized}"))?;
 
-    fs::read_to_string(&bundled_path)
-        .map_err(|error| format!("Failed to read {}: {error}", bundled_path.display()))
+    fs::read_to_string(&template_path)
+        .map_err(|error| format!("Failed to read {}: {error}", template_path.display()))
 }
 
 pub fn backend_open_downloads(paths: &AppPaths) -> Result<Value, String> {
@@ -288,11 +325,35 @@ pub fn backend_image_data(paths: &AppPaths, filename: &str) -> Result<String, St
     ))
 }
 
-fn ensure_json_filename(filename: &str) -> String {
-    if filename.ends_with(".json") {
-        filename.to_string()
+#[derive(Clone, Copy)]
+enum TemplateSource {
+    Any,
+    BuiltIn,
+    User,
+}
+
+fn parse_template_id(template_id: &str) -> (TemplateSource, String) {
+    let (source, filename) = if let Some(filename) = template_id.strip_prefix("user:") {
+        (TemplateSource::User, filename)
+    } else if let Some(filename) = template_id.strip_prefix("built-in:") {
+        (TemplateSource::BuiltIn, filename)
     } else {
-        format!("{filename}.json")
+        (TemplateSource::Any, template_id)
+    };
+
+    (source, ensure_json_filename(filename))
+}
+
+fn ensure_json_filename(filename: &str) -> String {
+    let safe_filename = Path::new(filename)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("template.json");
+
+    if safe_filename.ends_with(".json") {
+        safe_filename.to_string()
+    } else {
+        format!("{safe_filename}.json")
     }
 }
 
@@ -317,7 +378,7 @@ fn read_template_resolution(value: &Value) -> Option<(u64, u64)> {
     Some((width, height))
 }
 
-fn template_descriptor(path: &Path, filename: &str, template_type: &str) -> Option<Value> {
+fn template_descriptor(path: &Path, filename: &str, template_type: &str, id: &str) -> Option<Value> {
     let value = read_template_file(path)?;
     if !is_app_template(&value) {
         return None;
@@ -325,12 +386,19 @@ fn template_descriptor(path: &Path, filename: &str, template_type: &str) -> Opti
     let (width, height) = read_template_resolution(&value).unwrap_or((0, 0));
 
     Some(json!({
-        "id": filename,
+        "id": id,
         "name": filename.trim_end_matches(".json").replace('_', " ").to_uppercase(),
         "type": template_type,
         "width": width,
         "height": height
     }))
+}
+
+fn documents_ovrley_dir() -> PathBuf {
+    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."));
+    home.join("Documents").join("OVRLEY")
 }
 
 fn downloads_ovrley_dir() -> PathBuf {

@@ -21,7 +21,12 @@ fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
     } else {
         app.path().resource_dir().map_err(|e| e.to_string())?
     };
-    let paths = AppPaths::from_resource_root(repo_root, resource_root);
+    let mut paths = AppPaths::from_resource_root(repo_root, resource_root);
+    paths.user_templates_dir = app
+        .path()
+        .document_dir()
+        .map_err(|e| e.to_string())?
+        .join("OVRLEY");
     paths.ensure_dirs()?;
     Ok(paths)
 }

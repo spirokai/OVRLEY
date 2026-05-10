@@ -61,6 +61,7 @@ export function useTemplateStore() {
       createNewTemplate: state.createNewTemplate,
       exportCodec: state.exportCodec,
       exportRange: state.exportRange,
+      fetchTemplates: state.fetchTemplates,
       globalDefaults: state.globalDefaults,
       hydrateTemplateState: state.hydrateTemplateState,
       lastSavedTemplateState: state.lastSavedTemplateState,

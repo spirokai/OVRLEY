@@ -127,6 +127,8 @@ function App() {
                 backgroundMode={editorShell.editorBackgroundMode}
                 gridVisible={editorShell.editorGridVisible}
                 snapToGrid={editorShell.editorSnapToGrid}
+                showTemplateStatus={templateManagement.showTemplateStatus}
+                templateStatus={templateManagement.status}
               />
             </div>
             <OverlayPlayer />

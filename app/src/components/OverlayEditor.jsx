@@ -4,6 +4,7 @@
 
 import { memo, useMemo, useState } from 'react'
 import { LayoutGrid, Type } from 'lucide-react'
+import { Badge } from './ui/badge'
 import OverlayCanvas from './overlay-editor/OverlayCanvas'
 import OverlayMoveable from './overlay-editor/OverlayMoveable'
 import { WIDGET_ICONS } from './overlay-editor/constants'
@@ -60,10 +61,24 @@ function WidgetBadgeLayer({
  * @param {*} props.width - Current scene width.
  * @returns {JSX.Element} Rendered component output.
  */
-function ResolutionBadge({ height, width }) {
+function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
   return (
-    <div className="pointer-events-none absolute left-2 top-2 z-50 rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
-      {width} &times; {height}
+    <div className="pointer-events-none absolute left-4 top-4 z-50 flex items-center gap-2">
+      <div className="rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
+        {width} &times; {height}
+      </div>
+      {showTemplateStatus ? (
+        <Badge
+          variant={status === 'Modified' ? 'secondary' : 'outline'}
+          className={`h-6 rounded-full text-[10px] shadow-lg backdrop-blur-sm ${
+            status === 'Modified'
+              ? 'border-accent-border bg-surface-accent-soft text-primary'
+              : 'bg-card/85'
+          }`}
+        >
+          {status}
+        </Badge>
+      ) : null}
     </div>
   )
 }
@@ -102,6 +117,8 @@ function EmptyOverlayState() {
  * @param {*} props.backgroundMode - Selected canvas background style.
  * @param {*} props.gridVisible - Whether to show the editor grid overlay.
  * @param {*} props.snapToGrid - Whether to snap Moveable to editor grid guides.
+ * @param {*} props.showTemplateStatus - Whether to display the template status badge.
+ * @param {*} props.templateStatus - Current template status label.
  * @returns {JSX.Element} Rendered component output.
  */
 function OverlayEditor({
@@ -113,6 +130,8 @@ function OverlayEditor({
   backgroundMode,
   gridVisible,
   snapToGrid,
+  showTemplateStatus,
+  templateStatus,
 }) {
   const [hoveredWidgetId, setHoveredWidgetId] = useState(null)
   const {
@@ -163,7 +182,12 @@ function OverlayEditor({
       onWheel={handleWheel}
     >
       <div className="relative flex h-full w-full items-center justify-center overflow-hidden p-8">
-        <ResolutionBadge height={sceneSize.height} width={sceneSize.width} />
+        <CanvasStatusBadges
+          height={sceneSize.height}
+          showTemplateStatus={showTemplateStatus}
+          status={templateStatus}
+          width={sceneSize.width}
+        />
         <div
           className="relative shrink-0"
           style={{

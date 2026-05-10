@@ -41,6 +41,9 @@ const getFilenameFromPath = (path) => {
   return segments[segments.length - 1] || 'ovrley_template.json'
 }
 
+const getFilenameFromTemplateId = (templateId) =>
+  String(templateId || '').replace(/^(user:|built-in:)/, '')
+
 /**
  * Provides template management state and actions.
  *
@@ -55,6 +58,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     createNewTemplate,
     exportCodec,
     exportRange,
+    fetchTemplates,
     globalDefaults,
     hydrateTemplateState,
     lastSavedTemplateState,
@@ -158,7 +162,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
 
   const handleSaveTemplate = useCallback(async () => {
     const suggestedFilename = sanitizeTemplateFilename(
-      loadedTemplateFilename || 'my_template',
+      getFilenameFromTemplateId(loadedTemplateFilename) || 'my_template',
     )
 
     try {
@@ -196,10 +200,20 @@ export default function useTemplateManagement({ onTemplateCreated }) {
 
         await backend.writeTemplateFile(selectedPath, templateContents)
 
-        const savedFilename = sanitizeTemplateFilename(
-          getFilenameFromPath(selectedPath),
+        const savedFilename = getFilenameFromPath(selectedPath)
+        const defaultTemplateDir = defaultPath.replace(/[\\/][^\\/]*$/, '')
+        const selectedTemplateDir = String(selectedPath).replace(
+          /[\\/][^\\/]*$/,
+          '',
         )
-        setLoadedTemplate(savedFilename, 'file')
+        const savedInDefaultTemplateDir =
+          defaultTemplateDir.toLowerCase() === selectedTemplateDir.toLowerCase()
+
+        await fetchTemplates()
+        setLoadedTemplate(
+          savedInDefaultTemplateDir ? `user:${savedFilename}` : savedFilename,
+          savedInDefaultTemplateDir ? 'backend' : 'file',
+        )
         setLastSavedTemplateState(currentTemplateState)
         return
       }
@@ -217,6 +231,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     currentTemplateState,
     exportCodec,
     exportRange,
+    fetchTemplates,
     globalDefaults,
     loadedTemplateFilename,
     setErrorMessage,

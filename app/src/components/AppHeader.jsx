@@ -3,7 +3,6 @@
  */
 
 import { useMemo } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -139,7 +138,6 @@ export default function AppHeader({
     loadedTemplateFilename,
     loadedTemplateSource,
     showTemplateStatus,
-    status,
     templates,
   } = templateControls
   const templateGroups = useMemo(
@@ -238,19 +236,6 @@ export default function AppHeader({
                   </Button>
                 </SimpleTooltip>
               </div>
-
-              {showTemplateStatus ? (
-                <Badge
-                  variant={status === 'Modified' ? 'secondary' : 'outline'}
-                  className={`text-[10px] h-5 ${
-                    status === 'Modified'
-                      ? 'border-accent-border bg-surface-accent-soft text-primary'
-                      : ''
-                  }`}
-                >
-                  {status}
-                </Badge>
-              ) : null}
             </div>
           </div>
         </div>
