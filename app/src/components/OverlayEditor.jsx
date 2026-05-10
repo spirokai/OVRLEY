@@ -7,13 +7,17 @@ import { LayoutGrid, Type } from 'lucide-react'
 import { Badge } from './ui/badge'
 import OverlayCanvas from './overlay-editor/OverlayCanvas'
 import OverlayMoveable from './overlay-editor/OverlayMoveable'
+import { buildMetricWidgetPreviewModel } from './overlay-editor/metricWidgetPreviewModel'
 import { WIDGET_ICONS } from './overlay-editor/constants'
 import { getWidgetSceneOrigin } from './overlay-editor/overlayEditorHelpers'
 import useOverlayEditorState from './overlay-editor/useOverlayEditorState'
 
 function WidgetBadgeLayer({
+  activity,
   displayScale,
+  globalScale,
   hoveredWidgetId,
+  previewSecond,
   selectedWidgetIds,
   widgets,
 }) {
@@ -34,7 +38,15 @@ function WidgetBadgeLayer({
     <div className="pointer-events-none absolute inset-0 z-50 overflow-visible">
       {visibleWidgets.map((widget) => {
         const Icon = WIDGET_ICONS[widget.type] || Type
-        const origin = getWidgetSceneOrigin(widget)
+        const metricPreviewModel = buildMetricWidgetPreviewModel({
+          widget,
+          activity,
+          previewSecond,
+        })
+        const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
+        const origin = getWidgetSceneOrigin(widget, null, metricVisualBounds, {
+          boundsScale: widget.category === 'plots' ? 1 : globalScale,
+        })
         const left = origin.x * displayScale
         const top = Math.max(origin.y * displayScale - 24, 0)
 
@@ -251,8 +263,11 @@ function OverlayEditor({
             />
           </div>
           <WidgetBadgeLayer
+            activity={activity}
             displayScale={displayScale}
+            globalScale={globalScale}
             hoveredWidgetId={hoveredWidgetId}
+            previewSecond={previewSecond}
             selectedWidgetIds={selectedWidgetIds}
             widgets={widgets}
           />

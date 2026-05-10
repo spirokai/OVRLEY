@@ -205,6 +205,12 @@ export function getMetricWidgetLayout({
   const textGroupBottom = textGroupTop + textGroupHeight
   const valueTop =
     textGroupBottom - (valueLineHeight + valueVerticalMetrics.glyphHeight) / 2
+  const valueBaseline = getPreviewTextBaseline({
+    top: valueTop,
+    lineHeight: valueLineHeight,
+    ascent: valueVerticalMetrics.ascent,
+    glyphHeight: valueVerticalMetrics.glyphHeight,
+  })
   const unitsTop =
     textGroupBottom - (unitsLineHeight + unitsVerticalMetrics.glyphHeight) / 2
   const unitsLeft =
@@ -212,25 +218,22 @@ export function getMetricWidgetLayout({
   const width = showUnitText
     ? unitsLeft + unitsMeasure.width
     : textGroupLeft + valueMeasure.width
+  const valueGlyphCenterY =
+    valueBaseline +
+    (valueVerticalMetrics.descent - valueVerticalMetrics.ascent) * 0.5
 
   return {
     icon: showIcon
       ? {
           left: 0,
-          top: (rowHeight - iconSize) / 2,
+          top: valueGlyphCenterY - iconSize * 0.5,
           size: iconSize,
         }
       : null,
     value: {
       left: textGroupLeft,
       top: valueTop,
-      baseline: getPreviewTextBaseline({
-        top: valueTop,
-        lineHeight: valueLineHeight,
-        ascent: valueVerticalMetrics.ascent,
-        descent: valueVerticalMetrics.descent,
-        glyphHeight: valueVerticalMetrics.glyphHeight,
-      }),
+      baseline: valueBaseline,
       width: valueMeasure.width,
       lineHeight: valueLineHeight,
       ascent: valueVerticalMetrics.ascent,
