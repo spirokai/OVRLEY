@@ -8,6 +8,7 @@ import {
   applyLiveWidgetStyles,
   buildScaledWidgetDataDraft,
   getWidgetIdFromTarget,
+  getWidgetVisualBoundsFromTarget,
 } from './overlayEditorHelpers'
 import { clamp } from './utils'
 
@@ -297,6 +298,10 @@ export default function useOverlayMoveableHandlers({
         dragStart.set([0, 0])
       }
 
+      const currentBounds = getWidgetVisualBoundsFromTarget(
+        target ?? selectedTarget,
+      )
+
       interactionStartRef.current = {
         id: selectedWidget.id,
         x: selectedWidget.data.x ?? 0,
@@ -311,6 +316,8 @@ export default function useOverlayMoveableHandlers({
         renderedWidth: target?.offsetWidth ?? selectedTarget?.offsetWidth ?? 0,
         renderedHeight:
           target?.offsetHeight ?? selectedTarget?.offsetHeight ?? 0,
+        renderedMaxX: currentBounds?.maxX ?? 0,
+        renderedMaxY: currentBounds?.maxY ?? 0,
         type: 'scale',
       }
       draftWidgetsRef.current[selectedWidget.id] = {}
@@ -350,17 +357,20 @@ export default function useOverlayMoveableHandlers({
         const targetNode = target ?? selectedTarget
         if (!targetNode) return
 
-        const measuredWidth = targetNode.offsetWidth
-        const measuredHeight = targetNode.offsetHeight
+        const measuredBounds = getWidgetVisualBoundsFromTarget(targetNode)
         const measuredDraft = {
           ...draftWidgetsRef.current[origin.id],
           x:
             origin.x +
-            (direction?.[0] === -1 ? origin.renderedWidth - measuredWidth : 0),
+            (direction?.[0] === -1
+              ? origin.renderedMaxX -
+                (measuredBounds?.maxX ?? targetNode.offsetWidth)
+              : 0),
           y:
             origin.y +
             (direction?.[1] === -1
-              ? origin.renderedHeight - measuredHeight
+              ? origin.renderedMaxY -
+                (measuredBounds?.maxY ?? targetNode.offsetHeight)
               : 0),
         }
 
@@ -385,20 +395,23 @@ export default function useOverlayMoveableHandlers({
       const draft = draftWidgetsRef.current[origin.id]
       if (draft) {
         const targetNode = selectedTarget
-        const measuredWidth =
-          targetNode?.offsetWidth ?? origin.renderedWidth ?? 0
-        const measuredHeight =
-          targetNode?.offsetHeight ?? origin.renderedHeight ?? 0
+        const measuredBounds = targetNode
+          ? getWidgetVisualBoundsFromTarget(targetNode)
+          : null
         const finalDirection = Array.isArray(draft.scale_direction)
           ? draft.scale_direction
           : [1, 1]
         const finalX =
           origin.x +
-          (finalDirection[0] === -1 ? origin.renderedWidth - measuredWidth : 0)
+          (finalDirection[0] === -1
+            ? origin.renderedMaxX -
+              (measuredBounds?.maxX ?? origin.renderedWidth ?? 0)
+            : 0)
         const finalY =
           origin.y +
           (finalDirection[1] === -1
-            ? origin.renderedHeight - measuredHeight
+            ? origin.renderedMaxY -
+              (measuredBounds?.maxY ?? origin.renderedHeight ?? 0)
             : 0)
 
         commitWidgetUpdate(origin.id, {

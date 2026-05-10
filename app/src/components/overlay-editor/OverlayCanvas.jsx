@@ -6,6 +6,7 @@ import { memo, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from './constants'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
+import { buildMetricWidgetPreviewModel } from './metricWidgetPreviewModel'
 import WidgetPreview from './WidgetPreview'
 import { buildWidgetTransform } from './utils'
 
@@ -106,20 +107,32 @@ const OverlayCanvasWidget = memo(
     handleWidgetMouseDown,
     setHoveredWidgetId,
   }) {
-    const origin = getWidgetSceneOrigin(widget)
+    const metricPreviewModel = buildMetricWidgetPreviewModel({
+      widget,
+      activity,
+      previewSecond,
+    })
+    const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
     const isPlotWidget = widget.category === 'plots'
+    const origin = getWidgetSceneOrigin(widget, null, metricVisualBounds, {
+      boundsScale: isPlotWidget ? 1 : globalScale,
+    })
     const scale = isPlotWidget ? 1 : globalScale
     const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
     const width = isPlotWidget
       ? (widget.data.width ?? 0) * (globalScale || 1)
-      : widget.data.width
+      : (metricVisualBounds?.width ?? widget.data.width)
     const height = isPlotWidget
       ? (widget.data.height ?? 0) * (globalScale || 1)
-      : widget.data.height
+      : (metricVisualBounds?.height ?? widget.data.height)
     return (
       <div
         ref={registerNode}
         data-widget-id={widget.id}
+        data-widget-bounds-left={metricVisualBounds?.minX ?? 0}
+        data-widget-bounds-top={metricVisualBounds?.minY ?? 0}
+        data-widget-bounds-right={metricVisualBounds?.maxX ?? 0}
+        data-widget-bounds-bottom={metricVisualBounds?.maxY ?? 0}
         className="group absolute cursor-move select-none rounded-xl outline-1 outline-transparent transition-shadow hover:z-50"
         style={{
           left: origin.x,
@@ -147,6 +160,7 @@ const OverlayCanvasWidget = memo(
           previewSecond={previewSecond}
           globalOpacity={globalOpacity}
           globalScale={globalScale}
+          metricPreviewModel={metricPreviewModel}
           sceneFont={sceneFont}
           sceneFontSize={sceneFontSize}
           sceneStyle={sceneStyle}

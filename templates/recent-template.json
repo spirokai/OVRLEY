@@ -55,7 +55,7 @@
         "prefix": "",
         "suffix": "",
         "decimals": 0,
-        "show_icon": true,
+        "show_icon": false,
         "icon_color": "#c780ce",
         "icon_size": 84,
         "icon_offset_x": -28,

@@ -23,6 +23,26 @@ export function getPreviewFontFamily(fontName) {
 }
 
 let metricMeasureContext = null
+const NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT = '0123456789-:.%'
+
+function createEmptyTextMeasure() {
+  return {
+    width: 0,
+    glyphHeight: 0,
+    ascent: 0,
+    descent: 0,
+    boundsLeft: 0,
+    boundsRight: 0,
+  }
+}
+
+function createEmptyVerticalMetrics() {
+  return {
+    glyphHeight: 0,
+    ascent: 0,
+    descent: 0,
+  }
+}
 
 /**
  * Returns metric measure context.
@@ -60,26 +80,12 @@ function clamp(value, min, max) {
  */
 export function measurePreviewText(text, fontSize, fontFamily) {
   if (!text) {
-    return {
-      width: 0,
-      glyphHeight: 0,
-      ascent: 0,
-      descent: 0,
-      boundsLeft: 0,
-      boundsRight: 0,
-    }
+    return createEmptyTextMeasure()
   }
 
   const context = getMetricMeasureContext()
   if (!context) {
-    return {
-      width: 0,
-      glyphHeight: 0,
-      ascent: 0,
-      descent: 0,
-      boundsLeft: 0,
-      boundsRight: 0,
-    }
+    return createEmptyTextMeasure()
   }
 
   context.font = `${fontSize}px ${fontFamily}`
@@ -98,6 +104,34 @@ export function measurePreviewText(text, fontSize, fontFamily) {
   }
 }
 
+function resolvePreviewVerticalMetricsText(text) {
+  if (!text) {
+    return ''
+  }
+
+  return /^[0-9:.%+-]+$/.test(text)
+    ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT
+    : text
+}
+
+function getPreviewVerticalMetrics(text, fontSize, fontFamily) {
+  const metricsText = resolvePreviewVerticalMetricsText(text)
+  if (!metricsText) {
+    return createEmptyVerticalMetrics()
+  }
+
+  const { glyphHeight, ascent, descent } = measurePreviewText(
+    metricsText,
+    fontSize,
+    fontFamily,
+  )
+  return {
+    glyphHeight,
+    ascent,
+    descent,
+  }
+}
+
 /**
  * Returns preview text baseline.
  *
@@ -105,7 +139,6 @@ export function measurePreviewText(text, fontSize, fontFamily) {
  * @param {*} options.top - Value for top.
  * @param {*} options.lineHeight - Numeric line height value.
  * @param {*} options.ascent - Value for ascent.
- * @param {*} options._descent - Value for descent.
  * @param {*} options.glyphHeight - Numeric glyph height value.
  * @returns {*} Requested value or structure.
  */
@@ -113,7 +146,6 @@ export function getPreviewTextBaseline({
   top = 0,
   lineHeight,
   ascent,
-  descent: _descent,
   glyphHeight,
 }) {
   if (!glyphHeight) {
@@ -150,17 +182,18 @@ export function getMetricWidgetLayout({
   const unitsLineHeight = unitsFontSize * METRIC_WIDGET_LINE_HEIGHT
   const iconMarginRight = Math.max(fontSize * 0.08, 8)
   const valueMeasure = measurePreviewText(valueText, fontSize, fontFamily)
+  const valueVerticalMetrics = getPreviewVerticalMetrics(
+    valueText,
+    fontSize,
+    fontFamily,
+  )
   const showUnitText = Boolean(showUnits && unitText)
   const unitsMeasure = showUnitText
     ? measurePreviewText(unitText, unitsFontSize, fontFamily)
-    : {
-        width: 0,
-        glyphHeight: 0,
-        ascent: 0,
-        descent: 0,
-        boundsLeft: 0,
-        boundsRight: 0,
-      }
+    : createEmptyTextMeasure()
+  const unitsVerticalMetrics = showUnitText
+    ? getPreviewVerticalMetrics(unitText, unitsFontSize, fontFamily)
+    : createEmptyVerticalMetrics()
   const textGroupHeight = showUnitText
     ? Math.max(valueLineHeight, unitsLineHeight)
     : valueLineHeight
@@ -171,9 +204,9 @@ export function getMetricWidgetLayout({
   const textGroupTop = (rowHeight - textGroupHeight) / 2
   const textGroupBottom = textGroupTop + textGroupHeight
   const valueTop =
-    textGroupBottom - (valueLineHeight + valueMeasure.glyphHeight) / 2
+    textGroupBottom - (valueLineHeight + valueVerticalMetrics.glyphHeight) / 2
   const unitsTop =
-    textGroupBottom - (unitsLineHeight + unitsMeasure.glyphHeight) / 2
+    textGroupBottom - (unitsLineHeight + unitsVerticalMetrics.glyphHeight) / 2
   const unitsLeft =
     textGroupLeft + valueMeasure.width + METRIC_WIDGET_UNITS_GAP_PX
   const width = showUnitText
@@ -194,12 +227,16 @@ export function getMetricWidgetLayout({
       baseline: getPreviewTextBaseline({
         top: valueTop,
         lineHeight: valueLineHeight,
-        ascent: valueMeasure.ascent,
-        descent: valueMeasure.descent,
-        glyphHeight: valueMeasure.glyphHeight,
+        ascent: valueVerticalMetrics.ascent,
+        descent: valueVerticalMetrics.descent,
+        glyphHeight: valueVerticalMetrics.glyphHeight,
       }),
       width: valueMeasure.width,
       lineHeight: valueLineHeight,
+      ascent: valueVerticalMetrics.ascent,
+      descent: valueVerticalMetrics.descent,
+      boundsLeft: valueMeasure.boundsLeft,
+      boundsRight: valueMeasure.boundsRight,
     },
     units: showUnitText
       ? {
@@ -208,18 +245,118 @@ export function getMetricWidgetLayout({
           baseline: getPreviewTextBaseline({
             top: unitsTop,
             lineHeight: unitsLineHeight,
-            ascent: unitsMeasure.ascent,
-            descent: unitsMeasure.descent,
-            glyphHeight: unitsMeasure.glyphHeight,
+            ascent: unitsVerticalMetrics.ascent,
+            descent: unitsVerticalMetrics.descent,
+            glyphHeight: unitsVerticalMetrics.glyphHeight,
           }),
           width: unitsMeasure.width,
           fontSize: unitsFontSize,
           lineHeight: unitsLineHeight,
+          ascent: unitsVerticalMetrics.ascent,
+          descent: unitsVerticalMetrics.descent,
+          boundsLeft: unitsMeasure.boundsLeft,
+          boundsRight: unitsMeasure.boundsRight,
         }
       : null,
     width,
     height: rowHeight,
     unitsFontSize,
+  }
+}
+
+function expandMetricBounds(currentBounds, left, top, right, bottom) {
+  return {
+    minX: Math.min(currentBounds.minX, left),
+    minY: Math.min(currentBounds.minY, top),
+    maxX: Math.max(currentBounds.maxX, right),
+    maxY: Math.max(currentBounds.maxY, bottom),
+  }
+}
+
+function getPreviewTextVisualBounds(segment) {
+  if (!segment) {
+    return null
+  }
+
+  const left = segment.left - (segment.boundsLeft ?? 0)
+  const top = segment.baseline - (segment.ascent ?? 0)
+  const right = segment.left + (segment.boundsRight ?? segment.width ?? 0)
+  const bottom = segment.baseline + (segment.descent ?? 0)
+
+  return { left, top, right, bottom }
+}
+
+/**
+ * Returns the actual painted metric widget bounds.
+ *
+ * @param {object} layout - Base metric widget layout.
+ * @param {object} options - Bounds options.
+ * @param {*} options.iconOffsetX - Horizontal icon offset.
+ * @param {*} options.iconOffsetY - Vertical icon offset.
+ * @returns {object} Tight visual bounds and inner-content offsets.
+ */
+export function getMetricWidgetVisualBounds(
+  layout,
+  { iconOffsetX = 0, iconOffsetY = 0 } = {},
+) {
+  if (!layout) {
+    return {
+      minX: 0,
+      minY: 0,
+      maxX: 0,
+      maxY: 0,
+      width: 0,
+      height: 0,
+      offsetX: 0,
+      offsetY: 0,
+    }
+  }
+
+  let bounds = {
+    minX: Number.POSITIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+  }
+
+  if (layout.icon) {
+    const iconLeft = layout.icon.left + iconOffsetX
+    const iconTop = layout.icon.top + iconOffsetY
+    bounds = expandMetricBounds(
+      bounds,
+      iconLeft,
+      iconTop,
+      iconLeft + layout.icon.size,
+      iconTop + layout.icon.size,
+    )
+  }
+
+  ;[layout.value, layout.units]
+    .map(getPreviewTextVisualBounds)
+    .filter(Boolean)
+    .forEach((segmentBounds) => {
+      bounds = expandMetricBounds(
+        bounds,
+        segmentBounds.left,
+        segmentBounds.top,
+        segmentBounds.right,
+        segmentBounds.bottom,
+      )
+    })
+
+  if (!Number.isFinite(bounds.minX)) {
+    bounds = expandMetricBounds(bounds, 0, 0, layout.width, layout.height)
+  }
+
+  const width = Math.max(bounds.maxX - bounds.minX, 0)
+  const height = Math.max(bounds.maxY - bounds.minY, 0)
+
+  return {
+    ...bounds,
+    width,
+    height,
+    offsetX: -bounds.minX,
+    offsetY: -bounds.minY,
   }
 }
 

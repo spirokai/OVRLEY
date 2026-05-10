@@ -26,6 +26,7 @@ function WidgetPreview({
   previewSecond,
   globalOpacity,
   globalScale,
+  metricPreviewModel,
   sceneFont,
   sceneFontSize,
   sceneStyle,
@@ -80,6 +81,7 @@ function WidgetPreview({
       previewSecond={previewSecond}
       globalOpacity={globalOpacity}
       globalScale={globalScale}
+      metricPreviewModel={metricPreviewModel}
       sceneStyle={sceneStyle}
     />
   )
@@ -93,6 +95,7 @@ export default memo(
     previousProps.previewSecond === nextProps.previewSecond &&
     previousProps.globalOpacity === nextProps.globalOpacity &&
     previousProps.globalScale === nextProps.globalScale &&
+    previousProps.metricPreviewModel === nextProps.metricPreviewModel &&
     previousProps.sceneFont === nextProps.sceneFont &&
     previousProps.sceneFontSize === nextProps.sceneFontSize &&
     previousProps.sceneStyle === nextProps.sceneStyle &&

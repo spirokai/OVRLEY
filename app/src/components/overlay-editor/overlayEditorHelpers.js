@@ -133,22 +133,59 @@ export function getWidgetIdFromTarget(target) {
   return target.dataset.widgetId || null
 }
 
+function parseWidgetBoundsValue(value) {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : null
+}
+
+export function getWidgetVisualBoundsFromTarget(target) {
+  if (!(target instanceof HTMLElement)) {
+    return null
+  }
+
+  const minX = parseWidgetBoundsValue(target.dataset.widgetBoundsLeft)
+  const minY = parseWidgetBoundsValue(target.dataset.widgetBoundsTop)
+  const maxX = parseWidgetBoundsValue(target.dataset.widgetBoundsRight)
+  const maxY = parseWidgetBoundsValue(target.dataset.widgetBoundsBottom)
+
+  if (minX === null || minY === null || maxX === null || maxY === null) {
+    return null
+  }
+
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: Math.max(maxX - minX, 0),
+    height: Math.max(maxY - minY, 0),
+  }
+}
+
 /**
  * Returns widget scene origin used by editor DOM positioning.
  *
  * @param {*} widget - Widget definition being rendered or edited.
  * @param {*} draft - Optional live widget draft.
+ * @param {*} visualBounds - Optional tight widget bounds relative to config x/y.
  * @returns {{x: number, y: number}} Widget visual origin.
  */
-export function getWidgetSceneOrigin(widget, draft = null) {
+export function getWidgetSceneOrigin(
+  widget,
+  draft = null,
+  visualBounds = null,
+  { boundsScale = 1 } = {},
+) {
   const data = draft ? { ...widget.data, ...draft } : widget.data
   const x = data.x ?? 0
   const gradientYOffset =
     widget.type === 'gradient' ? Math.min(0, -(data.value_offset ?? 0)) : 0
+  const boundsOffsetX = (visualBounds?.minX ?? 0) * boundsScale
+  const boundsOffsetY = (visualBounds?.minY ?? 0) * boundsScale
 
   return {
-    x,
-    y: (data.y ?? 0) + gradientYOffset,
+    x: x + boundsOffsetX,
+    y: (data.y ?? 0) + gradientYOffset + boundsOffsetY,
   }
 }
 
@@ -166,7 +203,10 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
     return
   }
 
-  const origin = getWidgetSceneOrigin(widget, draft)
+  const visualBounds = getWidgetVisualBoundsFromTarget(target)
+  const origin = getWidgetSceneOrigin(widget, draft, visualBounds, {
+    boundsScale: widget.category === 'plots' ? 1 : globalScale,
+  })
   const nextWidth = draft.width ?? widget.data.width
   const nextHeight = draft.height ?? widget.data.height
   const nextRotation =
@@ -213,14 +253,14 @@ export function applyLiveScalePositionStyles(
     return
   }
 
-  const baseOrigin = getWidgetSceneOrigin(widget)
-  const draftOrigin = getWidgetSceneOrigin(widget, draft)
-  const nextTranslateX = draftOrigin.x - baseOrigin.x
-  const nextTranslateY = draftOrigin.y - baseOrigin.y
+  const visualBounds = getWidgetVisualBoundsFromTarget(target)
+  const draftOrigin = getWidgetSceneOrigin(widget, draft, visualBounds, {
+    boundsScale: widget.category === 'plots' ? 1 : globalScale,
+  })
   const nextRotation =
     draft.rotation ??
     (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
-  const transforms = [`translate(${nextTranslateX}px, ${nextTranslateY}px)`]
+  const transforms = []
 
   if (nextRotation) {
     transforms.push(`rotate(${nextRotation}deg)`)
@@ -230,8 +270,8 @@ export function applyLiveScalePositionStyles(
     transforms.push(`scale(${globalScale})`)
   }
 
-  target.style.left = `${baseOrigin.x}px`
-  target.style.top = `${baseOrigin.y}px`
+  target.style.left = `${draftOrigin.x}px`
+  target.style.top = `${draftOrigin.y}px`
   target.style.transform = transforms.join(' ')
 }
 

@@ -11,6 +11,7 @@ import {
   resolveExportRangeWindow,
 } from '@/lib/export-range'
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from './constants'
+import { buildMetricWidgetPreviewModel } from './metricWidgetPreviewModel'
 import { METRIC_ICON_SVGS } from './metricWidgetAssets'
 import {
   areaToSvg,
@@ -26,10 +27,6 @@ import {
   formatGradientValue,
   getGradientWidgetLayout,
   GRADIENT_ZERO_LINE_WIDTH_PX,
-  formatSpeed,
-  formatTemperature,
-  formatTimeValue,
-  getMetricWidgetLayout,
   getPreviewFontFamily,
   getPreviewTextBaseline,
   getTextShadowParts,
@@ -41,7 +38,6 @@ import {
   getDistanceProgressAtElapsed,
   getInterpolatedActivityValue,
   getInterpolatedSeriesValue,
-  getInterpolatedTimeValue,
   getSeriesValueAtProgress,
 } from './utils'
 
@@ -646,6 +642,7 @@ export function OverlayMetricWidget({
   previewSecond,
   globalOpacity,
   globalScale,
+  metricPreviewModel,
   sceneStyle,
 }) {
   const fontSize = widget.data.font_size ?? 60
@@ -657,61 +654,10 @@ export function OverlayMetricWidget({
   const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)
   const shadow = getTextShadowParts(sceneStyle)
 
-  let valueText = '--'
-  let unitText = ''
+  let valueText = metricPreviewModel?.valueText ?? '--'
+  let unitText = metricPreviewModel?.unitText ?? ''
 
-  if (widget.type === 'speed') {
-    const speedUnit =
-      widget.data.speed_unit ||
-      (widget.data.unit === 'imperial' ? 'mph' : 'kmh')
-    const formatted = formatSpeed(
-      getInterpolatedActivityValue(activity, 'speed', previewSecond),
-      speedUnit,
-    )
-    valueText = formatted.value
-    unitText = formatted.units
-  } else if (widget.type === 'heartrate') {
-    const value = getInterpolatedActivityValue(
-      activity,
-      'heartrate',
-      previewSecond,
-    )
-    valueText =
-      value === null || value === undefined
-        ? '--'
-        : Math.round(value).toString()
-    unitText = 'BPM'
-  } else if (widget.type === 'cadence') {
-    const value = getInterpolatedActivityValue(
-      activity,
-      'cadence',
-      previewSecond,
-    )
-    valueText =
-      value === null || value === undefined
-        ? '--'
-        : Math.round(value).toString()
-    unitText = 'RPM'
-  } else if (widget.type === 'power') {
-    const value = getInterpolatedActivityValue(activity, 'power', previewSecond)
-    valueText =
-      value === null || value === undefined
-        ? '--'
-        : Math.round(value).toString()
-    unitText = 'W'
-  } else if (widget.type === 'time') {
-    valueText = formatTimeValue(
-      widget.data.format || 'time-24',
-      getInterpolatedTimeValue(activity, previewSecond),
-    )
-  } else if (widget.type === 'temperature') {
-    const formatted = formatTemperature(
-      getInterpolatedActivityValue(activity, 'temperature', previewSecond),
-      widget.data.temperature_unit || 'celsius',
-    )
-    valueText = formatted.value
-    unitText = formatted.units
-  } else if (widget.type === 'gradient') {
+  if (widget.type === 'gradient') {
     valueText = `${formatGradientValue(
       widget,
       getInterpolatedActivityValue(activity, 'gradient', previewSecond),
@@ -721,22 +667,17 @@ export function OverlayMetricWidget({
   const currentGradientValue = Number(
     getInterpolatedActivityValue(activity, 'gradient', previewSecond) ?? 0,
   )
-  const iconSize = widget.data.icon_size ?? 28
-  const showUnits =
-    widget.data.show_units ?? ['speed', 'temperature'].includes(widget.type)
-  const showIcon = widget.data.show_icon ?? widget.type !== 'gradient'
   const metricLayout =
     widget.type === 'gradient'
       ? null
-      : getMetricWidgetLayout({
-          fontSize,
-          fontFamily,
-          valueText,
-          unitText,
-          showIcon: Boolean(showIcon && METRIC_ICON_SVGS[widget.type]),
-          showUnits,
-          iconSize,
-        })
+      : ((
+          metricPreviewModel ??
+          buildMetricWidgetPreviewModel({
+            widget,
+            activity,
+            previewSecond,
+          })
+        )?.metricLayout ?? null)
   const gradientLayout =
     widget.type === 'gradient'
       ? getGradientWidgetLayout({
@@ -753,33 +694,49 @@ export function OverlayMetricWidget({
       : null
 
   if (widget.type !== 'gradient' && metricLayout) {
+    const previewModel =
+      metricPreviewModel ??
+      buildMetricWidgetPreviewModel({
+        widget,
+        activity,
+        previewSecond,
+      })
     const iconSvg = METRIC_ICON_SVGS[widget.type]
     const valueShadowFilterId = sanitizeSvgId(`${widget.id}-value-shadow`)
     const unitsShadowFilterId = sanitizeSvgId(`${widget.id}-units-shadow`)
     const iconShadowFilterId = sanitizeSvgId(`${widget.id}-icon-shadow`)
+    const visualBounds = previewModel?.visualBounds
     const iconLeft = metricLayout.icon
-      ? metricLayout.icon.left + (widget.data.icon_offset_x ?? 0)
+      ? metricLayout.icon.left +
+        (widget.data.icon_offset_x ?? 0) +
+        (visualBounds?.offsetX ?? 0)
       : 0
     const iconTop = metricLayout.icon
-      ? metricLayout.icon.top + (widget.data.icon_offset_y ?? 0)
+      ? metricLayout.icon.top +
+        (widget.data.icon_offset_y ?? 0) +
+        (visualBounds?.offsetY ?? 0)
       : 0
+    const renderWidth = visualBounds?.width ?? metricLayout.width
+    const renderHeight = visualBounds?.height ?? metricLayout.height
+    const contentOffsetX = visualBounds?.offsetX ?? 0
+    const contentOffsetY = visualBounds?.offsetY ?? 0
 
     return (
       <div
         className="relative"
         style={{
-          width: metricLayout.width,
-          height: metricLayout.height,
+          width: renderWidth,
+          height: renderHeight,
         }}
       >
         <div
           className="absolute"
-          style={{ width: metricLayout.width, height: metricLayout.height }}
+          style={{ width: renderWidth, height: renderHeight }}
         >
           <svg
-            width={metricLayout.width}
-            height={metricLayout.height}
-            viewBox={`0 0 ${metricLayout.width} ${metricLayout.height}`}
+            width={renderWidth}
+            height={renderHeight}
+            viewBox={`0 0 ${renderWidth} ${renderHeight}`}
             className="absolute left-0 top-0 block overflow-visible"
           >
             {metricLayout.icon && iconSvg ? (
@@ -796,8 +753,8 @@ export function OverlayMetricWidget({
             ) : null}
             <PreviewSvgText
               text={valueText}
-              x={metricLayout.value.left}
-              baseline={metricLayout.value.baseline}
+              x={metricLayout.value.left + contentOffsetX}
+              baseline={metricLayout.value.baseline + contentOffsetY}
               color={color}
               fontFamily={fontFamily}
               fontSize={fontSize}
@@ -810,8 +767,8 @@ export function OverlayMetricWidget({
             {metricLayout.units ? (
               <PreviewSvgText
                 text={unitText}
-                x={metricLayout.units.left}
-                baseline={metricLayout.units.baseline}
+                x={metricLayout.units.left + contentOffsetX}
+                baseline={metricLayout.units.baseline + contentOffsetY}
                 color={color}
                 fontFamily={fontFamily}
                 fontSize={metricLayout.units.fontSize}
