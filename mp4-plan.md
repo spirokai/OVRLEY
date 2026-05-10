@@ -222,7 +222,7 @@ Restructure the codec selector into two `<SelectGroup>` sections:
 - HEVC VideoToolbox — `hevc_videotoolbox` (macOS only)
 - If no video imported: entire group disabled, tooltip "Video required"
 
-Each unavailable codec shown greyed out with "Not available on this system".
+Each unavailable codec (if potentially available on the platform; e.g. on Windows there's no point showing VAAPI or VideoToolbox options and vice versa;) is shown greyed out with "Not available on this system".
 
 #### Bitrate Slider
 
