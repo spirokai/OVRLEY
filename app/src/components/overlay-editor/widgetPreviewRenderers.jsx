@@ -32,11 +32,10 @@ import {
   getMetricWidgetLayout,
   getPreviewFontFamily,
   getPreviewTextBaseline,
-  getTextShadow,
   getTextShadowParts,
   getWidgetOpacity,
-  METRIC_WIDGET_LINE_HEIGHT,
   measurePreviewText,
+  METRIC_WIDGET_LINE_HEIGHT,
 } from './metricTextUtils'
 import {
   getDistanceProgressAtElapsed,
@@ -299,6 +298,87 @@ function sanitizeSvgId(value) {
   return String(value || 'preview-shadow').replace(/[^a-zA-Z0-9_-]/g, '_')
 }
 
+function normalizeSvgShadowColor(color, opacity = 1) {
+  const rawColor = String(color || '').trim()
+  const hex = rawColor.startsWith('#') ? rawColor.slice(1) : rawColor
+  const safeOpacity = Math.min(Math.max(Number(opacity) || 0, 0), 1)
+
+  if (/^[0-9a-fA-F]{8}$/.test(hex)) {
+    const alpha = parseInt(hex.slice(6, 8), 16) / 255
+    return {
+      color: `#${hex.slice(0, 6)}`,
+      opacity: alpha * safeOpacity,
+    }
+  }
+
+  return {
+    color: rawColor || '#000000',
+    opacity: safeOpacity,
+  }
+}
+
+// Mirrors Skia's drop_shadow_only: the filter emits only the shadow, and the
+// source glyph/icon is drawn separately afterward.
+function PreviewSvgShadowOnlyFilter({ id, shadow, opacity = 1 }) {
+  if (!id || !shadow) {
+    return null
+  }
+
+  const shadowColor = normalizeSvgShadowColor(shadow.color, opacity)
+
+  return (
+    <defs>
+      <filter
+        id={id}
+        x="-50%"
+        y="-50%"
+        width="200%"
+        height="200%"
+        colorInterpolationFilters="sRGB"
+      >
+        <feGaussianBlur
+          in="SourceAlpha"
+          stdDeviation={Math.max(shadow.strength, 0)}
+          result="shadow-blur"
+        />
+        <feOffset
+          in="shadow-blur"
+          dx={shadow.distance}
+          dy={shadow.distance}
+          result="shadow-offset"
+        />
+        <feFlood
+          floodColor={shadowColor.color}
+          floodOpacity={shadowColor.opacity}
+          result="shadow-color"
+        />
+        <feComposite in="shadow-color" in2="shadow-offset" operator="in" />
+      </filter>
+    </defs>
+  )
+}
+
+function PreviewSvgShadowBlurFilter({ id, shadow }) {
+  if (!id || !shadow || shadow.strength <= 0) {
+    return null
+  }
+
+  return (
+    <defs>
+      <filter
+        id={id}
+        x="-50%"
+        y="-50%"
+        width="200%"
+        height="200%"
+        colorInterpolationFilters="sRGB"
+      >
+        <feGaussianBlur stdDeviation={shadow.strength} />
+      </filter>
+    </defs>
+  )
+}
+
 /**
  * Returns a version token that changes after the requested font becomes ready.
  *
@@ -380,24 +460,24 @@ function PreviewSvgText({
 
   return (
     <>
+      <PreviewSvgShadowOnlyFilter
+        id={shadowFilterId}
+        shadow={shadow}
+        opacity={opacity}
+      />
       {hasShadow ? (
-        <defs>
-          <filter
-            id={shadowFilterId}
-            x="-50%"
-            y="-50%"
-            width="200%"
-            height="200%"
-            colorInterpolationFilters="sRGB"
-          >
-            <feDropShadow
-              dx={shadow.distance}
-              dy={shadow.distance}
-              stdDeviation={shadow.strength}
-              floodColor={shadow.color}
-            />
-          </filter>
-        </defs>
+        <text
+          x={x}
+          y={baseline}
+          fill={color}
+          fillOpacity={opacity}
+          fontFamily={fontFamily}
+          fontSize={fontSize}
+          stroke="none"
+          filter={`url(#${shadowFilterId})`}
+        >
+          {text}
+        </text>
       ) : null}
       <text
         x={x}
@@ -409,7 +489,6 @@ function PreviewSvgText({
         paintOrder="stroke fill"
         stroke={borderColor || 'none'}
         strokeWidth={borderThickness || 0}
-        filter={hasShadow ? `url(#${shadowFilterId})` : undefined}
       >
         {text}
       </text>
@@ -427,23 +506,96 @@ function PreviewSvgText({
  * @param {*} props.size - Numeric icon size value.
  * @param {*} props.color - Stroke color.
  * @param {*} props.opacity - Opacity value.
+ * @param {*} props.shadow - Structured shadow data.
+ * @param {*} props.shadowFilterId - Optional shadow filter id.
  * @returns {JSX.Element|null} Rendered component output.
  */
-function PreviewMetricIcon({ icon, left, top, size, color, opacity }) {
+function PreviewMetricIcon({
+  icon,
+  left,
+  top,
+  size,
+  color,
+  opacity,
+  shadow,
+  shadowFilterId,
+}) {
   if (!icon?.innerMarkup || size <= 0) {
     return null
   }
 
+  const iconScale = size / 24
+  const normalizedShadow =
+    shadow && iconScale > 0
+      ? {
+          ...shadow,
+          distance: shadow.distance / iconScale,
+          strength: shadow.strength / iconScale,
+        }
+      : null
+
   return (
-    <g
-      transform={`translate(${left} ${top}) scale(${size / 24})`}
+    <>
+      <PreviewSvgShadowOnlyFilter
+        id={shadowFilterId}
+        shadow={normalizedShadow}
+        opacity={opacity}
+      />
+      {shadowFilterId && normalizedShadow ? (
+        <g
+          transform={`translate(${left} ${top}) scale(${iconScale})`}
+          fill="none"
+          stroke={color}
+          strokeWidth={icon.strokeWidth || 2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeOpacity={opacity}
+          filter={`url(#${shadowFilterId})`}
+          dangerouslySetInnerHTML={{ __html: icon.innerMarkup }}
+        />
+      ) : null}
+      <g
+        transform={`translate(${left} ${top}) scale(${iconScale})`}
+        fill="none"
+        stroke={color}
+        strokeWidth={icon.strokeWidth || 2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={opacity}
+        dangerouslySetInnerHTML={{ __html: icon.innerMarkup }}
+      />
+    </>
+  )
+}
+
+function PreviewPolylineShadow({
+  points,
+  shadow,
+  blurFilterId,
+  strokeWidth,
+  strokeOpacity,
+}) {
+  if (!shadow || !points) {
+    return null
+  }
+
+  const shadowColor = normalizeSvgShadowColor(shadow.color, strokeOpacity)
+
+  return (
+    <polyline
       fill="none"
-      stroke={color}
-      strokeWidth={icon.strokeWidth || 2}
-      strokeLinecap="round"
+      stroke={shadowColor.color}
+      strokeOpacity={shadowColor.opacity}
+      strokeWidth={strokeWidth}
       strokeLinejoin="round"
-      opacity={opacity}
-      dangerouslySetInnerHTML={{ __html: icon.innerMarkup }}
+      strokeLinecap="round"
+      points={points}
+      transform={`translate(${shadow.distance} ${shadow.distance})`}
+      filter={
+        shadow.strength > 0 && blurFilterId
+          ? `url(#${blurFilterId})`
+          : undefined
+      }
     />
   )
 }
@@ -470,10 +622,9 @@ export function OverlayMetricWidget({
   const fontFamily = getPreviewFontFamily(
     widget.data.font || widget.data.font_family,
   )
-  const fontMetricsVersion = useFontMetricsVersion(fontFamily, fontSize)
+  useFontMetricsVersion(fontFamily, fontSize)
   const color = widget.data.color || '#ffffff'
   const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)
-  const textShadow = getTextShadow(sceneStyle)
   const shadow = getTextShadowParts(sceneStyle)
 
   let valueText = '--'
@@ -544,63 +695,38 @@ export function OverlayMetricWidget({
   const showUnits =
     widget.data.show_units ?? ['speed', 'temperature'].includes(widget.type)
   const showIcon = widget.data.show_icon ?? widget.type !== 'gradient'
-  const metricLayout = useMemo(
-    () =>
-      widget.type === 'gradient'
-        ? null
-        : getMetricWidgetLayout({
-            fontSize,
-            fontFamily,
-            valueText,
-            unitText,
-            showIcon: Boolean(showIcon && METRIC_ICON_SVGS[widget.type]),
-            showUnits,
-            iconSize,
-          }),
-    [
-      fontFamily,
-      fontMetricsVersion,
-      fontSize,
-      iconSize,
-      showIcon,
-      showUnits,
-      unitText,
-      valueText,
-      widget.type,
-    ],
-  )
-  const gradientLayout = useMemo(
-    () =>
-      widget.type === 'gradient'
-        ? getGradientWidgetLayout({
-            fontSize,
-            fontFamily,
-            valueText,
-            valueOffset: widget.data.value_offset ?? 0,
-            gradientValue: currentGradientValue,
-            triangleWidth:
-              widget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
-            showTriangle: widget.data.show_triangle !== false,
-            scale: globalScale || 1,
-          })
-        : null,
-    [
-      currentGradientValue,
-      fontFamily,
-      fontSize,
-      globalScale,
-      valueText,
-      widget.data.show_triangle,
-      widget.data.triangle_width,
-      widget.data.value_offset,
-      widget.type,
-    ],
-  )
+  const metricLayout =
+    widget.type === 'gradient'
+      ? null
+      : getMetricWidgetLayout({
+          fontSize,
+          fontFamily,
+          valueText,
+          unitText,
+          showIcon: Boolean(showIcon && METRIC_ICON_SVGS[widget.type]),
+          showUnits,
+          iconSize,
+        })
+  const gradientLayout =
+    widget.type === 'gradient'
+      ? getGradientWidgetLayout({
+          fontSize,
+          fontFamily,
+          valueText,
+          valueOffset: widget.data.value_offset ?? 0,
+          gradientValue: currentGradientValue,
+          triangleWidth:
+            widget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
+          showTriangle: widget.data.show_triangle !== false,
+          scale: globalScale || 1,
+        })
+      : null
 
   if (widget.type !== 'gradient' && metricLayout) {
     const iconSvg = METRIC_ICON_SVGS[widget.type]
     const valueShadowFilterId = sanitizeSvgId(`${widget.id}-value-shadow`)
     const unitsShadowFilterId = sanitizeSvgId(`${widget.id}-units-shadow`)
+    const iconShadowFilterId = sanitizeSvgId(`${widget.id}-icon-shadow`)
     const iconLeft = metricLayout.icon
       ? metricLayout.icon.left + (widget.data.icon_offset_x ?? 0)
       : 0
@@ -634,6 +760,8 @@ export function OverlayMetricWidget({
                 size={metricLayout.icon.size}
                 color={widget.data.icon_color || '#40e0d0'}
                 opacity={widgetOpacity}
+                shadow={shadow}
+                shadowFilterId={shadow ? iconShadowFilterId : undefined}
               />
             ) : null}
             <PreviewSvgText
@@ -729,35 +857,7 @@ export function OverlayMetricWidget({
     )
   }
 
-  return (
-    <div
-      className="inline-flex items-center gap-2 whitespace-nowrap"
-      style={{
-        color,
-        fontFamily,
-        fontSize,
-        lineHeight: METRIC_WIDGET_LINE_HEIGHT,
-        opacity: widgetOpacity,
-        textShadow,
-        transform: `translateY(${widget.data.value_offset ?? 0}px)`,
-      }}
-    >
-      <div className="inline-flex items-end gap-2">
-        <span>{valueText}</span>
-        {showUnits && unitText ? (
-          <span
-            style={{
-              fontSize: Math.max(fontSize * 0.28, 12),
-              lineHeight: METRIC_WIDGET_LINE_HEIGHT,
-              opacity: 'inherit',
-            }}
-          >
-            {unitText}
-          </span>
-        ) : null}
-      </div>
-    </div>
-  )
+  return null
 }
 
 /**
@@ -773,16 +873,13 @@ export function OverlayTextWidget({ widget, globalOpacity, sceneStyle }) {
   const fontFamily = getPreviewFontFamily(
     widget.data.font || widget.data.font_family,
   )
-  const fontMetricsVersion = useFontMetricsVersion(fontFamily, fontSize)
+  useFontMetricsVersion(fontFamily, fontSize)
   const color = widget.data.color || '#ffffff'
   const opacity = getWidgetOpacity(widget.data, globalOpacity)
   const shadow = getTextShadowParts(sceneStyle)
   const text = widget.data.text || 'TEXT'
   const lineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
-  const measurement = useMemo(
-    () => measurePreviewText(text, fontSize, fontFamily),
-    [fontFamily, fontMetricsVersion, fontSize, text],
-  )
+  const measurement = measurePreviewText(text, fontSize, fontFamily)
   const baseline = getPreviewTextBaseline({
     top: 0,
     lineHeight,
@@ -953,8 +1050,7 @@ export function OverlayRouteWidget({
     [markerColor, markerOpacity, svgMarkerSize, widget.data],
   )
   const shadow = getTextShadowParts(sceneStyle)
-  const shadowFilterId = sanitizeSvgId(`${widget.id}-route-shadow`)
-  const hasShadow = Boolean(shadow)
+  const shadowFilterId = sanitizeSvgId(`${widget.id}-route-shadow-blur`)
 
   return (
     <svg
@@ -964,26 +1060,15 @@ export function OverlayRouteWidget({
       className="block h-full w-full"
       style={{ opacity: getWidgetOpacity(widget.data, globalOpacity) }}
     >
-      {hasShadow ? (
-        <defs>
-          <filter
-            id={shadowFilterId}
-            x="-50%"
-            y="-50%"
-            width="200%"
-            height="200%"
-            colorInterpolationFilters="sRGB"
-          >
-            <feDropShadow
-              dx={shadow.distance}
-              dy={shadow.distance}
-              stdDeviation={shadow.strength}
-              floodColor={shadow.color}
-            />
-          </filter>
-        </defs>
-      ) : null}
+      <PreviewSvgShadowBlurFilter id={shadowFilterId} shadow={shadow} />
       <g>
+        <PreviewPolylineShadow
+          points={remainingSvgPoints}
+          shadow={shadow}
+          blurFilterId={shadowFilterId}
+          strokeWidth={remainingLineWidth}
+          strokeOpacity={remainingLineOpacity}
+        />
         <polyline
           fill="none"
           stroke={remainingLineColor}
@@ -992,7 +1077,6 @@ export function OverlayRouteWidget({
           strokeLinejoin="round"
           strokeLinecap="round"
           points={remainingSvgPoints}
-          filter={hasShadow ? `url(#${shadowFilterId})` : undefined}
         />
         <polyline
           fill="none"
@@ -1089,10 +1173,7 @@ export function OverlayElevationWidget({
       widget.data.font ||
       widget.data.font_family,
   )
-  const labelFontMetricsVersion = useFontMetricsVersion(
-    labelFontFamily,
-    labelFontSize,
-  )
+  useFontMetricsVersion(labelFontFamily, labelFontSize)
   const exportRange = useStore((state) => state.exportRange)
   const exportWindow = useMemo(
     () =>
@@ -1211,9 +1292,10 @@ export function OverlayElevationWidget({
       ),
     [markerColor, markerOpacity, svgMarkerSize, widget.data],
   )
-  const labelMeasurement = useMemo(
-    () => measurePreviewText(metricLabel, labelFontSize, labelFontFamily),
-    [labelFontFamily, labelFontMetricsVersion, labelFontSize, metricLabel],
+  const labelMeasurement = measurePreviewText(
+    metricLabel,
+    labelFontSize,
+    labelFontFamily,
   )
   const getElevationLabelBaseline = (top) =>
     getPreviewTextBaseline({
@@ -1227,8 +1309,9 @@ export function OverlayElevationWidget({
   const showMetricLabel = widget.data.show_elevation_metric ?? false
   const showImperialLabel = widget.data.show_elevation_imperial ?? false
   const shadow = getTextShadowParts(sceneStyle)
-  const shadowFilterId = sanitizeSvgId(`${widget.id}-elevation-shadow`)
-  const hasShadow = Boolean(shadow)
+  const lineShadowFilterId = sanitizeSvgId(
+    `${widget.id}-elevation-line-shadow-blur`,
+  )
 
   return (
     <svg
@@ -1239,29 +1322,18 @@ export function OverlayElevationWidget({
       className="block h-full w-full overflow-visible"
       style={{ opacity: getWidgetOpacity(widget.data, globalOpacity) }}
     >
-      {hasShadow ? (
-        <defs>
-          <filter
-            id={shadowFilterId}
-            x="-50%"
-            y="-50%"
-            width="200%"
-            height="200%"
-            colorInterpolationFilters="sRGB"
-          >
-            <feDropShadow
-              dx={shadow.distance}
-              dy={shadow.distance}
-              stdDeviation={shadow.strength}
-              floodColor={shadow.color}
-            />
-          </filter>
-        </defs>
-      ) : null}
+      <PreviewSvgShadowBlurFilter id={lineShadowFilterId} shadow={shadow} />
       <polygon
         points={areaSvgPoints}
         fill={remainingAreaColor}
         fillOpacity={remainingAreaOpacity}
+      />
+      <PreviewPolylineShadow
+        points={remainingSvgPoints}
+        shadow={shadow}
+        blurFilterId={lineShadowFilterId}
+        strokeWidth={remainingLineWidth}
+        strokeOpacity={remainingLineOpacity}
       />
       <polyline
         fill="none"
@@ -1271,7 +1343,6 @@ export function OverlayElevationWidget({
         strokeLinejoin="round"
         strokeLinecap="round"
         points={remainingSvgPoints}
-        filter={hasShadow ? `url(#${shadowFilterId})` : undefined}
       />
       <polygon
         points={completedAreaSvgPoints}
@@ -1293,38 +1364,42 @@ export function OverlayElevationWidget({
         y={markerPoint?.[1]}
       />
       {markerPoint && showMetricLabel ? (
-        <text
+        <PreviewSvgText
+          text={metricLabel}
           x={markerPoint[0] + (widget.data.metric_label_offset_x ?? 0)}
-          y={getElevationLabelBaseline(
+          baseline={getElevationLabelBaseline(
             markerPoint[1] + (widget.data.metric_label_offset_y ?? -28),
           )}
-          fill={labelColor}
+          color={labelColor}
           fontFamily={labelFontFamily}
           fontSize={labelFontSize}
-          paintOrder="stroke fill"
-          stroke={sceneStyle?.border_color || 'none'}
-          strokeWidth={sceneStyle?.border_thickness || 0}
-          filter={hasShadow ? `url(#${shadowFilterId})` : undefined}
-        >
-          {metricLabel}
-        </text>
+          opacity={1}
+          shadow={shadow}
+          shadowFilterId={sanitizeSvgId(
+            `${widget.id}-elevation-metric-label-shadow`,
+          )}
+          borderColor={sceneStyle?.border_color}
+          borderThickness={sceneStyle?.border_thickness}
+        />
       ) : null}
       {markerPoint && showImperialLabel ? (
-        <text
+        <PreviewSvgText
+          text={imperialLabel}
           x={markerPoint[0] + (widget.data.imperial_label_offset_x ?? 0)}
-          y={getElevationLabelBaseline(
+          baseline={getElevationLabelBaseline(
             markerPoint[1] + (widget.data.imperial_label_offset_y ?? 6),
           )}
-          fill={labelColor}
+          color={labelColor}
           fontFamily={labelFontFamily}
           fontSize={labelFontSize}
-          paintOrder="stroke fill"
-          stroke={sceneStyle?.border_color || 'none'}
-          strokeWidth={sceneStyle?.border_thickness || 0}
-          filter={hasShadow ? `url(#${shadowFilterId})` : undefined}
-        >
-          {imperialLabel}
-        </text>
+          opacity={1}
+          shadow={shadow}
+          shadowFilterId={sanitizeSvgId(
+            `${widget.id}-elevation-imperial-label-shadow`,
+          )}
+          borderColor={sceneStyle?.border_color}
+          borderThickness={sceneStyle?.border_thickness}
+        />
       ) : null}
     </svg>
   )

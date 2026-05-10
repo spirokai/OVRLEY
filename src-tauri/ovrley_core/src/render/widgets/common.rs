@@ -11,7 +11,7 @@ use super::types::{
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::MarkerPointConfig;
 use crate::config::RenderConfig;
-use skia_safe::{image_filters, Canvas, Paint, PaintCap, PaintJoin, Path as SkPath, Point};
+use skia_safe::{BlurStyle, Canvas, MaskFilter, Paint, PaintCap, PaintJoin, Path as SkPath, Point};
 
 pub(crate) const DEFAULT_COLOR: &str = "#ffffff";
 pub(crate) const DEFAULT_LINE_WIDTH: f32 = 1.75;
@@ -396,23 +396,24 @@ pub(crate) fn draw_polyline_with_shadow(
 
     if let Some(shadow) = shadow {
         if shadow.strength > 0.0 || shadow.distance != 0.0 {
-            if let Some(shadow_filter) = image_filters::drop_shadow_only(
-                (shadow.distance, shadow.distance),
-                (shadow.strength, shadow.strength),
-                crate::render::text::parse_color(&shadow.color, opacity),
-                None,
-                None,
-            ) {
-                let mut shadow_paint = Paint::default();
-                shadow_paint.set_anti_alias(true);
-                shadow_paint.set_style(skia_safe::paint::Style::Stroke);
-                shadow_paint.set_stroke_width(width.max(1.0));
-                shadow_paint.set_stroke_cap(PaintCap::Round);
-                shadow_paint.set_stroke_join(PaintJoin::Round);
-                shadow_paint.set_color(crate::render::text::parse_color(color, opacity));
-                shadow_paint.set_image_filter(shadow_filter);
-                canvas.draw_path(&path, &shadow_paint);
+            let mut shadow_paint = Paint::default();
+            shadow_paint.set_anti_alias(true);
+            shadow_paint.set_style(skia_safe::paint::Style::Stroke);
+            shadow_paint.set_stroke_width(width.max(1.0));
+            shadow_paint.set_stroke_cap(PaintCap::Round);
+            shadow_paint.set_stroke_join(PaintJoin::Round);
+            shadow_paint.set_color(crate::render::text::parse_color(&shadow.color, opacity));
+            if shadow.strength > 0.0 {
+                shadow_paint.set_mask_filter(MaskFilter::blur(
+                    BlurStyle::Normal,
+                    shadow.strength,
+                    true,
+                ));
             }
+            canvas.save();
+            canvas.translate((shadow.distance, shadow.distance));
+            canvas.draw_path(&path, &shadow_paint);
+            canvas.restore();
         }
     }
 
