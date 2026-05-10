@@ -96,6 +96,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     aspectRatio,
     setAspectRatio,
     resetGlobalDefaults,
+    importedVideoFps,
   } = useStore()
 
   const scene = config?.scene
@@ -266,29 +267,35 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             <Label className="text-[10px] text-muted-foreground uppercase font-bold">
               Framerate
             </Label>
-            <Select
-              value={fpsMode}
-              onValueChange={(v) => {
-                setFpsMode(v)
-                if (v !== 'custom') {
-                  const fps = sanitizeIntegerFps(v)
-                  setUpdateRate(normalizeUpdateRateForFps(fps, updateRate))
-                  updateScene('fps', fps)
-                }
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="24">24 fps</SelectItem>
-                <SelectItem value="30">30 fps</SelectItem>
-                <SelectItem value="60">60 fps</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
+            {importedVideoFps ? (
+              <div className="flex h-9 items-center rounded-md border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground">
+                Locked to video FPS ({Math.round(importedVideoFps)} fps)
+              </div>
+            ) : (
+              <Select
+                value={fpsMode}
+                onValueChange={(v) => {
+                  setFpsMode(v)
+                  if (v !== 'custom') {
+                    const fps = sanitizeIntegerFps(v)
+                    setUpdateRate(normalizeUpdateRateForFps(fps, updateRate))
+                    updateScene('fps', fps)
+                  }
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="24">24 fps</SelectItem>
+                  <SelectItem value="30">30 fps</SelectItem>
+                  <SelectItem value="60">60 fps</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
-          {fpsMode === 'custom' && (
+          {!importedVideoFps && fpsMode === 'custom' && (
             <div className="space-y-2 animate-in fade-in slide-in-from-left-1">
               <Label className="text-[10px] text-muted-foreground uppercase font-bold">
                 Custom FPS

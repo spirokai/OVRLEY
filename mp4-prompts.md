@@ -7,7 +7,7 @@ Use these prompts to trigger implementation of each phase. Copy the relevant pha
 ## Phase 1 — Video Import & Store State
 
 ```
-Implement Phase 1 of the MP4 compositing feature as defined in @mp4-plan.md (section "Phase 1 — Video Import & Store State").
+Implement Phase 1 of the MP4 compositing feature in full scope as defined in @mp4-plan.md (section "Phase 1 — Video Import & Store State").
 
 Also read @mp4-compositing.md for full project context.
 
@@ -38,7 +38,7 @@ After implementation, verify the Rust code compiles with `cargo check` from src-
 ## Phase 2 — Video Time Sync
 
 ```
-Implement Phase 2 of the MP4 compositing feature as defined in @mp4-plan.md (section "Phase 2 — Video Time Sync").
+Implement Phase 2 of the MP4 compositing feature in full scope as defined in @mp4-plan.md (section "Phase 2 — Video Time Sync").
 
 Also read @mp4-compositing.md for full project context.
 
@@ -61,7 +61,7 @@ Do not modify any backend Rust files in this phase.
 ## Phase 3 — Video Preview in Editor & Player
 
 ```
-Implement Phase 3 of the MP4 compositing feature as defined in @mp4-plan.md (section "Phase 3 — Video Preview in Editor & Player").
+Implement Phase 3 of the MP4 compositing feature in full scope as defined in @mp4-plan.md (section "Phase 3 — Video Preview in Editor & Player").
 
 Also read @mp4-compositing.md for full project context.
 
@@ -87,7 +87,7 @@ Do not modify any backend Rust files in this phase.
 ## Phase 4 — Codec Detection & Render Dialog
 
 ```
-Implement Phase 4 of the MP4 compositing feature as defined in @mp4-plan.md (section "Phase 4 — Codec Detection & Render Dialog").
+Implement Phase 4 of the MP4 compositing feature in full scope as defined in @mp4-plan.md (section "Phase 4 — Codec Detection & Render Dialog").
 
 Also read @mp4-compositing.md for full project context.
 
@@ -120,7 +120,7 @@ After implementation, verify the Rust code compiles with `cargo check` from src-
 ## Phase 5 — MP4 Compositing FFmpeg Pipeline
 
 ```
-Implement Phase 5 of the MP4 compositing feature as defined in @mp4-plan.md (section "Phase 5 — MP4 Compositing FFmpeg Pipeline (Backend)").
+Implement Phase 5 of the MP4 compositing feature in full scope as defined in @mp4-plan.md (section "Phase 5 — MP4 Compositing FFmpeg Pipeline (Backend)").
 
 Also read @mp4-compositing.md for full project context. Pay special attention to Appendix A in mp4-plan.md which contains the annotated gopro-dashboard-overlay builtin profiles — use these as the starting point for profile definitions.
 
@@ -157,7 +157,7 @@ After implementation, verify the Rust code compiles with `cargo check` from src-
 ## Phase 6 — Frontend Render Integration
 
 ```
-Implement Phase 6 of the MP4 compositing feature as defined in @mp4-plan.md (section "Phase 6 — Frontend Render Integration").
+Implement Phase 6 of the MP4 compositing feature in full scope as defined in @mp4-plan.md (section "Phase 6 — Frontend Render Integration").
 
 Also read @mp4-compositing.md for full project context.
 

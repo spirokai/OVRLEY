@@ -286,3 +286,15 @@ export async function writeParseDebugFile(filename, contents) {
   const invoke = await requireInvoke()
   return invoke('write_parse_debug_file', { filename, contents })
 }
+
+/**
+ * Probes video for metadata using ffprobe.
+ *
+ * @param {string} filePath - Path to the video file.
+ * @returns {Promise<object>} Promise resolving to video metadata.
+ */
+export async function probeVideo(filePath) {
+  const invoke = await requireInvoke()
+  const result = await invoke('backend_probe_video', { filePath })
+  return typeof result === 'string' ? JSON.parse(result) : result
+}

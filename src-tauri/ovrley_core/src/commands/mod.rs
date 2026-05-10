@@ -544,3 +544,11 @@ fn base64_encode(bytes: &[u8]) -> String {
 
     output
 }
+
+/// Probes a video file and returns its metadata.
+pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> Result<Value, String> {
+    use crate::encode::video_probe::probe_video;
+    let metadata = probe_video(&paths.repo_root, file_path)?;
+    serde_json::to_value(&metadata).map_err(|e| format!("Serialization error: {}", e))
+}
+

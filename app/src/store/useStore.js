@@ -8,6 +8,7 @@ import { devtools } from 'zustand/middleware'
 import { createEditorSlice } from './slices/createEditorSlice'
 import { createMediaSlice } from './slices/createMediaSlice'
 import { createTemplateSlice } from './slices/createTemplateSlice'
+import { createVideoImportSlice } from './slices/createVideoImportSlice'
 export { isUpdatingFromTimelineFlag } from './store-utils'
 
 /**
@@ -22,6 +23,7 @@ function createStoreState(set, get) {
     ...createTemplateSlice(set, get),
     ...createEditorSlice(set, get),
     ...createMediaSlice(set, get),
+    ...createVideoImportSlice(set, get),
   }
 }
 

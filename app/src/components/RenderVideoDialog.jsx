@@ -172,6 +172,7 @@ export default function RenderVideoDialog({
 }) {
   const renderingVideo = useStore((state) => state.renderingVideo)
   const platformOs = useStore((state) => state.platformOs)
+  const importedVideoFps = useStore((state) => state.importedVideoFps)
   const [fpsMode, setFpsMode] = useState(
     [24, 30, 60].includes(settings?.fps) ? settings.fps.toString() : 'custom',
   )
@@ -252,35 +253,41 @@ export default function RenderVideoDialog({
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Framerate
                 </Label>
-                <Select
-                  value={fpsMode}
-                  onValueChange={(value) => {
-                    setFpsMode(value)
-                    if (value !== 'custom') {
-                      const fps = sanitizeIntegerFps(value)
-                      onSettingsChange({
-                        fps,
-                        updateRate: normalizeUpdateRateForFps(
+                {importedVideoFps ? (
+                  <div className="flex h-9 items-center rounded-md border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground">
+                    Locked to video FPS ({Math.round(importedVideoFps)} fps)
+                  </div>
+                ) : (
+                  <Select
+                    value={fpsMode}
+                    onValueChange={(value) => {
+                      setFpsMode(value)
+                      if (value !== 'custom') {
+                        const fps = sanitizeIntegerFps(value)
+                        onSettingsChange({
                           fps,
-                          settings.updateRate,
-                        ),
-                      })
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="24">24 fps</SelectItem>
-                    <SelectItem value="30">30 fps</SelectItem>
-                    <SelectItem value="60">60 fps</SelectItem>
-                    <SelectItem value="custom">Custom</SelectItem>
-                  </SelectContent>
-                </Select>
+                          updateRate: normalizeUpdateRateForFps(
+                            fps,
+                            settings.updateRate,
+                          ),
+                        })
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="24">24 fps</SelectItem>
+                      <SelectItem value="30">30 fps</SelectItem>
+                      <SelectItem value="60">60 fps</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
-              {fpsMode === 'custom' && (
+              {!importedVideoFps && fpsMode === 'custom' && (
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                     Custom FPS

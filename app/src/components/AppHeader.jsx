@@ -18,6 +18,7 @@ import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import {
   Activity,
   FilePlus2,
+  Film,
   FolderOpen,
   Grid3X3,
   LayoutGrid,
@@ -28,6 +29,7 @@ import {
   Save,
   Sparkles,
   Square,
+  X,
   ZoomIn,
 } from 'lucide-react'
 
@@ -109,6 +111,7 @@ export default function AppHeader({
   onOpenDownloads,
   renderControls,
   templateControls,
+  videoControls,
 }) {
   const { activityLabel, onOpenActivityFile } = activityControls
   const {
@@ -144,10 +147,12 @@ export default function AppHeader({
     () => getTemplateGroups(templates),
     [templates],
   )
+  const { importedVideoFilename, handleImportVideo, clearImportedVideo } =
+    videoControls
 
   return (
     <header className="relative z-50 shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
-      <div className="grid grid-cols-[clamp(42rem,60vw,45rem)_auto_minmax(12rem,1fr)] items-center gap-6 px-6 py-3">
+      <div className="grid grid-cols-[50%_auto_minmax(12rem,1fr)] items-center gap-6 px-6 py-3">
         <div className="flex min-w-0 items-center gap-6 overflow-hidden">
           <div className="flex shrink-0 items-center gap-3">
             <img src="/logo.svg" alt="OVRLEY" className="h-5" />
@@ -158,12 +163,36 @@ export default function AppHeader({
           <div className="min-w-0 flex-1 overflow-hidden">
             <div className="flex min-w-0 items-center gap-2">
               <Button
-                className="mr-4 h-9 shrink-0 gap-2 border-border/70 px-5"
+                className="mr-2 h-9 shrink-0 gap-2 border-border/70 px-5"
                 onClick={onOpenActivityFile}
               >
                 <Activity className="h-3.5 w-3.5" />
                 <span className="max-w-28 truncate">{activityLabel}</span>
               </Button>
+
+              {importedVideoFilename ? (
+                <div className="w-50 mr-2 flex h-9 items-center rounded-md border border-border/70 bg-surface-elevated pl-3 pr-2 text-xs text-foreground">
+                  <Film className="mr-2 h-8 w-8 text-primary" />
+                  <span className="truncate">{importedVideoFilename}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-1 h-6 w-6 text-muted-foreground hover:bg-surface-accent-soft hover:text-foreground"
+                    onClick={clearImportedVideo}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-50 mr-2 h-9 shrink-0 gap-2 border-border/70 px-5 text-muted-foreground hover:text-foreground text-sm"
+                  onClick={handleImportVideo}
+                >
+                  <Film className="h-3.5 w-3.5" />
+                  <span className="truncate">Import Video</span>
+                </Button>
+              )}
 
               <Select
                 value={

@@ -10,6 +10,8 @@
 pub mod ffmpeg;
 /// Render controller and public video render orchestration.
 pub mod video;
+/// Video metadata extraction via ffprobe.
+pub mod video_probe;
 /// Debug summaries, sample-frame exports, and segment stitching helpers.
 mod video_debug;
 /// Single-render video pipeline used by normal and segmented renders.

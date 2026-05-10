@@ -68,7 +68,7 @@ When a video is imported, its FPS **overrides** the overlay FPS. The video FPS i
 
 ### Time Detection Strategy
 
-The creation time is extracted via ffprobe from multiple sources in priority order:
+The creation time is extracted via ffprobe (Phase 1) from multiple sources in priority order:
 
 1. **`format.tags.creation_time`** — most reliable for action cams (GoPro, DJI, Insta360 write this).
 2. **`streams[0].tags.creation_time`** — fallback if format-level tag is absent.
@@ -78,6 +78,8 @@ The creation time is extracted via ffprobe from multiple sources in priority ord
 For edited exports (Premiere, DaVinci, etc.), creation_time usually reflects export time, not original recording time. In these cases the auto-sync will fail and the user must manually set the offset.
 
 ### Auto-Sync Algorithm
+
+Auto sync can only happen when both a video and an activity are loaded. This can happen in either order and must be idempotent. If any of the two files change, the auto-sync should be re-run.
 
 ```
 videoStart = parse(creation_time)  // UTC
@@ -93,7 +95,7 @@ else:
     set offset to offsetSeconds
 ```
 
-If creation_time cannot be determined → show warning "Could not determine video creation time — placed at start", set offset to 0 (video starts at the beginning of the activity). The user can always manually adjust the offset.
+If creation_time cannot be determined or is outside the activity range → show warning "Could not determine video creation time or is outside the activity range — placed at start", set offset to 0 (video starts at the beginning of the activity). The user can always manually adjust the offset.
 
 ### Deliverables
 
@@ -104,13 +106,15 @@ Add auto-sync logic in a `computeVideoSync(activitySummary)` action called after
 #### [MODIFY] `app/src/components/SidebarSettingsTab.jsx`
 
 Add a new **"Video Sync"** section (only visible when `importedVideoPath` is set). Contains:
-- **Video info block**: read-only display of duration, FPS, and resolution (e.g. "Duration: 12:34 · 29.97 fps · 3840×2160").
-- Read-only display of detected creation time (or "Unknown").
+
+- **Video info block**: read-only display of duration, FPS, and resolution (e.g. "12:34 min · 29.97 fps · 3840×2160").
+- Read-only display of detected creation time (or "Creation Time: Unknown").
 - Warning alert if sync is out-of-range or creation time unknown.
-- Offset input accepting seconds (`123.5`) or timecode (`4:53`). Parses both formats.
+- Offset input accepting integer seconds (`123`) or timecode (`4:53`). Parses both formats.
 - A "Reset Sync" button to re-run auto-sync.
 
 When `importedVideoPath` is set, also:
+
 - Hide the "Custom Export Range" section (the `ExportRangeSettings` block).
 - Disable the framerate selector with a note "Locked to video FPS".
 
@@ -139,6 +143,7 @@ When `importedVideoPath` is set, render a `<video>` element behind the widget la
 #### [NEW] `app/src/hooks/useVideoPreview.js`
 
 Custom hook managing the `<video>` element:
+
 - Creates `<video>` with `src` pointing to the local file via `convertFileSrc` (Tauri asset protocol).
 - Seeks to the correct frame on `previewSecond` changes.
 - Pauses/plays in sync with OverlayPlayer playback state.
@@ -172,6 +177,7 @@ When video is imported, add a `backgroundMode: 'video'` option to the background
 #### [NEW] `src-tauri/ovrley_core/src/encode/codec_detect.rs`
 
 Runs `ffmpeg -encoders` and parses output to detect availability of:
+
 - **Software**: `libx264`, `libx265`
 - **NVIDIA**: `h264_nvenc`, `hevc_nvenc`
 - **Intel QSV**: `h264_qsv`, `hevc_qsv`
@@ -198,10 +204,12 @@ Add `availableCodecs: null` state; action `fetchAvailableCodecs()` called on app
 Restructure the codec selector into two `<SelectGroup>` sections:
 
 **Transparent Codecs** (existing):
+
 - ProRes (CPU), QT RLE (CPU), ProRes Vulkan (GPU), ProRes macOS
 - If video is imported: entire group disabled, tooltip "Video imported — use MP4 codecs"
 
 **MP4 Codecs** (new):
+
 - H.264 (CPU) — `libx264`
 - H.265 (CPU) — `libx265`
 - H.264 NVENC (GPU) — `h264_nvenc` (if detected)
@@ -230,21 +238,21 @@ Defaults are defined in a simple config constant (e.g. in a new `app/src/lib/bit
  * Entries are evaluated top-to-bottom; first match wins.
  */
 export const BITRATE_BINS = [
-  { maxPixels: 2_073_600, label: '1080p', h264: 10, h265: 8,  h264Hfr: 15, h265Hfr: 12 },
-  { maxPixels: 3_686_400, label: '1440p', h264: 30, h265: 20, h264Hfr: 45, h265Hfr: 30 },
-  { maxPixels: 8_294_400, label: '4K',    h264: 60, h265: 40, h264Hfr: 90, h265Hfr: 60 },
-]
+  { maxPixels: 2_073_600, label: "1080p", h264: 10, h265: 8, h264Hfr: 15, h265Hfr: 12 },
+  { maxPixels: 3_686_400, label: "1440p", h264: 30, h265: 20, h264Hfr: 45, h265Hfr: 30 },
+  { maxPixels: 8_294_400, label: "4K", h264: 60, h265: 40, h264Hfr: 90, h265Hfr: 60 },
+];
 
 /** Fallback if resolution exceeds all bins */
-export const BITRATE_FALLBACK = { h264: 80, h265: 60, h264Hfr: 100, h265Hfr: 80 }
+export const BITRATE_FALLBACK = { h264: 80, h265: 60, h264Hfr: 100, h265Hfr: 80 };
 
 export function getDefaultBitrate(width, height, fps, codecName) {
-  const pixels = width * height
-  const isHevc = /h265|hevc|x265/i.test(codecName)
-  const isHfr = fps > 30
-  const bin = BITRATE_BINS.find((b) => pixels <= b.maxPixels) ?? BITRATE_FALLBACK
-  if (isHevc) return isHfr ? bin.h265Hfr : bin.h265
-  return isHfr ? bin.h264Hfr : bin.h264
+  const pixels = width * height;
+  const isHevc = /h265|hevc|x265/i.test(codecName);
+  const isHfr = fps > 30;
+  const bin = BITRATE_BINS.find((b) => pixels <= b.maxPixels) ?? BITRATE_FALLBACK;
+  if (isHevc) return isHfr ? bin.h265Hfr : bin.h265;
+  return isHfr ? bin.h264Hfr : bin.h264;
 }
 ```
 
@@ -270,10 +278,12 @@ This config is easy to tweak — just edit the numbers in `BITRATE_BINS`. User c
 ### Architecture
 
 The compositing pipeline uses ffmpeg with two inputs:
+
 1. **Input 0**: The imported MP4 file (decoded by ffmpeg, optionally with hwaccel).
 2. **Input 1**: Raw RGBA frames piped via stdin (Skia-rendered overlays, same as current pipeline).
 
 FFmpeg composites them using `filter_complex`:
+
 ```
 [0:v]scale=WxH[base];[1:v]format=yuva420p[overlay];[base][overlay]overlay=0:0
 ```
@@ -285,6 +295,7 @@ For hardware-accelerated profiles (nvenc, qsv), the filter chains from the built
 #### [NEW] `src-tauri/ovrley_core/src/encode/ffmpeg_composite.rs`
 
 New module providing `build_composite_ffmpeg_settings()`:
+
 - Accepts: codec name, bitrate, video path, resolution, fps, hwaccel info.
 - Returns: `CompositeFfmpegSettings` struct with input_args, filter_complex, output_args.
 - Contains profile definitions matching the spec's builtin profiles (nvgpu, nnvgpu, mac, mac_hevc, qsv) plus software fallbacks.
@@ -293,6 +304,7 @@ New module providing `build_composite_ffmpeg_settings()`:
 #### [NEW] `src-tauri/ovrley_core/src/encode/video_composite_pipeline.rs`
 
 New rendering pipeline function `render_composite_video_single()`:
+
 - Mirrors `render_video_single()` structure but spawns ffmpeg with two inputs.
 - Input 0: the MP4 file path.
 - Input 1: pipe:0 (stdin) for raw RGBA overlay frames.
@@ -311,6 +323,7 @@ New rendering pipeline function `render_composite_video_single()`:
   - These are recorded in the `timing_summary.json` alongside the existing buckets (`frame.total`, `buffer.acquire_wait`, `queue.put_wait`, etc.). The phase is labeled `"phase_7"` to distinguish from transparent renders.
 
 Key ffmpeg command structure:
+
 ```
 ffmpeg -loglevel info \
   [hw_init_args...] \
@@ -326,6 +339,7 @@ ffmpeg -loglevel info \
 #### [MODIFY] `src-tauri/ovrley_core/src/encode/mod.rs`
 
 Add:
+
 ```rust
 pub mod ffmpeg_composite;
 mod video_composite_pipeline;
@@ -338,6 +352,7 @@ Add a new `render_composite_video()` entry function that delegates to `video_com
 #### [MODIFY] `src-tauri/ovrley_core/src/config/mod.rs`
 
 Add optional fields to `SceneConfig`:
+
 ```rust
 pub composite_video_path: Option<String>,
 pub composite_bitrate: Option<String>,
@@ -370,6 +385,7 @@ In `backend_render()`: if `config.scene.composite_video_path` is `Some`, call `r
 #### [MODIFY] `app/src/api/renderVideo.jsx`
 
 When `importedVideoPath` is set in the store:
+
 - Set `config.scene.composite_video_path` to the imported path.
 - Set `config.scene.composite_bitrate` to the selected bitrate (e.g., `"60M"`).
 - Set `config.scene.composite_sync_offset` to the sync offset.
@@ -414,6 +430,7 @@ Update the progress display to say "Compositing Video" instead of "Exporting Ove
 
 > [!IMPORTANT]
 > **Template persistence exclusions**: The following settings are **session-only** and must **NOT** be saved into template files:
+>
 > - `importedVideoPath` and all video import state
 > - `videoSyncOffsetSeconds` (sync offset)
 > - `composite_bitrate` (export bitrate for MP4)
@@ -427,34 +444,37 @@ Update the progress display to say "Compositing Video" instead of "Exporting Ove
 ## File Change Summary
 
 ### New Files (8)
-| File | Purpose |
-|------|---------|
-| `app/src/store/slices/createVideoImportSlice.js` | Zustand slice for video import state |
-| `app/src/lib/videoMetadata.js` | Video metadata extraction via Tauri |
-| `app/src/hooks/useVideoPreview.js` | Video preview sync hook |
-| `src-tauri/ovrley_core/src/encode/video_probe.rs` | ffprobe wrapper |
-| `src-tauri/ovrley_core/src/encode/codec_detect.rs` | Codec/hwaccel detection |
-| `src-tauri/ovrley_core/src/encode/ffmpeg_composite.rs` | Composite ffmpeg settings builder |
-| `src-tauri/ovrley_core/src/encode/video_composite_pipeline.rs` | Composite render pipeline |
+
+| File                                                           | Purpose                              |
+| -------------------------------------------------------------- | ------------------------------------ |
+| `app/src/store/slices/createVideoImportSlice.js`               | Zustand slice for video import state |
+| `app/src/lib/videoMetadata.js`                                 | Video metadata extraction via Tauri  |
+| `app/src/hooks/useVideoPreview.js`                             | Video preview sync hook              |
+| `src-tauri/ovrley_core/src/encode/video_probe.rs`              | ffprobe wrapper                      |
+| `src-tauri/ovrley_core/src/encode/codec_detect.rs`             | Codec/hwaccel detection              |
+| `src-tauri/ovrley_core/src/encode/ffmpeg_composite.rs`         | Composite ffmpeg settings builder    |
+| `src-tauri/ovrley_core/src/encode/video_composite_pipeline.rs` | Composite render pipeline            |
 
 ### Modified Files (12)
-| File | Change |
-|------|--------|
-| `app/src/store/useStore.js` | Add video import slice |
-| `app/src/api/backend.js` | Add `probeVideo()`, `detectCodecs()` |
-| `app/src/api/renderVideo.jsx` | Add composite config fields |
-| `app/src/components/AppHeader.jsx` | Add "Import Video" button |
-| `app/src/components/SidebarSettingsTab.jsx` | Add sync section, conditional range |
-| `app/src/components/OverlayPlayer.jsx` | Video timeline highlight |
-| `app/src/components/overlay-editor/OverlayCanvas.jsx` | Video background layer |
-| `app/src/components/RenderVideoDialog.jsx` | Grouped codecs, bitrate slider |
-| `src-tauri/ovrley_core/src/encode/mod.rs` | Register new modules |
-| `src-tauri/ovrley_core/src/encode/video.rs` | Add `render_composite_video()` entry |
-| `src-tauri/ovrley_core/src/config/mod.rs` | Add composite fields to SceneConfig |
-| `src-tauri/ovrley_core/src/commands/mod.rs` | Add probe/detect/composite commands |
-| `src-tauri/src/lib.rs` | Register new Tauri commands |
+
+| File                                                  | Change                               |
+| ----------------------------------------------------- | ------------------------------------ |
+| `app/src/store/useStore.js`                           | Add video import slice               |
+| `app/src/api/backend.js`                              | Add `probeVideo()`, `detectCodecs()` |
+| `app/src/api/renderVideo.jsx`                         | Add composite config fields          |
+| `app/src/components/AppHeader.jsx`                    | Add "Import Video" button            |
+| `app/src/components/SidebarSettingsTab.jsx`           | Add sync section, conditional range  |
+| `app/src/components/OverlayPlayer.jsx`                | Video timeline highlight             |
+| `app/src/components/overlay-editor/OverlayCanvas.jsx` | Video background layer               |
+| `app/src/components/RenderVideoDialog.jsx`            | Grouped codecs, bitrate slider       |
+| `src-tauri/ovrley_core/src/encode/mod.rs`             | Register new modules                 |
+| `src-tauri/ovrley_core/src/encode/video.rs`           | Add `render_composite_video()` entry |
+| `src-tauri/ovrley_core/src/config/mod.rs`             | Add composite fields to SceneConfig  |
+| `src-tauri/ovrley_core/src/commands/mod.rs`           | Add probe/detect/composite commands  |
+| `src-tauri/src/lib.rs`                                | Register new Tauri commands          |
 
 ### Untouched Sacred Files
+
 - `src-tauri/ovrley_core/src/encode/video_pipeline.rs` — existing render pipeline
 - `src-tauri/ovrley_core/src/encode/ffmpeg.rs` — existing ffmpeg settings (transparent codecs)
 - `src-tauri/ovrley_core/src/encode/video_debug.rs` — existing debug utilities (reused, not modified)
@@ -470,21 +490,20 @@ These profiles from [gopro-dashboard-overlay](https://github.com/time4tea/gopro-
 ```json
 {
   "input": ["-hwaccel", "nvdec"],
-  "output": ["-vcodec", "h264_nvenc", "-rc:v", "cbr", "-b:v", "25M", "-bf:v", "3",
-             "-profile:v", "high", "-spatial-aq", "true", "-movflags", "faststart"]
+  "output": ["-vcodec", "h264_nvenc", "-rc:v", "cbr", "-b:v", "25M", "-bf:v", "3", "-profile:v", "high", "-spatial-aq", "true", "-movflags", "faststart"]
 }
 ```
 
-| Argument | Purpose |
-|----------|---------|
-| `-hwaccel nvdec` | Use NVIDIA hardware decoder for input video (CPU→GPU transfer for decode only) |
-| `-vcodec h264_nvenc` | Encode output with NVIDIA H.264 hardware encoder |
-| `-rc:v cbr` | Constant bitrate rate control — predictable file sizes |
-| `-b:v 25M` | Target bitrate 25 Mbps (we'll override with user slider value) |
-| `-bf:v 3` | 3 B-frames between reference frames — improves compression |
-| `-profile:v high` | H.264 High profile — best quality/compression ratio |
-| `-spatial-aq true` | Spatial adaptive quantization — allocates more bits to complex regions |
-| `-movflags faststart` | Moves MP4 moov atom to file start — enables progressive web playback |
+| Argument              | Purpose                                                                        |
+| --------------------- | ------------------------------------------------------------------------------ |
+| `-hwaccel nvdec`      | Use NVIDIA hardware decoder for input video (CPU→GPU transfer for decode only) |
+| `-vcodec h264_nvenc`  | Encode output with NVIDIA H.264 hardware encoder                               |
+| `-rc:v cbr`           | Constant bitrate rate control — predictable file sizes                         |
+| `-b:v 25M`            | Target bitrate 25 Mbps (we'll override with user slider value)                 |
+| `-bf:v 3`             | 3 B-frames between reference frames — improves compression                     |
+| `-profile:v high`     | H.264 High profile — best quality/compression ratio                            |
+| `-spatial-aq true`    | Spatial adaptive quantization — allocates more bits to complex regions         |
+| `-movflags faststart` | Moves MP4 moov atom to file start — enables progressive web playback           |
 
 **Note**: No `filter` key — ffmpeg handles overlay compositing via default filter chain. The CPU performs the overlay operation. Good balance of simplicity and performance.
 
@@ -496,19 +515,18 @@ These profiles from [gopro-dashboard-overlay](https://github.com/time4tea/gopro-
 {
   "input": ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"],
   "filter": "[0:v]scale_cuda=format=yuv420p[mp4_stream];[1:v]format=yuva420p,hwupload[overlay_stream];[mp4_stream][overlay_stream]overlay_cuda",
-  "output": ["-vcodec", "h264_nvenc", "-rc:v", "cbr", "-b:v", "25M", "-bf:v", "3",
-             "-profile:v", "main", "-spatial-aq", "true", "-movflags", "faststart"]
+  "output": ["-vcodec", "h264_nvenc", "-rc:v", "cbr", "-b:v", "25M", "-bf:v", "3", "-profile:v", "main", "-spatial-aq", "true", "-movflags", "faststart"]
 }
 ```
 
-| Argument | Purpose |
-|----------|---------|
-| `-hwaccel cuda` | Use CUDA for hardware decoding (keeps frames in GPU memory) |
-| `-hwaccel_output_format cuda` | Keep decoded frames in CUDA device memory (zero-copy to encoder) |
-| `scale_cuda=format=yuv420p` | Convert input video to yuv420p on GPU |
-| `format=yuva420p,hwupload` | Convert overlay to yuva420p (with alpha), upload to GPU |
-| `overlay_cuda` | Perform overlay compositing entirely on GPU |
-| `-profile:v main` | H.264 Main profile (not High — required for some CUDA overlay paths) |
+| Argument                      | Purpose                                                              |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `-hwaccel cuda`               | Use CUDA for hardware decoding (keeps frames in GPU memory)          |
+| `-hwaccel_output_format cuda` | Keep decoded frames in CUDA device memory (zero-copy to encoder)     |
+| `scale_cuda=format=yuv420p`   | Convert input video to yuv420p on GPU                                |
+| `format=yuva420p,hwupload`    | Convert overlay to yuva420p (with alpha), upload to GPU              |
+| `overlay_cuda`                | Perform overlay compositing entirely on GPU                          |
+| `-profile:v main`             | H.264 Main profile (not High — required for some CUDA overlay paths) |
 
 **Note**: This is the highest-performance path. Decode, overlay, and encode all happen on the GPU with no CPU↔GPU round-trips. Requires CUDA toolkit support in ffmpeg.
 
@@ -523,11 +541,11 @@ These profiles from [gopro-dashboard-overlay](https://github.com/time4tea/gopro-
 }
 ```
 
-| Argument | Purpose |
-|----------|---------|
-| `-hwaccel videotoolbox` | Use Apple VideoToolbox for hardware decoding |
-| `-vcodec h264_videotoolbox` | Encode with Apple's hardware H.264 encoder |
-| `-b:v 60M` | Average bitrate mode (overridden by user slider). VT also supports `-q:v 1-100` for quality VBR, but we use `-b:v` to keep the bitrate slider universal across all codecs. |
+| Argument                    | Purpose                                                                                                                                                                    |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-hwaccel videotoolbox`     | Use Apple VideoToolbox for hardware decoding                                                                                                                               |
+| `-vcodec h264_videotoolbox` | Encode with Apple's hardware H.264 encoder                                                                                                                                 |
+| `-b:v 60M`                  | Average bitrate mode (overridden by user slider). VT also supports `-q:v 1-100` for quality VBR, but we use `-b:v` to keep the bitrate slider universal across all codecs. |
 
 **Note**: The original gopro-dashboard-overlay profile uses `-q:v 60` (quality-based VBR). We switch to `-b:v` so the same bitrate slider works for all codecs and aligns with YouTube's upload recommendations.
 
@@ -556,17 +574,17 @@ Same as `mac` but using HEVC (H.265) encoder. Better compression at same quality
 }
 ```
 
-| Argument | Purpose |
-|----------|---------|
-| `-init_hw_device qsv=hw` | Initialize Intel QSV hardware device |
-| `-hwaccel qsv` | Use QSV for hardware decoding |
-| `-hwaccel_output_format qsv` | Keep decoded frames in QSV device memory |
+| Argument                      | Purpose                                                                |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `-init_hw_device qsv=hw`      | Initialize Intel QSV hardware device                                   |
+| `-hwaccel qsv`                | Use QSV for hardware decoding                                          |
+| `-hwaccel_output_format qsv`  | Keep decoded frames in QSV device memory                               |
 | `hwupload=extra_hw_frames=64` | Upload frames to QSV surface pool (64 extra frame slots for buffering) |
-| `overlay_qsv=x=0:y=0` | Perform overlay compositing on Intel GPU |
-| `hwdownload,format=nv12` | Download composited frame back to CPU in NV12 format |
-| `-vcodec hevc_qsv` | Encode with Intel QSV HEVC encoder |
-| `-global_quality 25` | Quality-based encoding (1–51, lower = better quality) |
-| `-c:a copy` | Passthrough audio without re-encoding |
+| `overlay_qsv=x=0:y=0`         | Perform overlay compositing on Intel GPU                               |
+| `hwdownload,format=nv12`      | Download composited frame back to CPU in NV12 format                   |
+| `-vcodec hevc_qsv`            | Encode with Intel QSV HEVC encoder                                     |
+| `-global_quality 25`          | Quality-based encoding (1–51, lower = better quality)                  |
+| `-c:a copy`                   | Passthrough audio without re-encoding                                  |
 
 **Note**: The `hwdownload` step is required because QSV overlay output needs to be downloaded before re-encoding in some ffmpeg builds. This may cause a performance hit compared to the NVIDIA full-GPU path.
 
@@ -585,9 +603,9 @@ struct CompositeProfile {
 ```
 
 The profile is selected based on:
+
 1. The codec chosen by the user in the render dialog (e.g., `h264_nvenc`)
 2. The detected hardware capabilities from `codec_detect.rs`
 3. A fallback to software overlay (`libx264`/`libx265` + CPU filter) if no hardware match
 
 The **bitrate** (`-b:v`) is always overridden with the user's slider value. All codecs use `-b:v` for consistent behavior — including VideoToolbox, which supports average bitrate mode alongside its native `-q:v` quality mode.
-

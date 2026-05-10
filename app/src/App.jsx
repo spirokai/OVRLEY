@@ -17,6 +17,7 @@ import useBackendStatus from '@/hooks/useBackendStatus'
 import useEditorShellState from '@/hooks/useEditorShellState'
 import useRenderWorkflow from '@/hooks/useRenderWorkflow'
 import useTemplateManagement from '@/hooks/useTemplateManagement'
+import useVideoImport from '@/hooks/useVideoImport'
 import './index.css'
 import * as backend from './api/backend'
 
@@ -39,6 +40,7 @@ function App() {
     onTemplateCreated: editorShell.resetZoom,
   })
   const renderWorkflow = useRenderWorkflow({ backendStatus })
+  const videoControls = useVideoImport()
 
   useAppBootstrap()
 
@@ -112,6 +114,7 @@ function App() {
             status: templateManagement.status,
             templates: templateManagement.templates,
           }}
+          videoControls={videoControls}
         />
 
         <div className="flex min-h-0 flex-1 overflow-hidden">

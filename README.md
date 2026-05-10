@@ -20,7 +20,7 @@ OVRLEY turns .fit and .gpx activity data into customizable overlays for action-c
 - **10+ Widgets**: Speed, heartrate, power, cadence, date, temperature, elevation profile, map route, and more.
 - **100% Free & Offline**: No subscriptions. All data processing, rendering, and encoding happen locally on your machine. Your data never leaves your computer.
 
----
+> ## Using OVRLEY: Download the exe/app file from latest release and just run it - no installation or setup required.
 
 ## Project Summary
 
@@ -44,12 +44,12 @@ OVRLEY supports video transparency and offers multiple export pipelines tailored
 Compiling and running OVRLEY requires the following system-level toolchains:
 
 - **[Node.js](https://nodejs.org/) & [pnpm](https://pnpm.io/)** (Package management and script execution)
-- **[Rust Toolchain](https://rustup.rs/)** (For compiling the Tauri shell and core engine)
-- **[FFmpeg 8.1+ (Full Build)](https://ffmpeg.org/)** (For video manipulation; **installed automatically**)
+- **[Rust Toolchain](https://rust-lang.org/tools/install/)** (For compiling the Tauri shell and core engine)
+- **[FFmpeg 8.1+ (Full Build)](https://ffmpeg.org/download.html/)** (For video manipulation; **installed automatically**)
 
 > **Important:** The rendering engine requires an FFmpeg 8.1+ **Full Build** located within the `vendor/ffmpeg` directory to ensure compatibility with advanced hardware encoders. This is automatically handled by the installation process, but you can manually place your own build there.
 
-## Installation
+## Dev Installation
 
 The repository setup is automated. When you install the Node dependencies, a custom `postinstall` script will automatically download and place the required FFmpeg 8.1 binaries into the correct vendor directory.
 
