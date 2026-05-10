@@ -494,7 +494,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                   <div className="absolute inset-y-1 right-1 flex w-5 flex-col overflow-hidden rounded border border-none bg-surface-strong">
                     <button
                       type="button"
-                      className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50"
+                      className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => handleIncrement(0.1)}
                     >
@@ -503,7 +503,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                     <div className="h-px bg-border/60" />
                     <button
                       type="button"
-                      className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50"
+                      className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => handleIncrement(-0.1)}
                     >
@@ -515,7 +515,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
                   variant="outline"
                   size="sm"
                   className="h-9 px-3 text-xs"
-                  disabled={!activitySummary}
+                  disabled={!activitySummary || videoSyncOffsetSeconds === 0}
                   onClick={() => computeVideoSync(activitySummary)}
                 >
                   Auto-sync
