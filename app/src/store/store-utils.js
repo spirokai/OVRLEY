@@ -4,9 +4,10 @@
 
 import {
   DEFAULT_EXPORT_RANGE,
-  DEFAULT_GLOBAL_DEFAULTS,
+  normalizeTemplateConfig,
 } from '../lib/template-snapshot'
 import { normalizeColorFields } from '../lib/color-utils'
+import { DEFAULT_GLOBAL_DEFAULTS } from '../lib/config-utils'
 
 let isUpdatingFromConfig = false
 let isUpdatingFromTimeline = false
@@ -21,11 +22,6 @@ export const DEFAULT_CONFIG = {
     font: 'Arial.ttf',
     color: '#ffffff',
     font_size: 30,
-    border_color: '#000000',
-    border_thickness: 0,
-    shadow_color: '#000000',
-    shadow_strength: 0,
-    shadow_distance: 0,
   },
   labels: [],
   values: [],
@@ -140,7 +136,13 @@ export function readStoredConfig() {
   if (savedConfig) {
     try {
       const parsed = JSON.parse(savedConfig)
-      if (parsed && parsed.scene) return parsed
+      if (parsed && parsed.scene) {
+        const globalDefaults = {
+          ...DEFAULT_GLOBAL_DEFAULTS,
+          ...normalizeColorFields(readStoredJson('globalDefaults', {}) || {}),
+        }
+        return normalizeTemplateConfig(parsed, globalDefaults)
+      }
     } catch {
       console.warn('Failed to parse saved config, using default')
     }
@@ -190,6 +192,20 @@ export function isUpdatingFromTimelineFlag() {
  * @returns {object} Requested value or structure.
  */
 export function readStoredTemplateSettings() {
+  const storedGlobalDefaults = normalizeColorFields(
+    readStoredJson('globalDefaults', {}) || {},
+  )
+  const globalDefaults = Object.keys(DEFAULT_GLOBAL_DEFAULTS).reduce(
+    (result, key) => ({
+      ...result,
+      [key]:
+        storedGlobalDefaults[key] === undefined
+          ? DEFAULT_GLOBAL_DEFAULTS[key]
+          : storedGlobalDefaults[key],
+    }),
+    {},
+  )
+
   return {
     updateRate: readStoredInt('updateRate', 1),
     exportRange: {
@@ -197,10 +213,7 @@ export function readStoredTemplateSettings() {
       ...(readStoredJson('exportRange', {}) || {}),
     },
     exportCodec: localStorage.getItem('exportCodec') || 'prores_ks',
-    globalDefaults: {
-      ...DEFAULT_GLOBAL_DEFAULTS,
-      ...normalizeColorFields(readStoredJson('globalDefaults', {}) || {}),
-    },
+    globalDefaults,
     aspectRatio: localStorage.getItem('aspectRatio') || '16:9',
   }
 }

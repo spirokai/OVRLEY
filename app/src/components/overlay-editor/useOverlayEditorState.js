@@ -148,16 +148,26 @@ export default function useOverlayEditorState({
   const sceneSize = useMemo(() => getSceneSize(config), [config])
   const activity = sourceActivity
   const globalOpacity = globalDefaults?.opacity ?? 1
-  const globalScale = config?.scene?.scale ?? globalDefaults?.scale ?? 1
+  const globalScale = globalDefaults?.scale ?? 1
   const sceneStyle = useMemo(
     () => ({
-      border_color: config?.scene?.border_color,
-      border_thickness: config?.scene?.border_thickness ?? 0,
-      shadow_color: config?.scene?.shadow_color,
-      shadow_strength: config?.scene?.shadow_strength ?? 0,
-      shadow_distance: config?.scene?.shadow_distance ?? 0,
+      border_color: globalDefaults?.border_color ?? config?.scene?.border_color,
+      border_thickness:
+        globalDefaults?.border_thickness ??
+        config?.scene?.border_thickness ??
+        0,
+      shadow_color: globalDefaults?.shadow_color ?? config?.scene?.shadow_color,
+      shadow_strength:
+        globalDefaults?.shadow_strength ?? config?.scene?.shadow_strength ?? 0,
+      shadow_distance:
+        globalDefaults?.shadow_distance ?? config?.scene?.shadow_distance ?? 0,
     }),
     [
+      globalDefaults?.border_color,
+      globalDefaults?.border_thickness,
+      globalDefaults?.shadow_color,
+      globalDefaults?.shadow_distance,
+      globalDefaults?.shadow_strength,
       config?.scene?.border_color,
       config?.scene?.border_thickness,
       config?.scene?.shadow_color,

@@ -143,16 +143,12 @@ export function getWidgetIdFromTarget(target) {
 export function getWidgetSceneOrigin(widget, draft = null) {
   const data = draft ? { ...widget.data, ...draft } : widget.data
   const x = data.x ?? 0
-  const valueOffset =
-    widget.category === 'values' && widget.type !== 'gradient'
-      ? (data.value_offset ?? 0)
-      : 0
   const gradientYOffset =
     widget.type === 'gradient' ? Math.min(0, -(data.value_offset ?? 0)) : 0
 
   return {
     x,
-    y: (data.y ?? 0) + valueOffset + gradientYOffset,
+    y: (data.y ?? 0) + gradientYOffset,
   }
 }
 
@@ -246,7 +242,7 @@ export function applyLiveScalePositionStyles(
  * @param {*} scaleFactor - Value for scale factor.
  * @returns {object} Derived data structure for downstream use.
  */
-export function buildScaledWidgetDataDraft(origin, scaleFactor) {
+export function buildScaledWidgetDataDraft(origin, scaleFactor, widget) {
   const nextFontSize = clamp(
     Math.round((origin.fontSize || 60) * scaleFactor),
     8,
@@ -268,12 +264,24 @@ export function buildScaledWidgetDataDraft(origin, scaleFactor) {
   )
   const nextValueOffset = Math.round((origin.valueOffset || 0) * scaleFactor)
 
-  return {
+  const nextDraft = {
     font_size: nextFontSize,
-    icon_size: nextIconSize,
-    icon_offset_x: nextIconOffsetX,
-    icon_offset_y: nextIconOffsetY,
-    triangle_width: nextTriangleWidth,
-    value_offset: nextValueOffset,
   }
+
+  if (widget?.category === 'values' && widget.type !== 'gradient') {
+    Object.assign(nextDraft, {
+      icon_size: nextIconSize,
+      icon_offset_x: nextIconOffsetX,
+      icon_offset_y: nextIconOffsetY,
+    })
+  }
+
+  if (widget?.type === 'gradient') {
+    Object.assign(nextDraft, {
+      triangle_width: nextTriangleWidth,
+      value_offset: nextValueOffset,
+    })
+  }
+
+  return nextDraft
 }

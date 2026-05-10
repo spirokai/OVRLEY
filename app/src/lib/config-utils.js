@@ -5,18 +5,40 @@
 import { createFontSelection, getFontFamilyName } from './fonts'
 import { getThemeColor } from './theme'
 
-const SCENE_STYLE_DEFAULTS = {
+export const SCENE_STYLE_DEFAULTS = {
+  border_color: '#000000',
   border_thickness: 0,
+  shadow_color: '#000000',
   shadow_strength: 0,
   shadow_distance: 0,
 }
 
-export const SCENE_STYLE_KEYS = [
-  'border_color',
-  'border_thickness',
-  'shadow_color',
-  'shadow_strength',
-  'shadow_distance',
+export const SCENE_STYLE_KEYS = Object.keys(SCENE_STYLE_DEFAULTS)
+
+export const DEFAULT_GLOBAL_DEFAULTS = {
+  font_values: 'Arial.ttf',
+  font_text: 'Arial.ttf',
+  color_values: '#ffffff',
+  color_text: '#ffffff',
+  color_icons: '#ffffff',
+  ...SCENE_STYLE_DEFAULTS,
+  opacity: 1,
+  scale: 1,
+}
+
+export const GLOBAL_DEFAULT_KEYS = Object.keys(DEFAULT_GLOBAL_DEFAULTS)
+
+export const SCENE_GLOBAL_DEFAULT_KEYS = [
+  ...SCENE_STYLE_KEYS,
+  'opacity',
+  'scale',
+]
+
+export const SCENE_DERIVED_SETTING_KEYS = [
+  ...SCENE_GLOBAL_DEFAULT_KEYS,
+  'font',
+  'color',
+  'font_size',
 ]
 
 /**
@@ -49,9 +71,21 @@ export function getEffectiveSceneData(sceneData, globals) {
     return sceneData
   }
 
+  const globalSceneStyle = {}
+  SCENE_STYLE_KEYS.forEach((key) => {
+    if (globals?.[key] !== undefined) {
+      globalSceneStyle[key] = globals[key]
+    }
+  })
+
   return {
     ...SCENE_STYLE_DEFAULTS,
     ...sceneData,
+    ...globalSceneStyle,
+    font: globals?.font_text || sceneData.font || 'Arial.ttf',
+    color: globals?.color_text || sceneData.color || getThemeColor('ice'),
+    font_size: sceneData.font_size ?? 30,
+    opacity: globals?.opacity,
     scale: globals?.scale,
   }
 }
@@ -238,14 +272,6 @@ export function syncGlobalDefaultsToConfig(
   const shouldApply = (key) => !changedKeySet || changedKeySet.has(key)
   const nextConfig = JSON.parse(JSON.stringify(config))
 
-  if (nextConfig.scene) {
-    SCENE_STYLE_KEYS.forEach((key) => {
-      if (shouldApply(key)) {
-        nextConfig.scene[key] = globals[key] ?? SCENE_STYLE_DEFAULTS[key] ?? 0
-      }
-    })
-  }
-
   if (nextConfig.labels) {
     nextConfig.labels.forEach((label) => {
       if (shouldApply('font_text')) {
@@ -283,10 +309,6 @@ export function syncGlobalDefaultsToConfig(
         plot.color = globals.color_values
       }
     })
-  }
-
-  if (nextConfig.scene && shouldApply('scale')) {
-    nextConfig.scene.scale = globals.scale
   }
 
   return nextConfig

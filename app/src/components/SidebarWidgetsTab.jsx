@@ -199,6 +199,7 @@ export default function SidebarWidgetsTab() {
       nextConfig.plots.push(
         createPlotDefaults(type, globalDefaults, {
           coursePoints: parsedActivity?.sample_course_points,
+          sceneFontSize: nextConfig.scene?.font_size,
         }),
       )
       newId = `plot-${nextConfig.plots.length - 1}`
@@ -228,7 +229,9 @@ export default function SidebarWidgetsTab() {
         replaceWidgetInConfig(
           config,
           id,
-          createPlotDefaults(widget.type, globalDefaults),
+          createPlotDefaults(widget.type, globalDefaults, {
+            sceneFontSize: config?.scene?.font_size,
+          }),
         ),
       )
       return

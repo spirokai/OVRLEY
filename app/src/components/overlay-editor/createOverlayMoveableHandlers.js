@@ -333,13 +333,13 @@ export default function useOverlayMoveableHandlers({
       const nextDraft = {
         ...draftWidgetsRef.current[origin.id],
         scale_direction: direction,
-        ...buildScaledWidgetDataDraft(origin, uniformScale),
+        ...buildScaledWidgetDataDraft(origin, uniformScale, selectedWidget),
       }
 
       draftWidgetsRef.current[origin.id] = nextDraft
       setLiveWidgetDraft(
         origin.id,
-        buildScaledWidgetDataDraft(origin, uniformScale),
+        buildScaledWidgetDataDraft(origin, uniformScale, selectedWidget),
       )
 
       if (scalePreviewFrameRef.current) {
@@ -405,11 +405,21 @@ export default function useOverlayMoveableHandlers({
           x: Math.round(finalX),
           y: Math.round(finalY),
           font_size: draft.font_size ?? origin.fontSize ?? 60,
-          icon_size: draft.icon_size ?? origin.iconSize ?? 28,
-          icon_offset_x: draft.icon_offset_x ?? origin.iconOffsetX ?? 0,
-          icon_offset_y: draft.icon_offset_y ?? origin.iconOffsetY ?? 0,
-          triangle_width: draft.triangle_width ?? origin.triangleWidth ?? 0,
-          value_offset: draft.value_offset ?? origin.valueOffset ?? 0,
+          ...(selectedWidget?.category === 'values' &&
+          selectedWidget.type !== 'gradient'
+            ? {
+                icon_size: draft.icon_size ?? origin.iconSize ?? 28,
+                icon_offset_x: draft.icon_offset_x ?? origin.iconOffsetX ?? 0,
+                icon_offset_y: draft.icon_offset_y ?? origin.iconOffsetY ?? 0,
+              }
+            : {}),
+          ...(selectedWidget?.type === 'gradient'
+            ? {
+                triangle_width:
+                  draft.triangle_width ?? origin.triangleWidth ?? 0,
+                value_offset: draft.value_offset ?? origin.valueOffset ?? 0,
+              }
+            : {}),
         })
       }
 

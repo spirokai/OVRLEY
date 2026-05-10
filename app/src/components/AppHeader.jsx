@@ -149,18 +149,18 @@ export default function AppHeader({
 
   return (
     <header className="relative z-50 shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 px-6 py-3">
-        <div className="flex min-w-0 items-center gap-6">
-          <div className="flex items-center gap-3">
+      <div className="grid grid-cols-[clamp(42rem,60vw,45rem)_auto_minmax(12rem,1fr)] items-center gap-6 px-6 py-3">
+        <div className="flex min-w-0 items-center gap-6 overflow-hidden">
+          <div className="flex shrink-0 items-center gap-3">
             <img src="/logo.svg" alt="OVRLEY" className="h-5" />
           </div>
 
-          <div className="h-8 w-px bg-border/60" />
+          <div className="h-8 w-px shrink-0 bg-border/60" />
 
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1 overflow-hidden">
             <div className="flex min-w-0 items-center gap-2">
               <Button
-                className="mr-4 h-9 gap-2 border-border/70 px-5"
+                className="mr-4 h-9 shrink-0 gap-2 border-border/70 px-5"
                 onClick={onOpenActivityFile}
               >
                 <Activity className="h-3.5 w-3.5" />
@@ -175,7 +175,7 @@ export default function AppHeader({
                 }
                 onValueChange={handleTemplateChange}
               >
-                <SelectTrigger className="h-8 w-56 bg-surface text-xs border-border/70">
+                <SelectTrigger className="h-8 w-56 max-w-[min(14rem,22vw)] shrink bg-surface text-xs border-border/70">
                   <div className="flex items-center gap-2 truncate">
                     <Sparkles className="h-3 w-3 shrink-0 text-primary" />
                     <SelectValue
@@ -204,7 +204,7 @@ export default function AppHeader({
                 </SelectContent>
               </Select>
 
-              <div className="flex items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1">
                 <SimpleTooltip side="bottom" content="New Template">
                   <Button
                     variant="ghost"
@@ -255,7 +255,7 @@ export default function AppHeader({
           </div>
         </div>
 
-        <div className="justify-self-center">
+        <div>
           <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-card/80 p-1 backdrop-blur-sm shadow-lg">
             <SimpleTooltip side="bottom" content="Checkered background">
               <Button
@@ -353,7 +353,7 @@ export default function AppHeader({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 justify-self-end">
+        <div className="flex min-w-fit items-center justify-end gap-3">
           <SimpleTooltip side="bottom" content={renderTooltipContent}>
             <Button
               size="sm"

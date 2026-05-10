@@ -94,6 +94,20 @@ export function createTemplateSlice(set, get) {
     }
   }
 
+  const normalizeGlobalDefaultsForState = (globalDefaults) => {
+    const normalizedDefaults = normalizeColorFields(globalDefaults || {})
+    return Object.keys(DEFAULT_GLOBAL_DEFAULTS).reduce(
+      (result, key) => ({
+        ...result,
+        [key]:
+          normalizedDefaults[key] === undefined
+            ? DEFAULT_GLOBAL_DEFAULTS[key]
+            : normalizedDefaults[key],
+      }),
+      {},
+    )
+  }
+
   const updateUnrenderedChanges = (state, nextConfig) => {
     if (state.lastRenderedConfig) {
       state.hasUnrenderedChanges =
@@ -269,20 +283,19 @@ export function createTemplateSlice(set, get) {
       const { filename = null, source = null } = options
       const nextConfig = templateState?.config || DEFAULT_CONFIG
       const nextSettings = templateState?.settings || {}
-      const nextGlobalDefaults = {
-        ...DEFAULT_GLOBAL_DEFAULTS,
-        ...normalizeColorFields(nextSettings.globalDefaults || {}),
-      }
+      const nextGlobalDefaults = normalizeGlobalDefaultsForState(
+        nextSettings.globalDefaults,
+      )
       const nextExportRange = {
         ...DEFAULT_EXPORT_RANGE,
-        ...(nextSettings.exportRange || {}),
+        ...(get().exportRange || {}),
       }
       const nextExportCodec = normalizePlatformCodec(
-        nextSettings.exportCodec || 'prores_ks',
+        get().exportCodec || 'prores_ks',
         get().platformOs,
       )
-      const nextAspectRatio = nextSettings.aspectRatio || '16:9'
-      const nextUpdateRate = nextSettings.updateRate || 1
+      const nextAspectRatio = get().aspectRatio || '16:9'
+      const nextUpdateRate = get().updateRate || 1
 
       persistTemplateSettings({
         config: nextConfig,

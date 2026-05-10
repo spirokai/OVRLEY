@@ -122,14 +122,14 @@ export default function useTemplateManagement({ onTemplateCreated }) {
       try {
         setGeneratingImage(true)
         const data = await backend.getTemplate(filename)
-        const templateState = createTemplateState({
-          config: data,
+        const normalizedTemplate = normalizeTemplateFilePayload(data, {
           globalDefaults,
           updateRate,
           exportRange,
           exportCodec,
           aspectRatio,
         })
+        const { name: _templateName, ...templateState } = normalizedTemplate
 
         hydrateTemplateState(templateState, {
           filename,

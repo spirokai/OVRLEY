@@ -148,7 +148,8 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     }
     onConfigChange({ ...config, scene: { ...config.scene, [key]: finalValue } })
   }
-  const sceneStyleValue = (key, fallback) => scene?.[key] ?? fallback
+  const sceneStyleValue = (key, fallback) =>
+    globalDefaults?.[key] ?? scene?.[key] ?? fallback
 
   return (
     <div className="mt-4 space-y-8 outline-none pb-10">

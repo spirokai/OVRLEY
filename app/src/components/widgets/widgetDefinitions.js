@@ -179,7 +179,7 @@ export function createLabelDefaults(globalDefaults) {
 export function createMetricValueDefaults(type, globalDefaults) {
   const font = globalDefaults?.font_values || 'Furore.otf'
   const fontSelection = createFontSelection(font)
-  return {
+  const sharedDefaults = {
     x: 100,
     y: 100,
     value: type,
@@ -190,7 +190,10 @@ export function createMetricValueDefaults(type, globalDefaults) {
     prefix: '',
     suffix: '',
     decimals: 0,
-    show_icon: type !== 'gradient',
+  }
+
+  const iconDefaults = {
+    show_icon: true,
     icon_color: getGlobalColor(
       globalDefaults,
       'color_icons',
@@ -199,17 +202,49 @@ export function createMetricValueDefaults(type, globalDefaults) {
     icon_size: 28,
     icon_offset_x: 0,
     icon_offset_y: 0,
-    show_units: ['speed', 'temperature'].includes(type),
-    speed_unit: 'kmh',
-    temperature_unit: 'celsius',
-    format: 'time-24',
-    value_offset: 0,
-    triangle_positive_color: getThemeColor('aqua'),
-    triangle_negative_color: getThemeColor('accent'),
-    show_sign: true,
-    show_triangle: true,
-    triangle_width: 72,
-    unit: 'metric',
+  }
+
+  const typeDefaults = {
+    speed: {
+      ...iconDefaults,
+      show_units: true,
+      speed_unit: 'kmh',
+    },
+    temperature: {
+      ...iconDefaults,
+      show_units: true,
+      temperature_unit: 'celsius',
+    },
+    heartrate: {
+      ...iconDefaults,
+      show_units: false,
+    },
+    cadence: {
+      ...iconDefaults,
+      show_units: false,
+    },
+    power: {
+      ...iconDefaults,
+      show_units: false,
+    },
+    time: {
+      ...iconDefaults,
+      format: 'time-24',
+    },
+    gradient: {
+      decimals: 0,
+      value_offset: 0,
+      triangle_positive_color: getThemeColor('aqua'),
+      triangle_negative_color: getThemeColor('accent'),
+      show_sign: true,
+      show_triangle: true,
+      triangle_width: 72,
+    },
+  }
+
+  return {
+    ...sharedDefaults,
+    ...(typeDefaults[type] || iconDefaults),
   }
 }
 
@@ -259,6 +294,7 @@ export function createPlotDefaults(type, globalDefaults, options = {}) {
     }
   }
 
+  const labelFont = globalDefaults?.font_values || 'Furore.otf'
   return {
     ...base,
     color: getGlobalColor(globalDefaults, 'color_values', getThemeColor('ice')),
@@ -283,5 +319,14 @@ export function createPlotDefaults(type, globalDefaults, options = {}) {
     metric_label_offset_y: 0,
     imperial_label_offset_x: 0,
     imperial_label_offset_y: 0,
+    point_label: {
+      ...createFontSelection(labelFont),
+      font_size: options.sceneFontSize ?? 12.5,
+      color: getGlobalColor(
+        globalDefaults,
+        'color_values',
+        getThemeColor('ice'),
+      ),
+    },
   }
 }

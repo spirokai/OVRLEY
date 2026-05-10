@@ -227,7 +227,9 @@ pub fn backend_list_templates(paths: &AppPaths) -> Result<Value, String> {
                 if !seen.insert(filename.to_string()) {
                     continue;
                 }
-                templates.push(template_descriptor(&path, filename, "built-in"));
+                if let Some(descriptor) = template_descriptor(&path, filename, "built-in") {
+                    templates.push(descriptor);
+                }
             }
         }
     }
@@ -294,29 +296,41 @@ fn ensure_json_filename(filename: &str) -> String {
     }
 }
 
-fn read_template_resolution(path: &Path) -> Option<(u64, u64)> {
+fn read_template_file(path: &Path) -> Option<Value> {
     let text = fs::read_to_string(path).ok()?;
-    let value: Value = serde_json::from_str(&text).ok()?;
-    let scene = value
-        .get("config")
-        .and_then(|config| config.get("scene"))
-        .or_else(|| value.get("scene"))?;
+    serde_json::from_str(&text).ok()
+}
+
+fn is_app_template(value: &Value) -> bool {
+    value
+        .get("format")
+        .and_then(Value::as_str)
+        .map(|format| format == "ovrley-template")
+        .unwrap_or(false)
+}
+
+fn read_template_resolution(value: &Value) -> Option<(u64, u64)> {
+    let scene = value.get("config").and_then(|config| config.get("scene"))?;
     let width = scene.get("width").and_then(Value::as_u64)?;
     let height = scene.get("height").and_then(Value::as_u64)?;
 
     Some((width, height))
 }
 
-fn template_descriptor(path: &Path, filename: &str, template_type: &str) -> Value {
-    let (width, height) = read_template_resolution(path).unwrap_or((0, 0));
+fn template_descriptor(path: &Path, filename: &str, template_type: &str) -> Option<Value> {
+    let value = read_template_file(path)?;
+    if !is_app_template(&value) {
+        return None;
+    }
+    let (width, height) = read_template_resolution(&value).unwrap_or((0, 0));
 
-    json!({
+    Some(json!({
         "id": filename,
         "name": filename.trim_end_matches(".json").replace('_', " ").to_uppercase(),
         "type": template_type,
         "width": width,
         "height": height
-    })
+    }))
 }
 
 fn downloads_ovrley_dir() -> PathBuf {

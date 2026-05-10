@@ -5,6 +5,7 @@
 import { getCurrentParsedActivity } from './activityCache'
 import useStore from '../store/useStore'
 import * as backend from './backend'
+import { applyGlobalDefaults } from '../lib/config-utils'
 
 // Track if a request is in progress to prevent duplicate calls
 let isGenerating = false
@@ -21,10 +22,14 @@ export default async function generateDemoFrame(config) {
       setImageFilename,
       setGeneratingImage,
       config: storeConfig,
+      globalDefaults,
       selectedSecond,
     } = useStore.getState()
 
-    const configToSend = config ?? storeConfig
+    const configToSend = applyGlobalDefaults(
+      config ?? storeConfig,
+      globalDefaults,
+    )
 
     const parsedActivity = getCurrentParsedActivity()
 

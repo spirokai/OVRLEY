@@ -3,7 +3,14 @@
  */
 
 import { normalizeColorFields } from './color-utils'
-import { SCENE_STYLE_KEYS } from './config-utils'
+import {
+  DEFAULT_GLOBAL_DEFAULTS,
+  GLOBAL_DEFAULT_KEYS,
+  SCENE_DERIVED_SETTING_KEYS,
+  SCENE_GLOBAL_DEFAULT_KEYS,
+} from './config-utils'
+
+export { DEFAULT_GLOBAL_DEFAULTS } from './config-utils'
 
 export const TEMPLATE_FILE_FORMAT = 'ovrley-template'
 export const TEMPLATE_FILE_VERSION = 1
@@ -16,21 +23,162 @@ export const DEFAULT_EXPORT_RANGE = {
   toTime: '00:00:00',
 }
 
-export const DEFAULT_GLOBAL_DEFAULTS = {
-  font_values: 'Arial.ttf',
-  font_text: 'Arial.ttf',
-  color_values: '#ffffff',
-  color_text: '#ffffff',
-  color_icons: '#ffffff',
-  border_color: '#000000',
-  border_thickness: 0,
-  border_strength: 0,
-  border_distance: 0,
-  shadow_color: '#000000',
-  shadow_strength: 0,
-  shadow_distance: 0,
-  opacity: 1,
-  scale: 1,
+const LABEL_KEYS = ['x', 'y', 'font', 'font_size', 'text', 'color', 'opacity']
+
+const VALUE_SHARED_KEYS = [
+  'x',
+  'y',
+  'value',
+  'font',
+  'font_size',
+  'color',
+  'opacity',
+  'prefix',
+  'suffix',
+  'decimals',
+]
+
+const VALUE_ICON_KEYS = [
+  'show_icon',
+  'icon_color',
+  'icon_size',
+  'icon_offset_x',
+  'icon_offset_y',
+]
+
+const VALUE_TYPE_KEYS = {
+  speed: [...VALUE_ICON_KEYS, 'show_units', 'speed_unit'],
+  heartrate: [...VALUE_ICON_KEYS, 'show_units'],
+  cadence: [...VALUE_ICON_KEYS, 'show_units'],
+  power: [...VALUE_ICON_KEYS, 'show_units'],
+  temperature: [...VALUE_ICON_KEYS, 'show_units', 'temperature_unit'],
+  time: [...VALUE_ICON_KEYS, 'format'],
+  gradient: [
+    'value_offset',
+    'triangle_positive_color',
+    'triangle_negative_color',
+    'show_sign',
+    'show_triangle',
+    'triangle_width',
+  ],
+}
+
+const COURSE_PLOT_KEYS = [
+  'x',
+  'y',
+  'value',
+  'width',
+  'height',
+  'opacity',
+  'rotation',
+  'completed_line_width',
+  'remaining_line_width',
+  'color',
+  'completed_line_color',
+  'completed_line_opacity',
+  'remaining_line_color',
+  'remaining_line_opacity',
+  'simplify_tolerance_px',
+  'target_density',
+  'show_full_activity',
+  'marker_size',
+  'marker_color',
+  'marker_opacity',
+]
+
+const ELEVATION_PLOT_KEYS = [
+  ...COURSE_PLOT_KEYS,
+  'area_completed_color',
+  'area_completed_opacity',
+  'area_remaining_color',
+  'area_remaining_opacity',
+  'show_elevation_metric',
+  'show_elevation_imperial',
+  'metric_label_offset_x',
+  'metric_label_offset_y',
+  'imperial_label_offset_x',
+  'imperial_label_offset_y',
+  'y_scale',
+  'point_label',
+]
+
+const VALUE_DEFAULTS = {
+  speed: {
+    show_icon: true,
+    show_units: true,
+    speed_unit: 'kmh',
+  },
+  heartrate: {
+    show_icon: true,
+    show_units: false,
+  },
+  cadence: {
+    show_icon: true,
+    show_units: false,
+  },
+  power: {
+    show_icon: true,
+    show_units: false,
+  },
+  temperature: {
+    show_icon: true,
+    show_units: true,
+    temperature_unit: 'celsius',
+  },
+  time: {
+    show_icon: true,
+    show_units: false,
+    format: 'time-24',
+  },
+  gradient: {
+    decimals: 0,
+    value_offset: 0,
+    triangle_positive_color: '#40e0d0',
+    triangle_negative_color: '#c65102',
+    show_sign: true,
+    show_triangle: true,
+    triangle_width: 72,
+  },
+}
+
+const PLOT_DEFAULTS = {
+  course: {
+    opacity: 1,
+    rotation: 0,
+    completed_line_width: 6,
+    remaining_line_width: 6,
+    completed_line_opacity: 100,
+    remaining_line_opacity: 35,
+    simplify_tolerance_px: 1,
+    target_density: 1,
+    show_full_activity: false,
+    marker_size: 18,
+    marker_opacity: 100,
+  },
+  elevation: {
+    opacity: 1,
+    rotation: 0,
+    completed_line_width: 6,
+    remaining_line_width: 6,
+    completed_line_opacity: 100,
+    remaining_line_opacity: 35,
+    area_completed_opacity: 24,
+    area_completed_color: '#ffffff',
+    area_remaining_color: '#00565c',
+    area_remaining_opacity: 12,
+    show_elevation_metric: true,
+    show_elevation_imperial: false,
+    metric_label_offset_x: 0,
+    metric_label_offset_y: 0,
+    imperial_label_offset_x: 0,
+    imperial_label_offset_y: 0,
+    y_scale: 1,
+    simplify_tolerance_px: 1,
+    target_density: 0.75,
+    show_full_activity: false,
+    marker_size: 16,
+    marker_opacity: 100,
+  },
 }
 
 /**
@@ -44,18 +192,119 @@ function cloneSerializable(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
-function mergeSceneStyleDefaults(globalDefaults, scene) {
+function pickDefined(source, keys) {
+  return keys.reduce((result, key) => {
+    if (source?.[key] !== undefined) {
+      result[key] = source[key]
+    }
+    return result
+  }, {})
+}
+
+function normalizeGlobalDefaults(globalDefaults) {
+  return normalizeColorFields({
+    ...DEFAULT_GLOBAL_DEFAULTS,
+    ...pickDefined(
+      cloneSerializable(globalDefaults) || {},
+      GLOBAL_DEFAULT_KEYS,
+    ),
+  })
+}
+
+function mergeSceneGlobalDefaults(scene, globalDefaults) {
   const sceneDefaults = {}
-  SCENE_STYLE_KEYS.forEach((key) => {
+  SCENE_GLOBAL_DEFAULT_KEYS.forEach((key) => {
     if (scene?.[key] !== undefined) {
       sceneDefaults[key] = scene[key]
     }
   })
 
   return {
-    ...globalDefaults,
-    ...normalizeColorFields(sceneDefaults),
+    ...normalizeGlobalDefaults({
+      ...sceneDefaults,
+      ...(cloneSerializable(globalDefaults) || {}),
+    }),
   }
+}
+
+function normalizeScene(scene = {}) {
+  const nextScene = cloneSerializable(scene) || {}
+
+  SCENE_DERIVED_SETTING_KEYS.forEach((key) => {
+    delete nextScene[key]
+  })
+
+  return normalizeColorFields(nextScene)
+}
+
+function normalizeLabel(label = {}) {
+  return normalizeColorFields(pickDefined(label, LABEL_KEYS))
+}
+
+function normalizeValue(value = {}) {
+  const type = value.value
+  const withDefaults = {
+    ...VALUE_DEFAULTS[type],
+    ...value,
+  }
+  const keys = [
+    ...VALUE_SHARED_KEYS,
+    ...(VALUE_TYPE_KEYS[type] || VALUE_ICON_KEYS),
+  ]
+
+  return normalizeColorFields(pickDefined(withDefaults, keys))
+}
+
+function normalizePointLabel(pointLabel, config, globalDefaults) {
+  const fallbackFont = globalDefaults?.font_values || config?.scene?.font
+  const fallbackColor =
+    pointLabel?.color || globalDefaults?.color_values || '#ffffff'
+
+  return normalizeColorFields({
+    ...(fallbackFont ? { font: fallbackFont } : {}),
+    font_size: pointLabel?.font_size ?? config?.scene?.font_size ?? 12.5,
+    color: fallbackColor,
+    ...pickDefined(pointLabel, ['font', 'font_size', 'color']),
+  })
+}
+
+function normalizePlot(plot = {}, config, globalDefaults) {
+  const type = plot.value
+  const withDefaults = {
+    ...PLOT_DEFAULTS[type],
+    ...plot,
+  }
+
+  if (type === 'elevation') {
+    withDefaults.point_label = normalizePointLabel(
+      plot.point_label,
+      config,
+      globalDefaults,
+    )
+  }
+
+  const keys = type === 'elevation' ? ELEVATION_PLOT_KEYS : COURSE_PLOT_KEYS
+  return normalizeColorFields(pickDefined(withDefaults, keys))
+}
+
+export function normalizeTemplateConfig(config, globalDefaults) {
+  const nextConfig = cloneSerializable(config) || {}
+  const normalizedConfig = {
+    scene: normalizeScene(nextConfig.scene),
+    labels: Array.isArray(nextConfig.labels)
+      ? nextConfig.labels.map(normalizeLabel)
+      : [],
+    values: Array.isArray(nextConfig.values)
+      ? nextConfig.values.map(normalizeValue)
+      : [],
+    plots: Array.isArray(nextConfig.plots)
+      ? nextConfig.plots.map((plot) =>
+          normalizePlot(plot, nextConfig, globalDefaults),
+        )
+      : [],
+  }
+
+  return normalizedConfig
 }
 
 /**
@@ -81,34 +330,18 @@ export function sanitizeTemplateFilename(name) {
  * @param {object} options - Structured options for the helper.
  * @param {*} options.config - Overlay template configuration data.
  * @param {*} options.globalDefaults - Value for global defaults.
- * @param {*} options.updateRate - Metric sampling rate used during export.
- * @param {*} options.exportRange - Requested export start and end bounds.
- * @param {*} options.exportCodec - Selected export codec identifier.
- * @param {*} options.aspectRatio - Value for aspect ratio.
  * @returns {object} Derived data structure for downstream use.
  */
-export function createTemplateState({
-  config,
-  globalDefaults,
-  updateRate,
-  exportRange,
-  exportCodec,
-  aspectRatio,
-}) {
+export function createTemplateState({ config, globalDefaults }) {
+  const nextGlobalDefaults = mergeSceneGlobalDefaults(
+    config?.scene,
+    globalDefaults,
+  )
+
   return {
-    config: cloneSerializable(config),
+    config: normalizeTemplateConfig(config, nextGlobalDefaults),
     settings: {
-      globalDefaults: {
-        ...DEFAULT_GLOBAL_DEFAULTS,
-        ...normalizeColorFields(cloneSerializable(globalDefaults) || {}),
-      },
-      updateRate: Number.isFinite(updateRate) ? updateRate : 1,
-      exportRange: {
-        ...DEFAULT_EXPORT_RANGE,
-        ...(cloneSerializable(exportRange) || {}),
-      },
-      exportCodec: exportCodec || 'prores_ks',
-      aspectRatio: aspectRatio || '16:9',
+      globalDefaults: nextGlobalDefaults,
     },
   }
 }
@@ -137,41 +370,25 @@ export function createTemplateFilePayload(state, meta = {}) {
  * @param {*} fallbackState - Value for fallback state.
  * @returns {object} Derived data structure for downstream use.
  */
-export function normalizeTemplateFilePayload(rawTemplate, fallbackState = {}) {
+export function normalizeTemplateFilePayload(rawTemplate, _fallbackState = {}) {
   if (!rawTemplate || typeof rawTemplate !== 'object') {
     throw new Error('Template file is empty or invalid.')
   }
 
-  if (rawTemplate.config && rawTemplate.settings) {
+  if (
+    rawTemplate.format === TEMPLATE_FILE_FORMAT &&
+    rawTemplate.config &&
+    rawTemplate.settings
+  ) {
+    const nextGlobalDefaults = mergeSceneGlobalDefaults(
+      rawTemplate.config.scene,
+      rawTemplate.settings.globalDefaults,
+    )
+
     return {
       ...createTemplateState({
         config: rawTemplate.config,
-        globalDefaults:
-          rawTemplate.settings.globalDefaults || fallbackState.globalDefaults,
-        updateRate: rawTemplate.settings.updateRate ?? fallbackState.updateRate,
-        exportRange:
-          rawTemplate.settings.exportRange || fallbackState.exportRange,
-        exportCodec:
-          rawTemplate.settings.exportCodec || fallbackState.exportCodec,
-        aspectRatio:
-          rawTemplate.settings.aspectRatio || fallbackState.aspectRatio,
-      }),
-      name: rawTemplate.name || null,
-    }
-  }
-
-  if (rawTemplate.scene) {
-    return {
-      ...createTemplateState({
-        config: rawTemplate,
-        globalDefaults: mergeSceneStyleDefaults(
-          fallbackState.globalDefaults,
-          rawTemplate.scene,
-        ),
-        updateRate: fallbackState.updateRate,
-        exportRange: fallbackState.exportRange,
-        exportCodec: fallbackState.exportCodec,
-        aspectRatio: fallbackState.aspectRatio,
+        globalDefaults: nextGlobalDefaults,
       }),
       name: rawTemplate.name || null,
     }
