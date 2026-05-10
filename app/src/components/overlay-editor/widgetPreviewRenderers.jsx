@@ -379,6 +379,36 @@ function PreviewSvgShadowBlurFilter({ id, shadow }) {
   )
 }
 
+function PreviewSvgIconShadow({
+  icon,
+  left,
+  top,
+  iconScale,
+  shadow,
+  shadowFilterId,
+  opacity,
+}) {
+  if (!shadow || !shadowFilterId) {
+    return null
+  }
+
+  const shadowColor = normalizeSvgShadowColor(shadow.color, opacity)
+
+  return (
+    <g
+      transform={`translate(${left + shadow.distance} ${top + shadow.distance}) scale(${iconScale})`}
+      fill="none"
+      stroke={shadowColor.color}
+      strokeWidth={icon.strokeWidth || 2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeOpacity={shadowColor.opacity}
+      filter={shadow.strength > 0 ? `url(#${shadowFilterId})` : undefined}
+      dangerouslySetInnerHTML={{ __html: icon.innerMarkup }}
+    />
+  )
+}
+
 /**
  * Returns a version token that changes after the requested font becomes ready.
  *
@@ -529,31 +559,25 @@ function PreviewMetricIcon({
     shadow && iconScale > 0
       ? {
           ...shadow,
-          distance: shadow.distance / iconScale,
           strength: shadow.strength / iconScale,
         }
       : null
 
   return (
     <>
-      <PreviewSvgShadowOnlyFilter
+      <PreviewSvgShadowBlurFilter
         id={shadowFilterId}
         shadow={normalizedShadow}
+      />
+      <PreviewSvgIconShadow
+        icon={icon}
+        left={left}
+        top={top}
+        iconScale={iconScale}
+        shadow={shadow}
+        shadowFilterId={shadowFilterId}
         opacity={opacity}
       />
-      {shadowFilterId && normalizedShadow ? (
-        <g
-          transform={`translate(${left} ${top}) scale(${iconScale})`}
-          fill="none"
-          stroke={color}
-          strokeWidth={icon.strokeWidth || 2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeOpacity={opacity}
-          filter={`url(#${shadowFilterId})`}
-          dangerouslySetInnerHTML={{ __html: icon.innerMarkup }}
-        />
-      ) : null}
       <g
         transform={`translate(${left} ${top}) scale(${iconScale})`}
         fill="none"
