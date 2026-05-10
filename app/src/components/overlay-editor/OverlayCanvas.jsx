@@ -9,6 +9,7 @@ import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 import { buildMetricWidgetPreviewModel } from './metricWidgetPreviewModel'
 import WidgetPreview from './WidgetPreview'
 import { buildWidgetTransform } from './utils'
+import { useVideoPreview } from '@/hooks/useVideoPreview'
 
 const CANVAS_BACKGROUND_COLORS = {
   black: '#000000',
@@ -225,6 +226,9 @@ export default function OverlayCanvas({
   setHoveredWidgetId,
   widgetRefCallbacks,
 }) {
+  const videoRef = useRef(null)
+  const { videoSrc, isOutOfRange } = useVideoPreview(videoRef)
+
   return (
     <div
       ref={setSceneElement}
@@ -248,6 +252,20 @@ export default function OverlayCanvas({
             CANVAS_BACKGROUND_COLORS.black,
         }}
       />
+      {backgroundMode === 'video' && videoSrc && (
+        <video
+          ref={videoRef}
+          src={videoSrc}
+          className={cn(
+            'pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-300',
+            isOutOfRange ? 'opacity-20' : 'opacity-100',
+          )}
+          muted
+          playsInline
+          onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
+          onLoadedData={() => console.log('[OverlayCanvas] Video Loaded')}
+        />
+      )}
       {gridVisible ? (
         <CanvasGrid displayScale={displayScale} sceneSize={sceneSize} />
       ) : null}

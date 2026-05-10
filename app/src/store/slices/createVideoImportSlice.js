@@ -1,4 +1,4 @@
-export const createVideoImportSlice = (set) => ({
+export const createVideoImportSlice = (set, get) => ({
   importedVideoPath: null, // absolute path from Tauri file dialog
   importedVideoDuration: null, // seconds (float), read via ffprobe
   importedVideoFps: null, // fps (float)
@@ -7,14 +7,18 @@ export const createVideoImportSlice = (set) => ({
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
   videoSyncWarning: null, // string warning or null
 
-  setImportedVideo: (metadata) =>
+  setImportedVideo: (metadata) => {
     set({
       importedVideoPath: metadata.path,
       importedVideoDuration: metadata.duration,
       importedVideoFps: metadata.fps,
       importedVideoResolution: metadata.resolution,
       importedVideoCreationTime: metadata.creationTime,
-    }),
+    })
+
+    const activitySummary = get().activitySummary
+    get().computeVideoSync(activitySummary)
+  },
 
   clearImportedVideo: () =>
     set({
@@ -35,5 +39,47 @@ export const createVideoImportSlice = (set) => ({
   setVideoSyncWarning: (msg) =>
     set({
       videoSyncWarning: msg,
+    }),
+
+  computeVideoSync: (activitySummary) =>
+    set((state) => {
+      if (!state.importedVideoCreationTime || !activitySummary) {
+        return {
+          videoSyncOffsetSeconds: 0,
+          videoSyncWarning:
+            'Could not determine video creation time or activity is missing — placed at start',
+        }
+      }
+
+      const videoStart = new Date(state.importedVideoCreationTime).getTime()
+      const activityStart = new Date(activitySummary.startTime).getTime()
+      const activityEnd = new Date(activitySummary.endTime).getTime()
+
+      if (isNaN(videoStart) || isNaN(activityStart) || isNaN(activityEnd)) {
+        return {
+          videoSyncOffsetSeconds: 0,
+          videoSyncWarning: 'Invalid timestamp formats — placed at start',
+        }
+      }
+
+      const offsetSeconds = (videoStart - activityStart) / 1000
+
+      // within [activityStart - 1h, activityEnd + 1h]
+      const oneHour = 60 * 60 * 1000
+      if (
+        videoStart < activityStart - oneHour ||
+        videoStart > activityEnd + oneHour
+      ) {
+        return {
+          videoSyncOffsetSeconds: 0,
+          videoSyncWarning:
+            'Video creation time is outside activity range — placed at start',
+        }
+      }
+
+      return {
+        videoSyncOffsetSeconds: offsetSeconds,
+        videoSyncWarning: null,
+      }
     }),
 })

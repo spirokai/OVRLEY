@@ -75,6 +75,11 @@ export default function OverlayPlayer() {
   const setSelectedSecondTransient = useStore(
     (state) => state.setSelectedSecondTransient,
   )
+  const importedVideoPath = useStore((state) => state.importedVideoPath)
+  const importedVideoDuration = useStore((state) => state.importedVideoDuration)
+  const videoSyncOffsetSeconds = useStore(
+    (state) => state.videoSyncOffsetSeconds,
+  )
   const [isPlaying, setIsPlaying] = useState(false)
   const [dragSecond, setDragSecond] = useState(null)
   const playbackAnchorRef = useRef({
@@ -89,9 +94,18 @@ export default function OverlayPlayer() {
   const totalDuration = useMemo(() => {
     const metadataDuration = Number(activitySummary?.durationSeconds) || 0
     const fallbackDuration = Number(dummyDurationSeconds) || 0
+    const videoEnd = importedVideoPath
+      ? videoSyncOffsetSeconds + importedVideoDuration
+      : 0
 
-    return Math.max(metadataDuration, fallbackDuration, 0)
-  }, [activitySummary?.durationSeconds, dummyDurationSeconds])
+    return Math.max(metadataDuration, fallbackDuration, videoEnd, 0)
+  }, [
+    activitySummary?.durationSeconds,
+    dummyDurationSeconds,
+    importedVideoPath,
+    videoSyncOffsetSeconds,
+    importedVideoDuration,
+  ])
 
   const hasActivity = Boolean(activitySummary && totalDuration > 0)
   const clampedPlayhead = clamp(Number(selectedSecond) || 0, 0, totalDuration)
@@ -397,7 +411,16 @@ export default function OverlayPlayer() {
           <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
             {formatTimelineTime(displayedPlayhead)}
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="relative min-w-0 flex-1">
+            {importedVideoPath && totalDuration > 0 && (
+              <div
+                className="absolute top-1/2 h-1 -translate-y-1/2 rounded-none bg-accent"
+                style={{
+                  left: `${Math.max(0, (videoSyncOffsetSeconds / totalDuration) * 100)}%`,
+                  width: `${Math.min(100, (importedVideoDuration / totalDuration) * 100)}%`,
+                }}
+              />
+            )}
             <Slider
               min={0}
               max={Math.max(totalDuration, 1)}

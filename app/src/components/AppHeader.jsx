@@ -172,7 +172,7 @@ export default function AppHeader({
 
               {importedVideoFilename ? (
                 <div className="w-50 mr-2 flex h-9 items-center rounded-md border border-border/70 bg-surface-elevated pl-3 pr-2 text-xs text-foreground">
-                  <Film className="mr-2 h-8 w-8 text-primary" />
+                  <Film className="mr-2 h-4 w-4 text-primary" />
                   <span className="truncate">{importedVideoFilename}</span>
                   <Button
                     variant="ghost"
@@ -304,6 +304,24 @@ export default function AppHeader({
                 <Square className="h-4 w-4 fill-[#f4ead2] text-[#f4ead2]" />
               </Button>
             </SimpleTooltip>
+
+            {importedVideoFilename && (
+              <>
+                <div className="mx-1 h-5 w-px bg-border/70" />
+                <SimpleTooltip side="bottom" content="Video background">
+                  <Button
+                    type="button"
+                    variant={backgroundMode === 'video' ? 'default' : 'ghost'}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onSetBackgroundMode('video')}
+                  >
+                    <Film className="h-4 w-4" />
+                  </Button>
+                </SimpleTooltip>
+              </>
+            )}
+
             <div className="mx-1 h-5 w-px bg-border/70" />
             <SimpleTooltip side="bottom" content="Zoom out">
               <Button

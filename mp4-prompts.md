@@ -45,7 +45,7 @@ Also read @mp4-compositing.md for full project context.
 Key rules:
 - Do NOT modify any existing files unless the plan explicitly marks them as [MODIFY].
 - Sync offset is SESSION-ONLY — never saved to template files.
-- Auto-sync algorithm: compare video creation_time to activitySummary.startTime/endTime. If creation_time is unknown OR outside [activityStart - 1h, activityEnd + 1h], set offset to 0 (place video at activity start) and show a warning. Otherwise compute offsetSeconds = (videoStart - activityStart) / 1000.
+- Auto-sync algorithm: compare video creation_time to activitySummary.startTime/endTime. If creation_time is unknown OR outside [activityStart, activityEnd ], set offset to 0 (place video at activity start) and show a warning. Otherwise compute offsetSeconds = (videoStart - activityStart) / 1000.
 - The "Video Sync" section in SidebarSettingsTab must show: video info block (duration, fps, resolution), detected creation time (or "Unknown"), warning if applicable, offset input accepting both seconds and timecode formats, and a "Reset Sync" button.
 - When video is imported: hide ExportRangeSettings, disable framerate selector with "Locked to video FPS" note.
 

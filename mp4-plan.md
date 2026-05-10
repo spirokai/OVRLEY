@@ -110,7 +110,7 @@ Add a new **"Video Sync"** section (only visible when `importedVideoPath` is set
 - **Video info block**: read-only display of duration, FPS, and resolution (e.g. "12:34 min · 29.97 fps · 3840×2160").
 - Read-only display of detected creation time (or "Creation Time: Unknown").
 - Warning alert if sync is out-of-range or creation time unknown.
-- Offset input accepting integer seconds (`123`) or timecode (`4:53`). Parses both formats.
+- Offset input accepting seconds to the tenth of second (`123.4` or `-123.4`) or timecode (`4:53.3` or `-4:53.3`). Parses both formats.
 - A "Reset Sync" button to re-run auto-sync.
 
 When `importedVideoPath` is set, also:
@@ -238,19 +238,46 @@ Defaults are defined in a simple config constant (e.g. in a new `app/src/lib/bit
  * Entries are evaluated top-to-bottom; first match wins.
  */
 export const BITRATE_BINS = [
-  { maxPixels: 2_073_600, label: "1080p", h264: 10, h265: 8, h264Hfr: 15, h265Hfr: 12 },
-  { maxPixels: 3_686_400, label: "1440p", h264: 30, h265: 20, h264Hfr: 45, h265Hfr: 30 },
-  { maxPixels: 8_294_400, label: "4K", h264: 60, h265: 40, h264Hfr: 90, h265Hfr: 60 },
+  {
+    maxPixels: 2_073_600,
+    label: "1080p",
+    h264: 10,
+    h265: 8,
+    h264Hfr: 15,
+    h265Hfr: 12,
+  },
+  {
+    maxPixels: 3_686_400,
+    label: "1440p",
+    h264: 30,
+    h265: 20,
+    h264Hfr: 45,
+    h265Hfr: 30,
+  },
+  {
+    maxPixels: 8_294_400,
+    label: "4K",
+    h264: 60,
+    h265: 40,
+    h264Hfr: 90,
+    h265Hfr: 60,
+  },
 ];
 
 /** Fallback if resolution exceeds all bins */
-export const BITRATE_FALLBACK = { h264: 80, h265: 60, h264Hfr: 100, h265Hfr: 80 };
+export const BITRATE_FALLBACK = {
+  h264: 80,
+  h265: 60,
+  h264Hfr: 100,
+  h265Hfr: 80,
+};
 
 export function getDefaultBitrate(width, height, fps, codecName) {
   const pixels = width * height;
   const isHevc = /h265|hevc|x265/i.test(codecName);
   const isHfr = fps > 30;
-  const bin = BITRATE_BINS.find((b) => pixels <= b.maxPixels) ?? BITRATE_FALLBACK;
+  const bin =
+    BITRATE_BINS.find((b) => pixels <= b.maxPixels) ?? BITRATE_FALLBACK;
   if (isHevc) return isHfr ? bin.h265Hfr : bin.h265;
   return isHfr ? bin.h264Hfr : bin.h264;
 }
@@ -490,7 +517,22 @@ These profiles from [gopro-dashboard-overlay](https://github.com/time4tea/gopro-
 ```json
 {
   "input": ["-hwaccel", "nvdec"],
-  "output": ["-vcodec", "h264_nvenc", "-rc:v", "cbr", "-b:v", "25M", "-bf:v", "3", "-profile:v", "high", "-spatial-aq", "true", "-movflags", "faststart"]
+  "output": [
+    "-vcodec",
+    "h264_nvenc",
+    "-rc:v",
+    "cbr",
+    "-b:v",
+    "25M",
+    "-bf:v",
+    "3",
+    "-profile:v",
+    "high",
+    "-spatial-aq",
+    "true",
+    "-movflags",
+    "faststart"
+  ]
 }
 ```
 
@@ -515,7 +557,22 @@ These profiles from [gopro-dashboard-overlay](https://github.com/time4tea/gopro-
 {
   "input": ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"],
   "filter": "[0:v]scale_cuda=format=yuv420p[mp4_stream];[1:v]format=yuva420p,hwupload[overlay_stream];[mp4_stream][overlay_stream]overlay_cuda",
-  "output": ["-vcodec", "h264_nvenc", "-rc:v", "cbr", "-b:v", "25M", "-bf:v", "3", "-profile:v", "main", "-spatial-aq", "true", "-movflags", "faststart"]
+  "output": [
+    "-vcodec",
+    "h264_nvenc",
+    "-rc:v",
+    "cbr",
+    "-b:v",
+    "25M",
+    "-bf:v",
+    "3",
+    "-profile:v",
+    "main",
+    "-spatial-aq",
+    "true",
+    "-movflags",
+    "faststart"
+  ]
 }
 ```
 
@@ -537,7 +594,14 @@ These profiles from [gopro-dashboard-overlay](https://github.com/time4tea/gopro-
 ```json
 {
   "input": ["-hwaccel", "videotoolbox"],
-  "output": ["-vcodec", "h264_videotoolbox", "-b:v", "60M", "-movflags", "faststart"]
+  "output": [
+    "-vcodec",
+    "h264_videotoolbox",
+    "-b:v",
+    "60M",
+    "-movflags",
+    "faststart"
+  ]
 }
 ```
 
@@ -556,7 +620,14 @@ These profiles from [gopro-dashboard-overlay](https://github.com/time4tea/gopro-
 ```json
 {
   "input": ["-hwaccel", "videotoolbox"],
-  "output": ["-vcodec", "hevc_videotoolbox", "-b:v", "40M", "-movflags", "faststart"]
+  "output": [
+    "-vcodec",
+    "hevc_videotoolbox",
+    "-b:v",
+    "40M",
+    "-movflags",
+    "faststart"
+  ]
 }
 ```
 
@@ -568,7 +639,14 @@ Same as `mac` but using HEVC (H.265) encoder. Better compression at same quality
 
 ```json
 {
-  "input": ["-init_hw_device", "qsv=hw", "-hwaccel", "qsv", "-hwaccel_output_format", "qsv"],
+  "input": [
+    "-init_hw_device",
+    "qsv=hw",
+    "-hwaccel",
+    "qsv",
+    "-hwaccel_output_format",
+    "qsv"
+  ],
   "filter": "[0:v]hwupload=extra_hw_frames=64[main_hw];[1:v]hwupload=extra_hw_frames=64,format=qsv[overlay_hw];[main_hw][overlay_hw]overlay_qsv=x=0:y=0,hwdownload,format=nv12",
   "output": ["-vcodec", "hevc_qsv", "-global_quality", "25", "-c:a", "copy"]
 }

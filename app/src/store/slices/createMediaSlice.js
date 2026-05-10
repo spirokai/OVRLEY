@@ -10,7 +10,7 @@ import { DEFAULT_RENDER_PROGRESS } from '../store-utils'
  * @param {*} set - Zustand setter callback.
  * @returns {object} Derived data structure for downstream use.
  */
-export function createMediaSlice(set) {
+export function createMediaSlice(set, get) {
   localStorage.removeItem('gpxFilename')
 
   return {
@@ -91,13 +91,9 @@ export function createMediaSlice(set) {
     },
 
     setActivitySummary: (activity) => {
-      set((state) => {
-        if (!activity) {
-          state.activitySummary = null
-          return
-        }
-
-        state.activitySummary = {
+      let summary = null
+      if (activity) {
+        summary = {
           durationSeconds: activity.metadata?.duration_seconds ?? 0,
           endTime: activity.metadata?.end_time ?? null,
           extendedAttributes: activity.extended_attributes || [],
@@ -108,7 +104,15 @@ export function createMediaSlice(set) {
           totalDistanceMeters: activity.metadata?.total_distance_m ?? 0,
           validAttributes: activity.valid_attributes || [],
         }
+      }
+
+      set((state) => {
+        state.activitySummary = summary
       })
+
+      if (get().computeVideoSync) {
+        get().computeVideoSync(summary)
+      }
     },
 
     clearActivitySummary: () => {

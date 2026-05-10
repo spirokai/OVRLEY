@@ -14,7 +14,15 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Video, Palette, RotateCcw, Gauge } from 'lucide-react'
+import {
+  Video,
+  Palette,
+  RotateCcw,
+  Gauge,
+  AlertTriangle,
+  ChevronUp,
+  ChevronDown,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ExportRangeSettings from '@/components/ExportRangeSettings'
@@ -76,6 +84,32 @@ function sanitizeNumber(val) {
   return parseInt(sanitized, 10) || 0
 }
 
+function parseTimeOffset(value) {
+  if (!value) return 0
+  const str = String(value).trim()
+  if (str === '') return 0
+
+  const isNegative = str.startsWith('-')
+  const absStr = isNegative ? str.substring(1) : str
+
+  if (absStr.includes(':')) {
+    const parts = absStr.split(':')
+    let seconds = 0
+    if (parts.length === 2) {
+      seconds = parseInt(parts[0]) * 60 + parseFloat(parts[1])
+    } else if (parts.length === 3) {
+      seconds =
+        parseInt(parts[0]) * 3600 +
+        parseInt(parts[1]) * 60 +
+        parseFloat(parts[2])
+    }
+    return isNegative ? -seconds : seconds
+  }
+
+  const parsed = parseFloat(str)
+  return isNaN(parsed) ? 0 : parsed
+}
+
 /**
  * Renders the sidebar settings tab component.
  *
@@ -96,7 +130,15 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     aspectRatio,
     setAspectRatio,
     resetGlobalDefaults,
+    importedVideoPath,
     importedVideoFps,
+    importedVideoDuration,
+    importedVideoResolution,
+    importedVideoCreationTime,
+    videoSyncOffsetSeconds,
+    videoSyncWarning,
+    setVideoSyncOffset,
+    computeVideoSync,
   } = useStore()
 
   const scene = config?.scene
@@ -120,6 +162,32 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     () => getContainerFps(scene?.fps, updateRate),
     [scene?.fps, updateRate],
   )
+
+  const [offsetInput, setOffsetInput] = useState(
+    videoSyncOffsetSeconds?.toString() || '0',
+  )
+
+  useEffect(() => {
+    setOffsetInput(videoSyncOffsetSeconds?.toString() || '0')
+  }, [videoSyncOffsetSeconds])
+
+  const handleOffsetBlur = (val) => {
+    const parsed = parseTimeOffset(val)
+    const rounded = Math.round(parsed * 10) / 10
+    setVideoSyncOffset(rounded)
+    setOffsetInput(
+      Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1),
+    )
+  }
+
+  const handleIncrement = (amount) => {
+    const current = parseTimeOffset(offsetInput)
+    const newOffset = Math.round((current + amount) * 10) / 10
+    setVideoSyncOffset(newOffset)
+    setOffsetInput(
+      Number.isInteger(newOffset) ? newOffset.toString() : newOffset.toFixed(1),
+    )
+  }
 
   useEffect(() => {
     if (scene) {
@@ -355,12 +423,105 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             Output container: {containerFps.toFixed(2).replace(/\.00$/, '')} fps
           </p>
         </div>
-        {activitySummary ? (
+        {activitySummary && !importedVideoPath ? (
           <div className="space-y-3 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
             <ExportRangeSettings
               exportRange={exportRange}
               onExportRangeChange={setExportRange}
             />
+          </div>
+        ) : null}
+
+        {importedVideoPath ? (
+          <div className="space-y-4 rounded-lg border border-accent-border bg-surface-accent-soft p-4">
+            <div className="flex items-center gap-2">
+              <Video className="h-4 w-4 text-primary" />
+              <Label className="text-xs font-semibold">Video Sync</Label>
+            </div>
+
+            <div className="space-y-2 text-[10px] text-muted-foreground">
+              <div className="flex justify-between">
+                <span>Info:</span>
+                <span className="font-medium text-foreground">
+                  {importedVideoDuration
+                    ? `${Math.floor(importedVideoDuration / 60)}:${Math.floor(
+                        importedVideoDuration % 60,
+                      )
+                        .toString()
+                        .padStart(2, '0')} min`
+                    : 'Unknown'}{' '}
+                  ·{' '}
+                  {importedVideoFps
+                    ? `${Math.round(importedVideoFps * 100) / 100} fps`
+                    : 'Unknown'}{' '}
+                  ·{' '}
+                  {importedVideoResolution
+                    ? `${importedVideoResolution.width}×${importedVideoResolution.height}`
+                    : 'Unknown'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Creation Time:</span>
+                <span className="font-medium text-foreground">
+                  {importedVideoCreationTime
+                    ? new Date(importedVideoCreationTime).toLocaleString()
+                    : 'Unknown'}
+                </span>
+              </div>
+            </div>
+
+            {videoSyncWarning && (
+              <div className="flex gap-2 items-start rounded-md bg-destructive/10 p-2 text-destructive">
+                <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                <p className="text-[10px] leading-tight">{videoSyncWarning}</p>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <Label className="text-[9px] text-muted-foreground uppercase font-bold">
+                Sync Offset
+              </Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <BlurInput
+                    type="text"
+                    value={offsetInput}
+                    onChange={(e) => setOffsetInput(e.target.value)}
+                    onBlur={(e) => handleOffsetBlur(e.target.value)}
+                    className="h-9 bg-surface text-xs pr-11 w-full border border-border/70"
+                    placeholder="Seconds or MM:SS"
+                  />
+                  <div className="absolute inset-y-1 right-1 flex w-5 flex-col overflow-hidden rounded border border-none bg-surface-strong">
+                    <button
+                      type="button"
+                      className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleIncrement(0.1)}
+                    >
+                      <ChevronUp className="h-3 w-3" />
+                    </button>
+                    <div className="h-px bg-border/60" />
+                    <button
+                      type="button"
+                      className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleIncrement(-0.1)}
+                    >
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 px-3 text-xs"
+                  disabled={!activitySummary}
+                  onClick={() => computeVideoSync(activitySummary)}
+                >
+                  Auto-sync
+                </Button>
+              </div>
+            </div>
           </div>
         ) : null}
       </div>
