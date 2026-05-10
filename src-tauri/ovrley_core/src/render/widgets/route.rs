@@ -11,8 +11,8 @@ use super::common::{
     frame_progress_values, legacy_line_width, marker_layers_from_points, marker_size_from_weights,
     normalize_opacity, normalize_optional_progress_window, normalize_shadow_style, plot_base_color,
     point_at_metric_progress_with_cursor, relative_distance_frame_progress_values,
-    resolve_style_color, scale_marker_points, static_layer_padding, widget_render_report,
-    with_widget_transform, DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER,
+    resolve_style_color, scale_marker_points, shadow_with_screen_offset, static_layer_padding,
+    widget_render_report, with_widget_transform, DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER,
     DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
 };
 use super::types::{
@@ -171,11 +171,14 @@ fn normalize_route_plot(config: &RenderConfig, plot: &CoursePlotConfig) -> Norma
                 .or(plot.opacity),
             0.75,
         ),
-        remaining_line_shadow: normalize_shadow_style(
-            config.scene.shadow_color.as_ref(),
-            config.scene.shadow_strength,
-            config.scene.shadow_distance,
-            scale,
+        remaining_line_shadow: shadow_with_screen_offset(
+            normalize_shadow_style(
+                config.scene.shadow_color.as_ref(),
+                config.scene.shadow_strength,
+                config.scene.shadow_distance,
+                scale,
+            ),
+            plot.rotation,
         ),
         completed_line_width: plot.completed_line_width.unwrap_or(legacy_width),
         completed_line_color: resolve_style_color(

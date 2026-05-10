@@ -129,6 +129,8 @@ pub(crate) struct ShadowStyle {
     pub(crate) color: String,
     pub(crate) strength: f32,
     pub(crate) distance: f32,
+    pub(crate) offset_x: f32,
+    pub(crate) offset_y: f32,
 }
 
 /// Normalized route plot settings after defaults and scale are applied.

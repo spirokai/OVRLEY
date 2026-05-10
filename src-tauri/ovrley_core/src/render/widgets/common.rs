@@ -411,7 +411,7 @@ pub(crate) fn draw_polyline_with_shadow(
                 ));
             }
             canvas.save();
-            canvas.translate((shadow.distance, shadow.distance));
+            canvas.translate((shadow.offset_x, shadow.offset_y));
             canvas.draw_path(&path, &shadow_paint);
             canvas.restore();
         }
@@ -600,6 +600,25 @@ pub(crate) fn normalize_shadow_style(
         color,
         strength,
         distance,
+        offset_x: distance,
+        offset_y: distance,
+    })
+}
+
+// Converts a desired screen-space shadow into widget-local coordinates so it
+// remains visually down/right after the widget itself is rotated.
+pub(crate) fn shadow_with_screen_offset(
+    shadow: Option<ShadowStyle>,
+    rotation_deg: f32,
+) -> Option<ShadowStyle> {
+    shadow.map(|mut shadow| {
+        if rotation_deg != 0.0 && shadow.distance != 0.0 {
+            let radians = rotation_deg.to_radians();
+            let distance = shadow.distance;
+            shadow.offset_x = (radians.cos() + radians.sin()) * distance;
+            shadow.offset_y = (radians.cos() - radians.sin()) * distance;
+        }
+        shadow
     })
 }
 
@@ -608,7 +627,7 @@ pub(crate) fn static_layer_padding(line_width: f32, shadow: Option<&ShadowStyle>
     // Static layers can include shadows that extend beyond the widget bounds.
     // Padding prevents the cached image from clipping those pixels.
     let shadow_extent = shadow
-        .map(|shadow| shadow.distance.abs() + shadow.strength * 3.0)
+        .map(|shadow| shadow.offset_x.abs().max(shadow.offset_y.abs()) + shadow.strength * 3.0)
         .unwrap_or(0.0);
     (line_width.max(1.0) * 0.5 + shadow_extent).ceil().max(0.0) as u32
 }
@@ -652,19 +671,17 @@ pub(crate) fn with_widget_transform(
     canvas: &Canvas,
     x: f32,
     y: f32,
-    width: f32,
-    height: f32,
+    _width: f32,
+    _height: f32,
     rotation_deg: f32,
     draw: impl FnOnce(&Canvas),
 ) {
-    // Widget coordinates are local to the plot; rotate around its center after
-    // translating to the configured canvas position.
+    // Match the editor preview: plot widgets rotate around their top-left
+    // origin after being translated to the configured canvas position.
     canvas.save();
     canvas.translate((x, y));
     if rotation_deg != 0.0 {
-        canvas.translate((width / 2.0, height / 2.0));
         canvas.rotate(rotation_deg, None);
-        canvas.translate((-width / 2.0, -height / 2.0));
     }
     draw(canvas);
     canvas.restore();
@@ -676,8 +693,8 @@ pub(crate) fn rotate_point_to_canvas(
     y: f32,
     widget_x: f32,
     widget_y: f32,
-    width: f32,
-    height: f32,
+    _width: f32,
+    _height: f32,
     rotation_deg: f32,
 ) -> (f32, f32) {
     // Used for preview reports and labels that are drawn outside the widget's
@@ -685,17 +702,10 @@ pub(crate) fn rotate_point_to_canvas(
     if rotation_deg == 0.0 {
         return (widget_x + x, widget_y + y);
     }
-    let center_x = width / 2.0;
-    let center_y = height / 2.0;
-    let radians = (-rotation_deg).to_radians();
-    let translated_x = x - center_x;
-    let translated_y = y - center_y;
-    let rotated_x = translated_x * radians.cos() - translated_y * radians.sin();
-    let rotated_y = translated_x * radians.sin() + translated_y * radians.cos();
-    (
-        widget_x + rotated_x + center_x,
-        widget_y + rotated_y + center_y,
-    )
+    let radians = rotation_deg.to_radians();
+    let rotated_x = x * radians.cos() - y * radians.sin();
+    let rotated_y = x * radians.sin() + y * radians.cos();
+    (widget_x + rotated_x, widget_y + rotated_y)
 }
 
 // Builds preview diagnostics for a rendered widget frame.

@@ -574,12 +574,18 @@ function PreviewPolylineShadow({
   blurFilterId,
   strokeWidth,
   strokeOpacity,
+  rotation = 0,
 }) {
   if (!shadow || !points) {
     return null
   }
 
   const shadowColor = normalizeSvgShadowColor(shadow.color, strokeOpacity)
+  const rotationRadians = ((Number(rotation) || 0) * Math.PI) / 180
+  const offsetX =
+    (Math.cos(rotationRadians) + Math.sin(rotationRadians)) * shadow.distance
+  const offsetY =
+    (Math.cos(rotationRadians) - Math.sin(rotationRadians)) * shadow.distance
 
   return (
     <polyline
@@ -590,7 +596,7 @@ function PreviewPolylineShadow({
       strokeLinejoin="round"
       strokeLinecap="round"
       points={points}
-      transform={`translate(${shadow.distance} ${shadow.distance})`}
+      transform={`translate(${offsetX} ${offsetY})`}
       filter={
         shadow.strength > 0 && blurFilterId
           ? `url(#${blurFilterId})`
@@ -1068,6 +1074,7 @@ export function OverlayRouteWidget({
           blurFilterId={shadowFilterId}
           strokeWidth={remainingLineWidth}
           strokeOpacity={remainingLineOpacity}
+          rotation={widget.data.rotation ?? 0}
         />
         <polyline
           fill="none"
@@ -1334,6 +1341,7 @@ export function OverlayElevationWidget({
         blurFilterId={lineShadowFilterId}
         strokeWidth={remainingLineWidth}
         strokeOpacity={remainingLineOpacity}
+        rotation={widget.data.rotation ?? 0}
       />
       <polyline
         fill="none"
