@@ -67,12 +67,8 @@ export const createVideoImportSlice = (set, get) => ({
 
       const offsetSeconds = (videoStart - activityStart) / 1000
 
-      // within [activityStart - 1h, activityEnd + 1h]
-      const oneHour = 60 * 60 * 1000
-      if (
-        videoStart < activityStart - oneHour ||
-        videoStart > activityEnd + oneHour
-      ) {
+      // within [activityStart, activityEnd]
+      if (videoStart < activityStart || videoStart > activityEnd) {
         return {
           videoSyncOffsetSeconds: 0,
           videoSyncWarning:

@@ -137,6 +137,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     videoSyncOffsetSeconds,
     videoSyncWarning,
     setVideoSyncOffset,
+    setVideoSyncWarning,
     computeVideoSync,
   } = useStore()
 
@@ -170,6 +171,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
     const parsed = parseTimeOffset(val)
     const rounded = Math.round(parsed * 10) / 10
     setVideoSyncOffset(rounded)
+    setVideoSyncWarning(null)
     setOffsetInput(
       Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1),
     )
