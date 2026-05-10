@@ -8,7 +8,6 @@ build/
 dist/
 dist-portable/
 target/
-app/debug/*
 src-tauri/binaries/
 ffmpeg/
 .ffmpeg/
@@ -16,7 +15,9 @@ vendor/ffmpeg/*
 !vendor/ffmpeg/.gitkeep
 
 # App specifics
+app/debug/
 next/
+tmp/
 *.mov
 *.prof
 .ruff_cache
