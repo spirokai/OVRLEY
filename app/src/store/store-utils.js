@@ -10,7 +10,6 @@ import { normalizeColorFields } from '../lib/color-utils'
 import { DEFAULT_GLOBAL_DEFAULTS } from '../lib/config-utils'
 
 let isUpdatingFromConfig = false
-let isUpdatingFromTimeline = false
 
 export const DEFAULT_CONFIG = {
   scene: {
@@ -177,14 +176,6 @@ export function endConfigUpdateSoon() {
  */
 export function isConfigUpdateInProgress() {
   return isUpdatingFromConfig
-}
-
-/**
- * Checks whether is updating from timeline flag.
- * @returns {boolean} Whether the condition is satisfied.
- */
-export function isUpdatingFromTimelineFlag() {
-  return isUpdatingFromTimeline
 }
 
 /**

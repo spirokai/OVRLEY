@@ -567,11 +567,6 @@ fn draw_static_metric_icons(canvas: &skia_safe::Canvas, config: &RenderConfig, s
     }
 }
 
-/// Builds the frontend response payload for a preview render.
-pub fn stub_demo_response(filename: &str) -> Value {
-    json!({ "filename": filename })
-}
-
 /// Legacy placeholder response retained for callers that still expect it.
 pub fn stub_render_response(config: &RenderConfig, dense_activity: &DenseActivityReport) -> Value {
     json!({

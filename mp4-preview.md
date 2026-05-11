@@ -311,5 +311,3 @@ Expected target during video playback:
 ---
 
 ## Clean up
-
-carefully examine @createEditorSlice.js @OverlayCanvas.jsx and @useVidePreview.js and clean up any stray or obsolete code, especially from the precious implementation that relied on the previous implementation of the player: "`OverlayPlayer.jsx` owns a `requestAnimationFrame` loop that advances global `selectedSecond` through Zustand. `useVideoPreview.js` subscribes to `selectedSecond` and assigns `video.currentTime` whenever the playhead changes. During playback this becomes repeated frame-by-frame seeking."

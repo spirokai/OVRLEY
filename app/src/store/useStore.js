@@ -4,12 +4,11 @@
 
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import { devtools } from 'zustand/middleware'
+import { devtools, subscribeWithSelector } from 'zustand/middleware'
 import { createEditorSlice } from './slices/createEditorSlice'
 import { createMediaSlice } from './slices/createMediaSlice'
 import { createTemplateSlice } from './slices/createTemplateSlice'
 import { createVideoImportSlice } from './slices/createVideoImportSlice'
-export { isUpdatingFromTimelineFlag } from './store-utils'
 
 /**
  * Creates store state.
@@ -39,7 +38,7 @@ function shouldEnableStoreDevtools() {
   return window.localStorage.getItem('ovrley:store-devtools') === 'true'
 }
 
-const storeInitializer = immer(createStoreState)
+const storeInitializer = subscribeWithSelector(immer(createStoreState))
 
 const useStore = create(
   shouldEnableStoreDevtools()

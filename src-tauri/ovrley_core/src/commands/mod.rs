@@ -3,8 +3,8 @@
 //! Functions in this module are framework-agnostic: they accept plain strings,
 //! paths, and controller references so the Tauri command layer can delegate here
 //! without mixing app-window concerns into render logic. Responsibilities include
-//! runtime path resolution, template IO, preview rendering, video render startup,
-//! progress/cancel plumbing, and small OS integration helpers.
+//! runtime path resolution, template IO, video render startup, progress/cancel
+//! plumbing, and small OS integration helpers.
 
 use crate::activity::{build_dense_activity_report, parse_activity_json};
 use crate::config::parse_config_json;
@@ -12,7 +12,6 @@ use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
 use crate::encode::video::{render_video, RenderController};
 use crate::encode::video_pipeline::rendered_frame_count;
-use crate::render::{render_preview_to_path, stub_demo_response};
 use serde::Serialize;
 use serde_json::{json, Value};
 use skia_safe::FontMgr;
@@ -24,8 +23,8 @@ use std::process::Command;
 /// Filesystem locations used by backend operations.
 ///
 /// Paths are derived differently in development and packaged builds, but callers
-/// receive one normalized structure so rendering, templates, fonts, previews,
-/// temporary files, and downloads are always addressed consistently.
+/// receive one normalized structure so rendering, templates, fonts, temporary
+/// files, and downloads are always addressed consistently.
 #[derive(Clone, Debug)]
 pub struct AppPaths {
     /// Root used for bundled runtime assets such as vendor ffmpeg.
@@ -34,8 +33,6 @@ pub struct AppPaths {
     pub font_dirs: Vec<PathBuf>,
     /// Directory for timing summaries and sample-frame debug artifacts.
     pub debug_render_dir: PathBuf,
-    /// Directory where preview PNGs are written.
-    pub preview_dir: PathBuf,
     /// Directory for short-lived files such as ffmpeg concat lists.
     pub temp_dir: PathBuf,
     /// Built-in template directories, searched in precedence order.
@@ -75,7 +72,6 @@ impl AppPaths {
         } else {
             runtime_dir.join("debug_render")
         };
-        let preview_dir = runtime_dir.join("previews");
         let temp_dir = runtime_dir.join("tmp");
         let bundled_templates_dirs =
             vec![resource_root.join("templates"), repo_root.join("templates")]
@@ -88,7 +84,6 @@ impl AppPaths {
             repo_root: resource_root,
             font_dirs,
             debug_render_dir,
-            preview_dir,
             temp_dir,
             bundled_templates_dirs,
             user_templates_dir,
@@ -100,7 +95,6 @@ impl AppPaths {
     pub fn ensure_dirs(&self) -> Result<(), String> {
         for dir in [
             &self.debug_render_dir,
-            &self.preview_dir,
             &self.temp_dir,
             &self.user_templates_dir,
             &self.downloads_dir,
@@ -170,29 +164,6 @@ pub fn backend_list_system_fonts() -> Value {
     fonts.dedup_by(|current, next| current.eq_ignore_ascii_case(next));
 
     Value::Array(fonts.into_iter().map(Value::String).collect())
-}
-
-/// Renders a single preview PNG and returns its preview filename.
-pub fn backend_demo(
-    paths: &AppPaths,
-    config_json: &str,
-    parsed_activity_json: &str,
-    second: u32,
-) -> Result<Value, String> {
-    let config = parse_config_json(config_json)?;
-    let parsed_activity = parse_activity_json(parsed_activity_json)?;
-    let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
-    let filename = "demo_preview.png";
-    let output_path = paths.preview_dir.join(filename);
-    render_preview_to_path(
-        paths,
-        &config,
-        &parsed_activity,
-        &dense_activity,
-        second,
-        &output_path,
-    )?;
-    Ok(stub_demo_response(filename))
 }
 
 /// Starts a background video render.
@@ -350,31 +321,6 @@ pub fn backend_open_video(paths: &AppPaths, filename: &str) -> Result<Value, Str
     Ok(json!({ "message": "Video opened" }))
 }
 
-/// Reads a preview or downloaded image and returns it as a data URL.
-pub fn backend_image_data(paths: &AppPaths, filename: &str) -> Result<String, String> {
-    let preview_path = paths.preview_dir.join(filename);
-    let downloads_path = paths.downloads_dir.join(filename);
-    let path = if preview_path.is_file() {
-        preview_path
-    } else if downloads_path.is_file() {
-        downloads_path
-    } else {
-        return Err(format!("Image file not found: {filename}"));
-    };
-    let bytes =
-        fs::read(&path).map_err(|error| format!("Failed to read {}: {error}", path.display()))?;
-    let content_type = match path.extension().and_then(|value| value.to_str()) {
-        Some("png") => "image/png",
-        Some("jpg") | Some("jpeg") => "image/jpeg",
-        _ => "application/octet-stream",
-    };
-    Ok(format!(
-        "data:{};base64,{}",
-        content_type,
-        base64_encode(&bytes)
-    ))
-}
-
 #[derive(Clone, Copy)]
 enum TemplateSource {
     Any,
@@ -510,40 +456,6 @@ fn open_path_in_system(path: &Path) -> Result<(), String> {
     }
 }
 
-// Encodes raw bytes as base64 for image data URLs.
-fn base64_encode(bytes: &[u8]) -> String {
-    // Tiny local encoder keeps this crate independent of a base64 dependency
-    // for the single data-URL use case.
-    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut output = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    let mut chunks = bytes.chunks_exact(3);
-
-    for chunk in &mut chunks {
-        let block = ((chunk[0] as u32) << 16) | ((chunk[1] as u32) << 8) | chunk[2] as u32;
-        output.push(TABLE[((block >> 18) & 0x3f) as usize] as char);
-        output.push(TABLE[((block >> 12) & 0x3f) as usize] as char);
-        output.push(TABLE[((block >> 6) & 0x3f) as usize] as char);
-        output.push(TABLE[(block & 0x3f) as usize] as char);
-    }
-
-    let remainder = chunks.remainder();
-    if !remainder.is_empty() {
-        let first = remainder[0] as u32;
-        let second = remainder.get(1).copied().unwrap_or_default() as u32;
-        let block = (first << 16) | (second << 8);
-        output.push(TABLE[((block >> 18) & 0x3f) as usize] as char);
-        output.push(TABLE[((block >> 12) & 0x3f) as usize] as char);
-        if remainder.len() == 2 {
-            output.push(TABLE[((block >> 6) & 0x3f) as usize] as char);
-            output.push('=');
-        } else {
-            output.push('=');
-            output.push('=');
-        }
-    }
-
-    output
-}
 
 /// Probes a video file and returns its metadata.
 pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> Result<Value, String> {

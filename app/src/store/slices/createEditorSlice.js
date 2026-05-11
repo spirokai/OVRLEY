@@ -43,7 +43,6 @@ export function createEditorSlice(set, get) {
     selectedSecond: readStoredInt('selectedSecond', 0),
     previewPlaybackState: 'paused',
     previewPlaybackSource: 'timeline',
-    previewPlaybackStartedAtSecond: 0,
     config: readStoredConfig(),
     autoRender: localStorage.getItem('autoRender') === 'true',
 
@@ -189,7 +188,6 @@ export function createEditorSlice(set, get) {
       set((state) => {
         state.previewPlaybackState = 'playing'
         state.previewPlaybackSource = safeSource
-        state.previewPlaybackStartedAtSecond = safeSecond
         state.selectedSecond = safeSecond
       })
     },
@@ -200,7 +198,6 @@ export function createEditorSlice(set, get) {
       localStorage.setItem('selectedSecond', safeSecond.toString())
       set((state) => {
         state.previewPlaybackState = 'paused'
-        state.previewPlaybackStartedAtSecond = safeSecond
         state.selectedSecond = safeSecond
       })
     },
@@ -210,7 +207,6 @@ export function createEditorSlice(set, get) {
 
       set((state) => {
         state.previewPlaybackState = 'scrubbing'
-        state.previewPlaybackStartedAtSecond = safeSecond
         state.selectedSecond = safeSecond
       })
     },
@@ -230,7 +226,6 @@ export function createEditorSlice(set, get) {
       localStorage.setItem('selectedSecond', safeSecond.toString())
       set((state) => {
         state.previewPlaybackState = 'paused'
-        state.previewPlaybackStartedAtSecond = safeSecond
         state.selectedSecond = safeSecond
       })
     },

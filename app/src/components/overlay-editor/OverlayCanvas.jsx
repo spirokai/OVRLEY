@@ -267,7 +267,6 @@ export default function OverlayCanvas({
           muted
           playsInline
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
-          onLoadedData={() => console.log('[OverlayCanvas] Video Loaded')}
         />
       )}
       {gridVisible ? (

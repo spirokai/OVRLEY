@@ -50,22 +50,6 @@ async fn backend_list_system_fonts() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn backend_demo(
-    app: AppHandle,
-    config_json: String,
-    parsed_activity_json: String,
-    second: u32,
-) -> Result<String, String> {
-    let response = commands::backend_demo(
-        &app_paths(&app)?,
-        &config_json,
-        &parsed_activity_json,
-        second,
-    )?;
-    serde_json::to_string(&response).map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 async fn backend_render(
     app: AppHandle,
     state: tauri::State<'_, BackendState>,
@@ -117,11 +101,6 @@ async fn backend_cancel(state: tauri::State<'_, BackendState>) -> Result<String,
 }
 
 #[tauri::command]
-async fn backend_image_data(app: AppHandle, filename: String) -> Result<String, String> {
-    commands::backend_image_data(&app_paths(&app)?, &filename)
-}
-
-#[tauri::command]
 async fn backend_probe_video(app: AppHandle, file_path: String) -> Result<String, String> {
     let response = commands::backend_probe_video(&app_paths(&app)?, &file_path)?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
@@ -170,7 +149,6 @@ pub fn run() {
             backend_health,
             backend_current_os,
             backend_list_system_fonts,
-            backend_demo,
             backend_render,
             backend_progress,
             backend_cancel,
@@ -178,7 +156,6 @@ pub fn run() {
             backend_get_template,
             backend_open_downloads,
             backend_open_video,
-            backend_image_data,
             backend_probe_video,
             default_template_save_path,
             write_template_file,

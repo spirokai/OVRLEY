@@ -102,24 +102,6 @@ export async function socketReady() {
 }
 
 /**
- * Handles generate demo.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {*} parsedActivity - Normalized activity payload used by the app.
- * @param {*} second - Preview or export time in seconds.
- * @returns {Promise<*>} Promise resolving to the operation result.
- */
-export async function generateDemo(config, parsedActivity, second) {
-  const safeConfig = safeJsonStringify(config)
-  const safeParsedActivity = safeJsonStringify(parsedActivity)
-  return apiCall('backend_demo', {
-    configJson: safeConfig,
-    parsedActivityJson: safeParsedActivity,
-    second,
-  })
-}
-
-/**
  * Renders video.
  *
  * @param {*} config - Overlay template configuration data.
@@ -223,17 +205,6 @@ export async function openDownloads() {
  */
 export async function openVideo(filename) {
   return apiCall('backend_open_video', { filename })
-}
-
-/**
- * Returns image url.
- *
- * @param {*} filename - Target filename for the operation.
- * @returns {Promise<*>} Promise resolving to the operation result.
- */
-export async function getImageUrl(filename) {
-  const invoke = await requireInvoke()
-  return invoke('backend_image_data', { filename })
 }
 
 /**

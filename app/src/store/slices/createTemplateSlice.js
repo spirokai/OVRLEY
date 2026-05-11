@@ -357,10 +357,6 @@ export function createTemplateSlice(set, get) {
 
         if (state.editor) {
           state.editor.setValue(data)
-        } else {
-          const { default: generateDemoFrame } =
-            await import('../../api/generateDemoFrame.jsx')
-          await generateDemoFrame(data)
         }
       } catch (error) {
         console.error('Error with community templates:', error)

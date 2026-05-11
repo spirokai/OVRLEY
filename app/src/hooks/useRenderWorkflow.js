@@ -116,44 +116,44 @@ export default function useRenderWorkflow({ backendStatus }) {
   useEffect(() => {
     if (!renderingVideo) return
 
-    const unsubscribe = useStore.subscribe((state, previousState) => {
-      const nextProgress = state.renderProgress
-      const previousProgress = previousState.renderProgress
-      if (nextProgress === previousProgress) {
-        return
-      }
+    const unsubscribe = useStore.subscribe(
+      
+     
+        (state) => state.renderProgress,
+        (nextProgress) => {
+          const { activeRenderId: nextActiveRenderId } = useStore.getState()
+          if (nextProgress.renderId !== nextActiveRenderId) {
+          return
+          }
 
-      const { activeRenderId: nextActiveRenderId } = state
-      if (nextProgress.renderId !== nextActiveRenderId) {
-        return
-      }
-
-      const { filename, message, status } = nextProgress
-
-      if (status === 'complete' && filename) {
-        setVideoFilename(filename)
-        setActiveRenderId(null)
-        setRenderingVideo(false)
-        backend.openVideo(filename).catch((error) => {
-          console.error('Error calling open-video:', error)
-        })
-        return
-      }
-
-      if (status === 'cancelled') {
-        setActiveRenderId(null)
-        setRenderingVideo(false)
-        return
-      }
-
-      if (status === 'error') {
-        setActiveRenderId(null)
-        setRenderingVideo(false)
-        if (message) {
-          setErrorMessage(message)
+          const { filename, message, status } = nextProgress
+  
+          if (status === 'complete' && filename) {
+            setVideoFilename(filename)
+            setActiveRenderId(null)
+            setRenderingVideo(false)
+            backend.openVideo(filename).catch((error) => {
+              console.error('Error calling open-video:', error)
+            })
+          return
+          }
+  
+          if (status === 'cancelled') {
+            setActiveRenderId(null)
+            setRenderingVideo(false)
+          return
+          }
+  
+          if (status === 'error') {
+            setActiveRenderId(null)
+            setRenderingVideo(false)
+            if (message) {
+              setErrorMessage(message)
+       ,
+         }
         }
-      }
-    })
+      },
+    )
 
     return unsubscribe
   }, [
