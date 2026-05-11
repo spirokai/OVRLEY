@@ -11,7 +11,8 @@ import { useBootstrapStore } from '@/hooks/useAppStoreSelectors'
  * @returns {*} Result produced by the helper.
  */
 export default function useAppBootstrap() {
-  const { fetchTemplates, setPlatformOs } = useBootstrapStore()
+  const { fetchAvailableCodecs, fetchTemplates, setPlatformOs } =
+    useBootstrapStore()
 
   useEffect(() => {
     let cancelled = false
@@ -35,5 +36,6 @@ export default function useAppBootstrap() {
 
   useEffect(() => {
     fetchTemplates()
-  }, [fetchTemplates])
+    fetchAvailableCodecs()
+  }, [fetchAvailableCodecs, fetchTemplates])
 }

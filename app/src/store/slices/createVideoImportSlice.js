@@ -1,3 +1,5 @@
+import { detectCodecs } from '@/api/backend'
+
 export const createVideoImportSlice = (set, get) => ({
   importedVideoPath: null, // absolute path from Tauri file dialog
   importedVideoDuration: null, // seconds (float), read via ffprobe
@@ -6,6 +8,7 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoCreationTime: null, // ISO-8601 string or null
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
   videoSyncWarning: null, // string warning or null
+  availableCodecs: null,
 
   setImportedVideo: (metadata) => {
     set({
@@ -41,6 +44,22 @@ export const createVideoImportSlice = (set, get) => ({
       videoSyncWarning: msg,
     }),
 
+  fetchAvailableCodecs: async () => {
+    try {
+      const availableCodecs = await detectCodecs()
+      set({
+        availableCodecs,
+      })
+      return availableCodecs
+    } catch (error) {
+      console.error('Failed to detect ffmpeg codecs:', error)
+      set({
+        availableCodecs: null,
+      })
+      return null
+    }
+  },
+
   computeVideoSync: (activitySummary) =>
     set((state) => {
       if (!state.importedVideoCreationTime) {
@@ -61,7 +80,7 @@ export const createVideoImportSlice = (set, get) => ({
       ) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Invalid timestamp formats — placed at start',
+          videoSyncWarning: 'Invalid timestamp formats',
         }
       }
 
@@ -71,8 +90,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (videoStart < activityStart || videoStart > activityEnd) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning:
-            'Video creation time is outside activity range — placed at start',
+          videoSyncWarning: 'Video creation time is outside activity range',
         }
       }
 

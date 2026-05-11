@@ -171,9 +171,11 @@ export default function AppHeader({
               </Button>
 
               {importedVideoFilename ? (
-                <div className="w-50 mr-2 flex h-9 items-center rounded-md border border-border/70 bg-surface-elevated pl-3 pr-2 text-xs text-foreground">
-                  <Film className="mr-2 h-4 w-4 text-primary" />
-                  <span className="truncate">{importedVideoFilename}</span>
+                <div className="max-w-[min(14rem,22vw)] mr-2 flex h-9 items-center rounded-md border border-border/70 bg-surface-elevated pl-3 pr-2 text-xs text-foreground justify-between">
+                  <div className="flex items-center gap-2 truncate">
+                    <Film className="mr-2 h-4 w-4 text-primary" />
+                    <span className="truncate">{importedVideoFilename}</span>
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"

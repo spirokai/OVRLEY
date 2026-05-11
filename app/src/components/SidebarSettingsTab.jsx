@@ -240,6 +240,10 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
   }
   const sceneStyleValue = (key, fallback) =>
     globalDefaults?.[key] ?? scene?.[key] ?? fallback
+  const videoResolutionMismatch =
+    Boolean(scene?.width && scene?.height && importedVideoResolution) &&
+    (Number(scene.width) !== Number(importedVideoResolution.width) ||
+      Number(scene.height) !== Number(importedVideoResolution.height))
 
   return (
     <div className="mt-4 space-y-8 outline-none pb-10">
@@ -451,11 +455,11 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
         ) : null}
 
         {importedVideoPath ? (
-          <div className="space-y-4">
+          <div className="space-y-4 pt-4">
             <div className="flex items-center gap-2 mb-2">
               <Video className="h-4 w-4 text-primary" />
               <h4 className="text-xs   font-bold text-muted-foreground uppercase tracking-widest">
-                Video Sync
+                Video
               </h4>
               <Separator className="flex-1" />
             </div>
@@ -492,9 +496,18 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             </div>
 
             {videoSyncWarning && (
-              <div className="flex gap-2 items-start rounded-md bg-destructive/10 p-2 text-destructive">
-                <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+              <div className="flex gap-2 items-center rounded-md bg-destructive/10 p-2 pl-4 text-destructive">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
                 <p className="text-[10px] leading-tight">{videoSyncWarning}</p>
+              </div>
+            )}
+
+            {videoResolutionMismatch && (
+              <div className="flex gap-2 items-center  rounded-md bg-destructive/10 p-2 pl-4 text-destructive">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                <p className="text-[10px] leading-tight">
+                  Overlay and video resolutions do not match
+                </p>
               </div>
             )}
 

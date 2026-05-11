@@ -28,6 +28,7 @@ export function useAppShellStore() {
 export function useBootstrapStore() {
   return useStore(
     useShallow((state) => ({
+      fetchAvailableCodecs: state.fetchAvailableCodecs,
       fetchTemplates: state.fetchTemplates,
       setPlatformOs: state.setPlatformOs,
     })),

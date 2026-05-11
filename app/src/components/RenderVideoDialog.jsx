@@ -2,17 +2,21 @@
  * Renders the render video dialog portion of the application interface.
  */
 
-import { useEffect, useMemo, useState } from 'react'
-import { Film, Loader2, Play, Timer, Video } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, Film, Loader2, Play, Timer, Video } from 'lucide-react'
 import { cancelRender } from '@/api/backend'
 import useStore from '@/store/useStore'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
+import { Slider } from '@/components/ui/slider'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -25,6 +29,248 @@ import {
   normalizeUpdateRateForFps,
   sanitizeIntegerFps,
 } from '@/lib/update-rate'
+import { getDefaultBitrate } from '@/lib/bitrateDefaults'
+
+const OUTPUT_FORMATS = [
+  {
+    value: 'prores',
+    label: 'ProRes 4444',
+    group: 'transparent',
+    codecs: {
+      cpu: 'prores_ks',
+      videotoolbox: 'prores_videotoolbox',
+      vulkan_prores: 'prores_ks_vulkan',
+    },
+  },
+  {
+    value: 'qtrle',
+    label: 'QT RLE',
+    group: 'transparent',
+    codecs: {
+      cpu: 'qtrle',
+    },
+  },
+  {
+    value: 'h264',
+    label: 'H.264',
+    group: 'mp4',
+    codecs: {
+      cpu: 'libx264',
+      nvidia: 'h264_nvenc',
+      nvidia_cuda: 'h264_nvenc',
+      qsv: 'h264_qsv',
+      amd: 'h264_amf',
+      videotoolbox: 'h264_videotoolbox',
+    },
+  },
+  {
+    value: 'hevc',
+    label: 'H.265 / HEVC',
+    group: 'mp4',
+    codecs: {
+      cpu: 'libx265',
+      nvidia: 'hevc_nvenc',
+      nvidia_cuda: 'hevc_nvenc',
+      qsv: 'hevc_qsv',
+      amd: 'hevc_amf',
+      videotoolbox: 'hevc_videotoolbox',
+    },
+  },
+]
+
+const ACCELERATION_OPTIONS = [
+  { value: 'cpu', label: 'CPU' },
+  { value: 'nvidia', label: 'NVIDIA GPU', platform: ['windows', 'linux'] },
+  {
+    value: 'nvidia_cuda',
+    label: 'NVIDIA GPU + CUDA compositing',
+    platform: ['windows', 'linux'],
+  },
+  { value: 'qsv', label: 'Intel Quick Sync', platform: ['windows', 'linux'] },
+  { value: 'amd', label: 'AMD GPU', platform: ['windows', 'linux'] },
+  {
+    value: 'videotoolbox',
+    label: 'Apple VideoToolbox',
+    platform: ['macos'],
+  },
+  { value: 'vulkan_prores', label: 'Vulkan ProRes' },
+]
+
+const OUTPUT_FORMATS_BY_VALUE = Object.fromEntries(
+  OUTPUT_FORMATS.map((option) => [option.value, option]),
+)
+
+const EXPORT_CODEC_LOOKUP = OUTPUT_FORMATS.flatMap((format) =>
+  Object.entries(format.codecs).map(([acceleration, codec]) => ({
+    codec,
+    format: format.value,
+    acceleration,
+  })),
+).reduce((lookup, item) => {
+  if (!lookup[item.codec]) {
+    lookup[item.codec] = item
+  }
+  return lookup
+}, {})
+
+const LEGACY_MP4_CODECS = ['h264_vaapi', 'hevc_vaapi']
+
+function getOutputFormatForExportCodec(codec) {
+  return OUTPUT_FORMATS_BY_VALUE[EXPORT_CODEC_LOOKUP[codec]?.format] || null
+}
+
+function getExportCodecForSelection(formatValue, accelerationValue) {
+  return (
+    OUTPUT_FORMATS_BY_VALUE[formatValue]?.codecs?.[accelerationValue] || null
+  )
+}
+
+function isMp4Codec(codec) {
+  return (
+    getOutputFormatForExportCodec(codec)?.group === 'mp4' ||
+    LEGACY_MP4_CODECS.includes(codec)
+  )
+}
+
+function codecFlag(availableCodecs, codec) {
+  const flagByCodec = {
+    libx264: 'libx264',
+    libx265: 'libx265',
+    h264_nvenc: 'h264Nvenc',
+    hevc_nvenc: 'hevcNvenc',
+    h264_qsv: 'h264Qsv',
+    hevc_qsv: 'hevcQsv',
+    h264_amf: 'h264Amf',
+    hevc_amf: 'hevcAmf',
+    h264_videotoolbox: 'h264Videotoolbox',
+    hevc_videotoolbox: 'hevcVideotoolbox',
+  }
+  const key = flagByCodec[codec]
+  return Boolean(availableCodecs?.[key])
+}
+
+function isAccelerationPotentiallyVisible(option, platformOs) {
+  if (!option?.platform || platformOs === 'unknown') return true
+  return option.platform.includes(platformOs)
+}
+
+function isAccelerationAvailable(format, accelerationValue, availableCodecs) {
+  const codec = getExportCodecForSelection(format.value, accelerationValue)
+  if (!codec) return false
+
+  if (format.group === 'transparent') {
+    return true
+  }
+
+  if (!availableCodecs) return false
+
+  if (accelerationValue === 'nvidia') {
+    return (
+      codecFlag(availableCodecs, codec) &&
+      Boolean(availableCodecs.nvgpu || availableCodecs.nnvgpu)
+    )
+  }
+
+  if (accelerationValue === 'nvidia_cuda') {
+    return (
+      codecFlag(availableCodecs, codec) &&
+      Boolean(availableCodecs.nnvgpu || availableCodecs.cuda)
+    )
+  }
+
+  if (accelerationValue === 'qsv') {
+    return codecFlag(availableCodecs, codec) && Boolean(availableCodecs.qsv)
+  }
+
+  if (accelerationValue === 'amd') {
+    return codecFlag(availableCodecs, codec)
+  }
+
+  if (accelerationValue === 'videotoolbox') {
+    return (
+      codecFlag(availableCodecs, codec) && Boolean(availableCodecs.videotoolbox)
+    )
+  }
+
+  return codecFlag(availableCodecs, codec)
+}
+
+function getVisibleAccelerationOptions(format, platformOs, availableCodecs) {
+  return ACCELERATION_OPTIONS.map((option) => {
+    const codecSupported = Object.hasOwn(format.codecs, option.value)
+    const platformVisible = isAccelerationPotentiallyVisible(option, platformOs)
+    return {
+      ...option,
+      codecSupported,
+      available:
+        codecSupported &&
+        platformVisible &&
+        isAccelerationAvailable(format, option.value, availableCodecs),
+      platformVisible,
+    }
+  })
+}
+
+function getFirstAvailableAcceleration(format, platformOs, availableCodecs) {
+  return getVisibleAccelerationOptions(
+    format,
+    platformOs,
+    availableCodecs,
+  ).find((option) => option.available)
+}
+
+function isOutputFormatAvailable(format, platformOs, availableCodecs) {
+  if (format.group === 'transparent') {
+    return true
+  }
+
+  return Boolean(
+    getFirstAvailableAcceleration(format, platformOs, availableCodecs),
+  )
+}
+
+function getFirstAvailableMp4ExportCodec(platformOs, availableCodecs) {
+  for (const format of OUTPUT_FORMATS.filter(
+    (option) => option.group === 'mp4',
+  )) {
+    const acceleration = getFirstAvailableAcceleration(
+      format,
+      platformOs,
+      availableCodecs,
+    )
+    if (acceleration) {
+      return getExportCodecForSelection(format.value, acceleration.value)
+    }
+  }
+
+  return null
+}
+
+function getAccelerationValueForSettings(settings) {
+  const format = getOutputFormatForExportCodec(settings?.exportCodec)
+  if (!format) return 'cpu'
+
+  if (
+    settings?.exportAcceleration &&
+    getExportCodecForSelection(format.value, settings.exportAcceleration) ===
+      settings.exportCodec
+  ) {
+    return settings.exportAcceleration
+  }
+
+  return EXPORT_CODEC_LOOKUP[settings.exportCodec]?.acceleration || 'cpu'
+}
+
+function resolutionsMismatch(scene, videoResolution) {
+  if (!scene?.width || !scene?.height || !videoResolution) {
+    return false
+  }
+
+  return (
+    Number(scene.width) !== Number(videoResolution.width) ||
+    Number(scene.height) !== Number(videoResolution.height)
+  )
+}
 
 /**
  * Formats time.
@@ -172,7 +418,13 @@ export default function RenderVideoDialog({
 }) {
   const renderingVideo = useStore((state) => state.renderingVideo)
   const platformOs = useStore((state) => state.platformOs)
+  const availableCodecs = useStore((state) => state.availableCodecs)
+  const config = useStore((state) => state.config)
+  const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoFps = useStore((state) => state.importedVideoFps)
+  const importedVideoResolution = useStore(
+    (state) => state.importedVideoResolution,
+  )
   const [fpsMode, setFpsMode] = useState(
     [24, 30, 60].includes(settings?.fps) ? settings.fps.toString() : 'custom',
   )
@@ -183,6 +435,58 @@ export default function RenderVideoDialog({
   const containerFps = useMemo(
     () => getContainerFps(settings?.fps, settings?.updateRate),
     [settings?.fps, settings?.updateRate],
+  )
+  const hasImportedVideo = Boolean(importedVideoPath)
+  const selectedOutputFormat = getOutputFormatForExportCodec(
+    settings?.exportCodec,
+  )
+  const selectedOutputFormatValue = selectedOutputFormat?.value || 'prores'
+  const selectedAccelerationValue = getAccelerationValueForSettings(settings)
+  const selectedAccelerationOptions = useMemo(
+    () =>
+      getVisibleAccelerationOptions(
+        OUTPUT_FORMATS_BY_VALUE[selectedOutputFormatValue],
+        platformOs,
+        availableCodecs,
+      ),
+    [availableCodecs, platformOs, selectedOutputFormatValue],
+  )
+  const selectedCodecIsMp4 = isMp4Codec(settings?.exportCodec)
+  const selectedAccelerationAvailable = Boolean(
+    selectedAccelerationOptions.find(
+      (option) => option.value === selectedAccelerationValue,
+    )?.available,
+  )
+  const selectedExportCodecAvailable =
+    Boolean(EXPORT_CODEC_LOOKUP[settings?.exportCodec]) &&
+    selectedAccelerationAvailable
+  const resolutionMismatch = resolutionsMismatch(
+    config?.scene,
+    importedVideoResolution,
+  )
+  const renderStartDisabled =
+    renderingVideo ||
+    resolutionMismatch ||
+    (hasImportedVideo &&
+      (!selectedCodecIsMp4 || !selectedExportCodecAvailable)) ||
+    (!hasImportedVideo && selectedCodecIsMp4)
+
+  const defaultBitrateForCodec = useCallback(
+    (codec) =>
+      getDefaultBitrate(
+        importedVideoResolution?.width || config?.scene?.width,
+        importedVideoResolution?.height || config?.scene?.height,
+        importedVideoFps || settings?.fps,
+        codec,
+      ),
+    [
+      config?.scene?.height,
+      config?.scene?.width,
+      importedVideoFps,
+      importedVideoResolution?.height,
+      importedVideoResolution?.width,
+      settings?.fps,
+    ],
   )
 
   useEffect(() => {
@@ -203,6 +507,57 @@ export default function RenderVideoDialog({
       return
     }
 
+    if (!hasImportedVideo && selectedCodecIsMp4) {
+      onSettingsChange({
+        exportCodec: 'prores_ks',
+        exportAcceleration: 'cpu',
+        exportBitrate: undefined,
+      })
+      return
+    }
+
+    if (!hasImportedVideo) {
+      return
+    }
+
+    const firstAvailableMp4Codec = getFirstAvailableMp4ExportCodec(
+      platformOs,
+      availableCodecs,
+    )
+
+    if (!selectedCodecIsMp4 || !selectedExportCodecAvailable) {
+      if (firstAvailableMp4Codec) {
+        onSettingsChange({
+          exportCodec: firstAvailableMp4Codec,
+          exportAcceleration:
+            EXPORT_CODEC_LOOKUP[firstAvailableMp4Codec]?.acceleration || 'cpu',
+          exportBitrate: defaultBitrateForCodec(firstAvailableMp4Codec),
+        })
+      }
+      return
+    }
+
+    if (!Number.isFinite(settings.exportBitrate)) {
+      onSettingsChange({
+        exportBitrate: defaultBitrateForCodec(settings.exportCodec),
+      })
+    }
+  }, [
+    hasImportedVideo,
+    defaultBitrateForCodec,
+    onSettingsChange,
+    platformOs,
+    selectedCodecIsMp4,
+    selectedExportCodecAvailable,
+    settings,
+    availableCodecs,
+  ])
+
+  useEffect(() => {
+    if (!settings) {
+      return
+    }
+
     const normalizedUpdateRate = normalizeUpdateRateForFps(
       settings.fps,
       settings.updateRate,
@@ -217,13 +572,53 @@ export default function RenderVideoDialog({
   }
 
   const isProgress = phase === 'progress'
-  const isVideoToolboxAvailable = platformOs === 'macos'
   const handleBackdropPointerDown = (event) => {
     if (isProgress || event.target !== event.currentTarget) {
       return
     }
 
     onClose()
+  }
+  const handleOutputFormatChange = (value) => {
+    const format = OUTPUT_FORMATS_BY_VALUE[value]
+    if (!format) return
+
+    const acceleration =
+      getVisibleAccelerationOptions(format, platformOs, availableCodecs).find(
+        (option) =>
+          option.value === selectedAccelerationValue && option.available,
+      ) || getFirstAvailableAcceleration(format, platformOs, availableCodecs)
+
+    if (!acceleration) return
+
+    const nextExportCodec = getExportCodecForSelection(
+      format.value,
+      acceleration.value,
+    )
+    const nextIsMp4Codec = format.group === 'mp4'
+
+    onSettingsChange({
+      exportCodec: nextExportCodec,
+      exportAcceleration: acceleration.value,
+      exportBitrate: nextIsMp4Codec
+        ? defaultBitrateForCodec(nextExportCodec)
+        : undefined,
+    })
+  }
+  const handleAccelerationChange = (value) => {
+    const nextExportCodec = getExportCodecForSelection(
+      selectedOutputFormatValue,
+      value,
+    )
+    if (!nextExportCodec) return
+
+    onSettingsChange({
+      exportCodec: nextExportCodec,
+      exportAcceleration: value,
+      exportBitrate: selectedCodecIsMp4
+        ? defaultBitrateForCodec(nextExportCodec)
+        : undefined,
+    })
   }
 
   return (
@@ -357,39 +752,162 @@ export default function RenderVideoDialog({
 
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Export Codec
+                  Codec / Output Format
                 </Label>
                 <Select
-                  value={settings.exportCodec}
-                  onValueChange={(value) =>
-                    onSettingsChange({ exportCodec: value })
-                  }
+                  value={selectedOutputFormatValue}
+                  onValueChange={handleOutputFormatChange}
                 >
                   <SelectTrigger className="h-9 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="prores_ks">ProRes (CPU)</SelectItem>
-                    <SelectItem value="qtrle">QT RLE (CPU)</SelectItem>
-                    <SelectItem value="prores_ks_vulkan">
-                      ProRes Vulkan (GPU)
-                    </SelectItem>
-                    <SelectItem
-                      value="prores_videotoolbox"
-                      disabled={!isVideoToolboxAvailable}
-                    >
-                      ProRes (macOS)
-                    </SelectItem>
+                    <SelectGroup>
+                      <SelectLabel className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
+                        <span>Transparent Codecs</span>
+                        {hasImportedVideo && (
+                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
+                            Video imported
+                          </span>
+                        )}
+                      </SelectLabel>
+                      <SelectSeparator className="my-0" />
+                      {OUTPUT_FORMATS.filter(
+                        (option) => option.group === 'transparent',
+                      ).map((option) => (
+                        <SelectItem
+                          key={option.value}
+                          value={option.value}
+                          disabled={hasImportedVideo}
+                        >
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+
+                    <SelectGroup>
+                      <SelectLabel className="mt-1 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
+                        <span>MP4 Codecs</span>
+                        {!hasImportedVideo && (
+                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
+                            Video required
+                          </span>
+                        )}
+                      </SelectLabel>
+                      <SelectSeparator className="my-0" />
+                      {OUTPUT_FORMATS.filter(
+                        (option) => option.group === 'mp4',
+                      ).map((option) => {
+                        const available = isOutputFormatAvailable(
+                          option,
+                          platformOs,
+                          availableCodecs,
+                        )
+                        const disabled = !hasImportedVideo || !available
+                        return (
+                          <SelectItem
+                            key={option.value}
+                            value={option.value}
+                            disabled={disabled}
+                          >
+                            <span className="flex w-full items-center justify-between gap-3">
+                              <span className="min-w-0 truncate">
+                                {option.label}
+                              </span>
+                              {!available && (
+                                <span className="shrink-0 text-right text-[10px] text-muted-foreground">
+                                  Unavailable
+                                </span>
+                              )}
+                            </span>
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
 
-              <ExportRangeSettings
-                exportRange={settings.exportRange}
-                onExportRangeChange={(exportRange) =>
-                  onSettingsChange({ exportRange })
-                }
-              />
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Hardware Acceleration
+                </Label>
+                <Select
+                  value={selectedAccelerationValue}
+                  onValueChange={handleAccelerationChange}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedAccelerationOptions.map((option) => (
+                      <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        disabled={!option.available}
+                      >
+                        <span className="flex w-full items-center justify-between gap-3">
+                          <span className="min-w-0 truncate">
+                            {option.label}
+                          </span>
+                          {!option.available && (
+                            <span className="shrink-0 text-right text-[10px] text-muted-foreground">
+                              {!option.codecSupported
+                                ? 'Unsupported'
+                                : option.platformVisible
+                                  ? 'Unavailable'
+                                  : 'Unsupported'}
+                            </span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedCodecIsMp4 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Bitrate
+                    </Label>
+                    <span className="rounded bg-surface-strong px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      {settings.exportBitrate ?? 20} Mbps
+                    </span>
+                  </div>
+                  <Slider
+                    min={5}
+                    max={100}
+                    step={5}
+                    value={[settings.exportBitrate ?? 20]}
+                    onValueChange={([value]) =>
+                      onSettingsChange({ exportBitrate: value })
+                    }
+                  />
+                </div>
+              )}
+
+              {hasImportedVideo && resolutionMismatch && (
+                <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-2 text-destructive">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                  <p className="text-[10px] leading-tight">
+                    Overlay resolution {config?.scene?.width}x
+                    {config?.scene?.height} must match imported video{' '}
+                    {importedVideoResolution?.width}x
+                    {importedVideoResolution?.height}.
+                  </p>
+                </div>
+              )}
+
+              {!hasImportedVideo && (
+                <ExportRangeSettings
+                  exportRange={settings.exportRange}
+                  onExportRangeChange={(exportRange) =>
+                    onSettingsChange({ exportRange })
+                  }
+                />
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-6">
@@ -406,7 +924,7 @@ export default function RenderVideoDialog({
                 type="button"
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
                 onClick={onConfirm}
-                disabled={renderingVideo}
+                disabled={renderStartDisabled}
               >
                 <Play className="h-4 w-4" />
                 Start Render

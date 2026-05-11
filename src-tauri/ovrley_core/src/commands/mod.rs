@@ -456,7 +456,6 @@ fn open_path_in_system(path: &Path) -> Result<(), String> {
     }
 }
 
-
 /// Probes a video file and returns its metadata.
 pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> Result<Value, String> {
     use crate::encode::video_probe::probe_video;
@@ -464,3 +463,9 @@ pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> Result<Value, S
     serde_json::to_value(&metadata).map_err(|e| format!("Serialization error: {}", e))
 }
 
+/// Detects ffmpeg encoders and hardware acceleration methods available locally.
+pub fn backend_detect_codecs(paths: &AppPaths) -> Result<Value, String> {
+    use crate::encode::codec_detect::detect_codecs;
+    let codecs = detect_codecs(&paths.repo_root)?;
+    serde_json::to_value(&codecs).map_err(|e| format!("Serialization error: {}", e))
+}

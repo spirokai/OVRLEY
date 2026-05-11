@@ -107,6 +107,12 @@ async fn backend_probe_video(app: AppHandle, file_path: String) -> Result<String
 }
 
 #[tauri::command]
+async fn backend_detect_codecs(app: AppHandle) -> Result<String, String> {
+    let response = commands::backend_detect_codecs(&app_paths(&app)?)?;
+    serde_json::to_string(&response).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn default_template_save_path(app: tauri::AppHandle, filename: String) -> Result<String, String> {
     let mut path = app.path().document_dir().map_err(|e| e.to_string())?;
     path.push("OVRLEY");
@@ -157,6 +163,7 @@ pub fn run() {
             backend_open_downloads,
             backend_open_video,
             backend_probe_video,
+            backend_detect_codecs,
             default_template_save_path,
             write_template_file,
             write_parse_debug_file

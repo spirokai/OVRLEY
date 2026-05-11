@@ -263,8 +263,7 @@ fn draw_metric_parts(
     let icon_size = value.icon_size.unwrap_or(28.0) * scale;
     let show_units = parts.unit_text.is_some();
     let show_icon = parts.show_icon && parts.icon_kind.is_some();
-    let icon_margin_right =
-        (base_style.font_size * 0.08).max(METRIC_WIDGET_OUTER_GAP_PX * scale);
+    let icon_margin_right = (base_style.font_size * 0.08).max(METRIC_WIDGET_OUTER_GAP_PX * scale);
     let text_group_height = if show_units {
         value_line_height.max(units_line_height)
     } else {

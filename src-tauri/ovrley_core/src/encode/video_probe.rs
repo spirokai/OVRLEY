@@ -22,20 +22,28 @@ pub struct Resolution {
 
 pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, String> {
     let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
-    let ffprobe_name = if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" };
+    let ffprobe_name = if cfg!(windows) {
+        "ffprobe.exe"
+    } else {
+        "ffprobe"
+    };
     let ffprobe_path = ffmpeg_path.with_file_name(ffprobe_name);
 
     let mut command = Command::new(ffprobe_path);
     command.args([
-        "-v", "quiet",
-        "-print_format", "json",
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
         "-show_format",
         "-show_streams",
         file_path,
     ]);
     suppress_child_console(&mut command);
 
-    let output = command.output().map_err(|e| format!("Failed to run ffprobe: {e}"))?;
+    let output = command
+        .output()
+        .map_err(|e| format!("Failed to run ffprobe: {e}"))?;
 
     if !output.status.success() {
         return Err(format!(
@@ -79,7 +87,10 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, S
             stream.get("width").and_then(|v| v.as_u64()),
             stream.get("height").and_then(|v| v.as_u64()),
         ) {
-            metadata.resolution = Some(Resolution { width: w, height: h });
+            metadata.resolution = Some(Resolution {
+                width: w,
+                height: h,
+            });
         }
 
         if let Some(avg_frame_rate) = stream.get("avg_frame_rate").and_then(|v| v.as_str()) {

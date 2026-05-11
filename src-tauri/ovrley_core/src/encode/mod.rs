@@ -6,13 +6,15 @@
 //! controller in [`video`], while the pipeline module contains the single-pass
 //! frame producer/ffmpeg consumer implementation.
 
+/// ffmpeg codec and hardware-acceleration detection.
+pub mod codec_detect;
 /// ffmpeg discovery and codec argument construction.
 pub mod ffmpeg;
 /// Render controller and public video render orchestration.
 pub mod video;
-/// Video metadata extraction via ffprobe.
-pub mod video_probe;
 /// Debug summaries, sample-frame exports, and segment stitching helpers.
 mod video_debug;
 /// Single-render video pipeline used by normal and segmented renders.
 pub(crate) mod video_pipeline;
+/// Video metadata extraction via ffprobe.
+pub mod video_probe;

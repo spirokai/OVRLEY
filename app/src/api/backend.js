@@ -269,3 +269,14 @@ export async function probeVideo(filePath) {
   const result = await invoke('backend_probe_video', { filePath })
   return typeof result === 'string' ? JSON.parse(result) : result
 }
+
+/**
+ * Detects available ffmpeg MP4 codecs and hardware acceleration methods.
+ *
+ * @returns {Promise<object>} Promise resolving to available codec flags.
+ */
+export async function detectCodecs() {
+  const invoke = await requireInvoke()
+  const result = await invoke('backend_detect_codecs', {})
+  return typeof result === 'string' ? JSON.parse(result) : result
+}

@@ -97,6 +97,7 @@ Key rules:
 - Codec detection runs `ffmpeg -encoders` and `ffmpeg -hwaccels`, parses text output.
 - Codec/bitrate settings are SESSION-ONLY — never saved to template files.
 - RenderVideoDialog codec selector must have two <SelectGroup> sections: "Transparent Codecs" (existing, disabled when video imported) and "MP4 Codecs" (new, disabled when no video imported).
+- Disable the Render button if overlay and video resolutions do not match - display a warning in sync section of sidebar underneath the sync warning
 - Unavailable codecs shown greyed out with "Not available on this system".
 - Bitrate slider (20-100 Mbps) visible only when MP4 codec selected.
 - Bitrate defaults defined in app/src/lib/bitrateDefaults.js using the BITRATE_BINS config from the plan. Use getDefaultBitrate(width, height, fps, codecName) for lookup.
@@ -125,13 +126,14 @@ Implement Phase 5 of the MP4 compositing feature in full scope as defined in @mp
 Also read @mp4-compositing.md for full project context. Pay special attention to Appendix A in mp4-plan.md which contains the annotated gopro-dashboard-overlay builtin profiles — use these as the starting point for profile definitions.
 
 Key rules:
-- CRITICAL: All new code must be in SEPARATE FILES. Do NOT modify video_pipeline.rs, ffmpeg.rs, or video_debug.rs.
+- CRITICAL: All new code must be in SEPARATE FILES. Do NOT modify video_pipeline.rs, ffmpeg.rs, or video_debug.rs. You can only modify those files if you need to plug in the new files.
 - The compositing pipeline uses ffmpeg with two inputs: Input 0 = imported MP4 (decoded by ffmpeg), Input 1 = pipe:0 stdin (raw RGBA overlay frames from Skia).
 - Use filter_complex for overlay compositing.
 - Implement profiles matching Appendix A: nvgpu, nnvgpu, mac, mac_hevc, qsv, plus software fallbacks (libx264/libx265 with CPU filter).
 - Apply -ss and -t to input 0 for sync offset.
 - Always append -movflags faststart and -c:a copy.
 - All codecs use -b:v (bitrate) for rate control, including VideoToolbox. The bitrate slider is universal.
+- Refer to end of @mp4-plan.md for list ffmpeg prompts used in similar gopro-dashboard-overlay app
 - **Frame rendering loop**:
   - Iterates through every frame of the output video (matching background FPS).
   - Implement `widget_update_rate` logic: only call `render_frame_rgba` every $N$ frames.

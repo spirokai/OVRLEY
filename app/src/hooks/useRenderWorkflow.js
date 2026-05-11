@@ -12,6 +12,18 @@ import {
 } from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
+import { getDefaultBitrate } from '@/lib/bitrateDefaults'
+
+function resolutionsMismatch(scene, videoResolution) {
+  if (!scene?.width || !scene?.height || !videoResolution) {
+    return false
+  }
+
+  return (
+    Number(scene.width) !== Number(videoResolution.width) ||
+    Number(scene.height) !== Number(videoResolution.height)
+  )
+}
 
 /**
  * Provides render workflow state and actions.
@@ -39,13 +51,25 @@ export default function useRenderWorkflow({ backendStatus }) {
     setVideoFilename,
     updateRate,
   } = useRenderStore()
+  const importedVideoFps = useStore((state) => state.importedVideoFps)
+  const importedVideoPath = useStore((state) => state.importedVideoPath)
+  const importedVideoResolution = useStore(
+    (state) => state.importedVideoResolution,
+  )
   const [renderDialogPhase, setRenderDialogPhase] = useState('closed')
   const [renderSettingsDraft, setRenderSettingsDraft] = useState(null)
 
   const hasParsedActivity = Boolean(activitySummary)
   const canRender = Boolean(config && hasParsedActivity)
+  const hasResolutionMismatch = resolutionsMismatch(
+    config?.scene,
+    importedVideoResolution,
+  )
   const renderDisabled =
-    !canRender || renderingVideo || backendStatus !== 'connected'
+    !canRender ||
+    renderingVideo ||
+    backendStatus !== 'connected' ||
+    hasResolutionMismatch
   const renderTooltipContent = useMemo(() => {
     if (!config) {
       return hasParsedActivity
@@ -61,12 +85,22 @@ export default function useRenderWorkflow({ backendStatus }) {
       return 'Backend offline'
     }
 
+    if (hasResolutionMismatch) {
+      return 'Overlay and imported video resolutions must match'
+    }
+
     if (renderingVideo) {
       return 'Rendering already in progress'
     }
 
     return null
-  }, [backendStatus, config, hasParsedActivity, renderingVideo])
+  }, [
+    backendStatus,
+    config,
+    hasParsedActivity,
+    hasResolutionMismatch,
+    renderingVideo,
+  ])
 
   useEffect(() => {
     if (
@@ -163,16 +197,38 @@ export default function useRenderWorkflow({ backendStatus }) {
 
   const buildRenderSettingsDraft = useCallback(() => {
     const fps = sanitizeIntegerFps(config?.scene?.fps || 30)
+    const defaultCodec = importedVideoPath
+      ? 'libx264'
+      : exportCodec || 'prores_ks'
     return {
       fps,
       updateRate: normalizeUpdateRateForFps(fps, updateRate),
-      exportCodec: exportCodec || 'prores_ks',
+      exportCodec: defaultCodec,
+      exportBitrate: importedVideoPath
+        ? getDefaultBitrate(
+            importedVideoResolution?.width || config?.scene?.width,
+            importedVideoResolution?.height || config?.scene?.height,
+            importedVideoFps || fps,
+            defaultCodec,
+          )
+        : undefined,
       exportRange: {
         ...DEFAULT_EXPORT_RANGE,
         ...(exportRange || {}),
       },
     }
-  }, [config?.scene?.fps, updateRate, exportCodec, exportRange])
+  }, [
+    config?.scene?.fps,
+    config?.scene?.height,
+    config?.scene?.width,
+    exportCodec,
+    exportRange,
+    importedVideoFps,
+    importedVideoPath,
+    importedVideoResolution?.height,
+    importedVideoResolution?.width,
+    updateRate,
+  ])
 
   const openRenderDialog = useCallback(() => {
     if (renderDisabled) {
@@ -228,7 +284,9 @@ export default function useRenderWorkflow({ backendStatus }) {
 
     setConfig(nextConfig)
     setUpdateRate(nextUpdateRate)
-    setExportCodec(renderSettingsDraft.exportCodec)
+    if (!useStore.getState().importedVideoPath) {
+      setExportCodec(renderSettingsDraft.exportCodec)
+    }
     setExportRange(nextExportRange)
     setActiveRenderId(null)
     setRenderProgress({
@@ -246,6 +304,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         updateRate: nextUpdateRate,
         exportRange: nextExportRange,
         exportCodec: renderSettingsDraft.exportCodec,
+        exportBitrate: renderSettingsDraft.exportBitrate,
       })
       if (result && result.cancelled) {
         console.log('Render video cancelled (UI handled)')
