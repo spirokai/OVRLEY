@@ -22,10 +22,10 @@ import './index.css'
 import * as backend from './api/backend'
 
 /**
- * Renders the top-level application shell.
+ * Renders the main application shell.
  * @returns {JSX.Element} Rendered component output.
  */
-function App() {
+function AppShell() {
   const {
     config,
     generatingImage,
@@ -134,7 +134,7 @@ function App() {
                 templateStatus={templateManagement.status}
               />
             </div>
-            <OverlayPlayer />
+            <OverlayPlayer backgroundMode={editorShell.editorBackgroundMode} />
           </div>
 
           <div className="w-96 min-w-96 max-w-96 shrink-0 overflow-y-auto border-l border-border/70 bg-card/60 backdrop-blur-sm">
@@ -144,6 +144,14 @@ function App() {
       </div>
     </div>
   )
+}
+
+/**
+ * Renders the top-level application shell.
+ * @returns {JSX.Element} Rendered component output.
+ */
+function App() {
+  return <AppShell />
 }
 
 export default App

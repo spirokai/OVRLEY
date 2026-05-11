@@ -7,13 +7,19 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { AlertCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import useStore from '../store/useStore'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Renders the error alert component.
  * @returns {JSX.Element} Rendered component output.
  */
 function ErrorAlert() {
-  const { errorMessage, clearError } = useStore()
+  const { clearError, errorMessage } = useStore(
+    useShallow((state) => ({
+      clearError: state.clearError,
+      errorMessage: state.errorMessage,
+    })),
+  )
 
   if (!errorMessage) {
     return null

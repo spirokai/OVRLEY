@@ -61,26 +61,63 @@ function formatTimelineTime(value) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
+function resolvePlaybackSource({
+  shouldUseVideoPlayback,
+  playheadSecond,
+  videoSyncOffsetSeconds,
+  importedVideoDuration,
+}) {
+  if (!shouldUseVideoPlayback) {
+    return 'timeline'
+  }
+
+  const safePlayheadSecond = Number(playheadSecond) || 0
+  const videoStartSecond = Math.max(0, Number(videoSyncOffsetSeconds) || 0)
+  const safeVideoDuration = Number(importedVideoDuration)
+  const hasVideoEnd =
+    Number.isFinite(safeVideoDuration) && safeVideoDuration > 0
+  const videoEndSecond = hasVideoEnd
+    ? videoStartSecond + safeVideoDuration
+    : Number.POSITIVE_INFINITY
+
+  if (
+    safePlayheadSecond < videoStartSecond ||
+    safePlayheadSecond >= videoEndSecond
+  ) {
+    return 'timeline'
+  }
+
+  return 'video'
+}
+
 /**
  * Renders the overlay player component.
+ *
+ * @param {object} props - Component props.
+ * @param {string} props.backgroundMode - Selected canvas background style.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function OverlayPlayer() {
+export default function OverlayPlayer({ backgroundMode }) {
   const activitySummary = useStore((state) => state.activitySummary)
   const sceneFps = useStore((state) => state.config?.scene?.fps ?? 30)
   const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
   const selectedSecond = useStore((state) => state.selectedSecond)
   const updateRate = useStore((state) => state.updateRate)
-  const setSelectedSecond = useStore((state) => state.setSelectedSecond)
   const setSelectedSecondTransient = useStore(
     (state) => state.setSelectedSecondTransient,
   )
+  const previewPlaybackState = useStore((state) => state.previewPlaybackState)
+  const previewPlaybackSource = useStore((state) => state.previewPlaybackSource)
+  const startPreviewPlayback = useStore((state) => state.startPreviewPlayback)
+  const pausePreviewPlayback = useStore((state) => state.pausePreviewPlayback)
+  const beginPreviewScrub = useStore((state) => state.beginPreviewScrub)
+  const updatePreviewScrub = useStore((state) => state.updatePreviewScrub)
+  const commitPreviewScrub = useStore((state) => state.commitPreviewScrub)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoDuration = useStore((state) => state.importedVideoDuration)
   const videoSyncOffsetSeconds = useStore(
     (state) => state.videoSyncOffsetSeconds,
   )
-  const [isPlaying, setIsPlaying] = useState(false)
   const [dragSecond, setDragSecond] = useState(null)
   const playbackAnchorRef = useRef({
     startedAtMs: 0,
@@ -108,6 +145,13 @@ export default function OverlayPlayer() {
   ])
 
   const hasActivity = Boolean(activitySummary && totalDuration > 0)
+  const shouldUseVideoPlayback =
+    backgroundMode === 'video' && Boolean(importedVideoPath)
+  const isPlaying = previewPlaybackState === 'playing'
+  const isTimelinePlaybackActive =
+    previewPlaybackState === 'playing' && previewPlaybackSource === 'timeline'
+  const isVideoPlaybackActive =
+    previewPlaybackState === 'playing' && previewPlaybackSource === 'video'
   const clampedPlayhead = clamp(Number(selectedSecond) || 0, 0, totalDuration)
   const displayedPlayhead = clamp(
     dragSecond === null ? clampedPlayhead : dragSecond,
@@ -128,29 +172,6 @@ export default function OverlayPlayer() {
     pendingTimelineSecondRef.current = null
   }, [])
 
-  const scheduleTimelinePreviewUpdate = useCallback(
-    (nextSecond) => {
-      pendingTimelineSecondRef.current = nextSecond
-
-      if (timelineChangeFrameRef.current) {
-        return
-      }
-
-      timelineChangeFrameRef.current = window.requestAnimationFrame(() => {
-        timelineChangeFrameRef.current = 0
-        const pendingSecond = pendingTimelineSecondRef.current
-        pendingTimelineSecondRef.current = null
-
-        if (pendingSecond === null) {
-          return
-        }
-
-        setSelectedSecondTransient(pendingSecond)
-      })
-    },
-    [setSelectedSecondTransient],
-  )
-
   useEffect(() => {
     totalDurationRef.current = totalDuration
   }, [totalDuration])
@@ -164,7 +185,6 @@ export default function OverlayPlayer() {
 
   useEffect(() => {
     if (!hasActivity) {
-      setIsPlaying(false)
       playbackAnchorRef.current = {
         startedAtMs: 0,
         startedSecond: 0,
@@ -178,7 +198,68 @@ export default function OverlayPlayer() {
   }, [clampedPlayhead, hasActivity, selectedSecond, setSelectedSecondTransient])
 
   useEffect(() => {
-    if (!isPlaying || !hasActivity) return undefined
+    if (isVideoPlaybackActive && !shouldUseVideoPlayback) {
+      cancelPendingTimelineChange()
+      setDragSecond(null)
+      pausePreviewPlayback(clampedPlayhead)
+    }
+  }, [
+    cancelPendingTimelineChange,
+    clampedPlayhead,
+    isVideoPlaybackActive,
+    pausePreviewPlayback,
+    shouldUseVideoPlayback,
+  ])
+
+  useEffect(() => {
+    if (!isPlaying || !shouldUseVideoPlayback) {
+      return
+    }
+
+    const nextSource = resolvePlaybackSource({
+      shouldUseVideoPlayback,
+      playheadSecond: clampedPlayhead,
+      videoSyncOffsetSeconds,
+      importedVideoDuration,
+    })
+
+    if (nextSource === previewPlaybackSource) {
+      return
+    }
+
+    previewFrameRef.current = -1
+    cancelPendingTimelineChange()
+    setDragSecond(null)
+
+    if (nextSource === 'timeline') {
+      playbackAnchorRef.current = {
+        startedAtMs: performance.now(),
+        startedSecond: clampedPlayhead,
+      }
+    } else {
+      playbackAnchorRef.current = {
+        startedAtMs: 0,
+        startedSecond: clampedPlayhead,
+      }
+    }
+
+    startPreviewPlayback({
+      source: nextSource,
+      second: clampedPlayhead,
+    })
+  }, [
+    cancelPendingTimelineChange,
+    clampedPlayhead,
+    importedVideoDuration,
+    isPlaying,
+    previewPlaybackSource,
+    shouldUseVideoPlayback,
+    startPreviewPlayback,
+    videoSyncOffsetSeconds,
+  ])
+
+  useEffect(() => {
+    if (!isTimelinePlaybackActive || !hasActivity) return undefined
 
     let animationFrameId = 0
 
@@ -190,8 +271,7 @@ export default function OverlayPlayer() {
       const safeDuration = totalDurationRef.current
 
       if (nextSecond >= safeDuration) {
-        setSelectedSecondTransient(safeDuration)
-        setIsPlaying(false)
+        pausePreviewPlayback(safeDuration)
         playbackAnchorRef.current = {
           startedAtMs: 0,
           startedSecond: safeDuration,
@@ -215,21 +295,44 @@ export default function OverlayPlayer() {
     animationFrameId = window.requestAnimationFrame(tick)
 
     return () => window.cancelAnimationFrame(animationFrameId)
-  }, [effectivePreviewFps, hasActivity, isPlaying, setSelectedSecondTransient])
+  }, [
+    effectivePreviewFps,
+    hasActivity,
+    isTimelinePlaybackActive,
+    pausePreviewPlayback,
+    setSelectedSecondTransient,
+  ])
 
   const handlePlay = () => {
     if (!hasActivity) return
 
     const initialSecond = clampedPlayhead >= totalDuration ? 0 : clampedPlayhead
-    playbackAnchorRef.current = {
-      startedAtMs: performance.now(),
-      startedSecond: initialSecond,
+    const nextSource = resolvePlaybackSource({
+      shouldUseVideoPlayback,
+      playheadSecond: initialSecond,
+      videoSyncOffsetSeconds,
+      importedVideoDuration,
+    })
+
+    if (nextSource === 'timeline') {
+      playbackAnchorRef.current = {
+        startedAtMs: performance.now(),
+        startedSecond: initialSecond,
+      }
+    } else {
+      playbackAnchorRef.current = {
+        startedAtMs: 0,
+        startedSecond: initialSecond,
+      }
     }
+
     previewFrameRef.current = -1
     cancelPendingTimelineChange()
     setDragSecond(null)
-    setSelectedSecondTransient(initialSecond)
-    setIsPlaying(true)
+    startPreviewPlayback({
+      source: nextSource,
+      second: initialSecond,
+    })
   }
 
   const handlePause = () => {
@@ -240,8 +343,7 @@ export default function OverlayPlayer() {
     previewFrameRef.current = -1
     cancelPendingTimelineChange()
     setDragSecond(null)
-    setIsPlaying(false)
-    setSelectedSecond(clampedPlayhead)
+    pausePreviewPlayback(clampedPlayhead)
   }
 
   const handleReset = () => {
@@ -252,36 +354,38 @@ export default function OverlayPlayer() {
     previewFrameRef.current = -1
     cancelPendingTimelineChange()
     setDragSecond(null)
-    setIsPlaying(false)
-    setSelectedSecond(0)
+    pausePreviewPlayback(0)
   }
+
   const handleTimelineChange = ([nextValue]) => {
     const nextSecond = clamp(nextValue, 0, totalDuration)
+
+    playbackAnchorRef.current = {
+      startedAtMs: 0,
+      startedSecond: nextSecond,
+    }
+    cancelPendingTimelineChange()
     setDragSecond(nextSecond)
-    scheduleTimelinePreviewUpdate(nextSecond)
     previewFrameRef.current = -1
 
-    if (isPlaying) {
-      playbackAnchorRef.current = {
-        startedAtMs: performance.now(),
-        startedSecond: nextSecond,
-      }
+    if (previewPlaybackState !== 'scrubbing') {
+      beginPreviewScrub(nextSecond)
+      return
     }
+
+    updatePreviewScrub(nextSecond)
   }
 
   const handleTimelineCommit = ([nextValue]) => {
     const nextSecond = clamp(nextValue, 0, totalDuration)
+    playbackAnchorRef.current = {
+      startedAtMs: 0,
+      startedSecond: nextSecond,
+    }
     previewFrameRef.current = -1
     cancelPendingTimelineChange()
     setDragSecond(null)
-    setSelectedSecond(nextSecond)
-
-    if (isPlaying) {
-      playbackAnchorRef.current = {
-        startedAtMs: performance.now(),
-        startedSecond: nextSecond,
-      }
-    }
+    commitPreviewScrub(nextSecond)
   }
 
   useEffect(() => {
@@ -310,8 +414,7 @@ export default function OverlayPlayer() {
         previewFrameRef.current = -1
         cancelPendingTimelineChange()
         setDragSecond(null)
-        setIsPlaying(false)
-        setSelectedSecond(nextSecond)
+        pausePreviewPlayback(nextSecond)
         return
       }
 
@@ -329,22 +432,38 @@ export default function OverlayPlayer() {
         previewFrameRef.current = -1
         cancelPendingTimelineChange()
         setDragSecond(null)
-        setIsPlaying(false)
-        setSelectedSecond(clampedPlayhead)
+        pausePreviewPlayback(clampedPlayhead)
         return
       }
 
       const initialSecond =
         clampedPlayhead >= totalDuration ? 0 : clampedPlayhead
-      playbackAnchorRef.current = {
-        startedAtMs: performance.now(),
-        startedSecond: initialSecond,
+      const nextSource = resolvePlaybackSource({
+        shouldUseVideoPlayback,
+        playheadSecond: initialSecond,
+        videoSyncOffsetSeconds,
+        importedVideoDuration,
+      })
+
+      if (nextSource === 'timeline') {
+        playbackAnchorRef.current = {
+          startedAtMs: performance.now(),
+          startedSecond: initialSecond,
+        }
+      } else {
+        playbackAnchorRef.current = {
+          startedAtMs: 0,
+          startedSecond: initialSecond,
+        }
       }
+
       previewFrameRef.current = -1
       cancelPendingTimelineChange()
       setDragSecond(null)
-      setSelectedSecondTransient(initialSecond)
-      setIsPlaying(true)
+      startPreviewPlayback({
+        source: nextSource,
+        second: initialSecond,
+      })
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -352,11 +471,17 @@ export default function OverlayPlayer() {
   }, [
     clampedPlayhead,
     cancelPendingTimelineChange,
+    commitPreviewScrub,
+    beginPreviewScrub,
     hasActivity,
     isPlaying,
-    setSelectedSecond,
-    setSelectedSecondTransient,
+    pausePreviewPlayback,
+    importedVideoDuration,
+    shouldUseVideoPlayback,
+    startPreviewPlayback,
     totalDuration,
+    updatePreviewScrub,
+    videoSyncOffsetSeconds,
   ])
 
   return (

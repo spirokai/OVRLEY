@@ -12,6 +12,10 @@ import {
   updateWidgetsInConfig,
 } from '@/lib/widget-config'
 import { getEffectiveWidgetData } from '@/lib/config-utils'
+import {
+  incrementPreviewPerfCounter,
+  previewPerfCounterName,
+} from '@/lib/previewPerf'
 import useOverlayMoveableHandlers from './createOverlayMoveableHandlers'
 import useOverlayPointerHandlers from './createOverlayPointerHandlers'
 import {
@@ -182,6 +186,10 @@ export default function useOverlayEditorState({
       sourceActivity,
     })
   }, [dummyDurationSeconds, selectedSecond, sourceActivity])
+
+  useEffect(() => {
+    incrementPreviewPerfCounter(previewPerfCounterName('React preview updates'))
+  }, [previewSecond])
 
   useEffect(() => {
     resetWidgetDrafts()

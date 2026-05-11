@@ -1,23 +1,74 @@
 import { useEffect, useState } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import useStore from '@/store/useStore'
+import {
+  incrementPreviewPerfCounter,
+  previewPerfCounterName,
+} from '@/lib/previewPerf'
+import { useVideoPlaybackClock } from './useVideoPlaybackClock'
+
+const DRIFT_CORRECTION_SECONDS = 0.25
+
+function clampVideoTime(video, second) {
+  const nextSecond = Number(second)
+
+  if (!Number.isFinite(nextSecond) || nextSecond <= 0) {
+    return 0
+  }
+
+  const duration = Number(video.duration)
+  if (Number.isFinite(duration) && duration > 0) {
+    return Math.min(nextSecond, duration)
+  }
+
+  return nextSecond
+}
+
+function syncVideoCurrentTime(video, second) {
+  const safeSecond = clampVideoTime(video, second)
+
+  if (Math.abs(video.currentTime - safeSecond) <= 0.001) {
+    return
+  }
+
+  incrementPreviewPerfCounter(
+    previewPerfCounterName('video.currentTime assignments'),
+  )
+  video.currentTime = safeSecond
+}
 
 /**
  * Manages the video preview element and synchronization with the global playhead.
  *
  * @param {React.RefObject<HTMLVideoElement>} videoRef Ref to the video element
+ * @param {boolean} isActive Whether the imported video preview is currently visible
  */
-export function useVideoPreview(videoRef) {
+export function useVideoPreview(videoRef, isActive = true) {
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const videoSyncOffsetSeconds = useStore(
     (state) => state.videoSyncOffsetSeconds,
   )
   const selectedSecond = useStore((state) => state.selectedSecond)
-  const isUpdatingFromTimeline = useStore(
-    (state) => state.isUpdatingFromTimeline,
+  const previewPlaybackState = useStore((state) => state.previewPlaybackState)
+  const previewPlaybackSource = useStore((state) => state.previewPlaybackSource)
+  const setSelectedSecondTransient = useStore(
+    (state) => state.setSelectedSecondTransient,
   )
+  const videoDuration = useStore((state) => state.importedVideoDuration || 0)
 
   const [videoSrc, setVideoSrc] = useState('')
+
+  const isVideoPlaybackMode =
+    isActive &&
+    previewPlaybackState === 'playing' &&
+    previewPlaybackSource === 'video'
+
+  useVideoPlaybackClock({
+    videoRef,
+    isActive: Boolean(videoSrc) && isVideoPlaybackMode,
+    videoSyncOffsetSeconds,
+    onPreviewSecond: setSelectedSecondTransient,
+  })
 
   // Handle source changes
   useEffect(() => {
@@ -28,36 +79,66 @@ export function useVideoPreview(videoRef) {
     }
   }, [importedVideoPath])
 
-  // Handle seeking / synchronization
   useEffect(() => {
     const video = videoRef.current
     if (!video || !videoSrc) return
 
-    const videoTime = selectedSecond - videoSyncOffsetSeconds
+    const syncPlaybackState = () => {
+      const desiredVideoSecond = selectedSecond - videoSyncOffsetSeconds
 
-    // We only seek if the difference is significant to avoid overhead
-    // or if we are dragging the timeline.
-    // For 30fps, 1 frame is ~0.033s.
-    const diff = Math.abs(video.currentTime - videoTime)
+      if (isVideoPlaybackMode) {
+        if (
+          Math.abs(
+            clampVideoTime(video, desiredVideoSecond) - video.currentTime,
+          ) > DRIFT_CORRECTION_SECONDS
+        ) {
+          syncVideoCurrentTime(video, desiredVideoSecond)
+        }
 
-    if (diff > 0.05 || isUpdatingFromTimeline) {
-      if (videoTime < 0) {
-        video.currentTime = 0
-      } else if (video.duration && videoTime > video.duration) {
-        video.currentTime = video.duration
-      } else {
-        video.currentTime = videoTime
+        if (video.paused) {
+          const playPromise = video.play()
+          if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch((error) => {
+              if (
+                error?.name !== 'AbortError' &&
+                error?.name !== 'NotAllowedError'
+              ) {
+                console.error(
+                  '[useVideoPreview] Failed to start playback',
+                  error,
+                )
+              }
+            })
+          }
+        }
+
+        return
       }
+
+      if (!video.paused) {
+        video.pause()
+      }
+
+      syncVideoCurrentTime(video, desiredVideoSecond)
+    }
+
+    syncPlaybackState()
+    video.addEventListener('loadedmetadata', syncPlaybackState)
+
+    return () => {
+      video.removeEventListener('loadedmetadata', syncPlaybackState)
     }
   }, [
+    isActive,
+    isVideoPlaybackMode,
+    previewPlaybackSource,
+    previewPlaybackState,
     selectedSecond,
     videoSyncOffsetSeconds,
     videoSrc,
-    isUpdatingFromTimeline,
     videoRef,
   ])
 
-  const videoDuration = useStore((state) => state.importedVideoDuration || 0)
   const isOutOfRange =
     selectedSecond < videoSyncOffsetSeconds ||
     selectedSecond > videoSyncOffsetSeconds + videoDuration

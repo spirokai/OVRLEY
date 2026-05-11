@@ -39,6 +39,7 @@ import {
   updateWidgetInConfig,
 } from '@/lib/widget-config'
 import { PositionSection } from './widgets/widgetEditorSections'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Renders widget editor.
@@ -130,11 +131,19 @@ function renderWidgetEditor(
 export default function SidebarWidgetsTab() {
   const {
     config,
-    setConfig,
     globalDefaults,
     selectedWidgetId,
+    setConfig,
     setSelectedWidgetId,
-  } = useStore()
+  } = useStore(
+    useShallow((state) => ({
+      config: state.config,
+      globalDefaults: state.globalDefaults,
+      selectedWidgetId: state.selectedWidgetId,
+      setConfig: state.setConfig,
+      setSelectedWidgetId: state.setSelectedWidgetId,
+    })),
+  )
   const parsedActivity = getCurrentParsedActivity()
 
   const widgets = useMemo(() => {

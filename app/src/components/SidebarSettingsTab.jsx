@@ -34,6 +34,7 @@ import {
   normalizeUpdateRateForFps,
   sanitizeIntegerFps,
 } from '@/lib/update-rate'
+import { useShallow } from 'zustand/react/shallow'
 import useStore from '../store/useStore'
 
 const ASPECT_RATIOS = [
@@ -119,27 +120,50 @@ function parseTimeOffset(value) {
  */
 export default function SidebarSettingsTab({ config, onConfigChange }) {
   const {
-    globalDefaults,
-    setGlobalDefault,
-    updateRate,
-    setUpdateRate,
-    exportRange,
-    setExportRange,
     activitySummary,
     aspectRatio,
-    setAspectRatio,
-    resetGlobalDefaults,
-    importedVideoPath,
-    importedVideoFps,
-    importedVideoDuration,
-    importedVideoResolution,
+    computeVideoSync,
+    exportRange,
+    globalDefaults,
     importedVideoCreationTime,
-    videoSyncOffsetSeconds,
-    videoSyncWarning,
+    importedVideoDuration,
+    importedVideoFps,
+    importedVideoPath,
+    importedVideoResolution,
+    resetGlobalDefaults,
+    setAspectRatio,
+    setExportRange,
+    setGlobalDefault,
+    setUpdateRate,
     setVideoSyncOffset,
     setVideoSyncWarning,
-    computeVideoSync,
-  } = useStore()
+    updateRate,
+    videoSyncOffsetSeconds,
+    videoSyncWarning,
+  } = useStore(
+    useShallow((state) => ({
+      activitySummary: state.activitySummary,
+      aspectRatio: state.aspectRatio,
+      computeVideoSync: state.computeVideoSync,
+      exportRange: state.exportRange,
+      globalDefaults: state.globalDefaults,
+      importedVideoCreationTime: state.importedVideoCreationTime,
+      importedVideoDuration: state.importedVideoDuration,
+      importedVideoFps: state.importedVideoFps,
+      importedVideoPath: state.importedVideoPath,
+      importedVideoResolution: state.importedVideoResolution,
+      resetGlobalDefaults: state.resetGlobalDefaults,
+      setAspectRatio: state.setAspectRatio,
+      setExportRange: state.setExportRange,
+      setGlobalDefault: state.setGlobalDefault,
+      setUpdateRate: state.setUpdateRate,
+      setVideoSyncOffset: state.setVideoSyncOffset,
+      setVideoSyncWarning: state.setVideoSyncWarning,
+      updateRate: state.updateRate,
+      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+      videoSyncWarning: state.videoSyncWarning,
+    })),
+  )
 
   const scene = config?.scene
   const systemFonts = useAvailableFonts()

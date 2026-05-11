@@ -12,6 +12,10 @@ import {
   readStoredInt,
   updateConfigPersistence,
 } from '../store-utils'
+import {
+  incrementPreviewPerfCounter,
+  previewPerfCounterName,
+} from '../../lib/previewPerf'
 
 /**
  * Creates editor slice.
@@ -21,6 +25,11 @@ import {
  * @returns {object} Derived data structure for downstream use.
  */
 export function createEditorSlice(set, get) {
+  const normalizePreviewSecond = (second) => {
+    const nextSecond = Number(second)
+    return Number.isFinite(nextSecond) ? nextSecond : 0
+  }
+
   return {
     editor: null,
     selectedWidgetId: null,
@@ -32,6 +41,9 @@ export function createEditorSlice(set, get) {
     startSecond: readStoredInt('startSecond', 0),
     endSecond: readStoredInt('endSecond', 73),
     selectedSecond: readStoredInt('selectedSecond', 0),
+    previewPlaybackState: 'paused',
+    previewPlaybackSource: 'timeline',
+    previewPlaybackStartedAtSecond: 0,
     config: readStoredConfig(),
     autoRender: localStorage.getItem('autoRender') === 'true',
 
@@ -150,8 +162,7 @@ export function createEditorSlice(set, get) {
     },
 
     setSelectedSecond: (second) => {
-      const nextSecond = Number(second)
-      const safeSecond = Number.isFinite(nextSecond) ? nextSecond : 0
+      const safeSecond = normalizePreviewSecond(second)
 
       localStorage.setItem('selectedSecond', safeSecond.toString())
       set((state) => {
@@ -160,10 +171,66 @@ export function createEditorSlice(set, get) {
     },
 
     setSelectedSecondTransient: (second) => {
-      const nextSecond = Number(second)
-      const safeSecond = Number.isFinite(nextSecond) ? nextSecond : 0
+      const safeSecond = normalizePreviewSecond(second)
+
+      incrementPreviewPerfCounter(
+        previewPerfCounterName('transient selectedSecond updates'),
+      )
 
       set((state) => {
+        state.selectedSecond = safeSecond
+      })
+    },
+
+    startPreviewPlayback: ({ source, second } = {}) => {
+      const safeSecond = normalizePreviewSecond(second)
+      const safeSource = source === 'video' ? 'video' : 'timeline'
+
+      set((state) => {
+        state.previewPlaybackState = 'playing'
+        state.previewPlaybackSource = safeSource
+        state.previewPlaybackStartedAtSecond = safeSecond
+        state.selectedSecond = safeSecond
+      })
+    },
+
+    pausePreviewPlayback: (second) => {
+      const safeSecond = normalizePreviewSecond(second)
+
+      localStorage.setItem('selectedSecond', safeSecond.toString())
+      set((state) => {
+        state.previewPlaybackState = 'paused'
+        state.previewPlaybackStartedAtSecond = safeSecond
+        state.selectedSecond = safeSecond
+      })
+    },
+
+    beginPreviewScrub: (second) => {
+      const safeSecond = normalizePreviewSecond(second)
+
+      set((state) => {
+        state.previewPlaybackState = 'scrubbing'
+        state.previewPlaybackStartedAtSecond = safeSecond
+        state.selectedSecond = safeSecond
+      })
+    },
+
+    updatePreviewScrub: (second) => {
+      const safeSecond = normalizePreviewSecond(second)
+
+      set((state) => {
+        state.previewPlaybackState = 'scrubbing'
+        state.selectedSecond = safeSecond
+      })
+    },
+
+    commitPreviewScrub: (second) => {
+      const safeSecond = normalizePreviewSecond(second)
+
+      localStorage.setItem('selectedSecond', safeSecond.toString())
+      set((state) => {
+        state.previewPlaybackState = 'paused'
+        state.previewPlaybackStartedAtSecond = safeSecond
         state.selectedSecond = safeSecond
       })
     },

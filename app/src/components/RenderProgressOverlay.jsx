@@ -7,13 +7,19 @@ import useStore from '../store/useStore'
 import { Progress } from '@/components/ui/progress'
 import { Loader2, Timer, Film } from 'lucide-react'
 import { cancelRender } from '../api/backend'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Renders the render progress overlay component.
  * @returns {JSX.Element} Rendered component output.
  */
 export default function RenderProgressOverlay() {
-  const { renderingVideo, renderProgress } = useStore()
+  const { renderProgress, renderingVideo } = useStore(
+    useShallow((state) => ({
+      renderProgress: state.renderProgress,
+      renderingVideo: state.renderingVideo,
+    })),
+  )
   const [isCancelling, setIsCancelling] = useState(false)
 
   if (!renderingVideo) return null

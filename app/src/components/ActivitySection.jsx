@@ -6,13 +6,19 @@ import React from 'react'
 import useStore from '../store/useStore'
 import LoadGpxButton from './buttons/LoadGpxButton'
 import LoadDemoGpxButton from './buttons/LoadDemoGpxButton'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Renders the activity section component.
  * @returns {JSX.Element} Rendered component output.
  */
 function ActivitySection() {
-  const { gpxFilename, dummyDurationSeconds } = useStore()
+  const { dummyDurationSeconds, gpxFilename } = useStore(
+    useShallow((state) => ({
+      dummyDurationSeconds: state.dummyDurationSeconds,
+      gpxFilename: state.gpxFilename,
+    })),
+  )
   const minutes = Math.floor(dummyDurationSeconds / 60)
   const seconds = dummyDurationSeconds % 60
 

@@ -227,7 +227,10 @@ export default function OverlayCanvas({
   widgetRefCallbacks,
 }) {
   const videoRef = useRef(null)
-  const { videoSrc, isOutOfRange } = useVideoPreview(videoRef)
+  const { videoSrc, isOutOfRange } = useVideoPreview(
+    videoRef,
+    backgroundMode === 'video',
+  )
 
   return (
     <div
@@ -257,9 +260,10 @@ export default function OverlayCanvas({
           ref={videoRef}
           src={videoSrc}
           className={cn(
-            'pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-300',
+            'pointer-events-none absolute inset-0 h-full w-full object-cover',
             isOutOfRange ? 'opacity-20' : 'opacity-100',
           )}
+          preload="auto"
           muted
           playsInline
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
