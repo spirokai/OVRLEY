@@ -117,40 +117,37 @@ export default function useRenderWorkflow({ backendStatus }) {
     if (!renderingVideo) return
 
     const unsubscribe = useStore.subscribe(
-      
-     
-        (state) => state.renderProgress,
-        (nextProgress) => {
-          const { activeRenderId: nextActiveRenderId } = useStore.getState()
-          if (nextProgress.renderId !== nextActiveRenderId) {
+      (state) => state.renderProgress,
+      (nextProgress) => {
+        const { activeRenderId: nextActiveRenderId } = useStore.getState()
+        if (nextProgress.renderId !== nextActiveRenderId) {
           return
-          }
+        }
 
-          const { filename, message, status } = nextProgress
-  
-          if (status === 'complete' && filename) {
-            setVideoFilename(filename)
-            setActiveRenderId(null)
-            setRenderingVideo(false)
-            backend.openVideo(filename).catch((error) => {
-              console.error('Error calling open-video:', error)
-            })
+        const { filename, message, status } = nextProgress
+
+        if (status === 'complete' && filename) {
+          setVideoFilename(filename)
+          setActiveRenderId(null)
+          setRenderingVideo(false)
+          backend.openVideo(filename).catch((error) => {
+            console.error('Error calling open-video:', error)
+          })
           return
-          }
-  
-          if (status === 'cancelled') {
-            setActiveRenderId(null)
-            setRenderingVideo(false)
+        }
+
+        if (status === 'cancelled') {
+          setActiveRenderId(null)
+          setRenderingVideo(false)
           return
+        }
+
+        if (status === 'error') {
+          setActiveRenderId(null)
+          setRenderingVideo(false)
+          if (message) {
+            setErrorMessage(message)
           }
-  
-          if (status === 'error') {
-            setActiveRenderId(null)
-            setRenderingVideo(false)
-            if (message) {
-              setErrorMessage(message)
-       ,
-         }
         }
       },
     )
