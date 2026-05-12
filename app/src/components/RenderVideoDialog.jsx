@@ -34,7 +34,7 @@ import { getDefaultBitrate } from '@/lib/bitrateDefaults'
 const OUTPUT_FORMATS = [
   {
     value: 'prores',
-    label: 'ProRes 4444',
+    label: 'ProRes',
     group: 'transparent',
     codecs: {
       cpu: 'prores_ks',
@@ -61,6 +61,7 @@ const OUTPUT_FORMATS = [
       qsv: 'h264_qsv',
       amd: 'h264_amf',
       videotoolbox: 'h264_videotoolbox',
+      vaapi: 'h264_vaapi',
     },
   },
   {
@@ -74,6 +75,7 @@ const OUTPUT_FORMATS = [
       qsv: 'hevc_qsv',
       amd: 'hevc_amf',
       videotoolbox: 'hevc_videotoolbox',
+      vaapi: 'hevc_vaapi',
     },
   },
 ]
@@ -83,7 +85,7 @@ const ACCELERATION_OPTIONS = [
   { value: 'nvidia', label: 'NVIDIA GPU', platform: ['windows', 'linux'] },
   {
     value: 'nvidia_cuda',
-    label: 'NVIDIA GPU + CUDA compositing',
+    label: 'NVIDIA GPU | CUDA',
     platform: ['windows', 'linux'],
   },
   { value: 'qsv', label: 'Intel Quick Sync', platform: ['windows', 'linux'] },
@@ -93,7 +95,8 @@ const ACCELERATION_OPTIONS = [
     label: 'Apple VideoToolbox',
     platform: ['macos'],
   },
-  { value: 'vulkan_prores', label: 'Vulkan ProRes' },
+  { value: 'vaapi', label: 'VAAPI', platform: ['linux'] },
+  { value: 'vulkan_prores', label: 'Vulkan' },
 ]
 
 const OUTPUT_FORMATS_BY_VALUE = Object.fromEntries(
@@ -750,120 +753,125 @@ export default function RenderVideoDialog({
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Codec / Output Format
-                </Label>
-                <Select
-                  value={selectedOutputFormatValue}
-                  onValueChange={handleOutputFormatChange}
-                >
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
-                        <span>Transparent Codecs</span>
-                        {hasImportedVideo && (
-                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
-                            Video imported
-                          </span>
-                        )}
-                      </SelectLabel>
-                      <SelectSeparator className="my-0" />
-                      {OUTPUT_FORMATS.filter(
-                        (option) => option.group === 'transparent',
-                      ).map((option) => (
-                        <SelectItem
-                          key={option.value}
-                          value={option.value}
-                          disabled={hasImportedVideo}
-                        >
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-
-                    <SelectGroup>
-                      <SelectLabel className="mt-1 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
-                        <span>MP4 Codecs</span>
-                        {!hasImportedVideo && (
-                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
-                            Video required
-                          </span>
-                        )}
-                      </SelectLabel>
-                      <SelectSeparator className="my-0" />
-                      {OUTPUT_FORMATS.filter(
-                        (option) => option.group === 'mp4',
-                      ).map((option) => {
-                        const available = isOutputFormatAvailable(
-                          option,
-                          platformOs,
-                          availableCodecs,
-                        )
-                        const disabled = !hasImportedVideo || !available
-                        return (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Codec / Output Format
+                  </Label>
+                  <Select
+                    value={selectedOutputFormatValue}
+                    onValueChange={handleOutputFormatChange}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
+                          <span>Transparent Codecs</span>
+                          {hasImportedVideo && (
+                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
+                              Video imported
+                            </span>
+                          )}
+                        </SelectLabel>
+                        <SelectSeparator className="my-0" />
+                        {OUTPUT_FORMATS.filter(
+                          (option) => option.group === 'transparent',
+                        ).map((option) => (
                           <SelectItem
                             key={option.value}
                             value={option.value}
-                            disabled={disabled}
+                            disabled={hasImportedVideo}
                           >
-                            <span className="flex w-full items-center justify-between gap-3">
-                              <span className="min-w-0 truncate">
-                                {option.label}
-                              </span>
-                              {!available && (
-                                <span className="shrink-0 text-right text-[10px] text-muted-foreground">
-                                  Unavailable
-                                </span>
-                              )}
-                            </span>
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Hardware Acceleration
-                </Label>
-                <Select
-                  value={selectedAccelerationValue}
-                  onValueChange={handleAccelerationChange}
-                >
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectedAccelerationOptions.map((option) => (
-                      <SelectItem
-                        key={option.value}
-                        value={option.value}
-                        disabled={!option.available}
-                      >
-                        <span className="flex w-full items-center justify-between gap-3">
-                          <span className="min-w-0 truncate">
                             {option.label}
-                          </span>
-                          {!option.available && (
-                            <span className="shrink-0 text-right text-[10px] text-muted-foreground">
-                              {!option.codecSupported
-                                ? 'Unsupported'
-                                : option.platformVisible
-                                  ? 'Unavailable'
-                                  : 'Unsupported'}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+
+                      <SelectGroup>
+                        <SelectLabel className="mt-1 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
+                          <span>MP4 Codecs</span>
+                          {!hasImportedVideo && (
+                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
+                              Video required
                             </span>
                           )}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                        </SelectLabel>
+                        <SelectSeparator className="my-0" />
+                        {OUTPUT_FORMATS.filter(
+                          (option) => option.group === 'mp4',
+                        ).map((option) => {
+                          const available = isOutputFormatAvailable(
+                            option,
+                            platformOs,
+                            availableCodecs,
+                          )
+                          const disabled = !hasImportedVideo || !available
+                          return (
+                            <SelectItem
+                              key={option.value}
+                              value={option.value}
+                              disabled={disabled}
+                            >
+                              <span className="flex w-full items-center justify-between gap-3">
+                                <span className="min-w-0 truncate">
+                                  {option.label}
+                                </span>
+                                {!available && (
+                                  <span className="shrink-0 text-right text-[10px] text-muted-foreground">
+                                    Unavailable
+                                  </span>
+                                )}
+                              </span>
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Hardware Acceleration
+                  </Label>
+                  <Select
+                    value={selectedAccelerationValue}
+                    onValueChange={handleAccelerationChange}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedAccelerationOptions.map(
+                        (option) =>
+                          (option.available || option.platformVisible) && (
+                            <SelectItem
+                              key={option.value}
+                              value={option.value}
+                              disabled={!option.available}
+                            >
+                              <span className="flex w-full items-center justify-between gap-3">
+                                <span className="min-w-0 truncate">
+                                  {option.label}
+                                </span>
+                                {!option.available && (
+                                  <span className="shrink-0 text-right text-[10px] text-muted-foreground">
+                                    {!option.codecSupported
+                                      ? 'Unsupported'
+                                      : option.platformVisible
+                                        ? 'Unavailable'
+                                        : 'Unsupported'}
+                                  </span>
+                                )}
+                              </span>
+                            </SelectItem>
+                          ),
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {selectedCodecIsMp4 && (

@@ -276,8 +276,7 @@ export function getDefaultBitrate(width, height, fps, codecName) {
   const pixels = width * height;
   const isHevc = /h265|hevc|x265/i.test(codecName);
   const isHfr = fps > 30;
-  const bin =
-    BITRATE_BINS.find((b) => pixels <= b.maxPixels) ?? BITRATE_FALLBACK;
+  const bin = BITRATE_BINS.find((b) => pixels <= b.maxPixels) ?? BITRATE_FALLBACK;
   if (isHevc) return isHfr ? bin.h265Hfr : bin.h265;
   return isHfr ? bin.h264Hfr : bin.h264;
 }
@@ -315,7 +314,7 @@ FFmpeg composites them using `filter_complex`:
 [0:v]scale=WxH[base];[1:v]format=yuva420p[overlay];[base][overlay]overlay=0:0
 ```
 
-For hardware-accelerated profiles (nvenc, qsv), the filter chains from the builtin profiles in the spec are used.
+For hardware-accelerated profiles (nvenc, qsv), the filter chains from the builtin profiles in the spec are used. The default filters should be defined in a separate json file; see "Appendix A" at the end of this plan
 
 ### Deliverables
 
@@ -594,14 +593,7 @@ These profiles from [gopro-dashboard-overlay](https://github.com/time4tea/gopro-
 ```json
 {
   "input": ["-hwaccel", "videotoolbox"],
-  "output": [
-    "-vcodec",
-    "h264_videotoolbox",
-    "-b:v",
-    "60M",
-    "-movflags",
-    "faststart"
-  ]
+  "output": ["-vcodec", "h264_videotoolbox", "-b:v", "60M", "-movflags", "faststart"]
 }
 ```
 
@@ -620,14 +612,7 @@ These profiles from [gopro-dashboard-overlay](https://github.com/time4tea/gopro-
 ```json
 {
   "input": ["-hwaccel", "videotoolbox"],
-  "output": [
-    "-vcodec",
-    "hevc_videotoolbox",
-    "-b:v",
-    "40M",
-    "-movflags",
-    "faststart"
-  ]
+  "output": ["-vcodec", "hevc_videotoolbox", "-b:v", "40M", "-movflags", "faststart"]
 }
 ```
 
@@ -639,14 +624,7 @@ Same as `mac` but using HEVC (H.265) encoder. Better compression at same quality
 
 ```json
 {
-  "input": [
-    "-init_hw_device",
-    "qsv=hw",
-    "-hwaccel",
-    "qsv",
-    "-hwaccel_output_format",
-    "qsv"
-  ],
+  "input": ["-init_hw_device", "qsv=hw", "-hwaccel", "qsv", "-hwaccel_output_format", "qsv"],
   "filter": "[0:v]hwupload=extra_hw_frames=64[main_hw];[1:v]hwupload=extra_hw_frames=64,format=qsv[overlay_hw];[main_hw][overlay_hw]overlay_qsv=x=0:y=0,hwdownload,format=nv12",
   "output": ["-vcodec", "hevc_qsv", "-global_quality", "25", "-c:a", "copy"]
 }

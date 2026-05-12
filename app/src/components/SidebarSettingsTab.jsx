@@ -496,16 +496,18 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             </div>
 
             {videoSyncWarning && (
-              <div className="flex gap-2 items-center rounded-md bg-destructive/10 p-2 pl-4 text-destructive">
+              <div className="flex gap-2 items-center rounded-md bg-destructive/25 p-2 pl-4 text-destructive">
                 <AlertTriangle className="h-3 w-3 shrink-0" />
-                <p className="text-[10px] leading-tight">{videoSyncWarning}</p>
+                <p className="text-[0.7rem] font-medium leading-tight">
+                  {videoSyncWarning}
+                </p>
               </div>
             )}
 
             {videoResolutionMismatch && (
-              <div className="flex gap-2 items-center  rounded-md bg-destructive/10 p-2 pl-4 text-destructive">
+              <div className="flex gap-2 items-center  rounded-md bg-destructive/25 p-2 pl-4 text-destructive">
                 <AlertTriangle className="h-3 w-3 shrink-0" />
-                <p className="text-[10px] leading-tight">
+                <p className="text-[0.7rem] font-medium leading-tight">
                   Overlay and video resolutions do not match
                 </p>
               </div>
