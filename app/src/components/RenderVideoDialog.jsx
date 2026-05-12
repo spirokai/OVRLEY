@@ -137,6 +137,10 @@ function isMp4Codec(codec) {
 
 function codecFlag(availableCodecs, codec) {
   const flagByCodec = {
+    prores_ks: 'proresKs',
+    prores_ks_vulkan: 'proresKsVulkan',
+    prores_videotoolbox: 'proresVideotoolbox',
+    qtrle: 'qtrle',
     libx264: 'libx264',
     libx265: 'libx265',
     h264_nvenc: 'h264Nvenc',
@@ -161,11 +165,18 @@ function isAccelerationAvailable(format, accelerationValue, availableCodecs) {
   const codec = getExportCodecForSelection(format.value, accelerationValue)
   if (!codec) return false
 
-  if (format.group === 'transparent') {
-    return true
-  }
-
   if (!availableCodecs) return false
+
+  if (format.group === 'transparent') {
+    if (accelerationValue === 'videotoolbox') {
+      return (
+        codecFlag(availableCodecs, codec) &&
+        Boolean(availableCodecs.videotoolbox)
+      )
+    }
+
+    return codecFlag(availableCodecs, codec)
+  }
 
   if (accelerationValue === 'nvidia') {
     return (
@@ -199,7 +210,11 @@ function isAccelerationAvailable(format, accelerationValue, availableCodecs) {
 }
 
 function getVisibleAccelerationOptions(format, platformOs, availableCodecs) {
-  return ACCELERATION_OPTIONS.map((option) => {
+  return ACCELERATION_OPTIONS.filter((option) => {
+    const codecSupported = Object.hasOwn(format.codecs, option.value)
+    const platformVisible = isAccelerationPotentiallyVisible(option, platformOs)
+    return codecSupported && platformVisible
+  }).map((option) => {
     const codecSupported = Object.hasOwn(format.codecs, option.value)
     const platformVisible = isAccelerationPotentiallyVisible(option, platformOs)
     return {
@@ -844,31 +859,24 @@ export default function RenderVideoDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {selectedAccelerationOptions.map(
-                        (option) =>
-                          (option.available || option.platformVisible) && (
-                            <SelectItem
-                              key={option.value}
-                              value={option.value}
-                              disabled={!option.available}
-                            >
-                              <span className="flex w-full items-center justify-between gap-3">
-                                <span className="min-w-0 truncate">
-                                  {option.label}
-                                </span>
-                                {!option.available && (
-                                  <span className="shrink-0 text-right text-[10px] text-muted-foreground">
-                                    {!option.codecSupported
-                                      ? 'Unsupported'
-                                      : option.platformVisible
-                                        ? 'Unavailable'
-                                        : 'Unsupported'}
-                                  </span>
-                                )}
+                      {selectedAccelerationOptions.map((option) => (
+                        <SelectItem
+                          key={option.value}
+                          value={option.value}
+                          disabled={!option.available}
+                        >
+                          <span className="flex w-full items-center justify-between gap-3">
+                            <span className="min-w-0 truncate">
+                              {option.label}
+                            </span>
+                            {!option.available && (
+                              <span className="shrink-0 text-right text-[10px] text-muted-foreground">
+                                Unavailable
                               </span>
-                            </SelectItem>
-                          ),
-                      )}
+                            )}
+                          </span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

@@ -1,12 +1,16 @@
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AvailableCodecs {
+    pub prores_ks: bool,
+    pub prores_ks_vulkan: bool,
+    pub prores_videotoolbox: bool,
+    pub qtrle: bool,
     pub libx264: bool,
     pub libx265: bool,
     pub h264_nvenc: bool,
@@ -30,119 +34,458 @@ pub struct AvailableCodecs {
 
 pub fn detect_codecs(repo_root: &Path) -> Result<AvailableCodecs, String> {
     let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
-    let encoders = run_ffmpeg_list(&ffmpeg_path, "-encoders")?;
-    let hwaccels = run_ffmpeg_list(&ffmpeg_path, "-hwaccels")?;
+    let vaapi_device = find_vaapi_device();
 
-    let encoder_names = parse_encoder_names(&encoders);
-    let hwaccel_names = parse_hwaccel_names(&hwaccels);
+    let prores_ks = probe_codec(
+        "prores_ks",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "prores_ks",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let prores_ks_vulkan = probe_codec(
+        "prores_ks_vulkan",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-init_hw_device",
+            "vulkan=vk",
+            "-filter_hw_device",
+            "vk",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-vf",
+            "hwupload",
+            "-c:v",
+            "prores_ks_vulkan",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let prores_videotoolbox = probe_codec(
+        "prores_videotoolbox",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "prores_videotoolbox",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let qtrle = probe_codec(
+        "qtrle",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "qtrle",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
 
-    let h264_nvenc = encoder_names.contains("h264_nvenc");
-    let hevc_nvenc = encoder_names.contains("hevc_nvenc");
-    let cuda = hwaccel_names.contains("cuda");
-    let nvdec = hwaccel_names.contains("nvdec");
-    let qsv = hwaccel_names.contains("qsv");
-    let vaapi = hwaccel_names.contains("vaapi");
-    let videotoolbox = hwaccel_names.contains("videotoolbox");
+    let libx264 = probe_codec(
+        "libx264",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "libx264",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let libx265 = probe_codec(
+        "libx265",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "libx265",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let h264_nvenc = probe_codec(
+        "h264_nvenc",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "h264_nvenc",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let hevc_nvenc = probe_codec(
+        "hevc_nvenc",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "hevc_nvenc",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let h264_qsv = probe_codec(
+        "h264_qsv",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "h264_qsv",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let hevc_qsv = probe_codec(
+        "hevc_qsv",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "hevc_qsv",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let h264_amf = probe_codec(
+        "h264_amf",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "h264_amf",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let hevc_amf = probe_codec(
+        "hevc_amf",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "hevc_amf",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let h264_videotoolbox = probe_codec(
+        "h264_videotoolbox",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "h264_videotoolbox",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let hevc_videotoolbox = probe_codec(
+        "hevc_videotoolbox",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-c:v",
+            "hevc_videotoolbox",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let h264_vaapi = vaapi_device.as_ref().is_some_and(|device_path| {
+        let args = vec![
+            "-hide_banner".to_string(),
+            "-loglevel".to_string(),
+            "error".to_string(),
+            "-vaapi_device".to_string(),
+            device_path.to_string_lossy().to_string(),
+            "-f".to_string(),
+            "lavfi".to_string(),
+            "-i".to_string(),
+            "nullsrc=s=256x256:d=1".to_string(),
+            "-vf".to_string(),
+            "format=nv12,hwupload".to_string(),
+            "-c:v".to_string(),
+            "h264_vaapi".to_string(),
+            "-frames:v".to_string(),
+            "1".to_string(),
+            "-f".to_string(),
+            "null".to_string(),
+            "-".to_string(),
+        ];
+        probe_codec_owned("h264_vaapi", &ffmpeg_path, &args)
+    });
+    let hevc_vaapi = vaapi_device.as_ref().is_some_and(|device_path| {
+        let args = vec![
+            "-hide_banner".to_string(),
+            "-loglevel".to_string(),
+            "error".to_string(),
+            "-vaapi_device".to_string(),
+            device_path.to_string_lossy().to_string(),
+            "-f".to_string(),
+            "lavfi".to_string(),
+            "-i".to_string(),
+            "nullsrc=s=256x256:d=1".to_string(),
+            "-vf".to_string(),
+            "format=nv12,hwupload".to_string(),
+            "-c:v".to_string(),
+            "hevc_vaapi".to_string(),
+            "-frames:v".to_string(),
+            "1".to_string(),
+            "-f".to_string(),
+            "null".to_string(),
+            "-".to_string(),
+        ];
+        probe_codec_owned("hevc_vaapi", &ffmpeg_path, &args)
+    });
+    let cuda_h264_nvenc = probe_codec(
+        "cuda_h264_nvenc",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-vf",
+            "format=nv12,hwupload_cuda",
+            "-c:v",
+            "h264_nvenc",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let cuda_hevc_nvenc = probe_codec(
+        "cuda_hevc_nvenc",
+        &ffmpeg_path,
+        &[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "nullsrc=s=256x256:d=1",
+            "-vf",
+            "format=nv12,hwupload_cuda",
+            "-c:v",
+            "hevc_nvenc",
+            "-frames:v",
+            "1",
+            "-f",
+            "null",
+            "-",
+        ],
+    );
+    let cuda = cuda_h264_nvenc || cuda_hevc_nvenc;
 
     Ok(AvailableCodecs {
-        libx264: encoder_names.contains("libx264"),
-        libx265: encoder_names.contains("libx265"),
+        prores_ks,
+        prores_ks_vulkan,
+        prores_videotoolbox,
+        qtrle,
+        libx264,
+        libx265,
         h264_nvenc,
         hevc_nvenc,
-        h264_qsv: encoder_names.contains("h264_qsv"),
-        hevc_qsv: encoder_names.contains("hevc_qsv"),
-        h264_vaapi: encoder_names.contains("h264_vaapi"),
-        hevc_vaapi: encoder_names.contains("hevc_vaapi"),
-        h264_amf: encoder_names.contains("h264_amf"),
-        hevc_amf: encoder_names.contains("hevc_amf"),
-        h264_videotoolbox: encoder_names.contains("h264_videotoolbox"),
-        hevc_videotoolbox: encoder_names.contains("hevc_videotoolbox"),
+        h264_qsv,
+        hevc_qsv,
+        h264_vaapi,
+        hevc_vaapi,
+        h264_amf,
+        hevc_amf,
+        h264_videotoolbox,
+        hevc_videotoolbox,
         cuda,
-        nvdec,
-        qsv,
-        vaapi,
-        videotoolbox,
-        nvgpu: (h264_nvenc || hevc_nvenc) && (nvdec || cuda),
-        nnvgpu: (h264_nvenc || hevc_nvenc) && cuda,
+        nvdec: h264_nvenc || hevc_nvenc,
+        qsv: h264_qsv || hevc_qsv,
+        vaapi: h264_vaapi || hevc_vaapi,
+        videotoolbox: prores_videotoolbox || h264_videotoolbox || hevc_videotoolbox,
+        nvgpu: h264_nvenc || hevc_nvenc,
+        nnvgpu: cuda,
     })
 }
 
-fn run_ffmpeg_list(ffmpeg_path: &Path, list_arg: &str) -> Result<String, String> {
+fn probe_codec(name: &str, ffmpeg_path: &Path, args: &[&str]) -> bool {
+    let owned_args = args
+        .iter()
+        .map(|arg| (*arg).to_string())
+        .collect::<Vec<_>>();
+    probe_codec_owned(name, ffmpeg_path, &owned_args)
+}
+
+fn probe_codec_owned(_name: &str, ffmpeg_path: &Path, args: &[String]) -> bool {
     let mut command = Command::new(ffmpeg_path);
-    command.arg(list_arg);
+    command.args(args);
     suppress_child_console(&mut command);
+    command.stdout(Stdio::null());
+    command.stderr(Stdio::null());
 
-    let output = command
-        .output()
-        .map_err(|error| format!("Failed to run ffmpeg {list_arg}: {error}"))?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "ffmpeg {list_arg} failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
+    match command.status() {
+        Ok(status) => status.success(),
+        Err(_) => false,
     }
-
-    let mut text = String::from_utf8_lossy(&output.stdout).to_string();
-    if text.is_empty() {
-        text = String::from_utf8_lossy(&output.stderr).to_string();
-    }
-    Ok(text)
 }
 
-fn parse_encoder_names(output: &str) -> BTreeSet<String> {
-    output
-        .lines()
-        .filter_map(|line| {
-            let trimmed = line.trim_start();
-            if !trimmed.starts_with('V') {
-                return None;
-            }
+fn find_vaapi_device() -> Option<std::path::PathBuf> {
+    let dri_dir = Path::new("/dev/dri");
+    if !dri_dir.is_dir() {
+        return None;
+    }
 
-            trimmed
-                .split_whitespace()
-                .nth(1)
-                .map(|name| name.to_ascii_lowercase())
-        })
-        .collect()
-}
+    let preferred = dri_dir.join("renderD128");
+    if preferred.is_file() {
+        return Some(preferred);
+    }
 
-fn parse_hwaccel_names(output: &str) -> BTreeSet<String> {
-    output
-        .lines()
-        .map(str::trim)
-        .filter(|line| {
-            !line.is_empty()
-                && !line.starts_with("Hardware")
-                && !line.starts_with("ffmpeg")
-                && !line.starts_with("configuration:")
-                && !line.starts_with("lib")
-        })
-        .map(|line| line.to_ascii_lowercase())
-        .collect()
+    let mut entries = fs::read_dir(dri_dir).ok()?;
+    entries.find_map(|entry| {
+        let path = entry.ok()?.path();
+        let name = path.file_name()?.to_string_lossy();
+        if name.starts_with("renderD") || name.starts_with("card") {
+            Some(path)
+        } else {
+            None
+        }
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_encoder_names, parse_hwaccel_names};
-
-    #[test]
-    fn parses_encoder_names_from_ffmpeg_listing() {
-        let names = parse_encoder_names(
-            "Encoders:\n V....D libx264             libx264 H.264\n V..... h264_nvenc          NVIDIA NVENC H.264\n A..... aac\n",
-        );
-
-        assert!(names.contains("libx264"));
-        assert!(names.contains("h264_nvenc"));
-        assert!(!names.contains("aac"));
-    }
-
-    #[test]
-    fn parses_hwaccel_names_from_ffmpeg_listing() {
-        let names = parse_hwaccel_names("Hardware acceleration methods:\ncuda\nqsv\nvaapi\n");
-
-        assert!(names.contains("cuda"));
-        assert!(names.contains("qsv"));
-        assert!(names.contains("vaapi"));
-    }
 }
