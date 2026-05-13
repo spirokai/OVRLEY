@@ -248,15 +248,31 @@ export async function writeParseDebugFile(filename, contents) {
 }
 
 /**
- * Probes video for metadata using ffprobe.
+ * Imports a video into the local HTTP preview server.
  *
- * @param {string} filePath - Path to the video file.
- * @returns {Promise<object>} Promise resolving to video metadata.
+ * @param {string} path - Absolute path to the source video file.
+ * @returns {Promise<object>} Promise resolving to preview URL, import ID, metadata, and warnings.
  */
-export async function probeVideo(filePath) {
-  const invoke = await requireInvoke()
-  const result = await invoke('backend_probe_video', { filePath })
-  return typeof result === 'string' ? JSON.parse(result) : result
+export async function importPreviewVideo(path) {
+  return apiCall('backend_import_preview_video', { path })
+}
+
+/**
+ * Clears the currently registered local HTTP preview video.
+ *
+ * @returns {Promise<*>} Promise resolving when the preview has been cleared.
+ */
+export async function clearPreviewVideo() {
+  return apiCall('backend_clear_preview_video', {})
+}
+
+/**
+ * Returns current local HTTP preview server state.
+ *
+ * @returns {Promise<object|null>} Promise resolving to current preview server state or null.
+ */
+export async function getVideoState() {
+  return apiCall('backend_get_video_state', {})
 }
 
 /**

@@ -3,6 +3,7 @@
  */
 
 import { memo, useEffect, useRef } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from './constants'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
@@ -215,7 +216,7 @@ export default function OverlayCanvas({
   widgetRefCallbacks,
 }) {
   const videoRef = useRef(null)
-  const { videoSrc, isOutOfRange } = useVideoPreview(videoRef, backgroundMode === 'video')
+  const { videoSrc, importId, isOutOfRange, videoPreviewMessages } = useVideoPreview(videoRef, backgroundMode === 'video')
 
   return (
     <div
@@ -238,15 +239,29 @@ export default function OverlayCanvas({
       />
       {backgroundMode === 'video' && videoSrc && (
         <video
+          key={importId ?? 'no-video'}
           ref={videoRef}
           src={videoSrc}
           className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')}
-          preload="auto"
+          preload="metadata"
           muted
           playsInline
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
         />
       )}
+      {backgroundMode === 'video' && videoPreviewMessages.length > 0 ? (
+        <div
+          className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex max-w-xl items-start gap-2 rounded-md border border-amber-400/40 bg-black/75 px-3 py-2 text-xs leading-snug text-amber-100 shadow-lg"
+          aria-live="polite"
+        >
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <div className="space-y-1">
+            {videoPreviewMessages.slice(0, 2).map((message) => (
+              <p key={message}>{message}</p>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {gridVisible ? <CanvasGrid displayScale={displayScale} sceneSize={sceneSize} /> : null}
       <div className="absolute inset-0 overflow-visible">
         {widgets.map((widget) => {

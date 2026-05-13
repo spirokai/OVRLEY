@@ -487,5 +487,4 @@ fn find_vaapi_device() -> Option<std::path::PathBuf> {
 }
 
 #[cfg(test)]
-mod tests {
-}
+mod tests {}

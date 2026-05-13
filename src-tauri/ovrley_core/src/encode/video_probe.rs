@@ -12,6 +12,14 @@ pub struct VideoMetadata {
     pub fps: Option<f64>,
     pub resolution: Option<Resolution>,
     pub creation_time: Option<String>,
+    pub codec_name: Option<String>,
+    pub codec_long_name: Option<String>,
+    pub codec_profile: Option<String>,
+    pub pix_fmt: Option<String>,
+    pub bits_per_raw_sample: Option<u32>,
+    pub has_audio: bool,
+    pub container_format: Option<String>,
+    pub rotation_degrees: Option<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -61,6 +69,14 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, S
         fps: None,
         resolution: None,
         creation_time: None,
+        codec_name: None,
+        codec_long_name: None,
+        codec_profile: None,
+        pix_fmt: None,
+        bits_per_raw_sample: None,
+        has_audio: false,
+        container_format: None,
+        rotation_degrees: None,
     };
 
     let format = json.get("format");
@@ -70,6 +86,10 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, S
         if let Some(duration_str) = format_obj.get("duration").and_then(|v| v.as_str()) {
             metadata.duration = duration_str.parse::<f64>().ok();
         }
+        metadata.container_format = format_obj
+            .get("format_name")
+            .and_then(|v| v.as_str())
+            .map(|value| value.to_string());
     }
 
     let mut video_stream = None;
@@ -80,9 +100,35 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, S
                 break;
             }
         }
+
+        metadata.has_audio = streams
+            .iter()
+            .any(|stream| stream.get("codec_type").and_then(|v| v.as_str()) == Some("audio"));
     }
 
     if let Some(stream) = video_stream {
+        metadata.codec_name = stream
+            .get("codec_name")
+            .and_then(|v| v.as_str())
+            .map(|value| value.to_string());
+        metadata.codec_long_name = stream
+            .get("codec_long_name")
+            .and_then(|v| v.as_str())
+            .map(|value| value.to_string());
+        metadata.codec_profile = stream
+            .get("profile")
+            .and_then(|v| v.as_str())
+            .map(|value| value.to_string());
+        metadata.pix_fmt = stream
+            .get("pix_fmt")
+            .and_then(|v| v.as_str())
+            .map(|value| value.to_string());
+        metadata.bits_per_raw_sample = stream
+            .get("bits_per_raw_sample")
+            .and_then(|v| v.as_str())
+            .and_then(|value| value.parse::<u32>().ok());
+        metadata.rotation_degrees = read_rotation_degrees(stream);
+
         if let (Some(w), Some(h)) = (
             stream.get("width").and_then(|v| v.as_u64()),
             stream.get("height").and_then(|v| v.as_u64()),
@@ -149,4 +195,24 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, S
     // println!("[OVRLEY] Final selected creation time: {:?}", metadata.creation_time);
 
     Ok(metadata)
+}
+
+fn read_rotation_degrees(stream: &Value) -> Option<i32> {
+    stream
+        .get("tags")
+        .and_then(|tags| tags.get("rotate"))
+        .and_then(|value| value.as_str())
+        .and_then(|value| value.parse::<i32>().ok())
+        .or_else(|| {
+            stream
+                .get("side_data_list")
+                .and_then(|value| value.as_array())
+                .and_then(|items| {
+                    items.iter().find_map(|item| {
+                        item.get("rotation")
+                            .and_then(|value| value.as_f64())
+                            .map(|value| value.round() as i32)
+                    })
+                })
+        })
 }

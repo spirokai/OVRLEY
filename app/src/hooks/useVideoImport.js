@@ -1,5 +1,5 @@
 import { open } from '@tauri-apps/plugin-dialog'
-import { extractVideoMetadata } from '../lib/videoMetadata'
+import { clearPreviewVideo, importPreviewVideo } from '../api/backend'
 import useStore from '../store/useStore'
 
 export default function useVideoImport() {
@@ -23,7 +23,14 @@ export default function useVideoImport() {
         ],
       })
       if (selected) {
-        const metadata = await extractVideoMetadata(selected)
+        const response = await importPreviewVideo(selected)
+        const metadata = {
+          ...response.metadata,
+          importId: response.importId,
+          previewUrl: response.previewUrl,
+          previewWarnings: response.warnings ?? [],
+          previewError: null,
+        }
         setImportedVideo(metadata)
         if (metadata.fps && config?.scene) {
           setConfig({
@@ -38,9 +45,19 @@ export default function useVideoImport() {
     }
   }
 
+  const handleClearImportedVideo = async () => {
+    try {
+      await clearPreviewVideo()
+    } catch (err) {
+      console.error('Failed to clear preview video:', err)
+    } finally {
+      clearImportedVideo()
+    }
+  }
+
   return {
     importedVideoFilename,
     handleImportVideo,
-    clearImportedVideo,
+    clearImportedVideo: handleClearImportedVideo,
   }
 }

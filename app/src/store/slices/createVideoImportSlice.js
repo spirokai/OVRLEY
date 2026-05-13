@@ -6,6 +6,10 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoFps: null, // fps (float)
   importedVideoResolution: null, // { width, height }
   importedVideoCreationTime: null, // ISO-8601 string or null
+  importedVideoImportId: null, // opaque local preview server import ID
+  importedVideoPreviewUrl: null, // local HTTP preview URL for the video element
+  importedVideoPreviewWarnings: [],
+  importedVideoPreviewError: null,
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
   videoSyncWarning: null, // string warning or null
   availableCodecs: null,
@@ -17,6 +21,10 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoFps: metadata.fps,
       importedVideoResolution: metadata.resolution,
       importedVideoCreationTime: metadata.creationTime,
+      importedVideoImportId: metadata.importId ?? null,
+      importedVideoPreviewUrl: metadata.previewUrl ?? null,
+      importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
+      importedVideoPreviewError: metadata.previewError ?? null,
     })
 
     const activitySummary = get().activitySummary
@@ -30,6 +38,10 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoFps: null,
       importedVideoResolution: null,
       importedVideoCreationTime: null,
+      importedVideoImportId: null,
+      importedVideoPreviewUrl: null,
+      importedVideoPreviewWarnings: [],
+      importedVideoPreviewError: null,
       videoSyncOffsetSeconds: 0,
       videoSyncWarning: null,
     }),
@@ -42,6 +54,16 @@ export const createVideoImportSlice = (set, get) => ({
   setVideoSyncWarning: (msg) =>
     set({
       videoSyncWarning: msg,
+    }),
+
+  setImportedVideoPreviewError: (msg) =>
+    set({
+      importedVideoPreviewError: msg,
+    }),
+
+  setImportedVideoPreviewWarnings: (warnings) =>
+    set({
+      importedVideoPreviewWarnings: Array.isArray(warnings) ? warnings : [],
     }),
 
   fetchAvailableCodecs: async () => {
