@@ -3,6 +3,7 @@
  */
 
 import AppHeader from '@/components/AppHeader'
+import TitleBar from '@/components/TitleBar'
 import ControlPanel from '@/components/ControlPanel'
 import ErrorAlert from '@/components/ErrorAlert'
 import LoadingOverlay from '@/components/LoadingOverlay'
@@ -74,6 +75,7 @@ function AppShell() {
           onCancel={() => templateManagement.setShowNewTemplateConfirm(false)}
           onConfirm={templateManagement.confirmCreateNewTemplate}
         />
+        <TitleBar />
         <AppHeader
           activityControls={{
             activityLabel:
