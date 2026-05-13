@@ -3,12 +3,7 @@
  */
 
 import { normalizeColorFields } from './color-utils'
-import {
-  DEFAULT_GLOBAL_DEFAULTS,
-  GLOBAL_DEFAULT_KEYS,
-  SCENE_DERIVED_SETTING_KEYS,
-  SCENE_GLOBAL_DEFAULT_KEYS,
-} from './config-utils'
+import { DEFAULT_GLOBAL_DEFAULTS, GLOBAL_DEFAULT_KEYS, SCENE_DERIVED_SETTING_KEYS, SCENE_GLOBAL_DEFAULT_KEYS } from './config-utils'
 
 export { DEFAULT_GLOBAL_DEFAULTS } from './config-utils'
 
@@ -25,26 +20,9 @@ export const DEFAULT_EXPORT_RANGE = {
 
 const LABEL_KEYS = ['x', 'y', 'font', 'font_size', 'text', 'color', 'opacity']
 
-const VALUE_SHARED_KEYS = [
-  'x',
-  'y',
-  'value',
-  'font',
-  'font_size',
-  'color',
-  'opacity',
-  'prefix',
-  'suffix',
-  'decimals',
-]
+const VALUE_SHARED_KEYS = ['x', 'y', 'value', 'font', 'font_size', 'color', 'opacity', 'prefix', 'suffix', 'decimals']
 
-const VALUE_ICON_KEYS = [
-  'show_icon',
-  'icon_color',
-  'icon_size',
-  'icon_offset_x',
-  'icon_offset_y',
-]
+const VALUE_ICON_KEYS = ['show_icon', 'icon_color', 'icon_size', 'icon_offset_x', 'icon_offset_y']
 
 const VALUE_TYPE_KEYS = {
   speed: [...VALUE_ICON_KEYS, 'show_units', 'speed_unit'],
@@ -53,14 +31,7 @@ const VALUE_TYPE_KEYS = {
   power: [...VALUE_ICON_KEYS, 'show_units'],
   temperature: [...VALUE_ICON_KEYS, 'show_units', 'temperature_unit'],
   time: [...VALUE_ICON_KEYS, 'format'],
-  gradient: [
-    'value_offset',
-    'triangle_positive_color',
-    'triangle_negative_color',
-    'show_sign',
-    'show_triangle',
-    'triangle_width',
-  ],
+  gradient: ['value_offset', 'triangle_positive_color', 'triangle_negative_color', 'show_sign', 'show_triangle', 'triangle_width'],
 }
 
 const COURSE_PLOT_KEYS = [
@@ -204,10 +175,7 @@ function pickDefined(source, keys) {
 function normalizeGlobalDefaults(globalDefaults) {
   return normalizeColorFields({
     ...DEFAULT_GLOBAL_DEFAULTS,
-    ...pickDefined(
-      cloneSerializable(globalDefaults) || {},
-      GLOBAL_DEFAULT_KEYS,
-    ),
+    ...pickDefined(cloneSerializable(globalDefaults) || {}, GLOBAL_DEFAULT_KEYS),
   })
 }
 
@@ -247,18 +215,14 @@ function normalizeValue(value = {}) {
     ...VALUE_DEFAULTS[type],
     ...value,
   }
-  const keys = [
-    ...VALUE_SHARED_KEYS,
-    ...(VALUE_TYPE_KEYS[type] || VALUE_ICON_KEYS),
-  ]
+  const keys = [...VALUE_SHARED_KEYS, ...(VALUE_TYPE_KEYS[type] || VALUE_ICON_KEYS)]
 
   return normalizeColorFields(pickDefined(withDefaults, keys))
 }
 
 function normalizePointLabel(pointLabel, config, globalDefaults) {
   const fallbackFont = globalDefaults?.font_values || config?.scene?.font
-  const fallbackColor =
-    pointLabel?.color || globalDefaults?.color_values || '#ffffff'
+  const fallbackColor = pointLabel?.color || globalDefaults?.color_values || '#ffffff'
 
   return normalizeColorFields({
     ...(fallbackFont ? { font: fallbackFont } : {}),
@@ -276,11 +240,7 @@ function normalizePlot(plot = {}, config, globalDefaults) {
   }
 
   if (type === 'elevation') {
-    withDefaults.point_label = normalizePointLabel(
-      plot.point_label,
-      config,
-      globalDefaults,
-    )
+    withDefaults.point_label = normalizePointLabel(plot.point_label, config, globalDefaults)
   }
 
   const keys = type === 'elevation' ? ELEVATION_PLOT_KEYS : COURSE_PLOT_KEYS
@@ -291,17 +251,9 @@ export function normalizeTemplateConfig(config, globalDefaults) {
   const nextConfig = cloneSerializable(config) || {}
   const normalizedConfig = {
     scene: normalizeScene(nextConfig.scene),
-    labels: Array.isArray(nextConfig.labels)
-      ? nextConfig.labels.map(normalizeLabel)
-      : [],
-    values: Array.isArray(nextConfig.values)
-      ? nextConfig.values.map(normalizeValue)
-      : [],
-    plots: Array.isArray(nextConfig.plots)
-      ? nextConfig.plots.map((plot) =>
-          normalizePlot(plot, nextConfig, globalDefaults),
-        )
-      : [],
+    labels: Array.isArray(nextConfig.labels) ? nextConfig.labels.map(normalizeLabel) : [],
+    values: Array.isArray(nextConfig.values) ? nextConfig.values.map(normalizeValue) : [],
+    plots: Array.isArray(nextConfig.plots) ? nextConfig.plots.map((plot) => normalizePlot(plot, nextConfig, globalDefaults)) : [],
   }
 
   return normalizedConfig
@@ -333,10 +285,7 @@ export function sanitizeTemplateFilename(name) {
  * @returns {object} Derived data structure for downstream use.
  */
 export function createTemplateState({ config, globalDefaults }) {
-  const nextGlobalDefaults = mergeSceneGlobalDefaults(
-    config?.scene,
-    globalDefaults,
-  )
+  const nextGlobalDefaults = mergeSceneGlobalDefaults(config?.scene, globalDefaults)
 
   return {
     config: normalizeTemplateConfig(config, nextGlobalDefaults),
@@ -375,15 +324,8 @@ export function normalizeTemplateFilePayload(rawTemplate, _fallbackState = {}) {
     throw new Error('Template file is empty or invalid.')
   }
 
-  if (
-    rawTemplate.format === TEMPLATE_FILE_FORMAT &&
-    rawTemplate.config &&
-    rawTemplate.settings
-  ) {
-    const nextGlobalDefaults = mergeSceneGlobalDefaults(
-      rawTemplate.config.scene,
-      rawTemplate.settings.globalDefaults,
-    )
+  if (rawTemplate.format === TEMPLATE_FILE_FORMAT && rawTemplate.config && rawTemplate.settings) {
+    const nextGlobalDefaults = mergeSceneGlobalDefaults(rawTemplate.config.scene, rawTemplate.settings.globalDefaults)
 
     return {
       ...createTemplateState({

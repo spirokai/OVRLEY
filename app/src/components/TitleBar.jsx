@@ -5,18 +5,12 @@ export default function TitleBar() {
   const appWindow = getCurrentWindow()
 
   return (
-    <div
-      data-tauri-drag-region
-      className="flex h-6 shrink-0 items-center justify-between bg-background select-none"
-    >
+    <div data-tauri-drag-region className="flex h-6 shrink-0 items-center justify-between bg-background select-none">
       <div className="flex items-center pl-4">
         <img src="/logo.svg" alt="OVRLEY" className="h-4" />
       </div>
 
-      <div
-        className="flex h-full items-center"
-        style={{ pointerEvents: 'auto' }}
-      >
+      <div className="flex h-full items-center" style={{ pointerEvents: 'auto' }}>
         <button
           className="flex h-full w-12 items-center justify-center text-muted-foreground hover:bg-surface-elevated hover:text-foreground transition-colors"
           onClick={() => appWindow.minimize()}

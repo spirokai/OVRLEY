@@ -2,10 +2,7 @@
  * Provides store utilities related to store utils.
  */
 
-import {
-  DEFAULT_EXPORT_RANGE,
-  normalizeTemplateConfig,
-} from '../lib/template-snapshot'
+import { DEFAULT_EXPORT_RANGE, normalizeTemplateConfig } from '../lib/template-snapshot'
 import { normalizeColorFields } from '../lib/color-utils'
 import { DEFAULT_GLOBAL_DEFAULTS } from '../lib/config-utils'
 
@@ -116,10 +113,7 @@ export function updateConfigPersistence(state) {
   localStorage.setItem('editorConfig', JSON.stringify(state.config))
 
   if (state.lastRenderedConfig) {
-    state.hasUnrenderedChanges = hasSerializableChanged(
-      state.config,
-      state.lastRenderedConfig,
-    )
+    state.hasUnrenderedChanges = hasSerializableChanged(state.config, state.lastRenderedConfig)
     return
   }
 
@@ -183,16 +177,11 @@ export function isConfigUpdateInProgress() {
  * @returns {object} Requested value or structure.
  */
 export function readStoredTemplateSettings() {
-  const storedGlobalDefaults = normalizeColorFields(
-    readStoredJson('globalDefaults', {}) || {},
-  )
+  const storedGlobalDefaults = normalizeColorFields(readStoredJson('globalDefaults', {}) || {})
   const globalDefaults = Object.keys(DEFAULT_GLOBAL_DEFAULTS).reduce(
     (result, key) => ({
       ...result,
-      [key]:
-        storedGlobalDefaults[key] === undefined
-          ? DEFAULT_GLOBAL_DEFAULTS[key]
-          : storedGlobalDefaults[key],
+      [key]: storedGlobalDefaults[key] === undefined ? DEFAULT_GLOBAL_DEFAULTS[key] : storedGlobalDefaults[key],
     }),
     {},
   )

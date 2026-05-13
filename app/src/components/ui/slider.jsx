@@ -20,22 +20,9 @@ import { cn } from '@/lib/utils'
  * @param {*} props.max - Upper bound used by the calculation.
  * @returns {JSX.Element} Rendered component output.
  */
-function Slider({
-  className,
-  defaultValue,
-  value,
-  min = 0,
-  max = 100,
-  trackChildren,
-  ...props
-}) {
+function Slider({ className, defaultValue, value, min = 0, max = 100, trackChildren, ...props }) {
   const _values = React.useMemo(
-    () =>
-      Array.isArray(value)
-        ? value
-        : Array.isArray(defaultValue)
-          ? defaultValue
-          : [min, max],
+    () => (Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max]),
     [value, defaultValue, min, max],
   )
 
@@ -60,9 +47,7 @@ function Slider({
       >
         <SliderPrimitive.Range
           data-slot="slider-range"
-          className={cn(
-            'bg-primary absolute data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full',
-          )}
+          className={cn('bg-primary absolute data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full')}
         />
         {trackChildren}
       </SliderPrimitive.Track>

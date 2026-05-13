@@ -2,28 +2,10 @@
  * Implements API helpers for activity parser utils.
  */
 
-import {
-  buildDistanceSeries,
-  buildElapsedSeries,
-  buildProgressSeries,
-  insertIdleGapSamples,
-} from './activityGapUtils'
-import {
-  buildMetricCoverage,
-  deriveActivityMetricSeries,
-} from './activityMetricSeries'
+import { buildDistanceSeries, buildElapsedSeries, buildProgressSeries, insertIdleGapSamples } from './activityGapUtils'
+import { buildMetricCoverage, deriveActivityMetricSeries } from './activityMetricSeries'
 
-export const CORE_ACTIVITY_ATTRIBUTES = [
-  'cadence',
-  'course',
-  'elevation',
-  'gradient',
-  'heartrate',
-  'power',
-  'speed',
-  'time',
-  'temperature',
-]
+export const CORE_ACTIVITY_ATTRIBUTES = ['cadence', 'course', 'elevation', 'gradient', 'heartrate', 'power', 'speed', 'time', 'temperature']
 
 const EXTENDED_ACTIVITY_ATTRIBUTES = [
   'air_pressure',
@@ -135,12 +117,7 @@ export function safeTimestamp(value) {
  * @returns {*} Result produced by the helper.
  */
 export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
-  if (
-    !isFiniteNumber(lat1) ||
-    !isFiniteNumber(lon1) ||
-    !isFiniteNumber(lat2) ||
-    !isFiniteNumber(lon2)
-  ) {
+  if (!isFiniteNumber(lat1) || !isFiniteNumber(lon1) || !isFiniteNumber(lat2) || !isFiniteNumber(lon2)) {
     return 0
   }
 
@@ -150,9 +127,7 @@ export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
   const latDeltaRad = ((lat2 - lat1) * Math.PI) / 180
   const lonDeltaRad = ((lon2 - lon1) * Math.PI) / 180
 
-  const a =
-    Math.sin(latDeltaRad / 2) ** 2 +
-    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(lonDeltaRad / 2) ** 2
+  const a = Math.sin(latDeltaRad / 2) ** 2 + Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(lonDeltaRad / 2) ** 2
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return earthRadiusMeters * c
@@ -170,12 +145,7 @@ function calculateBearingDegrees(fromPoint, toPoint) {
 
   const [fromLat, fromLon] = fromPoint
   const [toLat, toLon] = toPoint
-  if (
-    !isFiniteNumber(fromLat) ||
-    !isFiniteNumber(fromLon) ||
-    !isFiniteNumber(toLat) ||
-    !isFiniteNumber(toLon)
-  ) {
+  if (!isFiniteNumber(fromLat) || !isFiniteNumber(fromLon) || !isFiniteNumber(toLat) || !isFiniteNumber(toLon)) {
     return null
   }
 
@@ -183,9 +153,7 @@ function calculateBearingDegrees(fromPoint, toPoint) {
   const toLatRad = (toLat * Math.PI) / 180
   const lonDeltaRad = ((toLon - fromLon) * Math.PI) / 180
   const y = Math.sin(lonDeltaRad) * Math.cos(toLatRad)
-  const x =
-    Math.cos(fromLatRad) * Math.sin(toLatRad) -
-    Math.sin(fromLatRad) * Math.cos(toLatRad) * Math.cos(lonDeltaRad)
+  const x = Math.cos(fromLatRad) * Math.sin(toLatRad) - Math.sin(fromLatRad) * Math.cos(toLatRad) * Math.cos(lonDeltaRad)
 
   const bearing = (Math.atan2(y, x) * 180) / Math.PI
   return (bearing + 360) % 360
@@ -213,10 +181,7 @@ function createActivityHelpers() {
  * @returns {*} Derived data structure for downstream use.
  */
 function buildCourseSeries(rawSamples) {
-  return rawSamples.map((sample) => [
-    safeNumber(sample.latitude),
-    safeNumber(sample.longitude),
-  ])
+  return rawSamples.map((sample) => [safeNumber(sample.latitude), safeNumber(sample.longitude)])
 }
 
 /**
@@ -240,10 +205,7 @@ function buildTimeSeries(rawSamples) {
 function buildValidAttributes(metricSeriesMap, courseSeries, timeSeries) {
   return CORE_ACTIVITY_ATTRIBUTES.filter((attribute) => {
     if (attribute === 'course') {
-      return courseSeries.some(
-        ([latitude, longitude]) =>
-          isFiniteNumber(latitude) && isFiniteNumber(longitude),
-      )
+      return courseSeries.some(([latitude, longitude]) => isFiniteNumber(latitude) && isFiniteNumber(longitude))
     }
 
     if (attribute === 'time') {
@@ -261,9 +223,7 @@ function buildValidAttributes(metricSeriesMap, courseSeries, timeSeries) {
  * @returns {*} Derived data structure for downstream use.
  */
 function buildExtendedAttributes(metricSeriesMap) {
-  return EXTENDED_ACTIVITY_ATTRIBUTES.filter((attribute) =>
-    metricSeriesMap[attribute].series.some((value) => value !== null),
-  )
+  return EXTENDED_ACTIVITY_ATTRIBUTES.filter((attribute) => metricSeriesMap[attribute].series.some((value) => value !== null))
 }
 
 /**
@@ -276,37 +236,16 @@ function buildExtendedAttributes(metricSeriesMap) {
  * @param {*} options.rawSamples - Raw activity samples from the source file.
  * @returns {object} Result produced by the helper.
  */
-export function finalizeParsedActivity({
-  fileName,
-  fileFormat,
-  metadata = {},
-  rawSamples = [],
-  options = {},
-}) {
+export function finalizeParsedActivity({ fileName, fileFormat, metadata = {}, rawSamples = [], options = {} }) {
   const helpers = createActivityHelpers()
   const useLegacyGpxDerivations = options.useLegacyGpxDerivations === true
-  const { rawSamples: normalizedRawSamples, gapDebug } = insertIdleGapSamples(
-    rawSamples,
-    helpers,
-  )
+  const { rawSamples: normalizedRawSamples, gapDebug } = insertIdleGapSamples(rawSamples, helpers)
   const timeSeries = buildTimeSeries(normalizedRawSamples)
   const courseSeries = buildCourseSeries(normalizedRawSamples)
-  const directDistanceSeries = normalizedRawSamples.map((sample) =>
-    safeNumber(sample.distance),
-  )
-  const distanceSeries = buildDistanceSeries(
-    courseSeries,
-    directDistanceSeries,
-    helpers,
-  )
-  const elapsedSeries = buildElapsedSeries(
-    normalizedRawSamples,
-    timeSeries,
-    helpers,
-  )
-  const elevationBaseSeries = normalizedRawSamples.map((sample) =>
-    safeNumber(sample.elevation),
-  )
+  const directDistanceSeries = normalizedRawSamples.map((sample) => safeNumber(sample.distance))
+  const distanceSeries = buildDistanceSeries(courseSeries, directDistanceSeries, helpers)
+  const elapsedSeries = buildElapsedSeries(normalizedRawSamples, timeSeries, helpers)
+  const elevationBaseSeries = normalizedRawSamples.map((sample) => safeNumber(sample.elevation))
   const { metricSeriesMap } = deriveActivityMetricSeries({
     courseSeries,
     distanceSeries,
@@ -317,11 +256,7 @@ export function finalizeParsedActivity({
     helpers,
   })
 
-  const validAttributes = buildValidAttributes(
-    metricSeriesMap,
-    courseSeries,
-    timeSeries,
-  )
+  const validAttributes = buildValidAttributes(metricSeriesMap, courseSeries, timeSeries)
   const extendedAttributes = buildExtendedAttributes(metricSeriesMap)
   const durationSeconds = elapsedSeries[elapsedSeries.length - 1] ?? 0
   const totalDistanceMeters = distanceSeries[distanceSeries.length - 1] ?? 0

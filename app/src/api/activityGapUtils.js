@@ -63,17 +63,11 @@ function lowerHalfMedian(values) {
  * @param {*} helpers - Shared numeric and geospatial helper functions.
  * @returns {*} Result produced by the helper.
  */
-function zeroFilledIdleSample(
-  sample,
-  elapsedSeconds,
-  timestampMsValue,
-  helpers,
-) {
+function zeroFilledIdleSample(sample, elapsedSeconds, timestampMsValue, helpers) {
   const { roundValue } = helpers
   const synthetic = cloneRawSample(sample)
   synthetic.elapsedSeconds = roundValue(elapsedSeconds, 3)
-  synthetic.timestamp =
-    timestampMsValue === null ? null : new Date(timestampMsValue).toISOString()
+  synthetic.timestamp = timestampMsValue === null ? null : new Date(timestampMsValue).toISOString()
   synthetic.speed = 0
   synthetic.cadence = 0
   synthetic.power = 0
@@ -179,11 +173,7 @@ function distanceMetersForPair(previousSample, currentSample, helpers) {
  * @param {*} helpers - Shared numeric and geospatial helper functions.
  * @returns {*} Derived data structure for downstream use.
  */
-export function buildDistanceSeries(
-  coursePoints,
-  directDistanceSeries,
-  helpers,
-) {
+export function buildDistanceSeries(coursePoints, directDistanceSeries, helpers) {
   const { haversineDistanceMeters, isFiniteNumber, roundValue } = helpers
   const distanceSeries = []
   let totalDistanceMeters = 0
@@ -199,12 +189,7 @@ export function buildDistanceSeries(
     const previousPoint = index > 0 ? coursePoints[index - 1] : null
     const currentPoint = coursePoints[index]
     if (index > 0) {
-      totalDistanceMeters += haversineDistanceMeters(
-        previousPoint?.[0],
-        previousPoint?.[1],
-        currentPoint?.[0],
-        currentPoint?.[1],
-      )
+      totalDistanceMeters += haversineDistanceMeters(previousPoint?.[0], previousPoint?.[1], currentPoint?.[0], currentPoint?.[1])
     }
 
     distanceSeries.push(roundValue(totalDistanceMeters, 3))
@@ -223,9 +208,7 @@ export function buildDistanceSeries(
  */
 export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
   const { isFiniteNumber, roundValue, safeNumber } = helpers
-  const explicitElapsed = rawSamples.map((sample) =>
-    safeNumber(sample.elapsedSeconds),
-  )
+  const explicitElapsed = rawSamples.map((sample) => safeNumber(sample.elapsedSeconds))
   const hasExplicitElapsed = explicitElapsed.some(isFiniteNumber)
 
   if (hasExplicitElapsed) {
@@ -252,12 +235,8 @@ export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
     return elapsedSeries
   }
 
-  const validTimestamps = timeSeries.map((value) =>
-    value ? new Date(value) : null,
-  )
-  const origin = validTimestamps.find(
-    (value) => value && Number.isFinite(value.getTime()),
-  )
+  const validTimestamps = timeSeries.map((value) => (value ? new Date(value) : null))
+  const origin = validTimestamps.find((value) => value && Number.isFinite(value.getTime()))
 
   if (!origin) {
     return rawSamples.map((_, index) => roundValue(index, 3))
@@ -270,10 +249,7 @@ export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
       return roundValue(lastValue, 3)
     }
 
-    const nextValue = Math.max(
-      0,
-      (timestamp.getTime() - origin.getTime()) / 1000,
-    )
+    const nextValue = Math.max(0, (timestamp.getTime() - origin.getTime()) / 1000)
 
     if (nextValue <= lastValue && index > 0) {
       lastValue += 0.001
@@ -299,9 +275,7 @@ export function buildProgressSeries(distanceSeries, helpers) {
     return distanceSeries.map(() => 0)
   }
 
-  return distanceSeries.map((value) =>
-    roundValue(value / totalDistanceMeters, 6),
-  )
+  return distanceSeries.map((value) => roundValue(value / totalDistanceMeters, 6))
 }
 
 /**
@@ -325,18 +299,10 @@ export function insertIdleGapSamples(rawSamples, helpers) {
     }
   }
 
-  const originTimestampMs = rawSamples
-    .map((sample) => timestampMs(sample.timestamp))
-    .find((value) => value !== null)
-  const recordingIntervalSeconds = Math.max(
-    0.2,
-    estimateRecordingIntervalSeconds(rawSamples, helpers),
-  )
+  const originTimestampMs = rawSamples.map((sample) => timestampMs(sample.timestamp)).find((value) => value !== null)
+  const recordingIntervalSeconds = Math.max(0.2, estimateRecordingIntervalSeconds(rawSamples, helpers))
   const gapThresholdSeconds = Math.max(3, recordingIntervalSeconds * 3)
-  const stationaryDistanceThresholdMeters = Math.max(
-    5,
-    recordingIntervalSeconds * 2.5,
-  )
+  const stationaryDistanceThresholdMeters = Math.max(5, recordingIntervalSeconds * 2.5)
   const detectedGaps = []
   const filledSamples = [cloneRawSample(rawSamples[0])]
   let insertedSampleCount = 0
@@ -344,64 +310,28 @@ export function insertIdleGapSamples(rawSamples, helpers) {
   for (let index = 1; index < rawSamples.length; index += 1) {
     const previousSample = rawSamples[index - 1]
     const currentSample = rawSamples[index]
-    const previousElapsed = elapsedSecondsForSample(
-      previousSample,
-      originTimestampMs,
-      helpers,
-    )
-    const currentElapsed = elapsedSecondsForSample(
-      currentSample,
-      originTimestampMs,
-      helpers,
-    )
-    const elapsedDelta =
-      isFiniteNumber(previousElapsed) && isFiniteNumber(currentElapsed)
-        ? currentElapsed - previousElapsed
-        : null
+    const previousElapsed = elapsedSecondsForSample(previousSample, originTimestampMs, helpers)
+    const currentElapsed = elapsedSecondsForSample(currentSample, originTimestampMs, helpers)
+    const elapsedDelta = isFiniteNumber(previousElapsed) && isFiniteNumber(currentElapsed) ? currentElapsed - previousElapsed : null
 
     let insertedForGap = 0
     if (isFiniteNumber(elapsedDelta) && elapsedDelta > gapThresholdSeconds) {
-      const distanceDelta = distanceMetersForPair(
-        previousSample,
-        currentSample,
-        helpers,
-      )
+      const distanceDelta = distanceMetersForPair(previousSample, currentSample, helpers)
       if (distanceDelta <= stationaryDistanceThresholdMeters) {
         const previousTimestampMs = timestampMs(previousSample.timestamp)
         const currentTimestampMs = timestampMs(currentSample.timestamp)
-        const maxInsertionCount =
-          Math.floor(elapsedDelta / recordingIntervalSeconds) - 1
+        const maxInsertionCount = Math.floor(elapsedDelta / recordingIntervalSeconds) - 1
 
-        for (
-          let insertIndex = 1;
-          insertIndex <= maxInsertionCount;
-          insertIndex += 1
-        ) {
-          const syntheticElapsed =
-            previousElapsed + recordingIntervalSeconds * insertIndex
+        for (let insertIndex = 1; insertIndex <= maxInsertionCount; insertIndex += 1) {
+          const syntheticElapsed = previousElapsed + recordingIntervalSeconds * insertIndex
           if (syntheticElapsed >= currentElapsed - 1e-6) break
 
           let syntheticTimestampMs = null
-          if (
-            previousTimestampMs !== null &&
-            currentTimestampMs !== null &&
-            currentTimestampMs > previousTimestampMs
-          ) {
-            syntheticTimestampMs = Math.min(
-              currentTimestampMs,
-              previousTimestampMs +
-                Math.round(recordingIntervalSeconds * 1000 * insertIndex),
-            )
+          if (previousTimestampMs !== null && currentTimestampMs !== null && currentTimestampMs > previousTimestampMs) {
+            syntheticTimestampMs = Math.min(currentTimestampMs, previousTimestampMs + Math.round(recordingIntervalSeconds * 1000 * insertIndex))
           }
 
-          filledSamples.push(
-            zeroFilledIdleSample(
-              previousSample,
-              syntheticElapsed,
-              syntheticTimestampMs,
-              helpers,
-            ),
-          )
+          filledSamples.push(zeroFilledIdleSample(previousSample, syntheticElapsed, syntheticTimestampMs, helpers))
           insertedForGap += 1
         }
       }
@@ -431,10 +361,7 @@ export function insertIdleGapSamples(rawSamples, helpers) {
       inserted_sample_count: insertedSampleCount,
       recording_interval_seconds: roundValue(recordingIntervalSeconds, 3),
       gap_threshold_seconds: roundValue(gapThresholdSeconds, 3),
-      stationary_distance_threshold_m: roundValue(
-        stationaryDistanceThresholdMeters,
-        3,
-      ),
+      stationary_distance_threshold_m: roundValue(stationaryDistanceThresholdMeters, 3),
     },
   }
 }

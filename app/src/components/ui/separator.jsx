@@ -18,12 +18,7 @@ import { cn } from '@/lib/utils'
  * @param {*} props.decorative - Value for decorative.
  * @returns {JSX.Element} Rendered component output.
  */
-function Separator({
-  className,
-  orientation = 'horizontal',
-  decorative = true,
-  ...props
-}) {
+function Separator({ className, orientation = 'horizontal', decorative = true, ...props }) {
   return (
     <SeparatorPrimitive.Root
       data-slot="separator"

@@ -41,8 +41,7 @@ const getFilenameFromPath = (path) => {
   return segments[segments.length - 1] || 'ovrley_template.json'
 }
 
-const getFilenameFromTemplateId = (templateId) =>
-  String(templateId || '').replace(/^(user:|built-in:)/, '')
+const getFilenameFromTemplateId = (templateId) => String(templateId || '').replace(/^(user:|built-in:)/, '')
 
 /**
  * Provides template management state and actions.
@@ -112,9 +111,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
       return 'Draft'
     }
 
-    return templateStatesEqual(currentTemplateState, lastSavedTemplateState)
-      ? 'Saved'
-      : 'Modified'
+    return templateStatesEqual(currentTemplateState, lastSavedTemplateState) ? 'Saved' : 'Modified'
   }, [config, currentTemplateState, lastSavedTemplateState])
 
   const showTemplateStatus = status === 'Draft' || status === 'Modified'
@@ -161,9 +158,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
   )
 
   const handleSaveTemplate = useCallback(async () => {
-    const suggestedFilename = sanitizeTemplateFilename(
-      getFilenameFromTemplateId(loadedTemplateFilename) || 'my_template',
-    )
+    const suggestedFilename = sanitizeTemplateFilename(getFilenameFromTemplateId(loadedTemplateFilename) || 'my_template')
 
     try {
       const payload = createTemplateFilePayload(
@@ -183,8 +178,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
 
       if (hasTauriRuntime()) {
         const { save } = await import('@tauri-apps/plugin-dialog')
-        const defaultPath =
-          await backend.getDefaultTemplateSavePath(suggestedFilename)
+        const defaultPath = await backend.getDefaultTemplateSavePath(suggestedFilename)
         const selectedPath = await save({
           title: 'Save Template',
           defaultPath,
@@ -202,18 +196,11 @@ export default function useTemplateManagement({ onTemplateCreated }) {
 
         const savedFilename = getFilenameFromPath(selectedPath)
         const defaultTemplateDir = defaultPath.replace(/[\\/][^\\/]*$/, '')
-        const selectedTemplateDir = String(selectedPath).replace(
-          /[\\/][^\\/]*$/,
-          '',
-        )
-        const savedInDefaultTemplateDir =
-          defaultTemplateDir.toLowerCase() === selectedTemplateDir.toLowerCase()
+        const selectedTemplateDir = String(selectedPath).replace(/[\\/][^\\/]*$/, '')
+        const savedInDefaultTemplateDir = defaultTemplateDir.toLowerCase() === selectedTemplateDir.toLowerCase()
 
         await fetchTemplates()
-        setLoadedTemplate(
-          savedInDefaultTemplateDir ? `user:${savedFilename}` : savedFilename,
-          savedInDefaultTemplateDir ? 'backend' : 'file',
-        )
+        setLoadedTemplate(savedInDefaultTemplateDir ? `user:${savedFilename}` : savedFilename, savedInDefaultTemplateDir ? 'backend' : 'file')
         setLastSavedTemplateState(currentTemplateState)
         return
       }
@@ -255,9 +242,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         aspectRatio,
       })
       const { name: _templateName, ...templateState } = normalizedTemplate
-      const importedFilename = sanitizeTemplateFilename(
-        normalizedTemplate.name || file.name,
-      )
+      const importedFilename = sanitizeTemplateFilename(normalizedTemplate.name || file.name)
 
       hydrateTemplateState(templateState, {
         filename: importedFilename,
@@ -268,16 +253,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
       console.error('Failed to import template:', error)
       setErrorMessage(`Failed to import template: ${error.message}`)
     }
-  }, [
-    aspectRatio,
-    exportCodec,
-    exportRange,
-    globalDefaults,
-    hydrateTemplateState,
-    setErrorMessage,
-    setLastSavedTemplateState,
-    updateRate,
-  ])
+  }, [aspectRatio, exportCodec, exportRange, globalDefaults, hydrateTemplateState, setErrorMessage, setLastSavedTemplateState, updateRate])
 
   const confirmCreateNewTemplate = useCallback(() => {
     createNewTemplate()

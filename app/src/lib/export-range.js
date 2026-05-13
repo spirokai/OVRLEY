@@ -44,9 +44,7 @@ export function timeToSeconds(timeStr) {
  * @returns {number} Activity duration.
  */
 export function getActivityDurationSeconds(activity) {
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
-    ? activity.sample_elapsed_seconds
-    : []
+  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
   const elapsedDuration = Number(elapsedSeries[elapsedSeries.length - 1]) || 0
   const trimmedDuration = Number(activity?.trim_end_seconds) || 0
   return Math.max(elapsedDuration, trimmedDuration, 0)
@@ -60,11 +58,7 @@ export function getActivityDurationSeconds(activity) {
  * @param {*} showFullActivity - Whether the widget should ignore the custom range.
  * @returns {object} Effective range window metadata.
  */
-export function resolveExportRangeWindow(
-  activity,
-  exportRange,
-  showFullActivity = false,
-) {
+export function resolveExportRangeWindow(activity, exportRange, showFullActivity = false) {
   const duration = getActivityDurationSeconds(activity)
 
   if (showFullActivity || exportRange?.type !== 'custom') {
@@ -108,27 +102,15 @@ export function getExportWindowDistanceSpan(activity, window) {
     return null
   }
 
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
-    ? activity.sample_elapsed_seconds
-    : []
-  const distanceProgress = Array.isArray(activity?.sample_distance_progress)
-    ? activity.sample_distance_progress
-    : []
+  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
+  const distanceProgress = Array.isArray(activity?.sample_distance_progress) ? activity.sample_distance_progress : []
 
   if (!elapsedSeries.length || !distanceProgress.length) {
     return null
   }
 
-  const startProgress = interpolateNumericSeries(
-    elapsedSeries,
-    distanceProgress,
-    window.start,
-  )
-  const endProgress = interpolateNumericSeries(
-    elapsedSeries,
-    distanceProgress,
-    window.end,
-  )
+  const startProgress = interpolateNumericSeries(elapsedSeries, distanceProgress, window.start)
+  const endProgress = interpolateNumericSeries(elapsedSeries, distanceProgress, window.end)
 
   if (!Number.isFinite(startProgress) || !Number.isFinite(endProgress)) {
     return null
@@ -169,27 +151,15 @@ export function normalizeDistanceProgressToWindow(value, distanceSpan) {
  * @param {*} elapsedSecond - Current preview second.
  * @returns {?number} Distance-based progress normalized to the selected range.
  */
-export function getExportWindowDistanceProgressAtElapsed(
-  activity,
-  window,
-  elapsedSecond,
-) {
+export function getExportWindowDistanceProgressAtElapsed(activity, window, elapsedSecond) {
   const distanceSpan = getExportWindowDistanceSpan(activity, window)
   if (!distanceSpan) {
     return null
   }
 
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
-    ? activity.sample_elapsed_seconds
-    : []
-  const distanceProgress = Array.isArray(activity?.sample_distance_progress)
-    ? activity.sample_distance_progress
-    : []
-  const currentProgress = interpolateNumericSeries(
-    elapsedSeries,
-    distanceProgress,
-    elapsedSecond,
-  )
+  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
+  const distanceProgress = Array.isArray(activity?.sample_distance_progress) ? activity.sample_distance_progress : []
+  const currentProgress = interpolateNumericSeries(elapsedSeries, distanceProgress, elapsedSecond)
 
   if (!Number.isFinite(currentProgress)) {
     return null
@@ -205,9 +175,7 @@ export function getExportWindowDistanceProgressAtElapsed(
  * @returns {Array} Course point series.
  */
 function getRouteSourcePoints(activity) {
-  return Array.isArray(activity?.sample_course_points)
-    ? activity.sample_course_points
-    : []
+  return Array.isArray(activity?.sample_course_points) ? activity.sample_course_points : []
 }
 
 /**
@@ -217,10 +185,7 @@ function getRouteSourcePoints(activity) {
  * @returns {Array} Elevation series.
  */
 function getElevationSourceValues(activity) {
-  if (
-    Array.isArray(activity?.sample_elevations) &&
-    activity.sample_elevations.some((value) => Number.isFinite(value))
-  ) {
+  if (Array.isArray(activity?.sample_elevations) && activity.sample_elevations.some((value) => Number.isFinite(value))) {
     return activity.sample_elevations
   }
 
@@ -289,22 +254,10 @@ function interpolateNumericSeries(elapsedSeries, values, targetSecond) {
  * @returns {?number[]} Interpolated course point.
  */
 function interpolateCoursePoint(elapsedSeries, coursePoints, targetSecond) {
-  const latitudes = coursePoints.map((point) =>
-    Array.isArray(point) ? point[0] : null,
-  )
-  const longitudes = coursePoints.map((point) =>
-    Array.isArray(point) ? point[1] : null,
-  )
-  const latitude = interpolateNumericSeries(
-    elapsedSeries,
-    latitudes,
-    targetSecond,
-  )
-  const longitude = interpolateNumericSeries(
-    elapsedSeries,
-    longitudes,
-    targetSecond,
-  )
+  const latitudes = coursePoints.map((point) => (Array.isArray(point) ? point[0] : null))
+  const longitudes = coursePoints.map((point) => (Array.isArray(point) ? point[1] : null))
+  const latitude = interpolateNumericSeries(elapsedSeries, latitudes, targetSecond)
+  const longitude = interpolateNumericSeries(elapsedSeries, longitudes, targetSecond)
 
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     return null
@@ -321,12 +274,7 @@ function interpolateCoursePoint(elapsedSeries, coursePoints, targetSecond) {
  * @returns {boolean} Whether the points match.
  */
 function coursePointsEqual(left, right) {
-  return (
-    Array.isArray(left) &&
-    Array.isArray(right) &&
-    left[0] === right[0] &&
-    left[1] === right[1]
-  )
+  return Array.isArray(left) && Array.isArray(right) && left[0] === right[0] && left[1] === right[1]
 }
 
 /**
@@ -338,20 +286,12 @@ function coursePointsEqual(left, right) {
  */
 export function buildScopedRouteSamples(activity, window) {
   const coursePoints = getRouteSourcePoints(activity)
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
-    ? activity.sample_elapsed_seconds
-    : []
-  const distanceProgress = Array.isArray(activity?.sample_distance_progress)
-    ? activity.sample_distance_progress
-    : []
+  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
+  const distanceProgress = Array.isArray(activity?.sample_distance_progress) ? activity.sample_distance_progress : []
 
   if (!window?.active || !elapsedSeries.length) {
     return coursePoints.reduce((result, point, index) => {
-      if (
-        !Array.isArray(point) ||
-        !Number.isFinite(point[0]) ||
-        !Number.isFinite(point[1])
-      ) {
+      if (!Array.isArray(point) || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) {
         return result
       }
 
@@ -365,11 +305,7 @@ export function buildScopedRouteSamples(activity, window) {
 
   const scopedSamples = []
   const distanceSpan = getExportWindowDistanceSpan(activity, window)
-  const startPoint = interpolateCoursePoint(
-    elapsedSeries,
-    coursePoints,
-    window.start,
-  )
+  const startPoint = interpolateCoursePoint(elapsedSeries, coursePoints, window.start)
 
   if (startPoint) {
     scopedSamples.push({
@@ -394,18 +330,11 @@ export function buildScopedRouteSamples(activity, window) {
 
     scopedSamples.push({
       point,
-      progress: normalizeDistanceProgressToWindow(
-        Number(distanceProgress[index]),
-        distanceSpan,
-      ),
+      progress: normalizeDistanceProgressToWindow(Number(distanceProgress[index]), distanceSpan),
     })
   }
 
-  const endPoint = interpolateCoursePoint(
-    elapsedSeries,
-    coursePoints,
-    window.end,
-  )
+  const endPoint = interpolateCoursePoint(elapsedSeries, coursePoints, window.end)
   if (endPoint) {
     const lastPoint = scopedSamples[scopedSamples.length - 1]?.point
     const lastProgress = scopedSamples[scopedSamples.length - 1]?.progress
@@ -430,30 +359,20 @@ export function buildScopedRouteSamples(activity, window) {
  */
 export function buildScopedElevationSeries(activity, window) {
   const values = getElevationSourceValues(activity)
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
-    ? activity.sample_elapsed_seconds
-    : []
+  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
 
   if (!window?.active || !elapsedSeries.length) {
     return {
       values,
-      progressValues: Array.isArray(activity?.sample_distance_progress)
-        ? activity.sample_distance_progress
-        : [],
+      progressValues: Array.isArray(activity?.sample_distance_progress) ? activity.sample_distance_progress : [],
     }
   }
 
   const scopedValues = []
   const scopedProgressValues = []
-  const distanceProgress = Array.isArray(activity?.sample_distance_progress)
-    ? activity.sample_distance_progress
-    : []
+  const distanceProgress = Array.isArray(activity?.sample_distance_progress) ? activity.sample_distance_progress : []
   const distanceSpan = getExportWindowDistanceSpan(activity, window)
-  const startValue = interpolateNumericSeries(
-    elapsedSeries,
-    values,
-    window.start,
-  )
+  const startValue = interpolateNumericSeries(elapsedSeries, values, window.start)
 
   if (Number.isFinite(startValue)) {
     scopedValues.push(startValue)
@@ -463,32 +382,18 @@ export function buildScopedElevationSeries(activity, window) {
   for (let index = 0; index < elapsedSeries.length; index += 1) {
     const elapsed = Number(elapsedSeries[index])
     const rawValue = values[index]
-    const value =
-      rawValue === null || rawValue === undefined ? null : Number(rawValue)
-    if (
-      !Number.isFinite(elapsed) ||
-      elapsed <= window.start ||
-      elapsed >= window.end ||
-      !Number.isFinite(value)
-    ) {
+    const value = rawValue === null || rawValue === undefined ? null : Number(rawValue)
+    if (!Number.isFinite(elapsed) || elapsed <= window.start || elapsed >= window.end || !Number.isFinite(value)) {
       continue
     }
 
     scopedValues.push(value)
-    scopedProgressValues.push(
-      normalizeDistanceProgressToWindow(
-        Number(distanceProgress[index]),
-        distanceSpan,
-      ),
-    )
+    scopedProgressValues.push(normalizeDistanceProgressToWindow(Number(distanceProgress[index]), distanceSpan))
   }
 
   const endValue = interpolateNumericSeries(elapsedSeries, values, window.end)
   if (Number.isFinite(endValue)) {
-    if (
-      scopedValues[scopedValues.length - 1] !== endValue ||
-      scopedProgressValues[scopedProgressValues.length - 1] !== 1
-    ) {
+    if (scopedValues[scopedValues.length - 1] !== endValue || scopedProgressValues[scopedProgressValues.length - 1] !== 1) {
       scopedValues.push(endValue)
       scopedProgressValues.push(1)
     }

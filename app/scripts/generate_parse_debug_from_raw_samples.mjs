@@ -22,9 +22,7 @@ async function main() {
   const rawArg = args[args.indexOf('--raw')]
   const outArg = args[args.indexOf('--out')]
   if (!rawArg || !outArg) {
-    throw new Error(
-      'Usage: node generate_parse_debug_from_raw_samples.mjs --raw <raw.json> --out <debug.json>',
-    )
+    throw new Error('Usage: node generate_parse_debug_from_raw_samples.mjs --raw <raw.json> --out <debug.json>')
   }
 
   const rawIndex = args.indexOf('--raw')

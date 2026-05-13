@@ -47,19 +47,13 @@ const CanvasGrid = memo(function CanvasGrid({ displayScale, sceneSize }) {
     context.beginPath()
 
     for (let x = 0; x <= sceneSize.width; x += sceneGridSize) {
-      const displayX = Math.min(
-        Math.round(x * displayScale) + 0.5,
-        Math.max(0.5, Math.round(displayWidth) - 0.5),
-      )
+      const displayX = Math.min(Math.round(x * displayScale) + 0.5, Math.max(0.5, Math.round(displayWidth) - 0.5))
       context.moveTo(displayX, 0)
       context.lineTo(displayX, displayHeight)
     }
 
     for (let y = 0; y <= sceneSize.height; y += sceneGridSize) {
-      const displayY = Math.min(
-        Math.round(y * displayScale) + 0.5,
-        Math.max(0.5, Math.round(displayHeight) - 0.5),
-      )
+      const displayY = Math.min(Math.round(y * displayScale) + 0.5, Math.max(0.5, Math.round(displayHeight) - 0.5))
       context.moveTo(0, displayY)
       context.lineTo(displayWidth, displayY)
     }
@@ -120,12 +114,8 @@ const OverlayCanvasWidget = memo(
     })
     const scale = isPlotWidget ? 1 : globalScale
     const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
-    const width = isPlotWidget
-      ? (widget.data.width ?? 0) * (globalScale || 1)
-      : (metricVisualBounds?.width ?? widget.data.width)
-    const height = isPlotWidget
-      ? (widget.data.height ?? 0) * (globalScale || 1)
-      : (metricVisualBounds?.height ?? widget.data.height)
+    const width = isPlotWidget ? (widget.data.width ?? 0) * (globalScale || 1) : (metricVisualBounds?.width ?? widget.data.width)
+    const height = isPlotWidget ? (widget.data.height ?? 0) * (globalScale || 1) : (metricVisualBounds?.height ?? widget.data.height)
     return (
       <div
         ref={registerNode}
@@ -150,9 +140,7 @@ const OverlayCanvasWidget = memo(
           setHoveredWidgetId(widget.id)
         }}
         onMouseLeave={() => {
-          setHoveredWidgetId((current) =>
-            current === widget.id ? null : current,
-          )
+          setHoveredWidgetId((current) => (current === widget.id ? null : current))
         }}
       >
         <WidgetPreview
@@ -227,10 +215,7 @@ export default function OverlayCanvas({
   widgetRefCallbacks,
 }) {
   const videoRef = useRef(null)
-  const { videoSrc, isOutOfRange } = useVideoPreview(
-    videoRef,
-    backgroundMode === 'video',
-  )
+  const { videoSrc, isOutOfRange } = useVideoPreview(videoRef, backgroundMode === 'video')
 
   return (
     <div
@@ -245,33 +230,24 @@ export default function OverlayCanvas({
       <div
         className={cn(
           'pointer-events-none absolute inset-0 rounded-sm shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)] border border-border/50',
-          backgroundMode === 'checker' &&
-            !gridVisible &&
-            'bg-overlay-grid-muted',
+          backgroundMode === 'checker' && !gridVisible && 'bg-overlay-grid-muted',
         )}
         style={{
-          backgroundColor:
-            CANVAS_BACKGROUND_COLORS[backgroundMode] ||
-            CANVAS_BACKGROUND_COLORS.black,
+          backgroundColor: CANVAS_BACKGROUND_COLORS[backgroundMode] || CANVAS_BACKGROUND_COLORS.black,
         }}
       />
       {backgroundMode === 'video' && videoSrc && (
         <video
           ref={videoRef}
           src={videoSrc}
-          className={cn(
-            'pointer-events-none absolute inset-0 h-full w-full object-cover',
-            isOutOfRange ? 'opacity-20' : 'opacity-100',
-          )}
+          className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')}
           preload="auto"
           muted
           playsInline
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
         />
       )}
-      {gridVisible ? (
-        <CanvasGrid displayScale={displayScale} sceneSize={sceneSize} />
-      ) : null}
+      {gridVisible ? <CanvasGrid displayScale={displayScale} sceneSize={sceneSize} /> : null}
       <div className="absolute inset-0 overflow-visible">
         {widgets.map((widget) => {
           return (

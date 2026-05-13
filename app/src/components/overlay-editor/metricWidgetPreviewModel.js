@@ -21,67 +21,36 @@ import { getInterpolatedActivityValue, getInterpolatedTimeValue } from './utils'
  * @param {*} options.previewSecond - Preview time in seconds.
  * @returns {object|null} Shared preview geometry for metric widgets.
  */
-export function buildMetricWidgetPreviewModel({
-  widget,
-  activity,
-  previewSecond,
-}) {
+export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond }) {
   if (!widget || widget.category !== 'values' || widget.type === 'gradient') {
     return null
   }
 
   const fontSize = widget.data.font_size ?? 60
-  const fontFamily = getPreviewFontFamily(
-    widget.data.font || widget.data.font_family,
-  )
+  const fontFamily = getPreviewFontFamily(widget.data.font || widget.data.font_family)
 
   let valueText = '--'
   let unitText = ''
 
   if (widget.type === 'speed') {
-    const speedUnit =
-      widget.data.speed_unit ||
-      (widget.data.unit === 'imperial' ? 'mph' : 'kmh')
-    const formatted = formatSpeed(
-      getInterpolatedActivityValue(activity, 'speed', previewSecond),
-      speedUnit,
-    )
+    const speedUnit = widget.data.speed_unit || (widget.data.unit === 'imperial' ? 'mph' : 'kmh')
+    const formatted = formatSpeed(getInterpolatedActivityValue(activity, 'speed', previewSecond), speedUnit)
     valueText = formatted.value
     unitText = formatted.units
   } else if (widget.type === 'heartrate') {
-    const value = getInterpolatedActivityValue(
-      activity,
-      'heartrate',
-      previewSecond,
-    )
-    valueText =
-      value === null || value === undefined
-        ? '--'
-        : Math.round(value).toString()
+    const value = getInterpolatedActivityValue(activity, 'heartrate', previewSecond)
+    valueText = value === null || value === undefined ? '--' : Math.round(value).toString()
     unitText = 'BPM'
   } else if (widget.type === 'cadence') {
-    const value = getInterpolatedActivityValue(
-      activity,
-      'cadence',
-      previewSecond,
-    )
-    valueText =
-      value === null || value === undefined
-        ? '--'
-        : Math.round(value).toString()
+    const value = getInterpolatedActivityValue(activity, 'cadence', previewSecond)
+    valueText = value === null || value === undefined ? '--' : Math.round(value).toString()
     unitText = 'RPM'
   } else if (widget.type === 'power') {
     const value = getInterpolatedActivityValue(activity, 'power', previewSecond)
-    valueText =
-      value === null || value === undefined
-        ? '--'
-        : Math.round(value).toString()
+    valueText = value === null || value === undefined ? '--' : Math.round(value).toString()
     unitText = 'W'
   } else if (widget.type === 'time') {
-    valueText = formatTimeValue(
-      widget.data.format || 'time-24',
-      getInterpolatedTimeValue(activity, previewSecond),
-    )
+    valueText = formatTimeValue(widget.data.format || 'time-24', getInterpolatedTimeValue(activity, previewSecond))
   } else if (widget.type === 'temperature') {
     const formatted = formatTemperature(
       getInterpolatedActivityValue(activity, 'temperature', previewSecond),
@@ -93,8 +62,7 @@ export function buildMetricWidgetPreviewModel({
     return null
   }
 
-  const showUnits =
-    widget.data.show_units ?? ['speed', 'temperature'].includes(widget.type)
+  const showUnits = widget.data.show_units ?? ['speed', 'temperature'].includes(widget.type)
   const showIcon = widget.data.show_icon ?? true
   const iconSize = widget.data.icon_size ?? 28
   const metricLayout = getMetricWidgetLayout({

@@ -65,8 +65,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (!state.importedVideoCreationTime) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning:
-            'Could not determine video creation time  — placed at start',
+          videoSyncWarning: 'Could not determine video creation time  — placed at start',
         }
       }
 
@@ -74,10 +73,7 @@ export const createVideoImportSlice = (set, get) => ({
       const activityStart = new Date(activitySummary?.startTime).getTime()
       const activityEnd = new Date(activitySummary?.endTime).getTime()
 
-      if (
-        isNaN(videoStart) ||
-        (activitySummary && (isNaN(activityStart) || isNaN(activityEnd)))
-      ) {
+      if (isNaN(videoStart) || (activitySummary && (isNaN(activityStart) || isNaN(activityEnd)))) {
         return {
           videoSyncOffsetSeconds: 0,
           videoSyncWarning: 'Invalid timestamp formats',

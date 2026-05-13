@@ -14,20 +14,9 @@ import * as React from 'react'
  * @returns {JSX.Element} Rendered component output.
  */
 function VisuallyHiddenInput(props) {
-  const {
-    control,
-    value,
-    checked,
-    bubbles = true,
-    type = 'hidden',
-    style,
-    ...inputProps
-  } = props
+  const { control, value, checked, bubbles = true, type = 'hidden', style, ...inputProps } = props
 
-  const isCheckInput = React.useMemo(
-    () => type === 'checkbox' || type === 'radio' || type === 'switch',
-    [type],
-  )
+  const isCheckInput = React.useMemo(() => type === 'checkbox' || type === 'radio' || type === 'switch', [type])
   const inputRef = React.useRef(null)
 
   const prevValueRef = React.useRef({
@@ -70,9 +59,7 @@ function VisuallyHiddenInput(props) {
 
       if ('borderBoxSize' in entry) {
         const borderSizeEntry = entry.borderBoxSize
-        const borderSize = Array.isArray(borderSizeEntry)
-          ? borderSizeEntry[0]
-          : borderSizeEntry
+        const borderSize = Array.isArray(borderSizeEntry) ? borderSizeEntry[0] : borderSizeEntry
         width = borderSize.inlineSize
         height = borderSize.blockSize
       } else {
@@ -98,11 +85,7 @@ function VisuallyHiddenInput(props) {
     const eventType = isCheckInput ? 'click' : 'input'
     const currentValue = isCheckInput ? checked : value
 
-    const serializedCurrentValue = isCheckInput
-      ? checked
-      : typeof value === 'object' && value !== null
-        ? JSON.stringify(value)
-        : value
+    const serializedCurrentValue = isCheckInput ? checked : typeof value === 'object' && value !== null ? JSON.stringify(value) : value
 
     const descriptor = Object.getOwnPropertyDescriptor(inputProto, propertyKey)
 
@@ -118,9 +101,7 @@ function VisuallyHiddenInput(props) {
   const composedStyle = React.useMemo(() => {
     return {
       ...style,
-      ...(controlSize.width !== undefined && controlSize.height !== undefined
-        ? controlSize
-        : {}),
+      ...(controlSize.width !== undefined && controlSize.height !== undefined ? controlSize : {}),
       border: 0,
       clip: 'rect(0 0 0 0)',
       clipPath: 'inset(50%)',

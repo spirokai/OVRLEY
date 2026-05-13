@@ -49,16 +49,7 @@ export function createTemplateSlice(set, get) {
     localStorage.setItem('loadedTemplateSource', source || '')
   }
 
-  const persistTemplateSettings = ({
-    config,
-    globalDefaults,
-    exportRange,
-    exportCodec,
-    aspectRatio,
-    updateRate,
-    filename = null,
-    source = null,
-  }) => {
+  const persistTemplateSettings = ({ config, globalDefaults, exportRange, exportCodec, aspectRatio, updateRate, filename = null, source = null }) => {
     localStorage.setItem('editorConfig', JSON.stringify(config))
     persistSerializable('globalDefaults', globalDefaults)
     persistSerializable('exportRange', exportRange)
@@ -99,10 +90,7 @@ export function createTemplateSlice(set, get) {
     return Object.keys(DEFAULT_GLOBAL_DEFAULTS).reduce(
       (result, key) => ({
         ...result,
-        [key]:
-          normalizedDefaults[key] === undefined
-            ? DEFAULT_GLOBAL_DEFAULTS[key]
-            : normalizedDefaults[key],
+        [key]: normalizedDefaults[key] === undefined ? DEFAULT_GLOBAL_DEFAULTS[key] : normalizedDefaults[key],
       }),
       {},
     )
@@ -110,8 +98,7 @@ export function createTemplateSlice(set, get) {
 
   const updateUnrenderedChanges = (state, nextConfig) => {
     if (state.lastRenderedConfig) {
-      state.hasUnrenderedChanges =
-        JSON.stringify(nextConfig) !== JSON.stringify(state.lastRenderedConfig)
+      state.hasUnrenderedChanges = JSON.stringify(nextConfig) !== JSON.stringify(state.lastRenderedConfig)
       return
     }
 
@@ -120,8 +107,7 @@ export function createTemplateSlice(set, get) {
 
   return {
     communityTemplateFilename: null,
-    loadedTemplateFilename:
-      localStorage.getItem('loadedTemplateFilename') || null,
+    loadedTemplateFilename: localStorage.getItem('loadedTemplateFilename') || null,
     loadedTemplateSource: localStorage.getItem('loadedTemplateSource') || null,
     templates: [],
     updateRate: initialUpdateRate,
@@ -180,10 +166,7 @@ export function createTemplateSlice(set, get) {
       const nextPlatformOs = platformOs || 'unknown'
       set((state) => {
         state.platformOs = nextPlatformOs
-        state.exportCodec = normalizePlatformCodec(
-          state.exportCodec,
-          nextPlatformOs,
-        )
+        state.exportCodec = normalizePlatformCodec(state.exportCodec, nextPlatformOs)
       })
       localStorage.setItem('exportCodec', get().exportCodec)
     },
@@ -191,20 +174,14 @@ export function createTemplateSlice(set, get) {
     setGlobalDefault: (key, value) => {
       const nextDefaults = {
         ...get().globalDefaults,
-        [key]: isColorFieldKey(key)
-          ? normalizeColorFields({ [key]: value })[key]
-          : value,
+        [key]: isColorFieldKey(key) ? normalizeColorFields({ [key]: value })[key] : value,
       }
 
       set((state) => {
         state.globalDefaults = nextDefaults
 
         if (state.config) {
-          state.config = syncGlobalDefaultsToConfig(
-            state.config,
-            nextDefaults,
-            [key],
-          )
+          state.config = syncGlobalDefaultsToConfig(state.config, nextDefaults, [key])
           updateConfigPersistence(state)
         }
 
@@ -259,10 +236,7 @@ export function createTemplateSlice(set, get) {
         state.globalDefaults = { ...DEFAULT_GLOBAL_DEFAULTS }
 
         if (state.config) {
-          state.config = syncGlobalDefaultsToConfig(
-            state.config,
-            state.globalDefaults,
-          )
+          state.config = syncGlobalDefaultsToConfig(state.config, state.globalDefaults)
           updateConfigPersistence(state)
         }
 
@@ -283,17 +257,12 @@ export function createTemplateSlice(set, get) {
       const { filename = null, source = null } = options
       const nextConfig = templateState?.config || DEFAULT_CONFIG
       const nextSettings = templateState?.settings || {}
-      const nextGlobalDefaults = normalizeGlobalDefaultsForState(
-        nextSettings.globalDefaults,
-      )
+      const nextGlobalDefaults = normalizeGlobalDefaultsForState(nextSettings.globalDefaults)
       const nextExportRange = {
         ...DEFAULT_EXPORT_RANGE,
         ...(get().exportRange || {}),
       }
-      const nextExportCodec = normalizePlatformCodec(
-        get().exportCodec || 'prores_ks',
-        get().platformOs,
-      )
+      const nextExportCodec = normalizePlatformCodec(get().exportCodec || 'prores_ks', get().platformOs)
       const nextAspectRatio = get().aspectRatio || '16:9'
       const nextUpdateRate = get().updateRate || 1
 

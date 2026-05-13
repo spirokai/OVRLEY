@@ -9,9 +9,7 @@ export default function useVideoImport() {
   const config = useStore((state) => state.config)
   const setConfig = useStore((state) => state.setConfig)
 
-  const importedVideoFilename = importedVideoPath
-    ? importedVideoPath.split(/[/\\]/).pop()
-    : null
+  const importedVideoFilename = importedVideoPath ? importedVideoPath.split(/[/\\]/).pop() : null
 
   const handleImportVideo = async () => {
     try {

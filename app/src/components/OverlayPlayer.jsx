@@ -33,11 +33,7 @@ function isPlaybackShortcutTarget(target) {
     return false
   }
 
-  return Boolean(
-    target.closest(
-      'input, textarea, select, button, a, [role="slider"], [contenteditable="true"]',
-    ),
-  )
+  return Boolean(target.closest('input, textarea, select, button, a, [role="slider"], [contenteditable="true"]'))
 }
 
 /**
@@ -53,20 +49,13 @@ function formatTimelineTime(value) {
   const seconds = safeValue % 60
 
   if (hours > 0) {
-    return [hours, minutes, seconds]
-      .map((part, index) => String(part).padStart(index === 0 ? 1 : 2, '0'))
-      .join(':')
+    return [hours, minutes, seconds].map((part, index) => String(part).padStart(index === 0 ? 1 : 2, '0')).join(':')
   }
 
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-function resolvePlaybackSource({
-  shouldUseVideoPlayback,
-  playheadSecond,
-  videoSyncOffsetSeconds,
-  importedVideoDuration,
-}) {
+function resolvePlaybackSource({ shouldUseVideoPlayback, playheadSecond, videoSyncOffsetSeconds, importedVideoDuration }) {
   if (!shouldUseVideoPlayback) {
     return 'timeline'
   }
@@ -74,16 +63,10 @@ function resolvePlaybackSource({
   const safePlayheadSecond = Number(playheadSecond) || 0
   const videoStartSecond = Math.max(0, Number(videoSyncOffsetSeconds) || 0)
   const safeVideoDuration = Number(importedVideoDuration)
-  const hasVideoEnd =
-    Number.isFinite(safeVideoDuration) && safeVideoDuration > 0
-  const videoEndSecond = hasVideoEnd
-    ? videoStartSecond + safeVideoDuration
-    : Number.POSITIVE_INFINITY
+  const hasVideoEnd = Number.isFinite(safeVideoDuration) && safeVideoDuration > 0
+  const videoEndSecond = hasVideoEnd ? videoStartSecond + safeVideoDuration : Number.POSITIVE_INFINITY
 
-  if (
-    safePlayheadSecond < videoStartSecond ||
-    safePlayheadSecond >= videoEndSecond
-  ) {
+  if (safePlayheadSecond < videoStartSecond || safePlayheadSecond >= videoEndSecond) {
     return 'timeline'
   }
 
@@ -103,9 +86,7 @@ export default function OverlayPlayer({ backgroundMode }) {
   const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
   const selectedSecond = useStore((state) => state.selectedSecond)
   const updateRate = useStore((state) => state.updateRate)
-  const setSelectedSecondTransient = useStore(
-    (state) => state.setSelectedSecondTransient,
-  )
+  const setSelectedSecondTransient = useStore((state) => state.setSelectedSecondTransient)
   const previewPlaybackState = useStore((state) => state.previewPlaybackState)
   const previewPlaybackSource = useStore((state) => state.previewPlaybackSource)
   const startPreviewPlayback = useStore((state) => state.startPreviewPlayback)
@@ -115,9 +96,7 @@ export default function OverlayPlayer({ backgroundMode }) {
   const commitPreviewScrub = useStore((state) => state.commitPreviewScrub)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoDuration = useStore((state) => state.importedVideoDuration)
-  const videoSyncOffsetSeconds = useStore(
-    (state) => state.videoSyncOffsetSeconds,
-  )
+  const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
   const [dragSecond, setDragSecond] = useState(null)
   const playbackAnchorRef = useRef({
     startedAtMs: 0,
@@ -131,37 +110,19 @@ export default function OverlayPlayer({ backgroundMode }) {
   const totalDuration = useMemo(() => {
     const metadataDuration = Number(activitySummary?.durationSeconds) || 0
     const fallbackDuration = Number(dummyDurationSeconds) || 0
-    const videoEnd = importedVideoPath
-      ? videoSyncOffsetSeconds + importedVideoDuration
-      : 0
+    const videoEnd = importedVideoPath ? videoSyncOffsetSeconds + importedVideoDuration : 0
 
     return Math.max(metadataDuration, fallbackDuration, videoEnd, 0)
-  }, [
-    activitySummary?.durationSeconds,
-    dummyDurationSeconds,
-    importedVideoPath,
-    videoSyncOffsetSeconds,
-    importedVideoDuration,
-  ])
+  }, [activitySummary?.durationSeconds, dummyDurationSeconds, importedVideoPath, videoSyncOffsetSeconds, importedVideoDuration])
 
   const hasActivity = Boolean(activitySummary && totalDuration > 0)
-  const shouldUseVideoPlayback =
-    backgroundMode === 'video' && Boolean(importedVideoPath)
+  const shouldUseVideoPlayback = backgroundMode === 'video' && Boolean(importedVideoPath)
   const isPlaying = previewPlaybackState === 'playing'
-  const isTimelinePlaybackActive =
-    previewPlaybackState === 'playing' && previewPlaybackSource === 'timeline'
-  const isVideoPlaybackActive =
-    previewPlaybackState === 'playing' && previewPlaybackSource === 'video'
+  const isTimelinePlaybackActive = previewPlaybackState === 'playing' && previewPlaybackSource === 'timeline'
+  const isVideoPlaybackActive = previewPlaybackState === 'playing' && previewPlaybackSource === 'video'
   const clampedPlayhead = clamp(Number(selectedSecond) || 0, 0, totalDuration)
-  const displayedPlayhead = clamp(
-    dragSecond === null ? clampedPlayhead : dragSecond,
-    0,
-    totalDuration,
-  )
-  const effectivePreviewFps = useMemo(
-    () => getEffectivePreviewFps(sceneFps, updateRate),
-    [sceneFps, updateRate],
-  )
+  const displayedPlayhead = clamp(dragSecond === null ? clampedPlayhead : dragSecond, 0, totalDuration)
+  const effectivePreviewFps = useMemo(() => getEffectivePreviewFps(sceneFps, updateRate), [sceneFps, updateRate])
 
   const cancelPendingTimelineChange = useCallback(() => {
     if (timelineChangeFrameRef.current) {
@@ -203,13 +164,7 @@ export default function OverlayPlayer({ backgroundMode }) {
       setDragSecond(null)
       pausePreviewPlayback(clampedPlayhead)
     }
-  }, [
-    cancelPendingTimelineChange,
-    clampedPlayhead,
-    isVideoPlaybackActive,
-    pausePreviewPlayback,
-    shouldUseVideoPlayback,
-  ])
+  }, [cancelPendingTimelineChange, clampedPlayhead, isVideoPlaybackActive, pausePreviewPlayback, shouldUseVideoPlayback])
 
   useEffect(() => {
     if (!isPlaying || !shouldUseVideoPlayback) {
@@ -264,10 +219,8 @@ export default function OverlayPlayer({ backgroundMode }) {
     let animationFrameId = 0
 
     const tick = (now) => {
-      const elapsedSeconds =
-        (now - playbackAnchorRef.current.startedAtMs) / 1000
-      const nextSecond =
-        playbackAnchorRef.current.startedSecond + elapsedSeconds
+      const elapsedSeconds = (now - playbackAnchorRef.current.startedAtMs) / 1000
+      const nextSecond = playbackAnchorRef.current.startedSecond + elapsedSeconds
       const safeDuration = totalDurationRef.current
 
       if (nextSecond >= safeDuration) {
@@ -284,9 +237,7 @@ export default function OverlayPlayer({ backgroundMode }) {
 
       if (frameIndex !== previewFrameRef.current) {
         previewFrameRef.current = frameIndex
-        setSelectedSecondTransient(
-          clamp(frameIndex / effectivePreviewFps, 0, safeDuration),
-        )
+        setSelectedSecondTransient(clamp(frameIndex / effectivePreviewFps, 0, safeDuration))
       }
 
       animationFrameId = window.requestAnimationFrame(tick)
@@ -295,13 +246,7 @@ export default function OverlayPlayer({ backgroundMode }) {
     animationFrameId = window.requestAnimationFrame(tick)
 
     return () => window.cancelAnimationFrame(animationFrameId)
-  }, [
-    effectivePreviewFps,
-    hasActivity,
-    isTimelinePlaybackActive,
-    pausePreviewPlayback,
-    setSelectedSecondTransient,
-  ])
+  }, [effectivePreviewFps, hasActivity, isTimelinePlaybackActive, pausePreviewPlayback, setSelectedSecondTransient])
 
   const handlePlay = () => {
     if (!hasActivity) return
@@ -436,8 +381,7 @@ export default function OverlayPlayer({ backgroundMode }) {
         return
       }
 
-      const initialSecond =
-        clampedPlayhead >= totalDuration ? 0 : clampedPlayhead
+      const initialSecond = clampedPlayhead >= totalDuration ? 0 : clampedPlayhead
       const nextSource = resolvePlaybackSource({
         shouldUseVideoPlayback,
         playheadSecond: initialSecond,
@@ -485,13 +429,7 @@ export default function OverlayPlayer({ backgroundMode }) {
   ])
 
   return (
-    <div
-      className={
-        hasActivity
-          ? 'shrink-0 border-border/70 bg-black/30 px-5 py-4 backdrop-blur-sm'
-          : 'hidden'
-      }
-    >
+    <div className={hasActivity ? 'shrink-0 border-border/70 bg-black/30 px-5 py-4 backdrop-blur-sm' : 'hidden'}>
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1.5 rounded-2xl border border-border/70 p-1 shadow-sm">
           <SimpleTooltip side="top" content="Play live preview">
@@ -507,14 +445,7 @@ export default function OverlayPlayer({ backgroundMode }) {
             </Button>
           </SimpleTooltip>
           <SimpleTooltip side="top" content="Pause playback">
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              className="rounded-xl"
-              disabled={!hasActivity || !isPlaying}
-              onClick={handlePause}
-            >
+            <Button type="button" size="icon-sm" variant="ghost" className="rounded-xl" disabled={!hasActivity || !isPlaying} onClick={handlePause}>
               <Pause className="h-4 w-4" />
             </Button>
           </SimpleTooltip>
@@ -533,9 +464,7 @@ export default function OverlayPlayer({ backgroundMode }) {
         </div>
 
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-            {formatTimelineTime(displayedPlayhead)}
-          </span>
+          <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">{formatTimelineTime(displayedPlayhead)}</span>
           <div className="relative min-w-0 flex-1">
             <Slider
               min={0}
@@ -559,9 +488,7 @@ export default function OverlayPlayer({ backgroundMode }) {
               }
             />
           </div>
-          <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-            {formatTimelineTime(totalDuration)}
-          </span>
+          <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">{formatTimelineTime(totalDuration)}</span>
         </div>
       </div>
     </div>

@@ -51,63 +51,27 @@
   --moveable-color: var(--theme-color-accent) !important;
   --background: var(--theme-color-background);
   --foreground: var(--theme-color-ice);
-  --card: color-mix(
-    in srgb,
-    var(--theme-color-background) 78%,
-    var(--theme-color-teal) 22%
-  );
+  --card: color-mix(in srgb, var(--theme-color-background) 78%, var(--theme-color-teal) 22%);
   --card-foreground: var(--theme-color-ice);
-  --popover: color-mix(
-    in srgb,
-    var(--theme-color-background) 82%,
-    var(--theme-color-teal) 18%
-  );
+  --popover: color-mix(in srgb, var(--theme-color-background) 82%, var(--theme-color-teal) 18%);
   --popover-foreground: var(--theme-color-ice);
   --primary: var(--theme-color-accent);
   --primary-foreground: var(--theme-color-background);
-  --secondary: color-mix(
-    in srgb,
-    var(--theme-color-background) 72%,
-    var(--theme-color-teal) 28%
-  );
+  --secondary: color-mix(in srgb, var(--theme-color-background) 72%, var(--theme-color-teal) 28%);
   --secondary-foreground: var(--theme-color-ice);
-  --muted: color-mix(
-    in srgb,
-    var(--theme-color-background) 88%,
-    var(--theme-color-teal) 12%
-  );
-  --muted-foreground: color-mix(
-    in srgb,
-    var(--theme-color-ice) 72%,
-    var(--theme-color-aqua) 28%
-  );
+  --muted: color-mix(in srgb, var(--theme-color-background) 88%, var(--theme-color-teal) 12%);
+  --muted-foreground: color-mix(in srgb, var(--theme-color-ice) 72%, var(--theme-color-aqua) 28%);
   --accent: var(--theme-color-aqua);
   --accent-foreground: var(--theme-color-background);
   --destructive: rgb(196, 23, 23);
-  --border: color-mix(
-    in srgb,
-    var(--theme-color-background) 52%,
-    var(--theme-color-ice) 48%
-  );
-  --input: color-mix(
-    in srgb,
-    var(--theme-color-background) 70%,
-    var(--theme-color-teal) 30%
-  );
-  --ring: color-mix(
-    in srgb,
-    var(--theme-color-accent) 70%,
-    var(--theme-color-aqua) 30%
-  );
+  --border: color-mix(in srgb, var(--theme-color-background) 52%, var(--theme-color-ice) 48%);
+  --input: color-mix(in srgb, var(--theme-color-background) 70%, var(--theme-color-teal) 30%);
+  --ring: color-mix(in srgb, var(--theme-color-accent) 70%, var(--theme-color-aqua) 30%);
   --chart-1: var(--theme-color-accent);
   --chart-2: var(--theme-color-aqua);
   --chart-3: var(--theme-color-teal);
   --chart-4: var(--theme-color-ice);
-  --chart-5: color-mix(
-    in srgb,
-    var(--theme-color-accent) 45%,
-    var(--theme-color-aqua) 55%
-  );
+  --chart-5: color-mix(in srgb, var(--theme-color-accent) 45%, var(--theme-color-aqua) 55%);
   --sidebar: var(--card);
   --sidebar-foreground: var(--theme-color-ice);
   --sidebar-primary: var(--theme-color-accent);
@@ -116,65 +80,21 @@
   --sidebar-accent-foreground: var(--theme-color-background);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
-  --surface: color-mix(
-    in srgb,
-    var(--theme-color-background) 84%,
-    var(--theme-color-teal) 16%
-  );
-  --surface-elevated: color-mix(
-    in srgb,
-    var(--theme-color-background) 80%,
-    var(--theme-color-teal) 20%
-  );
-  --surface-strong: color-mix(
-    in srgb,
-    var(--theme-color-background) 72%,
-    var(--theme-color-teal) 28%
-  );
-  --surface-overlay: color-mix(
-    in srgb,
-    var(--theme-color-background) 92%,
-    transparent
-  );
-  --surface-tooltip: color-mix(
-    in srgb,
-    var(--theme-color-background) 64%,
-    var(--theme-color-teal) 36%
-  );
-  --surface-accent-soft: color-mix(
-    in srgb,
-    var(--theme-color-background) 86%,
-    var(--theme-color-accent) 14%
-  );
-  --surface-accent-strong: color-mix(
-    in srgb,
-    var(--theme-color-background) 74%,
-    var(--theme-color-accent) 26%
-  );
-  --surface-highlight: color-mix(
-    in srgb,
-    var(--theme-color-background) 76%,
-    var(--theme-color-aqua) 24%
-  );
-  --surface-highlight-soft: color-mix(
-    in srgb,
-    var(--theme-color-background) 88%,
-    var(--theme-color-aqua) 12%
-  );
-  --accent-border: color-mix(
-    in srgb,
-    var(--theme-color-background) 48%,
-    var(--theme-color-accent) 52%
-  );
+  --surface: color-mix(in srgb, var(--theme-color-background) 84%, var(--theme-color-teal) 16%);
+  --surface-elevated: color-mix(in srgb, var(--theme-color-background) 80%, var(--theme-color-teal) 20%);
+  --surface-strong: color-mix(in srgb, var(--theme-color-background) 72%, var(--theme-color-teal) 28%);
+  --surface-overlay: color-mix(in srgb, var(--theme-color-background) 92%, transparent);
+  --surface-tooltip: color-mix(in srgb, var(--theme-color-background) 64%, var(--theme-color-teal) 36%);
+  --surface-accent-soft: color-mix(in srgb, var(--theme-color-background) 86%, var(--theme-color-accent) 14%);
+  --surface-accent-strong: color-mix(in srgb, var(--theme-color-background) 74%, var(--theme-color-accent) 26%);
+  --surface-highlight: color-mix(in srgb, var(--theme-color-background) 76%, var(--theme-color-aqua) 24%);
+  --surface-highlight-soft: color-mix(in srgb, var(--theme-color-background) 88%, var(--theme-color-aqua) 12%);
+  --accent-border: color-mix(in srgb, var(--theme-color-background) 48%, var(--theme-color-accent) 52%);
   --highlight: var(--theme-color-aqua);
   --highlight-foreground: var(--theme-color-background);
   --support: var(--theme-color-teal);
   --support-foreground: var(--theme-color-ice);
-  --grid-line: color-mix(
-    in srgb,
-    var(--theme-color-background) 66%,
-    var(--theme-color-aqua) 34%
-  );
+  --grid-line: color-mix(in srgb, var(--theme-color-background) 66%, var(--theme-color-aqua) 34%);
 }
 
 body {
@@ -277,10 +197,8 @@ body {
 
 .bg-grid-transparent {
   background-image:
-    linear-gradient(45deg, var(--grid-line) 25%, transparent 25%),
-    linear-gradient(-45deg, var(--grid-line) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, var(--grid-line) 75%),
-    linear-gradient(-45deg, transparent 75%, var(--grid-line) 75%);
+    linear-gradient(45deg, var(--grid-line) 25%, transparent 25%), linear-gradient(-45deg, var(--grid-line) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--grid-line) 75%), linear-gradient(-45deg, transparent 75%, var(--grid-line) 75%);
   background-size: 20px 20px;
   background-position:
     0 0,

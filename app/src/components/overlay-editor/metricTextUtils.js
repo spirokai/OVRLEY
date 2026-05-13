@@ -109,9 +109,7 @@ function resolvePreviewVerticalMetricsText(text) {
     return ''
   }
 
-  return /^[0-9:.%+-]+$/.test(text)
-    ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT
-    : text
+  return /^[0-9:.%+-]+$/.test(text) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : text
 }
 
 function getPreviewVerticalMetrics(text, fontSize, fontFamily) {
@@ -120,11 +118,7 @@ function getPreviewVerticalMetrics(text, fontSize, fontFamily) {
     return createEmptyVerticalMetrics()
   }
 
-  const { glyphHeight, ascent, descent } = measurePreviewText(
-    metricsText,
-    fontSize,
-    fontFamily,
-  )
+  const { glyphHeight, ascent, descent } = measurePreviewText(metricsText, fontSize, fontFamily)
   return {
     glyphHeight,
     ascent,
@@ -142,12 +136,7 @@ function getPreviewVerticalMetrics(text, fontSize, fontFamily) {
  * @param {*} options.glyphHeight - Numeric glyph height value.
  * @returns {*} Requested value or structure.
  */
-export function getPreviewTextBaseline({
-  top = 0,
-  lineHeight,
-  ascent,
-  glyphHeight,
-}) {
+export function getPreviewTextBaseline({ top = 0, lineHeight, ascent, glyphHeight }) {
   if (!glyphHeight) {
     return top + lineHeight
   }
@@ -168,59 +157,32 @@ export function getPreviewTextBaseline({
  * @param {*} options.iconSize - Numeric icon size value.
  * @returns {object} Requested value or structure.
  */
-export function getMetricWidgetLayout({
-  fontSize,
-  fontFamily,
-  valueText,
-  unitText,
-  showIcon,
-  showUnits,
-  iconSize,
-}) {
+export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitText, showIcon, showUnits, iconSize }) {
   const valueLineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const unitsFontSize = Math.max(fontSize * 0.28, 12)
   const unitsLineHeight = unitsFontSize * METRIC_WIDGET_LINE_HEIGHT
   const iconMarginRight = Math.max(fontSize * 0.08, 8)
   const valueMeasure = measurePreviewText(valueText, fontSize, fontFamily)
-  const valueVerticalMetrics = getPreviewVerticalMetrics(
-    valueText,
-    fontSize,
-    fontFamily,
-  )
+  const valueVerticalMetrics = getPreviewVerticalMetrics(valueText, fontSize, fontFamily)
   const showUnitText = Boolean(showUnits && unitText)
-  const unitsMeasure = showUnitText
-    ? measurePreviewText(unitText, unitsFontSize, fontFamily)
-    : createEmptyTextMeasure()
-  const unitsVerticalMetrics = showUnitText
-    ? getPreviewVerticalMetrics(unitText, unitsFontSize, fontFamily)
-    : createEmptyVerticalMetrics()
-  const textGroupHeight = showUnitText
-    ? Math.max(valueLineHeight, unitsLineHeight)
-    : valueLineHeight
+  const unitsMeasure = showUnitText ? measurePreviewText(unitText, unitsFontSize, fontFamily) : createEmptyTextMeasure()
+  const unitsVerticalMetrics = showUnitText ? getPreviewVerticalMetrics(unitText, unitsFontSize, fontFamily) : createEmptyVerticalMetrics()
+  const textGroupHeight = showUnitText ? Math.max(valueLineHeight, unitsLineHeight) : valueLineHeight
   const rowHeight = Math.max(showIcon ? iconSize : 0, textGroupHeight)
-  const textGroupLeft = showIcon
-    ? iconSize + METRIC_WIDGET_OUTER_GAP_PX + iconMarginRight
-    : 0
+  const textGroupLeft = showIcon ? iconSize + METRIC_WIDGET_OUTER_GAP_PX + iconMarginRight : 0
   const textGroupTop = (rowHeight - textGroupHeight) / 2
   const textGroupBottom = textGroupTop + textGroupHeight
-  const valueTop =
-    textGroupBottom - (valueLineHeight + valueVerticalMetrics.glyphHeight) / 2
+  const valueTop = textGroupBottom - (valueLineHeight + valueVerticalMetrics.glyphHeight) / 2
   const valueBaseline = getPreviewTextBaseline({
     top: valueTop,
     lineHeight: valueLineHeight,
     ascent: valueVerticalMetrics.ascent,
     glyphHeight: valueVerticalMetrics.glyphHeight,
   })
-  const unitsTop =
-    textGroupBottom - (unitsLineHeight + unitsVerticalMetrics.glyphHeight) / 2
-  const unitsLeft =
-    textGroupLeft + valueMeasure.width + METRIC_WIDGET_UNITS_GAP_PX
-  const width = showUnitText
-    ? unitsLeft + unitsMeasure.width
-    : textGroupLeft + valueMeasure.width
-  const valueGlyphCenterY =
-    valueBaseline +
-    (valueVerticalMetrics.descent - valueVerticalMetrics.ascent) * 0.5
+  const unitsTop = textGroupBottom - (unitsLineHeight + unitsVerticalMetrics.glyphHeight) / 2
+  const unitsLeft = textGroupLeft + valueMeasure.width + METRIC_WIDGET_UNITS_GAP_PX
+  const width = showUnitText ? unitsLeft + unitsMeasure.width : textGroupLeft + valueMeasure.width
+  const valueGlyphCenterY = valueBaseline + (valueVerticalMetrics.descent - valueVerticalMetrics.ascent) * 0.5
 
   return {
     icon: showIcon
@@ -298,10 +260,7 @@ function getPreviewTextVisualBounds(segment) {
  * @param {*} options.iconOffsetY - Vertical icon offset.
  * @returns {object} Tight visual bounds and inner-content offsets.
  */
-export function getMetricWidgetVisualBounds(
-  layout,
-  { iconOffsetX = 0, iconOffsetY = 0 } = {},
-) {
+export function getMetricWidgetVisualBounds(layout, { iconOffsetX = 0, iconOffsetY = 0 } = {}) {
   if (!layout) {
     return {
       minX: 0,
@@ -325,26 +284,14 @@ export function getMetricWidgetVisualBounds(
   if (layout.icon) {
     const iconLeft = layout.icon.left + iconOffsetX
     const iconTop = layout.icon.top + iconOffsetY
-    bounds = expandMetricBounds(
-      bounds,
-      iconLeft,
-      iconTop,
-      iconLeft + layout.icon.size,
-      iconTop + layout.icon.size,
-    )
+    bounds = expandMetricBounds(bounds, iconLeft, iconTop, iconLeft + layout.icon.size, iconTop + layout.icon.size)
   }
 
   ;[layout.value, layout.units]
     .map(getPreviewTextVisualBounds)
     .filter(Boolean)
     .forEach((segmentBounds) => {
-      bounds = expandMetricBounds(
-        bounds,
-        segmentBounds.left,
-        segmentBounds.top,
-        segmentBounds.right,
-        segmentBounds.bottom,
-      )
+      bounds = expandMetricBounds(bounds, segmentBounds.left, segmentBounds.top, segmentBounds.right, segmentBounds.bottom)
     })
 
   if (!Number.isFinite(bounds.minX)) {
@@ -540,12 +487,8 @@ export function formatTimeValue(format, timestamp) {
   const day = padNumber(date.getDate())
   const month = padNumber(date.getMonth() + 1)
   const year = date.getFullYear()
-  const shortMonth = date
-    .toLocaleString('en-US', { month: 'short' })
-    .toUpperCase()
-  const longMonth = date
-    .toLocaleString('en-US', { month: 'long' })
-    .toUpperCase()
+  const shortMonth = date.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+  const longMonth = date.toLocaleString('en-US', { month: 'long' }).toUpperCase()
   const hour24 = padNumber(date.getHours())
   const hour12Raw = date.getHours() % 12 || 12
   const hour12 = padNumber(hour12Raw)
@@ -627,10 +570,7 @@ export function getGradientTriangleHeight(value, width) {
  */
 export function isGradientZero(value) {
   const numericValue = Number(value)
-  return (
-    !Number.isFinite(numericValue) ||
-    Math.abs(numericValue) <= GRADIENT_ZERO_EPSILON
-  )
+  return !Number.isFinite(numericValue) || Math.abs(numericValue) <= GRADIENT_ZERO_EPSILON
 }
 
 /**
@@ -646,44 +586,21 @@ export function isGradientZero(value) {
  * @param {*} options.showTriangle - Boolean flag for triangle visibility.
  * @returns {object} Requested value or structure.
  */
-export function getGradientWidgetLayout({
-  fontSize,
-  fontFamily,
-  valueText,
-  valueOffset,
-  gradientValue,
-  triangleWidth,
-  showTriangle,
-  scale,
-}) {
+export function getGradientWidgetLayout({ fontSize, fontFamily, valueText, valueOffset, gradientValue, triangleWidth, showTriangle, scale }) {
   const valueLineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const valueMeasure = measurePreviewText(valueText, fontSize, fontFamily)
   const safeValueOffset = (Number(valueOffset) || 0) / (scale || 1)
   const safeTriangleWidth = Math.max(Number(triangleWidth) || 0, 0)
-  const maxTriangleHeight =
-    showTriangle && safeTriangleWidth > 0
-      ? getGradientTriangleHeight(MAX_GRADIENT_ABS_PERCENT, safeTriangleWidth)
-      : 0
-  const triangleHeight =
-    showTriangle && safeTriangleWidth > 0
-      ? getGradientTriangleHeight(gradientValue, safeTriangleWidth)
-      : 0
+  const maxTriangleHeight = showTriangle && safeTriangleWidth > 0 ? getGradientTriangleHeight(MAX_GRADIENT_ABS_PERCENT, safeTriangleWidth) : 0
+  const triangleHeight = showTriangle && safeTriangleWidth > 0 ? getGradientTriangleHeight(gradientValue, safeTriangleWidth) : 0
   const indicatorVisible = showTriangle && safeTriangleWidth > 0
-  const contentWidth = Math.max(
-    valueMeasure.width,
-    indicatorVisible ? safeTriangleWidth : 0,
-  )
+  const contentWidth = Math.max(valueMeasure.width, indicatorVisible ? safeTriangleWidth : 0)
   const indicatorTop = valueLineHeight + GRADIENT_WIDGET_TRIANGLE_GAP_PX
   const zeroBaseline = indicatorTop + maxTriangleHeight
   const anchoredValueTop = -safeValueOffset
   const indicatorHeight = indicatorVisible ? maxTriangleHeight * 2 : 0
   const rawMinY = Math.min(0, anchoredValueTop)
-  const rawMaxY = Math.max(
-    anchoredValueTop + valueLineHeight,
-    indicatorVisible
-      ? indicatorTop + indicatorHeight
-      : anchoredValueTop + valueLineHeight,
-  )
+  const rawMaxY = Math.max(anchoredValueTop + valueLineHeight, indicatorVisible ? indicatorTop + indicatorHeight : anchoredValueTop + valueLineHeight)
   const baseline = getPreviewTextBaseline({
     top: anchoredValueTop,
     lineHeight: valueLineHeight,
@@ -732,12 +649,7 @@ export function buildGradientTrianglePath(value, width, height) {
   const safeHeight = Math.max(Number(height) || 0, 0)
   const numericValue = Number(value)
 
-  if (
-    safeWidth <= 0 ||
-    safeHeight <= 0 ||
-    !Number.isFinite(numericValue) ||
-    Math.abs(numericValue) <= GRADIENT_ZERO_EPSILON
-  ) {
+  if (safeWidth <= 0 || safeHeight <= 0 || !Number.isFinite(numericValue) || Math.abs(numericValue) <= GRADIENT_ZERO_EPSILON) {
     return ''
   }
 

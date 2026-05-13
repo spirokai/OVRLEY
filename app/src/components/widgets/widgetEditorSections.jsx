@@ -3,15 +3,7 @@
  */
 
 import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
-import {
-  ColorField,
-  NumberField,
-  SelectField,
-  SliderField,
-  TextField,
-  TIME_FORMATS,
-  ToggleField,
-} from './widgetFormControls'
+import { ColorField, NumberField, SelectField, SliderField, TextField, TIME_FORMATS, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/hooks/useAvailableFonts'
 import { createFontSelection } from '@/lib/fonts'
@@ -30,9 +22,7 @@ export function SectionHeading({ icon: Icon, title }) {
   return (
     <div className="flex items-center gap-2 pt-2">
       <Icon className="h-3.5 w-3.5 text-primary" />
-      <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </h5>
+      <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</h5>
     </div>
   )
 }
@@ -53,16 +43,8 @@ export function PositionSection({ widget, setNumericField, updateWidgetData }) {
     <div className="space-y-3">
       <SectionHeading icon={Move} title="General" />
       <div className="grid grid-cols-2 gap-3">
-        <NumberField
-          label="Horizontal Position"
-          value={widget.data.x ?? 0}
-          onChange={(rawValue) => setNumericField(widget.id, 'x', rawValue)}
-        />
-        <NumberField
-          label="Vertical Position"
-          value={widget.data.y ?? 0}
-          onChange={(rawValue) => setNumericField(widget.id, 'y', rawValue)}
-        />
+        <NumberField label="Horizontal Position" value={widget.data.x ?? 0} onChange={(rawValue) => setNumericField(widget.id, 'x', rawValue)} />
+        <NumberField label="Vertical Position" value={widget.data.y ?? 0} onChange={(rawValue) => setNumericField(widget.id, 'y', rawValue)} />
       </div>
       <SliderField
         label="Transparency"
@@ -71,9 +53,7 @@ export function PositionSection({ widget, setNumericField, updateWidgetData }) {
         max={100}
         step={1}
         valueDisplay={`${opacity}%`}
-        onSliderChange={(value) =>
-          updateWidgetData(widget.id, { opacity: value / 100 })
-        }
+        onSliderChange={(value) => updateWidgetData(widget.id, { opacity: value / 100 })}
       />
     </div>
   )
@@ -95,16 +75,12 @@ export function DimensionsSection({ widget, setNumericField }) {
         <NumberField
           label="Width"
           value={widget.data.width ?? 0}
-          onChange={(rawValue) =>
-            setNumericField(widget.id, 'width', rawValue, { min: 0 })
-          }
+          onChange={(rawValue) => setNumericField(widget.id, 'width', rawValue, { min: 0 })}
         />
         <NumberField
           label="Height"
           value={widget.data.height ?? 0}
-          onChange={(rawValue) =>
-            setNumericField(widget.id, 'height', rawValue, { min: 0 })
-          }
+          onChange={(rawValue) => setNumericField(widget.id, 'height', rawValue, { min: 0 })}
         />
       </div>
     </div>
@@ -145,20 +121,14 @@ export function FontSection({
       <SectionHeading icon={Type} title={title} />
 
       {showTextInput ? (
-        <TextField
-          label="Text"
-          value={widget.data.text || ''}
-          onChange={(value) => updateWidgetData(widget.id, { text: value })}
-        />
+        <TextField label="Text" value={widget.data.text || ''} onChange={(value) => updateWidgetData(widget.id, { text: value })} />
       ) : null}
 
       {showFormatSelect ? (
         <SelectField
           label="Format"
           value={widget.data.format || 'time-24'}
-          onValueChange={(value) =>
-            updateWidgetData(widget.id, { format: value })
-          }
+          onValueChange={(value) => updateWidgetData(widget.id, { format: value })}
           options={TIME_FORMATS}
         />
       ) : null}
@@ -170,17 +140,13 @@ export function FontSection({
         max={sizeMax}
         step={1}
         valueDisplay={`${fontSize}px`}
-        onSliderChange={(value) =>
-          updateWidgetData(widget.id, { font_size: value })
-        }
+        onSliderChange={(value) => updateWidgetData(widget.id, { font_size: value })}
       />
       <div className="grid grid-cols-2 gap-3">
         <FontSelectField
           label="Font Family"
           value={getWidgetFont(widget)}
-          onValueChange={(value) =>
-            updateWidgetData(widget.id, createFontSelection(value))
-          }
+          onValueChange={(value) => updateWidgetData(widget.id, createFontSelection(value))}
           systemFonts={systemFonts}
           triggerClassName="h-9 border-border/70 bg-surface text-xs"
           labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
@@ -207,35 +173,21 @@ export function FontSection({
  * @param {*} props.unitsField - Value for units field.
  * @returns {JSX.Element} Rendered component output.
  */
-export function IconSection({
-  widget,
-  updateWidgetData,
-  setNumericField,
-  title = 'Icon',
-  showUnitsToggle = false,
-  unitsField = null,
-}) {
+export function IconSection({ widget, updateWidgetData, setNumericField, title = 'Icon', showUnitsToggle = false, unitsField = null }) {
   const iconSize = widget.data.icon_size ?? 28
 
   return (
     <div className="space-y-4">
       <div className="flex w-full justify-between items-center">
         <SectionHeading icon={Palette} title={title} />
-        <ToggleField
-          checked={widget.data.show_icon ?? true}
-          onCheckedChange={(checked) =>
-            updateWidgetData(widget.id, { show_icon: checked })
-          }
-        />
+        <ToggleField checked={widget.data.show_icon ?? true} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_icon: checked })} />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <ColorField
           label="Color"
           disabled={!widget.data.show_icon}
           value={widget.data.icon_color || getThemeColor('aqua')}
-          onChange={(value) =>
-            updateWidgetData(widget.id, { icon_color: value })
-          }
+          onChange={(value) => updateWidgetData(widget.id, { icon_color: value })}
         />
         <SliderField
           label="Size"
@@ -245,9 +197,7 @@ export function IconSection({
           max={100}
           step={1}
           valueDisplay={`${iconSize}px`}
-          onSliderChange={(value) =>
-            updateWidgetData(widget.id, { icon_size: value })
-          }
+          onSliderChange={(value) => updateWidgetData(widget.id, { icon_size: value })}
         />
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -255,17 +205,13 @@ export function IconSection({
           disabled={!widget.data.show_icon}
           label="Horizontal Offset"
           value={widget.data.icon_offset_x ?? 0}
-          onChange={(rawValue) =>
-            setNumericField(widget.id, 'icon_offset_x', rawValue)
-          }
+          onChange={(rawValue) => setNumericField(widget.id, 'icon_offset_x', rawValue)}
         />
         <NumberField
           disabled={!widget.data.show_icon}
           label="Vertical Offset"
           value={widget.data.icon_offset_y ?? 0}
-          onChange={(rawValue) =>
-            setNumericField(widget.id, 'icon_offset_y', rawValue)
-          }
+          onChange={(rawValue) => setNumericField(widget.id, 'icon_offset_y', rawValue)}
         />
       </div>
 
@@ -275,9 +221,7 @@ export function IconSection({
         <ToggleField
           label="Display Units"
           checked={widget.data.show_units ?? true}
-          onCheckedChange={(checked) =>
-            updateWidgetData(widget.id, { show_units: checked })
-          }
+          onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
         />
       ) : null}
     </div>
@@ -303,19 +247,14 @@ export function UnitsControlRow({
   widget,
   updateWidgetData,
   checked = widget.data.show_units ?? true,
-  onCheckedChange = (nextChecked) =>
-    updateWidgetData(widget.id, { show_units: nextChecked }),
+  onCheckedChange = (nextChecked) => updateWidgetData(widget.id, { show_units: nextChecked }),
   title = 'Unit',
   value,
   onValueChange,
   options,
   selectLabel = 'Unit',
 }) {
-  const showSelect =
-    Array.isArray(options) &&
-    options.length > 0 &&
-    value !== undefined &&
-    typeof onValueChange === 'function'
+  const showSelect = Array.isArray(options) && options.length > 0 && value !== undefined && typeof onValueChange === 'function'
 
   return (
     <div className="space-y-2">
@@ -325,12 +264,7 @@ export function UnitsControlRow({
       </div>
       {showSelect ? (
         <div className="grid grid-cols-2 gap-3">
-          <SelectField
-            label={selectLabel}
-            value={value}
-            onValueChange={onValueChange}
-            options={options}
-          />
+          <SelectField label={selectLabel} value={value} onValueChange={onValueChange} options={options} />
         </div>
       ) : null}
     </div>

@@ -95,11 +95,7 @@ export default function useOverlayMoveableHandlers({
     onDrag: ({ beforeTranslate, inputEvent, target }) => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
-      const lockedTranslate = getAxisLockedTranslate(
-        origin,
-        beforeTranslate,
-        inputEvent,
-      )
+      const lockedTranslate = getAxisLockedTranslate(origin, beforeTranslate, inputEvent)
 
       const nextDraft = {
         ...draftWidgetsRef.current[origin.id],
@@ -154,11 +150,7 @@ export default function useOverlayMoveableHandlers({
       if (origin?.type !== 'group-drag') return
 
       const nextDraftsById = {}
-      const lockedTranslate = getAxisLockedTranslate(
-        origin,
-        events[0]?.beforeTranslate || [0, 0],
-        inputEvent || events[0]?.inputEvent,
-      )
+      const lockedTranslate = getAxisLockedTranslate(origin, events[0]?.beforeTranslate || [0, 0], inputEvent || events[0]?.inputEvent)
 
       events.forEach((childEvent) => {
         const widgetId = getWidgetIdFromTarget(childEvent.target)
@@ -187,9 +179,7 @@ export default function useOverlayMoveableHandlers({
       const origin = interactionStartRef.current
       if (origin?.type !== 'group-drag') return
 
-      const draggedWidgetIds = origin.widgetIds?.length
-        ? [...origin.widgetIds]
-        : [...groupDragSelectionIds]
+      const draggedWidgetIds = origin.widgetIds?.length ? [...origin.widgetIds] : [...groupDragSelectionIds]
       const updatesById = draggedWidgetIds.reduce((accumulator, widgetId) => {
         const draft = draftWidgetsRef.current[widgetId]
         const widgetOrigin = origin.widgetsById[widgetId]
@@ -238,19 +228,13 @@ export default function useOverlayMoveableHandlers({
 
       const nextX = origin.x + drag.beforeTranslate[0]
       const nextY = origin.y + drag.beforeTranslate[1]
-      const dimensionScale =
-        selectedWidget?.category === 'plots'
-          ? Math.max(Number(globalScale) || 1, 0.1)
-          : 1
+      const dimensionScale = selectedWidget?.category === 'plots' ? Math.max(Number(globalScale) || 1, 0.1) : 1
       const nextWidth = Math.max(width / dimensionScale, 8)
       const nextHeight = Math.max(height / dimensionScale, 8)
       const widthScale = origin.width ? nextWidth / origin.width : 1
       const heightScale = origin.height ? nextHeight / origin.height : 1
       const markerScale = (widthScale + heightScale) / 2
-      const nextMarkerSize =
-        origin.markerSize === null
-          ? undefined
-          : clamp(Math.round(origin.markerSize * markerScale), 0, 400)
+      const nextMarkerSize = origin.markerSize === null ? undefined : clamp(Math.round(origin.markerSize * markerScale), 0, 400)
 
       const nextDraft = {
         ...draftWidgetsRef.current[origin.id],
@@ -258,18 +242,11 @@ export default function useOverlayMoveableHandlers({
         y: nextY,
         width: nextWidth,
         height: nextHeight,
-        ...(nextMarkerSize === undefined
-          ? {}
-          : { marker_size: nextMarkerSize }),
+        ...(nextMarkerSize === undefined ? {} : { marker_size: nextMarkerSize }),
       }
 
       setLiveWidgetDraft(origin.id, nextDraft)
-      applyLiveWidgetStyles(
-        target ?? drag.target,
-        selectedWidget,
-        nextDraft,
-        globalScale,
-      )
+      applyLiveWidgetStyles(target ?? drag.target, selectedWidget, nextDraft, globalScale)
     },
     onResizeEnd: () => {
       const origin = interactionStartRef.current
@@ -282,9 +259,7 @@ export default function useOverlayMoveableHandlers({
           y: Math.round(draft.y ?? origin.y),
           width: Math.max(Math.round(draft.width ?? 0), 0),
           height: Math.max(Math.round(draft.height ?? 0), 0),
-          ...(draft.marker_size === undefined
-            ? {}
-            : { marker_size: Math.max(Math.round(draft.marker_size), 0) }),
+          ...(draft.marker_size === undefined ? {} : { marker_size: Math.max(Math.round(draft.marker_size), 0) }),
         })
       }
 
@@ -298,9 +273,7 @@ export default function useOverlayMoveableHandlers({
         dragStart.set([0, 0])
       }
 
-      const currentBounds = getWidgetVisualBoundsFromTarget(
-        target ?? selectedTarget,
-      )
+      const currentBounds = getWidgetVisualBoundsFromTarget(target ?? selectedTarget)
 
       interactionStartRef.current = {
         id: selectedWidget.id,
@@ -310,12 +283,10 @@ export default function useOverlayMoveableHandlers({
         iconSize: selectedWidget.data.icon_size ?? 28,
         iconOffsetX: selectedWidget.data.icon_offset_x ?? 0,
         iconOffsetY: selectedWidget.data.icon_offset_y ?? 0,
-        triangleWidth:
-          selectedWidget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
+        triangleWidth: selectedWidget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
         valueOffset: selectedWidget.data.value_offset ?? 0,
         renderedWidth: target?.offsetWidth ?? selectedTarget?.offsetWidth ?? 0,
-        renderedHeight:
-          target?.offsetHeight ?? selectedTarget?.offsetHeight ?? 0,
+        renderedHeight: target?.offsetHeight ?? selectedTarget?.offsetHeight ?? 0,
         renderedMaxX: currentBounds?.maxX ?? 0,
         renderedMaxY: currentBounds?.maxY ?? 0,
         type: 'scale',
@@ -325,11 +296,7 @@ export default function useOverlayMoveableHandlers({
     onScale: ({ scale, direction, target }) => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
-      const rawScale = Number.isFinite(scale?.[0])
-        ? scale[0]
-        : Number.isFinite(scale?.[1])
-          ? scale[1]
-          : 1
+      const rawScale = Number.isFinite(scale?.[0]) ? scale[0] : Number.isFinite(scale?.[1]) ? scale[1] : 1
       // Moveable reads the CSS `scale(globalScale)` transform on the widget
       // element and includes it in the reported scale values. Normalize by
       // dividing out globalScale so it doesn't get permanently baked into
@@ -344,10 +311,7 @@ export default function useOverlayMoveableHandlers({
       }
 
       draftWidgetsRef.current[origin.id] = nextDraft
-      setLiveWidgetDraft(
-        origin.id,
-        buildScaledWidgetDataDraft(origin, uniformScale, selectedWidget),
-      )
+      setLiveWidgetDraft(origin.id, buildScaledWidgetDataDraft(origin, uniformScale, selectedWidget))
 
       if (scalePreviewFrameRef.current) {
         cancelAnimationFrame(scalePreviewFrameRef.current)
@@ -360,27 +324,12 @@ export default function useOverlayMoveableHandlers({
         const measuredBounds = getWidgetVisualBoundsFromTarget(targetNode)
         const measuredDraft = {
           ...draftWidgetsRef.current[origin.id],
-          x:
-            origin.x +
-            (direction?.[0] === -1
-              ? origin.renderedMaxX -
-                (measuredBounds?.maxX ?? targetNode.offsetWidth)
-              : 0),
-          y:
-            origin.y +
-            (direction?.[1] === -1
-              ? origin.renderedMaxY -
-                (measuredBounds?.maxY ?? targetNode.offsetHeight)
-              : 0),
+          x: origin.x + (direction?.[0] === -1 ? origin.renderedMaxX - (measuredBounds?.maxX ?? targetNode.offsetWidth) : 0),
+          y: origin.y + (direction?.[1] === -1 ? origin.renderedMaxY - (measuredBounds?.maxY ?? targetNode.offsetHeight) : 0),
         }
 
         draftWidgetsRef.current[origin.id] = measuredDraft
-        applyLiveScalePositionStyles(
-          targetNode,
-          selectedWidget,
-          measuredDraft,
-          globalScale,
-        )
+        applyLiveScalePositionStyles(targetNode, selectedWidget, measuredDraft, globalScale)
       })
     },
     onScaleEnd: () => {
@@ -395,31 +344,16 @@ export default function useOverlayMoveableHandlers({
       const draft = draftWidgetsRef.current[origin.id]
       if (draft) {
         const targetNode = selectedTarget
-        const measuredBounds = targetNode
-          ? getWidgetVisualBoundsFromTarget(targetNode)
-          : null
-        const finalDirection = Array.isArray(draft.scale_direction)
-          ? draft.scale_direction
-          : [1, 1]
-        const finalX =
-          origin.x +
-          (finalDirection[0] === -1
-            ? origin.renderedMaxX -
-              (measuredBounds?.maxX ?? origin.renderedWidth ?? 0)
-            : 0)
-        const finalY =
-          origin.y +
-          (finalDirection[1] === -1
-            ? origin.renderedMaxY -
-              (measuredBounds?.maxY ?? origin.renderedHeight ?? 0)
-            : 0)
+        const measuredBounds = targetNode ? getWidgetVisualBoundsFromTarget(targetNode) : null
+        const finalDirection = Array.isArray(draft.scale_direction) ? draft.scale_direction : [1, 1]
+        const finalX = origin.x + (finalDirection[0] === -1 ? origin.renderedMaxX - (measuredBounds?.maxX ?? origin.renderedWidth ?? 0) : 0)
+        const finalY = origin.y + (finalDirection[1] === -1 ? origin.renderedMaxY - (measuredBounds?.maxY ?? origin.renderedHeight ?? 0) : 0)
 
         commitWidgetUpdate(origin.id, {
           x: Math.round(finalX),
           y: Math.round(finalY),
           font_size: draft.font_size ?? origin.fontSize ?? 60,
-          ...(selectedWidget?.category === 'values' &&
-          selectedWidget.type !== 'gradient'
+          ...(selectedWidget?.category === 'values' && selectedWidget.type !== 'gradient'
             ? {
                 icon_size: draft.icon_size ?? origin.iconSize ?? 28,
                 icon_offset_x: draft.icon_offset_x ?? origin.iconOffsetX ?? 0,
@@ -428,8 +362,7 @@ export default function useOverlayMoveableHandlers({
             : {}),
           ...(selectedWidget?.type === 'gradient'
             ? {
-                triangle_width:
-                  draft.triangle_width ?? origin.triangleWidth ?? 0,
+                triangle_width: draft.triangle_width ?? origin.triangleWidth ?? 0,
                 value_offset: draft.value_offset ?? origin.valueOffset ?? 0,
               }
             : {}),
@@ -474,8 +407,7 @@ export default function useOverlayMoveableHandlers({
 
       const draft = draftWidgetsRef.current[origin.id]
       if (draft) {
-        const normalizedRotation =
-          (((draft.rotation ?? origin.rotation ?? 0) % 360) + 360) % 360
+        const normalizedRotation = (((draft.rotation ?? origin.rotation ?? 0) % 360) + 360) % 360
 
         commitWidgetUpdate(origin.id, {
           x: Math.round(draft.x ?? origin.x),

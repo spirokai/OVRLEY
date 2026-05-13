@@ -3,12 +3,7 @@
  */
 
 import { memo } from 'react'
-import {
-  OverlayElevationWidget,
-  OverlayMetricWidget,
-  OverlayRouteWidget,
-  OverlayTextWidget,
-} from './widgetPreviewRenderers'
+import { OverlayElevationWidget, OverlayMetricWidget, OverlayRouteWidget, OverlayTextWidget } from './widgetPreviewRenderers'
 
 /**
  * Renders the widget preview component.
@@ -33,13 +28,7 @@ function WidgetPreview({
   valueFont,
 }) {
   if (widget.type === 'label') {
-    return (
-      <OverlayTextWidget
-        widget={widget}
-        globalOpacity={globalOpacity}
-        sceneStyle={sceneStyle}
-      />
-    )
+    return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} sceneStyle={sceneStyle} />
   }
 
   if (widget.type === 'course') {

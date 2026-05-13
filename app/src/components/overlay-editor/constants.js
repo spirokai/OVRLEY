@@ -2,26 +2,13 @@
  * Provides overlay editor helpers for constants.
  */
 
-import {
-  Clock3,
-  Gauge,
-  Heart,
-  Map,
-  Mountain,
-  RefreshCw,
-  Thermometer,
-  TrendingUp,
-  Type,
-  Zap,
-} from 'lucide-react'
+import { Clock3, Gauge, Heart, Map, Mountain, RefreshCw, Thermometer, TrendingUp, Type, Zap } from 'lucide-react'
 
 export const FONT_FAMILY_MAP = {
   'Arial.ttf': 'Arial, Helvetica, sans-serif',
   Arial: 'Arial, Helvetica, sans-serif',
-  'Evogria.otf':
-    '"Evogria", Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif',
-  Evogria:
-    '"Evogria", Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif',
+  'Evogria.otf': '"Evogria", Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif',
+  Evogria: '"Evogria", Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif',
   'Furore.otf': '"Furore", "Arial Black", Impact, sans-serif',
   Furore: '"Furore", "Arial Black", Impact, sans-serif',
 }
@@ -60,8 +47,5 @@ export function getEditorGridSize(sceneSize) {
     return 1
   }
 
-  return Math.max(
-    1,
-    Math.round(Math.min(width, height) / EDITOR_GRID_DIVISIONS),
-  )
+  return Math.max(1, Math.round(Math.min(width, height) / EDITOR_GRID_DIVISIONS))
 }

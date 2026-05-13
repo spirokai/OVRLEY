@@ -18,11 +18,7 @@ function smoothElevationSeries(elevationSeries, helpers, radius = 2) {
 
     let total = 0
     let count = 0
-    for (
-      let neighborIndex = Math.max(0, index - radius);
-      neighborIndex <= Math.min(elevationSeries.length - 1, index + radius);
-      neighborIndex += 1
-    ) {
+    for (let neighborIndex = Math.max(0, index - radius); neighborIndex <= Math.min(elevationSeries.length - 1, index + radius); neighborIndex += 1) {
       const neighborValue = elevationSeries[neighborIndex]
       if (!isFiniteNumber(neighborValue)) continue
       total += neighborValue
@@ -83,11 +79,7 @@ function smoothGradientInputSeriesLegacy(elevationSeries, helpers) {
     return elevationSeries.map((value) => roundValue(value, 3))
   }
 
-  return applyFixedSavitzkyGolay(
-    elevationSeries,
-    helpers,
-    [-2, 3, 6, 7, 6, 3, -2],
-  )
+  return applyFixedSavitzkyGolay(elevationSeries, helpers, [-2, 3, 6, 7, 6, 3, -2])
 }
 
 /**
@@ -117,10 +109,7 @@ function deriveGradientSeries(elevationSeries, distanceSeries, helpers) {
     }
 
     let rightIndex = index
-    while (
-      rightIndex < distanceSeries.length - 1 &&
-      distanceSeries[rightIndex] - currentDistance < 5
-    ) {
+    while (rightIndex < distanceSeries.length - 1 && distanceSeries[rightIndex] - currentDistance < 5) {
       rightIndex += 1
     }
 
@@ -129,12 +118,7 @@ function deriveGradientSeries(elevationSeries, distanceSeries, helpers) {
     const leftElevation = smoothedElevation[leftIndex]
     const rightElevation = smoothedElevation[rightIndex]
 
-    if (
-      !isFiniteNumber(leftDistance) ||
-      !isFiniteNumber(rightDistance) ||
-      !isFiniteNumber(leftElevation) ||
-      !isFiniteNumber(rightElevation)
-    ) {
+    if (!isFiniteNumber(leftDistance) || !isFiniteNumber(rightDistance) || !isFiniteNumber(leftElevation) || !isFiniteNumber(rightElevation)) {
       gradientSeries.push(roundValue(lastGradient, 3))
       continue
     }
@@ -145,13 +129,7 @@ function deriveGradientSeries(elevationSeries, distanceSeries, helpers) {
       continue
     }
 
-    const nextGradient = Math.max(
-      -30,
-      Math.min(
-        30,
-        ((rightElevation - leftElevation) / horizontalDistance) * 100,
-      ),
-    )
+    const nextGradient = Math.max(-30, Math.min(30, ((rightElevation - leftElevation) / horizontalDistance) * 100))
     lastGradient = nextGradient
     gradientSeries.push(roundValue(nextGradient, 3))
   }
@@ -174,17 +152,11 @@ function deriveLegacyGradientSeries(elevationSeries, distanceSeries, helpers) {
     return []
   }
 
-  if (
-    elevationSeries.length === 1 ||
-    distanceSeries.length !== elevationSeries.length
-  ) {
+  if (elevationSeries.length === 1 || distanceSeries.length !== elevationSeries.length) {
     return elevationSeries.map(() => 0)
   }
 
-  const gradientInputElevations = smoothGradientInputSeriesLegacy(
-    elevationSeries,
-    helpers,
-  )
+  const gradientInputElevations = smoothGradientInputSeriesLegacy(elevationSeries, helpers)
   const gradients = []
   const lastIndex = elevationSeries.length - 1
 
@@ -197,12 +169,7 @@ function deriveLegacyGradientSeries(elevationSeries, distanceSeries, helpers) {
     const leftElevation = gradientInputElevations[leftIndex]
     const rightElevation = gradientInputElevations[rightIndex]
 
-    if (
-      !isFiniteNumber(leftDistance) ||
-      !isFiniteNumber(rightDistance) ||
-      !isFiniteNumber(leftElevation) ||
-      !isFiniteNumber(rightElevation)
-    ) {
+    if (!isFiniteNumber(leftDistance) || !isFiniteNumber(rightDistance) || !isFiniteNumber(leftElevation) || !isFiniteNumber(rightElevation)) {
       gradients.push(0)
       continue
     }
@@ -213,12 +180,7 @@ function deriveLegacyGradientSeries(elevationSeries, distanceSeries, helpers) {
       continue
     }
 
-    gradients.push(
-      roundValue(
-        ((rightElevation - leftElevation) / horizontalDistance) * 100,
-        3,
-      ) ?? 0,
-    )
+    gradients.push(roundValue(((rightElevation - leftElevation) / horizontalDistance) * 100, 3) ?? 0)
   }
 
   return gradients
@@ -237,12 +199,8 @@ function deriveHeadingSeries(courseSeries, helpers) {
 
   return courseSeries.map((point, index) => {
     const previousPoint = index > 0 ? courseSeries[index - 1] : null
-    const nextPoint =
-      index < courseSeries.length - 1 ? courseSeries[index + 1] : null
-    const heading =
-      calculateBearingDegrees(previousPoint, point) ??
-      calculateBearingDegrees(point, nextPoint) ??
-      lastHeading
+    const nextPoint = index < courseSeries.length - 1 ? courseSeries[index + 1] : null
+    const heading = calculateBearingDegrees(previousPoint, point) ?? calculateBearingDegrees(point, nextPoint) ?? lastHeading
 
     if (isFiniteNumber(heading)) {
       lastHeading = heading
@@ -277,12 +235,7 @@ function deriveNumericRateSeries(numeratorSeries, elapsedSeries, helpers) {
     const previousElapsed = elapsedSeries[index - 1]
     const currentElapsed = elapsedSeries[index]
 
-    if (
-      !isFiniteNumber(previousValue) ||
-      !isFiniteNumber(currentValue) ||
-      !isFiniteNumber(previousElapsed) ||
-      !isFiniteNumber(currentElapsed)
-    ) {
+    if (!isFiniteNumber(previousValue) || !isFiniteNumber(currentValue) || !isFiniteNumber(previousElapsed) || !isFiniteNumber(currentElapsed)) {
       derivedSeries.push(lastValue)
       continue
     }
@@ -345,14 +298,10 @@ function deriveTorqueSeries(powerSeries, cadenceSeries, helpers) {
  * @returns {object} Result produced by the helper.
  */
 function combineSeries(directSeries, derivedSeries) {
-  const combinedSeries = directSeries.map(
-    (value, index) => value ?? derivedSeries[index] ?? null,
-  )
+  const combinedSeries = directSeries.map((value, index) => value ?? derivedSeries[index] ?? null)
 
   const directCount = directSeries.filter((value) => value !== null).length
-  const derivedOnlyCount = combinedSeries.filter(
-    (value, index) => value !== null && directSeries[index] === null,
-  ).length
+  const derivedOnlyCount = combinedSeries.filter((value, index) => value !== null && directSeries[index] === null).length
 
   let source = 'missing'
   if (directCount > 0 && derivedOnlyCount > 0) {
@@ -377,14 +326,10 @@ function combineSeries(directSeries, derivedSeries) {
  * @returns {object} Result produced by the helper.
  */
 function combineSeriesPreferDerived(derivedSeries, directSeries) {
-  const combinedSeries = derivedSeries.map(
-    (value, index) => value ?? directSeries[index] ?? null,
-  )
+  const combinedSeries = derivedSeries.map((value, index) => value ?? directSeries[index] ?? null)
 
   const derivedCount = derivedSeries.filter((value) => value !== null).length
-  const directFallbackCount = combinedSeries.filter(
-    (value, index) => value !== null && derivedSeries[index] === null,
-  ).length
+  const directFallbackCount = combinedSeries.filter((value, index) => value !== null && derivedSeries[index] === null).length
 
   let source = 'missing'
   if (derivedCount > 0 && directFallbackCount > 0) {
@@ -448,74 +393,40 @@ export function deriveActivityMetricSeries({
 }) {
   const { safeNumber } = helpers
   const directMetrics = {
-    air_pressure: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.airPressure),
-    ),
+    air_pressure: normalizedRawSamples.map((sample) => safeNumber(sample.airPressure)),
     altitude: normalizedRawSamples.map((sample) => safeNumber(sample.altitude)),
     cadence: normalizedRawSamples.map((sample) => safeNumber(sample.cadence)),
     distance: distanceSeries,
     elevation: elevationBaseSeries,
     g_force: normalizedRawSamples.map((sample) => safeNumber(sample.gForce)),
     gradient: normalizedRawSamples.map((sample) => safeNumber(sample.gradient)),
-    ground_contact_time: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.groundContactTime),
-    ),
+    ground_contact_time: normalizedRawSamples.map((sample) => safeNumber(sample.groundContactTime)),
     heading: normalizedRawSamples.map((sample) => safeNumber(sample.heading)),
-    heartrate: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.heartrate),
-    ),
-    left_right_balance: normalizedRawSamples.map(
-      (sample) => sample.leftRightBalance ?? null,
-    ),
+    heartrate: normalizedRawSamples.map((sample) => safeNumber(sample.heartrate)),
+    left_right_balance: normalizedRawSamples.map((sample) => sample.leftRightBalance ?? null),
     pace: normalizedRawSamples.map((sample) => safeNumber(sample.pace)),
     power: normalizedRawSamples.map((sample) => safeNumber(sample.power)),
     speed: normalizedRawSamples.map((sample) => safeNumber(sample.speed)),
-    stride_length: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.strideLength),
-    ),
-    stroke_rate: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.strokeRate),
-    ),
-    temperature: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.temperature),
-    ),
+    stride_length: normalizedRawSamples.map((sample) => safeNumber(sample.strideLength)),
+    stroke_rate: normalizedRawSamples.map((sample) => safeNumber(sample.strokeRate)),
+    temperature: normalizedRawSamples.map((sample) => safeNumber(sample.temperature)),
     torque: normalizedRawSamples.map((sample) => safeNumber(sample.torque)),
-    vertical_oscillation: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.verticalOscillation),
-    ),
-    vertical_speed: normalizedRawSamples.map((sample) =>
-      safeNumber(sample.verticalSpeed),
-    ),
+    vertical_oscillation: normalizedRawSamples.map((sample) => safeNumber(sample.verticalOscillation)),
+    vertical_speed: normalizedRawSamples.map((sample) => safeNumber(sample.verticalSpeed)),
   }
 
   const nullSeries = normalizedRawSamples.map(() => null)
-  const derivedSpeed = deriveNumericRateSeries(
-    distanceSeries,
-    elapsedSeries,
-    helpers,
-  )
+  const derivedSpeed = deriveNumericRateSeries(distanceSeries, elapsedSeries, helpers)
   const derivedHeading = deriveHeadingSeries(courseSeries, helpers)
   const derivedGradient = useLegacyGpxDerivations
-    ? deriveLegacyGradientSeries(
-        directMetrics.elevation,
-        distanceSeries,
-        helpers,
-      )
+    ? deriveLegacyGradientSeries(directMetrics.elevation, distanceSeries, helpers)
     : deriveGradientSeries(directMetrics.elevation, distanceSeries, helpers)
-  const derivedVerticalSpeed = deriveNumericRateSeries(
-    directMetrics.elevation,
-    elapsedSeries,
-    helpers,
-  )
+  const derivedVerticalSpeed = deriveNumericRateSeries(directMetrics.elevation, elapsedSeries, helpers)
   const derivedPace = derivePaceSeries(
     directMetrics.speed.map((value, index) => value ?? derivedSpeed[index]),
     helpers,
   )
-  const derivedTorque = deriveTorqueSeries(
-    directMetrics.power,
-    directMetrics.cadence,
-    helpers,
-  )
+  const derivedTorque = deriveTorqueSeries(directMetrics.power, directMetrics.cadence, helpers)
 
   return {
     directMetrics,
@@ -526,20 +437,11 @@ export function deriveActivityMetricSeries({
       distance: { series: directMetrics.distance, source: 'direct' },
       elevation: combineSeries(directMetrics.elevation, nullSeries),
       g_force: combineSeries(directMetrics.g_force, nullSeries),
-      gradient: combineSeriesPreferDerived(
-        derivedGradient,
-        directMetrics.gradient,
-      ),
-      ground_contact_time: combineSeries(
-        directMetrics.ground_contact_time,
-        nullSeries,
-      ),
+      gradient: combineSeriesPreferDerived(derivedGradient, directMetrics.gradient),
+      ground_contact_time: combineSeries(directMetrics.ground_contact_time, nullSeries),
       heading: combineSeries(directMetrics.heading, derivedHeading),
       heartrate: combineSeries(directMetrics.heartrate, nullSeries),
-      left_right_balance: combineSeries(
-        directMetrics.left_right_balance,
-        nullSeries,
-      ),
+      left_right_balance: combineSeries(directMetrics.left_right_balance, nullSeries),
       pace: combineSeries(directMetrics.pace, derivedPace),
       power: combineSeries(directMetrics.power, nullSeries),
       speed: combineSeries(directMetrics.speed, derivedSpeed),
@@ -547,14 +449,8 @@ export function deriveActivityMetricSeries({
       stroke_rate: combineSeries(directMetrics.stroke_rate, nullSeries),
       temperature: combineSeries(directMetrics.temperature, nullSeries),
       torque: combineSeries(directMetrics.torque, derivedTorque),
-      vertical_oscillation: combineSeries(
-        directMetrics.vertical_oscillation,
-        nullSeries,
-      ),
-      vertical_speed: combineSeries(
-        directMetrics.vertical_speed,
-        derivedVerticalSpeed,
-      ),
+      vertical_oscillation: combineSeries(directMetrics.vertical_oscillation, nullSeries),
+      vertical_speed: combineSeries(directMetrics.vertical_speed, derivedVerticalSpeed),
     },
   }
 }

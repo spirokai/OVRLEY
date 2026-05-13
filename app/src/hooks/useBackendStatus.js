@@ -70,10 +70,7 @@ function updateBackendStatus(status, error = null) {
  * @returns {boolean} Whether the condition is satisfied.
  */
 export function hasTauriRuntime() {
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.__TAURI_INTERNALS__ !== 'undefined'
-  )
+  return typeof window !== 'undefined' && typeof window.__TAURI_INTERNALS__ !== 'undefined'
 }
 
 /**
@@ -82,9 +79,7 @@ export function hasTauriRuntime() {
  */
 export default function useBackendStatus() {
   const isTauriRuntime = hasTauriRuntime()
-  const [backendStatus, setBackendStatus] = useState(
-    isTauriRuntime ? 'connecting' : 'error',
-  )
+  const [backendStatus, setBackendStatus] = useState(isTauriRuntime ? 'connecting' : 'error')
   const [backendReady, setBackendReady] = useState(false)
   const statusRef = useRef(isTauriRuntime ? 'connecting' : 'error')
   const strikesRef = useRef(0)
@@ -114,16 +109,11 @@ export default function useBackendStatus() {
           strikesRef.current += 1
 
           if (strikesRef.current === 1) {
-            logBackend(
-              'Backend not yet ready, waiting for Rust commands to respond...',
-            )
+            logBackend('Backend not yet ready, waiting for Rust commands to respond...')
           }
 
           const threshold = statusRef.current === 'connecting' ? 90 : 8
-          if (
-            strikesRef.current >= threshold &&
-            statusRef.current !== 'error'
-          ) {
+          if (strikesRef.current >= threshold && statusRef.current !== 'error') {
             updateStatus('error', 'Backend bridge not available')
             setBackendReady(false)
           }

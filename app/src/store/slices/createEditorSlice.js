@@ -12,10 +12,7 @@ import {
   readStoredInt,
   updateConfigPersistence,
 } from '../store-utils'
-import {
-  incrementPreviewPerfCounter,
-  previewPerfCounterName,
-} from '../../lib/previewPerf'
+import { incrementPreviewPerfCounter, previewPerfCounterName } from '../../lib/previewPerf'
 
 /**
  * Creates editor slice.
@@ -33,8 +30,7 @@ export function createEditorSlice(set, get) {
   return {
     editor: null,
     selectedWidgetId: null,
-    previewInterpolationEnabled:
-      localStorage.getItem('previewInterpolationEnabled') !== 'false',
+    previewInterpolationEnabled: localStorage.getItem('previewInterpolationEnabled') !== 'false',
     hasUnrenderedChanges: false,
     lastRenderedConfig: null,
     dummyDurationSeconds: readStoredInt('dummyDurationSeconds', 73),
@@ -48,9 +44,7 @@ export function createEditorSlice(set, get) {
 
     setConfig: (val) => {
       const currentState = get()
-      const isDifferent = currentState.lastRenderedConfig
-        ? hasSerializableChanged(val, currentState.lastRenderedConfig)
-        : false
+      const isDifferent = currentState.lastRenderedConfig ? hasSerializableChanged(val, currentState.lastRenderedConfig) : false
 
       localStorage.setItem('editorConfig', JSON.stringify(val))
 
@@ -60,9 +54,7 @@ export function createEditorSlice(set, get) {
         state.config = val
 
         if (val.scene) {
-          const hasExistingTimeline =
-            state.startSecond !== 0 ||
-            state.endSecond !== state.dummyDurationSeconds
+          const hasExistingTimeline = state.startSecond !== 0 || state.endSecond !== state.dummyDurationSeconds
 
           if (!hasExistingTimeline) {
             if (val.scene.start !== undefined) {
@@ -75,17 +67,11 @@ export function createEditorSlice(set, get) {
               state.selectedSecond = val.scene.start
             }
           } else {
-            if (
-              val.scene.start !== undefined &&
-              val.scene.start !== state.startSecond
-            ) {
+            if (val.scene.start !== undefined && val.scene.start !== state.startSecond) {
               state.startSecond = val.scene.start
               localStorage.setItem('startSecond', val.scene.start.toString())
             }
-            if (
-              val.scene.end !== undefined &&
-              val.scene.end !== state.endSecond
-            ) {
+            if (val.scene.end !== undefined && val.scene.end !== state.endSecond) {
               state.endSecond = val.scene.end
               localStorage.setItem('endSecond', val.scene.end.toString())
             }
@@ -172,9 +158,7 @@ export function createEditorSlice(set, get) {
     setSelectedSecondTransient: (second) => {
       const safeSecond = normalizePreviewSecond(second)
 
-      incrementPreviewPerfCounter(
-        previewPerfCounterName('transient selectedSecond updates'),
-      )
+      incrementPreviewPerfCounter(previewPerfCounterName('transient selectedSecond updates'))
 
       set((state) => {
         state.selectedSecond = safeSecond

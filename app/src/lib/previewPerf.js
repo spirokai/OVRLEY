@@ -58,8 +58,7 @@ export function incrementPreviewPerfCounter(counterName, amount = 1) {
   }
 
   const safeAmount = Number.isFinite(amount) ? amount : 1
-  counterState.counts[counterName] =
-    (counterState.counts[counterName] || 0) + safeAmount
+  counterState.counts[counterName] = (counterState.counts[counterName] || 0) + safeAmount
 }
 
 export function previewPerfCounterName(label) {

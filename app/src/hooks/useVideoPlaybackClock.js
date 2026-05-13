@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import useStore from '@/store/useStore'
 import { getEffectivePreviewFps } from '@/components/overlay-editor/previewInterpolation'
-import {
-  incrementPreviewPerfCounter,
-  previewPerfCounterName,
-  setPreviewPerfValue,
-} from '@/lib/previewPerf'
+import { incrementPreviewPerfCounter, previewPerfCounterName, setPreviewPerfValue } from '@/lib/previewPerf'
 
 const PREVIEW_CLOCK_MODE_FLAG = 'ovrley:preview-clock-mode'
 
@@ -30,12 +26,7 @@ function resolvePreviewClockMode() {
  * @param {number} options.videoSyncOffsetSeconds Timeline offset for the video.
  * @param {(second: number) => void} options.onPreviewSecond Callback receiving timeline time.
  */
-export function useVideoPlaybackClock({
-  videoRef,
-  isActive,
-  videoSyncOffsetSeconds,
-  onPreviewSecond,
-}) {
+export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSeconds, onPreviewSecond }) {
   const sceneFps = useStore((state) => state.config?.scene?.fps ?? 30)
   const updateRate = useStore((state) => state.updateRate)
   const importedVideoFps = useStore((state) => state.importedVideoFps)
@@ -44,18 +35,12 @@ export function useVideoPlaybackClock({
   const publishedFrameRef = useRef(-1)
   const lastVideoSourceRef = useRef('')
 
-  const effectivePreviewFps = useMemo(
-    () => Math.max(1, getEffectivePreviewFps(sceneFps, updateRate) || 0),
-    [sceneFps, updateRate],
-  )
+  const effectivePreviewFps = useMemo(() => Math.max(1, getEffectivePreviewFps(sceneFps, updateRate) || 0), [sceneFps, updateRate])
   const previewClockMode = resolvePreviewClockMode()
   const shouldForceAnimationClock = previewClockMode === 'raf'
 
   useEffect(() => {
-    setPreviewPerfValue(
-      'effective preview fps',
-      Math.round(effectivePreviewFps * 100) / 100,
-    )
+    setPreviewPerfValue('effective preview fps', Math.round(effectivePreviewFps * 100) / 100)
   }, [effectivePreviewFps])
 
   useEffect(() => {
@@ -67,10 +52,7 @@ export function useVideoPlaybackClock({
       return
     }
 
-    setPreviewPerfValue(
-      'imported video fps',
-      Math.round(importedVideoFps * 100) / 100,
-    )
+    setPreviewPerfValue('imported video fps', Math.round(importedVideoFps * 100) / 100)
   }, [importedVideoFps])
 
   useEffect(() => {
@@ -95,9 +77,7 @@ export function useVideoPlaybackClock({
     }
 
     const publishPreviewSecond = () => {
-      incrementPreviewPerfCounter(
-        previewPerfCounterName('video frame callbacks'),
-      )
+      incrementPreviewPerfCounter(previewPerfCounterName('video frame callbacks'))
 
       const previewSecond = video.currentTime + videoSyncOffsetSeconds
       const nextFrame = Math.floor(previewSecond * effectivePreviewFps)
@@ -111,16 +91,11 @@ export function useVideoPlaybackClock({
     }
 
     const publishVideoEndSecond = () => {
-      incrementPreviewPerfCounter(
-        previewPerfCounterName('video frame callbacks'),
-      )
+      incrementPreviewPerfCounter(previewPerfCounterName('video frame callbacks'))
 
       const safeDuration = Number(video.duration)
-      const finalVideoSecond = Number.isFinite(safeDuration)
-        ? safeDuration
-        : video.currentTime
-      const previewSecond =
-        finalVideoSecond + videoSyncOffsetSeconds + 1 / effectivePreviewFps
+      const finalVideoSecond = Number.isFinite(safeDuration) ? safeDuration : video.currentTime
+      const previewSecond = finalVideoSecond + videoSyncOffsetSeconds + 1 / effectivePreviewFps
 
       publishedFrameRef.current = -1
       onPreviewSecond(previewSecond)
@@ -142,10 +117,7 @@ export function useVideoPlaybackClock({
         return
       }
 
-      if (
-        !shouldForceAnimationClock &&
-        typeof video.requestVideoFrameCallback === 'function'
-      ) {
+      if (!shouldForceAnimationClock && typeof video.requestVideoFrameCallback === 'function') {
         callbackTypeRef.current = 'video'
         callbackIdRef.current = video.requestVideoFrameCallback(() => {
           syncVideoSource()
@@ -206,12 +178,5 @@ export function useVideoPlaybackClock({
       cancelScheduledFrame()
       publishedFrameRef.current = -1
     }
-  }, [
-    effectivePreviewFps,
-    isActive,
-    onPreviewSecond,
-    shouldForceAnimationClock,
-    videoRef,
-    videoSyncOffsetSeconds,
-  ])
+  }, [effectivePreviewFps, isActive, onPreviewSecond, shouldForceAnimationClock, videoRef, videoSyncOffsetSeconds])
 }

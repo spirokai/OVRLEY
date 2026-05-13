@@ -23,12 +23,7 @@ function ResetButton() {
 
   return (
     <>
-      <Button
-        variant="outline-danger"
-        size="sm"
-        onClick={() => setShowModal(true)}
-        className="w-100"
-      >
+      <Button variant="outline-danger" size="sm" onClick={() => setShowModal(true)} className="w-100">
         Start Over
       </Button>
 

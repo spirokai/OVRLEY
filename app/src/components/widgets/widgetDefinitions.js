@@ -2,18 +2,7 @@
  * Supports widget editing flows related to widget definitions.
  */
 
-import {
-  Clock,
-  Gauge,
-  Heart,
-  Map,
-  Mountain,
-  RefreshCw,
-  Thermometer,
-  TrendingUp,
-  Type,
-  Zap,
-} from 'lucide-react'
+import { Clock, Gauge, Heart, Map, Mountain, RefreshCw, Thermometer, TrendingUp, Type, Zap } from 'lucide-react'
 import { getThemeColor } from '@/lib/theme'
 import { createFontSelection } from '@/lib/fonts'
 
@@ -110,31 +99,17 @@ export function getGlobalColor(globalDefaults, key, fallback) {
  * @returns {object} Requested value or structure.
  */
 function getCourseWidgetDimensions(coursePoints) {
-  const validPoints = (coursePoints || []).filter(
-    ([latitude, longitude]) =>
-      Number.isFinite(latitude) && Number.isFinite(longitude),
-  )
+  const validPoints = (coursePoints || []).filter(([latitude, longitude]) => Number.isFinite(latitude) && Number.isFinite(longitude))
 
   if (validPoints.length < 2) {
     return { width: 400, height: 200 }
   }
 
-  const meanLatitudeRadians =
-    (validPoints.reduce((sum, [latitude]) => sum + latitude, 0) /
-      validPoints.length) *
-    (Math.PI / 180)
-  const projectedX = validPoints.map(
-    ([, longitude]) => longitude * Math.cos(meanLatitudeRadians),
-  )
+  const meanLatitudeRadians = (validPoints.reduce((sum, [latitude]) => sum + latitude, 0) / validPoints.length) * (Math.PI / 180)
+  const projectedX = validPoints.map(([, longitude]) => longitude * Math.cos(meanLatitudeRadians))
   const projectedY = validPoints.map(([latitude]) => latitude)
-  const spanX = Math.max(
-    Math.max(...projectedX) - Math.min(...projectedX),
-    1e-6,
-  )
-  const spanY = Math.max(
-    Math.max(...projectedY) - Math.min(...projectedY),
-    1e-6,
-  )
+  const spanX = Math.max(Math.max(...projectedX) - Math.min(...projectedX), 1e-6)
+  const spanY = Math.max(Math.max(...projectedY) - Math.min(...projectedY), 1e-6)
 
   if (spanX >= spanY) {
     return {
@@ -194,11 +169,7 @@ export function createMetricValueDefaults(type, globalDefaults) {
 
   const iconDefaults = {
     show_icon: true,
-    icon_color: getGlobalColor(
-      globalDefaults,
-      'color_icons',
-      getThemeColor('aqua'),
-    ),
+    icon_color: getGlobalColor(globalDefaults, 'color_icons', getThemeColor('aqua')),
     icon_size: 28,
     icon_offset_x: 0,
     icon_offset_y: 0,
@@ -257,10 +228,7 @@ export function createMetricValueDefaults(type, globalDefaults) {
  * @returns {object} Derived data structure for downstream use.
  */
 export function createPlotDefaults(type, globalDefaults, options = {}) {
-  const courseDimensions =
-    type === 'course'
-      ? getCourseWidgetDimensions(options.coursePoints)
-      : { width: 400, height: 200 }
+  const courseDimensions = type === 'course' ? getCourseWidgetDimensions(options.coursePoints) : { width: 400, height: 200 }
   const base = {
     x: 100,
     y: 100,
@@ -276,11 +244,7 @@ export function createPlotDefaults(type, globalDefaults, options = {}) {
   if (type === 'course') {
     return {
       ...base,
-      color: getGlobalColor(
-        globalDefaults,
-        'color_values',
-        getThemeColor('ice'),
-      ),
+      color: getGlobalColor(globalDefaults, 'color_values', getThemeColor('ice')),
       completed_line_color: getThemeColor('ice'),
       completed_line_opacity: 100,
       remaining_line_color: getThemeColor('teal'),
@@ -322,11 +286,7 @@ export function createPlotDefaults(type, globalDefaults, options = {}) {
     point_label: {
       ...createFontSelection(labelFont),
       font_size: options.sceneFontSize ?? 12.5,
-      color: getGlobalColor(
-        globalDefaults,
-        'color_values',
-        getThemeColor('ice'),
-      ),
+      color: getGlobalColor(globalDefaults, 'color_values', getThemeColor('ice')),
     },
   }
 }

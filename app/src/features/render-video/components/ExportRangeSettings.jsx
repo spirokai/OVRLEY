@@ -27,10 +27,7 @@ function preventDecimalInput(event) {
  * @param {*} props.onExportRangeChange - Callback invoked when range changes.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function ExportRangeSettings({
-  exportRange,
-  onExportRangeChange,
-}) {
+export default function ExportRangeSettings({ exportRange, onExportRangeChange }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -51,9 +48,7 @@ export default function ExportRangeSettings({
       {exportRange.type === 'custom' ? (
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              From
-            </Label>
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">From</Label>
             <BlurInput
               value={exportRange.fromTime}
               onKeyDown={preventDecimalInput}
@@ -69,9 +64,7 @@ export default function ExportRangeSettings({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              To
-            </Label>
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">To</Label>
             <BlurInput
               value={exportRange.toTime}
               onKeyDown={preventDecimalInput}

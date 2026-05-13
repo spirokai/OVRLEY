@@ -135,6 +135,33 @@ Every file must have a single, clear responsibility:
 - lookup tables
 - mappings
 
+**Important**: `data/` is for static data ONLY — constants, enums, config objects, lookup tables.
+Pure helper functions that operate on data belong in `utils/`, NOT in `data/`.
+
+If a file under `data/` contains function definitions (other than simple one-line accessors like `Object.fromEntries(...)`), it is in the wrong directory.
+
+#### GOOD — data/constants.js
+
+```js
+export const OUTPUT_FORMATS = [...]
+export const FORMAT_BY_VALUE = Object.fromEntries(...)
+```
+
+#### BAD — data/constants.js (functions mixed in)
+
+```js
+export const OUTPUT_FORMATS = [...]
+export function getFormatLabel(value) { ... }  // ← belongs in utils/
+export function isFormatMp4(value) { ... }      // ← belongs in utils/
+```
+
+#### GOOD — utils/formatUtils.js (pure functions in utils/)
+
+```js
+export function getFormatLabel(value) { ... }
+export function isFormatMp4(value) { ... }
+```
+
 ### File Size and Granularity Guidelines
 
 **Target range: 50–250 lines per file.** A file significantly larger than 250 lines likely has multiple responsibilities. A file under ~30 lines likely didn't need extraction.
@@ -190,16 +217,17 @@ Prefer the least invasive refactor possible.
 
 Order of preference:
 
-1. Extract constants
-2. Extract pure helper functions
-3. Extract pure presentational components
-4. Extract hooks
-5. Introduce local composition
-6. Introduce feature boundaries
-7. Introduce context/providers
-8. Architectural redesign
+1. Extract constants → `data/`
+2. Extract pure helper functions → `utils/`
+3. Extract pure presentational components → `components/`
+4. Extract focused hooks → `hooks/`
+5. **Extract container hook for remaining component logic** → if after steps 1–4 the component still has store selectors, side effects, or derived state computations inline, extract them into a `use<ComponentName>State.js` hook. The component should be left with only prop-wiring and JSX rendering.
+6. Introduce local composition
+7. Introduce feature boundaries
+8. Introduce context/providers
+9. Architectural redesign
 
-Always prefer lower-impact refactors first.
+Always prefer lower-impact refactors first. Step 5 is mandatory when applicable — a component with inline store access, effects, or derived state after steps 1–4 is not fully refactored.
 
 Do NOT redesign architecture if extraction alone solves the problem.
 
@@ -241,11 +269,13 @@ When the user asks to refactor something, they will explicitly name the feature 
 - pre-emptively restructure code that happens to be nearby
 
 If during work you discover an issue in another feature:
+
 - document it for later discussion
 - do NOT fix it
 - stay scoped to the requested feature
 
 This rule exists because:
+
 - each feature has unique synchronization and rendering constraints
 - cross-feature changes make verification impossible
 - failures become difficult to attribute
@@ -545,7 +575,11 @@ export function useAppShellStore() {
 ## 3.6 Widget Editor Composition Pattern
 
 ```jsx
-import { FontSection, PositionSection, DimensionsSection } from "./widgetEditorSections";
+import {
+  FontSection,
+  PositionSection,
+  DimensionsSection,
+} from "./widgetEditorSections";
 
 function MetricWidgetEditor({ widget, updateWidgetData }) {
   return (
@@ -573,7 +607,8 @@ const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({ widget, selected }) {
     return <WidgetPreview widget={widget} />;
   },
-  (prev, next) => prev.widget === next.widget && prev.selected === next.selected,
+  (prev, next) =>
+    prev.widget === next.widget && prev.selected === next.selected,
 );
 ```
 
@@ -840,7 +875,18 @@ inside component files.
 
 ### Fix
 
-Extract to `data/`.
+Extract constant values to `data/<domain>.js`. If the constants have associated pure helper functions, extract those to `utils/<domain>.js` separately — do NOT put functions in `data/`.
+
+```txt
+// GOOD — separated by type
+data/renderConstants.js     → OUTPUT_FORMATS, ACCELERATION_OPTIONS (constants only)
+utils/codecUtils.js         → getFormatLabel(), isFormatMp4()      (functions only)
+
+// BAD — mixed in same file
+data/renderConstants.js     → OUTPUT_FORMATS, getFormatLabel(), isFormatMp4()
+```
+
+See Section 1.3 for the exact boundary between `data/` and `utils/`.
 
 ---
 
@@ -856,7 +902,40 @@ inside components.
 
 ### Fix
 
-Move to reusable utils.
+Move to reusable `utils/`. If the helper operates on domain constants, the function goes in `utils/` and the constants stay in `data/` — they are separate concerns (see Section 4.8).
+
+---
+
+## 4.11 Mixed UI + Store Logic (Incomplete Container Extraction)
+
+### BAD
+
+After extracting constants, sub-components, and helpers, a component still contains:
+
+```jsx
+function RenderVideoDialog({ phase, settings, ... }) {
+  const storeVal = useStore((s) => s.someValue)  // store access
+  const derivedVal = compute(storeVal, phase)     // derived state
+  useEffect(() => { ... }, [storeVal])            // side effects
+  const handleChange = () => { ... }             // business logic
+
+  return ( ... )  // rendering
+}
+```
+
+### Fix
+
+Extract all store access, effects, and derived state into a container hook, leaving the component as pure JSX:
+
+```jsx
+function RenderVideoDialog({ phase, settings, ... }) {
+  const state = useRenderVideoDialogState({ phase, settings })
+
+  return ( ... )  // rendering only, no store/effects/logic
+}
+```
+
+This is step 5 of the Refactor Hierarchy (Section 1.5).
 
 ---
 
@@ -924,10 +1003,11 @@ Split into focused hooks.
 
 ## Step 5: Document
 
-1. Add JSDoc.
-2. Document module purpose.
+1. Add JSDoc to **every** exported function, hook, and component — including all utility functions in `utils/`.
+2. Document module purpose at the top of the file.
 3. Explain unusual patterns.
 4. Explain custom memoization.
+5. Run `grep "^export function"` on every file you touched and verify each has JSDoc. A function without JSDoc is an incomplete refactor.
 
 ---
 
@@ -967,6 +1047,12 @@ A refactor is only complete when:
 - No changed drag behavior
 - No playback desynchronization
 - No animation timing changes
+
+Additionally, verify the extraction boundaries are correct:
+
+- **No mixed concerns in `data/`**: Every file under `data/` must contain ONLY constants, config, and lookup tables. If an exported function definition exists in a `data/` file (beyond simple one-liners like `Object.fromEntries`), it is a violation of Section 1.3 — the function must move to `utils/`.
+- **No residual container logic**: After extracting constants, helpers, sub-components, and sub-hooks, verify the component has no remaining store selectors, side effects, or derived state computations. If it does, a container hook (step 5 of Section 1.5) must be extracted.
+- **No undocumented exported functions**: Every exported function in the refactored files must have complete JSDoc (`@param` + `@returns`). Verify with `rg "^export (function|default)"` on every file touched — any result without JSDoc is a documentation gap.
 
 ---
 
@@ -1101,7 +1187,44 @@ features/overlay-editor/  -->  src/lib/render-utils.js
 
 # 6. JSDoc Documentation Standards
 
-Every exported function, hook, and component must have JSDoc.
+Every exported declaration — functions, hooks, components, and utility functions — must have JSDoc. There are no exceptions for "simple" or "self-documenting" functions.
+
+### GOOD — Utils function with full JSDoc
+
+```jsx
+/**
+ * Checks whether the scene resolution differs from the imported video resolution.
+ * @param {object} scene - Scene dimensions ({ width, height }).
+ * @param {object} videoResolution - Imported video dimensions ({ width, height }).
+ * @returns {boolean} True if resolutions do not match.
+ */
+export function resolutionsMismatch(scene, videoResolution) {
+  ...
+}
+```
+
+### BAD — No JSDoc (self-documenting is NOT acceptable)
+
+```jsx
+// ❌ Missing @param and @returns — will be flagged by the completion checklist
+export function resolutionsMismatch(scene, videoResolution) {
+  ...
+}
+```
+
+### BAD — Incomplete JSDoc
+
+```jsx
+/**
+ * Checks resolution mismatch.
+ */
+// ❌ Missing @param and @returns — every param and return must be documented
+export function resolutionsMismatch(scene, videoResolution) {
+  ...
+}
+```
+
+### Component/Hook JSDoc
 
 ```jsx
 /**
@@ -1121,27 +1244,114 @@ Every exported function, hook, and component must have JSDoc.
 
 ### Rules
 
-- `@param` for all params
-- `@returns` for all returns
-- Brief module description
+- **Every** exported function declaration MUST have JSDoc — including utility functions, helpers in `utils/`, and internal helper functions that happen to be exported
+- `@param` for all params (with type and description)
+- `@returns` for all returns (with type and description)
+- Brief module description at the top
 - Use `@async` where applicable
+- "The name is self-documenting" is NOT a valid reason to skip JSDoc
+
+### Internal Section Comments — Required (All Hooks)
+
+Every hook file, regardless of length, must use **internal section comments** to partition its body. Each logical group of statements must be preceded by a comment that names the concern. The section header must use `// <Name>` format.
+
+#### GOOD — Hook with sections
+
+```jsx
+/**
+ * Container hook for RenderVideoDialog.
+ * Orchestrates derived state, side effects, and event handlers.
+ */
+function useRenderVideoDialogState({ phase, settings, ... }) {
+  // Store selectors — shallow-pick zustand state needed for render dialog
+  const { renderingVideo, renderProgress, ... } = useStore(useShallow(...))
+
+  // Derived state — computed values derived from store and props
+  const derived = useRenderVideoDerivedState({ settings })
+
+  // Local UI state — dialog phase, FPS mode, codec selection
+  const [fpsMode, setFpsMode] = useState(...)
+
+  // Side effects — sync progress polling lifecycle with render state
+  useRenderVideoEffects({ settings, derivedState: derived, ... })
+
+  // Cancel handler — aborts the active render and resets progress
+  const handleCancel = useCallback(async () => { ... }, [])
+
+  // Backdrop click to close — closes the dialog when clicking outside
+  const handleBackdropPointerDown = (event) => { ... }
+
+  // Codec change handler — updates output format and resets bitrate to default
+  const handleOutputFormatChange = (value) => { ... }
+
+  return { ... }
+}
+```
+
+#### BAD — Hook without structure (missing or terse section comments)
+
+```jsx
+function useRenderVideoDialogState({ phase, settings, ... }) {
+  const derived = useRenderVideoDerivedState({ settings })
+  const [fpsMode, setFpsMode] = useState(...)
+  useRenderVideoEffects({ settings, derivedState: derived, ... })
+  const handleCancel = useCallback(async () => { ... }, [])
+  const handleBackdropPointerDown = (event) => { ... }
+  const handleOutputFormatChange = (value) => { ... }
+  return { ... }
+}
+```
+
+Also BAD — terse section comments that don't explain what the section does:
+
+```jsx
+function useSceneSettingsState({ config, onConfigChange }) {
+  // Side effects            ← Too terse — what effects? Why?
+  useEffect(() => { ... }, [...])
+  useEffect(() => { ... }, [...])
+
+  // Handlers                ← Too terse — what handlers? For what domain?
+  const handleAspectRatioChange = (v) => { ... }
+  const handleOffsetBlur = (val) => { ... }
+}
+```
+
+#### GOOD — Even a small focused hook gets a section comment
+
+```jsx
+function useRenderProgressPolling({ renderingVideo, setRenderProgress }) {
+  // Polling — checks render progress via IPC every second while rendering is active
+  useEffect(() => {
+    if (!renderingVideo) return
+    ...
+  }, [renderingVideo, setRenderProgress])
+}
+```
+
+### Rules for Section Headers
+
+- Every hook file MUST have at least one `// <Name>` section comment
+- **Provide 1–2 sentences of context** explaining what the section does, unless the header is absolutely self-explanatory. `// Store selectors` or `// Local UI state` are clear enough on their own. But `// Side effects` or `// Handlers` are NOT — they must describe what the effects or handlers actually do (e.g. `// Side effects — sync progress polling lifecycle with render state`).
+- Groups must be ordered: data → state → effects → handlers → return
+- Headers must be concise (2–5 words for the label portion before the dash, plus the explanatory sentence)
+- The format is `// <Label> — <explanation>` for non-obvious sections, or just `// <Label>` for self-explanatory sections
 
 ---
 
 # 7. Naming Conventions
 
-| Category            | Convention             | Example                       |
-| ------------------- | ---------------------- | ----------------------------- |
-| Component files     | `PascalCase.jsx`       | `AppHeader.jsx`               |
-| Hook files          | `useCamelCase.js`      | `useOverlayEditorState.js`    |
-| Hook functions      | `camelCase`            | `useOverlayEditorState`       |
-| Utility files       | `camelCase.js`         | `colorUtils.js`               |
-| Data files          | `camelCase.js`         | `outputFormats.js`            |
-| Feature directories | `kebab-case`           | `render-video/`               |
-| Components          | `PascalCase`           | `OverlayCanvas`               |
-| Callback props      | `onXxx`                | `onConfigChange`              |
-| Constants           | `SCREAMING_SNAKE_CASE` | `OUTPUT_FORMATS`              |
-| Grouped props       | `xxxControls`          | `editorControls`              |
+| Category            | Convention             | Example                    |
+| ------------------- | ---------------------- | -------------------------- |
+| Component files     | `PascalCase.jsx`       | `AppHeader.jsx`            |
+| Hook files          | `useCamelCase.js`      | `useOverlayEditorState.js` |
+| Hook functions      | `camelCase`            | `useOverlayEditorState`    |
+| Utility files       | `camelCase.js`         | `colorUtils.js`            |
+| Data files          | `camelCase.js`         | `outputFormats.js`         |
+| Feature directories | `kebab-case`           | `render-video/`            |
+| Components          | `PascalCase`           | `OverlayCanvas`            |
+| Callback props      | `onXxx`                | `onConfigChange`           |
+| Constants           | `SCREAMING_SNAKE_CASE` | `OUTPUT_FORMATS`           |
+| Grouped props       | `xxxControls`          | `editorControls`           |
 
 ---
 
@@ -1196,12 +1406,12 @@ Files grouped by target feature. Refactor one feature at a time — the effort, 
 
 Centralizes the render dialog, progress tracking, and export range.
 
-| File | Lines | Refactor | Risk |
-|---|---|---|---|
-| `RenderVideoDialog.jsx` | 877 | Extract constants → `data/`; extract `RenderProgressPanel` → `components/`; split settings form from progress panel; extract polling to `useRenderProgress.js` | Medium |
-| `RenderProgressOverlay.jsx` | 136 | Reuse the shared `RenderProgressPanel` extracted above; becomes thin wrapper | Low |
-| `ExportRangeSettings.jsx` | 86 | Move as-is — pure presentational, no logic changes | Low |
-| `useRenderWorkflow.js` | 306 | Split into `useRenderDialogState.js` + `useRenderProgressPolling.js` + `useRenderCompletion.js` | Medium |
+| File                        | Lines | Refactor                                                                                                                                                       | Risk   |
+| --------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `RenderVideoDialog.jsx`     | 877   | Extract constants → `data/`; extract `RenderProgressPanel` → `components/`; split settings form from progress panel; extract polling to `useRenderProgress.js` | Medium |
+| `RenderProgressOverlay.jsx` | 136   | Reuse the shared `RenderProgressPanel` extracted above; becomes thin wrapper                                                                                   | Low    |
+| `ExportRangeSettings.jsx`   | 86    | Move as-is — pure presentational, no logic changes                                                                                                             | Low    |
+| `useRenderWorkflow.js`      | 306   | Split into `useRenderDialogState.js` + `useRenderProgressPolling.js` + `useRenderCompletion.js`                                                                | Medium |
 
 **Total: 1,405 lines moved/split**
 
@@ -1211,20 +1421,20 @@ Centralizes the render dialog, progress tracking, and export range.
 
 The largest feature — central canvas, widget preview, geometry, and all editor state logic.
 
-| File | Lines | Refactor | Risk |
-|---|---|---|---|
-| `widgetPreviewRenderers.jsx` | 1326 | Split into per-widget renderer files (`RouteRenderer.jsx`, `ElevationRenderer.jsx`, `MetricRenderer.jsx`, `TextRenderer.jsx`); remove store access pass data via props | High |
-| `useOverlayEditorState.js` | 502 | Already composes 4 sub-hooks — further split viewport/zoom/keyboard into separate files | Medium |
-| `geometryUtils.js` | 738 | Split into 3 cohesive domain files: `routeGeometry.js`, `elevationGeometry.js`, keep general interpolation/SVG helpers in shared file | Low |
-| `metricTextUtils.js` | 675 | Split into 2–3 domain files: `textMeasurement.js`, `formatUtils.js`, `shadowUtils.js` | Low |
-| `createOverlayMoveableHandlers.js` | 439 | Split into focused handler groups (drag, resize, scale, rotate) | Low |
-| `utils.js` | 371 | Remove re-exports; let importers reference the split domain files directly; keep barrel export at feature level only | Low |
-| `overlayEditorHelpers.js` | 290 | Split widget DOM helpers from bounds/geometry helpers | Low |
-| `OverlayCanvas.jsx` | 294 | Consolidate 18 props into grouped objects; extract `CanvasGrid` already done but simplify prop tunneling | Medium |
-| `OverlayEditor.jsx` | 267 | Reduce prop drilling by consolidating props passed to children | Low |
-| `createOverlayPointerHandlers.js` | 264 | Well-structured — move as-is; consider extracting zoom handler | Low |
-| `OverlayMoveable.jsx` | 120 | Move as-is | Low |
-| `WidgetPreview.jsx` | 97 | Move as-is | Low |
+| File                               | Lines | Refactor                                                                                                                                                               | Risk   |
+| ---------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `widgetPreviewRenderers.jsx`       | 1326  | Split into per-widget renderer files (`RouteRenderer.jsx`, `ElevationRenderer.jsx`, `MetricRenderer.jsx`, `TextRenderer.jsx`); remove store access pass data via props | High   |
+| `useOverlayEditorState.js`         | 502   | Already composes 4 sub-hooks — further split viewport/zoom/keyboard into separate files                                                                                | Medium |
+| `geometryUtils.js`                 | 738   | Split into 3 cohesive domain files: `routeGeometry.js`, `elevationGeometry.js`, keep general interpolation/SVG helpers in shared file                                  | Low    |
+| `metricTextUtils.js`               | 675   | Split into 2–3 domain files: `textMeasurement.js`, `formatUtils.js`, `shadowUtils.js`                                                                                  | Low    |
+| `createOverlayMoveableHandlers.js` | 439   | Split into focused handler groups (drag, resize, scale, rotate)                                                                                                        | Low    |
+| `utils.js`                         | 371   | Remove re-exports; let importers reference the split domain files directly; keep barrel export at feature level only                                                   | Low    |
+| `overlayEditorHelpers.js`          | 290   | Split widget DOM helpers from bounds/geometry helpers                                                                                                                  | Low    |
+| `OverlayCanvas.jsx`                | 294   | Consolidate 18 props into grouped objects; extract `CanvasGrid` already done but simplify prop tunneling                                                               | Medium |
+| `OverlayEditor.jsx`                | 267   | Reduce prop drilling by consolidating props passed to children                                                                                                         | Low    |
+| `createOverlayPointerHandlers.js`  | 264   | Well-structured — move as-is; consider extracting zoom handler                                                                                                         | Low    |
+| `OverlayMoveable.jsx`              | 120   | Move as-is                                                                                                                                                             | Low    |
+| `WidgetPreview.jsx`                | 97    | Move as-is                                                                                                                                                             | Low    |
 
 **Total: ~5,383 lines moved/split** — this is the largest feature and should be broken into multiple refactor passes.
 
@@ -1234,9 +1444,9 @@ The largest feature — central canvas, widget preview, geometry, and all editor
 
 Timeline playback, scrubbing, keyboard shortcuts.
 
-| File | Lines | Refactor | Risk |
-|---|---|---|---|
-| `OverlayPlayer.jsx` | 509 | Extract playback engine to `usePlaybackEngine.js`; extract keyboard handler to `usePlayerKeyboard.js`; remove inline store selectors | High |
+| File                | Lines | Refactor                                                                                                                             | Risk |
+| ------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------ | ---- |
+| `OverlayPlayer.jsx` | 509   | Extract playback engine to `usePlaybackEngine.js`; extract keyboard handler to `usePlayerKeyboard.js`; remove inline store selectors | High |
 
 **Total: 509 lines**
 
@@ -1246,10 +1456,10 @@ Timeline playback, scrubbing, keyboard shortcuts.
 
 Video source management, frame clock, drift correction.
 
-| File | Lines | Refactor | Risk |
-|---|---|---|---|
-| `useVideoPreview.js` | 123 | Move as-is (already composes `useVideoPlaybackClock`) | Low |
-| `useVideoPlaybackClock.js` | 184 | Move as-is (already well-factored) | Low |
+| File                       | Lines | Refactor                                              | Risk |
+| -------------------------- | ----- | ----------------------------------------------------- | ---- |
+| `useVideoPreview.js`       | 123   | Move as-is (already composes `useVideoPlaybackClock`) | Low  |
+| `useVideoPlaybackClock.js` | 184   | Move as-is (already well-factored)                    | Low  |
 
 **Total: 307 lines moved**
 
@@ -1259,10 +1469,10 @@ Video source management, frame clock, drift correction.
 
 Sidebar settings panel — resolution, FPS, video sync, global defaults.
 
-| File | Lines | Refactor | Risk |
-|---|---|---|---|
-| `SidebarSettingsTab.jsx` | 696 | Split by section: video settings, overlay settings, global defaults, export range; extract duplicate FPS/codec logic shared with `RenderVideoDialog` | Medium |
-| `ControlPanel.jsx` | 52 | Move as-is | Low |
+| File                     | Lines | Refactor                                                                                                                                             | Risk   |
+| ------------------------ | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `SidebarSettingsTab.jsx` | 696   | Split by section: video settings, overlay settings, global defaults, export range; extract duplicate FPS/codec logic shared with `RenderVideoDialog` | Medium |
+| `ControlPanel.jsx`       | 52    | Move as-is                                                                                                                                           | Low    |
 
 **Total: 748 lines**
 
@@ -1272,14 +1482,14 @@ Sidebar settings panel — resolution, FPS, video sync, global defaults.
 
 Sidebar widget CRUD and per-type editors.
 
-| File | Lines | Refactor | Risk |
-|---|---|---|---|
-| `SidebarWidgetsTab.jsx` | 337 | Extract CRUD logic to `useWidgetManager.js`; replace `JSON.parse(JSON.stringify(...))` with `structuredClone` | Medium |
-| `ElevationWidgetEditor.jsx` | 329 | Extract reusable subsections; already uses shared sections pattern | Low |
-| Remaining 6 widget editors | 25–184 | Move as-is (already thin and well-factored) | Low |
-| `widgetEditorSections.jsx` | 323 | Move as-is (already well-factored shared sections) | Low |
-| `widgetFormControls.jsx` | 259 | Move as-is (already well-factored shared controls) | Low |
-| `widgetDefinitions.js` | 311 | Move as-is (data module) | Low |
+| File                        | Lines  | Refactor                                                                                                      | Risk   |
+| --------------------------- | ------ | ------------------------------------------------------------------------------------------------------------- | ------ |
+| `SidebarWidgetsTab.jsx`     | 337    | Extract CRUD logic to `useWidgetManager.js`; replace `JSON.parse(JSON.stringify(...))` with `structuredClone` | Medium |
+| `ElevationWidgetEditor.jsx` | 329    | Extract reusable subsections; already uses shared sections pattern                                            | Low    |
+| Remaining 6 widget editors  | 25–184 | Move as-is (already thin and well-factored)                                                                   | Low    |
+| `widgetEditorSections.jsx`  | 323    | Move as-is (already well-factored shared sections)                                                            | Low    |
+| `widgetFormControls.jsx`    | 259    | Move as-is (already well-factored shared controls)                                                            | Low    |
+| `widgetDefinitions.js`      | 311    | Move as-is (data module)                                                                                      | Low    |
 
 **Total: ~1,393 lines**
 
@@ -1289,9 +1499,9 @@ Sidebar widget CRUD and per-type editors.
 
 Template lifecycle: create, save, import, switch, dirty tracking.
 
-| File | Lines | Refactor | Risk |
-|---|---|---|---|
-| `useTemplateManagement.js` | 281 | Split save-status tracking → `useTemplateSaveStatus.js`; split file dialog helpers → `utils/templateFileUtils.js` | Medium |
+| File                       | Lines | Refactor                                                                                                          | Risk   |
+| -------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------- | ------ |
+| `useTemplateManagement.js` | 281   | Split save-status tracking → `useTemplateSaveStatus.js`; split file dialog helpers → `utils/templateFileUtils.js` | Medium |
 
 **Total: 281 lines**
 
@@ -1301,13 +1511,13 @@ Template lifecycle: create, save, import, switch, dirty tracking.
 
 Application chrome — toolbar, title bar, error handling, backend health.
 
-| File | Lines | Refactor | Risk |
-|---|---|---|---|
-| `AppHeader.jsx` | 402 | Already pure presentational (ideal). Optionally split each control group into sub-components | Low |
-| `useBackendStatus.js` | 143 | Extract debug logging helpers → `utils/backendDebug.js` | Low |
-| `TitleBar.jsx` | 41 | Move as-is | Low |
-| `ErrorAlert.jsx` | 47 | Move as-is | Low |
-| `LoadingOverlay.jsx` | 57 | Move as-is | Low |
+| File                  | Lines | Refactor                                                                                     | Risk |
+| --------------------- | ----- | -------------------------------------------------------------------------------------------- | ---- |
+| `AppHeader.jsx`       | 402   | Already pure presentational (ideal). Optionally split each control group into sub-components | Low  |
+| `useBackendStatus.js` | 143   | Extract debug logging helpers → `utils/backendDebug.js`                                      | Low  |
+| `TitleBar.jsx`        | 41    | Move as-is                                                                                   | Low  |
+| `ErrorAlert.jsx`      | 47    | Move as-is                                                                                   | Low  |
+| `LoadingOverlay.jsx`  | 57    | Move as-is                                                                                   | Low  |
 
 **Total: 690 lines**
 
@@ -1330,19 +1540,19 @@ Refactor in this order — each builds on the previous without conflicts:
 
 These files are large but are NOT React components/hooks that need refactoring per the guide's rules:
 
-| File | Lines | Type | Reason |
-|---|---|---|---|
-| `color-picker.jsx` | 1577 | UI primitive | Already well-structured compound component |
-| `activityMetricSeries.js` | 503 | API utility | Pure functions, no React |
-| `activityGapUtils.js` | 396 | API utility | Pure functions, no React |
-| `activityParserUtils.js` | 364 | API utility | Pure functions, no React |
-| `gpxUtils.jsx` | 350 | API utility | Backend API, no React rendering |
-| `export-range.js` (lib) | 445 | Library utility | Pure functions in `lib/` per guide rules |
-| `template-snapshot.js` | 398 | Library utility | Pure functions in `lib/` per guide rules |
-| `config-utils.js` | 281 | Library utility | Pure functions in `lib/` per guide rules |
-| `widget-config.js` | 304 | Library utility | Pure functions in `lib/` per guide rules |
-| `createTemplateSlice.js` | 319 | Store slice | Store architecture — leave as-is per guide rules |
-| `backend.js` | 256 | API module | Tauri IPC bridge — infrastructure code |
+| File                      | Lines | Type            | Reason                                           |
+| ------------------------- | ----- | --------------- | ------------------------------------------------ |
+| `color-picker.jsx`        | 1577  | UI primitive    | Already well-structured compound component       |
+| `activityMetricSeries.js` | 503   | API utility     | Pure functions, no React                         |
+| `activityGapUtils.js`     | 396   | API utility     | Pure functions, no React                         |
+| `activityParserUtils.js`  | 364   | API utility     | Pure functions, no React                         |
+| `gpxUtils.jsx`            | 350   | API utility     | Backend API, no React rendering                  |
+| `export-range.js` (lib)   | 445   | Library utility | Pure functions in `lib/` per guide rules         |
+| `template-snapshot.js`    | 398   | Library utility | Pure functions in `lib/` per guide rules         |
+| `config-utils.js`         | 281   | Library utility | Pure functions in `lib/` per guide rules         |
+| `widget-config.js`        | 304   | Library utility | Pure functions in `lib/` per guide rules         |
+| `createTemplateSlice.js`  | 319   | Store slice     | Store architecture — leave as-is per guide rules |
+| `backend.js`              | 256   | API module      | Tauri IPC bridge — infrastructure code           |
 
 ---
 

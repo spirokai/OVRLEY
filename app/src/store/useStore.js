@@ -45,8 +45,7 @@ const useStore = create(
     ? devtools(storeInitializer, {
         name: 'OVRLEYStore',
         serialize: {
-          replacer: (key, value) =>
-            key === 'editor' ? '<<MonacoEditor>>' : value,
+          replacer: (key, value) => (key === 'editor' ? '<<MonacoEditor>>' : value),
         },
       })
     : storeInitializer,
@@ -55,9 +54,7 @@ const useStore = create(
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   window.useStore = useStore
   window.__OVRLEY_STORE__ = useStore
-  console.info(
-    '[OVRLEY] Store exposed as window.useStore and window.__OVRLEY_STORE__',
-  )
+  console.info('[OVRLEY] Store exposed as window.useStore and window.__OVRLEY_STORE__')
 }
 
 export default useStore

@@ -39,11 +39,7 @@ export function getUpdateRateOptions(fps) {
     return [1, ...divisors]
   }
 
-  const selected = [
-    divisors[0],
-    divisors[Math.floor((divisors.length - 1) / 2)],
-    divisors[divisors.length - 1],
-  ]
+  const selected = [divisors[0], divisors[Math.floor((divisors.length - 1) / 2)], divisors[divisors.length - 1]]
 
   return [1, ...Array.from(new Set(selected))]
 }

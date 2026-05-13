@@ -36,12 +36,7 @@ function PopoverTrigger({ ...props }) {
  * @param {*} props.sideOffset - Numeric side offset value.
  * @returns {JSX.Element} Rendered component output.
  */
-function PopoverContent({
-  className,
-  align = 'center',
-  sideOffset = 4,
-  ...props
-}) {
+function PopoverContent({ className, align = 'center', sideOffset = 4, ...props }) {
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
@@ -76,13 +71,7 @@ function PopoverAnchor({ ...props }) {
  * @returns {JSX.Element} Rendered component output.
  */
 function PopoverHeader({ className, ...props }) {
-  return (
-    <div
-      data-slot="popover-header"
-      className={cn('flex flex-col gap-1 text-sm', className)}
-      {...props}
-    />
-  )
+  return <div data-slot="popover-header" className={cn('flex flex-col gap-1 text-sm', className)} {...props} />
 }
 
 /**
@@ -93,13 +82,7 @@ function PopoverHeader({ className, ...props }) {
  * @returns {JSX.Element} Rendered component output.
  */
 function PopoverTitle({ className, ...props }) {
-  return (
-    <div
-      data-slot="popover-title"
-      className={cn('font-medium', className)}
-      {...props}
-    />
-  )
+  return <div data-slot="popover-title" className={cn('font-medium', className)} {...props} />
 }
 
 /**
@@ -110,21 +93,7 @@ function PopoverTitle({ className, ...props }) {
  * @returns {JSX.Element} Rendered component output.
  */
 function PopoverDescription({ className, ...props }) {
-  return (
-    <p
-      data-slot="popover-description"
-      className={cn('text-muted-foreground', className)}
-      {...props}
-    />
-  )
+  return <p data-slot="popover-description" className={cn('text-muted-foreground', className)} {...props} />
 }
 
-export {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  PopoverAnchor,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverDescription,
-}
+export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor, PopoverHeader, PopoverTitle, PopoverDescription }

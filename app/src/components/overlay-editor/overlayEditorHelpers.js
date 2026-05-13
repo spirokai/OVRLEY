@@ -40,9 +40,7 @@ export function isEditableElement(target) {
     return false
   }
 
-  return Boolean(
-    target.closest('input, textarea, select, [contenteditable="true"]'),
-  )
+  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
 }
 
 /**
@@ -170,16 +168,10 @@ export function getWidgetVisualBoundsFromTarget(target) {
  * @param {*} visualBounds - Optional tight widget bounds relative to config x/y.
  * @returns {{x: number, y: number}} Widget visual origin.
  */
-export function getWidgetSceneOrigin(
-  widget,
-  draft = null,
-  visualBounds = null,
-  { boundsScale = 1 } = {},
-) {
+export function getWidgetSceneOrigin(widget, draft = null, visualBounds = null, { boundsScale = 1 } = {}) {
   const data = draft ? { ...widget.data, ...draft } : widget.data
   const x = data.x ?? 0
-  const gradientYOffset =
-    widget.type === 'gradient' ? Math.min(0, -(data.value_offset ?? 0)) : 0
+  const gradientYOffset = widget.type === 'gradient' ? Math.min(0, -(data.value_offset ?? 0)) : 0
   const boundsOffsetX = (visualBounds?.minX ?? 0) * boundsScale
   const boundsOffsetY = (visualBounds?.minY ?? 0) * boundsScale
 
@@ -209,9 +201,7 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
   })
   const nextWidth = draft.width ?? widget.data.width
   const nextHeight = draft.height ?? widget.data.height
-  const nextRotation =
-    draft.rotation ??
-    (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
+  const nextRotation = draft.rotation ?? (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
   const isPlotWidget = widget.category === 'plots'
   const renderScale = isPlotWidget ? globalScale || 1 : 1
   const nextScale = (draft.scale ?? 1) * (isPlotWidget ? 1 : globalScale)
@@ -243,12 +233,7 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
  * @param {*} globalScale - Scale factor applied to the overlay preview.
  * @returns {*} Result produced by the helper.
  */
-export function applyLiveScalePositionStyles(
-  target,
-  widget,
-  draft,
-  globalScale,
-) {
+export function applyLiveScalePositionStyles(target, widget, draft, globalScale) {
   if (!target || !widget) {
     return
   }
@@ -257,9 +242,7 @@ export function applyLiveScalePositionStyles(
   const draftOrigin = getWidgetSceneOrigin(widget, draft, visualBounds, {
     boundsScale: widget.category === 'plots' ? 1 : globalScale,
   })
-  const nextRotation =
-    draft.rotation ??
-    (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
+  const nextRotation = draft.rotation ?? (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
   const transforms = []
 
   if (nextRotation) {
@@ -283,25 +266,11 @@ export function applyLiveScalePositionStyles(
  * @returns {object} Derived data structure for downstream use.
  */
 export function buildScaledWidgetDataDraft(origin, scaleFactor, widget) {
-  const nextFontSize = clamp(
-    Math.round((origin.fontSize || 60) * scaleFactor),
-    8,
-    400,
-  )
-  const nextIconSize = clamp(
-    Math.round((origin.iconSize || 28) * scaleFactor),
-    0,
-    400,
-  )
+  const nextFontSize = clamp(Math.round((origin.fontSize || 60) * scaleFactor), 8, 400)
+  const nextIconSize = clamp(Math.round((origin.iconSize || 28) * scaleFactor), 0, 400)
   const nextIconOffsetX = Math.round((origin.iconOffsetX || 0) * scaleFactor)
   const nextIconOffsetY = Math.round((origin.iconOffsetY || 0) * scaleFactor)
-  const nextTriangleWidth = clamp(
-    Math.round(
-      (origin.triangleWidth ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH) * scaleFactor,
-    ),
-    0,
-    600,
-  )
+  const nextTriangleWidth = clamp(Math.round((origin.triangleWidth ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH) * scaleFactor), 0, 600)
   const nextValueOffset = Math.round((origin.valueOffset || 0) * scaleFactor)
 
   const nextDraft = {

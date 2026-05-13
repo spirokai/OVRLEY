@@ -76,13 +76,7 @@ function SelectTrigger({ className, size = 'default', children, ...props }) {
  * @param {*} props.align - Value for align.
  * @returns {JSX.Element} Rendered component output.
  */
-function SelectContent({
-  className,
-  children,
-  position = 'item-aligned',
-  align = 'center',
-  ...props
-}) {
+function SelectContent({ className, children, position = 'item-aligned', align = 'center', ...props }) {
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
@@ -101,8 +95,7 @@ function SelectContent({
         <SelectPrimitive.Viewport
           className={cn(
             'p-1',
-            position === 'popper' &&
-              'h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1',
+            position === 'popper' && 'h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1',
           )}
         >
           {children}
@@ -121,13 +114,7 @@ function SelectContent({
  * @returns {JSX.Element} Rendered component output.
  */
 function SelectLabel({ className, ...props }) {
-  return (
-    <SelectPrimitive.Label
-      data-slot="select-label"
-      className={cn('px-2 py-1.5 text-xs text-primary', className)}
-      {...props}
-    />
-  )
+  return <SelectPrimitive.Label data-slot="select-label" className={cn('px-2 py-1.5 text-xs text-primary', className)} {...props} />
 }
 
 /**
@@ -148,10 +135,7 @@ function SelectItem({ className, children, ...props }) {
       )}
       {...props}
     >
-      <span
-        data-slot="select-item-indicator"
-        className="absolute right-2 flex size-3.5 items-center justify-center"
-      >
+      <span data-slot="select-item-indicator" className="absolute right-2 flex size-3.5 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />
         </SelectPrimitive.ItemIndicator>
@@ -170,11 +154,7 @@ function SelectItem({ className, children, ...props }) {
  */
 function SelectSeparator({ className, ...props }) {
   return (
-    <SelectPrimitive.Separator
-      data-slot="select-separator"
-      className={cn('bg-border pointer-events-none -mx-1 my-1 h-px', className)}
-      {...props}
-    />
+    <SelectPrimitive.Separator data-slot="select-separator" className={cn('bg-border pointer-events-none -mx-1 my-1 h-px', className)} {...props} />
   )
 }
 
@@ -189,10 +169,7 @@ function SelectScrollUpButton({ className, ...props }) {
   return (
     <SelectPrimitive.ScrollUpButton
       data-slot="select-scroll-up-button"
-      className={cn(
-        'flex cursor-default items-center justify-center py-1',
-        className,
-      )}
+      className={cn('flex cursor-default items-center justify-center py-1', className)}
       {...props}
     >
       <ChevronUpIcon className="size-4" />
@@ -211,10 +188,7 @@ function SelectScrollDownButton({ className, ...props }) {
   return (
     <SelectPrimitive.ScrollDownButton
       data-slot="select-scroll-down-button"
-      className={cn(
-        'flex cursor-default items-center justify-center py-1',
-        className,
-      )}
+      className={cn('flex cursor-default items-center justify-center py-1', className)}
       {...props}
     >
       <ChevronDownIcon className="size-4" />

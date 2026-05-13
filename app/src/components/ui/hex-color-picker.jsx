@@ -17,14 +17,7 @@ import {
 import { cn } from '@/lib/utils'
 import { normalizeHexColor } from '@/lib/color-utils'
 
-const DEFAULT_PRESET_COLORS = [
-  '#ffffff',
-  '#afeeee',
-  '#40e0d0',
-  '#005b5b',
-  '#c65102',
-  '#000000',
-]
+const DEFAULT_PRESET_COLORS = ['#ffffff', '#afeeee', '#40e0d0', '#005b5b', '#c65102', '#000000']
 const AREA_COMMIT_DEBOUNCE_MS = 0
 
 /**
@@ -131,19 +124,9 @@ export default function HexColorPicker({
               triggerClassName,
             )}
           >
-            <ColorPickerSwatch
-              className={cn(
-                'size-5 shrink-0 rounded-[0.4rem] border border-border/70 shadow-sm',
-                swatchClassName,
-              )}
-            />
+            <ColorPickerSwatch className={cn('size-5 shrink-0 rounded-[0.4rem] border border-border/70 shadow-sm', swatchClassName)} />
             {showValue ? (
-              <span
-                className={cn(
-                  'truncate font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground',
-                  valueClassName,
-                )}
-              >
+              <span className={cn('truncate font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground', valueClassName)}>
                 {displayValue}
               </span>
             ) : null}
@@ -180,9 +163,7 @@ export default function HexColorPicker({
             </div>
 
             <div className="space-y-2">
-              <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-muted-foreground">
-                Presets
-              </p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-muted-foreground">Presets</p>
               <div className="grid grid-cols-6 gap-2">
                 {presetColors.map((presetColor) => (
                   <button

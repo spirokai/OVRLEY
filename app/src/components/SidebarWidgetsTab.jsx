@@ -6,12 +6,7 @@ import { useEffect, useMemo } from 'react'
 import { RotateCcw, Tag, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { getCurrentParsedActivity } from '../api/activityCache'
 import useStore from '../store/useStore'
 import ElevationWidgetEditor from './widgets/ElevationWidgetEditor'
@@ -31,13 +26,7 @@ import {
   TYPE_ICONS,
   TYPE_LABELS,
 } from './widgets/widgetDefinitions'
-import {
-  buildConfigWidgets,
-  deleteWidgetInConfig,
-  groupWidgetsForSidebar,
-  replaceWidgetInConfig,
-  updateWidgetInConfig,
-} from '@/lib/widget-config'
+import { buildConfigWidgets, deleteWidgetInConfig, groupWidgetsForSidebar, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget-config'
 import { PositionSection } from './widgets/widgetEditorSections'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -49,75 +38,34 @@ import { useShallow } from 'zustand/react/shallow'
  * @param {*} setNumericField - Value for set numeric field.
  * @returns {*} Result produced by the helper.
  */
-function renderWidgetEditor(
-  widget,
-  updateWidgetData,
-  setNumericField,
-  sceneFontSize,
-) {
+function renderWidgetEditor(widget, updateWidgetData, setNumericField, sceneFontSize) {
   if (widget.type === 'label') {
-    return (
-      <TextWidgetEditor widget={widget} updateWidgetData={updateWidgetData} />
-    )
+    return <TextWidgetEditor widget={widget} updateWidgetData={updateWidgetData} />
   }
 
   if (['speed', 'heartrate', 'cadence', 'power'].includes(widget.type)) {
-    return (
-      <MetricWidgetEditor
-        widget={widget}
-        updateWidgetData={updateWidgetData}
-        setNumericField={setNumericField}
-      />
-    )
+    return <MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
   }
 
   if (widget.type === 'time') {
-    return (
-      <TimeWidgetEditor
-        widget={widget}
-        updateWidgetData={updateWidgetData}
-        setNumericField={setNumericField}
-      />
-    )
+    return <TimeWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
   }
 
   if (widget.type === 'temperature') {
-    return (
-      <TemperatureWidgetEditor
-        widget={widget}
-        updateWidgetData={updateWidgetData}
-        setNumericField={setNumericField}
-      />
-    )
+    return <TemperatureWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
   }
 
   if (widget.type === 'gradient') {
-    return (
-      <GradientWidgetEditor
-        widget={widget}
-        updateWidgetData={updateWidgetData}
-      />
-    )
+    return <GradientWidgetEditor widget={widget} updateWidgetData={updateWidgetData} />
   }
 
   if (widget.type === 'course') {
-    return (
-      <RouteMapWidgetEditor
-        widget={widget}
-        updateWidgetData={updateWidgetData}
-        setNumericField={setNumericField}
-      />
-    )
+    return <RouteMapWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
   }
 
   if (widget.type === 'elevation') {
     return (
-      <ElevationWidgetEditor
-        widget={widget}
-        updateWidgetData={updateWidgetData}
-        setNumericField={setNumericField}
-        sceneFontSize={sceneFontSize}
-      />
+      <ElevationWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} sceneFontSize={sceneFontSize} />
     )
   }
 
@@ -129,13 +77,7 @@ function renderWidgetEditor(
  * @returns {JSX.Element} Rendered component output.
  */
 export default function SidebarWidgetsTab() {
-  const {
-    config,
-    globalDefaults,
-    selectedWidgetId,
-    setConfig,
-    setSelectedWidgetId,
-  } = useStore(
+  const { config, globalDefaults, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
     useShallow((state) => ({
       config: state.config,
       globalDefaults: state.globalDefaults,
@@ -173,10 +115,7 @@ export default function SidebarWidgetsTab() {
   const setNumericField = (widgetId, key, rawValue, options = {}) => {
     const { fallback = 0, min, max } = options
     const parsed = parseInteger(rawValue, fallback)
-    const nextValue =
-      min !== undefined || max !== undefined
-        ? clamp(parsed, min ?? parsed, max ?? parsed)
-        : parsed
+    const nextValue = min !== undefined || max !== undefined ? clamp(parsed, min ?? parsed, max ?? parsed) : parsed
 
     updateWidgetData(widgetId, { [key]: nextValue })
   }
@@ -189,17 +128,7 @@ export default function SidebarWidgetsTab() {
       if (!nextConfig.labels) nextConfig.labels = []
       nextConfig.labels.push(createLabelDefaults(globalDefaults))
       newId = `label-${nextConfig.labels.length - 1}`
-    } else if (
-      [
-        'speed',
-        'gradient',
-        'heartrate',
-        'power',
-        'cadence',
-        'time',
-        'temperature',
-      ].includes(type)
-    ) {
+    } else if (['speed', 'gradient', 'heartrate', 'power', 'cadence', 'time', 'temperature'].includes(type)) {
       if (!nextConfig.values) nextConfig.values = []
       nextConfig.values.push(createMetricValueDefaults(type, globalDefaults))
       newId = `value-${nextConfig.values.length - 1}`
@@ -227,9 +156,7 @@ export default function SidebarWidgetsTab() {
     if (!widget) return
 
     if (widget.type === 'label') {
-      setConfig(
-        replaceWidgetInConfig(config, id, createLabelDefaults(globalDefaults)),
-      )
+      setConfig(replaceWidgetInConfig(config, id, createLabelDefaults(globalDefaults)))
       return
     }
 
@@ -246,13 +173,7 @@ export default function SidebarWidgetsTab() {
       return
     }
 
-    setConfig(
-      replaceWidgetInConfig(
-        config,
-        id,
-        createMetricValueDefaults(widget.type, globalDefaults),
-      ),
-    )
+    setConfig(replaceWidgetInConfig(config, id, createMetricValueDefaults(widget.type, globalDefaults)))
   }
 
   if (!config) return null
@@ -276,23 +197,17 @@ export default function SidebarWidgetsTab() {
       <Separator className="bg-border/60" />
 
       <div className="space-y-3">
-        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-          Active Widgets
-        </h4>
+        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Active Widgets</h4>
 
         {widgets.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/70 py-8 text-center">
-            <p className="text-xs text-muted-foreground">
-              No widgets added yet.
-            </p>
+            <p className="text-xs text-muted-foreground">No widgets added yet.</p>
           </div>
         ) : (
           <Accordion
             type="single"
             value={selectedWidgetId || undefined}
-            onValueChange={(value) =>
-              setSelectedWidgetId(value || widgets[0]?.id || null)
-            }
+            onValueChange={(value) => setSelectedWidgetId(value || widgets[0]?.id || null)}
             className="space-y-1"
           >
             {widgets.map((widget) => {
@@ -344,17 +259,8 @@ export default function SidebarWidgetsTab() {
                         </Button>
 
                         <div className="space-y-3 pt-1">
-                          <PositionSection
-                            widget={widget}
-                            setNumericField={setNumericField}
-                            updateWidgetData={updateWidgetData}
-                          />
-                          {renderWidgetEditor(
-                            widget,
-                            updateWidgetData,
-                            setNumericField,
-                            config?.scene?.font_size,
-                          )}
+                          <PositionSection widget={widget} setNumericField={setNumericField} updateWidgetData={updateWidgetData} />
+                          {renderWidgetEditor(widget, updateWidgetData, setNumericField, config?.scene?.font_size)}
                         </div>
                       </div>
                     </AccordionContent>

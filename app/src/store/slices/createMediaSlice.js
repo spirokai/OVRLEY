@@ -40,10 +40,7 @@ export function createMediaSlice(set, get) {
       }),
 
     setRenderProgress: (progress) => {
-      const percent =
-        progress.total > 0
-          ? Math.round((progress.current / progress.total) * 100)
-          : 0
+      const percent = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0
 
       set((state) => {
         state.renderProgress = {

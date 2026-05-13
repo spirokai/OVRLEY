@@ -11,19 +11,8 @@
  */
 function Spinner({ className = 'h-4 w-4' }) {
   return (
-    <svg
-      className={`animate-spin ${className}`}
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
+    <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path
         className="opacity-75"
         fill="currentColor"
@@ -41,10 +30,7 @@ function Spinner({ className = 'h-4 w-4' }) {
  * @param {*} props.show - Value for show.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function LoadingOverlay({
-  label = 'Loading editor data...',
-  show,
-}) {
+export default function LoadingOverlay({ label = 'Loading editor data...', show }) {
   if (!show) {
     return null
   }

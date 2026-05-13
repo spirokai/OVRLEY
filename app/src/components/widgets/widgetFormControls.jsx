@@ -8,13 +8,7 @@ import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import HexColorPicker from '@/components/ui/hex-color-picker'
 import { cn } from '@/lib/utils'
 
@@ -88,22 +82,11 @@ export function FieldBlock({ label, children, className, disabled = false }) {
  * @param {*} props.disabled - Value for disabled.
  * @returns {JSX.Element} Rendered component output.
  */
-export function SelectField({
-  label,
-  value,
-  onValueChange,
-  options,
-  disabled = false,
-}) {
+export function SelectField({ label, value, onValueChange, options, disabled = false }) {
   return (
     <FieldBlock label={label}>
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-        <SelectTrigger
-          className={cn(
-            CONTROL_CLASS,
-            disabled && 'opacity-50 pointer-events-none',
-          )}
-        >
+        <SelectTrigger className={cn(CONTROL_CLASS, disabled && 'opacity-50 pointer-events-none')}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -131,12 +114,7 @@ export function SelectField({
 export function TextField({ label, value, onChange, placeholder = '' }) {
   return (
     <FieldBlock label={label}>
-      <BlurInput
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={CONTROL_CLASS}
-        placeholder={placeholder}
-      />
+      <BlurInput value={value} onChange={(event) => onChange(event.target.value)} className={CONTROL_CLASS} placeholder={placeholder} />
     </FieldBlock>
   )
 }
@@ -153,15 +131,7 @@ export function TextField({ label, value, onChange, placeholder = '' }) {
  * @param {*} props.step - Value for step.
  * @returns {JSX.Element} Rendered component output.
  */
-export function NumberField({
-  label,
-  value,
-  onChange,
-  min,
-  max,
-  disabled = false,
-  step = 1,
-}) {
+export function NumberField({ label, value, onChange, min, max, disabled = false, step = 1 }) {
   return (
     <FieldBlock label={label} disabled={disabled}>
       <BlurInput
@@ -193,12 +163,7 @@ export function ColorField({ label, value, onChange, disabled = false }) {
       <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
         {label}
       </Label>
-      <HexColorPicker
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        triggerClassName="justify-start"
-      />
+      <HexColorPicker value={value} onChange={onChange} disabled={disabled} triggerClassName="justify-start" />
     </div>
   )
 }
@@ -216,25 +181,14 @@ export function ColorField({ label, value, onChange, disabled = false }) {
  * @param {*} props.valueDisplay - Value for value display.
  * @returns {JSX.Element} Rendered component output.
  */
-export function SliderField({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  disabled = false,
-  onSliderChange,
-  valueDisplay,
-}) {
+export function SliderField({ label, value, min, max, step = 1, disabled = false, onSliderChange, valueDisplay }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
           {label}
         </Label>
-        <span className="text-[10px] font-mono text-muted-foreground">
-          {valueDisplay}
-        </span>
+        <span className="text-[10px] font-mono text-muted-foreground">{valueDisplay}</span>
       </div>
       <div className="flex items-center gap-3 px-1">
         <Slider
@@ -262,12 +216,5 @@ export function SliderField({
  * @returns {JSX.Element} Rendered component output.
  */
 export function ToggleField({ checked, onCheckedChange, className }) {
-  return (
-    <Switch
-      size="xs"
-      checked={checked}
-      onCheckedChange={onCheckedChange}
-      className={className}
-    />
-  )
+  return <Switch size="xs" checked={checked} onCheckedChange={onCheckedChange} className={className} />
 }

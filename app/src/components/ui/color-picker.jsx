@@ -7,11 +7,7 @@
 'use client'
 import { cva } from 'class-variance-authority'
 import { PipetteIcon } from 'lucide-react'
-import {
-  Direction as DirectionPrimitive,
-  Slider as SliderPrimitive,
-  Slot as SlotPrimitive,
-} from 'radix-ui'
+import { Direction as DirectionPrimitive, Slider as SliderPrimitive, Slot as SlotPrimitive } from 'radix-ui'
 import * as React from 'react'
 import { useComposedRefs } from '@/lib/compose-refs'
 import { cn } from '@/lib/utils'
@@ -21,18 +17,8 @@ import { useIsomorphicLayoutEffect } from '@/hooks/use-isomorphic-layout-effect'
 import { useLazyRef } from '@/hooks/use-lazy-ref'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const ROOT_NAME = 'ColorPicker'
 const ROOT_IMPL_NAME = 'ColorPickerImpl'
@@ -217,20 +203,14 @@ function colorToString(color, format = 'hex') {
     case 'hex':
       return rgbToHex(color)
     case 'rgb':
-      return color.a < 1
-        ? `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`
-        : `rgb(${color.r}, ${color.g}, ${color.b})`
+      return color.a < 1 ? `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})` : `rgb(${color.r}, ${color.g}, ${color.b})`
     case 'hsl': {
       const hsl = rgbToHsl(color)
-      return color.a < 1
-        ? `hsla(${hsl.h}, ${hsl.s}%, ${hsl.l}%, ${color.a})`
-        : `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`
+      return color.a < 1 ? `hsla(${hsl.h}, ${hsl.s}%, ${hsl.l}%, ${color.a})` : `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`
     }
     case 'hsb': {
       const hsv = rgbToHsv(color)
-      return color.a < 1
-        ? `hsba(${hsv.h}, ${hsv.s}%, ${hsv.v}%, ${color.a})`
-        : `hsb(${hsv.h}, ${hsv.s}%, ${hsv.v}%)`
+      return color.a < 1 ? `hsba(${hsv.h}, ${hsv.s}%, ${hsv.v}%, ${color.a})` : `hsb(${hsv.h}, ${hsv.s}%, ${hsv.v}%)`
     }
     default:
       return rgbToHex(color)
@@ -348,9 +328,7 @@ function parseColorString(value) {
   }
 
   // Parse rgb/rgba colors
-  const rgbMatch = trimmed.match(
-    /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)$/,
-  )
+  const rgbMatch = trimmed.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)$/)
   if (rgbMatch) {
     return {
       r: Number.parseInt(rgbMatch[1] ?? '0', 10),
@@ -361,9 +339,7 @@ function parseColorString(value) {
   }
 
   // Parse hsl/hsla colors
-  const hslMatch = trimmed.match(
-    /^hsla?\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*(?:,\s*([\d.]+))?\s*\)$/,
-  )
+  const hslMatch = trimmed.match(/^hsla?\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*(?:,\s*([\d.]+))?\s*\)$/)
   if (hslMatch) {
     const h = Number.parseInt(hslMatch[1] ?? '0', 10)
     const s = Number.parseInt(hslMatch[2] ?? '0', 10) / 100
@@ -414,9 +390,7 @@ function parseColorString(value) {
   }
 
   // Parse hsb/hsba colors
-  const hsbMatch = trimmed.match(
-    /^hsba?\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*(?:,\s*([\d.]+))?\s*\)$/,
-  )
+  const hsbMatch = trimmed.match(/^hsba?\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*(?:,\s*([\d.]+))?\s*\)$/)
   if (hsbMatch) {
     const h = Number.parseInt(hsbMatch[1] ?? '0', 10)
     const s = Number.parseInt(hsbMatch[2] ?? '0', 10)
@@ -454,10 +428,7 @@ function useStoreContext(consumerName) {
 function useStore(selector) {
   const store = useStoreContext('useStore')
 
-  const getSnapshot = React.useCallback(
-    () => selector(store.getState()),
-    [store, selector],
-  )
+  const getSnapshot = React.useCallback(() => selector(store.getState()), [store, selector])
 
   return React.useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot)
 }
@@ -687,12 +658,7 @@ function ColorPickerImpl(props) {
 
   return (
     <ColorPickerContext.Provider value={contextValue}>
-      <Popover
-        defaultOpen={defaultOpen}
-        open={open}
-        onOpenChange={store.setOpen}
-        modal={modal}
-      >
+      <Popover defaultOpen={defaultOpen} open={open} onOpenChange={store.setOpen} modal={modal}>
         <RootPrimitive {...rootProps} ref={composedRef} />
         {isFormControl && (
           <VisuallyHiddenInput
@@ -731,10 +697,7 @@ function ColorPickerTrigger(props) {
         data-slot="color-picker-trigger"
         disabled={isDisabled}
         aria-disabled={isDisabled}
-        className={cn(
-          'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer',
-          className,
-        )}
+        className={cn('disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer', className)}
         {...triggerProps}
       />
     </PopoverTrigger>
@@ -756,11 +719,7 @@ function ColorPickerContent(props) {
     const ContentPrimitive = asChild ? SlotPrimitive.Slot : 'div'
 
     return (
-      <ContentPrimitive
-        data-slot="color-picker-content"
-        {...popoverContentProps}
-        className={cn('flex w-85 flex-col gap-4 p-4', className)}
-      >
+      <ContentPrimitive data-slot="color-picker-content" {...popoverContentProps} className={cn('flex w-85 flex-col gap-4 p-4', className)}>
         {children}
       </ContentPrimitive>
     )
@@ -951,10 +910,7 @@ function ColorPickerHueSlider(props) {
       {...sliderProps}
       max={360}
       step={1}
-      className={cn(
-        'relative flex w-full touch-none select-none items-center',
-        className,
-      )}
+      className={cn('relative flex w-full touch-none select-none items-center', className)}
       value={[hsv?.h ?? 0]}
       onValueChange={onValueChange}
       disabled={context.disabled}
@@ -1002,10 +958,7 @@ function ColorPickerAlphaSlider(props) {
       max={100}
       step={1}
       disabled={context.disabled}
-      className={cn(
-        'relative flex w-full touch-none select-none items-center',
-        className,
-      )}
+      className={cn('relative flex w-full touch-none select-none items-center', className)}
       value={[Math.round((color?.a ?? 1) * 100)]}
       onValueChange={onValueChange}
     >
@@ -1066,9 +1019,7 @@ function ColorPickerSwatch(props) {
     }
   }, [color])
 
-  const ariaLabel = !color
-    ? 'No color selected'
-    : `Current color: ${colorToString(color, format)}`
+  const ariaLabel = !color ? 'No color selected' : `Current color: ${colorToString(color, format)}`
 
   const SwatchPrimitive = asChild ? SlotPrimitive.Slot : 'div'
 
@@ -1078,11 +1029,7 @@ function ColorPickerSwatch(props) {
       aria-label={ariaLabel}
       data-slot="color-picker-swatch"
       {...swatchProps}
-      className={cn(
-        'box-border size-8 rounded-sm border shadow-sm',
-        context.disabled && 'opacity-50',
-        className,
-      )}
+      className={cn('box-border size-8 rounded-sm border shadow-sm', context.disabled && 'opacity-50', className)}
       style={{
         ...backgroundStyle,
         forcedColorAdjust: 'none',
@@ -1133,14 +1080,7 @@ function ColorPickerEyeDropper(props) {
   const size = sizeProp ?? (children ? 'default' : 'icon')
 
   return (
-    <Button
-      data-slot="color-picker-eye-dropper"
-      {...buttonProps}
-      variant="outline"
-      size={size}
-      onClick={onEyeDropper}
-      disabled={isDisabled}
-    >
+    <Button data-slot="color-picker-eye-dropper" {...buttonProps} variant="outline" size={size} onClick={onEyeDropper} disabled={isDisabled}>
       {children ?? <PipetteIcon />}
     </Button>
   )
@@ -1169,18 +1109,8 @@ function ColorPickerFormatSelect(props) {
   )
 
   return (
-    <Select
-      data-slot="color-picker-format-select"
-      {...selectProps}
-      value={format}
-      onValueChange={onFormatChange}
-      disabled={isDisabled}
-    >
-      <SelectTrigger
-        data-slot="color-picker-format-select-trigger"
-        size={size ?? 'md'}
-        className={cn(className)}
-      >
+    <Select data-slot="color-picker-format-select" {...selectProps} value={format} onValueChange={onFormatChange} disabled={isDisabled}>
+      <SelectTrigger data-slot="color-picker-format-select-trigger" size={size ?? 'md'} className={cn(className)}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -1218,47 +1148,19 @@ function ColorPickerInput(props) {
   )
 
   if (format === 'hex') {
-    return (
-      <HexInput
-        color={color}
-        onColorChange={onColorChange}
-        context={context}
-        {...props}
-      />
-    )
+    return <HexInput color={color} onColorChange={onColorChange} context={context} {...props} />
   }
 
   if (format === 'rgb') {
-    return (
-      <RgbInput
-        color={color}
-        onColorChange={onColorChange}
-        context={context}
-        {...props}
-      />
-    )
+    return <RgbInput color={color} onColorChange={onColorChange} context={context} {...props} />
   }
 
   if (format === 'hsl') {
-    return (
-      <HslInput
-        color={color}
-        onColorChange={onColorChange}
-        context={context}
-        {...props}
-      />
-    )
+    return <HslInput color={color} onColorChange={onColorChange} context={context} {...props} />
   }
 
   if (format === 'hsb') {
-    return (
-      <HsbInput
-        hsv={hsv}
-        onColorChange={onColorChange}
-        context={context}
-        {...props}
-      />
-    )
+    return <HsbInput hsv={hsv} onColorChange={onColorChange} context={context} {...props} />
   }
 }
 
@@ -1288,13 +1190,7 @@ const inputGroupItemVariants = cva(
  * @returns {JSX.Element} Rendered component output.
  */
 function InputGroupItem({ className, position, ...props }) {
-  return (
-    <Input
-      data-slot="color-picker-input"
-      className={cn(inputGroupItemVariants({ position }), className)}
-      {...props}
-    />
-  )
+  return <Input data-slot="color-picker-input" className={cn(inputGroupItemVariants({ position }), className)} {...props} />
 }
 
 /**
@@ -1304,16 +1200,7 @@ function InputGroupItem({ className, position, ...props }) {
  * @returns {JSX.Element} Rendered component output.
  */
 function HexInput(props) {
-  const {
-    color,
-    onColorChange,
-    context,
-    withoutAlpha,
-    className,
-    onBlur,
-    onFocus,
-    ...inputProps
-  } = props
+  const { color, onColorChange, context, withoutAlpha, className, onBlur, onFocus, ...inputProps } = props
 
   const hexValue = rgbToHex(color)
   const alphaValue = Math.round((color?.a ?? 1) * 100)
@@ -1386,10 +1273,7 @@ function HexInput(props) {
   }
 
   return (
-    <div
-      data-slot="color-picker-input-wrapper "
-      className={cn(className, 'flex items-center rounded-md w-39 bg-red-300')}
-    >
+    <div data-slot="color-picker-input-wrapper " className={cn(className, 'flex items-center rounded-md w-39 bg-red-300')}>
       <InputGroupItem
         aria-label="Hex color value"
         position="first"
@@ -1427,14 +1311,7 @@ function HexInput(props) {
  * @returns {JSX.Element} Rendered component output.
  */
 function RgbInput(props) {
-  const {
-    color,
-    onColorChange,
-    context,
-    withoutAlpha,
-    className,
-    ...inputProps
-  } = props
+  const { color, onColorChange, context, withoutAlpha, className, ...inputProps } = props
 
   const rValue = Math.round(color?.r ?? 0)
   const gValue = Math.round(color?.g ?? 0)
@@ -1454,10 +1331,7 @@ function RgbInput(props) {
   )
 
   return (
-    <div
-      data-slot="color-picker-input-wrapper"
-      className={cn('flex items-center', className)}
-    >
+    <div data-slot="color-picker-input-wrapper" className={cn('flex items-center', className)}>
       <InputGroupItem
         aria-label="Red color component (0-255)"
         position="first"
@@ -1528,14 +1402,7 @@ function RgbInput(props) {
  * @returns {JSX.Element} Rendered component output.
  */
 function HslInput(props) {
-  const {
-    color,
-    onColorChange,
-    context,
-    withoutAlpha,
-    className,
-    ...inputProps
-  } = props
+  const { color, onColorChange, context, withoutAlpha, className, ...inputProps } = props
 
   const hsl = React.useMemo(() => rgbToHsl(color), [color])
   const alphaValue = Math.round((color?.a ?? 1) * 100)
@@ -1563,10 +1430,7 @@ function HslInput(props) {
   )
 
   return (
-    <div
-      data-slot="color-picker-input-wrapper"
-      className={cn('flex items-center rounded-md', className)}
-    >
+    <div data-slot="color-picker-input-wrapper" className={cn('flex items-center rounded-md', className)}>
       <InputGroupItem
         aria-label="Hue degree (0-360)"
         position="first"
@@ -1637,14 +1501,7 @@ function HslInput(props) {
  * @returns {JSX.Element} Rendered component output.
  */
 function HsbInput(props) {
-  const {
-    hsv,
-    onColorChange,
-    context,
-    withoutAlpha,
-    className,
-    ...inputProps
-  } = props
+  const { hsv, onColorChange, context, withoutAlpha, className, ...inputProps } = props
 
   const alphaValue = Math.round((hsv?.a ?? 1) * 100)
 
@@ -1672,10 +1529,7 @@ function HsbInput(props) {
   )
 
   return (
-    <div
-      data-slot="color-picker-input-wrapper"
-      className={cn('flex items-center rounded-md', className)}
-    >
+    <div data-slot="color-picker-input-wrapper" className={cn('flex items-center rounded-md', className)}>
       <InputGroupItem
         aria-label="Hue degree (0-360)"
         position="first"

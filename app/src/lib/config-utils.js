@@ -28,18 +28,9 @@ export const DEFAULT_GLOBAL_DEFAULTS = {
 
 export const GLOBAL_DEFAULT_KEYS = Object.keys(DEFAULT_GLOBAL_DEFAULTS)
 
-export const SCENE_GLOBAL_DEFAULT_KEYS = [
-  ...SCENE_STYLE_KEYS,
-  'opacity',
-  'scale',
-]
+export const SCENE_GLOBAL_DEFAULT_KEYS = [...SCENE_STYLE_KEYS, 'opacity', 'scale']
 
-export const SCENE_DERIVED_SETTING_KEYS = [
-  ...SCENE_GLOBAL_DEFAULT_KEYS,
-  'font',
-  'color',
-  'font_size',
-]
+export const SCENE_DERIVED_SETTING_KEYS = [...SCENE_GLOBAL_DEFAULT_KEYS, 'font', 'color', 'font_size']
 
 /**
  * Applies preview overrides to resolved widget data.
@@ -98,11 +89,7 @@ export function getEffectiveSceneData(sceneData, globals) {
  * @param {*} previewOverrides - Value for preview overrides.
  * @returns {object} Derived data structure for downstream use.
  */
-export function getEffectiveLabelData(
-  widgetData = {},
-  globals,
-  previewOverrides = null,
-) {
+export function getEffectiveLabelData(widgetData = {}, globals, previewOverrides = null) {
   const font = widgetData.font || globals?.font_text
   const nextData = {
     ...widgetData,
@@ -132,11 +119,7 @@ export function getEffectiveLabelData(
  * @param {*} previewOverrides - Value for preview overrides.
  * @returns {object} Derived data structure for downstream use.
  */
-export function getEffectiveValueData(
-  widgetData = {},
-  globals,
-  previewOverrides = null,
-) {
+export function getEffectiveValueData(widgetData = {}, globals, previewOverrides = null) {
   const font = widgetData.font || globals?.font_values
   const nextData = {
     ...widgetData,
@@ -169,11 +152,7 @@ export function getEffectiveValueData(
  * @param {*} previewOverrides - Value for preview overrides.
  * @returns {object} Derived data structure for downstream use.
  */
-export function getEffectivePlotData(
-  widgetData = {},
-  globals,
-  previewOverrides = null,
-) {
+export function getEffectivePlotData(widgetData = {}, globals, previewOverrides = null) {
   const nextData = {
     ...widgetData,
   }
@@ -187,9 +166,7 @@ export function getEffectivePlotData(
   if (nextData.value === 'elevation' && globals?.font_values) {
     nextData.point_label = {
       ...(nextData.point_label || {}),
-      ...(!nextData.point_label?.font
-        ? createFontSelection(globals.font_values)
-        : {}),
+      ...(!nextData.point_label?.font ? createFontSelection(globals.font_values) : {}),
     }
   }
 
@@ -204,11 +181,7 @@ export function getEffectivePlotData(
  * @param {*} previewOverrides - Value for preview overrides.
  * @returns {*} Requested value or structure.
  */
-export function getEffectiveWidgetData(
-  widget,
-  globals,
-  previewOverrides = null,
-) {
+export function getEffectiveWidgetData(widget, globals, previewOverrides = null) {
   if (!widget) {
     return widget
   }
@@ -240,15 +213,9 @@ export function applyGlobalDefaults(config, globals) {
 
   return {
     ...config,
-    labels: Array.isArray(config.labels)
-      ? config.labels.map((label) => getEffectiveLabelData(label, globals))
-      : config.labels,
-    values: Array.isArray(config.values)
-      ? config.values.map((value) => getEffectiveValueData(value, globals))
-      : config.values,
-    plots: Array.isArray(config.plots)
-      ? config.plots.map((plot) => getEffectivePlotData(plot, globals))
-      : config.plots,
+    labels: Array.isArray(config.labels) ? config.labels.map((label) => getEffectiveLabelData(label, globals)) : config.labels,
+    values: Array.isArray(config.values) ? config.values.map((value) => getEffectiveValueData(value, globals)) : config.values,
+    plots: Array.isArray(config.plots) ? config.plots.map((plot) => getEffectivePlotData(plot, globals)) : config.plots,
     scene: getEffectiveSceneData(config.scene, globals),
   }
 }
@@ -261,11 +228,7 @@ export function applyGlobalDefaults(config, globals) {
  * @param {*} changedKeys - Value for changed keys.
  * @returns {*} Result produced by the helper.
  */
-export function syncGlobalDefaultsToConfig(
-  config,
-  globals,
-  changedKeys = null,
-) {
+export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null) {
   if (!config || !globals) return config
 
   const changedKeySet = changedKeys ? new Set(changedKeys) : null

@@ -70,10 +70,7 @@ function parseDebugWritePlugin() {
           res.setHeader('Content-Type', 'application/json')
           res.end(
             JSON.stringify({
-              error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to write parse debug file',
+              error: error instanceof Error ? error.message : 'Failed to write parse debug file',
             }),
           )
         }

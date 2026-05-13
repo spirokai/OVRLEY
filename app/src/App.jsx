@@ -10,13 +10,13 @@ import LoadingOverlay from '@/components/LoadingOverlay'
 import NewTemplateConfirmDialog from '@/components/NewTemplateConfirmDialog'
 import OverlayEditor from '@/components/OverlayEditor'
 import OverlayPlayer from '@/components/OverlayPlayer'
-import RenderVideoDialog from '@/components/RenderVideoDialog'
+import { RenderVideoDialog } from '@/features/render-video'
 import useActivityImport from '@/hooks/useActivityImport'
 import useAppBootstrap from '@/hooks/useAppBootstrap'
 import { useAppShellStore } from '@/hooks/useAppStoreSelectors'
 import useBackendStatus from '@/hooks/useBackendStatus'
 import useEditorShellState from '@/hooks/useEditorShellState'
-import useRenderWorkflow from '@/hooks/useRenderWorkflow'
+import { useRenderWorkflow } from '@/features/render-video'
 import useTemplateManagement from '@/hooks/useTemplateManagement'
 import useVideoImport from '@/hooks/useVideoImport'
 import './index.css'
@@ -27,13 +27,7 @@ import * as backend from './api/backend'
  * @returns {JSX.Element} Rendered component output.
  */
 function AppShell() {
-  const {
-    config,
-    generatingImage,
-    globalDefaults,
-    setConfig,
-    setErrorMessage,
-  } = useAppShellStore()
+  const { config, generatingImage, globalDefaults, setConfig, setErrorMessage } = useAppShellStore()
   const { backendStatus } = useBackendStatus()
   const editorShell = useEditorShellState()
   const { gpxFilename, handleGpxFileOpen } = useActivityImport()
@@ -78,10 +72,7 @@ function AppShell() {
         <TitleBar />
         <AppHeader
           activityControls={{
-            activityLabel:
-              gpxFilename === 'demo.gpxinit'
-                ? 'Load GPX/FIT'
-                : gpxFilename || 'Load GPX/FIT',
+            activityLabel: gpxFilename === 'demo.gpxinit' ? 'Load GPX/FIT' : gpxFilename || 'Load GPX/FIT',
             onOpenActivityFile: handleGpxFileOpen,
           }}
           backendStatus={backendStatus}

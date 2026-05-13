@@ -46,9 +46,7 @@ export default async function parseFitActivityFile(file) {
     throw new Error('The FIT file does not contain any record messages.')
   }
 
-  const firstSession = Array.isArray(parsedFit?.sessions)
-    ? parsedFit.sessions[0] || null
-    : null
+  const firstSession = Array.isArray(parsedFit?.sessions) ? parsedFit.sessions[0] || null : null
   const fileId = parsedFit?.file_id || null
 
   const rawSamples = records.map((record) => ({
@@ -56,24 +54,12 @@ export default async function parseFitActivityFile(file) {
     altitude: safeNumber(record.enhanced_altitude ?? record.altitude),
     cadence: safeNumber(record.cadence),
     distance: safeNumber(record.distance),
-    elapsedSeconds: safeNumber(
-      getOptionalRecordValue(record, ['elapsed_time']),
-    ),
+    elapsedSeconds: safeNumber(getOptionalRecordValue(record, ['elapsed_time'])),
     elevation: safeNumber(record.enhanced_altitude ?? record.altitude),
     gForce: safeNumber(getOptionalRecordValue(record, ['g_force', 'gforce'])),
     gradient: safeNumber(record.grade),
-    groundContactTime: safeNumber(
-      getOptionalRecordValue(record, ['ground_contact_time', 'stance_time']),
-    ),
-    heading: safeNumber(
-      getOptionalRecordValue(record, [
-        'gps_heading',
-        'compass_heading',
-        'heading',
-        'course_heading',
-        'navigation_heading',
-      ]),
-    ),
+    groundContactTime: safeNumber(getOptionalRecordValue(record, ['ground_contact_time', 'stance_time'])),
+    heading: safeNumber(getOptionalRecordValue(record, ['gps_heading', 'compass_heading', 'heading', 'course_heading', 'navigation_heading'])),
     heartrate: safeNumber(record.heart_rate),
     latitude: safeNumber(record.position_lat),
     leftRightBalance: record.left_right_balance ?? null,
@@ -81,12 +67,8 @@ export default async function parseFitActivityFile(file) {
     pace: safeNumber(record.pace),
     power: safeNumber(record.power),
     speed: safeNumber(record.enhanced_speed ?? record.speed),
-    strideLength: safeNumber(
-      getOptionalRecordValue(record, ['stride_length', 'step_length']),
-    ),
-    strokeRate: safeNumber(
-      getOptionalRecordValue(record, ['stroke_rate', 'running_cadence']),
-    ),
+    strideLength: safeNumber(getOptionalRecordValue(record, ['stride_length', 'step_length'])),
+    strokeRate: safeNumber(getOptionalRecordValue(record, ['stroke_rate', 'running_cadence'])),
     temperature: safeNumber(record.temperature),
     timestamp: record.timestamp,
     torque: safeNumber(getOptionalRecordValue(record, ['torque'])),

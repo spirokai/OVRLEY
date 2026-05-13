@@ -24,14 +24,7 @@ function resolveWidgetTarget(widgetId) {
     return null
   }
 
-  const category =
-    prefix === 'label'
-      ? 'labels'
-      : prefix === 'value'
-        ? 'values'
-        : prefix === 'plot'
-          ? 'plots'
-          : null
+  const category = prefix === 'label' ? 'labels' : prefix === 'value' ? 'values' : prefix === 'plot' ? 'plots' : null
 
   if (!category) {
     return null
@@ -182,10 +175,7 @@ export function findWidgetById(config, widgetId) {
     type: target.category === 'labels' ? 'label' : widgetData.value,
     category: target.category,
     index: target.index,
-    name:
-      target.category === 'labels'
-        ? widgetData.text || 'Text'
-        : widgetData.value,
+    name: target.category === 'labels' ? widgetData.text || 'Text' : widgetData.value,
     data: widgetData,
   }
 }
@@ -218,9 +208,7 @@ export function updateWidgetsInConfig(config, updatesById) {
     return config
   }
 
-  const widgetUpdates = Object.entries(updatesById).filter(
-    ([, updates]) => updates && typeof updates === 'object',
-  )
+  const widgetUpdates = Object.entries(updatesById).filter(([, updates]) => updates && typeof updates === 'object')
   if (!widgetUpdates.length) {
     return config
   }
@@ -234,12 +222,8 @@ export function updateWidgetsInConfig(config, updatesById) {
       return
     }
 
-    const sourceCollection = nextCollectionsByCategory.has(target.category)
-      ? nextCollectionsByCategory.get(target.category)
-      : config[target.category]
-    const currentWidget = Array.isArray(sourceCollection)
-      ? sourceCollection[target.index]
-      : null
+    const sourceCollection = nextCollectionsByCategory.has(target.category) ? nextCollectionsByCategory.get(target.category) : config[target.category]
+    const currentWidget = Array.isArray(sourceCollection) ? sourceCollection[target.index] : null
 
     if (!currentWidget) {
       return
@@ -299,9 +283,7 @@ export function deleteWidgetInConfig(config, widgetId) {
 
   return {
     ...config,
-    [target.category]: currentCollection.filter(
-      (_, index) => index !== target.index,
-    ),
+    [target.category]: currentCollection.filter((_, index) => index !== target.index),
   }
 }
 
@@ -339,9 +321,7 @@ export function deleteWidgetsInConfig(config, widgetIds) {
   return categories.reduce(
     (nextConfig, category) => ({
       ...nextConfig,
-      [category]: (nextConfig[category] || []).filter(
-        (_, index) => !indexesByCategory[category].has(index),
-      ),
+      [category]: (nextConfig[category] || []).filter((_, index) => !indexesByCategory[category].has(index)),
     }),
     config,
   )

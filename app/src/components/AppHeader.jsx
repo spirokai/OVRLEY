@@ -4,16 +4,7 @@
 
 import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import {
   Activity,
@@ -37,12 +28,7 @@ function getTemplateResolution(template) {
   const width = Number(template.width ?? template.scene?.width)
   const height = Number(template.height ?? template.scene?.height)
 
-  if (
-    !Number.isFinite(width) ||
-    !Number.isFinite(height) ||
-    width <= 0 ||
-    height <= 0
-  ) {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return null
   }
 
@@ -126,12 +112,7 @@ export default function AppHeader({
     snapToGrid,
     zoomLevel,
   } = editorControls
-  const {
-    onOpenRenderDialog,
-    renderDisabled,
-    renderTooltipContent,
-    renderingVideo,
-  } = renderControls
+  const { onOpenRenderDialog, renderDisabled, renderTooltipContent, renderingVideo } = renderControls
   const {
     config,
     handleCreateNewTemplate,
@@ -143,12 +124,8 @@ export default function AppHeader({
     showTemplateStatus,
     templates,
   } = templateControls
-  const templateGroups = useMemo(
-    () => getTemplateGroups(templates),
-    [templates],
-  )
-  const { importedVideoFilename, handleImportVideo, clearImportedVideo } =
-    videoControls
+  const templateGroups = useMemo(() => getTemplateGroups(templates), [templates])
+  const { importedVideoFilename, handleImportVideo, clearImportedVideo } = videoControls
 
   return (
     <header className="relative z-50 shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
@@ -162,10 +139,7 @@ export default function AppHeader({
 
           <div className="min-w-0 flex-1 overflow-hidden">
             <div className="flex min-w-0 items-center gap-2">
-              <Button
-                className="mr-2 h-9 shrink-0 gap-2 border-border/70 px-5"
-                onClick={onOpenActivityFile}
-              >
+              <Button className="mr-2 h-9 shrink-0 gap-2 border-border/70 px-5" onClick={onOpenActivityFile}>
                 <Activity className="h-3.5 w-3.5" />
                 <span className="max-w-28 truncate">{activityLabel}</span>
               </Button>
@@ -196,23 +170,12 @@ export default function AppHeader({
                 </Button>
               )}
 
-              <Select
-                value={
-                  loadedTemplateSource === 'backend'
-                    ? loadedTemplateFilename || ''
-                    : ''
-                }
-                onValueChange={handleTemplateChange}
-              >
+              <Select value={loadedTemplateSource === 'backend' ? loadedTemplateFilename || '' : ''} onValueChange={handleTemplateChange}>
                 <SelectTrigger className="h-8 w-56 max-w-[min(14rem,22vw)] shrink bg-surface text-xs border-border/70">
                   <div className="flex items-center gap-2 truncate">
                     <Sparkles className="h-3 w-3 shrink-0 text-primary" />
                     <SelectValue
-                      placeholder={
-                        loadedTemplateSource === 'file'
-                          ? loadedTemplateFilename || 'Imported Template'
-                          : 'Select Template...'
-                      }
+                      placeholder={loadedTemplateSource === 'file' ? loadedTemplateFilename || 'Imported Template' : 'Select Template...'}
                     />
                   </div>
                 </SelectTrigger>
@@ -326,38 +289,18 @@ export default function AppHeader({
 
             <div className="mx-1 h-5 w-px bg-border/70" />
             <SimpleTooltip side="bottom" content="Zoom out">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={onZoomOut}
-              >
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onZoomOut}>
                 <Minus className="h-4 w-4" />
               </Button>
             </SimpleTooltip>
-            <div className="min-w-14 text-center text-xs font-semibold text-muted-foreground">
-              {Math.round(zoomLevel * 100)}%
-            </div>
+            <div className="min-w-14 text-center text-xs font-semibold text-muted-foreground">{Math.round(zoomLevel * 100)}%</div>
             <SimpleTooltip side="bottom" content="Zoom in">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={onZoomIn}
-              >
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onZoomIn}>
                 <ZoomIn className="h-4 w-4" />
               </Button>
             </SimpleTooltip>
             <SimpleTooltip side="bottom" content="Reset zoom">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={onResetZoom}
-              >
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onResetZoom}>
                 <RotateCcw className="h-4 w-4" />
               </Button>
             </SimpleTooltip>
@@ -400,10 +343,7 @@ export default function AppHeader({
             </Button>
           </SimpleTooltip>
 
-          <SimpleTooltip
-            side="bottom"
-            content={backendStatus !== 'connected' ? 'Backend offline' : null}
-          >
+          <SimpleTooltip side="bottom" content={backendStatus !== 'connected' ? 'Backend offline' : null}>
             <Button
               variant="outline"
               size="sm"

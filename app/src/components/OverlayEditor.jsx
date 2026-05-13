@@ -12,15 +12,7 @@ import { WIDGET_ICONS } from './overlay-editor/constants'
 import { getWidgetSceneOrigin } from './overlay-editor/overlayEditorHelpers'
 import useOverlayEditorState from './overlay-editor/useOverlayEditorState'
 
-function WidgetBadgeLayer({
-  activity,
-  displayScale,
-  globalScale,
-  hoveredWidgetId,
-  previewSecond,
-  selectedWidgetIds,
-  widgets,
-}) {
+function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId, previewSecond, selectedWidgetIds, widgets }) {
   const visibleWidgets = useMemo(() => {
     const visibleIds = new Set(selectedWidgetIds)
     if (hoveredWidgetId) {
@@ -83,9 +75,7 @@ function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
         <Badge
           variant={status === 'Modified' ? 'secondary' : 'outline'}
           className={`h-6 rounded-full text-[10px] shadow-lg backdrop-blur-sm ${
-            status === 'Modified'
-              ? 'border-accent-border bg-surface-accent-soft text-primary'
-              : 'bg-card/85'
+            status === 'Modified' ? 'border-accent-border bg-surface-accent-soft text-primary' : 'bg-card/85'
           }`}
         >
           {status}
@@ -106,12 +96,8 @@ function EmptyOverlayState() {
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center bg-surface-elevated text-primary">
           <LayoutGrid className="h-6 w-6" />
         </div>
-        <p className="text-sm font-semibold text-foreground">
-          Overlay canvas ready
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Load a template or add widgets to start positioning the overlay.
-        </p>
+        <p className="text-sm font-semibold text-foreground">Overlay canvas ready</p>
+        <p className="mt-2 text-sm text-muted-foreground">Load a template or add widgets to start positioning the overlay.</p>
       </div>
     </div>
   )
@@ -188,18 +174,9 @@ function OverlayEditor({
   }
 
   return (
-    <div
-      ref={viewportRef}
-      className="relative flex h-full flex-1 overflow-hidden"
-      onWheel={handleWheel}
-    >
+    <div ref={viewportRef} className="relative flex h-full flex-1 overflow-hidden" onWheel={handleWheel}>
       <div className="relative flex h-full w-full items-center justify-center overflow-hidden p-8">
-        <CanvasStatusBadges
-          height={sceneSize.height}
-          showTemplateStatus={showTemplateStatus}
-          status={templateStatus}
-          width={sceneSize.width}
-        />
+        <CanvasStatusBadges height={sceneSize.height} showTemplateStatus={showTemplateStatus} status={templateStatus} width={sceneSize.width} />
         <div
           className="relative shrink-0"
           style={{
@@ -229,10 +206,8 @@ function OverlayEditor({
               sceneFontSize={config.scene?.font_size}
               sceneStyle={sceneStyle}
               valueFont={
-                config.values?.find((value) => value.font || value.font_family)
-                  ?.font ||
-                config.values?.find((value) => value.font || value.font_family)
-                  ?.font_family ||
+                config.values?.find((value) => value.font || value.font_family)?.font ||
+                config.values?.find((value) => value.font || value.font_family)?.font_family ||
                 globalDefaults?.font_values
               }
               sceneSize={sceneSize}

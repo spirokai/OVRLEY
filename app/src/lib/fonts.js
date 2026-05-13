@@ -28,13 +28,7 @@ export function normalizeFontKey(value) {
  */
 export function getRecommendedFont(value) {
   const key = normalizeFontKey(value)
-  return (
-    RECOMMENDED_FONTS.find(
-      (font) =>
-        normalizeFontKey(font.id) === key ||
-        normalizeFontKey(font.name) === key,
-    ) || null
-  )
+  return RECOMMENDED_FONTS.find((font) => normalizeFontKey(font.id) === key || normalizeFontKey(font.name) === key) || null
 }
 
 /**

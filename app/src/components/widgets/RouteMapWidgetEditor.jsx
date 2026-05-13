@@ -17,13 +17,8 @@ import { Label } from '@/components/ui/label'
  * @param {*} props.setNumericField - Value for set numeric field.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function RouteMapWidgetEditor({
-  widget,
-  updateWidgetData,
-  setNumericField,
-}) {
-  const lineWidth =
-    widget.data.completed_line_width ?? widget.data.remaining_line_width ?? 6
+export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNumericField }) {
+  const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width ?? 6
   const completedLineOpacity = widget.data.completed_line_opacity ?? 100
   const remainingLineOpacity = widget.data.remaining_line_opacity ?? 35
   const markerSize = widget.data.marker_size ?? 18
@@ -54,14 +49,10 @@ export default function RouteMapWidgetEditor({
       <div className="space-y-4">
         <SectionHeading icon={Palette} title="Line Styling" />
         <div className="flex items-center justify-between gap-2 px-1">
-          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
-            Render Full Activity
-          </Label>
+          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Render Full Activity</Label>
           <ToggleField
             checked={widget.data.show_full_activity ?? false}
-            onCheckedChange={(checked) =>
-              updateWidgetData(widget.id, { show_full_activity: checked })
-            }
+            onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_activity: checked })}
           />
         </div>
         <SliderField
@@ -92,9 +83,7 @@ export default function RouteMapWidgetEditor({
           <ColorField
             label="Remaining Color"
             value={widget.data.remaining_line_color || getThemeColor('teal')}
-            onChange={(value) =>
-              updateWidgetData(widget.id, { remaining_line_color: value })
-            }
+            onChange={(value) => updateWidgetData(widget.id, { remaining_line_color: value })}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -105,9 +94,7 @@ export default function RouteMapWidgetEditor({
             max={100}
             step={1}
             valueDisplay={`${completedLineOpacity}%`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { completed_line_opacity: value })
-            }
+            onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
           />
           <SliderField
             label="Remaining Opacity"
@@ -116,9 +103,7 @@ export default function RouteMapWidgetEditor({
             max={100}
             step={1}
             valueDisplay={`${remainingLineOpacity}%`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { remaining_line_opacity: value })
-            }
+            onSliderChange={(value) => updateWidgetData(widget.id, { remaining_line_opacity: value })}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -159,17 +144,13 @@ export default function RouteMapWidgetEditor({
           max={50}
           step={1}
           valueDisplay={`${markerSize}px`}
-          onSliderChange={(value) =>
-            updateWidgetData(widget.id, { marker_size: value })
-          }
+          onSliderChange={(value) => updateWidgetData(widget.id, { marker_size: value })}
         />
         <div className="grid grid-cols-2 gap-3">
           <ColorField
             label="Color"
             value={widget.data.marker_color || getThemeColor('aqua')}
-            onChange={(value) =>
-              updateWidgetData(widget.id, { marker_color: value })
-            }
+            onChange={(value) => updateWidgetData(widget.id, { marker_color: value })}
           />
           <SliderField
             label="Opacity"
@@ -178,9 +159,7 @@ export default function RouteMapWidgetEditor({
             max={100}
             step={1}
             valueDisplay={`${markerOpacity}%`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { marker_opacity: value })
-            }
+            onSliderChange={(value) => updateWidgetData(widget.id, { marker_opacity: value })}
           />
         </div>
       </div>

@@ -3,10 +3,7 @@
  */
 
 import { useCallback, useRef, useState } from 'react'
-import {
-  clearLiveWidgetDraft,
-  clearLiveWidgetDrafts,
-} from './overlayEditorHelpers'
+import { clearLiveWidgetDraft, clearLiveWidgetDrafts } from './overlayEditorHelpers'
 
 /**
  * Provides widget draft state state and actions.

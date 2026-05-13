@@ -3,13 +3,7 @@
  */
 
 import { clamp } from './utils'
-import {
-  buildSelectionRect,
-  getPrimarySelectionId,
-  hasSelectionModifier,
-  normalizeSelectionIds,
-  rectanglesIntersect,
-} from './overlayEditorHelpers'
+import { buildSelectionRect, getPrimarySelectionId, hasSelectionModifier, normalizeSelectionIds, rectanglesIntersect } from './overlayEditorHelpers'
 
 /**
  * Returns scene point.
@@ -21,13 +15,7 @@ import {
  * @param {*} clientY - Value for client y.
  * @returns {object} Requested value or structure.
  */
-function getScenePoint(
-  sceneElement,
-  displayScale,
-  sceneSize,
-  clientX,
-  clientY,
-) {
+function getScenePoint(sceneElement, displayScale, sceneSize, clientX, clientY) {
   if (!sceneElement) {
     return null
   }
@@ -50,13 +38,7 @@ function getScenePoint(
  * @param {*} options.widgetNodes - Value for widget nodes.
  * @returns {*} Requested value or structure.
  */
-function getIntersectedWidgetIds({
-  displayScale,
-  nextSelectionRect,
-  orderedWidgetIds,
-  sceneElement,
-  widgetNodes,
-}) {
+function getIntersectedWidgetIds({ displayScale, nextSelectionRect, orderedWidgetIds, sceneElement, widgetNodes }) {
   if (!sceneElement) {
     return []
   }
@@ -124,9 +106,7 @@ export default function useOverlayPointerHandlers({
   const handleWheel = (event) => {
     event.preventDefault()
     const delta = event.deltaY < 0 ? 0.05 : -0.05
-    onZoomLevelChange((current) =>
-      clamp(Number((current + delta).toFixed(2)), 0.35, 4),
-    )
+    onZoomLevelChange((current) => clamp(Number((current + delta).toFixed(2)), 0.35, 4))
   }
 
   const handleWidgetMouseDown = (event, widgetId) => {
@@ -137,8 +117,7 @@ export default function useOverlayPointerHandlers({
     }
 
     const isSelected = selectedWidgetIds.includes(widgetId)
-    const isCtrlAxisLockDrag =
-      event.ctrlKey && isSelected && !event.metaKey && !event.shiftKey
+    const isCtrlAxisLockDrag = event.ctrlKey && isSelected && !event.metaKey && !event.shiftKey
 
     if (isCtrlAxisLockDrag && selectedWidgetIds.length > 1) {
       event.preventDefault()
@@ -154,15 +133,8 @@ export default function useOverlayPointerHandlers({
     }
 
     if (hasSelectionModifier(event)) {
-      const nextIds = isSelected
-        ? selectedWidgetIds.filter((selectedId) => selectedId !== widgetId)
-        : [...selectedWidgetIds, widgetId]
-      const nextPrimaryId = isSelected
-        ? getPrimarySelectionId(
-            nextIds,
-            selectedWidgetId === widgetId ? null : selectedWidgetId,
-          )
-        : widgetId
+      const nextIds = isSelected ? selectedWidgetIds.filter((selectedId) => selectedId !== widgetId) : [...selectedWidgetIds, widgetId]
+      const nextPrimaryId = isSelected ? getPrimarySelectionId(nextIds, selectedWidgetId === widgetId ? null : selectedWidgetId) : widgetId
 
       commitSelection(nextIds, nextPrimaryId)
       return
@@ -189,13 +161,7 @@ export default function useOverlayPointerHandlers({
       return
     }
 
-    const startPoint = getScenePoint(
-      sceneElement,
-      displayScale,
-      sceneSize,
-      event.clientX,
-      event.clientY,
-    )
+    const startPoint = getScenePoint(sceneElement, displayScale, sceneSize, event.clientX, event.clientY)
     if (!startPoint) {
       return
     }
@@ -221,13 +187,7 @@ export default function useOverlayPointerHandlers({
     })
 
     const handleWindowMouseMove = (moveEvent) => {
-      const nextPoint = getScenePoint(
-        sceneElement,
-        displayScale,
-        sceneSize,
-        moveEvent.clientX,
-        moveEvent.clientY,
-      )
+      const nextPoint = getScenePoint(sceneElement, displayScale, sceneSize, moveEvent.clientX, moveEvent.clientY)
       const gesture = marqueeSelectionRef.current
       if (!nextPoint || !gesture) {
         return
@@ -244,9 +204,7 @@ export default function useOverlayPointerHandlers({
             widgetNodes,
           })
         : []
-      const nextIds = additive
-        ? normalizeSelectionIds([...baseIds, ...hitIds], orderedWidgetIds)
-        : hitIds
+      const nextIds = additive ? normalizeSelectionIds([...baseIds, ...hitIds], orderedWidgetIds) : hitIds
 
       marqueeSelectionRef.current = {
         ...gesture,
@@ -276,10 +234,7 @@ export default function useOverlayPointerHandlers({
         return
       }
 
-      commitSelection(
-        gesture.previewIds,
-        getPrimarySelectionId(gesture.previewIds, selectedWidgetId),
-      )
+      commitSelection(gesture.previewIds, getPrimarySelectionId(gesture.previewIds, selectedWidgetId))
     }
 
     marqueeCleanupRef.current = () => {

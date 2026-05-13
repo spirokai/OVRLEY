@@ -15,13 +15,7 @@ import { FontSection } from './widgetEditorSections'
 export default function TextWidgetEditor({ widget, updateWidgetData }) {
   return (
     <>
-      <FontSection
-        widget={widget}
-        updateWidgetData={updateWidgetData}
-        title="Typography"
-        showTextInput
-        colorLabel="Color"
-      />
+      <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Typography" showTextInput colorLabel="Color" />
     </>
   )
 }

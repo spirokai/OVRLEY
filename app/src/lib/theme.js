@@ -23,7 +23,5 @@ export function getThemeColor(name) {
     return ''
   }
 
-  return getComputedStyle(document.documentElement)
-    .getPropertyValue(variableName)
-    .trim()
+  return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim()
 }

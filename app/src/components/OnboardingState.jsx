@@ -36,24 +36,18 @@ function OnboardingState() {
             <strong>Load an activity</strong>
             <br />
             <small className="text-muted">
-              Click <strong>"Try Demo Activity"</strong> to use sample data, or{' '}
-              <strong>"Load Activity"</strong> to upload your own GPX file
+              Click <strong>"Try Demo Activity"</strong> to use sample data, or <strong>"Load Activity"</strong> to upload your own GPX file
             </small>
           </li>
           <li className="mb-2">
             <strong>Choose a template</strong>
             <br />
-            <small className="text-muted">
-              Select a community template or customize your own in the editor
-            </small>
+            <small className="text-muted">Select a community template or customize your own in the editor</small>
           </li>
           <li className="mb-0">
             <strong>Render your video</strong>
             <br />
-            <small className="text-muted">
-              Adjust the timeline and click "Render Video" to create your
-              overlay
-            </small>
+            <small className="text-muted">Adjust the timeline and click "Render Video" to create your overlay</small>
           </li>
         </ol>
       </Alert>
@@ -63,8 +57,7 @@ function OnboardingState() {
           <strong>💡 Pro Tip:</strong>
         </p>
         <p className="small mb-0">
-          Start with the <strong>"Try Demo Activity"</strong> button and a
-          community template to see how it works!
+          Start with the <strong>"Try Demo Activity"</strong> button and a community template to see how it works!
         </p>
       </div>
     </div>

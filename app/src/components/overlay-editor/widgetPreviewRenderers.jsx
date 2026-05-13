@@ -34,12 +34,7 @@ import {
   measurePreviewText,
   METRIC_WIDGET_LINE_HEIGHT,
 } from './metricTextUtils'
-import {
-  getDistanceProgressAtElapsed,
-  getInterpolatedActivityValue,
-  getInterpolatedSeriesValue,
-  getSeriesValueAtProgress,
-} from './utils'
+import { getDistanceProgressAtElapsed, getInterpolatedActivityValue, getInterpolatedSeriesValue, getSeriesValueAtProgress } from './utils'
 
 /**
  * Handles points equal.
@@ -73,9 +68,7 @@ function normalizePreviewOpacity(value, fallback) {
     return fallback
   }
 
-  return numericValue > 1
-    ? Math.min(Math.max(numericValue / 100, 0), 1)
-    : Math.min(Math.max(numericValue, 0), 1)
+  return numericValue > 1 ? Math.min(Math.max(numericValue / 100, 0), 1) : Math.min(Math.max(numericValue, 0), 1)
 }
 
 /**
@@ -115,11 +108,7 @@ function resolvePreviewLineWidth(explicitWidth, legacyWidth) {
  * @param {*} globalScale - Scene scale applied by the overlay wrapper.
  * @returns {number} SVG-local stroke width.
  */
-function resolveScaledPreviewLineWidth(
-  explicitWidth,
-  legacyWidth,
-  globalScale,
-) {
+function resolveScaledPreviewLineWidth(explicitWidth, legacyWidth, globalScale) {
   const safeScale = Math.max(Number(globalScale) || 1, 0.1)
   const numericExplicit = Number(explicitWidth)
 
@@ -139,12 +128,7 @@ function resolveScaledPreviewLineWidth(
  * @param {*} fallbackOpacity - Fallback opacity.
  * @returns {Array} Marker layers.
  */
-function getPreviewMarkerLayers(
-  widgetData,
-  fallbackRadius,
-  fallbackColor,
-  fallbackOpacity,
-) {
+function getPreviewMarkerLayers(widgetData, fallbackRadius, fallbackColor, fallbackOpacity) {
   const sourcePoints = Array.isArray(widgetData.points) ? widgetData.points : []
   const markerPoints = sourcePoints.length
     ? sourcePoints
@@ -193,11 +177,7 @@ function PreviewMarkerLayers({ layers, x, y }) {
           r={layer.radius}
           fill={layer.solidFill ? layer.color : 'none'}
           stroke={layer.solidFill ? 'none' : layer.color}
-          strokeWidth={
-            layer.solidFill
-              ? undefined
-              : Math.min(Math.max(Math.round(layer.radius * 0.18), 1), 3)
-          }
+          strokeWidth={layer.solidFill ? undefined : Math.min(Math.max(Math.round(layer.radius * 0.18), 1), 3)}
           opacity={layer.opacity}
         />
       ))}
@@ -218,29 +198,17 @@ function buildRouteFramePreview(points, progressValues, progress01) {
     return { markerPoint: null, completedPoints: [] }
   }
 
-  const metricPoint = getPointAtMetricProgressWithIndex(
-    points,
-    progressValues,
-    progress01,
-  )
-  const markerPoint =
-    metricPoint?.point ||
-    getPointAtProgress(points, progress01) ||
-    points[points.length - 1]
+  const metricPoint = getPointAtMetricProgressWithIndex(points, progressValues, progress01)
+  const markerPoint = metricPoint?.point || getPointAtProgress(points, progress01) || points[points.length - 1]
   const lastPoint = points[points.length - 1]
   let completedPoints =
-    markerPoint && pointsEqual(lastPoint, markerPoint)
-      ? [...points]
-      : points.slice(0, Math.min(metricPoint?.index ?? 0, points.length))
+    markerPoint && pointsEqual(lastPoint, markerPoint) ? [...points] : points.slice(0, Math.min(metricPoint?.index ?? 0, points.length))
 
   if (!completedPoints.length) {
     completedPoints = [points[0]]
   }
 
-  if (
-    markerPoint &&
-    !pointsEqual(completedPoints[completedPoints.length - 1], markerPoint)
-  ) {
+  if (markerPoint && !pointsEqual(completedPoints[completedPoints.length - 1], markerPoint)) {
     completedPoints.push(markerPoint)
   }
 
@@ -256,28 +224,18 @@ function buildRouteFramePreview(points, progressValues, progress01) {
  * @param {*} markerPoint - Current marker point.
  * @returns {Array} Completed points.
  */
-function buildElevationCompletedPoints(
-  points,
-  progressValues,
-  progress01,
-  markerPoint,
-) {
+function buildElevationCompletedPoints(points, progressValues, progress01, markerPoint) {
   if (!points.length) {
     return []
   }
 
-  const completedPoints = points.filter(
-    (_, index) => (progressValues[index] ?? 0) <= progress01,
-  )
+  const completedPoints = points.filter((_, index) => (progressValues[index] ?? 0) <= progress01)
 
   if (!completedPoints.length) {
     completedPoints.push(points[0])
   }
 
-  if (
-    markerPoint &&
-    !pointsEqual(completedPoints[completedPoints.length - 1], markerPoint)
-  ) {
+  if (markerPoint && !pointsEqual(completedPoints[completedPoints.length - 1], markerPoint)) {
     completedPoints.push(markerPoint)
   }
 
@@ -324,30 +282,10 @@ function PreviewSvgShadowOnlyFilter({ id, shadow, opacity = 1 }) {
 
   return (
     <defs>
-      <filter
-        id={id}
-        x="-50%"
-        y="-50%"
-        width="200%"
-        height="200%"
-        colorInterpolationFilters="sRGB"
-      >
-        <feGaussianBlur
-          in="SourceAlpha"
-          stdDeviation={Math.max(shadow.strength, 0)}
-          result="shadow-blur"
-        />
-        <feOffset
-          in="shadow-blur"
-          dx={shadow.distance}
-          dy={shadow.distance}
-          result="shadow-offset"
-        />
-        <feFlood
-          floodColor={shadowColor.color}
-          floodOpacity={shadowColor.opacity}
-          result="shadow-color"
-        />
+      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" colorInterpolationFilters="sRGB">
+        <feGaussianBlur in="SourceAlpha" stdDeviation={Math.max(shadow.strength, 0)} result="shadow-blur" />
+        <feOffset in="shadow-blur" dx={shadow.distance} dy={shadow.distance} result="shadow-offset" />
+        <feFlood floodColor={shadowColor.color} floodOpacity={shadowColor.opacity} result="shadow-color" />
         <feComposite in="shadow-color" in2="shadow-offset" operator="in" />
       </filter>
     </defs>
@@ -361,29 +299,14 @@ function PreviewSvgShadowBlurFilter({ id, shadow }) {
 
   return (
     <defs>
-      <filter
-        id={id}
-        x="-50%"
-        y="-50%"
-        width="200%"
-        height="200%"
-        colorInterpolationFilters="sRGB"
-      >
+      <filter id={id} x="-50%" y="-50%" width="200%" height="200%" colorInterpolationFilters="sRGB">
         <feGaussianBlur stdDeviation={shadow.strength} />
       </filter>
     </defs>
   )
 }
 
-function PreviewSvgIconShadow({
-  icon,
-  left,
-  top,
-  iconScale,
-  shadow,
-  shadowFilterId,
-  opacity,
-}) {
+function PreviewSvgIconShadow({ icon, left, top, iconScale, shadow, shadowFilterId, opacity }) {
   if (!shadow || !shadowFilterId) {
     return null
   }
@@ -416,11 +339,7 @@ function useFontMetricsVersion(fontFamily, fontSize) {
   const [version, setVersion] = useState(0)
 
   useEffect(() => {
-    if (
-      typeof document === 'undefined' ||
-      !document.fonts ||
-      typeof document.fonts.load !== 'function'
-    ) {
+    if (typeof document === 'undefined' || !document.fonts || typeof document.fonts.load !== 'function') {
       return undefined
     }
 
@@ -428,13 +347,7 @@ function useFontMetricsVersion(fontFamily, fontSize) {
 
     const refreshMetrics = async () => {
       try {
-        await Promise.allSettled([
-          document.fonts.load(
-            `${fontSize}px ${fontFamily}`,
-            '0123456789WBMPRK/H',
-          ),
-          document.fonts.ready,
-        ])
+        await Promise.allSettled([document.fonts.load(`${fontSize}px ${fontFamily}`, '0123456789WBMPRK/H'), document.fonts.ready])
       } finally {
         if (!cancelled) {
           setVersion((current) => current + 1)
@@ -469,28 +382,12 @@ function useFontMetricsVersion(fontFamily, fontSize) {
  * @param {*} props.borderThickness - Value for border thickness.
  * @returns {JSX.Element} Rendered component output.
  */
-function PreviewSvgText({
-  text,
-  x = 0,
-  baseline,
-  color,
-  fontFamily,
-  fontSize,
-  opacity,
-  shadow,
-  shadowFilterId,
-  borderColor,
-  borderThickness,
-}) {
+function PreviewSvgText({ text, x = 0, baseline, color, fontFamily, fontSize, opacity, shadow, shadowFilterId, borderColor, borderThickness }) {
   const hasShadow = Boolean(shadow && shadowFilterId)
 
   return (
     <>
-      <PreviewSvgShadowOnlyFilter
-        id={shadowFilterId}
-        shadow={shadow}
-        opacity={opacity}
-      />
+      <PreviewSvgShadowOnlyFilter id={shadowFilterId} shadow={shadow} opacity={opacity} />
       {hasShadow ? (
         <text
           x={x}
@@ -536,16 +433,7 @@ function PreviewSvgText({
  * @param {*} props.shadowFilterId - Optional shadow filter id.
  * @returns {JSX.Element|null} Rendered component output.
  */
-function PreviewMetricIcon({
-  icon,
-  left,
-  top,
-  size,
-  color,
-  opacity,
-  shadow,
-  shadowFilterId,
-}) {
+function PreviewMetricIcon({ icon, left, top, size, color, opacity, shadow, shadowFilterId }) {
   if (!icon?.innerMarkup || size <= 0) {
     return null
   }
@@ -561,10 +449,7 @@ function PreviewMetricIcon({
 
   return (
     <>
-      <PreviewSvgShadowBlurFilter
-        id={shadowFilterId}
-        shadow={normalizedShadow}
-      />
+      <PreviewSvgShadowBlurFilter id={shadowFilterId} shadow={normalizedShadow} />
       <PreviewSvgIconShadow
         icon={icon}
         left={left}
@@ -588,24 +473,15 @@ function PreviewMetricIcon({
   )
 }
 
-function PreviewPolylineShadow({
-  points,
-  shadow,
-  blurFilterId,
-  strokeWidth,
-  strokeOpacity,
-  rotation = 0,
-}) {
+function PreviewPolylineShadow({ points, shadow, blurFilterId, strokeWidth, strokeOpacity, rotation = 0 }) {
   if (!shadow || !points) {
     return null
   }
 
   const shadowColor = normalizeSvgShadowColor(shadow.color, strokeOpacity)
   const rotationRadians = ((Number(rotation) || 0) * Math.PI) / 180
-  const offsetX =
-    (Math.cos(rotationRadians) + Math.sin(rotationRadians)) * shadow.distance
-  const offsetY =
-    (Math.cos(rotationRadians) - Math.sin(rotationRadians)) * shadow.distance
+  const offsetX = (Math.cos(rotationRadians) + Math.sin(rotationRadians)) * shadow.distance
+  const offsetY = (Math.cos(rotationRadians) - Math.sin(rotationRadians)) * shadow.distance
 
   return (
     <polyline
@@ -617,11 +493,7 @@ function PreviewPolylineShadow({
       strokeLinecap="round"
       points={points}
       transform={`translate(${offsetX} ${offsetY})`}
-      filter={
-        shadow.strength > 0 && blurFilterId
-          ? `url(#${blurFilterId})`
-          : undefined
-      }
+      filter={shadow.strength > 0 && blurFilterId ? `url(#${blurFilterId})` : undefined}
     />
   )
 }
@@ -636,19 +508,9 @@ function PreviewPolylineShadow({
  * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
  * @returns {JSX.Element} Rendered component output.
  */
-export function OverlayMetricWidget({
-  widget,
-  activity,
-  previewSecond,
-  globalOpacity,
-  globalScale,
-  metricPreviewModel,
-  sceneStyle,
-}) {
+export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpacity, globalScale, metricPreviewModel, sceneStyle }) {
   const fontSize = widget.data.font_size ?? 60
-  const fontFamily = getPreviewFontFamily(
-    widget.data.font || widget.data.font_family,
-  )
+  const fontFamily = getPreviewFontFamily(widget.data.font || widget.data.font_family)
   useFontMetricsVersion(fontFamily, fontSize)
   const color = widget.data.color || '#ffffff'
   const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)
@@ -658,15 +520,10 @@ export function OverlayMetricWidget({
   let unitText = metricPreviewModel?.unitText ?? ''
 
   if (widget.type === 'gradient') {
-    valueText = `${formatGradientValue(
-      widget,
-      getInterpolatedActivityValue(activity, 'gradient', previewSecond),
-    )}%`
+    valueText = `${formatGradientValue(widget, getInterpolatedActivityValue(activity, 'gradient', previewSecond))}%`
   }
 
-  const currentGradientValue = Number(
-    getInterpolatedActivityValue(activity, 'gradient', previewSecond) ?? 0,
-  )
+  const currentGradientValue = Number(getInterpolatedActivityValue(activity, 'gradient', previewSecond) ?? 0)
   const metricLayout =
     widget.type === 'gradient'
       ? null
@@ -686,8 +543,7 @@ export function OverlayMetricWidget({
           valueText,
           valueOffset: widget.data.value_offset ?? 0,
           gradientValue: currentGradientValue,
-          triangleWidth:
-            widget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
+          triangleWidth: widget.data.triangle_width ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH,
           showTriangle: widget.data.show_triangle !== false,
           scale: globalScale || 1,
         })
@@ -706,16 +562,8 @@ export function OverlayMetricWidget({
     const unitsShadowFilterId = sanitizeSvgId(`${widget.id}-units-shadow`)
     const iconShadowFilterId = sanitizeSvgId(`${widget.id}-icon-shadow`)
     const visualBounds = previewModel?.visualBounds
-    const iconLeft = metricLayout.icon
-      ? metricLayout.icon.left +
-        (widget.data.icon_offset_x ?? 0) +
-        (visualBounds?.offsetX ?? 0)
-      : 0
-    const iconTop = metricLayout.icon
-      ? metricLayout.icon.top +
-        (widget.data.icon_offset_y ?? 0) +
-        (visualBounds?.offsetY ?? 0)
-      : 0
+    const iconLeft = metricLayout.icon ? metricLayout.icon.left + (widget.data.icon_offset_x ?? 0) + (visualBounds?.offsetX ?? 0) : 0
+    const iconTop = metricLayout.icon ? metricLayout.icon.top + (widget.data.icon_offset_y ?? 0) + (visualBounds?.offsetY ?? 0) : 0
     const renderWidth = visualBounds?.width ?? metricLayout.width
     const renderHeight = visualBounds?.height ?? metricLayout.height
     const contentOffsetX = visualBounds?.offsetX ?? 0
@@ -729,10 +577,7 @@ export function OverlayMetricWidget({
           height: renderHeight,
         }}
       >
-        <div
-          className="absolute"
-          style={{ width: renderWidth, height: renderHeight }}
-        >
+        <div className="absolute" style={{ width: renderWidth, height: renderHeight }}>
           <svg
             width={renderWidth}
             height={renderHeight}
@@ -788,11 +633,7 @@ export function OverlayMetricWidget({
   if (widget.type === 'gradient' && gradientLayout) {
     const valueShadowFilterId = sanitizeSvgId(`${widget.id}-value-shadow`)
     const trianglePath = gradientLayout.triangle
-      ? buildGradientTrianglePath(
-          currentGradientValue,
-          gradientLayout.triangle.width,
-          gradientLayout.triangle.height,
-        )
+      ? buildGradientTrianglePath(currentGradientValue, gradientLayout.triangle.width, gradientLayout.triangle.height)
       : ''
 
     return (
@@ -831,11 +672,7 @@ export function OverlayMetricWidget({
             <path
               d={trianglePath}
               transform={`translate(${gradientLayout.triangle.left} ${gradientLayout.triangle.baseline})`}
-              fill={
-                currentGradientValue < 0
-                  ? widget.data.triangle_negative_color || '#c65102'
-                  : widget.data.triangle_positive_color || '#40e0d0'
-              }
+              fill={currentGradientValue < 0 ? widget.data.triangle_negative_color || '#c65102' : widget.data.triangle_positive_color || '#40e0d0'}
               opacity={widgetOpacity}
             />
           ) : null
@@ -857,9 +694,7 @@ export function OverlayMetricWidget({
  */
 export function OverlayTextWidget({ widget, globalOpacity, sceneStyle }) {
   const fontSize = widget.data.font_size ?? 60
-  const fontFamily = getPreviewFontFamily(
-    widget.data.font || widget.data.font_family,
-  )
+  const fontFamily = getPreviewFontFamily(widget.data.font || widget.data.font_family)
   useFontMetricsVersion(fontFamily, fontSize)
   const color = widget.data.color || '#ffffff'
   const opacity = getWidgetOpacity(widget.data, globalOpacity)
@@ -876,12 +711,7 @@ export function OverlayTextWidget({ widget, globalOpacity, sceneStyle }) {
   })
 
   return (
-    <svg
-      width={measurement.width}
-      height={lineHeight}
-      viewBox={`0 0 ${measurement.width} ${lineHeight}`}
-      className="block overflow-visible"
-    >
+    <svg width={measurement.width} height={lineHeight} viewBox={`0 0 ${measurement.width} ${lineHeight}`} className="block overflow-visible">
       <PreviewSvgText
         text={text}
         baseline={baseline}
@@ -908,75 +738,26 @@ export function OverlayTextWidget({ widget, globalOpacity, sceneStyle }) {
  * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
  * @returns {JSX.Element} Rendered component output.
  */
-export function OverlayRouteWidget({
-  widget,
-  activity,
-  previewSecond,
-  globalOpacity,
-  globalScale,
-  sceneStyle,
-}) {
+export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle }) {
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
   const safeGlobalScale = Math.max(Number(globalScale) || 1, 0.1)
   const baseColor = widget.data.color || '#ffffff'
-  const geometryRemainingLineWidth = resolvePreviewLineWidth(
-    widget.data.remaining_line_width,
-    widget.data.line?.width,
-  )
-  const geometryCompletedLineWidth = resolvePreviewLineWidth(
-    widget.data.completed_line_width,
-    widget.data.line?.width,
-  )
-  const remainingLineWidth = resolveScaledPreviewLineWidth(
-    widget.data.remaining_line_width,
-    widget.data.line?.width,
-    safeGlobalScale,
-  )
-  const completedLineWidth = resolveScaledPreviewLineWidth(
-    widget.data.completed_line_width,
-    widget.data.line?.width,
-    safeGlobalScale,
-  )
-  const remainingLineColor = resolvePreviewStyleColor(
-    widget.data.remaining_line_color,
-    widget.data.line?.color,
-    baseColor,
-  )
-  const completedLineColor = resolvePreviewStyleColor(
-    widget.data.completed_line_color,
-    widget.data.line?.color,
-    baseColor,
-  )
-  const remainingLineOpacity = normalizePreviewOpacity(
-    widget.data.remaining_line_opacity ??
-      widget.data.line?.opacity ??
-      widget.data.opacity,
-    0.75,
-  )
-  const completedLineOpacity = normalizePreviewOpacity(
-    widget.data.completed_line_opacity ??
-      widget.data.line?.opacity ??
-      widget.data.opacity,
-    1,
-  )
-  const markerSize = Number.isFinite(Number(widget.data.marker_size))
-    ? Number(widget.data.marker_size)
-    : 18
+  const geometryRemainingLineWidth = resolvePreviewLineWidth(widget.data.remaining_line_width, widget.data.line?.width)
+  const geometryCompletedLineWidth = resolvePreviewLineWidth(widget.data.completed_line_width, widget.data.line?.width)
+  const remainingLineWidth = resolveScaledPreviewLineWidth(widget.data.remaining_line_width, widget.data.line?.width, safeGlobalScale)
+  const completedLineWidth = resolveScaledPreviewLineWidth(widget.data.completed_line_width, widget.data.line?.width, safeGlobalScale)
+  const remainingLineColor = resolvePreviewStyleColor(widget.data.remaining_line_color, widget.data.line?.color, baseColor)
+  const completedLineColor = resolvePreviewStyleColor(widget.data.completed_line_color, widget.data.line?.color, baseColor)
+  const remainingLineOpacity = normalizePreviewOpacity(widget.data.remaining_line_opacity ?? widget.data.line?.opacity ?? widget.data.opacity, 0.75)
+  const completedLineOpacity = normalizePreviewOpacity(widget.data.completed_line_opacity ?? widget.data.line?.opacity ?? widget.data.opacity, 1)
+  const markerSize = Number.isFinite(Number(widget.data.marker_size)) ? Number(widget.data.marker_size) : 18
   const svgMarkerSize = markerSize
   const markerColor = widget.data.marker_color || baseColor
-  const markerOpacity = normalizePreviewOpacity(
-    widget.data.marker_opacity ?? widget.data.opacity,
-    1,
-  )
+  const markerOpacity = normalizePreviewOpacity(widget.data.marker_opacity ?? widget.data.opacity, 1)
   const exportRange = useStore((state) => state.exportRange)
   const exportWindow = useMemo(
-    () =>
-      resolveExportRangeWindow(
-        activity,
-        exportRange,
-        widget.data.show_full_activity ?? false,
-      ),
+    () => resolveExportRangeWindow(activity, exportRange, widget.data.show_full_activity ?? false),
     [activity, exportRange, widget.data.show_full_activity],
   )
   const routeSamples = useMemo(() => {
@@ -1007,33 +788,16 @@ export function OverlayRouteWidget({
   )
   const pointProgress = routeGeometry.progressValues
   const progress01 = exportWindow.active
-    ? (getExportWindowDistanceProgressAtElapsed(
-        activity,
-        exportWindow,
-        previewSecond,
-      ) ?? 0)
+    ? (getExportWindowDistanceProgressAtElapsed(activity, exportWindow, previewSecond) ?? 0)
     : getDistanceProgressAtElapsed(activity, previewSecond)
   const { markerPoint, completedPoints } = useMemo(
-    () =>
-      buildRouteFramePreview(routeGeometry.points, pointProgress, progress01),
+    () => buildRouteFramePreview(routeGeometry.points, pointProgress, progress01),
     [pointProgress, progress01, routeGeometry.points],
   )
-  const remainingSvgPoints = useMemo(
-    () => pointsToSvg(routeGeometry.points),
-    [routeGeometry.points],
-  )
-  const completedSvgPoints = useMemo(
-    () => pointsToSvg(completedPoints),
-    [completedPoints],
-  )
+  const remainingSvgPoints = useMemo(() => pointsToSvg(routeGeometry.points), [routeGeometry.points])
+  const completedSvgPoints = useMemo(() => pointsToSvg(completedPoints), [completedPoints])
   const markerLayers = useMemo(
-    () =>
-      getPreviewMarkerLayers(
-        widget.data,
-        svgMarkerSize,
-        markerColor,
-        markerOpacity,
-      ),
+    () => getPreviewMarkerLayers(widget.data, svgMarkerSize, markerColor, markerOpacity),
     [markerColor, markerOpacity, svgMarkerSize, widget.data],
   )
   const shadow = getTextShadowParts(sceneStyle)
@@ -1075,11 +839,7 @@ export function OverlayRouteWidget({
           strokeLinecap="round"
           points={completedSvgPoints}
         />
-        <PreviewMarkerLayers
-          layers={markerLayers}
-          x={markerPoint?.[0]}
-          y={markerPoint?.[1]}
-        />
+        <PreviewMarkerLayers layers={markerLayers} x={markerPoint?.[0]} y={markerPoint?.[1]} />
       </g>
     </svg>
   )
@@ -1110,87 +870,34 @@ export function OverlayElevationWidget({
   const height = Math.max(widget.data.height ?? 180, 80)
   const safeGlobalScale = Math.max(Number(globalScale) || 1, 0.1)
   const baseColor = widget.data.color || '#ffffff'
-  const remainingLineWidth = resolveScaledPreviewLineWidth(
-    widget.data.remaining_line_width,
-    widget.data.line?.width,
-    safeGlobalScale,
-  )
-  const completedLineWidth = resolveScaledPreviewLineWidth(
-    widget.data.completed_line_width,
-    widget.data.line?.width,
-    safeGlobalScale,
-  )
-  const remainingLineColor = resolvePreviewStyleColor(
-    widget.data.remaining_line_color,
-    widget.data.line?.color,
-    baseColor,
-  )
-  const completedLineColor = resolvePreviewStyleColor(
-    widget.data.completed_line_color,
-    widget.data.line?.color,
-    baseColor,
-  )
-  const remainingLineOpacity = normalizePreviewOpacity(
-    widget.data.remaining_line_opacity ??
-      widget.data.line?.opacity ??
-      widget.data.opacity,
-    1,
-  )
-  const completedLineOpacity = normalizePreviewOpacity(
-    widget.data.completed_line_opacity ??
-      widget.data.line?.opacity ??
-      widget.data.opacity,
-    1,
-  )
-  const markerSize = Number.isFinite(Number(widget.data.marker_size))
-    ? Number(widget.data.marker_size)
-    : 16
+  const remainingLineWidth = resolveScaledPreviewLineWidth(widget.data.remaining_line_width, widget.data.line?.width, safeGlobalScale)
+  const completedLineWidth = resolveScaledPreviewLineWidth(widget.data.completed_line_width, widget.data.line?.width, safeGlobalScale)
+  const remainingLineColor = resolvePreviewStyleColor(widget.data.remaining_line_color, widget.data.line?.color, baseColor)
+  const completedLineColor = resolvePreviewStyleColor(widget.data.completed_line_color, widget.data.line?.color, baseColor)
+  const remainingLineOpacity = normalizePreviewOpacity(widget.data.remaining_line_opacity ?? widget.data.line?.opacity ?? widget.data.opacity, 1)
+  const completedLineOpacity = normalizePreviewOpacity(widget.data.completed_line_opacity ?? widget.data.line?.opacity ?? widget.data.opacity, 1)
+  const markerSize = Number.isFinite(Number(widget.data.marker_size)) ? Number(widget.data.marker_size) : 16
   const svgMarkerSize = markerSize
   const markerColor = widget.data.marker_color || baseColor
-  const markerOpacity = normalizePreviewOpacity(
-    widget.data.marker_opacity ?? widget.data.opacity,
-    1,
-  )
-  const labelFontSize =
-    widget.data.point_label?.font_size ?? sceneFontSize ?? 12.5
+  const markerOpacity = normalizePreviewOpacity(widget.data.marker_opacity ?? widget.data.opacity, 1)
+  const labelFontSize = widget.data.point_label?.font_size ?? sceneFontSize ?? 12.5
   const labelFontFamily = getPreviewFontFamily(
-    widget.data.point_label?.font ||
-      widget.data.point_label?.font_family ||
-      valueFont ||
-      sceneFont ||
-      widget.data.font ||
-      widget.data.font_family,
+    widget.data.point_label?.font || widget.data.point_label?.font_family || valueFont || sceneFont || widget.data.font || widget.data.font_family,
   )
   useFontMetricsVersion(labelFontFamily, labelFontSize)
   const exportRange = useStore((state) => state.exportRange)
   const exportWindow = useMemo(
-    () =>
-      resolveExportRangeWindow(
-        activity,
-        exportRange,
-        widget.data.show_full_activity ?? false,
-      ),
+    () => resolveExportRangeWindow(activity, exportRange, widget.data.show_full_activity ?? false),
     [activity, exportRange, widget.data.show_full_activity],
   )
-  const remainingAreaColor =
-    widget.data.area_remaining_color || widget.data.fill?.color || baseColor
-  const completedAreaColor =
-    widget.data.area_completed_color || widget.data.fill?.color || baseColor
+  const remainingAreaColor = widget.data.area_remaining_color || widget.data.fill?.color || baseColor
+  const completedAreaColor = widget.data.area_completed_color || widget.data.fill?.color || baseColor
   const remainingAreaOpacity = normalizePreviewOpacity(
-    widget.data.area_remaining_opacity ??
-      (widget.data.fill?.opacity === undefined
-        ? undefined
-        : widget.data.fill.opacity * 0.35),
+    widget.data.area_remaining_opacity ?? (widget.data.fill?.opacity === undefined ? undefined : widget.data.fill.opacity * 0.35),
     0.12,
   )
-  const completedAreaOpacity = normalizePreviewOpacity(
-    widget.data.area_completed_opacity ?? widget.data.fill?.opacity,
-    0.24,
-  )
-  const scopedElevationSeries = useMemo(
-    () => buildScopedElevationSeries(activity, exportWindow),
-    [activity, exportWindow],
-  )
+  const completedAreaOpacity = normalizePreviewOpacity(widget.data.area_completed_opacity ?? widget.data.fill?.opacity, 0.24)
+  const scopedElevationSeries = useMemo(() => buildScopedElevationSeries(activity, exportWindow), [activity, exportWindow])
   const profileElevations = scopedElevationSeries.values
   const profileDistanceProgress = scopedElevationSeries.progressValues
   const elevationGeometry = useMemo(() => {
@@ -1207,10 +914,7 @@ export function OverlayElevationWidget({
 
     return {
       ...scaledGeometry,
-      points: scaledGeometry.points.map(([x, y]) => [
-        x / safeGlobalScale,
-        y / safeGlobalScale,
-      ]),
+      points: scaledGeometry.points.map(([x, y]) => [x / safeGlobalScale, y / safeGlobalScale]),
     }
   }, [
     height,
@@ -1226,65 +930,27 @@ export function OverlayElevationWidget({
   const points = elevationGeometry.points
   const pointProgress = elevationGeometry.progressValues
   const progress01 = exportWindow.active
-    ? (getExportWindowDistanceProgressAtElapsed(
-        activity,
-        exportWindow,
-        previewSecond,
-      ) ?? 0)
+    ? (getExportWindowDistanceProgressAtElapsed(activity, exportWindow, previewSecond) ?? 0)
     : getDistanceProgressAtElapsed(activity, previewSecond)
   const markerPoint =
-    getPointAtMetricProgress(points, pointProgress, progress01) ||
-    getPointAtProgress(points, progress01) ||
-    points[points.length - 1]
+    getPointAtMetricProgress(points, pointProgress, progress01) || getPointAtProgress(points, progress01) || points[points.length - 1]
   const completedPoints = useMemo(
-    () =>
-      buildElevationCompletedPoints(
-        points,
-        pointProgress,
-        progress01,
-        markerPoint,
-      ),
+    () => buildElevationCompletedPoints(points, pointProgress, progress01, markerPoint),
     [markerPoint, pointProgress, points, progress01],
   )
   const elevationValue =
-    getInterpolatedSeriesValue(
-      profileDistanceProgress,
-      profileElevations,
-      progress01,
-    ) ?? getSeriesValueAtProgress(profileElevations, progress01)
-  const areaSvgPoints = useMemo(
-    () => areaToSvg(points, width, height, null),
-    [height, points, width],
-  )
-  const completedAreaSvgPoints = useMemo(
-    () => areaToSvg(completedPoints, width, height, null),
-    [completedPoints, height, width],
-  )
+    getInterpolatedSeriesValue(profileDistanceProgress, profileElevations, progress01) ?? getSeriesValueAtProgress(profileElevations, progress01)
+  const areaSvgPoints = useMemo(() => areaToSvg(points, width, height, null), [height, points, width])
+  const completedAreaSvgPoints = useMemo(() => areaToSvg(completedPoints, width, height, null), [completedPoints, height, width])
   const remainingSvgPoints = pointsToSvg(points)
   const completedSvgPoints = pointsToSvg(completedPoints)
-  const metricLabel =
-    elevationValue === null || elevationValue === undefined
-      ? '-- M'
-      : `${Math.round(elevationValue)} M`
-  const imperialLabel =
-    elevationValue === null || elevationValue === undefined
-      ? '-- FT'
-      : `${Math.round(elevationValue * 3.28084)} FT`
+  const metricLabel = elevationValue === null || elevationValue === undefined ? '-- M' : `${Math.round(elevationValue)} M`
+  const imperialLabel = elevationValue === null || elevationValue === undefined ? '-- FT' : `${Math.round(elevationValue * 3.28084)} FT`
   const markerLayers = useMemo(
-    () =>
-      getPreviewMarkerLayers(
-        widget.data,
-        svgMarkerSize,
-        markerColor,
-        markerOpacity,
-      ),
+    () => getPreviewMarkerLayers(widget.data, svgMarkerSize, markerColor, markerOpacity),
     [markerColor, markerOpacity, svgMarkerSize, widget.data],
   )
-  const labelMeasurement = measurePreviewText(
-    metricLabel,
-    labelFontSize,
-    labelFontFamily,
-  )
+  const labelMeasurement = measurePreviewText(metricLabel, labelFontSize, labelFontFamily)
   const getElevationLabelBaseline = (top) =>
     getPreviewTextBaseline({
       top,
@@ -1297,9 +963,7 @@ export function OverlayElevationWidget({
   const showMetricLabel = widget.data.show_elevation_metric ?? false
   const showImperialLabel = widget.data.show_elevation_imperial ?? false
   const shadow = getTextShadowParts(sceneStyle)
-  const lineShadowFilterId = sanitizeSvgId(
-    `${widget.id}-elevation-line-shadow-blur`,
-  )
+  const lineShadowFilterId = sanitizeSvgId(`${widget.id}-elevation-line-shadow-blur`)
 
   return (
     <svg
@@ -1311,11 +975,7 @@ export function OverlayElevationWidget({
       style={{ opacity: getWidgetOpacity(widget.data, globalOpacity) }}
     >
       <PreviewSvgShadowBlurFilter id={lineShadowFilterId} shadow={shadow} />
-      <polygon
-        points={areaSvgPoints}
-        fill={remainingAreaColor}
-        fillOpacity={remainingAreaOpacity}
-      />
+      <polygon points={areaSvgPoints} fill={remainingAreaColor} fillOpacity={remainingAreaOpacity} />
       <PreviewPolylineShadow
         points={remainingSvgPoints}
         shadow={shadow}
@@ -1333,11 +993,7 @@ export function OverlayElevationWidget({
         strokeLinecap="round"
         points={remainingSvgPoints}
       />
-      <polygon
-        points={completedAreaSvgPoints}
-        fill={completedAreaColor}
-        fillOpacity={completedAreaOpacity}
-      />
+      <polygon points={completedAreaSvgPoints} fill={completedAreaColor} fillOpacity={completedAreaOpacity} />
       <polyline
         fill="none"
         stroke={completedLineColor}
@@ -1347,26 +1003,18 @@ export function OverlayElevationWidget({
         strokeLinecap="round"
         points={completedSvgPoints}
       />
-      <PreviewMarkerLayers
-        layers={markerLayers}
-        x={markerPoint?.[0]}
-        y={markerPoint?.[1]}
-      />
+      <PreviewMarkerLayers layers={markerLayers} x={markerPoint?.[0]} y={markerPoint?.[1]} />
       {markerPoint && showMetricLabel ? (
         <PreviewSvgText
           text={metricLabel}
           x={markerPoint[0] + (widget.data.metric_label_offset_x ?? 0)}
-          baseline={getElevationLabelBaseline(
-            markerPoint[1] + (widget.data.metric_label_offset_y ?? -28),
-          )}
+          baseline={getElevationLabelBaseline(markerPoint[1] + (widget.data.metric_label_offset_y ?? -28))}
           color={labelColor}
           fontFamily={labelFontFamily}
           fontSize={labelFontSize}
           opacity={1}
           shadow={shadow}
-          shadowFilterId={sanitizeSvgId(
-            `${widget.id}-elevation-metric-label-shadow`,
-          )}
+          shadowFilterId={sanitizeSvgId(`${widget.id}-elevation-metric-label-shadow`)}
           borderColor={sceneStyle?.border_color}
           borderThickness={sceneStyle?.border_thickness}
         />
@@ -1375,17 +1023,13 @@ export function OverlayElevationWidget({
         <PreviewSvgText
           text={imperialLabel}
           x={markerPoint[0] + (widget.data.imperial_label_offset_x ?? 0)}
-          baseline={getElevationLabelBaseline(
-            markerPoint[1] + (widget.data.imperial_label_offset_y ?? 6),
-          )}
+          baseline={getElevationLabelBaseline(markerPoint[1] + (widget.data.imperial_label_offset_y ?? 6))}
           color={labelColor}
           fontFamily={labelFontFamily}
           fontSize={labelFontSize}
           opacity={1}
           shadow={shadow}
-          shadowFilterId={sanitizeSvgId(
-            `${widget.id}-elevation-imperial-label-shadow`,
-          )}
+          shadowFilterId={sanitizeSvgId(`${widget.id}-elevation-imperial-label-shadow`)}
           borderColor={sceneStyle?.border_color}
           borderThickness={sceneStyle?.border_thickness}
         />

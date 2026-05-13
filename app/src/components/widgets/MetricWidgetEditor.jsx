@@ -2,11 +2,7 @@
  * Supports widget editing flows related to metric widget editor.
  */
 
-import {
-  FontSection,
-  IconSection,
-  UnitsControlRow,
-} from './widgetEditorSections'
+import { FontSection, IconSection, UnitsControlRow } from './widgetEditorSections'
 import { SPEED_UNITS } from './widgetFormControls'
 
 /**
@@ -18,11 +14,7 @@ import { SPEED_UNITS } from './widgetFormControls'
  * @param {*} props.setNumericField - Value for set numeric field.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function MetricWidgetEditor({
-  widget,
-  updateWidgetData,
-  setNumericField,
-}) {
+export default function MetricWidgetEditor({ widget, updateWidgetData, setNumericField }) {
   return (
     <>
       <FontSection widget={widget} updateWidgetData={updateWidgetData} />
@@ -38,13 +30,9 @@ export default function MetricWidgetEditor({
               updateWidgetData={updateWidgetData}
               title="Unit"
               checked={widget.data.show_units ?? true}
-              onCheckedChange={(checked) =>
-                updateWidgetData(widget.id, { show_units: checked })
-              }
+              onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
               value={widget.data.speed_unit || 'kmh'}
-              onValueChange={(value) =>
-                updateWidgetData(widget.id, { speed_unit: value })
-              }
+              onValueChange={(value) => updateWidgetData(widget.id, { speed_unit: value })}
               options={SPEED_UNITS}
             />
           ) : (
@@ -53,9 +41,7 @@ export default function MetricWidgetEditor({
               updateWidgetData={updateWidgetData}
               title="Unit"
               checked={widget.data.show_units ?? true}
-              onCheckedChange={(checked) =>
-                updateWidgetData(widget.id, { show_units: checked })
-              }
+              onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
             />
           )
         }

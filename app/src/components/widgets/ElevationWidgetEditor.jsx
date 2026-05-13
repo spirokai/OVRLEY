@@ -18,14 +18,8 @@ import { Label } from '@/components/ui/label'
  * @param {*} props.sceneFontSize - Scene fallback font size.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function ElevationWidgetEditor({
-  widget,
-  updateWidgetData,
-  setNumericField,
-  sceneFontSize,
-}) {
-  const lineWidth =
-    widget.data.completed_line_width ?? widget.data.remaining_line_width ?? 6
+export default function ElevationWidgetEditor({ widget, updateWidgetData, setNumericField, sceneFontSize }) {
+  const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width ?? 6
   const completedLineOpacity = widget.data.completed_line_opacity ?? 100
   const remainingLineOpacity = widget.data.remaining_line_opacity ?? 35
   const completedAreaOpacity = widget.data.area_completed_opacity ?? 24
@@ -33,8 +27,7 @@ export default function ElevationWidgetEditor({
   const yScale = widget.data.y_scale ?? 1
   const simplifyTolerance = widget.data.simplify_tolerance_px ?? 1
   const targetDensity = widget.data.target_density ?? 0.75
-  const labelFontSize =
-    widget.data.point_label?.font_size ?? sceneFontSize ?? 12.5
+  const labelFontSize = widget.data.point_label?.font_size ?? sceneFontSize ?? 12.5
   const updatePointLabel = (updates) =>
     updateWidgetData(widget.id, {
       point_label: {
@@ -49,14 +42,10 @@ export default function ElevationWidgetEditor({
       <div className="space-y-4">
         <SectionHeading icon={Palette} title="Line Styling" />
         <div className="flex items-center justify-between gap-2 px-1">
-          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
-            Render Full Activity
-          </Label>
+          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Render Full Activity</Label>
           <ToggleField
             checked={widget.data.show_full_activity ?? false}
-            onCheckedChange={(checked) =>
-              updateWidgetData(widget.id, { show_full_activity: checked })
-            }
+            onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_activity: checked })}
           />
         </div>
         <SliderField
@@ -87,9 +76,7 @@ export default function ElevationWidgetEditor({
           <ColorField
             label="Remaining Color"
             value={widget.data.remaining_line_color || getThemeColor('teal')}
-            onChange={(value) =>
-              updateWidgetData(widget.id, { remaining_line_color: value })
-            }
+            onChange={(value) => updateWidgetData(widget.id, { remaining_line_color: value })}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -100,9 +87,7 @@ export default function ElevationWidgetEditor({
             max={100}
             step={1}
             valueDisplay={`${completedLineOpacity}%`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { completed_line_opacity: value })
-            }
+            onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
           />
           <SliderField
             label="Remaining Opacity"
@@ -111,9 +96,7 @@ export default function ElevationWidgetEditor({
             max={100}
             step={1}
             valueDisplay={`${remainingLineOpacity}%`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { remaining_line_opacity: value })
-            }
+            onSliderChange={(value) => updateWidgetData(widget.id, { remaining_line_opacity: value })}
           />
         </div>
         <SliderField
@@ -163,16 +146,12 @@ export default function ElevationWidgetEditor({
             <ColorField
               label="Finished Color"
               value={widget.data.area_completed_color || getThemeColor('ice')}
-              onChange={(value) =>
-                updateWidgetData(widget.id, { area_completed_color: value })
-              }
+              onChange={(value) => updateWidgetData(widget.id, { area_completed_color: value })}
             />
             <ColorField
               label="Remaining Color"
               value={widget.data.area_remaining_color || getThemeColor('teal')}
-              onChange={(value) =>
-                updateWidgetData(widget.id, { area_remaining_color: value })
-              }
+              onChange={(value) => updateWidgetData(widget.id, { area_remaining_color: value })}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -183,9 +162,7 @@ export default function ElevationWidgetEditor({
               max={100}
               step={1}
               valueDisplay={`${completedAreaOpacity}%`}
-              onSliderChange={(value) =>
-                updateWidgetData(widget.id, { area_completed_opacity: value })
-              }
+              onSliderChange={(value) => updateWidgetData(widget.id, { area_completed_opacity: value })}
             />
             <SliderField
               label="Remaining Opacity"
@@ -194,9 +171,7 @@ export default function ElevationWidgetEditor({
               max={100}
               step={1}
               valueDisplay={`${remainingAreaOpacity}%`}
-              onSliderChange={(value) =>
-                updateWidgetData(widget.id, { area_remaining_opacity: value })
-              }
+              onSliderChange={(value) => updateWidgetData(widget.id, { area_remaining_opacity: value })}
             />
           </div>
         </div>
@@ -211,9 +186,7 @@ export default function ElevationWidgetEditor({
             max={50}
             step={1}
             valueDisplay={`${widget.data.marker_size ?? 16}px`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { marker_size: value })
-            }
+            onSliderChange={(value) => updateWidgetData(widget.id, { marker_size: value })}
           />
           <SliderField
             label="Opacity"
@@ -222,16 +195,12 @@ export default function ElevationWidgetEditor({
             max={100}
             step={1}
             valueDisplay={`${widget.data.marker_opacity ?? 100}%`}
-            onSliderChange={(value) =>
-              updateWidgetData(widget.id, { marker_opacity: value })
-            }
+            onSliderChange={(value) => updateWidgetData(widget.id, { marker_opacity: value })}
           />
           <ColorField
             label="Color"
             value={widget.data.marker_color || getThemeColor('aqua')}
-            onChange={(value) =>
-              updateWidgetData(widget.id, { marker_color: value })
-            }
+            onChange={(value) => updateWidgetData(widget.id, { marker_color: value })}
           />
         </div>
         <SliderField
@@ -247,9 +216,7 @@ export default function ElevationWidgetEditor({
         <div className="grid grid-cols-2 gap-4 pt-2">
           <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center gap-2 px-1">
-              <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
-                Metric Label
-              </Label>
+              <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Metric Label</Label>
               <ToggleField
                 label="Label Metric"
                 checked={widget.data.show_elevation_metric ?? true}
@@ -268,9 +235,7 @@ export default function ElevationWidgetEditor({
               max={100}
               step={1}
               valueDisplay={`${widget.data.metric_label_offset_x ?? 16}px`}
-              onSliderChange={(value) =>
-                updateWidgetData(widget.id, { metric_label_offset_x: value })
-              }
+              onSliderChange={(value) => updateWidgetData(widget.id, { metric_label_offset_x: value })}
             />
             <SliderField
               label="Metric Offset Y"
@@ -280,16 +245,12 @@ export default function ElevationWidgetEditor({
               max={100}
               step={1}
               valueDisplay={`${widget.data.metric_label_offset_y ?? 16}px`}
-              onSliderChange={(value) =>
-                updateWidgetData(widget.id, { metric_label_offset_y: value })
-              }
+              onSliderChange={(value) => updateWidgetData(widget.id, { metric_label_offset_y: value })}
             />
           </div>
           <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center gap-2 px-1">
-              <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
-                Imperial Label
-              </Label>
+              <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Imperial Label</Label>
               <ToggleField
                 label="Label Imperial"
                 checked={widget.data.show_elevation_imperial ?? false}
@@ -309,9 +270,7 @@ export default function ElevationWidgetEditor({
               max={100}
               step={1}
               valueDisplay={`${widget.data.imperial_label_offset_x ?? 16}px`}
-              onSliderChange={(value) =>
-                updateWidgetData(widget.id, { imperial_label_offset_x: value })
-              }
+              onSliderChange={(value) => updateWidgetData(widget.id, { imperial_label_offset_x: value })}
             />
             <SliderField
               label="Imperial Offset Y"
@@ -321,9 +280,7 @@ export default function ElevationWidgetEditor({
               max={100}
               step={1}
               valueDisplay={`${widget.data.imperial_label_offset_y ?? 16}px`}
-              onSliderChange={(value) =>
-                updateWidgetData(widget.id, { imperial_label_offset_y: value })
-              }
+              onSliderChange={(value) => updateWidgetData(widget.id, { imperial_label_offset_y: value })}
             />
           </div>
         </div>

@@ -65,10 +65,5 @@ export function normalizeColorFields(record) {
     return record
   }
 
-  return Object.fromEntries(
-    Object.entries(record).map(([key, value]) => [
-      key,
-      isColorFieldKey(key) ? normalizeHexColor(value) : value,
-    ]),
-  )
+  return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, isColorFieldKey(key) ? normalizeHexColor(value) : value]))
 }

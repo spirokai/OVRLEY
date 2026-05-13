@@ -5,24 +5,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentParsedActivity } from '../../api/activityCache'
 import useStore from '../../store/useStore'
-import {
-  buildConfigWidgets,
-  deleteWidgetsInConfig,
-  updateWidgetInConfig,
-  updateWidgetsInConfig,
-} from '@/lib/widget-config'
+import { buildConfigWidgets, deleteWidgetsInConfig, updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget-config'
 import { getEffectiveWidgetData } from '@/lib/config-utils'
-import {
-  incrementPreviewPerfCounter,
-  previewPerfCounterName,
-} from '@/lib/previewPerf'
+import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
 import useOverlayMoveableHandlers from './createOverlayMoveableHandlers'
 import useOverlayPointerHandlers from './createOverlayPointerHandlers'
-import {
-  getPrimarySelectionId,
-  isEditableElement,
-  normalizeSelectionIds,
-} from './overlayEditorHelpers'
+import { getPrimarySelectionId, isEditableElement, normalizeSelectionIds } from './overlayEditorHelpers'
 import { clamp, getSceneSize } from './utils'
 import useWidgetDraftState from './useWidgetDraftState'
 
@@ -35,22 +23,10 @@ import useWidgetDraftState from './useWidgetDraftState'
  * @param {*} options.sourceActivity - Value for source activity.
  * @returns {*} Result produced by the helper.
  */
-function resolvePreviewSecond({
-  dummyDurationSeconds,
-  selectedSecond,
-  sourceActivity,
-}) {
+function resolvePreviewSecond({ dummyDurationSeconds, selectedSecond, sourceActivity }) {
   const rawSecond = Number(selectedSecond) || 0
-  const activityDuration = Number(
-    sourceActivity?.trim_end_seconds ??
-      sourceActivity?.metadata?.duration_seconds ??
-      dummyDurationSeconds ??
-      0,
-  )
-  const maxSecond = Math.max(
-    Number.isFinite(activityDuration) ? activityDuration : 0,
-    0,
-  )
+  const activityDuration = Number(sourceActivity?.trim_end_seconds ?? sourceActivity?.metadata?.duration_seconds ?? dummyDurationSeconds ?? 0)
+  const maxSecond = Math.max(Number.isFinite(activityDuration) ? activityDuration : 0, 0)
 
   return clamp(rawSecond, 0, maxSecond)
 }
@@ -87,10 +63,7 @@ function mergeDraftsIntoWidgets(widgets, liveWidgetDrafts) {
  * @returns {*} Result produced by the helper.
  */
 function selectionIdsChanged(leftIds, rightIds) {
-  return (
-    leftIds.length !== rightIds.length ||
-    leftIds.some((widgetId, index) => widgetId !== rightIds[index])
-  )
+  return leftIds.length !== rightIds.length || leftIds.some((widgetId, index) => widgetId !== rightIds[index])
 }
 
 /**
@@ -104,13 +77,7 @@ function selectionIdsChanged(leftIds, rightIds) {
  * @param {*} options.onZoomLevelChange - Callback invoked to zoom level change.
  * @returns {object} Result produced by the helper.
  */
-export default function useOverlayEditorState({
-  config,
-  globalDefaults,
-  onConfigChange,
-  zoomLevel,
-  onZoomLevelChange,
-}) {
+export default function useOverlayEditorState({ config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange }) {
   const selectedWidgetId = useStore((state) => state.selectedWidgetId)
   const setSelectedWidgetId = useStore((state) => state.setSelectedWidgetId)
   const selectedSecond = useStore((state) => state.selectedSecond)
@@ -129,15 +96,8 @@ export default function useOverlayEditorState({
   const [widgetNodes, setWidgetNodes] = useState({})
   const [selectedWidgetIds, setSelectedWidgetIds] = useState([])
   const [selectionRect, setSelectionRect] = useState(null)
-  const {
-    clearWidgetDraft,
-    clearWidgetDrafts,
-    draftWidgetsRef,
-    liveWidgetDrafts,
-    resetWidgetDrafts,
-    setLiveWidgetDraft,
-    setLiveWidgetDraftsBatch,
-  } = useWidgetDraftState()
+  const { clearWidgetDraft, clearWidgetDrafts, draftWidgetsRef, liveWidgetDrafts, resetWidgetDrafts, setLiveWidgetDraft, setLiveWidgetDraftsBatch } =
+    useWidgetDraftState()
 
   const sourceActivity = getCurrentParsedActivity()
   const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
@@ -156,15 +116,10 @@ export default function useOverlayEditorState({
   const sceneStyle = useMemo(
     () => ({
       border_color: globalDefaults?.border_color ?? config?.scene?.border_color,
-      border_thickness:
-        globalDefaults?.border_thickness ??
-        config?.scene?.border_thickness ??
-        0,
+      border_thickness: globalDefaults?.border_thickness ?? config?.scene?.border_thickness ?? 0,
       shadow_color: globalDefaults?.shadow_color ?? config?.scene?.shadow_color,
-      shadow_strength:
-        globalDefaults?.shadow_strength ?? config?.scene?.shadow_strength ?? 0,
-      shadow_distance:
-        globalDefaults?.shadow_distance ?? config?.scene?.shadow_distance ?? 0,
+      shadow_strength: globalDefaults?.shadow_strength ?? config?.scene?.shadow_strength ?? 0,
+      shadow_distance: globalDefaults?.shadow_distance ?? config?.scene?.shadow_distance ?? 0,
     }),
     [
       globalDefaults?.border_color,
@@ -221,27 +176,13 @@ export default function useOverlayEditorState({
   const fitScale = useMemo(() => {
     const safeWidth = Math.max(viewportSize.width - 72, 1)
     const safeHeight = Math.max(viewportSize.height - 72, 1)
-    return Math.min(
-      safeWidth / sceneSize.width,
-      safeHeight / sceneSize.height,
-      1,
-    )
+    return Math.min(safeWidth / sceneSize.width, safeHeight / sceneSize.height, 1)
   }, [viewportSize, sceneSize])
 
   const displayScale = fitScale * zoomLevel
-  const renderedWidgets = useMemo(
-    () => mergeDraftsIntoWidgets(widgets, liveWidgetDrafts),
-    [liveWidgetDrafts, widgets],
-  )
-  const renderedWidgetMap = useMemo(
-    () =>
-      Object.fromEntries(renderedWidgets.map((widget) => [widget.id, widget])),
-    [renderedWidgets],
-  )
-  const orderedWidgetIds = useMemo(
-    () => renderedWidgets.map((widget) => widget.id),
-    [renderedWidgets],
-  )
+  const renderedWidgets = useMemo(() => mergeDraftsIntoWidgets(widgets, liveWidgetDrafts), [liveWidgetDrafts, widgets])
+  const renderedWidgetMap = useMemo(() => Object.fromEntries(renderedWidgets.map((widget) => [widget.id, widget])), [renderedWidgets])
+  const orderedWidgetIds = useMemo(() => renderedWidgets.map((widget) => widget.id), [renderedWidgets])
 
   const setSelectionState = (widgetIds) => {
     setSelectedWidgetIds(normalizeSelectionIds(widgetIds, orderedWidgetIds))
@@ -269,16 +210,8 @@ export default function useOverlayEditorState({
   }
 
   const effectiveSelectedWidgetIds = useMemo(
-    () =>
-      isGroupDragActive
-        ? normalizeSelectionIds(groupDragSelectionIds, orderedWidgetIds)
-        : selectedWidgetIds,
-    [
-      groupDragSelectionIds,
-      isGroupDragActive,
-      orderedWidgetIds,
-      selectedWidgetIds,
-    ],
+    () => (isGroupDragActive ? normalizeSelectionIds(groupDragSelectionIds, orderedWidgetIds) : selectedWidgetIds),
+    [groupDragSelectionIds, isGroupDragActive, orderedWidgetIds, selectedWidgetIds],
   )
 
   useEffect(() => {
@@ -291,12 +224,7 @@ export default function useOverlayEditorState({
       return
     }
 
-    setSelectedWidgetIds(
-      normalizeSelectionIds(
-        selectedWidgetId ? [selectedWidgetId] : [],
-        orderedWidgetIds,
-      ),
-    )
+    setSelectedWidgetIds(normalizeSelectionIds(selectedWidgetId ? [selectedWidgetId] : [], orderedWidgetIds))
   }, [isGroupDragActive, orderedWidgetIds, selectedWidgetId])
 
   useEffect(() => {
@@ -304,14 +232,8 @@ export default function useOverlayEditorState({
       return
     }
 
-    const normalizedIds = normalizeSelectionIds(
-      selectedWidgetIds,
-      orderedWidgetIds,
-    )
-    const selectionChanged = selectionIdsChanged(
-      normalizedIds,
-      selectedWidgetIds,
-    )
+    const normalizedIds = normalizeSelectionIds(selectedWidgetIds, orderedWidgetIds)
+    const selectionChanged = selectionIdsChanged(normalizedIds, selectedWidgetIds)
 
     if (!selectionChanged) {
       return
@@ -320,45 +242,19 @@ export default function useOverlayEditorState({
     const nextPrimaryId = getPrimarySelectionId(normalizedIds, selectedWidgetId)
     setSelectedWidgetIds(normalizedIds)
     syncPrimarySelectionId(nextPrimaryId)
-  }, [
-    isGroupDragActive,
-    orderedWidgetIds,
-    selectedWidgetId,
-    selectedWidgetIds,
-    setSelectedWidgetId,
-    syncPrimarySelectionId,
-  ])
+  }, [isGroupDragActive, orderedWidgetIds, selectedWidgetId, selectedWidgetIds, setSelectedWidgetId, syncPrimarySelectionId])
 
   const selectedWidgets = useMemo(
-    () =>
-      effectiveSelectedWidgetIds
-        .map((widgetId) => renderedWidgetMap[widgetId])
-        .filter(Boolean),
+    () => effectiveSelectedWidgetIds.map((widgetId) => renderedWidgetMap[widgetId]).filter(Boolean),
     [effectiveSelectedWidgetIds, renderedWidgetMap],
   )
-  const primarySelectedWidgetId = getPrimarySelectionId(
-    effectiveSelectedWidgetIds,
-    selectedWidgetId,
-  )
-  const selectedWidget = primarySelectedWidgetId
-    ? renderedWidgetMap[primarySelectedWidgetId] || null
-    : null
-  const selectedWidgetDataSignature = useMemo(
-    () => JSON.stringify(selectedWidgets.map((widget) => widget?.data ?? null)),
-    [selectedWidgets],
-  )
+  const primarySelectedWidgetId = getPrimarySelectionId(effectiveSelectedWidgetIds, selectedWidgetId)
+  const selectedWidget = primarySelectedWidgetId ? renderedWidgetMap[primarySelectedWidgetId] || null : null
+  const selectedWidgetDataSignature = useMemo(() => JSON.stringify(selectedWidgets.map((widget) => widget?.data ?? null)), [selectedWidgets])
   const isGroupSelection = effectiveSelectedWidgetIds.length > 1
-  const selectedTarget =
-    !isGroupSelection && primarySelectedWidgetId
-      ? widgetNodes[primarySelectedWidgetId] || null
-      : null
+  const selectedTarget = !isGroupSelection && primarySelectedWidgetId ? widgetNodes[primarySelectedWidgetId] || null : null
   const selectedTargets = useMemo(
-    () =>
-      isGroupSelection
-        ? effectiveSelectedWidgetIds
-            .map((widgetId) => widgetNodes[widgetId])
-            .filter(Boolean)
-        : [],
+    () => (isGroupSelection ? effectiveSelectedWidgetIds.map((widgetId) => widgetNodes[widgetId]).filter(Boolean) : []),
     [effectiveSelectedWidgetIds, isGroupSelection, widgetNodes],
   )
   const elementGuidelines = useMemo(
@@ -371,10 +267,7 @@ export default function useOverlayEditorState({
   )
 
   useEffect(() => {
-    if (
-      !moveableRef.current ||
-      (!selectedTarget && selectedTargets.length === 0)
-    ) {
+    if (!moveableRef.current || (!selectedTarget && selectedTargets.length === 0)) {
       return undefined
     }
 
@@ -383,25 +276,13 @@ export default function useOverlayEditorState({
     })
 
     return () => cancelAnimationFrame(frameId)
-  }, [
-    displayScale,
-    globalScale,
-    selectedTarget,
-    selectedTargets,
-    selectedWidgetDataSignature,
-  ])
+  }, [displayScale, globalScale, selectedTarget, selectedTargets, selectedWidgetDataSignature])
 
-  const canResizeSelected =
-    !isGroupSelection && selectedWidget?.category === 'plots'
-  const showEdgeResizeHandles =
-    canResizeSelected && selectedWidget?.type === 'elevation'
-  const canScaleSelected = Boolean(
-    !isGroupSelection && selectedWidget && selectedWidget.category !== 'plots',
-  )
-  const canRotateSelected =
-    !isGroupSelection && selectedWidget?.type === 'course'
-  const maintainAspectRatio =
-    !isGroupSelection && (selectedWidget?.type === 'course' || canScaleSelected)
+  const canResizeSelected = !isGroupSelection && selectedWidget?.category === 'plots'
+  const showEdgeResizeHandles = canResizeSelected && selectedWidget?.type === 'elevation'
+  const canScaleSelected = Boolean(!isGroupSelection && selectedWidget && selectedWidget.category !== 'plots')
+  const canRotateSelected = !isGroupSelection && selectedWidget?.type === 'course'
+  const maintainAspectRatio = !isGroupSelection && (selectedWidget?.type === 'course' || canScaleSelected)
 
   const widgetRefCallbacks = useMemo(
     () =>
@@ -447,13 +328,7 @@ export default function useOverlayEditorState({
         return
       }
 
-      if (
-        event.defaultPrevented ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.altKey ||
-        isEditableElement(event.target)
-      ) {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || isEditableElement(event.target)) {
         return
       }
 
@@ -465,33 +340,26 @@ export default function useOverlayEditorState({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [
-    config,
-    onConfigChange,
-    selectedWidgetIds,
-    setSelectedWidgetId,
-    syncPrimarySelectionId,
-  ])
+  }, [config, onConfigChange, selectedWidgetIds, setSelectedWidgetId, syncPrimarySelectionId])
 
-  const { handleSceneMouseDown, handleWidgetMouseDown, handleWheel } =
-    useOverlayPointerHandlers({
-      commitSelection,
-      displayScale,
-      moveableRef,
-      marqueeCleanupRef,
-      marqueeSelectionRef,
-      onZoomLevelChange,
-      orderedWidgetIds,
-      sceneElement,
-      sceneSize,
-      selectedWidgetId,
-      selectedWidgetIds,
-      setGroupDragSelectionIds,
-      setIsGroupDragActive,
-      setSelectionRect,
-      setSelectionState,
-      widgetNodes,
-    })
+  const { handleSceneMouseDown, handleWidgetMouseDown, handleWheel } = useOverlayPointerHandlers({
+    commitSelection,
+    displayScale,
+    moveableRef,
+    marqueeCleanupRef,
+    marqueeSelectionRef,
+    onZoomLevelChange,
+    orderedWidgetIds,
+    sceneElement,
+    sceneSize,
+    selectedWidgetId,
+    selectedWidgetIds,
+    setGroupDragSelectionIds,
+    setIsGroupDragActive,
+    setSelectionRect,
+    setSelectionState,
+    widgetNodes,
+  })
 
   const handlers = useOverlayMoveableHandlers({
     clearWidgetDraft,

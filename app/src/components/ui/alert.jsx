@@ -13,8 +13,7 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: 'bg-card text-card-foreground',
-        destructive:
-          'text-destructive bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-destructive/90',
+        destructive: 'text-destructive bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-destructive/90',
       },
     },
     defaultVariants: {
@@ -32,14 +31,7 @@ const alertVariants = cva(
  * @returns {JSX.Element} Rendered component output.
  */
 function Alert({ className, variant, ...props }) {
-  return (
-    <div
-      data-slot="alert"
-      role="alert"
-      className={cn(alertVariants({ variant }), className)}
-      {...props}
-    />
-  )
+  return <div data-slot="alert" role="alert" className={cn(alertVariants({ variant }), className)} {...props} />
 }
 
 /**
@@ -50,16 +42,7 @@ function Alert({ className, variant, ...props }) {
  * @returns {JSX.Element} Rendered component output.
  */
 function AlertTitle({ className, ...props }) {
-  return (
-    <div
-      data-slot="alert-title"
-      className={cn(
-        'col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight',
-        className,
-      )}
-      {...props}
-    />
-  )
+  return <div data-slot="alert-title" className={cn('col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight', className)} {...props} />
 }
 
 /**
@@ -73,10 +56,7 @@ function AlertDescription({ className, ...props }) {
   return (
     <div
       data-slot="alert-description"
-      className={cn(
-        'text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed',
-        className,
-      )}
+      className={cn('text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed', className)}
       {...props}
     />
   )

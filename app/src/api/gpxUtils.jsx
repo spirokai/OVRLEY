@@ -3,10 +3,7 @@
  */
 
 import useStore from '../store/useStore'
-import {
-  clearCurrentActivityCache,
-  setCurrentActivityCache,
-} from './activityCache'
+import { clearCurrentActivityCache, setCurrentActivityCache } from './activityCache'
 import * as backend from './backend'
 import { finalizeParsedActivity, safeNumber } from './activityParserUtils'
 import parseFitActivityFile from './fitParserUtils'
@@ -110,15 +107,12 @@ function parseGpxActivityFile(file, textContent) {
     throw new Error('The GPX file could not be parsed.')
   }
 
-  const trackPoints = Array.from(
-    documentNode.getElementsByTagNameNS('*', 'trkpt'),
-  )
+  const trackPoints = Array.from(documentNode.getElementsByTagNameNS('*', 'trkpt'))
   if (!trackPoints.length) {
     throw new Error('The GPX file does not contain any track points.')
   }
 
-  const metadataNode =
-    documentNode.getElementsByTagNameNS('*', 'metadata')[0] || null
+  const metadataNode = documentNode.getElementsByTagNameNS('*', 'metadata')[0] || null
   const trackNode = documentNode.getElementsByTagNameNS('*', 'trk')[0] || null
   const metadataName =
     metadataNode?.getElementsByTagNameNS('*', 'name')[0]?.textContent?.trim() ||
@@ -128,17 +122,10 @@ function parseGpxActivityFile(file, textContent) {
   const rawSamples = trackPoints.map((trackPoint) => {
     const latitude = safeNumber(trackPoint.getAttribute('lat'))
     const longitude = safeNumber(trackPoint.getAttribute('lon'))
-    const elevation = safeNumber(
-      trackPoint.getElementsByTagNameNS('*', 'ele')[0]?.textContent,
-    )
-    const timestamp =
-      trackPoint.getElementsByTagNameNS('*', 'time')[0]?.textContent?.trim() ||
-      null
+    const elevation = safeNumber(trackPoint.getElementsByTagNameNS('*', 'ele')[0]?.textContent)
+    const timestamp = trackPoint.getElementsByTagNameNS('*', 'time')[0]?.textContent?.trim() || null
     const extensionValues = {}
-    const extensionsNode = trackPoint.getElementsByTagNameNS(
-      '*',
-      'extensions',
-    )[0]
+    const extensionsNode = trackPoint.getElementsByTagNameNS('*', 'extensions')[0]
     if (extensionsNode) {
       Array.from(extensionsNode.children || []).forEach((child) => {
         collectLeafExtensionValues(child, extensionValues)
@@ -146,80 +133,29 @@ function parseGpxActivityFile(file, textContent) {
     }
 
     return {
-      airPressure: readTrackPointMetric(extensionValues, [
-        'air_pressure',
-        'absolute_pressure',
-        'pressure',
-      ]),
+      airPressure: readTrackPointMetric(extensionValues, ['air_pressure', 'absolute_pressure', 'pressure']),
       altitude: elevation,
       cadence: readTrackPointMetric(extensionValues, ['cad', 'cadence']),
-      distance: readTrackPointMetric(extensionValues, [
-        'distance',
-        'distance_m',
-        'distancemeters',
-      ]),
+      distance: readTrackPointMetric(extensionValues, ['distance', 'distance_m', 'distancemeters']),
       elevation,
       gForce: readTrackPointMetric(extensionValues, ['g_force', 'gforce']),
-      gradient: readTrackPointMetric(extensionValues, [
-        'gradient',
-        'grade',
-        'slope',
-      ]),
-      groundContactTime: readTrackPointMetric(extensionValues, [
-        'ground_contact_time',
-        'groundcontacttime',
-        'stance_time',
-      ]),
-      heading: readTrackPointMetric(extensionValues, [
-        'heading',
-        'course',
-        'bearing',
-        'gps_heading',
-      ]),
-      heartrate: readTrackPointMetric(extensionValues, [
-        'hr',
-        'heartrate',
-        'heart_rate',
-      ]),
+      gradient: readTrackPointMetric(extensionValues, ['gradient', 'grade', 'slope']),
+      groundContactTime: readTrackPointMetric(extensionValues, ['ground_contact_time', 'groundcontacttime', 'stance_time']),
+      heading: readTrackPointMetric(extensionValues, ['heading', 'course', 'bearing', 'gps_heading']),
+      heartrate: readTrackPointMetric(extensionValues, ['hr', 'heartrate', 'heart_rate']),
       latitude,
-      leftRightBalance: readTrackPointMetric(extensionValues, [
-        'left_right_balance',
-        'leftrightbalance',
-        'balance',
-      ]),
+      leftRightBalance: readTrackPointMetric(extensionValues, ['left_right_balance', 'leftrightbalance', 'balance']),
       longitude,
       pace: readTrackPointMetric(extensionValues, ['pace']),
-      power: readTrackPointMetric(extensionValues, [
-        'power',
-        'powerinwatts',
-        'watts',
-      ]),
+      power: readTrackPointMetric(extensionValues, ['power', 'powerinwatts', 'watts']),
       speed: readTrackPointMetric(extensionValues, ['speed', 'enhanced_speed']),
-      strideLength: readTrackPointMetric(extensionValues, [
-        'stride_length',
-        'stridelength',
-        'step_length',
-      ]),
-      strokeRate: readTrackPointMetric(extensionValues, [
-        'stroke_rate',
-        'strokerate',
-      ]),
-      temperature: readTrackPointMetric(extensionValues, [
-        'atemp',
-        'temperature',
-        'temp',
-      ]),
+      strideLength: readTrackPointMetric(extensionValues, ['stride_length', 'stridelength', 'step_length']),
+      strokeRate: readTrackPointMetric(extensionValues, ['stroke_rate', 'strokerate']),
+      temperature: readTrackPointMetric(extensionValues, ['atemp', 'temperature', 'temp']),
       timestamp,
       torque: readTrackPointMetric(extensionValues, ['torque']),
-      verticalOscillation: readTrackPointMetric(extensionValues, [
-        'vertical_oscillation',
-        'verticaloscillation',
-      ]),
-      verticalSpeed: readTrackPointMetric(extensionValues, [
-        'vertical_speed',
-        'verticalspeed',
-        'vam',
-      ]),
+      verticalOscillation: readTrackPointMetric(extensionValues, ['vertical_oscillation', 'verticaloscillation']),
+      verticalSpeed: readTrackPointMetric(extensionValues, ['vertical_speed', 'verticalspeed', 'vam']),
     }
   })
 
@@ -244,9 +180,7 @@ function parseGpxActivityFile(file, textContent) {
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 async function parseActivityFile(file) {
-  return file.name.toLowerCase().endsWith('.fit')
-    ? parseFitActivityFile(file)
-    : parseGpxActivityFile(file, await file.text())
+  return file.name.toLowerCase().endsWith('.fit') ? parseFitActivityFile(file) : parseGpxActivityFile(file, await file.text())
 }
 
 /**
@@ -263,14 +197,7 @@ function syncSceneDurationWithActivity(durationSeconds, storeState) {
   }
 
   const wholeSeconds = Math.floor(durationSeconds)
-  const {
-    config,
-    setConfig,
-    setDummyDurationSeconds,
-    setEndSecond,
-    setSelectedSecond,
-    setStartSecond,
-  } = storeState
+  const { config, setConfig, setDummyDurationSeconds, setEndSecond, setSelectedSecond, setStartSecond } = storeState
 
   console.log('Setting activity duration:', durationSeconds, 'seconds')
   setDummyDurationSeconds(wholeSeconds)
@@ -300,12 +227,7 @@ function syncSceneDurationWithActivity(durationSeconds, storeState) {
  * @param {*} options.storeState - Current store snapshot used for synchronization.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
-async function applyParsedActivityToStore({
-  filename,
-  parsedActivity,
-  debugPayload,
-  storeState,
-}) {
+async function applyParsedActivityToStore({ filename, parsedActivity, debugPayload, storeState }) {
   const { setActivitySummary, setGpxFilename } = storeState
 
   setGpxFilename(filename)
@@ -315,10 +237,7 @@ async function applyParsedActivityToStore({
   console.log('Parse debug JSON written:', debugPath)
   console.log('Activity filename set in store:', filename)
 
-  syncSceneDurationWithActivity(
-    parsedActivity?.metadata?.duration_seconds || 0,
-    storeState,
-  )
+  syncSceneDurationWithActivity(parsedActivity?.metadata?.duration_seconds || 0, storeState)
 }
 
 /**
@@ -330,9 +249,7 @@ async function applyParsedActivityToStore({
 async function ensureFileObject(fileOrPath) {
   if (fileOrPath instanceof File) return fileOrPath
 
-  throw new Error(
-    'Activity import now requires a browser File object. Path-based imports are not supported in this phase.',
-  )
+  throw new Error('Activity import now requires a browser File object. Path-based imports are not supported in this phase.')
 }
 
 /**

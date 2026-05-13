@@ -7,10 +7,7 @@ import useStore from '../store/useStore'
 import * as backend from './backend'
 import { applyGlobalDefaults } from '../lib/config-utils'
 import { timeToSeconds } from '../lib/export-range'
-import {
-  normalizeUpdateRateForFps,
-  sanitizeIntegerFps,
-} from '../lib/update-rate'
+import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '../lib/update-rate'
 
 /**
  * Renders video.
@@ -52,23 +49,17 @@ export default async function renderVideo(overrides = {}) {
     // Apply performance and range overrides
     if (config.scene) {
       config.scene.fps = sanitizeIntegerFps(config.scene.fps)
-      config.scene.update_rate = normalizeUpdateRateForFps(
-        config.scene.fps,
-        activeUpdateRate,
-      )
+      config.scene.update_rate = normalizeUpdateRateForFps(config.scene.fps, activeUpdateRate)
       config.scene.ffmpeg = {
         ...(config.scene.ffmpeg || {}),
         codec: activeExportCodec || 'prores_ks',
       }
 
       if ((activeExportCodec || 'prores_ks') === 'prores_ks') {
-        config.scene.ffmpeg.prores_profile =
-          config.scene.ffmpeg.prores_profile || '4444'
-        config.scene.ffmpeg.pix_fmt =
-          config.scene.ffmpeg.pix_fmt || 'yuva444p10le'
+        config.scene.ffmpeg.prores_profile = config.scene.ffmpeg.prores_profile || '4444'
+        config.scene.ffmpeg.pix_fmt = config.scene.ffmpeg.pix_fmt || 'yuva444p10le'
       } else if ((activeExportCodec || 'prores_ks') === 'prores_ks_vulkan') {
-        config.scene.ffmpeg.prores_profile =
-          config.scene.ffmpeg.prores_profile || '4'
+        config.scene.ffmpeg.prores_profile = config.scene.ffmpeg.prores_profile || '4'
         config.scene.ffmpeg.alpha_bits = config.scene.ffmpeg.alpha_bits || 16
       } else if ((activeExportCodec || 'prores_ks') === 'qtrle') {
         config.scene.ffmpeg.pix_fmt = config.scene.ffmpeg.pix_fmt || 'argb'
@@ -137,8 +128,7 @@ export default async function renderVideo(overrides = {}) {
 
     throw new Error('Render did not start')
   } catch (error) {
-    const { setActiveRenderId, setRenderingVideo, setRenderProgress } =
-      useStore.getState()
+    const { setActiveRenderId, setRenderingVideo, setRenderProgress } = useStore.getState()
     setActiveRenderId(null)
     setRenderingVideo(false)
     setRenderProgress({

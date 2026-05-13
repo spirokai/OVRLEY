@@ -24,8 +24,7 @@ const selectBrowserGpxFile = () =>
  * @returns {object} Result produced by the helper.
  */
 export default function useActivityImport() {
-  const { gpxFilename, setErrorMessage, setGeneratingImage } =
-    useActivityStore()
+  const { gpxFilename, setErrorMessage, setGeneratingImage } = useActivityStore()
 
   const handleGpxFileOpen = useCallback(async () => {
     try {

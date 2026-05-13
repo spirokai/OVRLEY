@@ -60,9 +60,7 @@ export function getElapsedSeries(activity) {
     return frameElapsedSeries
   }
 
-  return Array.isArray(activity?.sample_elapsed_seconds)
-    ? activity.sample_elapsed_seconds
-    : []
+  return Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
 }
 
 /**
@@ -130,11 +128,7 @@ function isValidInterpolatedSample(xValues, yValues, index) {
 }
 
 function findNearestValidSampleIndex(xValues, yValues, startIndex, direction) {
-  for (
-    let index = startIndex;
-    index >= 0 && index < xValues.length;
-    index += direction
-  ) {
+  for (let index = startIndex; index >= 0 && index < xValues.length; index += direction) {
     if (isValidInterpolatedSample(xValues, yValues, index)) {
       return index
     }
@@ -210,25 +204,13 @@ export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
     return Number(yValues[lastValidIndex])
   }
 
-  const insertionIndex = findFirstIndexAtOrAfter(
-    xValues,
-    safeTargetX,
-    firstValidIndex,
-    lastValidIndex,
-  )
-  const rightIndex = findNearestValidSampleIndex(
-    xValues,
-    yValues,
-    insertionIndex,
-    1,
-  )
+  const insertionIndex = findFirstIndexAtOrAfter(xValues, safeTargetX, firstValidIndex, lastValidIndex)
+  const rightIndex = findNearestValidSampleIndex(xValues, yValues, insertionIndex, 1)
   const rightXAtInsertion = Number(xValues[rightIndex])
   const leftIndex = findNearestValidSampleIndex(
     xValues,
     yValues,
-    rightXAtInsertion === safeTargetX
-      ? rightIndex
-      : Math.min(rightIndex - 1, lastValidIndex),
+    rightXAtInsertion === safeTargetX ? rightIndex : Math.min(rightIndex - 1, lastValidIndex),
     -1,
   )
 
@@ -237,12 +219,7 @@ export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
   const leftY = Number(yValues[leftIndex])
   const rightY = Number(yValues[rightIndex])
 
-  if (
-    !Number.isFinite(leftX) ||
-    !Number.isFinite(rightX) ||
-    !Number.isFinite(leftY) ||
-    !Number.isFinite(rightY)
-  ) {
+  if (!Number.isFinite(leftX) || !Number.isFinite(rightX) || !Number.isFinite(leftY) || !Number.isFinite(rightY)) {
     return null
   }
 
@@ -263,20 +240,14 @@ export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
  * @returns {*} Requested value or structure.
  */
 export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
-    ? activity.sample_elapsed_seconds
-    : []
+  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
   const series = activity?.[key]
 
   if (!Array.isArray(series) || !elapsedSeries.length) {
     return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
   }
 
-  const interpolatedValue = getInterpolatedSeriesValue(
-    elapsedSeries,
-    series,
-    elapsedSecond,
-  )
+  const interpolatedValue = getInterpolatedSeriesValue(elapsedSeries, series, elapsedSecond)
 
   return interpolatedValue ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
 }
@@ -291,28 +262,18 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
 export function getInterpolatedTimeValue(activity, elapsedSecond) {
   const sourceStartTimeMs = Date.parse(activity?.source_start_time || '')
   if (Number.isFinite(sourceStartTimeMs)) {
-    return new Date(
-      sourceStartTimeMs + Math.max(elapsedSecond, 0) * 1000,
-    ).toISOString()
+    return new Date(sourceStartTimeMs + Math.max(elapsedSecond, 0) * 1000).toISOString()
   }
 
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
-    ? activity.sample_elapsed_seconds
-    : []
+  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
   const timeSeries = Array.isArray(activity?.time) ? activity.time : []
   const numericTimeSeries = timeSeries.map((value) => {
     const parsed = Date.parse(value || '')
     return Number.isFinite(parsed) ? parsed : null
   })
-  const interpolatedTimeMs = getInterpolatedSeriesValue(
-    elapsedSeries,
-    numericTimeSeries,
-    elapsedSecond,
-  )
+  const interpolatedTimeMs = getInterpolatedSeriesValue(elapsedSeries, numericTimeSeries, elapsedSecond)
 
-  return Number.isFinite(interpolatedTimeMs)
-    ? new Date(interpolatedTimeMs).toISOString()
-    : DEFAULT_ACTIVITY_PREVIEW.time
+  return Number.isFinite(interpolatedTimeMs) ? new Date(interpolatedTimeMs).toISOString() : DEFAULT_ACTIVITY_PREVIEW.time
 }
 
 /**
@@ -331,10 +292,7 @@ export function getDistanceProgress(activity, sampleIndex) {
         : null
 
   if (distanceProgressSeries) {
-    const progressValue =
-      distanceProgressSeries[
-        clamp(sampleIndex, 0, distanceProgressSeries.length - 1)
-      ]
+    const progressValue = distanceProgressSeries[clamp(sampleIndex, 0, distanceProgressSeries.length - 1)]
 
     return clamp(Number(progressValue) || 0, 0, 1)
   }
@@ -355,20 +313,10 @@ export function getDistanceProgress(activity, sampleIndex) {
  * @returns {*} Requested value or structure.
  */
 export function getDistanceProgressAtElapsed(activity, elapsedSecond) {
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds)
-    ? activity.sample_elapsed_seconds
-    : []
-  const distanceProgressSeries = Array.isArray(
-    activity?.sample_distance_progress,
-  )
-    ? activity.sample_distance_progress
-    : []
+  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
+  const distanceProgressSeries = Array.isArray(activity?.sample_distance_progress) ? activity.sample_distance_progress : []
 
-  const interpolatedProgress = getInterpolatedSeriesValue(
-    elapsedSeries,
-    distanceProgressSeries,
-    elapsedSecond,
-  )
+  const interpolatedProgress = getInterpolatedSeriesValue(elapsedSeries, distanceProgressSeries, elapsedSecond)
 
   if (Number.isFinite(interpolatedProgress)) {
     return clamp(interpolatedProgress, 0, 1)
@@ -378,13 +326,8 @@ export function getDistanceProgressAtElapsed(activity, elapsedSecond) {
     return 0
   }
 
-  const safeElapsed = clamp(
-    Number(elapsedSecond) || 0,
-    elapsedSeries[0] ?? 0,
-    elapsedSeries[elapsedSeries.length - 1] ?? 0,
-  )
-  const totalElapsed =
-    (elapsedSeries[elapsedSeries.length - 1] ?? 0) - (elapsedSeries[0] ?? 0)
+  const safeElapsed = clamp(Number(elapsedSecond) || 0, elapsedSeries[0] ?? 0, elapsedSeries[elapsedSeries.length - 1] ?? 0)
+  const totalElapsed = (elapsedSeries[elapsedSeries.length - 1] ?? 0) - (elapsedSeries[0] ?? 0)
 
   if (totalElapsed <= 0) {
     return 0

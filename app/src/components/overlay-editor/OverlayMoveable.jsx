@@ -60,14 +60,8 @@ export default function OverlayMoveable({
 }) {
   const isGroupSelection = selectedTargets.length > 1
   const gridSize = getEditorGridSize(sceneSize)
-  const horizontalGuidelines = useMemo(
-    () => getGridGuidelines(sceneSize.height, gridSize, snapToGrid),
-    [gridSize, sceneSize.height, snapToGrid],
-  )
-  const verticalGuidelines = useMemo(
-    () => getGridGuidelines(sceneSize.width, gridSize, snapToGrid),
-    [gridSize, sceneSize.width, snapToGrid],
-  )
+  const horizontalGuidelines = useMemo(() => getGridGuidelines(sceneSize.height, gridSize, snapToGrid), [gridSize, sceneSize.height, snapToGrid])
+  const verticalGuidelines = useMemo(() => getGridGuidelines(sceneSize.width, gridSize, snapToGrid), [gridSize, sceneSize.width, snapToGrid])
   // With rootContainer={document.body}, the Moveable UI is rendered at body
   // level, not inside the scaled parent container. No zoom compensation needed.
   const moveableZoom = 1.5
@@ -93,11 +87,7 @@ export default function OverlayMoveable({
       resizable={canResizeSelected}
       scalable={canScaleSelected}
       rotatable={canRotateSelected}
-      renderDirections={
-        showEdgeResizeHandles
-          ? EDGE_RESIZE_DIRECTIONS
-          : CORNER_RESIZE_DIRECTIONS
-      }
+      renderDirections={showEdgeResizeHandles ? EDGE_RESIZE_DIRECTIONS : CORNER_RESIZE_DIRECTIONS}
       snappable
       snapThreshold={8}
       snapGap

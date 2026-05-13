@@ -23,13 +23,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
 
   return (
     <>
-      <FontSection
-        widget={widget}
-        updateWidgetData={updateWidgetData}
-        title="Typography"
-        fontSizeLabel="Font Size"
-        colorLabel="Value Color"
-      />
+      <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Typography" fontSizeLabel="Font Size" colorLabel="Value Color" />
 
       <SliderField
         label="Value Offset"
@@ -38,9 +32,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
         max={200}
         step={1}
         valueDisplay={`${valueOffset}px`}
-        onSliderChange={(value) =>
-          updateWidgetData(widget.id, { value_offset: value })
-        }
+        onSliderChange={(value) => updateWidgetData(widget.id, { value_offset: value })}
       />
       <div className="grid grid-cols-2 gap-3">
         <SliderField
@@ -50,20 +42,11 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
           max={2}
           step={1}
           valueDisplay={decimals.toString()}
-          onSliderChange={(value) =>
-            updateWidgetData(widget.id, { decimals: value })
-          }
+          onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
         />
         <div className="flex items-center justify-between rounded-md pl-8 py-2.5 mt-4.5">
-          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
-            Show sign
-          </Label>
-          <ToggleField
-            checked={widget.data.show_sign ?? true}
-            onCheckedChange={(checked) =>
-              updateWidgetData(widget.id, { show_sign: checked })
-            }
-          />
+          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Show sign</Label>
+          <ToggleField checked={widget.data.show_sign ?? true} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_sign: checked })} />
         </div>
       </div>
       <div className="space-y-4">
@@ -71,9 +54,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
           <SectionHeading icon={TrendingUp} title="Indicator" />
           <ToggleField
             checked={widget.data.show_triangle ?? true}
-            onCheckedChange={(checked) =>
-              updateWidgetData(widget.id, { show_triangle: checked })
-            }
+            onCheckedChange={(checked) => updateWidgetData(widget.id, { show_triangle: checked })}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -81,19 +62,13 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
             label="Color Positive"
             disabled={!widget.data.show_triangle}
             value={widget.data.triangle_positive_color || getThemeColor('aqua')}
-            onChange={(value) =>
-              updateWidgetData(widget.id, { triangle_positive_color: value })
-            }
+            onChange={(value) => updateWidgetData(widget.id, { triangle_positive_color: value })}
           />
           <ColorField
             label="Color Negative"
             disabled={!widget.data.show_triangle}
-            value={
-              widget.data.triangle_negative_color || getThemeColor('accent')
-            }
-            onChange={(value) =>
-              updateWidgetData(widget.id, { triangle_negative_color: value })
-            }
+            value={widget.data.triangle_negative_color || getThemeColor('accent')}
+            onChange={(value) => updateWidgetData(widget.id, { triangle_negative_color: value })}
           />
         </div>
 
@@ -105,9 +80,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
           max={240}
           step={1}
           valueDisplay={`${triangleWidth}px`}
-          onSliderChange={(value) =>
-            updateWidgetData(widget.id, { triangle_width: value })
-          }
+          onSliderChange={(value) => updateWidgetData(widget.id, { triangle_width: value })}
         />
       </div>
     </>

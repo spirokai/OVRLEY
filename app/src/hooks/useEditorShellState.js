@@ -32,18 +32,10 @@ function getUiScale(width) {
  */
 export default function useEditorShellState() {
   const [editorZoomLevel, setEditorZoomLevel] = useState(1)
-  const [editorBackgroundMode, setEditorBackgroundMode] = useState(
-    () => localStorage.getItem('overlayBackgroundMode') || 'checker',
-  )
-  const [editorGridVisible, setEditorGridVisible] = useState(
-    () => localStorage.getItem('overlayGridVisible') === 'true',
-  )
-  const [editorSnapToGrid, setEditorSnapToGrid] = useState(
-    () => localStorage.getItem('overlaySnapToGrid') === 'true',
-  )
-  const [uiScale, setUiScale] = useState(() =>
-    typeof window === 'undefined' ? 1 : getUiScale(window.innerWidth),
-  )
+  const [editorBackgroundMode, setEditorBackgroundMode] = useState(() => localStorage.getItem('overlayBackgroundMode') || 'checker')
+  const [editorGridVisible, setEditorGridVisible] = useState(() => localStorage.getItem('overlayGridVisible') === 'true')
+  const [editorSnapToGrid, setEditorSnapToGrid] = useState(() => localStorage.getItem('overlaySnapToGrid') === 'true')
+  const [uiScale, setUiScale] = useState(() => (typeof window === 'undefined' ? 1 : getUiScale(window.innerWidth)))
 
   useEffect(() => {
     localStorage.setItem('overlayBackgroundMode', editorBackgroundMode)
@@ -74,15 +66,11 @@ export default function useEditorShellState() {
   }, [])
 
   const decreaseZoom = () => {
-    setEditorZoomLevel((current) =>
-      clamp(Number((current - 0.05).toFixed(2)), 0.35, 4),
-    )
+    setEditorZoomLevel((current) => clamp(Number((current - 0.05).toFixed(2)), 0.35, 4))
   }
 
   const increaseZoom = () => {
-    setEditorZoomLevel((current) =>
-      clamp(Number((current + 0.05).toFixed(2)), 0.35, 4),
-    )
+    setEditorZoomLevel((current) => clamp(Number((current + 0.05).toFixed(2)), 0.35, 4))
   }
 
   const resetZoom = () => {

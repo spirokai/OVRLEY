@@ -17,13 +17,7 @@ import { cn } from '@/lib/utils'
  * @param {*} props.className - Additional class names to merge into the element.
  * @returns {JSX.Element} Rendered component output.
  */
-export function BlurInput({
-  value: initialValue,
-  onChange,
-  onBlur,
-  className,
-  ...props
-}) {
+export function BlurInput({ value: initialValue, onChange, onBlur, className, ...props }) {
   const [value, setValue] = useState(initialValue)
   const inputRef = useRef(null)
   const isNumberInput = props.type === 'number'
@@ -91,8 +85,7 @@ export function BlurInput({
       className={cn(
         'transition-colors',
         value !== initialValue && 'border-accent-border bg-surface-accent-soft',
-        isNumberInput &&
-          'pr-11 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
+        isNumberInput && 'pr-11 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
         className,
       )}
     />

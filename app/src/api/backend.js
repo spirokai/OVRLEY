@@ -8,9 +8,7 @@
  * Checks whether is tauri.
  * @returns {boolean} Whether the condition is satisfied.
  */
-const isTauri = () =>
-  typeof window !== 'undefined' &&
-  typeof window.__TAURI_INTERNALS__ !== 'undefined'
+const isTauri = () => typeof window !== 'undefined' && typeof window.__TAURI_INTERNALS__ !== 'undefined'
 
 /**
  * Returns invoke.
@@ -137,9 +135,7 @@ function sortFontNames(fonts) {
   return [...new Set(fonts.filter(Boolean))]
     .map((font) => font.trim())
     .filter(Boolean)
-    .sort((left, right) =>
-      left.localeCompare(right, undefined, { sensitivity: 'base' }),
-    )
+    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }))
 }
 
 /**
@@ -154,17 +150,10 @@ export async function listAvailableFonts() {
     return Array.isArray(fonts) ? sortFontNames(fonts) : []
   }
 
-  if (
-    typeof window !== 'undefined' &&
-    typeof window.queryLocalFonts === 'function'
-  ) {
+  if (typeof window !== 'undefined' && typeof window.queryLocalFonts === 'function') {
     try {
       const fonts = await window.queryLocalFonts()
-      return sortFontNames(
-        fonts.map(
-          (font) => font.family || font.fullName || font.postscriptName || '',
-        ),
-      )
+      return sortFontNames(fonts.map((font) => font.family || font.fullName || font.postscriptName || ''))
     } catch (error) {
       console.warn('Local font access unavailable in browser:', error)
     }
