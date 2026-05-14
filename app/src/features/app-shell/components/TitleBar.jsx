@@ -1,6 +1,10 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { Minus, Square, X } from 'lucide-react'
 
+/**
+ * Renders the custom title bar for the Tauri window with minimize, maximize, and close buttons.
+ * @returns {JSX.Element} Rendered component.
+ */
 export default function TitleBar() {
   const appWindow = getCurrentWindow()
 

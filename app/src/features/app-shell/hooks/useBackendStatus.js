@@ -1,81 +1,15 @@
 /**
- * Implements the use Backend Status hook and related behavior for the app.
+ * Provides backend status state — polls the backend health endpoint and tracks connection state.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
-
-/**
- * Handles ensure backend debug state.
- * @returns {*} Result produced by the helper.
- */
-function ensureBackendDebugState() {
-  if (typeof window === 'undefined') {
-    return null
-  }
-
-  if (!window.__BACKEND_DEBUG__) {
-    window.__BACKEND_DEBUG__ = {
-      status: 'initializing',
-      error: null,
-      logs: [],
-      startTime: null,
-    }
-  }
-
-  return window.__BACKEND_DEBUG__
-}
-
-/**
- * Handles log backend.
- *
- * @param {*} message - Value for message.
- * @returns {*} Result produced by the helper.
- */
-function logBackend(message) {
-  const debugState = ensureBackendDebugState()
-  const timestamp = new Date().toISOString()
-
-  console.log(`[Backend] ${message}`)
-
-  if (!debugState) {
-    return
-  }
-
-  debugState.logs.push(`[${timestamp}] ${message}`)
-  if (debugState.logs.length > 50) {
-    debugState.logs.shift()
-  }
-}
-
-/**
- * Updates backend status.
- *
- * @param {*} status - Status value for the current workflow.
- * @param {*} error - Value for error.
- * @returns {*} Result produced by the helper.
- */
-function updateBackendStatus(status, error = null) {
-  const debugState = ensureBackendDebugState()
-  if (!debugState) {
-    return
-  }
-
-  debugState.status = status
-  debugState.error = error
-}
-
-/**
- * Checks whether has tauri runtime.
- * @returns {boolean} Whether the condition is satisfied.
- */
-export function hasTauriRuntime() {
-  return typeof window !== 'undefined' && typeof window.__TAURI_INTERNALS__ !== 'undefined'
-}
+import { hasTauriRuntime, logBackend } from '../utils/backendDebug'
+import { updateBackendStatus } from '../utils/backendDebug'
 
 /**
  * Provides backend status state and actions.
- * @returns {object} Result produced by the helper.
+ * @returns {{ backendReady: boolean, backendStatus: string }} Backend readiness and status.
  */
 export default function useBackendStatus() {
   const isTauriRuntime = hasTauriRuntime()
@@ -84,6 +18,7 @@ export default function useBackendStatus() {
   const statusRef = useRef(isTauriRuntime ? 'connecting' : 'error')
   const strikesRef = useRef(0)
 
+  // Polling — checks backend health via IPC every 2 seconds while the component is mounted
   useEffect(() => {
     updateBackendStatus(statusRef.current)
 

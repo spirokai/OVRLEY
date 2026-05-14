@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import * as backend from '@/api/backend'
-import { hasTauriRuntime } from '@/hooks/useBackendStatus'
+import { hasTauriRuntime } from '@/features/app-shell'
 import { useTemplateStore } from '@/hooks/useAppStoreSelectors'
 import {
   createTemplateFilePayload,

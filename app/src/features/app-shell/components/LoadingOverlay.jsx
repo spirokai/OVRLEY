@@ -6,7 +6,7 @@
  * Renders the spinner component.
  *
  * @param {object} props - Component props.
- * @param {*} props.className - Additional class names to merge into the element.
+ * @param {string} [props.className='h-4 w-4'] - Additional class names to merge into the element.
  * @returns {JSX.Element} Rendered component output.
  */
 function Spinner({ className = 'h-4 w-4' }) {
@@ -26,8 +26,8 @@ function Spinner({ className = 'h-4 w-4' }) {
  * Renders the loading overlay component.
  *
  * @param {object} props - Component props.
- * @param {*} props.label - Field or UI label text.
- * @param {*} props.show - Value for show.
+ * @param {string} [props.label='Loading editor data...'] - Field or UI label text.
+ * @param {boolean} props.show - Whether to show the loading overlay.
  * @returns {JSX.Element} Rendered component output.
  */
 export default function LoadingOverlay({ label = 'Loading editor data...', show }) {

@@ -2,22 +2,18 @@
  * Composes the main application shell for the OVRLEY overlay editor.
  */
 
-import AppHeader from '@/components/AppHeader'
-import TitleBar from '@/components/TitleBar'
 import ControlPanel from '@/components/ControlPanel'
-import ErrorAlert from '@/components/ErrorAlert'
-import LoadingOverlay from '@/components/LoadingOverlay'
 import OverlayEditor from '@/components/OverlayEditor'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
 import useActivityImport from '@/hooks/useActivityImport'
 import useAppBootstrap from '@/hooks/useAppBootstrap'
 import { useAppShellStore } from '@/hooks/useAppStoreSelectors'
-import useBackendStatus from '@/hooks/useBackendStatus'
 import useEditorShellState from '@/hooks/useEditorShellState'
 import { useRenderWorkflow } from '@/features/render-video'
 import { NewTemplateConfirmDialog, useTemplateManagement } from '@/features/template-manager'
 import useVideoImport from '@/hooks/useVideoImport'
+import { AppHeader, ErrorAlert, LoadingOverlay, TitleBar, useBackendStatus } from '@/features/app-shell'
 import './index.css'
 import * as backend from './api/backend'
 

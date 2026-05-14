@@ -6,7 +6,7 @@ import React from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { AlertCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import useStore from '../store/useStore'
+import useStore from '@/store/useStore'
 import { useShallow } from 'zustand/react/shallow'
 
 /**
