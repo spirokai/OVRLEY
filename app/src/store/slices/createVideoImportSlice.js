@@ -4,6 +4,8 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoPath: null, // absolute path from Tauri file dialog
   importedVideoDuration: null, // seconds (float), read via ffprobe
   importedVideoFps: null, // fps (float)
+  importedVideoFpsNum: null, // exact ffprobe FPS numerator
+  importedVideoFpsDen: null, // exact ffprobe FPS denominator
   importedVideoResolution: null, // { width, height }
   importedVideoCreationTime: null, // ISO-8601 string or null
   importedVideoImportId: null, // opaque local preview server import ID
@@ -19,6 +21,8 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoPath: metadata.path,
       importedVideoDuration: metadata.duration,
       importedVideoFps: metadata.fps,
+      importedVideoFpsNum: metadata.fpsNum,
+      importedVideoFpsDen: metadata.fpsDen,
       importedVideoResolution: metadata.resolution,
       importedVideoCreationTime: metadata.creationTime,
       importedVideoImportId: metadata.importId ?? null,
@@ -36,6 +40,8 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoPath: null,
       importedVideoDuration: null,
       importedVideoFps: null,
+      importedVideoFpsNum: null,
+      importedVideoFpsDen: null,
       importedVideoResolution: null,
       importedVideoCreationTime: null,
       importedVideoImportId: null,

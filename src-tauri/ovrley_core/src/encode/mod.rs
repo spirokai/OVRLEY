@@ -10,8 +10,14 @@
 pub mod codec_detect;
 /// ffmpeg discovery and codec argument construction.
 pub mod ffmpeg;
+/// FFmpeg argument construction for MP4 compositing mode.
+pub mod ffmpeg_composite;
+/// Rational frame-rate helpers shared by composite encoding modules.
+pub mod fps;
 /// Render controller and public video render orchestration.
 pub mod video;
+/// Composite MP4 render pipeline used by the composite render entry point.
+pub(crate) mod video_composite_pipeline;
 /// Debug summaries, sample-frame exports, and segment stitching helpers.
 mod video_debug;
 /// Single-render video pipeline used by normal and segmented renders.

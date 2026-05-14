@@ -20,6 +20,18 @@ export const DEFAULT_EXPORT_RANGE = {
 
 const LABEL_KEYS = ['x', 'y', 'font', 'font_size', 'text', 'color', 'opacity']
 
+const SCENE_RENDER_TIME_ONLY_KEYS = [
+  'composite_video_path',
+  'composite_bitrate',
+  'composite_sync_offset',
+  'composite_video_fps_num',
+  'composite_video_fps_den',
+  'composite_video_duration',
+  'composite_render_duration',
+  'composite_video_trim_start',
+  'composite_widget_update_rate',
+]
+
 const VALUE_SHARED_KEYS = ['x', 'y', 'value', 'font', 'font_size', 'color', 'opacity', 'prefix', 'suffix', 'decimals']
 
 const VALUE_ICON_KEYS = ['show_icon', 'icon_color', 'icon_size', 'icon_offset_x', 'icon_offset_y']
@@ -199,6 +211,9 @@ function normalizeScene(scene = {}) {
   const nextScene = cloneSerializable(scene) || {}
 
   SCENE_DERIVED_SETTING_KEYS.forEach((key) => {
+    delete nextScene[key]
+  })
+  SCENE_RENDER_TIME_ONLY_KEYS.forEach((key) => {
     delete nextScene[key]
   })
 

@@ -1,95 +1,84 @@
-# OVRLEY Reloaded - Agent Configuration
+# OVRLEY — Agent Guide
 
-## Project Overview
+## Project
 
-OVRLEY is a desktop application designed to create stunning telemetry video overlays from GPX (and eventually FIT) data. It allows users to visualize route tracking, elevation profiles, and rich metrics like speed, power, heart rate, cadence, gradient, and temperature on top of their videos.
+Desktop app that turns `.fit`/`.gpx` activity data into customizable video overlays (speed, HR, elevation, map route, etc.).
 
-The application is structured as a monorepo consisting of:
+**Product name in config/bundles: OVRLEY.** Package name in root `package.json`: `ovrley`.
 
-1. **Frontend (`app/`)**: A React-based web application providing a drag-and-drop overlay designer.
-2. **Backend (`backend/`)**: A Python sidecar that processes telemetry data and renders the final video overlay.
-3. **App Wrapper (`src-tauri/`)**: A Rust/Tauri desktop application shell that bundles the frontend and manages the Python sidecar.
+## Architecture
 
-Currently undergoing major refactoring:
+```
+app/              React 19 + Vite frontend (JSX, NOT TypeScript)
+src-tauri/        Tauri v2 desktop shell
+src-tauri/ovrley_core/   Standalone Rust crate — Skia rendering, ffmpeg encoding, activity parsing
+```
 
-- **Frontend Refactor**: Moving to a fully reactive, drag-and-drop UI editor using React, Immer, and Zustand.
-- **Backend Refactor**: Moving away from slow, per-frame Matplotlib rendering to a precomputed geometry and cached layer compositing model for significantly faster export times.
+- **No Python backend.** The old `backend/` directory & Python sidecar are gone. All rendering is Rust (Skia) + ffmpeg subprocess.
+- Tauri IPC commands are defined in `src-tauri/src/lib.rs` and `ovrley_core/src/commands/`. Frontend calls them via `@/api/backend.js`.
+- `@/` path alias resolves to `app/src/` (configured in `vite.config.js` and `jsconfig.json`).
 
-## Tech Stack & Packages Used
+## Commands (run from repo root)
 
-### Frontend (`app/`)
+| Command             | What it does                                                        |
+| ------------------- | ------------------------------------------------------------------- |
+| `pnpm dev`          | Full dev: builds frontend + launches Tauri window                   |
+| `pnpm dev:frontend` | Vite dev server only (port 5173)                                    |
+| `pnpm build`        | Production build (runs `pnpm tauri build` via wrapper)              |
+| `pnpm lint`         | ESLint on `app/` (flat config v9, Prettier-integrated)              |
+| `pnpm format`       | Prettier on `app/`                                                  |
+| `pnpm release`      | semantic-release (auto-tags on `skia-render-backend` branch pushes) |
 
-- **Core**: React 19, TypeScript, Vite
-- **Styling**: Tailwind CSS v4, `clsx`, `tailwind-merge`, `tw-animate-css`
-- **UI Components**: Radix UI primitives, Lucide React (icons)
-- **State Management**: Zustand, Immer (planned per refactor docs)
-- **Desktop Integration**: `@tauri-apps/api`, `@tauri-apps/plugin-shell`, `@tauri-apps/plugin-dialog`
-- **Linting/Formatting**: ESLint v9, Prettier
+`pnpm tauri build` is wrapped by `scripts/tauri.mjs` — it runs Tauri with `--no-bundle`, then creates a standalone `.zip` portable archive containing the binary + `vendor/ffmpeg/` + `fonts/` + `templates/`.
 
-### Backend (`backend/`)
+## Code style (frontend)
 
-- **Core**: Python 3.11+, managed via `uv`
-- **Web Server/API**: Flask, Flask-CORS, Waitress/Gunicorn, Gevent/Websockets
-- **Data Processing**: `gpxpy`, `numpy`, `scipy`, `tsmoothie`, `simdkalman`
-- **Video/Graphics Processing**: `imageio-ffmpeg`, `matplotlib` (being deprecated for frame loops), `Pillow` (PIL) for new compositing pipeline, `fonttools`
-- **Packaging**: PyInstaller (for compiling the sidecar binary)
-- **Linting/Formatting**: `ruff`
+- **Prettier** (enforced via ESLint `prettier/prettier: error`): no semicolons, single quotes, trailing commas, 150 print width, LF line endings.
+- **ESLint**: `react/prop-types: off`, `react-hooks/exhaustive-deps: error` (flat config at `app/eslint.config.js`).
+- **No TypeScript.** Use JSDoc `@param`/`@returns` on exported functions for type documentation.
+- **Zustand** for global state with Immer middleware (store slices in `app/src/store/slices/`). Use `useShallow` for object selectors.
+- **shadcn/ui components** live in `app/src/components/ui/`. Use existing Radix primitives when adding new UI.
 
-### App Wrapper (`src-tauri/`)
+## State management patterns
 
-- **Core**: Rust, Tauri v2 CLI
+- Zustand store created with `create()` + `immer` + `subscribeWithSelector` + `devtools` middleware.
+- Store slices: `createEditorSlice`, `createMediaSlice`, `createTemplateSlice`, `createVideoImportSlice`.
+- Component store access goes through selector hooks in `app/src/hooks/` (e.g. `useAppStoreSelectors.js`). Avoid direct `useStore()` in leaf components.
 
-## Build & Test Commands
+## Frontend refactoring conventions
 
-Run these commands from the repository root:
+When asked to refactor React code, follow the detailed process in `.agents/refactor-guide.md`:
 
-- **Development**:
-  - `pnpm dev` - Runs both frontend & backend concurrently (Development Mode - TCP).
-  - `pnpm dev:frontend` - Runs only the Vite frontend dev server.
-  - `pnpm dev:backend` - Runs only the Python backend via `uv`.
-- **Testing Production (Unix Socket Mode)**:
-  - `pnpm buildtest` - Builds the Python sidecar and runs Tauri in dev mode with the compiled binary.
-- **Building**:
-  - `pnpm build` - Tauri build process.
-  - `pnpm build:sidecar` - Compiles the Python backend into a single executable using PyInstaller.
-- **Code Quality**:
-  - `pnpm lint` - Runs both frontend ESLint and backend Ruff linting.
-  - `pnpm format` - Runs both frontend Prettier and backend Ruff formatting.
+- Extract in order: constants → utils → presentational components → hooks → container hooks
+- Only refactor one feature at a time
+- No behavioral changes, no bug fixes, no feature additions
+- Extract `data/` (constants only, no functions) vs `utils/` (pure functions) vs `components/` vs `hooks/`
 
-## Code Style Guidelines and Practices
+## Rust backend
 
-### General
+- Rust 1.84.0 (`.tool-versions`). `edition = "2021"`.
+- `ovrley_core` crate has Skia (`skia-safe 0.75`), serde, chrono.
+- Tauri crate (`src-tauri/`) depends on `ovrley_core` as a workspace member.
+- On Windows: links `msvcprt` via `build.rs`.
 
-- Prefer using `pnpm` for package management in the root and frontend.
-- Prefer using `uv` for Python dependency management and running backend scripts.
+## Dependencies
 
-### Frontend
+- **FFmpeg 8.1+** (full build) auto-downloaded by `postinstall` script to `vendor/ffmpeg/`. Required for video encoding. Tauri bundle resources include this path.
+- **pnpm 10.25.0** (enforced via `package.json` `packageManager` field).
+- **Node 24** used in CI; any modern LTS should work.
 
-- **React**: Use functional components and hooks. Rely on Zustand for global state to manage the reactive overlay builder.
-- **Styling**: Use Tailwind CSS utility classes. Avoid custom CSS files where Tailwind suffices.
-- **UI Elements**: Build upon Radix UI primitives for accessible, headless components.
+## Build & release
 
-### Backend
+- CI: `pnpm install --frozen-lockfile` → `pnpm tauri build --bundles <type>`.
+- Release workflow (`.github/workflows/release.yml`): manual trigger with tag input, builds Windows (NSI/MSI + portable) and macOS (DMG + portable).
+- semantic-release auto-creates tags on pushes to `skia-render-backend` branch using `@semantic-release/commit-analyzer`.
+- The portable archive script (`scripts/package-portable.mjs`) packages: Tauri binary renamed to `OVRLEY(.exe)`, `vendor/ffmpeg/`, `fonts/`, `templates/`.
 
-- **Formatting**: Strictly follow `ruff` defaults (equivalent to Black): 88 line length, 4 space indents, double quotes for strings.
-- **Architecture**:
-  - **Refactor Rule**: Matplotlib must NOT be used in the per-frame rendering loop.
-  - All static layers (backgrounds, completed routes, text fonts) must be cached and composited using Pillow (`PIL`).
-  - Precompute widget-local geometry before the frame loop begins.
-  - Debugging: Emit visual debug artifacts (e.g., `debug_render/`) when working on rendering pipelines rather than rendering full videos.
+## Testing
 
-## Security Constraints
+No test framework is set up. No test files exist. Manual verification is the only testing approach.
 
-- **Local Communication**: The Tauri frontend and Python sidecar communicate over local TCP ports or Unix domain sockets. Ensure these are tightly bound (`127.0.0.1` or secure socket permissions) to prevent local network exposure.
-- **Sidecar Execution**: The Python backend is bundled as a PyInstaller executable. Ensure that only the intended binary is executed by Tauri to prevent arbitrary code execution vulnerabilities.
-- **macOS App Signing**: Currently not signed with an Apple Developer Account. Users must bypass Gatekeeper using `xattr -cr /Applications/OVRLEY.app`. Be mindful of this when handling executable permissions or modifying the build process.
-- **File Access**: The app parses local `.fit` and `.gpx` files and writes large video files. Ensure paths are validated and sanitized to prevent directory traversal or accidental overwrites.
+## Stale documentation to be aware of
 
-## AI Agent Directives
-
-When working in this repository:
-
-1. **Always check the current architectural refactoring state.** If working on rendering, refer strictly to `strategy.md`. If working on the frontend, refer to `frontend-refactor.md`.
-2. **Prioritize Performance in Python:** The main bottleneck is frame generation. Avoid any repetitive tasks (like I/O, font loading, complex object instantiation) inside frame loops.
-3. **Use the specified tools:** Use `pnpm` and `uv` exclusively. Do not generate `requirements.txt` or use `npm/yarn` unless explicitly requested.
-4. **Cross-Platform Awareness:** While Windows is the primary target right now, maintain code compatibility with macOS (e.g., path separators, socket types).
+- `.agents/refactor-guide.md` is for frontend-only refactoring work — best consulted explicitly when refactoring is requested.
+- `docs/`, `gpu-render.md`, `mp4-*`, `phase-5-*` files may describe old or aspirational architecture. Prefer reading code and config over these docs.

@@ -68,6 +68,17 @@ scene.fps   = source_video_fps / composite_widget_update_rate
 11. Rust should render/write one frame per overlay-frame timestamp, not one frame per output-video timestamp.
 12. Audio should be copied from the source video when present using optional audio mapping.
 13. Full respect the "Key Implementation Warnings" in this plan.
+14. Properly document every function and helper that you create in 1-2 sentences e.g.:
+
+```txt
+/// Streams a single byte range from the registered video file as `206`.
+///
+/// The response includes `Content-Range` and `Content-Length` headers suitable
+/// for native browser/WebView video seeking. `HEAD` requests only receive the
+/// headers.
+```
+
+15. Place tests in a separate file inside a `tests` subfolder
 
 ---
 
@@ -782,6 +793,16 @@ Expected result:
 ```txt
 -map 0:a? is present.
 -c:a copy is present.
+```
+
+### Test 2.8 — FPS conversion
+
+Validate that source_fps of 29.97 is converted to rational number
+
+Expected result:
+
+```txt
+input 1 contains -r 30000/1001
 ```
 
 ---
@@ -1761,17 +1782,7 @@ Output duration is correct.
 No extra visual tail frame appears.
 ```
 
-### Test 5.8 — Video without audio
-
-Use a source MP4 with no audio track.
-
-Expected result:
-
-```txt
-Render succeeds because -map 0:a? is optional.
-```
-
-### Test 5.9 — Video with audio
+### Test 5.8 — Video with audio
 
 Use a source MP4 with an audio track.
 
@@ -1782,7 +1793,7 @@ Output MP4 contains the original audio track.
 Audio is copied, not re-encoded.
 ```
 
-### Test 5.10 — Invalid dense frame range
+### Test 5.9 — Invalid dense frame range
 
 Force a config where dense report timing does not cover the requested composite sync offset.
 

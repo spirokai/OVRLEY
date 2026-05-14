@@ -6,11 +6,14 @@
 //! runtime path resolution, template IO, video render startup, progress/cancel
 //! plumbing, and small OS integration helpers.
 
+use crate::activity::schema::ParsedActivity;
 use crate::activity::{build_dense_activity_report, parse_activity_json};
 use crate::config::parse_config_json;
+use crate::config::RenderConfig;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
-use crate::encode::video::{render_video, RenderController};
+use crate::encode::fps::Fps;
+use crate::encode::video::{render_composite_video, render_video, RenderController};
 use crate::encode::video_pipeline::rendered_frame_count;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -179,6 +182,10 @@ pub fn backend_render(
 ) -> Result<Value, String> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
+    if is_composite_render(&config) {
+        return backend_render_composite_phase3(paths, controller, config, parsed_activity);
+    }
+
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
     let output_frame_count = rendered_frame_count(
         dense_activity.frame_count,
@@ -209,6 +216,177 @@ pub fn backend_render(
         "started": true,
         "render_id": render_id
     }))
+}
+
+/// Returns whether the render config requests MP4 compositing mode.
+///
+/// Composite mode is intentionally gated only by `composite_video_path` so
+/// transparent exports continue through their existing path unchanged.
+fn is_composite_render(config: &RenderConfig) -> bool {
+    config.scene.composite_video_path.is_some()
+}
+
+/// Starts the composite branch after deriving composite timing.
+///
+/// This branch validates inputs, builds the adjusted dense report, starts
+/// progress, and dispatches to the Phase 4 composite pipeline shell.
+fn backend_render_composite_phase3(
+    paths: &AppPaths,
+    controller: &RenderController,
+    mut config: RenderConfig,
+    parsed_activity: ParsedActivity,
+) -> Result<Value, String> {
+    let plan = derive_composite_render_plan(&config)?;
+    apply_composite_scene_timing(&mut config, &plan);
+    let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
+
+    let output_frame_count = (plan.render_duration * plan.source_fps.as_f64())
+        .ceil()
+        .max(1.0) as u32;
+    let render_id = controller.try_start(output_frame_count, "Compositing video...")?;
+
+    let controller_clone = controller.clone();
+    let paths = paths.clone();
+    std::thread::spawn(move || {
+        match render_composite_video(
+            &paths,
+            &config,
+            &parsed_activity,
+            &dense_activity,
+            &controller_clone,
+            &plan.video_path,
+            &plan.bitrate,
+            plan.sync_offset,
+            plan.source_fps.num,
+            plan.source_fps.den,
+            plan.video_duration,
+            Some(plan.render_duration),
+            Some(plan.trim_start),
+            Some(plan.update_rate),
+        ) {
+            Ok(filename) => controller_clone.finish_success(filename),
+            Err(error) => {
+                let cancelled = error.to_lowercase().contains("cancelled");
+                controller_clone.finish_error(error, cancelled);
+            }
+        }
+    });
+
+    Ok(json!({
+        "started": true,
+        "render_id": render_id
+    }))
+}
+
+/// Composite render values derived from render-time scene fields.
+///
+/// These values drive dense-report timing and later phases will pass them to
+/// the composite FFmpeg pipeline without reinterpreting sync offset as seek.
+#[derive(Clone, Debug, PartialEq)]
+struct CompositeRenderPlan {
+    video_path: String,
+    bitrate: String,
+    sync_offset: f64,
+    trim_start: f64,
+    video_duration: f64,
+    render_duration: f64,
+    update_rate: u32,
+    source_fps: Fps,
+    overlay_pipe_fps: Fps,
+}
+
+/// Validates composite render fields and derives timing/FPS values.
+///
+/// Required fields fail before dense activity is built, while optional fields
+/// receive the Phase 3 defaults from the implementation plan.
+fn derive_composite_render_plan(config: &RenderConfig) -> Result<CompositeRenderPlan, String> {
+    let video_path = config
+        .scene
+        .composite_video_path
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .ok_or_else(|| "scene.composite_video_path required for composite render".to_string())?;
+    let bitrate = config
+        .scene
+        .composite_bitrate
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .ok_or_else(|| "scene.composite_bitrate required for composite render".to_string())?;
+    let fps_num = config
+        .scene
+        .composite_video_fps_num
+        .ok_or_else(|| "scene.composite_video_fps_num required for composite render".to_string())?;
+    let fps_den = config
+        .scene
+        .composite_video_fps_den
+        .ok_or_else(|| "scene.composite_video_fps_den required for composite render".to_string())?;
+    let source_fps = Fps::new(fps_num, fps_den)?;
+    let video_duration = config.scene.composite_video_duration.ok_or_else(|| {
+        "scene.composite_video_duration required for composite render".to_string()
+    })?;
+    if !video_duration.is_finite() || video_duration <= 0.0 {
+        return Err(format!(
+            "scene.composite_video_duration must be greater than zero: {video_duration}"
+        ));
+    }
+
+    let sync_offset = config.scene.composite_sync_offset.unwrap_or(0.0);
+    if !sync_offset.is_finite() || sync_offset < 0.0 {
+        return Err(format!(
+            "scene.composite_sync_offset must be zero or greater: {sync_offset}"
+        ));
+    }
+    let trim_start = config.scene.composite_video_trim_start.unwrap_or(0.0);
+    if !trim_start.is_finite() || trim_start < 0.0 {
+        return Err(format!(
+            "scene.composite_video_trim_start must be zero or greater: {trim_start}"
+        ));
+    }
+    if trim_start >= video_duration {
+        return Err(format!(
+            "scene.composite_video_trim_start ({trim_start}) must be less than scene.composite_video_duration ({video_duration})"
+        ));
+    }
+
+    let update_rate = config
+        .scene
+        .composite_widget_update_rate
+        .unwrap_or(1)
+        .max(1);
+    let overlay_pipe_fps = source_fps.divided_by(update_rate)?;
+    let render_duration = config
+        .scene
+        .composite_render_duration
+        .unwrap_or(video_duration - trim_start);
+    if !render_duration.is_finite() || render_duration <= 0.0 {
+        return Err(format!(
+            "scene.composite_render_duration must be greater than zero: {render_duration}"
+        ));
+    }
+
+    Ok(CompositeRenderPlan {
+        video_path,
+        bitrate,
+        sync_offset,
+        trim_start,
+        video_duration,
+        render_duration,
+        update_rate,
+        source_fps,
+        overlay_pipe_fps,
+    })
+}
+
+/// Applies composite timing to a local render config before densification.
+///
+/// This keeps persisted template timing untouched while aligning dense frames
+/// with the lower-FPS overlay stream used by compositing mode.
+fn apply_composite_scene_timing(config: &mut RenderConfig, plan: &CompositeRenderPlan) {
+    config.scene.start = plan.sync_offset;
+    config.scene.end = plan.sync_offset + plan.render_duration;
+    config.scene.fps = plan.overlay_pipe_fps.as_f64();
 }
 
 /// Returns the current render progress snapshot.
@@ -469,3 +647,7 @@ pub fn backend_detect_codecs(paths: &AppPaths) -> Result<Value, String> {
     let codecs = detect_codecs(&paths.repo_root)?;
     serde_json::to_value(&codecs).map_err(|e| format!("Serialization error: {}", e))
 }
+
+#[cfg(test)]
+#[path = "tests/commands_tests.rs"]
+mod tests;

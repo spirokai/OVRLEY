@@ -11,6 +11,7 @@ use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
+use crate::encode::video_composite_pipeline::render_composite_video_single;
 use crate::encode::video_debug::{concat_video_segments, timestamp_nanos, write_stitch_summary};
 use crate::encode::video_pipeline::{render_video_single, rendered_frame_count};
 use std::collections::VecDeque;
@@ -265,6 +266,44 @@ pub fn render_video(
         return render_video_segmented_qtrle(paths, config, activity, dense_activity, controller);
     }
     render_video_single(paths, config, activity, dense_activity, controller)
+}
+
+/// Renders an imported video with the Skia overlay composited into an MP4 output.
+///
+/// This public entry point keeps compositing separate from [`render_video`] and
+/// delegates the actual Phase 4 dry-run pipeline shell to the composite module.
+pub fn render_composite_video(
+    paths: &AppPaths,
+    config: &RenderConfig,
+    activity: &ParsedActivity,
+    dense_activity: &DenseActivityReport,
+    controller: &RenderController,
+    composite_video_path: &str,
+    composite_bitrate: &str,
+    composite_sync_offset: f64,
+    composite_video_fps_num: u32,
+    composite_video_fps_den: u32,
+    composite_video_duration: f64,
+    composite_render_duration: Option<f64>,
+    composite_video_trim_start: Option<f64>,
+    composite_widget_update_rate: Option<u32>,
+) -> Result<String, String> {
+    render_composite_video_single(
+        paths,
+        config,
+        activity,
+        dense_activity,
+        controller,
+        composite_video_path,
+        composite_bitrate,
+        composite_sync_offset,
+        composite_video_fps_num,
+        composite_video_fps_den,
+        composite_video_duration,
+        composite_render_duration,
+        composite_video_trim_start,
+        composite_widget_update_rate,
+    )
 }
 
 // Returns whether qtrle rendering should be split into stitched segments.

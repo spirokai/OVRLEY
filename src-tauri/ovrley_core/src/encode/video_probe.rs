@@ -10,6 +10,8 @@ pub struct VideoMetadata {
     pub path: String,
     pub duration: Option<f64>,
     pub fps: Option<f64>,
+    pub fps_num: Option<u32>,
+    pub fps_den: Option<u32>,
     pub resolution: Option<Resolution>,
     pub creation_time: Option<String>,
     pub codec_name: Option<String>,
@@ -67,6 +69,8 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, S
         path: file_path.to_string(),
         duration: None,
         fps: None,
+        fps_num: None,
+        fps_den: None,
         resolution: None,
         creation_time: None,
         codec_name: None,
@@ -139,15 +143,12 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, S
             });
         }
 
-        if let Some(avg_frame_rate) = stream.get("avg_frame_rate").and_then(|v| v.as_str()) {
-            let parts: Vec<&str> = avg_frame_rate.split('/').collect();
-            if parts.len() == 2 {
-                if let (Ok(num), Ok(den)) = (parts[0].parse::<f64>(), parts[1].parse::<f64>()) {
-                    if den != 0.0 {
-                        metadata.fps = Some(num / den);
-                    }
-                }
-            }
+        if let Some((num, den)) = read_rational_rate(stream, "avg_frame_rate")
+            .or_else(|| read_rational_rate(stream, "r_frame_rate"))
+        {
+            metadata.fps = Some(num as f64 / den as f64);
+            metadata.fps_num = Some(num);
+            metadata.fps_den = Some(den);
         }
     }
 
@@ -195,6 +196,14 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, S
     // println!("[OVRLEY] Final selected creation time: {:?}", metadata.creation_time);
 
     Ok(metadata)
+}
+
+fn read_rational_rate(stream: &Value, key: &str) -> Option<(u32, u32)> {
+    let value = stream.get(key).and_then(|v| v.as_str())?;
+    let (num, den) = value.split_once('/')?;
+    let num = num.parse::<u32>().ok()?;
+    let den = den.parse::<u32>().ok()?;
+    (num > 0 && den > 0).then_some((num, den))
 }
 
 fn read_rotation_degrees(stream: &Value) -> Option<i32> {

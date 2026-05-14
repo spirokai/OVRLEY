@@ -46,6 +46,33 @@ pub struct SceneConfig {
     /// Draw every Nth layout frame into the video container.
     #[serde(default)]
     pub update_rate: Option<u32>,
+    /// Render-time source video path for MP4 compositing mode.
+    #[serde(default, skip_serializing)]
+    pub composite_video_path: Option<String>,
+    /// Render-time video bitrate override for MP4 compositing mode.
+    #[serde(default, skip_serializing)]
+    pub composite_bitrate: Option<String>,
+    /// Activity timestamp where source video time zero begins.
+    #[serde(default, skip_serializing)]
+    pub composite_sync_offset: Option<f64>,
+    /// Numerator of the source video's rational FPS.
+    #[serde(default, skip_serializing)]
+    pub composite_video_fps_num: Option<u32>,
+    /// Denominator of the source video's rational FPS.
+    #[serde(default, skip_serializing)]
+    pub composite_video_fps_den: Option<u32>,
+    /// Source video duration in seconds.
+    #[serde(default, skip_serializing)]
+    pub composite_video_duration: Option<f64>,
+    /// Composite output duration in seconds.
+    #[serde(default, skip_serializing)]
+    pub composite_render_duration: Option<f64>,
+    /// Source video trim/seek start in seconds.
+    #[serde(default, skip_serializing)]
+    pub composite_video_trim_start: Option<f64>,
+    /// Number of source video frames per rendered overlay update.
+    #[serde(default, skip_serializing)]
+    pub composite_widget_update_rate: Option<u32>,
     /// Codec/container options passed through to ffmpeg settings builder.
     #[serde(default)]
     pub ffmpeg: Value,
@@ -481,6 +508,9 @@ pub fn parse_config_json(input: &str) -> Result<RenderConfig, String> {
             ));
         }
     }
+    if matches!(config.scene.composite_widget_update_rate, Some(0)) {
+        return Err("scene.composite_widget_update_rate must be at least 1".to_string());
+    }
     if config.scene.end <= config.scene.start {
         return Err(format!(
             "Invalid scene range. scene.end ({}) must be greater than scene.start ({})",
@@ -580,3 +610,7 @@ fn find_plot_value<'a>(plots: &'a Value, value_key: &str) -> Option<&'a Value> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+#[path = "tests/config_tests.rs"]
+mod tests;
