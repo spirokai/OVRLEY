@@ -1,5 +1,6 @@
 /**
- * Supports widget editing flows related to widget editor sections.
+ * Shared section components used across widget editors.
+ * Each section is a reusable UI block (Position, Dimensions, Font, Icon, Units).
  */
 
 import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
@@ -7,14 +8,14 @@ import { ColorField, NumberField, SelectField, SliderField, TextField, TIME_FORM
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/hooks/useAvailableFonts'
 import { createFontSelection } from '@/lib/fonts'
-import { getWidgetFont } from './widgetDefinitions'
+import { getWidgetFont } from '../utils/widgetUtils'
 import { getThemeColor } from '@/lib/theme'
 
 /**
  * Renders the section heading component.
  *
  * @param {object} props - Component props.
- * @param {*} props.Icon - Value for icon.
+ * @param {*} props.icon - Value for icon.
  * @param {*} props.title - Value for title.
  * @returns {JSX.Element} Rendered component output.
  */

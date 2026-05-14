@@ -1,49 +1,20 @@
 /**
- * Supports widget editing flows related to widget definitions.
+ * Pure helper functions for widget creation, parsing, and geometry.
+ * Domain constants used by these functions live in ../data/widgetDefinitions.js.
  */
 
-import { Clock, Gauge, Heart, Map, Mountain, RefreshCw, Thermometer, TrendingUp, Type, Zap } from 'lucide-react'
-import { getThemeColor } from '@/lib/theme'
 import { createFontSelection } from '@/lib/fonts'
-
-export const QUICKMENU_ITEMS = [
-  { type: 'label', icon: Type, label: 'Text' },
-  { type: 'speed', icon: Gauge, label: 'Speed' },
-  { type: 'elevation', icon: Mountain, label: 'Elev.' },
-  { type: 'heartrate', icon: Heart, label: 'HR' },
-  { type: 'power', icon: Zap, label: 'Power' },
-  { type: 'cadence', icon: RefreshCw, label: 'Cadence' },
-  { type: 'time', icon: Clock, label: 'Time' },
-  { type: 'temperature', icon: Thermometer, label: 'Temp.' },
-  { type: 'gradient', icon: TrendingUp, label: 'Grad.' },
-  { type: 'course', icon: Map, label: 'Map' },
-]
-
-export const TYPE_LABELS = {
-  label: 'Text',
-  speed: 'Speed',
-  elevation: 'Elevation',
-  heartrate: 'Heart Rate',
-  power: 'Power',
-  cadence: 'Cadence',
-  time: 'Time',
-  temperature: 'Temperature',
-  gradient: 'Gradient',
-  course: 'Route Map',
-}
-
-export const TYPE_ICONS = {
-  label: Type,
-  speed: Gauge,
-  elevation: Mountain,
-  heartrate: Heart,
-  power: Zap,
-  cadence: RefreshCw,
-  time: Clock,
-  temperature: Thermometer,
-  gradient: TrendingUp,
-  course: Map,
-}
+import {
+  LABEL_DEFAULTS,
+  SHARED_VALUE_DEFAULTS,
+  FONT_SIZE_BY_TYPE,
+  ICON_DEFAULTS,
+  TYPE_DEFAULTS,
+  PLOT_BASE_DEFAULTS,
+  COURSE_PLOT_DEFAULTS,
+  ELEVATION_PLOT_DEFAULTS,
+  COURSE_DIMENSIONS_FALLBACK,
+} from '../data/widgetDefaults'
 
 /**
  * Parses integer.
@@ -102,7 +73,7 @@ function getCourseWidgetDimensions(coursePoints) {
   const validPoints = (coursePoints || []).filter(([latitude, longitude]) => Number.isFinite(latitude) && Number.isFinite(longitude))
 
   if (validPoints.length < 2) {
-    return { width: 400, height: 200 }
+    return COURSE_DIMENSIONS_FALLBACK
   }
 
   const meanLatitudeRadians = (validPoints.reduce((sum, [latitude]) => sum + latitude, 0) / validPoints.length) * (Math.PI / 180)
@@ -134,12 +105,9 @@ export function createLabelDefaults(globalDefaults) {
   const font = globalDefaults?.font_text || 'Arial.ttf'
   const fontSelection = createFontSelection(font)
   return {
-    x: 100,
-    y: 100,
+    ...LABEL_DEFAULTS,
     ...fontSelection,
-    font_size: 60,
-    text: 'New Text',
-    color: getGlobalColor(globalDefaults, 'color_text', getThemeColor('ice')),
+    color: getGlobalColor(globalDefaults, 'color_text'),
     opacity: globalDefaults?.opacity ?? 1,
   }
 }
@@ -155,67 +123,26 @@ export function createMetricValueDefaults(type, globalDefaults) {
   const font = globalDefaults?.font_values || 'Furore.otf'
   const fontSelection = createFontSelection(font)
   const sharedDefaults = {
-    x: 100,
-    y: 100,
+    ...SHARED_VALUE_DEFAULTS,
     value: type,
     ...fontSelection,
-    font_size: type === 'time' ? 72 : type === 'gradient' ? 96 : 100,
-    color: getGlobalColor(globalDefaults, 'color_values', getThemeColor('ice')),
+    font_size: FONT_SIZE_BY_TYPE[type] || FONT_SIZE_BY_TYPE.default,
+    color: getGlobalColor(globalDefaults, 'color_values'),
     opacity: globalDefaults?.opacity ?? 1,
-    prefix: '',
-    suffix: '',
-    decimals: 0,
   }
 
-  const iconDefaults = {
-    show_icon: true,
-    icon_color: getGlobalColor(globalDefaults, 'color_icons', getThemeColor('aqua')),
-    icon_size: 28,
-    icon_offset_x: 0,
-    icon_offset_y: 0,
-  }
-
-  const typeDefaults = {
-    speed: {
-      ...iconDefaults,
-      show_units: true,
-      speed_unit: 'kmh',
-    },
-    temperature: {
-      ...iconDefaults,
-      show_units: true,
-      temperature_unit: 'celsius',
-    },
-    heartrate: {
-      ...iconDefaults,
-      show_units: false,
-    },
-    cadence: {
-      ...iconDefaults,
-      show_units: false,
-    },
-    power: {
-      ...iconDefaults,
-      show_units: false,
-    },
-    time: {
-      ...iconDefaults,
-      format: 'time-24',
-    },
-    gradient: {
-      decimals: 0,
-      value_offset: 0,
-      triangle_positive_color: getThemeColor('aqua'),
-      triangle_negative_color: getThemeColor('accent'),
-      show_sign: true,
-      show_triangle: true,
-      triangle_width: 72,
-    },
+  if (type === 'gradient') {
+    return {
+      ...sharedDefaults,
+      ...TYPE_DEFAULTS.gradient,
+    }
   }
 
   return {
     ...sharedDefaults,
-    ...(typeDefaults[type] || iconDefaults),
+    ...ICON_DEFAULTS,
+    icon_color: getGlobalColor(globalDefaults, 'color_icons'),
+    ...TYPE_DEFAULTS[type],
   }
 }
 
@@ -228,65 +155,32 @@ export function createMetricValueDefaults(type, globalDefaults) {
  * @returns {object} Derived data structure for downstream use.
  */
 export function createPlotDefaults(type, globalDefaults, options = {}) {
-  const courseDimensions = type === 'course' ? getCourseWidgetDimensions(options.coursePoints) : { width: 400, height: 200 }
+  const courseDimensions = type === 'course' ? getCourseWidgetDimensions(options.coursePoints) : COURSE_DIMENSIONS_FALLBACK
   const base = {
-    x: 100,
-    y: 100,
+    ...PLOT_BASE_DEFAULTS,
     value: type,
     width: courseDimensions.width,
     height: courseDimensions.height,
     opacity: globalDefaults?.opacity ?? 1,
-    rotation: 0,
-    completed_line_width: 6,
-    remaining_line_width: 6,
   }
 
   if (type === 'course') {
     return {
       ...base,
-      color: getGlobalColor(globalDefaults, 'color_values', getThemeColor('ice')),
-      completed_line_color: getThemeColor('ice'),
-      completed_line_opacity: 100,
-      remaining_line_color: getThemeColor('teal'),
-      remaining_line_opacity: 35,
-      simplify_tolerance_px: 1,
-      target_density: 1,
-      show_full_activity: false,
-      marker_size: 18,
-      marker_color: getThemeColor('aqua'),
-      marker_opacity: 100,
+      ...COURSE_PLOT_DEFAULTS,
+      color: getGlobalColor(globalDefaults, 'color_values'),
     }
   }
 
   const labelFont = globalDefaults?.font_values || 'Furore.otf'
   return {
     ...base,
-    color: getGlobalColor(globalDefaults, 'color_values', getThemeColor('ice')),
-    completed_line_color: getThemeColor('ice'),
-    completed_line_opacity: 100,
-    remaining_line_color: getThemeColor('teal'),
-    remaining_line_opacity: 35,
-    area_completed_color: getThemeColor('ice'),
-    area_completed_opacity: 24,
-    area_remaining_color: getThemeColor('teal'),
-    area_remaining_opacity: 12,
-    marker_size: 16,
-    marker_color: getThemeColor('aqua'),
-    marker_opacity: 100,
-    show_elevation_metric: true,
-    show_elevation_imperial: false,
-    show_full_activity: false,
-    y_scale: 1,
-    simplify_tolerance_px: 1,
-    target_density: 0.75,
-    metric_label_offset_x: 0,
-    metric_label_offset_y: 0,
-    imperial_label_offset_x: 0,
-    imperial_label_offset_y: 0,
+    ...ELEVATION_PLOT_DEFAULTS,
+    color: getGlobalColor(globalDefaults, 'color_values'),
     point_label: {
       ...createFontSelection(labelFont),
       font_size: options.sceneFontSize ?? 12.5,
-      color: getGlobalColor(globalDefaults, 'color_values', getThemeColor('ice')),
+      color: getGlobalColor(globalDefaults, 'color_values'),
     },
   }
 }

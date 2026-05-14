@@ -5,7 +5,7 @@
 import { Settings2, Activity } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SidebarSettingsTab } from '@/features/scene-settings'
-import SidebarWidgetsTab from './SidebarWidgetsTab'
+import { SidebarWidgetsTab } from '@/features/widget-editor'
 
 /**
  * Renders the control panel component.

@@ -1,42 +1,31 @@
 /**
  * Renders the sidebar widgets tab portion of the application interface.
+ * Presentation only — all state and CRUD logic is owned by useWidgetManager.
  */
 
-import { useEffect, useMemo } from 'react'
 import { RotateCcw, Tag, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { getCurrentParsedActivity } from '../api/activityCache'
-import useStore from '../store/useStore'
-import ElevationWidgetEditor from './widgets/ElevationWidgetEditor'
-import GradientWidgetEditor from './widgets/GradientWidgetEditor'
-import MetricWidgetEditor from './widgets/MetricWidgetEditor'
-import RouteMapWidgetEditor from './widgets/RouteMapWidgetEditor'
-import TemperatureWidgetEditor from './widgets/TemperatureWidgetEditor'
-import TextWidgetEditor from './widgets/TextWidgetEditor'
-import TimeWidgetEditor from './widgets/TimeWidgetEditor'
-import {
-  createLabelDefaults,
-  createMetricValueDefaults,
-  createPlotDefaults,
-  clamp,
-  parseInteger,
-  QUICKMENU_ITEMS,
-  TYPE_ICONS,
-  TYPE_LABELS,
-} from './widgets/widgetDefinitions'
-import { buildConfigWidgets, deleteWidgetInConfig, groupWidgetsForSidebar, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget-config'
-import { PositionSection } from './widgets/widgetEditorSections'
-import { useShallow } from 'zustand/react/shallow'
+import { QUICKMENU_ITEMS, TYPE_ICONS } from '../data/widgetDefinitions'
+import { useWidgetManager } from '../hooks/useWidgetManager'
+import { PositionSection } from './widgetEditorSections'
+import ElevationWidgetEditor from './ElevationWidgetEditor'
+import GradientWidgetEditor from './GradientWidgetEditor'
+import MetricWidgetEditor from './MetricWidgetEditor'
+import RouteMapWidgetEditor from './RouteMapWidgetEditor'
+import TemperatureWidgetEditor from './TemperatureWidgetEditor'
+import TextWidgetEditor from './TextWidgetEditor'
+import TimeWidgetEditor from './TimeWidgetEditor'
 
 /**
- * Renders widget editor.
+ * Maps widget type to its editor component.
  *
- * @param {*} widget - Widget definition being rendered or edited.
- * @param {*} updateWidgetData - Value for update widget data.
- * @param {*} setNumericField - Value for set numeric field.
- * @returns {*} Result produced by the helper.
+ * @param {object} widget - Widget definition being rendered or edited.
+ * @param {Function} updateWidgetData - Callback to update widget data.
+ * @param {Function} setNumericField - Callback to set a numeric field on a widget.
+ * @param {number} [sceneFontSize] - Scene fallback font size.
+ * @returns {JSX.Element|null} Rendered editor component or null.
  */
 function renderWidgetEditor(widget, updateWidgetData, setNumericField, sceneFontSize) {
   if (widget.type === 'label') {
@@ -77,104 +66,8 @@ function renderWidgetEditor(widget, updateWidgetData, setNumericField, sceneFont
  * @returns {JSX.Element} Rendered component output.
  */
 export default function SidebarWidgetsTab() {
-  const { config, globalDefaults, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
-    useShallow((state) => ({
-      config: state.config,
-      globalDefaults: state.globalDefaults,
-      selectedWidgetId: state.selectedWidgetId,
-      setConfig: state.setConfig,
-      setSelectedWidgetId: state.setSelectedWidgetId,
-    })),
-  )
-  const parsedActivity = getCurrentParsedActivity()
-
-  const widgets = useMemo(() => {
-    return groupWidgetsForSidebar(buildConfigWidgets(config), TYPE_LABELS)
-  }, [config])
-
-  useEffect(() => {
-    if (widgets.length === 0) {
-      if (selectedWidgetId !== null) setSelectedWidgetId(null)
-      return
-    }
-
-    if (!selectedWidgetId) {
-      setSelectedWidgetId(widgets[widgets.length - 1].id)
-      return
-    }
-
-    if (!widgets.some((widget) => widget.id === selectedWidgetId)) {
-      setSelectedWidgetId(widgets[0].id)
-    }
-  }, [widgets, selectedWidgetId, setSelectedWidgetId])
-
-  const updateWidgetData = (id, updates) => {
-    setConfig(updateWidgetInConfig(config, id, updates))
-  }
-
-  const setNumericField = (widgetId, key, rawValue, options = {}) => {
-    const { fallback = 0, min, max } = options
-    const parsed = parseInteger(rawValue, fallback)
-    const nextValue = min !== undefined || max !== undefined ? clamp(parsed, min ?? parsed, max ?? parsed) : parsed
-
-    updateWidgetData(widgetId, { [key]: nextValue })
-  }
-
-  const addWidget = (type) => {
-    const nextConfig = JSON.parse(JSON.stringify(config))
-    let newId = ''
-
-    if (type === 'label') {
-      if (!nextConfig.labels) nextConfig.labels = []
-      nextConfig.labels.push(createLabelDefaults(globalDefaults))
-      newId = `label-${nextConfig.labels.length - 1}`
-    } else if (['speed', 'gradient', 'heartrate', 'power', 'cadence', 'time', 'temperature'].includes(type)) {
-      if (!nextConfig.values) nextConfig.values = []
-      nextConfig.values.push(createMetricValueDefaults(type, globalDefaults))
-      newId = `value-${nextConfig.values.length - 1}`
-    } else if (['course', 'elevation'].includes(type)) {
-      if (!nextConfig.plots) nextConfig.plots = []
-      nextConfig.plots.push(
-        createPlotDefaults(type, globalDefaults, {
-          coursePoints: parsedActivity?.sample_course_points,
-          sceneFontSize: nextConfig.scene?.font_size,
-        }),
-      )
-      newId = `plot-${nextConfig.plots.length - 1}`
-    }
-
-    setConfig(nextConfig)
-    if (newId) setSelectedWidgetId(newId)
-  }
-
-  const deleteWidget = (id) => {
-    setConfig(deleteWidgetInConfig(config, id))
-  }
-
-  const resetWidget = (id) => {
-    const widget = widgets.find((item) => item.id === id)
-    if (!widget) return
-
-    if (widget.type === 'label') {
-      setConfig(replaceWidgetInConfig(config, id, createLabelDefaults(globalDefaults)))
-      return
-    }
-
-    if (widget.type === 'course' || widget.type === 'elevation') {
-      setConfig(
-        replaceWidgetInConfig(
-          config,
-          id,
-          createPlotDefaults(widget.type, globalDefaults, {
-            sceneFontSize: config?.scene?.font_size,
-          }),
-        ),
-      )
-      return
-    }
-
-    setConfig(replaceWidgetInConfig(config, id, createMetricValueDefaults(widget.type, globalDefaults)))
-  }
+  const { config, widgets, selectedWidgetId, updateWidgetData, setNumericField, addWidget, deleteWidget, resetWidget, setSelectedWidgetId } =
+    useWidgetManager()
 
   if (!config) return null
 

@@ -259,7 +259,6 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
                     show_elevation_imperial: checked,
                   })
                 }
-                s
               />
             </div>
             <SliderField

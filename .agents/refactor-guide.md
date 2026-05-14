@@ -135,7 +135,7 @@ Every file must have a single, clear responsibility:
 - lookup tables
 - mappings
 
-**Important**: `data/` is for static data ONLY — constants, enums, config objects, lookup tables.
+**Important**: `data/` is for static data ONLY — constants, enums, config objects, lookup tables. ALWAYS extract all constants into a single file per feature.
 Pure helper functions that operate on data belong in `utils/`, NOT in `data/`.
 
 If a file under `data/` contains function definitions (other than simple one-line accessors like `Object.fromEntries(...)`), it is in the wrong directory.

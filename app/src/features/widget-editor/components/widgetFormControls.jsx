@@ -1,5 +1,6 @@
 /**
- * Supports widget editing flows related to widget form controls.
+ * Shared form control components used across widget editors.
+ * Each component is a thin wrapper around a shadcn/ui primitive with consistent widget-editor styling.
  */
 
 /* eslint-disable react-refresh/only-export-components */
