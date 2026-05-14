@@ -1,47 +1,21 @@
 /**
- * Implements the use Template Management hook and related behavior for the app.
+ * Orchestrates template lifecycle: create, save, import, switch, and dirty tracking.
+ * Container hook — composes sub-hooks and exposes template actions.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import * as backend from '@/api/backend'
 import { hasTauriRuntime } from '@/hooks/useBackendStatus'
 import { useTemplateStore } from '@/hooks/useAppStoreSelectors'
 import {
   createTemplateFilePayload,
-  createTemplateState,
   downloadTemplateFile,
   normalizeTemplateFilePayload,
   sanitizeTemplateFilename,
   stringifyTemplateFile,
-  templateStatesEqual,
 } from '@/lib/template-snapshot'
-
-/**
- * Handles select browser template file.
- * @returns {*} Result produced by the helper.
- */
-const selectBrowserTemplateFile = () =>
-  new Promise((resolve) => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.json,application/json'
-    input.onchange = () => resolve(input.files?.[0] ?? null)
-    input.oncancel = () => resolve(null)
-    input.click()
-  })
-
-/**
- * Returns filename from path.
- *
- * @param {*} path - Filesystem path for the target resource.
- * @returns {*} Requested value or structure.
- */
-const getFilenameFromPath = (path) => {
-  const segments = String(path || '').split(/[/\\]/)
-  return segments[segments.length - 1] || 'ovrley_template.json'
-}
-
-const getFilenameFromTemplateId = (templateId) => String(templateId || '').replace(/^(user:|built-in:)/, '')
+import { useTemplateSaveStatus } from './useTemplateSaveStatus'
+import { selectBrowserTemplateFile, getFilenameFromPath, getFilenameFromTemplateId } from '../utils/templateFileUtils'
 
 /**
  * Provides template management state and actions.
@@ -51,6 +25,7 @@ const getFilenameFromTemplateId = (templateId) => String(templateId || '').repla
  * @returns {object} Result produced by the helper.
  */
 export default function useTemplateManagement({ onTemplateCreated }) {
+  // Store selectors — template config, state, and actions from the Zustand template slice
   const {
     aspectRatio,
     config,
@@ -70,8 +45,22 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     templates,
     updateRate,
   } = useTemplateStore()
+
+  // Local UI state — manages the new-template confirmation dialog visibility
   const [showNewTemplateConfirm, setShowNewTemplateConfirm] = useState(false)
 
+  // Derived state — template save status computed from current editor state vs last saved snapshot
+  const { currentTemplateState, status, showTemplateStatus } = useTemplateSaveStatus({
+    config,
+    globalDefaults,
+    updateRate,
+    exportRange,
+    exportCodec,
+    aspectRatio,
+    lastSavedTemplateState,
+  })
+
+  // Side effects — closes the new-template confirmation dialog on Escape key press
   useEffect(() => {
     if (!showNewTemplateConfirm || typeof window === 'undefined') {
       return undefined
@@ -89,33 +78,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     }
   }, [showNewTemplateConfirm])
 
-  const currentTemplateState = useMemo(
-    () =>
-      createTemplateState({
-        config,
-        globalDefaults,
-        updateRate,
-        exportRange,
-        exportCodec,
-        aspectRatio,
-      }),
-    [config, globalDefaults, updateRate, exportRange, exportCodec, aspectRatio],
-  )
-
-  const status = useMemo(() => {
-    if (!config) {
-      return null
-    }
-
-    if (!lastSavedTemplateState) {
-      return 'Draft'
-    }
-
-    return templateStatesEqual(currentTemplateState, lastSavedTemplateState) ? 'Saved' : 'Modified'
-  }, [config, currentTemplateState, lastSavedTemplateState])
-
-  const showTemplateStatus = status === 'Draft' || status === 'Modified'
-
+  // Template change handler — loads a template from the backend by filename
   const handleTemplateChange = useCallback(
     async (filename) => {
       if (!filename) return
@@ -157,6 +120,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     ],
   )
 
+  // Save template handler — serializes current state and triggers save dialog or download
   const handleSaveTemplate = useCallback(async () => {
     const suggestedFilename = sanitizeTemplateFilename(getFilenameFromTemplateId(loadedTemplateFilename) || 'my_template')
 
@@ -227,6 +191,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     updateRate,
   ])
 
+  // Import template handler — opens browser file picker and hydrates state from a JSON file
   const handleImportTemplate = useCallback(async () => {
     try {
       const file = await selectBrowserTemplateFile()
@@ -255,12 +220,14 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     }
   }, [aspectRatio, exportCodec, exportRange, globalDefaults, hydrateTemplateState, setErrorMessage, setLastSavedTemplateState, updateRate])
 
+  // Confirm create new — executes the new template action and closes confirmation
   const confirmCreateNewTemplate = useCallback(() => {
     createNewTemplate()
     onTemplateCreated()
     setShowNewTemplateConfirm(false)
   }, [createNewTemplate, onTemplateCreated])
 
+  // Create new template — shows confirmation dialog if there are unsaved changes
   const handleCreateNewTemplate = useCallback(() => {
     const hasUnsavedChanges = status === 'Draft' || status === 'Modified'
     if (hasUnsavedChanges) {

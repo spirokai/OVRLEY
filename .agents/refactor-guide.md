@@ -575,11 +575,7 @@ export function useAppShellStore() {
 ## 3.6 Widget Editor Composition Pattern
 
 ```jsx
-import {
-  FontSection,
-  PositionSection,
-  DimensionsSection,
-} from "./widgetEditorSections";
+import { FontSection, PositionSection, DimensionsSection } from "./widgetEditorSections";
 
 function MetricWidgetEditor({ widget, updateWidgetData }) {
   return (
@@ -607,8 +603,7 @@ const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({ widget, selected }) {
     return <WidgetPreview widget={widget} />;
   },
-  (prev, next) =>
-    prev.widget === next.widget && prev.selected === next.selected,
+  (prev, next) => prev.widget === next.widget && prev.selected === next.selected,
 );
 ```
 
@@ -1105,12 +1100,7 @@ Create `src/features/render-video/components/RenderProgressPanel.jsx`:
  * Displays render progress bar, status message, ETA, and cancel button.
  * Pure presentational — all data comes from props.
  */
-function RenderProgressPanel({
-  progress,
-  activeRenderId,
-  onCancel,
-  ...containerProps
-}) {
+function RenderProgressPanel({ progress, activeRenderId, onCancel, ...containerProps }) {
   // ... byte-identical JSX from RenderVideoDialog
 }
 ```
@@ -1499,9 +1489,10 @@ Sidebar widget CRUD and per-type editors.
 
 Template lifecycle: create, save, import, switch, dirty tracking.
 
-| File                       | Lines | Refactor                                                                                                          | Risk   |
-| -------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------- | ------ |
-| `useTemplateManagement.js` | 281   | Split save-status tracking → `useTemplateSaveStatus.js`; split file dialog helpers → `utils/templateFileUtils.js` | Medium |
+| File                           | Lines | Refactor                                                                                                          | Risk   |
+| ------------------------------ | ----- | ----------------------------------------------------------------------------------------------------------------- | ------ |
+| `useTemplateManagement.js`     | 281   | Split save-status tracking → `useTemplateSaveStatus.js`; split file dialog helpers → `utils/templateFileUtils.js` | Medium |
+| `NewTemplateConfirmDialog.jsx` | 53    | Clean, only requires moving                                                                                       | Low    |
 
 **Total: 281 lines**
 
