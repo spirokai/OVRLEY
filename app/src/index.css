@@ -29,7 +29,7 @@
     sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  font-size: clamp(13px, 0.5vw + 8px, 16px);
+  font-size: clamp(13px, 0.5vw + 8px, 15.5px);
   text-transform: uppercase;
   font-optical-sizing: auto;
   letter-spacing: 0.03em;

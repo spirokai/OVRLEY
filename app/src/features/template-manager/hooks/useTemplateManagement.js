@@ -13,7 +13,7 @@ import {
   normalizeTemplateFilePayload,
   sanitizeTemplateFilename,
   stringifyTemplateFile,
-} from '@/lib/template-snapshot'
+} from '../utils/templateSnapshot'
 import { useTemplateSaveStatus } from './useTemplateSaveStatus'
 import { selectBrowserTemplateFile, getFilenameFromPath, getFilenameFromTemplateId } from '../utils/templateFileUtils'
 

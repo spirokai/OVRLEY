@@ -5,3 +5,5 @@
 
 export { default as NewTemplateConfirmDialog } from './components/NewTemplateConfirmDialog'
 export { default as useTemplateManagement } from './hooks/useTemplateManagement'
+export { DEFAULT_EXPORT_RANGE } from './data/templateConstants'
+export { normalizeTemplateConfig } from './utils/templateSnapshot'

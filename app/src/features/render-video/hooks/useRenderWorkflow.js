@@ -9,11 +9,11 @@
 
 import { useCallback, useMemo } from 'react'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
-import { DEFAULT_EXPORT_RANGE } from '@/lib/template-snapshot'
+import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
-import { getDefaultBitrate } from '@/lib/bitrateDefaults'
+import { getDefaultBitrate } from '../utils/bitrateDefaults'
 import { resolutionsMismatch } from '../utils/codecUtils'
 import useRenderDialogState from './useRenderDialogState'
 import useRenderProgressPolling from './useRenderProgressPolling'

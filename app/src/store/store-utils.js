@@ -2,7 +2,7 @@
  * Provides store utilities related to store utils.
  */
 
-import { DEFAULT_EXPORT_RANGE, normalizeTemplateConfig } from '../lib/template-snapshot'
+import { DEFAULT_EXPORT_RANGE, normalizeTemplateConfig } from '@/features/template-manager'
 import { normalizeColorFields } from '../lib/color-utils'
 import { DEFAULT_GLOBAL_DEFAULTS } from '../lib/config-utils'
 

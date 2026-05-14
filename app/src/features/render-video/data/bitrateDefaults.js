@@ -2,7 +2,11 @@
  * Bitrate defaults in Mbps, keyed by max pixel count.
  * Each entry: { maxPixels, label, h264, h265, h264Hfr, h265Hfr }
  * Hfr = high frame rate (>30 fps). Values in Mbps.
+ *
+ * The companion function getDefaultBitrate lives in ../utils/bitrateDefaults.js.
  */
+
+/** @type {Array<{maxPixels: number, label: string, h264: number, h265: number, h264Hfr: number, h265Hfr: number}>} */
 export const BITRATE_BINS = [
   {
     maxPixels: 2_073_600,
@@ -36,17 +40,4 @@ export const BITRATE_FALLBACK = {
   h265: 60,
   h264Hfr: 100,
   h265Hfr: 80,
-}
-
-export function getDefaultBitrate(width, height, fps, codecName) {
-  const pixels = Number(width || 0) * Number(height || 0)
-  const isHevc = /h265|hevc|x265/i.test(codecName || '')
-  const isHfr = Number(fps || 0) > 30
-  const bin = BITRATE_BINS.find((item) => pixels <= item.maxPixels) ?? {
-    ...BITRATE_FALLBACK,
-    label: 'Fallback',
-  }
-
-  if (isHevc) return isHfr ? bin.h265Hfr : bin.h265
-  return isHfr ? bin.h264Hfr : bin.h264
 }

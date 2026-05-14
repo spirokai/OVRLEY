@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from 'react'
-import { createTemplateState, templateStatesEqual } from '@/lib/template-snapshot'
+import { createTemplateState, templateStatesEqual } from '../utils/templateSnapshot'
 
 /**
  * Derives the template save status from current editor state and the

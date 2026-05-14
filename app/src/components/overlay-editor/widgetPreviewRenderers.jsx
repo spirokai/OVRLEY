@@ -9,7 +9,7 @@ import {
   buildScopedRouteSamples,
   getExportWindowDistanceProgressAtElapsed,
   resolveExportRangeWindow,
-} from '@/lib/export-range'
+} from '@/features/overlay-editor/utils/exportRange'
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from './constants'
 import { buildMetricWidgetPreviewModel } from './metricWidgetPreviewModel'
 import { METRIC_ICON_SVGS } from './metricWidgetAssets'
