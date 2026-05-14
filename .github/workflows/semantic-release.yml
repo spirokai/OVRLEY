@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - skia-render-backend
+      - frontend-refactor
+      - main
+      - video-compositing
   workflow_dispatch:
 
 permissions:

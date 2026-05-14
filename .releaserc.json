@@ -1,5 +1,5 @@
 {
-  "branches": ["skia-render-backend"],
+  "branches": ["skia-render-backend", "frontend-refactor", "video-compositing", "main"],
   "tagFormat": "${version}",
   "plugins": ["@semantic-release/commit-analyzer"]
 }
