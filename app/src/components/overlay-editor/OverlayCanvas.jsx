@@ -10,7 +10,7 @@ import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 import { buildMetricWidgetPreviewModel } from './metricWidgetPreviewModel'
 import WidgetPreview from './WidgetPreview'
 import { buildWidgetTransform } from './utils'
-import { useVideoPreview } from '@/hooks/useVideoPreview'
+import { useVideoPreview } from '@/features/video-preview'
 
 const CANVAS_BACKGROUND_COLORS = {
   black: '#000000',

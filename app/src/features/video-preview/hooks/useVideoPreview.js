@@ -1,18 +1,32 @@
+/**
+ * Manages the <video> preview element: source resolution, metadata loading,
+ * seek/scrub throttling, playback sync, drift correction, and user-facing
+ * warnings for slow loading or slow seeking.
+ */
+
 import { useEffect, useRef, useState } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import useStore from '@/store/useStore'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
 import { useVideoPlaybackClock } from './useVideoPlaybackClock'
+import {
+  DRIFT_CORRECTION_SECONDS,
+  METADATA_SOFT_WARNING_MS,
+  METADATA_STRONG_WARNING_MS,
+  SCRUB_SEEK_EPSILON_SECONDS,
+  SCRUB_SEEK_INTERVAL_MS,
+  SLOW_SEEK_WARNING_COUNT,
+  SLOW_SEEK_WARNING_MS,
+  USE_LOCAL_HTTP_VIDEO_PREVIEW,
+} from '../data/videoPreviewConstants'
 
-const DRIFT_CORRECTION_SECONDS = 0.25
-const SCRUB_SEEK_INTERVAL_MS = 50
-const SCRUB_SEEK_EPSILON_SECONDS = 0.05
-const METADATA_SOFT_WARNING_MS = 10_000
-const METADATA_STRONG_WARNING_MS = 35_000
-const SLOW_SEEK_WARNING_MS = 1_200
-const SLOW_SEEK_WARNING_COUNT = 2
-const USE_LOCAL_HTTP_VIDEO_PREVIEW = import.meta.env.VITE_USE_LOCAL_HTTP_VIDEO_PREVIEW !== 'false'
-
+/**
+ * Clamps a time value to the video's valid range [0, duration].
+ * Returns 0 for negative, NaN, or non-finite values.
+ * @param {HTMLVideoElement} video - The video element whose duration is used as upper bound.
+ * @param {number} second - Requested time in seconds.
+ * @returns {number} Clamped time in seconds within [0, duration].
+ */
 function clampVideoTime(video, second) {
   const nextSecond = Number(second)
 
@@ -28,6 +42,14 @@ function clampVideoTime(video, second) {
   return nextSecond
 }
 
+/**
+ * Assigns `video.currentTime` to the given second (clamped) but skips the
+ * assignment if the difference is within `epsilonSeconds`. This avoids
+ * triggering redundant seek events for negligible positioning changes.
+ * @param {HTMLVideoElement} video - The video element to sync.
+ * @param {number} second - Target time in seconds.
+ * @param {number} [epsilonSeconds=0.001] - Tolerance below which the assignment is skipped.
+ */
 function syncVideoCurrentTime(video, second, epsilonSeconds = 0.001) {
   const safeSecond = clampVideoTime(video, second)
 
@@ -39,6 +61,11 @@ function syncVideoCurrentTime(video, second, epsilonSeconds = 0.001) {
   video.currentTime = safeSecond
 }
 
+/**
+ * Produces a human-readable description for a `MediaError` based on its `.code`.
+ * @param {MediaError|null|undefined} error - The error object from the video element.
+ * @returns {string} A user-facing error description string.
+ */
 function describeMediaError(error) {
   switch (error?.code) {
     case MediaError.MEDIA_ERR_ABORTED:
@@ -59,8 +86,10 @@ function describeMediaError(error) {
  *
  * @param {React.RefObject<HTMLVideoElement>} videoRef Ref to the video element
  * @param {boolean} isActive Whether the imported video preview is currently visible
+ * @returns {{ videoSrc: string, importId: string|null, isOutOfRange: boolean, videoPreviewMessages: string[] }}
  */
 export function useVideoPreview(videoRef, isActive = true) {
+  // Store selectors — subscribes to video import state, playhead position, playback mode, and sync offset
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoImportId = useStore((state) => state.importedVideoImportId)
   const importedVideoPreviewUrl = useStore((state) => state.importedVideoPreviewUrl)
@@ -73,10 +102,13 @@ export function useVideoPreview(videoRef, isActive = true) {
   const setImportedVideoPreviewError = useStore((state) => state.setImportedVideoPreviewError)
   const videoDuration = useStore((state) => state.importedVideoDuration || 0)
 
+  // Local UI state — video source URL and user-facing warning messages
   const [videoSrc, setVideoSrc] = useState('')
   const [metadataStatusMessage, setMetadataStatusMessage] = useState('')
   const [nativeVideoError, setNativeVideoError] = useState('')
   const [seekWarning, setSeekWarning] = useState('')
+
+  // Internal refs — scrub throttling timers, metadata loading timers, slow-seek detection
   const pendingScrubSecondRef = useRef(null)
   const pendingScrubTimeoutRef = useRef(null)
   const lastScrubSeekMsRef = useRef(0)
@@ -85,8 +117,11 @@ export function useVideoPreview(videoRef, isActive = true) {
   const seekStartedAtMsRef = useRef(null)
   const slowSeekCountRef = useRef(0)
 
+  // Derived state — determines whether the video should play (vs. pause/scrub/static)
   const isVideoPlaybackMode = isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video'
 
+  // Video playback clock — publishes preview time from the video element while playing,
+  // driving the global timeline via setSelectedSecondTransient to keep the playhead in sync
   useVideoPlaybackClock({
     videoRef,
     isActive: Boolean(videoSrc) && isVideoPlaybackMode,
@@ -94,7 +129,7 @@ export function useVideoPreview(videoRef, isActive = true) {
     onPreviewSecond: setSelectedSecondTransient,
   })
 
-  // Handle source changes
+  // Video source — resolves the preview URL from the store path or HTTP preview endpoint
   useEffect(() => {
     if (USE_LOCAL_HTTP_VIDEO_PREVIEW && importedVideoPreviewUrl) {
       setVideoSrc(importedVideoPreviewUrl)
@@ -105,6 +140,8 @@ export function useVideoPreview(videoRef, isActive = true) {
     }
   }, [importedVideoPath, importedVideoPreviewUrl])
 
+  // Metadata timers — shows progressive warnings (soft → strong) when the video's metadata
+  // takes unusually long to load, and clears all state+timers when videoSrc changes
   useEffect(() => {
     const clearMetadataTimers = () => {
       if (metadataSoftTimerRef.current) {
@@ -139,6 +176,8 @@ export function useVideoPreview(videoRef, isActive = true) {
     return clearMetadataTimers
   }, [setImportedVideoPreviewError, videoSrc])
 
+  // Scrub cleanup — clears any pending scrub seek timer and refs when the video source changes,
+  // preventing stale seeks from executing against a now-incorrect source
   useEffect(
     () => () => {
       if (pendingScrubTimeoutRef.current) {
@@ -151,10 +190,13 @@ export function useVideoPreview(videoRef, isActive = true) {
     [videoSrc],
   )
 
+  // Video sync — primary effect that manages play/pause/scrub state, drift correction,
+  // and event handlers for loadedmetadata, error, seeking, and seeked
   useEffect(() => {
     const video = videoRef.current
     if (!video || !videoSrc) return
 
+    // Scrub scheduling — clears any pending or queued seek
     const clearPendingScrubSeek = () => {
       if (pendingScrubTimeoutRef.current) {
         window.clearTimeout(pendingScrubTimeoutRef.current)
@@ -163,6 +205,8 @@ export function useVideoPreview(videoRef, isActive = true) {
       pendingScrubSecondRef.current = null
     }
 
+    // Scrub scheduling — immediately executes the most recently requested scrub seek,
+    // bypassing the epsilon check so the seek always fires
     const flushPendingScrubSeek = () => {
       pendingScrubTimeoutRef.current = null
       const nextSecond = pendingScrubSecondRef.current
@@ -174,6 +218,9 @@ export function useVideoPreview(videoRef, isActive = true) {
       }
     }
 
+    // Scrub scheduling — coalesces rapid scrub requests: stores the latest second,
+    // and either flushes immediately (if enough time has elapsed) or schedules a
+    // deferred flush for the remaining interval
     const scheduleScrubSeek = (second) => {
       pendingScrubSecondRef.current = second
       const now = performance.now()
@@ -193,6 +240,10 @@ export function useVideoPreview(videoRef, isActive = true) {
       }
     }
 
+    // Playback state machine — syncs the video element with the global playhead:
+    // - In playback mode: plays the video and applies drift correction if the playhead drifts too far
+    // - In scrubbing mode: throttles seeks via scheduleScrubSeek
+    // - Otherwise (paused/idle): directly seeks to the desired second
     const syncPlaybackState = () => {
       const desiredVideoSecond = selectedSecond - videoSyncOffsetSeconds
 
@@ -230,6 +281,9 @@ export function useVideoPreview(videoRef, isActive = true) {
       syncVideoCurrentTime(video, desiredVideoSecond)
     }
 
+    // Video event handlers
+
+    /** Clears metadata loading timers and immediately syncs playback state once metadata is ready. */
     const handleLoadedMetadata = () => {
       if (metadataSoftTimerRef.current) {
         window.clearTimeout(metadataSoftTimerRef.current)
@@ -243,16 +297,19 @@ export function useVideoPreview(videoRef, isActive = true) {
       syncPlaybackState()
     }
 
+    /** Translates the native MediaError into a user-facing message and sets it in both local state and the store. */
     const handleVideoError = () => {
       const message = describeMediaError(video.error)
       setNativeVideoError(message)
       setImportedVideoPreviewError(message)
     }
 
+    /** Records the start time of a seek operation for slow-seek latency detection. */
     const handleSeeking = () => {
       seekStartedAtMsRef.current = performance.now()
     }
 
+    /** Measures seek latency and increments/decrements a counter; shows a warning if several consecutive slow seeks are detected. */
     const handleSeeked = () => {
       const startedAt = seekStartedAtMsRef.current
       seekStartedAtMsRef.current = null
@@ -273,6 +330,7 @@ export function useVideoPreview(videoRef, isActive = true) {
       }
     }
 
+    // Initialise — perform initial sync, then bind event listeners
     syncPlaybackState()
     video.addEventListener('loadedmetadata', handleLoadedMetadata)
     video.addEventListener('error', handleVideoError)
@@ -297,6 +355,8 @@ export function useVideoPreview(videoRef, isActive = true) {
     videoRef,
   ])
 
+  // Derived return values — computes whether the playhead is outside the video range
+  // and aggregates all preview-related messages into a single array
   const isOutOfRange = selectedSecond < videoSyncOffsetSeconds || selectedSecond > videoSyncOffsetSeconds + videoDuration
   const videoPreviewMessages = [...importedVideoPreviewWarnings, metadataStatusMessage, seekWarning, nativeVideoError].filter(Boolean)
 
