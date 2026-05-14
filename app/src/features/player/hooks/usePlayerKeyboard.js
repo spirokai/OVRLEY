@@ -1,0 +1,68 @@
+/**
+ * Keyboard shortcut hook for the overlay player.
+ */
+
+import { useEffect } from 'react'
+
+function isPlaybackShortcutTarget(target) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return Boolean(target.closest('input, textarea, select, button, a, [role="slider"], [contenteditable="true"]'))
+}
+
+/**
+ * Registers global keyboard shortcuts for player playback and timeline stepping.
+ *
+ * @param {object} options - Keyboard shortcut inputs.
+ * @param {number} options.clampedPlayhead - Current playhead constrained to the timeline duration.
+ * @param {function} options.handlePause - Callback that pauses playback at the current playhead.
+ * @param {function} options.handlePlay - Callback that starts playback from the current playhead.
+ * @param {function} options.handleStep - Callback that steps playback by one second.
+ * @param {boolean} options.hasActivity - Whether there is an activity timeline to control.
+ * @param {boolean} options.isPlaying - Whether preview playback is currently active.
+ * @param {number} options.totalDuration - Total timeline duration in seconds.
+ * @returns {void}
+ */
+export default function usePlayerKeyboard({ clampedPlayhead, handlePause, handlePlay, handleStep, hasActivity, isPlaying, totalDuration }) {
+  // Global shortcuts - maps Space and Arrow keys to playback controls while focus is outside form controls
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (
+        event.repeat ||
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        !hasActivity ||
+        isPlaybackShortcutTarget(event.target)
+      ) {
+        return
+      }
+
+      if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
+        event.preventDefault()
+        const direction = event.code === 'ArrowRight' ? 1 : -1
+        handleStep(direction)
+        return
+      }
+
+      if (event.code !== 'Space' || !hasActivity) {
+        return
+      }
+
+      event.preventDefault()
+
+      if (isPlaying) {
+        handlePause()
+        return
+      }
+
+      handlePlay()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [clampedPlayhead, handlePause, handlePlay, handleStep, hasActivity, isPlaying, totalDuration])
+}
