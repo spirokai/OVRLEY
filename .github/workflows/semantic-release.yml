@@ -3,7 +3,6 @@ name: Semantic Release
 on:
   push:
     branches:
-      - skia-render-backend
       - frontend-refactor
       - main
       - video-compositing

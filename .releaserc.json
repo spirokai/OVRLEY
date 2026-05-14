@@ -1,6 +1,5 @@
 {
   "branches": [
-    {"name": "skia-render-backend"},
     {"name": "frontend-refactor"},
     {"name": "main"},
     {"name": "video-compositing"}
