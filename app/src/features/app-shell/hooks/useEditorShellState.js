@@ -1,5 +1,6 @@
 /**
- * Implements the use Editor Shell State hook and related behavior for the app.
+ * Editor shell state — local UI state for the overlay editor chrome.
+ * Owns zoom level, background mode, grid visibility, snap-to-grid, and UI scale.
  */
 
 import { useEffect, useState } from 'react'
@@ -7,36 +8,54 @@ import { useEffect, useState } from 'react'
 /**
  * Constrains a value to the provided minimum and maximum bounds.
  *
- * @param {*} value - Input value processed by the helper.
- * @param {*} min - Lower bound used by the calculation.
- * @param {*} max - Upper bound used by the calculation.
- * @returns {number} Result produced by the helper.
+ * @param {number} value - Input value.
+ * @param {number} min - Lower bound.
+ * @param {number} max - Upper bound.
+ * @returns {number} Clamped value.
  */
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
 /**
- * Returns ui scale.
+ * Derives the UI scale factor from the viewport width.
+ * Scaled from a 1440px reference, clamped to 0.9–1.08.
  *
- * @param {*} width - Numeric width value.
- * @returns {*} Requested value or structure.
+ * @param {number} width - Viewport width in pixels.
+ * @returns {number} UI scale factor.
  */
 function getUiScale(width) {
   return clamp(Number((width / 1440).toFixed(3)), 0.9, 1.08)
 }
 
 /**
- * Provides editor shell state state and actions.
- * @returns {object} Result produced by the helper.
+ * Container hook for editor shell chrome state.
+ * Manages zoom, background/grid/snap toggles, and responsive UI scale.
+ *
+ * @returns {{
+ *   decreaseZoom: Function,
+ *   editorBackgroundMode: string,
+ *   editorGridVisible: boolean,
+ *   editorSnapToGrid: boolean,
+ *   editorZoomLevel: number,
+ *   increaseZoom: Function,
+ *   resetZoom: Function,
+ *   setEditorBackgroundMode: Function,
+ *   setEditorGridVisible: Function,
+ *   setEditorSnapToGrid: Function,
+ *   setEditorZoomLevel: Function,
+ *   uiScale: number,
+ * }}
  */
 export default function useEditorShellState() {
+  // Local UI state — editor viewport settings with localStorage hydration
   const [editorZoomLevel, setEditorZoomLevel] = useState(1)
   const [editorBackgroundMode, setEditorBackgroundMode] = useState(() => localStorage.getItem('overlayBackgroundMode') || 'checker')
   const [editorGridVisible, setEditorGridVisible] = useState(() => localStorage.getItem('overlayGridVisible') === 'true')
   const [editorSnapToGrid, setEditorSnapToGrid] = useState(() => localStorage.getItem('overlaySnapToGrid') === 'true')
   const [uiScale, setUiScale] = useState(() => (typeof window === 'undefined' ? 1 : getUiScale(window.innerWidth)))
 
+  // Persistence effects — sync each toggle to localStorage on change
   useEffect(() => {
     localStorage.setItem('overlayBackgroundMode', editorBackgroundMode)
   }, [editorBackgroundMode])
@@ -49,6 +68,7 @@ export default function useEditorShellState() {
     localStorage.setItem('overlaySnapToGrid', String(editorSnapToGrid))
   }, [editorSnapToGrid])
 
+  // UI scale — recalculate scale on window resize
   useEffect(() => {
     if (typeof window === 'undefined') {
       return undefined
@@ -65,6 +85,7 @@ export default function useEditorShellState() {
     }
   }, [])
 
+  // Zoom handlers — step-based zoom in/out/reset with clamped bounds
   const decreaseZoom = () => {
     setEditorZoomLevel((current) => clamp(Number((current - 0.05).toFixed(2)), 0.35, 4))
   }
