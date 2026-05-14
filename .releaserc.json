@@ -2,7 +2,8 @@
   "branches": [
     {"name": "skia-render-backend"},
     {"name": "frontend-refactor"},
-    {"name": "main"}
+    {"name": "main"},
+    {"name": "video-compositing"}
   ],
   "tagFormat": "${version}",
   "plugins": ["@semantic-release/commit-analyzer"]
