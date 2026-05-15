@@ -25,6 +25,7 @@ const GRADIENT_TRIANGLE_GAP_PX: f32 = 8.0;
 const GRADIENT_ZERO_EPSILON: f64 = 0.05;
 const MAX_GRADIENT_ABS_PERCENT: f64 = 25.0;
 const GRADIENT_ZERO_LINE_WIDTH_PX: f32 = 1.0;
+const NUMERIC_VERTICAL_METRICS_TEXT: &str = "0123456789-:.%";
 
 /// Parsed SVG icon with enough data for Skia stroke rendering.
 #[derive(Clone, Debug)]
@@ -249,6 +250,11 @@ fn draw_metric_parts(
     // The metric row is manually laid out so icon, value, and units can each use
     // their own size while sharing one top-left anchor.
     let value_measure = measure_text(&parts.value_text, base_style, font_dirs);
+    let value_vertical_measure = measure_text(
+        metric_vertical_metrics_text(&parts.value_text),
+        base_style,
+        font_dirs,
+    );
     let value_line_height = base_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
 
     let mut units_style = base_style.clone();
@@ -281,7 +287,8 @@ fn draw_metric_parts(
     };
     let text_group_top = base_style.y + ((row_height - text_group_height) * 0.5);
     let text_group_bottom = text_group_top + text_group_height;
-    let value_glyph_height = (value_measure.bounds_bottom - value_measure.bounds_top).abs();
+    let value_glyph_height =
+        (value_vertical_measure.bounds_bottom - value_vertical_measure.bounds_top).abs();
     let value_top = text_group_bottom - (value_line_height + value_glyph_height) * 0.5;
 
     let mut value_style = base_style.clone();
@@ -299,9 +306,12 @@ fn draw_metric_parts(
             base_style.shadow_strength,
             base_style.shadow_distance,
             base_style.x + value.icon_offset_x.unwrap_or(0.0) * scale,
-            base_style.y
-                + ((row_height - icon_size) * 0.5)
-                + value.icon_offset_y.unwrap_or(0.0) * scale,
+            metric_icon_top_from_value_layout(
+                text_group_bottom,
+                value_line_height,
+                &value_vertical_measure,
+                icon_size,
+            ) + value.icon_offset_y.unwrap_or(0.0) * scale,
             icon_size,
         );
     }
@@ -321,6 +331,7 @@ fn draw_metric_parts(
 pub(crate) fn has_static_metric_icon(value: &ValueConfig) -> bool {
     value.show_icon.unwrap_or(value.value != "gradient")
         && metric_icon_kind_for_value(value.value.as_str()).is_some()
+        && metric_icon_has_stable_static_vertical_metrics(value)
 }
 
 // Draws one static metric icon for caching in the base layer.
@@ -329,6 +340,7 @@ pub(crate) fn draw_static_metric_icon_for_value(
     value: &ValueConfig,
     base_style: &ResolvedTextStyle,
     scale: f32,
+    font_dirs: &[PathBuf],
 ) -> bool {
     // Static icon drawing is used for the cached base layer. Dynamic text is
     // drawn later, but the icon can be reused every frame.
@@ -344,8 +356,11 @@ pub(crate) fn draw_static_metric_icon_for_value(
         return false;
     }
 
-    let text_group_height = base_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
-    let row_height = icon_size.max(text_group_height);
+    let value_line_height = base_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
+    let row_height = icon_size.max(value_line_height);
+    let text_group_top = base_style.y + ((row_height - value_line_height) * 0.5);
+    let text_group_bottom = text_group_top + value_line_height;
+    let value_vertical_measure = measure_text(NUMERIC_VERTICAL_METRICS_TEXT, base_style, font_dirs);
     draw_metric_icon(
         canvas,
         Some(icon_kind),
@@ -355,12 +370,48 @@ pub(crate) fn draw_static_metric_icon_for_value(
         base_style.shadow_strength,
         base_style.shadow_distance,
         base_style.x + value.icon_offset_x.unwrap_or(0.0) * scale,
-        base_style.y
-            + ((row_height - icon_size) * 0.5)
-            + value.icon_offset_y.unwrap_or(0.0) * scale,
+        metric_icon_top_from_value_layout(
+            text_group_bottom,
+            value_line_height,
+            &value_vertical_measure,
+            icon_size,
+        ) + value.icon_offset_y.unwrap_or(0.0) * scale,
         icon_size,
     );
     true
+}
+
+// Returns the text used for vertical alignment measurements. This mirrors the
+// editor preview, which stabilizes numeric metric rows across changing values.
+fn metric_vertical_metrics_text(text: &str) -> &str {
+    if !text.is_empty()
+        && text
+            .chars()
+            .all(|ch| ch.is_ascii_digit() || matches!(ch, ':' | '.' | '%' | '+' | '-'))
+    {
+        NUMERIC_VERTICAL_METRICS_TEXT
+    } else {
+        text
+    }
+}
+
+// Static icons are cached without the current frame value. Keep that fast path
+// only when the preview also uses stable numeric metrics for vertical layout.
+fn metric_icon_has_stable_static_vertical_metrics(value: &ValueConfig) -> bool {
+    value.value != "time" || value.format.as_deref().unwrap_or("time-24") == "time-24"
+}
+
+// Computes icon top so metric icons are centered on the value glyphs rather
+// than on the row line box. This matches the frontend preview layout.
+fn metric_icon_top_from_value_layout(
+    text_group_bottom: f32,
+    value_line_height: f32,
+    value_measure: &crate::render::text::MeasuredText,
+    icon_size: f32,
+) -> f32 {
+    let value_glyph_height = (value_measure.bounds_bottom - value_measure.bounds_top).abs();
+    let value_top = text_group_bottom - (value_line_height + value_glyph_height) * 0.5;
+    value_top + (value_line_height * 0.5) - (icon_size * 0.5)
 }
 
 // Draws a scaled parsed metric icon with optional shadow.
@@ -813,7 +864,11 @@ fn point_from_command(current: Point, x: f32, y: f32, is_relative: bool) -> Poin
 
 #[cfg(test)]
 mod tests {
-    use super::gradient_triangle_height;
+    use super::{
+        gradient_triangle_height, metric_icon_top_from_value_layout, metric_vertical_metrics_text,
+        NUMERIC_VERTICAL_METRICS_TEXT,
+    };
+    use crate::render::text::MeasuredText;
 
     #[test]
     // Verifies missing and near-zero gradients produce no triangle height.
@@ -828,5 +883,37 @@ mod tests {
         let expected = (72.0_f32) * (5.0_f32.to_radians().tan());
         let actual = gradient_triangle_height(Some(10.0), 72.0);
         assert!((actual - expected).abs() < 0.001);
+    }
+
+    #[test]
+    // Verifies numeric values use stable preview-compatible vertical metrics.
+    fn metric_vertical_metrics_text_uses_canonical_numeric_sample() {
+        assert_eq!(
+            metric_vertical_metrics_text("19:00"),
+            NUMERIC_VERTICAL_METRICS_TEXT
+        );
+        assert_eq!(
+            metric_vertical_metrics_text("-12.5%"),
+            NUMERIC_VERTICAL_METRICS_TEXT
+        );
+        assert_eq!(metric_vertical_metrics_text("TEMP"), "TEMP");
+    }
+
+    #[test]
+    // Verifies icon placement centers on value glyphs instead of the row box.
+    fn metric_icon_top_centers_on_value_glyph_box() {
+        let measure = MeasuredText {
+            width: 100.0,
+            bounds_left: 0.0,
+            bounds_top: -70.0,
+            bounds_right: 100.0,
+            bounds_bottom: 10.0,
+            ascent: -80.0,
+            descent: 20.0,
+        };
+
+        let actual = metric_icon_top_from_value_layout(92.0, 92.0, &measure, 44.0);
+
+        assert!((actual - 30.0).abs() < 0.001);
     }
 }

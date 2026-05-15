@@ -404,6 +404,8 @@ fn render_frame_to_surface(
     frame_profiler.measure("text.dynamic", || {
         for value in &config.values {
             let style = value_style(&config.scene, value, scale);
+            let static_icon_rendered_for_value =
+                static_metric_icons_rendered && has_static_metric_icon(value);
             if draw_metric_value_widget_with_config(
                 canvas,
                 config,
@@ -413,7 +415,7 @@ fn render_frame_to_surface(
                 frame_index,
                 scale,
                 &paths.font_dirs,
-                static_metric_icons_rendered,
+                static_icon_rendered_for_value,
             ) {
                 continue;
             }
@@ -482,7 +484,7 @@ fn cached_labels_image(
             let style = label_style(&config.scene, label, scale);
             draw_text(surface.canvas(), &label.text, &style, &paths.font_dirs);
         }
-        draw_static_metric_icons(surface.canvas(), config, scale);
+        draw_static_metric_icons(surface.canvas(), paths, config, scale);
     });
     let image = surface.image_snapshot();
     prepare_profiler.record_ms(
@@ -523,7 +525,7 @@ pub fn prepare_base_rgba(
             let style = label_style(&config.scene, label, scale);
             draw_text(surface.canvas(), &label.text, &style, &paths.font_dirs);
         }
-        draw_static_metric_icons(surface.canvas(), config, scale);
+        draw_static_metric_icons(surface.canvas(), paths, config, scale);
     });
     drop(surface);
     Ok(Some(pixels))
@@ -560,10 +562,15 @@ fn config_has_static_metric_icons(config: &RenderConfig) -> bool {
 }
 
 // Draws metric icons that do not depend on the current frame value.
-fn draw_static_metric_icons(canvas: &skia_safe::Canvas, config: &RenderConfig, scale: f32) {
+fn draw_static_metric_icons(
+    canvas: &skia_safe::Canvas,
+    paths: &AppPaths,
+    config: &RenderConfig,
+    scale: f32,
+) {
     for value in &config.values {
         let style = value_style(&config.scene, value, scale);
-        draw_static_metric_icon_for_value(canvas, value, &style, scale);
+        draw_static_metric_icon_for_value(canvas, value, &style, scale, &paths.font_dirs);
     }
 }
 
