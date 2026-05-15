@@ -126,6 +126,19 @@ export function updateConfigPersistence(state) {
  * @returns {*} Requested value or structure.
  */
 export function readStoredConfig() {
+  const loadedTemplateFilename = localStorage.getItem('loadedTemplateFilename')
+  const lastSavedTemplateState = readStoredJson('lastSavedTemplateState', null)
+  if (loadedTemplateFilename && lastSavedTemplateState?.config?.scene) {
+    const savedGlobalDefaults = normalizeColorFields(lastSavedTemplateState.settings?.globalDefaults || {})
+    const globalDefaults = {
+      ...DEFAULT_GLOBAL_DEFAULTS,
+      ...savedGlobalDefaults,
+    }
+    const savedConfig = normalizeTemplateConfig(lastSavedTemplateState.config, globalDefaults)
+    localStorage.setItem('editorConfig', JSON.stringify(savedConfig))
+    return savedConfig
+  }
+
   const savedConfig = localStorage.getItem('editorConfig')
   if (savedConfig) {
     try {
