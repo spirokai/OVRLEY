@@ -74,6 +74,12 @@ async function main() {
   const discoveredBinDir = dirname(discoveredBinary)
   await cp(discoveredBinDir, binDir, { recursive: true })
 
+  const discoveredLibDir = resolve(discoveredBinDir, '..', 'lib')
+  try {
+    await stat(discoveredLibDir)
+    await cp(discoveredLibDir, join(installDir, 'lib'), { recursive: true })
+  } catch { /* no lib/ directory, that's fine */ }
+
   if (process.platform !== 'win32') {
     await chmod(binaryPath, 0o755)
   }
