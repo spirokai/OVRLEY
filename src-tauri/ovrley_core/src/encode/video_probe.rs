@@ -87,9 +87,11 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, S
     let streams = json.get("streams").and_then(|v| v.as_array());
 
     if let Some(format_obj) = format {
-        if let Some(duration_str) = format_obj.get("duration").and_then(|v| v.as_str()) {
-            metadata.duration = duration_str.parse::<f64>().ok();
-        }
+        let format_duration = format_obj
+            .get("duration")
+            .and_then(|v| v.as_str())
+            .and_then(parse_positive_f64);
+        metadata.duration = format_duration;
         metadata.container_format = format_obj
             .get("format_name")
             .and_then(|v| v.as_str())
@@ -150,6 +152,8 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, S
             metadata.fps_num = Some(num);
             metadata.fps_den = Some(den);
         }
+
+        metadata.duration = read_video_stream_duration(stream, metadata.fps).or(metadata.duration);
     }
 
     // println!("[OVRLEY] Probing video: {}", file_path);
@@ -206,6 +210,26 @@ fn read_rational_rate(stream: &Value, key: &str) -> Option<(u32, u32)> {
     (num > 0 && den > 0).then_some((num, den))
 }
 
+fn read_video_stream_duration(stream: &Value, fps: Option<f64>) -> Option<f64> {
+    stream
+        .get("duration")
+        .and_then(|v| v.as_str())
+        .and_then(parse_positive_f64)
+        .or_else(|| {
+            let frames = stream
+                .get("nb_frames")
+                .and_then(|v| v.as_str())
+                .and_then(|value| value.parse::<u64>().ok())?;
+            let fps = fps.filter(|value| value.is_finite() && *value > 0.0)?;
+            Some(frames as f64 / fps)
+        })
+}
+
+fn parse_positive_f64(value: &str) -> Option<f64> {
+    let parsed = value.parse::<f64>().ok()?;
+    (parsed.is_finite() && parsed > 0.0).then_some(parsed)
+}
+
 fn read_rotation_degrees(stream: &Value) -> Option<i32> {
     stream
         .get("tags")
@@ -224,4 +248,34 @@ fn read_rotation_degrees(stream: &Value) -> Option<i32> {
                     })
                 })
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_video_stream_duration;
+    use serde_json::json;
+
+    #[test]
+    fn reads_video_stream_duration_before_container_duration() {
+        let stream = json!({
+            "duration": "30.033333",
+            "nb_frames": "901"
+        });
+
+        assert_eq!(
+            read_video_stream_duration(&stream, Some(30.0)),
+            Some(30.033333)
+        );
+    }
+
+    #[test]
+    fn falls_back_to_frame_count_when_stream_duration_is_missing() {
+        let stream = json!({
+            "nb_frames": "901"
+        });
+
+        let duration = read_video_stream_duration(&stream, Some(30.0)).unwrap();
+
+        assert!((duration - 30.033333333333335).abs() < 1e-9);
+    }
 }

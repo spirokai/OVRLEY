@@ -33,6 +33,7 @@ export default function useRenderProgressPolling({ renderingVideo, setRenderProg
           status: data.status || 'rendering',
           message: data.message || '',
           estimatedSecondsRemaining: data.estimated_seconds_remaining,
+          renderingFps: data.rendering_fps ?? null,
           filename: data.filename || null,
         })
       } catch (error) {

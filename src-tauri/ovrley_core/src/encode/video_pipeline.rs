@@ -10,6 +10,7 @@ use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::encode::ffmpeg::{build_ffmpeg_settings, resolve_ffmpeg_binary, suppress_child_console};
+use crate::encode::progress::ProgressEstimator;
 use crate::encode::video::RenderController;
 use crate::encode::video_debug::{
     create_debug_dir, render_sample_frames_enabled, sample_frame_indices, write_prepare_summary,
@@ -41,12 +42,6 @@ struct WriterResult {
     written_frames: u32,
     /// Writer-side timing buckets.
     timings: BTreeMap<String, TimingBucket>,
-}
-
-/// Exponential moving average estimator for remaining render time.
-#[derive(Default)]
-struct ProgressEstimator {
-    ema_seconds_per_frame: Option<f64>,
 }
 
 /// Renders one video output by streaming Skia-rendered frames to ffmpeg.
@@ -177,12 +172,14 @@ pub(crate) fn render_video_single(
             rendered_frames += 1;
             let frame_ms = frame_started.elapsed().as_secs_f64() * 1000.0;
             aggregate_profiler.record_ms("frame.total", frame_ms);
-            let estimate = estimator.record(rendered_frames, total_frames, frame_ms / 1000.0);
+            let (estimate, rendering_fps) =
+                estimator.record(rendered_frames, total_frames, frame_ms / 1000.0);
             controller.set_frame_progress(
                 rendered_frames,
                 total_frames,
                 encoded_frames.load(Ordering::SeqCst),
                 estimate,
+                rendering_fps,
             );
         }
         Ok(())
@@ -513,17 +510,4 @@ fn ffmpeg_input_pix_fmt() -> String {
     // Exposed for diagnosing platform-specific pixel-format issues without
     // recompiling the backend.
     std::env::var("OVRLEY_INPUT_PIX_FMT").unwrap_or_else(|_| "rgba".to_string())
-}
-
-impl ProgressEstimator {
-    /// Records a frame duration and returns an estimated remaining second count.
-    fn record(&mut self, current: u32, total: u32, frame_seconds: f64) -> Option<u64> {
-        self.ema_seconds_per_frame = Some(match self.ema_seconds_per_frame {
-            Some(previous) => previous * 0.85 + frame_seconds * 0.15,
-            None => frame_seconds,
-        });
-        let remaining = total.saturating_sub(current);
-        self.ema_seconds_per_frame
-            .map(|avg| (avg * remaining as f64).max(0.0).round() as u64)
-    }
 }

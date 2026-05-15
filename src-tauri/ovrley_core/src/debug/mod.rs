@@ -21,7 +21,7 @@ pub struct RenderProgress {
     pub current: u32,
     /// Total number of frames expected in the encoded output.
     pub total: u32,
-    /// Number of frames ffmpeg has reported as encoded.
+    /// Number of output frames encoded or covered by the active render pipeline.
     pub encoded: u32,
     /// State string such as `idle`, `rendering`, `complete`, `error`, or `cancelled`.
     pub status: String,
@@ -29,6 +29,8 @@ pub struct RenderProgress {
     pub message: String,
     /// Estimated remaining render seconds, when enough samples exist.
     pub estimated_seconds_remaining: Option<u64>,
+    /// Estimated final output frame production rate, when enough samples exist.
+    pub rendering_fps: Option<f64>,
     /// Final output filename after a successful render.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filename: Option<String>,
@@ -45,6 +47,7 @@ impl Default for RenderProgress {
             status: "idle".to_string(),
             message: String::new(),
             estimated_seconds_remaining: None,
+            rendering_fps: None,
             filename: None,
         }
     }

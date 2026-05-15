@@ -114,7 +114,7 @@ fn test_5_4_lower_overlay_update_rate_renders_half_overlay_frames() {
         render_fixture_composite("tmp/test-4k.mp4", 60000, 1001, 0.2, 2, 600.0, 3840, 2160);
     let fps = ffprobe_video_rates(&result.paths.repo_root, &result.output_path);
 
-    assert_eq!(result.controller.progress().encoded, 6);
+    assert_eq!(result.controller.progress().encoded, 12);
     assert_eq!(result.controller.progress().total, 12);
     assert!(fps.contains("r_frame_rate=60000/1001") || fps.contains("avg_frame_rate=60000/1001"));
 }
@@ -125,7 +125,7 @@ fn test_5_5_aggressive_overlay_update_rate_renders_one_sixth_overlay_frames() {
         render_fixture_composite("tmp/test-4k.mp4", 60000, 1001, 0.2, 6, 600.0, 3840, 2160);
     let fps = ffprobe_video_rates(&result.paths.repo_root, &result.output_path);
 
-    assert_eq!(result.controller.progress().encoded, 2);
+    assert_eq!(result.controller.progress().encoded, 12);
     assert_eq!(result.controller.progress().total, 12);
     assert!(fps.contains("r_frame_rate=60000/1001") || fps.contains("avg_frame_rate=60000/1001"));
 }

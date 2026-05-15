@@ -22,6 +22,7 @@ use crate::encode::ffmpeg_composite::{
     build_composite_ffmpeg_settings, CompositeFfmpegSettings, HwAccelInfo,
 };
 use crate::encode::fps::Fps;
+use crate::encode::progress::ProgressEstimator;
 use crate::encode::video::RenderController;
 use crate::encode::video_debug::timestamp_nanos;
 use crate::render::{prepare_preview_assets, render_frame_rgba, RenderTarget};
@@ -92,6 +93,7 @@ pub(crate) fn render_composite_video_single(
         plan.output_frame_count.min(u64::from(u32::MAX)) as u32,
         0,
         None,
+        None,
     );
 
     let (prepared_preview_assets, _, _, _) =
@@ -121,6 +123,9 @@ pub(crate) fn render_composite_video_single(
     let mut overlay_frame_index = 0u64;
     let mut written_overlay_frames = 0u64;
     let render_started = Instant::now();
+    let output_frame_equivalent_multiplier =
+        plan.output_fps.as_f64() / plan.overlay_pipe_fps.as_f64();
+    let mut estimator = ProgressEstimator::default();
 
     let render_result = (|| -> Result<(), String> {
         loop {
@@ -137,6 +142,7 @@ pub(crate) fn render_composite_video_single(
             if video_local_time >= plan.render_duration {
                 break;
             }
+            let frame_started = Instant::now();
             let activity_time = composite_sync_offset + video_local_time;
             let dense_frame_index =
                 dense_frame_index_for_overlay(config, dense_activity, &plan, activity_time)?;
@@ -164,11 +170,20 @@ pub(crate) fn render_composite_video_single(
             overlay_frame_index += 1;
             let estimated_output_progress =
                 output_progress_for_overlay_time(video_local_time, &plan);
-            controller.set_frame_progress(
-                estimated_output_progress.min(total_progress),
+            let current_progress = estimated_output_progress.min(total_progress);
+            let output_equivalent_frame_seconds =
+                frame_started.elapsed().as_secs_f64() / output_frame_equivalent_multiplier;
+            let (estimate, rendering_fps) = estimator.record(
+                current_progress,
                 total_progress,
-                written_overlay_frames.min(u64::from(u32::MAX)) as u32,
-                None,
+                output_equivalent_frame_seconds,
+            );
+            controller.set_frame_progress(
+                current_progress,
+                total_progress,
+                current_progress,
+                estimate,
+                rendering_fps,
             );
         }
         Ok(())
@@ -222,8 +237,9 @@ pub(crate) fn render_composite_video_single(
     controller.set_frame_progress(
         total_progress,
         total_progress,
-        written_overlay_frames.min(u64::from(u32::MAX)) as u32,
+        total_progress,
         Some(0),
+        None,
     );
     Ok(plan.output_filename)
 }
@@ -289,6 +305,7 @@ fn is_pipe_write_error(error: &str) -> bool {
         && (lower.contains("broken pipe")
             || lower.contains("pipe is being closed")
             || lower.contains("os error 32")
+            || lower.contains("os error 109")
             || lower.contains("os error 232"))
 }
 

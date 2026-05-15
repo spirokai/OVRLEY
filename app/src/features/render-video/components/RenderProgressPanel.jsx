@@ -9,20 +9,21 @@
  * @param {number} props.renderProgress.total - Total frame count.
  * @param {string} props.renderProgress.message - Status message from the backend.
  * @param {number|null} props.renderProgress.estimatedSecondsRemaining - Estimated remaining time.
+ * @param {number|null} props.renderProgress.renderingFps - Estimated output-frame-equivalent production FPS.
  * @param {number} props.renderProgress.encoded - Number of encoded frames.
  * @param {function} props.onCancel - Async callback invoked when user clicks cancel.
  */
 
 import { useEffect, useState } from 'react'
-import { Film, Loader2, Timer } from 'lucide-react'
+import { Activity, Film, Loader2, Timer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { formatTime } from '../utils/format'
+import { formatFps, formatTime } from '../utils/format'
 
 function RenderProgressPanel({ renderProgress, onCancel }) {
   const [isCancelling, setIsCancelling] = useState(false)
 
-  const { percent, current, total, message, estimatedSecondsRemaining, encoded } = renderProgress
+  const { percent, current, total, message, estimatedSecondsRemaining, renderingFps, encoded } = renderProgress
 
   useEffect(() => {
     if (renderProgress.status !== 'rendering') {
@@ -72,6 +73,13 @@ function RenderProgressPanel({ renderProgress, onCancel }) {
 
       {!isFinalizing && (
         <div className="flex items-center justify-center gap-6 pt-2">
+          <div className="flex flex-col items-center">
+            <div className="mb-1 flex items-center gap-1.5 text-muted-foreground">
+              <Activity className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Render FPS</span>
+            </div>
+            <span className="text-lg font-mono font-bold text-foreground">{formatFps(renderingFps)}</span>
+          </div>
           <div className="flex flex-col items-center">
             <div className="mb-1 flex items-center gap-1.5 text-muted-foreground">
               <Timer className="h-3.5 w-3.5" />

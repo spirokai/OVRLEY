@@ -88,6 +88,7 @@ impl RenderController {
                 status: "rendering".to_string(),
                 message: message.to_string(),
                 estimated_seconds_remaining: None,
+                rendering_fps: None,
                 filename: None,
             };
         }
@@ -101,12 +102,14 @@ impl RenderController {
         total: u32,
         encoded: u32,
         estimate: Option<u64>,
+        rendering_fps: Option<f64>,
     ) {
         if let Ok(mut progress) = self.progress.lock() {
             progress.current = current;
             progress.total = total;
             progress.encoded = encoded;
             progress.estimated_seconds_remaining = estimate;
+            progress.rendering_fps = rendering_fps;
             progress.message = if current >= total {
                 "Encoding output file...".to_string()
             } else {
@@ -123,6 +126,7 @@ impl RenderController {
             progress.status = "complete".to_string();
             progress.message = "Video rendered successfully".to_string();
             progress.estimated_seconds_remaining = Some(0);
+            progress.rendering_fps = None;
             progress.filename = Some(filename);
         }
         self.running.store(false, Ordering::SeqCst);
@@ -143,6 +147,7 @@ impl RenderController {
                 error
             };
             progress.estimated_seconds_remaining = None;
+            progress.rendering_fps = None;
             progress.filename = None;
         }
         self.running.store(false, Ordering::SeqCst);
@@ -426,7 +431,12 @@ fn render_video_segmented_qtrle(
             .iter()
             .filter_map(|progress| progress.estimated_seconds_remaining)
             .max();
-        controller.set_frame_progress(current, combined_frames, encoded, estimate);
+        let rendering_fps = progress_snapshots
+            .iter()
+            .filter_map(|progress| progress.rendering_fps)
+            .sum::<f64>();
+        let rendering_fps = (rendering_fps > 0.0).then_some(rendering_fps);
+        controller.set_frame_progress(current, combined_frames, encoded, estimate, rendering_fps);
 
         match rx.recv_timeout(Duration::from_millis(200)) {
             Ok(SegmentEvent::Completed(index, Ok(filename))) => {
@@ -470,7 +480,13 @@ fn render_video_segmented_qtrle(
             "Segmented qtrle render did not produce all output files".to_string()
         })?;
 
-    controller.set_frame_progress(combined_frames, combined_frames, combined_frames, Some(0));
+    controller.set_frame_progress(
+        combined_frames,
+        combined_frames,
+        combined_frames,
+        Some(0),
+        None,
+    );
 
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let public_filename = format!("video_{}.mov", timestamp_nanos()?);

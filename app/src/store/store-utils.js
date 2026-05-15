@@ -32,6 +32,7 @@ export const DEFAULT_RENDER_PROGRESS = {
   status: 'idle',
   message: '',
   estimatedSecondsRemaining: null,
+  renderingFps: null,
   encoded: 0,
   filename: null,
 }

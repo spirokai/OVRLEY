@@ -14,6 +14,8 @@ pub mod ffmpeg;
 pub mod ffmpeg_composite;
 /// Rational frame-rate helpers shared by composite encoding modules.
 pub mod fps;
+/// Live render progress estimation helpers.
+pub(crate) mod progress;
 /// Render controller and public video render orchestration.
 pub mod video;
 /// Composite MP4 render pipeline used by the composite render entry point.

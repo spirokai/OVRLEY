@@ -18,3 +18,17 @@ export function formatTime(seconds) {
   const secs = seconds % 60
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
+
+/**
+ * Formats render production FPS for display.
+ *
+ * @param {number|null|undefined} fps - Numeric frames-per-second value.
+ * @returns {string} Formatted FPS value.
+ */
+export function formatFps(fps) {
+  if (fps === null || fps === undefined || !Number.isFinite(fps)) {
+    return '--'
+  }
+
+  return fps.toFixed(1)
+}
