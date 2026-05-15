@@ -15,6 +15,7 @@ export function useAppShellStore() {
       config: state.config,
       generatingImage: state.generatingImage,
       globalDefaults: state.globalDefaults,
+      importingVideo: state.importingVideo,
       setConfig: state.setConfig,
       setErrorMessage: state.setErrorMessage,
     })),

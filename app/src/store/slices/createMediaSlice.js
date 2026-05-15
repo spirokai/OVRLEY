@@ -16,6 +16,7 @@ export function createMediaSlice(set, get) {
 
   return {
     generatingImage: false,
+    importingVideo: false,
     renderingVideo: false,
     errorMessage: null,
     videoFilename: localStorage.getItem('videoFilename') || null,
@@ -27,6 +28,11 @@ export function createMediaSlice(set, get) {
     setGeneratingImage: (generating) =>
       set((state) => {
         state.generatingImage = generating
+      }),
+
+    setImportingVideo: (importing) =>
+      set((state) => {
+        state.importingVideo = importing
       }),
 
     setRenderingVideo: (rendering) =>

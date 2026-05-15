@@ -28,7 +28,7 @@ import * as backend from './api/backend'
  * @returns {JSX.Element} Rendered component output.
  */
 function AppShell() {
-  const { config, generatingImage, globalDefaults, setConfig, setErrorMessage } = useAppShellStore()
+  const { config, generatingImage, globalDefaults, importingVideo, setConfig, setErrorMessage } = useAppShellStore()
   const { backendStatus } = useBackendStatus()
   const editorShell = useEditorShellState()
   const { gpxFilename, handleGpxFileOpen } = useActivityImport()
@@ -113,7 +113,10 @@ function AppShell() {
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="relative flex min-w-0 flex-1 flex-col bg-background">
-            <LoadingOverlay show={generatingImage} />
+            <LoadingOverlay
+              show={generatingImage || importingVideo}
+              label={importingVideo ? 'Importing video...' : 'Generating activity...'}
+            />
             <div className="min-h-0 flex-1">
               <OverlayEditor
                 config={config}

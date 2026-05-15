@@ -3,6 +3,10 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
+
+const CODEC_PROBE_TIMEOUT: Duration = Duration::from_secs(8);
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -72,9 +76,21 @@ pub fn detect_codecs(repo_root: &Path) -> Result<AvailableCodecs, String> {
             "-i",
             "nullsrc=s=256x256:d=1",
             "-vf",
-            "hwupload",
+            "format=yuva444p10le,hwupload",
             "-c:v",
             "prores_ks_vulkan",
+            "-profile:v",
+            "4",
+            "-mbs_per_slice",
+            "2",
+            "-vendor",
+            "apl0",
+            "-alpha_bits",
+            "16",
+            "-async_depth",
+            "4",
+            "-pix_fmt",
+            "vulkan",
             "-frames:v",
             "1",
             "-f",
@@ -450,15 +466,38 @@ fn probe_codec(name: &str, ffmpeg_path: &Path, args: &[&str]) -> bool {
     probe_codec_owned(name, ffmpeg_path, &owned_args)
 }
 
-fn probe_codec_owned(_name: &str, ffmpeg_path: &Path, args: &[String]) -> bool {
+fn probe_codec_owned(name: &str, ffmpeg_path: &Path, args: &[String]) -> bool {
     let mut command = Command::new(ffmpeg_path);
+    command.arg("-nostdin");
     command.args(args);
     suppress_child_console(&mut command);
     command.stdout(Stdio::null());
     command.stderr(Stdio::null());
 
-    match command.status() {
-        Ok(status) => status.success(),
+    match command.spawn() {
+        Ok(mut child) => {
+            let started_at = Instant::now();
+            loop {
+                match child.try_wait() {
+                    Ok(Some(status)) => return status.success(),
+                    Ok(None) if started_at.elapsed() >= CODEC_PROBE_TIMEOUT => {
+                        eprintln!(
+                            "[OVRLEY] ffmpeg codec probe timed out after {}s: {name}",
+                            CODEC_PROBE_TIMEOUT.as_secs()
+                        );
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return false;
+                    }
+                    Ok(None) => thread::sleep(Duration::from_millis(50)),
+                    Err(_) => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return false;
+                    }
+                }
+            }
+        }
         Err(_) => false,
     }
 }

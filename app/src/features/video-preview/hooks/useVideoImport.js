@@ -23,6 +23,7 @@ export default function useVideoImport() {
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const setImportedVideo = useStore((state) => state.setImportedVideo)
   const clearImportedVideo = useStore((state) => state.clearImportedVideo)
+  const setImportingVideo = useStore((state) => state.setImportingVideo)
   const config = useStore((state) => state.config)
   const setConfig = useStore((state) => state.setConfig)
 
@@ -41,26 +42,31 @@ export default function useVideoImport() {
           },
         ],
       })
-      if (selected) {
-        const response = await importPreviewVideo(selected)
-        const metadata = {
-          ...response.metadata,
-          importId: response.importId,
-          previewUrl: response.previewUrl,
-          previewWarnings: response.warnings ?? [],
-          previewError: null,
-        }
-        setImportedVideo(metadata)
-        if (metadata.fps && config?.scene) {
-          setConfig({
-            ...config,
-            scene: { ...config.scene, fps: Math.round(metadata.fps) },
-          })
-        }
-        // Phase 2: computeVideoSync will be called here
+      if (!selected) {
+        return
       }
+
+      setImportingVideo(true)
+      const response = await importPreviewVideo(selected)
+      const metadata = {
+        ...response.metadata,
+        importId: response.importId,
+        previewUrl: response.previewUrl,
+        previewWarnings: response.warnings ?? [],
+        previewError: null,
+      }
+      setImportedVideo(metadata)
+      if (metadata.fps && config?.scene) {
+        setConfig({
+          ...config,
+          scene: { ...config.scene, fps: Math.round(metadata.fps) },
+        })
+      }
+      // Phase 2: computeVideoSync will be called here
     } catch (err) {
       console.error('Failed to import video:', err)
+    } finally {
+      setImportingVideo(false)
     }
   }
 

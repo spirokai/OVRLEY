@@ -1,5 +1,7 @@
 import { detectCodecs } from '@/api/backend'
 
+let availableCodecsPromise = null
+
 export const createVideoImportSlice = (set, get) => ({
   importedVideoPath: null, // absolute path from Tauri file dialog
   importedVideoDuration: null, // seconds (float), read via ffprobe
@@ -73,19 +75,34 @@ export const createVideoImportSlice = (set, get) => ({
     }),
 
   fetchAvailableCodecs: async () => {
-    try {
-      const availableCodecs = await detectCodecs()
-      set({
-        availableCodecs,
-      })
-      return availableCodecs
-    } catch (error) {
-      console.error('Failed to detect ffmpeg codecs:', error)
-      set({
-        availableCodecs: null,
-      })
-      return null
+    const cachedCodecs = get().availableCodecs
+    if (cachedCodecs) {
+      return cachedCodecs
     }
+
+    if (availableCodecsPromise) {
+      return availableCodecsPromise
+    }
+
+    availableCodecsPromise = detectCodecs()
+      .then((availableCodecs) => {
+        set({
+          availableCodecs,
+        })
+        return availableCodecs
+      })
+      .catch((error) => {
+        console.error('Failed to detect ffmpeg codecs:', error)
+        set({
+          availableCodecs: null,
+        })
+        return null
+      })
+      .finally(() => {
+        availableCodecsPromise = null
+      })
+
+    return availableCodecsPromise
   },
 
   computeVideoSync: (activitySummary) =>
