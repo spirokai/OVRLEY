@@ -15,7 +15,7 @@ export function createMediaSlice(set, get) {
   localStorage.removeItem('imageFilename')
 
   return {
-    generatingImage: false,
+    isProcessing: false,
     importingVideo: false,
     renderingVideo: false,
     errorMessage: null,
@@ -25,9 +25,9 @@ export function createMediaSlice(set, get) {
     activeRenderId: null,
     renderProgress: { ...DEFAULT_RENDER_PROGRESS },
 
-    setGeneratingImage: (generating) =>
+    setProcessing: (processing) =>
       set((state) => {
-        state.generatingImage = generating
+        state.isProcessing = processing
       }),
 
     setImportingVideo: (importing) =>

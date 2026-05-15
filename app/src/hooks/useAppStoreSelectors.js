@@ -13,7 +13,7 @@ export function useAppShellStore() {
   return useStore(
     useShallow((state) => ({
       config: state.config,
-      generatingImage: state.generatingImage,
+      isProcessing: state.isProcessing,
       globalDefaults: state.globalDefaults,
       importingVideo: state.importingVideo,
       setConfig: state.setConfig,
@@ -46,7 +46,7 @@ export function useActivityStore() {
       activitySummary: state.activitySummary,
       gpxFilename: state.gpxFilename,
       setErrorMessage: state.setErrorMessage,
-      setGeneratingImage: state.setGeneratingImage,
+      setProcessing: state.setProcessing,
     })),
   )
 }
@@ -70,7 +70,7 @@ export function useTemplateStore() {
       loadedTemplateFilename: state.loadedTemplateFilename,
       loadedTemplateSource: state.loadedTemplateSource,
       setErrorMessage: state.setErrorMessage,
-      setGeneratingImage: state.setGeneratingImage,
+      setProcessing: state.setProcessing,
       setLastSavedTemplateState: state.setLastSavedTemplateState,
       setLoadedTemplate: state.setLoadedTemplate,
       templates: state.templates,

@@ -39,7 +39,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     loadedTemplateFilename,
     loadedTemplateSource,
     setErrorMessage,
-    setGeneratingImage,
+    setProcessing,
     setLastSavedTemplateState,
     setLoadedTemplate,
     templates,
@@ -84,7 +84,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
       if (!filename) return
 
       try {
-        setGeneratingImage(true)
+        setProcessing(true)
         const data = await backend.getTemplate(filename)
         const normalizedTemplate = normalizeTemplateFilePayload(data, {
           globalDefaults,
@@ -104,7 +104,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         console.error('Failed to load template:', error)
         setErrorMessage(`Failed to load template: ${error.message}`)
       } finally {
-        setGeneratingImage(false)
+        setProcessing(false)
       }
     },
     [
@@ -114,7 +114,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
       globalDefaults,
       hydrateTemplateState,
       setErrorMessage,
-      setGeneratingImage,
+      setProcessing,
       setLastSavedTemplateState,
       updateRate,
     ],

@@ -34,7 +34,7 @@ const selectBrowserGpxFile = () =>
  */
 export default function useActivityImport() {
   // Store selectors — activity import state from the global store
-  const { gpxFilename, setErrorMessage, setGeneratingImage } = useActivityStore()
+  const { gpxFilename, setErrorMessage, setProcessing } = useActivityStore()
 
   // Activity file handler — opens file dialog, imports GPX/FIT, handles errors
   const handleGpxFileOpen = useCallback(async () => {
@@ -44,15 +44,15 @@ export default function useActivityImport() {
 
       if (!selected) return
 
-      setGeneratingImage(true)
+      setProcessing(true)
       await saveFileFromPath(selected)
     } catch (error) {
       console.error('GPX selection failed:', error)
       setErrorMessage(`GPX Selection failed: ${error.message}`)
     } finally {
-      setGeneratingImage(false)
+      setProcessing(false)
     }
-  }, [setErrorMessage, setGeneratingImage])
+  }, [setErrorMessage, setProcessing])
 
   return {
     gpxFilename,
