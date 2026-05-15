@@ -2383,6 +2383,10 @@ or:
 Requested hardware encoder is unavailable.
 ```
 
+### 11. Abstract the default ffmpeg commands
+
+- For each profile, abstract the default ffmpeg command into a separate file (one file total) so they can be easily edited/tweaked outside the main pipeline code. This also allows for easier debugging and testing of individual profiles.
+
 ## Deliverables
 
 - Hardware profile selection implemented.
@@ -2393,6 +2397,7 @@ Requested hardware encoder is unavailable.
 - VAAPI support added or clearly deferred behind profile availability.
 - User bitrate respected across all profiles.
 - Fallback behavior implemented and logged.
+- FFmpeg command templates for each profile in a separate file.
 
 ## Manual tests after Phase 8
 

@@ -2,6 +2,9 @@ use super::*;
 use crate::activity::{build_dense_activity_report, parse_activity_json};
 use crate::config::{parse_config_json, RenderConfig};
 use crate::encode::video::RenderController;
+use crate::encode::video_composite_debug::{
+    write_composite_timing_summary, CompositeTimingSummaryInput,
+};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
@@ -333,6 +336,92 @@ fn test_6_6_output_file_exists_and_is_nonzero_on_success() {
 }
 
 #[test]
+fn test_7_1_timing_summary_exists() {
+    let paths = write_fixture_phase7_summary("phase7_summary_exists");
+
+    assert!(phase7_timing_summary_path(&paths).is_file());
+    assert!(phase7_timing_summary_path(&paths)
+        .parent()
+        .unwrap()
+        .ends_with("1778853729503903000"));
+}
+
+#[test]
+fn test_7_2_phase_marker_is_correct() {
+    let paths = write_fixture_phase7_summary("phase7_phase_marker");
+    let summary = phase7_timing_summary(&paths);
+
+    assert_eq!(summary["phase"], "phase_7");
+    assert_eq!(summary["mode"], "mp4_composite");
+}
+
+#[test]
+fn test_7_3_fps_values_are_recorded_as_rationals() {
+    let paths = write_fixture_phase7_summary("phase7_rational_fps");
+    let summary = phase7_timing_summary(&paths);
+
+    assert_eq!(summary["diagnostics"]["source_fps"], "60000/1001");
+    assert_eq!(summary["diagnostics"]["overlay_pipe_fps"], "30000/1001");
+    assert_eq!(summary["update_rate"], 2);
+    assert_eq!(summary["fps"], 59.94);
+    assert_eq!(summary["layout_fps"], 29.97);
+}
+
+#[test]
+fn test_7_4_frame_counts_are_recorded() {
+    let paths = write_fixture_phase7_summary("phase7_frame_counts");
+    let summary = phase7_timing_summary(&paths);
+
+    assert_eq!(summary["rendered_frames"], 6);
+    assert_eq!(summary["layout_total_frames"], 6);
+    assert_eq!(summary["total_frames"], 12);
+}
+
+#[test]
+fn test_7_5_total_wall_time_is_recorded() {
+    let paths = write_fixture_phase7_summary("phase7_total_wall_time");
+    let summary = phase7_timing_summary(&paths);
+
+    assert!(summary["total_time_taken"].as_f64().unwrap() > 0.0);
+    assert!(summary["overlay_filename"]
+        .as_str()
+        .unwrap()
+        .contains("video_composited_1778853729503903000.mp4"));
+    assert!(summary["diagnostics"]["render_loop_ms"].as_f64().unwrap() > 0.0);
+    assert!(
+        summary["diagnostics"]["ffmpeg_finalize_wait_ms"]
+            .as_f64()
+            .unwrap()
+            >= 0.0
+    );
+    assert!(summary["timings"]["frame.total"]["count"].as_u64().unwrap() > 0);
+    assert!(
+        summary["timings"]["ffmpeg.write"]["count"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+    assert_eq!(
+        summary["diagnostics"]["ffmpeg_timing_note"],
+        "FFmpeg decode/filter/encode timings are not isolated; ffmpeg.write measures stdin write/backpressure time."
+    );
+    assert!(summary["performance"]["ffmpeg_decode_filter_encode_note"]
+        .as_str()
+        .unwrap()
+        .contains("cannot be exactly separated"));
+    assert!(summary["timings"]
+        .get("composite.widget_update_rate")
+        .is_none());
+}
+
+#[test]
+fn test_7_6_phase_7_output_is_only_created_by_composite_render() {
+    let paths = test_paths_named("phase7_transparent_unaffected");
+
+    assert!(!paths.debug_render_dir.join("phase_7").exists());
+}
+
+#[test]
 #[ignore = "Long-running 4K end-to-end render for manual validation."]
 fn test_manual_full_duration_4k_composite() {
     let result = render_fixture_composite(
@@ -542,6 +631,76 @@ fn composited_outputs(paths: &AppPaths) -> Vec<String> {
         .collect::<Vec<_>>();
     outputs.sort();
     outputs
+}
+
+fn phase7_timing_summary_path(paths: &AppPaths) -> PathBuf {
+    let phase_dir = paths.debug_render_dir.join("phase_7");
+    let mut summaries = fs::read_dir(&phase_dir)
+        .unwrap_or_else(|error| panic!("Failed to read {}: {error}", phase_dir.display()))
+        .flatten()
+        .map(|entry| entry.path().join("timing_summary.json"))
+        .filter(|path| path.is_file())
+        .collect::<Vec<_>>();
+    summaries.sort();
+    summaries
+        .pop()
+        .unwrap_or_else(|| panic!("No Phase 7 timing summary under {}", phase_dir.display()))
+}
+
+fn phase7_timing_summary(paths: &AppPaths) -> Value {
+    let json = fs::read_to_string(phase7_timing_summary_path(paths)).unwrap();
+    serde_json::from_str(&json).unwrap()
+}
+
+fn write_fixture_phase7_summary(path_name: &str) -> AppPaths {
+    let paths = test_paths_named(path_name);
+    let _ = fs::remove_dir_all(paths.debug_render_dir.join("phase_7"));
+    let source_fps = Fps::new(60000, 1001).unwrap();
+    let overlay_pipe_fps = Fps::new(30000, 1001).unwrap();
+    let ffmpeg_settings = build_composite_ffmpeg_settings(
+        "libx264",
+        "20M",
+        PathBuf::from("input.mp4").as_path(),
+        0.0,
+        0.2,
+        1920,
+        1080,
+        source_fps,
+        overlay_pipe_fps,
+        &HwAccelInfo::default(),
+    )
+    .unwrap();
+    let output_path = paths
+        .downloads_dir
+        .join("video_composited_1778853729503903000.mp4");
+    let mut profiler = RenderProfiler::default();
+    profiler.record_ms("frame.total", 1.0);
+    profiler.record_ms("frame.draw", 0.8);
+    profiler.record_ms("ffmpeg.write", 0.5);
+
+    write_composite_timing_summary(CompositeTimingSummaryInput {
+        debug_render_dir: &paths.debug_render_dir,
+        ffmpeg_settings: &ffmpeg_settings,
+        output_path: &output_path,
+        source_fps,
+        overlay_pipe_fps,
+        widget_update_rate: 2,
+        render_duration: 0.2,
+        overlay_frame_count: 6,
+        output_frame_count: 12,
+        total_ms: 123.4,
+        render_loop_ms: 100.0,
+        ffmpeg_finalize_wait_ms: 23.4,
+        timings: profiler.summary(),
+        codec: "libx264",
+        bitrate: "20M",
+        input_width: 1920,
+        input_height: 1080,
+        trim_start: 0.0,
+        sync_offset: 600.0,
+    })
+    .unwrap();
+    paths
 }
 
 fn recent_template_config(width: u32, height: u32) -> RenderConfig {

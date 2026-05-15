@@ -24,6 +24,9 @@ use crate::encode::ffmpeg_composite::{
 use crate::encode::fps::Fps;
 use crate::encode::progress::ProgressEstimator;
 use crate::encode::video::RenderController;
+use crate::encode::video_composite_debug::{
+    write_composite_timing_summary, CompositeTimingSummaryInput,
+};
 use crate::encode::video_debug::timestamp_nanos;
 use crate::render::{prepare_preview_assets, render_frame_rgba, RenderTarget};
 
@@ -40,6 +43,10 @@ struct CompositePipelinePlan {
     overlay_frame_count: u64,
     output_frame_count: u64,
     first_overrun_overlay_index: u64,
+    widget_update_rate: u32,
+    trim_start: f64,
+    codec_name: String,
+    bitrate: String,
     ffmpeg_settings: CompositeFfmpegSettings,
     output_filename: String,
     output_path: PathBuf,
@@ -123,6 +130,7 @@ pub(crate) fn render_composite_video_single(
     let mut overlay_frame_index = 0u64;
     let mut written_overlay_frames = 0u64;
     let render_started = Instant::now();
+    let render_loop_started = Instant::now();
     let output_frame_equivalent_multiplier =
         plan.output_fps.as_f64() / plan.overlay_pipe_fps.as_f64();
     let mut estimator = ProgressEstimator::default();
@@ -144,27 +152,40 @@ pub(crate) fn render_composite_video_single(
             }
             let frame_started = Instant::now();
             let activity_time = composite_sync_offset + video_local_time;
-            let dense_frame_index =
-                dense_frame_index_for_overlay(config, dense_activity, &plan, activity_time)?;
+            let frame_result = (|| -> Result<(), String> {
+                let dense_frame_index =
+                    dense_frame_index_for_overlay(config, dense_activity, &plan, activity_time)?;
 
-            render_frame_rgba(
-                paths,
-                config,
-                dense_activity,
-                &prepared_preview_assets.prepared_assets,
-                dense_frame_index,
-                scale,
-                None,
-                RenderTarget {
-                    width,
-                    height,
-                    pixels: frame_pixels.as_mut_slice(),
-                },
-                &mut profiler,
-            )?;
-            stdin
-                .write_all(frame_pixels.as_slice())
-                .map_err(|error| format!("Failed writing composite overlay frame: {error}"))?;
+                render_frame_rgba(
+                    paths,
+                    config,
+                    dense_activity,
+                    &prepared_preview_assets.prepared_assets,
+                    dense_frame_index,
+                    scale,
+                    None,
+                    RenderTarget {
+                        width,
+                        height,
+                        pixels: frame_pixels.as_mut_slice(),
+                    },
+                    &mut profiler,
+                )?;
+                let write_started = Instant::now();
+                stdin
+                    .write_all(frame_pixels.as_slice())
+                    .map_err(|error| format!("Failed writing composite overlay frame: {error}"))?;
+                profiler.record_ms(
+                    "ffmpeg.write",
+                    write_started.elapsed().as_secs_f64() * 1000.0,
+                );
+                Ok(())
+            })();
+            profiler.record_ms(
+                "frame.total",
+                frame_started.elapsed().as_secs_f64() * 1000.0,
+            );
+            frame_result?;
 
             written_overlay_frames += 1;
             overlay_frame_index += 1;
@@ -189,14 +210,17 @@ pub(crate) fn render_composite_video_single(
         }
         Ok(())
     })();
+    let render_loop_ms = render_loop_started.elapsed().as_secs_f64() * 1000.0;
 
     drop(stdin);
     let was_cancelled = cancel_flag.load(Ordering::SeqCst);
+    let ffmpeg_finalize_started = Instant::now();
     let status = if was_cancelled {
         terminate_composite_ffmpeg_after_cancel(&mut child)?
     } else {
         child.wait().map_err(|error| error.to_string())?
     };
+    let ffmpeg_finalize_wait_ms = ffmpeg_finalize_started.elapsed().as_secs_f64() * 1000.0;
     monitor_thread
         .join()
         .map_err(|_| "Composite ffmpeg monitor thread panicked".to_string())?;
@@ -234,7 +258,28 @@ pub(crate) fn render_composite_video_single(
     }
     verify_successful_composite_output(&plan.output_path)?;
 
-    let _total_time_taken = render_started.elapsed().as_secs_f64();
+    let total_ms = render_started.elapsed().as_secs_f64() * 1000.0;
+    write_composite_timing_summary(CompositeTimingSummaryInput {
+        debug_render_dir: &paths.debug_render_dir,
+        ffmpeg_settings: &plan.ffmpeg_settings,
+        output_path: &plan.output_path,
+        source_fps: plan.source_fps,
+        overlay_pipe_fps: plan.overlay_pipe_fps,
+        widget_update_rate: plan.widget_update_rate,
+        render_duration: plan.render_duration,
+        overlay_frame_count: written_overlay_frames,
+        output_frame_count: plan.output_frame_count,
+        total_ms,
+        render_loop_ms,
+        ffmpeg_finalize_wait_ms,
+        timings: profiler.summary(),
+        codec: &plan.codec_name,
+        bitrate: &plan.bitrate,
+        input_width: width,
+        input_height: height,
+        trim_start: plan.trim_start,
+        sync_offset: composite_sync_offset,
+    })?;
     controller.set_frame_progress(
         total_progress,
         total_progress,
@@ -406,6 +451,10 @@ fn derive_composite_pipeline_plan(
         overlay_frame_count,
         output_frame_count,
         first_overrun_overlay_index,
+        widget_update_rate: update_rate,
+        trim_start,
+        codec_name,
+        bitrate: composite_bitrate.to_string(),
         ffmpeg_settings,
         output_filename,
         output_path,

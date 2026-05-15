@@ -18,6 +18,8 @@ pub mod fps;
 pub(crate) mod progress;
 /// Render controller and public video render orchestration.
 pub mod video;
+/// Composite-only debug summaries for MP4 compositing diagnostics.
+pub(crate) mod video_composite_debug;
 /// Composite MP4 render pipeline used by the composite render entry point.
 pub(crate) mod video_composite_pipeline;
 /// Debug summaries, sample-frame exports, and segment stitching helpers.
