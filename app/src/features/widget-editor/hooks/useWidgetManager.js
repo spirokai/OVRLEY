@@ -6,7 +6,7 @@
 import { useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
-import { getCurrentParsedActivity } from '@/api/activityCache'
+import { getCurrentParsedActivity } from '@/lib/activity/cache'
 import { buildConfigWidgets, deleteWidgetInConfig, groupWidgetsForSidebar, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget-config'
 import { TYPE_LABELS } from '../data/widgetDefinitions'
 import { createLabelDefaults, createMetricValueDefaults, createPlotDefaults, clamp, parseInteger } from '../utils/widgetUtils'

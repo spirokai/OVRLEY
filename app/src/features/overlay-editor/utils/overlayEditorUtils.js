@@ -5,13 +5,10 @@
  * Pure functions. No React imports, no side effects.
  */
 
+import { clamp } from '@/lib/utils'
 import { DEFAULT_ACTIVITY_PREVIEW } from '../data/overlayEditorConfig'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
 import { getContainerFps } from '@/lib/update-rate'
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value))
-}
 
 /**
  * Returns the configured scene dimensions with defaults of 1920x1080.

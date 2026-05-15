@@ -1,5 +1,5 @@
 /**
- * Implements API helpers for activity metric series.
+ * Metric series derivation — gradient, heading, pace, torque, elevation smoothing.
  */
 
 /**

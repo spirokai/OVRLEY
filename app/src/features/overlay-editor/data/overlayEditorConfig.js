@@ -7,7 +7,7 @@
  * component references used as icon lookup values.
  */
 
-import { Clock3, Gauge, Heart, Map, Mountain, RefreshCw, Thermometer, TrendingUp, Type, Zap } from 'lucide-react'
+import { WIDGET_ICONS } from '@/lib/widget-icons'
 
 /**
  * Maps font file names and short names to CSS font-family strings.
@@ -22,22 +22,7 @@ export const FONT_FAMILY_MAP = {
   Furore: '"Furore", "Arial Black", Impact, sans-serif',
 }
 
-/**
- * Maps widget type names to Lucide icon components for badge rendering.
- * @type {Object<string, import('lucide-react').LucideIcon>}
- */
-export const WIDGET_ICONS = {
-  label: Type,
-  speed: Gauge,
-  heartrate: Heart,
-  cadence: RefreshCw,
-  power: Zap,
-  time: Clock3,
-  temperature: Thermometer,
-  gradient: TrendingUp,
-  course: Map,
-  elevation: Mountain,
-}
+export { WIDGET_ICONS }
 
 /**
  * Default activity metric values used as fallback when no real activity is loaded.

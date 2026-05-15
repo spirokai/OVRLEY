@@ -39,7 +39,7 @@ export default function useActivityImport() {
   // Activity file handler — opens file dialog, imports GPX/FIT, handles errors
   const handleGpxFileOpen = useCallback(async () => {
     try {
-      const { default: saveFileFromPath } = await import('@/api/gpxUtils')
+      const { default: saveFileFromPath } = await import('@/lib/activity/import-activity')
       const selected = await selectBrowserGpxFile()
 
       if (!selected) return

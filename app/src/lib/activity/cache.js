@@ -3,7 +3,6 @@
  */
 
 let currentParsedActivity = null
-let currentParsedActivityDebug = null
 
 /**
  * Sets current activity cache.
@@ -12,9 +11,8 @@ let currentParsedActivityDebug = null
  * @param {*} debugPayload - Value for debug payload.
  * @returns {*} Result produced by the helper.
  */
-export function setCurrentActivityCache(activity, debugPayload = null) {
+export function setCurrentActivityCache(activity) {
   currentParsedActivity = activity
-  currentParsedActivityDebug = debugPayload
 }
 
 /**
@@ -26,18 +24,9 @@ export function getCurrentParsedActivity() {
 }
 
 /**
- * Returns current parsed activity debug.
- * @returns {*} Requested value or structure.
- */
-export function getCurrentParsedActivityDebug() {
-  return currentParsedActivityDebug
-}
-
-/**
  * Clears current activity cache.
  * @returns {*} Result produced by the helper.
  */
 export function clearCurrentActivityCache() {
   currentParsedActivity = null
-  currentParsedActivityDebug = null
 }

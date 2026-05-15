@@ -3,19 +3,8 @@
  * Owns zoom level, background mode, grid visibility, snap-to-grid, and UI scale.
  */
 
+import { clamp } from '@/lib/utils'
 import { useEffect, useState } from 'react'
-
-/**
- * Constrains a value to the provided minimum and maximum bounds.
- *
- * @param {number} value - Input value.
- * @param {number} min - Lower bound.
- * @param {number} max - Upper bound.
- * @returns {number} Clamped value.
- */
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value))
-}
 
 /**
  * Derives the UI scale factor from the viewport width.

@@ -2,19 +2,8 @@
  * Provides shared helpers for custom export range handling.
  */
 
+import { clamp } from '@/lib/utils'
 import { interpolateCoursePoint, interpolateNumericSeries, coursePointsEqual } from '@/lib/interpolation'
-
-/**
- * Constrains a value to [min, max].
- *
- * @param {number} value - Input value.
- * @param {number} min - Lower bound.
- * @param {number} max - Upper bound.
- * @returns {number} Clamped value.
- */
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value))
-}
 
 /**
  * Converts a time string (HH:MM:SS, MM:SS, or plain seconds) to seconds.

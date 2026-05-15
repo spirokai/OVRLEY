@@ -159,27 +159,6 @@ export function groupWidgetsForSidebar(widgets, typeLabels) {
  * @param {*} widgetId - Identifier of the target widget.
  * @returns {*} Requested value or structure.
  */
-export function findWidgetById(config, widgetId) {
-  const target = resolveWidgetTarget(widgetId)
-  if (!target) {
-    return null
-  }
-
-  const widgetData = config?.[target.category]?.[target.index]
-  if (!widgetData) {
-    return null
-  }
-
-  return {
-    id: target.id,
-    type: target.category === 'labels' ? 'label' : widgetData.value,
-    category: target.category,
-    index: target.index,
-    name: target.category === 'labels' ? widgetData.text || 'Text' : widgetData.value,
-    data: widgetData,
-  }
-}
-
 /**
  * Updates widget in config.
  *

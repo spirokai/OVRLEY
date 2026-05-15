@@ -26,7 +26,7 @@ export function normalizeFontKey(value) {
  * @param {*} value - Input value processed by the helper.
  * @returns {*} Requested value or structure.
  */
-export function getRecommendedFont(value) {
+function getRecommendedFont(value) {
   const key = normalizeFontKey(value)
   return RECOMMENDED_FONTS.find((font) => normalizeFontKey(font.id) === key || normalizeFontKey(font.name) === key) || null
 }

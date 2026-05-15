@@ -5,17 +5,8 @@
  * Domain-agnostic pure functions extracted from features/overlay-editor.
  */
 
-/**
- * Constrains a value to the provided minimum and maximum bounds.
- *
- * @param {number} value - Input value.
- * @param {number} min - Lower bound.
- * @param {number} max - Upper bound.
- * @returns {number} Clamped value within [min, max].
- */
-export function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value))
-}
+import { clamp } from './utils'
+export { clamp }
 
 /**
  * Builds a CSS transform string from scale and rotation values.

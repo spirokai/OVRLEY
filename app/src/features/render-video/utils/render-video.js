@@ -1,13 +1,16 @@
 /**
- * Implements API helpers for render video.
+ * Orchestrates a video render request — reads store state, applies config
+ * transformations (global defaults, codec, export range, composite video),
+ * and sends the payload to the backend via Tauri IPC.
  */
 
-import { getCurrentParsedActivity } from './activityCache'
-import useStore from '../store/useStore'
-import * as backend from './backend'
-import { applyGlobalDefaults } from '../lib/config-utils'
+import { getCurrentParsedActivity } from '@/lib/activity/cache'
+import useStore from '@/store/useStore'
+import * as backend from '@/api/backend'
+import { applyGlobalDefaults } from '@/lib/config-utils'
 import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
-import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '../lib/update-rate'
+import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
+import { formatCompositeBitrate, isCompositeCodec, isQsvFullCodec, resolveCompositeFps } from './render-execution'
 
 /**
  * Renders video.
@@ -47,15 +50,12 @@ export default async function renderVideo(overrides = {}) {
     const activeExportCodec = overrideExportCodec ?? exportCodec
     const resolvedExportCodec = importedVideoPath && !isCompositeCodec(activeExportCodec) ? 'libx264' : activeExportCodec || 'prores_ks'
 
-    // Validate we have required data
     if (!activeConfig || !activeConfig.scene) {
       throw new Error('No valid config available')
     }
 
-    // Apply global defaults and overrides
     const config = applyGlobalDefaults(activeConfig, globalDefaults)
 
-    // Apply performance and range overrides
     if (config.scene) {
       config.scene.fps = sanitizeIntegerFps(config.scene.fps)
       config.scene.update_rate = normalizeUpdateRateForFps(config.scene.fps, activeUpdateRate)
@@ -100,7 +100,6 @@ export default async function renderVideo(overrides = {}) {
         config.scene.ffmpeg.pix_fmt = config.scene.ffmpeg.pix_fmt || 'argb'
       }
 
-      // Apply export range override if custom
       config.scene.custom_export_range_active = false
       if (activeExportRange.type === 'custom') {
         const start = Math.trunc(timeToSeconds(activeExportRange.fromTime))
@@ -148,7 +147,6 @@ export default async function renderVideo(overrides = {}) {
     const data = await backend.renderVideo(config, parsedActivity)
 
     if (data.error) {
-      // Check for cancellation
       if (data.cancelled || data.error.toLowerCase().includes('cancelled')) {
         console.log('Render cancelled by user')
         return { success: false, cancelled: true }
@@ -179,113 +177,4 @@ export default async function renderVideo(overrides = {}) {
     console.error('Error in renderVideo:', error)
     throw error
   }
-}
-
-/**
- * Resolves imported-video FPS metadata to the rational fields expected by Rust.
- *
- * @param {*} fpsNum - Exact FPS numerator from ffprobe, when available.
- * @param {*} fpsDen - Exact FPS denominator from ffprobe, when available.
- * @param {*} fps - Floating FPS fallback from older metadata.
- * @returns {{num:number, den:number}|null} Reduced rational FPS or null.
- */
-function resolveCompositeFps(fpsNum, fpsDen, fps) {
-  const num = Number(fpsNum)
-  const den = Number(fpsDen)
-  if (Number.isInteger(num) && num > 0 && Number.isInteger(den) && den > 0) {
-    return reduceFps(num, den)
-  }
-
-  const value = Number(fps)
-  if (!Number.isFinite(value) || value <= 0) {
-    return null
-  }
-
-  const commonRates = [
-    [23.976, 24000, 1001],
-    [29.97, 30000, 1001],
-    [59.94, 60000, 1001],
-    [25, 25, 1],
-    [30, 30, 1],
-    [60, 60, 1],
-  ]
-  const match = commonRates.find(([approx]) => Math.abs(value - approx) <= 0.001)
-  if (match) {
-    return { num: match[1], den: match[2] }
-  }
-
-  return reduceFps(Math.round(value * 1000), 1000)
-}
-
-/**
- * Reduces a rational FPS pair.
- *
- * @param {number} num - FPS numerator.
- * @param {number} den - FPS denominator.
- * @returns {{num:number, den:number}} Reduced FPS pair.
- */
-function reduceFps(num, den) {
-  let a = Math.abs(num)
-  let b = Math.abs(den)
-  while (b !== 0) {
-    const next = a % b
-    a = b
-    b = next
-  }
-  const gcd = Math.max(a, 1)
-  return { num: num / gcd, den: den / gcd }
-}
-
-/**
- * Formats dialog bitrate values for FFmpeg's `-b:v` argument.
- *
- * @param {*} value - Numeric Mbps value or already formatted FFmpeg bitrate.
- * @returns {string} FFmpeg bitrate string.
- */
-function formatCompositeBitrate(value) {
-  const bitrate = Number(value)
-  if (Number.isFinite(bitrate) && bitrate > 0) {
-    return `${bitrate}M`
-  }
-  if (typeof value === 'string' && value.trim()) {
-    return value.trim()
-  }
-  return '20M'
-}
-
-/**
- * Returns whether a codec is valid for MP4 compositing output.
- *
- * @param {*} codec - Candidate FFmpeg codec name.
- * @returns {boolean} Whether the codec belongs to the composite MP4 path.
- */
-function isCompositeCodec(codec) {
-  return [
-    'libx264',
-    'libx265',
-    'h264_nvenc',
-    'hevc_nvenc',
-    'nnvgpu_h264',
-    'nnvgpu_hevc',
-    'h264_qsv',
-    'hevc_qsv',
-    'qsv_full_h264',
-    'qsv_full_hevc',
-    'h264_amf',
-    'hevc_amf',
-    'h264_videotoolbox',
-    'hevc_videotoolbox',
-    'h264_vaapi',
-    'hevc_vaapi',
-  ].includes(codec)
-}
-
-/**
- * Returns whether a codec value names an experimental full-QSV profile.
- *
- * @param {*} codec - Candidate codec or profile name.
- * @returns {boolean} Whether the value requires detected QSV filter init args.
- */
-function isQsvFullCodec(codec) {
-  return ['qsv_full_h264', 'qsv_full_hevc'].includes(codec)
 }

@@ -156,7 +156,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     setRenderDialogPhase('progress')
 
     try {
-      const { default: renderVideo } = await import('@/api/renderVideo')
+      const { default: renderVideo } = await import('@/features/render-video/utils/render-video')
       const result = await renderVideo({
         config: nextConfig,
         updateRate: nextUpdateRate,

@@ -2,17 +2,7 @@
  * Pure helpers for player timeline calculations and formatting.
  */
 
-/**
- * Constrains a value to the provided minimum and maximum bounds.
- *
- * @param {number} value - Input value to constrain.
- * @param {number} min - Lower bound used by the calculation.
- * @param {number} max - Upper bound used by the calculation.
- * @returns {number} Value constrained to the provided range.
- */
-export function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value))
-}
+export { clamp } from '@/lib/utils'
 
 /**
  * Formats a timeline second value as a clock label.

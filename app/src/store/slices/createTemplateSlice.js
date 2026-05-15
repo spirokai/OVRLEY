@@ -4,12 +4,11 @@
 
 import * as backend from '../../api/backend'
 import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
-import { syncGlobalDefaultsToConfig } from '../../lib/config-utils'
+import { DEFAULT_GLOBAL_DEFAULTS, syncGlobalDefaultsToConfig } from '../../lib/config-utils'
+import { DEFAULT_EXPORT_RANGE } from '../../features/template-manager'
 import {
   cloneSerializable,
   DEFAULT_CONFIG,
-  DEFAULT_EXPORT_RANGE,
-  DEFAULT_GLOBAL_DEFAULTS,
   persistSerializable,
   readStoredJson,
   readStoredTemplateSettings,

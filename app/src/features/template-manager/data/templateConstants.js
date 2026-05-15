@@ -3,6 +3,8 @@
  * Used by templateSnapshot.js for config normalization and file I/O.
  */
 
+import { TYPE_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS } from '../../widget-editor/data/widgetDefaults'
+
 /** File format identifier for OVRLEY template files. */
 export const TEMPLATE_FILE_FORMAT = 'ovrley-template'
 
@@ -93,82 +95,19 @@ export const ELEVATION_PLOT_KEYS = [
 ]
 
 /** Default values applied to value widgets of each type during normalization. */
-export const VALUE_DEFAULTS = {
-  speed: {
-    show_icon: true,
-    show_units: true,
-    speed_unit: 'kmh',
-  },
-  heartrate: {
-    show_icon: true,
-    show_units: false,
-  },
-  cadence: {
-    show_icon: true,
-    show_units: false,
-  },
-  power: {
-    show_icon: true,
-    show_units: false,
-  },
-  temperature: {
-    show_icon: true,
-    show_units: true,
-    temperature_unit: 'celsius',
-  },
-  time: {
-    show_icon: true,
-    show_units: false,
-    format: 'time-24',
-  },
-  gradient: {
-    decimals: 0,
-    value_offset: 0,
-    triangle_positive_color: '#40e0d0',
-    triangle_negative_color: '#c65102',
-    show_sign: true,
-    show_triangle: true,
-    triangle_width: 72,
-  },
-}
+export const VALUE_DEFAULTS = Object.fromEntries(
+  Object.entries(TYPE_DEFAULTS).map(([type, defaults]) => [type, type === 'gradient' ? defaults : { show_icon: true, ...defaults }]),
+)
 
 /** Default values applied to plot widgets of each type during normalization. */
 export const PLOT_DEFAULTS = {
-  course: {
-    opacity: 1,
-    rotation: 0,
-    completed_line_width: 6,
-    remaining_line_width: 6,
-    completed_line_opacity: 100,
-    remaining_line_opacity: 35,
-    simplify_tolerance_px: 1,
-    target_density: 1,
-    show_full_activity: false,
-    marker_size: 18,
-    marker_opacity: 100,
-  },
+  course: { opacity: 1, rotation: 0, completed_line_width: 6, remaining_line_width: 6, ...COURSE_PLOT_DEFAULTS },
   elevation: {
     opacity: 1,
     rotation: 0,
     completed_line_width: 6,
     remaining_line_width: 6,
-    completed_line_opacity: 100,
-    remaining_line_opacity: 35,
-    area_completed_opacity: 24,
-    area_completed_color: '#ffffff',
     area_remaining_color: '#00565c',
-    area_remaining_opacity: 12,
-    show_elevation_metric: true,
-    show_elevation_imperial: false,
-    metric_label_offset_x: 0,
-    metric_label_offset_y: 0,
-    imperial_label_offset_x: 0,
-    imperial_label_offset_y: 0,
-    y_scale: 1,
-    simplify_tolerance_px: 1,
-    target_density: 0.75,
-    show_full_activity: false,
-    marker_size: 16,
-    marker_opacity: 100,
+    ...ELEVATION_PLOT_DEFAULTS,
   },
 }

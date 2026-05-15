@@ -1,5 +1,5 @@
 /**
- * Implements API helpers for activity gap utils.
+ * Gap detection, distance/elapsed/progress series building for activity parsing.
  */
 
 /**

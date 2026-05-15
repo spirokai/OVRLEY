@@ -1,12 +1,14 @@
 /**
- * Implements API helpers for gpx utils.
+ * Activity file import pipeline — orchestrates GPX/FIT parsing,
+ * cache update, store synchronization, and debug payload persistence.
  */
 
-import useStore from '../store/useStore'
-import { clearCurrentActivityCache, setCurrentActivityCache } from './activityCache'
-import * as backend from './backend'
-import { finalizeParsedActivity, safeNumber } from './activityParserUtils'
-import parseFitActivityFile from './fitParserUtils'
+import useStore from '@/store/useStore'
+import { clearCurrentActivityCache, setCurrentActivityCache } from '@/lib/activity/cache'
+import * as backend from '@/api/backend'
+import { finalizeParsedActivity } from './parser.js'
+import { safeNumber } from './parse-helpers.js'
+import parseFitActivityFile from './fit-parser.js'
 
 /**
  * Handles sanitize debug filename.
@@ -231,7 +233,7 @@ async function applyParsedActivityToStore({ filename, parsedActivity, debugPaylo
   const { setActivitySummary, setGpxFilename } = storeState
 
   setGpxFilename(filename)
-  setCurrentActivityCache(parsedActivity, debugPayload)
+  setCurrentActivityCache(parsedActivity)
   setActivitySummary(parsedActivity)
   const debugPath = await persistDebugPayload(filename, debugPayload)
   console.log('Parse debug JSON written:', debugPath)

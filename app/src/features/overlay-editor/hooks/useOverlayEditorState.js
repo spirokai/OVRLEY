@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getCurrentParsedActivity } from '@/api/activityCache'
+import { getCurrentParsedActivity } from '@/lib/activity/cache'
 import useStore from '@/store/useStore'
 import { buildConfigWidgets, updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget-config'
 import { getEffectiveWidgetData } from '@/lib/config-utils'

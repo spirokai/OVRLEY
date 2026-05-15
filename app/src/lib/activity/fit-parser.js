@@ -1,9 +1,10 @@
 /**
- * Implements API helpers for fit parser utils.
+ * FIT file parser — reads FIT binary format and converts to normalized raw samples.
  */
 
 import FitParser from 'fit-file-parser'
-import { finalizeParsedActivity, safeNumber } from './activityParserUtils'
+import { finalizeParsedActivity } from './parser.js'
+import { safeNumber } from './parse-helpers.js'
 
 /**
  * Returns optional record value.

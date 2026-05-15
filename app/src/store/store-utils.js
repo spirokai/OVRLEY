@@ -211,5 +211,3 @@ export function readStoredTemplateSettings() {
     aspectRatio: localStorage.getItem('aspectRatio') || '16:9',
   }
 }
-
-export { DEFAULT_EXPORT_RANGE, DEFAULT_GLOBAL_DEFAULTS }

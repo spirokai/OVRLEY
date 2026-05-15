@@ -5,7 +5,7 @@
 import { createFontSelection, getFontFamilyName } from './fonts'
 import { getThemeColor } from './theme'
 
-export const SCENE_STYLE_DEFAULTS = {
+const SCENE_STYLE_DEFAULTS = {
   border_color: '#000000',
   border_thickness: 0,
   shadow_color: '#000000',
@@ -13,7 +13,7 @@ export const SCENE_STYLE_DEFAULTS = {
   shadow_distance: 0,
 }
 
-export const SCENE_STYLE_KEYS = Object.keys(SCENE_STYLE_DEFAULTS)
+const SCENE_STYLE_KEYS = Object.keys(SCENE_STYLE_DEFAULTS)
 
 export const DEFAULT_GLOBAL_DEFAULTS = {
   font_values: 'Arial.ttf',
@@ -57,7 +57,7 @@ function applyPreviewOverrides(data, previewOverrides) {
  * @param {*} globals - Global defaults merged into widgets.
  * @returns {*} Requested value or structure.
  */
-export function getEffectiveSceneData(sceneData, globals) {
+function getEffectiveSceneData(sceneData, globals) {
   if (!sceneData) {
     return sceneData
   }
@@ -89,7 +89,7 @@ export function getEffectiveSceneData(sceneData, globals) {
  * @param {*} previewOverrides - Value for preview overrides.
  * @returns {object} Derived data structure for downstream use.
  */
-export function getEffectiveLabelData(widgetData = {}, globals, previewOverrides = null) {
+function getEffectiveLabelData(widgetData = {}, globals, previewOverrides = null) {
   const font = widgetData.font || globals?.font_text
   const nextData = {
     ...widgetData,
@@ -119,7 +119,7 @@ export function getEffectiveLabelData(widgetData = {}, globals, previewOverrides
  * @param {*} previewOverrides - Value for preview overrides.
  * @returns {object} Derived data structure for downstream use.
  */
-export function getEffectiveValueData(widgetData = {}, globals, previewOverrides = null) {
+function getEffectiveValueData(widgetData = {}, globals, previewOverrides = null) {
   const font = widgetData.font || globals?.font_values
   const nextData = {
     ...widgetData,
@@ -152,7 +152,7 @@ export function getEffectiveValueData(widgetData = {}, globals, previewOverrides
  * @param {*} previewOverrides - Value for preview overrides.
  * @returns {object} Derived data structure for downstream use.
  */
-export function getEffectivePlotData(widgetData = {}, globals, previewOverrides = null) {
+function getEffectivePlotData(widgetData = {}, globals, previewOverrides = null) {
   const nextData = {
     ...widgetData,
   }

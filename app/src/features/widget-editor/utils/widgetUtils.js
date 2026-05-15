@@ -3,6 +3,7 @@
  * Domain constants used by these functions live in ../data/widgetDefinitions.js.
  */
 
+export { clamp } from '@/lib/utils'
 import { createFontSelection } from '@/lib/fonts'
 import {
   LABEL_DEFAULTS,
@@ -36,10 +37,6 @@ export function parseInteger(value, fallback = 0) {
  * @param {*} max - Upper bound used by the calculation.
  * @returns {number} Result produced by the helper.
  */
-export function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value))
-}
-
 /**
  * Returns widget font.
  *

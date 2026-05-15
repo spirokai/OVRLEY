@@ -3,7 +3,7 @@
  * Presentation only — all state and CRUD logic is owned by useWidgetManager.
  */
 
-import { RotateCcw, Tag, Trash2 } from 'lucide-react'
+import { RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
@@ -104,7 +104,7 @@ export default function SidebarWidgetsTab() {
             className="space-y-1"
           >
             {widgets.map((widget) => {
-              const Icon = TYPE_ICONS[widget.type] || Tag
+              const Icon = TYPE_ICONS[widget.type]
 
               return (
                 <div key={widget.id} className="space-y-1">

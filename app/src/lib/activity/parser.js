@@ -1,11 +1,13 @@
 /**
- * Implements API helpers for activity parser utils.
+ * Activity parsing pipeline — orchestrates gap filling, series derivation,
+ * and finalization of parsed activity data.
  */
 
-import { buildDistanceSeries, buildElapsedSeries, buildProgressSeries, insertIdleGapSamples } from './activityGapUtils'
-import { buildMetricCoverage, deriveActivityMetricSeries } from './activityMetricSeries'
+import { buildDistanceSeries, buildElapsedSeries, buildProgressSeries, insertIdleGapSamples } from './gap-utils.js'
+import { buildMetricCoverage, deriveActivityMetricSeries } from './metric-series.js'
+import { calculateBearingDegrees, haversineDistanceMeters, isFiniteNumber, roundValue, safeNumber, safeTimestamp } from './parse-helpers.js'
 
-export const CORE_ACTIVITY_ATTRIBUTES = ['cadence', 'course', 'elevation', 'gradient', 'heartrate', 'power', 'speed', 'time', 'temperature']
+const CORE_ACTIVITY_ATTRIBUTES = ['cadence', 'course', 'elevation', 'gradient', 'heartrate', 'power', 'speed', 'time', 'temperature']
 
 const EXTENDED_ACTIVITY_ATTRIBUTES = [
   'air_pressure',
@@ -44,119 +46,6 @@ const METRIC_UNITS = {
   torque: 'nm',
   vertical_oscillation: 'raw',
   vertical_speed: 'mps',
-}
-
-/**
- * Checks whether is finite number.
- *
- * @param {*} value - Input value processed by the helper.
- * @returns {boolean} Whether the condition is satisfied.
- */
-function isFiniteNumber(value) {
-  return typeof value === 'number' && Number.isFinite(value)
-}
-
-/**
- * Handles round value.
- *
- * @param {*} value - Input value processed by the helper.
- * @param {*} digits - Value for digits.
- * @returns {number} Result produced by the helper.
- */
-function roundValue(value, digits = 6) {
-  if (!isFiniteNumber(value)) return null
-  const scale = 10 ** digits
-  return Math.round(value * scale) / scale
-}
-
-/**
- * Handles safe number.
- *
- * @param {*} value - Input value processed by the helper.
- * @returns {number} Result produced by the helper.
- */
-export function safeNumber(value) {
-  if (value === null || value === undefined || value === '') {
-    return null
-  }
-
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null
-  }
-
-  if (typeof value === 'string') {
-    const normalized = value.trim()
-    if (!normalized) return null
-    const numeric = Number(normalized)
-    return Number.isFinite(numeric) ? numeric : null
-  }
-
-  return null
-}
-
-/**
- * Handles safe timestamp.
- *
- * @param {*} value - Input value processed by the helper.
- * @returns {number} Result produced by the helper.
- */
-export function safeTimestamp(value) {
-  if (!value) return null
-  const date = value instanceof Date ? value : new Date(value)
-  if (!Number.isFinite(date.getTime())) return null
-  return date.toISOString()
-}
-
-/**
- * Handles haversine distance meters.
- *
- * @param {*} lat1 - Value for lat1.
- * @param {*} lon1 - Value for lon1.
- * @param {*} lat2 - Value for lat2.
- * @param {*} lon2 - Value for lon2.
- * @returns {*} Result produced by the helper.
- */
-export function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
-  if (!isFiniteNumber(lat1) || !isFiniteNumber(lon1) || !isFiniteNumber(lat2) || !isFiniteNumber(lon2)) {
-    return 0
-  }
-
-  const earthRadiusMeters = 6371000
-  const lat1Rad = (lat1 * Math.PI) / 180
-  const lat2Rad = (lat2 * Math.PI) / 180
-  const latDeltaRad = ((lat2 - lat1) * Math.PI) / 180
-  const lonDeltaRad = ((lon2 - lon1) * Math.PI) / 180
-
-  const a = Math.sin(latDeltaRad / 2) ** 2 + Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(lonDeltaRad / 2) ** 2
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return earthRadiusMeters * c
-}
-
-/**
- * Handles calculate bearing degrees.
- *
- * @param {*} fromPoint - Value for from point.
- * @param {*} toPoint - Value for to point.
- * @returns {*} Result produced by the helper.
- */
-function calculateBearingDegrees(fromPoint, toPoint) {
-  if (!fromPoint || !toPoint) return null
-
-  const [fromLat, fromLon] = fromPoint
-  const [toLat, toLon] = toPoint
-  if (!isFiniteNumber(fromLat) || !isFiniteNumber(fromLon) || !isFiniteNumber(toLat) || !isFiniteNumber(toLon)) {
-    return null
-  }
-
-  const fromLatRad = (fromLat * Math.PI) / 180
-  const toLatRad = (toLat * Math.PI) / 180
-  const lonDeltaRad = ((toLon - fromLon) * Math.PI) / 180
-  const y = Math.sin(lonDeltaRad) * Math.cos(toLatRad)
-  const x = Math.cos(fromLatRad) * Math.sin(toLatRad) - Math.sin(fromLatRad) * Math.cos(toLatRad) * Math.cos(lonDeltaRad)
-
-  const bearing = (Math.atan2(y, x) * 180) / Math.PI
-  return (bearing + 360) % 360
 }
 
 /**

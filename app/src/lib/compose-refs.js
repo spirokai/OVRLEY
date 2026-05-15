@@ -70,4 +70,4 @@ function useComposedRefs(...refs) {
   return React.useCallback(composeRefs(...refs), refs)
 }
 
-export { composeRefs, useComposedRefs }
+export { useComposedRefs }

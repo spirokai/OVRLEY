@@ -7,7 +7,7 @@
  */
 
 import { memo, useMemo, useState } from 'react'
-import { LayoutGrid, Type } from 'lucide-react'
+import { LayoutGrid, Tag } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import OverlayCanvas from './OverlayCanvas'
 import OverlayMoveable from './OverlayMoveable'
@@ -37,7 +37,7 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
   return (
     <div className="pointer-events-none absolute inset-0 z-50 overflow-visible">
       {visibleWidgets.map((widget) => {
-        const Icon = WIDGET_ICONS[widget.type] || Type
+        const Icon = WIDGET_ICONS[widget.type] || Tag
         const metricPreviewModel = buildMetricWidgetPreviewModel({
           widget,
           activity,
