@@ -438,7 +438,7 @@ fn derive_composite_pipeline_plan(
         height,
         source_fps,
         overlay_pipe_fps,
-        &HwAccelInfo::default(),
+        &HwAccelInfo::trust_selected_profile(),
     )?;
     let output_filename = format!("video_composited_{}.mp4", timestamp_nanos()?);
     let output_path = paths.downloads_dir.join(&output_filename);

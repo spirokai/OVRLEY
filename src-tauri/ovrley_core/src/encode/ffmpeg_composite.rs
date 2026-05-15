@@ -5,6 +5,9 @@
 
 use std::path::Path;
 
+use crate::encode::codec_detect::AvailableCodecs;
+
+use super::ffmpeg_composite_profiles::composite_profile_template;
 use super::fps::Fps;
 
 /// Profile-specific FFmpeg settings for composite encoding.
@@ -14,6 +17,7 @@ use super::fps::Fps;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompositeProfile {
     pub name: &'static str,
+    pub codec: &'static str,
     pub input_args: Vec<String>,
     pub filter_complex: Option<String>,
     pub output_args: Vec<String>,
@@ -36,14 +40,75 @@ pub struct CompositeFfmpegSettings {
 ///
 /// Phase 2 only builds the robust software-overlay path, but this placeholder
 /// keeps the builder signature ready for later hardware profile selection.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HwAccelInfo {
+    pub h264_nvenc_available: bool,
+    pub hevc_nvenc_available: bool,
+    pub h264_qsv_available: bool,
+    pub hevc_qsv_available: bool,
+    pub h264_videotoolbox_available: bool,
+    pub hevc_videotoolbox_available: bool,
+    pub h264_vaapi_available: bool,
+    pub hevc_vaapi_available: bool,
     pub nvenc_available: bool,
     pub cuda_filters_available: bool,
     pub qsv_available: bool,
     pub qsv_filters_available: bool,
     pub videotoolbox_available: bool,
     pub vaapi_available: bool,
+    pub vaapi_device: Option<String>,
+}
+
+impl HwAccelInfo {
+    /// Returns capability flags that trust the already-selected frontend profile.
+    ///
+    /// The render path uses this when AppBootstrap has already filtered codec
+    /// choices, avoiding a second FFmpeg capability probe during export.
+    pub fn trust_selected_profile() -> Self {
+        Self {
+            h264_nvenc_available: true,
+            hevc_nvenc_available: true,
+            h264_qsv_available: true,
+            hevc_qsv_available: true,
+            h264_videotoolbox_available: true,
+            hevc_videotoolbox_available: true,
+            h264_vaapi_available: true,
+            hevc_vaapi_available: true,
+            nvenc_available: true,
+            cuda_filters_available: true,
+            qsv_available: true,
+            qsv_filters_available: true,
+            videotoolbox_available: true,
+            vaapi_available: true,
+            vaapi_device: None,
+        }
+    }
+}
+
+impl From<&AvailableCodecs> for HwAccelInfo {
+    /// Converts the existing codec detector response into composite profile flags.
+    ///
+    /// The frontend and backend share the same codec names, so Phase 8 can use
+    /// the detector output directly for explicit hardware profile validation.
+    fn from(codecs: &AvailableCodecs) -> Self {
+        Self {
+            h264_nvenc_available: codecs.h264_nvenc,
+            hevc_nvenc_available: codecs.hevc_nvenc,
+            h264_qsv_available: codecs.h264_qsv,
+            hevc_qsv_available: codecs.hevc_qsv,
+            h264_videotoolbox_available: codecs.h264_videotoolbox,
+            hevc_videotoolbox_available: codecs.hevc_videotoolbox,
+            h264_vaapi_available: codecs.h264_vaapi,
+            hevc_vaapi_available: codecs.hevc_vaapi,
+            nvenc_available: codecs.h264_nvenc || codecs.hevc_nvenc,
+            cuda_filters_available: codecs.cuda,
+            qsv_available: codecs.qsv,
+            qsv_filters_available: false,
+            videotoolbox_available: codecs.videotoolbox,
+            vaapi_available: codecs.vaapi,
+            vaapi_device: None,
+        }
+    }
 }
 
 /// Builds FFmpeg argument groups for the default software composite path.
@@ -62,7 +127,6 @@ pub fn build_composite_ffmpeg_settings(
     overlay_pipe_fps: Fps,
     hwaccel_available: &HwAccelInfo,
 ) -> Result<CompositeFfmpegSettings, String> {
-    let _ = hwaccel_available;
     validate_composite_inputs(
         codec_name,
         bitrate,
@@ -78,8 +142,9 @@ pub fn build_composite_ffmpeg_settings(
     let source_fps = source_fps.reduced();
     let overlay_pipe_fps = overlay_pipe_fps.reduced();
     let video_path = video_path.to_string_lossy().to_string();
+    let selected_profile = select_composite_profile(codec_name, hwaccel_available)?;
 
-    let mut input_0_args = Vec::new();
+    let mut input_0_args = selected_profile.input_args.clone();
     if video_trim_start > 0.0 {
         input_0_args.push("-ss".to_string());
         input_0_args.push(format_seconds_arg(video_trim_start));
@@ -106,16 +171,17 @@ pub fn build_composite_ffmpeg_settings(
         "pipe:0".to_string(),
     ];
 
-    let filter_complex = software_overlay_filter_complex(width, height);
-    let output_args = vec![
+    let filter_complex = composite_filter_complex(width, height, &selected_profile)?;
+    let mut output_args = vec![
         "-map".to_string(),
         "[out]".to_string(),
         "-map".to_string(),
         "0:a?".to_string(),
         "-r".to_string(),
         source_fps.ffmpeg_arg(),
-        "-c:v".to_string(),
-        codec_name.to_string(),
+    ];
+    output_args.extend(selected_profile.output_args.clone());
+    output_args.extend([
         "-b:v".to_string(),
         bitrate.to_string(),
         "-c:a".to_string(),
@@ -123,10 +189,10 @@ pub fn build_composite_ffmpeg_settings(
         "-movflags".to_string(),
         "faststart".to_string(),
         "-y".to_string(),
-    ];
+    ]);
 
     Ok(CompositeFfmpegSettings {
-        hw_init_args: Vec::new(),
+        hw_init_args: profile_hw_init_args(&selected_profile, hwaccel_available),
         input_0_args,
         input_1_args,
         filter_complex,
@@ -134,16 +200,86 @@ pub fn build_composite_ffmpeg_settings(
     })
 }
 
-/// Builds the Phase 2 software overlay filter graph.
+/// Builds global FFmpeg hardware initialization args for the selected profile.
 ///
-/// The imported video is scaled to the overlay resolution, the overlay stream
-/// is timestamp-normalized, and FFmpeg repeats overlay frames between updates.
-fn software_overlay_filter_complex(width: u32, height: u32) -> String {
-    format!(
+/// Most Phase 8 profiles use hardware encode only and need no global setup;
+/// VAAPI is the exception because FFmpeg requires a render device.
+fn profile_hw_init_args(
+    profile: &CompositeProfile,
+    hwaccel_available: &HwAccelInfo,
+) -> Vec<String> {
+    if !matches!(profile.codec, "h264_vaapi" | "hevc_vaapi") {
+        return Vec::new();
+    }
+    hwaccel_available
+        .vaapi_device
+        .as_ref()
+        .map(|device| vec!["-vaapi_device".to_string(), device.clone()])
+        .unwrap_or_default()
+}
+
+/// Selects the requested composite profile and validates explicit hardware asks.
+///
+/// Unknown codec names remain pass-through so FFmpeg can produce detailed
+/// process-level diagnostics for custom encoders and failure tests.
+fn select_composite_profile(
+    codec_name: &str,
+    hwaccel_available: &HwAccelInfo,
+) -> Result<CompositeProfile, String> {
+    let profile = composite_profile_template(codec_name).unwrap_or_else(|| CompositeProfile {
+        name: "custom_passthrough",
+        codec: "custom",
+        input_args: Vec::new(),
+        filter_complex: None,
+        output_args: vec!["-c:v".to_string(), codec_name.to_string()],
+    });
+
+    match profile.codec {
+        "h264_nvenc" if !hwaccel_available.h264_nvenc_available => {
+            Err("Requested hardware encoder h264_nvenc is unavailable.".to_string())
+        }
+        "hevc_nvenc" if !hwaccel_available.hevc_nvenc_available => {
+            Err("Requested hardware encoder hevc_nvenc is unavailable.".to_string())
+        }
+        "h264_qsv" if !hwaccel_available.h264_qsv_available => {
+            Err("Requested hardware encoder h264_qsv is unavailable.".to_string())
+        }
+        "hevc_qsv" if !hwaccel_available.hevc_qsv_available => {
+            Err("Requested hardware encoder hevc_qsv is unavailable.".to_string())
+        }
+        "h264_videotoolbox" if !hwaccel_available.h264_videotoolbox_available => {
+            Err("Requested hardware encoder h264_videotoolbox is unavailable.".to_string())
+        }
+        "hevc_videotoolbox" if !hwaccel_available.hevc_videotoolbox_available => {
+            Err("Requested hardware encoder hevc_videotoolbox is unavailable.".to_string())
+        }
+        "h264_vaapi" if !hwaccel_available.h264_vaapi_available => {
+            Err("Requested hardware encoder h264_vaapi is unavailable.".to_string())
+        }
+        "hevc_vaapi" if !hwaccel_available.hevc_vaapi_available => {
+            Err("Requested hardware encoder hevc_vaapi is unavailable.".to_string())
+        }
+        _ => Ok(profile),
+    }
+}
+
+/// Builds the selected profile's composite filter graph.
+///
+/// Profile templates use `{width}` and `{height}` placeholders for the overlay
+/// render size; custom pass-through profiles get the safe software overlay.
+fn composite_filter_complex(
+    width: u32,
+    height: u32,
+    profile: &CompositeProfile,
+) -> Result<String, String> {
+    let template = profile.filter_complex.as_deref().unwrap_or(
         "[0:v]setpts=PTS-STARTPTS,scale={width}:{height}[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
-[base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=yuv420p[out]"
-    )
+[base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=yuv420p[out]",
+    );
+    Ok(template
+        .replace("{width}", &width.to_string())
+        .replace("{height}", &height.to_string()))
 }
 
 /// Validates composite FFmpeg builder inputs before any command is produced.
