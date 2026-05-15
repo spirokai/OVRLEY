@@ -94,6 +94,14 @@ async function main() {
   console.log(`[ffmpeg] Installed ${binaryPath}`)
 }
 
+function execFfmpeg(path, args, options) {
+  const env = { ...process.env }
+  if (process.platform === 'linux') {
+    env.LD_LIBRARY_PATH = `${join(dirname(path), '..', 'lib')}:${env.LD_LIBRARY_PATH ?? ''}`
+  }
+  return spawnSync(path, args, { ...options, env })
+}
+
 async function checkFfmpeg(path) {
   try {
     await stat(path)
@@ -104,7 +112,7 @@ async function checkFfmpeg(path) {
     }
   }
 
-  const result = spawnSync(path, ['-version'], { encoding: 'utf8' })
+  const result = execFfmpeg(path, ['-version'], { encoding: 'utf8' })
   if (result.status !== 0) {
     return {
       usable: false,
@@ -150,7 +158,7 @@ function compareVersions(left, right) {
 }
 
 function hasRequiredFfmpegFeatures(path) {
-  const encoders = spawnSync(path, ['-hide_banner', '-encoders'], { encoding: 'utf8' })
+  const encoders = execFfmpeg(path, ['-hide_banner', '-encoders'], { encoding: 'utf8' })
   if (encoders.status !== 0) {
     return {
       usable: false,
@@ -158,7 +166,7 @@ function hasRequiredFfmpegFeatures(path) {
     }
   }
 
-  const filters = spawnSync(path, ['-hide_banner', '-filters'], { encoding: 'utf8' })
+  const filters = execFfmpeg(path, ['-hide_banner', '-filters'], { encoding: 'utf8' })
   if (filters.status !== 0) {
     return {
       usable: false,
