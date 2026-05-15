@@ -84,7 +84,7 @@ export default function VideoSyncSection({
 
       {activitySummary?.startTime && (
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground uppercase font-bold pb-2!">Sync Offset</Label>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold pb-2!">Sync Offset</Label>
           <div className="grid grid-cols-2 gap-4">
             <div className="relative flex-1">
               <BlurInput

@@ -387,6 +387,7 @@ fn apply_composite_scene_timing(config: &mut RenderConfig, plan: &CompositeRende
     config.scene.start = plan.sync_offset;
     config.scene.end = plan.sync_offset + plan.render_duration;
     config.scene.fps = plan.overlay_pipe_fps.as_f64();
+    config.scene.update_rate = Some(1);
 }
 
 /// Returns the current render progress snapshot.

@@ -48,7 +48,7 @@ export default function ExportRangeSettings({ exportRange, onExportRangeChange }
       {exportRange.type === 'custom' ? (
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">From</Label>
+            <Label className="text-[10px] text-muted-foreground uppercase font-bold">From</Label>
             <BlurInput
               value={exportRange.fromTime}
               onKeyDown={preventDecimalInput}
@@ -64,7 +64,7 @@ export default function ExportRangeSettings({ exportRange, onExportRangeChange }
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">To</Label>
+            <Label className="text-[10px] text-muted-foreground uppercase font-bold">To</Label>
             <BlurInput
               value={exportRange.toTime}
               onKeyDown={preventDecimalInput}

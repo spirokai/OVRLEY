@@ -18,7 +18,7 @@ import {
   isMp4Codec,
   resolutionsMismatch,
 } from '../utils/codecUtils'
-import { getContainerFps, getUpdateRateOptions } from '@/lib/update-rate'
+import { getContainerFps, getUpdateRateOptions, sanitizeIntegerFps } from '@/lib/update-rate'
 import { getDefaultBitrate } from '../utils/bitrateDefaults'
 
 export default function useRenderVideoDerivedState({ settings }) {
@@ -33,9 +33,13 @@ export default function useRenderVideoDerivedState({ settings }) {
   const renderProgress = useStore((state) => state.renderProgress)
 
   // Derived values — computed FPS options, codec availability flags, and render readiness state
-  const updateRateOptions = useMemo(() => getUpdateRateOptions(settings?.fps), [settings?.fps])
-  const containerFps = useMemo(() => getContainerFps(settings?.fps, settings?.updateRate), [settings?.fps, settings?.updateRate])
   const hasImportedVideo = Boolean(importedVideoPath)
+  const updateRateFps = useMemo(
+    () => (hasImportedVideo && importedVideoFps ? sanitizeIntegerFps(Math.round(importedVideoFps)) : settings?.fps),
+    [hasImportedVideo, importedVideoFps, settings?.fps],
+  )
+  const updateRateOptions = useMemo(() => getUpdateRateOptions(updateRateFps), [updateRateFps])
+  const containerFps = useMemo(() => getContainerFps(updateRateFps, settings?.updateRate), [updateRateFps, settings?.updateRate])
   const selectedOutputFormat = getOutputFormatForExportCodec(settings?.exportCodec)
   const selectedOutputFormatValue = selectedOutputFormat?.value || 'prores'
   const selectedAccelerationValue = getAccelerationValueForSettings(settings)
@@ -82,6 +86,7 @@ export default function useRenderVideoDerivedState({ settings }) {
     selectedCodecIsMp4,
     selectedExportCodecAvailable,
     selectedOutputFormatValue,
+    updateRateFps,
     updateRateOptions,
   }
 }

@@ -172,6 +172,7 @@ fn test_3_6_dense_report_timing_for_lower_overlay_update_rate() {
 
     assert_eq!(plan.overlay_pipe_fps, Fps::new(30000, 1001).unwrap());
     assert!((config.scene.fps - (30000.0 / 1001.0)).abs() < 1e-9);
+    assert_eq!(config.widget_update_rate(), 1);
     assert_eq!(dense.frame_count, 300);
 }
 

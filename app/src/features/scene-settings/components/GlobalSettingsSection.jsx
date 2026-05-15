@@ -56,7 +56,7 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
 
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-2">
-          <Label className="text-xs">Values</Label>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Values</Label>
           <HexColorPicker
             value={globalDefaults.color_values}
             onChange={(value) => onGlobalDefaultChange('color_values', value)}
@@ -64,7 +64,7 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
           />
         </div>
         <div className="space-y-2">
-          <Label className="text-xs">Labels</Label>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Labels</Label>
           <HexColorPicker
             value={globalDefaults.color_text}
             onChange={(value) => onGlobalDefaultChange('color_text', value)}
@@ -72,7 +72,7 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
           />
         </div>
         <div className="space-y-2">
-          <Label className="text-xs">Icons</Label>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Icons</Label>
           <HexColorPicker
             value={globalDefaults.color_icons}
             onChange={(value) => onGlobalDefaultChange('color_icons', value)}
@@ -83,7 +83,7 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
 
       <div className="grid grid-cols-3 gap-4 pt-2">
         <div className="space-y-2">
-          <Label className="text-xs">Borders</Label>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Borders</Label>
           <HexColorPicker
             value={sceneStyleValue('border_color', '#000000')}
             onChange={(value) => onGlobalDefaultChange('border_color', value)}
@@ -91,7 +91,7 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
           />
         </div>
         <div className="space-y-2">
-          <Label className="text-xs">Shadows</Label>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Shadows</Label>
           <HexColorPicker
             value={sceneStyleValue('shadow_color', '#000000')}
             onChange={(value) => onGlobalDefaultChange('shadow_color', value)}
@@ -103,7 +103,7 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
       <div className="space-y-6 pt-2">
         <div className="space-y-3 pt-2">
           <div className="flex justify-between items-center">
-            <Label className="text-xs">Transparency</Label>
+            <Label className="text-[10px] text-muted-foreground uppercase font-bold">Transparency</Label>
             <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">
               {Math.round(globalDefaults.opacity * 100)}%
             </span>
@@ -112,14 +112,14 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
         </div>
         <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <Label className="text-xs">Scale</Label>
+            <Label className="text-[10px] text-muted-foreground uppercase font-bold">Scale</Label>
             <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">{globalDefaults.scale.toFixed(2)}x</span>
           </div>
           <Slider min={0.5} max={2} step={0.01} value={[globalDefaults.scale]} onValueChange={([v]) => onGlobalDefaultChange('scale', v)} />
         </div>
         <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <Label className="text-xs">Border Thickness</Label>
+            <Label className="text-[10px] text-muted-foreground uppercase font-bold">Border Thickness</Label>
             <span className="rounded bg-surface-strong px-1.5 py-0.5 text-[10px] text-muted-foreground">
               {sceneStyleValue('border_thickness', 0)}px
             </span>
@@ -135,7 +135,7 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
         <div className="grid grid-cols-2 gap-6">
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <Label className="text-xs">Shadow Strength</Label>
+              <Label className="text-[10px] text-muted-foreground uppercase font-bold">Shadow Strength</Label>
               <span className="text-[10px] text-muted-foreground">{sceneStyleValue('shadow_strength', 0)}</span>
             </div>
             <Slider
@@ -148,7 +148,7 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
           </div>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <Label className="text-xs">Shadow Distance</Label>
+              <Label className="text-[10px] text-muted-foreground uppercase font-bold">Shadow Distance</Label>
               <span className="text-[10px] text-muted-foreground">{sceneStyleValue('shadow_distance', 0)}</span>
             </div>
             <Slider

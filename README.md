@@ -18,6 +18,10 @@ OVRLEY turns .fit and .gpx activity data into customizable overlays for action-c
 - **Interactive Editor**: Drag-and-drop editor for live layout editing and template sharing.
 - **Full Customization**: Shape every widget with your own styling, color, font, and size.
 - **10+ Widgets**: Speed, heartrate, power, cadence, date, temperature, elevation profile, map route, and more.
+- **Transparent Overlays**: Export with alpha channel for maximum flexibility in post-production. Use in Premiere Pro, DaVinci Resolve, Final Cut Pro, or any editor that supports layered video.
+- **Direct Video Export**: Export your video footage with overlays baked in; no separate compositing step required. Choose from multiple codecs and hardware-accelerated pipelines, customize bitrate, and more.
+- **Hardware-Accelerated Export**: State-of-the-art export pipelines leveraging GPU acceleration for maximum render times.
+- **Preview & Sync**: Preview your footage directly inside the app in full quality. Automatically syncs activity to your video, with manual offset possible.
 - **100% Free & Offline**: No subscriptions. All data processing, rendering, and encoding happen locally on your machine. Your data never leaves your computer.
 
 > ## Using OVRLEY: Download the exe/app file from latest release and just run it - no installation or setup required.
@@ -32,12 +36,20 @@ The codebase utilizes a modern, dual-stack architecture to maximize both the use
 
 ## Export & Codecs
 
-OVRLEY supports video transparency and offers multiple export pipelines tailored to your hardware and workflow needs:
+OVRLEY supports both exporting transparent overlays as well as final footage with overlays baked in. It offers multiple export pipelines tailored to your hardware and workflow needs:
+
+Transparent Overlays:
 
 - **ProRes CPU**: The safest general recommendation. High quality and excellent compatibility with professional editors like Premiere Pro or DaVinci Resolve.
 - **ProRes Vulkan**: A newer, GPU-accelerated option for ProRes. Frees up your CPU for other tasks, though hardware/driver compatibility may vary.
-- **ProRes VideoToolbox**: A highly optimized, hardware-accelerated pipeline exclusively for macOS.
 - **QT RLE**: Offers significantly smaller file sizes and extremely fast export times, though with slightly lower compatibility in some basic video players.
+
+MP4 Exports (overlays baked in):
+
+- **H.264/H.265**: Industry-standard codecs for maximum compatibility. Custom bitrate settings allow you to balance quality and file size.
+
+Hardware-Acceleration Options:
+**NVENC/AMF/QSV/VideoToolbox**: Hardware-accelerated encoding options to take full advantage of your system and GPU to speed up export times.
 
 ## Dependencies
 

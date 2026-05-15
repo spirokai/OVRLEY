@@ -17,7 +17,8 @@ import { getFirstAvailableMp4ExportCodec } from '../utils/codecUtils'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 
 export default function useRenderVideoEffects({ settings, derivedState, onSettingsChange, setFpsMode }) {
-  const { defaultBitrateForCodec, hasImportedVideo, platformOs, availableCodecs, selectedCodecIsMp4, selectedExportCodecAvailable } = derivedState
+  const { defaultBitrateForCodec, hasImportedVideo, platformOs, availableCodecs, selectedCodecIsMp4, selectedExportCodecAvailable, updateRateFps } =
+    derivedState
 
   // Sync fpsMode local state when settings.fps changes externally
   useEffect(() => {
@@ -87,9 +88,9 @@ export default function useRenderVideoEffects({ settings, derivedState, onSettin
       return
     }
 
-    const normalizedUpdateRate = normalizeUpdateRateForFps(settings.fps, settings.updateRate)
+    const normalizedUpdateRate = normalizeUpdateRateForFps(updateRateFps, settings.updateRate)
     if (normalizedUpdateRate !== settings.updateRate) {
       onSettingsChange({ updateRate: normalizedUpdateRate })
     }
-  }, [settings, onSettingsChange])
+  }, [settings, updateRateFps, onSettingsChange])
 }

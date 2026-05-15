@@ -69,7 +69,8 @@ export default function useRenderWorkflow({ backendStatus }) {
 
   // Build render settings draft — assembles initial FPS, codec, bitrate, and export range from store
   const buildRenderSettingsDraft = useCallback(() => {
-    const fps = sanitizeIntegerFps(config?.scene?.fps || 30)
+    const templateFps = sanitizeIntegerFps(config?.scene?.fps || 30)
+    const fps = importedVideoPath && importedVideoFps ? sanitizeIntegerFps(Math.round(importedVideoFps)) : templateFps
     const defaultCodec = importedVideoPath ? 'libx264' : exportCodec || 'prores_ks'
     return {
       fps,
