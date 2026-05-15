@@ -30,9 +30,10 @@ const CUDA_FILTER: &str = "[0:v]setpts=PTS-STARTPTS,scale_cuda=format=yuv420p[ba
 [1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[ovr];\
 [base][ovr]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]";
 
-const QSV_FULL_FILTER: &str = "[0:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=64[main_hw];\
-[1:v]setpts=PTS-STARTPTS,format=bgra,hwupload=extra_hw_frames=64[overlay_hw];\
-[main_hw][overlay_hw]overlay_qsv=x=0:y=0,hwdownload,format=nv12[out]";
+const QSV_FULL_FILTER: &str =
+    "[0:v]setpts=PTS-STARTPTS,scale_qsv=w={width}:h={height}:format=nv12[main_hw];\
+[1:v]setpts=PTS-STARTPTS,format=bgra,hwupload=extra_hw_frames=64,format=qsv[overlay_hw];\
+[main_hw][overlay_hw]overlay_qsv=x=0:y=0[out]";
 
 const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
     CompositeProfileTemplate {
@@ -88,7 +89,16 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
     CompositeProfileTemplate {
         name: "nnvgpu_h264",
         codec: "h264_nvenc",
-        input_args: &["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"],
+        input_args: &[
+            "-init_hw_device",
+            "cuda=cuda",
+            "-filter_hw_device",
+            "cuda",
+            "-hwaccel",
+            "cuda",
+            "-hwaccel_output_format",
+            "cuda",
+        ],
         filter_complex: Some(CUDA_FILTER),
         output_args: &[
             "-c:v",
@@ -106,7 +116,16 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
     CompositeProfileTemplate {
         name: "nnvgpu_hevc",
         codec: "hevc_nvenc",
-        input_args: &["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"],
+        input_args: &[
+            "-init_hw_device",
+            "cuda=cuda",
+            "-filter_hw_device",
+            "cuda",
+            "-hwaccel",
+            "cuda",
+            "-hwaccel_output_format",
+            "cuda",
+        ],
         filter_complex: Some(CUDA_FILTER),
         output_args: &[
             "-c:v",
@@ -138,28 +157,14 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
     CompositeProfileTemplate {
         name: "qsv_full_h264",
         codec: "h264_qsv",
-        input_args: &[
-            "-init_hw_device",
-            "qsv=hw",
-            "-hwaccel",
-            "qsv",
-            "-hwaccel_output_format",
-            "qsv",
-        ],
+        input_args: &[],
         filter_complex: Some(QSV_FULL_FILTER),
         output_args: &["-c:v", "h264_qsv", "-global_quality", "25"],
     },
     CompositeProfileTemplate {
         name: "qsv_full_hevc",
         codec: "hevc_qsv",
-        input_args: &[
-            "-init_hw_device",
-            "qsv=hw",
-            "-hwaccel",
-            "qsv",
-            "-hwaccel_output_format",
-            "qsv",
-        ],
+        input_args: &[],
         filter_complex: Some(QSV_FULL_FILTER),
         output_args: &["-c:v", "hevc_qsv", "-global_quality", "25"],
     },

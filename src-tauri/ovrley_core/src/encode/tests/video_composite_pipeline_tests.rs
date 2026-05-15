@@ -312,16 +312,28 @@ fn test_6_5_broken_pipe_error_includes_ffmpeg_exit_context() {
         })
         .status()
         .unwrap();
+    let plan = phase4_plan(
+        r#""width":1920,"height":1080,"ffmpeg":{"codec":"libx264"}"#,
+        30,
+        1,
+        1.0,
+        Some(0.2),
+        Some(0.0),
+        Some(1),
+    );
     let message = format_pipe_write_failure(
         "Failed writing composite overlay frame: Broken pipe".to_string(),
         status,
         "filter graph failed\nUnknown filter",
+        &plan,
     );
 
     assert!(is_pipe_write_error(
         "Failed writing composite overlay frame: Broken pipe"
     ));
     assert!(message.contains("FFmpeg terminated before all overlay frames were written"));
+    assert!(message.contains("profile software_h264"));
+    assert!(message.contains("Filter graph"));
     assert!(message.contains("FFmpeg stderr"));
     assert!(message.contains("Unknown filter"));
 }

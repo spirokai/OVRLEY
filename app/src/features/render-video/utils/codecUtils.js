@@ -49,8 +49,12 @@ export function codecFlag(availableCodecs, codec) {
     libx265: 'libx265',
     h264_nvenc: 'h264Nvenc',
     hevc_nvenc: 'hevcNvenc',
+    nnvgpu_h264: 'h264Nvenc',
+    nnvgpu_hevc: 'hevcNvenc',
     h264_qsv: 'h264Qsv',
     hevc_qsv: 'hevcQsv',
+    qsv_full_h264: 'h264Qsv',
+    qsv_full_hevc: 'hevcQsv',
     h264_amf: 'h264Amf',
     hevc_amf: 'hevcAmf',
     h264_videotoolbox: 'h264Videotoolbox',
@@ -97,11 +101,15 @@ export function isAccelerationAvailable(format, accelerationValue, availableCode
   }
 
   if (accelerationValue === 'nvidia_cuda') {
-    return codecFlag(availableCodecs, codec) && Boolean(availableCodecs.nnvgpu || availableCodecs.cuda)
+    return codecFlag(availableCodecs, codec) && Boolean(availableCodecs.nnvgpu)
   }
 
   if (accelerationValue === 'qsv') {
     return codecFlag(availableCodecs, codec) && Boolean(availableCodecs.qsv)
+  }
+
+  if (accelerationValue === 'qsv_full') {
+    return codecFlag(availableCodecs, codec) && Boolean(availableCodecs.qsvFull)
   }
 
   if (accelerationValue === 'amd') {

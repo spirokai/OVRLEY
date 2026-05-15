@@ -365,6 +365,251 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
     }
 }
 
+#[test]
+fn test_9_1_cuda_full_profile_requires_cuda_filter_stack() {
+    let hwaccel = HwAccelInfo {
+        h264_nvenc_available: true,
+        nvenc_available: true,
+        cuda_filters_available: false,
+        ..HwAccelInfo::default()
+    };
+    let error = build_composite_ffmpeg_settings(
+        "nnvgpu_h264",
+        "60M",
+        Path::new("test.mp4"),
+        0.0,
+        10.0,
+        3840,
+        2160,
+        Fps::new(30000, 1001).unwrap(),
+        Fps::new(30000, 1001).unwrap(),
+        &hwaccel,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("overlay_cuda"));
+    assert!(error.contains("scale_cuda"));
+    assert!(error.contains("hwupload"));
+}
+
+#[test]
+fn test_9_2_cuda_h264_full_profile_uses_overlay_cuda_when_available() {
+    let hwaccel = HwAccelInfo {
+        h264_nvenc_available: true,
+        nvenc_available: true,
+        cuda_filters_available: true,
+        ..HwAccelInfo::default()
+    };
+    let built = settings_for_codec(
+        "nnvgpu_h264",
+        "60M",
+        Fps::new(30000, 1001).unwrap(),
+        Fps::new(30000, 1001).unwrap(),
+        0.0,
+        &hwaccel,
+    );
+
+    assert_eq!(built.selected_profile_name, "nnvgpu_h264");
+    assert_eq!(built.fallback_profile_name.as_deref(), Some("nvgpu_h264"));
+    assert_argument_pair(&built.input_0_args, "-init_hw_device", "cuda=cuda");
+    assert_argument_pair(&built.input_0_args, "-filter_hw_device", "cuda");
+    assert_argument_pair(&built.input_0_args, "-hwaccel", "cuda");
+    assert_argument_pair(&built.input_0_args, "-hwaccel_output_format", "cuda");
+    assert!(built.filter_complex.contains("scale_cuda"));
+    assert!(built.filter_complex.contains("overlay_cuda"));
+    assert_argument_pair(&built.output_args, "-c:v", "h264_nvenc");
+}
+
+#[test]
+fn test_9_3_cuda_hevc_full_profile_uses_overlay_cuda_when_available() {
+    let hwaccel = HwAccelInfo {
+        hevc_nvenc_available: true,
+        nvenc_available: true,
+        cuda_filters_available: true,
+        ..HwAccelInfo::default()
+    };
+    let built = settings_for_codec(
+        "nnvgpu_hevc",
+        "60M",
+        Fps::new(30000, 1001).unwrap(),
+        Fps::new(30000, 1001).unwrap(),
+        0.0,
+        &hwaccel,
+    );
+
+    assert_eq!(built.selected_profile_name, "nnvgpu_hevc");
+    assert_eq!(built.fallback_profile_name.as_deref(), Some("nvgpu_hevc"));
+    assert!(built.filter_complex.contains("overlay_cuda"));
+    assert_argument_pair(&built.output_args, "-c:v", "hevc_nvenc");
+}
+
+#[test]
+fn test_9_5_qsv_full_profile_requires_qsv_filter_stack() {
+    let hwaccel = HwAccelInfo {
+        h264_qsv_available: true,
+        qsv_available: true,
+        qsv_filters_available: false,
+        ..HwAccelInfo::default()
+    };
+    let error = build_composite_ffmpeg_settings(
+        "qsv_full_h264",
+        "60M",
+        Path::new("test.mp4"),
+        0.0,
+        10.0,
+        3840,
+        2160,
+        Fps::new(30000, 1001).unwrap(),
+        Fps::new(30000, 1001).unwrap(),
+        &hwaccel,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("overlay_qsv"));
+    assert!(error.contains("scale_qsv"));
+    assert!(error.contains("hwupload"));
+}
+
+#[test]
+fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
+    let detected_args = vec![
+        "-init_hw_device".to_string(),
+        "dxva2=dx".to_string(),
+        "-init_hw_device".to_string(),
+        "qsv=qs@dx".to_string(),
+        "-filter_hw_device".to_string(),
+        "qs".to_string(),
+        "-hwaccel".to_string(),
+        "qsv".to_string(),
+        "-hwaccel_output_format".to_string(),
+        "qsv".to_string(),
+    ];
+    let hwaccel = HwAccelInfo {
+        h264_qsv_available: true,
+        qsv_available: true,
+        qsv_filters_available: true,
+        qsv_full_init_args: detected_args.clone(),
+        ..HwAccelInfo::default()
+    };
+    let built = settings_for_codec(
+        "qsv_full_h264",
+        "60M",
+        Fps::new(30, 1).unwrap(),
+        Fps::new(30, 1).unwrap(),
+        0.0,
+        &hwaccel,
+    );
+
+    assert_eq!(built.selected_profile_name, "qsv_full_h264");
+    assert_eq!(built.fallback_profile_name.as_deref(), Some("qsv_h264"));
+    assert!(built.input_0_args.starts_with(&detected_args));
+    assert_argument_pair(&built.input_0_args, "-hwaccel", "qsv");
+    assert_argument_pair(&built.input_0_args, "-hwaccel_output_format", "qsv");
+    assert!(built
+        .filter_complex
+        .contains("scale_qsv=w=3840:h=2160:format=nv12"));
+    assert!(built.filter_complex.contains(
+        "[1:v]setpts=PTS-STARTPTS,format=bgra,hwupload=extra_hw_frames=64,format=qsv[overlay_hw]"
+    ));
+    assert!(built.filter_complex.contains("overlay_qsv"));
+    assert!(!built.filter_complex.contains("hwdownload"));
+    assert_argument_pair(&built.output_args, "-c:v", "h264_qsv");
+}
+
+#[test]
+fn test_9_6_qsv_full_profile_requires_detected_init_args() {
+    let hwaccel = HwAccelInfo {
+        h264_qsv_available: true,
+        qsv_available: true,
+        qsv_filters_available: true,
+        qsv_full_init_args: Vec::new(),
+        ..HwAccelInfo::default()
+    };
+    let error = build_composite_ffmpeg_settings(
+        "qsv_full_h264",
+        "60M",
+        Path::new("test.mp4"),
+        0.0,
+        10.0,
+        3840,
+        2160,
+        Fps::new(30, 1).unwrap(),
+        Fps::new(30, 1).unwrap(),
+        &hwaccel,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("QSV hardware-device init args"));
+}
+
+#[test]
+fn test_9_6_qsv_full_profile_uses_detected_init_args_when_available() {
+    let detected_args = vec![
+        "-init_hw_device".to_string(),
+        "d3d11va=dx:1".to_string(),
+        "-init_hw_device".to_string(),
+        "qsv=qs@dx".to_string(),
+        "-filter_hw_device".to_string(),
+        "qs".to_string(),
+        "-hwaccel".to_string(),
+        "qsv".to_string(),
+        "-hwaccel_output_format".to_string(),
+        "qsv".to_string(),
+    ];
+    let hwaccel = HwAccelInfo {
+        h264_qsv_available: true,
+        qsv_available: true,
+        qsv_filters_available: true,
+        qsv_full_init_args: detected_args.clone(),
+        ..HwAccelInfo::default()
+    };
+    let built = settings_for_codec(
+        "qsv_full_h264",
+        "60M",
+        Fps::new(30, 1).unwrap(),
+        Fps::new(30, 1).unwrap(),
+        0.0,
+        &hwaccel,
+    );
+
+    assert!(built.input_0_args.starts_with(&detected_args));
+}
+
+#[test]
+fn test_9_7_safe_codec_names_do_not_select_experimental_profiles() {
+    let hwaccel = HwAccelInfo {
+        h264_nvenc_available: true,
+        h264_qsv_available: true,
+        nvenc_available: true,
+        qsv_available: true,
+        cuda_filters_available: true,
+        qsv_filters_available: true,
+        ..HwAccelInfo::default()
+    };
+
+    let nvenc = settings_for_codec(
+        "h264_nvenc",
+        "60M",
+        Fps::new(30, 1).unwrap(),
+        Fps::new(30, 1).unwrap(),
+        0.0,
+        &hwaccel,
+    );
+    let qsv = settings_for_codec(
+        "h264_qsv",
+        "60M",
+        Fps::new(30, 1).unwrap(),
+        Fps::new(30, 1).unwrap(),
+        0.0,
+        &hwaccel,
+    );
+
+    assert_eq!(nvenc.selected_profile_name, "nvgpu_h264");
+    assert_eq!(qsv.selected_profile_name, "qsv_h264");
+    assert!(!nvenc.filter_complex.contains("overlay_cuda"));
+    assert!(!qsv.filter_complex.contains("overlay_qsv"));
+}
+
 fn assert_argument_pair(args: &[String], key: &str, value: &str) {
     assert!(
         has_argument_pair(args, key, value),

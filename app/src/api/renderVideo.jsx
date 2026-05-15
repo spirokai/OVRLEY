@@ -28,6 +28,7 @@ export default async function renderVideo(overrides = {}) {
       importedVideoFpsNum,
       importedVideoFpsDen,
       importedVideoPath,
+      availableCodecs,
       videoSyncOffsetSeconds,
       setActiveRenderId,
       setRenderingVideo,
@@ -61,6 +62,11 @@ export default async function renderVideo(overrides = {}) {
       config.scene.ffmpeg = {
         ...(config.scene.ffmpeg || {}),
         codec: resolvedExportCodec,
+      }
+      if (isQsvFullCodec(resolvedExportCodec) && Array.isArray(availableCodecs?.qsvFullInitArgs)) {
+        config.scene.ffmpeg.qsv_full_init_args = availableCodecs.qsvFullInitArgs
+      } else {
+        delete config.scene.ffmpeg.qsv_full_init_args
       }
 
       if (importedVideoPath) {
@@ -259,8 +265,12 @@ function isCompositeCodec(codec) {
     'libx265',
     'h264_nvenc',
     'hevc_nvenc',
+    'nnvgpu_h264',
+    'nnvgpu_hevc',
     'h264_qsv',
     'hevc_qsv',
+    'qsv_full_h264',
+    'qsv_full_hevc',
     'h264_amf',
     'hevc_amf',
     'h264_videotoolbox',
@@ -268,4 +278,14 @@ function isCompositeCodec(codec) {
     'h264_vaapi',
     'hevc_vaapi',
   ].includes(codec)
+}
+
+/**
+ * Returns whether a codec value names an experimental full-QSV profile.
+ *
+ * @param {*} codec - Candidate codec or profile name.
+ * @returns {boolean} Whether the value requires detected QSV filter init args.
+ */
+function isQsvFullCodec(codec) {
+  return ['qsv_full_h264', 'qsv_full_hevc'].includes(codec)
 }

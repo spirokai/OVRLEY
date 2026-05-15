@@ -229,7 +229,7 @@ pub(crate) fn render_composite_video_single(
         let _ = std::fs::remove_file(&plan.output_path);
         let stderr = stderr_snapshot(&stderr_lines);
         if is_pipe_write_error(&error) {
-            return Err(format_pipe_write_failure(error, status, &stderr));
+            return Err(format_pipe_write_failure(error, status, &stderr, &plan));
         }
         if stderr.is_empty() {
             return Err(error);
@@ -243,10 +243,7 @@ pub(crate) fn render_composite_video_single(
     if !status.success() {
         let _ = std::fs::remove_file(&plan.output_path);
         let stderr = stderr_snapshot(&stderr_lines);
-        return Err(format!(
-            "Composite ffmpeg failed ({status}). Stderr:\n{}",
-            stderr_tail(&stderr)
-        ));
+        return Err(format_composite_ffmpeg_failure(&plan, status, &stderr));
     }
     if written_overlay_frames != expected_guarded_overlay_frame_count(&plan) {
         let _ = std::fs::remove_file(&plan.output_path);
@@ -363,14 +360,48 @@ fn format_pipe_write_failure(
     error: String,
     status: std::process::ExitStatus,
     stderr: &str,
+    plan: &CompositePipelinePlan,
 ) -> String {
     let mut message = format!(
-        "{error}. FFmpeg terminated before all overlay frames were written (status {status})."
+        "{error}. FFmpeg terminated before all overlay frames were written (status {status}) for profile {}.",
+        plan.ffmpeg_settings.selected_profile_name
     );
+    if let Some(fallback) = &plan.ffmpeg_settings.fallback_profile_name {
+        message.push_str(&format!(
+            "\nSafe fallback profile available: {fallback}. This explicit experimental render was not silently retried."
+        ));
+    }
+    message.push_str("\nFilter graph:\n");
+    message.push_str(&plan.ffmpeg_settings.filter_complex);
     if !stderr.trim().is_empty() {
         message.push_str("\nFFmpeg stderr:\n");
         message.push_str(&stderr_tail(stderr));
     }
+    message
+}
+
+/// Formats a failed FFmpeg completion with full-GPU profile diagnostics.
+///
+/// Experimental CUDA/QSV profiles include the selected profile, filter graph,
+/// and safe fallback profile name so callers can decide whether to retry.
+fn format_composite_ffmpeg_failure(
+    plan: &CompositePipelinePlan,
+    status: std::process::ExitStatus,
+    stderr: &str,
+) -> String {
+    let mut message = format!(
+        "Composite ffmpeg failed ({status}) for profile {}.",
+        plan.ffmpeg_settings.selected_profile_name
+    );
+    if let Some(fallback) = &plan.ffmpeg_settings.fallback_profile_name {
+        message.push_str(&format!(
+            "\nSafe fallback profile available: {fallback}. This explicit experimental render was not silently retried."
+        ));
+    }
+    message.push_str("\nFilter graph:\n");
+    message.push_str(&plan.ffmpeg_settings.filter_complex);
+    message.push_str("\nFFmpeg stderr:\n");
+    message.push_str(&stderr_tail(stderr));
     message
 }
 
@@ -428,6 +459,8 @@ fn derive_composite_pipeline_plan(
     let output_frame_count = (render_duration * output_fps.as_f64()).ceil().max(0.0) as u64;
     let first_overrun_overlay_index =
         first_fractional_overrun_overlay_index(render_duration, overlay_pipe_fps);
+    let mut hwaccel_info = HwAccelInfo::trust_selected_profile();
+    hwaccel_info.qsv_full_init_args = composite_qsv_full_init_args(config);
     let ffmpeg_settings = build_composite_ffmpeg_settings(
         &codec_name,
         composite_bitrate,
@@ -438,7 +471,7 @@ fn derive_composite_pipeline_plan(
         height,
         source_fps,
         overlay_pipe_fps,
-        &HwAccelInfo::trust_selected_profile(),
+        &hwaccel_info,
     )?;
     let output_filename = format!("video_composited_{}.mp4", timestamp_nanos()?);
     let output_path = paths.downloads_dir.join(&output_filename);
@@ -593,6 +626,26 @@ fn composite_codec_name(config: &RenderConfig) -> String {
         .and_then(serde_json::Value::as_str)
         .unwrap_or("libx264")
         .to_string()
+}
+
+/// Reads detected QSV full-overlay initialization args from `scene.ffmpeg`.
+///
+/// The frontend injects these render-time args after codec detection so the
+/// backend can reuse the exact hardware-device candidate that passed probing.
+fn composite_qsv_full_init_args(config: &RenderConfig) -> Vec<String> {
+    config
+        .scene
+        .ffmpeg
+        .as_object()
+        .and_then(|map| map.get("qsv_full_init_args"))
+        .and_then(serde_json::Value::as_array)
+        .map(|args| {
+            args.iter()
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Finds the first overlay frame index that the render loop must reject.

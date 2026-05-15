@@ -29,8 +29,9 @@ export const OUTPUT_FORMATS = [
     codecs: {
       cpu: 'libx264',
       nvidia: 'h264_nvenc',
-      nvidia_cuda: 'h264_nvenc',
+      nvidia_cuda: 'nnvgpu_h264',
       qsv: 'h264_qsv',
+      qsv_full: 'qsv_full_h264',
       amd: 'h264_amf',
       videotoolbox: 'h264_videotoolbox',
       vaapi: 'h264_vaapi',
@@ -43,8 +44,9 @@ export const OUTPUT_FORMATS = [
     codecs: {
       cpu: 'libx265',
       nvidia: 'hevc_nvenc',
-      nvidia_cuda: 'hevc_nvenc',
+      nvidia_cuda: 'nnvgpu_hevc',
       qsv: 'hevc_qsv',
+      qsv_full: 'qsv_full_hevc',
       amd: 'hevc_amf',
       videotoolbox: 'hevc_videotoolbox',
       vaapi: 'hevc_vaapi',
@@ -57,10 +59,15 @@ export const ACCELERATION_OPTIONS = [
   { value: 'nvidia', label: 'NVIDIA GPU', platform: ['windows', 'linux'] },
   {
     value: 'nvidia_cuda',
-    label: 'NVIDIA GPU | CUDA',
+    label: 'NVIDIA CUDA Overlay',
     platform: ['windows', 'linux'],
   },
   { value: 'qsv', label: 'Intel Quick Sync', platform: ['windows', 'linux'] },
+  {
+    value: 'qsv_full',
+    label: 'Intel QSV Overlay',
+    platform: ['windows', 'linux'],
+  },
   { value: 'amd', label: 'AMD GPU', platform: ['windows', 'linux'] },
   {
     value: 'videotoolbox',

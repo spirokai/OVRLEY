@@ -14,11 +14,16 @@ const binaryName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
 const binaryPath = join(binDir, binaryName)
 const requiredEncoders = process.platform === 'darwin'
   ? ['prores_ks', 'qtrle', 'prores_videotoolbox']
-  : ['prores_ks', 'qtrle']
-const requiredFilters = ['format', 'hwupload']
+  : process.platform === 'win32' || process.platform === 'linux'
+    ? ['prores_ks', 'qtrle', 'h264_qsv', 'hevc_qsv']
+    : ['prores_ks', 'qtrle']
+const requiredFilters = process.platform === 'win32' || process.platform === 'linux'
+  ? ['format', 'hwupload', 'overlay_qsv', 'hwdownload']
+  : ['format', 'hwupload']
 
 const defaultArchives = {
-  win32: 'https://github.com/GyanD/codexffmpeg/releases/download/8.1.1/ffmpeg-8.1.1-full_build-shared.zip',
+  win32: 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip',
+  linux: 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl-shared.tar.xz',
   darwin: 'https://evermeet.cx/ffmpeg/ffmpeg-8.1.1.zip',
 }
 
@@ -124,7 +129,7 @@ async function checkFfmpeg(path) {
 }
 
 function parseVersion(output) {
-  const match = output.match(/ffmpeg version\s+(?:n)?(\d+(?:\.\d+){0,2})/i)
+  const match = output.match(/ffmpeg version\s+(?:n-)?(\d+(?:\.\d+){0,2})/i)
   return match?.[1] ?? null
 }
 
@@ -249,6 +254,9 @@ function extractArchive(archivePath, destination) {
       '-Command',
       `Expand-Archive -LiteralPath '${archivePath.replaceAll("'", "''")}' -DestinationPath '${destination.replaceAll("'", "''")}' -Force`,
     ])
+  }
+  if (archivePath.endsWith('.tar.xz')) {
+    return run('tar', ['-xf', archivePath, '-C', destination])
   }
   return run('unzip', ['-q', archivePath, '-d', destination])
 }

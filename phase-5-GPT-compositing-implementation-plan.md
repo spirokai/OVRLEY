@@ -2598,6 +2598,8 @@ This may require adjustment depending on FFmpeg build support and alpha-format c
 
 ### 4. Fall back if CUDA graph fails
 
+NOTE: Clarify this point before implementation. I am not sure what this means in practice. The rendering should fail loudly if CUDA fails, not silently fall back.
+
 If `overlay_cuda` does not accept the exact options or alpha format, the implementation must fall back to:
 
 ```txt
@@ -2607,6 +2609,8 @@ software overlay + NVENC encode
 Do not let CUDA fragility block hardware encoding entirely.
 
 ### 5. Add QSV full-GPU profiles
+
+NOTE: Also clarify, what is QSV full-GPU profile. How does it differ from the QSV we have in Phase 8? Explain prior to starting implementation.
 
 Add optional QSV overlay path:
 
@@ -2627,6 +2631,8 @@ hwdownload
 ```
 
 ### 7. Keep experimental profiles opt-in
+
+NOTE: These profiles are fully opt-in via frontend dropdown. As far as I understand they are never default. Verify and discuss this point before implementation.
 
 Full-GPU paths should not become the default until tested widely.
 

@@ -29,6 +29,8 @@ pub struct CompositeProfile {
 /// output path if its process-spawning architecture owns destination handling.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompositeFfmpegSettings {
+    pub selected_profile_name: String,
+    pub fallback_profile_name: Option<String>,
     pub hw_init_args: Vec<String>,
     pub input_0_args: Vec<String>,
     pub input_1_args: Vec<String>,
@@ -57,6 +59,7 @@ pub struct HwAccelInfo {
     pub videotoolbox_available: bool,
     pub vaapi_available: bool,
     pub vaapi_device: Option<String>,
+    pub qsv_full_init_args: Vec<String>,
 }
 
 impl HwAccelInfo {
@@ -81,6 +84,7 @@ impl HwAccelInfo {
             videotoolbox_available: true,
             vaapi_available: true,
             vaapi_device: None,
+            qsv_full_init_args: Vec::new(),
         }
     }
 }
@@ -101,12 +105,13 @@ impl From<&AvailableCodecs> for HwAccelInfo {
             h264_vaapi_available: codecs.h264_vaapi,
             hevc_vaapi_available: codecs.hevc_vaapi,
             nvenc_available: codecs.h264_nvenc || codecs.hevc_nvenc,
-            cuda_filters_available: codecs.cuda,
+            cuda_filters_available: codecs.nnvgpu,
             qsv_available: codecs.qsv,
-            qsv_filters_available: false,
+            qsv_filters_available: codecs.qsv_full,
             videotoolbox_available: codecs.videotoolbox,
             vaapi_available: codecs.vaapi,
             vaapi_device: None,
+            qsv_full_init_args: codecs.qsv_full_init_args.clone(),
         }
     }
 }
@@ -142,7 +147,16 @@ pub fn build_composite_ffmpeg_settings(
     let source_fps = source_fps.reduced();
     let overlay_pipe_fps = overlay_pipe_fps.reduced();
     let video_path = video_path.to_string_lossy().to_string();
-    let selected_profile = select_composite_profile(codec_name, hwaccel_available)?;
+    let mut selected_profile = select_composite_profile(codec_name, hwaccel_available)?;
+    if selected_profile.name.starts_with("qsv_full_") {
+        if hwaccel_available.qsv_full_init_args.is_empty() {
+            return Err(format!(
+                "Requested experimental QSV overlay profile {} is unavailable; codec detection did not provide working QSV hardware-device init args.",
+                selected_profile.name
+            ));
+        }
+        selected_profile.input_args = hwaccel_available.qsv_full_init_args.clone();
+    }
 
     let mut input_0_args = selected_profile.input_args.clone();
     if video_trim_start > 0.0 {
@@ -192,6 +206,8 @@ pub fn build_composite_ffmpeg_settings(
     ]);
 
     Ok(CompositeFfmpegSettings {
+        selected_profile_name: selected_profile.name.to_string(),
+        fallback_profile_name: fallback_profile_name(&selected_profile),
         hw_init_args: profile_hw_init_args(&selected_profile, hwaccel_available),
         input_0_args,
         input_1_args,
@@ -234,6 +250,19 @@ fn select_composite_profile(
         output_args: vec!["-c:v".to_string(), codec_name.to_string()],
     });
 
+    if profile.name.starts_with("nnvgpu_") && !hwaccel_available.cuda_filters_available {
+        return Err(format!(
+            "Requested experimental CUDA overlay profile {} is unavailable; FFmpeg must support overlay_cuda, scale_cuda, and hwupload.",
+            profile.name
+        ));
+    }
+    if profile.name.starts_with("qsv_full_") && !hwaccel_available.qsv_filters_available {
+        return Err(format!(
+            "Requested experimental QSV overlay profile {} is unavailable; FFmpeg must support overlay_qsv, scale_qsv, and hwupload.",
+            profile.name
+        ));
+    }
+
     match profile.codec {
         "h264_nvenc" if !hwaccel_available.h264_nvenc_available => {
             Err("Requested hardware encoder h264_nvenc is unavailable.".to_string())
@@ -260,6 +289,20 @@ fn select_composite_profile(
             Err("Requested hardware encoder hevc_vaapi is unavailable.".to_string())
         }
         _ => Ok(profile),
+    }
+}
+
+/// Returns the safe CPU-overlay profile that corresponds to an experimental path.
+///
+/// This is diagnostic only for explicit full-GPU renders, which fail loudly
+/// instead of silently producing a fallback output when FFmpeg rejects the graph.
+pub(crate) fn fallback_profile_name(profile: &CompositeProfile) -> Option<String> {
+    match profile.name {
+        "nnvgpu_h264" => Some("nvgpu_h264".to_string()),
+        "nnvgpu_hevc" => Some("nvgpu_hevc".to_string()),
+        "qsv_full_h264" => Some("qsv_h264".to_string()),
+        "qsv_full_hevc" => Some("qsv_hevc".to_string()),
+        _ => None,
     }
 }
 

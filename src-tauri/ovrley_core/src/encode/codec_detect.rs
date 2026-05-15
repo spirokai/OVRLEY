@@ -34,6 +34,14 @@ pub struct AvailableCodecs {
     pub videotoolbox: bool,
     pub nvgpu: bool,
     pub nnvgpu: bool,
+    pub overlay_cuda: bool,
+    pub scale_cuda: bool,
+    pub scale_qsv: bool,
+    pub hwupload_filter: bool,
+    pub overlay_qsv: bool,
+    pub hwdownload_filter: bool,
+    pub qsv_full: bool,
+    pub qsv_full_init_args: Vec<String>,
 }
 
 pub fn detect_codecs(repo_root: &Path) -> Result<AvailableCodecs, String> {
@@ -430,6 +438,21 @@ pub fn detect_codecs(repo_root: &Path) -> Result<AvailableCodecs, String> {
         ],
     );
     let cuda = cuda_h264_nvenc || cuda_hevc_nvenc;
+    let filters = detect_ffmpeg_filters(&ffmpeg_path);
+    let overlay_cuda = filters.contains("overlay_cuda");
+    let scale_cuda = filters.contains("scale_cuda");
+    let scale_qsv = filters.contains("scale_qsv");
+    let hwupload_filter = filters.contains("hwupload");
+    let overlay_qsv = filters.contains("overlay_qsv");
+    let hwdownload_filter = filters.contains("hwdownload");
+    let cuda_filter_stack = cuda && overlay_cuda && scale_cuda && hwupload_filter;
+    let qsv_filter_stack = overlay_qsv && scale_qsv && hwupload_filter;
+    let qsv_full_init_args = if (h264_qsv || hevc_qsv) && qsv_filter_stack {
+        detect_qsv_full_init_args(&ffmpeg_path).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let qsv_full = !qsv_full_init_args.is_empty();
 
     Ok(AvailableCodecs {
         prores_ks,
@@ -454,8 +477,183 @@ pub fn detect_codecs(repo_root: &Path) -> Result<AvailableCodecs, String> {
         vaapi: h264_vaapi || hevc_vaapi,
         videotoolbox: prores_videotoolbox || h264_videotoolbox || hevc_videotoolbox,
         nvgpu: h264_nvenc || hevc_nvenc,
-        nnvgpu: cuda,
+        nnvgpu: cuda_filter_stack,
+        overlay_cuda,
+        scale_cuda,
+        scale_qsv,
+        hwupload_filter,
+        overlay_qsv,
+        hwdownload_filter,
+        qsv_full,
+        qsv_full_init_args,
     })
+}
+
+/// Lists FFmpeg filter names advertised by the bundled FFmpeg binary.
+///
+/// A failed probe returns an empty set so hardware-only filter profiles are
+/// conservatively disabled instead of being shown optimistically.
+fn detect_ffmpeg_filters(ffmpeg_path: &Path) -> std::collections::BTreeSet<String> {
+    let output = Command::new(ffmpeg_path)
+        .args(["-hide_banner", "-filters"])
+        .output();
+    let Ok(output) = output else {
+        return std::collections::BTreeSet::new();
+    };
+
+    let mut text = String::from_utf8_lossy(&output.stdout).to_string();
+    text.push_str(&String::from_utf8_lossy(&output.stderr));
+    parse_ffmpeg_filter_names(&text)
+}
+
+/// Parses the human-readable `ffmpeg -filters` table into filter names.
+///
+/// Only rows with a media-flow signature are treated as filter entries, which
+/// avoids capturing headings and legend text.
+fn parse_ffmpeg_filter_names(filters_output: &str) -> std::collections::BTreeSet<String> {
+    filters_output
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split_whitespace();
+            let _flags = parts.next()?;
+            let name = parts.next()?;
+            let signature = parts.next()?;
+            signature.contains("->").then(|| name.to_string())
+        })
+        .collect()
+}
+
+/// Returns the first QSV hardware-device argument set that can run `overlay_qsv`.
+///
+/// The probe mirrors the composite render shape with two video inputs, hardware
+/// upload for the raw overlay leg, `scale_qsv`, `overlay_qsv`, and a one-frame
+/// QSV encode without downloading the filtered frames.
+fn detect_qsv_full_init_args(ffmpeg_path: &Path) -> Option<Vec<String>> {
+    qsv_full_init_arg_candidates()
+        .into_iter()
+        .find(|args| probe_qsv_overlay_path(ffmpeg_path, args))
+}
+
+/// Lists platform-specific QSV hardware-device initialization candidates.
+///
+/// Windows tries explicit DXVA2/D3D11 derivation first because adapter binding
+/// can differ on systems with both integrated and dedicated GPUs.
+fn qsv_full_init_arg_candidates() -> Vec<Vec<String>> {
+    let candidates: &[&[&str]] = if cfg!(windows) {
+        &[
+            &[
+                "-init_hw_device",
+                "dxva2=dx",
+                "-init_hw_device",
+                "qsv=qs@dx",
+                "-filter_hw_device",
+                "qs",
+                "-hwaccel",
+                "qsv",
+                "-hwaccel_output_format",
+                "qsv",
+            ],
+            &[
+                "-init_hw_device",
+                "d3d11va=dx",
+                "-init_hw_device",
+                "qsv=qs@dx",
+                "-filter_hw_device",
+                "qs",
+                "-hwaccel",
+                "qsv",
+                "-hwaccel_output_format",
+                "qsv",
+            ],
+            &[
+                "-init_hw_device",
+                "d3d11va=dx:0",
+                "-init_hw_device",
+                "qsv=qs@dx",
+                "-filter_hw_device",
+                "qs",
+                "-hwaccel",
+                "qsv",
+                "-hwaccel_output_format",
+                "qsv",
+            ],
+            &[
+                "-init_hw_device",
+                "d3d11va=dx:1",
+                "-init_hw_device",
+                "qsv=qs@dx",
+                "-filter_hw_device",
+                "qs",
+                "-hwaccel",
+                "qsv",
+                "-hwaccel_output_format",
+                "qsv",
+            ],
+            &[
+                "-init_hw_device",
+                "qsv=qs",
+                "-filter_hw_device",
+                "qs",
+                "-hwaccel",
+                "qsv",
+                "-hwaccel_output_format",
+                "qsv",
+            ],
+        ]
+    } else {
+        &[&[
+            "-init_hw_device",
+            "qsv=qs",
+            "-filter_hw_device",
+            "qs",
+            "-hwaccel",
+            "qsv",
+            "-hwaccel_output_format",
+            "qsv",
+        ]]
+    };
+
+    candidates
+        .iter()
+        .map(|candidate| candidate.iter().map(|arg| (*arg).to_string()).collect())
+        .collect()
+}
+
+/// Probes whether a QSV device can run the performance QSV filter path.
+///
+/// This is intentionally small but exercises QSV scaling, raw overlay upload,
+/// QSV overlay, and QSV encode without a hardware-frame download.
+fn probe_qsv_overlay_path(ffmpeg_path: &Path, init_args: &[String]) -> bool {
+    let mut args = vec![
+        "-hide_banner".to_string(),
+        "-loglevel".to_string(),
+        "error".to_string(),
+    ];
+    args.extend(init_args.iter().cloned());
+    args.extend([
+        "-f".to_string(),
+        "lavfi".to_string(),
+        "-i".to_string(),
+        "color=c=black:s=128x128:r=30:d=0.1,format=yuv420p".to_string(),
+        "-f".to_string(),
+        "lavfi".to_string(),
+        "-i".to_string(),
+        "color=c=red@0.35:s=128x128:r=30:d=0.1,format=rgba".to_string(),
+        "-filter_complex".to_string(),
+        "[0:v]format=nv12,hwupload=extra_hw_frames=64,scale_qsv=w=128:h=128:format=nv12[main_hw];[1:v]format=bgra,hwupload=extra_hw_frames=64,format=qsv[overlay_hw];[main_hw][overlay_hw]overlay_qsv=x=0:y=0[out]"
+            .to_string(),
+        "-map".to_string(),
+        "[out]".to_string(),
+        "-c:v".to_string(),
+        "h264_qsv".to_string(),
+        "-frames:v".to_string(),
+        "1".to_string(),
+        "-f".to_string(),
+        "null".to_string(),
+        "-".to_string(),
+    ]);
+
+    probe_codec_owned("qsv_overlay", ffmpeg_path, &args)
 }
 
 fn probe_codec(name: &str, ffmpeg_path: &Path, args: &[&str]) -> bool {
@@ -526,4 +724,25 @@ fn find_vaapi_device() -> Option<std::path::PathBuf> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_ffmpeg_filter_names_from_filter_listing() {
+        let filters = parse_ffmpeg_filter_names(
+            " TSC overlay_cuda    VV->V      Overlay one video on top of another using CUDA\n\
+             ... scale_cuda      V->V       GPU accelerated video resizer\n\
+             ... scale_qsv       V->V       Quick Sync Video scaling and format conversion\n\
+             ... hwupload        V->V       Upload a normal frame to a hardware frame\n\
+             ... overlay_qsv     VV->V      Quick Sync overlay\n\
+             ... hwdownload      V->V       Download a hardware frame\n",
+        );
+
+        assert!(filters.contains("overlay_cuda"));
+        assert!(filters.contains("scale_cuda"));
+        assert!(filters.contains("scale_qsv"));
+        assert!(filters.contains("hwupload"));
+        assert!(filters.contains("overlay_qsv"));
+        assert!(filters.contains("hwdownload"));
+    }
+}
