@@ -728,6 +728,81 @@ fn recent_template_config(width: u32, height: u32) -> RenderConfig {
     config
 }
 
+#[test]
+fn test_parallel_composite_render_2_segments() {
+    let paths = test_paths();
+    let config = composite_test_config(5.0);
+    let activity = fixture_activity();
+    let dense = build_dense_activity_report(&activity, &config).unwrap();
+    let controller = RenderController::default();
+    controller.try_start(dense.frame_count as u32, "test_parallel_2").unwrap();
+
+    let result = crate::encode::video::render_composite_video(
+        &paths, &config, &activity, &dense, &controller,
+        "D:\\Downloads\\video sample.mp4", "10M",
+        0.0, 30000, 1001, 35.0,
+        Some(5.0), Some(0.0), Some(1),
+    );
+    assert!(result.is_ok(), "Failed: {:?}", result);
+    let filename = result.unwrap();
+    let output = paths.downloads_dir.join(&filename);
+    assert!(output.exists());
+    assert!(std::fs::metadata(&output).unwrap().len() > 0);
+    println!("Parallel composite output: {}", output.display());
+}
+
+#[test]
+fn test_parallel_composite_render_with_audio() {
+    let paths = test_paths();
+    let config = composite_test_config(5.0);
+    let activity = fixture_activity();
+    let dense = build_dense_activity_report(&activity, &config).unwrap();
+    let controller = RenderController::default();
+    controller.try_start(dense.frame_count as u32, "test_parallel_audio").unwrap();
+
+    let result = crate::encode::video::render_composite_video(
+        &paths, &config, &activity, &dense, &controller,
+        "D:\\Downloads\\video sample.mp4", "10M",
+        0.0, 30000, 1001, 35.0,
+        Some(5.0), Some(15.0), Some(1),
+    );
+    assert!(result.is_ok(), "Failed: {:?}", result);
+    let filename = result.unwrap();
+    let output = paths.downloads_dir.join(&filename);
+    assert!(output.exists());
+    assert!(std::fs::metadata(&output).unwrap().len() > 0);
+    println!("Parallel audio output: {}", output.display());
+}
+
+fn composite_test_config(render_duration: f64) -> RenderConfig {
+    let json = format!(
+        r#"{{
+        "scene": {{
+            "width": 1920,
+            "height": 1080,
+            "fps": 30.0,
+            "start": 0.0,
+            "end": {duration},
+            "ffmpeg": {{
+                "codec": "qsv_full_h264",
+                "qsv_full_init_args": [
+                    "-init_hw_device", "dxva2=dx",
+                    "-init_hw_device", "qsv=qs@dx",
+                    "-filter_hw_device", "qs",
+                    "-hwaccel", "qsv",
+                    "-hwaccel_output_format", "qsv"
+                ]
+            }}
+        }},
+        "widgets": [],
+        "maps": [],
+        "athlete": null
+    }}"#,
+        duration = render_duration
+    );
+    parse_config_json(&json).unwrap()
+}
+
 fn fixture_activity() -> ParsedActivity {
     let activity = fs::read_to_string(
         repo_root()

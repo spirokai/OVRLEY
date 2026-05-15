@@ -275,8 +275,8 @@ pub fn render_video(
 
 /// Renders an imported video with the Skia overlay composited into an MP4 output.
 ///
-/// This public entry point keeps compositing separate from [`render_video`] and
-/// delegates the actual Phase 4 dry-run pipeline shell to the composite module.
+/// Longer renders are automatically split into parallel segments for better CPU
+/// utilization and then stitched with FFmpeg stream copy.
 pub fn render_composite_video(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -293,6 +293,30 @@ pub fn render_composite_video(
     composite_video_trim_start: Option<f64>,
     composite_widget_update_rate: Option<u32>,
 ) -> Result<String, String> {
+    let render_duration = composite_render_duration
+        .unwrap_or(composite_video_duration - composite_video_trim_start.unwrap_or(0.0));
+    let trim_start = composite_video_trim_start.unwrap_or(0.0);
+    let update_rate = composite_widget_update_rate.unwrap_or(1).max(1);
+
+    if should_parallelize_composite(render_duration, composite_video_fps_num, update_rate) {
+        return render_composite_video_segmented(
+            paths,
+            config,
+            activity,
+            dense_activity,
+            controller,
+            composite_video_path,
+            composite_bitrate,
+            composite_sync_offset,
+            composite_video_fps_num,
+            composite_video_fps_den,
+            composite_video_duration,
+            render_duration,
+            trim_start,
+            update_rate,
+        );
+    }
+
     render_composite_video_single(
         paths,
         config,
@@ -305,10 +329,208 @@ pub fn render_composite_video(
         composite_video_fps_num,
         composite_video_fps_den,
         composite_video_duration,
-        composite_render_duration,
-        composite_video_trim_start,
-        composite_widget_update_rate,
+        Some(render_duration),
+        Some(trim_start),
+        Some(update_rate),
     )
+}
+
+/// Returns whether composite rendering should be split into parallel segments.
+///
+/// Only activates for renders with enough frames to make splitting worthwhile
+/// and when the machine has at least 2 available workers.
+fn should_parallelize_composite(
+    render_duration: f64,
+    fps_num: u32,
+    update_rate: u32,
+) -> bool {
+    let overlay_fps = fps_num as f64 / update_rate.max(1) as f64;
+    let total_frames = (render_duration * overlay_fps).ceil() as u32;
+    total_frames >= 120 && estimate_parallel_render_worker_count(total_frames as usize) >= 2
+}
+
+/// Renders a composite video as multiple parallel segments stitched together.
+///
+/// Each segment covers a contiguous time window of the render timeline. Segments
+/// are rendered concurrently on separate threads, each with its own FFmpeg
+/// process and buffer pool, then concatenated with stream copy.
+fn render_composite_video_segmented(
+    paths: &AppPaths,
+    config: &RenderConfig,
+    activity: &ParsedActivity,
+    dense_activity: &DenseActivityReport,
+    controller: &RenderController,
+    composite_video_path: &str,
+    composite_bitrate: &str,
+    composite_sync_offset: f64,
+    composite_video_fps_num: u32,
+    composite_video_fps_den: u32,
+    composite_video_duration: f64,
+    render_duration: f64,
+    trim_start: f64,
+    update_rate: u32,
+) -> Result<String, String> {
+    let segment_count = estimate_parallel_render_worker_count(render_duration.ceil() as usize);
+    if segment_count < 2 {
+        return render_composite_video_single(
+            paths, config, activity, dense_activity, controller,
+            composite_video_path, composite_bitrate,
+            composite_sync_offset,
+            composite_video_fps_num, composite_video_fps_den,
+            composite_video_duration,
+            Some(render_duration), Some(trim_start), Some(update_rate),
+        );
+    }
+
+    let source_fps = composite_video_fps_num as f64 / composite_video_fps_den as f64;
+    let base_duration = render_duration / segment_count as f64;
+    let mut segments: Vec<(f64, f64)> = Vec::with_capacity(segment_count);
+    let mut cursor = 0.0;
+    for index in 0..segment_count {
+        let seg_duration = if index == segment_count - 1 {
+            render_duration - cursor
+        } else {
+            base_duration
+        };
+        segments.push((cursor, cursor + seg_duration));
+        cursor += seg_duration;
+    }
+
+    let combined_frames = segments
+        .iter()
+        .map(|(start, end)| ((end - start) * source_fps).ceil() as u32)
+        .sum::<u32>();
+
+    let child_cancel_flag = controller.cancel_flag();
+    let segment_controllers: Vec<RenderController> = segments
+        .iter()
+        .map(|(start, end)| {
+            let frames = ((end - start) * source_fps).ceil() as u32;
+            child_render_controller(frames, &child_cancel_flag)
+        })
+        .collect();
+
+    enum SegmentEvent {
+        Completed(usize, Result<String, String>),
+    }
+
+    let (tx, rx) = mpsc::channel::<SegmentEvent>();
+    let mut handles = Vec::with_capacity(segment_count);
+    for index in 0..segment_count {
+        let tx = tx.clone();
+        let segment_controller = segment_controllers[index].clone();
+        let segment_paths = paths.clone();
+        let segment_config = config.clone();
+        let segment_activity = activity.clone();
+        let segment_dense = dense_activity.clone();
+        let segment_video_path = composite_video_path.to_string();
+        let segment_bitrate = composite_bitrate.to_string();
+        let (seg_start, seg_end) = segments[index];
+
+        let handle = thread::spawn(move || {
+            let result = render_composite_video_single(
+                &segment_paths,
+                &segment_config,
+                &segment_activity,
+                &segment_dense,
+                &segment_controller,
+                &segment_video_path,
+                &segment_bitrate,
+                composite_sync_offset,
+                composite_video_fps_num,
+                composite_video_fps_den,
+                composite_video_duration,
+                Some(seg_end - seg_start),
+                Some(trim_start + seg_start),
+                Some(update_rate),
+            );
+            let _ = tx.send(SegmentEvent::Completed(index, result));
+        });
+        handles.push(handle);
+    }
+    drop(tx);
+
+    let mut results = vec![None; segment_count];
+    let mut completed = 0usize;
+    let mut first_error: Option<String> = None;
+
+    while completed < segment_count {
+        let progress_snapshots = segment_controllers
+            .iter()
+            .map(RenderController::progress)
+            .collect::<Vec<_>>();
+        let current = progress_snapshots
+            .iter()
+            .map(|p| p.current)
+            .sum::<u32>();
+        let encoded = progress_snapshots
+            .iter()
+            .map(|p| p.encoded)
+            .sum::<u32>();
+        let estimate = progress_snapshots
+            .iter()
+            .filter_map(|p| p.estimated_seconds_remaining)
+            .max();
+        let rendering_fps = progress_snapshots
+            .iter()
+            .filter_map(|p| p.rendering_fps)
+            .sum::<f64>();
+        let rendering_fps = (rendering_fps > 0.0).then_some(rendering_fps);
+        controller.set_frame_progress(current, combined_frames, encoded, estimate, rendering_fps);
+
+        match rx.recv_timeout(Duration::from_millis(200)) {
+            Ok(SegmentEvent::Completed(index, Ok(filename))) => {
+                results[index] = Some(filename);
+                completed += 1;
+            }
+            Ok(SegmentEvent::Completed(_, Err(error))) => {
+                if first_error.is_none() {
+                    first_error = Some(error);
+                    controller.cancel_flag().store(true, Ordering::SeqCst);
+                }
+                completed += 1;
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => break,
+        }
+    }
+
+    for handle in handles {
+        handle
+            .join()
+            .map_err(|_| "Composite segment render thread panicked".to_string())?;
+    }
+
+    if let Some(error) = first_error {
+        cleanup_segment_outputs(paths, &results);
+        return Err(error);
+    }
+
+    if controller.cancel_flag().load(Ordering::SeqCst) {
+        cleanup_segment_outputs(paths, &results);
+        return Err("Rendering cancelled".to_string());
+    }
+
+    let segment_filenames: Option<Vec<String>> = results.iter().cloned().collect();
+    let segment_filenames = match segment_filenames {
+        Some(filenames) => filenames,
+        None => {
+            cleanup_segment_outputs(paths, &results);
+            return Err("Composite segment render did not produce all output files".to_string());
+        }
+    };
+
+    controller.set_frame_progress(combined_frames, combined_frames, combined_frames, Some(0), None);
+
+    let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
+    let public_filename = format!("video_composited_{}.mp4", timestamp_nanos()?);
+    let output_path = paths.downloads_dir.join(&public_filename);
+    if let Err(error) = concat_video_segments(paths, &ffmpeg_bin, &segment_filenames, &output_path) {
+        cleanup_segment_outputs(paths, &results);
+        return Err(error);
+    }
+    cleanup_segment_outputs(paths, &results);
+    Ok(public_filename)
 }
 
 // Returns whether qtrle rendering should be split into stitched segments.
