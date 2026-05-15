@@ -168,14 +168,14 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
         codec: "h264_videotoolbox",
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_FILTER),
-        output_args: &["-c:v", "h264_videotoolbox", "-q:v", "60"],
+        output_args: &["-c:v", "h264_videotoolbox"],
     },
     CompositeProfileTemplate {
         name: "mac_hevc",
         codec: "hevc_videotoolbox",
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_FILTER),
-        output_args: &["-c:v", "hevc_videotoolbox", "-q:v", "60"],
+        output_args: &["-c:v", "hevc_videotoolbox"],
     },
     CompositeProfileTemplate {
         name: "vaapi_h264",
