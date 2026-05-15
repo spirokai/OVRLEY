@@ -177,6 +177,7 @@ pub(crate) fn render_composite_video_single(
                 current_progress,
                 total_progress,
                 output_equivalent_frame_seconds,
+                render_started.elapsed().as_secs_f64(),
             );
             controller.set_frame_progress(
                 current_progress,

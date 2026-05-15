@@ -172,8 +172,12 @@ pub(crate) fn render_video_single(
             rendered_frames += 1;
             let frame_ms = frame_started.elapsed().as_secs_f64() * 1000.0;
             aggregate_profiler.record_ms("frame.total", frame_ms);
-            let (estimate, rendering_fps) =
-                estimator.record(rendered_frames, total_frames, frame_ms / 1000.0);
+            let (estimate, rendering_fps) = estimator.record(
+                rendered_frames,
+                total_frames,
+                frame_ms / 1000.0,
+                render_started.elapsed().as_secs_f64(),
+            );
             controller.set_frame_progress(
                 rendered_frames,
                 total_frames,
