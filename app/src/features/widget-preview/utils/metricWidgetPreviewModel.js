@@ -1,26 +1,11 @@
 /**
- * Provides overlay editor helpers for metric widget preview geometry.
- */
-
-import {
-  formatSpeed,
-  formatTemperature,
-  formatTimeValue,
-  getMetricWidgetLayout,
-  getMetricWidgetVisualBounds,
-  getPreviewFontFamily,
-} from './metricTextUtils'
-import { getInterpolatedActivityValue, getInterpolatedTimeValue } from './utils'
-
-/**
  * Builds the shared preview model for metric-style widgets.
- *
- * @param {object} options - Structured options for the helper.
- * @param {*} options.widget - Widget definition being rendered.
- * @param {*} options.activity - Parsed preview activity.
- * @param {*} options.previewSecond - Preview time in seconds.
- * @returns {object|null} Shared preview geometry for metric widgets.
  */
+
+import { formatSpeed, formatTemperature, formatTimeValue } from './formatUtils'
+import { getMetricWidgetLayout, getMetricWidgetVisualBounds, getPreviewFontFamily } from './textMeasurement'
+import { getInterpolatedActivityValue, getInterpolatedTimeValue } from '@/features/overlay-editor'
+
 export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond }) {
   if (!widget || widget.category !== 'values' || widget.type === 'gradient') {
     return null

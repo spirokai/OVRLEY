@@ -1428,6 +1428,52 @@ The largest feature — central canvas, widget preview, geometry, and all editor
 
 **Total: ~5,383 lines moved/split** — this is the largest feature and should be broken into multiple refactor passes.
 
+### Refactor Passes
+
+**Pass 1 — Constants Extraction + Utilities & Low-Risk Moves (~2,783 lines)**
+
+Start by extracting **all data-only constants** into `data/overlayEditorConstants.js`. Constants are currently scattered across 5+ files and must be consolidated before splitting utilities, so split files can import from a single source.
+
+**Constants to extract (26 unique values):**
+
+| Source File | Constant(s) | Extraction Target |
+|---|---|---|
+| `constants.js` (existing) | `DEFAULT_GRADIENT_TRIANGLE_WIDTH`, `EDITOR_GRID_DIVISIONS` → move to data/; keep `FONT_FAMILY_MAP`, `WIDGET_ICONS`, `DEFAULT_ACTIVITY_PREVIEW`, `getEditorGridSize` where they are (data + function mix) | `data/overlayEditorConstants.js` |
+| `metricTextUtils.js` | `METRIC_WIDGET_LINE_HEIGHT` (0.92), `METRIC_WIDGET_OUTER_GAP_PX` (8), `METRIC_WIDGET_UNITS_GAP_PX` (8), `GRADIENT_WIDGET_TRIANGLE_GAP_PX` (8), `GRADIENT_ZERO_EPSILON` (0.05), `MAX_GRADIENT_ABS_PERCENT` (25), `GRADIENT_ZERO_LINE_WIDTH_PX` (1), `NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT` | `data/overlayEditorConstants.js` |
+| `OverlayMoveable.jsx` | `CORNER_RESIZE_DIRECTIONS`, `EDGE_RESIZE_DIRECTIONS`, `MOVEABLE_ZOOM` (1.5) | `data/overlayEditorConstants.js` |
+| `createOverlayMoveableHandlers.js` | `AXIS_LOCK_THRESHOLD` (3) | `data/overlayEditorConstants.js` |
+| `OverlayCanvas.jsx` | `CANVAS_BACKGROUND_COLORS` map | `data/overlayEditorConstants.js` |
+| `geometryUtils.js` | `ROUTE_FALLBACK_INSET_MAX_RATIO` (0.45), `ELEVATION_FALLBACK_PADDING` (18), `GEOMETRY_EPSILON` (1e-9), `SIMPLIFY_MIN_TOLERANCE` (0.05), `DENSITY_CLAMP_MIN` (0.1), `DENSITY_CLAMP_MAX` (2), `VERTICAL_SCALE_CLAMP_MIN` (0.2), `VERTICAL_SCALE_CLAMP_MAX` (4), `SIMPLIFY_TOLERANCE_CLAMP_MAX` (8) | `data/overlayEditorConstants.js` |
+| `useOverlayEditorState.js` | `VIEWPORT_PADDING` (72), `ZOOM_MIN` (0.35), `ZOOM_MAX` (4), `ZOOM_DELTA` (0.05) | `data/overlayEditorConstants.js` |
+
+Then proceed with utility splits and low-risk moves:
+
+| Files | Lines | Work |
+| ----- | ----- | ---- |
+| `geometryUtils.js` | 738 | Split into `routeGeometry.js`, `elevationGeometry.js`, keep general helpers in shared file |
+| `metricTextUtils.js` | 675 | Split into `textMeasurement.js`, `formatUtils.js`, `shadowUtils.js`; remove extracted constants |
+| `overlayEditorHelpers.js` | 290 | Split widget DOM helpers from bounds/geometry helpers |
+| `utils.js` | 371 | Remove re-exports; direct imports to split domain files; keep barrel export at feature level |
+| `createOverlayMoveableHandlers.js` | 439 | Split into focused handler groups (drag, resize, scale, rotate) |
+| `createOverlayPointerHandlers.js` | 264 | Move as-is; optionally extract zoom handler |
+| `OverlayMoveable.jsx` | 120 | Move as-is; import constants from data/ |
+| `WidgetPreview.jsx` | 97 | Move as-is |
+
+Validation: app loads, canvas renders, widgets are movable/resizable.
+
+**Pass 2 — Core Editor, State, & High-Risk Renderer (~2,600 lines)**
+
+Tackle the biggest structural changes once the utility foundation is settled.
+
+| Files | Lines | Work |
+| ----- | ----- | ---- |
+| `widgetPreviewRenderers.jsx` | 1,326 | Split into per-widget renderers (`RouteRenderer.jsx`, `ElevationRenderer.jsx`, `MetricRenderer.jsx`, `TextRenderer.jsx`); remove store access, pass data via props |
+| `useOverlayEditorState.js` | 502 | Further split viewport/zoom/keyboard into separate hook files |
+| `OverlayCanvas.jsx` | 294 | Consolidate 18 props into grouped objects; simplify prop tunneling |
+| `OverlayEditor.jsx` | 267 | Reduce prop drilling by consolidating props passed to children |
+
+Validation: full editor workflow works — add/edit/remove widgets, drag/resize/rotate, canvas renders correctly.
+
 ---
 
 ## 10.3 `features/player/`

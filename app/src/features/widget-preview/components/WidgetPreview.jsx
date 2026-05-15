@@ -1,20 +1,14 @@
 /**
- * Provides overlay editor helpers for widget preview.
+ * Renders the widget preview component — dispatches to the appropriate
+ * renderer based on widget type.
  */
 
 import { memo } from 'react'
-import { OverlayElevationWidget, OverlayMetricWidget, OverlayRouteWidget, OverlayTextWidget } from './widgetPreviewRenderers'
+import { OverlayTextWidget } from './TextRenderer'
+import { OverlayMetricWidget } from './MetricRenderer'
+import { OverlayRouteWidget } from './RouteRenderer'
+import { OverlayElevationWidget } from './ElevationRenderer'
 
-/**
- * Renders the widget preview component.
- *
- * @param {object} props - Component props.
- * @param {*} props.widget - Widget definition being rendered or edited.
- * @param {*} props.activity - Parsed activity data for previews or rendering.
- * @param {*} props.previewSecond - Preview time in seconds.
- * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
- * @returns {JSX.Element} Rendered component output.
- */
 function WidgetPreview({
   widget,
   activity,
@@ -26,6 +20,7 @@ function WidgetPreview({
   sceneFontSize,
   sceneStyle,
   valueFont,
+  exportRange,
 }) {
   if (widget.type === 'label') {
     return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} sceneStyle={sceneStyle} />
@@ -39,10 +34,8 @@ function WidgetPreview({
         previewSecond={previewSecond}
         globalOpacity={globalOpacity}
         globalScale={globalScale}
-        sceneFont={sceneFont}
-        sceneFontSize={sceneFontSize}
         sceneStyle={sceneStyle}
-        valueFont={valueFont}
+        exportRange={exportRange}
       />
     )
   }
@@ -59,6 +52,7 @@ function WidgetPreview({
         sceneFontSize={sceneFontSize}
         sceneStyle={sceneStyle}
         valueFont={valueFont}
+        exportRange={exportRange}
       />
     )
   }
@@ -88,5 +82,6 @@ export default memo(
     previousProps.sceneFont === nextProps.sceneFont &&
     previousProps.sceneFontSize === nextProps.sceneFontSize &&
     previousProps.sceneStyle === nextProps.sceneStyle &&
-    previousProps.valueFont === nextProps.valueFont,
+    previousProps.valueFont === nextProps.valueFont &&
+    previousProps.exportRange === nextProps.exportRange,
 )

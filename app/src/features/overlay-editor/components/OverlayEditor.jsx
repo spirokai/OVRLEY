@@ -1,17 +1,25 @@
 /**
- * Renders the overlay editor portion of the application interface.
+ * Main overlay editor component — renders the canvas, Moveable resize handles,
+ * widget badge labels, zoom-to-fit viewport, and empty state.
+ *
+ * Acts as a thin shell that delegates state orchestration to useOverlayEditorState
+ * and passes grouped props to child components.
  */
 
 import { memo, useMemo, useState } from 'react'
 import { LayoutGrid, Type } from 'lucide-react'
-import { Badge } from './ui/badge'
-import OverlayCanvas from './overlay-editor/OverlayCanvas'
-import OverlayMoveable from './overlay-editor/OverlayMoveable'
-import { buildMetricWidgetPreviewModel } from './overlay-editor/metricWidgetPreviewModel'
-import { WIDGET_ICONS } from './overlay-editor/constants'
-import { getWidgetSceneOrigin } from './overlay-editor/overlayEditorHelpers'
-import useOverlayEditorState from './overlay-editor/useOverlayEditorState'
+import { Badge } from '@/components/ui/badge'
+import OverlayCanvas from './OverlayCanvas'
+import OverlayMoveable from './OverlayMoveable'
+import { buildMetricWidgetPreviewModel } from '@/features/widget-preview'
+import { WIDGET_ICONS } from '../data/overlayEditorConfig'
+import { getWidgetSceneOrigin } from '../utils/overlayEditorHelpers'
+import useOverlayEditorState from '../hooks/useOverlayEditorState'
 
+/**
+ * Renders floating badge labels above selected/hovered widgets showing their type.
+ * Only visible during widget selection — hidden entirely when no widgets are selected.
+ */
 function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId, previewSecond, selectedWidgetIds, widgets }) {
   const visibleWidgets = useMemo(() => {
     const visibleIds = new Set(selectedWidgetIds)
@@ -58,12 +66,8 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
 }
 
 /**
- * Renders the scene resolution badge.
- *
- * @param {object} props - Component props.
- * @param {*} props.height - Current scene height.
- * @param {*} props.width - Current scene width.
- * @returns {JSX.Element} Rendered component output.
+ * Displays scene resolution and optional template save status badge
+ * in the top-left corner of the editor viewport.
  */
 function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
   return (
@@ -86,8 +90,8 @@ function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
 }
 
 /**
- * Renders the empty overlay state component.
- * @returns {JSX.Element} Rendered component output.
+ * Placeholder shown when no config is loaded — guides the user to load a template
+ * or add widgets to begin editing.
  */
 function EmptyOverlayState() {
   return (
@@ -104,19 +108,17 @@ function EmptyOverlayState() {
 }
 
 /**
- * Renders the overlay editor component.
- *
- * @param {object} props - Component props.
- * @param {*} props.config - Overlay template configuration data.
- * @param {*} props.globalDefaults - Value for global defaults.
- * @param {*} props.onConfigChange - Callback invoked to config change.
- * @param {*} props.zoomLevel - Current editor zoom level.
- * @param {*} props.onZoomLevelChange - Callback invoked to zoom level change.
- * @param {*} props.backgroundMode - Selected canvas background style.
- * @param {*} props.gridVisible - Whether to show the editor grid overlay.
- * @param {*} props.snapToGrid - Whether to snap Moveable to editor grid guides.
- * @param {*} props.showTemplateStatus - Whether to display the template status badge.
- * @param {*} props.templateStatus - Current template status label.
+ * @param {object} props
+ * @param {object|null} props.config - Current overlay template config.
+ * @param {object} props.globalDefaults - Global default values (opacity, scale, styles).
+ * @param {Function} props.onConfigChange - Callback to update the template config.
+ * @param {number} props.zoomLevel - Current viewport zoom multiplier.
+ * @param {Function} props.onZoomLevelChange - Callback to change zoom level.
+ * @param {string} props.backgroundMode - Canvas background mode (black, checker, white, video).
+ * @param {boolean} props.gridVisible - Whether the editor grid overlay is visible.
+ * @param {boolean} props.snapToGrid - Whether Moveable snapping is enabled.
+ * @param {boolean} props.showTemplateStatus - Whether to display the template save-status badge.
+ * @param {string} props.templateStatus - Current template save status text.
  * @returns {JSX.Element} Rendered component output.
  */
 function OverlayEditor({
@@ -139,6 +141,7 @@ function OverlayEditor({
     canScaleSelected,
     displayScale,
     elementGuidelines,
+    exportRange,
     globalOpacity,
     globalScale,
     handleSceneMouseDown,
@@ -169,6 +172,28 @@ function OverlayEditor({
     onZoomLevelChange,
   })
 
+  const valueFont =
+    config?.values?.find((value) => value.font || value.font_family)?.font ||
+    config?.values?.find((value) => value.font || value.font_family)?.font_family ||
+    globalDefaults?.font_values
+
+  const canvasSceneProps = useMemo(
+    () => ({ sceneFont: config?.scene?.font, sceneFontSize: config?.scene?.font_size, sceneStyle, valueFont, sceneSize }),
+    [config?.scene?.font, config?.scene?.font_size, sceneStyle, valueFont, sceneSize],
+  )
+  const canvasDisplayProps = useMemo(
+    () => ({ displayScale, globalScale, globalOpacity, backgroundMode, gridVisible }),
+    [displayScale, globalScale, globalOpacity, backgroundMode, gridVisible],
+  )
+  const canvasDataProps = useMemo(
+    () => ({ widgets, activity, previewSecond, selectionRect, exportRange }),
+    [widgets, activity, previewSecond, selectionRect, exportRange],
+  )
+  const canvasCallbacks = useMemo(
+    () => ({ setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks }),
+    [setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks],
+  )
+
   if (!config) {
     return <EmptyOverlayState />
   }
@@ -193,31 +218,7 @@ function OverlayEditor({
               transformOrigin: 'top left',
             }}
           >
-            <OverlayCanvas
-              widgets={widgets}
-              displayScale={displayScale}
-              globalScale={globalScale}
-              globalOpacity={globalOpacity}
-              activity={activity}
-              previewSecond={previewSecond}
-              backgroundMode={backgroundMode}
-              gridVisible={gridVisible}
-              sceneFont={config.scene?.font}
-              sceneFontSize={config.scene?.font_size}
-              sceneStyle={sceneStyle}
-              valueFont={
-                config.values?.find((value) => value.font || value.font_family)?.font ||
-                config.values?.find((value) => value.font || value.font_family)?.font_family ||
-                globalDefaults?.font_values
-              }
-              sceneSize={sceneSize}
-              setSceneElement={setSceneElement}
-              selectionRect={selectionRect}
-              handleSceneMouseDown={handleSceneMouseDown}
-              handleWidgetMouseDown={handleWidgetMouseDown}
-              setHoveredWidgetId={setHoveredWidgetId}
-              widgetRefCallbacks={widgetRefCallbacks}
-            />
+            <OverlayCanvas sceneProps={canvasSceneProps} displayProps={canvasDisplayProps} dataProps={canvasDataProps} callbacks={canvasCallbacks} />
 
             <OverlayMoveable
               moveableRef={moveableRef}

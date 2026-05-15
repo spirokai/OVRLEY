@@ -1,27 +1,25 @@
 /**
- * Provides overlay editor helpers for use overlay editor state.
+ * Container hook for OverlayEditor — orchestrates store access, derived state,
+ * selection management, viewport tracking, keyboard shortcuts, and sub-hooks.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getCurrentParsedActivity } from '../../api/activityCache'
-import useStore from '../../store/useStore'
-import { buildConfigWidgets, deleteWidgetsInConfig, updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget-config'
+import { getCurrentParsedActivity } from '@/api/activityCache'
+import useStore from '@/store/useStore'
+import { buildConfigWidgets, updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget-config'
 import { getEffectiveWidgetData } from '@/lib/config-utils'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
 import useOverlayMoveableHandlers from './createOverlayMoveableHandlers'
-import useOverlayPointerHandlers from './createOverlayPointerHandlers'
-import { getPrimarySelectionId, isEditableElement, normalizeSelectionIds } from './overlayEditorHelpers'
-import { clamp, getSceneSize } from './utils'
+import useOverlayPointerHandlers from '../utils/createOverlayPointerHandlers'
+import { getPrimarySelectionId, normalizeSelectionIds } from '../utils/overlayEditorHelpers'
+import { clamp } from '@/lib/geometryUtils'
+import { getSceneSize } from '../utils/overlayEditorUtils'
+import { useEditorViewport } from './useEditorViewport'
+import { useEditorKeyboard } from './useEditorKeyboard'
 import useWidgetDraftState from './useWidgetDraftState'
 
 /**
- * Handles resolve preview second.
- *
- * @param {object} options - Structured options for the helper.
- * @param {*} options.dummyDurationSeconds - Numeric dummy duration seconds value.
- * @param {*} options.selectedSecond - Value for selected second.
- * @param {*} options.sourceActivity - Value for source activity.
- * @returns {*} Result produced by the helper.
+ * Clamps the preview second to valid activity duration bounds.
  */
 function resolvePreviewSecond({ dummyDurationSeconds, selectedSecond, sourceActivity }) {
   const rawSecond = Number(selectedSecond) || 0
@@ -32,11 +30,8 @@ function resolvePreviewSecond({ dummyDurationSeconds, selectedSecond, sourceActi
 }
 
 /**
- * Handles merge drafts into widgets.
- *
- * @param {*} widgets - Widget collection in the current template.
- * @param {*} liveWidgetDrafts - Value for live widget drafts.
- * @returns {object} Result produced by the helper.
+ * Merges live widget drafts (unsaved edits) into the widget array.
+ * Each draft's data properties override the corresponding widget's data.
  */
 function mergeDraftsIntoWidgets(widgets, liveWidgetDrafts) {
   return widgets.map((widget) => {
@@ -56,49 +51,41 @@ function mergeDraftsIntoWidgets(widgets, liveWidgetDrafts) {
 }
 
 /**
- * Handles selection ids changed.
- *
- * @param {*} leftIds - Value for left ids.
- * @param {*} rightIds - Value for right ids.
- * @returns {*} Result produced by the helper.
+ * Checks whether two selection ID arrays differ in content or order.
  */
 function selectionIdsChanged(leftIds, rightIds) {
   return leftIds.length !== rightIds.length || leftIds.some((widgetId, index) => widgetId !== rightIds[index])
 }
 
-/**
- * Provides overlay editor state state and actions.
- *
- * @param {object} options - Structured options for the helper.
- * @param {*} options.config - Overlay template configuration data.
- * @param {*} options.globalDefaults - Value for global defaults.
- * @param {*} options.onConfigChange - Callback invoked to config change.
- * @param {*} options.zoomLevel - Current editor zoom level.
- * @param {*} options.onZoomLevelChange - Callback invoked to zoom level change.
- * @returns {object} Result produced by the helper.
- */
 export default function useOverlayEditorState({ config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange }) {
+  // Store selectors — shallow-pick zustand state needed for overlay editor
   const selectedWidgetId = useStore((state) => state.selectedWidgetId)
   const setSelectedWidgetId = useStore((state) => state.setSelectedWidgetId)
   const selectedSecond = useStore((state) => state.selectedSecond)
   const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
-  const viewportRef = useRef(null)
+  const exportRange = useStore((state) => state.exportRange)
+
+  // Refs — mutable interaction state
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
   const scalePreviewFrameRef = useRef(null)
   const selectionSyncRef = useRef(false)
   const marqueeCleanupRef = useRef(null)
   const marqueeSelectionRef = useRef(null)
+
+  // Local UI state — group drag, scene element, widget nodes, selection, marquee
   const [isGroupDragActive, setIsGroupDragActive] = useState(false)
   const [groupDragSelectionIds, setGroupDragSelectionIds] = useState([])
-  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const [sceneElement, setSceneElement] = useState(null)
   const [widgetNodes, setWidgetNodes] = useState({})
   const [selectedWidgetIds, setSelectedWidgetIds] = useState([])
   const [selectionRect, setSelectionRect] = useState(null)
+
+  // Widget draft state — live edits during drag/resize/scale/rotate
   const { clearWidgetDraft, clearWidgetDrafts, draftWidgetsRef, liveWidgetDrafts, resetWidgetDrafts, setLiveWidgetDraft, setLiveWidgetDraftsBatch } =
     useWidgetDraftState()
 
+  // Derived state — computed values from store and props
   const sourceActivity = getCurrentParsedActivity()
   const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
   const widgets = useMemo(
@@ -142,6 +129,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     })
   }, [dummyDurationSeconds, selectedSecond, sourceActivity])
 
+  // Side effects — preview perf counter, draft reset on config change, marquee cleanup
   useEffect(() => {
     incrementPreviewPerfCounter(previewPerfCounterName('React preview updates'))
   }, [previewSecond])
@@ -152,20 +140,6 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     setGroupDragSelectionIds([])
   }, [config, resetWidgetDrafts])
 
-  useEffect(() => {
-    const viewportNode = viewportRef.current
-    if (!viewportNode || typeof ResizeObserver === 'undefined') return undefined
-
-    const resizeObserver = new ResizeObserver(([entry]) => {
-      const nextWidth = entry?.contentRect?.width || viewportNode.clientWidth
-      const nextHeight = entry?.contentRect?.height || viewportNode.clientHeight
-      setViewportSize({ width: nextWidth, height: nextHeight })
-    })
-
-    resizeObserver.observe(viewportNode)
-    return () => resizeObserver.disconnect()
-  }, [])
-
   useEffect(
     () => () => {
       marqueeCleanupRef.current?.()
@@ -173,17 +147,15 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     [],
   )
 
-  const fitScale = useMemo(() => {
-    const safeWidth = Math.max(viewportSize.width - 72, 1)
-    const safeHeight = Math.max(viewportSize.height - 72, 1)
-    return Math.min(safeWidth / sceneSize.width, safeHeight / sceneSize.height, 1)
-  }, [viewportSize, sceneSize])
+  // Viewport — resize observer and fit scale computation
+  const { viewportRef, fitScale } = useEditorViewport(sceneSize)
 
   const displayScale = fitScale * zoomLevel
   const renderedWidgets = useMemo(() => mergeDraftsIntoWidgets(widgets, liveWidgetDrafts), [liveWidgetDrafts, widgets])
   const renderedWidgetMap = useMemo(() => Object.fromEntries(renderedWidgets.map((widget) => [widget.id, widget])), [renderedWidgets])
   const orderedWidgetIds = useMemo(() => renderedWidgets.map((widget) => widget.id), [renderedWidgets])
 
+  // Selection management — normalize, commit, sync with store
   const setSelectionState = (widgetIds) => {
     setSelectedWidgetIds(normalizeSelectionIds(widgetIds, orderedWidgetIds))
   }
@@ -244,6 +216,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     syncPrimarySelectionId(nextPrimaryId)
   }, [isGroupDragActive, orderedWidgetIds, selectedWidgetId, selectedWidgetIds, setSelectedWidgetId, syncPrimarySelectionId])
 
+  // Selected widget derivation — primary selection, targets, guidelines
   const selectedWidgets = useMemo(
     () => effectiveSelectedWidgetIds.map((widgetId) => renderedWidgetMap[widgetId]).filter(Boolean),
     [effectiveSelectedWidgetIds, renderedWidgetMap],
@@ -266,6 +239,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     [effectiveSelectedWidgetIds, widgetNodes, widgets],
   )
 
+  // Moveable rect update — re-measure after display/scale changes
   useEffect(() => {
     if (!moveableRef.current || (!selectedTarget && selectedTargets.length === 0)) {
       return undefined
@@ -278,12 +252,14 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     return () => cancelAnimationFrame(frameId)
   }, [displayScale, globalScale, selectedTarget, selectedTargets, selectedWidgetDataSignature])
 
+  // Editor capability flags
   const canResizeSelected = !isGroupSelection && selectedWidget?.category === 'plots'
   const showEdgeResizeHandles = canResizeSelected && selectedWidget?.type === 'elevation'
   const canScaleSelected = Boolean(!isGroupSelection && selectedWidget && selectedWidget.category !== 'plots')
   const canRotateSelected = !isGroupSelection && selectedWidget?.type === 'course'
   const maintainAspectRatio = !isGroupSelection && (selectedWidget?.type === 'course' || canScaleSelected)
 
+  // Widget ref callbacks — register/unregister DOM nodes
   const widgetRefCallbacks = useMemo(
     () =>
       Object.fromEntries(
@@ -308,6 +284,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     [widgets],
   )
 
+  // Config mutation helpers
   const commitWidgetUpdate = (widgetId, updates) => {
     if (!config) return
     onConfigChange(updateWidgetInConfig(config, widgetId, updates))
@@ -318,30 +295,16 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     onConfigChange(updateWidgetsInConfig(config, updatesById))
   }
 
-  useEffect(() => {
-    if (!selectedWidgetIds.length || !config) {
-      return undefined
-    }
+  // Keyboard — Delete key removes selected widgets
+  useEditorKeyboard({
+    config,
+    onConfigChange,
+    selectedWidgetIds,
+    setSelectedWidgetIds,
+    syncPrimarySelectionId,
+  })
 
-    const handleKeyDown = (event) => {
-      if (event.key !== 'Delete') {
-        return
-      }
-
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || isEditableElement(event.target)) {
-        return
-      }
-
-      event.preventDefault()
-      onConfigChange(deleteWidgetsInConfig(config, selectedWidgetIds))
-      setSelectedWidgetIds([])
-      syncPrimarySelectionId(null)
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [config, onConfigChange, selectedWidgetIds, setSelectedWidgetId, syncPrimarySelectionId])
-
+  // Pointer handlers — scene mousedown, widget mousedown, wheel zoom
   const { handleSceneMouseDown, handleWidgetMouseDown, handleWheel } = useOverlayPointerHandlers({
     commitSelection,
     displayScale,
@@ -361,6 +324,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     widgetNodes,
   })
 
+  // Moveable handlers — drag, resize, scale, rotate (composed from sub-hooks)
   const handlers = useOverlayMoveableHandlers({
     clearWidgetDraft,
     clearWidgetDrafts,
@@ -382,6 +346,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     setLiveWidgetDraftsBatch,
   })
 
+  // Return — full editor state object consumed by OverlayEditor component
   return {
     activity,
     canResizeSelected,
@@ -389,6 +354,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     canScaleSelected,
     displayScale,
     elementGuidelines,
+    exportRange,
     globalOpacity,
     globalScale,
     handleSceneMouseDown,

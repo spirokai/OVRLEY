@@ -3,7 +3,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getEffectivePreviewFps } from '@/components/overlay-editor/previewInterpolation'
+import { getEffectivePreviewFps } from '@/features/overlay-editor'
 import { clamp, resolvePlaybackSource } from '../utils/playerTimeline'
 
 /**

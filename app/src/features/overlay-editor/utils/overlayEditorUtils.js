@@ -1,126 +1,29 @@
 /**
- * Provides overlay editor helpers for utils.
- */
-
-import { DEFAULT_ACTIVITY_PREVIEW } from './constants'
-
-export {
-  areaToSvg,
-  buildWidgetTransform,
-  getCompletedIndex,
-  normalizeElevationGeometry,
-  getPointAtMetricProgress,
-  getPointAtProgress,
-  normalizeRouteGeometry,
-  normalizeRoutePoints,
-  pointsToSvg,
-} from './geometryUtils'
-export {
-  buildGradientTrianglePath,
-  formatGradientValue,
-  getGradientTriangleHeight,
-  getGradientWidgetLayout,
-  formatSpeed,
-  formatTemperature,
-  formatTimeValue,
-  getCombinedTextShadow,
-  getMetricWidgetLayout,
-  getPreviewFontFamily,
-  getPreviewTextBaseline,
-  getTextOutlineShadow,
-  getTextShadow,
-  getWidgetOpacity,
-  METRIC_WIDGET_LINE_HEIGHT,
-  METRIC_WIDGET_OUTER_GAP_PX,
-  METRIC_WIDGET_UNITS_GAP_PX,
-  measurePreviewText,
-} from './metricTextUtils'
-
-/**
- * Constrains a value to the provided minimum and maximum bounds.
+ * Overlay editor utilities — scene size, activity data interpolation,
+ * grid size computation, and FPS resolution.
  *
- * @param {*} value - Input value processed by the helper.
- * @param {*} min - Lower bound used by the calculation.
- * @param {*} max - Upper bound used by the calculation.
- * @returns {number} Result produced by the helper.
+ * Pure functions. No React imports, no side effects.
  */
-export function clamp(value, min, max) {
+
+import { DEFAULT_ACTIVITY_PREVIEW } from '../data/overlayEditorConfig'
+import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
+import { getContainerFps } from '@/lib/update-rate'
+
+function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
 /**
- * Returns elapsed series.
+ * Returns the configured scene dimensions with defaults of 1920x1080.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @returns {*} Requested value or structure.
- */
-export function getElapsedSeries(activity) {
-  const frameElapsedSeries = activity?.frame_elapsed_seconds
-  if (Array.isArray(frameElapsedSeries) && frameElapsedSeries.length) {
-    return frameElapsedSeries
-  }
-
-  return Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
-}
-
-/**
- * Returns scene size.
- *
- * @param {*} config - Overlay template configuration data.
- * @returns {object} Requested value or structure.
+ * @param {object|null} config - Overlay template config.
+ * @returns {{ width: number, height: number }} Scene dimensions.
  */
 export function getSceneSize(config) {
   return {
     width: config?.scene?.width || 1920,
     height: config?.scene?.height || 1080,
   }
-}
-
-/**
- * Finds closest sample index.
- *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @param {*} selectedSecond - Value for selected second.
- * @returns {*} Requested value or structure.
- */
-export function findClosestSampleIndex(activity, selectedSecond) {
-  const elapsedSeries = getElapsedSeries(activity)
-  if (!elapsedSeries.length) return 0
-
-  let low = 0
-  let high = elapsedSeries.length - 1
-  let result = 0
-
-  while (low <= high) {
-    const middle = Math.floor((low + high) / 2)
-    const candidate = Number(elapsedSeries[middle]) || 0
-
-    if (candidate <= selectedSecond) {
-      result = middle
-      low = middle + 1
-    } else {
-      high = middle - 1
-    }
-  }
-
-  return result
-}
-
-/**
- * Returns sample value.
- *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @param {*} key - Lookup key for the requested value.
- * @param {*} sampleIndex - Sample index within the activity series.
- * @returns {*} Requested value or structure.
- */
-export function getSampleValue(activity, key, sampleIndex) {
-  const series = activity?.[key]
-  if (!Array.isArray(series)) {
-    return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
-  }
-
-  return series[sampleIndex] ?? DEFAULT_ACTIVITY_PREVIEW[key] ?? null
 }
 
 function isValidInterpolatedSample(xValues, yValues, index) {
@@ -158,12 +61,13 @@ function findFirstIndexAtOrAfter(xValues, targetX, low, high) {
 }
 
 /**
- * Returns interpolated series value.
+ * Performs linear interpolation on a series of (x, y) values at the target X.
+ * Falls back to the nearest endpoint if targetX is out of range.
  *
- * @param {*} xValues - Series of x-axis values used for interpolation.
- * @param {*} yValues - Series of y-axis values used for interpolation.
- * @param {*} targetX - Value for target x.
- * @returns {*} Requested value or structure.
+ * @param {number[]} xValues - X-axis sample values (monotonic).
+ * @param {number[]} yValues - Y-axis sample values aligned with xValues.
+ * @param {number} targetX - Requested X value to interpolate at.
+ * @returns {number|null} Interpolated Y value or null if no valid samples.
  */
 export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
   if (!Array.isArray(xValues) || !Array.isArray(yValues) || !xValues.length) {
@@ -232,12 +136,13 @@ export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
 }
 
 /**
- * Returns interpolated activity value.
+ * Interpolates an activity metric series (speed, heartrate, etc.) at the
+ * given elapsed second. Falls back to DEFAULT_ACTIVITY_PREVIEW values.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @param {*} key - Lookup key for the requested value.
- * @param {*} elapsedSecond - Elapsed playback time in seconds.
- * @returns {*} Requested value or structure.
+ * @param {object|null} activity - Parsed activity data.
+ * @param {string} key - Activity series key (e.g. 'speed', 'heartrate').
+ * @param {number} elapsedSecond - Target elapsed second.
+ * @returns {number|null} Interpolated value or preview default.
  */
 export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
@@ -253,11 +158,13 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
 }
 
 /**
- * Returns interpolated time value.
+ * Interpolates the time-of-day value at the given elapsed second.
+ * Uses the source_start_time offset when available, otherwise
+ * interpolates the ISO time series.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @param {*} elapsedSecond - Elapsed playback time in seconds.
- * @returns {*} Requested value or structure.
+ * @param {object|null} activity - Parsed activity data.
+ * @param {number} elapsedSecond - Target elapsed second.
+ * @returns {string} ISO timestamp string.
  */
 export function getInterpolatedTimeValue(activity, elapsedSecond) {
   const sourceStartTimeMs = Date.parse(activity?.source_start_time || '')
@@ -277,40 +184,13 @@ export function getInterpolatedTimeValue(activity, elapsedSecond) {
 }
 
 /**
- * Returns distance progress.
+ * Returns the distance-based progress (0–1) at the given elapsed second.
+ * Uses the sample_distance_progress series if available, otherwise
+ * falls back to a linear ratio of elapsed time.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @param {*} sampleIndex - Sample index within the activity series.
- * @returns {*} Requested value or structure.
- */
-export function getDistanceProgress(activity, sampleIndex) {
-  const distanceProgressSeries =
-    activity?.frame_distance_progress?.length > 0
-      ? activity.frame_distance_progress
-      : activity?.sample_distance_progress?.length > 0
-        ? activity.sample_distance_progress
-        : null
-
-  if (distanceProgressSeries) {
-    const progressValue = distanceProgressSeries[clamp(sampleIndex, 0, distanceProgressSeries.length - 1)]
-
-    return clamp(Number(progressValue) || 0, 0, 1)
-  }
-
-  const elapsedSeries = getElapsedSeries(activity)
-  if (elapsedSeries.length <= 1) {
-    return 0
-  }
-
-  return clamp(sampleIndex / (elapsedSeries.length - 1), 0, 1)
-}
-
-/**
- * Returns distance progress at elapsed.
- *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @param {*} elapsedSecond - Elapsed playback time in seconds.
- * @returns {*} Requested value or structure.
+ * @param {object|null} activity - Parsed activity data.
+ * @param {number} elapsedSecond - Target elapsed second.
+ * @returns {number} Normalized progress between 0 and 1.
  */
 export function getDistanceProgressAtElapsed(activity, elapsedSecond) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
@@ -337,11 +217,12 @@ export function getDistanceProgressAtElapsed(activity, elapsedSecond) {
 }
 
 /**
- * Returns series value at progress.
+ * Returns an interpolated series value at normalized progress (0–1).
+ * Linearly interpolates between adjacent samples at the progress position.
  *
- * @param {*} series - Value for series.
- * @param {*} progress01 - Normalized progress value between 0 and 1.
- * @returns {*} Requested value or structure.
+ * @param {number[]} series - Numeric series to interpolate.
+ * @param {number} progress01 - Normalized progress between 0 and 1.
+ * @returns {number|null} Interpolated value or null if series is empty.
  */
 export function getSeriesValueAtProgress(series, progress01) {
   if (!Array.isArray(series) || !series.length) {
@@ -369,4 +250,34 @@ export function getSeriesValueAtProgress(series, progress01) {
   }
 
   return startValue + (endValue - startValue) * mix
+}
+
+/**
+ * Computes the editor overlay grid cell size by dividing the smaller
+ * scene dimension by EDITOR_GRID_DIVISIONS.
+ *
+ * @param {{ width: number, height: number }} sceneSize - Scene dimensions.
+ * @returns {number} Grid cell size in scene-space pixels.
+ */
+export function getEditorGridSize(sceneSize) {
+  const width = Number(sceneSize?.width)
+  const height = Number(sceneSize?.height)
+
+  if (!Number.isFinite(width) || !Number.isFinite(height)) {
+    return 1
+  }
+
+  return Math.max(1, Math.round(Math.min(width, height) / EDITOR_GRID_DIVISIONS))
+}
+
+/**
+ * Resolves the effective preview FPS from the configured FPS and update rate.
+ * Delegates to the shared getContainerFps utility.
+ *
+ * @param {number} fps - Configured FPS value.
+ * @param {number} updateRate - Container update rate.
+ * @returns {number} Effective FPS for preview rendering.
+ */
+export function getEffectivePreviewFps(fps, updateRate) {
+  return getContainerFps(fps, updateRate)
 }

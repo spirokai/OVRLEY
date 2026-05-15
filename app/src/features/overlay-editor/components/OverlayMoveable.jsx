@@ -1,13 +1,11 @@
 /**
- * Provides overlay editor helpers for overlay moveable.
+ * Renders the overlay moveable component.
  */
 
 import Moveable from 'react-moveable'
 import { useMemo } from 'react'
-import { getEditorGridSize } from './constants'
-
-const CORNER_RESIZE_DIRECTIONS = ['nw', 'ne', 'se', 'sw']
-const EDGE_RESIZE_DIRECTIONS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+import { getEditorGridSize } from '../utils/overlayEditorUtils'
+import { CORNER_RESIZE_DIRECTIONS, EDGE_RESIZE_DIRECTIONS, MOVEABLE_ZOOM } from '../data/overlayEditorConstants'
 
 function getGridGuidelines(max, gridSize, enabled) {
   const guidelines = [0, max / 2, max]
@@ -62,9 +60,6 @@ export default function OverlayMoveable({
   const gridSize = getEditorGridSize(sceneSize)
   const horizontalGuidelines = useMemo(() => getGridGuidelines(sceneSize.height, gridSize, snapToGrid), [gridSize, sceneSize.height, snapToGrid])
   const verticalGuidelines = useMemo(() => getGridGuidelines(sceneSize.width, gridSize, snapToGrid), [gridSize, sceneSize.width, snapToGrid])
-  // With rootContainer={document.body}, the Moveable UI is rendered at body
-  // level, not inside the scaled parent container. No zoom compensation needed.
-  const moveableZoom = 1.5
 
   if ((!selectedTarget && !selectedTargets.length) || !sceneElement) {
     return null
@@ -97,7 +92,7 @@ export default function OverlayMoveable({
       elementGuidelines={elementGuidelines}
       horizontalGuidelines={horizontalGuidelines}
       verticalGuidelines={verticalGuidelines}
-      zoom={moveableZoom}
+      zoom={MOVEABLE_ZOOM}
       onDragStart={handlers.onDragStart}
       onDrag={handlers.onDrag}
       onDragEnd={handlers.onDragEnd}

@@ -2,18 +2,20 @@
  * Provides overlay editor helpers for create overlay pointer handlers.
  */
 
-import { clamp } from './utils'
+import { ZOOM_MIN, ZOOM_MAX } from '../data/overlayEditorConstants'
+import { clamp } from '@/lib/geometryUtils'
 import { buildSelectionRect, getPrimarySelectionId, hasSelectionModifier, normalizeSelectionIds, rectanglesIntersect } from './overlayEditorHelpers'
 
 /**
- * Returns scene point.
+ * Converts a client-space mouse position to scene-space coordinates,
+ * clamped to the scene bounds.
  *
- * @param {*} sceneElement - Value for scene element.
- * @param {*} displayScale - Value for display scale.
- * @param {*} sceneSize - Numeric scene size value.
- * @param {*} clientX - Value for client x.
- * @param {*} clientY - Value for client y.
- * @returns {object} Requested value or structure.
+ * @param {HTMLElement|null} sceneElement - The scene container DOM element.
+ * @param {number} displayScale - Current display scale factor.
+ * @param {{ width: number, height: number }} sceneSize - Scene dimensions.
+ * @param {number} clientX - Client-space X.
+ * @param {number} clientY - Client-space Y.
+ * @returns {{ x: number, y: number }|null} Scene-space point or null.
  */
 function getScenePoint(sceneElement, displayScale, sceneSize, clientX, clientY) {
   if (!sceneElement) {
@@ -28,15 +30,16 @@ function getScenePoint(sceneElement, displayScale, sceneSize, clientX, clientY) 
 }
 
 /**
- * Returns intersected widget ids.
+ * Finds widget IDs whose DOM bounding rects intersect with the given
+ * scene-space selection rectangle. Used for marquee/selection box.
  *
- * @param {object} options - Structured options for the helper.
- * @param {*} options.displayScale - Value for display scale.
- * @param {*} options.nextSelectionRect - Value for next selection rect.
- * @param {*} options.orderedWidgetIds - Value for ordered widget ids.
- * @param {*} options.sceneElement - Value for scene element.
- * @param {*} options.widgetNodes - Value for widget nodes.
- * @returns {*} Requested value or structure.
+ * @param {object} options
+ * @param {number} options.displayScale - Display scale for coordinate conversion.
+ * @param {{ x: number, y: number, width: number, height: number }} options.nextSelectionRect - Selection rect in scene coords.
+ * @param {string[]} options.orderedWidgetIds - Ordered list of all widget IDs.
+ * @param {HTMLElement|null} options.sceneElement - Scene container element.
+ * @param {Object<string, HTMLElement>} options.widgetNodes - Widget DOM node map.
+ * @returns {string[]} Intersecting widget IDs.
  */
 function getIntersectedWidgetIds({ displayScale, nextSelectionRect, orderedWidgetIds, sceneElement, widgetNodes }) {
   if (!sceneElement) {
@@ -64,26 +67,28 @@ function getIntersectedWidgetIds({ displayScale, nextSelectionRect, orderedWidge
 }
 
 /**
- * Provides overlay pointer handlers state and actions.
+ * Creates pointer event handlers for the overlay editor — scene click/marquee
+ * selection, widget mouse down (single and group), and mouse wheel zoom.
  *
- * @param {object} options - Structured options for the helper.
- * @param {*} options.commitSelection - Value for commit selection.
- * @param {*} options.displayScale - Value for display scale.
- * @param {*} options.moveableRef - Value for moveable ref.
- * @param {*} options.marqueeCleanupRef - Value for marquee cleanup ref.
- * @param {*} options.marqueeSelectionRef - Value for marquee selection ref.
- * @param {*} options.onZoomLevelChange - Callback invoked to zoom level change.
- * @param {*} options.orderedWidgetIds - Value for ordered widget ids.
- * @param {*} options.sceneElement - Value for scene element.
- * @param {*} options.sceneSize - Numeric scene size value.
- * @param {*} options.selectedWidgetId - Value for selected widget id.
- * @param {*} options.selectedWidgetIds - Value for selected widget ids.
- * @param {*} options.setGroupDragSelectionIds - Value for set group drag selection ids.
- * @param {*} options.setIsGroupDragActive - Value for set is group drag active.
- * @param {*} options.setSelectionRect - Value for set selection rect.
- * @param {*} options.setSelectionState - Value for set selection state.
- * @param {*} options.widgetNodes - Value for widget nodes.
- * @returns {object} Result produced by the helper.
+ * @param {object} options
+ * @param {Function} options.commitSelection - Commits a selection set to state and store.
+ * @param {number} options.displayScale - Current display scale.
+ * @param {React.RefObject} options.moveableRef - Ref to Moveable instance for programmatic dragStart.
+ * @param {React.MutableRefObject} options.marqueeCleanupRef - Ref for cleanup function.
+ * @param {React.MutableRefObject} options.marqueeSelectionRef - Ref for marquee gesture state.
+ * @param {Function} options.onZoomLevelChange - Zoom level state setter.
+ * @param {string[]} options.orderedWidgetIds - Ordered widget ID list.
+ * @param {HTMLElement|null} options.sceneElement - Scene container element.
+ * @param {{ width: number, height: number }} options.sceneSize - Scene dimensions.
+ * @param {string|null} options.selectedWidgetId - Currently selected widget ID.
+ * @param {string[]} options.selectedWidgetIds - All selected widget IDs.
+ * @param {Function} options.setGroupDragSelectionIds - Setter for group-drag IDs.
+ * @param {Function} options.setIsGroupDragActive - Setter for group-drag flag.
+ * @param {Function} options.setSelectionRect - Setter for selection rectangle.
+ * @param {Function} options.setSelectionState - Setter for widget selection.
+ * @param {Object<string, HTMLElement>} options.widgetNodes - Widget DOM node map.
+ * @returns {{ handleSceneMouseDown: Function, handleWheel: Function, handleWidgetMouseDown: Function }}
+ *   Pointer event handlers.
  */
 export default function useOverlayPointerHandlers({
   commitSelection,
@@ -106,7 +111,7 @@ export default function useOverlayPointerHandlers({
   const handleWheel = (event) => {
     event.preventDefault()
     const delta = event.deltaY < 0 ? 0.05 : -0.05
-    onZoomLevelChange((current) => clamp(Number((current + delta).toFixed(2)), 0.35, 4))
+    onZoomLevelChange((current) => clamp(Number((current + delta).toFixed(2)), ZOOM_MIN, ZOOM_MAX))
   }
 
   const handleWidgetMouseDown = (event, widgetId) => {

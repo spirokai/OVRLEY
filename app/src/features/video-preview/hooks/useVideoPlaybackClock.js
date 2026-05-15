@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import useStore from '@/store/useStore'
-import { getEffectivePreviewFps } from '@/components/overlay-editor/previewInterpolation'
+import { getEffectivePreviewFps } from '@/features/overlay-editor'
 import { incrementPreviewPerfCounter, previewPerfCounterName, setPreviewPerfValue } from '@/lib/previewPerf'
 import { PREVIEW_CLOCK_MODE_FLAG } from '../data/videoPreviewConstants'
 

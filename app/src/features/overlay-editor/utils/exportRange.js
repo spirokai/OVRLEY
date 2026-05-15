@@ -2,25 +2,26 @@
  * Provides shared helpers for custom export range handling.
  */
 
-import { interpolateCoursePoint, interpolateNumericSeries, coursePointsEqual } from './interpolation'
+import { interpolateCoursePoint, interpolateNumericSeries, coursePointsEqual } from '@/lib/interpolation'
 
 /**
- * Constrains a value to the provided minimum and maximum bounds.
+ * Constrains a value to [min, max].
  *
- * @param {*} value - Input value processed by the helper.
- * @param {*} min - Lower bound used by the calculation.
- * @param {*} max - Upper bound used by the calculation.
- * @returns {number} Clamped numeric value.
+ * @param {number} value - Input value.
+ * @param {number} min - Lower bound.
+ * @param {number} max - Upper bound.
+ * @returns {number} Clamped value.
  */
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
 /**
- * Converts a time string to seconds.
+ * Converts a time string (HH:MM:SS, MM:SS, or plain seconds) to seconds.
+ * Empty/null input returns 0.
  *
- * @param {*} timeStr - Value in HH:MM:SS, MM:SS, or seconds form.
- * @returns {number} Parsed seconds value.
+ * @param {string|null|undefined} timeStr - Time string in HH:MM:SS or MM:SS format.
+ * @returns {number} Total seconds.
  */
 export function timeToSeconds(timeStr) {
   if (timeStr === null || timeStr === undefined || timeStr === '') {
@@ -40,10 +41,11 @@ export function timeToSeconds(timeStr) {
 }
 
 /**
- * Returns the activity duration in seconds.
+ * Returns the activity duration in seconds — the max of the last elapsed
+ * sample and the trim_end_seconds.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @returns {number} Activity duration.
+ * @param {object|null} activity - Parsed activity data.
+ * @returns {number} Duration in seconds.
  */
 export function getActivityDurationSeconds(activity) {
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
@@ -53,12 +55,15 @@ export function getActivityDurationSeconds(activity) {
 }
 
 /**
- * Resolves the active custom export range for widget previews.
+ * Resolves the effective export range window for widget scoping.
+ * If showFullActivity is true or exportRange is not 'custom', returns
+ * an inactive window covering the full activity duration.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @param {*} exportRange - Range settings from store state.
- * @param {*} showFullActivity - Whether the widget should ignore the custom range.
- * @returns {object} Effective range window metadata.
+ * @param {object|null} activity - Parsed activity data.
+ * @param {object|null} exportRange - Export range config from store.
+ * @param {boolean} [showFullActivity=false] - Whether to ignore the custom range.
+ * @returns {{ active: boolean, duration: number, start: number, end: number }}
+ *   Effective range window metadata.
  */
 export function resolveExportRangeWindow(activity, exportRange, showFullActivity = false) {
   const duration = getActivityDurationSeconds(activity)
@@ -93,11 +98,12 @@ export function resolveExportRangeWindow(activity, exportRange, showFullActivity
 }
 
 /**
- * Returns the normalized distance-progress span for the active export window.
+ * Interpolates the distance-progress values at the start and end of the
+ * export window, returning the span metadata needed for rebasing progress.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @param {*} window - Effective export range window.
- * @returns {?object} Start/end distance progress and span metadata.
+ * @param {object|null} activity - Parsed activity data.
+ * @param {{ active: boolean, start: number, end: number }|null} window - Export window.
+ * @returns {{ start: number, end: number, span: number }|null} Distance span metadata.
  */
 export function getExportWindowDistanceSpan(activity, window) {
   if (!window?.active) {
@@ -131,11 +137,12 @@ export function getExportWindowDistanceSpan(activity, window) {
 }
 
 /**
- * Normalizes a distance progress value within the active export window span.
+ * Rebases a global distance progress value to the export window's span,
+ * returning 0 at window start and 1 at window end.
  *
- * @param {*} value - Global distance progress value.
- * @param {*} distanceSpan - Effective distance-progress span metadata.
- * @returns {number} Progress rebased within the custom range.
+ * @param {number} value - Global distance progress (0–1).
+ * @param {{ start: number, span: number }|null} distanceSpan - Distance span metadata.
+ * @returns {number} Window-relative progress (0–1).
  */
 export function normalizeDistanceProgressToWindow(value, distanceSpan) {
   if (!distanceSpan || !Number.isFinite(value) || !(distanceSpan.span > 0)) {
@@ -146,12 +153,13 @@ export function normalizeDistanceProgressToWindow(value, distanceSpan) {
 }
 
 /**
- * Returns the current normalized distance progress inside the export window.
+ * Returns the current distance-based playback progress normalized within
+ * the active export window at the given elapsed second.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @param {*} window - Effective export range window.
- * @param {*} elapsedSecond - Current preview second.
- * @returns {?number} Distance-based progress normalized to the selected range.
+ * @param {object|null} activity - Parsed activity data.
+ * @param {{ active: boolean, start: number, end: number }|null} window - Export window.
+ * @param {number} elapsedSecond - Current elapsed second.
+ * @returns {number|null} Window-normalized progress (0–1) or null if not applicable.
  */
 export function getExportWindowDistanceProgressAtElapsed(activity, window, elapsedSecond) {
   const distanceSpan = getExportWindowDistanceSpan(activity, window)
@@ -171,9 +179,9 @@ export function getExportWindowDistanceProgressAtElapsed(activity, window, elaps
 }
 
 /**
- * Returns the source course points used by route previews.
+ * Extracts the sample_course_points array from activity data.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
+ * @param {object|null} activity - Parsed activity data.
  * @returns {Array} Course point series.
  */
 function getRouteSourcePoints(activity) {
@@ -181,10 +189,11 @@ function getRouteSourcePoints(activity) {
 }
 
 /**
- * Returns the source elevation series used by elevation previews.
+ * Extracts the elevation series from activity data — prefers sample_elevations
+ * (from processed course points), falls back to raw elevation series.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @returns {Array} Elevation series.
+ * @param {object|null} activity - Parsed activity data.
+ * @returns {number[]} Elevation value series.
  */
 function getElevationSourceValues(activity) {
   if (Array.isArray(activity?.sample_elevations) && activity.sample_elevations.some((value) => Number.isFinite(value))) {
@@ -195,11 +204,12 @@ function getElevationSourceValues(activity) {
 }
 
 /**
- * Builds route samples scoped to the active export range.
+ * Builds route (course point) samples trimmed to the active export window.
+ * Includes interpolated start/end points and rebased progress values.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @param {*} window - Effective export range window.
- * @returns {Array} Route samples for preview geometry.
+ * @param {object|null} activity - Parsed activity data.
+ * @param {{ active: boolean, start: number, end: number }|null} window - Export window.
+ * @returns {Array<{ point: number[], progress: number|null }>} Scoped route samples.
  */
 export function buildScopedRouteSamples(activity, window) {
   const coursePoints = getRouteSourcePoints(activity)
@@ -268,11 +278,12 @@ export function buildScopedRouteSamples(activity, window) {
 }
 
 /**
- * Builds elevation series scoped to the active export range.
+ * Builds the elevation series trimmed to the active export window.
+ * Includes interpolated start/end values and rebased distance progress.
  *
- * @param {*} activity - Parsed activity data for previews or rendering.
- * @param {*} window - Effective export range window.
- * @returns {object} Scoped elevation values and progress values.
+ * @param {object|null} activity - Parsed activity data.
+ * @param {{ active: boolean, start: number, end: number }|null} window - Export window.
+ * @returns {{ values: number[], progressValues: (number|null)[] }} Scoped elevation series.
  */
 export function buildScopedElevationSeries(activity, window) {
   const values = getElevationSourceValues(activity)

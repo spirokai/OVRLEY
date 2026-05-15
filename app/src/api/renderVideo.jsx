@@ -6,7 +6,7 @@ import { getCurrentParsedActivity } from './activityCache'
 import useStore from '../store/useStore'
 import * as backend from './backend'
 import { applyGlobalDefaults } from '../lib/config-utils'
-import { timeToSeconds } from '../lib/export-range'
+import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '../lib/update-rate'
 
 /**

@@ -1,6 +1,8 @@
 /**
  * Numeric interpolation utilities for activity data series.
  * Provides linear interpolation between sample points for elapsed-time series.
+ *
+ * Domain-agnostic pure functions extracted from features/overlay-editor.
  */
 
 /**

@@ -2,7 +2,7 @@
  * Composes the main application shell for the OVRLEY overlay editor.
  */
 
-import OverlayEditor from '@/components/OverlayEditor'
+import { OverlayEditor } from '@/features/overlay-editor'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
 import { useAppShellStore } from '@/hooks/useAppStoreSelectors'

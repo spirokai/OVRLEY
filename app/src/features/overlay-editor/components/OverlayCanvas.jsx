@@ -1,23 +1,22 @@
 /**
- * Provides overlay editor helpers for overlay canvas.
+ * Renders the overlay canvas component with grouped props.
  */
 
 import { memo, useEffect, useRef } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getEditorGridSize } from './constants'
-import { getWidgetSceneOrigin } from './overlayEditorHelpers'
-import { buildMetricWidgetPreviewModel } from './metricWidgetPreviewModel'
-import WidgetPreview from './WidgetPreview'
-import { buildWidgetTransform } from './utils'
+import { getEditorGridSize } from '../utils/overlayEditorUtils'
+import { getWidgetSceneOrigin } from '../utils/overlayEditorHelpers'
+import { buildMetricWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
+import { buildWidgetTransform } from '@/lib/geometryUtils'
+import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
 
-const CANVAS_BACKGROUND_COLORS = {
-  black: '#000000',
-  checker: '#000000',
-  white: '#f4ead2',
-}
-
+/**
+ * Canvas overlay grid — draws a teal-colored grid on an HTML canvas element
+ * positioned above the scene background. Uses device pixel ratio for crisp rendering.
+ * Re-draws whenever scene size or display scale changes.
+ */
 const CanvasGrid = memo(function CanvasGrid({ displayScale, sceneSize }) {
   const canvasRef = useRef(null)
   const sceneGridSize = getEditorGridSize(sceneSize)
@@ -75,30 +74,18 @@ const CanvasGrid = memo(function CanvasGrid({ displayScale, sceneSize }) {
   )
 })
 
-/**
- * Renders the overlay canvas widget component.
- *
- * @param {object} props - Component props.
- * @param {*} props.activity - Parsed activity data for previews or rendering.
- * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
- * @param {*} props.widget - Widget definition being rendered or edited.
- * @param {*} props.globalScale - Scale factor applied to the overlay preview.
- * @param {*} props.previewSecond - Preview time in seconds.
- * @param {*} props.registerNode - Value for register node.
- * @param {*} props.handleWidgetMouseDown - Value for handle widget mouse down.
- * @returns {JSX.Element} Rendered component output.
- */
 const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({
-    activity,
-    globalOpacity,
     widget,
     globalScale,
+    globalOpacity,
+    activity,
     previewSecond,
     sceneFont,
     sceneFontSize,
     sceneStyle,
     valueFont,
+    exportRange,
     registerNode,
     handleWidgetMouseDown,
     setHoveredWidgetId,
@@ -155,6 +142,7 @@ const OverlayCanvasWidget = memo(
           sceneFontSize={sceneFontSize}
           sceneStyle={sceneStyle}
           valueFont={valueFont}
+          exportRange={exportRange}
         />
       </div>
     )
@@ -169,52 +157,28 @@ const OverlayCanvasWidget = memo(
     previousProps.sceneFontSize === nextProps.sceneFontSize &&
     previousProps.sceneStyle === nextProps.sceneStyle &&
     previousProps.valueFont === nextProps.valueFont &&
+    previousProps.exportRange === nextProps.exportRange &&
     previousProps.registerNode === nextProps.registerNode &&
     previousProps.handleWidgetMouseDown === nextProps.handleWidgetMouseDown &&
     previousProps.setHoveredWidgetId === nextProps.setHoveredWidgetId,
 )
 
 /**
- * Renders the overlay canvas component.
+ * Renders the scene background (color or video), widget previews, and selection rectangle.
+ * Delegates scene-level state to grouped props to minimize re-renders.
  *
- * @param {object} props - Component props.
- * @param {*} props.widgets - Widget collection in the current template.
- * @param {*} props.globalScale - Scale factor applied to the overlay preview.
- * @param {*} props.displayScale - Scale factor applied to the scene display.
- * @param {*} props.globalOpacity - Global opacity multiplier applied to the widget.
- * @param {*} props.activity - Parsed activity data for previews or rendering.
- * @param {*} props.previewSecond - Preview time in seconds.
- * @param {*} props.backgroundMode - Selected canvas background style.
- * @param {*} props.gridVisible - Whether to show the editor grid overlay.
- * @param {*} props.sceneSize - Numeric scene size value.
- * @param {*} props.setSceneElement - Value for set scene element.
- * @param {*} props.selectionRect - Current drag-selection rectangle.
- * @param {*} props.handleSceneMouseDown - Value for handle scene mouse down.
- * @param {*} props.handleWidgetMouseDown - Value for handle widget mouse down.
- * @param {*} props.widgetRefCallbacks - Value for widget ref callbacks.
+ * @param {object} props
+ * @param {object} props.sceneProps - { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize }
+ * @param {object} props.displayProps - { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible }
+ * @param {object} props.dataProps - { widgets, activity, previewSecond, selectionRect, exportRange }
+ * @param {object} props.callbacks - { setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks }
  * @returns {JSX.Element} Rendered component output.
  */
-export default function OverlayCanvas({
-  widgets,
-  displayScale,
-  globalScale,
-  globalOpacity,
-  activity,
-  previewSecond,
-  backgroundMode,
-  gridVisible,
-  sceneFont,
-  sceneFontSize,
-  sceneStyle,
-  valueFont,
-  sceneSize,
-  setSceneElement,
-  selectionRect,
-  handleSceneMouseDown,
-  handleWidgetMouseDown,
-  setHoveredWidgetId,
-  widgetRefCallbacks,
-}) {
+export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks }) {
+  const { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize } = sceneProps
+  const { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible } = displayProps
+  const { widgets, activity, previewSecond, selectionRect, exportRange } = dataProps
+  const { setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const videoRef = useRef(null)
   const { videoSrc, importId, isOutOfRange, videoPreviewMessages } = useVideoPreview(videoRef, backgroundMode === 'video')
 
@@ -277,6 +241,7 @@ export default function OverlayCanvas({
               sceneFontSize={sceneFontSize}
               sceneStyle={sceneStyle}
               valueFont={valueFont}
+              exportRange={exportRange}
               registerNode={widgetRefCallbacks[widget.id]}
               handleWidgetMouseDown={handleWidgetMouseDown}
               setHoveredWidgetId={setHoveredWidgetId}
