@@ -4,10 +4,12 @@
 //! overlay FPS and streams them to FFmpeg, which composites them over input
 //! video frames and writes the final MP4 output.
 
+use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::Ordering;
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -16,7 +18,7 @@ use std::time::Instant;
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::commands::AppPaths;
 use crate::config::RenderConfig;
-use crate::debug::RenderProfiler;
+use crate::debug::{RenderProfiler, TimingBucket};
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
 use crate::encode::ffmpeg_composite::{
     build_composite_ffmpeg_settings, CompositeFfmpegSettings, HwAccelInfo,
@@ -29,6 +31,17 @@ use crate::encode::video_composite_debug::{
 };
 use crate::encode::video_debug::timestamp_nanos;
 use crate::render::{prepare_preview_assets, render_frame_rgba, RenderTarget};
+
+/// Reusable raw RGBA frame buffer.
+struct FrameBuffer {
+    pixels: Vec<u8>,
+}
+
+/// Result returned by the ffmpeg stdin writer thread.
+struct WriterResult {
+    written_frames: u64,
+    timings: BTreeMap<String, TimingBucket>,
+}
 
 /// Timing and command values derived by the composite pipeline shell.
 ///
@@ -107,7 +120,7 @@ pub(crate) fn render_composite_video_single(
         prepare_preview_assets(paths, config, activity, dense_activity)?;
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let mut child = spawn_composite_ffmpeg_process(&ffmpeg_bin, &plan)?;
-    let mut stdin = child
+    let stdin = child
         .stdin
         .take()
         .ok_or_else(|| "Failed to capture composite ffmpeg stdin".to_string())?;
@@ -125,15 +138,28 @@ pub(crate) fn render_composite_video_single(
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let total_progress = plan.output_frame_count.min(u64::from(u32::MAX)) as u32;
     let cancel_flag = controller.cancel_flag();
-    let mut frame_pixels = vec![0u8; frame_byte_len];
     let mut profiler = RenderProfiler::default();
     let mut overlay_frame_index = 0u64;
-    let mut written_overlay_frames = 0u64;
     let render_started = Instant::now();
     let render_loop_started = Instant::now();
     let output_frame_equivalent_multiplier =
         plan.output_fps.as_f64() / plan.overlay_pipe_fps.as_f64();
     let mut estimator = ProgressEstimator::default();
+
+    let frame_queue_size = 4usize;
+    let (sender, receiver) = mpsc::sync_channel::<FrameBuffer>(frame_queue_size);
+    let (free_sender, free_receiver) = mpsc::sync_channel::<FrameBuffer>(frame_queue_size + 1);
+    for _ in 0..(frame_queue_size + 1) {
+        free_sender
+            .send(FrameBuffer {
+                pixels: vec![0u8; frame_byte_len],
+            })
+            .map_err(|_| "Failed to initialize composite frame buffer pool".to_string())?;
+    }
+
+    let writer_thread = thread::spawn(move || {
+        writer_worker(stdin, receiver, free_sender)
+    });
 
     let render_result = (|| -> Result<(), String> {
         loop {
@@ -156,6 +182,8 @@ pub(crate) fn render_composite_video_single(
                 let dense_frame_index =
                     dense_frame_index_for_overlay(config, dense_activity, &plan, activity_time)?;
 
+                let mut frame_buffer =
+                    acquire_frame_buffer(&free_receiver, cancel_flag.as_ref(), &mut profiler)?;
                 render_frame_rgba(
                     paths,
                     config,
@@ -167,18 +195,11 @@ pub(crate) fn render_composite_video_single(
                     RenderTarget {
                         width,
                         height,
-                        pixels: frame_pixels.as_mut_slice(),
+                        pixels: frame_buffer.pixels.as_mut_slice(),
                     },
                     &mut profiler,
                 )?;
-                let write_started = Instant::now();
-                stdin
-                    .write_all(frame_pixels.as_slice())
-                    .map_err(|error| format!("Failed writing composite overlay frame: {error}"))?;
-                profiler.record_ms(
-                    "ffmpeg.write",
-                    write_started.elapsed().as_secs_f64() * 1000.0,
-                );
+                queue_frame(&sender, frame_buffer, cancel_flag.as_ref(), &mut profiler)?;
                 Ok(())
             })();
             profiler.record_ms(
@@ -187,7 +208,6 @@ pub(crate) fn render_composite_video_single(
             );
             frame_result?;
 
-            written_overlay_frames += 1;
             overlay_frame_index += 1;
             let estimated_output_progress =
                 output_progress_for_overlay_time(video_local_time, &plan);
@@ -212,7 +232,11 @@ pub(crate) fn render_composite_video_single(
     })();
     let render_loop_ms = render_loop_started.elapsed().as_secs_f64() * 1000.0;
 
-    drop(stdin);
+    drop(sender);
+    let writer_result = writer_thread
+        .join()
+        .map_err(|_| "Composite encoder writer thread panicked".to_string())?
+        .map_err(|error| error)?;
     let was_cancelled = cancel_flag.load(Ordering::SeqCst);
     let ffmpeg_finalize_started = Instant::now();
     let status = if was_cancelled {
@@ -245,17 +269,18 @@ pub(crate) fn render_composite_video_single(
         let stderr = stderr_snapshot(&stderr_lines);
         return Err(format_composite_ffmpeg_failure(&plan, status, &stderr));
     }
-    if written_overlay_frames != expected_guarded_overlay_frame_count(&plan) {
+    if writer_result.written_frames != expected_guarded_overlay_frame_count(&plan) {
         let _ = std::fs::remove_file(&plan.output_path);
         return Err(format!(
             "Composite overlay writer ended early: wrote {} of {} frames",
-            written_overlay_frames,
+            writer_result.written_frames,
             expected_guarded_overlay_frame_count(&plan)
         ));
     }
     verify_successful_composite_output(&plan.output_path)?;
 
     let total_ms = render_started.elapsed().as_secs_f64() * 1000.0;
+    let merged_timings = merge_timing_maps(profiler.summary(), writer_result.timings);
     write_composite_timing_summary(CompositeTimingSummaryInput {
         debug_render_dir: &paths.debug_render_dir,
         ffmpeg_settings: &plan.ffmpeg_settings,
@@ -264,12 +289,12 @@ pub(crate) fn render_composite_video_single(
         overlay_pipe_fps: plan.overlay_pipe_fps,
         widget_update_rate: plan.widget_update_rate,
         render_duration: plan.render_duration,
-        overlay_frame_count: written_overlay_frames,
+        overlay_frame_count: writer_result.written_frames,
         output_frame_count: plan.output_frame_count,
         total_ms,
         render_loop_ms,
         ffmpeg_finalize_wait_ms,
-        timings: profiler.summary(),
+        timings: merged_timings,
         codec: &plan.codec_name,
         bitrate: &plan.bitrate,
         input_width: width,
@@ -664,6 +689,115 @@ fn first_fractional_overrun_overlay_index(render_duration: f64, overlay_pipe_fps
         }
         index += 1;
     }
+}
+
+/// Writes queued frame buffers into ffmpeg stdin and returns buffers to the pool.
+fn writer_worker(
+    mut stdin: std::process::ChildStdin,
+    receiver: Receiver<FrameBuffer>,
+    free_sender: SyncSender<FrameBuffer>,
+) -> Result<WriterResult, String> {
+    let mut profiler = crate::debug::RenderProfiler::default();
+    let mut written_frames = 0u64;
+    loop {
+        let frame = match receiver.recv() {
+            Ok(frame) => frame,
+            Err(_) => break,
+        };
+        let write_started = Instant::now();
+        stdin
+            .write_all(frame.pixels.as_slice())
+            .map_err(|error| format!("Failed writing composite overlay frame: {error}"))?;
+        profiler.record_ms(
+            "ffmpeg.write",
+            write_started.elapsed().as_secs_f64() * 1000.0,
+        );
+        written_frames += 1;
+        let _ = free_sender.send(frame);
+    }
+    let _ = stdin.flush();
+    Ok(WriterResult {
+        written_frames,
+        timings: profiler.summary(),
+    })
+}
+
+/// Waits for a reusable frame buffer from the free-buffer pool.
+fn acquire_frame_buffer(
+    receiver: &Receiver<FrameBuffer>,
+    cancel_flag: &std::sync::atomic::AtomicBool,
+    profiler: &mut RenderProfiler,
+) -> Result<FrameBuffer, String> {
+    let started = Instant::now();
+    loop {
+        if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err("Rendering cancelled".to_string());
+        }
+        match receiver.recv_timeout(Duration::from_millis(25)) {
+            Ok(buffer) => {
+                profiler.record_ms(
+                    "buffer.acquire_wait",
+                    started.elapsed().as_secs_f64() * 1000.0,
+                );
+                return Ok(buffer);
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => {
+                return Err("Frame buffer pool disconnected".to_string());
+            }
+        }
+    }
+}
+
+/// Sends a completed frame to the writer thread while respecting cancellation.
+fn queue_frame(
+    sender: &SyncSender<FrameBuffer>,
+    frame_buffer: FrameBuffer,
+    cancel_flag: &std::sync::atomic::AtomicBool,
+    profiler: &mut RenderProfiler,
+) -> Result<(), String> {
+    let started = Instant::now();
+    let mut payload = frame_buffer;
+    loop {
+        if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err("Rendering cancelled".to_string());
+        }
+        match sender.try_send(payload) {
+            Ok(()) => {
+                profiler.record_ms(
+                    "queue.put_wait",
+                    started.elapsed().as_secs_f64() * 1000.0,
+                );
+                return Ok(());
+            }
+            Err(TrySendError::Full(returned_payload)) => {
+                payload = returned_payload;
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                return Err("Encoder queue disconnected".to_string());
+            }
+        }
+    }
+}
+
+/// Merges timing buckets recorded on separate render/writer threads.
+fn merge_timing_maps(
+    mut left: BTreeMap<String, TimingBucket>,
+    right: BTreeMap<String, TimingBucket>,
+) -> BTreeMap<String, TimingBucket> {
+    for (name, bucket) in right {
+        let entry = left.entry(name).or_default();
+        entry.count += bucket.count;
+        entry.total_ms += bucket.total_ms;
+        entry.avg_ms = if entry.count == 0 {
+            0.0
+        } else {
+            entry.total_ms / f64::from(entry.count)
+        };
+        entry.max_ms = entry.max_ms.max(bucket.max_ms);
+    }
+    left
 }
 
 #[cfg(test)]

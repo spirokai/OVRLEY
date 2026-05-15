@@ -507,9 +507,9 @@ fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
     assert_argument_pair(&built.input_0_args, "-hwaccel_output_format", "qsv");
     assert!(built
         .filter_complex
-        .contains("scale_qsv=w=3840:h=2160:format=nv12"));
+        .contains("scale_qsv=w=3840:h=2160:format=nv12[main_hw]"));
     assert!(built.filter_complex.contains(
-        "[1:v]setpts=PTS-STARTPTS,format=bgra,hwupload=extra_hw_frames=64,format=qsv[overlay_hw]"
+        "[1:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=64[overlay_hw]"
     ));
     assert!(built.filter_complex.contains("overlay_qsv"));
     assert!(!built.filter_complex.contains("hwdownload"));

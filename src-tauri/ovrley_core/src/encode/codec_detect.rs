@@ -640,7 +640,7 @@ fn probe_qsv_overlay_path(ffmpeg_path: &Path, init_args: &[String]) -> bool {
         "-i".to_string(),
         "color=c=red@0.35:s=128x128:r=30:d=0.1,format=rgba".to_string(),
         "-filter_complex".to_string(),
-        "[0:v]format=nv12,hwupload=extra_hw_frames=64,scale_qsv=w=128:h=128:format=nv12[main_hw];[1:v]format=bgra,hwupload=extra_hw_frames=64,format=qsv[overlay_hw];[main_hw][overlay_hw]overlay_qsv=x=0:y=0[out]"
+        "[0:v]format=nv12,hwupload=extra_hw_frames=64[main_hw];[1:v]format=bgra,hwupload=extra_hw_frames=64[overlay_hw];[main_hw][overlay_hw]overlay_qsv=x=0:y=0,hwdownload,format=nv12[out]"
             .to_string(),
         "-map".to_string(),
         "[out]".to_string(),

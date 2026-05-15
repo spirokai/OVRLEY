@@ -32,7 +32,7 @@ const CUDA_FILTER: &str = "[0:v]setpts=PTS-STARTPTS,scale_cuda=format=yuv420p[ba
 
 const QSV_FULL_FILTER: &str =
     "[0:v]setpts=PTS-STARTPTS,scale_qsv=w={width}:h={height}:format=nv12[main_hw];\
-[1:v]setpts=PTS-STARTPTS,format=bgra,hwupload=extra_hw_frames=64,format=qsv[overlay_hw];\
+[1:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=64[overlay_hw];\
 [main_hw][overlay_hw]overlay_qsv=x=0:y=0[out]";
 
 const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
@@ -159,14 +159,14 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
         codec: "h264_qsv",
         input_args: &[],
         filter_complex: Some(QSV_FULL_FILTER),
-        output_args: &["-c:v", "h264_qsv", "-global_quality", "25"],
+        output_args: &["-c:v", "h264_qsv"],
     },
     CompositeProfileTemplate {
         name: "qsv_full_hevc",
         codec: "hevc_qsv",
         input_args: &[],
         filter_complex: Some(QSV_FULL_FILTER),
-        output_args: &["-c:v", "hevc_qsv", "-global_quality", "25"],
+        output_args: &["-c:v", "hevc_qsv"],
     },
     CompositeProfileTemplate {
         name: "mac_h264",
