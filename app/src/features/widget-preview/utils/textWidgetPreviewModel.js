@@ -1,5 +1,12 @@
 /**
  * Builds the shared preview model for text/label widgets.
+ *
+ * Computes text measurement, baseline, line height, font family, and visual
+ * bounding box for a text/label widget.
+ *
+ * @param {object} params
+ * @param {object} params.widget - Widget configuration object (must have type 'label').
+ * @returns {object|null} Preview model with measurement, baseline, visualBounds, and text properties, or null.
  */
 
 import { METRIC_WIDGET_LINE_HEIGHT } from '@/features/overlay-editor'

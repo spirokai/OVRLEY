@@ -43,10 +43,30 @@ function getMetricMeasureContext() {
   return metricMeasureContext
 }
 
+/**
+ * Resolves a font name to its CSS font-family value via the FONT_FAMILY_MAP lookup.
+ *
+ * Falls back to the font name itself if not found in the map, and further to
+ * Arial.ttf as the final fallback.
+ *
+ * @param {string} fontName - Font name key from FONT_FAMILY_MAP or a raw CSS font-family.
+ * @returns {string} CSS-compatible font-family string.
+ */
 export function getPreviewFontFamily(fontName) {
   return FONT_FAMILY_MAP[fontName] || fontName || FONT_FAMILY_MAP['Arial.ttf']
 }
 
+/**
+ * Measures text dimensions using a canvas 2D context.
+ *
+ * Returns width, glyph bounding box, ascent, and descent using the Canvas API's
+ * measureText method to match the Skia renderer's text layout.
+ *
+ * @param {string} text - Text to measure.
+ * @param {number} fontSize - Font size in pixels.
+ * @param {string} fontFamily - CSS font family.
+ * @returns {{ width: number, glyphHeight: number, ascent: number, descent: number, boundsLeft: number, boundsRight: number }} Measurement results.
+ */
 export function measurePreviewText(text, fontSize, fontFamily) {
   if (!text) {
     return createEmptyTextMeasure()
@@ -95,6 +115,19 @@ function getPreviewVerticalMetrics(text, fontSize, fontFamily) {
   }
 }
 
+/**
+ * Computes the SVG text `y` baseline position from vertical metrics.
+ *
+ * Centers the glyph vertically within the line height while aligning to the
+ * alphabetic baseline, matching the Skia renderer's text positioning.
+ *
+ * @param {object} params
+ * @param {number} [params.top=0] - Top of the text area.
+ * @param {number} params.lineHeight - Total line height in pixels.
+ * @param {number} params.ascent - Glyph ascent from baseline.
+ * @param {number} params.glyphHeight - Total glyph height (ascent + descent).
+ * @returns {number} Y position for the SVG text baseline attribute.
+ */
 export function getPreviewTextBaseline({ top = 0, lineHeight, ascent, glyphHeight }) {
   if (!glyphHeight) {
     return top + lineHeight
@@ -103,7 +136,24 @@ export function getPreviewTextBaseline({ top = 0, lineHeight, ascent, glyphHeigh
   return top + ((lineHeight - glyphHeight) / 2 + ascent)
 }
 
+/**
+ * Computes the full metric widget layout — icon, value text, and units text positions.
+ *
+ * Calculates positions, baselines, and dimensions for all three visual elements
+ * (icon, value, units) based on font metrics and widget configuration.
+ *
+ * @param {object} params
+ * @param {number} params.fontSize - Value font size in pixels.
+ * @param {string} params.fontFamily - Font family.
+ * @param {string} params.valueText - Value text string.
+ * @param {string} params.unitText - Units text string.
+ * @param {boolean} params.showIcon - Whether to include an icon element.
+ * @param {boolean} params.showUnits - Whether to include units text.
+ * @param {number} params.iconSize - Icon size in pixels.
+ * @returns {{ icon: object|null, value: object, units: object|null, width: number, height: number, unitsFontSize: number }} Layout positions and dimensions.
+ */
 export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitText, showIcon, showUnits, iconSize }) {
+  // Font metrics — compute line heights and measure both value and units text using canvas measurement
   const valueLineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const unitsFontSize = Math.max(fontSize * 0.28, 12)
   const unitsLineHeight = unitsFontSize * METRIC_WIDGET_LINE_HEIGHT
@@ -113,11 +163,15 @@ export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitTex
   const showUnitText = Boolean(showUnits && unitText)
   const unitsMeasure = showUnitText ? measurePreviewText(unitText, unitsFontSize, fontFamily) : createEmptyTextMeasure()
   const unitsVerticalMetrics = showUnitText ? getPreviewVerticalMetrics(unitText, unitsFontSize, fontFamily) : createEmptyVerticalMetrics()
+
+  // Row layout — determine the overall row height based on the tallest element (icon vs text group)
   const textGroupHeight = showUnitText ? Math.max(valueLineHeight, unitsLineHeight) : valueLineHeight
   const rowHeight = Math.max(showIcon ? iconSize : 0, textGroupHeight)
   const textGroupLeft = showIcon ? iconSize + METRIC_WIDGET_OUTER_GAP_PX + iconMarginRight : 0
   const textGroupTop = (rowHeight - textGroupHeight) / 2
   const textGroupBottom = textGroupTop + textGroupHeight
+
+  // Value text baseline — center the glyph vertically within the line height using the alphabetic baseline
   const valueTop = textGroupBottom - (valueLineHeight + valueVerticalMetrics.glyphHeight) / 2
   const valueBaseline = getPreviewTextBaseline({
     top: valueTop,
@@ -197,7 +251,20 @@ function getPreviewTextVisualBounds(segment) {
   return { left, top, right, bottom }
 }
 
+/**
+ * Computes the visual bounding box of a metric widget layout, accounting for icon offsets.
+ *
+ * Evaluates the actual rendered extents of the icon (with offsets), value text,
+ * and units text, then computes the minimal bounding rectangle and alignment offsets.
+ *
+ * @param {object|null} layout - Layout from getMetricWidgetLayout.
+ * @param {object} [params={}] - Offset parameters.
+ * @param {number} [params.iconOffsetX=0] - Horizontal icon offset relative to layout.
+ * @param {number} [params.iconOffsetY=0] - Vertical icon offset relative to layout.
+ * @returns {{ minX: number, minY: number, maxX: number, maxY: number, width: number, height: number, offsetX: number, offsetY: number }} Visual bounds and alignment offsets.
+ */
 export function getMetricWidgetVisualBounds(layout, { iconOffsetX = 0, iconOffsetY = 0 } = {}) {
+  // Empty layout — return zero bounds when no layout is provided
   if (!layout) {
     return {
       minX: 0,
@@ -211,6 +278,7 @@ export function getMetricWidgetVisualBounds(layout, { iconOffsetX = 0, iconOffse
     }
   }
 
+  // Initialize bounds to infinity/negative-infinity for expansion
   let bounds = {
     minX: Number.POSITIVE_INFINITY,
     minY: Number.POSITIVE_INFINITY,
@@ -218,12 +286,14 @@ export function getMetricWidgetVisualBounds(layout, { iconOffsetX = 0, iconOffse
     maxY: Number.NEGATIVE_INFINITY,
   }
 
+  // Icon bounds — expand the bounding rect to include the icon with user-specified offsets
   if (layout.icon) {
     const iconLeft = layout.icon.left + iconOffsetX
     const iconTop = layout.icon.top + iconOffsetY
     bounds = expandMetricBounds(bounds, iconLeft, iconTop, iconLeft + layout.icon.size, iconTop + layout.icon.size)
   }
 
+  // Text bounds — expand the rect to include value and units text bounding boxes
   ;[layout.value, layout.units]
     .map(getPreviewTextVisualBounds)
     .filter(Boolean)
@@ -247,6 +317,16 @@ export function getMetricWidgetVisualBounds(layout, { iconOffsetX = 0, iconOffse
   }
 }
 
+/**
+ * Computes the effective opacity of a widget, combining widget-level and global opacity.
+ *
+ * Multiplies the widget's individual opacity by the scene's global opacity,
+ * clamped to the [0, 1] range.
+ *
+ * @param {object} data - Widget data object (may contain .opacity).
+ * @param {number} [globalOpacity=1] - Global opacity multiplier from the scene.
+ * @returns {number} Clamped combined opacity in the 0–1 range.
+ */
 export function getWidgetOpacity(data, globalOpacity = 1) {
   return clamp((data?.opacity ?? 1) * globalOpacity, 0, 1)
 }

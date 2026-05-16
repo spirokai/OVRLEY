@@ -4,6 +4,19 @@
  * progress marker, and optional metric/imperial elevation labels.
  *
  * All data is received via props; no store access.
+ *
+ * @param {object} props
+ * @param {object} props.widget - Widget configuration object.
+ * @param {object} props.activity - Activity data with elevation series.
+ * @param {number} props.previewSecond - Current preview time in seconds.
+ * @param {number} props.globalOpacity - Global opacity multiplier.
+ * @param {number} props.globalScale - Global scale multiplier.
+ * @param {string} props.sceneFont - Scene-level font family.
+ * @param {number} props.sceneFontSize - Scene-level font size.
+ * @param {object} props.sceneStyle - Scene style object (shadow, border).
+ * @param {string} props.valueFont - Value font family override.
+ * @param {object} props.exportRange - Export range configuration.
+ * @returns {JSX.Element} SVG element for elevation preview.
  */
 
 import { useMemo } from 'react'
@@ -36,6 +49,7 @@ export function OverlayElevationWidget({
   valueFont,
   exportRange,
 }) {
+  // Dimensions and base styling — clamp widget dimensions and resolve colors, line widths, and opacities from widget config
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
   const safeGlobalScale = Math.max(Number(globalScale) || 1, 0.1)
@@ -54,11 +68,16 @@ export function OverlayElevationWidget({
   const labelFontFamily = getPreviewFontFamily(
     widget.data.point_label?.font || widget.data.point_label?.font_family || valueFont || sceneFont || widget.data.font || widget.data.font_family,
   )
+  // Font metrics — trigger font loading to ensure accurate text measurement before layout
   useFontMetricsVersion(labelFontFamily, labelFontSize)
+
+  // Export window — compute the visible time/distance range based on full activity or user crop
   const exportWindow = useMemo(
     () => resolveExportRangeWindow(activity, exportRange, widget.data.show_full_activity ?? false),
     [activity, exportRange, widget.data.show_full_activity],
   )
+
+  // Area styling — fill colors and opacities for the remaining (unridden) and completed (ridden) elevation area
   const remainingAreaColor = widget.data.area_remaining_color || widget.data.fill?.color || baseColor
   const completedAreaColor = widget.data.area_completed_color || widget.data.fill?.color || baseColor
   const remainingAreaOpacity = normalizePreviewOpacity(
@@ -66,10 +85,13 @@ export function OverlayElevationWidget({
     0.12,
   )
   const completedAreaOpacity = normalizePreviewOpacity(widget.data.area_completed_opacity ?? widget.data.fill?.opacity, 0.24)
+
+  // Elevation data — build the scoped elevation series and normalize it into SVG-space points
   const scopedElevationSeries = useMemo(() => buildScopedElevationSeries(activity, exportWindow), [activity, exportWindow])
   const profileElevations = scopedElevationSeries.values
   const profileDistanceProgress = scopedElevationSeries.progressValues
   const elevationGeometry = useMemo(() => {
+    // Normalize elevation data at full resolution, then divide back by scale for unscaled preview coords
     const scaledGeometry = normalizeElevationGeometry(
       profileElevations,
       width * safeGlobalScale,
@@ -98,6 +120,8 @@ export function OverlayElevationWidget({
   ])
   const points = elevationGeometry.points
   const pointProgress = elevationGeometry.progressValues
+
+  // Playhead position — compute 0–1 progress and locate the marker point on the elevation profile
   const progress01 = exportWindow.active
     ? (getExportWindowDistanceProgressAtElapsed(activity, exportWindow, previewSecond) ?? 0)
     : getDistanceProgressAtElapsed(activity, previewSecond)
@@ -107,14 +131,22 @@ export function OverlayElevationWidget({
     () => buildElevationCompletedPoints(points, pointProgress, progress01, markerPoint),
     [markerPoint, pointProgress, points, progress01],
   )
+
+  // Elevation value at playhead — interpolate the elevation at the current progress position
   const elevationValue =
     getInterpolatedSeriesValue(profileDistanceProgress, profileElevations, progress01) ?? getSeriesValueAtProgress(profileElevations, progress01)
+
+  // SVG paths — convert remaining/completed point arrays into SVG point string formats
   const areaSvgPoints = useMemo(() => areaToSvg(points, width, height, null), [height, points, width])
   const completedAreaSvgPoints = useMemo(() => areaToSvg(completedPoints, width, height, null), [completedPoints, height, width])
   const remainingSvgPoints = pointsToSvg(points)
   const completedSvgPoints = pointsToSvg(completedPoints)
+
+  // Elevation labels — build metric ("M") and imperial ("FT") label text from the interpolated elevation value
   const metricLabel = elevationValue === null || elevationValue === undefined ? '-- M' : `${Math.round(elevationValue)} M`
   const imperialLabel = elevationValue === null || elevationValue === undefined ? '-- FT' : `${Math.round(elevationValue * 3.28084)} FT`
+
+  // Marker layers and label positioning — build concentric circle layers and measure label text for baseline centering
   const markerLayers = useMemo(
     () => getPreviewMarkerLayers(widget.data, svgMarkerSize, markerColor, markerOpacity),
     [markerColor, markerOpacity, svgMarkerSize, widget.data],

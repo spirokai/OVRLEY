@@ -11,6 +11,13 @@ import {
 } from '@/features/overlay-editor'
 import { measurePreviewText, getPreviewTextBaseline } from './textMeasurement'
 
+/**
+ * Formats a speed value into a human-readable string with unit label.
+ *
+ * @param {number|null|undefined} value - Speed value in meters per second.
+ * @param {string} unit - Target unit system ('kmh', 'mph', 'kn', 'mps').
+ * @returns {{ value: string, units: string }} Formatted speed string and unit label.
+ */
 export function formatSpeed(value, unit) {
   const conversions = {
     kmh: { units: 'KM/H', factor: 3.6 },
@@ -31,6 +38,13 @@ export function formatSpeed(value, unit) {
   }
 }
 
+/**
+ * Formats a temperature value with the specified unit.
+ *
+ * @param {number|null|undefined} value - Temperature in Celsius.
+ * @param {string} unit - Target unit ('celsius' or 'fahrenheit').
+ * @returns {{ value: string, units: string }} Formatted temperature string and unit symbol.
+ */
 export function formatTemperature(value, unit) {
   if (value === null || value === undefined) {
     return {
@@ -57,12 +71,24 @@ function padNumber(value) {
   return String(value).padStart(2, '0')
 }
 
+/**
+ * Formats a timestamp into a time/date string based on the specified format key.
+ *
+ * Supports date formats (dd-mm-yyyy, mm-dd-yyyy, etc.), time formats (12h/24h),
+ * and combined date-time formats.
+ *
+ * @param {string} format - Format key (e.g. 'time-24', 'date-dd-mm-yyyy').
+ * @param {number|string|null|undefined} timestamp - Timestamp in milliseconds or ISO string.
+ * @returns {string} Formatted time/date string.
+ */
 export function formatTimeValue(format, timestamp) {
+  // Early return — missing or invalid timestamps show a placeholder
   if (!timestamp) return '--:--'
 
   const date = new Date(timestamp)
   if (!Number.isFinite(date.getTime())) return '--:--'
 
+  // Extract all date/time components for format string composition
   const day = padNumber(date.getDate())
   const month = padNumber(date.getMonth() + 1)
   const year = date.getFullYear()
@@ -74,6 +100,7 @@ export function formatTimeValue(format, timestamp) {
   const minutes = padNumber(date.getMinutes())
   const suffix = date.getHours() >= 12 ? 'PM' : 'AM'
 
+  // Format map — selects the rendered string based on the format key; falls back to 24-hour time
   const formatMap = {
     'date-dd-mm-yyyy': `${day}-${month}-${year}`,
     'date-mm-dd-yyyy': `${month}-${day}-${year}`,
@@ -95,6 +122,13 @@ export function formatTimeValue(format, timestamp) {
   return formatMap[format] || formatMap['time-24']
 }
 
+/**
+ * Formats a gradient value as a signed percentage string.
+ *
+ * @param {object} widget - Widget configuration containing decimal precision and sign display settings.
+ * @param {number|null|undefined} value - Raw gradient value.
+ * @returns {string} Formatted gradient string with optional sign prefix.
+ */
 export function formatGradientValue(widget, value) {
   if (value === null || value === undefined) return '--'
 
@@ -107,6 +141,16 @@ export function formatGradientValue(widget, value) {
   return `${prefix}${absoluteValue}`
 }
 
+/**
+ * Computes the height of a gradient indicator triangle for a given value and width.
+ *
+ * Uses trigonometric relationship between the gradient angle and the triangle width
+ * to determine the visual height of the direction indicator.
+ *
+ * @param {number} value - Gradient value (percent).
+ * @param {number} width - Triangle width in pixels.
+ * @returns {number} Triangle height in pixels.
+ */
 export function getGradientTriangleHeight(value, width) {
   const safeWidth = Math.max(Number(width) || 0, 0)
   if (safeWidth <= 0) {
@@ -127,16 +171,42 @@ export function getGradientTriangleHeight(value, width) {
   return safeWidth * Math.tan(halfAngleRadians)
 }
 
+/**
+ * Checks whether a gradient value is effectively zero (within GRADIENT_ZERO_EPSILON).
+ *
+ * @param {number} value - Gradient value.
+ * @returns {boolean} True if the value is zero, non-finite, or within epsilon.
+ */
 export function isGradientZero(value) {
   const numericValue = Number(value)
   return !Number.isFinite(numericValue) || Math.abs(numericValue) <= GRADIENT_ZERO_EPSILON
 }
 
+/**
+ * Computes the full layout for a gradient widget — value text and triangle indicator positions.
+ *
+ * Calculates the dimensions and positions of the value text and optional triangle
+ * direction indicator based on font metrics, gradient magnitude, and widget settings.
+ *
+ * @param {object} params
+ * @param {number} params.fontSize - Font size for the value text.
+ * @param {string} params.fontFamily - Font family.
+ * @param {string} params.valueText - Formatted value string.
+ * @param {number} params.valueOffset - Vertical offset for the value text.
+ * @param {number} params.gradientValue - Current gradient value.
+ * @param {number} params.triangleWidth - Width of the gradient triangle.
+ * @param {boolean} params.showTriangle - Whether to render the triangle indicator.
+ * @param {number} params.scale - Global scale factor.
+ * @returns {{ width: number, height: number, yOffset: number, value: object, triangle: object|null }} Layout dimensions and positioned elements.
+ */
 export function getGradientWidgetLayout({ fontSize, fontFamily, valueText, valueOffset, gradientValue, triangleWidth, showTriangle, scale }) {
+  // Value text measurement — compute line height and measure the value text for positioning
   const valueLineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const valueMeasure = measurePreviewText(valueText, fontSize, fontFamily)
   const safeValueOffset = (Number(valueOffset) || 0) / (scale || 1)
   const safeTriangleWidth = Math.max(Number(triangleWidth) || 0, 0)
+
+  // Triangle dimensions — compute the max possible height and actual height based on gradient magnitude
   const maxTriangleHeight = showTriangle && safeTriangleWidth > 0 ? getGradientTriangleHeight(MAX_GRADIENT_ABS_PERCENT, safeTriangleWidth) : 0
   const triangleHeight = showTriangle && safeTriangleWidth > 0 ? getGradientTriangleHeight(gradientValue, safeTriangleWidth) : 0
   const indicatorVisible = showTriangle && safeTriangleWidth > 0
@@ -145,6 +215,8 @@ export function getGradientWidgetLayout({ fontSize, fontFamily, valueText, value
   const zeroBaseline = indicatorTop + maxTriangleHeight
   const anchoredValueTop = -safeValueOffset
   const indicatorHeight = indicatorVisible ? maxTriangleHeight * 2 : 0
+
+  // Content bounding box — compute the raw vertical extent of value + indicator, then calculate baseline
   const rawMinY = Math.min(0, anchoredValueTop)
   const rawMaxY = Math.max(anchoredValueTop + valueLineHeight, indicatorVisible ? indicatorTop + indicatorHeight : anchoredValueTop + valueLineHeight)
   const baseline = getPreviewTextBaseline({
@@ -182,6 +254,17 @@ export function getGradientWidgetLayout({ fontSize, fontFamily, valueText, value
   }
 }
 
+/**
+ * Builds an SVG path string for a gradient direction triangle.
+ *
+ * Positive values produce an upward-pointing triangle; negative values produce
+ * downward. Zero or non-finite values return an empty string.
+ *
+ * @param {number} value - Gradient value (determines triangle direction).
+ * @param {number} width - Triangle width in pixels.
+ * @param {number} height - Triangle height in pixels.
+ * @returns {string} SVG path 'd' attribute value, or empty string.
+ */
 export function buildGradientTrianglePath(value, width, height) {
   const safeWidth = Math.max(Number(width) || 0, 0)
   const safeHeight = Math.max(Number(height) || 0, 0)

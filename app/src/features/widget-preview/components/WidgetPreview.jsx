@@ -1,6 +1,26 @@
 /**
- * Renders the widget preview component — dispatches to the appropriate
- * renderer based on widget type.
+ * WidgetPreview — renders the appropriate preview component based on widget type.
+ *
+ * Dispatches to OverlayTextWidget, OverlayRouteWidget, OverlayElevationWidget,
+ * or OverlayMetricWidget depending on `widget.type`.
+ *
+ * Memoized with a custom comparator that checks all individual props to avoid
+ * unnecessary re-renders during playback scrubbing.
+ *
+ * @param {object} props
+ * @param {object} props.widget - Widget configuration object.
+ * @param {object} [props.activity] - Activity data.
+ * @param {number} [props.previewSecond] - Current preview time in seconds.
+ * @param {number} [props.globalOpacity] - Global opacity multiplier.
+ * @param {number} [props.globalScale] - Global scale multiplier.
+ * @param {object} [props.metricPreviewModel] - Precomputed metric preview model.
+ * @param {object} [props.textPreviewModel] - Precomputed text preview model.
+ * @param {string} [props.sceneFont] - Scene-level font family.
+ * @param {number} [props.sceneFontSize] - Scene-level font size.
+ * @param {object} [props.sceneStyle] - Scene style object.
+ * @param {string} [props.valueFont] - Value font family override.
+ * @param {object} [props.exportRange] - Export range configuration.
+ * @returns {JSX.Element|null} Widget preview component.
  */
 
 import { memo } from 'react'

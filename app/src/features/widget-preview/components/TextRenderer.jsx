@@ -3,6 +3,13 @@
  * with font, color, opacity, shadow, and border styling.
  *
  * All data is received via props; no store access.
+ *
+ * @param {object} props
+ * @param {object} props.widget - Widget configuration object.
+ * @param {number} props.globalOpacity - Global opacity multiplier.
+ * @param {object} props.sceneStyle - Scene style object (shadow, border).
+ * @param {object|null} props.textPreviewModel - Precomputed text preview model (optional).
+ * @returns {JSX.Element} SVG element for text widget preview.
  */
 
 import { buildTextWidgetPreviewModel } from '../utils/textWidgetPreviewModel'

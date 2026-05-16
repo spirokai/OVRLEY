@@ -4,10 +4,29 @@
 
 import { getPointAtMetricProgressWithIndex, getPointAtProgress } from '@/lib/geometryUtils'
 
+/**
+ * Sanitizes a string for use as an SVG element ID.
+ *
+ * Replaces all non-alphanumeric characters (except hyphens and underscores)
+ * with underscores to prevent invalid SVG id attributes.
+ *
+ * @param {string} value - Raw ID string.
+ * @returns {string} Sanitized ID safe for SVG use.
+ */
 export function sanitizeSvgId(value) {
   return String(value || 'preview-shadow').replace(/[^a-zA-Z0-9_-]/g, '_')
 }
 
+/**
+ * Normalizes a shadow color string, splitting 8-digit hex into separate color and opacity components.
+ *
+ * For 8-character hex values, the last two digits are treated as alpha and combined
+ * with the explicit opacity parameter. For all other formats, opacity is passed through.
+ *
+ * @param {string} color - Raw color string (hex, named, etc.).
+ * @param {number} [opacity=1] - Additional opacity multiplier.
+ * @returns {{ color: string, opacity: number }} Normalized hex color and clamped opacity.
+ */
 export function normalizeSvgShadowColor(color, opacity = 1) {
   const rawColor = String(color || '').trim()
   const hex = rawColor.startsWith('#') ? rawColor.slice(1) : rawColor
@@ -27,6 +46,13 @@ export function normalizeSvgShadowColor(color, opacity = 1) {
   }
 }
 
+/**
+ * Checks whether two 2D points are approximately equal within a small epsilon.
+ *
+ * @param {number[]|null|undefined} left - First point [x, y].
+ * @param {number[]|null|undefined} right - Second point [x, y].
+ * @returns {boolean} True if both points are within 1e-3 Euclidean distance.
+ */
 export function pointsEqual(left, right) {
   if (!left || !right) {
     return false
@@ -35,6 +61,15 @@ export function pointsEqual(left, right) {
   return Math.hypot(right[0] - left[0], right[1] - left[1]) <= 1e-3
 }
 
+/**
+ * Normalizes an opacity value handling both percentage (0–100) and decimal (0–1) ranges.
+ *
+ * Values > 1 are treated as percentages and divided by 100.
+ *
+ * @param {number|null|undefined} value - Raw opacity value.
+ * @param {number} fallback - Fallback opacity if value is null, undefined, or non-finite.
+ * @returns {number} Clamped opacity in the 0–1 range.
+ */
 export function normalizePreviewOpacity(value, fallback) {
   if (value === null || value === undefined) {
     return fallback
@@ -48,10 +83,29 @@ export function normalizePreviewOpacity(value, fallback) {
   return numericValue > 1 ? Math.min(Math.max(numericValue / 100, 0), 1) : Math.min(Math.max(numericValue, 0), 1)
 }
 
+/**
+ * Resolves a display color from explicit, inherited, or base fallback values.
+ *
+ * Precedence: explicitColor > inheritedColor > baseColor.
+ *
+ * @param {string|null|undefined} explicitColor - Widget-level color override.
+ * @param {string|null|undefined} inheritedColor - Inherited line/group color.
+ * @param {string} [baseColor='#ffffff'] - Base fallback color.
+ * @returns {string} Resolved color string.
+ */
 export function resolvePreviewStyleColor(explicitColor, inheritedColor, baseColor) {
   return explicitColor || inheritedColor || baseColor || '#ffffff'
 }
 
+/**
+ * Resolves a line width value from explicit or legacy widget settings.
+ *
+ * Legacy widths are multiplied by 2.5 to match the Skia renderer's scaling convention.
+ *
+ * @param {number|null|undefined} explicitWidth - Explicit line width value.
+ * @param {number|null|undefined} legacyWidth - Legacy line width (multiplied by 2.5 as fallback).
+ * @returns {number} Resolved line width in pixels.
+ */
 export function resolvePreviewLineWidth(explicitWidth, legacyWidth) {
   const numericExplicit = Number(explicitWidth)
   if (Number.isFinite(numericExplicit)) {
@@ -62,6 +116,17 @@ export function resolvePreviewLineWidth(explicitWidth, legacyWidth) {
   return (Number.isFinite(numericLegacy) ? numericLegacy : 1.75) * 2.5
 }
 
+/**
+ * Resolves a line width accounting for global SVG scale.
+ *
+ * Explicit widths are divided by the global scale to produce an unscaled preview value.
+ * Legacy widths fall through to resolvePreviewLineWidth without scaling.
+ *
+ * @param {number|null|undefined} explicitWidth - Explicit line width.
+ * @param {number|null|undefined} legacyWidth - Legacy line width.
+ * @param {number} globalScale - Global scale factor to un-scale.
+ * @returns {number} Resolved line width in unscaled preview coordinates.
+ */
 export function resolveScaledPreviewLineWidth(explicitWidth, legacyWidth, globalScale) {
   const safeScale = Math.max(Number(globalScale) || 1, 0.1)
   const numericExplicit = Number(explicitWidth)
@@ -73,6 +138,19 @@ export function resolveScaledPreviewLineWidth(explicitWidth, legacyWidth, global
   return resolvePreviewLineWidth(undefined, legacyWidth)
 }
 
+/**
+ * Builds the marker layer definitions for a widget's position indicator.
+ *
+ * Processes widget data points into sorted circle layers (largest radius first),
+ * with the innermost layer rendered as a solid fill. Falls back to a single
+ * default marker when no custom points are configured.
+ *
+ * @param {object} widgetData - Widget configuration with optional points array.
+ * @param {number} fallbackRadius - Default marker radius if no points defined.
+ * @param {string} fallbackColor - Default marker color.
+ * @param {number} fallbackOpacity - Default marker opacity.
+ * @returns {Array<{radius: number, color: string, opacity: number, solidFill: boolean}>} Sorted marker layers.
+ */
 export function getPreviewMarkerLayers(widgetData, fallbackRadius, fallbackColor, fallbackOpacity) {
   const sourcePoints = Array.isArray(widgetData.points) ? widgetData.points : []
   const markerPoints = sourcePoints.length
@@ -98,6 +176,18 @@ export function getPreviewMarkerLayers(widgetData, fallbackRadius, fallbackColor
     }))
 }
 
+/**
+ * Builds the route frame preview state — determines the marker point and
+ * completed segment points from route geometry at a given progress value.
+ *
+ * Uses metric-distance-based interpolation with fallback to uniform progress,
+ * ensuring the marker lands at the correct position along the route.
+ *
+ * @param {number[][]} points - Route SVG points.
+ * @param {number[]} progressValues - Per-point progress values (0–1).
+ * @param {number} progress01 - Current progress (0–1).
+ * @returns {{ markerPoint: number[]|null, completedPoints: number[][] }} Marker position and completed polyline points.
+ */
 export function buildRouteFramePreview(points, progressValues, progress01) {
   if (!points.length) {
     return { markerPoint: null, completedPoints: [] }
@@ -120,6 +210,19 @@ export function buildRouteFramePreview(points, progressValues, progress01) {
   return { markerPoint, completedPoints }
 }
 
+/**
+ * Builds the completed elevation polyline points up to a given progress value.
+ *
+ * Filters the full elevation point array to include only points whose progress
+ * is at or below the current progress, appending the marker point if it extends
+ * beyond the last filtered point.
+ *
+ * @param {number[][]} points - Elevation SVG points.
+ * @param {number[]} progressValues - Per-point progress values (0–1).
+ * @param {number} progress01 - Current progress (0–1).
+ * @param {number[]|null} markerPoint - Current marker position [x, y] to append.
+ * @returns {number[][]} Points for the completed (ridden) portion of the elevation profile.
+ */
 export function buildElevationCompletedPoints(points, progressValues, progress01, markerPoint) {
   if (!points.length) {
     return []

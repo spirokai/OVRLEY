@@ -1048,6 +1048,7 @@ Additionally, verify the extraction boundaries are correct:
 - **No mixed concerns in `data/`**: Every file under `data/` must contain ONLY constants, config, and lookup tables. If an exported function definition exists in a `data/` file (beyond simple one-liners like `Object.fromEntries`), it is a violation of Section 1.3 — the function must move to `utils/`.
 - **No residual container logic**: After extracting constants, helpers, sub-components, and sub-hooks, verify the component has no remaining store selectors, side effects, or derived state computations. If it does, a container hook (step 5 of Section 1.5) must be extracted.
 - **No undocumented exported functions**: Every exported function in the refactored files must have complete JSDoc (`@param` + `@returns`). Verify with `rg "^export (function|default)"` on every file touched — any result without JSDoc is a documentation gap.
+- **No missing step comments**: Every function or component body longer than 20–30 lines must have intermediate step comments at each logical phase.
 
 ---
 
@@ -1241,9 +1242,11 @@ export function resolutionsMismatch(scene, videoResolution) {
 - Use `@async` where applicable
 - "The name is self-documenting" is NOT a valid reason to skip JSDoc
 
-### Internal Section Comments — Required (All Hooks)
+### Internal Section Comments — Required (All Hooks and Long Functions)
 
 Every hook file, regardless of length, must use **internal section comments** to partition its body. Each logical group of statements must be preceded by a comment that names the concern. The section header must use `// <Name>` format.
+
+Any function or component with a body longer than 20–30 lines must also contain **intermediate step comments** at each logical step within the body. These comments explain what the next group of statements does in 1–2 sentences, serving as a narrative guide through the function's flow. Step comments apply to all code — components, hooks, and utility functions alike.
 
 #### GOOD — Hook with sections
 
@@ -1318,9 +1321,36 @@ function useRenderProgressPolling({ renderingVideo, setRenderProgress }) {
 }
 ```
 
-### Rules for Section Headers
+#### GOOD — Long utility/component functions get step comments
+
+```jsx
+export function normalizeElevationGeometry(values, width, height, ...) {
+  // Convert raw values to structured samples — pair each valid value with its progress, filtering out non-finite entries
+  const samples = values.reduce((result, value, index) => { ... }, [])
+
+  // Fallback geometry — when no valid samples exist, return a synthetic smooth curve as a preview placeholder
+  if (!samples.length) { ... }
+
+  // Safe parameters — clamp margin, vertical scale, density, and tolerance to their valid ranges
+  const safeVerticalScale = clamp(...)
+
+  // Smoothing — applies a weighted convolution kernel to reduce noise while preserving endpoints
+  const smoothElevationSamples = (inputSamples) => { ... }
+
+  // Downsampling — reduce sample count to match target density, preserving endpoints
+  const downsampleElevationSamples = (inputSamples, targetCount) => { ... }
+
+  // Project into SVG coordinate space, then simplify via Ramer-Douglas-Peucker
+  const projectedPoints = downsampledSamples.map(...)
+  const simplified = simplifyProjectedPoints(projectedPoints, safeSimplifyTolerance)
+  return { points: simplified.map(...), progressValues: simplified.map(...) }
+}
+```
+
+### Rules for Section Headers and Step Comments
 
 - Every hook file MUST have at least one `// <Name>` section comment
+- Every function or component with a body longer than 20–30 lines MUST have intermediate `// <step>` comments at each logical phase
 - **Provide 1–2 sentences of context** explaining what the section does, unless the header is absolutely self-explanatory. `// Store selectors` or `// Local UI state` are clear enough on their own. But `// Side effects` or `// Handlers` are NOT — they must describe what the effects or handlers actually do (e.g. `// Side effects — sync progress polling lifecycle with render state`).
 - Groups must be ordered: data → state → effects → handlers → return
 - Headers must be concise (2–5 words for the label portion before the dash, plus the explanatory sentence)

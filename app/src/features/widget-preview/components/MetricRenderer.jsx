@@ -8,6 +8,16 @@
  * 2. Gradient with value text + triangle indicator (up/down/zero).
  *
  * All data is received via props; no store access.
+ *
+ * @param {object} props
+ * @param {object} props.widget - Widget configuration object.
+ * @param {object} props.activity - Activity data with series values.
+ * @param {number} props.previewSecond - Current preview time in seconds.
+ * @param {number} props.globalOpacity - Global opacity multiplier.
+ * @param {number} props.globalScale - Global scale multiplier.
+ * @param {object|null} props.metricPreviewModel - Precomputed preview model (optional).
+ * @param {object} props.sceneStyle - Scene style object (shadow, border).
+ * @returns {JSX.Element|null} SVG or div element with metric widget preview, or null.
  */
 
 import { buildMetricWidgetPreviewModel } from '../utils/metricWidgetPreviewModel'
@@ -21,6 +31,7 @@ import { PreviewMetricIcon, PreviewSvgText } from './previewSvgComponents'
 import { useFontMetricsVersion } from '../hooks/useFontMetricsVersion'
 
 export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpacity, globalScale, metricPreviewModel, sceneStyle }) {
+  // Base styling — resolve font, color, opacity, and shadow from widget config and scene
   const fontSize = widget.data.font_size ?? 60
   const fontFamily = getPreviewFontFamily(widget.data.font || widget.data.font_family)
   useFontMetricsVersion(fontFamily, fontSize)
@@ -28,6 +39,7 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
   const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)
   const shadow = getTextShadowParts(sceneStyle)
 
+  // Value text — use the precomputed preview model or fall back to defaults; gradient overrides the value text inline
   let valueText = metricPreviewModel?.valueText ?? '--'
   let unitText = metricPreviewModel?.unitText ?? ''
 
@@ -35,6 +47,7 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
     valueText = `${formatGradientValue(widget, getInterpolatedActivityValue(activity, 'gradient', previewSecond))}%`
   }
 
+  // Layout — compute the metric layout (icon + value + units) or gradient layout (value + triangle) depending on widget type
   const currentGradientValue = Number(getInterpolatedActivityValue(activity, 'gradient', previewSecond) ?? 0)
   const metricLayout =
     widget.type === 'gradient'
@@ -61,6 +74,7 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
         })
       : null
 
+  // Standard metric rendering — icon + value text + optional units text in an SVG overlay
   if (widget.type !== 'gradient' && metricLayout) {
     const previewModel =
       metricPreviewModel ??
@@ -142,6 +156,7 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
     )
   }
 
+  // Gradient rendering — value text + direction triangle (up for positive, down for negative, line for zero)
   if (widget.type === 'gradient' && gradientLayout) {
     const valueShadowFilterId = sanitizeSvgId(`${widget.id}-value-shadow`)
     const trianglePath = gradientLayout.triangle

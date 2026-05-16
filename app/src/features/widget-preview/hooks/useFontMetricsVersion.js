@@ -1,10 +1,18 @@
 /**
  * Returns a version token that changes after the requested font becomes ready.
+ *
+ * Used to trigger re-renders of preview components once font metrics are available,
+ * ensuring accurate text measurement after font loading.
+ *
+ * @param {string} fontFamily - Font family to await.
+ * @param {number} fontSize - Font size in pixels to load.
+ * @returns {number} Version counter — increments each time the font finishes loading.
  */
 
 import { useEffect, useState } from 'react'
 
 export function useFontMetricsVersion(fontFamily, fontSize) {
+  // State — version token incremented when font metrics are refreshed
   const [version, setVersion] = useState(0)
 
   useEffect(() => {
@@ -26,6 +34,7 @@ export function useFontMetricsVersion(fontFamily, fontSize) {
 
     refreshMetrics()
 
+    // Cleanup — cancels pending font load on unmount or re-render
     return () => {
       cancelled = true
     }

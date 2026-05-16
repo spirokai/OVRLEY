@@ -1,5 +1,15 @@
 /**
  * Builds the shared preview model for metric-style widgets.
+ *
+ * Computes the formatted value text, unit text, icon layout, and visual bounds
+ * for a metric widget (speed, heartrate, cadence, power, time, temperature) at
+ * the given preview time.
+ *
+ * @param {object} params
+ * @param {object} params.widget - Widget configuration object.
+ * @param {object} params.activity - Activity data with series values.
+ * @param {number} params.previewSecond - Current preview time in seconds.
+ * @returns {object|null} Preview model with metricLayout, visualBounds, and text values, or null for non-value widgets.
  */
 
 import { formatSpeed, formatTemperature, formatTimeValue } from './formatUtils'
@@ -7,6 +17,7 @@ import { getMetricWidgetLayout, getMetricWidgetVisualBounds, getPreviewFontFamil
 import { getInterpolatedActivityValue, getInterpolatedTimeValue } from '@/features/overlay-editor'
 
 export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond }) {
+  // Guard — skip non-value widgets and gradient type (handled separately)
   if (!widget || widget.category !== 'values' || widget.type === 'gradient') {
     return null
   }
@@ -14,6 +25,7 @@ export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond 
   const fontSize = widget.data.font_size ?? 60
   const fontFamily = getPreviewFontFamily(widget.data.font || widget.data.font_family)
 
+  // Value formatting — format the interpolated activity value based on widget type (speed, heartrate, cadence, power, time, temperature)
   let valueText = '--'
   let unitText = ''
 
@@ -47,6 +59,7 @@ export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond 
     return null
   }
 
+  // Layout computation — build icon, value, and units positions via text measurement, then compute visual bounds with icon offsets
   const showUnits = widget.data.show_units ?? ['speed', 'temperature'].includes(widget.type)
   const showIcon = widget.data.show_icon ?? true
   const iconSize = widget.data.icon_size ?? 28
