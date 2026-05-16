@@ -30,6 +30,18 @@ function resolvePreviewSecond({ dummyDurationSeconds, selectedSecond, sourceActi
 }
 
 /**
+ * Formats seconds as HH:MM:SS for helpers that consume export-range-shaped windows.
+ */
+function formatRangeTime(seconds) {
+  const safeSeconds = Math.max(0, Math.trunc(Number(seconds) || 0))
+  const hours = Math.floor(safeSeconds / 3600)
+  const minutes = Math.floor((safeSeconds % 3600) / 60)
+  const remainingSeconds = safeSeconds % 60
+
+  return [hours, minutes, remainingSeconds].map((part) => String(part).padStart(2, '0')).join(':')
+}
+
+/**
  * Merges live widget drafts (unsaved edits) into the widget array.
  * Each draft's data properties override the corresponding widget's data.
  */
@@ -64,6 +76,9 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   const selectedSecond = useStore((state) => state.selectedSecond)
   const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
   const exportRange = useStore((state) => state.exportRange)
+  const importedVideoPath = useStore((state) => state.importedVideoPath)
+  const importedVideoDuration = useStore((state) => state.importedVideoDuration)
+  const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
 
   // Refs — mutable interaction state
   const moveableRef = useRef(null)
@@ -128,6 +143,24 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
       sourceActivity,
     })
   }, [dummyDurationSeconds, selectedSecond, sourceActivity])
+  const previewExportRange = useMemo(() => {
+    if (!importedVideoPath) {
+      return exportRange
+    }
+
+    const duration = Number(importedVideoDuration)
+    if (!Number.isFinite(duration) || duration <= 0) {
+      return null
+    }
+
+    const start = Math.max(0, Number(videoSyncOffsetSeconds) || 0)
+    const end = start + duration
+    return {
+      type: 'custom',
+      fromTime: formatRangeTime(start),
+      toTime: formatRangeTime(end),
+    }
+  }, [exportRange, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds])
 
   // Side effects — preview perf counter, draft reset on config change, marquee cleanup
   useEffect(() => {
@@ -354,7 +387,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     canScaleSelected,
     displayScale,
     elementGuidelines,
-    exportRange,
+    exportRange: previewExportRange,
     globalOpacity,
     globalScale,
     handleSceneMouseDown,

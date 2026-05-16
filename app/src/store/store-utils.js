@@ -191,6 +191,7 @@ export function isConfigUpdateInProgress() {
  * @returns {object} Requested value or structure.
  */
 export function readStoredTemplateSettings() {
+  localStorage.removeItem('exportRange')
   const storedGlobalDefaults = normalizeColorFields(readStoredJson('globalDefaults', {}) || {})
   const globalDefaults = Object.keys(DEFAULT_GLOBAL_DEFAULTS).reduce(
     (result, key) => ({
@@ -202,10 +203,7 @@ export function readStoredTemplateSettings() {
 
   return {
     updateRate: readStoredInt('updateRate', 1),
-    exportRange: {
-      ...DEFAULT_EXPORT_RANGE,
-      ...(readStoredJson('exportRange', {}) || {}),
-    },
+    exportRange: { ...DEFAULT_EXPORT_RANGE },
     exportCodec: localStorage.getItem('exportCodec') || 'prores_ks',
     globalDefaults,
     aspectRatio: localStorage.getItem('aspectRatio') || '16:9',

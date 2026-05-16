@@ -72,6 +72,8 @@ export default function useRenderWorkflow({ backendStatus }) {
     const templateFps = sanitizeIntegerFps(config?.scene?.fps || 30)
     const fps = importedVideoPath && importedVideoFps ? sanitizeIntegerFps(Math.round(importedVideoFps)) : templateFps
     const defaultCodec = importedVideoPath ? 'libx264' : exportCodec || 'prores_ks'
+    const draftExportRange = importedVideoPath ? DEFAULT_EXPORT_RANGE : { ...DEFAULT_EXPORT_RANGE, ...(exportRange || {}) }
+
     return {
       fps,
       updateRate: normalizeUpdateRateForFps(fps, updateRate),
@@ -84,10 +86,7 @@ export default function useRenderWorkflow({ backendStatus }) {
             defaultCodec,
           )
         : undefined,
-      exportRange: {
-        ...DEFAULT_EXPORT_RANGE,
-        ...(exportRange || {}),
-      },
+      exportRange: draftExportRange,
     }
   }, [
     config?.scene?.fps,
@@ -126,10 +125,13 @@ export default function useRenderWorkflow({ backendStatus }) {
       return
     }
 
-    const nextExportRange = {
-      ...DEFAULT_EXPORT_RANGE,
-      ...(renderSettingsDraft.exportRange || {}),
-    }
+    const hasImportedVideo = Boolean(useStore.getState().importedVideoPath)
+    const nextExportRange = hasImportedVideo
+      ? DEFAULT_EXPORT_RANGE
+      : {
+          ...DEFAULT_EXPORT_RANGE,
+          ...(renderSettingsDraft.exportRange || {}),
+        }
     const nextFps = sanitizeIntegerFps(renderSettingsDraft.fps || 30)
     const nextUpdateRate = normalizeUpdateRateForFps(nextFps, renderSettingsDraft.updateRate)
     const nextConfig = {
@@ -142,10 +144,10 @@ export default function useRenderWorkflow({ backendStatus }) {
 
     setConfig(nextConfig)
     setUpdateRate(nextUpdateRate)
-    if (!useStore.getState().importedVideoPath) {
+    if (!hasImportedVideo) {
       setExportCodec(renderSettingsDraft.exportCodec)
+      setExportRange(nextExportRange)
     }
-    setExportRange(nextExportRange)
     setActiveRenderId(null)
     setRenderProgress({
       ...DEFAULT_RENDER_PROGRESS,

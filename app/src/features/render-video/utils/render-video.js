@@ -69,7 +69,9 @@ export default async function renderVideo(overrides = {}) {
         delete config.scene.ffmpeg.qsv_full_init_args
       }
 
-      if (importedVideoPath) {
+      const isCompositeRender = Boolean(importedVideoPath)
+
+      if (isCompositeRender) {
         const sourceFps = resolveCompositeFps(importedVideoFpsNum, importedVideoFpsDen, importedVideoFps)
         const renderDuration = Number(importedVideoDuration)
         if (!sourceFps) {
@@ -100,8 +102,8 @@ export default async function renderVideo(overrides = {}) {
         config.scene.ffmpeg.pix_fmt = config.scene.ffmpeg.pix_fmt || 'argb'
       }
 
-      config.scene.custom_export_range_active = false
-      if (activeExportRange.type === 'custom') {
+      config.scene.custom_export_range_active = isCompositeRender
+      if (!isCompositeRender && activeExportRange.type === 'custom') {
         const start = Math.trunc(timeToSeconds(activeExportRange.fromTime))
         const end = Math.trunc(timeToSeconds(activeExportRange.toTime))
         if (end > start) {

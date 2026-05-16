@@ -48,10 +48,9 @@ export function createTemplateSlice(set, get) {
     localStorage.setItem('loadedTemplateSource', source || '')
   }
 
-  const persistTemplateSettings = ({ config, globalDefaults, exportRange, exportCodec, aspectRatio, updateRate, filename = null, source = null }) => {
+  const persistTemplateSettings = ({ config, globalDefaults, exportCodec, aspectRatio, updateRate, filename = null, source = null }) => {
     localStorage.setItem('editorConfig', JSON.stringify(config))
     persistSerializable('globalDefaults', globalDefaults)
-    persistSerializable('exportRange', exportRange)
     localStorage.setItem('exportCodec', exportCodec)
     localStorage.setItem('aspectRatio', aspectRatio)
     localStorage.setItem('updateRate', updateRate.toString())
@@ -150,7 +149,6 @@ export function createTemplateSlice(set, get) {
     setExportRange: (range) =>
       set((state) => {
         state.exportRange = { ...state.exportRange, ...range }
-        persistSerializable('exportRange', state.exportRange)
       }),
 
     setExportCodec: (codec) => {
@@ -206,7 +204,6 @@ export function createTemplateSlice(set, get) {
       persistTemplateSettings({
         config: nextConfig,
         globalDefaults: nextGlobalDefaults,
-        exportRange: nextExportRange,
         exportCodec: nextExportCodec,
         aspectRatio: nextAspectRatio,
         updateRate: nextUpdateRate,
@@ -268,7 +265,6 @@ export function createTemplateSlice(set, get) {
       persistTemplateSettings({
         config: nextConfig,
         globalDefaults: nextGlobalDefaults,
-        exportRange: nextExportRange,
         exportCodec: nextExportCodec,
         aspectRatio: nextAspectRatio,
         updateRate: nextUpdateRate,
