@@ -211,6 +211,9 @@ export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
   const explicitElapsed = rawSamples.map((sample) => safeNumber(sample.elapsedSeconds))
   const hasExplicitElapsed = explicitElapsed.some(isFiniteNumber)
 
+  const validTimestamps = timeSeries.map((value) => (value ? new Date(value) : null))
+  const origin = validTimestamps.find((value) => value && Number.isFinite(value.getTime()))
+
   if (hasExplicitElapsed) {
     const elapsedSeries = []
     let lastValue = 0
@@ -221,6 +224,16 @@ export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
         lastValue = Math.max(lastValue, currentExplicit)
         elapsedSeries.push(roundValue(lastValue, 3))
         continue
+      }
+
+      if (origin) {
+        const timestamp = validTimestamps[index]
+        if (timestamp && Number.isFinite(timestamp.getTime())) {
+          const computed = Math.max(0, (timestamp.getTime() - origin.getTime()) / 1000)
+          lastValue = Math.max(lastValue, computed)
+          elapsedSeries.push(roundValue(lastValue, 3))
+          continue
+        }
       }
 
       if (index === 0) {
@@ -234,9 +247,6 @@ export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
 
     return elapsedSeries
   }
-
-  const validTimestamps = timeSeries.map((value) => (value ? new Date(value) : null))
-  const origin = validTimestamps.find((value) => value && Number.isFinite(value.getTime()))
 
   if (!origin) {
     return rawSamples.map((_, index) => roundValue(index, 3))
