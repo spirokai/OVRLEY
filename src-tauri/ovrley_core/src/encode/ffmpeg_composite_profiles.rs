@@ -2,7 +2,8 @@
 //!
 //! Profiles are intentionally data-shaped: static input, filter, and output
 //! fragments live here, while render-specific values such as bitrate, duration,
-//! FPS, dimensions, and output path are injected by the composite builder.
+//! FPS, dimensions, trim filters, and output path are injected by the
+//! composite builder.
 
 use super::ffmpeg_composite::CompositeProfile;
 
@@ -18,20 +19,20 @@ struct CompositeProfileTemplate {
     output_args: &'static [&'static str],
 }
 
-const SOFTWARE_FILTER: &str = "[0:v]setpts=PTS-STARTPTS,scale={width}:{height}[base];\
+const SOFTWARE_FILTER: &str = "[0:v]{base_video_filters}scale={width}:{height}[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=yuv420p[out]";
 
-const VAAPI_FILTER: &str = "[0:v]setpts=PTS-STARTPTS,scale={width}:{height}[base];\
+const VAAPI_FILTER: &str = "[0:v]{base_video_filters}scale={width}:{height}[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=nv12,hwupload[out]";
 
-const CUDA_FILTER: &str = "[0:v]setpts=PTS-STARTPTS,scale_cuda=format=yuv420p[base];\
+const CUDA_FILTER: &str = "[0:v]{base_video_filters}scale_cuda=format=yuv420p[base];\
 [1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[ovr];\
 [base][ovr]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]";
 
 const QSV_FULL_FILTER: &str =
-    "[0:v]setpts=PTS-STARTPTS,scale_qsv=w={width}:h={height}:format=nv12[main_hw];\
+    "[0:v]{base_video_filters}scale_qsv=w={width}:h={height}:format=nv12[main_hw];\
 [1:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=64[overlay_hw];\
 [main_hw][overlay_hw]overlay_qsv=x=0:y=0[out]";
 

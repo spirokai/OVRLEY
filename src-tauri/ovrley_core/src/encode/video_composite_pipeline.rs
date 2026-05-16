@@ -519,10 +519,11 @@ fn derive_composite_pipeline_plan(
     })
 }
 
-/// Spawns FFmpeg for a two-input composite render.
+/// Spawns FFmpeg for a three-input composite render.
 ///
-/// Input 0 is the imported source video and input 1 is raw RGBA overlay frames
-/// streamed through stdin as `pipe:0`.
+/// Input 0 is the unseeked source video used for filter-side video trimming,
+/// input 1 is raw RGBA overlay frames streamed through stdin as `pipe:0`, and
+/// input 2 is a separately trimmed source-media input used for audio copy.
 fn spawn_composite_ffmpeg_process(
     ffmpeg_bin: &Path,
     plan: &CompositePipelinePlan,
@@ -533,6 +534,7 @@ fn spawn_composite_ffmpeg_process(
     command.args(&plan.ffmpeg_settings.hw_init_args);
     command.args(&plan.ffmpeg_settings.input_0_args);
     command.args(&plan.ffmpeg_settings.input_1_args);
+    command.args(&plan.ffmpeg_settings.input_2_args);
     command
         .arg("-filter_complex")
         .arg(&plan.ffmpeg_settings.filter_complex)

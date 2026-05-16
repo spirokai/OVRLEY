@@ -156,7 +156,11 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
         "-ss",
         "300"
     ));
-    assert_argument_pair(&plan.ffmpeg_settings.input_0_args, "-t", "0.2");
+    assert_argument_pair(&plan.ffmpeg_settings.input_2_args, "-t", "0.2");
+    assert!(plan
+        .ffmpeg_settings
+        .filter_complex
+        .contains("trim=start=0:end=0.2,setpts=PTS-STARTPTS,"));
 }
 
 #[test]
