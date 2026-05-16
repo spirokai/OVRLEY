@@ -436,7 +436,7 @@ fn render_composite_video_segmented(
                 &segment_controller,
                 &segment_video_path,
                 &segment_bitrate,
-                composite_sync_offset,
+                composite_sync_offset + seg_start,
                 composite_video_fps_num,
                 composite_video_fps_den,
                 composite_video_duration,
