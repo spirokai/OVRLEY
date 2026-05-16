@@ -810,8 +810,8 @@ fn composite_test_config(render_duration: f64) -> RenderConfig {
 fn fixture_activity() -> ParsedActivity {
     let activity = fs::read_to_string(
         repo_root()
-            .join("app")
             .join("debug")
+            .join("activities")
             .join("Test_FIT-parse-debug.json"),
     )
     .unwrap();

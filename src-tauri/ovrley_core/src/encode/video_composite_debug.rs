@@ -95,7 +95,7 @@ pub(crate) struct CompositeTimingSummaryInput<'a> {
 
 /// Writes the Phase 7 composite timing summary JSON.
 ///
-/// The summary is stored under `debug_render/phase_7/<video-id>/timing_summary.json`
+/// The summary is stored under `debug/timings/phase_7/<video-id>/timing_summary.json`
 /// and includes rational FPS values, frame counts, timings, and FFmpeg diagnostics.
 pub(crate) fn write_composite_timing_summary(
     input: CompositeTimingSummaryInput<'_>,

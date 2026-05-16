@@ -39,7 +39,7 @@ fn main() -> Result<(), String> {
     let paths = AppPaths::from_repo_root(root.clone());
     paths.ensure_dirs()?;
 
-    let payload_path = root.join("app/debug/Test_FIT-parse-debug.json");
+    let payload_path = root.join("debug/activities/Test_FIT-parse-debug.json");
 
     println!("Loading payload: {}", payload_path.display());
     let payload_json = fs::read_to_string(&payload_path)
