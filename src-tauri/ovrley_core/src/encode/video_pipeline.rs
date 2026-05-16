@@ -255,7 +255,7 @@ fn finalize_ffmpeg_settings(
 }
 
 /// Computes how many frames will be written after applying frame decimation.
-pub(crate) fn rendered_frame_count(layout_frame_count: usize, update_rate: usize) -> usize {
+pub fn rendered_frame_count(layout_frame_count: usize, update_rate: usize) -> usize {
     // Decimation keeps the first frame and then every `update_rate`th layout
     // frame. The +1 form avoids off-by-one loss for non-divisible lengths.
     if layout_frame_count == 0 {

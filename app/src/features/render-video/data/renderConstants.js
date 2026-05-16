@@ -59,13 +59,13 @@ export const ACCELERATION_OPTIONS = [
   { value: 'nvidia', label: 'NVIDIA GPU', platform: ['windows', 'linux'] },
   {
     value: 'nvidia_cuda',
-    label: 'NVIDIA CUDA Overlay',
+    label: 'NVIDIA GPU | CUDA ',
     platform: ['windows', 'linux'],
   },
   { value: 'qsv', label: 'Intel Quick Sync', platform: ['windows', 'linux'] },
   {
     value: 'qsv_full',
-    label: 'Intel QSV Overlay',
+    label: 'Intel QSV Full',
     platform: ['windows', 'linux'],
   },
   { value: 'amd', label: 'AMD GPU', platform: ['windows', 'linux'] },

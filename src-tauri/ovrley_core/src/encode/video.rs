@@ -14,7 +14,8 @@ use crate::encode::ffmpeg::resolve_ffmpeg_binary;
 use crate::encode::fps::Fps;
 use crate::encode::video_composite_pipeline::render_composite_video_single;
 use crate::encode::video_debug::{concat_video_segments, timestamp_nanos, write_stitch_summary};
-use crate::encode::video_pipeline::{render_video_single, rendered_frame_count};
+use crate::encode::video_pipeline::render_video_single;
+pub use crate::encode::video_pipeline::rendered_frame_count;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -256,7 +257,7 @@ fn estimate_parallel_render_worker_count(total_jobs: usize) -> usize {
     let logical_cores = std::thread::available_parallelism()
         .map(|value| value.get())
         .unwrap_or(4);
-    let worker_count = (logical_cores / 4).max(1);
+    let worker_count = (logical_cores / 4 + 1).max(1);
     worker_count.min(total_jobs.max(1))
 }
 
@@ -268,8 +269,8 @@ pub fn render_video(
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> Result<String, String> {
-    if should_parallelize_qtrle(config, dense_activity) {
-        return render_video_segmented_qtrle(paths, config, activity, dense_activity, controller);
+    if should_parallelize_segmented(config, dense_activity) {
+        return render_video_segmented(paths, config, activity, dense_activity, controller);
     }
     render_video_single(paths, config, activity, dense_activity, controller)
 }
@@ -299,7 +300,14 @@ pub fn render_composite_video(
     let trim_start = composite_video_trim_start.unwrap_or(0.0);
     let update_rate = composite_widget_update_rate.unwrap_or(1).max(1);
 
-    if should_parallelize_composite(render_duration, composite_video_fps_num, update_rate) {
+    let codec = config
+        .scene
+        .ffmpeg
+        .as_object()
+        .and_then(|map| map.get("codec"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("libx264");
+    if should_parallelize_composite(render_duration, composite_video_fps_num, update_rate, codec) {
         return render_composite_video_segmented(
             paths,
             config,
@@ -338,13 +346,18 @@ pub fn render_composite_video(
 
 /// Returns whether composite rendering should be split into parallel segments.
 ///
-/// Only activates for renders with enough frames to make splitting worthwhile
-/// and when the machine has at least 2 available workers.
+/// Software CPU encoders (libx264, libx265) run single-pass because parallel
+/// segments would fight for the same cores. Hardware encoders benefit more
+/// from splitting when there are enough frames to justify the overhead.
 fn should_parallelize_composite(
     render_duration: f64,
     fps_num: u32,
     update_rate: u32,
+    codec: &str,
 ) -> bool {
+    if codec == "libx264" || codec == "libx265" {
+        return false;
+    }
     let overlay_fps = fps_num as f64 / update_rate.max(1) as f64;
     let total_frames = (render_duration * overlay_fps).ceil() as u32;
     total_frames >= 120 && estimate_parallel_render_worker_count(total_frames as usize) >= 2
@@ -604,24 +617,24 @@ fn composite_output_frame_windows(
     windows
 }
 
-// Returns whether qtrle rendering should be split into stitched segments.
-fn should_parallelize_qtrle(config: &RenderConfig, dense_activity: &DenseActivityReport) -> bool {
-    // qtrle encoding is comparatively slow and stitch-friendly for integer
-    // second windows, making it the only codec currently segmented.
+// Returns whether rendering should be split into stitched segments.
+fn should_parallelize_segmented(config: &RenderConfig, dense_activity: &DenseActivityReport) -> bool {
+    // qtrle and prores_ks_vulkan encoding are comparatively slow and
+    // stitch-friendly for integer second windows.
     config
         .scene
         .ffmpeg
         .as_object()
         .and_then(|map| map.get("codec"))
         .and_then(serde_json::Value::as_str)
-        .map(|codec| codec == "qtrle")
+        .map(|codec| codec == "qtrle" || codec == "prores_ks_vulkan")
         .unwrap_or(false)
         && integer_second_duration(config).unwrap_or(0) >= 2
         && dense_activity.frame_count >= 2
 }
 
-// Renders qtrle output as multiple second-aligned segments and stitches them.
-fn render_video_segmented_qtrle(
+// Renders output as multiple second-aligned segments and stitches them.
+fn render_video_segmented(
     paths: &AppPaths,
     config: &RenderConfig,
     activity: &ParsedActivity,
@@ -751,7 +764,7 @@ fn render_video_segmented_qtrle(
     for handle in handles {
         handle
             .join()
-            .map_err(|_| "Segmented qtrle render thread panicked".to_string())?;
+            .map_err(|_| "Segmented render thread panicked".to_string())?;
     }
 
     if let Some(error) = first_error {
@@ -770,7 +783,7 @@ fn render_video_segmented_qtrle(
         .collect::<Option<Vec<_>>>()
         .ok_or_else(|| {
             cleanup_segment_outputs(paths, &results);
-            "Segmented qtrle render did not produce all output files".to_string()
+            "Segmented render did not produce all output files".to_string()
         })?;
 
     controller.set_frame_progress(

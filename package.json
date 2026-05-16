@@ -14,7 +14,10 @@
     "lint": "pnpm lint:frontend",
     "format:frontend": "cd app && pnpm format",
     "format": "pnpm format:frontend",
-    "release": "semantic-release"
+    "release": "semantic-release",
+    "benchmark:transparent": "cd src-tauri && cargo run --bin benchmark_transparent --",
+    "benchmark:composite": "cd src-tauri && cargo run --bin benchmark_composite --",
+    "benchmark:widget-rate": "cd src-tauri && cargo run --bin benchmark_widget_rate --"
   },
   "keywords": [],
   "author": "",
