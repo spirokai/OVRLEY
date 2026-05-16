@@ -12,7 +12,7 @@ export function buildTextWidgetPreviewModel({ widget }) {
 
   const fontSize = widget.data.font_size ?? 60
   const fontFamily = getPreviewFontFamily(widget.data.font || widget.data.font_family)
-  const text = widget.data.text || 'TEXT'
+  const text = (widget.data.text || 'TEXT').toUpperCase()
   const lineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const measurement = measurePreviewText(text, fontSize, fontFamily)
   const baseline = getPreviewTextBaseline({
