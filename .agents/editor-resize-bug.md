@@ -16,14 +16,14 @@ Two systems race to position the same DOM element during a resize:
 
 The sequence per animation frame:
 
-| Step | Actor | What happens |
-|------|-------|-------------|
-| 1 | Moveable | Drags element to new position via its internal transform/position logic |
-| 2 | `onResize` handler | Reads `drag.beforeTranslate[1]`, calls `getWidgetVisualBoundsFromTarget(target)` |
-| 3 | DOM dataset | Still holds **pre-resize** `data-widget-bounds-*` values because `OverlayCanvasWidget` is memo'd and hasn't re-rendered with the new metric layout |
-| 4 | `getWidgetSceneOrigin` | Combines stale `minY` from dataset with the new `y` from the data draft → produces a wrong Y |
-| 5 | `applyLiveWidgetStyles` | Sets `target.style.top` to that wrong Y → element jumps down |
-| 6 | Next rAF | Moveable re-reads actual element position, detects the delta, immediately corrects it → snap back |
+| Step | Actor                   | What happens                                                                                                                                       |
+| ---- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Moveable                | Drags element to new position via its internal transform/position logic                                                                            |
+| 2    | `onResize` handler      | Reads `drag.beforeTranslate[1]`, calls `getWidgetVisualBoundsFromTarget(target)`                                                                   |
+| 3    | DOM dataset             | Still holds **pre-resize** `data-widget-bounds-*` values because `OverlayCanvasWidget` is memo'd and hasn't re-rendered with the new metric layout |
+| 4    | `getWidgetSceneOrigin`  | Combines stale `minY` from dataset with the new `y` from the data draft → produces a wrong Y                                                       |
+| 5    | `applyLiveWidgetStyles` | Sets `target.style.top` to that wrong Y → element jumps down                                                                                       |
+| 6    | Next rAF                | Moveable re-reads actual element position, detects the delta, immediately corrects it → snap back                                                  |
 
 The `data-widget-bounds-*` attributes are written by `OverlayCanvasWidget` during render based on `buildMetricWidgetPreviewModel`. During a resize gesture the React tree does not re-render (the draft update is done imperatively, not via React state for the affected widget), so the dataset becomes stale.
 
@@ -55,8 +55,6 @@ Remove the `applyLiveWidgetStyles` call from `onResize` for all widget categorie
 
 **Risk:** Medium. Plot widgets may rely on `applyLiveWidgetStyles` to keep the CSS scale transform in sync during resize. Requires verifying plot resize behavior.
 
-## Recommendation
+## Related bug
 
-**Solution A** is the safest: gate the `applyLiveWidgetStyles` call on `widget.category !== 'values'`. This preserves the existing behavior for plot widgets (where dataset bounds are not the source of truth) and eliminates the race for metric widgets where position is fully derived from text measurements.
-
-Roughly 4 lines changed in `useResizeHandlers.js`.
+- a likely related bug exists for text/label widgets - the selection box is not properly updated when font is changed. This problem does not exist for metric widgets, so inspect how it is handled there and perhaps we can apply a similar solution to text widgets.

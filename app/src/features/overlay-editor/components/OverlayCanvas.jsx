@@ -7,7 +7,9 @@ import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { getWidgetSceneOrigin } from '../utils/overlayEditorHelpers'
-import { buildMetricWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
+import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
+import { useFontMetricsVersion } from '@/features/widget-preview/hooks/useFontMetricsVersion'
+import { getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
 import { buildWidgetTransform } from '@/lib/geometryUtils'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
@@ -90,12 +92,18 @@ const OverlayCanvasWidget = memo(
     handleWidgetMouseDown,
     setHoveredWidgetId,
   }) {
+    const widgetFontSize = widget.data.font_size ?? 60
+    const widgetFontFamily = getPreviewFontFamily(widget.data.font || widget.data.font_family)
+    useFontMetricsVersion(widgetFontFamily, widgetFontSize)
+
     const metricPreviewModel = buildMetricWidgetPreviewModel({
       widget,
       activity,
       previewSecond,
     })
-    const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
+    const textPreviewModel = buildTextWidgetPreviewModel({ widget })
+    const widgetPreviewModel = metricPreviewModel ?? textPreviewModel
+    const metricVisualBounds = widgetPreviewModel?.visualBounds ?? null
     const isPlotWidget = widget.category === 'plots'
     const origin = getWidgetSceneOrigin(widget, null, metricVisualBounds, {
       boundsScale: isPlotWidget ? 1 : globalScale,
@@ -138,6 +146,7 @@ const OverlayCanvasWidget = memo(
           globalOpacity={globalOpacity}
           globalScale={globalScale}
           metricPreviewModel={metricPreviewModel}
+          textPreviewModel={textPreviewModel}
           sceneFont={sceneFont}
           sceneFontSize={sceneFontSize}
           sceneStyle={sceneStyle}

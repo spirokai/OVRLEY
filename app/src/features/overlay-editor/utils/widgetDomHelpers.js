@@ -133,12 +133,12 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
  * @param {object} draft - Live draft with position overrides.
  * @param {number} globalScale - Global scale factor.
  */
-export function applyLiveScalePositionStyles(target, widget, draft, globalScale) {
+export function applyLiveScalePositionStyles(target, widget, draft, globalScale, visualBoundsOverride = null) {
   if (!target || !widget) {
     return
   }
 
-  const visualBounds = getWidgetVisualBoundsFromTarget(target)
+  const visualBounds = visualBoundsOverride ?? getWidgetVisualBoundsFromTarget(target)
   const draftOrigin = getWidgetSceneOrigin(widget, draft, visualBounds, {
     boundsScale: widget.category === 'plots' ? 1 : globalScale,
   })

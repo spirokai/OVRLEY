@@ -16,6 +16,7 @@ function WidgetPreview({
   globalOpacity,
   globalScale,
   metricPreviewModel,
+  textPreviewModel,
   sceneFont,
   sceneFontSize,
   sceneStyle,
@@ -23,7 +24,7 @@ function WidgetPreview({
   exportRange,
 }) {
   if (widget.type === 'label') {
-    return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} sceneStyle={sceneStyle} />
+    return <OverlayTextWidget widget={widget} globalOpacity={globalOpacity} sceneStyle={sceneStyle} textPreviewModel={textPreviewModel} />
   }
 
   if (widget.type === 'course') {
@@ -79,6 +80,7 @@ export default memo(
     previousProps.globalOpacity === nextProps.globalOpacity &&
     previousProps.globalScale === nextProps.globalScale &&
     previousProps.metricPreviewModel === nextProps.metricPreviewModel &&
+    previousProps.textPreviewModel === nextProps.textPreviewModel &&
     previousProps.sceneFont === nextProps.sceneFont &&
     previousProps.sceneFontSize === nextProps.sceneFontSize &&
     previousProps.sceneStyle === nextProps.sceneStyle &&
