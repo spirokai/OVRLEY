@@ -91,6 +91,8 @@ pub fn detect_codecs(repo_root: &Path) -> Result<AvailableCodecs, String> {
             "4",
             "-qscale:v",
             "4",
+            "-mbs_per_slice",
+            "4",
             "-vendor",
             "apl0",
             "-alpha_bits",

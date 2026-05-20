@@ -3,6 +3,7 @@
  * Constants only — pure helper functions are in ../utils/codecUtils.js.
  */
 
+// QSV regular is disabled in lieu of QSV full due to better performance and compatibility, but left here for reference and potential future use if needed.
 export const OUTPUT_FORMATS = [
   {
     value: 'prores',
@@ -30,7 +31,7 @@ export const OUTPUT_FORMATS = [
       cpu: 'libx264',
       nvidia: 'h264_nvenc',
       nvidia_cuda: 'nnvgpu_h264',
-      qsv: 'h264_qsv',
+      // qsv: 'h264_qsv',
       qsv_full: 'qsv_full_h264',
       amd: 'h264_amf',
       videotoolbox: 'h264_videotoolbox',
@@ -45,7 +46,7 @@ export const OUTPUT_FORMATS = [
       cpu: 'libx265',
       nvidia: 'hevc_nvenc',
       nvidia_cuda: 'nnvgpu_hevc',
-      qsv: 'hevc_qsv',
+      // qsv: 'hevc_qsv',
       qsv_full: 'qsv_full_hevc',
       amd: 'hevc_amf',
       videotoolbox: 'hevc_videotoolbox',
@@ -62,10 +63,10 @@ export const ACCELERATION_OPTIONS = [
     label: 'NVIDIA GPU | CUDA ',
     platform: ['windows', 'linux'],
   },
-  { value: 'qsv', label: 'Intel Quick Sync', platform: ['windows', 'linux'] },
+  // { value: 'qsv', label: 'Intel Quick Sync', platform: ['windows', 'linux'] },
   {
     value: 'qsv_full',
-    label: 'Intel QSV Full',
+    label: 'Intel QSV',
     platform: ['windows', 'linux'],
   },
   { value: 'amd', label: 'AMD GPU', platform: ['windows', 'linux'] },

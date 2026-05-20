@@ -2,17 +2,19 @@
   "format": "ovrley-template",
   "version": 1,
   "name": "recent-template",
-  "savedAt": "2026-05-10T09:27:42.980Z",
+  "savedAt": "2026-05-20T21:22:20.542Z",
   "config": {
     "scene": {
-      "width": 3840,
-      "height": 2160,
+      "width": 1920,
+      "height": 1080,
       "fps": 30,
       "start": 0,
       "end": 4912,
       "ffmpeg": {
         "vendor": "ap10"
-      }
+      },
+      "border_strength": 0,
+      "border_distance": 0
     },
     "labels": [
       {
@@ -27,8 +29,8 @@
     ],
     "values": [
       {
-        "x": 2904,
-        "y": 383,
+        "x": 1401,
+        "y": 251,
         "value": "cadence",
         "font": "Furore.otf",
         "font_size": 111,
@@ -37,7 +39,7 @@
         "prefix": "",
         "suffix": "",
         "decimals": 0,
-        "show_icon": true,
+        "show_icon": false,
         "icon_color": "#c780ce",
         "icon_size": 84,
         "icon_offset_x": -28,
@@ -45,8 +47,8 @@
         "show_units": true
       },
       {
-        "x": 319,
-        "y": 1378,
+        "x": 113,
+        "y": 701,
         "value": "temperature",
         "font": "Furore.otf",
         "font_size": 43,
@@ -64,8 +66,8 @@
         "temperature_unit": "celsius"
       },
       {
-        "x": 133,
-        "y": 1033,
+        "x": 123,
+        "y": 524,
         "value": "heartrate",
         "font": "Furore.otf",
         "font_size": 93,
@@ -82,8 +84,8 @@
         "show_units": true
       },
       {
-        "x": 126,
-        "y": 591,
+        "x": 117,
+        "y": 245,
         "value": "power",
         "font": "Furore.otf",
         "font_size": 76,
@@ -100,8 +102,8 @@
         "show_units": true
       },
       {
-        "x": 133,
-        "y": 791,
+        "x": 129,
+        "y": 378,
         "value": "speed",
         "font": "Furore.otf",
         "font_size": 91,
@@ -119,8 +121,8 @@
         "speed_unit": "kmh"
       },
       {
-        "x": 252,
-        "y": 1552,
+        "x": 127,
+        "y": 832,
         "value": "gradient",
         "font": "Furore.otf",
         "font_size": 36,
@@ -137,8 +139,8 @@
         "triangle_width": 186
       },
       {
-        "x": 133,
-        "y": 431,
+        "x": 117,
+        "y": 123,
         "value": "time",
         "font": "Furore.otf",
         "font_size": 57,
@@ -157,8 +159,8 @@
     ],
     "plots": [
       {
-        "x": 133,
-        "y": 1816,
+        "x": 70,
+        "y": 890,
         "value": "elevation",
         "width": 1794,
         "height": 143,
@@ -195,8 +197,8 @@
         }
       },
       {
-        "x": 2932,
-        "y": 1193,
+        "x": 1395,
+        "y": 487,
         "value": "course",
         "width": 407,
         "height": 321,
@@ -226,14 +228,12 @@
       "color_text": "#ffffff",
       "color_icons": "#ffffff",
       "border_color": "#ff0000",
-      "border_thickness": 3,
-      "border_strength": 0,
-      "border_distance": 0,
+      "border_thickness": 2,
       "shadow_color": "#0059ff",
       "shadow_strength": 4,
       "shadow_distance": 4,
       "opacity": 1,
-      "scale": 2
+      "scale": 1
     }
   }
 }

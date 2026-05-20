@@ -164,6 +164,15 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
             );
             append_ffmpeg_option(
                 &mut output_args,
+                "-qscale:v",
+                object.and_then(|map| map.get("qscale")),
+            );
+            if !output_args.iter().any(|value| value == "-qscale:v") {
+                output_args.push("-qscale:v".to_string());
+                output_args.push("4".to_string());
+            }
+            append_ffmpeg_option(
+                &mut output_args,
                 "-mbs_per_slice",
                 object.and_then(|map| map.get("mbs_per_slice")),
             );
@@ -210,18 +219,13 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
             );
             append_ffmpeg_option(
                 &mut output_args,
-                "-qscale:v",
-                object.and_then(|map| map.get("qscale")),
-            );
-            if !output_args.iter().any(|value| value == "-qscale:v") {
-                output_args.push("-qscale:v".to_string());
-                output_args.push("4".to_string());
-            }
-            append_ffmpeg_option(
-                &mut output_args,
                 "-mbs_per_slice",
                 object.and_then(|map| map.get("mbs_per_slice")),
             );
+            if !output_args.iter().any(|value| value == "-mbs_per_slice") {
+                output_args.push("-mbs_per_slice".to_string());
+                output_args.push("4".to_string());
+            }
             append_ffmpeg_option(
                 &mut output_args,
                 "-vendor",
