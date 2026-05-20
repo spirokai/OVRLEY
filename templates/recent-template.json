@@ -18,12 +18,12 @@
         "vendor": "ap10"
       },
       "border_color": "#ff0000",
-      "border_thickness": 2,
+      "border_thickness": 0,
       "border_strength": 0,
       "border_distance": 0,
       "shadow_color": "#0055FF",
-      "shadow_strength": 3,
-      "shadow_distance": 4
+      "shadow_strength": 0,
+      "shadow_distance": 0
     },
     "labels": [
       {
