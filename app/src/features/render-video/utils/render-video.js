@@ -137,7 +137,7 @@ export default async function renderVideo(overrides = {}) {
       filename: null,
     })
 
-    console.log('📤 Sending video render request:', {
+    console.log('Sending video render request:', {
       start: config?.scene?.start,
       end: config?.scene?.end,
       duration: (config?.scene?.end || 0) - (config?.scene?.start || 0),
