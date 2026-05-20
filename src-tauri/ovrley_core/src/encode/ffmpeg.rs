@@ -144,6 +144,10 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
                 "-profile:v",
                 object.and_then(|map| map.get("prores_profile")),
             );
+            if !output_args.iter().any(|value| value == "-profile:v") {
+                output_args.push("-profile:v".to_string());
+                output_args.push("4444".to_string());
+            }
             append_ffmpeg_option(
                 &mut output_args,
                 "-qscale:v",

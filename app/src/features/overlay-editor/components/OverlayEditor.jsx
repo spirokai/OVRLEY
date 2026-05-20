@@ -11,7 +11,7 @@ import { LayoutGrid, Tag } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import OverlayCanvas from './OverlayCanvas'
 import OverlayMoveable from './OverlayMoveable'
-import { buildMetricWidgetPreviewModel } from '@/features/widget-preview'
+import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel } from '@/features/widget-preview'
 import { WIDGET_ICONS } from '../data/overlayEditorConfig'
 import { getWidgetSceneOrigin } from '../utils/overlayEditorHelpers'
 import useOverlayEditorState from '../hooks/useOverlayEditorState'
@@ -43,8 +43,9 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
           activity,
           previewSecond,
         })
-        const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
-        const origin = getWidgetSceneOrigin(widget, null, metricVisualBounds, {
+        const textPreviewModel = buildTextWidgetPreviewModel({ widget })
+        const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
+        const origin = getWidgetSceneOrigin(widget, null, visualBounds, {
           boundsScale: widget.category === 'plots' ? 1 : globalScale,
         })
         const left = origin.x * displayScale

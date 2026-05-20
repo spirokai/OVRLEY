@@ -5,6 +5,33 @@
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from '../data/overlayEditorConstants'
 import { applyLiveScalePositionStyles, getWidgetVisualBoundsFromTarget } from '../utils/widgetDomHelpers'
 import { buildScaledWidgetDataDraft } from '../utils/overlayEditorHelpers'
+import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel } from '@/features/widget-preview'
+
+function buildScaledVisualBounds(widget, scaledDraft, activity, previewSecond) {
+  if (!widget) {
+    return null
+  }
+
+  const draftWidget = {
+    ...widget,
+    data: {
+      ...widget.data,
+      ...scaledDraft,
+    },
+  }
+
+  return (
+    buildMetricWidgetPreviewModel({
+      widget: draftWidget,
+      activity,
+      previewSecond,
+    })?.visualBounds ??
+    buildTextWidgetPreviewModel({
+      widget: draftWidget,
+    })?.visualBounds ??
+    null
+  )
+}
 
 /**
  * Creates scale-related moveable handlers.
@@ -15,6 +42,8 @@ import { buildScaledWidgetDataDraft } from '../utils/overlayEditorHelpers'
  * @param {object} ctx.scalePreviewFrameRef
  * @param {object} ctx.selectedWidget
  * @param {object} ctx.selectedTarget
+ * @param {object|null} ctx.activity
+ * @param {number} ctx.previewSecond
  * @param {number} ctx.globalScale
  * @param {Function} ctx.setLiveWidgetDraft
  * @param {Function} ctx.commitWidgetUpdate
@@ -27,6 +56,8 @@ export function useScaleHandlers({
   scalePreviewFrameRef,
   selectedWidget,
   selectedTarget,
+  activity,
+  previewSecond,
   globalScale,
   setLiveWidgetDraft,
   commitWidgetUpdate,
@@ -68,14 +99,21 @@ export function useScaleHandlers({
       const safeGlobalScale = globalScale > 0 ? globalScale : 1
       const uniformScale = rawScale / safeGlobalScale
 
-      const nextDraft = {
+      const scaledDraft = buildScaledWidgetDataDraft(origin, uniformScale, selectedWidget)
+      const nextBounds = buildScaledVisualBounds(selectedWidget, scaledDraft, activity, previewSecond)
+      const positionedDraft = {
         ...draftWidgetsRef.current[origin.id],
+        ...scaledDraft,
+        x: origin.x + (direction?.[0] === -1 ? origin.renderedMaxX - (nextBounds?.maxX ?? origin.renderedWidth ?? 0) : 0),
+        y: origin.y + (direction?.[1] === -1 ? origin.renderedMaxY - (nextBounds?.maxY ?? origin.renderedHeight ?? 0) : 0),
+      }
+      const nextDraft = {
+        ...positionedDraft,
         scale_direction: direction,
-        ...buildScaledWidgetDataDraft(origin, uniformScale, selectedWidget),
       }
 
       draftWidgetsRef.current[origin.id] = nextDraft
-      setLiveWidgetDraft(origin.id, buildScaledWidgetDataDraft(origin, uniformScale, selectedWidget))
+      setLiveWidgetDraft(origin.id, positionedDraft)
 
       if (scalePreviewFrameRef.current) {
         cancelAnimationFrame(scalePreviewFrameRef.current)
@@ -84,16 +122,7 @@ export function useScaleHandlers({
       scalePreviewFrameRef.current = requestAnimationFrame(() => {
         const targetNode = target ?? selectedTarget
         if (!targetNode) return
-
-        const measuredBounds = getWidgetVisualBoundsFromTarget(targetNode)
-        const measuredDraft = {
-          ...draftWidgetsRef.current[origin.id],
-          x: origin.x + (direction?.[0] === -1 ? origin.renderedMaxX - (measuredBounds?.maxX ?? targetNode.offsetWidth) : 0),
-          y: origin.y + (direction?.[1] === -1 ? origin.renderedMaxY - (measuredBounds?.maxY ?? targetNode.offsetHeight) : 0),
-        }
-
-        draftWidgetsRef.current[origin.id] = measuredDraft
-        applyLiveScalePositionStyles(targetNode, selectedWidget, measuredDraft, globalScale)
+        applyLiveScalePositionStyles(targetNode, selectedWidget, positionedDraft, globalScale, nextBounds)
       })
     },
     onScaleEnd: () => {
@@ -108,10 +137,14 @@ export function useScaleHandlers({
       const draft = draftWidgetsRef.current[origin.id]
       if (draft) {
         const targetNode = selectedTarget
-        const measuredBounds = targetNode ? getWidgetVisualBoundsFromTarget(targetNode) : null
         const finalDirection = Array.isArray(draft.scale_direction) ? draft.scale_direction : [1, 1]
-        const finalX = origin.x + (finalDirection[0] === -1 ? origin.renderedMaxX - (measuredBounds?.maxX ?? origin.renderedWidth ?? 0) : 0)
-        const finalY = origin.y + (finalDirection[1] === -1 ? origin.renderedMaxY - (measuredBounds?.maxY ?? origin.renderedHeight ?? 0) : 0)
+        const finalBounds = buildScaledVisualBounds(selectedWidget, draft, activity, previewSecond)
+        const measuredBounds = targetNode ? getWidgetVisualBoundsFromTarget(targetNode) : null
+        const resolvedBounds = finalBounds ?? measuredBounds
+        const fallbackX = origin.x + (finalDirection[0] === -1 ? origin.renderedMaxX - (resolvedBounds?.maxX ?? origin.renderedWidth ?? 0) : 0)
+        const fallbackY = origin.y + (finalDirection[1] === -1 ? origin.renderedMaxY - (resolvedBounds?.maxY ?? origin.renderedHeight ?? 0) : 0)
+        const finalX = draft.x ?? fallbackX
+        const finalY = draft.y ?? fallbackY
 
         commitWidgetUpdate(origin.id, {
           x: Math.round(finalX),

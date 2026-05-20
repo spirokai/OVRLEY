@@ -74,7 +74,7 @@ mod tests {
 
     // Loads an activity parser debug fixture by filename.
     fn fixture(name: &str) -> String {
-        let path = repo_root().join("app").join("debug").join(name);
+        let path = repo_root().join("debug").join("activities").join(name);
         fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("Failed to read {}: {error}", path.display()))
     }

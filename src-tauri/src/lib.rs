@@ -295,15 +295,15 @@ fn write_template_file(path: String, contents: String) -> Result<String, String>
     Ok(path)
 }
 
-/// Writes parser/debug output under `app/debug` in the source checkout.
+/// Writes parser/debug output under `debug/activities` in the source checkout.
 ///
 /// This command is intended for development diagnostics rather than packaged
 /// user data.
 #[tauri::command]
 fn write_parse_debug_file(filename: String, contents: String) -> Result<String, String> {
     let mut path = source_repo_root();
-    path.push("app");
     path.push("debug");
+    path.push("activities");
     std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
     path.push(filename);
 

@@ -31,7 +31,7 @@ build/
 # App specific
 app/dist/
 app/dist-ssr/
-app/debug/
+debug/
 app/*.local
 app/public/preview*.png
 next/

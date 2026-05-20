@@ -49,7 +49,7 @@ function parseDebugWritePlugin() {
             return
           }
 
-          const debugDir = path.resolve(__dirname, 'debug')
+          const debugDir = path.resolve(__dirname, '..', 'debug', 'activities')
           await fs.mkdir(debugDir, { recursive: true })
           const outputPath = path.resolve(debugDir, filename)
 

@@ -27,6 +27,11 @@ pub struct CompositeProfile {
 ///
 /// The caller is expected to concatenate these groups in order and append the
 /// output path if its process-spawning architecture owns destination handling.
+///
+/// Composite mode currently uses three inputs:
+/// - input 0: unseeked source video for frame-accurate filter-side video trim
+/// - input 1: raw RGBA overlay frames from stdin (`pipe:0`)
+/// - input 2: separately trimmed source media for audio stream copy
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompositeFfmpegSettings {
     pub selected_profile_name: String,
@@ -34,6 +39,7 @@ pub struct CompositeFfmpegSettings {
     pub hw_init_args: Vec<String>,
     pub input_0_args: Vec<String>,
     pub input_1_args: Vec<String>,
+    pub input_2_args: Vec<String>,
     pub filter_complex: String,
     pub output_args: Vec<String>,
 }
@@ -118,8 +124,10 @@ impl From<&AvailableCodecs> for HwAccelInfo {
 
 /// Builds FFmpeg argument groups for the default software composite path.
 ///
-/// The source video is input 0, the raw RGBA overlay stream is input 1 on
-/// `pipe:0`, and output FPS is preserved from the exact source-video FPS.
+/// Input 0 keeps the original source video unseeked so the filter graph can
+/// apply frame-accurate video trimming. Input 1 is the raw RGBA overlay stream
+/// on `pipe:0`, and input 2 is a separately trimmed source-media input used for
+/// copying audio without re-encoding it.
 pub fn build_composite_ffmpeg_settings(
     codec_name: &str,
     bitrate: &str,
@@ -159,16 +167,7 @@ pub fn build_composite_ffmpeg_settings(
     }
 
     let mut input_0_args = selected_profile.input_args.clone();
-    if video_trim_start > 0.0 {
-        input_0_args.push("-ss".to_string());
-        input_0_args.push(format_seconds_arg(video_trim_start));
-    }
-    input_0_args.extend([
-        "-t".to_string(),
-        format_seconds_arg(render_duration),
-        "-i".to_string(),
-        video_path,
-    ]);
+    input_0_args.extend(["-i".to_string(), video_path.clone()]);
 
     let input_1_args = vec![
         "-thread_queue_size".to_string(),
@@ -185,12 +184,30 @@ pub fn build_composite_ffmpeg_settings(
         "pipe:0".to_string(),
     ];
 
-    let filter_complex = composite_filter_complex(width, height, &selected_profile)?;
+    let mut input_2_args = Vec::new();
+    if video_trim_start > 0.0 {
+        input_2_args.push("-ss".to_string());
+        input_2_args.push(format_seconds_arg(video_trim_start));
+    }
+    input_2_args.extend([
+        "-t".to_string(),
+        format_seconds_arg(render_duration),
+        "-i".to_string(),
+        video_path,
+    ]);
+
+    let filter_complex = composite_filter_complex(
+        width,
+        height,
+        video_trim_start,
+        render_duration,
+        &selected_profile,
+    )?;
     let mut output_args = vec![
         "-map".to_string(),
         "[out]".to_string(),
         "-map".to_string(),
-        "0:a?".to_string(),
+        "2:a?".to_string(),
         "-r".to_string(),
         source_fps.ffmpeg_arg(),
     ];
@@ -200,6 +217,7 @@ pub fn build_composite_ffmpeg_settings(
         bitrate.to_string(),
         "-c:a".to_string(),
         "copy".to_string(),
+        "-shortest".to_string(),
         "-movflags".to_string(),
         "faststart".to_string(),
         "-y".to_string(),
@@ -211,6 +229,7 @@ pub fn build_composite_ffmpeg_settings(
         hw_init_args: profile_hw_init_args(&selected_profile, hwaccel_available),
         input_0_args,
         input_1_args,
+        input_2_args,
         filter_complex,
         output_args,
     })
@@ -308,19 +327,29 @@ pub(crate) fn fallback_profile_name(profile: &CompositeProfile) -> Option<String
 
 /// Builds the selected profile's composite filter graph.
 ///
-/// Profile templates use `{width}` and `{height}` placeholders for the overlay
-/// render size; custom pass-through profiles get the safe software overlay.
+/// Profile templates use `{base_video_filters}`, `{width}`, and `{height}`
+/// placeholders. The base-video filter chain owns exact video trimming so the
+/// decoded frame boundary matches the segment plan more closely than input-side
+/// seek alone.
 fn composite_filter_complex(
     width: u32,
     height: u32,
+    video_trim_start: f64,
+    render_duration: f64,
     profile: &CompositeProfile,
 ) -> Result<String, String> {
     let template = profile.filter_complex.as_deref().unwrap_or(
-        "[0:v]setpts=PTS-STARTPTS,scale={width}:{height}[base];\
+        "[0:v]{base_video_filters}scale={width}:{height}[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=yuv420p[out]",
     );
+    let base_video_filters = format!(
+        "trim=start={}:end={},setpts=PTS-STARTPTS,",
+        format_seconds_arg(video_trim_start),
+        format_seconds_arg(video_trim_start + render_duration),
+    );
     Ok(template
+        .replace("{base_video_filters}", &base_video_filters)
         .replace("{width}", &width.to_string())
         .replace("{height}", &height.to_string()))
 }

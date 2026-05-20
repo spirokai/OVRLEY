@@ -3,6 +3,16 @@
  * polylines, shadow layers, and marker indicators for the course route.
  *
  * All data is received via props; no store access.
+ *
+ * @param {object} props
+ * @param {object} props.widget - Widget configuration object.
+ * @param {object} props.activity - Activity data with route samples.
+ * @param {number} props.previewSecond - Current preview time in seconds.
+ * @param {number} props.globalOpacity - Global opacity multiplier.
+ * @param {number} props.globalScale - Global scale multiplier.
+ * @param {object} props.sceneStyle - Scene style object (shadow, border).
+ * @param {object} props.exportRange - Export range configuration.
+ * @returns {JSX.Element} SVG element for route preview.
  */
 
 import { useMemo } from 'react'
@@ -24,6 +34,7 @@ import { pointsToSvg } from '@/lib/geometryUtils'
 import { PreviewMarkerLayers, PreviewPolylineShadow, PreviewSvgShadowBlurFilter } from './previewSvgComponents'
 
 export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle, exportRange }) {
+  // Dimensions and base styling — clamp widget size and resolve line colors, widths, and opacities from widget config
   const width = Math.max(widget.data.width ?? 320, 80)
   const height = Math.max(widget.data.height ?? 180, 80)
   const safeGlobalScale = Math.max(Number(globalScale) || 1, 0.1)
@@ -40,6 +51,8 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
   const svgMarkerSize = markerSize
   const markerColor = widget.data.marker_color || baseColor
   const markerOpacity = normalizePreviewOpacity(widget.data.marker_opacity ?? widget.data.opacity, 1)
+
+  // Export window and route samples — compute the visible range and fetch scoped route data
   const exportWindow = useMemo(
     () => resolveExportRangeWindow(activity, exportRange, widget.data.show_full_activity ?? false),
     [activity, exportRange, widget.data.show_full_activity],
@@ -47,6 +60,8 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
   const routeSamples = useMemo(() => {
     return buildScopedRouteSamples(activity, exportWindow)
   }, [activity, exportWindow])
+
+  // Route geometry — project lat/lng samples to SVG points with Mercator, downsample, and simplify
   const routeGeometry = useMemo(
     () =>
       normalizeRouteGeometry(
@@ -71,6 +86,8 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
     ],
   )
   const pointProgress = routeGeometry.progressValues
+
+  // Playhead position — compute 0–1 progress and determine marker + completed route segment
   const progress01 = exportWindow.active
     ? (getExportWindowDistanceProgressAtElapsed(activity, exportWindow, previewSecond) ?? 0)
     : getDistanceProgressAtElapsed(activity, previewSecond)
@@ -78,6 +95,8 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
     () => buildRouteFramePreview(routeGeometry.points, pointProgress, progress01),
     [pointProgress, progress01, routeGeometry.points],
   )
+
+  // SVG paths — convert remaining/completed point arrays to SVG point strings and build marker layers
   const remainingSvgPoints = useMemo(() => pointsToSvg(routeGeometry.points), [routeGeometry.points])
   const completedSvgPoints = useMemo(() => pointsToSvg(completedPoints), [completedPoints])
   const markerLayers = useMemo(

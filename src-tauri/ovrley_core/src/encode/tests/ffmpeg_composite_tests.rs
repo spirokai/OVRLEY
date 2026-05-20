@@ -73,16 +73,18 @@ fn test_2_3_sync_offset_is_not_used_as_seek_argument() {
 }
 
 #[test]
-fn test_2_4_trim_seek_appears_only_for_video_trim_start() {
+fn test_2_4_video_trim_uses_filter_side_cut_and_audio_seek_input() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
         10.0,
     );
 
-    assert_argument_pair(&built.input_0_args, "-ss", "10");
-    assert_argument_pair(&built.input_0_args, "-t", "10");
     assert_argument_pair(&built.input_0_args, "-i", "test.mp4");
+    assert_argument_pair(&built.input_2_args, "-ss", "10");
+    assert_argument_pair(&built.input_2_args, "-t", "10");
+    assert_argument_pair(&built.input_2_args, "-i", "test.mp4");
+    assert!(built.filter_complex.contains("trim=start=10:end=20,setpts=PTS-STARTPTS,"));
 }
 
 #[test]
@@ -132,8 +134,21 @@ fn test_2_7_optional_audio_map_and_copy_are_present() {
         0.0,
     );
 
-    assert_argument_pair(&built.output_args, "-map", "0:a?");
+    assert_argument_pair(&built.output_args, "-map", "2:a?");
     assert_argument_pair(&built.output_args, "-c:a", "copy");
+}
+
+#[test]
+fn test_2_7a_video_trim_is_filter_side_even_without_input_seek() {
+    let built = settings(
+        Fps::new(30000, 1001).unwrap(),
+        Fps::new(30000, 1001).unwrap(),
+        0.0,
+    );
+
+    assert!(!has_argument_pair(&built.input_0_args, "-ss", "0"));
+    assert!(built.filter_complex.contains("trim=start=0:end=10,setpts=PTS-STARTPTS,"));
+    assert!(built.output_args.iter().any(|arg| arg == "-shortest"));
 }
 
 #[test]

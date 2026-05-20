@@ -11,9 +11,11 @@ use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
+use crate::encode::fps::Fps;
 use crate::encode::video_composite_pipeline::render_composite_video_single;
 use crate::encode::video_debug::{concat_video_segments, timestamp_nanos, write_stitch_summary};
-use crate::encode::video_pipeline::{render_video_single, rendered_frame_count};
+use crate::encode::video_pipeline::render_video_single;
+pub use crate::encode::video_pipeline::rendered_frame_count;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -255,7 +257,7 @@ fn estimate_parallel_render_worker_count(total_jobs: usize) -> usize {
     let logical_cores = std::thread::available_parallelism()
         .map(|value| value.get())
         .unwrap_or(4);
-    let worker_count = (logical_cores / 4).max(1);
+    let worker_count = (logical_cores / 4 ).max(1);
     worker_count.min(total_jobs.max(1))
 }
 
@@ -267,8 +269,8 @@ pub fn render_video(
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> Result<String, String> {
-    if should_parallelize_qtrle(config, dense_activity) {
-        return render_video_segmented_qtrle(paths, config, activity, dense_activity, controller);
+    if should_parallelize_segmented(config, dense_activity) {
+        return render_video_segmented(paths, config, activity, dense_activity, controller);
     }
     render_video_single(paths, config, activity, dense_activity, controller)
 }
@@ -298,7 +300,14 @@ pub fn render_composite_video(
     let trim_start = composite_video_trim_start.unwrap_or(0.0);
     let update_rate = composite_widget_update_rate.unwrap_or(1).max(1);
 
-    if should_parallelize_composite(render_duration, composite_video_fps_num, update_rate) {
+    let codec = config
+        .scene
+        .ffmpeg
+        .as_object()
+        .and_then(|map| map.get("codec"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("libx264");
+    if should_parallelize_composite(render_duration, composite_video_fps_num, update_rate, codec) {
         return render_composite_video_segmented(
             paths,
             config,
@@ -337,13 +346,18 @@ pub fn render_composite_video(
 
 /// Returns whether composite rendering should be split into parallel segments.
 ///
-/// Only activates for renders with enough frames to make splitting worthwhile
-/// and when the machine has at least 2 available workers.
+/// Software CPU encoders (libx264, libx265) run single-pass because parallel
+/// segments would fight for the same cores. Hardware encoders benefit more
+/// from splitting when there are enough frames to justify the overhead.
 fn should_parallelize_composite(
     render_duration: f64,
     fps_num: u32,
     update_rate: u32,
+    codec: &str,
 ) -> bool {
+    if codec == "libx264" || codec == "libx265" {
+        return false;
+    }
     let overlay_fps = fps_num as f64 / update_rate.max(1) as f64;
     let total_frames = (render_duration * overlay_fps).ceil() as u32;
     total_frames >= 120 && estimate_parallel_render_worker_count(total_frames as usize) >= 2
@@ -370,7 +384,10 @@ fn render_composite_video_segmented(
     trim_start: f64,
     update_rate: u32,
 ) -> Result<String, String> {
-    let segment_count = estimate_parallel_render_worker_count(render_duration.ceil() as usize);
+    let source_fps = Fps::new(composite_video_fps_num, composite_video_fps_den)?;
+    let overlay_pipe_fps = source_fps.divided_by(update_rate)?;
+    let total_overlay_frames = (render_duration * overlay_pipe_fps.as_f64()).ceil() as usize;
+    let segment_count = estimate_parallel_render_worker_count(total_overlay_frames.max(1));
     if segment_count < 2 {
         return render_composite_video_single(
             paths, config, activity, dense_activity, controller,
@@ -382,31 +399,48 @@ fn render_composite_video_segmented(
         );
     }
 
-    let source_fps = composite_video_fps_num as f64 / composite_video_fps_den as f64;
-    let base_duration = render_duration / segment_count as f64;
-    let mut segments: Vec<(f64, f64)> = Vec::with_capacity(segment_count);
-    let mut cursor = 0.0;
-    for index in 0..segment_count {
-        let seg_duration = if index == segment_count - 1 {
-            render_duration - cursor
-        } else {
-            base_duration
-        };
-        segments.push((cursor, cursor + seg_duration));
-        cursor += seg_duration;
+    let total_output_frames = (render_duration * source_fps.as_f64()).ceil().max(0.0) as u32;
+    let segments = composite_output_frame_windows(
+        total_output_frames,
+        render_duration,
+        source_fps,
+        segment_count,
+    );
+    if segments.len() < 2 {
+        return render_composite_video_single(
+            paths, config, activity, dense_activity, controller,
+            composite_video_path, composite_bitrate,
+            composite_sync_offset,
+            composite_video_fps_num, composite_video_fps_den,
+            composite_video_duration,
+            Some(render_duration), Some(trim_start), Some(update_rate),
+        );
     }
 
-    let combined_frames = segments
+    let segment_output_frames = segments
         .iter()
-        .map(|(start, end)| ((end - start) * source_fps).ceil() as u32)
-        .sum::<u32>();
+        .map(|segment| segment.output_end_frame - segment.output_start_frame)
+        .collect::<Vec<_>>();
+
+    let actual_segment_count = segments.len();
+    if actual_segment_count < 2 {
+        return render_composite_video_single(
+            paths, config, activity, dense_activity, controller,
+            composite_video_path, composite_bitrate,
+            composite_sync_offset,
+            composite_video_fps_num, composite_video_fps_den,
+            composite_video_duration,
+            Some(render_duration), Some(trim_start), Some(update_rate),
+        );
+    }
+
+    let combined_frames = segment_output_frames.iter().copied().sum::<u32>();
 
     let child_cancel_flag = controller.cancel_flag();
-    let segment_controllers: Vec<RenderController> = segments
+    let segment_controllers: Vec<RenderController> = segment_output_frames
         .iter()
-        .map(|(start, end)| {
-            let frames = ((end - start) * source_fps).ceil() as u32;
-            child_render_controller(frames, &child_cancel_flag)
+        .map(|frames| {
+            child_render_controller(*frames, &child_cancel_flag)
         })
         .collect();
 
@@ -415,8 +449,8 @@ fn render_composite_video_segmented(
     }
 
     let (tx, rx) = mpsc::channel::<SegmentEvent>();
-    let mut handles = Vec::with_capacity(segment_count);
-    for index in 0..segment_count {
+    let mut handles = Vec::with_capacity(actual_segment_count);
+    for index in 0..actual_segment_count {
         let tx = tx.clone();
         let segment_controller = segment_controllers[index].clone();
         let segment_paths = paths.clone();
@@ -425,7 +459,10 @@ fn render_composite_video_segmented(
         let segment_dense = dense_activity.clone();
         let segment_video_path = composite_video_path.to_string();
         let segment_bitrate = composite_bitrate.to_string();
-        let (seg_start, seg_end) = segments[index];
+        let segment = segments[index];
+        let segment_trim_start = trim_start + segment.video_start_seconds;
+        let segment_render_duration = segment.render_duration_seconds;
+        let segment_sync_offset = composite_sync_offset + segment.video_start_seconds;
 
         let handle = thread::spawn(move || {
             let result = render_composite_video_single(
@@ -436,12 +473,12 @@ fn render_composite_video_segmented(
                 &segment_controller,
                 &segment_video_path,
                 &segment_bitrate,
-                composite_sync_offset,
+                segment_sync_offset,
                 composite_video_fps_num,
                 composite_video_fps_den,
                 composite_video_duration,
-                Some(seg_end - seg_start),
-                Some(trim_start + seg_start),
+                Some(segment_render_duration),
+                Some(segment_trim_start),
                 Some(update_rate),
             );
             let _ = tx.send(SegmentEvent::Completed(index, result));
@@ -533,24 +570,71 @@ fn render_composite_video_segmented(
     Ok(public_filename)
 }
 
-// Returns whether qtrle rendering should be split into stitched segments.
-fn should_parallelize_qtrle(config: &RenderConfig, dense_activity: &DenseActivityReport) -> bool {
-    // qtrle encoding is comparatively slow and stitch-friendly for integer
-    // second windows, making it the only codec currently segmented.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct CompositeSegmentWindow {
+    output_start_frame: u32,
+    output_end_frame: u32,
+    video_start_seconds: f64,
+    render_duration_seconds: f64,
+}
+
+fn composite_output_frame_windows(
+    total_output_frames: u32,
+    render_duration: f64,
+    source_fps: Fps,
+    segment_count: usize,
+) -> Vec<CompositeSegmentWindow> {
+    if total_output_frames == 0 {
+        return Vec::new();
+    }
+
+    let actual_segment_count = segment_count.min(total_output_frames as usize).max(1);
+    let base_frames = total_output_frames / actual_segment_count as u32;
+    let extra_segments = total_output_frames % actual_segment_count as u32;
+    let frame_seconds = source_fps.den as f64 / source_fps.num as f64;
+    let mut output_start_frame = 0u32;
+    let mut windows = Vec::with_capacity(actual_segment_count);
+
+    for index in 0..actual_segment_count {
+        let segment_frames = base_frames + u32::from((index as u32) < extra_segments);
+        let output_end_frame = output_start_frame + segment_frames;
+        let video_start_seconds = output_start_frame as f64 * frame_seconds;
+        let segment_end_seconds = if index == actual_segment_count - 1 {
+            render_duration
+        } else {
+            output_end_frame as f64 * frame_seconds
+        };
+
+        windows.push(CompositeSegmentWindow {
+            output_start_frame,
+            output_end_frame,
+            video_start_seconds,
+            render_duration_seconds: (segment_end_seconds - video_start_seconds).max(0.0),
+        });
+        output_start_frame = output_end_frame;
+    }
+
+    windows
+}
+
+// Returns whether rendering should be split into stitched segments.
+fn should_parallelize_segmented(config: &RenderConfig, dense_activity: &DenseActivityReport) -> bool {
+    // qtrle and prores_ks_vulkan encoding are comparatively slow and
+    // stitch-friendly for integer second windows.
     config
         .scene
         .ffmpeg
         .as_object()
         .and_then(|map| map.get("codec"))
         .and_then(serde_json::Value::as_str)
-        .map(|codec| codec == "qtrle")
+        .map(|codec| codec == "qtrle" || codec == "prores_ks_vulkan")
         .unwrap_or(false)
         && integer_second_duration(config).unwrap_or(0) >= 2
         && dense_activity.frame_count >= 2
 }
 
-// Renders qtrle output as multiple second-aligned segments and stitches them.
-fn render_video_segmented_qtrle(
+// Renders output as multiple second-aligned segments and stitches them.
+fn render_video_segmented(
     paths: &AppPaths,
     config: &RenderConfig,
     activity: &ParsedActivity,
@@ -680,7 +764,7 @@ fn render_video_segmented_qtrle(
     for handle in handles {
         handle
             .join()
-            .map_err(|_| "Segmented qtrle render thread panicked".to_string())?;
+            .map_err(|_| "Segmented render thread panicked".to_string())?;
     }
 
     if let Some(error) = first_error {
@@ -699,7 +783,7 @@ fn render_video_segmented_qtrle(
         .collect::<Option<Vec<_>>>()
         .ok_or_else(|| {
             cleanup_segment_outputs(paths, &results);
-            "Segmented qtrle render did not produce all output files".to_string()
+            "Segmented render did not produce all output files".to_string()
         })?;
 
     controller.set_frame_progress(
@@ -793,5 +877,43 @@ fn cleanup_segment_outputs(paths: &AppPaths, results: &[Option<String>]) {
     // stitched movie. Best-effort cleanup keeps failed renders from piling up.
     for filename in results.iter().flatten() {
         let _ = std::fs::remove_file(paths.downloads_dir.join(filename));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::composite_output_frame_windows;
+    use crate::encode::fps::Fps;
+
+    #[test]
+    fn composite_output_frame_windows_share_exact_frame_boundary_times() {
+        let fps = Fps::new(30000, 1001).unwrap();
+        let windows = composite_output_frame_windows(150, 5.0, fps, 2);
+        let split_time = 75.0 / fps.as_f64();
+
+        assert_eq!(windows.len(), 2);
+        assert_eq!(windows[0].output_start_frame, 0);
+        assert_eq!(windows[0].output_end_frame, 75);
+        assert_eq!(windows[1].output_start_frame, 75);
+        assert_eq!(windows[1].output_end_frame, 150);
+        assert!(windows[0].video_start_seconds.abs() <= 1e-12);
+        assert!((windows[0].render_duration_seconds - split_time).abs() <= 1e-9);
+        assert!((windows[1].video_start_seconds - split_time).abs() <= 1e-9);
+        assert!((windows[1].render_duration_seconds - (5.0 - split_time)).abs() <= 1e-9);
+    }
+
+    #[test]
+    fn composite_output_frame_windows_keep_fractional_tail_on_last_segment() {
+        let fps = Fps::new(30000, 1001).unwrap();
+        let windows = composite_output_frame_windows(4, 0.101, fps, 2);
+
+        assert_eq!(windows.len(), 2);
+        assert_eq!(windows[0].output_start_frame, 0);
+        assert_eq!(windows[0].output_end_frame, 2);
+        assert_eq!(windows[1].output_start_frame, 2);
+        assert_eq!(windows[1].output_end_frame, 4);
+        assert!((windows[0].render_duration_seconds - (2.0 / fps.as_f64())).abs() <= 1e-9);
+        assert!((windows[1].video_start_seconds - (2.0 / fps.as_f64())).abs() <= 1e-9);
+        assert!((windows[1].render_duration_seconds - (0.101 - (2.0 / fps.as_f64()))).abs() <= 1e-9);
     }
 }

@@ -227,10 +227,10 @@ body {
 /* control box points */
 
 .moveable-control {
-  height: 8px !important;
-  width: 8px !important;
-  margin-top: -4px !important;
-  margin-left: -4px !important;
+  height: calc(12px / var(--app-scale, 1)) !important;
+  width: calc(12px / var(--app-scale, 1)) !important;
+  margin-top: calc(-6.5px / var(--app-scale, 1)) !important;
+  margin-left: calc(-6.5px / var(--app-scale, 1)) !important;
 }
 
 .moveable-direction,

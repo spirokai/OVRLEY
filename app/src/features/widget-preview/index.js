@@ -13,3 +13,4 @@ export { OverlayMetricWidget } from './components/MetricRenderer'
 export { OverlayTextWidget } from './components/TextRenderer'
 
 export { buildMetricWidgetPreviewModel } from './utils/metricWidgetPreviewModel'
+export { buildTextWidgetPreviewModel } from './utils/textWidgetPreviewModel'

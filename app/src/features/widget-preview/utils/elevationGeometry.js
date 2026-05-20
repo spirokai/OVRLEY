@@ -14,6 +14,22 @@ import {
 } from '@/features/overlay-editor'
 import { clamp } from '@/lib/geometryUtils'
 
+/**
+ * Normalizes elevation data into projected SVG points with smoothing, downsampling, and simplification.
+ *
+ * Handles fallback geometry when no data is available, smooths raw elevation values
+ * using a weighted convolution kernel, and applies Ramer-Douglas-Peucker simplification.
+ *
+ * @param {number[]} values - Raw elevation values.
+ * @param {number} width - Target SVG width in pixels.
+ * @param {number} height - Target SVG height in pixels.
+ * @param {number} [margin=0] - Margin ratio (0–0.5) for inner padding.
+ * @param {number} [verticalScale=1] - Vertical amplitude scale factor.
+ * @param {number[]} [progressValues=[]] - Optional per-sample progress (0–1).
+ * @param {number} [targetDensity=0.75] - Target points-per-pixel density for downsampling.
+ * @param {number} [simplifyTolerancePx=1] - Ramer-Douglas-Peucker simplification tolerance in pixels.
+ * @returns {{ points: number[][], progressValues: number[] }} Projected points and progress values.
+ */
 export function normalizeElevationGeometry(
   values,
   width,
@@ -24,6 +40,7 @@ export function normalizeElevationGeometry(
   targetDensity = 0.75,
   simplifyTolerancePx = 1,
 ) {
+  // Convert raw values to structured samples — pair each valid value with its progress, filtering out non-finite entries
   const samples = values.reduce((result, value, index) => {
     if (!Number.isFinite(value)) {
       return result
@@ -37,6 +54,7 @@ export function normalizeElevationGeometry(
     return result
   }, [])
 
+  // Fallback geometry — when no valid samples exist, return a synthetic smooth curve as a preview placeholder
   if (!samples.length) {
     const fallbackPadding = ELEVATION_FALLBACK_PADDING
     const fallbackPoints = [
@@ -51,6 +69,7 @@ export function normalizeElevationGeometry(
     }
   }
 
+  // Safe parameters — clamp margin, vertical scale, density, and tolerance to their valid ranges
   const safeMargin = Number.isFinite(Number(margin)) ? Number(margin) : 0
   const innerWidth = Math.max(width * (1 - 2 * safeMargin), 1)
   const innerHeight = Math.max(height * (1 - 2 * safeMargin), 1)
@@ -58,6 +77,7 @@ export function normalizeElevationGeometry(
   const safeTargetDensity = clamp(Number(targetDensity) || 0.75, DENSITY_CLAMP_MIN, DENSITY_CLAMP_MAX)
   const safeSimplifyTolerance = clamp(Number(simplifyTolerancePx) || 0, 0, SIMPLIFY_TOLERANCE_CLAMP_MAX)
 
+  // Smoothing — applies a weighted convolution kernel to reduce noise while preserving endpoints
   const smoothElevationSamples = (inputSamples) => {
     const coefficients = [-36, 9, 44, 69, 84, 89, 84, 69, 44, 9, -36]
     const radius = Math.floor(coefficients.length / 2)
@@ -90,6 +110,7 @@ export function normalizeElevationGeometry(
     })
   }
 
+  // Downsampling — reduce the number of sample points to match the target density, preserving endpoints
   const downsampleElevationSamples = (inputSamples, targetCount) => {
     if (inputSamples.length <= targetCount || targetCount < 3) {
       return inputSamples.map((sample, index) => ({
@@ -118,6 +139,7 @@ export function normalizeElevationGeometry(
     return selectedSamples
   }
 
+  // Ramer-Douglas-Peucker simplification — recursively reduces points within a single contiguous segment
   const simplifyProjectedPointsSegment = (inputPoints, tolerance) => {
     if (inputPoints.length <= 2 || tolerance <= 0) {
       return inputPoints
@@ -135,6 +157,7 @@ export function normalizeElevationGeometry(
       return Math.abs(dy * x0 - dx * y0 + x2 * y1 - y2 * x1) / Math.hypot(dx, dy)
     }
 
+    // Find the point furthest from the line segment — if within tolerance, collapse to endpoints
     let maxDistance = 0
     let splitIndex = 0
     for (let index = 1; index < inputPoints.length - 1; index += 1) {
@@ -149,16 +172,19 @@ export function normalizeElevationGeometry(
       return [inputPoints[0], inputPoints[inputPoints.length - 1]]
     }
 
+    // Recursively simplify the two sub-segments split at the furthest point
     const left = simplifyProjectedPointsSegment(inputPoints.slice(0, splitIndex + 1), tolerance)
     const right = simplifyProjectedPointsSegment(inputPoints.slice(splitIndex), tolerance)
     return [...left.slice(0, -1), ...right]
   }
 
+  // Top-level simplification — runs RDP within each preserved segment window independently
   const simplifyProjectedPoints = (inputPoints, tolerance) => {
     if (inputPoints.length <= 2 || tolerance <= 0) {
       return inputPoints
     }
 
+    // Collect indexes of points marked as preserve (endpoints) and simplify each inter-preserve segment
     const preservedIndexes = inputPoints.reduce((result, point, index) => {
       if (point.preserve) result.push(index)
       return result
@@ -181,6 +207,7 @@ export function normalizeElevationGeometry(
     return simplifyProjectedPointsSegment(inputPoints, tolerance)
   }
 
+  // Downsample, normalize to 0–1 range, project into SVG coordinate space, then simplify
   const targetCount = Math.max(2, Math.min(samples.length, Math.round(width * safeTargetDensity)))
   const downsampledSamples = downsampleElevationSamples(samples, targetCount)
   const usableValues = downsampledSamples.map((sample) => sample.value)
