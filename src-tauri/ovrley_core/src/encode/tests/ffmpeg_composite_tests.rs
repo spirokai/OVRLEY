@@ -342,7 +342,10 @@ fn test_8_7a_amf_h264_simple_path_when_available() {
     assert_eq!(built.selected_profile_name, "amf_h264");
     assert_argument_pair(&built.output_args, "-c:v", "h264_amf");
     assert_argument_pair(&built.output_args, "-b:v", "60M");
+    assert_argument_pair(&built.input_0_args, "-init_hw_device", "d3d11va=dx");
+    assert_argument_pair(&built.input_0_args, "-filter_hw_device", "dx");
     assert!(built.filter_complex.contains("overlay=0:0"));
+    assert!(built.filter_complex.contains("format=nv12,hwupload[out]"));
 }
 
 #[test]
@@ -363,6 +366,7 @@ fn test_8_7b_amf_hevc_unavailable_fails_clearly() {
 
     assert_eq!(error, "Requested hardware encoder hevc_amf is unavailable.");
 }
+
 
 #[test]
 fn test_8_8_automatic_h264_uses_software_fallback() {

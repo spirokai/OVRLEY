@@ -261,6 +261,15 @@ fn estimate_parallel_render_worker_count(total_jobs: usize) -> usize {
     worker_count.min(total_jobs.max(1))
 }
 
+fn estimate_composite_segment_count(total_jobs: usize, codec: &str) -> usize {
+    let worker_count = estimate_parallel_render_worker_count(total_jobs);
+    if matches!(codec, "h264_amf" | "hevc_amf") {
+        worker_count.min(2)
+    } else {
+        worker_count
+    }
+}
+
 /// Renders a video, using segmentation when the selected codec benefits from it.
 pub fn render_video(
     paths: &AppPaths,
@@ -355,12 +364,12 @@ fn should_parallelize_composite(
     update_rate: u32,
     codec: &str,
 ) -> bool {
-    if codec == "libx264" || codec == "libx265" {
+    if matches!(codec, "libx264" | "libx265") {
         return false;
     }
     let overlay_fps = fps_num as f64 / update_rate.max(1) as f64;
     let total_frames = (render_duration * overlay_fps).ceil() as u32;
-    total_frames >= 120 && estimate_parallel_render_worker_count(total_frames as usize) >= 2
+    total_frames >= 120 && estimate_composite_segment_count(total_frames as usize, codec) >= 2
 }
 
 /// Renders a composite video as multiple parallel segments stitched together.
@@ -384,10 +393,17 @@ fn render_composite_video_segmented(
     trim_start: f64,
     update_rate: u32,
 ) -> Result<String, String> {
+    let codec = config
+        .scene
+        .ffmpeg
+        .as_object()
+        .and_then(|map| map.get("codec"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("libx264");
     let source_fps = Fps::new(composite_video_fps_num, composite_video_fps_den)?;
     let overlay_pipe_fps = source_fps.divided_by(update_rate)?;
     let total_overlay_frames = (render_duration * overlay_pipe_fps.as_f64()).ceil() as usize;
-    let segment_count = estimate_parallel_render_worker_count(total_overlay_frames.max(1));
+    let segment_count = estimate_composite_segment_count(total_overlay_frames.max(1), codec);
     if segment_count < 2 {
         return render_composite_video_single(
             paths, config, activity, dense_activity, controller,
@@ -487,11 +503,11 @@ fn render_composite_video_segmented(
     }
     drop(tx);
 
-    let mut results = vec![None; segment_count];
+    let mut results = vec![None; actual_segment_count];
     let mut completed = 0usize;
     let mut first_error: Option<String> = None;
 
-    while completed < segment_count {
+    while completed < actual_segment_count {
         let progress_snapshots = segment_controllers
             .iter()
             .map(RenderController::progress)

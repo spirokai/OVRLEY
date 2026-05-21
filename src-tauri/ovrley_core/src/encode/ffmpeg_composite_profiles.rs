@@ -27,6 +27,17 @@ const VAAPI_FILTER: &str = "[0:v]{base_video_filters}scale={width}:{height}[base
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=nv12,hwupload[out]";
 
+const AMF_D3D11_INPUT_ARGS: &[&str] = &[
+    "-init_hw_device",
+    "d3d11va=dx",
+    "-filter_hw_device",
+    "dx",
+];
+
+const AMF_D3D11_FILTER: &str = "[0:v]{base_video_filters}scale={width}:{height}[base];\
+[1:v]setpts=PTS-STARTPTS[ovr];\
+[base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=nv12,hwupload[out]";
+
 const CUDA_FILTER: &str = "[0:v]{base_video_filters}scale_cuda=format=yuv420p[base];\
 [1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[ovr];\
 [base][ovr]overlay_cuda=0:0:eof_action=repeat:shortest=1[out]";
@@ -200,15 +211,15 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
     CompositeProfileTemplate {
         name: "amf_h264",
         codec: "h264_amf",
-        input_args: &[],
-        filter_complex: Some(SOFTWARE_FILTER),
+        input_args: AMF_D3D11_INPUT_ARGS,
+        filter_complex: Some(AMF_D3D11_FILTER),
         output_args: &["-c:v", "h264_amf"],
     },
     CompositeProfileTemplate {
         name: "amf_hevc",
         codec: "hevc_amf",
-        input_args: &[],
-        filter_complex: Some(SOFTWARE_FILTER),
+        input_args: AMF_D3D11_INPUT_ARGS,
+        filter_complex: Some(AMF_D3D11_FILTER),
         output_args: &["-c:v", "hevc_amf"],
     },
 ];
