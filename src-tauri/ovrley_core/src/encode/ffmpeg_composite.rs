@@ -54,6 +54,8 @@ pub struct HwAccelInfo {
     pub hevc_nvenc_available: bool,
     pub h264_qsv_available: bool,
     pub hevc_qsv_available: bool,
+    pub h264_amf_available: bool,
+    pub hevc_amf_available: bool,
     pub h264_videotoolbox_available: bool,
     pub hevc_videotoolbox_available: bool,
     pub h264_vaapi_available: bool,
@@ -79,6 +81,8 @@ impl HwAccelInfo {
             hevc_nvenc_available: true,
             h264_qsv_available: true,
             hevc_qsv_available: true,
+            h264_amf_available: true,
+            hevc_amf_available: true,
             h264_videotoolbox_available: true,
             hevc_videotoolbox_available: true,
             h264_vaapi_available: true,
@@ -106,6 +110,8 @@ impl From<&AvailableCodecs> for HwAccelInfo {
             hevc_nvenc_available: codecs.hevc_nvenc,
             h264_qsv_available: codecs.h264_qsv,
             hevc_qsv_available: codecs.hevc_qsv,
+            h264_amf_available: codecs.h264_amf,
+            hevc_amf_available: codecs.hevc_amf,
             h264_videotoolbox_available: codecs.h264_videotoolbox,
             hevc_videotoolbox_available: codecs.hevc_videotoolbox,
             h264_vaapi_available: codecs.h264_vaapi,
@@ -294,6 +300,12 @@ fn select_composite_profile(
         }
         "hevc_qsv" if !hwaccel_available.hevc_qsv_available => {
             Err("Requested hardware encoder hevc_qsv is unavailable.".to_string())
+        }
+        "h264_amf" if !hwaccel_available.h264_amf_available => {
+            Err("Requested hardware encoder h264_amf is unavailable.".to_string())
+        }
+        "hevc_amf" if !hwaccel_available.hevc_amf_available => {
+            Err("Requested hardware encoder hevc_amf is unavailable.".to_string())
         }
         "h264_videotoolbox" if !hwaccel_available.h264_videotoolbox_available => {
             Err("Requested hardware encoder h264_videotoolbox is unavailable.".to_string())

@@ -325,6 +325,46 @@ fn test_8_7_qsv_h264_simple_path_when_available() {
 }
 
 #[test]
+fn test_8_7a_amf_h264_simple_path_when_available() {
+    let hwaccel = HwAccelInfo {
+        h264_amf_available: true,
+        ..HwAccelInfo::default()
+    };
+    let built = settings_for_codec(
+        "h264_amf",
+        "60M",
+        Fps::new(30, 1).unwrap(),
+        Fps::new(30, 1).unwrap(),
+        0.0,
+        &hwaccel,
+    );
+
+    assert_eq!(built.selected_profile_name, "amf_h264");
+    assert_argument_pair(&built.output_args, "-c:v", "h264_amf");
+    assert_argument_pair(&built.output_args, "-b:v", "60M");
+    assert!(built.filter_complex.contains("overlay=0:0"));
+}
+
+#[test]
+fn test_8_7b_amf_hevc_unavailable_fails_clearly() {
+    let error = build_composite_ffmpeg_settings(
+        "hevc_amf",
+        "60M",
+        Path::new("test.mp4"),
+        0.0,
+        10.0,
+        3840,
+        2160,
+        Fps::new(30000, 1001).unwrap(),
+        Fps::new(30000, 1001).unwrap(),
+        &HwAccelInfo::default(),
+    )
+    .unwrap_err();
+
+    assert_eq!(error, "Requested hardware encoder hevc_amf is unavailable.");
+}
+
+#[test]
 fn test_8_8_automatic_h264_uses_software_fallback() {
     let built = settings_for_codec(
         "auto_h264",
@@ -344,6 +384,7 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
     let hwaccel = HwAccelInfo {
         h264_nvenc_available: true,
         h264_qsv_available: true,
+        h264_amf_available: true,
         h264_videotoolbox_available: true,
         nvenc_available: true,
         qsv_available: true,
@@ -356,6 +397,7 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
         "libx265",
         "h264_nvenc",
         "h264_qsv",
+        "h264_amf",
         "h264_videotoolbox",
     ] {
         let low = settings_for_codec(

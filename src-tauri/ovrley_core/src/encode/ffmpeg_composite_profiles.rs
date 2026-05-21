@@ -197,6 +197,20 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
         filter_complex: Some(VAAPI_FILTER),
         output_args: &["-c:v", "hevc_vaapi"],
     },
+    CompositeProfileTemplate {
+        name: "amf_h264",
+        codec: "h264_amf",
+        input_args: &[],
+        filter_complex: Some(SOFTWARE_FILTER),
+        output_args: &["-c:v", "h264_amf"],
+    },
+    CompositeProfileTemplate {
+        name: "amf_hevc",
+        codec: "hevc_amf",
+        input_args: &[],
+        filter_complex: Some(SOFTWARE_FILTER),
+        output_args: &["-c:v", "hevc_amf"],
+    },
 ];
 
 /// Returns the catalog entry for a named composite profile or codec.
@@ -217,6 +231,8 @@ pub(crate) fn composite_profile_template(name_or_codec: &str) -> Option<Composit
         "hevc_videotoolbox" => "mac_hevc",
         "h264_vaapi" => "vaapi_h264",
         "hevc_vaapi" => "vaapi_hevc",
+        "h264_amf" => "amf_h264",
+        "hevc_amf" => "amf_hevc",
         other => other,
     };
 

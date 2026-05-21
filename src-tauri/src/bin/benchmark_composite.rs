@@ -90,12 +90,12 @@ fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
 
 fn is_composite_codec_available(codecs: &AvailableCodecs, name: &str) -> bool {
     match name {
-        "software_h264" => codecs.libx264,
+     //   "software_h264" => codecs.libx264,
     //   "software_hevc" => codecs.libx265,
-         "nvgpu_h264" => codecs.h264_nvenc,
+     //    "nvgpu_h264" => codecs.h264_nvenc,
     //    "nvgpu_hevc" => codecs.hevc_nvenc,
     //     "nnvgpu_h264" => codecs.nnvgpu,
-        "nnvgpu_hevc" => codecs.nnvgpu,
+   //     "nnvgpu_hevc" => codecs.nnvgpu,
     //     "qsv_h264" => codecs.h264_qsv,
     //     "qsv_hevc" => codecs.hevc_qsv,
     //     "qsv_full_h264" => codecs.qsv_full,
@@ -104,7 +104,7 @@ fn is_composite_codec_available(codecs: &AvailableCodecs, name: &str) -> bool {
     //     "mac_hevc" => codecs.hevc_videotoolbox,
     //     "vaapi_h264" => codecs.h264_vaapi,
     //    "vaapi_hevc" => codecs.hevc_vaapi,
-    //     "amd_h264" => codecs.h264_amf,
+         "amd_h264" => codecs.h264_amf,
     //     "amd_hevc" => codecs.hevc_amf,
         _ => false,
     }
