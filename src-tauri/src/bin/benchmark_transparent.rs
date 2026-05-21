@@ -22,9 +22,9 @@ const ES_SYSTEM_REQUIRED: u32 = 0x0000_0001;
 const ES_DISPLAY_REQUIRED: u32 = 0x0000_0002;
 
 const TRANSPARENT_CODECS: &[&str] = &[
-    "prores_ks",
-    "prores_ks_vulkan",
-    "prores_videotoolbox",
+    //"prores_ks",
+    //"prores_ks_vulkan",
+    //"prores_videotoolbox",
     "qtrle",
 ];
 

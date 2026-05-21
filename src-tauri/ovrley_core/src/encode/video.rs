@@ -257,7 +257,7 @@ fn estimate_parallel_render_worker_count(total_jobs: usize) -> usize {
     let logical_cores = std::thread::available_parallelism()
         .map(|value| value.get())
         .unwrap_or(4);
-    let worker_count = (logical_cores / 4 ).max(1);
+    let worker_count = (logical_cores / 4 ).max(1).min(4);
     worker_count.min(total_jobs.max(1))
 }
 
