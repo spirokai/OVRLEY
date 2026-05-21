@@ -46,6 +46,7 @@ export default function OverlayMoveable({
   selectedTargets,
   isGroupDragActive,
   sceneElement,
+  displayScale,
   canResizeSelected,
   canScaleSelected,
   canRotateSelected,
@@ -58,6 +59,7 @@ export default function OverlayMoveable({
 }) {
   const isGroupSelection = selectedTargets.length > 1
   const gridSize = getEditorGridSize(sceneSize)
+  const moveableZoom = MOVEABLE_ZOOM / Math.max(displayScale, Number.EPSILON) / 2
   const horizontalGuidelines = useMemo(() => getGridGuidelines(sceneSize.height, gridSize, snapToGrid), [gridSize, sceneSize.height, snapToGrid])
   const verticalGuidelines = useMemo(() => getGridGuidelines(sceneSize.width, gridSize, snapToGrid), [gridSize, sceneSize.width, snapToGrid])
 
@@ -92,7 +94,7 @@ export default function OverlayMoveable({
       elementGuidelines={elementGuidelines}
       horizontalGuidelines={horizontalGuidelines}
       verticalGuidelines={verticalGuidelines}
-      zoom={MOVEABLE_ZOOM}
+      zoom={moveableZoom}
       onDragStart={handlers.onDragStart}
       onDrag={handlers.onDrag}
       onDragEnd={handlers.onDragEnd}
