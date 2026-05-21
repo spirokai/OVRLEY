@@ -17,6 +17,22 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Saira Stencil';
+  src: url('../../fonts/Saira Stencil.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Teko';
+  src: url('../../fonts/Teko.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
 :root,
 .radix-themes {
   font-family:

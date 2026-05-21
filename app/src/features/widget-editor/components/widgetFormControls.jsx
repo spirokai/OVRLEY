@@ -11,13 +11,10 @@ import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import HexColorPicker from '@/components/ui/hex-color-picker'
+import { RECOMMENDED_FONTS } from '@/lib/fonts'
 import { cn } from '@/lib/utils'
 
-export const FONTS = [
-  { id: 'Arial.ttf', name: 'Arial' },
-  { id: 'Evogria.otf', name: 'Evogria' },
-  { id: 'Furore.otf', name: 'Furore' },
-]
+export const FONTS = RECOMMENDED_FONTS
 
 export const TIME_FORMATS = [
   { value: 'date-dd-mm-yyyy', label: 'Date only (DD-MM-YYYY)' },

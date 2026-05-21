@@ -6,6 +6,8 @@ export const RECOMMENDED_FONTS = [
   { id: 'Arial.ttf', name: 'Arial' },
   { id: 'Evogria.otf', name: 'Evogria' },
   { id: 'Furore.otf', name: 'Furore' },
+  { id: 'Saira Stencil.ttf', name: 'Saira Stencil' },
+  { id: 'Teko.ttf', name: 'Teko' },
 ]
 
 /**

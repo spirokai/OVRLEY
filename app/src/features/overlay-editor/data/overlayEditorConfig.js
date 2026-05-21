@@ -20,6 +20,10 @@ export const FONT_FAMILY_MAP = {
   Evogria: '"Evogria", Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif',
   'Furore.otf': '"Furore", "Arial Black", Impact, sans-serif',
   Furore: '"Furore", "Arial Black", Impact, sans-serif',
+  'Saira Stencil.ttf': '"Saira Stencil", Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif',
+  'Saira Stencil': '"Saira Stencil", Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif',
+  'Teko.ttf': '"Teko", "Arial Narrow", sans-serif',
+  Teko: '"Teko", "Arial Narrow", sans-serif',
 }
 
 export { WIDGET_ICONS }
