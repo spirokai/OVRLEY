@@ -1,4 +1,9 @@
-//! Single-pass video render pipeline.
+//! Single-pass transparent overlay render pipeline.
+//!
+//! Renders Skia frames and streams them to ffmpeg via stdin.
+//! Produces alpha-preserving overlay video (ProRes, QTRLE, or Vulkan).
+//!
+//! Must not import from [`video_composite_pipeline`].
 //!
 //! The pipeline prepares reusable Skia assets, renders frames into a bounded
 //! pool of RGBA buffers, and streams those buffers to ffmpeg through stdin. A
@@ -8,7 +13,8 @@
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
-use crate::encode::ffmpeg::{build_ffmpeg_settings, resolve_ffmpeg_binary, suppress_child_console};
+use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
+use crate::encode::ffmpeg_settings::{build_ffmpeg_settings, FfmpegSettings};
 use crate::encode::progress::ProgressEstimator;
 use crate::encode::video::RenderController;
 use crate::encode::video_debug::{
@@ -17,7 +23,7 @@ use crate::encode::video_debug::{
 };
 use crate::error::{CoreError, CoreResult};
 use crate::paths::AppPaths;
-use crate::render::{prepare_preview_assets, render_frame_rgba, RenderTarget};
+use crate::render::{prepare_preview_assets, render_frame_rgba, FrameRenderRequest, RenderTarget};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
@@ -146,21 +152,21 @@ pub(crate) fn render_video_single(
             let frame_index = source_frame_index(output_frame_index, update_rate, dense_activity);
             let mut frame_buffer =
                 acquire_frame_buffer(&free_receiver, &cancel_flag, &mut aggregate_profiler)?;
-            render_frame_rgba(
+            render_frame_rgba(FrameRenderRequest {
                 paths,
                 config,
                 dense_activity,
-                &prepared_preview_assets.prepared_assets,
+                prepared_assets: &prepared_preview_assets.prepared_assets,
                 frame_index,
                 scale,
-                None,
-                RenderTarget {
+                labels_image: None,
+                target: RenderTarget {
                     width,
                     height,
                     pixels: frame_buffer.pixels.as_mut_slice(),
                 },
-                &mut aggregate_profiler,
-            )?;
+                frame_profiler: &mut aggregate_profiler,
+            })?;
             if sample_frames.contains(&output_frame_index) {
                 aggregate_profiler.measure("debug.sample_frame_write", || {
                     write_sample_frame(
@@ -247,9 +253,7 @@ pub(crate) fn render_video_single(
 }
 
 // Applies pipeline-level defaults that depend on the chosen ffmpeg settings.
-fn finalize_ffmpeg_settings(
-    mut ffmpeg_settings: crate::encode::ffmpeg::FfmpegSettings,
-) -> crate::encode::ffmpeg::FfmpegSettings {
+fn finalize_ffmpeg_settings(mut ffmpeg_settings: FfmpegSettings) -> FfmpegSettings {
     // Vulkan ProRes benefits from explicit async depth. Apply it here so the
     // config builder remains a pure mapping from template JSON.
     if ffmpeg_settings.codec == "prores_ks_vulkan"
@@ -323,7 +327,7 @@ fn queue_frame(
 // Starts ffmpeg configured to accept raw video from stdin.
 fn spawn_ffmpeg_process(
     ffmpeg_bin: &Path,
-    ffmpeg_settings: &crate::encode::ffmpeg::FfmpegSettings,
+    ffmpeg_settings: &FfmpegSettings,
     output_path: &Path,
     width: u32,
     height: u32,

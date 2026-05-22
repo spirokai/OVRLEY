@@ -1,4 +1,9 @@
-//! Composite MP4 render pipeline.
+//! Multi-pass composite MP4 render pipeline.
+//!
+//! Renders Skia frames, composites with source video segments,
+//! and produces final H.264/H.265 MP4 output.
+//!
+//! Must not import from [`video_pipeline`].
 //!
 //! The composite path renders transparent Skia overlay frames at the derived
 //! overlay FPS and streams them to FFmpeg, which composites them over input
@@ -31,7 +36,124 @@ use crate::encode::video_composite_debug::{
 use crate::encode::video_debug::timestamp_nanos;
 use crate::error::{CoreError, CoreResult};
 use crate::paths::AppPaths;
-use crate::render::{prepare_preview_assets, render_frame_rgba, RenderTarget};
+use crate::render::{prepare_preview_assets, render_frame_rgba, FrameRenderRequest, RenderTarget};
+
+/// Composite render values derived from render-time scene fields.
+///
+/// These values drive dense-report timing and are passed to the composite
+/// FFmpeg pipeline without reinterpreting sync offset as seek.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompositeRenderPlan {
+    // test seam
+    pub video_path: String,
+    pub bitrate: String,
+    pub sync_offset: f64,
+    pub trim_start: f64,
+    pub video_duration: f64,
+    pub render_duration: f64,
+    pub update_rate: u32,
+    pub source_fps: Fps,
+    pub overlay_pipe_fps: Fps,
+}
+
+/// Validates composite render fields and derives timing/FPS values.
+///
+/// Required fields fail before dense activity is built, while optional fields
+/// receive the Phase 3 defaults from the implementation plan.
+pub fn derive_composite_render_plan(config: &RenderConfig) -> CoreResult<CompositeRenderPlan> {
+    // test seam
+    let video_path = config
+        .scene
+        .composite_video_path
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .ok_or_else(|| {
+            CoreError::Config("scene.composite_video_path required for composite render".into())
+        })?;
+    let bitrate = config
+        .scene
+        .composite_bitrate
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .ok_or_else(|| {
+            CoreError::Config("scene.composite_bitrate required for composite render".into())
+        })?;
+    let fps_num = config.scene.composite_video_fps_num.ok_or_else(|| {
+        CoreError::Config("scene.composite_video_fps_num required for composite render".into())
+    })?;
+    let fps_den = config.scene.composite_video_fps_den.ok_or_else(|| {
+        CoreError::Config("scene.composite_video_fps_den required for composite render".into())
+    })?;
+    let source_fps = Fps::new(fps_num, fps_den)?;
+    let video_duration = config.scene.composite_video_duration.ok_or_else(|| {
+        CoreError::Config("scene.composite_video_duration required for composite render".into())
+    })?;
+    if !video_duration.is_finite() || video_duration <= 0.0 {
+        return Err(CoreError::Config(format!(
+            "scene.composite_video_duration must be greater than zero: {video_duration}"
+        )));
+    }
+
+    let sync_offset = config.scene.composite_sync_offset.unwrap_or(0.0);
+    if !sync_offset.is_finite() || sync_offset < 0.0 {
+        return Err(CoreError::Config(format!(
+            "scene.composite_sync_offset must be zero or greater: {sync_offset}"
+        )));
+    }
+    let trim_start = config.scene.composite_video_trim_start.unwrap_or(0.0);
+    if !trim_start.is_finite() || trim_start < 0.0 {
+        return Err(CoreError::Config(format!(
+            "scene.composite_video_trim_start must be zero or greater: {trim_start}"
+        )));
+    }
+    if trim_start >= video_duration {
+        return Err(CoreError::Config(format!(
+            "scene.composite_video_trim_start ({trim_start}) must be less than scene.composite_video_duration ({video_duration})"
+        )));
+    }
+
+    let update_rate = config
+        .scene
+        .composite_widget_update_rate
+        .unwrap_or(1)
+        .max(1);
+    let overlay_pipe_fps = source_fps.divided_by(update_rate)?;
+    let render_duration = config
+        .scene
+        .composite_render_duration
+        .unwrap_or(video_duration - trim_start);
+    if !render_duration.is_finite() || render_duration <= 0.0 {
+        return Err(CoreError::Config(format!(
+            "scene.composite_render_duration must be greater than zero: {render_duration}"
+        )));
+    }
+
+    Ok(CompositeRenderPlan {
+        video_path,
+        bitrate,
+        sync_offset,
+        trim_start,
+        video_duration,
+        render_duration,
+        update_rate,
+        source_fps,
+        overlay_pipe_fps,
+    })
+}
+
+/// Applies composite timing to a local render config before densification.
+///
+/// This keeps persisted template timing untouched while aligning dense frames
+/// with the lower-FPS overlay stream used by compositing mode.
+pub fn apply_composite_scene_timing(config: &mut RenderConfig, plan: &CompositeRenderPlan) {
+    // test seam
+    config.scene.start = plan.sync_offset;
+    config.scene.end = plan.sync_offset + plan.render_duration;
+    config.scene.fps = plan.overlay_pipe_fps.as_f64();
+    config.scene.update_rate = Some(1);
+}
 
 /// Reusable raw RGBA frame buffer.
 struct FrameBuffer {
@@ -187,21 +309,21 @@ pub fn render_composite_video_single(
 
                 let mut frame_buffer =
                     acquire_frame_buffer(&free_receiver, cancel_flag.as_ref(), &mut profiler)?;
-                render_frame_rgba(
+                render_frame_rgba(FrameRenderRequest {
                     paths,
                     config,
                     dense_activity,
-                    &prepared_preview_assets.prepared_assets,
-                    dense_frame_index,
+                    prepared_assets: &prepared_preview_assets.prepared_assets,
+                    frame_index: dense_frame_index,
                     scale,
-                    None,
-                    RenderTarget {
+                    labels_image: None,
+                    target: RenderTarget {
                         width,
                         height,
                         pixels: frame_buffer.pixels.as_mut_slice(),
                     },
-                    &mut profiler,
-                )?;
+                    frame_profiler: &mut profiler,
+                })?;
                 queue_frame(&sender, frame_buffer, cancel_flag.as_ref(), &mut profiler)?;
                 Ok(())
             })();

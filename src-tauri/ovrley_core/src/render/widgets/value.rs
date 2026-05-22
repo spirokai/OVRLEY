@@ -50,45 +50,52 @@ enum PathToken {
     Number(f32),
 }
 
+/// Bundled parameters for drawing a metric value widget.
+pub(crate) struct MetricWidgetRequest<'a> {
+    pub canvas: &'a Canvas,
+    pub config: &'a RenderConfig,
+    pub value: &'a ValueConfig,
+    pub base_style: &'a ResolvedTextStyle,
+    pub dense_activity: &'a DenseActivityReport,
+    pub frame_index: usize,
+    pub scale: f32,
+    pub font_dirs: &'a [PathBuf],
+    pub static_icon_rendered: bool,
+}
+
 // Draws a configured metric widget and reports whether it handled the value.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn draw_metric_value_widget_with_config(
-    canvas: &Canvas,
-    config: &RenderConfig,
-    value: &ValueConfig,
-    base_style: &ResolvedTextStyle,
-    dense_activity: &DenseActivityReport,
-    frame_index: usize,
-    scale: f32,
-    font_dirs: &[PathBuf],
-    static_icon_rendered: bool,
-) -> bool {
+pub(crate) fn draw_metric_value_widget_with_config(request: MetricWidgetRequest<'_>) -> bool {
     // Return false for unsupported values so callers can fall back to generic
     // formatted text drawing.
-    if value.value == MetricKind::Gradient {
+    if request.value.value == MetricKind::Gradient {
         return draw_gradient_value_widget(
-            canvas,
-            config,
-            value,
-            base_style,
-            dense_activity,
-            frame_index,
-            scale,
-            font_dirs,
+            request.canvas,
+            request.config,
+            request.value,
+            request.base_style,
+            request.dense_activity,
+            request.frame_index,
+            request.scale,
+            request.font_dirs,
         );
     }
 
-    let Some(parts) = format_metric_parts(config, value, dense_activity, frame_index) else {
+    let Some(parts) = format_metric_parts(
+        request.config,
+        request.value,
+        request.dense_activity,
+        request.frame_index,
+    ) else {
         return false;
     };
     draw_metric_parts(
-        canvas,
-        value,
-        base_style,
+        request.canvas,
+        request.value,
+        request.base_style,
         &parts,
-        scale,
-        font_dirs,
-        static_icon_rendered,
+        request.scale,
+        request.font_dirs,
+        request.static_icon_rendered,
     );
     true
 }

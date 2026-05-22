@@ -4,7 +4,7 @@ use ovrley_core::config::parse_config_json;
 use ovrley_core::debug::TimingBucket;
 use ovrley_core::render::{
     prepare_preview_assets, render_preview_with_prepared_assets, LabelCacheStatus,
-    PreviewRenderReport,
+    PreviewRenderReport, PreviewRenderRequest,
 };
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -178,17 +178,17 @@ fn main() -> Result<(), String> {
         };
         let extra_total_ms = if index == 0 { prepare_total_ms } else { 0.0 };
 
-        let (_, report) = render_preview_with_prepared_assets(
-            &paths,
-            &config,
-            &dense_activity,
-            &prepared_preview_assets,
+        let (_, report) = render_preview_with_prepared_assets(PreviewRenderRequest {
+            paths: &paths,
+            config: &config,
+            dense_activity: &dense_activity,
+            prepared_preview_assets: &prepared_preview_assets,
             second,
-            prepare_timings_for_frame,
-            per_frame_label_cache_status,
+            prepare_timings: prepare_timings_for_frame,
+            label_cache_status: per_frame_label_cache_status,
             extra_total_ms,
-            &target_out_path,
-        )
+            out_path: &target_out_path,
+        })
         .map_err(|e| e.to_string())?;
         reports.push(report);
     }

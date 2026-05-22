@@ -14,6 +14,8 @@ pub mod ffmpeg;
 pub mod ffmpeg_composite;
 /// Editable FFmpeg command templates for composite encoder profiles.
 pub mod ffmpeg_composite_profiles;
+/// FFmpeg codec settings resolution (separated from binary discovery).
+pub mod ffmpeg_settings;
 /// Rational frame-rate helpers shared by composite encoding modules.
 pub mod fps;
 /// Live render progress estimation helpers.

@@ -6,15 +6,15 @@ use serde_json::Value;
 
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::commands::{
-    apply_composite_scene_timing, backend_render, derive_composite_render_plan,
-    is_composite_render, AppPaths,
-};
+use ovrley_core::commands::{backend_render, is_composite_render, AppPaths};
 use ovrley_core::config::parse_config_json;
 use ovrley_core::config::RenderConfig;
 use ovrley_core::debug::RenderProgress;
 use ovrley_core::encode::fps::Fps;
 use ovrley_core::encode::video::RenderController;
+use ovrley_core::encode::video_composite_pipeline::{
+    apply_composite_scene_timing, derive_composite_render_plan,
+};
 
 #[test]
 fn test_3_1_transparent_render_branch_keeps_original_dense_timing() {

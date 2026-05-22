@@ -23,6 +23,7 @@ use crate::error::{CoreError, CoreResult};
 use crate::render::format::{format_value, frame_index_for_second};
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
 use crate::render::text::{draw_text, label_style, value_style};
+use crate::render::widgets::value::MetricWidgetRequest;
 use crate::render::widgets::{
     draw_elevation_widget, draw_metric_value_widget_with_config, draw_route_widget,
     draw_static_metric_icon_for_value, has_static_metric_icon, prepare_render_assets,
@@ -155,57 +156,75 @@ pub fn render_preview_with_report(
 ) -> CoreResult<((), PreviewRenderReport)> {
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
         prepare_preview_assets(paths, config, activity, dense_activity)?;
-    render_preview_with_prepared_assets(
+    render_preview_with_prepared_assets(PreviewRenderRequest {
         paths,
         config,
         dense_activity,
-        &prepared_preview_assets,
+        prepared_preview_assets: &prepared_preview_assets,
         second,
         prepare_timings,
         label_cache_status,
-        prepare_total_ms,
+        extra_total_ms: prepare_total_ms,
         out_path,
-    )
+    })
+}
+
+/// Bundled parameters for a preview frame render.
+pub struct PreviewRenderRequest<'a> {
+    pub paths: &'a AppPaths,
+    pub config: &'a RenderConfig,
+    pub dense_activity: &'a DenseActivityReport,
+    pub prepared_preview_assets: &'a PreparedPreviewAssets,
+    pub second: u32,
+    pub prepare_timings: BTreeMap<String, TimingBucket>,
+    pub label_cache_status: LabelCacheStatus,
+    pub extra_total_ms: f64,
+    pub out_path: &'a Path,
+}
+
+/// Bundled parameters for rendering a single frame to RGBA.
+pub struct FrameRenderRequest<'a> {
+    pub paths: &'a AppPaths,
+    pub config: &'a RenderConfig,
+    pub dense_activity: &'a DenseActivityReport,
+    pub prepared_assets: &'a PreparedRenderAssets,
+    pub frame_index: usize,
+    pub scale: f32,
+    pub labels_image: Option<&'a Image>,
+    pub target: RenderTarget<'a>,
+    pub frame_profiler: &'a mut RenderProfiler,
 }
 
 /// Renders a preview using already-prepared assets.
 ///
 /// This is useful for repeated preview generation where static labels and widget
 /// geometry should be prepared once and reused.
-#[allow(clippy::too_many_arguments)]
 pub fn render_preview_with_prepared_assets(
-    paths: &AppPaths,
-    config: &RenderConfig,
-    dense_activity: &DenseActivityReport,
-    prepared_preview_assets: &PreparedPreviewAssets,
-    second: u32,
-    prepare_timings: BTreeMap<String, TimingBucket>,
-    label_cache_status: LabelCacheStatus,
-    extra_total_ms: f64,
-    out_path: &Path,
+    request: PreviewRenderRequest<'_>,
 ) -> CoreResult<((), PreviewRenderReport)> {
-    let width = config.scene.width.unwrap_or(1920);
-    let height = config.scene.height.unwrap_or(1080);
-    let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
-    let frame_index = frame_index_for_second(config, dense_activity, second);
+    let width = request.config.scene.width.unwrap_or(1920);
+    let height = request.config.scene.height.unwrap_or(1080);
+    let scale = request.config.scene.scale.unwrap_or(1.0).max(0.1);
+    let frame_index =
+        frame_index_for_second(request.config, request.dense_activity, request.second);
     let mut frame_profiler = RenderProfiler::default();
     let mut preview_profiler = RenderProfiler::default();
     let total_started = Instant::now();
 
     let (mut surface, route_widget, elevation_widget) = render_frame_surface(
-        paths,
-        config,
-        dense_activity,
-        &prepared_preview_assets.prepared_assets,
+        request.paths,
+        request.config,
+        request.dense_activity,
+        &request.prepared_preview_assets.prepared_assets,
         frame_index,
         scale,
-        prepared_preview_assets.labels_image.as_ref(),
+        request.prepared_preview_assets.labels_image.as_ref(),
         &mut frame_profiler,
         Some(&mut preview_profiler),
     )?;
 
     preview_profiler.measure("preview.png_write", || {
-        write_surface_png(&mut surface, out_path)
+        write_surface_png(&mut surface, request.out_path)
             .map_err(|error| CoreError::Render(format!("Failed to render preview frame: {error}")))
     })?;
 
@@ -236,25 +255,25 @@ pub fn render_preview_with_prepared_assets(
         .unwrap_or(0.0);
 
     let report = PreviewRenderReport {
-        second,
+        second: request.second,
         frame_index,
         width,
         height,
-        total_ms: total_started.elapsed().as_secs_f64() * 1000.0 + extra_total_ms,
+        total_ms: total_started.elapsed().as_secs_f64() * 1000.0 + request.extra_total_ms,
         surface_ms,
         label_layer_ms,
         value_draw_ms,
         png_write_ms,
-        value_count: config.values.len(),
-        label_count: config.labels.len(),
-        label_cache_status: match label_cache_status {
+        value_count: request.config.values.len(),
+        label_count: request.config.labels.len(),
+        label_cache_status: match request.label_cache_status {
             LabelCacheStatus::None => "none".to_string(),
             LabelCacheStatus::Hit => "hit".to_string(),
             LabelCacheStatus::Miss => "miss".to_string(),
         },
         route_widget,
         elevation_widget,
-        prepare_timings,
+        prepare_timings: request.prepare_timings,
         frame_timings,
         preview_only_timings,
     };
@@ -266,54 +285,46 @@ pub fn render_preview_with_prepared_assets(
 ///
 /// This is the hot path used by video encoding. If prepared base pixels match
 /// the target buffer length, they are copied before dynamic content is drawn.
-#[allow(clippy::too_many_arguments)]
-pub fn render_frame_rgba(
-    paths: &AppPaths,
-    config: &RenderConfig,
-    dense_activity: &DenseActivityReport,
-    prepared_assets: &PreparedRenderAssets,
-    frame_index: usize,
-    scale: f32,
-    labels_image: Option<&Image>,
-    target: RenderTarget<'_>,
-    frame_profiler: &mut RenderProfiler,
-) -> CoreResult<()> {
-    let width = target.width;
-    let height = target.height;
-    let mut labels_image = labels_image;
+pub fn render_frame_rgba(request: FrameRenderRequest<'_>) -> CoreResult<()> {
+    let width = request.target.width;
+    let height = request.target.height;
+    let mut labels_image = request.labels_image;
     let mut base_layer_restored = false;
-    if let Some(base_rgba) = prepared_assets
+    if let Some(base_rgba) = request
+        .prepared_assets
         .base_rgba
         .as_ref()
-        .filter(|base_rgba| base_rgba.len() == target.pixels.len())
+        .filter(|base_rgba| base_rgba.len() == request.target.pixels.len())
     {
         let started = Instant::now();
-        target.pixels.copy_from_slice(base_rgba);
+        request.target.pixels.copy_from_slice(base_rgba);
         let restore_ms = started.elapsed().as_secs_f64() * 1000.0;
-        frame_profiler.record_ms("base.restore", restore_ms);
-        frame_profiler.record_ms("surface.restore", restore_ms);
+        request.frame_profiler.record_ms("base.restore", restore_ms);
+        request
+            .frame_profiler
+            .record_ms("surface.restore", restore_ms);
         labels_image = None;
         base_layer_restored = true;
     } else {
-        frame_profiler.measure("surface.clear", || {
-            target.pixels.fill(0);
+        request.frame_profiler.measure("surface.clear", || {
+            request.target.pixels.fill(0);
         });
     }
 
-    let mut surface = frame_profiler.measure("surface.create", || {
-        wrap_native_surface(width, height, target.pixels)
+    let mut surface = request.frame_profiler.measure("surface.create", || {
+        wrap_native_surface(width, height, request.target.pixels)
     })?;
     let _ = render_frame_to_surface(
         surface.canvas(),
-        paths,
-        config,
-        dense_activity,
-        prepared_assets,
-        frame_index,
-        scale,
+        request.paths,
+        request.config,
+        request.dense_activity,
+        request.prepared_assets,
+        request.frame_index,
+        request.scale,
         labels_image,
         base_layer_restored,
-        frame_profiler,
+        request.frame_profiler,
     );
     Ok(())
 }
@@ -401,17 +412,17 @@ fn render_frame_to_surface(
             let style = value_style(&config.scene, value, scale);
             let static_icon_rendered_for_value =
                 static_metric_icons_rendered && has_static_metric_icon(value);
-            if draw_metric_value_widget_with_config(
+            if draw_metric_value_widget_with_config(MetricWidgetRequest {
                 canvas,
                 config,
                 value,
-                &style,
+                base_style: &style,
                 dense_activity,
                 frame_index,
                 scale,
-                &paths.font_dirs,
-                static_icon_rendered_for_value,
-            ) {
+                font_dirs: &paths.font_dirs,
+                static_icon_rendered: static_icon_rendered_for_value,
+            }) {
                 continue;
             }
             let text = format_value(config, value, dense_activity, frame_index);
