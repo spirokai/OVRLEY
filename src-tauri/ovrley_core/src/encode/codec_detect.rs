@@ -1,3 +1,32 @@
+//! Encoder codec availability probing.
+//!
+//! Owns: codec capability detection — `detect_codecs` spawns ffmpeg subprocesses
+//!       to discover which H.264, H.265, ProRes, QTRLE, and hardware-accelerated
+//!       encoders (NVENC, QSV, VAAPI, AMF, VideoToolbox) are available. Also owns
+//!       hardware filter-name parsing (`parse_ffmpeg_filter_names`) and the
+//!       `AvailableCodecs` capability struct returned to the frontend.
+//! Does not own: ffmpeg binary resolution (see [`crate::encode::ffmpeg`]), encoder
+//!       profile selection (see [`crate::encode::ffmpeg_composite_profiles`]),
+//!       actual encoding settings construction (see
+//!       [`crate::encode::ffmpeg_settings`], [`crate::encode::ffmpeg_composite`]).
+//!
+//! Allowed dependencies: `crate::encode::ffmpeg`, `crate::error`.
+//! Forbidden dependencies: `crate::commands`, `crate::render`, `crate::config`.
+//!
+//! Related modules: [`crate::encode::ffmpeg_composite_profiles`] (consumes detected
+//!       codecs to select encoder profiles), [`crate::encode::video_probe`]
+//!       (video metadata extraction, separate concern).
+//!
+//! ## Thread Safety
+//! Single-threaded. Spawns one ffmpeg probe subprocess per codec, each with an
+//! 8-second timeout, and waits synchronously for each. No shared mutable state.
+//!
+//! ## Performance
+//! Heavy one-time operation: spawns ~20 ffmpeg subprocesses sequentially, each
+//! with up to 8s timeout. Called once at application startup; result is cached
+//! by the frontend. Total worst-case wall time ~160s (unlikely — most probes
+//! complete in < 1s). Not on any render hot path.
+
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
 use crate::error::CoreResult;
 use serde::{Deserialize, Serialize};
@@ -9,6 +38,17 @@ use std::time::{Duration, Instant};
 
 const CODEC_PROBE_TIMEOUT: Duration = Duration::from_secs(8);
 
+/// Collective codec-availability snapshot returned to the frontend.
+///
+/// Each boolean field corresponds to one encoder probed at startup. Hardware
+/// acceleration fields (`nvgpu`, `cuda_filter_stack`, `qsv_full`, etc.) indicate
+/// whether the required ffmpeg filters are available, not just the encoder.
+/// The frontend uses this struct to grey out unavailable codec options in the
+/// export dialog.
+///
+/// # Thread Safety
+/// Constructed once at startup on the calling thread. Immutable after construction.
+/// Safe to serialize and send to the frontend.
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AvailableCodecs {
@@ -45,6 +85,24 @@ pub struct AvailableCodecs {
     pub qsv_full_init_args: Vec<String>,
 }
 
+/// Probes every known encoder and hardware filter via ffmpeg subprocesses.
+///
+/// Each probe spawns ffmpeg with a minimal null-source encode for 1 frame and
+/// checks the exit code. Hardware filters are detected via `ffmpeg -filters`.
+/// The function is intentionally sequential — parallel probing adds complexity
+/// without a meaningful speedup since probe time is dominated by subprocess
+/// startup, not encode work.
+///
+/// # Performance
+/// Called once at application startup. Worst case ~160s for all ~20 probes if
+/// every subprocess hits the 8-second timeout. Typical time is < 10s because
+/// most codecs either succeed or fail quickly.
+///
+/// # Errors
+/// Returns [`CoreError::FfmpegNotFound`] if the ffmpeg binary cannot be located.
+/// Individual probe failures are silently recorded as `false` — a missing codec
+/// is not a fatal error.
+#[must_use = "expensive subprocess call; codec capabilities must be consumed"]
 pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
     let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
     let vaapi_device = find_vaapi_device();

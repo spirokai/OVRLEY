@@ -1,6 +1,19 @@
-//! Skia path and coordinate transform helpers.
+//! Skia path construction and coordinate transform helpers for widgets.
 //!
-//! Allowed dependencies: skia_safe.
+//! Owns: `path_from_points` (converts point arrays into Skia paths with optional
+//!       closure and baseline-y), `with_widget_transform` (applies Skia canvas
+//!       save/restore with translation, rotation, and clipping for a widget rect).
+//! Does not own: polyline drawing (see [`super::polyline`]), route/elevation
+//!       point projection (see [`super::common`]).
+//!
+//! Allowed dependencies: `skia_safe`.
+//! Forbidden dependencies: `crate::config`, `crate::activity`,
+//!       `crate::encode`, `crate::commands`.
+//!
+//! ## Performance
+//! `with_widget_transform` calls `canvas.save()` + `canvas.restore()` per widget
+//! per frame — these are lightweight Skia state stack operations. `path_from_points`
+//! is O(n) in point count and called during widget preparation (not per-frame).
 
 use skia_safe::Path as SkPath;
 

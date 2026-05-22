@@ -1,7 +1,25 @@
 //! FFmpeg argument builder for MP4 compositing mode.
 //!
-//! This module is intentionally separate from the existing transparent-overlay
-//! FFmpeg builder so composite rendering can evolve as a parallel backend path.
+//! This module is intentionally separate from the transparent-overlay FFmpeg
+//! builder so composite rendering can evolve as a parallel backend path.
+//!
+//! Owns: `CompositeProfile` (per-codec encoding profile), `CompositeFfmpegSettings`
+//!       (grouped FFmpeg arguments for 3-input composite encodes), `HwAccelInfo`
+//!       (hardware acceleration availability), and `build_composite_ffmpeg_settings`
+//!       (the main argument construction function).
+//! Does not own: encoder profile templates (see
+//!       [`crate::encode::ffmpeg_composite_profiles`]), codec detection (see
+//!       [`crate::encode::codec_detect`]), actual ffmpeg process spawning (see
+//!       [`crate::encode::video_composite_pipeline`]).
+//!
+//! Allowed dependencies: `crate::encode::codec_detect`, `crate::encode::ffmpeg_composite_profiles`,
+//!       `crate::encode::fps`, `crate::error`.
+//! Forbidden dependencies: `crate::commands`, `crate::render`,
+//!       `crate::encode::video_pipeline`, `crate::encode::video_composite_pipeline`.
+//!
+//! ## Thread Safety
+//! All types are plain data (no shared mutable state). Callers construct
+//! `CompositeFfmpegSettings` on the render thread before spawning ffmpeg.
 
 use std::path::Path;
 
@@ -129,6 +147,23 @@ impl From<&AvailableCodecs> for HwAccelInfo {
     }
 }
 
+/// Bundled inputs for building composite FFmpeg settings.
+///
+/// Consolidates what was previously 9–10 separate parameters shared between
+/// `build_composite_ffmpeg_settings` and `validate_composite_inputs`.
+pub struct CompositeFfmpegBuildRequest<'a> {
+    pub codec_name: &'a str,
+    pub bitrate: &'a str,
+    pub video_path: &'a Path,
+    pub video_trim_start: f64,
+    pub render_duration: f64,
+    pub width: u32,
+    pub height: u32,
+    pub source_fps: Fps,
+    pub overlay_pipe_fps: Fps,
+    pub hwaccel_available: &'a HwAccelInfo,
+}
+
 /// Builds FFmpeg argument groups for the default software composite path.
 ///
 /// Input 0 keeps the original source video unseeked so the filter graph can
@@ -136,41 +171,22 @@ impl From<&AvailableCodecs> for HwAccelInfo {
 /// on `pipe:0`, and input 2 is a separately trimmed source-media input used for
 /// copying audio without re-encoding it.
 pub fn build_composite_ffmpeg_settings(
-    codec_name: &str,
-    bitrate: &str,
-    video_path: &Path,
-    video_trim_start: f64,
-    render_duration: f64,
-    width: u32,
-    height: u32,
-    source_fps: Fps,
-    overlay_pipe_fps: Fps,
-    hwaccel_available: &HwAccelInfo,
+    request: &CompositeFfmpegBuildRequest<'_>,
 ) -> CoreResult<CompositeFfmpegSettings> {
-    validate_composite_inputs(
-        codec_name,
-        bitrate,
-        video_path,
-        video_trim_start,
-        render_duration,
-        width,
-        height,
-        source_fps,
-        overlay_pipe_fps,
-    )?;
+    validate_composite_inputs(request)?;
 
-    let source_fps = source_fps.reduced();
-    let overlay_pipe_fps = overlay_pipe_fps.reduced();
-    let video_path = video_path.to_string_lossy().to_string();
-    let mut selected_profile = select_composite_profile(codec_name, hwaccel_available)?;
+    let source_fps = request.source_fps.reduced();
+    let overlay_pipe_fps = request.overlay_pipe_fps.reduced();
+    let video_path = request.video_path.to_string_lossy().to_string();
+    let mut selected_profile = select_composite_profile(request.codec_name, request.hwaccel_available)?;
     if selected_profile.name.starts_with("qsv_full_") {
-        if hwaccel_available.qsv_full_init_args.is_empty() {
+        if request.hwaccel_available.qsv_full_init_args.is_empty() {
             return Err(CoreError::Encode(format!(
                 "Requested experimental QSV overlay profile {} is unavailable; codec detection did not provide working QSV hardware-device init args.",
                 selected_profile.name
             )));
         }
-        selected_profile.input_args = hwaccel_available.qsv_full_init_args.clone();
+        selected_profile.input_args = request.hwaccel_available.qsv_full_init_args.clone();
     }
 
     let mut input_0_args = selected_profile.input_args.clone();
@@ -184,7 +200,7 @@ pub fn build_composite_ffmpeg_settings(
         "-pix_fmt".to_string(),
         "rgba".to_string(),
         "-s".to_string(),
-        format!("{width}x{height}"),
+        format!("{width}x{height}", width = request.width, height = request.height),
         "-r".to_string(),
         overlay_pipe_fps.ffmpeg_arg(),
         "-i".to_string(),
@@ -192,22 +208,22 @@ pub fn build_composite_ffmpeg_settings(
     ];
 
     let mut input_2_args = Vec::new();
-    if video_trim_start > 0.0 {
+    if request.video_trim_start > 0.0 {
         input_2_args.push("-ss".to_string());
-        input_2_args.push(format_seconds_arg(video_trim_start));
+        input_2_args.push(format_seconds_arg(request.video_trim_start));
     }
     input_2_args.extend([
         "-t".to_string(),
-        format_seconds_arg(render_duration),
+        format_seconds_arg(request.render_duration),
         "-i".to_string(),
         video_path,
     ]);
 
     let filter_complex = composite_filter_complex(
-        width,
-        height,
-        video_trim_start,
-        render_duration,
+        request.width,
+        request.height,
+        request.video_trim_start,
+        request.render_duration,
         &selected_profile,
     )?;
     let mut output_args = vec![
@@ -221,7 +237,7 @@ pub fn build_composite_ffmpeg_settings(
     output_args.extend(selected_profile.output_args.clone());
     output_args.extend([
         "-b:v".to_string(),
-        bitrate.to_string(),
+        request.bitrate.to_string(),
         "-c:a".to_string(),
         "copy".to_string(),
         "-shortest".to_string(),
@@ -233,7 +249,7 @@ pub fn build_composite_ffmpeg_settings(
     Ok(CompositeFfmpegSettings {
         selected_profile_name: selected_profile.name.to_string(),
         fallback_profile_name: fallback_profile_name(&selected_profile),
-        hw_init_args: profile_hw_init_args(&selected_profile, hwaccel_available),
+        hw_init_args: profile_hw_init_args(&selected_profile, request.hwaccel_available),
         input_0_args,
         input_1_args,
         input_2_args,
@@ -376,54 +392,46 @@ fn composite_filter_complex(
 ///
 /// This fails fast on values that would otherwise produce confusing FFmpeg
 /// errors or accidentally round/zero an FPS value.
-fn validate_composite_inputs(
-    codec_name: &str,
-    bitrate: &str,
-    video_path: &Path,
-    video_trim_start: f64,
-    render_duration: f64,
-    width: u32,
-    height: u32,
-    source_fps: Fps,
-    overlay_pipe_fps: Fps,
-) -> CoreResult<()> {
-    if codec_name.trim().is_empty() {
+fn validate_composite_inputs(request: &CompositeFfmpegBuildRequest<'_>) -> CoreResult<()> {
+    if request.codec_name.trim().is_empty() {
         return Err(CoreError::Encode(
             "Composite codec name must not be empty".to_string(),
         ));
     }
-    if bitrate.trim().is_empty() {
+    if request.bitrate.trim().is_empty() {
         return Err(CoreError::Encode(
             "Composite bitrate must not be empty".to_string(),
         ));
     }
-    if video_path.as_os_str().is_empty() {
+    if request.video_path.as_os_str().is_empty() {
         return Err(CoreError::Encode(
             "Composite video path must not be empty".to_string(),
         ));
     }
-    if !render_duration.is_finite() || render_duration <= 0.0 {
+    if !request.render_duration.is_finite() || request.render_duration <= 0.0 {
         return Err(CoreError::Encode(format!(
-            "Composite render duration must be greater than zero: {render_duration}"
+            "Composite render duration must be greater than zero: {}",
+            request.render_duration
         )));
     }
-    if !video_trim_start.is_finite() || video_trim_start < 0.0 {
+    if !request.video_trim_start.is_finite() || request.video_trim_start < 0.0 {
         return Err(CoreError::Encode(format!(
-            "Composite video trim start must be zero or greater: {video_trim_start}"
+            "Composite video trim start must be zero or greater: {}",
+            request.video_trim_start
         )));
     }
-    if width == 0 {
+    if request.width == 0 {
         return Err(CoreError::Encode(
             "Composite width must be greater than zero".to_string(),
         ));
     }
-    if height == 0 {
+    if request.height == 0 {
         return Err(CoreError::Encode(
             "Composite height must be greater than zero".to_string(),
         ));
     }
-    validate_fps("source FPS", source_fps)?;
-    validate_fps("overlay pipe FPS", overlay_pipe_fps)?;
+    validate_fps("source FPS", request.source_fps)?;
+    validate_fps("overlay pipe FPS", request.overlay_pipe_fps)?;
     Ok(())
 }
 

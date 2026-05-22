@@ -272,9 +272,14 @@ fn text_paint(color: Color) -> Paint {
 }
 
 // Resolves and caches a Skia typeface for a font name or file.
+//
+// The cache is a global `OnceLock<Mutex<HashMap<…>>>` keyed by font name. Fonts
+// are loaded from disk once and never invalidated — the font set is fixed and
+// small (system fonts + bundled fonts, ~10–20 entries max). Entries are
+// immutable after load, so stale reads are harmless. This cache is accessed on
+// the hot path (every text-drawing call), but the `Mutex` is only locked on
+// first insertion; subsequent lookups hit the cached `Typeface` directly.
 fn resolve_typeface(font_dirs: &[PathBuf], name: Option<&str>) -> Typeface {
-    // Cache by requested name, not resolved absolute path, because templates
-    // repeatedly request the same family/file for labels and values.
     static CACHE: OnceLock<Mutex<HashMap<String, Typeface>>> = OnceLock::new();
     let key = name.unwrap_or("Arial.ttf").to_string();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));

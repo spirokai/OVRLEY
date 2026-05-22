@@ -5,6 +5,17 @@
 //! The public surface is intentionally small: callers start renders through the
 //! controller in [`video`], while the pipeline module contains the single-pass
 //! frame producer/ffmpeg consumer implementation.
+//!
+//! ## Thread Map
+//!
+//! | Thread Type | Spawned By | Owns | Shutdown Signal | Joined By |
+//! |-------------|------------|------|-----------------|-----------|
+//! | Writer | `render_video_single` / `render_composite_video_single` | ffmpeg stdin | Channel sender dropped (EOF) | Spawning function |
+//! | Monitor (transparent) | `render_video_single` | ffmpeg stderr, `Arc<AtomicU32>` | ffmpeg exits → stderr EOF | Spawning function |
+//! | Monitor (composite) | `render_composite_video_single` | ffmpeg stderr, `Arc<Mutex<Vec>>` | ffmpeg exits → stderr EOF | Spawning function |
+//! | Segment render worker | `render_video_segmented` / `render_composite_video_segmented` | Per-segment ffmpeg + buffer pool | Child-controller cancel flag | Aggregator loop |
+//! | Parallel render worker | `run_parallel_renders` | Independent config + ffmpeg | Work queue exhaustion | `run_parallel_renders` |
+//! | Command dispatch | `backend_render` / `backend_render_composite_phase3` | Full render call | Completion / cancel / error (updates controller) | Fire-and-forget |
 
 /// ffmpeg codec and hardware-acceleration detection.
 pub mod codec_detect;

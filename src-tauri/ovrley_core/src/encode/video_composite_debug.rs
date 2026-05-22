@@ -1,7 +1,12 @@
 //! Composite-only debug artifacts.
 //!
-//! MP4 compositing writes diagnostics into a fixed phase directory so the new
-//! pipeline can be inspected without changing the transparent render debug path.
+//! MP4 compositing writes diagnostic timing/command summaries into a fixed
+//! debug directory so the composite pipeline can be inspected without changing
+//! the transparent render debug path.
+//!
+//! Write failures are best-effort — the composite render continues even if
+//! debug artifact creation fails. Artifacts accumulate indefinitely; there is
+//! no automatic cleanup.
 
 use crate::debug::TimingBucket;
 use crate::encode::ffmpeg_composite::CompositeFfmpegSettings;
@@ -12,7 +17,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const COMPOSITE_DEBUG_PHASE: &str = "phase_7";
+const COMPOSITE_DEBUG_PHASE: &str = "composite";
 
 #[derive(Serialize)]
 /// Top-level timing and command summary for one MP4 composite render.
@@ -99,7 +104,7 @@ pub struct CompositeTimingSummaryInput<'a> {
 
 /// Writes the Phase 7 composite timing summary JSON.
 ///
-/// The summary is stored under `debug/timings/phase_7/<video-id>/timing_summary.json`
+/// The summary is stored under `debug_render/composite/<video-id>/timing_summary.json`
 /// and includes rational FPS values, frame counts, timings, and FFmpeg diagnostics.
 pub fn write_composite_timing_summary(
     // test seam

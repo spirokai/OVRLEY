@@ -65,6 +65,7 @@ fn trim_numeric_series(
 /// The returned timeline starts at `0.0` seconds and ends at `end - start`.
 /// Optional telemetry series are only copied when requested by
 /// [`RenderDataRequirements`].
+#[must_use = "trimmed activity must be consumed for densification"]
 pub fn trim_activity(
     activity: &ParsedActivity,
     start: f64,

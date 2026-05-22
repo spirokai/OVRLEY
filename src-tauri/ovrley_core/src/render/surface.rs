@@ -1,7 +1,20 @@
-//! Skia surface and image IO helpers.
+//! Skia surface allocation and PNG output helpers.
 //!
-//! Preview rendering allocates owned raster surfaces, while video rendering
-//! wraps caller-owned RGBA buffers so frames can be streamed directly to ffmpeg.
+//! Owns: Skia raster surface creation (`create_surface`), native pixel-format
+//!       info (`native_n32_image_info`), buffer wrapping for video frames
+//!       (`wrap_native_surface`), and PNG export (`write_surface_png`).
+//! Does not own: frame rendering (see [`crate::render::mod`]), text drawing
+//!       (see [`crate::render::text`]), widget rendering (see
+//!       [`crate::render::widgets`]).
+//!
+//! Allowed dependencies: `skia_safe`, `crate::error`.
+//! Forbidden dependencies: `config`, `activity`, `encode`, `commands`.
+//!
+//! ## Performance
+//! `create_surface` performs a heap allocation per call (owned Skia surface).
+//! `wrap_native_surface` is allocation-free — it borrows a caller-owned RGBA
+//! buffer and is safe for the video render hot path. `write_surface_png` is
+//! called once per preview render, not in the video hot loop.
 
 use crate::error::{CoreError, CoreResult};
 use skia_safe::{surfaces, Borrows, EncodedImageFormat, ImageInfo, Surface};

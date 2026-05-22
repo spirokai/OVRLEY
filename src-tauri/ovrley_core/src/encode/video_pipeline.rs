@@ -9,6 +9,22 @@
 //! pool of RGBA buffers, and streams those buffers to ffmpeg through stdin. A
 //! separate monitor thread parses ffmpeg stderr for encoded-frame progress,
 //! while the writer thread keeps expensive IO off the render loop.
+//!
+//! ## FFmpeg Process Lifecycle
+//!
+//! 1. **Spawn**: `spawn_ffmpeg_process()` creates the child with piped stdin
+//!    (raw RGBA video) and piped stderr (progress). The child inherits no stdin.
+//! 2. **Stdin**: The writer thread takes `child.stdin.take()`, writes frames in a
+//!    loop, then drops the handle (EOF) so ffmpeg finalizes output.
+//! 3. **Stderr**: The monitor thread takes `child.stderr.take()`, parses
+//!    `frame=N` lines, and updates a shared `Arc<AtomicU32>` counter.
+//! 4. **Wait**: After the writer finishes, the main thread calls `child.wait()`.
+//! 5. **Cancel**: On cancellation, the render loop stops, the channel sender is
+//!    dropped (signals writer), the writer flushes and exits, and the main thread
+//!    calls `child.try_wait()` with a timeout before killing if hung.
+//! 6. **Error**: If ffmpeg exits non-zero or the writer panics, the partial
+//!    output file is removed and `CoreError::Ffmpeg` or `CoreError::Encode` is
+//!    returned. A frame-count mismatch after success is also treated as a failure.
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::RenderConfig;
@@ -51,7 +67,54 @@ struct WriterResult {
     timings: BTreeMap<String, TimingBucket>,
 }
 
-/// Renders one video output by streaming Skia-rendered frames to ffmpeg.
+/// Renders one transparent-overlay video by streaming Skia frames to ffmpeg.
+///
+/// This is the single-pass pipeline: it prepares reusable Skia assets, spawns
+/// ffmpeg configured to accept raw RGBA on stdin, then runs a hot render loop
+/// that produces one frame at a time into pooled buffers. A writer thread drains
+/// the frame queue and feeds ffmpeg stdin, while a monitor thread parses stderr
+/// for progress. The render loop checks cancellation between every frame.
+///
+/// # Arguments
+///
+/// * `paths` — Central path configuration (fonts, templates, debug/output dirs).
+/// * `config` — Validated render configuration with scene/widget/ffmpeg settings.
+/// * `activity` — Parsed (but untrimmed) source activity for asset preparation.
+/// * `dense_activity` — Frame-aligned dense report used for per-frame telemetry.
+/// * `controller` — Shared render state; cloned to observe progress/cancellation.
+///
+/// # Returns
+///
+/// On success, returns the output filename (relative to the downloads directory).
+/// Debug timing summaries are written to `paths.debug_render_dir/phase_6/`.
+///
+/// # Errors
+///
+/// Returns [`CoreError::Cancelled`] when the user cancels (output is cleaned up).
+/// Returns [`CoreError::Ffmpeg`] if ffmpeg exits non-zero.
+/// Returns [`CoreError::Encode`] on thread panic, pipe failure, or frame-count mismatch.
+/// Returns [`CoreError::Render`] if any frame fails to render.
+/// Returns [`CoreError::Io`] on filesystem errors.
+///
+/// # Thread Safety
+///
+/// Spawns two threads whose handles are stored and joined before returning:
+/// a monitor thread (ffmpeg stderr → AtomicU32 counter) and a writer thread
+/// (bounded channel → ffmpeg stdin, with buffer return to free pool). The
+/// render loop runs on the calling thread.
+///
+/// # Cancellation
+///
+/// Checks `controller.cancel_flag` between every frame and at buffer-acquire
+/// time. On cancellation: drops the channel sender (signals writer), joins
+/// threads, waits for ffmpeg (with kill timeout fallback), removes the partial
+/// output file, and returns `CoreError::Cancelled`.
+///
+/// # Performance
+///
+/// This is a render hot path. Frame rendering and ffmpeg stdin writing overlap
+/// via a bounded channel (capacity 12) and a pooled buffer ring (13 buffers).
+/// Avoid per-frame allocations inside the loop — buffers are reused.
 pub(crate) fn render_video_single(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -67,6 +130,9 @@ pub(crate) fn render_video_single(
     let height = make_even(config.scene.height.unwrap_or(1080));
     let layout_total_frames = dense_activity.frame_count as u32;
     let update_rate = config.widget_update_rate() as usize;
+    // `rendered_frame_count` applies frame decimation: when update_rate > 1,
+    // we render fewer frames than the dense report has, skipping layout frames
+    // that would not change the visible overlay at the configured rate.
     let total_frames = rendered_frame_count(dense_activity.frame_count, update_rate) as u32;
     let container_fps = config.container_fps();
     let debug_dir = create_debug_dir(paths, "phase_6")?;
@@ -134,11 +200,19 @@ pub(crate) fn render_video_single(
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let mut estimator = ProgressEstimator::default();
     let mut rendered_frames = 0u32;
+    // ── PHASE 5: HOT RENDER LOOP ──
+    // ffmpeg is running, the writer is draining the channel, the monitor is
+    // parsing stderr. We own the render thread and produce exactly total_frames.
+    // The bounded channel (capacity 12) provides backpressure: if the writer
+    // falls behind, the next queue_frame call blocks, capping memory usage.
     let render_result = (|| -> CoreResult<()> {
         for output_frame_index in 0..(total_frames as usize) {
             if cancel_flag.load(Ordering::SeqCst) {
                 break;
             }
+            // Poll ffmpeg liveness. If ffmpeg exits mid-render (e.g. disk full,
+            // codec error), we catch it here rather than discovering it only
+            // after the loop when we call child.wait() and have no diagnostics.
             if let Some(status) = child
                 .try_wait()
                 .map_err(|error| CoreError::Encode(format!("ffmpeg process error: {error}")))?
@@ -202,6 +276,11 @@ pub(crate) fn render_video_single(
     })();
 
     drop(sender);
+    // ── PHASE 6: THREAD JOIN & FFMPEG WAIT ──
+    // Dropping the sender signals the writer to exit its recv() loop.
+    // The writer flushes stdin and returns, which causes ffmpeg to see EOF
+    // and finalize the output file. We join threads before waiting on ffmpeg
+    // so pipe-write errors are collected before we check the exit status.
     let writer_result = writer_thread
         .join()
         .map_err(|_| CoreError::Encode("Encoder writer thread panicked".to_string()))??;
@@ -213,9 +292,15 @@ pub(crate) fn render_video_single(
         .map_err(|error| CoreError::Encode(error.to_string()))?;
 
     if let Err(error) = render_result {
+        // Clean up partial output on any render-loop error. The file is
+        // incomplete and ffmpeg may have written a truncated header — keeping
+        // it would mislead the user into importing a broken video.
         let _ = fs::remove_file(&output_path);
         return Err(error);
     }
+    // Check cancel flag again after the loop. The render may have finished
+    // all frames but the user cancelled during the final frame — we still
+    // treat that as a cancellation and clean up.
     if cancel_flag.load(Ordering::SeqCst) {
         let _ = child.kill();
         let _ = fs::remove_file(&output_path);
@@ -228,6 +313,9 @@ pub(crate) fn render_video_single(
         )));
     }
     if writer_result.written_frames != total_frames {
+        // Frame-count mismatch means ffmpeg accepted stdin but produced fewer
+        // frames than expected — typically a pipe-write error partway through
+        // that ffmpeg didn't report via exit status. Clean up and fail.
         let _ = fs::remove_file(&output_path);
         return Err(CoreError::Encode(format!(
             "ffmpeg encode pipeline ended early: wrote {} of {} frames",
@@ -324,7 +412,15 @@ fn queue_frame(
     }
 }
 
-// Starts ffmpeg configured to accept raw video from stdin.
+/// Spawns ffmpeg configured to accept raw RGBA video via stdin.
+///
+/// All arguments are separate argv entries so user-supplied paths are not
+/// shell-expanded. The child process has its stdin piped (for rawvideo frames),
+/// stderr piped (for progress parsing), and stdout nulled. Callers must take
+/// ownership of stdin and stderr via `.take()` before using them.
+///
+/// The spawned process does NOT inherit the parent's stdin — all frame data
+/// flows through the piped stdin handle.
 fn spawn_ffmpeg_process(
     ffmpeg_bin: &Path,
     ffmpeg_settings: &FfmpegSettings,

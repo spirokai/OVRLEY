@@ -131,7 +131,11 @@ pub(crate) fn draw_route_widget(
     ))
 }
 
-// Normalizes route plot options into concrete scaled drawing settings.
+/// Normalizes route plot options into concrete scaled drawing settings.
+///
+/// Resolves legacy flat-style fields and nested styles into a single internal
+/// shape, applies scene scale to dimensions and stroke/marker sizes, and
+/// resolves color/opacity precedence chains. Called once per widget build.
 fn normalize_route_plot(config: &RenderConfig, plot: &CoursePlotConfig) -> NormalizedRoutePlot {
     // Normalize legacy flat style fields and newer nested styles into one
     // internal shape. Scale is applied to dimensions and stroke/marker sizes.

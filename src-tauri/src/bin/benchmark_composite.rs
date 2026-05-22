@@ -2,7 +2,7 @@ use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::commands::AppPaths;
 use ovrley_core::config::parse_config_json;
 use ovrley_core::encode::codec_detect::{detect_codecs, AvailableCodecs};
-use ovrley_core::encode::video::{render_composite_video, RenderController};
+use ovrley_core::encode::video::{render_composite_video, CompositeRenderRequest, RenderController};
 use ovrley_core::encode::video_probe::probe_video;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -341,22 +341,22 @@ fn main() -> Result<(), String> {
             }
 
             let started = Instant::now();
-            let render_result = render_composite_video(
-                &paths,
-                &config,
-                &activity,
-                &dense,
-                &controller,
-                &resolved_video.to_string_lossy(),
-                "40M",
-                0.0,
-                fps_num,
-                fps_den,
-                video_duration,
-                Some(render_duration),
-                Some(trim_start),
-                Some(update_rate),
-            );
+            let render_result = render_composite_video(&CompositeRenderRequest {
+                paths: &paths,
+                config: &config,
+                activity: &activity,
+                dense_activity: &dense,
+                controller: &controller,
+                composite_video_path: &resolved_video.to_string_lossy(),
+                composite_bitrate: "40M",
+                composite_sync_offset: 0.0,
+                composite_video_fps_num: fps_num,
+                composite_video_fps_den: fps_den,
+                composite_video_duration: video_duration,
+                composite_render_duration: Some(render_duration),
+                composite_video_trim_start: Some(trim_start),
+                composite_widget_update_rate: Some(update_rate),
+            });
             let elapsed_secs = started.elapsed().as_secs_f64();
 
             match render_result {

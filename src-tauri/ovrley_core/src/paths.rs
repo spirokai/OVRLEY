@@ -15,6 +15,15 @@ use crate::error::{CoreError, CoreResult};
 use std::fs;
 use std::path::PathBuf;
 
+/// Central path configuration for the application runtime.
+///
+/// Resolves font directories, template directories, debug/render output paths,
+/// temporary storage, and the user downloads directory. Paths are computed once
+/// at startup from the repository root and (optionally) a Tauri resource root,
+/// then cloned into every request that needs filesystem access.
+///
+/// This type lives in a neutral module so both `commands` and `encode` can
+/// depend on it without creating a circular dependency.
 #[derive(Clone, Debug)]
 pub struct AppPaths {
     pub repo_root: PathBuf,

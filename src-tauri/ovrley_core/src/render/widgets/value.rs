@@ -100,7 +100,13 @@ pub(crate) fn draw_metric_value_widget_with_config(request: MetricWidgetRequest<
     true
 }
 
-// Draws the specialized gradient value text and slope triangle.
+/// Draws the gradient value widget — percentage text with a slope triangle.
+///
+/// Uses a fixed maximum visual height (based on the largest allowed grade) so
+/// the text and triangle layout remain stable across frames. The triangle is
+/// filled for non-zero grades and drawn as a flat zero-line stroke when the
+/// gradient is within epsilon of zero. Color switches between positive and
+/// negative config colors based on the sign of the raw gradient value.
 #[allow(clippy::too_many_arguments)]
 fn draw_gradient_value_widget(
     canvas: &Canvas,
@@ -199,7 +205,12 @@ fn gradient_is_zero(raw_gradient: Option<f64>) -> bool {
     gradient.abs() <= GRADIENT_ZERO_EPSILON
 }
 
-// Computes the visual triangle height for a gradient percentage.
+/// Computes the visual triangle height for a gradient percentage display.
+///
+/// Converts a grade percentage (e.g., 10% = 5.7°) to a visual triangle height
+/// using `tan(gradient / 2) × width`. The half-angle mapping gives a visually
+/// proportional height that feels natural at typical road grades (0–20%).
+/// Returns 0.0 when the gradient is missing, zero, or the triangle width is 0.
 pub fn gradient_triangle_height(raw_gradient: Option<f64>, triangle_width: f32) -> f32 {
     // test seam
     if triangle_width <= 0.0 {
@@ -395,8 +406,11 @@ pub(crate) fn draw_static_metric_icon_for_value(
     true
 }
 
-// Returns the text used for vertical alignment measurements. This mirrors the
-// editor preview, which stabilizes numeric metric rows across changing values.
+/// Returns the text used for vertical alignment measurements.
+///
+/// Numeric metrics (digits, `:`, `.`, `%`, `+`, `-`) use a stable reference
+/// string (`"888:88"`) so vertical layout does not jump when the displayed
+/// value changes. Non-numeric text passes through unchanged.
 pub fn metric_vertical_metrics_text(text: &str) -> &str {
     // test seam
     if !text.is_empty()
@@ -416,8 +430,9 @@ fn metric_icon_has_stable_static_vertical_metrics(value: &ValueConfig) -> bool {
     value.value != MetricKind::Time || value.format.as_deref().unwrap_or("time-24") == "time-24"
 }
 
-// Computes icon top so metric icons are centered on the value glyphs rather
-// than on the row line box. This matches the frontend preview layout.
+/// Computes the icon top position so the icon is visually centered on the
+/// value glyphs rather than on the row line box. This matches the frontend
+/// preview layout so the Rust renderer produces identical icon placement.
 pub fn metric_icon_top_from_value_layout(
     // test seam
     text_group_bottom: f32,
@@ -544,8 +559,15 @@ fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconKind> {
 }
 
 // Returns the cached parsed SVG representation for a metric icon.
+//
+// Each icon is parsed once from bundled SVG markup (`include_str!`-imported at
+// compile time) and cached in a `OnceLock<Option<ParsedSvgIcon>>` for the
+// lifetime of the process. The parsed data is immutable — SVG files never change
+// at runtime. Six independent `OnceLock` caches exist (one per `MetricIconKind`),
+// lazily initialized on first access. On the hot path (every frame that draws an
+// icon), the lookup hits the pre-initialized `OnceLock` and returns an `Option<&>`
+// without any locking.
 fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIcon> {
-    // Each icon is parsed once and cached for the lifetime of the process.
     match icon_kind {
         MetricIconKind::Gauge => {
             static CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();

@@ -1,3 +1,25 @@
+//! Video metadata extraction via ffprobe.
+//!
+//! Owns: video probe types (`VideoMetadata`, `Resolution`) and the `probe_video`
+//!       function that extracts duration, FPS, resolution, codec, and creation-time
+//!       metadata from an MP4/MOV file using ffprobe.
+//! Does not own: ffmpeg binary discovery (see [`crate::encode::ffmpeg`]), codec
+//!       availability detection (see [`crate::encode::codec_detect`]).
+//!
+//! Allowed dependencies: `crate::encode::ffmpeg`, `crate::error`.
+//! Forbidden dependencies: `crate::commands`, `crate::render`.
+//!
+//! Related modules: [`crate::encode::ffmpeg`] (binary resolution),
+//!       [`crate::encode::codec_detect`] (encoder capability probing).
+//!
+//! ## Thread Safety
+//! Single-threaded. Spawns an ffprobe subprocess and waits synchronously for
+//! its JSON output. No shared mutable state.
+//!
+//! ## Performance
+//! Not a hot path — called once per imported video. Subprocess overhead
+//! dominates; ffprobe typically completes in < 1 second for 1080p files.
+
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
 use crate::error::{CoreError, CoreResult};
 use serde::{Deserialize, Serialize};
@@ -5,6 +27,12 @@ use serde_json::Value;
 use std::path::Path;
 use std::process::Command;
 
+/// Extracted video metadata returned to the frontend after import.
+///
+/// All fields except `path` and `has_audio` may be `None` if ffprobe did not
+/// report them. `creation_time` uses a priority chain: stream-level
+/// `creation_time` tag first, then container-level `creation_time`, then
+/// the file-system modification time as a final fallback.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VideoMetadata {
@@ -25,12 +53,30 @@ pub struct VideoMetadata {
     pub rotation_degrees: Option<i32>,
 }
 
+/// Width and height in pixels as reported by ffprobe.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Resolution {
     pub width: u64,
     pub height: u64,
 }
 
+/// Probes a video file with ffprobe and returns structured metadata.
+///
+/// Spawns `ffprobe -v quiet -print_format json -show_format -show_streams` for
+/// the given file. Parses the JSON output into a [`VideoMetadata`] struct.
+/// Creation time is resolved with this priority:
+/// 1. Stream-level `creation_time` tag from the first video stream
+/// 2. Container-level `creation_time` from the format tags
+/// 3. File-system modification time (converted to RFC 3339)
+///
+/// # Errors
+/// Returns [`CoreError::FfmpegNotFound`] if ffmpeg/ffprobe cannot be located.
+/// Returns [`CoreError::Encode`] if ffprobe exits non-zero or produces invalid JSON.
+///
+/// # Performance
+/// Called once per imported video (not on any render hot path). Typical wall
+/// time < 1 second for 1080p files.
+#[must_use = "probe result contains video metadata required for rendering"]
 pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadata> {
     let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
     let ffprobe_name = if cfg!(windows) {
@@ -216,6 +262,12 @@ fn read_rational_rate(stream: &Value, key: &str) -> Option<(u32, u32)> {
     (num > 0 && den > 0).then_some((num, den))
 }
 
+/// Reads video stream duration from an ffprobe JSON stream object.
+///
+/// Prefers the explicit `duration` field. Falls back to computing duration from
+/// `nb_frames / fps` when the duration field is absent or unparseable. The FPS
+/// value is expected to have been validated (finite, positive) before this call.
+/// Returns `None` when neither source is available.
 pub fn read_video_stream_duration(stream: &Value, fps: Option<f64>) -> Option<f64> {
     // test seam
     stream

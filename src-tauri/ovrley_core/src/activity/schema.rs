@@ -1,9 +1,30 @@
 //! Activity data contracts used by the renderer.
 //!
+//! Owns: `ParsedActivity` (frontend-provided JSON shape), `DenseActivityReport`
+//!       (frame-aligned interpolated telemetry), `TrimmedActivity` (scene-window
+//!       subset), `DebugPayload` (parser debug wrapper), and the type aliases
+//!       `NumericSeries`, `TimeSeries`, `CourseSeries`.
+//! Does not own: parsing (see [`crate::activity::mod::parse_activity_json`]),
+//!       trimming (see [`crate::activity::trim`]), interpolation (see
+//!       [`crate::activity::interpolate`] and [`crate::interpolation`]).
+//!
+//! Allowed dependencies: `serde`, `serde_json`.
+//! Forbidden dependencies: `render`, `encode`, `commands`.
+//!
+//! Related modules: [`crate::activity::interpolate`] (consumes these types for
+//!       densification), [`crate::config`] (consumes `RenderDataRequirements` to
+//!       decide which series are needed).
+//!
+//! ## Serde Contract
 //! The frontend parser normalizes GPX/FIT input into these shapes before Rust
-//! receives it. The renderer keeps optional telemetry values as `Option<T>` so
-//! missing sensor samples remain distinguishable from real zero values during
-//! trimming, interpolation, and widget rendering.
+//! receives it. Optional telemetry values use `Option<T>` so missing sensor
+//! samples remain distinguishable from real zero values during trimming,
+//! interpolation, and widget rendering.
+//!
+//! ## Performance
+//! Not a hot path — these types are constructed once per render during the
+//! parse-and-prepare phase. The `DenseActivityReport` is read heavily during
+//! per-frame rendering (O(1) lookup via `frame_index`).
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

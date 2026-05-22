@@ -284,7 +284,12 @@ pub(crate) fn draw_elevation_widget(
     ))
 }
 
-// Normalizes elevation plot options into concrete scaled drawing settings.
+/// Normalizes elevation plot options into concrete scaled drawing settings.
+///
+/// Merges legacy flat-style fields and newer nested-style fields, applies the
+/// scene scale to all dimension/stroke/marker/label values, and resolves color
+/// precedence chains so draw code receives only concrete values. This runs once
+/// per widget build, not per-frame.
 fn normalize_elevation_plot(
     config: &RenderConfig,
     plot: &ElevationPlotConfig,

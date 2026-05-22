@@ -154,6 +154,36 @@ impl Default for ProgressEstimator {
 ///
 /// After any terminal state, the caller must call `try_start()` again
 /// to begin a new render.
+///
+/// # Thread Safety
+///
+/// - `progress: Arc<Mutex<RenderProgress>>` — Mutex-protected; locked briefly
+///   on each progress update (batched, not per-frame in the hot path).
+///   Also locked on frontend progress polling via the `backend_progress` command.
+///   The mutex guard is held only long enough to read or write the struct.
+/// - `cancel_flag: Arc<AtomicBool>` — Lock-free; read on every frame boundary
+///   in the render loop. Written once by `cancel()`.
+/// - `running: Arc<AtomicBool>` — Lock-free; used as a compare_exchange gate
+///   in `try_start()` to prevent concurrent render starts.
+/// - `next_render_id: Arc<AtomicU32>` — Lock-free; monotonically increasing
+///   across renders. The value is incremented in `try_start()` before any
+///   other state is mutated.
+///
+/// # Ownership
+///
+/// Created by `commands::backend_render` (or the composite variant). One clone
+/// is stored in Tauri managed state and returned to the frontend for progress
+/// polling. The original is moved into the background render thread. All clones
+/// observe the same underlying `Arc`-wrapped state.
+///
+/// # Shutdown
+///
+/// On `cancel()`: sets `cancel_flag = true` and marks the progress status as
+/// `"cancelled"`. The render thread polls this flag between frames and initiates
+/// shutdown (close ffmpeg stdin, join threads, kill ffmpeg, clean up output).
+/// `running` is set to `false` via `finish_error()` after cleanup completes.
+/// If the render thread panics, `running` remains `true` — this is a known
+/// limitation (there is no watchdog thread to detect and reset hung state).
 #[derive(Clone)]
 pub struct RenderController {
     pub(crate) progress: Arc<Mutex<RenderProgress>>,
@@ -176,6 +206,7 @@ impl Default for RenderController {
 
 impl RenderController {
     /// Returns a snapshot of the latest progress state.
+    #[must_use = "progress snapshot must be consumed for frontend polling"]
     pub fn progress(&self) -> RenderProgress {
         self.progress
             .lock()
@@ -184,6 +215,7 @@ impl RenderController {
     }
 
     /// Requests cancellation and returns whether a render was active.
+    #[must_use = "the return value indicates whether a render was in progress"]
     pub fn cancel(&self) -> bool {
         self.cancel_flag.store(true, Ordering::SeqCst);
         if let Ok(mut progress) = self.progress.lock() {

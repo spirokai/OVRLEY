@@ -1,3 +1,26 @@
+//! Tauri application shell — command registration, preview server lifecycle,
+//! and platform resource resolution.
+//!
+//! Owns: Tauri command wiring, `BackendState` management, `AppPaths` resolution
+//!       for bundled resources, the `video_server` lifecycle, and the `run()`
+//!       entry point that glues the Rust core to the Electron/Tauri window.
+//! Does not own: rendering, encoding, activity parsing, or config validation —
+//!       those live in `ovrley_core`. This file is the boundary layer.
+//!
+//! Allowed dependencies: `ovrley_core`, `tauri`, `video_server`.
+//! Forbidden dependencies: none (this is the outermost layer — it may import
+//!       anything from `ovrley_core` but should not implement domain logic).
+//!
+//! ## Thread Safety
+//! `BackendState` is managed by Tauri as app-level state (Send + Sync via Tauri's
+//! `manage`). The `RenderController` inside it is the shared coordination point
+//! for all render progress and cancellation. The video server runs on a dedicated
+//! thread spawned at startup and joined on app teardown.
+//!
+//! ## Performance
+//! Not a hot path — called once at application startup. Resource path resolution
+//! and plugin registration happen before the frontend loads.
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub mod video_server; // test seam
 

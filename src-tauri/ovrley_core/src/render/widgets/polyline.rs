@@ -1,6 +1,19 @@
-//! Polyline and area drawing helpers.
+//! Polyline and area drawing helpers for route and elevation widgets.
 //!
-//! Allowed dependencies: skia_safe, crate::render::text, super::transform.
+//! Owns: `draw_polyline` (stroked line rendering with shadow support),
+//!       `draw_polyline_with_shadow` (two-pass shadow+line compositing),
+//!       `draw_area` (filled area under an elevation curve).
+//! Does not own: point-to-path conversion (see [`super::transform`]), color
+//!       parsing (see [`crate::render::text::parse_color`]).
+//!
+//! Allowed dependencies: `skia_safe`, `super::transform`, `super::types`.
+//! Forbidden dependencies: `crate::config`, `crate::activity`,
+//!       `crate::encode`, `crate::commands`.
+//!
+//! ## Performance
+//! Called per-frame during video rendering. `draw_polyline_with_shadow` does
+//! two Skia draw calls (shadow then line). The path is rebuilt from cached
+//! point arrays — no heap allocation inside the draw calls.
 
 use super::transform::path_from_points;
 use super::types::ShadowStyle;

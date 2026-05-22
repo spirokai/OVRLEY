@@ -455,6 +455,17 @@ fn annotate_timing_aliases(
 }
 
 // Returns a cached static label/icon layer or renders a new one.
+//
+// The cache is a global `OnceLock<Mutex<HashMap<u64, Image>>>` keyed by a hash
+// of all config-dependent inputs (width, height, scale, scene, labels, values —
+// see `labels_cache_key` below). Because the key covers every input that affects
+// label/icon appearance, different configs produce different keys — cross-render
+// staleness is structurally impossible.
+//
+// This cache is consulted once during asset preparation (`prepare_preview_assets`),
+// not inside the per-frame render loop. The `Mutex` guard is held only during
+// `get`/`insert`; once the image is stored in `PreparedPreviewAssets`, the cache
+// is not touched again for the remainder of the render.
 fn cached_labels_image(
     paths: &AppPaths,
     config: &RenderConfig,

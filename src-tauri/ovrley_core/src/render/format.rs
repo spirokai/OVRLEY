@@ -379,7 +379,11 @@ fn format_time(config: &RenderConfig, value_config: &ValueConfig, raw: Option<&s
     format_time_key("time-24", adjusted)
 }
 
-// Applies one of the built-in date/time format presets.
+/// Applies one of the built-in date/time format presets.
+///
+/// Supported keys: `"time-24"`, `"time-12"`, `"date-dmy"`, `"date-mdy"`,
+/// `"date-ymd"`, `"datetime"`, `"datetime-short-month"`. Unrecognized keys
+/// fall back to the ISO 8601 datetime format.
 pub fn format_time_key<Tz>(format_key: &str, value: DateTime<Tz>) -> String
 // test seam
 where

@@ -2,6 +2,16 @@
 //!
 //! Every test imports paths from here. No test file should contain
 //! `repo_root()`, `fixture_path()`, or `parent().unwrap()` chains.
+//!
+//! Some functions may appear unused depending on which test crates are
+//! compiled — this is expected because different test files use different
+//! subsets of the registry. All entries are intentionally retained as
+//! the canonical fixture catalogue.
+
+// Each test crate compiles independently and uses a different subset of
+// fixture paths. All functions in this file are intentional registry entries
+// and must be kept even if some are not referenced by every test crate.
+#![allow(dead_code)]
 
 use std::path::PathBuf;
 

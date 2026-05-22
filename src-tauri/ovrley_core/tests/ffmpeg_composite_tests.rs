@@ -1,7 +1,8 @@
 use std::path::Path;
 
 use ovrley_core::encode::ffmpeg_composite::{
-    build_composite_ffmpeg_settings, CompositeFfmpegSettings, HwAccelInfo,
+    build_composite_ffmpeg_settings, CompositeFfmpegBuildRequest, CompositeFfmpegSettings,
+    HwAccelInfo,
 };
 use ovrley_core::encode::fps::Fps;
 
@@ -24,18 +25,18 @@ fn settings_for_codec(
     trim_start: f64,
     hwaccel: &HwAccelInfo,
 ) -> CompositeFfmpegSettings {
-    build_composite_ffmpeg_settings(
-        codec,
+    build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
+        codec_name: codec,
         bitrate,
-        Path::new("test.mp4"),
-        trim_start,
-        10.0,
-        3840,
-        2160,
+        video_path: Path::new("test.mp4"),
+        video_trim_start: trim_start,
+        render_duration: 10.0,
+        width: 3840,
+        height: 2160,
         source_fps,
         overlay_pipe_fps,
-        hwaccel,
-    )
+        hwaccel_available: hwaccel,
+    })
     .unwrap()
 }
 
@@ -169,18 +170,7 @@ fn test_2_8_float_fps_fallback_can_feed_rational_builder_args() {
 
 #[test]
 fn validates_zero_direct_fps_values() {
-    let error = build_composite_ffmpeg_settings(
-        "libx264",
-        "60M",
-        Path::new("test.mp4"),
-        0.0,
-        10.0,
-        3840,
-        2160,
-        Fps { num: 0, den: 1 },
-        Fps::new(30000, 1001).unwrap(),
-        &HwAccelInfo::default(),
-    )
+    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest { codec_name: "libx264", bitrate: "60M", video_path: Path::new("test.mp4"), video_trim_start: 0.0, render_duration: 10.0, width: 3840, height: 2160, source_fps: Fps { num: 0, den: 1 }, overlay_pipe_fps: Fps::new(30000, 1001).unwrap(), hwaccel_available: &HwAccelInfo::default(), })
     .unwrap_err();
 
     assert_eq!(
@@ -248,18 +238,7 @@ fn test_8_3_nvenc_h264_simple_path_uses_cpu_overlay_when_available() {
 
 #[test]
 fn test_8_4_nvenc_hevc_unavailable_fails_clearly() {
-    let error = build_composite_ffmpeg_settings(
-        "hevc_nvenc",
-        "60M",
-        Path::new("test.mp4"),
-        0.0,
-        10.0,
-        3840,
-        2160,
-        Fps::new(30000, 1001).unwrap(),
-        Fps::new(30000, 1001).unwrap(),
-        &HwAccelInfo::default(),
-    )
+    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest { codec_name: "hevc_nvenc", bitrate: "60M", video_path: Path::new("test.mp4"), video_trim_start: 0.0, render_duration: 10.0, width: 3840, height: 2160, source_fps: Fps::new(30000, 1001).unwrap(), overlay_pipe_fps: Fps::new(30000, 1001).unwrap(), hwaccel_available: &HwAccelInfo::default(), })
     .unwrap_err();
 
     assert_eq!(
@@ -291,18 +270,7 @@ fn test_8_5_videotoolbox_h264_simple_path_when_available() {
 
 #[test]
 fn test_8_6_videotoolbox_hevc_unavailable_fails_clearly() {
-    let error = build_composite_ffmpeg_settings(
-        "hevc_videotoolbox",
-        "60M",
-        Path::new("test.mp4"),
-        0.0,
-        10.0,
-        3840,
-        2160,
-        Fps::new(30000, 1001).unwrap(),
-        Fps::new(30000, 1001).unwrap(),
-        &HwAccelInfo::default(),
-    )
+    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest { codec_name: "hevc_videotoolbox", bitrate: "60M", video_path: Path::new("test.mp4"), video_trim_start: 0.0, render_duration: 10.0, width: 3840, height: 2160, source_fps: Fps::new(30000, 1001).unwrap(), overlay_pipe_fps: Fps::new(30000, 1001).unwrap(), hwaccel_available: &HwAccelInfo::default(), })
     .unwrap_err();
 
     assert_eq!(
@@ -358,18 +326,7 @@ fn test_8_7a_amf_h264_simple_path_when_available() {
 
 #[test]
 fn test_8_7b_amf_hevc_unavailable_fails_clearly() {
-    let error = build_composite_ffmpeg_settings(
-        "hevc_amf",
-        "60M",
-        Path::new("test.mp4"),
-        0.0,
-        10.0,
-        3840,
-        2160,
-        Fps::new(30000, 1001).unwrap(),
-        Fps::new(30000, 1001).unwrap(),
-        &HwAccelInfo::default(),
-    )
+    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest { codec_name: "hevc_amf", bitrate: "60M", video_path: Path::new("test.mp4"), video_trim_start: 0.0, render_duration: 10.0, width: 3840, height: 2160, source_fps: Fps::new(30000, 1001).unwrap(), overlay_pipe_fps: Fps::new(30000, 1001).unwrap(), hwaccel_available: &HwAccelInfo::default(), })
     .unwrap_err();
 
     assert_eq!(
@@ -444,18 +401,18 @@ fn test_9_1_cuda_full_profile_requires_cuda_filter_stack() {
         cuda_filters_available: false,
         ..HwAccelInfo::default()
     };
-    let error = build_composite_ffmpeg_settings(
-        "nnvgpu_h264",
-        "60M",
-        Path::new("test.mp4"),
-        0.0,
-        10.0,
-        3840,
-        2160,
-        Fps::new(30000, 1001).unwrap(),
-        Fps::new(30000, 1001).unwrap(),
-        &hwaccel,
-    )
+    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
+        codec_name: "nnvgpu_h264",
+        bitrate: "60M",
+        video_path: Path::new("test.mp4"),
+        video_trim_start: 0.0,
+        render_duration: 10.0,
+        width: 3840,
+        height: 2160,
+        source_fps: Fps::new(30000, 1001).unwrap(),
+        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        hwaccel_available: &hwaccel,
+    })
     .unwrap_err();
 
     assert!(error.to_string().contains("overlay_cuda"));
@@ -522,18 +479,18 @@ fn test_9_5_qsv_full_profile_requires_qsv_filter_stack() {
         qsv_filters_available: false,
         ..HwAccelInfo::default()
     };
-    let error = build_composite_ffmpeg_settings(
-        "qsv_full_h264",
-        "60M",
-        Path::new("test.mp4"),
-        0.0,
-        10.0,
-        3840,
-        2160,
-        Fps::new(30000, 1001).unwrap(),
-        Fps::new(30000, 1001).unwrap(),
-        &hwaccel,
-    )
+    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
+        codec_name: "qsv_full_h264",
+        bitrate: "60M",
+        video_path: Path::new("test.mp4"),
+        video_trim_start: 0.0,
+        render_duration: 10.0,
+        width: 3840,
+        height: 2160,
+        source_fps: Fps::new(30000, 1001).unwrap(),
+        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        hwaccel_available: &hwaccel,
+    })
     .unwrap_err();
 
     assert!(error.to_string().contains("overlay_qsv"));
@@ -596,18 +553,18 @@ fn test_9_6_qsv_full_profile_requires_detected_init_args() {
         qsv_full_init_args: Vec::new(),
         ..HwAccelInfo::default()
     };
-    let error = build_composite_ffmpeg_settings(
-        "qsv_full_h264",
-        "60M",
-        Path::new("test.mp4"),
-        0.0,
-        10.0,
-        3840,
-        2160,
-        Fps::new(30, 1).unwrap(),
-        Fps::new(30, 1).unwrap(),
-        &hwaccel,
-    )
+    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
+        codec_name: "qsv_full_h264",
+        bitrate: "60M",
+        video_path: Path::new("test.mp4"),
+        video_trim_start: 0.0,
+        render_duration: 10.0,
+        width: 3840,
+        height: 2160,
+        source_fps: Fps::new(30, 1).unwrap(),
+        overlay_pipe_fps: Fps::new(30, 1).unwrap(),
+        hwaccel_available: &hwaccel,
+    })
     .unwrap_err();
 
     assert!(error.to_string().contains("QSV hardware-device init args"));

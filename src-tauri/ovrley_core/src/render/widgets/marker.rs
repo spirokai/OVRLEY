@@ -1,6 +1,18 @@
-//! Marker and dot drawing helpers.
+//! Marker and dot drawing helpers for route and elevation widgets.
 //!
-//! Allowed dependencies: skia_safe, super::types, super::geometry, super::common.
+//! Owns: `draw_marker` (renders multi-layer markers at a position), `marker_layers_from_points`
+//!       (converts config-defined marker points into drawable layers).
+//! Does not own: marker point configuration (see [`crate::config`]), widget
+//!       coordinate transforms (see [`super::transform`]).
+//!
+//! Allowed dependencies: `skia_safe`, `super::types`, `super::geometry`, `super::common`.
+//! Forbidden dependencies: `crate::config`, `crate::activity`,
+//!       `crate::encode`, `crate::commands`.
+//!
+//! ## Performance
+//! Called once per frame for the active marker position during video rendering.
+//! The layer list is pre-allocated during widget preparation — per-frame work is
+//! O(layers) Skia draw calls with no heap allocation.
 
 use super::common::{DEFAULT_COLOR, DEFAULT_POINT_WEIGHT};
 use super::geometry::normalize_opacity;

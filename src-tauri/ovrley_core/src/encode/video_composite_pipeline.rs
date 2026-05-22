@@ -25,7 +25,8 @@ use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
 use crate::encode::ffmpeg_composite::{
-    build_composite_ffmpeg_settings, CompositeFfmpegSettings, HwAccelInfo,
+    build_composite_ffmpeg_settings, CompositeFfmpegBuildRequest, CompositeFfmpegSettings,
+    HwAccelInfo,
 };
 use crate::encode::fps::Fps;
 use crate::encode::progress::ProgressEstimator;
@@ -193,6 +194,9 @@ pub struct CompositePipelinePlan {
 ///
 /// This renders only overlay-frame timestamps, writes raw RGBA frames to
 /// FFmpeg stdin, and lets FFmpeg repeat overlay frames between updates.
+// Called from multiple sites across video.rs, tests, and benchmarks;
+// request-struct refactor deferred to avoid destabilising test seams.
+#[allow(clippy::too_many_arguments)]
 pub fn render_composite_video_single(
     // test seam
     paths: &AppPaths,
@@ -570,6 +574,9 @@ fn format_pipe_write_failure(
 ///
 /// This helper mirrors the future render loop's timing math, including the
 /// fractional-frame overrun guard, without producing any overlay frames.
+// Called only from render_composite_video_single; request-struct deferred
+// because the parameters mirror CompositeRenderRequest fields exactly.
+#[allow(clippy::too_many_arguments)]
 pub fn derive_composite_pipeline_plan(
     // test seam
     paths: &AppPaths,
@@ -623,18 +630,18 @@ pub fn derive_composite_pipeline_plan(
         first_fractional_overrun_overlay_index(render_duration, overlay_pipe_fps);
     let mut hwaccel_info = HwAccelInfo::trust_selected_profile();
     hwaccel_info.qsv_full_init_args = composite_qsv_full_init_args(config);
-    let ffmpeg_settings = build_composite_ffmpeg_settings(
-        &codec_name,
-        composite_bitrate,
-        Path::new(composite_video_path),
-        trim_start,
+    let ffmpeg_settings = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
+        codec_name: &codec_name,
+        bitrate: composite_bitrate,
+        video_path: Path::new(composite_video_path),
+        video_trim_start: trim_start,
         render_duration,
         width,
         height,
         source_fps,
         overlay_pipe_fps,
-        &hwaccel_info,
-    )?;
+        hwaccel_available: &hwaccel_info,
+    })?;
     let output_filename = format!("video_composited_{}.mp4", timestamp_nanos()?);
     let output_path = paths.downloads_dir.join(&output_filename);
 

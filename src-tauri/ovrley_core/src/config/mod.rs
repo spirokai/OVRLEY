@@ -488,6 +488,7 @@ pub struct ElevationPlotConfig {
 ///
 /// Validation focuses on constraints that would otherwise break frame timing:
 /// positive integer FPS, update-rate divisibility, and non-empty scene ranges.
+#[must_use = "parsed config must be consumed for rendering"]
 pub fn parse_config_json(input: &str) -> CoreResult<RenderConfig> {
     let config: RenderConfig = serde_json::from_str(input)
         .map_err(|error| CoreError::Config(format!("config JSON: {error}")))?;

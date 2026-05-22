@@ -12,7 +12,7 @@ fn start_immediate_cancel_cancels_cleanly() {
 
     assert_eq!(controller.progress().status, "running");
 
-    controller.cancel();
+    let _ = controller.cancel();
     let progress = controller.progress();
     assert_eq!(progress.status, "cancelled");
 }
@@ -23,8 +23,8 @@ fn double_cancel_is_idempotent() {
     let controller = RenderController::default();
     controller.try_start(100, "test_double_cancel").unwrap();
 
-    controller.cancel();
-    controller.cancel(); // must not panic
+    let _ = controller.cancel();
+    let _ = controller.cancel(); // must not panic
 
     // After cancel, progress reflects cancelled state
     let progress = controller.progress();
@@ -38,13 +38,13 @@ fn cancel_resets_state_for_next_render() {
     let controller = RenderController::default();
 
     controller.try_start(50, "test_cancel_reset_1").unwrap();
-    controller.cancel();
+    let _ = controller.cancel();
 
     // After cancel, a new start should succeed.
     let result = controller.try_start(50, "test_cancel_reset_2");
     assert!(result.is_ok());
 
-    controller.cancel();
+    let _ = controller.cancel();
 }
 
 /// Progress reports zero frames before any frames are rendered.
@@ -68,7 +68,7 @@ fn controller_lifecycle_start_and_cancel() {
     assert!(progress.total > 0);
 
     // Cancel works
-    controller.cancel();
+    let _ = controller.cancel();
     let progress = controller.progress();
     assert!(progress.status == "cancelled" || progress.status == "running");
 }

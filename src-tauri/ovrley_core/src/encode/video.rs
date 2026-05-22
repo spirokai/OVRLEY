@@ -152,51 +152,59 @@ pub fn render_video(
     render_video_single(paths, config, activity, dense_activity, controller)
 }
 
+/// Bundled parameters for composite MP4 rendering.
+///
+/// Consolidates what was previously 14 separate parameters shared between
+/// `render_composite_video`, `render_composite_video_segmented`, and
+/// `render_composite_video_single`.
+pub struct CompositeRenderRequest<'a> {
+    pub paths: &'a AppPaths,
+    pub config: &'a RenderConfig,
+    pub activity: &'a ParsedActivity,
+    pub dense_activity: &'a DenseActivityReport,
+    pub controller: &'a RenderController,
+    pub composite_video_path: &'a str,
+    pub composite_bitrate: &'a str,
+    pub composite_sync_offset: f64,
+    pub composite_video_fps_num: u32,
+    pub composite_video_fps_den: u32,
+    pub composite_video_duration: f64,
+    pub composite_render_duration: Option<f64>,
+    pub composite_video_trim_start: Option<f64>,
+    pub composite_widget_update_rate: Option<u32>,
+}
+
 /// Renders an imported video with the Skia overlay composited into an MP4 output.
 ///
 /// Longer renders are automatically split into parallel segments for better CPU
 /// utilization and then stitched with FFmpeg stream copy.
-pub fn render_composite_video(
-    paths: &AppPaths,
-    config: &RenderConfig,
-    activity: &ParsedActivity,
-    dense_activity: &DenseActivityReport,
-    controller: &RenderController,
-    composite_video_path: &str,
-    composite_bitrate: &str,
-    composite_sync_offset: f64,
-    composite_video_fps_num: u32,
-    composite_video_fps_den: u32,
-    composite_video_duration: f64,
-    composite_render_duration: Option<f64>,
-    composite_video_trim_start: Option<f64>,
-    composite_widget_update_rate: Option<u32>,
-) -> CoreResult<String> {
-    let render_duration = composite_render_duration
-        .unwrap_or(composite_video_duration - composite_video_trim_start.unwrap_or(0.0));
-    let trim_start = composite_video_trim_start.unwrap_or(0.0);
-    let update_rate = composite_widget_update_rate.unwrap_or(1).max(1);
+pub fn render_composite_video(request: &CompositeRenderRequest<'_>) -> CoreResult<String> {
+    let render_duration = request
+        .composite_render_duration
+        .unwrap_or(request.composite_video_duration - request.composite_video_trim_start.unwrap_or(0.0));
+    let trim_start = request.composite_video_trim_start.unwrap_or(0.0);
+    let update_rate = request.composite_widget_update_rate.unwrap_or(1).max(1);
 
-    let codec = config
+    let codec = request.config
         .scene
         .ffmpeg
         .as_object()
         .and_then(|map| map.get("codec"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or("libx264");
-    if should_parallelize_composite(render_duration, composite_video_fps_num, update_rate, codec) {
+    if should_parallelize_composite(render_duration, request.composite_video_fps_num, update_rate, codec) {
         return render_composite_video_segmented(
-            paths,
-            config,
-            activity,
-            dense_activity,
-            controller,
-            composite_video_path,
-            composite_bitrate,
-            composite_sync_offset,
-            composite_video_fps_num,
-            composite_video_fps_den,
-            composite_video_duration,
+            request.paths,
+            request.config,
+            request.activity,
+            request.dense_activity,
+            request.controller,
+            request.composite_video_path,
+            request.composite_bitrate,
+            request.composite_sync_offset,
+            request.composite_video_fps_num,
+            request.composite_video_fps_den,
+            request.composite_video_duration,
             render_duration,
             trim_start,
             update_rate,
@@ -204,17 +212,17 @@ pub fn render_composite_video(
     }
 
     render_composite_video_single(
-        paths,
-        config,
-        activity,
-        dense_activity,
-        controller,
-        composite_video_path,
-        composite_bitrate,
-        composite_sync_offset,
-        composite_video_fps_num,
-        composite_video_fps_den,
-        composite_video_duration,
+        request.paths,
+        request.config,
+        request.activity,
+        request.dense_activity,
+        request.controller,
+        request.composite_video_path,
+        request.composite_bitrate,
+        request.composite_sync_offset,
+        request.composite_video_fps_num,
+        request.composite_video_fps_den,
+        request.composite_video_duration,
         Some(render_duration),
         Some(trim_start),
         Some(update_rate),
@@ -240,11 +248,28 @@ fn should_parallelize_composite(
     total_frames >= 120 && estimate_composite_segment_count(total_frames as usize, codec) >= 2
 }
 
-/// Renders a composite video as multiple parallel segments stitched together.
+/// Renders a composite MP4 as parallel time-window segments stitched together.
 ///
-/// Each segment covers a contiguous time window of the render timeline. Segments
-/// are rendered concurrently on separate threads, each with its own FFmpeg
-/// process and buffer pool, then concatenated with stream copy.
+/// When a composite render exceeds a per-codec segment threshold, this function
+/// divides the render timeline into roughly equal contiguous windows and spawns
+/// one thread per window. Each thread runs an independent `render_composite_video_single`
+/// with its own ffmpeg process and buffer pool. The segment outputs are then
+/// concatenated via ffmpeg stream copy (no re-encode).
+///
+/// If the computed segment count is 1 (render too short for the codec), it falls
+/// through to a single-pass `render_composite_video_single`.
+///
+/// # Progress & Cancellation
+/// Child controllers share the parent's cancel flag. On first segment error, the
+/// cancel flag is set to stop in-flight segments. Aggregate progress is the sum
+/// of child progress values polled at 200ms intervals.
+///
+/// # Errors
+/// Returns the first segment error or stitch failure. All segment outputs are
+/// cleaned up on any error path (including cancellation).
+// Private function passing through the CompositeRenderRequest fields to
+// render_composite_video_single — deferred from request-struct refactor.
+#[allow(clippy::too_many_arguments)]
 fn render_composite_video_segmented(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -273,6 +298,9 @@ fn render_composite_video_segmented(
     let total_overlay_frames = (render_duration * overlay_pipe_fps.as_f64()).ceil() as usize;
     let segment_count = estimate_composite_segment_count(total_overlay_frames.max(1), codec);
     if segment_count < 2 {
+        // Segment count below threshold — fall through to single-pass.
+        // We pass the computed render_duration/trim_start/update_rate so the
+        // single-pass path receives the same timing parameters the segments would.
         return render_composite_video_single(
             paths,
             config,
@@ -345,6 +373,9 @@ fn render_composite_video_segmented(
     let combined_frames = segment_output_frames.iter().copied().sum::<u32>();
 
     let child_cancel_flag = controller.cancel_flag();
+    // Create one child controller per segment. Each child mirrors the parent's
+    // cancel flag so a cancel (user-triggered or first-error propagation) stops
+    // all in-flight segments. Progress is tracked independently per segment.
     let segment_controllers: Vec<RenderController> = segment_output_frames
         .iter()
         .map(|frames| child_render_controller(*frames, &child_cancel_flag))
@@ -391,6 +422,9 @@ fn render_composite_video_segmented(
         });
         handles.push(handle);
     }
+    // ── PROGRESS AGGREGATION ──
+    // Drop sender so the rx loop below will see Disconnected when all segment
+    // threads have completed (rather than the sender clones keeping the channel open).
     drop(tx);
 
     let mut results = vec![None; actual_segment_count];
@@ -433,6 +467,8 @@ fn render_composite_video_segmented(
     }
 
     for handle in handles {
+        // Join every segment thread, even if we already have an error.
+        // Skipping a join would leak the thread and its ffmpeg process.
         handle.join().map_err(|_| {
             CoreError::Encode("Composite segment render thread panicked".to_string())
         })?;
@@ -479,15 +515,33 @@ fn render_composite_video_segmented(
     Ok(public_filename)
 }
 
+/// Output-frame window range for one parallel composite segment.
+///
+/// Parallel composite rendering splits the total output frame range into
+/// roughly equal non-overlapping windows. Each segment runs an independent
+/// ffmpeg process responsible for exactly the frames in `[output_start_frame,
+/// output_end_frame)`. The video-time equivalents are derived from the
+/// source FPS so each ffmpeg invocation can seek and trim correctly.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CompositeSegmentWindow {
-    // test seam
+    /// First frame index this segment must produce (inclusive).
     pub output_start_frame: u32,
+    /// Frame index one past the last frame (exclusive).
     pub output_end_frame: u32,
+    /// Source-video seek position in seconds for this segment.
     pub video_start_seconds: f64,
+    /// Duration in seconds this segment's ffmpeg should process.
     pub render_duration_seconds: f64,
 }
 
+/// Divides total output frames into roughly equal windows for segmented rendering.
+///
+/// When the segment count exceeds the frame count, it is clamped so each segment
+/// produces at least one frame (extra "remainder" segments are dropped). The
+/// remainder from integer division is distributed one frame at a time across the
+/// first N segments so early segments may be one frame longer than later ones.
+///
+/// Returns an empty `Vec` when `total_output_frames` is zero.
 pub fn composite_output_frame_windows(
     // test seam
     total_output_frames: u32,
@@ -555,8 +609,10 @@ fn render_video_segmented(
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> CoreResult<String> {
-    // Segment renders share the parent cancellation flag while maintaining
-    // independent progress counters. The parent reports aggregate progress.
+    // Segmented transparent rendering: split the scene into integer-second
+    // windows, render each on its own thread, then stitch via stream copy.
+    // Only qtrle and prores_ks_vulkan codecs are segmented — other codecs
+    // produce I-frame-only output that doesn't benefit from parallelism.
     let Some(total_seconds) = integer_second_duration(config) else {
         return render_video_single(paths, config, activity, dense_activity, controller);
     };
@@ -628,6 +684,10 @@ fn render_video_segmented(
         });
         handles.push(handle);
     }
+    // ── PROGRESS AGGREGATION ──
+    // Same aggregation pattern as the composite segmented variant: poll child
+    // controllers, sum progress, collect results via mpsc with 200ms timeout.
+    // First error sets the parent cancel flag to stop remaining segments.
     drop(tx);
 
     let mut results = vec![None; actual_segment_count];

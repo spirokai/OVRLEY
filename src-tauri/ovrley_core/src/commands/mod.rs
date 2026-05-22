@@ -12,7 +12,7 @@ use crate::config::parse_config_json;
 use crate::config::RenderConfig;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
-use crate::encode::video::{render_composite_video, render_video, RenderController};
+use crate::encode::video::{render_composite_video, render_video, CompositeRenderRequest, RenderController};
 use crate::encode::video_composite_pipeline::{
     apply_composite_scene_timing, derive_composite_render_plan,
 };
@@ -155,22 +155,22 @@ fn backend_render_composite_phase3(
     let controller_clone = controller.clone();
     let paths = paths.clone();
     std::thread::spawn(move || {
-        match render_composite_video(
-            &paths,
-            &config,
-            &parsed_activity,
-            &dense_activity,
-            &controller_clone,
-            &plan.video_path,
-            &plan.bitrate,
-            plan.sync_offset,
-            plan.source_fps.num,
-            plan.source_fps.den,
-            plan.video_duration,
-            Some(plan.render_duration),
-            Some(plan.trim_start),
-            Some(plan.update_rate),
-        ) {
+        match render_composite_video(&CompositeRenderRequest {
+            paths: &paths,
+            config: &config,
+            activity: &parsed_activity,
+            dense_activity: &dense_activity,
+            controller: &controller_clone,
+            composite_video_path: &plan.video_path,
+            composite_bitrate: &plan.bitrate,
+            composite_sync_offset: plan.sync_offset,
+            composite_video_fps_num: plan.source_fps.num,
+            composite_video_fps_den: plan.source_fps.den,
+            composite_video_duration: plan.video_duration,
+            composite_render_duration: Some(plan.render_duration),
+            composite_video_trim_start: Some(plan.trim_start),
+            composite_widget_update_rate: Some(plan.update_rate),
+        }) {
             Ok(filename) => controller_clone.finish_success(filename),
             Err(error) => {
                 let cancelled = matches!(error, CoreError::Cancelled);

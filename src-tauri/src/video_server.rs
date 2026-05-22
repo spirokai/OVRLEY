@@ -1,3 +1,29 @@
+//! Local HTTP preview server with byte-range support.
+//!
+//! Owns: the `VideoServerHandle` / `PreviewVideoState` lifecycle, the tiny_http
+//!       accept-loop thread, byte-range parsing (`parse_range`), and all
+//!       preview-video HTTP serving logic. The server binds to a random loopback
+//!       port at startup and serves video files to the frontend for in-app preview.
+//! Does not own: core rendering, video encoding, or activity parsing — those live
+//!       in `ovrley_core`. This module is Tauri-shell infrastructure.
+//!
+//! Allowed dependencies: `tiny_http`, `serde`, `std` (fs, io, thread, sync).
+//! Forbidden dependencies: `ovrley_core` (the core crate is not a dependency of
+//!       the Tauri shell — the Tauri shell wraps core, not vice versa).
+//!
+//! ## Thread Safety
+//! The preview server runs on a dedicated accept-loop thread. Shared state
+//! (`VideoServerHandle.inner: Arc<Mutex<VideoServerInner>>`) is locked only on
+//! video-path changes and shutdown — the hot request-serving path locks neither
+//! a mutex nor the server handle. The accept loop exits when `shutdown_flag`
+//! (AtomicBool) is set to true.
+//!
+//! ## Request Handling
+//! Supports HTTP range requests (`bytes=start-end`, `bytes=start-`,
+//! `bytes=-suffix`) for video scrubbing. Returns 206 Partial Content with
+//! Content-Range headers for valid ranges, 416 Range Not Satisfiable for
+//! out-of-bounds ranges, and 200 OK for full-file requests.
+
 use serde::Serialize;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -10,6 +36,13 @@ use uuid::Uuid;
 
 const CHUNK_SIZE: usize = 512 * 1024;
 
+/// Handle for the local HTTP preview server.
+///
+/// Created before the Tauri window opens and stored as managed app state.
+/// The inner state is `Arc<Mutex<...>>` so the handle can be cloned and
+/// shared between the Tauri command layer and the accept-loop thread.
+/// Call `start()` to bind the loopback socket and spawn the server thread,
+/// `stop()` to signal shutdown and join the thread.
 #[derive(Clone)]
 pub struct VideoServerHandle {
     inner: Arc<Mutex<VideoServerInner>>,
@@ -30,6 +63,11 @@ struct CurrentVideo {
     content_type: String,
 }
 
+/// Serializable preview-video state returned to the frontend.
+///
+/// The frontend polls this after importing a video to discover the local
+/// preview URL and confirm the file is accessible. `preview_url` uses a random
+/// loopback port assigned at server start.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewVideoState {
@@ -40,6 +78,11 @@ pub struct PreviewVideoState {
     pub content_type: String,
 }
 
+/// Inclusive byte range for HTTP range requests.
+///
+/// Both `start` and `end` are inclusive offsets (RFC 7233 semantics).
+/// The server constructs Content-Range headers from these values and
+/// seeks the file cursor accordingly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ByteRange {
     // test seam
