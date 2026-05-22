@@ -1,4 +1,6 @@
-use super::parse_config_json;
+use ovrley_core::config::parse_config_json;
+
+mod common;
 
 #[test]
 // Verifies old transparent-render configs parse without composite fields.
@@ -137,4 +139,50 @@ fn rejects_zero_composite_widget_update_rate() {
         error,
         "scene.composite_widget_update_rate must be at least 1"
     );
+}
+
+// --- Snapshot / golden tests (Step 11a) ---
+
+#[test]
+fn valid_minimal_config_fills_defaults() {
+    let json = std::fs::read_to_string(common::test_config::simple_config_path()).unwrap();
+    let config = parse_config_json(&json).unwrap();
+
+    assert_eq!(config.scene.fps, 30.0);
+    assert_eq!(config.scene.width, Some(1920));
+    assert_eq!(config.scene.height, Some(1080));
+    assert_eq!(config.scene.composite_video_path, None);
+    assert_eq!(config.values.len(), 1);
+}
+
+#[test]
+fn valid_composite_config_preserves_fields() {
+    let json = std::fs::read_to_string(common::test_config::composite_config_path()).unwrap();
+    let config = parse_config_json(&json).unwrap();
+
+    assert_eq!(config.scene.composite_video_path.as_deref(), Some("test.mp4"));
+    assert_eq!(config.scene.composite_bitrate.as_deref(), Some("60M"));
+    assert_eq!(config.scene.composite_sync_offset, Some(300.0));
+    assert_eq!(config.scene.composite_widget_update_rate, Some(2));
+}
+
+#[test]
+fn invalid_json_reports_error() {
+    let json = std::fs::read_to_string(
+        common::test_config::fixtures().join("config").join("invalid.json"),
+    )
+    .unwrap();
+    let error = parse_config_json(&json).unwrap_err();
+    assert!(!error.is_empty());
+}
+
+#[test]
+fn config_roundtrip_is_idempotent() {
+    let json = std::fs::read_to_string(common::test_config::simple_config_path()).unwrap();
+    let config1 = parse_config_json(&json).unwrap();
+    let serialized = serde_json::to_string(&config1).unwrap();
+    let config2 = parse_config_json(&serialized).unwrap();
+    assert_eq!(config1.scene.fps, config2.scene.fps);
+    assert_eq!(config1.scene.width, config2.scene.width);
+    assert_eq!(config1.scene.height, config2.scene.height);
 }

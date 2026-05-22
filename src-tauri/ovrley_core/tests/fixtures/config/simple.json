@@ -1,0 +1,13 @@
+{
+  "scene": {
+    "fps": 30,
+    "start": 0,
+    "end": 10,
+    "width": 1920,
+    "height": 1080,
+    "ffmpeg": {}
+  },
+  "labels": [],
+  "values": [{ "value": "speed", "x": 0, "y": 0 }],
+  "plots": []
+}

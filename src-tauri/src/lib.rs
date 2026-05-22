@@ -1,5 +1,5 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-mod video_server;
+pub mod video_server; // test seam
 
 use ovrley_core::commands::{self, AppPaths};
 use ovrley_core::encode::video::RenderController;

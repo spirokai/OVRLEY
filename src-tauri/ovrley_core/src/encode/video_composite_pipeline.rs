@@ -48,28 +48,28 @@ struct WriterResult {
 /// Keeping this as a small data object makes Phase 4 behavior easy to test and
 /// gives the Phase 5 render loop one place to read its exact frame counts.
 #[derive(Debug, Clone, PartialEq)]
-struct CompositePipelinePlan {
-    source_fps: Fps,
-    output_fps: Fps,
-    overlay_pipe_fps: Fps,
-    render_duration: f64,
-    overlay_frame_count: u64,
-    output_frame_count: u64,
-    first_overrun_overlay_index: u64,
-    widget_update_rate: u32,
-    trim_start: f64,
-    codec_name: String,
-    bitrate: String,
-    ffmpeg_settings: CompositeFfmpegSettings,
-    output_filename: String,
-    output_path: PathBuf,
+pub struct CompositePipelinePlan { // test seam
+    pub source_fps: Fps,
+    pub output_fps: Fps,
+    pub overlay_pipe_fps: Fps,
+    pub render_duration: f64,
+    pub overlay_frame_count: u64,
+    pub output_frame_count: u64,
+    pub first_overrun_overlay_index: u64,
+    pub widget_update_rate: u32,
+    pub trim_start: f64,
+    pub codec_name: String,
+    pub bitrate: String,
+    pub ffmpeg_settings: CompositeFfmpegSettings,
+    pub output_filename: String,
+    pub output_path: PathBuf,
 }
 
 /// Runs the software composite render pipeline.
 ///
 /// This renders only overlay-frame timestamps, writes raw RGBA frames to
 /// FFmpeg stdin, and lets FFmpeg repeat overlay frames between updates.
-pub(crate) fn render_composite_video_single(
+pub fn render_composite_video_single( // test seam
     paths: &AppPaths,
     config: &RenderConfig,
     activity: &ParsedActivity,
@@ -235,8 +235,7 @@ pub(crate) fn render_composite_video_single(
     drop(sender);
     let writer_result = writer_thread
         .join()
-        .map_err(|_| "Composite encoder writer thread panicked".to_string())?
-        .map_err(|error| error)?;
+        .map_err(|_| "Composite encoder writer thread panicked".to_string())?;
     let was_cancelled = cancel_flag.load(Ordering::SeqCst);
     let ffmpeg_finalize_started = Instant::now();
     let status = if was_cancelled {
@@ -248,6 +247,21 @@ pub(crate) fn render_composite_video_single(
     monitor_thread
         .join()
         .map_err(|_| "Composite ffmpeg monitor thread panicked".to_string())?;
+
+    let writer = match writer_result {
+        Ok(w) => w,
+        Err(error) => {
+            let _ = std::fs::remove_file(&plan.output_path);
+            let stderr = stderr_snapshot(&stderr_lines);
+            if is_pipe_write_error(&error) {
+                return Err(format_pipe_write_failure(error, status, &stderr, &plan));
+            }
+            if stderr.is_empty() {
+                return Err(error);
+            }
+            return Err(format!("{error}. FFmpeg stderr:\n{}", stderr_tail(&stderr)));
+        }
+    };
 
     if let Err(error) = render_result {
         let _ = std::fs::remove_file(&plan.output_path);
@@ -269,18 +283,18 @@ pub(crate) fn render_composite_video_single(
         let stderr = stderr_snapshot(&stderr_lines);
         return Err(format_composite_ffmpeg_failure(&plan, status, &stderr));
     }
-    if writer_result.written_frames != expected_guarded_overlay_frame_count(&plan) {
+    if writer.written_frames != expected_guarded_overlay_frame_count(&plan) {
         let _ = std::fs::remove_file(&plan.output_path);
         return Err(format!(
             "Composite overlay writer ended early: wrote {} of {} frames",
-            writer_result.written_frames,
+            writer.written_frames,
             expected_guarded_overlay_frame_count(&plan)
         ));
     }
     verify_successful_composite_output(&plan.output_path)?;
 
     let total_ms = render_started.elapsed().as_secs_f64() * 1000.0;
-    let merged_timings = merge_timing_maps(profiler.summary(), writer_result.timings);
+    let merged_timings = merge_timing_maps(profiler.summary(), writer.timings);
     write_composite_timing_summary(CompositeTimingSummaryInput {
         debug_render_dir: &paths.debug_render_dir,
         ffmpeg_settings: &plan.ffmpeg_settings,
@@ -289,7 +303,7 @@ pub(crate) fn render_composite_video_single(
         overlay_pipe_fps: plan.overlay_pipe_fps,
         widget_update_rate: plan.widget_update_rate,
         render_duration: plan.render_duration,
-        overlay_frame_count: writer_result.written_frames,
+        overlay_frame_count: writer.written_frames,
         output_frame_count: plan.output_frame_count,
         total_ms,
         render_loop_ms,
@@ -434,7 +448,7 @@ fn format_composite_ffmpeg_failure(
 ///
 /// This helper mirrors the future render loop's timing math, including the
 /// fractional-frame overrun guard, without producing any overlay frames.
-fn derive_composite_pipeline_plan(
+pub fn derive_composite_pipeline_plan( // test seam
     paths: &AppPaths,
     config: &RenderConfig,
     composite_video_path: &str,
@@ -553,7 +567,7 @@ fn spawn_composite_ffmpeg_process(
 ///
 /// Composite-adjusted dense reports use direct `overlay j -> dense j` mapping;
 /// otherwise this falls back to scene-start-relative time mapping.
-fn dense_frame_index_for_overlay(
+pub fn dense_frame_index_for_overlay( // test seam
     config: &RenderConfig,
     dense_activity: &DenseActivityReport,
     plan: &CompositePipelinePlan,
@@ -611,7 +625,7 @@ fn dense_report_frame_count_matches(config: &RenderConfig, plan: &CompositePipel
 }
 
 /// Counts overlay frames whose timestamps are strictly inside render duration.
-fn expected_guarded_overlay_frame_count(plan: &CompositePipelinePlan) -> u64 {
+pub fn expected_guarded_overlay_frame_count(plan: &CompositePipelinePlan) -> u64 { // test seam
     plan.first_overrun_overlay_index
 }
 
@@ -680,7 +694,7 @@ fn composite_qsv_full_init_args(config: &RenderConfig) -> Vec<String> {
 /// The render loop uses the equivalent guard
 /// `video_local_time >= render_duration` so fractional durations never emit an
 /// extra tail frame.
-fn first_fractional_overrun_overlay_index(render_duration: f64, overlay_pipe_fps: Fps) -> u64 {
+pub fn first_fractional_overrun_overlay_index(render_duration: f64, overlay_pipe_fps: Fps) -> u64 { // test seam
     let mut index = (render_duration * overlay_pipe_fps.as_f64())
         .floor()
         .max(0.0) as u64;
@@ -801,7 +815,3 @@ fn merge_timing_maps(
     }
     left
 }
-
-#[cfg(test)]
-#[path = "tests/video_composite_pipeline_tests.rs"]
-mod tests;

@@ -10,6 +10,32 @@ The refactor must improve structure **without changing how the application works
 
 ---
 
+## Prompt
+
+Read and execute the Phase 1 refactor plan in `.agents/backend-refactor-Phase1-DSPro.md`.
+
+Rules:
+
+- Treat that document as the execution spec.
+- Follow the steps in order.
+- Do not skip verification steps.
+- Do not make architectural changes outside Phase 1.
+- Do not change production behavior.
+- Do not “improve” code beyond what the plan requires.
+- If a step reveals a blocker, stop and report it before proceeding.
+- If a test depends on private internals, use the smallest possible `pub(crate)` seam only if required by the plan.
+- Do not rely on unwired `src/*/tests/` files being discovered by Cargo.
+- Final test locations must be real crate-root integration tests under `src-tauri/ovrley_core/tests/` or `src-tauri/tests/`.
+- After each migration step, run the exact verification the plan calls for and report results.
+- Before editing any file, state which step of the plan you are executing.
+- At the end, summarize:
+  1. completed steps
+  2. files changed
+  3. verification results
+  4. blockers or deviations from the plan
+
+---
+
 ## Table of Contents
 
 1. [Current Architecture Overview](#1-current-architecture-overview)
@@ -259,6 +285,7 @@ The production file must not know about test files.
 ## 2.6 Do Not Introduce Premature Abstractions
 
 Do not introduce:
+
 - generic plugin systems, service locators, dependency injection frameworks
 - unnecessary traits, speculative GPU renderer abstractions
 - micro-crates, over-generalized pipeline traits
@@ -270,6 +297,7 @@ Do not introduce:
 ## 2.7 Hot Paths Must Stay Hot
 
 Render and encode paths are performance-sensitive. Avoid adding these inside frame/render/write loops:
+
 - heap allocations
 - unnecessary clones
 - repeated `String` formatting
@@ -284,6 +312,7 @@ If a refactor touches a hot path, benchmark before and after.
 ## 2.8 Prefer Cohesion Over File Size Rules
 
 Do not split files only because they exceed a line count. Split when:
+
 - a file has multiple unrelated reasons to change
 - imports become incoherent
 - tests become awkward
@@ -296,7 +325,7 @@ Do not split files only because they exceed a line count. Split when:
 All integration and module-level tests **must** source their test fixture paths from a single shared configuration file (`tests/common/mod.rs` or `tests/common/test_config.rs`). This file defines the paths to:
 
 - a representative parsed activity JSON fixture
-- a representative template/config JSON fixture  
+- a representative template/config JSON fixture
 - a representative MP4 video fixture (for probe/composite tests)
 
 No test file should hardcode its own `repo_root()` or `fixture_path()` calls with literal relative paths. Instead, each test references the shared config:
@@ -310,6 +339,7 @@ let video = test_config::sample_video_path();
 ```
 
 **Why this is required:**
+
 - a single redirect point when fixtures are reorganized or relocated
 - eliminates brittle `parent().unwrap().parent().unwrap()` chains scattered across files
 - ensures all tests use the same source data, preventing silent divergence where different tests exercise slightly different inputs
@@ -353,6 +383,7 @@ No production code may reference this test config. It is test-only infrastructur
 **Current Problem:** Tests are co-located with source via `#[path = "tests/..."]` (e.g., `config/mod.rs:614-616`) or inline `#[cfg(test)] mod tests { ... }` (e.g., `activity/mod.rs:57-190`, `render/format.rs:500-737`, `render/widgets/value.rs:814-832`).
 
 **Why This Is a Problem:**
+
 - source modules must know about test file layout
 - tests may silently rely on private module internals
 - test wiring adds noise to production modules
@@ -365,6 +396,7 @@ No production code may reference this test config. It is test-only infrastructur
 **Current Problem:** Nearly every fallible function returns `Result<T, String>`. Examples: `parse_config_json`, `parse_activity_json`, `trim_activity`, `densify_activity`, `render_frame_rgba`, `build_ffmpeg_settings`, `probe_video`.
 
 **Why This Is a Problem:**
+
 - lose error kind information — cannot distinguish validation vs IO vs ffmpeg failure
 - prevent pattern matching on error type
 - encourage fragile string-based error inspection (`error.to_lowercase().contains("cancelled")` in `commands/mod.rs:209`)
@@ -426,6 +458,7 @@ No test file should contain `repo_root()`, `fixture_path()`, or `parent().unwrap
 - `activity/trim.rs` — boolean requirements for each metric
 
 **Why This Is a Problem:**
+
 - typos are silent bugs
 - supported metrics are not discoverable
 - logic is duplicated across 5+ files
@@ -438,15 +471,15 @@ No test file should contain `repo_root()`, `fixture_path()`, or `parent().unwrap
 
 **Current Problem:** At least **7 functions** suppress `#[allow(clippy::too_many_arguments)]`:
 
-| Function | File | Args |
-|----------|------|------|
-| `render_preview_with_prepared_assets` | `render/mod.rs:177-188` | 9 |
-| `render_frame_rgba` | `render/mod.rs:271-282` | 8 |
-| `render_frame_to_surface` | `render/mod.rs:379-391` | 10 |
-| `render_frame_surface` | `render/mod.rs:324-335` | 9 |
-| `draw_metric_value_widget_with_config` | `render/widgets/value.rs:52-63` | 10 |
-| `widget_render_report` | `render/widgets/common.rs:712-723` | 8 |
-| `draw_metric_icon` | `render/widgets/value.rs:367-379` | 10 |
+| Function                               | File                               | Args |
+| -------------------------------------- | ---------------------------------- | ---- |
+| `render_preview_with_prepared_assets`  | `render/mod.rs:177-188`            | 9    |
+| `render_frame_rgba`                    | `render/mod.rs:271-282`            | 8    |
+| `render_frame_to_surface`              | `render/mod.rs:379-391`            | 10   |
+| `render_frame_surface`                 | `render/mod.rs:324-335`            | 9    |
+| `draw_metric_value_widget_with_config` | `render/widgets/value.rs:52-63`    | 10   |
+| `widget_render_report`                 | `render/widgets/common.rs:712-723` | 8    |
+| `draw_metric_icon`                     | `render/widgets/value.rs:367-379`  | 10   |
 
 **Target:** Use plain request/context structs. Do not automatically introduce builders — simple structs with named fields are sufficient.
 
@@ -475,6 +508,7 @@ These may drift. The `render/widgets/common.rs` versions use `f32` while `activi
 ## 3.8 Large `render/widgets/common.rs` (MEDIUM PRIORITY)
 
 **Current Problem:** 774 lines containing too many unrelated responsibilities:
+
 - interpolation helpers (duplicated from `activity/interpolate.rs`)
 - polyline/area drawing helpers
 - marker drawing helpers
@@ -504,6 +538,7 @@ Only extract modules when cohesion improves. Do not split mechanically.
 - `render/mod.rs:464` — label cache: `static CACHE: OnceLock<Mutex<HashMap<u64, Image>>>`
 
 **Why This May Be a Problem:**
+
 - hidden lifecycle — no way to reset between tests
 - possible state leakage between test runs
 - hard to measure hit rate or size
@@ -536,6 +571,7 @@ Only add TTL, LRU, max entries, or metrics if needed.
 ## 3.11 Command Layer Contains Logic That Belongs Elsewhere (MEDIUM PRIORITY)
 
 **Current Problem:** `commands/mod.rs` contains:
+
 - `derive_composite_render_plan` — composite timing/planning logic (lines 302-380)
 - `apply_composite_scene_timing` — mutates render config (lines 386-391)
 - `is_composite_render` — composite mode detection (lines 225-227)
@@ -700,17 +736,17 @@ ovrley_core/src/*/tests/              # module-local if internals needed
 
 Files to migrate:
 
-| Current Location | Source Line |
-|-----------------|-------------|
-| `config/mod.rs` | `#[path = "tests/config_tests.rs"] mod tests;` at line 614 |
-| `commands/mod.rs` | `#[path = "tests/commands_tests.rs"] mod tests;` at line 652 |
-| `encode/fps.rs` | `#[path = "tests/fps_tests.rs"] mod tests;` at line 104 |
-| `encode/ffmpeg_composite.rs` | `#[path = "tests/ffmpeg_composite_tests.rs"] mod tests;` at line 228 |
+| Current Location                     | Source Line                                                                  |
+| ------------------------------------ | ---------------------------------------------------------------------------- |
+| `config/mod.rs`                      | `#[path = "tests/config_tests.rs"] mod tests;` at line 614                   |
+| `commands/mod.rs`                    | `#[path = "tests/commands_tests.rs"] mod tests;` at line 652                 |
+| `encode/fps.rs`                      | `#[path = "tests/fps_tests.rs"] mod tests;` at line 104                      |
+| `encode/ffmpeg_composite.rs`         | `#[path = "tests/ffmpeg_composite_tests.rs"] mod tests;` at line 228         |
 | `encode/video_composite_pipeline.rs` | `#[path = "tests/video_composite_pipeline_tests.rs"] mod tests;` at line 549 |
-| `activity/mod.rs` | inline `#[cfg(test)] mod tests {}` at line 57 |
-| `render/format.rs` | inline `#[cfg(test)] mod tests {}` at line 500 |
-| `render/widgets/value.rs` | inline `#[cfg(test)] mod tests {}` at line 814 |
-| `video_server.rs` | inline `#[cfg(test)] mod tests {}` at line 461 |
+| `activity/mod.rs`                    | inline `#[cfg(test)] mod tests {}` at line 57                                |
+| `render/format.rs`                   | inline `#[cfg(test)] mod tests {}` at line 500                               |
+| `render/widgets/value.rs`            | inline `#[cfg(test)] mod tests {}` at line 814                               |
+| `video_server.rs`                    | inline `#[cfg(test)] mod tests {}` at line 461                               |
 
 **2. Add fixture helper infrastructure**
 
@@ -819,6 +855,7 @@ pub enum CoreError {
 **2. Migrate errors incrementally**
 
 Recommended order (each step = one PR):
+
 ```
 config -> activity -> render helpers -> encode helpers -> commands -> Tauri boundary
 ```
@@ -981,6 +1018,7 @@ Move `build_ffmpeg_settings`, `FfmpegSettings`, and supporting helpers from `ffm
 - **2b.** Review `ProgressEstimator` — it has inline `#[cfg(test)] mod tests` that must be moved to a `tests/` directory.
 
 Document lifecycle:
+
 ```
 Idle -> Running -> Completed
                 -> Failed
@@ -1021,12 +1059,12 @@ pub fn render_preview_with_prepared_assets(
 
 Functions to refactor:
 
-| Current | Suggested Struct |
-|---------|-----------------|
-| `render_preview_with_prepared_assets` (9 args) | `PreviewRenderRequest` |
-| `render_frame_rgba` (8 args) | `FrameRenderRequest` |
-| `render_frame_to_surface` (10 args) | `FrameRenderRequest` |
-| `draw_metric_value_widget_with_config` (10 args) | `MetricWidgetRequest` |
+| Current                                          | Suggested Struct       |
+| ------------------------------------------------ | ---------------------- |
+| `render_preview_with_prepared_assets` (9 args)   | `PreviewRenderRequest` |
+| `render_frame_rgba` (8 args)                     | `FrameRenderRequest`   |
+| `render_frame_to_surface` (10 args)              | `FrameRenderRequest`   |
+| `draw_metric_value_widget_with_config` (10 args) | `MetricWidgetRequest`  |
 
 **4. Separate planning from execution**
 
@@ -1070,6 +1108,7 @@ Planning should be easy to test without running ffmpeg. Execution may own IO/pro
 **1. Audit all global caches**
 
 Identify:
+
 - what is cached (typeface references, rendered label images)
 - why it is cached (performance — font loading and label rendering are expensive)
 - whether it is bounded (unbounded — grows with unique configs/fonts)
@@ -1119,6 +1158,7 @@ Potential metrics: hit count, miss count, cache size. Do not add metrics if they
 **1. Add module-level docs for major modules**
 
 Each major module should explain:
+
 - what it owns
 - what it does not own
 - allowed dependencies
@@ -1148,6 +1188,7 @@ Include: purpose, errors, panics, performance assumptions (if hot path), threadi
 **3. Add threading and lifecycle docs**
 
 For shared controllers, queues, and cancellation state, document:
+
 - ownership
 - state transitions
 - thread safety
@@ -1169,6 +1210,7 @@ cargo deny check   # if configured
 ### Manual Tests After Phase 6
 
 Verify all user-facing flows:
+
 - import video, preview overlay, scrub preview
 - render transparent overlay, render composite MP4
 - cancel render, inspect progress
@@ -1189,18 +1231,18 @@ Verify all user-facing flows:
 
 ## 6.1 Test Categories
 
-| Priority | Area | Examples |
-|----------|------|----------|
-| P0 | Config parsing | Valid configs, invalid configs, defaults, composite fields |
-| P0 | Activity parsing | GPX/FIT-derived JSON, missing fields, debug payload wrapper |
-| P0 | Interpolation | Frame timestamps, dense reports, 29.97/59.94 FPS |
-| P0 | Frame counting | fps, duration, integer/non-integer windows |
-| P1 | FFmpeg commands | Transparent (prores, qtrle, vulkan), composite (libx264) |
-| P1 | Render plans | Preview, export, composite plan derivation |
-| P1 | Cancellation | Start/cancel/reset lifecycle, progress states |
-| P2 | Video probe | Metadata extraction, creation time priority fallback |
-| P2 | HTTP server | Range headers (full, partial, suffix, unsatisfiable), 404, 416 |
-| P3 | Visual regression | Representative rendered frames (optional, manual) |
+| Priority | Area              | Examples                                                       |
+| -------- | ----------------- | -------------------------------------------------------------- |
+| P0       | Config parsing    | Valid configs, invalid configs, defaults, composite fields     |
+| P0       | Activity parsing  | GPX/FIT-derived JSON, missing fields, debug payload wrapper    |
+| P0       | Interpolation     | Frame timestamps, dense reports, 29.97/59.94 FPS               |
+| P0       | Frame counting    | fps, duration, integer/non-integer windows                     |
+| P1       | FFmpeg commands   | Transparent (prores, qtrle, vulkan), composite (libx264)       |
+| P1       | Render plans      | Preview, export, composite plan derivation                     |
+| P1       | Cancellation      | Start/cancel/reset lifecycle, progress states                  |
+| P2       | Video probe       | Metadata extraction, creation time priority fallback           |
+| P2       | HTTP server       | Range headers (full, partial, suffix, unsatisfiable), 404, 416 |
+| P3       | Visual regression | Representative rendered frames (optional, manual)              |
 
 ## 6.2 Snapshot Testing
 
@@ -1341,6 +1383,7 @@ config -> activity -> render -> encode
 ```
 
 **Forbidden:**
+
 - `render` importing `encode`
 - pipelines importing sibling pipelines
 - `config` importing runtime systems
@@ -1349,24 +1392,25 @@ config -> activity -> render -> encode
 
 ## 8.2 Import Matrix
 
-| Module | May Import | Must Not Import |
-|--------|-----------|----------------|
-| `config` | std, serde, local helpers, `error`, `types` | `activity`, `render`, `encode`, `commands` |
-| `activity` | `config`, `error`, `types`, `debug` (if justified) | `render`, `encode`, `commands` |
-| `render` | `config`, `activity`, `debug`, `error`, `types` | `encode`, `commands` |
-| `render::widgets` | `render::format`, `render::text`, `config`, `activity` | `encode`, `commands` |
-| `encode::video_pipeline` | `config`, `activity`, `render`, `encode::ffmpeg`, `encode::ffmpeg_settings`, `encode::fps`, `encode::progress`, `error` | `commands`, `encode::video_composite_pipeline` |
-| `encode::video_composite_pipeline` | `config`, `activity`, `render`, `encode::ffmpeg`, `encode::ffmpeg_composite`, `encode::fps`, `encode::progress`, `error` | `commands`, `encode::video_pipeline` |
-| `encode::video` (orchestrator) | Everything in `encode/` + `config`, `activity`, `commands`, `error` | `render` directly (go through `video_pipeline`) |
-| `commands` | `config`, `activity`, `render`, `encode`, `debug`, `error` | Tauri-specific APIs |
-| `debug` | std, serde | `config`, `render`, `encode` (unless justified) |
-| `src-tauri/src/lib.rs` | `ovrley_core`, `video_server`, tauri | Core implementation details |
+| Module                             | May Import                                                                                                               | Must Not Import                                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| `config`                           | std, serde, local helpers, `error`, `types`                                                                              | `activity`, `render`, `encode`, `commands`      |
+| `activity`                         | `config`, `error`, `types`, `debug` (if justified)                                                                       | `render`, `encode`, `commands`                  |
+| `render`                           | `config`, `activity`, `debug`, `error`, `types`                                                                          | `encode`, `commands`                            |
+| `render::widgets`                  | `render::format`, `render::text`, `config`, `activity`                                                                   | `encode`, `commands`                            |
+| `encode::video_pipeline`           | `config`, `activity`, `render`, `encode::ffmpeg`, `encode::ffmpeg_settings`, `encode::fps`, `encode::progress`, `error`  | `commands`, `encode::video_composite_pipeline`  |
+| `encode::video_composite_pipeline` | `config`, `activity`, `render`, `encode::ffmpeg`, `encode::ffmpeg_composite`, `encode::fps`, `encode::progress`, `error` | `commands`, `encode::video_pipeline`            |
+| `encode::video` (orchestrator)     | Everything in `encode/` + `config`, `activity`, `commands`, `error`                                                      | `render` directly (go through `video_pipeline`) |
+| `commands`                         | `config`, `activity`, `render`, `encode`, `debug`, `error`                                                               | Tauri-specific APIs                             |
+| `debug`                            | std, serde                                                                                                               | `config`, `render`, `encode` (unless justified) |
+| `src-tauri/src/lib.rs`             | `ovrley_core`, `video_server`, tauri                                                                                     | Core implementation details                     |
 
 ## 8.3 Crate Split Rule
 
 Do not split into separate crates (`encoding_transparent`, `encoding_composite`, `rendering_cpu`, `rendering_gpu`).
 
 **Reasons:**
+
 - shared types (`AppPaths`, `RenderConfig`, `DenseActivityReport`) would require yet another crate
 - pipelines share render/config/activity concepts — the dependency graph becomes a DAG of crates
 - GPU path is future-facing — premature abstraction
@@ -1426,6 +1470,7 @@ Cancellation must:
 8. Reset `running` state (allowing subsequent renders)
 
 **Must not:**
+
 - orphan ffmpeg child processes
 - deadlock on join (use timeouts)
 - leave `running = true` after failure
@@ -1446,6 +1491,7 @@ Any function spawning ffmpeg must document:
 ## 9.4 Progress Updates
 
 Progress updates should:
+
 - be thread-safe (use atomic counter for encoded frames, mutex for full state snapshot)
 - avoid high-frequency lock contention (don't lock per-frame, batch updates)
 - avoid per-frame expensive formatting (format strings only on state change)
@@ -1453,6 +1499,7 @@ Progress updates should:
 - expose clear state transitions
 
 State model:
+
 ```
 Idle -> Running -> Completed
                 -> Failed
@@ -1489,6 +1536,7 @@ Diagnostic binaries may print user-facing output (e.g., timing summaries to stdo
 ## 10.2 Include Useful Context
 
 Good context for log messages:
+
 - render id
 - pipeline type (transparent, composite)
 - input/output paths
@@ -1527,6 +1575,7 @@ log::debug!("Probing video: {}", path);
 ## 11.1 Hot Path Examples
 
 Treat these as hot paths:
+
 - frame rendering (`render_frame_rgba`, `render_frame_to_surface`)
 - widget drawing (`draw_route_widget`, `draw_elevation_widget`, `draw_metric_parts`)
 - activity interpolation (`interpolate_points`, `densify_activity`)
@@ -1538,6 +1587,7 @@ Treat these as hot paths:
 ## 11.2 Avoid in Hot Paths
 
 Avoid:
+
 - unnecessary heap allocation (reuse buffers via pool)
 - unnecessary cloning (pass references where possible)
 - repeated `String` formatting (format once, cache)
@@ -1550,6 +1600,7 @@ Avoid:
 ## 11.3 Benchmark Before/After
 
 For render/encode changes, capture:
+
 - ms/frame
 - total export time
 - memory usage (process RSS)
@@ -1561,6 +1612,7 @@ For render/encode changes, capture:
 A refactor that makes code cleaner but significantly slower is not acceptable unless explicitly justified.
 
 If performance changes, document:
+
 ```
 Performance impact:
 - Before: 12ms/frame, 30s export
@@ -1614,6 +1666,7 @@ Do not do this everywhere automatically. Use it where it improves correctness.
 ## 12.3 Use Enums for Finite Domains
 
 Use enums for:
+
 - metric kinds (`MetricKind`)
 - codec choices (replace string matching in `build_ffmpeg_settings`)
 - export format, render state (`RenderProgress.status`)
@@ -1824,7 +1877,7 @@ format!("Preview URL {preview_url} has no valid import id segment")
 value.as_str().unwrap_or_default().to_ascii_lowercase()
 ```
 
- `None` and `""` (Some("")) may have different meanings. Handle the distinction explicitly.
+`None` and `""` (Some("")) may have different meanings. Handle the distinction explicitly.
 
 ## 14.8 Test Wiring in Production Source
 
@@ -1890,6 +1943,7 @@ Every `mod.rs` (and every module root) should include:
 ## 15.2 Function Documentation
 
 Document public functions when they are meaningful API. Include:
+
 - purpose (what the function does)
 - errors (which error variants can be returned and why)
 - panics (if any — ideally none)
@@ -1917,7 +1971,7 @@ pub fn parse_config_json(input: &str) -> CoreResult<RenderConfig> { ... }
 
 Document types that encode important state or ownership:
 
-```rust
+````rust
 /// Shared render state for progress polling and cancellation.
 ///
 /// Clones share the same underlying progress state via `Arc<Mutex>`.
@@ -1932,7 +1986,7 @@ Document types that encode important state or ownership:
 /// ```
 #[derive(Clone)]
 pub struct RenderController { ... }
-```
+````
 
 ## 15.4 Intra-Doc Links
 
@@ -2046,26 +2100,29 @@ Before considering the refactor complete, verify all of the following:
 
 **Status:** Moderate refactor needed.
 **Issues:**
+
 - Tauri command wrappers should remain thin — convert typed errors to frontend strings only at boundary
 - Contains `cfg!(debug_assertions)` that should be `#[cfg(debug_assertions)]` (line 348)
 - Do not move core business logic into this file
-**Action:** Keep as boundary layer. Fix `cfg!` → `#[cfg]`.
+  **Action:** Keep as boundary layer. Fix `cfg!` → `#[cfg]`.
 
 ## 17.3 `src-tauri/src/video_server.rs` (705 lines)
 
 **Status:** Reasonable quality.
 **Issues:**
+
 - Tests must be moved to dedicated `tests/` directory (inline `#[cfg(test)] mod tests` at line 461)
 - `expect()` on static headers (lines 364-365, 373-374) — acceptable if invariant is clear
 - Range parsing behavior should be snapshot/integration tested
-**Action:** Move tests. Preserve behavior exactly. Do not rewrite the server.
+  **Action:** Move tests. Preserve behavior exactly. Do not rewrite the server.
 
 ## 17.4 `src-tauri/src/bin/*.rs` (4 files)
 
 **Status:** Useful diagnostic binaries with duplicated boilerplate.
 **Issues:**
+
 - `read_arg()`, `read_optional_arg()`, `repo_root()` repeated identically across all 4 files
-**Action:** Extract into `src-tauri/src/bin/common.rs`. Use `anyhow` in binaries.
+  **Action:** Extract into `src-tauri/src/bin/common.rs`. Use `anyhow` in binaries.
 
 ## 17.5 `ovrley_core/src/lib.rs` (22 lines)
 
@@ -2076,19 +2133,21 @@ Before considering the refactor complete, verify all of the following:
 
 **Status:** Generally strong domain separation.
 **Issues:**
+
 - Tests must move (inline `mod tests` in `mod.rs:57`)
 - Errors should migrate from `String`
 - Interpolation and frame timestamp behavior must be heavily protected (29.97/59.94 FPS)
-**Action:** Add regression tests before refactoring. Protect NTSC-rate behavior.
+  **Action:** Add regression tests before refactoring. Protect NTSC-rate behavior.
 
 ## 17.7 `ovrley_core/src/config/mod.rs` (616 lines)
 
 **Status:** Important schema/validation module.
 **Issues:**
+
 - Stringly-typed metric values (lines 541-553)
 - `#[path = "tests/config_tests.rs"]` at line 614
 - Config schema may mix raw DTO and validated domain concerns
-**Action:** Introduce `MetricKind`. Preserve serde compatibility exactly. Move tests.
+  **Action:** Introduce `MetricKind`. Preserve serde compatibility exactly. Move tests.
 
 ## 17.8 `ovrley_core/src/debug/mod.rs` (113 lines)
 
@@ -2099,16 +2158,18 @@ Before considering the refactor complete, verify all of the following:
 
 **Status:** Mixed — contains logic that belongs elsewhere.
 **Issues:**
+
 - `derive_composite_render_plan` and `apply_composite_scene_timing` belong in `encode`
 - `AppPaths` should live in a neutral `paths.rs`
 - Must remain framework-agnostic (no Tauri imports)
-**Action:** Move planning logic to `encode`. Move `AppPaths` to `paths.rs`. Keep commands thin.
+  **Action:** Move planning logic to `encode`. Move `AppPaths` to `paths.rs`. Keep commands thin.
 
 ## 17.10 `ovrley_core/src/encode/` (~4200 lines)
 
 **Status:** Largest complexity hotspot. Three new modules have been added since the original plan.
 
 **Issues:**
+
 - `video.rs` — `RenderController` should be in `progress.rs` (partially done — `ProgressEstimator` already extracted)
 - `ffmpeg.rs` — `build_ffmpeg_settings` + `FfmpegSettings` should be in `ffmpeg_settings.rs`
 - `video_pipeline.rs` — 200-line `render_video_single` mixes orchestration with execution
@@ -2119,41 +2180,45 @@ Before considering the refactor complete, verify all of the following:
 - `ffmpeg_composite_profiles.rs` (new) — data-driven encoder profile table, no tests, `Option` return instead of typed errors
 - `video_composite_debug.rs` (new) — composite debug summary writer, uses `Result<T, String>`, no tests
 - `progress.rs` (new) — `ProgressEstimator` with inline tests, `RenderController` separation not yet complete
-**Action:** Extract `ffmpeg_settings.rs`. Complete `RenderController` migration to `progress.rs`. Enforce sibling pipeline isolation. Add tests for new modules. Preserve ffmpeg behavior exactly.
+  **Action:** Extract `ffmpeg_settings.rs`. Complete `RenderController` migration to `progress.rs`. Enforce sibling pipeline isolation. Add tests for new modules. Preserve ffmpeg behavior exactly.
 
 ## 17.11 `ovrley_core/src/render/` (~4500 lines)
 
 **Status:** Good domain separation overall, but some large shared helpers.
 **Issues:**
+
 - `widgets/common.rs` (774 lines) too broad
 - Duplicated geometry/RDP logic in `route.rs` and `elevation.rs`
 - Duplicated interpolation logic with `activity/interpolate.rs`
 - Stringly-typed metric/icon behavior
 - Global caches (`OnceLock<Mutex<HashMap>>`) need ownership review
 - Hot path performance must be protected
-**Action:** Split `common.rs` by cohesive responsibility. Consolidate RDP into `rdp.rs`. Consolidate interpolation into `interpolation.rs`. Add tests before extracting algorithms.
+  **Action:** Split `common.rs` by cohesive responsibility. Consolidate RDP into `rdp.rs`. Consolidate interpolation into `interpolation.rs`. Add tests before extracting algorithms.
 
 ## 17.12 `ovrley_core/src/encode/video_probe.rs` (227 lines)
 
 **Status:** Important metadata extraction module.
 **Issues:**
+
 - Commented-out `println!` debug output (lines 155, 163, 170, 177, 185, 191, 197)
 - Creation time resolution priority should be documented
-**Action:** Replace debug prints with `tracing` or remove. Add fixture tests using stored ffprobe JSON.
+  **Action:** Replace debug prints with `tracing` or remove. Add fixture tests using stored ffprobe JSON.
 
 ## 17.13 `ovrley_core/src/encode/codec_detect.rs` (490 lines)
 
 **Status:** Highly repetitive probe pattern.
 **Issues:**
+
 - Each codec probe repeats the same `probe_codec` call pattern with different args
 - 20+ codec probe calls with nearly identical structure
-**Action:** The probe pattern is already extracted into `probe_codec` — this is acceptable. The repetition is the list of codecs, not the logic. Consider a data-driven approach only if new codecs are added regularly.
+  **Action:** The probe pattern is already extracted into `probe_codec` — this is acceptable. The repetition is the list of codecs, not the logic. Consider a data-driven approach only if new codecs are added regularly.
 
 ## 17.14 `ovrley_core/src/encode/progress.rs` (183 lines)
 
 **Status:** Clean EMA-based progress estimator, well-tested, already extracted as a separate file.
 
 **Issues:**
+
 - `#[cfg(test)] mod tests` at line 106 must be moved to a dedicated `tests/` directory (violates Phase 1 target)
 - Uses `f64` for frame timing — ensure overflow/NaN/Infinity are handled (currently checked in `record()` at line 53)
 - No integration with `RenderController` — `RenderController` is still in `video.rs`
@@ -2165,6 +2230,7 @@ Before considering the refactor complete, verify all of the following:
 **Status:** Well-structured data-driven profile table. Predefined profiles for software (libx264/5), NVENC (H.264/HEVC), QSV (H.264/HEVC), VAAPI (H.264/HEVC), and VideoToolbox (H.264/HEVC) with HWA filter chains.
 
 **Issues:**
+
 - Returns `Option<CompositeProfile>` — should use `CoreResult` for unknown profiles with a descriptive error
 - No tests for profile resolution (`composite_profile_template`)
 - All filter strings are `&'static str` with `{width}`/`{height}` placeholders — no validation that format strings are correct
@@ -2177,6 +2243,7 @@ Before considering the refactor complete, verify all of the following:
 **Status:** Composite-only debug/timing summary writer. Produces `timing_summary.json` under `debug_render/phase_7/`.
 
 **Issues:**
+
 - Uses `Result<T, String>` for all fallible operations (lines 100-166)
 - `composite_debug_id` strips `"video_composited_"` prefix from output filename — brittle if naming convention changes
 - Debug directory layout (`phase_7/`) hardcoded — should reference a shared constant

@@ -1,17 +1,31 @@
-use super::*;
-use crate::activity::{build_dense_activity_report, parse_activity_json};
-use crate::config::{parse_config_json, RenderConfig};
-use crate::encode::video::RenderController;
-use crate::encode::video_composite_debug::{
-    write_composite_timing_summary, CompositeTimingSummaryInput,
-};
-use serde_json::Value;
+mod common;
+
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::Duration;
+
+use ovrley_core::activity::schema::ParsedActivity;
+use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
+use ovrley_core::commands::AppPaths;
+use ovrley_core::config::{parse_config_json, RenderConfig};
+use ovrley_core::debug::RenderProfiler;
+use ovrley_core::encode::ffmpeg_composite::{
+    build_composite_ffmpeg_settings, CompositeFfmpegSettings, HwAccelInfo,
+};
+use ovrley_core::encode::fps::Fps;
+use ovrley_core::encode::video::RenderController;
+use ovrley_core::encode::video_composite_debug::{
+    write_composite_timing_summary, CompositeTimingSummaryInput,
+};
+use ovrley_core::encode::video_composite_pipeline::{
+    dense_frame_index_for_overlay, derive_composite_pipeline_plan,
+    expected_guarded_overlay_frame_count, first_fractional_overrun_overlay_index,
+    render_composite_video_single, CompositePipelinePlan,
+};
+use serde_json::Value;
 
 #[test]
 fn test_4_3_derives_composite_shell_timing_without_rounding() {
@@ -95,7 +109,7 @@ fn test_5_1_basic_software_h264_composite_creates_mp4() {
 fn test_5_2_preserves_29_97_output_fps() {
     let result =
         render_fixture_composite("tmp/test-4k.mp4", 30000, 1001, 0.2, 1, 600.0, 3840, 2160);
-    let fps = ffprobe_video_rates(&result.paths.repo_root, &result.output_path);
+    let fps = ffprobe_video_rates(&result.output_path);
 
     assert!(fps.contains("r_frame_rate=30000/1001") || fps.contains("avg_frame_rate=30000/1001"));
     assert!(!fps.contains("30/1"));
@@ -105,7 +119,7 @@ fn test_5_2_preserves_29_97_output_fps() {
 fn test_5_3_preserves_59_94_output_fps_when_requested() {
     let result =
         render_fixture_composite("tmp/test-4k.mp4", 60000, 1001, 0.12, 1, 600.0, 3840, 2160);
-    let fps = ffprobe_video_rates(&result.paths.repo_root, &result.output_path);
+    let fps = ffprobe_video_rates(&result.output_path);
 
     assert!(fps.contains("r_frame_rate=60000/1001") || fps.contains("avg_frame_rate=60000/1001"));
     assert!(!fps.contains("60/1"));
@@ -115,7 +129,7 @@ fn test_5_3_preserves_59_94_output_fps_when_requested() {
 fn test_5_4_lower_overlay_update_rate_renders_half_overlay_frames() {
     let result =
         render_fixture_composite("tmp/test-4k.mp4", 60000, 1001, 0.2, 2, 600.0, 3840, 2160);
-    let fps = ffprobe_video_rates(&result.paths.repo_root, &result.output_path);
+    let fps = ffprobe_video_rates(&result.output_path);
 
     assert_eq!(result.controller.progress().encoded, 12);
     assert_eq!(result.controller.progress().total, 12);
@@ -126,7 +140,7 @@ fn test_5_4_lower_overlay_update_rate_renders_half_overlay_frames() {
 fn test_5_5_aggressive_overlay_update_rate_renders_one_sixth_overlay_frames() {
     let result =
         render_fixture_composite("tmp/test-4k.mp4", 60000, 1001, 0.2, 6, 600.0, 3840, 2160);
-    let fps = ffprobe_video_rates(&result.paths.repo_root, &result.output_path);
+    let fps = ffprobe_video_rates(&result.output_path);
 
     assert_eq!(result.controller.progress().encoded, 12);
     assert_eq!(result.controller.progress().total, 12);
@@ -188,7 +202,7 @@ fn test_5_7_fractional_duration_uses_overrun_guard() {
 #[test]
 fn test_5_8_video_with_audio_copies_audio_track() {
     let result = render_fixture_composite("tmp/test-1080p.mp4", 30, 1, 0.2, 1, 600.0, 1920, 1080);
-    let audio = ffprobe_audio_codecs(&result.paths.repo_root, &result.output_path);
+    let audio = ffprobe_audio_codecs(&result.output_path);
 
     assert!(audio.contains("codec_name=aac"));
 }
@@ -450,7 +464,7 @@ fn test_manual_full_duration_4k_composite() {
         3840,
         2160,
     );
-    let fps = ffprobe_video_rates(&result.paths.repo_root, &result.output_path);
+    let fps = ffprobe_video_rates(&result.output_path);
 
     assert!(result.output_path.is_file());
     assert!(result.output_size > 0);
@@ -588,7 +602,9 @@ fn render_fixture_composite_with_paths(
     height: u32,
     codec: &str,
 ) -> Result<RenderFixtureResult, String> {
-    let absolute_video_path = repo_root().join(video_path);
+    let absolute_video_path = common::test_config::fixtures()
+        .join("video")
+        .join(video_path.trim_start_matches("tmp/"));
     let absolute_video_path = absolute_video_path.to_string_lossy().to_string();
     let mut config = recent_template_config(width, height);
     config.scene.ffmpeg = serde_json::json!({"codec": codec});
@@ -720,9 +736,9 @@ fn write_fixture_phase7_summary(path_name: &str) -> AppPaths {
 }
 
 fn recent_template_config(width: u32, height: u32) -> RenderConfig {
-    let repo_root = repo_root();
+    let git_root = common::test_config::repo_git_root();
     let template =
-        fs::read_to_string(repo_root.join("templates").join("recent-template.json")).unwrap();
+        fs::read_to_string(git_root.join("templates").join("recent-template.json")).unwrap();
     let value: Value = serde_json::from_str(&template).unwrap();
     let mut config: RenderConfig =
         serde_json::from_value(value.get("config").unwrap().clone()).unwrap();
@@ -741,9 +757,12 @@ fn test_parallel_composite_render_2_segments() {
     let controller = RenderController::default();
     controller.try_start(dense.frame_count as u32, "test_parallel_2").unwrap();
 
-    let result = crate::encode::video::render_composite_video(
+    let video_path = common::test_config::sample_video_path()
+        .to_string_lossy()
+        .to_string();
+    let result = ovrley_core::encode::video::render_composite_video(
         &paths, &config, &activity, &dense, &controller,
-        "D:\\Downloads\\video sample.mp4", "10M",
+        &video_path, "10M",
         0.0, 30000, 1001, 35.0,
         Some(5.0), Some(0.0), Some(1),
     );
@@ -764,9 +783,12 @@ fn test_parallel_composite_render_with_audio() {
     let controller = RenderController::default();
     controller.try_start(dense.frame_count as u32, "test_parallel_audio").unwrap();
 
-    let result = crate::encode::video::render_composite_video(
+    let video_path = common::test_config::sample_video_path()
+        .to_string_lossy()
+        .to_string();
+    let result = ovrley_core::encode::video::render_composite_video(
         &paths, &config, &activity, &dense, &controller,
-        "D:\\Downloads\\video sample.mp4", "10M",
+        &video_path, "10M",
         0.0, 30000, 1001, 35.0,
         Some(5.0), Some(15.0), Some(1),
     );
@@ -788,14 +810,7 @@ fn composite_test_config(render_duration: f64) -> RenderConfig {
             "start": 0.0,
             "end": {duration},
             "ffmpeg": {{
-                "codec": "qsv_full_h264",
-                "qsv_full_init_args": [
-                    "-init_hw_device", "dxva2=dx",
-                    "-init_hw_device", "qsv=qs@dx",
-                    "-filter_hw_device", "qs",
-                    "-hwaccel", "qsv",
-                    "-hwaccel_output_format", "qsv"
-                ]
+                "codec": "libx264"
             }}
         }},
         "widgets": [],
@@ -808,13 +823,7 @@ fn composite_test_config(render_duration: f64) -> RenderConfig {
 }
 
 fn fixture_activity() -> ParsedActivity {
-    let activity = fs::read_to_string(
-        repo_root()
-            .join("debug")
-            .join("activities")
-            .join("Test_FIT-parse-debug.json"),
-    )
-    .unwrap();
+    let activity = fs::read_to_string(common::test_config::fit_activity_path()).unwrap();
     parse_activity_json(&activity).unwrap()
 }
 
@@ -823,8 +832,9 @@ fn test_paths() -> AppPaths {
 }
 
 fn test_paths_named(name: &str) -> AppPaths {
-    let repo_root = repo_root();
-    let test_root = repo_root.join("src-tauri").join("target").join(name);
+    let git_root = common::test_config::repo_git_root();
+    let ws_root = common::test_config::workspace_root();
+    let test_root = ws_root.join("target").join(name);
     let downloads_dir = test_root.join("downloads");
     let temp_dir = test_root.join("tmp");
     let debug_render_dir = test_root.join("debug_render");
@@ -832,27 +842,18 @@ fn test_paths_named(name: &str) -> AppPaths {
     fs::create_dir_all(&temp_dir).unwrap();
     fs::create_dir_all(&debug_render_dir).unwrap();
     AppPaths {
-        repo_root: repo_root.clone(),
-        font_dirs: vec![repo_root.join("fonts")],
+        repo_root: git_root.clone(),
+        font_dirs: vec![git_root.join("fonts")],
         debug_render_dir,
         temp_dir,
-        bundled_templates_dirs: vec![repo_root.join("templates")],
+        bundled_templates_dirs: vec![git_root.join("templates")],
         user_templates_dir: test_root.join("templates"),
         downloads_dir,
     }
 }
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_path_buf()
-}
-
-fn ffprobe_video_rates(repo_root: &std::path::Path, output_path: &std::path::Path) -> String {
-    let ffprobe_path = repo_root
+fn ffprobe_video_rates(output_path: &Path) -> String {
+    let ffprobe_path = common::test_config::repo_git_root()
         .join("vendor")
         .join("ffmpeg")
         .join("bin")
@@ -879,8 +880,8 @@ fn ffprobe_video_rates(repo_root: &std::path::Path, output_path: &std::path::Pat
     String::from_utf8_lossy(&output.stdout).to_string()
 }
 
-fn ffprobe_audio_codecs(repo_root: &std::path::Path, output_path: &std::path::Path) -> String {
-    let ffprobe_path = repo_root
+fn ffprobe_audio_codecs(output_path: &Path) -> String {
+    let ffprobe_path = common::test_config::repo_git_root()
         .join("vendor")
         .join("ffmpeg")
         .join("bin")
@@ -918,4 +919,67 @@ fn assert_argument_pair(args: &[String], key: &str, value: &str) {
 fn has_argument_pair(args: &[String], key: &str, value: &str) -> bool {
     args.windows(2)
         .any(|window| window[0] == key && window[1] == value)
+}
+
+fn output_progress_for_overlay_time(video_local_time: f64, plan: &CompositePipelinePlan) -> u32 {
+    (video_local_time * plan.output_fps.as_f64())
+        .round()
+        .max(0.0)
+        .min(plan.output_frame_count as f64) as u32
+}
+
+fn verify_successful_composite_output(output_path: &Path) -> Result<(), String> {
+    let metadata = std::fs::metadata(output_path).map_err(|error| {
+        format!(
+            "Composite render finished but output file is missing ({}): {error}",
+            output_path.display()
+        )
+    })?;
+    if metadata.len() == 0 {
+        return Err(format!(
+            "Composite render finished but output file is empty: {}",
+            output_path.display()
+        ));
+    }
+    Ok(())
+}
+
+fn is_pipe_write_error(error: &str) -> bool {
+    let lower = error.to_lowercase();
+    lower.contains("failed writing composite overlay frame")
+        && (lower.contains("broken pipe")
+            || lower.contains("pipe is being closed")
+            || lower.contains("os error 32")
+            || lower.contains("os error 109")
+            || lower.contains("os error 232"))
+}
+
+fn format_pipe_write_failure(
+    error: String,
+    status: std::process::ExitStatus,
+    stderr: &str,
+    plan: &CompositePipelinePlan,
+) -> String {
+    let mut message = format!(
+        "{error}. FFmpeg terminated before all overlay frames were written (status {status}) for profile {}.",
+        plan.ffmpeg_settings.selected_profile_name
+    );
+    if let Some(fallback) = &plan.ffmpeg_settings.fallback_profile_name {
+        message.push_str(&format!(
+            "\nSafe fallback profile available: {fallback}. This explicit experimental render was not silently retried."
+        ));
+    }
+    message.push_str("\nFilter graph:\n");
+    message.push_str(&plan.ffmpeg_settings.filter_complex);
+    if !stderr.trim().is_empty() {
+        message.push_str("\nFFmpeg stderr:\n");
+        message.push_str(&stderr_tail(stderr));
+    }
+    message
+}
+
+fn stderr_tail(stderr: &str) -> String {
+    let lines = stderr.lines().collect::<Vec<_>>();
+    let start = lines.len().saturating_sub(30);
+    lines[start..].join("\n")
 }

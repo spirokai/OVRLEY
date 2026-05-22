@@ -1,0 +1,22 @@
+{
+  "scene": {
+    "fps": 30,
+    "start": 0,
+    "end": 10,
+    "width": 1920,
+    "height": 1080,
+    "ffmpeg": { "codec": "libx264" },
+    "composite_video_path": "test.mp4",
+    "composite_bitrate": "60M",
+    "composite_sync_offset": 300,
+    "composite_video_fps_num": 30000,
+    "composite_video_fps_den": 1001,
+    "composite_video_duration": 20,
+    "composite_render_duration": 10,
+    "composite_video_trim_start": 0,
+    "composite_widget_update_rate": 2
+  },
+  "labels": [],
+  "values": [{ "value": "speed", "x": 0, "y": 0 }],
+  "plots": []
+}

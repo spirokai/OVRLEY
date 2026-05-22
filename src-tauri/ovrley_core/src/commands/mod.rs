@@ -218,7 +218,7 @@ pub fn backend_render(
 ///
 /// Composite mode is intentionally gated only by `composite_video_path` so
 /// transparent exports continue through their existing path unchanged.
-fn is_composite_render(config: &RenderConfig) -> bool {
+pub fn is_composite_render(config: &RenderConfig) -> bool { // test seam
     config.scene.composite_video_path.is_some()
 }
 
@@ -279,23 +279,23 @@ fn backend_render_composite_phase3(
 /// These values drive dense-report timing and later phases will pass them to
 /// the composite FFmpeg pipeline without reinterpreting sync offset as seek.
 #[derive(Clone, Debug, PartialEq)]
-struct CompositeRenderPlan {
-    video_path: String,
-    bitrate: String,
-    sync_offset: f64,
-    trim_start: f64,
-    video_duration: f64,
-    render_duration: f64,
-    update_rate: u32,
-    source_fps: Fps,
-    overlay_pipe_fps: Fps,
+pub struct CompositeRenderPlan { // test seam
+    pub video_path: String,
+    pub bitrate: String,
+    pub sync_offset: f64,
+    pub trim_start: f64,
+    pub video_duration: f64,
+    pub render_duration: f64,
+    pub update_rate: u32,
+    pub source_fps: Fps,
+    pub overlay_pipe_fps: Fps,
 }
 
 /// Validates composite render fields and derives timing/FPS values.
 ///
 /// Required fields fail before dense activity is built, while optional fields
 /// receive the Phase 3 defaults from the implementation plan.
-fn derive_composite_render_plan(config: &RenderConfig) -> Result<CompositeRenderPlan, String> {
+pub fn derive_composite_render_plan(config: &RenderConfig) -> Result<CompositeRenderPlan, String> { // test seam
     let video_path = config
         .scene
         .composite_video_path
@@ -379,7 +379,7 @@ fn derive_composite_render_plan(config: &RenderConfig) -> Result<CompositeRender
 ///
 /// This keeps persisted template timing untouched while aligning dense frames
 /// with the lower-FPS overlay stream used by compositing mode.
-fn apply_composite_scene_timing(config: &mut RenderConfig, plan: &CompositeRenderPlan) {
+pub fn apply_composite_scene_timing(config: &mut RenderConfig, plan: &CompositeRenderPlan) { // test seam
     config.scene.start = plan.sync_offset;
     config.scene.end = plan.sync_offset + plan.render_duration;
     config.scene.fps = plan.overlay_pipe_fps.as_f64();
@@ -645,6 +645,4 @@ pub fn backend_detect_codecs(paths: &AppPaths) -> Result<Value, String> {
     serde_json::to_value(&codecs).map_err(|e| format!("Serialization error: {}", e))
 }
 
-#[cfg(test)]
-#[path = "tests/commands_tests.rs"]
-mod tests;
+

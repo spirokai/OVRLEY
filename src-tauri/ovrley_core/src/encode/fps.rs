@@ -99,7 +99,3 @@ pub fn gcd_u32(mut left: u32, mut right: u32) -> u32 {
     }
     left.max(1)
 }
-
-#[cfg(test)]
-#[path = "tests/fps_tests.rs"]
-mod tests;

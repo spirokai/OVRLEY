@@ -47,7 +47,8 @@ ffmpeg/
 vendor/ffmpeg/*
 !vendor/ffmpeg/.gitkeep
 
-# Temporary / Local
+# Test fixtures (large video files)
+src-tauri/ovrley_core/tests/fixtures/video/
 tmp/
 /tmp/ovrley.sock
 *.mov

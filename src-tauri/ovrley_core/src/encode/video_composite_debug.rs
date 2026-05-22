@@ -71,7 +71,7 @@ struct CompositeDiagnostics {
 }
 
 /// Immutable inputs needed to write a Phase 7 composite timing summary.
-pub(crate) struct CompositeTimingSummaryInput<'a> {
+pub struct CompositeTimingSummaryInput<'a> { // test seam
     pub debug_render_dir: &'a Path,
     pub ffmpeg_settings: &'a CompositeFfmpegSettings,
     pub output_path: &'a Path,
@@ -97,7 +97,7 @@ pub(crate) struct CompositeTimingSummaryInput<'a> {
 ///
 /// The summary is stored under `debug/timings/phase_7/<video-id>/timing_summary.json`
 /// and includes rational FPS values, frame counts, timings, and FFmpeg diagnostics.
-pub(crate) fn write_composite_timing_summary(
+pub fn write_composite_timing_summary( // test seam
     input: CompositeTimingSummaryInput<'_>,
 ) -> Result<PathBuf, String> {
     let debug_dir = input

@@ -1,4 +1,20 @@
-use super::*;
+mod common;
+
+use std::path::PathBuf;
+
+use serde_json::Value;
+
+use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
+use ovrley_core::activity::schema::ParsedActivity;
+use ovrley_core::commands::{
+    apply_composite_scene_timing, backend_render, derive_composite_render_plan, is_composite_render,
+    AppPaths,
+};
+use ovrley_core::config::parse_config_json;
+use ovrley_core::config::RenderConfig;
+use ovrley_core::debug::RenderProgress;
+use ovrley_core::encode::fps::Fps;
+use ovrley_core::encode::video::RenderController;
 
 #[test]
 fn test_3_1_transparent_render_branch_keeps_original_dense_timing() {
@@ -40,10 +56,10 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
 
 #[test]
 fn test_4_3_composite_branch_reaches_pipeline_shell() {
-    let repo_root = repo_root();
-    let paths = test_paths(repo_root.clone());
+    let ws_root = common::test_config::workspace_root();
+    let paths = test_paths(ws_root.clone());
     let controller = RenderController::default();
-    let video_path = repo_root.join("tmp").join("test-4k.mp4");
+    let video_path = common::test_config::sample_video_path();
 
     let result = backend_render(
         &paths,
@@ -263,26 +279,15 @@ fn synthetic_activity_json() -> String {
     .to_string()
 }
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_path_buf()
-}
-
-fn test_paths(repo_root: PathBuf) -> AppPaths {
-    let test_root = repo_root
-        .join("src-tauri")
-        .join("target")
-        .join("command_tests");
+fn test_paths(ws_root: PathBuf) -> AppPaths {
+    let git_root = common::test_config::repo_git_root();
+    let test_root = ws_root.join("target").join("command_tests");
     AppPaths {
-        repo_root: repo_root.clone(),
-        font_dirs: vec![repo_root.join("fonts")],
+        repo_root: git_root.clone(),
+        font_dirs: vec![git_root.join("fonts")],
         debug_render_dir: test_root.join("debug_render"),
         temp_dir: test_root.join("tmp"),
-        bundled_templates_dirs: vec![repo_root.join("templates")],
+        bundled_templates_dirs: vec![git_root.join("templates")],
         user_templates_dir: test_root.join("templates"),
         downloads_dir: test_root.join("downloads"),
     }

@@ -17,13 +17,13 @@ pub(crate) mod ffmpeg_composite_profiles;
 /// Rational frame-rate helpers shared by composite encoding modules.
 pub mod fps;
 /// Live render progress estimation helpers.
-pub(crate) mod progress;
+pub mod progress; // test seam
 /// Render controller and public video render orchestration.
 pub mod video;
 /// Composite-only debug summaries for MP4 compositing diagnostics.
-pub(crate) mod video_composite_debug;
+pub mod video_composite_debug; // test seam
 /// Composite MP4 render pipeline used by the composite render entry point.
-pub(crate) mod video_composite_pipeline;
+pub mod video_composite_pipeline; // test seam
 /// Debug summaries, sample-frame exports, and segment stitching helpers.
 mod video_debug;
 /// Single-render video pipeline used by normal and segmented renders.

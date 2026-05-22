@@ -611,6 +611,3 @@ fn find_plot_value<'a>(plots: &'a Value, value_key: &str) -> Option<&'a Value> {
     }
 }
 
-#[cfg(test)]
-#[path = "tests/config_tests.rs"]
-mod tests;

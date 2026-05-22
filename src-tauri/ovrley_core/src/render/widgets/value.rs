@@ -25,7 +25,7 @@ const GRADIENT_TRIANGLE_GAP_PX: f32 = 8.0;
 const GRADIENT_ZERO_EPSILON: f64 = 0.05;
 const MAX_GRADIENT_ABS_PERCENT: f64 = 25.0;
 const GRADIENT_ZERO_LINE_WIDTH_PX: f32 = 1.0;
-const NUMERIC_VERTICAL_METRICS_TEXT: &str = "0123456789-:.%";
+pub const NUMERIC_VERTICAL_METRICS_TEXT: &str = "0123456789-:.%"; // test seam
 
 /// Parsed SVG icon with enough data for Skia stroke rendering.
 #[derive(Clone, Debug)]
@@ -192,7 +192,7 @@ fn gradient_is_zero(raw_gradient: Option<f64>) -> bool {
 }
 
 // Computes the visual triangle height for a gradient percentage.
-fn gradient_triangle_height(raw_gradient: Option<f64>, triangle_width: f32) -> f32 {
+pub fn gradient_triangle_height(raw_gradient: Option<f64>, triangle_width: f32) -> f32 { // test seam
     if triangle_width <= 0.0 {
         return 0.0;
     }
@@ -383,7 +383,7 @@ pub(crate) fn draw_static_metric_icon_for_value(
 
 // Returns the text used for vertical alignment measurements. This mirrors the
 // editor preview, which stabilizes numeric metric rows across changing values.
-fn metric_vertical_metrics_text(text: &str) -> &str {
+pub fn metric_vertical_metrics_text(text: &str) -> &str { // test seam
     if !text.is_empty()
         && text
             .chars()
@@ -403,7 +403,7 @@ fn metric_icon_has_stable_static_vertical_metrics(value: &ValueConfig) -> bool {
 
 // Computes icon top so metric icons are centered on the value glyphs rather
 // than on the row line box. This matches the frontend preview layout.
-fn metric_icon_top_from_value_layout(
+pub fn metric_icon_top_from_value_layout( // test seam
     text_group_bottom: f32,
     value_line_height: f32,
     value_measure: &crate::render::text::MeasuredText,
@@ -862,58 +862,3 @@ fn point_from_command(current: Point, x: f32, y: f32, is_relative: bool) -> Poin
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{
-        gradient_triangle_height, metric_icon_top_from_value_layout, metric_vertical_metrics_text,
-        NUMERIC_VERTICAL_METRICS_TEXT,
-    };
-    use crate::render::text::MeasuredText;
-
-    #[test]
-    // Verifies missing and near-zero gradients produce no triangle height.
-    fn gradient_triangle_height_is_zero_for_zero_and_missing_values() {
-        assert_eq!(gradient_triangle_height(None, 72.0), 0.0);
-        assert_eq!(gradient_triangle_height(Some(0.0), 72.0), 0.0);
-    }
-
-    #[test]
-    // Verifies grade visualization uses the configured half-angle geometry.
-    fn gradient_triangle_height_uses_half_angle_rule() {
-        let expected = (72.0_f32) * (5.0_f32.to_radians().tan());
-        let actual = gradient_triangle_height(Some(10.0), 72.0);
-        assert!((actual - expected).abs() < 0.001);
-    }
-
-    #[test]
-    // Verifies numeric values use stable preview-compatible vertical metrics.
-    fn metric_vertical_metrics_text_uses_canonical_numeric_sample() {
-        assert_eq!(
-            metric_vertical_metrics_text("19:00"),
-            NUMERIC_VERTICAL_METRICS_TEXT
-        );
-        assert_eq!(
-            metric_vertical_metrics_text("-12.5%"),
-            NUMERIC_VERTICAL_METRICS_TEXT
-        );
-        assert_eq!(metric_vertical_metrics_text("TEMP"), "TEMP");
-    }
-
-    #[test]
-    // Verifies icon placement centers on value glyphs instead of the row box.
-    fn metric_icon_top_centers_on_value_glyph_box() {
-        let measure = MeasuredText {
-            width: 100.0,
-            bounds_left: 0.0,
-            bounds_top: -70.0,
-            bounds_right: 100.0,
-            bounds_bottom: 10.0,
-            ascent: -80.0,
-            descent: 20.0,
-        };
-
-        let actual = metric_icon_top_from_value_layout(92.0, 92.0, &measure, 44.0);
-
-        assert!((actual - 30.0).abs() < 0.001);
-    }
-}

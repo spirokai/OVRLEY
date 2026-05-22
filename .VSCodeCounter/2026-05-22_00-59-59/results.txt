@@ -1,0 +1,424 @@
+Date : 2026-05-22 00:59:59
+Directory : h:\tools\cyclemetry
+Total : 286 files,  314578 codes, 5844 comments, 8368 blanks, all 328790 lines
+
+Languages
++--------------------+------------+------------+------------+------------+------------+
+| language           | files      | code       | comment    | blank      | total      |
++--------------------+------------+------------+------------+------------+------------+
+| JSON               |         20 |    267,019 |          0 |         16 |    267,035 |
+| Rust               |         58 |     15,398 |      1,452 |      1,510 |     18,360 |
+| YAML               |          5 |      9,793 |          0 |      2,352 |     12,145 |
+| JavaScript         |        113 |      9,416 |      3,028 |      1,789 |     14,233 |
+| JavaScript JSX     |         59 |      6,165 |      1,357 |        674 |      8,196 |
+| Markdown           |         12 |      5,979 |          0 |      1,981 |      7,960 |
+| XML                |         15 |        516 |          3 |         16 |        535 |
+| PostCSS            |          1 |        259 |          4 |         27 |        290 |
+| HTML               |          1 |         19 |          0 |          1 |         20 |
+| JSON with Comments |          1 |          9 |          0 |          1 |         10 |
+| Ignore             |          1 |          5 |          0 |          1 |          6 |
++--------------------+------------+------------+------------+------------+------------+
+
+Directories
++-----------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                          | files      | code       | comment    | blank      | total      |
++-----------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                             |        286 |    314,578 |      5,844 |      8,368 |    328,790 |
+| . (Files)                                                                                     |          7 |     12,730 |          0 |      1,637 |     14,367 |
+| .agents                                                                                       |          8 |      4,973 |          0 |      1,695 |      6,668 |
+| .github                                                                                       |          2 |        105 |          0 |         22 |        127 |
+| .github\workflows                                                                             |          2 |        105 |          0 |         22 |        127 |
+| app                                                                                           |        189 |     26,659 |      4,389 |      3,287 |     34,335 |
+| app (Files)                                                                                   |         10 |     11,152 |         11 |        862 |     12,025 |
+| app\public                                                                                    |          1 |        142 |          1 |          2 |        145 |
+| app\scripts                                                                                   |          1 |         36 |          0 |          9 |         45 |
+| app\src                                                                                       |        177 |     15,329 |      4,377 |      2,414 |     22,120 |
+| app\src (Files)                                                                               |          3 |        399 |         18 |         40 |        457 |
+| app\src\api                                                                                   |          1 |        131 |        128 |         29 |        288 |
+| app\src\components                                                                            |         29 |      2,235 |        551 |        356 |      3,142 |
+| app\src\components\ui                                                                         |         19 |      2,147 |        551 |        346 |      3,044 |
+| app\src\components\widgets                                                                    |         10 |         88 |          0 |         10 |         98 |
+| app\src\components\widgets\icons                                                              |         10 |         88 |          0 |         10 |         98 |
+| app\src\features                                                                              |        113 |      9,730 |      2,769 |      1,408 |     13,907 |
+| app\src\features\app-shell                                                                    |         16 |        806 |        244 |        116 |      1,166 |
+| app\src\features\app-shell (Files)                                                            |          1 |         10 |          4 |          2 |         16 |
+| app\src\features\app-shell\components                                                         |          9 |        525 |        125 |         49 |        699 |
+| app\src\features\app-shell\hooks                                                              |          4 |        186 |         77 |         45 |        308 |
+| app\src\features\app-shell\utils                                                              |          2 |         85 |         38 |         20 |        143 |
+| app\src\features\overlay-editor                                                               |         21 |      2,176 |        628 |        371 |      3,175 |
+| app\src\features\overlay-editor (Files)                                                       |          1 |         22 |          6 |          7 |         35 |
+| app\src\features\overlay-editor\components                                                    |          3 |        533 |         76 |         40 |        649 |
+| app\src\features\overlay-editor\data                                                          |          3 |         56 |         27 |         14 |         97 |
+| app\src\features\overlay-editor\hooks                                                         |          9 |        865 |        193 |        142 |      1,200 |
+| app\src\features\overlay-editor\utils                                                         |          5 |        700 |        326 |        168 |      1,194 |
+| app\src\features\player                                                                       |          7 |        465 |        115 |         80 |        660 |
+| app\src\features\player (Files)                                                               |          1 |          1 |          3 |          2 |          6 |
+| app\src\features\player\components                                                            |          1 |         87 |         10 |          5 |        102 |
+| app\src\features\player\hooks                                                                 |          4 |        352 |         83 |         64 |        499 |
+| app\src\features\player\utils                                                                 |          1 |         25 |         19 |          9 |         53 |
+| app\src\features\render-video                                                                 |         18 |      1,410 |        317 |        192 |      1,919 |
+| app\src\features\render-video (Files)                                                         |          1 |          4 |          4 |          2 |         10 |
+| app\src\features\render-video\components                                                      |          3 |        381 |         41 |         36 |        458 |
+| app\src\features\render-video\data                                                            |          2 |        116 |         17 |          9 |        142 |
+| app\src\features\render-video\hooks                                                           |          7 |        548 |         99 |         77 |        724 |
+| app\src\features\render-video\utils                                                           |          5 |        361 |        156 |         68 |        585 |
+| app\src\features\scene-settings                                                               |          8 |        706 |        109 |         66 |        881 |
+| app\src\features\scene-settings (Files)                                                       |          1 |          5 |          5 |          2 |         12 |
+| app\src\features\scene-settings\components                                                    |          4 |        452 |         67 |         29 |        548 |
+| app\src\features\scene-settings\data                                                          |          1 |         30 |          3 |          3 |         36 |
+| app\src\features\scene-settings\hooks                                                         |          1 |        192 |         19 |         26 |        237 |
+| app\src\features\scene-settings\utils                                                         |          1 |         27 |         15 |          6 |         48 |
+| app\src\features\template-manager                                                             |          7 |        545 |        152 |         92 |        789 |
+| app\src\features\template-manager (Files)                                                     |          1 |          4 |          4 |          2 |         10 |
+| app\src\features\template-manager\components                                                  |          1 |         38 |         12 |          5 |         55 |
+| app\src\features\template-manager\data                                                        |          1 |         84 |         16 |         14 |        114 |
+| app\src\features\template-manager\hooks                                                       |          2 |        241 |         39 |         34 |        314 |
+| app\src\features\template-manager\utils                                                       |          2 |        178 |         81 |         37 |        296 |
+| app\src\features\video-preview                                                                |          5 |        467 |        140 |        104 |        711 |
+| app\src\features\video-preview (Files)                                                        |          1 |          3 |          4 |          2 |          9 |
+| app\src\features\video-preview\data                                                           |          1 |          9 |         17 |         10 |         36 |
+| app\src\features\video-preview\hooks                                                          |          3 |        455 |        119 |         92 |        666 |
+| app\src\features\widget-editor                                                                |         15 |      1,331 |        362 |        131 |      1,824 |
+| app\src\features\widget-editor (Files)                                                        |          1 |          1 |          4 |          2 |          7 |
+| app\src\features\widget-editor\components                                                     |         10 |      1,023 |        250 |         79 |      1,352 |
+| app\src\features\widget-editor\data                                                           |          2 |         98 |         19 |         14 |        131 |
+| app\src\features\widget-editor\hooks                                                          |          1 |        103 |         28 |         19 |        150 |
+| app\src\features\widget-editor\utils                                                          |          1 |        106 |         61 |         17 |        184 |
+| app\src\features\widget-preview                                                               |         16 |      1,824 |        702 |        256 |      2,782 |
+| app\src\features\widget-preview (Files)                                                       |          1 |          7 |          6 |          4 |         17 |
+| app\src\features\widget-preview\components                                                    |          6 |        784 |        210 |         63 |      1,057 |
+| app\src\features\widget-preview\hooks                                                         |          1 |         24 |         12 |          9 |         45 |
+| app\src\features\widget-preview\utils                                                         |          8 |      1,009 |        474 |        180 |      1,663 |
+| app\src\hooks                                                                                 |          5 |        142 |         55 |         35 |        232 |
+| app\src\lib                                                                                   |         20 |      1,858 |        749 |        382 |      2,989 |
+| app\src\lib (Files)                                                                           |         13 |        835 |        353 |        196 |      1,384 |
+| app\src\lib\activity                                                                          |          7 |      1,023 |        396 |        186 |      1,605 |
+| app\src\store                                                                                 |          6 |        834 |        107 |        164 |      1,105 |
+| app\src\store (Files)                                                                         |          2 |        164 |         77 |         32 |        273 |
+| app\src\store\slices                                                                          |          4 |        670 |         30 |        132 |        832 |
+| docs                                                                                          |          4 |        824 |          0 |        142 |        966 |
+| scripts                                                                                       |          3 |        421 |          1 |         62 |        484 |
+| src-tauri                                                                                     |         71 |    268,298 |      1,454 |      1,522 |    271,274 |
+| src-tauri (Files)                                                                             |          3 |         64 |          0 |          3 |         67 |
+| src-tauri\capabilities                                                                        |          1 |         17 |          0 |          1 |         18 |
+| src-tauri\icons                                                                               |          4 |        286 |          2 |          4 |        292 |
+| src-tauri\icons (Files)                                                                       |          2 |        277 |          2 |          4 |        283 |
+| src-tauri\icons\android                                                                       |          2 |          9 |          0 |          0 |          9 |
+| src-tauri\icons\android\mipmap-anydpi-v26                                                     |          1 |          5 |          0 |          0 |          5 |
+| src-tauri\icons\android\values                                                                |          1 |          4 |          0 |          0 |          4 |
+| src-tauri\ovrley_core                                                                         |         52 |    265,427 |      1,294 |      1,161 |    267,882 |
+| src-tauri\ovrley_core\src                                                                     |         30 |     10,136 |      1,236 |        811 |     12,183 |
+| src-tauri\ovrley_core\src (Files)                                                             |          1 |          6 |         15 |          2 |         23 |
+| src-tauri\ovrley_core\src\activity                                                            |          4 |        605 |        177 |         47 |        829 |
+| src-tauri\ovrley_core\src\commands                                                            |          1 |        499 |         86 |         64 |        649 |
+| src-tauri\ovrley_core\src\config                                                              |          1 |        481 |        107 |         26 |        614 |
+| src-tauri\ovrley_core\src\encode                                                              |         13 |      4,363 |        463 |        328 |      5,154 |
+| src-tauri\ovrley_core\src\render                                                              |         10 |      4,182 |        388 |        344 |      4,914 |
+| src-tauri\ovrley_core\src\render (Files)                                                      |          4 |      1,204 |        150 |        106 |      1,460 |
+| src-tauri\ovrley_core\src\render\widgets                                                      |          6 |      2,978 |        238 |        238 |      3,454 |
+| src-tauri\ovrley_core\tests                                                                   |         22 |    255,291 |         58 |        350 |    255,699 |
+| src-tauri\ovrley_core\tests (Files)                                                           |         14 |      2,709 |         54 |        331 |      3,094 |
+| src-tauri\ovrley_core\tests\common                                                            |          2 |         43 |          4 |         14 |         61 |
+| src-tauri\ovrley_core\tests\fixtures                                                          |          6 |    252,539 |          0 |          5 |    252,544 |
+| src-tauri\ovrley_core\tests\fixtures\activity                                                 |          2 |    252,317 |          0 |          1 |    252,318 |
+| src-tauri\ovrley_core\tests\fixtures\config                                                   |          3 |         36 |          0 |          3 |         39 |
+| src-tauri\ovrley_core\tests\fixtures\ffprobe                                                  |          1 |        186 |          0 |          1 |        187 |
+| src-tauri\src                                                                                 |         10 |      2,300 |        139 |        329 |      2,768 |
+| src-tauri\src (Files)                                                                         |          3 |        619 |        115 |         95 |        829 |
+| src-tauri\src\bin                                                                             |          7 |      1,681 |         24 |        234 |      1,939 |
+| src-tauri\tests                                                                               |          1 |        204 |         19 |         24 |        247 |
+| templates                                                                                     |          2 |        568 |          0 |          1 |        569 |
++-----------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-----------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| filename                                                                                      | language           | code       | comment    | blank      | total      |
++-----------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| h:\tools\cyclemetry\.agents\agents.md                                                         | Markdown           |         58 |          0 |         27 |         85 |
+| h:\tools\cyclemetry\.agents\backend-refactor-Phase1-DSPro.md                                  | Markdown           |        827 |          0 |        281 |      1,108 |
+| h:\tools\cyclemetry\.agents\backend-refactor-Phase2.md                                        | Markdown           |        764 |          0 |        203 |        967 |
+| h:\tools\cyclemetry\.agents\backend-refactor-v2.md                                            | Markdown           |      1,646 |          0 |        622 |      2,268 |
+| h:\tools\cyclemetry\.agents\composite-1080p.json                                              | JSON               |        175 |          0 |          0 |        175 |
+| h:\tools\cyclemetry\.agents\composite-4k.json                                                 | JSON               |        214 |          0 |          0 |        214 |
+| h:\tools\cyclemetry\.agents\frontend-refactor.md                                              | Markdown           |      1,009 |          0 |        429 |      1,438 |
+| h:\tools\cyclemetry\.agents\gpu-render.md                                                     | Markdown           |        280 |          0 |        133 |        413 |
+| h:\tools\cyclemetry\.github\workflows\release.yml                                             | YAML               |         72 |          0 |         13 |         85 |
+| h:\tools\cyclemetry\.github\workflows\semantic-release.yml                                    | YAML               |         33 |          0 |          9 |         42 |
+| h:\tools\cyclemetry\.releaserc.json                                                           | JSON               |          9 |          0 |          1 |         10 |
+| h:\tools\cyclemetry\LICENSE.md                                                                | Markdown           |        508 |          0 |        108 |        616 |
+| h:\tools\cyclemetry\README.md                                                                 | Markdown           |         63 |          0 |         36 |         99 |
+| h:\tools\cyclemetry\app\.prettierignore                                                       | Ignore             |          5 |          0 |          1 |          6 |
+| h:\tools\cyclemetry\app\.prettierrc                                                           | JSON               |          8 |          0 |          1 |          9 |
+| h:\tools\cyclemetry\app\components.json                                                       | JSON               |         24 |          0 |          1 |         25 |
+| h:\tools\cyclemetry\app\eslint.config.js                                                      | JavaScript         |         57 |          3 |          3 |         63 |
+| h:\tools\cyclemetry\app\index.html                                                            | HTML               |         19 |          0 |          1 |         20 |
+| h:\tools\cyclemetry\app\jsconfig.json                                                         | JSON with Comments |          9 |          0 |          1 |         10 |
+| h:\tools\cyclemetry\app\package-lock.json                                                     | JSON               |      7,407 |          0 |          1 |      7,408 |
+| h:\tools\cyclemetry\app\package.json                                                          | JSON               |         55 |          0 |          1 |         56 |
+| h:\tools\cyclemetry\app\pnpm-lock.yaml                                                        | YAML               |      3,483 |          0 |        840 |      4,323 |
+| h:\tools\cyclemetry\app\public\logo.svg                                                       | XML                |        142 |          1 |          2 |        145 |
+| h:\tools\cyclemetry\app\scripts\generate_parse_debug_from_raw_samples.mjs                     | JavaScript         |         36 |          0 |          9 |         45 |
+| h:\tools\cyclemetry\app\src\App.jsx                                                           | JavaScript JSX     |        131 |         11 |         10 |        152 |
+| h:\tools\cyclemetry\app\src\api\backend.js                                                    | JavaScript         |        131 |        128 |         29 |        288 |
+| h:\tools\cyclemetry\app\src\components\ui\accordion.jsx                                       | JavaScript JSX     |         36 |         29 |          8 |         73 |
+| h:\tools\cyclemetry\app\src\components\ui\alert.jsx                                           | JavaScript JSX     |         33 |         25 |          8 |         66 |
+| h:\tools\cyclemetry\app\src\components\ui\badge.jsx                                           | JavaScript JSX     |         25 |         12 |          7 |         44 |
+| h:\tools\cyclemetry\app\src\components\ui\blur-input.jsx                                      | JavaScript JSX     |         95 |         16 |         16 |        127 |
+| h:\tools\cyclemetry\app\src\components\ui\button.jsx                                          | JavaScript JSX     |         37 |         13 |          7 |         57 |
+| h:\tools\cyclemetry\app\src\components\ui\color-picker.jsx                                    | JavaScript JSX     |      1,255 |        176 |        177 |      1,608 |
+| h:\tools\cyclemetry\app\src\components\ui\font-select-field.jsx                               | JavaScript JSX     |         55 |         15 |          7 |         77 |
+| h:\tools\cyclemetry\app\src\components\ui\hex-color-picker.jsx                                | JavaScript JSX     |        157 |         18 |         16 |        191 |
+| h:\tools\cyclemetry\app\src\components\ui\input.jsx                                           | JavaScript JSX     |         20 |         12 |          6 |         38 |
+| h:\tools\cyclemetry\app\src\components\ui\label.jsx                                           | JavaScript JSX     |         18 |         10 |          5 |         33 |
+| h:\tools\cyclemetry\app\src\components\ui\popover.jsx                                         | JavaScript JSX     |         38 |         51 |         11 |        100 |
+| h:\tools\cyclemetry\app\src\components\ui\progress.jsx                                        | JavaScript JSX     |         19 |         11 |          5 |         35 |
+| h:\tools\cyclemetry\app\src\components\ui\select.jsx                                          | JavaScript JSX     |        121 |         76 |         14 |        211 |
+| h:\tools\cyclemetry\app\src\components\ui\separator.jsx                                       | JavaScript JSX     |         19 |         12 |          6 |         37 |
+| h:\tools\cyclemetry\app\src\components\ui\simple-tooltip.jsx                                  | JavaScript JSX     |         20 |         14 |          7 |         41 |
+| h:\tools\cyclemetry\app\src\components\ui\slider.jsx                                          | JavaScript JSX     |         45 |         14 |          7 |         66 |
+| h:\tools\cyclemetry\app\src\components\ui\switch.jsx                                          | JavaScript JSX     |         23 |         10 |          5 |         38 |
+| h:\tools\cyclemetry\app\src\components\ui\tabs.jsx                                            | JavaScript JSX     |         35 |         27 |          8 |         70 |
+| h:\tools\cyclemetry\app\src\components\ui\visually-hidden-input.jsx                           | JavaScript JSX     |         96 |         10 |         26 |        132 |
+| h:\tools\cyclemetry\app\src\components\widgets\icons\widget-cadence.svg                       | XML                |         54 |          0 |          1 |         55 |
+| h:\tools\cyclemetry\app\src\components\widgets\icons\widget-course.svg                        | XML                |          5 |          0 |          1 |          6 |
+| h:\tools\cyclemetry\app\src\components\widgets\icons\widget-elevation.svg                     | XML                |          3 |          0 |          1 |          4 |
+| h:\tools\cyclemetry\app\src\components\widgets\icons\widget-gradient.svg                      | XML                |          4 |          0 |          1 |          5 |
+| h:\tools\cyclemetry\app\src\components\widgets\icons\widget-heartrate.svg                     | XML                |          3 |          0 |          1 |          4 |
+| h:\tools\cyclemetry\app\src\components\widgets\icons\widget-label.svg                         | XML                |          5 |          0 |          1 |          6 |
+| h:\tools\cyclemetry\app\src\components\widgets\icons\widget-power.svg                         | XML                |          3 |          0 |          1 |          4 |
+| h:\tools\cyclemetry\app\src\components\widgets\icons\widget-speed.svg                         | XML                |          4 |          0 |          1 |          5 |
+| h:\tools\cyclemetry\app\src\components\widgets\icons\widget-temperature.svg                   | XML                |          3 |          0 |          1 |          4 |
+| h:\tools\cyclemetry\app\src\components\widgets\icons\widget-time.svg                          | XML                |          4 |          0 |          1 |          5 |
+| h:\tools\cyclemetry\app\src\features\app-shell\components\ActionButtons.jsx                   | JavaScript JSX     |         32 |         16 |          4 |         52 |
+| h:\tools\cyclemetry\app\src\features\app-shell\components\ActivitySection.jsx                 | JavaScript JSX     |        122 |         24 |          9 |        155 |
+| h:\tools\cyclemetry\app\src\features\app-shell\components\AppHeader.jsx                       | JavaScript JSX     |         82 |         17 |          6 |        105 |
+| h:\tools\cyclemetry\app\src\features\app-shell\components\ControlPanel.jsx                    | JavaScript JSX     |         32 |         11 |          5 |         48 |
+| h:\tools\cyclemetry\app\src\features\app-shell\components\EditorToolbar.jsx                   | JavaScript JSX     |        112 |         21 |          5 |        138 |
+| h:\tools\cyclemetry\app\src\features\app-shell\components\ErrorAlert.jsx                      | JavaScript JSX     |         30 |          7 |          6 |         43 |
+| h:\tools\cyclemetry\app\src\features\app-shell\components\LoadingOverlay.jsx                  | JavaScript JSX     |         25 |         18 |          4 |         47 |
+| h:\tools\cyclemetry\app\src\features\app-shell\components\OnboardingState.jsx                 | JavaScript JSX     |         55 |          7 |          6 |         68 |
+| h:\tools\cyclemetry\app\src\features\app-shell\components\TitleBar.jsx                        | JavaScript JSX     |         35 |          4 |          4 |         43 |
+| h:\tools\cyclemetry\app\src\features\app-shell\hooks\useActivityImport.js                     | JavaScript         |         32 |         22 |          8 |         62 |
+| h:\tools\cyclemetry\app\src\features\app-shell\hooks\useAppBootstrap.js                       | JavaScript         |         27 |         13 |          7 |         47 |
+| h:\tools\cyclemetry\app\src\features\app-shell\hooks\useBackendStatus.js                      | JavaScript         |         70 |          8 |         16 |         94 |
+| h:\tools\cyclemetry\app\src\features\app-shell\hooks\useEditorShellState.js                   | JavaScript         |         57 |         34 |         14 |        105 |
+| h:\tools\cyclemetry\app\src\features\app-shell\index.js                                       | JavaScript         |         10 |          4 |          2 |         16 |
+| h:\tools\cyclemetry\app\src\features\app-shell\utils\backendDebug.js                          | JavaScript         |         38 |         22 |         12 |         72 |
+| h:\tools\cyclemetry\app\src\features\app-shell\utils\templateGroups.js                        | JavaScript         |         47 |         16 |          8 |         71 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\components\OverlayCanvas.jsx              | JavaScript JSX     |        240 |         19 |         16 |        275 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\components\OverlayEditor.jsx              | JavaScript JSX     |        209 |         33 |         16 |        258 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\components\OverlayMoveable.jsx            | JavaScript JSX     |         84 |         24 |          8 |        116 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\data\metricWidgetAssets.js                | JavaScript         |          1 |          0 |          1 |          2 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\data\overlayEditorConfig.js               | JavaScript         |         23 |         16 |          5 |         44 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\data\overlayEditorConstants.js            | JavaScript         |         32 |         11 |          8 |         51 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\hooks\createOverlayMoveableHandlers.js    | JavaScript         |         16 |         28 |          4 |         48 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\hooks\useDragHandlers.js                  | JavaScript         |        145 |         26 |         26 |        197 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\hooks\useEditorKeyboard.js                | JavaScript         |         24 |         13 |          7 |         44 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\hooks\useEditorViewport.js                | JavaScript         |         23 |          9 |          8 |         40 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\hooks\useOverlayEditorState.js            | JavaScript         |        337 |         34 |         47 |        418 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\hooks\useResizeHandlers.js                | JavaScript         |         69 |         17 |         10 |         96 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\hooks\useRotateHandlers.js                | JavaScript         |         54 |         17 |          9 |         80 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\hooks\useScaleHandlers.js                 | JavaScript         |        136 |         21 |         17 |        174 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\hooks\useWidgetDraftState.js              | JavaScript         |         61 |         28 |         14 |        103 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\index.js                                  | JavaScript         |         22 |          6 |          7 |         35 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\utils\createOverlayPointerHandlers.js     | JavaScript         |        174 |         50 |         37 |        261 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\utils\exportRange.js                      | JavaScript         |        198 |         82 |         44 |        324 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\utils\overlayEditorHelpers.js             | JavaScript         |         77 |         73 |         18 |        168 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\utils\overlayEditorUtils.js               | JavaScript         |        163 |         71 |         47 |        281 |
+| h:\tools\cyclemetry\app\src\features\overlay-editor\utils\widgetDomHelpers.js                 | JavaScript         |         88 |         50 |         22 |        160 |
+| h:\tools\cyclemetry\app\src\features\player\components\OverlayPlayer.jsx                      | JavaScript JSX     |         87 |         10 |          5 |        102 |
+| h:\tools\cyclemetry\app\src\features\player\hooks\useOverlayPlayerState.js                    | JavaScript         |         20 |         14 |          6 |         40 |
+| h:\tools\cyclemetry\app\src\features\player\hooks\usePlaybackEngine.js                        | JavaScript         |        267 |         44 |         44 |        355 |
+| h:\tools\cyclemetry\app\src\features\player\hooks\usePlayerKeyboard.js                        | JavaScript         |         41 |         17 |         11 |         69 |
+| h:\tools\cyclemetry\app\src\features\player\hooks\usePlayerStore.js                           | JavaScript         |         24 |          8 |          3 |         35 |
+| h:\tools\cyclemetry\app\src\features\player\index.js                                          | JavaScript         |          1 |          3 |          2 |          6 |
+| h:\tools\cyclemetry\app\src\features\player\utils\playerTimeline.js                           | JavaScript         |         25 |         19 |          9 |         53 |
+| h:\tools\cyclemetry\app\src\features\render-video\components\ExportRangeSettings.jsx          | JavaScript JSX     |         68 |         11 |          7 |         86 |
+| h:\tools\cyclemetry\app\src\features\render-video\components\RenderProgressPanel.jsx          | JavaScript JSX     |         89 |         15 |         14 |        118 |
+| h:\tools\cyclemetry\app\src\features\render-video\components\RenderVideoDialog.jsx            | JavaScript JSX     |        224 |         15 |         15 |        254 |
+| h:\tools\cyclemetry\app\src\features\render-video\data\bitrateDefaults.js                     | JavaScript         |         32 |          9 |          3 |         44 |
+| h:\tools\cyclemetry\app\src\features\render-video\data\renderConstants.js                     | JavaScript         |         84 |          8 |          6 |         98 |
+| h:\tools\cyclemetry\app\src\features\render-video\hooks\useRenderCompletion.js                | JavaScript         |         40 |         14 |          9 |         63 |
+| h:\tools\cyclemetry\app\src\features\render-video\hooks\useRenderDialogState.js               | JavaScript         |         42 |         15 |         11 |         68 |
+| h:\tools\cyclemetry\app\src\features\render-video\hooks\useRenderProgressPolling.js           | JavaScript         |         33 |         10 |          6 |         49 |
+| h:\tools\cyclemetry\app\src\features\render-video\hooks\useRenderVideoDerivedState.js         | JavaScript         |         76 |         11 |          6 |         93 |
+| h:\tools\cyclemetry\app\src\features\render-video\hooks\useRenderVideoDialogState.js          | JavaScript         |        113 |         22 |         17 |        152 |
+| h:\tools\cyclemetry\app\src\features\render-video\hooks\useRenderVideoEffects.js              | JavaScript         |         68 |         15 |         14 |         97 |
+| h:\tools\cyclemetry\app\src\features\render-video\hooks\useRenderWorkflow.js                  | JavaScript         |        176 |         12 |         14 |        202 |
+| h:\tools\cyclemetry\app\src\features\render-video\index.js                                    | JavaScript         |          4 |          4 |          2 |         10 |
+| h:\tools\cyclemetry\app\src\features\render-video\utils\bitrateDefaults.js                    | JavaScript         |         12 |         14 |          4 |         30 |
+| h:\tools\cyclemetry\app\src\features\render-video\utils\codecUtils.js                         | JavaScript         |        116 |         77 |         29 |        222 |
+| h:\tools\cyclemetry\app\src\features\render-video\utils\format.js                             | JavaScript         |         14 |         16 |          5 |         35 |
+| h:\tools\cyclemetry\app\src\features\render-video\utils\render-execution.js                   | JavaScript         |         68 |         38 |          9 |        115 |
+| h:\tools\cyclemetry\app\src\features\render-video\utils\render-video.js                       | JavaScript         |        151 |         11 |         21 |        183 |
+| h:\tools\cyclemetry\app\src\features\scene-settings\components\GlobalSettingsSection.jsx      | JavaScript JSX     |        147 |         13 |          7 |        167 |
+| h:\tools\cyclemetry\app\src\features\scene-settings\components\OverlaySettingsSection.jsx     | JavaScript JSX     |        150 |         25 |          9 |        184 |
+| h:\tools\cyclemetry\app\src\features\scene-settings\components\SidebarSettingsTab.jsx         | JavaScript JSX     |         55 |          9 |          6 |         70 |
+| h:\tools\cyclemetry\app\src\features\scene-settings\components\VideoSyncSection.jsx           | JavaScript JSX     |        100 |         20 |          7 |        127 |
+| h:\tools\cyclemetry\app\src\features\scene-settings\data\sceneSettingsConstants.js            | JavaScript         |         30 |          3 |          3 |         36 |
+| h:\tools\cyclemetry\app\src\features\scene-settings\hooks\useSceneSettingsState.js            | JavaScript         |        192 |         19 |         26 |        237 |
+| h:\tools\cyclemetry\app\src\features\scene-settings\index.js                                  | JavaScript         |          5 |          5 |          2 |         12 |
+| h:\tools\cyclemetry\app\src\features\scene-settings\utils\sceneSettingsUtils.js               | JavaScript         |         27 |         15 |          6 |         48 |
+| h:\tools\cyclemetry\app\src\features\template-manager\components\NewTemplateConfirmDialog.jsx | JavaScript JSX     |         38 |         12 |          5 |         55 |
+| h:\tools\cyclemetry\app\src\features\template-manager\data\templateConstants.js               | JavaScript         |         84 |         16 |         14 |        114 |
+| h:\tools\cyclemetry\app\src\features\template-manager\hooks\useTemplateManagement.js          | JavaScript         |        210 |         20 |         26 |        256 |
+| h:\tools\cyclemetry\app\src\features\template-manager\hooks\useTemplateSaveStatus.js          | JavaScript         |         31 |         19 |          8 |         58 |
+| h:\tools\cyclemetry\app\src\features\template-manager\index.js                                | JavaScript         |          4 |          4 |          2 |         10 |
+| h:\tools\cyclemetry\app\src\features\template-manager\utils\templateFileUtils.js              | JavaScript         |         14 |         22 |          4 |         40 |
+| h:\tools\cyclemetry\app\src\features\template-manager\utils\templateSnapshot.js               | JavaScript         |        164 |         59 |         33 |        256 |
+| h:\tools\cyclemetry\app\src\features\video-preview\data\videoPreviewConstants.js              | JavaScript         |          9 |         17 |         10 |         36 |
+| h:\tools\cyclemetry\app\src\features\video-preview\hooks\useVideoImport.js                    | JavaScript         |         62 |         20 |          8 |         90 |
+| h:\tools\cyclemetry\app\src\features\video-preview\hooks\useVideoPlaybackClock.js             | JavaScript         |        140 |         36 |         35 |        211 |
+| h:\tools\cyclemetry\app\src\features\video-preview\hooks\useVideoPreview.js                   | JavaScript         |        253 |         63 |         49 |        365 |
+| h:\tools\cyclemetry\app\src\features\video-preview\index.js                                   | JavaScript         |          3 |          4 |          2 |          9 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\components\ElevationWidgetEditor.jsx       | JavaScript JSX     |        272 |         13 |          5 |        290 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\components\GradientWidgetEditor.jsx        | JavaScript JSX     |         72 |         11 |          6 |         89 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\components\MetricWidgetEditor.jsx          | JavaScript JSX     |         37 |         12 |          3 |         52 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\components\RouteMapWidgetEditor.jsx        | JavaScript JSX     |        151 |         12 |          6 |        169 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\components\SidebarWidgetsTab.jsx           | JavaScript JSX     |        134 |         17 |         19 |        170 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\components\TemperatureWidgetEditor.jsx     | JavaScript JSX     |         28 |         12 |          3 |         43 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\components\TextWidgetEditor.jsx            | JavaScript JSX     |          8 |         11 |          3 |         22 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\components\TimeWidgetEditor.jsx            | JavaScript JSX     |          9 |         12 |          3 |         24 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\components\widgetEditorSections.jsx        | JavaScript JSX     |        187 |         71 |         16 |        274 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\components\widgetFormControls.jsx          | JavaScript JSX     |        125 |         79 |         15 |        219 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\data\widgetDefaults.js                     | JavaScript         |         84 |         14 |         10 |        108 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\data\widgetDefinitions.js                  | JavaScript         |         14 |          5 |          4 |         23 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\hooks\useWidgetManager.js                  | JavaScript         |        103 |         28 |         19 |        150 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\index.js                                   | JavaScript         |          1 |          4 |          2 |          7 |
+| h:\tools\cyclemetry\app\src\features\widget-editor\utils\widgetUtils.js                       | JavaScript         |        106 |         61 |         17 |        184 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\components\ElevationRenderer.jsx          | JavaScript JSX     |        197 |         31 |         13 |        241 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\components\MetricRenderer.jsx             | JavaScript JSX     |        176 |         26 |         11 |        213 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\components\RouteRenderer.jsx              | JavaScript JSX     |        121 |         21 |          8 |        150 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\components\TextRenderer.jsx               | JavaScript JSX     |         36 |         13 |          4 |         53 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\components\WidgetPreview.jsx              | JavaScript JSX     |         79 |         24 |          7 |        110 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\components\previewSvgComponents.jsx       | JavaScript JSX     |        175 |         95 |         20 |        290 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\hooks\useFontMetricsVersion.js            | JavaScript         |         24 |         12 |          9 |         45 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\index.js                                  | JavaScript         |          7 |          6 |          4 |         17 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\utils\elevationGeometry.js                | JavaScript         |        178 |         31 |         29 |        238 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\utils\formatUtils.js                      | JavaScript         |        167 |         85 |         31 |        283 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\utils\metricWidgetPreviewModel.js         | JavaScript         |         67 |         16 |          8 |         91 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\utils\routeGeometry.js                    | JavaScript         |        184 |        110 |         28 |        322 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\utils\shadowUtils.js                      | JavaScript         |         46 |         34 |         15 |         95 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\utils\svgPreviewUtils.js                  | JavaScript         |        108 |        106 |         29 |        243 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\utils\textMeasurement.js                  | JavaScript         |        217 |         82 |         34 |        333 |
+| h:\tools\cyclemetry\app\src\features\widget-preview\utils\textWidgetPreviewModel.js           | JavaScript         |         42 |         10 |          6 |         58 |
+| h:\tools\cyclemetry\app\src\hooks\use-as-ref.js                                               | JavaScript         |         10 |          9 |          7 |         26 |
+| h:\tools\cyclemetry\app\src\hooks\use-isomorphic-layout-effect.js                             | JavaScript         |          3 |          3 |          4 |         10 |
+| h:\tools\cyclemetry\app\src\hooks\use-lazy-ref.js                                             | JavaScript         |          9 |          9 |          6 |         24 |
+| h:\tools\cyclemetry\app\src\hooks\useAppStoreSelectors.js                                     | JavaScript         |         79 |         23 |          7 |        109 |
+| h:\tools\cyclemetry\app\src\hooks\useAvailableFonts.js                                        | JavaScript         |         41 |         11 |         11 |         63 |
+| h:\tools\cyclemetry\app\src\index.css                                                         | PostCSS            |        259 |          4 |         27 |        290 |
+| h:\tools\cyclemetry\app\src\lib\activity\cache.js                                             | JavaScript         |         10 |         18 |          5 |         33 |
+| h:\tools\cyclemetry\app\src\lib\activity\fit-parser.js                                        | JavaScript         |         70 |         16 |         10 |         96 |
+| h:\tools\cyclemetry\app\src\lib\activity\gap-utils.js                                         | JavaScript         |        243 |         89 |         46 |        378 |
+| h:\tools\cyclemetry\app\src\lib\activity\import-activity.js                                   | JavaScript         |        190 |         79 |         35 |        304 |
+| h:\tools\cyclemetry\app\src\lib\activity\metric-series.js                                     | JavaScript         |        294 |        105 |         58 |        457 |
+| h:\tools\cyclemetry\app\src\lib\activity\parse-helpers.js                                     | JavaScript         |         57 |         45 |         16 |        118 |
+| h:\tools\cyclemetry\app\src\lib\activity\parser.js                                            | JavaScript         |        159 |         44 |         16 |        219 |
+| h:\tools\cyclemetry\app\src\lib\color-utils.js                                                | JavaScript         |         37 |         22 |         11 |         70 |
+| h:\tools\cyclemetry\app\src\lib\compose-refs.js                                               | JavaScript         |         37 |         28 |          9 |         74 |
+| h:\tools\cyclemetry\app\src\lib\config-utils.js                                               | JavaScript         |        180 |         64 |         35 |        279 |
+| h:\tools\cyclemetry\app\src\lib\fonts.js                                                      | JavaScript         |         33 |         33 |          8 |         74 |
+| h:\tools\cyclemetry\app\src\lib\geometryUtils.js                                              | JavaScript         |        104 |         58 |         31 |        193 |
+| h:\tools\cyclemetry\app\src\lib\interpolation.js                                              | JavaScript         |         49 |         29 |         14 |         92 |
+| h:\tools\cyclemetry\app\src\lib\previewPerf.js                                                | JavaScript         |         59 |          0 |         16 |         75 |
+| h:\tools\cyclemetry\app\src\lib\theme.js                                                      | JavaScript         |         14 |          9 |          5 |         28 |
+| h:\tools\cyclemetry\app\src\lib\update-rate.js                                                | JavaScript         |         37 |         26 |          9 |         72 |
+| h:\tools\cyclemetry\app\src\lib\utils.js                                                      | JavaScript         |          8 |          9 |          4 |         21 |
+| h:\tools\cyclemetry\app\src\lib\widget-config.js                                              | JavaScript         |        192 |         74 |         42 |        308 |
+| h:\tools\cyclemetry\app\src\lib\widget-icon-data.js                                           | JavaScript         |         30 |          0 |          3 |         33 |
+| h:\tools\cyclemetry\app\src\lib\widget-icons.jsx                                              | JavaScript JSX     |         55 |          1 |          9 |         65 |
+| h:\tools\cyclemetry\app\src\main.jsx                                                          | JavaScript JSX     |          9 |          3 |          3 |         15 |
+| h:\tools\cyclemetry\app\src\store\slices\createEditorSlice.js                                 | JavaScript         |        181 |         10 |         44 |        235 |
+| h:\tools\cyclemetry\app\src\store\slices\createMediaSlice.js                                  | JavaScript         |         93 |          9 |         19 |        121 |
+| h:\tools\cyclemetry\app\src\store\slices\createTemplateSlice.js                               | JavaScript         |        273 |         10 |         49 |        332 |
+| h:\tools\cyclemetry\app\src\store\slices\createVideoImportSlice.js                            | JavaScript         |        123 |          1 |         20 |        144 |
+| h:\tools\cyclemetry\app\src\store\store-utils.js                                              | JavaScript         |        126 |         63 |         23 |        212 |
+| h:\tools\cyclemetry\app\src\store\useStore.js                                                 | JavaScript         |         38 |         14 |          9 |         61 |
+| h:\tools\cyclemetry\app\vite.config.js                                                        | JavaScript         |         85 |          8 |         12 |        105 |
+| h:\tools\cyclemetry\docs\ARCHITECTURE.md                                                      | Markdown           |        781 |          0 |        114 |        895 |
+| h:\tools\cyclemetry\docs\benchmarks.md                                                        | Markdown           |         12 |          0 |          9 |         21 |
+| h:\tools\cyclemetry\docs\ffmpeg-bundle-notice-template.md                                     | Markdown           |          9 |          0 |          5 |         14 |
+| h:\tools\cyclemetry\docs\portable-distribution.md                                             | Markdown           |         22 |          0 |         14 |         36 |
+| h:\tools\cyclemetry\package-lock.json                                                         | JSON               |      5,911 |          0 |          1 |      5,912 |
+| h:\tools\cyclemetry\package.json                                                              | JSON               |         34 |          0 |          1 |         35 |
+| h:\tools\cyclemetry\pnpm-lock.yaml                                                            | YAML               |      6,203 |          0 |      1,489 |      7,692 |
+| h:\tools\cyclemetry\pnpm-workspace.yaml                                                       | YAML               |          2 |          0 |          1 |          3 |
+| h:\tools\cyclemetry\scripts\install-ffmpeg.mjs                                                | JavaScript         |        263 |          0 |         41 |        304 |
+| h:\tools\cyclemetry\scripts\package-portable.mjs                                              | JavaScript         |        119 |          1 |         16 |        136 |
+| h:\tools\cyclemetry\scripts\tauri.mjs                                                         | JavaScript         |         39 |          0 |          5 |         44 |
+| h:\tools\cyclemetry\src-tauri\build.rs                                                        | Rust               |          6 |          0 |          1 |          7 |
+| h:\tools\cyclemetry\src-tauri\capabilities\default.json                                       | JSON               |         17 |          0 |          1 |         18 |
+| h:\tools\cyclemetry\src-tauri\icons\android\mipmap-anydpi-v26\ic_launcher.xml                 | XML                |          5 |          0 |          0 |          5 |
+| h:\tools\cyclemetry\src-tauri\icons\android\values\ic_launcher_background.xml                 | XML                |          4 |          0 |          0 |          4 |
+| h:\tools\cyclemetry\src-tauri\icons\icon.svg                                                  | XML                |        135 |          1 |          2 |        138 |
+| h:\tools\cyclemetry\src-tauri\icons\logo.svg                                                  | XML                |        142 |          1 |          2 |        145 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\activity\interpolate.rs                         | Rust               |        259 |         46 |         16 |        321 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\activity\mod.rs                                 | Rust               |         33 |         17 |          8 |         58 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\activity\schema.rs                              | Rust               |         94 |         90 |         10 |        194 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\activity\trim.rs                                | Rust               |        219 |         24 |         13 |        256 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\commands\mod.rs                                 | Rust               |        499 |         86 |         64 |        649 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\config\mod.rs                                   | Rust               |        481 |        107 |         26 |        614 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\codec_detect.rs                          | Rust               |        685 |         21 |         22 |        728 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\ffmpeg.rs                                | Rust               |        314 |         34 |         21 |        369 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\ffmpeg_composite.rs                      | Rust               |        356 |         65 |         25 |        446 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\ffmpeg_composite_profiles.rs             | Rust               |        246 |         18 |         13 |        277 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\fps.rs                                   | Rust               |         67 |         24 |         11 |        102 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\mod.rs                                   | Rust               |         12 |         19 |          2 |         33 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\progress.rs                              | Rust               |         68 |         26 |         12 |        106 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\video.rs                                 | Rust               |        766 |         60 |         73 |        899 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\video_composite_debug.rs                 | Rust               |        209 |         29 |         16 |        254 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\video_composite_pipeline.rs              | Rust               |        691 |         78 |         49 |        818 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\video_debug.rs                           | Rust               |        299 |         29 |         23 |        351 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\video_pipeline.rs                        | Rust               |        438 |         49 |         31 |        518 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\encode\video_probe.rs                           | Rust               |        212 |         11 |         30 |        253 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\lib.rs                                          | Rust               |          6 |         15 |          2 |         23 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\render\format.rs                                | Rust               |        429 |         40 |         31 |        500 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\render\mod.rs                                   | Rust               |        490 |         60 |         37 |        587 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\render\surface.rs                               | Rust               |         32 |         11 |          6 |         49 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\render\text.rs                                  | Rust               |        253 |         39 |         32 |        324 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\render\widgets\common.rs                        | Rust               |        662 |         59 |         54 |        775 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\render\widgets\elevation.rs                     | Rust               |        834 |         46 |         54 |        934 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\render\widgets\mod.rs                           | Rust               |         41 |         15 |          8 |         64 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\render\widgets\route.rs                         | Rust               |        525 |         41 |         40 |        606 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\render\widgets\types.rs                         | Rust               |        168 |         23 |         19 |        210 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\src\render\widgets\value.rs                         | Rust               |        748 |         54 |         63 |        865 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\activity_tests.rs                             | Rust               |        102 |          4 |         14 |        120 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\cancellation_tests.rs                         | Rust               |         47 |         10 |         16 |         73 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\codec_detect_tests.rs                         | Rust               |         18 |          0 |          3 |         21 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\commands_tests.rs                             | Rust               |        270 |          0 |         36 |        306 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\common\mod.rs                                 | Rust               |          1 |          0 |          1 |          2 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\common\test_config.rs                         | Rust               |         42 |          4 |         13 |         59 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\config_tests.rs                               | Rust               |        167 |          5 |         17 |        189 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\ffmpeg_composite_tests.rs                     | Rust               |        622 |          0 |         67 |        689 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\fixtures\activity\fit-parse-debug.json        | JSON               |    177,156 |          0 |          0 |    177,156 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\fixtures\activity\gpx-parse-debug.json        | JSON               |     75,161 |          0 |          1 |     75,162 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\fixtures\config\composite.json                | JSON               |         22 |          0 |          1 |         23 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\fixtures\config\invalid.json                  | JSON               |          1 |          0 |          1 |          2 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\fixtures\config\simple.json                   | JSON               |         13 |          0 |          1 |         14 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\fixtures\ffprobe\1080p.json                   | JSON               |        186 |          0 |          1 |        187 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\format_tests.rs                               | Rust               |        227 |          3 |          7 |        237 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\fps_tests.rs                                  | Rust               |         86 |          5 |         18 |        109 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\progress_tests.rs                             | Rust               |         52 |          7 |         17 |         76 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\rdp_tests.rs                                  | Rust               |         78 |         15 |         15 |        108 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\value_widget_tests.rs                         | Rust               |         42 |          4 |          7 |         53 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\video_composite_pipeline_tests.rs             | Rust               |        897 |          0 |         89 |        986 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\video_probe_tests.rs                          | Rust               |         71 |          1 |         20 |         92 |
+| h:\tools\cyclemetry\src-tauri\ovrley_core\tests\video_tests.rs                                | Rust               |         30 |          0 |          5 |         35 |
+| h:\tools\cyclemetry\src-tauri\src\bin\benchmark_composite.rs                                  | Rust               |        457 |         16 |         60 |        533 |
+| h:\tools\cyclemetry\src-tauri\src\bin\benchmark_transparent.rs                                | Rust               |        364 |          4 |         55 |        423 |
+| h:\tools\cyclemetry\src-tauri\src\bin\benchmark_widget_rate.rs                                | Rust               |        460 |          2 |         65 |        527 |
+| h:\tools\cyclemetry\src-tauri\src\bin\parallel_render.rs                                      | Rust               |         53 |          2 |         16 |         71 |
+| h:\tools\cyclemetry\src-tauri\src\bin\render_preview.rs                                       | Rust               |        206 |          0 |         21 |        227 |
+| h:\tools\cyclemetry\src-tauri\src\bin\render_video.rs                                         | Rust               |        109 |          0 |         11 |        120 |
+| h:\tools\cyclemetry\src-tauri\src\bin\validate_activity.rs                                    | Rust               |         32 |          0 |          6 |         38 |
+| h:\tools\cyclemetry\src-tauri\src\lib.rs                                                      | Rust               |        266 |         58 |         37 |        361 |
+| h:\tools\cyclemetry\src-tauri\src\main.rs                                                     | Rust               |          4 |          1 |          2 |          7 |
+| h:\tools\cyclemetry\src-tauri\src\video_server.rs                                             | Rust               |        349 |         56 |         56 |        461 |
+| h:\tools\cyclemetry\src-tauri\tauri.conf.json                                                 | JSON               |         55 |          0 |          1 |         56 |
+| h:\tools\cyclemetry\src-tauri\tauri.macos.conf.json                                           | JSON               |          3 |          0 |          1 |          4 |
+| h:\tools\cyclemetry\src-tauri\tests\video_server_tests.rs                                     | Rust               |        204 |         19 |         24 |        247 |
+| h:\tools\cyclemetry\templates\recent-template-1080p.json                                      | JSON               |        239 |          0 |          0 |        239 |
+| h:\tools\cyclemetry\templates\recent-template.json                                            | JSON               |        329 |          0 |          1 |        330 |
+| Total                                                                                         |                    |    314,578 |      5,844 |      8,368 |    328,790 |
++-----------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+

@@ -327,7 +327,7 @@ fn select_composite_profile(
 ///
 /// This is diagnostic only for explicit full-GPU renders, which fail loudly
 /// instead of silently producing a fallback output when FFmpeg rejects the graph.
-pub(crate) fn fallback_profile_name(profile: &CompositeProfile) -> Option<String> {
+pub fn fallback_profile_name(profile: &CompositeProfile) -> Option<String> { // test seam
     match profile.name {
         "nnvgpu_h264" => Some("nvgpu_h264".to_string()),
         "nnvgpu_hevc" => Some("nvgpu_hevc".to_string()),
@@ -443,7 +443,3 @@ fn format_seconds_arg(value: f64) -> String {
         .trim_end_matches('.')
         .to_string()
 }
-
-#[cfg(test)]
-#[path = "tests/ffmpeg_composite_tests.rs"]
-mod tests;

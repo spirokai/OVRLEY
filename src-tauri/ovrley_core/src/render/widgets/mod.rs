@@ -14,7 +14,7 @@ mod route;
 /// Shared widget cache and report types.
 mod types;
 /// Metric value widgets, including icons and gradient triangles.
-mod value;
+pub mod value; // test seam
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::RenderConfig;

@@ -210,7 +210,7 @@ fn read_rational_rate(stream: &Value, key: &str) -> Option<(u32, u32)> {
     (num > 0 && den > 0).then_some((num, den))
 }
 
-fn read_video_stream_duration(stream: &Value, fps: Option<f64>) -> Option<f64> {
+pub fn read_video_stream_duration(stream: &Value, fps: Option<f64>) -> Option<f64> { // test seam
     stream
         .get("duration")
         .and_then(|v| v.as_str())
@@ -250,32 +250,3 @@ fn read_rotation_degrees(stream: &Value) -> Option<i32> {
         })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::read_video_stream_duration;
-    use serde_json::json;
-
-    #[test]
-    fn reads_video_stream_duration_before_container_duration() {
-        let stream = json!({
-            "duration": "30.033333",
-            "nb_frames": "901"
-        });
-
-        assert_eq!(
-            read_video_stream_duration(&stream, Some(30.0)),
-            Some(30.033333)
-        );
-    }
-
-    #[test]
-    fn falls_back_to_frame_count_when_stream_duration_is_missing() {
-        let stream = json!({
-            "nb_frames": "901"
-        });
-
-        let duration = read_video_stream_duration(&stream, Some(30.0)).unwrap();
-
-        assert!((duration - 30.033333333333335).abs() < 1e-9);
-    }
-}

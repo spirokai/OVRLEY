@@ -157,7 +157,7 @@ impl RenderController {
     }
 
     /// Returns the shared cancellation flag for internal worker coordination.
-    pub(crate) fn cancel_flag(&self) -> Arc<AtomicBool> {
+    pub fn cancel_flag(&self) -> Arc<AtomicBool> { // test seam
         self.cancel_flag.clone()
     }
 }
@@ -587,14 +587,14 @@ fn render_composite_video_segmented(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct CompositeSegmentWindow {
-    output_start_frame: u32,
-    output_end_frame: u32,
-    video_start_seconds: f64,
-    render_duration_seconds: f64,
+pub struct CompositeSegmentWindow { // test seam
+    pub output_start_frame: u32,
+    pub output_end_frame: u32,
+    pub video_start_seconds: f64,
+    pub render_duration_seconds: f64,
 }
 
-fn composite_output_frame_windows(
+pub fn composite_output_frame_windows( // test seam
     total_output_frames: u32,
     render_duration: f64,
     source_fps: Fps,
@@ -896,40 +896,3 @@ fn cleanup_segment_outputs(paths: &AppPaths, results: &[Option<String>]) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::composite_output_frame_windows;
-    use crate::encode::fps::Fps;
-
-    #[test]
-    fn composite_output_frame_windows_share_exact_frame_boundary_times() {
-        let fps = Fps::new(30000, 1001).unwrap();
-        let windows = composite_output_frame_windows(150, 5.0, fps, 2);
-        let split_time = 75.0 / fps.as_f64();
-
-        assert_eq!(windows.len(), 2);
-        assert_eq!(windows[0].output_start_frame, 0);
-        assert_eq!(windows[0].output_end_frame, 75);
-        assert_eq!(windows[1].output_start_frame, 75);
-        assert_eq!(windows[1].output_end_frame, 150);
-        assert!(windows[0].video_start_seconds.abs() <= 1e-12);
-        assert!((windows[0].render_duration_seconds - split_time).abs() <= 1e-9);
-        assert!((windows[1].video_start_seconds - split_time).abs() <= 1e-9);
-        assert!((windows[1].render_duration_seconds - (5.0 - split_time)).abs() <= 1e-9);
-    }
-
-    #[test]
-    fn composite_output_frame_windows_keep_fractional_tail_on_last_segment() {
-        let fps = Fps::new(30000, 1001).unwrap();
-        let windows = composite_output_frame_windows(4, 0.101, fps, 2);
-
-        assert_eq!(windows.len(), 2);
-        assert_eq!(windows[0].output_start_frame, 0);
-        assert_eq!(windows[0].output_end_frame, 2);
-        assert_eq!(windows[1].output_start_frame, 2);
-        assert_eq!(windows[1].output_end_frame, 4);
-        assert!((windows[0].render_duration_seconds - (2.0 / fps.as_f64())).abs() <= 1e-9);
-        assert!((windows[1].video_start_seconds - (2.0 / fps.as_f64())).abs() <= 1e-9);
-        assert!((windows[1].render_duration_seconds - (0.101 - (2.0 / fps.as_f64()))).abs() <= 1e-9);
-    }
-}

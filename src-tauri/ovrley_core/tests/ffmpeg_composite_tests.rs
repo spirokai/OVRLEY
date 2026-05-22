@@ -1,5 +1,9 @@
-use super::*;
 use std::path::Path;
+
+use ovrley_core::encode::ffmpeg_composite::{
+    build_composite_ffmpeg_settings, CompositeFfmpegSettings, HwAccelInfo,
+};
+use ovrley_core::encode::fps::Fps;
 
 fn settings(source_fps: Fps, overlay_pipe_fps: Fps, trim_start: f64) -> CompositeFfmpegSettings {
     settings_for_codec(
