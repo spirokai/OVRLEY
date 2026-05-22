@@ -41,8 +41,8 @@ pub fn simplify_rdp_indices(points: &[(f32, f32)], tolerance: f32) -> Vec<usize>
     let mut max_distance = 0.0f32;
     let mut split_index = 0usize;
 
-    for i in 1..points.len() - 1 {
-        let distance = perpendicular_distance(points[i], first, last);
+    for (i, &point) in points.iter().enumerate().skip(1).take(points.len().saturating_sub(2)) {
+        let distance = perpendicular_distance(point, first, last);
         if distance > max_distance {
             max_distance = distance;
             split_index = i;

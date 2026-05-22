@@ -848,11 +848,7 @@ fn writer_worker(
 ) -> CoreResult<WriterResult> {
     let mut profiler = crate::debug::RenderProfiler::default();
     let mut written_frames = 0u64;
-    loop {
-        let frame = match receiver.recv() {
-            Ok(frame) => frame,
-            Err(_) => break,
-        };
+    while let Ok(frame) = receiver.recv() {
         let write_started = Instant::now();
         stdin.write_all(frame.pixels.as_slice()).map_err(|error| {
             CoreError::Encode(format!("Failed writing composite overlay frame: {error}"))

@@ -215,10 +215,10 @@ fn main() -> Result<(), String> {
         activity_start, activity_end, trim_start, render_duration
     );
 
-    let activity_json = fs::read_to_string(&resolve_path(&activity_path, &root))
+    let activity_json = fs::read_to_string(resolve_path(&activity_path, &root))
         .map_err(|e| format!("Failed to read activity: {e}"))?;
 
-    let template_raw = fs::read_to_string(&resolve_path(&template_path, &root))
+    let template_raw = fs::read_to_string(resolve_path(&template_path, &root))
         .map_err(|e| format!("Failed to read template: {e}"))?;
     let template_value: serde_json::Value =
         serde_json::from_str(&template_raw).map_err(|e| format!("Invalid template JSON: {e}"))?;

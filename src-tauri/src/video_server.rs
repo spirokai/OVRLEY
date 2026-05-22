@@ -112,7 +112,15 @@ impl VideoServerHandle {
             })),
         }
     }
+}
 
+impl Default for VideoServerHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl VideoServerHandle {
     /// Starts the local HTTP server on `127.0.0.1` using a random available port.
     ///
     /// The request loop runs on a dedicated thread so Tauri setup can return

@@ -9,7 +9,7 @@
 
 #![allow(dead_code)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Resolves the repository root from `CARGO_MANIFEST_DIR`.
 ///
@@ -53,17 +53,15 @@ pub fn read_positional(index: usize, args: &[String]) -> Option<String> {
 ///
 /// Returns the first path variant that exists on disk. Falls back to the
 /// original input if none of the resolved variants are found.
-pub fn resolve_path(input: &PathBuf, root: &PathBuf) -> PathBuf {
-    if input.is_absolute() {
-        input.clone()
-    } else if input.exists() {
-        input.clone()
+pub fn resolve_path(input: &Path, root: &Path) -> PathBuf {
+    if input.is_absolute() || input.exists() {
+        input.to_path_buf()
     } else {
         let rooted = root.join(input);
         if rooted.exists() {
             rooted
         } else {
-            input.clone()
+            input.to_path_buf()
         }
     }
 }
