@@ -5,13 +5,13 @@
 //! subtle visual drift between widget implementations.
 
 use super::types::{
-    MarkerLayer, ShadowStyle, StaticLayer, WidgetFrameReport, WidgetGeometry, WidgetGeometryReport,
+    ShadowStyle, StaticLayer, WidgetFrameReport, WidgetGeometry, WidgetGeometryReport,
     WidgetRenderReport,
 };
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::MarkerPointConfig;
 use crate::config::RenderConfig;
-use skia_safe::{BlurStyle, Canvas, MaskFilter, Paint, PaintCap, PaintJoin, Path as SkPath, Point};
+use skia_safe::Canvas;
 
 pub(crate) const DEFAULT_COLOR: &str = "#ffffff";
 pub(crate) const DEFAULT_LINE_WIDTH: f32 = 1.75;
@@ -23,93 +23,9 @@ pub(crate) const DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER: f32 = 2.5;
 pub(crate) const DEFAULT_ELEVATION_MARKER_SCALE: f32 = 2.5;
 pub(crate) const DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER: f32 = 2.5;
 
-// Normalizes opacity from either `0..=1` or legacy `0..=100` input.
-pub(crate) fn normalize_opacity(value: Option<f32>, default: f32) -> f32 {
-    match value {
-        Some(value) if value > 1.0 => (value / 100.0).clamp(0.0, 1.0),
-        Some(value) => value.clamp(0.0, 1.0),
-        None => default,
-    }
-}
-
-// Computes Euclidean distance between two widget-space points.
-pub(crate) fn distance(left: (f32, f32), right: (f32, f32)) -> f32 {
-    ((right.0 - left.0).powi(2) + (right.1 - left.1).powi(2)).sqrt()
-}
-
-// Fits source points into widget bounds while preserving aspect ratio.
-pub(crate) fn fit_points_to_widget_with_inset(
-    points: &[(f32, f32)],
-    width: f32,
-    height: f32,
-    inset_px: f32,
-    invert_y: bool,
-) -> Vec<(f32, f32)> {
-    // Preserve aspect ratio and center the fitted route/profile inside the
-    // widget while reserving space for strokes, shadows, and marker radii.
-    if points.is_empty() {
-        return Vec::new();
-    }
-
-    let min_x = points.iter().map(|(x, _)| *x).fold(f32::INFINITY, f32::min);
-    let max_x = points
-        .iter()
-        .map(|(x, _)| *x)
-        .fold(f32::NEG_INFINITY, f32::max);
-    let min_y = points.iter().map(|(_, y)| *y).fold(f32::INFINITY, f32::min);
-    let max_y = points
-        .iter()
-        .map(|(_, y)| *y)
-        .fold(f32::NEG_INFINITY, f32::max);
-    let safe_inset = inset_px.max(0.0).min(width.min(height) * 0.45);
-    let inner_width = (width - safe_inset * 2.0).max(1.0);
-    let inner_height = (height - safe_inset * 2.0).max(1.0);
-    let span_x = (max_x - min_x).max(1e-6);
-    let span_y = (max_y - min_y).max(1e-6);
-    let scale = (inner_width / span_x).min(inner_height / span_y);
-    let offset_x = (width - span_x * scale) / 2.0;
-    let offset_y = (height - span_y * scale) / 2.0;
-
-    points
-        .iter()
-        .map(|(x, y)| {
-            let fitted_x = (x - min_x) * scale + offset_x;
-            let mut fitted_y = (y - min_y) * scale + offset_y;
-            if invert_y {
-                fitted_y = height - fitted_y;
-            }
-            (fitted_x, fitted_y)
-        })
-        .collect()
-}
-
 // Interpolates one numeric value from sorted valid points.
-fn interpolate_numeric_points(points: &[(f64, f64)], target_x: f64) -> Option<f64> {
-    if points.is_empty() {
-        return None;
-    }
-    if target_x <= points[0].0 {
-        return Some(points[0].1);
-    }
-    let last_index = points.len() - 1;
-    if target_x >= points[last_index].0 {
-        return Some(points[last_index].1);
-    }
-
-    let right_index = points.partition_point(|(x, _)| *x < target_x);
-    if right_index == 0 {
-        return Some(points[0].1);
-    }
-    if right_index >= points.len() {
-        return Some(points[last_index].1);
-    }
-
-    let (left_x, left_y) = points[right_index - 1];
-    let (right_x, right_y) = points[right_index];
-    let delta = (right_x - left_x).max(f64::EPSILON);
-    let mix = (target_x - left_x) / delta;
-    Some(left_y + (right_y - left_y) * mix)
-}
+// Delegates to the shared `interpolation` leaf module.
+use crate::interpolation::interpolate_points as interpolate_points_f64; // intentionally aliased
 
 // Interpolates a numeric series at many target positions.
 fn interpolate_numeric_series_many(
@@ -129,7 +45,7 @@ fn interpolate_numeric_series_many(
 
     target_x_values
         .iter()
-        .map(|target_x| interpolate_numeric_points(&valid_points, *target_x).unwrap_or(0.0) as f32)
+        .map(|target_x| interpolate_points_f64(&valid_points, *target_x).unwrap_or(0.0) as f32)
         .collect()
 }
 
@@ -264,38 +180,13 @@ pub(crate) fn normalize_optional_progress_window(
 }
 
 // Interpolates one optional numeric series at a target x-value.
+// Delegates to the shared `interpolation` leaf module.
 pub(crate) fn interpolate_optional_numeric_series(
     x_values: &[f64],
     y_values: &[Option<f64>],
     target_x: f64,
 ) -> Option<f64> {
-    let valid = x_values
-        .iter()
-        .copied()
-        .zip(y_values.iter().copied())
-        .filter_map(|(x, y)| y.map(|value| (x, value)))
-        .collect::<Vec<_>>();
-    if valid.is_empty() {
-        return None;
-    }
-    if target_x <= valid[0].0 {
-        return Some(valid[0].1);
-    }
-    let last_index = valid.len() - 1;
-    if target_x >= valid[last_index].0 {
-        return Some(valid[last_index].1);
-    }
-    for index in 1..valid.len() {
-        let (left_x, left_y) = valid[index - 1];
-        let (right_x, right_y) = valid[index];
-        if right_x < target_x {
-            continue;
-        }
-        let delta = (right_x - left_x).max(f64::EPSILON);
-        let mix = (target_x - left_x) / delta;
-        return Some(left_y + (right_y - left_y) * mix);
-    }
-    Some(valid[last_index].1)
+    crate::interpolation::interpolate_optional_numeric_series(x_values, y_values, target_x)
 }
 
 // Finds an interpolated point for target progress using a reusable search cursor.
@@ -360,151 +251,6 @@ pub(crate) fn point_at_progress_x(
     let index = scaled_index.floor() as usize;
     let point = points.get(index.min(points.len().saturating_sub(1)))?;
     Some((index, point.0, point.1))
-}
-
-// Draws a stroked polyline without shadow.
-pub(crate) fn draw_polyline(
-    canvas: &Canvas,
-    points: &[(f32, f32)],
-    color: &str,
-    width: f32,
-    opacity: f32,
-) {
-    draw_polyline_with_shadow(canvas, points, color, width, opacity, None);
-}
-
-// Draws a stroked polyline with an optional drop shadow.
-pub(crate) fn draw_polyline_with_shadow(
-    canvas: &Canvas,
-    points: &[(f32, f32)],
-    color: &str,
-    width: f32,
-    opacity: f32,
-    shadow: Option<&ShadowStyle>,
-) {
-    if points.len() < 2 {
-        return;
-    }
-    let path = path_from_points(points, false, None);
-    let mut paint = Paint::default();
-    paint.set_anti_alias(true);
-    paint.set_style(skia_safe::paint::Style::Stroke);
-    paint.set_stroke_width(width.max(1.0));
-    paint.set_stroke_cap(PaintCap::Round);
-    paint.set_stroke_join(PaintJoin::Round);
-    paint.set_color(crate::render::text::parse_color(color, opacity));
-
-    if let Some(shadow) = shadow {
-        if shadow.strength > 0.0 || shadow.distance != 0.0 {
-            let mut shadow_paint = Paint::default();
-            shadow_paint.set_anti_alias(true);
-            shadow_paint.set_style(skia_safe::paint::Style::Stroke);
-            shadow_paint.set_stroke_width(width.max(1.0));
-            shadow_paint.set_stroke_cap(PaintCap::Round);
-            shadow_paint.set_stroke_join(PaintJoin::Round);
-            shadow_paint.set_color(crate::render::text::parse_color(&shadow.color, opacity));
-            if shadow.strength > 0.0 {
-                shadow_paint.set_mask_filter(MaskFilter::blur(
-                    BlurStyle::Normal,
-                    shadow.strength,
-                    true,
-                ));
-            }
-            canvas.save();
-            canvas.translate((shadow.offset_x, shadow.offset_y));
-            canvas.draw_path(&path, &shadow_paint);
-            canvas.restore();
-        }
-    }
-
-    canvas.draw_path(&path, &paint);
-}
-
-// Draws a filled area under a polyline down to `baseline_y`.
-pub(crate) fn draw_area(
-    canvas: &Canvas,
-    points: &[(f32, f32)],
-    baseline_y: f32,
-    color: &str,
-    opacity: f32,
-) {
-    if points.len() < 2 {
-        return;
-    }
-    let path = path_from_points(points, true, Some(baseline_y));
-    let mut paint = Paint::default();
-    paint.set_anti_alias(true);
-    paint.set_style(skia_safe::paint::Style::Fill);
-    paint.set_color(crate::render::text::parse_color(color, opacity));
-    canvas.draw_path(&path, &paint);
-}
-
-// Draws the configured marker layers or a fallback circular marker.
-pub(crate) fn draw_marker(
-    canvas: &Canvas,
-    layers: &[MarkerLayer],
-    x: f32,
-    y: f32,
-    fallback_color: &str,
-    fallback_radius: f32,
-    fallback_opacity: f32,
-) {
-    // Marker points are rendered largest-to-smallest. The smallest layer is
-    // filled to create a visible center; larger layers become rings.
-    if layers.is_empty() {
-        let mut paint = Paint::default();
-        paint.set_anti_alias(true);
-        paint.set_style(skia_safe::paint::Style::Fill);
-        paint.set_color(crate::render::text::parse_color(
-            fallback_color,
-            fallback_opacity,
-        ));
-        canvas.draw_circle(Point::new(x, y), fallback_radius.max(2.0), &paint);
-        return;
-    }
-
-    for layer in layers {
-        let mut paint = Paint::default();
-        paint.set_anti_alias(true);
-        paint.set_color(crate::render::text::parse_color(
-            &layer.color,
-            layer.opacity,
-        ));
-        if layer.solid_fill {
-            paint.set_style(skia_safe::paint::Style::Fill);
-            canvas.draw_circle(Point::new(x, y), layer.radius, &paint);
-        } else {
-            paint.set_style(skia_safe::paint::Style::Stroke);
-            paint.set_stroke_width((layer.radius * 0.18).round().clamp(1.0, 3.0));
-            canvas.draw_circle(Point::new(x, y), layer.radius, &paint);
-        }
-    }
-}
-
-// Converts marker point config into sorted drawable marker layers.
-pub(crate) fn marker_layers_from_points(points: &[MarkerPointConfig]) -> Vec<MarkerLayer> {
-    let mut layers = points
-        .iter()
-        .map(|point| MarkerLayer {
-            radius: point
-                .weight
-                .unwrap_or(DEFAULT_POINT_WEIGHT)
-                .max(1.0)
-                .sqrt()
-                .max(2.0),
-            color: point
-                .color
-                .clone()
-                .unwrap_or_else(|| DEFAULT_COLOR.to_string()),
-            opacity: normalize_opacity(point.opacity, 1.0),
-            solid_fill: false,
-        })
-        .collect::<Vec<_>>();
-    layers.sort_by(|left, right| right.radius.total_cmp(&left.radius));
-    if let Some(last) = layers.last_mut() {
-        last.solid_fill = true;
-    }
-    layers
 }
 
 // Resolves the base plot color with a white default.
@@ -637,54 +383,6 @@ pub(crate) fn draw_static_layer(canvas: &Canvas, layer: Option<&StaticLayer>) {
     if let Some(layer) = layer {
         canvas.draw_image(&layer.image, (layer.x, layer.y), None);
     }
-}
-
-// Builds a Skia path from widget points, optionally closing to a baseline.
-pub(crate) fn path_from_points(
-    points: &[(f32, f32)],
-    close_path: bool,
-    baseline_y: Option<f32>,
-) -> SkPath {
-    let mut path = SkPath::new();
-    if points.is_empty() {
-        return path;
-    }
-    if let Some(baseline) = baseline_y {
-        path.move_to((points[0].0, baseline));
-    } else {
-        path.move_to(points[0]);
-    }
-    for point in points {
-        path.line_to(*point);
-    }
-    if let Some(baseline) = baseline_y {
-        path.line_to((points.last().unwrap().0, baseline));
-    }
-    if close_path {
-        path.close();
-    }
-    path
-}
-
-// Applies widget translation and rotation while drawing local widget contents.
-pub(crate) fn with_widget_transform(
-    canvas: &Canvas,
-    x: f32,
-    y: f32,
-    _width: f32,
-    _height: f32,
-    rotation_deg: f32,
-    draw: impl FnOnce(&Canvas),
-) {
-    // Match the editor preview: plot widgets rotate around their top-left
-    // origin after being translated to the configured canvas position.
-    canvas.save();
-    canvas.translate((x, y));
-    if rotation_deg != 0.0 {
-        canvas.rotate(rotation_deg, None);
-    }
-    draw(canvas);
-    canvas.restore();
 }
 
 // Converts a widget-local point into absolute canvas coordinates.

@@ -3,12 +3,9 @@ use ovrley_core::config::parse_config_json;
 use std::fs;
 use std::path::PathBuf;
 
-fn read_arg(flag: &str, args: &[String]) -> Result<String, String> {
-    args.windows(2)
-        .find(|pair| pair[0] == flag)
-        .map(|pair| pair[1].clone())
-        .ok_or_else(|| format!("Missing required argument: {flag}"))
-}
+#[path = "../bin_common.rs"]
+mod common;
+use common::read_arg;
 
 fn main() -> Result<(), String> {
     let args = std::env::args().collect::<Vec<_>>();

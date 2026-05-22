@@ -268,7 +268,7 @@ fn select_composite_profile(
     codec_name: &str,
     hwaccel_available: &HwAccelInfo,
 ) -> CoreResult<CompositeProfile> {
-    let profile = composite_profile_template(codec_name).unwrap_or_else(|| CompositeProfile {
+    let profile = composite_profile_template(codec_name).unwrap_or_else(|_| CompositeProfile {
         name: "custom_passthrough",
         codec: "custom",
         input_args: Vec::new(),

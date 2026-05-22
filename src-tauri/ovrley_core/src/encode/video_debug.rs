@@ -5,7 +5,7 @@
 //! across phases without coupling the main render loop to reporting details.
 
 use crate::activity::schema::DenseActivityReport;
-use crate::commands::AppPaths;
+use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::TimingBucket;
 use crate::encode::ffmpeg::suppress_child_console;

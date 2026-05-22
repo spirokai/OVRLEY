@@ -1,28 +1,18 @@
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::commands::AppPaths;
 use ovrley_core::config::parse_config_json;
-use std::fs;
-use std::path::PathBuf;
 
-fn repo_root() -> Result<PathBuf, String> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir
-        .parent()
-        .map(PathBuf::from)
-        .ok_or_else(|| "Failed to resolve repo root".to_string())
-}
+#[path = "../bin_common.rs"]
+mod common;
+use common::repo_root;
 
 fn estimate_max_parallelism() -> usize {
     let cores = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4);
 
-    // Heuristic: 4K render needs ~4 logical cores for peak efficiency (Skia + FFmpeg)
     let by_cores = cores / 4;
-
-    // Hard limit for hardware encoders (usually 3 on consumer cards)
     let gpu_limit = 3;
-
     let estimate = std::cmp::min(by_cores, gpu_limit).max(1);
 
     println!("--- Resource Estimation ---");
@@ -42,7 +32,7 @@ fn main() -> Result<(), String> {
     let payload_path = root.join("debug/activities/Test_FIT-parse-debug.json");
 
     println!("Loading payload: {}", payload_path.display());
-    let payload_json = fs::read_to_string(&payload_path)
+    let payload_json = std::fs::read_to_string(&payload_path)
         .map_err(|error| format!("Failed to read payload: {error}"))?;
     let activity = parse_activity_json(&payload_json).map_err(|e| e.to_string())?;
 
@@ -52,7 +42,7 @@ fn main() -> Result<(), String> {
 
     for i in 1..=2 {
         let config_path = root.join(format!("templates/parallel{}.json", i));
-        let config_json = fs::read_to_string(&config_path)
+        let config_json = std::fs::read_to_string(&config_path)
             .map_err(|error| format!("Failed to read config{}: {error}", i))?;
         let config = parse_config_json(&config_json).map_err(|e| e.to_string())?;
         let dense = build_dense_activity_report(&activity, &config).map_err(|e| e.to_string())?;

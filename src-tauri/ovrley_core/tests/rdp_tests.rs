@@ -58,6 +58,31 @@ fn perpendicular_distance_offset_point() {
     assert!((dist - expected).abs() < 0.001);
 }
 
+/// Peak (triangle shape) — preserves the peak point at reasonable tolerance.
+#[test]
+fn rdp_preserves_peaks() {
+    let points = vec![(0.0, 0.0), (50.0, 100.0), (100.0, 0.0)];
+    // With tolerance 0, the peak must be kept.
+    let simplified = rdp_simplify(&points, 0.0);
+    assert_eq!(simplified.len(), 3);
+    // With tolerance large enough, the peak is removed.
+    let simplified = rdp_simplify(&points, 101.0);
+    assert_eq!(simplified.len(), 2);
+    assert_eq!(simplified[0], (0.0, 0.0));
+    assert_eq!(simplified[1], (100.0, 0.0));
+}
+
+/// Tolerance exactly at the maximum distance removes the point.
+#[test]
+fn rdp_tolerance_at_max_distance_removes_point() {
+    let points = vec![(0.0, 0.0), (50.0, 50.0), (100.0, 0.0)];
+    let dist_to_mid = perpendicular_distance((50.0, 50.0), (0.0, 0.0), (100.0, 0.0));
+    let simplified = rdp_simplify(&points, dist_to_mid);
+    assert_eq!(simplified.len(), 2);
+    let simplified = rdp_simplify(&points, dist_to_mid - 0.001);
+    assert_eq!(simplified.len(), 3);
+}
+
 // --- Reusable RDP implementation for Phase 3 behavioral spec ---
 
 fn perpendicular_distance(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> f32 {

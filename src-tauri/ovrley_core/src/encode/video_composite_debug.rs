@@ -12,6 +12,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+const COMPOSITE_DEBUG_PHASE: &str = "phase_7";
+
 #[derive(Serialize)]
 /// Top-level timing and command summary for one MP4 composite render.
 struct CompositeTimingSummary {
@@ -105,7 +107,7 @@ pub fn write_composite_timing_summary(
 ) -> CoreResult<PathBuf> {
     let debug_dir = input
         .debug_render_dir
-        .join("phase_7")
+        .join(COMPOSITE_DEBUG_PHASE)
         .join(composite_debug_id(input.output_path));
     fs::create_dir_all(&debug_dir).map_err(|error| CoreError::Io {
         path: debug_dir.clone(),
@@ -119,7 +121,7 @@ pub fn write_composite_timing_summary(
         input.ffmpeg_finalize_wait_ms,
     );
     let summary = CompositeTimingSummary {
-        phase: "phase_7".to_string(),
+        phase: COMPOSITE_DEBUG_PHASE.to_string(),
         mode: "mp4_composite".to_string(),
         overlay_filename: input.output_path.to_string_lossy().to_string(),
         fps: round3(input.source_fps.as_f64()),

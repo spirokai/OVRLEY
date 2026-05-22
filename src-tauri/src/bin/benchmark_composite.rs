@@ -8,10 +8,14 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
+
+#[path = "../bin_common.rs"]
+mod common;
+use common::{format_mmss, read_positional, repo_root, resolve_path, unix_timestamp};
 
 const COMPOSITE_CODECS: &[(&str, &str)] = &[
-    ("software_h264", "libx264"),
+     ("software_h264", "libx264"),
     ("software_hevc", "libx265"),
     ("nvgpu_h264", "h264_nvenc"),
     ("nvgpu_hevc", "hevc_nvenc"),
@@ -41,37 +45,6 @@ const ES_SYSTEM_REQUIRED: u32 = 0x0000_0001;
 #[cfg(windows)]
 const ES_DISPLAY_REQUIRED: u32 = 0x0000_0002;
 
-fn repo_root() -> Result<PathBuf, String> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir
-        .parent()
-        .map(PathBuf::from)
-        .ok_or_else(|| "Failed to resolve repo root".to_string())
-}
-
-fn resolve_path(path: &PathBuf, root: &PathBuf) -> PathBuf {
-    if path.is_absolute() {
-        path.clone()
-    } else if path.exists() {
-        path.clone()
-    } else {
-        let rooted = root.join(path);
-        if rooted.exists() {
-            rooted
-        } else {
-            path.clone()
-        }
-    }
-}
-
-fn read_positional(index: usize, args: &[String]) -> Option<String> {
-    let non_flag = args
-        .iter()
-        .filter(|a| !a.starts_with('-'))
-        .collect::<Vec<_>>();
-    non_flag.get(index).map(|s| (*s).clone())
-}
-
 fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     let program = &args[0];
     let rest = &args[1..];
@@ -90,9 +63,9 @@ fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
 
 fn is_composite_codec_available(codecs: &AvailableCodecs, name: &str) -> bool {
     match name {
-        "software_h264" => codecs.libx264,
+        // "software_h264" => codecs.libx264,
         //   "software_hevc" => codecs.libx265,
-        //    "nvgpu_h264" => codecs.h264_nvenc,
+            "nvgpu_h264" => codecs.h264_nvenc,
         //    "nvgpu_hevc" => codecs.hevc_nvenc,
         //     "nnvgpu_h264" => codecs.nnvgpu,
         //     "nnvgpu_hevc" => codecs.nnvgpu,
@@ -108,20 +81,6 @@ fn is_composite_codec_available(codecs: &AvailableCodecs, name: &str) -> bool {
         //     "amd_hevc" => codecs.hevc_amf,
         _ => false,
     }
-}
-
-fn format_mmss(secs: f64) -> String {
-    let total = secs.round() as u64;
-    let minutes = total / 60;
-    let seconds = total % 60;
-    format!("{minutes:02}:{seconds:02}")
-}
-
-fn unix_timestamp() -> String {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs().to_string())
-        .unwrap_or_else(|_| "unknown".to_string())
 }
 
 #[derive(Serialize)]

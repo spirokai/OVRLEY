@@ -6,26 +6,9 @@ use serde_json::{Map, Number, Value};
 use std::fs;
 use std::path::PathBuf;
 
-fn read_arg(flag: &str, args: &[String]) -> Result<String, String> {
-    args.windows(2)
-        .find(|pair| pair[0] == flag)
-        .map(|pair| pair[1].clone())
-        .ok_or_else(|| format!("Missing required argument: {flag}"))
-}
-
-fn read_optional_arg(flag: &str, args: &[String]) -> Option<String> {
-    args.windows(2)
-        .find(|pair| pair[0] == flag)
-        .map(|pair| pair[1].clone())
-}
-
-fn repo_root() -> Result<PathBuf, String> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir
-        .parent()
-        .map(PathBuf::from)
-        .ok_or_else(|| "Failed to resolve repo root".to_string())
-}
+#[path = "../bin_common.rs"]
+mod common;
+use common::{read_arg, read_optional_arg, repo_root};
 
 fn ensure_ffmpeg_object(
     config: &mut ovrley_core::config::RenderConfig,

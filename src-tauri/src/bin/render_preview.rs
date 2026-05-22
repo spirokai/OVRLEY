@@ -11,26 +11,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-fn read_arg(flag: &str, args: &[String]) -> Result<String, String> {
-    args.windows(2)
-        .find(|pair| pair[0] == flag)
-        .map(|pair| pair[1].clone())
-        .ok_or_else(|| format!("Missing required argument: {flag}"))
-}
-
-fn repo_root() -> Result<PathBuf, String> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir
-        .parent()
-        .map(PathBuf::from)
-        .ok_or_else(|| "Failed to resolve repo root".to_string())
-}
-
-fn read_optional_arg(flag: &str, args: &[String]) -> Option<String> {
-    args.windows(2)
-        .find(|pair| pair[0] == flag)
-        .map(|pair| pair[1].clone())
-}
+#[path = "../bin_common.rs"]
+mod common;
+use common::{read_arg, read_optional_arg, repo_root};
 
 fn parse_seconds(args: &[String]) -> Result<Vec<u32>, String> {
     if let Some(seconds) = read_optional_arg("--seconds", args) {

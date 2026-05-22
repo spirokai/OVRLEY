@@ -5,16 +5,19 @@
 //! completed profile, marker, and optional labels on each frame.
 
 use super::common::{
-    custom_export_range_active, draw_area, draw_marker, draw_polyline, draw_polyline_with_shadow,
-    draw_static_layer, fallback_marker_points, format_elevation_label, frame_progress_values,
-    interpolate_optional_numeric_series, legacy_line_width, marker_layers_from_points,
-    marker_size_from_weights, normalize_opacity, normalize_optional_progress_window,
-    normalize_shadow_style, plot_base_color, point_at_metric_progress_with_cursor,
-    point_at_progress_x, relative_distance_frame_progress_values, resolve_style_color,
-    rotate_point_to_canvas, scale_marker_points, shadow_with_screen_offset, static_layer_padding,
-    widget_render_report, with_widget_transform, DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER,
-    DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER, DEFAULT_ELEVATION_MARKER_SCALE,
+    custom_export_range_active, draw_static_layer, fallback_marker_points, format_elevation_label,
+    frame_progress_values, interpolate_optional_numeric_series, legacy_line_width,
+    marker_size_from_weights, normalize_optional_progress_window, normalize_shadow_style,
+    plot_base_color, point_at_metric_progress_with_cursor, point_at_progress_x,
+    relative_distance_frame_progress_values, resolve_style_color, rotate_point_to_canvas,
+    scale_marker_points, shadow_with_screen_offset, static_layer_padding, widget_render_report,
+    DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER, DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER,
+    DEFAULT_ELEVATION_MARKER_SCALE,
 };
+use super::geometry::normalize_opacity;
+use super::marker::{draw_marker, marker_layers_from_points};
+use super::polyline::{draw_area, draw_polyline, draw_polyline_with_shadow};
+use super::transform::with_widget_transform;
 use super::types::{
     ElevationFrameState, ElevationWidgetCache, NormalizedElevationPlot, StaticLayer,
     WidgetGeometry, WidgetRenderReport,
@@ -25,6 +28,7 @@ use crate::commands::AppPaths;
 use crate::config::{ElevationPlotConfig, RenderConfig, RenderDataRequirements};
 use crate::debug::RenderProfiler;
 use crate::error::{CoreError, CoreResult};
+use crate::rdp::simplify_rdp_indices;
 use crate::render::surface::create_surface;
 use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};
 use skia_safe::Canvas;
@@ -767,14 +771,15 @@ fn select_evenly_spaced_elevation_points(
 
 #[derive(Clone, Copy)]
 /// Projected elevation sample used during screen-space simplification.
-struct ElevationSample {
-    point: (f32, f32),
-    progress01: f32,
-    preserve: bool,
+pub(crate) struct ElevationSample {
+    pub(crate) point: (f32, f32),
+    pub(crate) progress01: f32,
+    pub(crate) preserve: bool,
 }
 
 // Simplifies projected elevation samples while preserving protected endpoints.
-fn simplify_elevation_samples(points: &[ElevationSample], tolerance: f32) -> Vec<ElevationSample> {
+// test seam
+pub(crate) fn simplify_elevation_samples(points: &[ElevationSample], tolerance: f32) -> Vec<ElevationSample> {
     if points.len() <= 2 || tolerance <= 0.0 {
         return points.to_vec();
     }
@@ -804,48 +809,14 @@ fn simplify_elevation_samples(points: &[ElevationSample], tolerance: f32) -> Vec
 }
 
 // Runs RDP simplification over one continuous elevation segment.
-fn simplify_elevation_samples_segment(
+// test seam
+pub(crate) fn simplify_elevation_samples_segment(
     points: &[ElevationSample],
     tolerance: f32,
 ) -> Vec<ElevationSample> {
-    if points.len() <= 2 || tolerance <= 0.0 {
-        return points.to_vec();
-    }
-
-    // Computes perpendicular error used by elevation RDP simplification.
-    fn perpendicular_distance(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> f32 {
-        let (x0, y0) = point;
-        let (x1, y1) = start;
-        let (x2, y2) = end;
-        let dx = x2 - x1;
-        let dy = y2 - y1;
-        if dx.abs() <= f32::EPSILON && dy.abs() <= f32::EPSILON {
-            return ((x0 - x1).powi(2) + (y0 - y1).powi(2)).sqrt();
-        }
-        (dy * x0 - dx * y0 + x2 * y1 - y2 * x1).abs() / (dx * dx + dy * dy).sqrt()
-    }
-
-    let mut max_distance = 0.0f32;
-    let mut split_index = 0usize;
-    for index in 1..points.len() - 1 {
-        let distance = perpendicular_distance(
-            points[index].point,
-            points[0].point,
-            points.last().unwrap().point,
-        );
-        if distance > max_distance {
-            max_distance = distance;
-            split_index = index;
-        }
-    }
-
-    if max_distance <= tolerance {
-        return vec![points[0], *points.last().unwrap()];
-    }
-
-    let left = simplify_elevation_samples_segment(&points[..=split_index], tolerance);
-    let right = simplify_elevation_samples_segment(&points[split_index..], tolerance);
-    [left[..left.len() - 1].to_vec(), right].concat()
+    let tuples: Vec<(f32, f32)> = points.iter().map(|p| p.point).collect();
+    let indices = simplify_rdp_indices(&tuples, tolerance);
+    indices.iter().map(|&i| points[i]).collect()
 }
 
 // Projects reduced elevation samples into widget-space points.
@@ -903,7 +874,7 @@ fn build_elevation_completed_points(
     if result.is_empty() {
         result.push(points[0]);
     }
-    if super::common::distance(*result.last().unwrap_or(&points[0]), marker_point) > 1e-3 {
+    if super::geometry::distance(*result.last().unwrap_or(&points[0]), marker_point) > 1e-3 {
         result.push(marker_point);
     }
     result

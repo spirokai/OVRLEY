@@ -6,7 +6,7 @@
 //! while the writer thread keeps expensive IO off the render loop.
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::commands::AppPaths;
+use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::encode::ffmpeg::{build_ffmpeg_settings, resolve_ffmpeg_binary, suppress_child_console};

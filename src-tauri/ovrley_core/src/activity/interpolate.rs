@@ -13,62 +13,9 @@ use super::schema::{
 use crate::config::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
 
-// Builds interpolation points by pairing source x-values with present y-values.
-fn collect_valid_numeric_points(x_values: &[f64], y_values: &[Option<f64>]) -> Vec<(f64, f64)> {
-    // Keep only real y-values while preserving their source x-coordinate. This
-    // lets interpolation bridge gaps without treating missing sensor data as 0.
-    x_values
-        .iter()
-        .copied()
-        .zip(y_values.iter().copied())
-        .filter_map(|(x, y)| y.map(|value| (x, value)))
-        .collect()
-}
-
-// Resolves one interpolated y-value from a sorted set of `(x, y)` points.
-fn interpolate_points(points: &[(f64, f64)], target_x: f64) -> Option<f64> {
-    // Clamp outside the known domain instead of extrapolating; edge frames
-    // should remain stable even when the trim window starts before the first
-    // valid sensor value or ends after the last one.
-    match points.len() {
-        0 => None,
-        1 => Some(points[0].1),
-        _ => {
-            if target_x <= points[0].0 {
-                return Some(points[0].1);
-            }
-            let last = points.len() - 1;
-            if target_x >= points[last].0 {
-                return Some(points[last].1);
-            }
-            let right_index = points.partition_point(|(x, _)| *x < target_x);
-            if right_index < points.len() && (points[right_index].0 - target_x).abs() <= 1e-9 {
-                return Some(points[right_index].1);
-            }
-            let left_index = right_index.saturating_sub(1);
-            let (left_x, left_y) = points[left_index];
-            let (right_x, right_y) = points[right_index];
-            if (right_x - left_x).abs() <= f64::EPSILON {
-                return Some(right_y);
-            }
-            let ratio = (target_x - left_x) / (right_x - left_x);
-            Some(left_y + (right_y - left_y) * ratio)
-        }
-    }
-}
-
-/// Interpolates a single numeric telemetry value at `target_x`.
-///
-/// The input series must be aligned by index. `None` values are skipped, and
-/// targets outside the valid sample range return the nearest valid edge value.
-pub fn interpolate_numeric_series_value(
-    x_values: &[f64],
-    y_values: &[Option<f64>],
-    target_x: f64,
-) -> Option<f64> {
-    let points = collect_valid_numeric_points(x_values, y_values);
-    interpolate_points(&points, target_x)
-}
+pub use crate::interpolation::{
+    collect_valid_numeric_points, interpolate_numeric_series_value, interpolate_points,
+};
 
 /// Interpolates a latitude/longitude pair at `target_x`.
 ///

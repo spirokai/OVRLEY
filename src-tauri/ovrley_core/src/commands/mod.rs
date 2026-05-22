@@ -21,106 +21,11 @@ use serde_json::{json, Value};
 use skia_safe::FontMgr;
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
-/// Filesystem locations used by backend operations.
-///
-/// Paths are derived differently in development and packaged builds, but callers
-/// receive one normalized structure so rendering, templates, fonts, temporary
-/// files, and downloads are always addressed consistently.
-#[derive(Clone, Debug)]
-pub struct AppPaths {
-    /// Root used for bundled runtime assets such as vendor ffmpeg.
-    pub repo_root: PathBuf,
-    /// Existing font directories searched before system fonts.
-    pub font_dirs: Vec<PathBuf>,
-    /// Directory for timing summaries and sample-frame debug artifacts.
-    pub debug_render_dir: PathBuf,
-    /// Directory for short-lived files such as ffmpeg concat lists.
-    pub temp_dir: PathBuf,
-    /// Built-in template directories, searched in precedence order.
-    pub bundled_templates_dirs: Vec<PathBuf>,
-    /// User template directory under Documents/OVRLEY.
-    pub user_templates_dir: PathBuf,
-    /// Public output directory under Downloads/OVRLEY.
-    pub downloads_dir: PathBuf,
-}
-
-impl AppPaths {
-    /// Builds development paths when repo and resources share the same root.
-    pub fn from_repo_root(repo_root: PathBuf) -> Self {
-        Self::from_roots(repo_root.clone(), repo_root)
-    }
-
-    /// Builds packaged-app paths from separate repository and resource roots.
-    pub fn from_resource_root(repo_root: PathBuf, resource_root: PathBuf) -> Self {
-        Self::from_roots(repo_root, resource_root)
-    }
-
-    /// Builds all backend runtime paths from repository and resource roots.
-    fn from_roots(repo_root: PathBuf, resource_root: PathBuf) -> Self {
-        let downloads_dir = downloads_ovrley_dir();
-        let runtime_dir = downloads_dir.join(".runtime");
-        let font_dirs = vec![resource_root.join("fonts"), repo_root.join("fonts")]
-            .into_iter()
-            .filter(|path| path.is_dir())
-            .collect();
-        // Keep debug artifacts under the root `debug` directory.
-        let debug_render_dir = if resource_root == repo_root {
-            repo_root.join("debug").join("timings")
-        } else {
-            runtime_dir.join("debug").join("timings")
-        };
-        let temp_dir = runtime_dir.join("tmp");
-        let bundled_templates_dirs =
-            vec![resource_root.join("templates"), repo_root.join("templates")]
-                .into_iter()
-                .filter(|path| path.is_dir())
-                .collect();
-        let user_templates_dir = documents_ovrley_dir();
-
-        Self {
-            repo_root: resource_root,
-            font_dirs,
-            debug_render_dir,
-            temp_dir,
-            bundled_templates_dirs,
-            user_templates_dir,
-            downloads_dir,
-        }
-    }
-
-    /// Ensures all runtime-writable directories exist.
-    pub fn ensure_dirs(&self) -> CoreResult<()> {
-        for dir in [
-            &self.debug_render_dir,
-            &self.temp_dir,
-            &self.user_templates_dir,
-            &self.downloads_dir,
-        ] {
-            fs::create_dir_all(dir).map_err(|error| CoreError::Io {
-                path: dir.clone(),
-                source: error,
-            })?;
-        }
-        Ok(())
-    }
-
-    /// Returns the first built-in template path matching `filename`.
-    pub fn bundled_template_path(&self, filename: &str) -> Option<PathBuf> {
-        self.bundled_templates_dirs
-            .iter()
-            .map(|dir| dir.join(filename))
-            .find(|path| path.is_file())
-    }
-
-    /// Returns a user template path if it exists.
-    pub fn user_template_path(&self, filename: &str) -> Option<PathBuf> {
-        let path = self.user_templates_dir.join(filename);
-        path.is_file().then_some(path)
-    }
-}
+// TODO: Remove re-export in Phase 6 after all callers use crate::paths.
+pub use crate::paths::AppPaths;
 
 /// Health-check response sent to the frontend.
 #[derive(Debug, Serialize)]
@@ -593,22 +498,6 @@ fn template_descriptor(
         "width": width,
         "height": height
     }))
-}
-
-// Returns the user-writable OVRLEY documents directory.
-fn documents_ovrley_dir() -> PathBuf {
-    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join("Documents").join("OVRLEY")
-}
-
-// Returns the public OVRLEY downloads/output directory.
-fn downloads_ovrley_dir() -> PathBuf {
-    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join("Downloads").join("OVRLEY")
 }
 
 // Opens a filesystem path with the operating system's default file launcher.

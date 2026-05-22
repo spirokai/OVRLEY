@@ -156,7 +156,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
         metadata.duration = read_video_stream_duration(stream, metadata.fps).or(metadata.duration);
     }
 
-    // println!("[OVRLEY] Probing video: {}", file_path);
+    log::debug!("Probing video: {}", file_path);
 
     // Priority order:
     // 1. format.tags.creation_time
@@ -164,21 +164,21 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
         .and_then(|f| f.get("tags"))
         .and_then(|t| t.get("creation_time"))
         .and_then(|v| v.as_str());
-    // if let Some(t) = format_creation_time { println!("[OVRLEY] Found format.tags.creation_time: {}", t); }
+    if let Some(t) = format_creation_time { log::debug!("Found format.tags.creation_time: {}", t); }
 
     // 2. streams[0].tags.creation_time
     let stream_creation_time = video_stream
         .and_then(|s| s.get("tags"))
         .and_then(|t| t.get("creation_time"))
         .and_then(|v| v.as_str());
-    // if let Some(t) = stream_creation_time { println!("[OVRLEY] Found streams[0].tags.creation_time: {}", t); }
+    if let Some(t) = stream_creation_time { log::debug!("Found streams[0].tags.creation_time: {}", t); }
 
     // 3. format.tags.com.apple.quicktime.creationdate
     let apple_creation_date = format
         .and_then(|f| f.get("tags"))
         .and_then(|t| t.get("com.apple.quicktime.creationdate"))
         .and_then(|v| v.as_str());
-    // if let Some(t) = apple_creation_date { println!("[OVRLEY] Found format.tags.com.apple.quicktime.creationdate: {}", t); }
+    if let Some(t) = apple_creation_date { log::debug!("Found format.tags.com.apple.quicktime.creationdate: {}", t); }
 
     metadata.creation_time = format_creation_time
         .or(stream_creation_time)
@@ -186,18 +186,18 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
         .map(|s| s.to_string());
 
     if metadata.creation_time.is_none() {
-        // println!("[OVRLEY] No creation time found in video metadata. Using file system modified time as fallback.");
+        log::warn!("No creation time found in video metadata. Using file system modified time as fallback.");
         if let Ok(fs_meta) = std::fs::metadata(file_path) {
             if let Ok(modified) = fs_meta.modified() {
                 let dt: chrono::DateTime<chrono::Utc> = modified.into();
                 let rfc3339 = dt.to_rfc3339();
-                // println!("[OVRLEY] Fallback file modified time: {}", rfc3339);
+                log::debug!("Fallback file modified time: {}", rfc3339);
                 metadata.creation_time = Some(rfc3339);
             }
         }
     }
 
-    // println!("[OVRLEY] Final selected creation time: {:?}", metadata.creation_time);
+    log::debug!("Final selected creation time: {:?}", metadata.creation_time);
 
     Ok(metadata)
 }

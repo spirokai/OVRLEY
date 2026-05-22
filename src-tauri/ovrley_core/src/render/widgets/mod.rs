@@ -9,12 +9,20 @@
 mod common;
 /// Elevation profile widget implementation.
 mod elevation;
+/// Point/rect/math and layout-fitting helpers.
+mod geometry;
+/// Marker and dot drawing helpers.
+mod marker;
+/// Polyline and area drawing helpers.
+mod polyline;
 /// Route/course widget implementation.
 mod route;
 /// Shared widget cache and report types.
 mod types;
 /// Metric value widgets, including icons and gradient triangles.
-pub mod value; // test seam
+pub mod value;
+/// Skia path and coordinate transform helpers.
+mod transform;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::RenderConfig;
@@ -27,6 +35,9 @@ pub use types::{PreparedRenderAssets, WidgetRenderReport};
 pub(crate) use value::{
     draw_metric_value_widget_with_config, draw_static_metric_icon_for_value, has_static_metric_icon,
 };
+
+#[cfg(test)]
+mod tests;
 
 /// Prepares all widget-specific caches needed by the active template.
 ///

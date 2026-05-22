@@ -13,7 +13,7 @@ pub mod ffmpeg;
 /// FFmpeg argument construction for MP4 compositing mode.
 pub mod ffmpeg_composite;
 /// Editable FFmpeg command templates for composite encoder profiles.
-pub(crate) mod ffmpeg_composite_profiles;
+pub mod ffmpeg_composite_profiles;
 /// Rational frame-rate helpers shared by composite encoding modules.
 pub mod fps;
 /// Live render progress estimation helpers.

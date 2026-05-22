@@ -16,7 +16,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::commands::AppPaths;
+use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};

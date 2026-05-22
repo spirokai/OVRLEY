@@ -6,15 +6,18 @@
 //! for each frame.
 
 use super::common::{
-    custom_export_range_active, distance, draw_marker, draw_polyline, draw_polyline_with_shadow,
-    draw_static_layer, fallback_marker_points, fit_points_to_widget_with_inset,
-    frame_progress_values, legacy_line_width, marker_layers_from_points, marker_size_from_weights,
-    normalize_opacity, normalize_optional_progress_window, normalize_shadow_style, plot_base_color,
+    custom_export_range_active, draw_static_layer, fallback_marker_points,
+    frame_progress_values, legacy_line_width, marker_size_from_weights,
+    normalize_optional_progress_window, normalize_shadow_style, plot_base_color,
     point_at_metric_progress_with_cursor, relative_distance_frame_progress_values,
     resolve_style_color, scale_marker_points, shadow_with_screen_offset, static_layer_padding,
-    widget_render_report, with_widget_transform, DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER,
+    widget_render_report, DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER,
     DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
 };
+use super::geometry::{distance, fit_points_to_widget_with_inset, normalize_opacity};
+use super::marker::{draw_marker, marker_layers_from_points};
+use super::polyline::{draw_polyline, draw_polyline_with_shadow};
+use super::transform::with_widget_transform;
 use super::types::{
     NormalizedRoutePlot, RouteFrameState, RouteSample, RouteWidgetCache, StaticLayer,
     WidgetGeometry, WidgetRenderReport,
@@ -24,6 +27,7 @@ use crate::activity::trim::trim_activity;
 use crate::config::{CoursePlotConfig, RenderConfig, RenderDataRequirements};
 use crate::debug::RenderProfiler;
 use crate::error::{CoreError, CoreResult};
+use crate::rdp::simplify_rdp_indices;
 use crate::render::surface::create_surface;
 use skia_safe::Canvas;
 use std::time::Instant;
@@ -428,47 +432,11 @@ fn project_course_samples_with_optional_progress(
 }
 
 // Simplifies route samples using Ramer-Douglas-Peucker.
-fn simplify_route_samples(points: &[RouteSample], tolerance: f32) -> Vec<RouteSample> {
-    // Ramer-Douglas-Peucker simplification keeps endpoints and removes points
-    // whose perpendicular error is below the pixel tolerance.
-    if points.len() <= 2 {
-        return points.to_vec();
-    }
-
-    // Computes perpendicular error used by route RDP simplification.
-    fn perpendicular_distance(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> f32 {
-        let (x0, y0) = point;
-        let (x1, y1) = start;
-        let (x2, y2) = end;
-        let dx = x2 - x1;
-        let dy = y2 - y1;
-        if dx.abs() <= f32::EPSILON && dy.abs() <= f32::EPSILON {
-            return ((x0 - x1).powi(2) + (y0 - y1).powi(2)).sqrt();
-        }
-        (dy * x0 - dx * y0 + x2 * y1 - y2 * x1).abs() / (dx * dx + dy * dy).sqrt()
-    }
-
-    let mut max_distance = 0.0f32;
-    let mut split_index = 0usize;
-    for index in 1..points.len() - 1 {
-        let distance = perpendicular_distance(
-            points[index].point,
-            points[0].point,
-            points.last().unwrap().point,
-        );
-        if distance > max_distance {
-            max_distance = distance;
-            split_index = index;
-        }
-    }
-
-    if max_distance <= tolerance {
-        return vec![points[0], *points.last().unwrap()];
-    }
-
-    let left = simplify_route_samples(&points[..=split_index], tolerance);
-    let right = simplify_route_samples(&points[split_index..], tolerance);
-    [left[..left.len() - 1].to_vec(), right].concat()
+// test seam
+pub(crate) fn simplify_route_samples(points: &[RouteSample], tolerance: f32) -> Vec<RouteSample> {
+    let tuples: Vec<(f32, f32)> = points.iter().map(|p| p.point).collect();
+    let indices = simplify_rdp_indices(&tuples, tolerance);
+    indices.iter().map(|&i| points[i]).collect()
 }
 
 // Reduces dense route samples with Largest-Triangle-Three-Buckets.

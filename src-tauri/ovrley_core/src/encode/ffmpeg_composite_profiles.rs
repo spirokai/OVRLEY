@@ -6,6 +6,7 @@
 //! composite builder.
 
 use super::ffmpeg_composite::CompositeProfile;
+use crate::error::{CoreError, CoreResult};
 
 /// Static command fragments for one composite FFmpeg profile.
 ///
@@ -223,7 +224,7 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
 ///
 /// Callers may pass either profile names such as `nvgpu_h264` or encoder codec
 /// names such as `h264_nvenc`; codec names resolve to the safe CPU-overlay path.
-pub(crate) fn composite_profile_template(name_or_codec: &str) -> Option<CompositeProfile> {
+pub fn composite_profile_template(name_or_codec: &str) -> CoreResult<CompositeProfile> {
     let normalized = match name_or_codec {
         "auto" | "auto_h264" => "software_h264",
         "auto_hevc" | "auto_h265" => "software_hevc",
@@ -246,6 +247,12 @@ pub(crate) fn composite_profile_template(name_or_codec: &str) -> Option<Composit
         .iter()
         .find(|profile| profile.name == normalized)
         .map(expand_template)
+        .ok_or_else(|| {
+            CoreError::Encode(format!(
+                "Unknown composite profile: '{}' (normalized: '{}')",
+                name_or_codec, normalized
+            ))
+        })
 }
 
 /// Expands one static profile template into owned FFmpeg argument fragments.

@@ -7,7 +7,7 @@
 
 use crate::activity::build_dense_activity_report;
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::commands::AppPaths;
+use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
