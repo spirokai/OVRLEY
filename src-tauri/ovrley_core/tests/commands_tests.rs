@@ -4,11 +4,11 @@ use std::path::PathBuf;
 
 use serde_json::Value;
 
-use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::activity::schema::ParsedActivity;
+use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::commands::{
-    apply_composite_scene_timing, backend_render, derive_composite_render_plan, is_composite_render,
-    AppPaths,
+    apply_composite_scene_timing, backend_render, derive_composite_render_plan,
+    is_composite_render, AppPaths,
 };
 use ovrley_core::config::parse_config_json;
 use ovrley_core::config::RenderConfig;
@@ -109,8 +109,8 @@ fn test_3_3_missing_bitrate_validation() {
     let error = derive_composite_render_plan(&config).unwrap_err();
 
     assert_eq!(
-        error,
-        "scene.composite_bitrate required for composite render"
+        error.to_string(),
+        "Invalid configuration: scene.composite_bitrate required for composite render"
     );
 }
 
@@ -134,12 +134,16 @@ fn test_3_4_missing_fps_validation() {
     );
 
     assert_eq!(
-        derive_composite_render_plan(&missing_num).unwrap_err(),
-        "scene.composite_video_fps_num required for composite render"
+        derive_composite_render_plan(&missing_num)
+            .unwrap_err()
+            .to_string(),
+        "Invalid configuration: scene.composite_video_fps_num required for composite render"
     );
     assert_eq!(
-        derive_composite_render_plan(&missing_den).unwrap_err(),
-        "scene.composite_video_fps_den required for composite render"
+        derive_composite_render_plan(&missing_den)
+            .unwrap_err()
+            .to_string(),
+        "Invalid configuration: scene.composite_video_fps_den required for composite render"
     );
 }
 
@@ -226,8 +230,8 @@ fn test_3_8_rejects_impossible_trim() {
     let error = derive_composite_render_plan(&config).unwrap_err();
 
     assert_eq!(
-        error,
-        "scene.composite_video_trim_start (60) must be less than scene.composite_video_duration (60)"
+        error.to_string(),
+        "Invalid configuration: scene.composite_video_trim_start (60) must be less than scene.composite_video_duration (60)"
     );
 }
 

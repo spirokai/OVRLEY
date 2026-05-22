@@ -39,7 +39,7 @@ fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
         .document_dir()
         .map_err(|e| e.to_string())?
         .join("OVRLEY");
-    paths.ensure_dirs()?;
+    paths.ensure_dirs().map_err(|e| e.to_string())?;
     Ok(paths)
 }
 
@@ -80,7 +80,8 @@ async fn backend_render(
         &state.render_controller,
         &config_json,
         &parsed_activity_json,
-    )?;
+    )
+    .map_err(|e| e.to_string())?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
@@ -94,28 +95,31 @@ async fn backend_progress(state: tauri::State<'_, BackendState>) -> Result<Strin
 /// Opens the application's downloads/output directory in the platform file manager.
 #[tauri::command]
 async fn backend_open_downloads(app: AppHandle) -> Result<String, String> {
-    let response = commands::backend_open_downloads(&app_paths(&app)?)?;
+    let response =
+        commands::backend_open_downloads(&app_paths(&app)?).map_err(|e| e.to_string())?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
 /// Opens a rendered video file from the output directory.
 #[tauri::command]
 async fn backend_open_video(app: AppHandle, filename: String) -> Result<String, String> {
-    let response = commands::backend_open_video(&app_paths(&app)?, &filename)?;
+    let response =
+        commands::backend_open_video(&app_paths(&app)?, &filename).map_err(|e| e.to_string())?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
 /// Lists bundled and user-created overlay templates.
 #[tauri::command]
 async fn backend_list_templates(app: AppHandle) -> Result<String, String> {
-    let response = commands::backend_list_templates(&app_paths(&app)?)?;
+    let response =
+        commands::backend_list_templates(&app_paths(&app)?).map_err(|e| e.to_string())?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
 /// Reads one overlay template by filename.
 #[tauri::command]
 async fn backend_get_template(app: AppHandle, filename: String) -> Result<String, String> {
-    commands::backend_get_template(&app_paths(&app)?, &filename)
+    commands::backend_get_template(&app_paths(&app)?, &filename).map_err(|e| e.to_string())
 }
 
 /// Requests cancellation for the active render job.
@@ -131,7 +135,8 @@ async fn backend_cancel(state: tauri::State<'_, BackendState>) -> Result<String,
 /// same core probe through `backend_import_preview_video`.
 #[tauri::command]
 async fn backend_probe_video(app: AppHandle, file_path: String) -> Result<String, String> {
-    let response = commands::backend_probe_video(&app_paths(&app)?, &file_path)?;
+    let response =
+        commands::backend_probe_video(&app_paths(&app)?, &file_path).map_err(|e| e.to_string())?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
@@ -161,7 +166,8 @@ async fn backend_import_preview_video(
         return Err(format!("Video path is not a file: {}", path_buf.display()));
     }
 
-    let video_metadata = commands::backend_probe_video(&app_paths(&app)?, &path)?;
+    let video_metadata =
+        commands::backend_probe_video(&app_paths(&app)?, &path).map_err(|e| e.to_string())?;
     let preview_url = state.set_video(path_buf, content_type_for_path(&path))?;
     let import_id = preview_url
         .rsplit('/')
@@ -268,7 +274,7 @@ fn content_type_for_path(path: &str) -> String {
 /// Detects available ffmpeg encoders and hardware acceleration paths.
 #[tauri::command]
 async fn backend_detect_codecs(app: AppHandle) -> Result<String, String> {
-    let response = commands::backend_detect_codecs(&app_paths(&app)?)?;
+    let response = commands::backend_detect_codecs(&app_paths(&app)?).map_err(|e| e.to_string())?;
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 

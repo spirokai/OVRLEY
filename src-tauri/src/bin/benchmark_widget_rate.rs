@@ -190,12 +190,13 @@ fn main() -> Result<(), String> {
 
     let root = repo_root()?;
     let paths = AppPaths::from_repo_root(root.clone());
-    paths.ensure_dirs()?;
+    paths.ensure_dirs().map_err(|e| e.to_string())?;
 
-    let available = detect_codecs(&root)?;
+    let available = detect_codecs(&root).map_err(|e| e.to_string())?;
 
     let resolved_video = resolve_path(&video_path, &root);
-    let metadata = probe_video(&root, &resolved_video.to_string_lossy())?;
+    let metadata =
+        probe_video(&root, &resolved_video.to_string_lossy()).map_err(|e| e.to_string())?;
     let fps_num = metadata.fps_num.unwrap_or(30);
     let fps_den = metadata.fps_den.unwrap_or(1);
     let source_fps = fps_num as f64 / fps_den as f64;
@@ -210,7 +211,10 @@ fn main() -> Result<(), String> {
 
     println!(
         "Video: {}  {:.1}fps  {:.1}s  {}",
-        resolved_video.file_name().unwrap_or_default().to_string_lossy(),
+        resolved_video
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy(),
         source_fps,
         video_duration,
         video_res_text,
@@ -230,13 +234,11 @@ fn main() -> Result<(), String> {
         activity_start, activity_end, trim_start, render_duration
     );
 
-    let activity_json =
-        fs::read_to_string(&resolve_path(&activity_path, &root))
-            .map_err(|e| format!("Failed to read activity: {e}"))?;
+    let activity_json = fs::read_to_string(&resolve_path(&activity_path, &root))
+        .map_err(|e| format!("Failed to read activity: {e}"))?;
 
-    let template_raw =
-        fs::read_to_string(&resolve_path(&template_path, &root))
-            .map_err(|e| format!("Failed to read template: {e}"))?;
+    let template_raw = fs::read_to_string(&resolve_path(&template_path, &root))
+        .map_err(|e| format!("Failed to read template: {e}"))?;
     let template_value: serde_json::Value =
         serde_json::from_str(&template_raw).map_err(|e| format!("Invalid template JSON: {e}"))?;
 
@@ -261,14 +263,10 @@ fn main() -> Result<(), String> {
         .ok_or_else(|| "Template missing 'config' key".to_string())?
         .clone();
 
-    let activity = parse_activity_json(&activity_json)?;
+    let activity = parse_activity_json(&activity_json).map_err(|e| e.to_string())?;
 
-    let res_width = config_value["scene"]["width"]
-        .as_u64()
-        .unwrap_or(1920);
-    let res_height = config_value["scene"]["height"]
-        .as_u64()
-        .unwrap_or(1080);
+    let res_width = config_value["scene"]["width"].as_u64().unwrap_or(1920);
+    let res_height = config_value["scene"]["height"].as_u64().unwrap_or(1080);
 
     let mut results = BTreeMap::new();
 
@@ -324,20 +322,18 @@ fn main() -> Result<(), String> {
 
                 let config_str = serde_json::to_string(&run_config_value)
                     .map_err(|e| format!("Failed to serialize config: {e}"))?;
-                let config = parse_config_json(&config_str)?;
-                let dense = build_dense_activity_report(&activity, &config)?;
+                let config = parse_config_json(&config_str).map_err(|e| e.to_string())?;
+                let dense =
+                    build_dense_activity_report(&activity, &config).map_err(|e| e.to_string())?;
 
                 let overlay_duration = config.scene.end - config.scene.start;
-                let overlay_frame_count = (overlay_duration * overlay_pipe_fps)
-                    .ceil()
-                    .max(1.0) as u32;
+                let overlay_frame_count =
+                    (overlay_duration * overlay_pipe_fps).ceil().max(1.0) as u32;
 
                 let controller = RenderController::default();
                 if let Err(e) = controller.try_start(
                     overlay_frame_count,
-                    &format!(
-                        "Benchmark {display_name} ur{update_rate} run {run_num}"
-                    ),
+                    &format!("Benchmark {display_name} ur{update_rate} run {run_num}"),
                 ) {
                     println!("FAILED: {e}");
                     runs.push(RunResult {
@@ -351,7 +347,7 @@ fn main() -> Result<(), String> {
                         job_time: None,
                         job_time_seconds: None,
                         file_size_mb: None,
-                        error: Some(e),
+                        error: Some(e.to_string()),
                         overlay_fps: None,
                         overlay_frame_count: None,
                     });
@@ -426,7 +422,7 @@ fn main() -> Result<(), String> {
                             job_time: None,
                             job_time_seconds: None,
                             file_size_mb: None,
-                            error: Some(e),
+                            error: Some(e.to_string()),
                             overlay_fps: None,
                             overlay_frame_count: None,
                         });
@@ -435,9 +431,7 @@ fn main() -> Result<(), String> {
             }
 
             // Cooldown between update rate groups
-            if !successful_run_data.is_empty()
-                && ur_index + 1 < UPDATE_RATES.len()
-            {
+            if !successful_run_data.is_empty() && ur_index + 1 < UPDATE_RATES.len() {
                 println!("      Update rate done, cooldown 60s before next update rate...");
                 std::thread::sleep(Duration::from_secs(60));
             }
@@ -472,18 +466,19 @@ fn main() -> Result<(), String> {
 
         // Cooldown between codecs
         if codec_index + 1 < CODECS.len() {
-            let any_success = update_rate_entries
-                .values()
-                .any(|r| r.successful_runs > 0);
+            let any_success = update_rate_entries.values().any(|r| r.successful_runs > 0);
             if any_success {
                 println!("    Codec done, cooldown 60s before next codec...");
                 std::thread::sleep(Duration::from_secs(60));
             }
         }
 
-        results.insert(display_name.to_string(), CodecEntry {
-            update_rates: update_rate_entries,
-        });
+        results.insert(
+            display_name.to_string(),
+            CodecEntry {
+                update_rates: update_rate_entries,
+            },
+        );
     }
 
     let output = BenchmarkOutput {
@@ -510,17 +505,13 @@ fn main() -> Result<(), String> {
     };
 
     let output_dir = root.join("debug").join("benchmarks");
-    fs::create_dir_all(&output_dir)
-        .map_err(|e| format!("Failed to create benchmarks dir: {e}"))?;
+    fs::create_dir_all(&output_dir).map_err(|e| format!("Failed to create benchmarks dir: {e}"))?;
     let output_path = output_dir.join("update_rate.json");
     let output_json = serde_json::to_string_pretty(&output)
         .map_err(|e| format!("Failed to serialize output: {e}"))?;
     fs::write(&output_path, &output_json)
         .map_err(|e| format!("Failed to write {}: {e}", output_path.display()))?;
 
-    println!(
-        "\n=== Results written to {} ===",
-        output_path.display()
-    );
+    println!("\n=== Results written to {} ===", output_path.display());
     Ok(())
 }

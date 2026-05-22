@@ -21,9 +21,9 @@ fn main() -> Result<(), String> {
     let config_json = fs::read_to_string(&config_path)
         .map_err(|error| format!("Failed to read {}: {error}", config_path.display()))?;
 
-    let activity = parse_activity_json(&payload_json)?;
-    let config = parse_config_json(&config_json)?;
-    let report = build_dense_activity_report(&activity, &config)?;
+    let activity = parse_activity_json(&payload_json).map_err(|e| e.to_string())?;
+    let config = parse_config_json(&config_json).map_err(|e| e.to_string())?;
+    let report = build_dense_activity_report(&activity, &config).map_err(|e| e.to_string())?;
     let output = serde_json::to_string_pretty(&report)
         .map_err(|error| format!("Failed to serialize report: {error}"))?;
 

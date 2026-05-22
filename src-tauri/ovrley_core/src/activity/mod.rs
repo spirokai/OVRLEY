@@ -17,23 +17,27 @@ use crate::activity::interpolate::densify_activity;
 use crate::activity::schema::{DebugPayload, DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
 use crate::config::RenderConfig;
+use crate::error::{CoreError, CoreResult};
 use serde_json::Value;
 
 /// Parses frontend activity JSON from either production or debug payload shapes.
-pub fn parse_activity_json(input: &str) -> Result<ParsedActivity, String> {
+pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
     // Debug exports wrap the real payload under `parsed_activity`; production
     // calls pass the payload directly. Accept both to keep diagnostics reusable
     // in tests and local tooling.
     let value: Value = serde_json::from_str(input)
-        .map_err(|error| format!("Invalid parsedActivity JSON: {error}"))?;
+        .map_err(|error| CoreError::Activity(format!("Invalid parsedActivity JSON: {error}")))?;
 
     if value.get("parsed_activity").is_some() {
         serde_json::from_value::<DebugPayload>(value)
             .map(|payload| payload.parsed_activity)
-            .map_err(|error| format!("Invalid parsedActivity debug payload: {error}"))
+            .map_err(|error| {
+                CoreError::Activity(format!("Invalid parsedActivity debug payload: {error}"))
+            })
     } else {
-        serde_json::from_value(value)
-            .map_err(|error| format!("Invalid parsedActivity payload: {error}"))
+        serde_json::from_value(value).map_err(|error| {
+            CoreError::Activity(format!("Invalid parsedActivity payload: {error}"))
+        })
     }
 }
 
@@ -41,7 +45,7 @@ pub fn parse_activity_json(input: &str) -> Result<ParsedActivity, String> {
 pub fn build_dense_activity_report(
     activity: &ParsedActivity,
     config: &RenderConfig,
-) -> Result<DenseActivityReport, String> {
+) -> CoreResult<DenseActivityReport> {
     // Data requirements are derived from the template before trimming so unused
     // high-cardinality series never get copied or densified.
     let requirements = config.render_data_requirements()?;
@@ -53,5 +57,3 @@ pub fn build_dense_activity_report(
     )?;
     Ok(densify_activity(&trimmed, config.scene.fps, &requirements))
 }
-
-

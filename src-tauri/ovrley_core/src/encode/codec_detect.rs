@@ -1,4 +1,5 @@
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
+use crate::error::CoreResult;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -44,7 +45,7 @@ pub struct AvailableCodecs {
     pub qsv_full_init_args: Vec<String>,
 }
 
-pub fn detect_codecs(repo_root: &Path) -> Result<AvailableCodecs, String> {
+pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
     let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
     let vaapi_device = find_vaapi_device();
 
@@ -512,7 +513,8 @@ fn detect_ffmpeg_filters(ffmpeg_path: &Path) -> std::collections::BTreeSet<Strin
 ///
 /// Only rows with a media-flow signature are treated as filter entries, which
 /// avoids capturing headings and legend text.
-pub fn parse_ffmpeg_filter_names(filters_output: &str) -> std::collections::BTreeSet<String> { // test seam
+pub fn parse_ffmpeg_filter_names(filters_output: &str) -> std::collections::BTreeSet<String> {
+    // test seam
     filters_output
         .lines()
         .filter_map(|line| {
@@ -724,4 +726,3 @@ fn find_vaapi_device() -> Option<std::path::PathBuf> {
         }
     })
 }
-

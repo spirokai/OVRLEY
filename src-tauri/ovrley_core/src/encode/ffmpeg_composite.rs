@@ -6,6 +6,7 @@
 use std::path::Path;
 
 use crate::encode::codec_detect::AvailableCodecs;
+use crate::error::{CoreError, CoreResult};
 
 use super::ffmpeg_composite_profiles::composite_profile_template;
 use super::fps::Fps;
@@ -145,7 +146,7 @@ pub fn build_composite_ffmpeg_settings(
     source_fps: Fps,
     overlay_pipe_fps: Fps,
     hwaccel_available: &HwAccelInfo,
-) -> Result<CompositeFfmpegSettings, String> {
+) -> CoreResult<CompositeFfmpegSettings> {
     validate_composite_inputs(
         codec_name,
         bitrate,
@@ -164,10 +165,10 @@ pub fn build_composite_ffmpeg_settings(
     let mut selected_profile = select_composite_profile(codec_name, hwaccel_available)?;
     if selected_profile.name.starts_with("qsv_full_") {
         if hwaccel_available.qsv_full_init_args.is_empty() {
-            return Err(format!(
+            return Err(CoreError::Encode(format!(
                 "Requested experimental QSV overlay profile {} is unavailable; codec detection did not provide working QSV hardware-device init args.",
                 selected_profile.name
-            ));
+            )));
         }
         selected_profile.input_args = hwaccel_available.qsv_full_init_args.clone();
     }
@@ -266,7 +267,7 @@ fn profile_hw_init_args(
 fn select_composite_profile(
     codec_name: &str,
     hwaccel_available: &HwAccelInfo,
-) -> Result<CompositeProfile, String> {
+) -> CoreResult<CompositeProfile> {
     let profile = composite_profile_template(codec_name).unwrap_or_else(|| CompositeProfile {
         name: "custom_passthrough",
         codec: "custom",
@@ -276,49 +277,53 @@ fn select_composite_profile(
     });
 
     if profile.name.starts_with("nnvgpu_") && !hwaccel_available.cuda_filters_available {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Requested experimental CUDA overlay profile {} is unavailable; FFmpeg must support overlay_cuda, scale_cuda, and hwupload.",
             profile.name
-        ));
+        )));
     }
     if profile.name.starts_with("qsv_full_") && !hwaccel_available.qsv_filters_available {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Requested experimental QSV overlay profile {} is unavailable; FFmpeg must support overlay_qsv, scale_qsv, and hwupload.",
             profile.name
-        ));
+        )));
     }
 
     match profile.codec {
-        "h264_nvenc" if !hwaccel_available.h264_nvenc_available => {
-            Err("Requested hardware encoder h264_nvenc is unavailable.".to_string())
-        }
-        "hevc_nvenc" if !hwaccel_available.hevc_nvenc_available => {
-            Err("Requested hardware encoder hevc_nvenc is unavailable.".to_string())
-        }
-        "h264_qsv" if !hwaccel_available.h264_qsv_available => {
-            Err("Requested hardware encoder h264_qsv is unavailable.".to_string())
-        }
-        "hevc_qsv" if !hwaccel_available.hevc_qsv_available => {
-            Err("Requested hardware encoder hevc_qsv is unavailable.".to_string())
-        }
-        "h264_amf" if !hwaccel_available.h264_amf_available => {
-            Err("Requested hardware encoder h264_amf is unavailable.".to_string())
-        }
-        "hevc_amf" if !hwaccel_available.hevc_amf_available => {
-            Err("Requested hardware encoder hevc_amf is unavailable.".to_string())
-        }
+        "h264_nvenc" if !hwaccel_available.h264_nvenc_available => Err(CoreError::Encode(
+            "Requested hardware encoder h264_nvenc is unavailable.".to_string(),
+        )),
+        "hevc_nvenc" if !hwaccel_available.hevc_nvenc_available => Err(CoreError::Encode(
+            "Requested hardware encoder hevc_nvenc is unavailable.".to_string(),
+        )),
+        "h264_qsv" if !hwaccel_available.h264_qsv_available => Err(CoreError::Encode(
+            "Requested hardware encoder h264_qsv is unavailable.".to_string(),
+        )),
+        "hevc_qsv" if !hwaccel_available.hevc_qsv_available => Err(CoreError::Encode(
+            "Requested hardware encoder hevc_qsv is unavailable.".to_string(),
+        )),
+        "h264_amf" if !hwaccel_available.h264_amf_available => Err(CoreError::Encode(
+            "Requested hardware encoder h264_amf is unavailable.".to_string(),
+        )),
+        "hevc_amf" if !hwaccel_available.hevc_amf_available => Err(CoreError::Encode(
+            "Requested hardware encoder hevc_amf is unavailable.".to_string(),
+        )),
         "h264_videotoolbox" if !hwaccel_available.h264_videotoolbox_available => {
-            Err("Requested hardware encoder h264_videotoolbox is unavailable.".to_string())
+            Err(CoreError::Encode(
+                "Requested hardware encoder h264_videotoolbox is unavailable.".to_string(),
+            ))
         }
         "hevc_videotoolbox" if !hwaccel_available.hevc_videotoolbox_available => {
-            Err("Requested hardware encoder hevc_videotoolbox is unavailable.".to_string())
+            Err(CoreError::Encode(
+                "Requested hardware encoder hevc_videotoolbox is unavailable.".to_string(),
+            ))
         }
-        "h264_vaapi" if !hwaccel_available.h264_vaapi_available => {
-            Err("Requested hardware encoder h264_vaapi is unavailable.".to_string())
-        }
-        "hevc_vaapi" if !hwaccel_available.hevc_vaapi_available => {
-            Err("Requested hardware encoder hevc_vaapi is unavailable.".to_string())
-        }
+        "h264_vaapi" if !hwaccel_available.h264_vaapi_available => Err(CoreError::Encode(
+            "Requested hardware encoder h264_vaapi is unavailable.".to_string(),
+        )),
+        "hevc_vaapi" if !hwaccel_available.hevc_vaapi_available => Err(CoreError::Encode(
+            "Requested hardware encoder hevc_vaapi is unavailable.".to_string(),
+        )),
         _ => Ok(profile),
     }
 }
@@ -327,7 +332,8 @@ fn select_composite_profile(
 ///
 /// This is diagnostic only for explicit full-GPU renders, which fail loudly
 /// instead of silently producing a fallback output when FFmpeg rejects the graph.
-pub fn fallback_profile_name(profile: &CompositeProfile) -> Option<String> { // test seam
+pub fn fallback_profile_name(profile: &CompositeProfile) -> Option<String> {
+    // test seam
     match profile.name {
         "nnvgpu_h264" => Some("nvgpu_h264".to_string()),
         "nnvgpu_hevc" => Some("nvgpu_hevc".to_string()),
@@ -349,7 +355,7 @@ fn composite_filter_complex(
     video_trim_start: f64,
     render_duration: f64,
     profile: &CompositeProfile,
-) -> Result<String, String> {
+) -> CoreResult<String> {
     let template = profile.filter_complex.as_deref().unwrap_or(
         "[0:v]{base_video_filters}scale={width}:{height}[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
@@ -380,31 +386,41 @@ fn validate_composite_inputs(
     height: u32,
     source_fps: Fps,
     overlay_pipe_fps: Fps,
-) -> Result<(), String> {
+) -> CoreResult<()> {
     if codec_name.trim().is_empty() {
-        return Err("Composite codec name must not be empty".to_string());
+        return Err(CoreError::Encode(
+            "Composite codec name must not be empty".to_string(),
+        ));
     }
     if bitrate.trim().is_empty() {
-        return Err("Composite bitrate must not be empty".to_string());
+        return Err(CoreError::Encode(
+            "Composite bitrate must not be empty".to_string(),
+        ));
     }
     if video_path.as_os_str().is_empty() {
-        return Err("Composite video path must not be empty".to_string());
+        return Err(CoreError::Encode(
+            "Composite video path must not be empty".to_string(),
+        ));
     }
     if !render_duration.is_finite() || render_duration <= 0.0 {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Composite render duration must be greater than zero: {render_duration}"
-        ));
+        )));
     }
     if !video_trim_start.is_finite() || video_trim_start < 0.0 {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Composite video trim start must be zero or greater: {video_trim_start}"
-        ));
+        )));
     }
     if width == 0 {
-        return Err("Composite width must be greater than zero".to_string());
+        return Err(CoreError::Encode(
+            "Composite width must be greater than zero".to_string(),
+        ));
     }
     if height == 0 {
-        return Err("Composite height must be greater than zero".to_string());
+        return Err(CoreError::Encode(
+            "Composite height must be greater than zero".to_string(),
+        ));
     }
     validate_fps("source FPS", source_fps)?;
     validate_fps("overlay pipe FPS", overlay_pipe_fps)?;
@@ -415,16 +431,16 @@ fn validate_composite_inputs(
 ///
 /// `Fps::new` is preferred, but the fields are public for simple data passing,
 /// so the composite builder also guards against direct zero-valued instances.
-fn validate_fps(label: &str, fps: Fps) -> Result<(), String> {
+fn validate_fps(label: &str, fps: Fps) -> CoreResult<()> {
     if fps.num == 0 {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Composite {label} numerator must be greater than zero"
-        ));
+        )));
     }
     if fps.den == 0 {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Composite {label} denominator must be greater than zero"
-        ));
+        )));
     }
     Ok(())
 }

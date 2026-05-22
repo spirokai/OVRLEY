@@ -30,8 +30,8 @@ fn rejects_zero_division_factor() {
     let source = Fps::new(60000, 1001).unwrap();
 
     assert_eq!(
-        source.divided_by(0).unwrap_err(),
-        "FPS division factor must be greater than zero"
+        source.divided_by(0).unwrap_err().to_string(),
+        "Encoding error: FPS division factor must be greater than zero"
     );
 }
 
@@ -82,7 +82,10 @@ fn fps_division_halves_and_quarters() {
     assert_eq!(fps60.divided_by(4).unwrap(), Fps::new(15, 1).unwrap());
 
     let fps5994 = Fps::new(60000, 1001).unwrap();
-    assert_eq!(fps5994.divided_by(2).unwrap(), Fps::new(30000, 1001).unwrap());
+    assert_eq!(
+        fps5994.divided_by(2).unwrap(),
+        Fps::new(30000, 1001).unwrap()
+    );
 }
 
 #[test]

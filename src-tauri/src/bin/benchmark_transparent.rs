@@ -69,10 +69,8 @@ fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf), String> {
     let program = &args[0];
     let rest = &args[1..];
 
-    let activity = read_arg("--activity", rest)
-        .or_else(|| read_positional(0, rest));
-    let template = read_arg("--template", rest)
-        .or_else(|| read_positional(1, rest));
+    let activity = read_arg("--activity", rest).or_else(|| read_positional(0, rest));
+    let template = read_arg("--template", rest).or_else(|| read_positional(1, rest));
 
     match (activity, template) {
         (Some(a), Some(t)) => Ok((PathBuf::from(a), PathBuf::from(t))),
@@ -180,18 +178,26 @@ fn main() -> Result<(), String> {
 
     let root = repo_root()?;
     let paths = AppPaths::from_repo_root(root.clone());
-    paths.ensure_dirs()?;
+    paths.ensure_dirs().map_err(|e| e.to_string())?;
 
-    let available = detect_codecs(&root)?;
+    let available = detect_codecs(&root).map_err(|e| e.to_string())?;
 
     let resolved_activity = resolve_path(&activity_path, &root);
     let resolved_template = resolve_path(&template_path, &root);
 
-    let activity_json = fs::read_to_string(&resolved_activity)
-        .map_err(|e| format!("Failed to read activity {}: {e}", resolved_activity.display()))?;
+    let activity_json = fs::read_to_string(&resolved_activity).map_err(|e| {
+        format!(
+            "Failed to read activity {}: {e}",
+            resolved_activity.display()
+        )
+    })?;
 
-    let template_raw = fs::read_to_string(&resolved_template)
-        .map_err(|e| format!("Failed to read template {}: {e}", resolved_template.display()))?;
+    let template_raw = fs::read_to_string(&resolved_template).map_err(|e| {
+        format!(
+            "Failed to read template {}: {e}",
+            resolved_template.display()
+        )
+    })?;
     let template_value: serde_json::Value =
         serde_json::from_str(&template_raw).map_err(|e| format!("Invalid template JSON: {e}"))?;
 
@@ -217,14 +223,10 @@ fn main() -> Result<(), String> {
         .and_then(serde_json::Value::as_u64)
         .map(|u| u as u32);
 
-    let activity = parse_activity_json(&activity_json)?;
+    let activity = parse_activity_json(&activity_json).map_err(|e| e.to_string())?;
 
-    let res_width = config_value["scene"]["width"]
-        .as_u64()
-        .unwrap_or(3840);
-    let res_height = config_value["scene"]["height"]
-        .as_u64()
-        .unwrap_or(2160);
+    let res_width = config_value["scene"]["width"].as_u64().unwrap_or(3840);
+    let res_height = config_value["scene"]["height"].as_u64().unwrap_or(2160);
     let base_update_rate = settings_update_rate
         .or_else(|| {
             config_value["scene"]["update_rate"]
@@ -262,21 +264,18 @@ fn main() -> Result<(), String> {
             print!("    Run {run_num}/3... ");
 
             let mut run_config_value = config_value.clone();
-            run_config_value["scene"]["start"] =
-                serde_json::json!(300.0f64);
-            run_config_value["scene"]["end"] =
-                serde_json::json!(360.0f64);
-            run_config_value["scene"]["ffmpeg"] =
-                serde_json::json!({"codec": codec_name});
+            run_config_value["scene"]["start"] = serde_json::json!(300.0f64);
+            run_config_value["scene"]["end"] = serde_json::json!(360.0f64);
+            run_config_value["scene"]["ffmpeg"] = serde_json::json!({"codec": codec_name});
 
             let config_str = serde_json::to_string(&run_config_value)
                 .map_err(|e| format!("Failed to serialize config: {e}"))?;
-            let config = parse_config_json(&config_str)?;
-            let dense = build_dense_activity_report(&activity, &config)?;
+            let config = parse_config_json(&config_str).map_err(|e| e.to_string())?;
+            let dense =
+                build_dense_activity_report(&activity, &config).map_err(|e| e.to_string())?;
 
             let update_rate = config.widget_update_rate();
-            let total_frames =
-                rendered_frame_count(dense.frame_count, update_rate as usize) as u32;
+            let total_frames = rendered_frame_count(dense.frame_count, update_rate as usize) as u32;
             let overlay_duration = config.scene.end - config.scene.start;
 
             let controller = RenderController::default();
@@ -295,7 +294,7 @@ fn main() -> Result<(), String> {
                     job_time: None,
                     job_time_seconds: None,
                     file_size_mb: None,
-                    error: Some(e),
+                    error: Some(e.to_string()),
                 });
                 continue;
             }
@@ -349,7 +348,7 @@ fn main() -> Result<(), String> {
                         job_time: None,
                         job_time_seconds: None,
                         file_size_mb: None,
-                        error: Some(e),
+                        error: Some(e.to_string()),
                     });
                 }
             }
@@ -406,17 +405,13 @@ fn main() -> Result<(), String> {
     };
 
     let output_dir = root.join("debug").join("benchmarks");
-    fs::create_dir_all(&output_dir)
-        .map_err(|e| format!("Failed to create benchmarks dir: {e}"))?;
+    fs::create_dir_all(&output_dir).map_err(|e| format!("Failed to create benchmarks dir: {e}"))?;
     let output_path = output_dir.join("transparent.json");
     let output_json = serde_json::to_string_pretty(&output)
         .map_err(|e| format!("Failed to serialize output: {e}"))?;
     fs::write(&output_path, &output_json)
         .map_err(|e| format!("Failed to write {}: {e}", output_path.display()))?;
 
-    println!(
-        "\n=== Results written to {} ===",
-        output_path.display()
-    );
+    println!("\n=== Results written to {} ===", output_path.display());
     Ok(())
 }

@@ -30,6 +30,7 @@ use crate::encode::video_composite_debug::{
     write_composite_timing_summary, CompositeTimingSummaryInput,
 };
 use crate::encode::video_debug::timestamp_nanos;
+use crate::error::{CoreError, CoreResult};
 use crate::render::{prepare_preview_assets, render_frame_rgba, RenderTarget};
 
 /// Reusable raw RGBA frame buffer.
@@ -48,7 +49,8 @@ struct WriterResult {
 /// Keeping this as a small data object makes Phase 4 behavior easy to test and
 /// gives the Phase 5 render loop one place to read its exact frame counts.
 #[derive(Debug, Clone, PartialEq)]
-pub struct CompositePipelinePlan { // test seam
+pub struct CompositePipelinePlan {
+    // test seam
     pub source_fps: Fps,
     pub output_fps: Fps,
     pub overlay_pipe_fps: Fps,
@@ -69,7 +71,8 @@ pub struct CompositePipelinePlan { // test seam
 ///
 /// This renders only overlay-frame timestamps, writes raw RGBA frames to
 /// FFmpeg stdin, and lets FFmpeg repeat overlay frames between updates.
-pub fn render_composite_video_single( // test seam
+pub fn render_composite_video_single(
+    // test seam
     paths: &AppPaths,
     config: &RenderConfig,
     activity: &ParsedActivity,
@@ -84,9 +87,9 @@ pub fn render_composite_video_single( // test seam
     composite_render_duration: Option<f64>,
     composite_video_trim_start: Option<f64>,
     composite_widget_update_rate: Option<u32>,
-) -> Result<String, String> {
+) -> CoreResult<String> {
     if controller.cancel_flag().load(Ordering::SeqCst) {
-        return Err("Rendering cancelled".to_string());
+        return Err(CoreError::Cancelled);
     }
 
     let plan = derive_composite_pipeline_plan(
@@ -102,11 +105,9 @@ pub fn render_composite_video_single( // test seam
         composite_widget_update_rate,
     )?;
 
-    std::fs::create_dir_all(&paths.downloads_dir).map_err(|error| {
-        format!(
-            "Failed to create output directory {}: {error}",
-            paths.downloads_dir.display()
-        )
+    std::fs::create_dir_all(&paths.downloads_dir).map_err(|error| CoreError::Io {
+        path: paths.downloads_dir.clone(),
+        source: error,
     })?;
     controller.set_frame_progress(
         0,
@@ -123,11 +124,10 @@ pub fn render_composite_video_single( // test seam
     let stdin = child
         .stdin
         .take()
-        .ok_or_else(|| "Failed to capture composite ffmpeg stdin".to_string())?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| "Failed to capture composite ffmpeg stderr".to_string())?;
+        .ok_or_else(|| CoreError::Encode("Failed to capture composite ffmpeg stdin".to_string()))?;
+    let stderr = child.stderr.take().ok_or_else(|| {
+        CoreError::Encode("Failed to capture composite ffmpeg stderr".to_string())
+    })?;
     let stderr_lines = Arc::new(Mutex::new(Vec::new()));
     let monitor_lines = stderr_lines.clone();
     let monitor_thread = thread::spawn(move || monitor_composite_ffmpeg(stderr, monitor_lines));
@@ -154,22 +154,25 @@ pub fn render_composite_video_single( // test seam
             .send(FrameBuffer {
                 pixels: vec![0u8; frame_byte_len],
             })
-            .map_err(|_| "Failed to initialize composite frame buffer pool".to_string())?;
+            .map_err(|_| {
+                CoreError::Encode("Failed to initialize composite frame buffer pool".to_string())
+            })?;
     }
 
-    let writer_thread = thread::spawn(move || {
-        writer_worker(stdin, receiver, free_sender)
-    });
+    let writer_thread = thread::spawn(move || writer_worker(stdin, receiver, free_sender));
 
-    let render_result = (|| -> Result<(), String> {
+    let render_result = (|| -> CoreResult<()> {
         loop {
             if cancel_flag.load(Ordering::SeqCst) {
                 break;
             }
-            if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
-                return Err(format!(
+            if let Some(status) = child
+                .try_wait()
+                .map_err(|error| CoreError::Encode(format!("ffmpeg process error: {error}")))?
+            {
+                return Err(CoreError::Encode(format!(
                     "composite ffmpeg exited unexpectedly with status {status}"
-                ));
+                )));
             }
 
             let video_local_time = overlay_frame_index as f64 / plan.overlay_pipe_fps.as_f64();
@@ -178,7 +181,7 @@ pub fn render_composite_video_single( // test seam
             }
             let frame_started = Instant::now();
             let activity_time = composite_sync_offset + video_local_time;
-            let frame_result = (|| -> Result<(), String> {
+            let frame_result = (|| -> CoreResult<()> {
                 let dense_frame_index =
                     dense_frame_index_for_overlay(config, dense_activity, &plan, activity_time)?;
 
@@ -235,61 +238,78 @@ pub fn render_composite_video_single( // test seam
     drop(sender);
     let writer_result = writer_thread
         .join()
-        .map_err(|_| "Composite encoder writer thread panicked".to_string())?;
+        .map_err(|_| CoreError::Encode("Composite encoder writer thread panicked".to_string()))?;
     let was_cancelled = cancel_flag.load(Ordering::SeqCst);
     let ffmpeg_finalize_started = Instant::now();
     let status = if was_cancelled {
         terminate_composite_ffmpeg_after_cancel(&mut child)?
     } else {
-        child.wait().map_err(|error| error.to_string())?
+        child
+            .wait()
+            .map_err(|error| CoreError::Encode(error.to_string()))?
     };
     let ffmpeg_finalize_wait_ms = ffmpeg_finalize_started.elapsed().as_secs_f64() * 1000.0;
     monitor_thread
         .join()
-        .map_err(|_| "Composite ffmpeg monitor thread panicked".to_string())?;
+        .map_err(|_| CoreError::Encode("Composite ffmpeg monitor thread panicked".to_string()))?;
 
     let writer = match writer_result {
         Ok(w) => w,
         Err(error) => {
             let _ = std::fs::remove_file(&plan.output_path);
             let stderr = stderr_snapshot(&stderr_lines);
-            if is_pipe_write_error(&error) {
-                return Err(format_pipe_write_failure(error, status, &stderr, &plan));
+            let error_str = error.to_string();
+            if is_pipe_write_error(&error_str) {
+                return Err(CoreError::Encode(format_pipe_write_failure(
+                    error_str, status, &stderr, &plan,
+                )));
             }
             if stderr.is_empty() {
                 return Err(error);
             }
-            return Err(format!("{error}. FFmpeg stderr:\n{}", stderr_tail(&stderr)));
+            return Err(CoreError::Encode(format!(
+                "{error}. FFmpeg stderr:\n{}",
+                stderr_tail(&stderr)
+            )));
         }
     };
 
     if let Err(error) = render_result {
         let _ = std::fs::remove_file(&plan.output_path);
         let stderr = stderr_snapshot(&stderr_lines);
-        if is_pipe_write_error(&error) {
-            return Err(format_pipe_write_failure(error, status, &stderr, &plan));
+        let error_str = error.to_string();
+        if is_pipe_write_error(&error_str) {
+            return Err(CoreError::Encode(format_pipe_write_failure(
+                error_str, status, &stderr, &plan,
+            )));
         }
         if stderr.is_empty() {
             return Err(error);
         }
-        return Err(format!("{error}. FFmpeg stderr:\n{}", stderr_tail(&stderr)));
+        return Err(CoreError::Encode(format!(
+            "{error}. FFmpeg stderr:\n{}",
+            stderr_tail(&stderr)
+        )));
     }
     if was_cancelled {
         let _ = std::fs::remove_file(&plan.output_path);
-        return Err("Rendering cancelled".to_string());
+        return Err(CoreError::Cancelled);
     }
     if !status.success() {
         let _ = std::fs::remove_file(&plan.output_path);
         let stderr = stderr_snapshot(&stderr_lines);
-        return Err(format_composite_ffmpeg_failure(&plan, status, &stderr));
+        return Err(CoreError::Ffmpeg {
+            status,
+            stderr: stderr_tail(&stderr),
+        });
     }
     if writer.written_frames != expected_guarded_overlay_frame_count(&plan) {
         let _ = std::fs::remove_file(&plan.output_path);
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Composite overlay writer ended early: wrote {} of {} frames",
             writer.written_frames,
             expected_guarded_overlay_frame_count(&plan)
-        ));
+        )));
     }
     verify_successful_composite_output(&plan.output_path)?;
 
@@ -343,36 +363,41 @@ fn output_progress_for_overlay_time(video_local_time: f64, plan: &CompositePipel
 /// running, the process is killed and waited so no encoder process is orphaned.
 fn terminate_composite_ffmpeg_after_cancel(
     child: &mut std::process::Child,
-) -> Result<std::process::ExitStatus, String> {
+) -> CoreResult<std::process::ExitStatus> {
     for _ in 0..10 {
-        if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|error| CoreError::Encode(error.to_string()))?
+        {
             return Ok(status);
         }
         thread::sleep(Duration::from_millis(50));
     }
 
     child.kill().map_err(|error| {
-        format!("Failed to terminate composite ffmpeg after cancellation: {error}")
+        CoreError::Encode(format!(
+            "Failed to terminate composite ffmpeg after cancellation: {error}"
+        ))
     })?;
-    child.wait().map_err(|error| error.to_string())
+    child
+        .wait()
+        .map_err(|error| CoreError::Encode(error.to_string()))
 }
 
 /// Confirms that FFmpeg finalized a usable output file on success.
 ///
 /// A successful process exit without a non-empty MP4 is treated as a render
 /// failure because callers need a playable artifact, not just a clean status.
-fn verify_successful_composite_output(output_path: &Path) -> Result<(), String> {
-    let metadata = std::fs::metadata(output_path).map_err(|error| {
-        format!(
-            "Composite render finished but output file is missing ({}): {error}",
-            output_path.display()
-        )
+fn verify_successful_composite_output(output_path: &Path) -> CoreResult<()> {
+    let metadata = std::fs::metadata(output_path).map_err(|error| CoreError::Io {
+        path: output_path.to_path_buf(),
+        source: error,
     })?;
     if metadata.len() == 0 {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Composite render finished but output file is empty: {}",
             output_path.display()
-        ));
+        )));
     }
     Ok(())
 }
@@ -419,36 +444,12 @@ fn format_pipe_write_failure(
     message
 }
 
-/// Formats a failed FFmpeg completion with full-GPU profile diagnostics.
-///
-/// Experimental CUDA/QSV profiles include the selected profile, filter graph,
-/// and safe fallback profile name so callers can decide whether to retry.
-fn format_composite_ffmpeg_failure(
-    plan: &CompositePipelinePlan,
-    status: std::process::ExitStatus,
-    stderr: &str,
-) -> String {
-    let mut message = format!(
-        "Composite ffmpeg failed ({status}) for profile {}.",
-        plan.ffmpeg_settings.selected_profile_name
-    );
-    if let Some(fallback) = &plan.ffmpeg_settings.fallback_profile_name {
-        message.push_str(&format!(
-            "\nSafe fallback profile available: {fallback}. This explicit experimental render was not silently retried."
-        ));
-    }
-    message.push_str("\nFilter graph:\n");
-    message.push_str(&plan.ffmpeg_settings.filter_complex);
-    message.push_str("\nFFmpeg stderr:\n");
-    message.push_str(&stderr_tail(stderr));
-    message
-}
-
 /// Derives Phase 4 composite timing and FFmpeg settings.
 ///
 /// This helper mirrors the future render loop's timing math, including the
 /// fractional-frame overrun guard, without producing any overlay frames.
-pub fn derive_composite_pipeline_plan( // test seam
+pub fn derive_composite_pipeline_plan(
+    // test seam
     paths: &AppPaths,
     config: &RenderConfig,
     composite_video_path: &str,
@@ -459,7 +460,7 @@ pub fn derive_composite_pipeline_plan( // test seam
     composite_render_duration: Option<f64>,
     composite_video_trim_start: Option<f64>,
     composite_widget_update_rate: Option<u32>,
-) -> Result<CompositePipelinePlan, String> {
+) -> CoreResult<CompositePipelinePlan> {
     let source_fps = Fps::new(composite_video_fps_num, composite_video_fps_den)?;
     let output_fps = source_fps;
     let update_rate = composite_widget_update_rate.unwrap_or(1).max(1);
@@ -472,24 +473,24 @@ pub fn derive_composite_pipeline_plan( // test seam
     let codec_name = composite_codec_name(config);
 
     if !composite_video_duration.is_finite() || composite_video_duration <= 0.0 {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Composite video duration must be greater than zero: {composite_video_duration}"
-        ));
+        )));
     }
     if !trim_start.is_finite() || trim_start < 0.0 {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Composite video trim start must be zero or greater: {trim_start}"
-        ));
+        )));
     }
     if trim_start >= composite_video_duration {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Composite video trim start ({trim_start}) must be less than video duration ({composite_video_duration})"
-        ));
+        )));
     }
     if !render_duration.is_finite() || render_duration <= 0.0 {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Composite render duration must be greater than zero: {render_duration}"
-        ));
+        )));
     }
 
     let overlay_frame_count = (render_duration * overlay_pipe_fps.as_f64())
@@ -541,7 +542,7 @@ pub fn derive_composite_pipeline_plan( // test seam
 fn spawn_composite_ffmpeg_process(
     ffmpeg_bin: &Path,
     plan: &CompositePipelinePlan,
-) -> Result<std::process::Child, String> {
+) -> CoreResult<std::process::Child> {
     let mut command = Command::new(ffmpeg_bin);
     suppress_child_console(&mut command);
     command.arg("-loglevel").arg("info");
@@ -560,19 +561,20 @@ fn spawn_composite_ffmpeg_process(
 
     command
         .spawn()
-        .map_err(|error| format!("Could not start composite ffmpeg: {error}"))
+        .map_err(|error| CoreError::Encode(format!("Could not start composite ffmpeg: {error}")))
 }
 
 /// Maps one overlay timestamp to a dense activity frame index.
 ///
 /// Composite-adjusted dense reports use direct `overlay j -> dense j` mapping;
 /// otherwise this falls back to scene-start-relative time mapping.
-pub fn dense_frame_index_for_overlay( // test seam
+pub fn dense_frame_index_for_overlay(
+    // test seam
     config: &RenderConfig,
     dense_activity: &DenseActivityReport,
     plan: &CompositePipelinePlan,
     activity_time: f64,
-) -> Result<usize, String> {
+) -> CoreResult<usize> {
     let direct_index = if dense_report_matches_composite_window(config, plan) {
         let video_local_time = activity_time - config.scene.start;
         Some((video_local_time * plan.overlay_pipe_fps.as_f64()).round() as usize)
@@ -584,20 +586,20 @@ pub fn dense_frame_index_for_overlay( // test seam
         None => {
             let idx = ((activity_time - config.scene.start) * config.scene.fps).floor();
             if idx < 0.0 {
-                return Err(format!(
+                return Err(CoreError::Encode(format!(
                     "Composite overlay frame is before dense activity range: activity_time={activity_time}, scene.start={}",
                     config.scene.start
-                ));
+                )));
             }
             idx as usize
         }
     };
 
     if dense_frame_index >= dense_activity.frame_count {
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "Composite dense frame index {dense_frame_index} is outside dense activity range 0..{}",
             dense_activity.frame_count
-        ));
+        )));
     }
     Ok(dense_frame_index)
 }
@@ -625,7 +627,8 @@ fn dense_report_frame_count_matches(config: &RenderConfig, plan: &CompositePipel
 }
 
 /// Counts overlay frames whose timestamps are strictly inside render duration.
-pub fn expected_guarded_overlay_frame_count(plan: &CompositePipelinePlan) -> u64 { // test seam
+pub fn expected_guarded_overlay_frame_count(plan: &CompositePipelinePlan) -> u64 {
+    // test seam
     plan.first_overrun_overlay_index
 }
 
@@ -694,7 +697,8 @@ fn composite_qsv_full_init_args(config: &RenderConfig) -> Vec<String> {
 /// The render loop uses the equivalent guard
 /// `video_local_time >= render_duration` so fractional durations never emit an
 /// extra tail frame.
-pub fn first_fractional_overrun_overlay_index(render_duration: f64, overlay_pipe_fps: Fps) -> u64 { // test seam
+pub fn first_fractional_overrun_overlay_index(render_duration: f64, overlay_pipe_fps: Fps) -> u64 {
+    // test seam
     let mut index = (render_duration * overlay_pipe_fps.as_f64())
         .floor()
         .max(0.0) as u64;
@@ -712,7 +716,7 @@ fn writer_worker(
     mut stdin: std::process::ChildStdin,
     receiver: Receiver<FrameBuffer>,
     free_sender: SyncSender<FrameBuffer>,
-) -> Result<WriterResult, String> {
+) -> CoreResult<WriterResult> {
     let mut profiler = crate::debug::RenderProfiler::default();
     let mut written_frames = 0u64;
     loop {
@@ -721,9 +725,9 @@ fn writer_worker(
             Err(_) => break,
         };
         let write_started = Instant::now();
-        stdin
-            .write_all(frame.pixels.as_slice())
-            .map_err(|error| format!("Failed writing composite overlay frame: {error}"))?;
+        stdin.write_all(frame.pixels.as_slice()).map_err(|error| {
+            CoreError::Encode(format!("Failed writing composite overlay frame: {error}"))
+        })?;
         profiler.record_ms(
             "ffmpeg.write",
             write_started.elapsed().as_secs_f64() * 1000.0,
@@ -743,11 +747,11 @@ fn acquire_frame_buffer(
     receiver: &Receiver<FrameBuffer>,
     cancel_flag: &std::sync::atomic::AtomicBool,
     profiler: &mut RenderProfiler,
-) -> Result<FrameBuffer, String> {
+) -> CoreResult<FrameBuffer> {
     let started = Instant::now();
     loop {
         if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err("Rendering cancelled".to_string());
+            return Err(CoreError::Cancelled);
         }
         match receiver.recv_timeout(Duration::from_millis(25)) {
             Ok(buffer) => {
@@ -759,7 +763,9 @@ fn acquire_frame_buffer(
             }
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => {
-                return Err("Frame buffer pool disconnected".to_string());
+                return Err(CoreError::Encode(
+                    "Frame buffer pool disconnected".to_string(),
+                ));
             }
         }
     }
@@ -771,19 +777,16 @@ fn queue_frame(
     frame_buffer: FrameBuffer,
     cancel_flag: &std::sync::atomic::AtomicBool,
     profiler: &mut RenderProfiler,
-) -> Result<(), String> {
+) -> CoreResult<()> {
     let started = Instant::now();
     let mut payload = frame_buffer;
     loop {
         if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err("Rendering cancelled".to_string());
+            return Err(CoreError::Cancelled);
         }
         match sender.try_send(payload) {
             Ok(()) => {
-                profiler.record_ms(
-                    "queue.put_wait",
-                    started.elapsed().as_secs_f64() * 1000.0,
-                );
+                profiler.record_ms("queue.put_wait", started.elapsed().as_secs_f64() * 1000.0);
                 return Ok(());
             }
             Err(TrySendError::Full(returned_payload)) => {
@@ -791,7 +794,7 @@ fn queue_frame(
                 thread::sleep(Duration::from_millis(10));
             }
             Err(TrySendError::Disconnected(_)) => {
-                return Err("Encoder queue disconnected".to_string());
+                return Err(CoreError::Encode("Encoder queue disconnected".to_string()));
             }
         }
     }

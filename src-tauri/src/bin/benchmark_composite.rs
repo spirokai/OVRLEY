@@ -16,7 +16,7 @@ const COMPOSITE_CODECS: &[(&str, &str)] = &[
     ("nvgpu_h264", "h264_nvenc"),
     ("nvgpu_hevc", "hevc_nvenc"),
     ("nnvgpu_h264", "nnvgpu_h264"),
-   ("nnvgpu_hevc", "nnvgpu_hevc"),
+    ("nnvgpu_hevc", "nnvgpu_hevc"),
     ("qsv_h264", "h264_qsv"),
     ("qsv_hevc", "hevc_qsv"),
     ("qsv_full_h264", "qsv_full_h264"),
@@ -90,22 +90,22 @@ fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
 
 fn is_composite_codec_available(codecs: &AvailableCodecs, name: &str) -> bool {
     match name {
-       "software_h264" => codecs.libx264,
-    //   "software_hevc" => codecs.libx265,
-     //    "nvgpu_h264" => codecs.h264_nvenc,
-    //    "nvgpu_hevc" => codecs.hevc_nvenc,
-    //     "nnvgpu_h264" => codecs.nnvgpu,
-   //     "nnvgpu_hevc" => codecs.nnvgpu,
-    //     "qsv_h264" => codecs.h264_qsv,
-    //     "qsv_hevc" => codecs.hevc_qsv,
-    //     "qsv_full_h264" => codecs.qsv_full,
-    //     "qsv_full_hevc" => codecs.qsv_full,
-    //     "mac_h264" => codecs.h264_videotoolbox,
-    //     "mac_hevc" => codecs.hevc_videotoolbox,
-    //     "vaapi_h264" => codecs.h264_vaapi,
-    //    "vaapi_hevc" => codecs.hevc_vaapi,
-    //     "amd_h264" => codecs.h264_amf,
-    //     "amd_hevc" => codecs.hevc_amf,
+        "software_h264" => codecs.libx264,
+        //   "software_hevc" => codecs.libx265,
+        //    "nvgpu_h264" => codecs.h264_nvenc,
+        //    "nvgpu_hevc" => codecs.hevc_nvenc,
+        //     "nnvgpu_h264" => codecs.nnvgpu,
+        //     "nnvgpu_hevc" => codecs.nnvgpu,
+        //     "qsv_h264" => codecs.h264_qsv,
+        //     "qsv_hevc" => codecs.hevc_qsv,
+        //     "qsv_full_h264" => codecs.qsv_full,
+        //     "qsv_full_hevc" => codecs.qsv_full,
+        //     "mac_h264" => codecs.h264_videotoolbox,
+        //     "mac_hevc" => codecs.hevc_videotoolbox,
+        //     "vaapi_h264" => codecs.h264_vaapi,
+        //    "vaapi_hevc" => codecs.hevc_vaapi,
+        //     "amd_h264" => codecs.h264_amf,
+        //     "amd_hevc" => codecs.hevc_amf,
         _ => false,
     }
 }
@@ -209,12 +209,13 @@ fn main() -> Result<(), String> {
 
     let root = repo_root()?;
     let paths = AppPaths::from_repo_root(root.clone());
-    paths.ensure_dirs()?;
+    paths.ensure_dirs().map_err(|e| e.to_string())?;
 
-    let available = detect_codecs(&root)?;
+    let available = detect_codecs(&root).map_err(|e| e.to_string())?;
 
     let resolved_video = resolve_path(&video_path, &root);
-    let metadata = probe_video(&root, &resolved_video.to_string_lossy())?;
+    let metadata =
+        probe_video(&root, &resolved_video.to_string_lossy()).map_err(|e| e.to_string())?;
     let fps_num = metadata.fps_num.unwrap_or(30);
     let fps_den = metadata.fps_den.unwrap_or(1);
     let video_duration = metadata
@@ -228,7 +229,10 @@ fn main() -> Result<(), String> {
 
     println!(
         "Video: {}  {}  {:.1}s  {}",
-        resolved_video.file_name().unwrap_or_default().to_string_lossy(),
+        resolved_video
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy(),
         if fps_den == 1 {
             format!("{}fps", fps_num)
         } else {
@@ -252,13 +256,11 @@ fn main() -> Result<(), String> {
         activity_start, activity_end, trim_start, render_duration
     );
 
-    let activity_json =
-        fs::read_to_string(&resolve_path(&activity_path, &root))
-            .map_err(|e| format!("Failed to read activity: {e}"))?;
+    let activity_json = fs::read_to_string(&resolve_path(&activity_path, &root))
+        .map_err(|e| format!("Failed to read activity: {e}"))?;
 
-    let template_raw =
-        fs::read_to_string(&resolve_path(&template_path, &root))
-            .map_err(|e| format!("Failed to read template: {e}"))?;
+    let template_raw = fs::read_to_string(&resolve_path(&template_path, &root))
+        .map_err(|e| format!("Failed to read template: {e}"))?;
     let template_value: serde_json::Value =
         serde_json::from_str(&template_raw).map_err(|e| format!("Invalid template JSON: {e}"))?;
 
@@ -289,14 +291,10 @@ fn main() -> Result<(), String> {
         .and_then(serde_json::Value::as_u64)
         .map(|u| u as u32);
 
-    let activity = parse_activity_json(&activity_json)?;
+    let activity = parse_activity_json(&activity_json).map_err(|e| e.to_string())?;
 
-    let res_width = config_value["scene"]["width"]
-        .as_u64()
-        .unwrap_or(1920);
-    let res_height = config_value["scene"]["height"]
-        .as_u64()
-        .unwrap_or(1080);
+    let res_width = config_value["scene"]["width"].as_u64().unwrap_or(1920);
+    let res_height = config_value["scene"]["height"].as_u64().unwrap_or(1080);
     let base_update_rate = settings_update_rate
         .or_else(|| {
             config_value["scene"]["update_rate"]
@@ -351,8 +349,9 @@ fn main() -> Result<(), String> {
 
             let config_str = serde_json::to_string(&run_config_value)
                 .map_err(|e| format!("Failed to serialize config: {e}"))?;
-            let config = parse_config_json(&config_str)?;
-            let dense = build_dense_activity_report(&activity, &config)?;
+            let config = parse_config_json(&config_str).map_err(|e| e.to_string())?;
+            let dense =
+                build_dense_activity_report(&activity, &config).map_err(|e| e.to_string())?;
 
             let update_rate = config.widget_update_rate();
             let overlay_duration = config.scene.end - config.scene.start;
@@ -377,7 +376,7 @@ fn main() -> Result<(), String> {
                     job_time: None,
                     job_time_seconds: None,
                     file_size_mb: None,
-                    error: Some(e),
+                    error: Some(e.to_string()),
                 });
                 continue;
             }
@@ -446,7 +445,7 @@ fn main() -> Result<(), String> {
                         job_time: None,
                         job_time_seconds: None,
                         file_size_mb: None,
-                        error: Some(e),
+                        error: Some(e.to_string()),
                     });
                 }
             }
@@ -516,17 +515,13 @@ fn main() -> Result<(), String> {
     };
 
     let output_dir = root.join("debug").join("benchmarks");
-    fs::create_dir_all(&output_dir)
-        .map_err(|e| format!("Failed to create benchmarks dir: {e}"))?;
+    fs::create_dir_all(&output_dir).map_err(|e| format!("Failed to create benchmarks dir: {e}"))?;
     let output_path = output_dir.join("composite.json");
     let output_json = serde_json::to_string_pretty(&output)
         .map_err(|e| format!("Failed to serialize output: {e}"))?;
     fs::write(&output_path, &output_json)
         .map_err(|e| format!("Failed to write {}: {e}", output_path.display()))?;
 
-    println!(
-        "\n=== Results written to {} ===",
-        output_path.display()
-    );
+    println!("\n=== Results written to {} ===", output_path.display());
     Ok(())
 }

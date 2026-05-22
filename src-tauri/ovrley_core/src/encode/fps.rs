@@ -3,6 +3,8 @@
 //! Composite rendering keeps source-video frame rates as exact rationals so
 //! NTSC rates such as `30000/1001` are not rounded during command construction.
 
+use crate::error::{CoreError, CoreResult};
+
 /// Exact rational frames-per-second value used for FFmpeg arguments and timing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Fps {
@@ -15,12 +17,16 @@ impl Fps {
     ///
     /// The numerator and denominator must be non-zero because FFmpeg and frame
     /// timing code cannot represent zero-rate streams.
-    pub fn new(num: u32, den: u32) -> Result<Self, String> {
+    pub fn new(num: u32, den: u32) -> CoreResult<Self> {
         if num == 0 {
-            return Err("FPS numerator must be greater than zero".to_string());
+            return Err(CoreError::Encode(
+                "FPS numerator must be greater than zero".to_string(),
+            ));
         }
         if den == 0 {
-            return Err("FPS denominator must be greater than zero".to_string());
+            return Err(CoreError::Encode(
+                "FPS denominator must be greater than zero".to_string(),
+            ));
         }
         Ok(Self { num, den }.reduced())
     }
@@ -39,9 +45,11 @@ impl Fps {
     ///
     /// Composite mode uses this to derive overlay pipe FPS from source video FPS
     /// without rounding fractional NTSC rates.
-    pub fn divided_by(&self, factor: u32) -> Result<Fps, String> {
+    pub fn divided_by(&self, factor: u32) -> CoreResult<Fps> {
         if factor == 0 {
-            return Err("FPS division factor must be greater than zero".to_string());
+            return Err(CoreError::Encode(
+                "FPS division factor must be greater than zero".to_string(),
+            ));
         }
         Ok(Fps {
             num: self.num,
@@ -63,9 +71,11 @@ impl Fps {
     ///
     /// This is a fallback for callers that do not yet have numerator and
     /// denominator metadata; exact rational fields should be preferred.
-    pub fn from_f64_fallback(value: f64) -> Result<Fps, String> {
+    pub fn from_f64_fallback(value: f64) -> CoreResult<Fps> {
         if !value.is_finite() || value <= 0.0 {
-            return Err(format!("FPS value must be finite and positive: {value}"));
+            return Err(CoreError::Encode(format!(
+                "FPS value must be finite and positive: {value}"
+            )));
         }
 
         for (approx, num, den) in [
@@ -81,9 +91,9 @@ impl Fps {
             }
         }
 
-        Err(format!(
+        Err(CoreError::Encode(format!(
             "Unsupported non-rational FPS fallback value: {value}"
-        ))
+        )))
     }
 }
 

@@ -9,6 +9,7 @@ use crate::activity::schema::DenseActivityReport;
 use crate::config::{RenderConfig, ValueConfig};
 use crate::render::format::{format_metric_parts, MetricDisplayParts, MetricIconKind};
 use crate::render::text::{draw_text, measure_text, parse_color, ResolvedTextStyle};
+use crate::MetricKind;
 use skia_safe::{
     image_filters, paint::Style, path::ArcSize, Canvas, Color, Paint, PaintCap, PaintJoin, Path,
     PathDirection, Point,
@@ -64,7 +65,7 @@ pub(crate) fn draw_metric_value_widget_with_config(
 ) -> bool {
     // Return false for unsupported values so callers can fall back to generic
     // formatted text drawing.
-    if value.value == "gradient" {
+    if value.value == MetricKind::Gradient {
         return draw_gradient_value_widget(
             canvas,
             config,
@@ -192,7 +193,8 @@ fn gradient_is_zero(raw_gradient: Option<f64>) -> bool {
 }
 
 // Computes the visual triangle height for a gradient percentage.
-pub fn gradient_triangle_height(raw_gradient: Option<f64>, triangle_width: f32) -> f32 { // test seam
+pub fn gradient_triangle_height(raw_gradient: Option<f64>, triangle_width: f32) -> f32 {
+    // test seam
     if triangle_width <= 0.0 {
         return 0.0;
     }
@@ -329,8 +331,10 @@ fn draw_metric_parts(
 
 // Returns whether a value contributes an icon that can be cached statically.
 pub(crate) fn has_static_metric_icon(value: &ValueConfig) -> bool {
-    value.show_icon.unwrap_or(value.value != "gradient")
-        && metric_icon_kind_for_value(value.value.as_str()).is_some()
+    value
+        .show_icon
+        .unwrap_or(value.value != MetricKind::Gradient)
+        && metric_icon_kind_for_value(value.value).is_some()
         && metric_icon_has_stable_static_vertical_metrics(value)
 }
 
@@ -344,10 +348,13 @@ pub(crate) fn draw_static_metric_icon_for_value(
 ) -> bool {
     // Static icon drawing is used for the cached base layer. Dynamic text is
     // drawn later, but the icon can be reused every frame.
-    let Some(icon_kind) = metric_icon_kind_for_value(value.value.as_str()) else {
+    let Some(icon_kind) = metric_icon_kind_for_value(value.value) else {
         return false;
     };
-    if !value.show_icon.unwrap_or(value.value != "gradient") {
+    if !value
+        .show_icon
+        .unwrap_or(value.value != MetricKind::Gradient)
+    {
         return false;
     }
 
@@ -383,7 +390,8 @@ pub(crate) fn draw_static_metric_icon_for_value(
 
 // Returns the text used for vertical alignment measurements. This mirrors the
 // editor preview, which stabilizes numeric metric rows across changing values.
-pub fn metric_vertical_metrics_text(text: &str) -> &str { // test seam
+pub fn metric_vertical_metrics_text(text: &str) -> &str {
+    // test seam
     if !text.is_empty()
         && text
             .chars()
@@ -398,12 +406,13 @@ pub fn metric_vertical_metrics_text(text: &str) -> &str { // test seam
 // Static icons are cached without the current frame value. Keep that fast path
 // only when the preview also uses stable numeric metrics for vertical layout.
 fn metric_icon_has_stable_static_vertical_metrics(value: &ValueConfig) -> bool {
-    value.value != "time" || value.format.as_deref().unwrap_or("time-24") == "time-24"
+    value.value != MetricKind::Time || value.format.as_deref().unwrap_or("time-24") == "time-24"
 }
 
 // Computes icon top so metric icons are centered on the value glyphs rather
 // than on the row line box. This matches the frontend preview layout.
-pub fn metric_icon_top_from_value_layout( // test seam
+pub fn metric_icon_top_from_value_layout(
+    // test seam
     text_group_bottom: f32,
     value_line_height: f32,
     value_measure: &crate::render::text::MeasuredText,
@@ -515,14 +524,14 @@ fn draw_metric_icon_primitives(canvas: &Canvas, icon: &ParsedSvgIcon, paint: &Pa
 }
 
 // Maps a telemetry value key to its built-in icon kind.
-fn metric_icon_kind_for_value(value: &str) -> Option<MetricIconKind> {
-    match value {
-        "speed" => Some(MetricIconKind::Gauge),
-        "heartrate" => Some(MetricIconKind::Heart),
-        "cadence" => Some(MetricIconKind::RefreshCw),
-        "power" => Some(MetricIconKind::Zap),
-        "time" => Some(MetricIconKind::Clock3),
-        "temperature" => Some(MetricIconKind::Thermometer),
+fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconKind> {
+    match kind {
+        MetricKind::Speed => Some(MetricIconKind::Gauge),
+        MetricKind::Heartrate => Some(MetricIconKind::Heart),
+        MetricKind::Cadence => Some(MetricIconKind::RefreshCw),
+        MetricKind::Power => Some(MetricIconKind::Zap),
+        MetricKind::Time => Some(MetricIconKind::Clock3),
+        MetricKind::Temperature => Some(MetricIconKind::Thermometer),
         _ => None,
     }
 }
@@ -861,4 +870,3 @@ fn point_from_command(current: Point, x: f32, y: f32, is_relative: bool) -> Poin
         Point::new(x, y)
     }
 }
-

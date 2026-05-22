@@ -150,13 +150,15 @@ fn main() -> Result<(), String> {
     let config_json = fs::read_to_string(&config_path)
         .map_err(|error| format!("Failed to read {}: {error}", config_path.display()))?;
 
-    let activity = parse_activity_json(&payload_json)?;
-    let config = parse_config_json(&config_json)?;
-    let dense_activity = build_dense_activity_report(&activity, &config)?;
+    let activity = parse_activity_json(&payload_json).map_err(|e| e.to_string())?;
+    let config = parse_config_json(&config_json).map_err(|e| e.to_string())?;
+    let dense_activity =
+        build_dense_activity_report(&activity, &config).map_err(|e| e.to_string())?;
 
     let paths = AppPaths::from_repo_root(repo_root()?);
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
-        prepare_preview_assets(&paths, &config, &activity, &dense_activity)?;
+        prepare_preview_assets(&paths, &config, &activity, &dense_activity)
+            .map_err(|e| e.to_string())?;
     let mut reports = Vec::with_capacity(seconds.len());
     for (index, second) in seconds.into_iter().enumerate() {
         let target_out_path = if reports.is_empty() {
@@ -203,7 +205,8 @@ fn main() -> Result<(), String> {
             per_frame_label_cache_status,
             extra_total_ms,
             &target_out_path,
-        )?;
+        )
+        .map_err(|e| e.to_string())?;
         reports.push(report);
     }
     let summary = summarize_reports(reports);

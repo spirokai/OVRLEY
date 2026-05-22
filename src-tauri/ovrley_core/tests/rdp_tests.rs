@@ -60,11 +60,7 @@ fn perpendicular_distance_offset_point() {
 
 // --- Reusable RDP implementation for Phase 3 behavioral spec ---
 
-fn perpendicular_distance(
-    point: (f32, f32),
-    start: (f32, f32),
-    end: (f32, f32),
-) -> f32 {
+fn perpendicular_distance(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> f32 {
     let (x0, y0) = point;
     let (x1, y1) = start;
     let (x2, y2) = end;

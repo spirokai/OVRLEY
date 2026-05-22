@@ -19,6 +19,7 @@ use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
+use crate::error::{CoreError, CoreResult};
 use crate::render::format::{format_value, frame_index_for_second};
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
 use crate::render::text::{draw_text, label_style, value_style};
@@ -97,15 +98,12 @@ pub fn prepare_preview_assets(
     config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
-) -> Result<
-    (
-        PreparedPreviewAssets,
-        LabelCacheStatus,
-        BTreeMap<String, TimingBucket>,
-        f64,
-    ),
-    String,
-> {
+) -> CoreResult<(
+    PreparedPreviewAssets,
+    LabelCacheStatus,
+    BTreeMap<String, TimingBucket>,
+    f64,
+)> {
     let width = config.scene.width.unwrap_or(1920);
     let height = config.scene.height.unwrap_or(1080);
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
@@ -141,7 +139,7 @@ pub fn render_preview_to_path(
     dense_activity: &DenseActivityReport,
     second: u32,
     out_path: &Path,
-) -> Result<(), String> {
+) -> CoreResult<()> {
     render_preview_with_report(paths, config, activity, dense_activity, second, out_path)
         .map(|report| report.0)
 }
@@ -154,7 +152,7 @@ pub fn render_preview_with_report(
     dense_activity: &DenseActivityReport,
     second: u32,
     out_path: &Path,
-) -> Result<((), PreviewRenderReport), String> {
+) -> CoreResult<((), PreviewRenderReport)> {
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
         prepare_preview_assets(paths, config, activity, dense_activity)?;
     render_preview_with_prepared_assets(
@@ -185,7 +183,7 @@ pub fn render_preview_with_prepared_assets(
     label_cache_status: LabelCacheStatus,
     extra_total_ms: f64,
     out_path: &Path,
-) -> Result<((), PreviewRenderReport), String> {
+) -> CoreResult<((), PreviewRenderReport)> {
     let width = config.scene.width.unwrap_or(1920);
     let height = config.scene.height.unwrap_or(1080);
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
@@ -208,7 +206,7 @@ pub fn render_preview_with_prepared_assets(
 
     preview_profiler.measure("preview.png_write", || {
         write_surface_png(&mut surface, out_path)
-            .map_err(|error| format!("Failed to render preview frame: {error}"))
+            .map_err(|error| CoreError::Render(format!("Failed to render preview frame: {error}")))
     })?;
 
     let frame_timings =
@@ -279,7 +277,7 @@ pub fn render_frame_rgba(
     labels_image: Option<&Image>,
     target: RenderTarget<'_>,
     frame_profiler: &mut RenderProfiler,
-) -> Result<(), String> {
+) -> CoreResult<()> {
     let width = target.width;
     let height = target.height;
     let mut labels_image = labels_image;
@@ -332,14 +330,11 @@ fn render_frame_surface(
     labels_image: Option<&Image>,
     frame_profiler: &mut RenderProfiler,
     mut preview_profiler: Option<&mut RenderProfiler>,
-) -> Result<
-    (
-        skia_safe::Surface,
-        Option<WidgetRenderReport>,
-        Option<WidgetRenderReport>,
-    ),
-    String,
-> {
+) -> CoreResult<(
+    skia_safe::Surface,
+    Option<WidgetRenderReport>,
+    Option<WidgetRenderReport>,
+)> {
     // Preview rendering owns its surface and writes a PNG, while video rendering
     // wraps caller-owned pixels. This helper is the preview-side equivalent of
     // `render_frame_rgba`.
@@ -456,7 +451,7 @@ fn cached_labels_image(
     height: u32,
     scale: f32,
     prepare_profiler: &mut RenderProfiler,
-) -> Result<(Option<Image>, LabelCacheStatus), String> {
+) -> CoreResult<(Option<Image>, LabelCacheStatus)> {
     // Preview surfaces can reuse a Skia image cache keyed by all inputs that can
     // affect static text/icon pixels.
     if config.labels.is_empty() && !config_has_static_metric_icons(config) {
@@ -507,7 +502,7 @@ pub fn prepare_base_rgba(
     height: u32,
     scale: f32,
     prepare_profiler: &mut RenderProfiler,
-) -> Result<Option<Vec<u8>>, String> {
+) -> CoreResult<Option<Vec<u8>>> {
     // Video rendering copies this base buffer into each frame before drawing
     // dynamic values. That is faster than asking Skia to redraw static labels on
     // every frame.
@@ -532,27 +527,16 @@ pub fn prepare_base_rgba(
 }
 
 // Computes the cache key for the static label/icon layer.
-fn labels_cache_key(
-    config: &RenderConfig,
-    width: u32,
-    height: u32,
-    scale: f32,
-) -> Result<u64, String> {
+fn labels_cache_key(config: &RenderConfig, width: u32, height: u32, scale: f32) -> CoreResult<u64> {
     // Include dynamic values because static metric icons are derived from value
     // configs even though the numeric text itself is drawn every frame.
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     width.hash(&mut hasher);
     height.hash(&mut hasher);
     scale.to_bits().hash(&mut hasher);
-    serde_json::to_string(&config.scene)
-        .map_err(|error| error.to_string())?
-        .hash(&mut hasher);
-    serde_json::to_string(&config.labels)
-        .map_err(|error| error.to_string())?
-        .hash(&mut hasher);
-    serde_json::to_string(&config.values)
-        .map_err(|error| error.to_string())?
-        .hash(&mut hasher);
+    serde_json::to_string(&config.scene)?.hash(&mut hasher);
+    serde_json::to_string(&config.labels)?.hash(&mut hasher);
+    serde_json::to_string(&config.values)?.hash(&mut hasher);
     Ok(hasher.finish())
 }
 

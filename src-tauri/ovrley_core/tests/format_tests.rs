@@ -4,6 +4,7 @@ use serde_json::json;
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
 use ovrley_core::config::{RenderConfig, SceneConfig, ValueConfig};
 use ovrley_core::render::format::{format_metric_parts, format_time_key, MetricIconKind};
+use ovrley_core::MetricKind;
 
 #[test]
 // Verifies representative built-in time format presets.
@@ -63,7 +64,7 @@ fn formats_metric_parts_for_speed() {
         extra: Default::default(),
     };
     let value = ValueConfig {
-        value: "speed".to_string(),
+        value: MetricKind::Speed,
         x: 0.0,
         y: 0.0,
         font: None,
@@ -171,7 +172,7 @@ fn formats_metric_parts_for_temperature_with_degree_units() {
         extra: Default::default(),
     };
     let value = ValueConfig {
-        value: "temperature".to_string(),
+        value: MetricKind::Temperature,
         x: 0.0,
         y: 0.0,
         font: None,

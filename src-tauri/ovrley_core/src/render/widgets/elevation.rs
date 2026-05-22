@@ -24,6 +24,7 @@ use crate::activity::trim::trim_activity;
 use crate::commands::AppPaths;
 use crate::config::{ElevationPlotConfig, RenderConfig, RenderDataRequirements};
 use crate::debug::RenderProfiler;
+use crate::error::{CoreError, CoreResult};
 use crate::render::surface::create_surface;
 use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};
 use skia_safe::Canvas;
@@ -36,7 +37,7 @@ pub(crate) fn prepare_elevation_cache(
     dense_activity: &DenseActivityReport,
     plot: &ElevationPlotConfig,
     prepare_profiler: &mut RenderProfiler,
-) -> Result<ElevationWidgetCache, String> {
+) -> CoreResult<ElevationWidgetCache> {
     // Preparation owns smoothing, downsampling, simplification, static layers,
     // and frame-state generation so the render loop stays predictable.
     let prepare_started = Instant::now();
@@ -418,7 +419,7 @@ fn normalize_elevation_plot(
 fn build_elevation_remaining_layer(
     plot: &NormalizedElevationPlot,
     geometry: &WidgetGeometry,
-) -> Result<Option<StaticLayer>, String> {
+) -> CoreResult<Option<StaticLayer>> {
     // The remaining area/line does not change per frame, so cache it as a Skia
     // image with enough padding for stroke and shadow overflow.
     if geometry.points.len() < 2 {
@@ -471,11 +472,13 @@ fn first_value_font(config: &RenderConfig) -> Option<String> {
 fn build_elevation_geometry(
     plot: &NormalizedElevationPlot,
     raw_points: &[(f32, f64)],
-) -> Result<WidgetGeometry, String> {
+) -> CoreResult<WidgetGeometry> {
     // Elevation traces are smoothed and reduced before projection, then RDP is
     // applied in screen space to remove visually redundant points.
     if raw_points.is_empty() {
-        return Err("Elevation plot requires elevation samples".to_string());
+        return Err(CoreError::Render(
+            "Elevation plot requires elevation samples".into(),
+        ));
     }
 
     let target_count =
@@ -621,7 +624,7 @@ fn build_elevation_source_points(
     config: &RenderConfig,
     activity: &ParsedActivity,
     show_full_activity: bool,
-) -> Result<Vec<(f32, f64)>, String> {
+) -> CoreResult<Vec<(f32, f64)>> {
     // Custom export ranges trim the source samples so the profile itself can
     // represent only the selected slice unless the template asks for full view.
     if show_full_activity || !custom_export_range_active(config) {

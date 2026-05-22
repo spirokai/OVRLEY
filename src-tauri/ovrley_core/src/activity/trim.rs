@@ -11,21 +11,22 @@ use super::interpolate::{
 };
 use super::schema::{ParsedActivity, TrimmedActivity};
 use crate::config::RenderDataRequirements;
+use crate::error::{CoreError, CoreResult};
 use chrono::{DateTime, SecondsFormat, Utc};
 
 // Validates that the requested scene window fits inside activity duration.
-fn validate_trim_window(duration: f64, start: f64, end: f64) -> Result<(), String> {
+fn validate_trim_window(duration: f64, start: f64, end: f64) -> CoreResult<()> {
     // Keep validation messages frontend-friendly because they are surfaced
     // directly when a user configures an invalid export window.
     if start < 0.0 || start >= duration {
-        return Err(format!(
+        return Err(CoreError::Activity(format!(
             "Invalid scene start value in config. Value should be at least 0 and less than {duration:.3}. Current value is {start}"
-        ));
+        )));
     }
     if end <= start || end > duration {
-        return Err(format!(
+        return Err(CoreError::Activity(format!(
             "Invalid scene end value in config. Value should be at most {duration:.3} and greater than {start}. Current value is {end}"
-        ));
+        )));
     }
     Ok(())
 }
@@ -69,11 +70,11 @@ pub fn trim_activity(
     start: f64,
     end: f64,
     requirements: &RenderDataRequirements,
-) -> Result<TrimmedActivity, String> {
+) -> CoreResult<TrimmedActivity> {
     if activity.sample_elapsed_seconds.len() < 2 {
-        return Err(
-            "parsedActivity must contain at least two sample_elapsed_seconds values".to_string(),
-        );
+        return Err(CoreError::Activity(
+            "parsedActivity must contain at least two sample_elapsed_seconds values".into(),
+        ));
     }
 
     let duration = activity.trim_end_seconds.max(

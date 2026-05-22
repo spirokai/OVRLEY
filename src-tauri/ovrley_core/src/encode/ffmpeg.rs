@@ -11,12 +11,14 @@ use std::process::Command;
 
 use serde_json::Value;
 
+use crate::error::{CoreError, CoreResult};
+
 /// Resolves the ffmpeg executable used for previews, encoding, and stitching.
 ///
 /// Search order is: explicit environment override, known app-local vendor
 /// locations, then `PATH`. Returning a concrete path lets health checks and
 /// render failures show actionable messages.
-pub fn resolve_ffmpeg_binary(repo_root: &Path) -> Result<PathBuf, String> {
+pub fn resolve_ffmpeg_binary(repo_root: &Path) -> CoreResult<PathBuf> {
     let mut candidate_paths = Vec::new();
 
     if let Some(env_override) =
@@ -52,10 +54,10 @@ pub fn resolve_ffmpeg_binary(repo_root: &Path) -> Result<PathBuf, String> {
         return Ok(path);
     }
 
-    Err(
+    Err(CoreError::FfmpegNotFound(
         "ffmpeg executable not found. Run pnpm install, install ffmpeg on PATH, or set OVRLEY_FFMPEG."
             .to_string(),
-    )
+    ))
 }
 
 #[cfg(windows)]
@@ -105,7 +107,7 @@ pub struct FfmpegSettings {
 /// Supported codecs are alpha-preserving formats suitable for overlay exports.
 /// Unknown keys are ignored except `output_args`, which appends raw extra args
 /// for advanced users.
-pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, String> {
+pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> CoreResult<FfmpegSettings> {
     let object = ffmpeg_config.as_object();
     let codec = object
         .and_then(|map| map.get("codec"))
@@ -317,9 +319,9 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> Result<FfmpegSettings, St
                 filters: None,
             })
         }
-        other => Err(format!(
+        other => Err(CoreError::Encode(format!(
             "Unsupported scene.ffmpeg.codec '{other}'. Supported codecs are prores_ks, prores_ks_vulkan, prores_videotoolbox, and qtrle."
-        )),
+        ))),
     }
 }
 

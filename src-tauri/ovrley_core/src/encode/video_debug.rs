@@ -9,6 +9,7 @@ use crate::commands::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::TimingBucket;
 use crate::encode::ffmpeg::suppress_child_console;
+use crate::error::{CoreError, CoreResult};
 use crate::render::LabelCacheStatus;
 use chrono::Local;
 use serde::Serialize;
@@ -75,7 +76,7 @@ pub(crate) fn concat_video_segments(
     ffmpeg_bin: &Path,
     filenames: &[String],
     output_path: &Path,
-) -> Result<(), String> {
+) -> CoreResult<()> {
     // Use ffmpeg's concat demuxer with stream copy because each segment is
     // encoded with the same settings and should not be recompressed.
     let list_path = paths
@@ -93,7 +94,10 @@ pub(crate) fn concat_video_segments(
                 .replace('\\', "/")
         ));
     }
-    fs::write(&list_path, list_content).map_err(|e| format!("Failed to write concat list: {e}"))?;
+    fs::write(&list_path, list_content).map_err(|e| CoreError::Io {
+        path: list_path.clone(),
+        source: e,
+    })?;
 
     let mut command = Command::new(ffmpeg_bin);
     suppress_child_console(&mut command);
@@ -109,14 +113,16 @@ pub(crate) fn concat_video_segments(
         .arg("-y")
         .arg(output_path)
         .status()
-        .map_err(|e| format!("Failed to run ffmpeg concat: {e}"))?;
+        .map_err(|e| CoreError::Encode(format!("Failed to run ffmpeg concat: {e}")))?;
 
     let _ = fs::remove_file(&list_path);
 
     if status.success() {
         Ok(())
     } else {
-        Err(format!("FFmpeg concat failed with status {status}"))
+        Err(CoreError::Encode(format!(
+            "FFmpeg concat failed with status {status}"
+        )))
     }
 }
 
@@ -126,7 +132,7 @@ pub(crate) fn write_prepare_summary(
     total_ms: f64,
     timings: &BTreeMap<String, TimingBucket>,
     label_cache_status: LabelCacheStatus,
-) -> Result<(), String> {
+) -> CoreResult<()> {
     let summary = PrepareTimingSummary {
         total_ms,
         timings: timings.clone(),
@@ -155,7 +161,7 @@ pub(crate) fn write_timing_summary_with_phase(
     total_time_taken: f64,
     sample_frame_indices: Vec<usize>,
     timings: BTreeMap<String, TimingBucket>,
-) -> Result<(), String> {
+) -> CoreResult<()> {
     let summary = TimingSummary {
         phase: phase.to_string(),
         timestamp: iso_timestamp_now(),
@@ -184,7 +190,7 @@ pub(crate) fn write_stitch_summary(
     segment_configs: &[RenderConfig],
     segment_reports: &[DenseActivityReport],
     filenames: &[String],
-) -> Result<(), String> {
+) -> CoreResult<()> {
     let debug_dir = create_debug_dir(paths, "phase_6_stitch")?;
     let codec = config
         .scene
@@ -227,19 +233,21 @@ pub(crate) fn write_stitch_summary(
 }
 
 /// Creates a timestamped debug directory for a render phase.
-pub(crate) fn create_debug_dir(paths: &AppPaths, phase: &str) -> Result<PathBuf, String> {
+pub(crate) fn create_debug_dir(paths: &AppPaths, phase: &str) -> CoreResult<PathBuf> {
     let dir = paths.debug_render_dir.join(phase).join(timestamp_slug()?);
-    fs::create_dir_all(&dir)
-        .map_err(|error| format!("Failed to create {}: {error}", dir.display()))?;
+    fs::create_dir_all(&dir).map_err(|error| CoreError::Io {
+        path: dir.clone(),
+        source: error,
+    })?;
     Ok(dir)
 }
 
 /// Returns the current Unix timestamp in nanoseconds.
-pub(crate) fn timestamp_nanos() -> Result<u128, String> {
+pub(crate) fn timestamp_nanos() -> CoreResult<u128> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_nanos())
-        .map_err(|error| error.to_string())
+        .map_err(|error| CoreError::Encode(error.to_string()))
 }
 
 /// Selects representative frame indexes for optional sample PNG export.
@@ -278,7 +286,7 @@ pub(crate) fn write_sample_frame(
     rgba: &[u8],
     frame_index: usize,
     input_pix_fmt: &str,
-) -> Result<(), String> {
+) -> CoreResult<()> {
     // Reuse ffmpeg for raw RGBA to PNG conversion so sample images exercise the
     // same input pixel format as the real encoder path.
     let png_path = debug_dir.join(format!("sample_{frame_index:04}.png"));
@@ -302,20 +310,24 @@ pub(crate) fn write_sample_frame(
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    let mut child = command
-        .spawn()
-        .map_err(|error| format!("Failed to spawn ffmpeg for sample frame: {error}"))?;
+    let mut child = command.spawn().map_err(|error| {
+        CoreError::Encode(format!("Failed to spawn ffmpeg for sample frame: {error}"))
+    })?;
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(rgba).map_err(|error| error.to_string())?;
+        stdin
+            .write_all(rgba)
+            .map_err(|error| CoreError::Encode(error.to_string()))?;
     }
-    let status = child.wait().map_err(|error| error.to_string())?;
+    let status = child
+        .wait()
+        .map_err(|error| CoreError::Encode(error.to_string()))?;
     if status.success() {
         Ok(())
     } else {
-        Err(format!(
+        Err(CoreError::Encode(format!(
             "Failed to write sample frame {}",
             png_path.display()
-        ))
+        )))
     }
 }
 
@@ -339,12 +351,15 @@ fn rendered_frame_count_for_summary(layout_frame_count: usize, update_rate: usiz
 }
 
 // Serializes a payload as pretty JSON and writes it to disk.
-fn write_json<T: Serialize>(path: PathBuf, payload: &T) -> Result<(), String> {
-    let json = serde_json::to_string_pretty(payload).map_err(|error| error.to_string())?;
-    fs::write(&path, json).map_err(|error| format!("Failed to write {}: {error}", path.display()))
+fn write_json<T: Serialize>(path: PathBuf, payload: &T) -> CoreResult<()> {
+    let json = serde_json::to_string_pretty(payload)?;
+    fs::write(&path, json).map_err(|error| CoreError::Io {
+        path: path.clone(),
+        source: error,
+    })
 }
 
 // Builds a filesystem-safe timestamp slug for debug directories/files.
-fn timestamp_slug() -> Result<String, String> {
+fn timestamp_slug() -> CoreResult<String> {
     Ok(timestamp_nanos()?.to_string())
 }

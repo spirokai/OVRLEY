@@ -15,6 +15,7 @@ use crate::encode::ffmpeg::resolve_ffmpeg_binary;
 use crate::encode::fps::Fps;
 use crate::encode::video::{render_composite_video, render_video, RenderController};
 use crate::encode::video_pipeline::rendered_frame_count;
+use crate::error::{CoreError, CoreResult};
 use serde::Serialize;
 use serde_json::{json, Value};
 use skia_safe::FontMgr;
@@ -91,15 +92,17 @@ impl AppPaths {
     }
 
     /// Ensures all runtime-writable directories exist.
-    pub fn ensure_dirs(&self) -> Result<(), String> {
+    pub fn ensure_dirs(&self) -> CoreResult<()> {
         for dir in [
             &self.debug_render_dir,
             &self.temp_dir,
             &self.user_templates_dir,
             &self.downloads_dir,
         ] {
-            fs::create_dir_all(dir)
-                .map_err(|error| format!("Failed to create {}: {error}", dir.display()))?;
+            fs::create_dir_all(dir).map_err(|error| CoreError::Io {
+                path: dir.clone(),
+                source: error,
+            })?;
         }
         Ok(())
     }
@@ -175,7 +178,7 @@ pub fn backend_render(
     controller: &RenderController,
     config_json: &str,
     parsed_activity_json: &str,
-) -> Result<Value, String> {
+) -> CoreResult<Value> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
     if is_composite_render(&config) {
@@ -202,8 +205,8 @@ pub fn backend_render(
         ) {
             Ok(filename) => controller_clone.finish_success(filename),
             Err(error) => {
-                let cancelled = error.to_lowercase().contains("cancelled");
-                controller_clone.finish_error(error, cancelled);
+                let cancelled = matches!(error, CoreError::Cancelled);
+                controller_clone.finish_error(error.to_string(), cancelled);
             }
         }
     });
@@ -218,7 +221,8 @@ pub fn backend_render(
 ///
 /// Composite mode is intentionally gated only by `composite_video_path` so
 /// transparent exports continue through their existing path unchanged.
-pub fn is_composite_render(config: &RenderConfig) -> bool { // test seam
+pub fn is_composite_render(config: &RenderConfig) -> bool {
+    // test seam
     config.scene.composite_video_path.is_some()
 }
 
@@ -231,7 +235,7 @@ fn backend_render_composite_phase3(
     controller: &RenderController,
     mut config: RenderConfig,
     parsed_activity: ParsedActivity,
-) -> Result<Value, String> {
+) -> CoreResult<Value> {
     let plan = derive_composite_render_plan(&config)?;
     apply_composite_scene_timing(&mut config, &plan);
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
@@ -262,8 +266,8 @@ fn backend_render_composite_phase3(
         ) {
             Ok(filename) => controller_clone.finish_success(filename),
             Err(error) => {
-                let cancelled = error.to_lowercase().contains("cancelled");
-                controller_clone.finish_error(error, cancelled);
+                let cancelled = matches!(error, CoreError::Cancelled);
+                controller_clone.finish_error(error.to_string(), cancelled);
             }
         }
     });
@@ -279,7 +283,8 @@ fn backend_render_composite_phase3(
 /// These values drive dense-report timing and later phases will pass them to
 /// the composite FFmpeg pipeline without reinterpreting sync offset as seek.
 #[derive(Clone, Debug, PartialEq)]
-pub struct CompositeRenderPlan { // test seam
+pub struct CompositeRenderPlan {
+    // test seam
     pub video_path: String,
     pub bitrate: String,
     pub sync_offset: f64,
@@ -295,55 +300,58 @@ pub struct CompositeRenderPlan { // test seam
 ///
 /// Required fields fail before dense activity is built, while optional fields
 /// receive the Phase 3 defaults from the implementation plan.
-pub fn derive_composite_render_plan(config: &RenderConfig) -> Result<CompositeRenderPlan, String> { // test seam
+pub fn derive_composite_render_plan(config: &RenderConfig) -> CoreResult<CompositeRenderPlan> {
+    // test seam
     let video_path = config
         .scene
         .composite_video_path
         .as_ref()
         .filter(|value| !value.trim().is_empty())
         .cloned()
-        .ok_or_else(|| "scene.composite_video_path required for composite render".to_string())?;
+        .ok_or_else(|| {
+            CoreError::Config("scene.composite_video_path required for composite render".into())
+        })?;
     let bitrate = config
         .scene
         .composite_bitrate
         .as_ref()
         .filter(|value| !value.trim().is_empty())
         .cloned()
-        .ok_or_else(|| "scene.composite_bitrate required for composite render".to_string())?;
-    let fps_num = config
-        .scene
-        .composite_video_fps_num
-        .ok_or_else(|| "scene.composite_video_fps_num required for composite render".to_string())?;
-    let fps_den = config
-        .scene
-        .composite_video_fps_den
-        .ok_or_else(|| "scene.composite_video_fps_den required for composite render".to_string())?;
+        .ok_or_else(|| {
+            CoreError::Config("scene.composite_bitrate required for composite render".into())
+        })?;
+    let fps_num = config.scene.composite_video_fps_num.ok_or_else(|| {
+        CoreError::Config("scene.composite_video_fps_num required for composite render".into())
+    })?;
+    let fps_den = config.scene.composite_video_fps_den.ok_or_else(|| {
+        CoreError::Config("scene.composite_video_fps_den required for composite render".into())
+    })?;
     let source_fps = Fps::new(fps_num, fps_den)?;
     let video_duration = config.scene.composite_video_duration.ok_or_else(|| {
-        "scene.composite_video_duration required for composite render".to_string()
+        CoreError::Config("scene.composite_video_duration required for composite render".into())
     })?;
     if !video_duration.is_finite() || video_duration <= 0.0 {
-        return Err(format!(
+        return Err(CoreError::Config(format!(
             "scene.composite_video_duration must be greater than zero: {video_duration}"
-        ));
+        )));
     }
 
     let sync_offset = config.scene.composite_sync_offset.unwrap_or(0.0);
     if !sync_offset.is_finite() || sync_offset < 0.0 {
-        return Err(format!(
+        return Err(CoreError::Config(format!(
             "scene.composite_sync_offset must be zero or greater: {sync_offset}"
-        ));
+        )));
     }
     let trim_start = config.scene.composite_video_trim_start.unwrap_or(0.0);
     if !trim_start.is_finite() || trim_start < 0.0 {
-        return Err(format!(
+        return Err(CoreError::Config(format!(
             "scene.composite_video_trim_start must be zero or greater: {trim_start}"
-        ));
+        )));
     }
     if trim_start >= video_duration {
-        return Err(format!(
+        return Err(CoreError::Config(format!(
             "scene.composite_video_trim_start ({trim_start}) must be less than scene.composite_video_duration ({video_duration})"
-        ));
+        )));
     }
 
     let update_rate = config
@@ -357,9 +365,9 @@ pub fn derive_composite_render_plan(config: &RenderConfig) -> Result<CompositeRe
         .composite_render_duration
         .unwrap_or(video_duration - trim_start);
     if !render_duration.is_finite() || render_duration <= 0.0 {
-        return Err(format!(
+        return Err(CoreError::Config(format!(
             "scene.composite_render_duration must be greater than zero: {render_duration}"
-        ));
+        )));
     }
 
     Ok(CompositeRenderPlan {
@@ -379,7 +387,8 @@ pub fn derive_composite_render_plan(config: &RenderConfig) -> Result<CompositeRe
 ///
 /// This keeps persisted template timing untouched while aligning dense frames
 /// with the lower-FPS overlay stream used by compositing mode.
-pub fn apply_composite_scene_timing(config: &mut RenderConfig, plan: &CompositeRenderPlan) { // test seam
+pub fn apply_composite_scene_timing(config: &mut RenderConfig, plan: &CompositeRenderPlan) {
+    // test seam
     config.scene.start = plan.sync_offset;
     config.scene.end = plan.sync_offset + plan.render_duration;
     config.scene.fps = plan.overlay_pipe_fps.as_f64();
@@ -408,7 +417,7 @@ pub fn backend_cancel(controller: &RenderController) -> Value {
 ///
 /// Built-in templates are de-duplicated by filename, while user templates are
 /// exposed with a `user:` id prefix to avoid collisions.
-pub fn backend_list_templates(paths: &AppPaths) -> Result<Value, String> {
+pub fn backend_list_templates(paths: &AppPaths) -> CoreResult<Value> {
     let mut templates = Vec::new();
     let mut seen = BTreeSet::new();
 
@@ -462,7 +471,7 @@ pub fn backend_list_templates(paths: &AppPaths) -> Result<Value, String> {
 }
 
 /// Reads a template by built-in filename, user-prefixed id, or unqualified id.
-pub fn backend_get_template(paths: &AppPaths, filename: &str) -> Result<String, String> {
+pub fn backend_get_template(paths: &AppPaths, filename: &str) -> CoreResult<String> {
     let (source, normalized) = parse_template_id(filename);
     let template_path = match source {
         TemplateSource::User => paths.user_template_path(&normalized),
@@ -471,25 +480,29 @@ pub fn backend_get_template(paths: &AppPaths, filename: &str) -> Result<String, 
             .bundled_template_path(&normalized)
             .or_else(|| paths.user_template_path(&normalized)),
     }
-    .ok_or_else(|| format!("Template not found: {normalized}"))?;
+    .ok_or_else(|| CoreError::Config(format!("Template not found: {normalized}")))?;
 
-    fs::read_to_string(&template_path)
-        .map_err(|error| format!("Failed to read {}: {error}", template_path.display()))
+    fs::read_to_string(&template_path).map_err(|error| CoreError::Io {
+        path: template_path.clone(),
+        source: error,
+    })
 }
 
 /// Opens the public downloads directory in the system file browser.
-pub fn backend_open_downloads(paths: &AppPaths) -> Result<Value, String> {
+pub fn backend_open_downloads(paths: &AppPaths) -> CoreResult<Value> {
     open_path_in_system(&paths.downloads_dir)?;
     Ok(json!({ "message": "Folder opened" }))
 }
 
 /// Opens a rendered video from the downloads directory.
-pub fn backend_open_video(paths: &AppPaths, filename: &str) -> Result<Value, String> {
+pub fn backend_open_video(paths: &AppPaths, filename: &str) -> CoreResult<Value> {
     let downloads_path = paths.downloads_dir.join(filename);
     let target = if downloads_path.is_file() {
         downloads_path
     } else {
-        return Err(format!("Video file not found: {filename}"));
+        return Err(CoreError::Config(format!(
+            "Video file not found: {filename}"
+        )));
     };
 
     open_path_in_system(&target)?;
@@ -599,14 +612,16 @@ fn downloads_ovrley_dir() -> PathBuf {
 }
 
 // Opens a filesystem path with the operating system's default file launcher.
-fn open_path_in_system(path: &Path) -> Result<(), String> {
+fn open_path_in_system(path: &Path) -> CoreResult<()> {
     // Use native platform launchers rather than shell invocation so paths with
     // spaces are passed as arguments and not interpreted as command text.
     if cfg!(windows) {
         Command::new("explorer")
             .arg(path)
             .spawn()
-            .map_err(|error| format!("Failed to open {}: {error}", path.display()))?;
+            .map_err(|error| {
+                CoreError::Encode(format!("Failed to open {}: {error}", path.display()))
+            })?;
         return Ok(());
     }
 
@@ -620,29 +635,30 @@ fn open_path_in_system(path: &Path) -> Result<(), String> {
         cmd
     };
 
-    let status = command
-        .status()
-        .map_err(|error| format!("Failed to open {}: {error}", path.display()))?;
+    let status = command.status().map_err(|error| {
+        CoreError::Encode(format!("Failed to open {}: {error}", path.display()))
+    })?;
 
     if status.success() {
         Ok(())
     } else {
-        Err(format!("Failed to open {}", path.display()))
+        Err(CoreError::Encode(format!(
+            "Failed to open {}",
+            path.display()
+        )))
     }
 }
 
 /// Probes a video file and returns its metadata.
-pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> Result<Value, String> {
+pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
     use crate::encode::video_probe::probe_video;
     let metadata = probe_video(&paths.repo_root, file_path)?;
-    serde_json::to_value(&metadata).map_err(|e| format!("Serialization error: {}", e))
+    serde_json::to_value(&metadata).map_err(CoreError::Serialization)
 }
 
 /// Detects ffmpeg encoders and hardware acceleration methods available locally.
-pub fn backend_detect_codecs(paths: &AppPaths) -> Result<Value, String> {
+pub fn backend_detect_codecs(paths: &AppPaths) -> CoreResult<Value> {
     use crate::encode::codec_detect::detect_codecs;
     let codecs = detect_codecs(&paths.repo_root)?;
-    serde_json::to_value(&codecs).map_err(|e| format!("Serialization error: {}", e))
+    serde_json::to_value(&codecs).map_err(CoreError::Serialization)
 }
-
-

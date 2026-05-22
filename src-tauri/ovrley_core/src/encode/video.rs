@@ -16,6 +16,7 @@ use crate::encode::video_composite_pipeline::render_composite_video_single;
 use crate::encode::video_debug::{concat_video_segments, timestamp_nanos, write_stitch_summary};
 use crate::encode::video_pipeline::render_video_single;
 pub use crate::encode::video_pipeline::rendered_frame_count;
+use crate::error::{CoreError, CoreResult};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -71,13 +72,15 @@ impl RenderController {
     ///
     /// On success this resets cancellation state, creates a new render id, and
     /// initializes progress totals. Concurrent starts fail fast.
-    pub fn try_start(&self, total_frames: u32, message: &str) -> Result<u64, String> {
+    pub fn try_start(&self, total_frames: u32, message: &str) -> CoreResult<u64> {
         if self
             .running
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_err()
         {
-            return Err("A render is already in progress".to_string());
+            return Err(CoreError::Encode(
+                "A render is already in progress".to_string(),
+            ));
         }
         self.cancel_flag.store(false, Ordering::SeqCst);
         let render_id = self.next_render_id.fetch_add(1, Ordering::SeqCst) as u64 + 1;
@@ -157,7 +160,8 @@ impl RenderController {
     }
 
     /// Returns the shared cancellation flag for internal worker coordination.
-    pub fn cancel_flag(&self) -> Arc<AtomicBool> { // test seam
+    pub fn cancel_flag(&self) -> Arc<AtomicBool> {
+        // test seam
         self.cancel_flag.clone()
     }
 }
@@ -171,9 +175,11 @@ pub fn run_parallel_renders(
     configs: Vec<RenderConfig>,
     activity: &ParsedActivity,
     reports: Vec<DenseActivityReport>,
-) -> Result<Duration, String> {
+) -> CoreResult<Duration> {
     if configs.len() != reports.len() {
-        return Err("Configs and reports vectors must have the same length".to_string());
+        return Err(CoreError::Encode(
+            "Configs and reports vectors must have the same length".to_string(),
+        ));
     }
 
     let start_time = Instant::now();
@@ -186,7 +192,7 @@ pub fn run_parallel_renders(
             .enumerate()
             .collect::<VecDeque<_>>(),
     ));
-    let (result_tx, result_rx) = mpsc::channel::<(usize, Result<String, String>)>();
+    let (result_tx, result_rx) = mpsc::channel::<(usize, CoreResult<String>)>();
     let mut handles = Vec::new();
 
     for _ in 0..worker_count {
@@ -224,16 +230,16 @@ pub fn run_parallel_renders(
 
     let mut filenames = vec![None; total_jobs];
     for _ in 0..filenames.len() {
-        let (index, result) = result_rx
-            .recv()
-            .map_err(|_| "Parallel render worker channel disconnected".to_string())?;
+        let (index, result) = result_rx.recv().map_err(|_| {
+            CoreError::Encode("Parallel render worker channel disconnected".to_string())
+        })?;
         filenames[index] = Some(result?);
     }
 
     for handle in handles {
         handle
             .join()
-            .map_err(|_| "Parallel render thread panicked".to_string())?;
+            .map_err(|_| CoreError::Encode("Parallel render thread panicked".to_string()))?;
     }
 
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
@@ -243,7 +249,9 @@ pub fn run_parallel_renders(
         .into_iter()
         .collect::<Option<Vec<_>>>()
         .ok_or_else(|| {
-            "Parallel render finished without producing all output filenames".to_string()
+            CoreError::Encode(
+                "Parallel render finished without producing all output filenames".to_string(),
+            )
         })?;
     concat_video_segments(paths, &ffmpeg_bin, &filenames, &output_path)?;
 
@@ -257,7 +265,7 @@ fn estimate_parallel_render_worker_count(total_jobs: usize) -> usize {
     let logical_cores = std::thread::available_parallelism()
         .map(|value| value.get())
         .unwrap_or(4);
-    let worker_count = (logical_cores / 4 ).max(1).min(4);
+    let worker_count = (logical_cores / 4).max(1).min(4);
     worker_count.min(total_jobs.max(1))
 }
 
@@ -277,7 +285,7 @@ pub fn render_video(
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
-) -> Result<String, String> {
+) -> CoreResult<String> {
     if should_parallelize_segmented(config, dense_activity) {
         return render_video_segmented(paths, config, activity, dense_activity, controller);
     }
@@ -303,7 +311,7 @@ pub fn render_composite_video(
     composite_render_duration: Option<f64>,
     composite_video_trim_start: Option<f64>,
     composite_widget_update_rate: Option<u32>,
-) -> Result<String, String> {
+) -> CoreResult<String> {
     let render_duration = composite_render_duration
         .unwrap_or(composite_video_duration - composite_video_trim_start.unwrap_or(0.0));
     let trim_start = composite_video_trim_start.unwrap_or(0.0);
@@ -392,7 +400,7 @@ fn render_composite_video_segmented(
     render_duration: f64,
     trim_start: f64,
     update_rate: u32,
-) -> Result<String, String> {
+) -> CoreResult<String> {
     let codec = config
         .scene
         .ffmpeg
@@ -406,12 +414,20 @@ fn render_composite_video_segmented(
     let segment_count = estimate_composite_segment_count(total_overlay_frames.max(1), codec);
     if segment_count < 2 {
         return render_composite_video_single(
-            paths, config, activity, dense_activity, controller,
-            composite_video_path, composite_bitrate,
+            paths,
+            config,
+            activity,
+            dense_activity,
+            controller,
+            composite_video_path,
+            composite_bitrate,
             composite_sync_offset,
-            composite_video_fps_num, composite_video_fps_den,
+            composite_video_fps_num,
+            composite_video_fps_den,
             composite_video_duration,
-            Some(render_duration), Some(trim_start), Some(update_rate),
+            Some(render_duration),
+            Some(trim_start),
+            Some(update_rate),
         );
     }
 
@@ -424,12 +440,20 @@ fn render_composite_video_segmented(
     );
     if segments.len() < 2 {
         return render_composite_video_single(
-            paths, config, activity, dense_activity, controller,
-            composite_video_path, composite_bitrate,
+            paths,
+            config,
+            activity,
+            dense_activity,
+            controller,
+            composite_video_path,
+            composite_bitrate,
             composite_sync_offset,
-            composite_video_fps_num, composite_video_fps_den,
+            composite_video_fps_num,
+            composite_video_fps_den,
             composite_video_duration,
-            Some(render_duration), Some(trim_start), Some(update_rate),
+            Some(render_duration),
+            Some(trim_start),
+            Some(update_rate),
         );
     }
 
@@ -441,12 +465,20 @@ fn render_composite_video_segmented(
     let actual_segment_count = segments.len();
     if actual_segment_count < 2 {
         return render_composite_video_single(
-            paths, config, activity, dense_activity, controller,
-            composite_video_path, composite_bitrate,
+            paths,
+            config,
+            activity,
+            dense_activity,
+            controller,
+            composite_video_path,
+            composite_bitrate,
             composite_sync_offset,
-            composite_video_fps_num, composite_video_fps_den,
+            composite_video_fps_num,
+            composite_video_fps_den,
             composite_video_duration,
-            Some(render_duration), Some(trim_start), Some(update_rate),
+            Some(render_duration),
+            Some(trim_start),
+            Some(update_rate),
         );
     }
 
@@ -455,13 +487,11 @@ fn render_composite_video_segmented(
     let child_cancel_flag = controller.cancel_flag();
     let segment_controllers: Vec<RenderController> = segment_output_frames
         .iter()
-        .map(|frames| {
-            child_render_controller(*frames, &child_cancel_flag)
-        })
+        .map(|frames| child_render_controller(*frames, &child_cancel_flag))
         .collect();
 
     enum SegmentEvent {
-        Completed(usize, Result<String, String>),
+        Completed(usize, CoreResult<String>),
     }
 
     let (tx, rx) = mpsc::channel::<SegmentEvent>();
@@ -505,21 +535,15 @@ fn render_composite_video_segmented(
 
     let mut results = vec![None; actual_segment_count];
     let mut completed = 0usize;
-    let mut first_error: Option<String> = None;
+    let mut first_error: Option<CoreError> = None;
 
     while completed < actual_segment_count {
         let progress_snapshots = segment_controllers
             .iter()
             .map(RenderController::progress)
             .collect::<Vec<_>>();
-        let current = progress_snapshots
-            .iter()
-            .map(|p| p.current)
-            .sum::<u32>();
-        let encoded = progress_snapshots
-            .iter()
-            .map(|p| p.encoded)
-            .sum::<u32>();
+        let current = progress_snapshots.iter().map(|p| p.current).sum::<u32>();
+        let encoded = progress_snapshots.iter().map(|p| p.encoded).sum::<u32>();
         let estimate = progress_snapshots
             .iter()
             .filter_map(|p| p.estimated_seconds_remaining)
@@ -549,9 +573,9 @@ fn render_composite_video_segmented(
     }
 
     for handle in handles {
-        handle
-            .join()
-            .map_err(|_| "Composite segment render thread panicked".to_string())?;
+        handle.join().map_err(|_| {
+            CoreError::Encode("Composite segment render thread panicked".to_string())
+        })?;
     }
 
     if let Some(error) = first_error {
@@ -561,7 +585,7 @@ fn render_composite_video_segmented(
 
     if controller.cancel_flag().load(Ordering::SeqCst) {
         cleanup_segment_outputs(paths, &results);
-        return Err("Rendering cancelled".to_string());
+        return Err(CoreError::Cancelled);
     }
 
     let segment_filenames: Option<Vec<String>> = results.iter().cloned().collect();
@@ -569,16 +593,25 @@ fn render_composite_video_segmented(
         Some(filenames) => filenames,
         None => {
             cleanup_segment_outputs(paths, &results);
-            return Err("Composite segment render did not produce all output files".to_string());
+            return Err(CoreError::Encode(
+                "Composite segment render did not produce all output files".to_string(),
+            ));
         }
     };
 
-    controller.set_frame_progress(combined_frames, combined_frames, combined_frames, Some(0), None);
+    controller.set_frame_progress(
+        combined_frames,
+        combined_frames,
+        combined_frames,
+        Some(0),
+        None,
+    );
 
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let public_filename = format!("video_composited_{}.mp4", timestamp_nanos()?);
     let output_path = paths.downloads_dir.join(&public_filename);
-    if let Err(error) = concat_video_segments(paths, &ffmpeg_bin, &segment_filenames, &output_path) {
+    if let Err(error) = concat_video_segments(paths, &ffmpeg_bin, &segment_filenames, &output_path)
+    {
         cleanup_segment_outputs(paths, &results);
         return Err(error);
     }
@@ -587,14 +620,16 @@ fn render_composite_video_segmented(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct CompositeSegmentWindow { // test seam
+pub struct CompositeSegmentWindow {
+    // test seam
     pub output_start_frame: u32,
     pub output_end_frame: u32,
     pub video_start_seconds: f64,
     pub render_duration_seconds: f64,
 }
 
-pub fn composite_output_frame_windows( // test seam
+pub fn composite_output_frame_windows(
+    // test seam
     total_output_frames: u32,
     render_duration: f64,
     source_fps: Fps,
@@ -634,7 +669,10 @@ pub fn composite_output_frame_windows( // test seam
 }
 
 // Returns whether rendering should be split into stitched segments.
-fn should_parallelize_segmented(config: &RenderConfig, dense_activity: &DenseActivityReport) -> bool {
+fn should_parallelize_segmented(
+    config: &RenderConfig,
+    dense_activity: &DenseActivityReport,
+) -> bool {
     // qtrle and prores_ks_vulkan encoding are comparatively slow and
     // stitch-friendly for integer second windows.
     config
@@ -656,7 +694,7 @@ fn render_video_segmented(
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
-) -> Result<String, String> {
+) -> CoreResult<String> {
     // Segment renders share the parent cancellation flag while maintaining
     // independent progress counters. The parent reports aggregate progress.
     let Some(total_seconds) = integer_second_duration(config) else {
@@ -706,7 +744,7 @@ fn render_video_segmented(
         .collect::<Vec<_>>();
 
     enum SegmentEvent {
-        Completed(usize, Result<String, String>),
+        Completed(usize, CoreResult<String>),
     }
 
     let (tx, rx) = mpsc::channel::<SegmentEvent>();
@@ -734,7 +772,7 @@ fn render_video_segmented(
 
     let mut results = vec![None; actual_segment_count];
     let mut completed = 0usize;
-    let mut first_error: Option<String> = None;
+    let mut first_error: Option<CoreError> = None;
 
     while completed < actual_segment_count {
         let progress_snapshots = segment_controllers
@@ -780,7 +818,7 @@ fn render_video_segmented(
     for handle in handles {
         handle
             .join()
-            .map_err(|_| "Segmented render thread panicked".to_string())?;
+            .map_err(|_| CoreError::Encode("Segmented render thread panicked".to_string()))?;
     }
 
     if let Some(error) = first_error {
@@ -790,7 +828,7 @@ fn render_video_segmented(
 
     if controller.cancel_flag().load(Ordering::SeqCst) {
         cleanup_segment_outputs(paths, &results);
-        return Err("Rendering cancelled".to_string());
+        return Err(CoreError::Cancelled);
     }
 
     let segment_filenames = results
@@ -799,7 +837,7 @@ fn render_video_segmented(
         .collect::<Option<Vec<_>>>()
         .ok_or_else(|| {
             cleanup_segment_outputs(paths, &results);
-            "Segmented render did not produce all output files".to_string()
+            CoreError::Encode("Segmented render did not produce all output files".to_string())
         })?;
 
     controller.set_frame_progress(
@@ -895,4 +933,3 @@ fn cleanup_segment_outputs(paths: &AppPaths, results: &[Option<String>]) {
         let _ = std::fs::remove_file(paths.downloads_dir.join(filename));
     }
 }
-

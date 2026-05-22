@@ -6,6 +6,7 @@
 use crate::debug::TimingBucket;
 use crate::encode::ffmpeg_composite::CompositeFfmpegSettings;
 use crate::encode::fps::Fps;
+use crate::error::{CoreError, CoreResult};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -71,7 +72,8 @@ struct CompositeDiagnostics {
 }
 
 /// Immutable inputs needed to write a Phase 7 composite timing summary.
-pub struct CompositeTimingSummaryInput<'a> { // test seam
+pub struct CompositeTimingSummaryInput<'a> {
+    // test seam
     pub debug_render_dir: &'a Path,
     pub ffmpeg_settings: &'a CompositeFfmpegSettings,
     pub output_path: &'a Path,
@@ -97,18 +99,17 @@ pub struct CompositeTimingSummaryInput<'a> { // test seam
 ///
 /// The summary is stored under `debug/timings/phase_7/<video-id>/timing_summary.json`
 /// and includes rational FPS values, frame counts, timings, and FFmpeg diagnostics.
-pub fn write_composite_timing_summary( // test seam
+pub fn write_composite_timing_summary(
+    // test seam
     input: CompositeTimingSummaryInput<'_>,
-) -> Result<PathBuf, String> {
+) -> CoreResult<PathBuf> {
     let debug_dir = input
         .debug_render_dir
         .join("phase_7")
         .join(composite_debug_id(input.output_path));
-    fs::create_dir_all(&debug_dir).map_err(|error| {
-        format!(
-            "Failed to create composite debug directory {}: {error}",
-            debug_dir.display()
-        )
+    fs::create_dir_all(&debug_dir).map_err(|error| CoreError::Io {
+        path: debug_dir.clone(),
+        source: error,
     })?;
 
     let performance = composite_performance_summary(
@@ -154,13 +155,10 @@ pub fn write_composite_timing_summary( // test seam
     };
 
     let summary_path = debug_dir.join("timing_summary.json");
-    let json = serde_json::to_string_pretty(&summary)
-        .map_err(|error| format!("Failed to serialize composite timing summary: {error}"))?;
-    fs::write(&summary_path, json).map_err(|error| {
-        format!(
-            "Failed to write composite timing summary {}: {error}",
-            summary_path.display()
-        )
+    let json = serde_json::to_string_pretty(&summary)?;
+    fs::write(&summary_path, json).map_err(|error| CoreError::Io {
+        path: summary_path.clone(),
+        source: error,
     })?;
     Ok(summary_path)
 }

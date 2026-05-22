@@ -19,6 +19,7 @@ pub mod value; // test seam
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
+use crate::error::CoreResult;
 
 pub(crate) use elevation::draw_elevation_widget;
 pub(crate) use route::draw_route_widget;
@@ -36,7 +37,7 @@ pub fn prepare_render_assets(
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     prepare_profiler: &mut RenderProfiler,
-) -> Result<PreparedRenderAssets, String> {
+) -> CoreResult<PreparedRenderAssets> {
     let mut assets = PreparedRenderAssets::default();
 
     if let Some(route_plot) = config.course_plot()? {

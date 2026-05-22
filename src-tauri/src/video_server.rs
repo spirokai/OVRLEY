@@ -41,12 +41,14 @@ pub struct PreviewVideoState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ByteRange { // test seam
+pub struct ByteRange {
+    // test seam
     pub start: u64,
     pub end: u64,
 }
 
-pub enum ParsedRange { // test seam
+pub enum ParsedRange {
+    // test seam
     Valid(ByteRange),
     Unsatisfiable,
     Ignore,
@@ -388,7 +390,8 @@ fn header(name: &str, value: impl Into<String>) -> Result<Header, String> {
 /// The parser supports open-ended, bounded, suffix, and comma-separated range
 /// headers. Multipart requests use the first range only, which matches the
 /// preview server's single-client/browser-focused requirements.
-pub fn parse_range(header: Option<&str>, file_size: u64) -> ParsedRange { // test seam
+pub fn parse_range(header: Option<&str>, file_size: u64) -> ParsedRange {
+    // test seam
     let Some(header) = header else {
         return ParsedRange::Ignore;
     };
@@ -457,4 +460,3 @@ impl<R: Read> Read for ChunkedRead<R> {
         self.inner.read(&mut buf[..len])
     }
 }
-

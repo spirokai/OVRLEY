@@ -5,6 +5,7 @@
 //! values reuse the same typefaces across many frames.
 
 use crate::config::{LabelConfig, SceneConfig, ValueConfig};
+use crate::MetricKind;
 use skia_safe::{
     image_filters,
     paint::{Join, Style},
@@ -108,7 +109,7 @@ pub fn label_style(scene: &SceneConfig, label: &LabelConfig, scale: f32) -> Reso
 
 /// Resolves a dynamic value style from scene defaults and value overrides.
 pub fn value_style(scene: &SceneConfig, value: &ValueConfig, scale: f32) -> ResolvedTextStyle {
-    let base_y = if value.value == "gradient" {
+    let base_y = if value.value == MetricKind::Gradient {
         value.y
     } else {
         value.y + value.value_offset.unwrap_or(0.0)

@@ -53,11 +53,7 @@ fn ffprobe_fixture_has_duration_and_format() {
     let probe: serde_json::Value = serde_json::from_str(&json_text).unwrap();
 
     let format = &probe["format"];
-    let duration: f64 = format["duration"]
-        .as_str()
-        .unwrap()
-        .parse()
-        .unwrap();
+    let duration: f64 = format["duration"].as_str().unwrap().parse().unwrap();
 
     assert!(duration > 0.0);
     assert!(duration < 120.0);

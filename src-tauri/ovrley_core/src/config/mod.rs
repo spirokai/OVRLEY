@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+use crate::error::{CoreError, CoreResult};
+use crate::types::MetricKind;
+
 /// Global render settings shared by labels, metric values, plots, and ffmpeg.
 ///
 /// Coordinates are in canvas pixels before applying `scale`. Most style fields
@@ -169,7 +172,7 @@ pub struct LabelConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ValueConfig {
     /// Metric key, such as `speed`, `power`, `time`, or `gradient`.
-    pub value: String,
+    pub value: MetricKind,
     /// Left position in canvas pixels.
     pub x: f32,
     /// Top position in canvas pixels.
@@ -485,37 +488,44 @@ pub struct ElevationPlotConfig {
 ///
 /// Validation focuses on constraints that would otherwise break frame timing:
 /// positive integer FPS, update-rate divisibility, and non-empty scene ranges.
-pub fn parse_config_json(input: &str) -> Result<RenderConfig, String> {
-    let config: RenderConfig =
-        serde_json::from_str(input).map_err(|error| format!("Invalid config JSON: {error}"))?;
+pub fn parse_config_json(input: &str) -> CoreResult<RenderConfig> {
+    let config: RenderConfig = serde_json::from_str(input)
+        .map_err(|error| CoreError::Config(format!("config JSON: {error}")))?;
     if config.scene.fps <= 0.0 {
-        return Err(format!("Invalid scene.fps: {}", config.scene.fps));
+        return Err(CoreError::Config(format!(
+            "scene.fps: {}",
+            config.scene.fps
+        )));
     }
     if (config.scene.fps.fract()).abs() > f64::EPSILON {
-        return Err(format!(
+        return Err(CoreError::Config(format!(
             "scene.fps must be an integer for widget update rate support: {}",
             config.scene.fps
-        ));
+        )));
     }
     if let Some(update_rate) = config.scene.update_rate {
         if update_rate == 0 {
-            return Err("scene.update_rate must be at least 1".to_string());
+            return Err(CoreError::Config(
+                "scene.update_rate must be at least 1".into(),
+            ));
         }
         let fps = config.scene.fps.round() as u32;
         if !fps.is_multiple_of(update_rate) {
-            return Err(format!(
+            return Err(CoreError::Config(format!(
                 "scene.update_rate ({update_rate}) must cleanly divide scene.fps ({fps})"
-            ));
+            )));
         }
     }
     if matches!(config.scene.composite_widget_update_rate, Some(0)) {
-        return Err("scene.composite_widget_update_rate must be at least 1".to_string());
+        return Err(CoreError::Config(
+            "scene.composite_widget_update_rate must be at least 1".into(),
+        ));
     }
     if config.scene.end <= config.scene.start {
-        return Err(format!(
-            "Invalid scene range. scene.end ({}) must be greater than scene.start ({})",
+        return Err(CoreError::Config(format!(
+            "scene range. scene.end ({}) must be greater than scene.start ({})",
             config.scene.end, config.scene.start
-        ));
+        )));
     }
     Ok(config)
 }
@@ -535,20 +545,19 @@ impl RenderConfig {
     ///
     /// Metric values enable their direct series. Plot widgets also request
     /// distance progress and any source series required to build their geometry.
-    pub fn render_data_requirements(&self) -> Result<RenderDataRequirements, String> {
+    pub fn render_data_requirements(&self) -> CoreResult<RenderDataRequirements> {
         let mut requirements = RenderDataRequirements::default();
 
         for value in &self.values {
-            match value.value.as_str() {
-                "speed" => requirements.speed = true,
-                "elevation" => requirements.elevation = true,
-                "gradient" => requirements.gradient = true,
-                "heartrate" => requirements.heartrate = true,
-                "cadence" => requirements.cadence = true,
-                "power" => requirements.power = true,
-                "temperature" => requirements.temperature = true,
-                "time" => requirements.time = true,
-                _ => {}
+            match value.value {
+                MetricKind::Speed => requirements.speed = true,
+                MetricKind::Elevation => requirements.elevation = true,
+                MetricKind::Gradient => requirements.gradient = true,
+                MetricKind::Heartrate => requirements.heartrate = true,
+                MetricKind::Cadence => requirements.cadence = true,
+                MetricKind::Power => requirements.power = true,
+                MetricKind::Temperature => requirements.temperature = true,
+                MetricKind::Time => requirements.time = true,
             }
         }
 
@@ -565,17 +574,17 @@ impl RenderConfig {
     }
 
     /// Returns the course plot config if present.
-    pub fn course_plot(&self) -> Result<Option<CoursePlotConfig>, String> {
+    pub fn course_plot(&self) -> CoreResult<Option<CoursePlotConfig>> {
         self.parse_plot("course")
     }
 
     /// Returns the elevation plot config if present.
-    pub fn elevation_plot(&self) -> Result<Option<ElevationPlotConfig>, String> {
+    pub fn elevation_plot(&self) -> CoreResult<Option<ElevationPlotConfig>> {
         self.parse_plot("elevation")
     }
 
     /// Parses one plot entry from the legacy object/array `plots` container.
-    fn parse_plot<T>(&self, value_key: &str) -> Result<Option<T>, String>
+    fn parse_plot<T>(&self, value_key: &str) -> CoreResult<Option<T>>
     where
         T: for<'de> Deserialize<'de>,
     {
@@ -584,7 +593,7 @@ impl RenderConfig {
         };
         serde_json::from_value(raw_plot.clone())
             .map(Some)
-            .map_err(|error| format!("Invalid {value_key} plot config: {error}"))
+            .map_err(|error| CoreError::Config(format!("{value_key} plot config: {error}")))
     }
 }
 
@@ -610,4 +619,3 @@ fn find_plot_value<'a>(plots: &'a Value, value_key: &str) -> Option<&'a Value> {
         _ => None,
     }
 }
-

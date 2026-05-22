@@ -12,7 +12,7 @@ The refactor must improve structure **without changing how the application works
 
 ## Prompt
 
-Read and execute the Phase 1 refactor plan in `.agents/backend-refactor-Phase1-DSPro.md`.
+Read and execute the Phase 2 refactor plan in `.agents/backend-refactor-Phase2.md`.
 
 Rules:
 

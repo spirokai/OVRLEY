@@ -75,8 +75,8 @@ fn main() -> Result<(), String> {
     let config_json = fs::read_to_string(&config_path)
         .map_err(|error| format!("Failed to read {}: {error}", config_path.display()))?;
 
-    let activity = parse_activity_json(&payload_json)?;
-    let mut config = parse_config_json(&config_json)?;
+    let activity = parse_activity_json(&payload_json).map_err(|e| e.to_string())?;
+    let mut config = parse_config_json(&config_json).map_err(|e| e.to_string())?;
     set_ffmpeg_string(&mut config, "codec", read_optional_arg("--codec", &args))?;
     set_ffmpeg_string(
         &mut config,
@@ -103,16 +103,20 @@ fn main() -> Result<(), String> {
         "threads",
         read_optional_arg("--threads", &args),
     )?;
-    let dense_activity = build_dense_activity_report(&activity, &config)?;
+    let dense_activity =
+        build_dense_activity_report(&activity, &config).map_err(|e| e.to_string())?;
     let paths = AppPaths::from_repo_root(repo_root()?);
-    paths.ensure_dirs()?;
+    paths.ensure_dirs().map_err(|e| e.to_string())?;
 
     let controller = RenderController::default();
-    controller.try_start(
-        dense_activity.frame_count as u32,
-        "Preparing render assets...",
-    )?;
-    let filename = render_video(&paths, &config, &activity, &dense_activity, &controller)?;
+    controller
+        .try_start(
+            dense_activity.frame_count as u32,
+            "Preparing render assets...",
+        )
+        .map_err(|e| e.to_string())?;
+    let filename = render_video(&paths, &config, &activity, &dense_activity, &controller)
+        .map_err(|e| e.to_string())?;
     controller.finish_success(filename.clone());
     println!("{{\"filename\":\"{filename}\"}}");
     Ok(())

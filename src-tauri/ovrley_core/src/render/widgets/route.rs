@@ -23,6 +23,7 @@ use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
 use crate::config::{CoursePlotConfig, RenderConfig, RenderDataRequirements};
 use crate::debug::RenderProfiler;
+use crate::error::{CoreError, CoreResult};
 use crate::render::surface::create_surface;
 use skia_safe::Canvas;
 use std::time::Instant;
@@ -34,7 +35,7 @@ pub(crate) fn prepare_route_cache(
     dense_activity: &DenseActivityReport,
     plot: &CoursePlotConfig,
     prepare_profiler: &mut RenderProfiler,
-) -> Result<RouteWidgetCache, String> {
+) -> CoreResult<RouteWidgetCache> {
     // Build all expensive geometry and frame-position data once before the
     // render loop. Per-frame drawing then only composites cached/static pieces.
     let prepare_started = Instant::now();
@@ -208,11 +209,13 @@ fn normalize_route_plot(config: &RenderConfig, plot: &CoursePlotConfig) -> Norma
 fn build_route_geometry(
     plot: &NormalizedRoutePlot,
     route_samples: &[RouteSample],
-) -> Result<WidgetGeometry, String> {
+) -> CoreResult<WidgetGeometry> {
     // Downsample before RDP simplification to cap work for long activities while
     // preserving visually important points.
     if route_samples.len() < 2 {
-        return Err("Route plot requires at least two valid course points".to_string());
+        return Err(CoreError::Render(
+            "Route plot requires at least two valid course points".into(),
+        ));
     }
     let projected = route_samples
         .iter()
@@ -255,7 +258,7 @@ fn build_route_geometry(
 fn build_route_remaining_layer(
     plot: &NormalizedRoutePlot,
     geometry: &WidgetGeometry,
-) -> Result<Option<StaticLayer>, String> {
+) -> CoreResult<Option<StaticLayer>> {
     if geometry.points.len() < 2 {
         return Ok(None);
     }
@@ -339,7 +342,7 @@ fn build_route_samples(
     config: &RenderConfig,
     activity: &ParsedActivity,
     show_full_activity: bool,
-) -> Result<Vec<RouteSample>, String> {
+) -> CoreResult<Vec<RouteSample>> {
     // `show_full_activity` overrides custom export trimming so the full route
     // remains visible while progress can still follow the selected scene.
     if show_full_activity || !custom_export_range_active(config) {

@@ -6,7 +6,9 @@ use ovrley_core::encode::video::RenderController;
 #[ignore = "Requires render pipeline to be running for state transitions"]
 fn start_immediate_cancel_cancels_cleanly() {
     let controller = RenderController::default();
-    controller.try_start(100, "test_start_immediate_cancel").unwrap();
+    controller
+        .try_start(100, "test_start_immediate_cancel")
+        .unwrap();
 
     assert_eq!(controller.progress().status, "running");
 

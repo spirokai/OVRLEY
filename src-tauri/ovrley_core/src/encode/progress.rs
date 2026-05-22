@@ -14,7 +14,8 @@ const WARMUP_FRAMES: u32 = 5;
 
 /// Exponential moving average estimator for remaining render time and FPS.
 #[derive(Debug, Clone)]
-pub struct ProgressEstimator { // test seam
+pub struct ProgressEstimator {
+    // test seam
     ema_seconds_per_frame: Option<f64>,
     smoothing_factor: f64,
     warmup_counter: u32,
@@ -30,7 +31,8 @@ impl ProgressEstimator {
     const DEFAULT_SMOOTHING_FACTOR: f64 = 0.85;
 
     /// Creates an estimator with the given EMA smoothing factor.
-    pub fn new(smoothing_factor: f64) -> Self { // test seam
+    pub fn new(smoothing_factor: f64) -> Self {
+        // test seam
         Self {
             ema_seconds_per_frame: None,
             smoothing_factor: smoothing_factor.clamp(0.0, 1.0),
@@ -43,7 +45,8 @@ impl ProgressEstimator {
     /// Returns `(None, None)` during the warmup phase so the UI shows `--:--`.
     /// After warmup, blends frame timing with wall-clock throughput for a
     /// stable, conservative estimate that converges in ~20–30 frames.
-    pub fn record( // test seam
+    pub fn record(
+        // test seam
         &mut self,
         current: u32,
         total: u32,
@@ -102,4 +105,3 @@ impl Default for ProgressEstimator {
         Self::new(Self::DEFAULT_SMOOTHING_FACTOR)
     }
 }
-

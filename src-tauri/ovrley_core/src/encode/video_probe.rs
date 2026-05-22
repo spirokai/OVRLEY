@@ -1,4 +1,5 @@
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
+use crate::error::{CoreError, CoreResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::Path;
@@ -30,7 +31,7 @@ pub struct Resolution {
     pub height: u64,
 }
 
-pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, String> {
+pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadata> {
     let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
     let ffprobe_name = if cfg!(windows) {
         "ffprobe.exe"
@@ -53,17 +54,16 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> Result<VideoMetadata, S
 
     let output = command
         .output()
-        .map_err(|e| format!("Failed to run ffprobe: {e}"))?;
+        .map_err(|e| CoreError::Encode(format!("Failed to run ffprobe: {e}")))?;
 
     if !output.status.success() {
-        return Err(format!(
-            "ffprobe failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
+        return Err(CoreError::Ffmpeg {
+            status: output.status,
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        });
     }
 
-    let json: Value = serde_json::from_slice(&output.stdout)
-        .map_err(|e| format!("Failed to parse ffprobe JSON: {e}"))?;
+    let json: Value = serde_json::from_slice(&output.stdout)?;
 
     let mut metadata = VideoMetadata {
         path: file_path.to_string(),
@@ -210,7 +210,8 @@ fn read_rational_rate(stream: &Value, key: &str) -> Option<(u32, u32)> {
     (num > 0 && den > 0).then_some((num, den))
 }
 
-pub fn read_video_stream_duration(stream: &Value, fps: Option<f64>) -> Option<f64> { // test seam
+pub fn read_video_stream_duration(stream: &Value, fps: Option<f64>) -> Option<f64> {
+    // test seam
     stream
         .get("duration")
         .and_then(|v| v.as_str())
@@ -249,4 +250,3 @@ fn read_rotation_degrees(stream: &Value) -> Option<i32> {
                 })
         })
 }
-

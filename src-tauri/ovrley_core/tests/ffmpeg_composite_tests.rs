@@ -88,7 +88,9 @@ fn test_2_4_video_trim_uses_filter_side_cut_and_audio_seek_input() {
     assert_argument_pair(&built.input_2_args, "-ss", "10");
     assert_argument_pair(&built.input_2_args, "-t", "10");
     assert_argument_pair(&built.input_2_args, "-i", "test.mp4");
-    assert!(built.filter_complex.contains("trim=start=10:end=20,setpts=PTS-STARTPTS,"));
+    assert!(built
+        .filter_complex
+        .contains("trim=start=10:end=20,setpts=PTS-STARTPTS,"));
 }
 
 #[test]
@@ -151,7 +153,9 @@ fn test_2_7a_video_trim_is_filter_side_even_without_input_seek() {
     );
 
     assert!(!has_argument_pair(&built.input_0_args, "-ss", "0"));
-    assert!(built.filter_complex.contains("trim=start=0:end=10,setpts=PTS-STARTPTS,"));
+    assert!(built
+        .filter_complex
+        .contains("trim=start=0:end=10,setpts=PTS-STARTPTS,"));
     assert!(built.output_args.iter().any(|arg| arg == "-shortest"));
 }
 
@@ -180,8 +184,8 @@ fn validates_zero_direct_fps_values() {
     .unwrap_err();
 
     assert_eq!(
-        error,
-        "Composite source FPS numerator must be greater than zero"
+        error.to_string(),
+        "Encoding error: Composite source FPS numerator must be greater than zero"
     );
 }
 
@@ -259,8 +263,8 @@ fn test_8_4_nvenc_hevc_unavailable_fails_clearly() {
     .unwrap_err();
 
     assert_eq!(
-        error,
-        "Requested hardware encoder hevc_nvenc is unavailable."
+        error.to_string(),
+        "Encoding error: Requested hardware encoder hevc_nvenc is unavailable."
     );
 }
 
@@ -302,8 +306,8 @@ fn test_8_6_videotoolbox_hevc_unavailable_fails_clearly() {
     .unwrap_err();
 
     assert_eq!(
-        error,
-        "Requested hardware encoder hevc_videotoolbox is unavailable."
+        error.to_string(),
+        "Encoding error: Requested hardware encoder hevc_videotoolbox is unavailable."
     );
 }
 
@@ -368,9 +372,11 @@ fn test_8_7b_amf_hevc_unavailable_fails_clearly() {
     )
     .unwrap_err();
 
-    assert_eq!(error, "Requested hardware encoder hevc_amf is unavailable.");
+    assert_eq!(
+        error.to_string(),
+        "Encoding error: Requested hardware encoder hevc_amf is unavailable."
+    );
 }
-
 
 #[test]
 fn test_8_8_automatic_h264_uses_software_fallback() {
@@ -452,9 +458,9 @@ fn test_9_1_cuda_full_profile_requires_cuda_filter_stack() {
     )
     .unwrap_err();
 
-    assert!(error.contains("overlay_cuda"));
-    assert!(error.contains("scale_cuda"));
-    assert!(error.contains("hwupload"));
+    assert!(error.to_string().contains("overlay_cuda"));
+    assert!(error.to_string().contains("scale_cuda"));
+    assert!(error.to_string().contains("hwupload"));
 }
 
 #[test]
@@ -530,9 +536,9 @@ fn test_9_5_qsv_full_profile_requires_qsv_filter_stack() {
     )
     .unwrap_err();
 
-    assert!(error.contains("overlay_qsv"));
-    assert!(error.contains("scale_qsv"));
-    assert!(error.contains("hwupload"));
+    assert!(error.to_string().contains("overlay_qsv"));
+    assert!(error.to_string().contains("scale_qsv"));
+    assert!(error.to_string().contains("hwupload"));
 }
 
 #[test]
@@ -573,9 +579,9 @@ fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
     assert!(built
         .filter_complex
         .contains("scale_qsv=w=3840:h=2160:format=nv12[main_hw]"));
-    assert!(built.filter_complex.contains(
-        "[1:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=64[overlay_hw]"
-    ));
+    assert!(built
+        .filter_complex
+        .contains("[1:v]setpts=PTS-STARTPTS,hwupload=extra_hw_frames=64[overlay_hw]"));
     assert!(built.filter_complex.contains("overlay_qsv"));
     assert!(!built.filter_complex.contains("hwdownload"));
     assert_argument_pair(&built.output_args, "-c:v", "h264_qsv");
@@ -604,7 +610,7 @@ fn test_9_6_qsv_full_profile_requires_detected_init_args() {
     )
     .unwrap_err();
 
-    assert!(error.contains("QSV hardware-device init args"));
+    assert!(error.to_string().contains("QSV hardware-device init args"));
 }
 
 #[test]

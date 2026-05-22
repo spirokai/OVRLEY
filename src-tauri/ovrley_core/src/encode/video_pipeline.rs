@@ -16,6 +16,7 @@ use crate::encode::video_debug::{
     create_debug_dir, render_sample_frames_enabled, sample_frame_indices, write_prepare_summary,
     write_sample_frame, write_timing_summary_with_phase,
 };
+use crate::error::{CoreError, CoreResult};
 use crate::render::{prepare_preview_assets, render_frame_rgba, RenderTarget};
 use std::collections::BTreeMap;
 use std::fs;
@@ -51,7 +52,7 @@ pub(crate) fn render_video_single(
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
-) -> Result<String, String> {
+) -> CoreResult<String> {
     // The render loop is the producer; ffmpeg stdin is the consumer. A bounded
     // frame queue plus a free-buffer pool limit peak memory while allowing
     // encoder IO to overlap with Skia rendering.
@@ -93,7 +94,7 @@ pub(crate) fn render_video_single(
             .send(FrameBuffer {
                 pixels: vec![0u8; frame_byte_len],
             })
-            .map_err(|_| "Failed to initialize frame buffer pool".to_string())?;
+            .map_err(|_| CoreError::Encode("Failed to initialize frame buffer pool".to_string()))?;
     }
     let mut child = spawn_ffmpeg_process(
         &ffmpeg_bin,
@@ -108,11 +109,11 @@ pub(crate) fn render_video_single(
     let stderr = child
         .stderr
         .take()
-        .ok_or_else(|| "Failed to capture ffmpeg stderr".to_string())?;
+        .ok_or_else(|| CoreError::Encode("Failed to capture ffmpeg stderr".to_string()))?;
     let stdin = child
         .stdin
         .take()
-        .ok_or_else(|| "Failed to capture ffmpeg stdin".to_string())?;
+        .ok_or_else(|| CoreError::Encode("Failed to capture ffmpeg stdin".to_string()))?;
     let encoded_frames_for_monitor = encoded_frames.clone();
     let monitor_thread = thread::spawn(move || monitor_ffmpeg(stderr, encoded_frames_for_monitor));
     let cancel_flag_for_writer = cancel_flag.clone();
@@ -127,13 +128,18 @@ pub(crate) fn render_video_single(
     let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let mut estimator = ProgressEstimator::default();
     let mut rendered_frames = 0u32;
-    let render_result = (|| -> Result<(), String> {
+    let render_result = (|| -> CoreResult<()> {
         for output_frame_index in 0..(total_frames as usize) {
             if cancel_flag.load(Ordering::SeqCst) {
                 break;
             }
-            if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
-                return Err(format!("ffmpeg exited unexpectedly with status {status}"));
+            if let Some(status) = child
+                .try_wait()
+                .map_err(|error| CoreError::Encode(format!("ffmpeg process error: {error}")))?
+            {
+                return Err(CoreError::Encode(format!(
+                    "ffmpeg exited unexpectedly with status {status}"
+                )));
             }
 
             let frame_started = Instant::now();
@@ -192,11 +198,13 @@ pub(crate) fn render_video_single(
     drop(sender);
     let writer_result = writer_thread
         .join()
-        .map_err(|_| "Encoder writer thread panicked".to_string())??;
+        .map_err(|_| CoreError::Encode("Encoder writer thread panicked".to_string()))??;
     monitor_thread
         .join()
-        .map_err(|_| "FFmpeg monitor thread panicked".to_string())?;
-    let status = child.wait().map_err(|error| error.to_string())?;
+        .map_err(|_| CoreError::Encode("FFmpeg monitor thread panicked".to_string()))?;
+    let status = child
+        .wait()
+        .map_err(|error| CoreError::Encode(error.to_string()))?;
 
     if let Err(error) = render_result {
         let _ = fs::remove_file(&output_path);
@@ -205,18 +213,20 @@ pub(crate) fn render_video_single(
     if cancel_flag.load(Ordering::SeqCst) {
         let _ = child.kill();
         let _ = fs::remove_file(&output_path);
-        return Err("Rendering cancelled".to_string());
+        return Err(CoreError::Cancelled);
     }
     if !status.success() {
         let _ = fs::remove_file(&output_path);
-        return Err(format!("ffmpeg encoding failed ({status})"));
+        return Err(CoreError::Encode(format!(
+            "ffmpeg encoding failed ({status})"
+        )));
     }
     if writer_result.written_frames != total_frames {
         let _ = fs::remove_file(&output_path);
-        return Err(format!(
+        return Err(CoreError::Encode(format!(
             "ffmpeg encode pipeline ended early: wrote {} of {} frames",
             writer_result.written_frames, total_frames
-        ));
+        )));
     }
 
     let total_time_taken = render_started.elapsed().as_secs_f64();
@@ -285,14 +295,14 @@ fn queue_frame(
     frame_buffer: FrameBuffer,
     cancel_flag: &AtomicBool,
     profiler: &mut RenderProfiler,
-) -> Result<(), String> {
+) -> CoreResult<()> {
     // `try_send` lets us poll the cancel flag while waiting for encoder
     // backpressure to clear.
     let started = Instant::now();
     let mut payload = frame_buffer;
     loop {
         if cancel_flag.load(Ordering::SeqCst) {
-            return Err("Rendering cancelled".to_string());
+            return Err(CoreError::Cancelled);
         }
         match sender.try_send(payload) {
             Ok(()) => {
@@ -304,7 +314,7 @@ fn queue_frame(
                 thread::sleep(Duration::from_millis(10));
             }
             Err(TrySendError::Disconnected(_)) => {
-                return Err("Encoder queue disconnected".to_string());
+                return Err(CoreError::Encode("Encoder queue disconnected".to_string()));
             }
         }
     }
@@ -319,7 +329,7 @@ fn spawn_ffmpeg_process(
     height: u32,
     fps: f64,
     input_pix_fmt: &str,
-) -> Result<std::process::Child, String> {
+) -> CoreResult<std::process::Child> {
     // Feed rawvideo via stdin to avoid writing intermediary frame files. All
     // arguments are separate argv entries, so user paths are not shell-expanded.
     let mut command = Command::new(ffmpeg_bin);
@@ -364,7 +374,7 @@ fn spawn_ffmpeg_process(
 
     command
         .spawn()
-        .map_err(|error| format!("Could not start ffmpeg: {error}"))
+        .map_err(|error| CoreError::Encode(format!("Could not start ffmpeg: {error}")))
 }
 
 // Writes queued frame buffers into ffmpeg stdin and returns buffers to the pool.
@@ -373,7 +383,7 @@ fn writer_worker(
     receiver: Receiver<FrameBuffer>,
     free_sender: SyncSender<FrameBuffer>,
     cancel_flag: Arc<AtomicBool>,
-) -> Result<WriterResult, String> {
+) -> CoreResult<WriterResult> {
     // The writer owns ffmpeg stdin. It returns buffers to the free pool after a
     // successful write so the renderer can reuse allocations across frames.
     let mut profiler = RenderProfiler::default();
@@ -400,9 +410,9 @@ fn writer_worker(
             break;
         }
         let write_started = Instant::now();
-        stdin
-            .write_all(frame.pixels.as_slice())
-            .map_err(|error| format!("Failed writing frame to ffmpeg: {error}"))?;
+        stdin.write_all(frame.pixels.as_slice()).map_err(|error| {
+            CoreError::Encode(format!("Failed writing frame to ffmpeg: {error}"))
+        })?;
         profiler.record_ms(
             "ffmpeg.write",
             write_started.elapsed().as_secs_f64() * 1000.0,
@@ -411,13 +421,15 @@ fn writer_worker(
         let release_started = Instant::now();
         free_sender
             .send(frame)
-            .map_err(|_| "Frame buffer pool disconnected".to_string())?;
+            .map_err(|_| CoreError::Encode("Frame buffer pool disconnected".to_string()))?;
         profiler.record_ms(
             "buffer.release_wait",
             release_started.elapsed().as_secs_f64() * 1000.0,
         );
     }
-    stdin.flush().map_err(|error| error.to_string())?;
+    stdin
+        .flush()
+        .map_err(|error| CoreError::Encode(error.to_string()))?;
     Ok(WriterResult {
         written_frames,
         timings: profiler.summary(),
@@ -474,13 +486,13 @@ fn acquire_frame_buffer(
     receiver: &Receiver<FrameBuffer>,
     cancel_flag: &AtomicBool,
     profiler: &mut RenderProfiler,
-) -> Result<FrameBuffer, String> {
+) -> CoreResult<FrameBuffer> {
     // Timeout polling gives cancellation a chance to interrupt even when all
     // buffers are currently held by the writer/encoder.
     let started = Instant::now();
     loop {
         if cancel_flag.load(Ordering::SeqCst) {
-            return Err("Rendering cancelled".to_string());
+            return Err(CoreError::Cancelled);
         }
         match receiver.recv_timeout(Duration::from_millis(25)) {
             Ok(buffer) => {
@@ -492,7 +504,9 @@ fn acquire_frame_buffer(
             }
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => {
-                return Err("Frame buffer pool disconnected".to_string());
+                return Err(CoreError::Encode(
+                    "Frame buffer pool disconnected".to_string(),
+                ));
             }
         }
     }

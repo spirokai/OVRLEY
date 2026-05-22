@@ -7,6 +7,7 @@
 
 use crate::activity::schema::DenseActivityReport;
 use crate::config::{RenderConfig, ValueConfig};
+use crate::MetricKind;
 use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
 
 /// Built-in metric icon kinds supported by value widgets.
@@ -58,11 +59,11 @@ pub fn format_value(
     dense_activity: &DenseActivityReport,
     frame_index: usize,
 ) -> String {
-    let raw = raw_value(value_config.value.as_str(), dense_activity, frame_index);
-    let mut formatted = match value_config.value.as_str() {
-        "speed" => format_speed(config, value_config, raw),
-        "temperature" => format_temperature(config, value_config, raw),
-        "time" => format_time(
+    let raw = raw_value(value_config.value, dense_activity, frame_index);
+    let mut formatted = match value_config.value {
+        MetricKind::Speed => format_speed(config, value_config, raw),
+        MetricKind::Temperature => format_temperature(config, value_config, raw),
+        MetricKind::Time => format_time(
             config,
             value_config,
             dense_activity
@@ -71,8 +72,8 @@ pub fn format_value(
                 .get(frame_index)
                 .and_then(|value| value.as_deref()),
         ),
-        "gradient" => format_gradient(config, value_config, raw),
-        "elevation" => format_elevation(config, value_config, raw),
+        MetricKind::Gradient => format_gradient(config, value_config, raw),
+        MetricKind::Elevation => format_elevation(config, value_config, raw),
         _ => format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
     };
 
@@ -87,47 +88,51 @@ pub fn format_value(
 }
 
 // Looks up one raw numeric sample by metric key and frame index.
-fn raw_value(key: &str, dense_activity: &DenseActivityReport, frame_index: usize) -> Option<f64> {
+fn raw_value(
+    key: MetricKind,
+    dense_activity: &DenseActivityReport,
+    frame_index: usize,
+) -> Option<f64> {
     // Series vectors may be empty when the template did not request them.
     // Treat out-of-range and absent values as missing.
     match key {
-        "speed" => dense_activity
+        MetricKind::Speed => dense_activity
             .series
             .speed
             .get(frame_index)
             .copied()
             .flatten(),
-        "elevation" => dense_activity
+        MetricKind::Elevation => dense_activity
             .series
             .elevation
             .get(frame_index)
             .copied()
             .flatten(),
-        "gradient" => dense_activity
+        MetricKind::Gradient => dense_activity
             .series
             .gradient
             .get(frame_index)
             .copied()
             .flatten(),
-        "heartrate" => dense_activity
+        MetricKind::Heartrate => dense_activity
             .series
             .heartrate
             .get(frame_index)
             .copied()
             .flatten(),
-        "cadence" => dense_activity
+        MetricKind::Cadence => dense_activity
             .series
             .cadence
             .get(frame_index)
             .copied()
             .flatten(),
-        "power" => dense_activity
+        MetricKind::Power => dense_activity
             .series
             .power
             .get(frame_index)
             .copied()
             .flatten(),
-        "temperature" => dense_activity
+        MetricKind::Temperature => dense_activity
             .series
             .temperature
             .get(frame_index)
@@ -146,9 +151,9 @@ pub fn format_metric_parts(
 ) -> Option<MetricDisplayParts> {
     // Metric widgets need the value and units separately so units can be drawn
     // at a smaller size while sharing the same raw telemetry formatting rules.
-    let raw = raw_value(value_config.value.as_str(), dense_activity, frame_index);
-    let (mut value_text, unit_text, icon_kind) = match value_config.value.as_str() {
-        "speed" => {
+    let raw = raw_value(value_config.value, dense_activity, frame_index);
+    let (mut value_text, unit_text, icon_kind) = match value_config.value {
+        MetricKind::Speed => {
             let unit = speed_units(value_config).to_string();
             let value_text = raw
                 .map(|speed_mps| {
@@ -167,7 +172,7 @@ pub fn format_metric_parts(
             let unit_text = value_config.show_units.unwrap_or(true).then_some(unit);
             (value_text, unit_text, Some(MetricIconKind::Gauge))
         }
-        "temperature" => {
+        MetricKind::Temperature => {
             let unit = value_config
                 .temperature_unit
                 .as_deref()
@@ -201,7 +206,7 @@ pub fn format_metric_parts(
             };
             (value_text, unit_text, Some(MetricIconKind::Thermometer))
         }
-        "heartrate" => (
+        MetricKind::Heartrate => (
             format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
             value_config
                 .show_units
@@ -209,7 +214,7 @@ pub fn format_metric_parts(
                 .then_some("BPM".to_string()),
             Some(MetricIconKind::Heart),
         ),
-        "cadence" => (
+        MetricKind::Cadence => (
             format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
             value_config
                 .show_units
@@ -217,7 +222,7 @@ pub fn format_metric_parts(
                 .then_some("RPM".to_string()),
             Some(MetricIconKind::RefreshCw),
         ),
-        "power" => (
+        MetricKind::Power => (
             format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
             value_config
                 .show_units
@@ -225,7 +230,7 @@ pub fn format_metric_parts(
                 .then_some("W".to_string()),
             Some(MetricIconKind::Zap),
         ),
-        "time" => (
+        MetricKind::Time => (
             format_time(
                 config,
                 value_config,
@@ -253,7 +258,7 @@ pub fn format_metric_parts(
         unit_text,
         show_icon: value_config
             .show_icon
-            .unwrap_or(value_config.value != "gradient"),
+            .unwrap_or(value_config.value != MetricKind::Gradient),
         icon_kind,
     })
 }
@@ -375,7 +380,8 @@ fn format_time(config: &RenderConfig, value_config: &ValueConfig, raw: Option<&s
 }
 
 // Applies one of the built-in date/time format presets.
-pub fn format_time_key<Tz>(format_key: &str, value: DateTime<Tz>) -> String // test seam
+pub fn format_time_key<Tz>(format_key: &str, value: DateTime<Tz>) -> String
+// test seam
 where
     Tz: TimeZone,
     Tz::Offset: std::fmt::Display,
@@ -496,4 +502,3 @@ fn missing_value_with_units(show_units: bool, units: &str) -> String {
         "--".to_string()
     }
 }
-

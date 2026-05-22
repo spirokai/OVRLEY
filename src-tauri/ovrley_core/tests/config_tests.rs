@@ -135,9 +135,10 @@ fn rejects_zero_composite_widget_update_rate() {
     )
     .unwrap_err();
 
-    assert_eq!(
-        error,
-        "scene.composite_widget_update_rate must be at least 1"
+    let error_msg = error.to_string();
+    assert!(
+        error_msg.contains("scene.composite_widget_update_rate must be at least 1"),
+        "got: '{error_msg}'"
     );
 }
 
@@ -160,7 +161,10 @@ fn valid_composite_config_preserves_fields() {
     let json = std::fs::read_to_string(common::test_config::composite_config_path()).unwrap();
     let config = parse_config_json(&json).unwrap();
 
-    assert_eq!(config.scene.composite_video_path.as_deref(), Some("test.mp4"));
+    assert_eq!(
+        config.scene.composite_video_path.as_deref(),
+        Some("test.mp4")
+    );
     assert_eq!(config.scene.composite_bitrate.as_deref(), Some("60M"));
     assert_eq!(config.scene.composite_sync_offset, Some(300.0));
     assert_eq!(config.scene.composite_widget_update_rate, Some(2));
@@ -169,11 +173,13 @@ fn valid_composite_config_preserves_fields() {
 #[test]
 fn invalid_json_reports_error() {
     let json = std::fs::read_to_string(
-        common::test_config::fixtures().join("config").join("invalid.json"),
+        common::test_config::fixtures()
+            .join("config")
+            .join("invalid.json"),
     )
     .unwrap();
     let error = parse_config_json(&json).unwrap_err();
-    assert!(!error.is_empty());
+    assert!(!error.to_string().is_empty());
 }
 
 #[test]

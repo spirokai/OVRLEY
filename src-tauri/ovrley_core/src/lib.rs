@@ -18,5 +18,12 @@ pub mod config;
 pub mod debug;
 /// Video encoding and ffmpeg integration.
 pub mod encode;
+/// Structured error types and result alias used by all core modules.
+pub mod error;
 /// Skia-based overlay rendering.
 pub mod render;
+/// Cross-cutting domain types (MetricKind, etc.) shared by config, render, and activity.
+pub mod types;
+
+pub use error::{CoreError, CoreResult};
+pub use types::MetricKind;

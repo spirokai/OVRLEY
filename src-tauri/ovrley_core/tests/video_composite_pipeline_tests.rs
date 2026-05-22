@@ -231,7 +231,7 @@ fn test_5_9_invalid_dense_frame_range_fails_clearly() {
 
     let error = dense_frame_index_for_overlay(&config, &dense_activity, &plan, 600.0).unwrap_err();
 
-    assert!(error.contains("outside dense activity range"));
+    assert!(error.to_string().contains("outside dense activity range"));
 }
 
 #[test]
@@ -640,7 +640,8 @@ fn render_fixture_composite_with_paths(
         Some(render_duration),
         Some(0.0),
         Some(update_rate),
-    )?;
+    )
+    .map_err(|e| e.to_string())?;
     let output_path = paths.downloads_dir.join(filename);
     let output_size = fs::metadata(&output_path)
         .map_err(|error| format!("Failed to read output metadata: {error}"))?
@@ -755,16 +756,28 @@ fn test_parallel_composite_render_2_segments() {
     let activity = fixture_activity();
     let dense = build_dense_activity_report(&activity, &config).unwrap();
     let controller = RenderController::default();
-    controller.try_start(dense.frame_count as u32, "test_parallel_2").unwrap();
+    controller
+        .try_start(dense.frame_count as u32, "test_parallel_2")
+        .unwrap();
 
     let video_path = common::test_config::sample_video_path()
         .to_string_lossy()
         .to_string();
     let result = ovrley_core::encode::video::render_composite_video(
-        &paths, &config, &activity, &dense, &controller,
-        &video_path, "10M",
-        0.0, 30000, 1001, 35.0,
-        Some(5.0), Some(0.0), Some(1),
+        &paths,
+        &config,
+        &activity,
+        &dense,
+        &controller,
+        &video_path,
+        "10M",
+        0.0,
+        30000,
+        1001,
+        35.0,
+        Some(5.0),
+        Some(0.0),
+        Some(1),
     );
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
@@ -781,16 +794,28 @@ fn test_parallel_composite_render_with_audio() {
     let activity = fixture_activity();
     let dense = build_dense_activity_report(&activity, &config).unwrap();
     let controller = RenderController::default();
-    controller.try_start(dense.frame_count as u32, "test_parallel_audio").unwrap();
+    controller
+        .try_start(dense.frame_count as u32, "test_parallel_audio")
+        .unwrap();
 
     let video_path = common::test_config::sample_video_path()
         .to_string_lossy()
         .to_string();
     let result = ovrley_core::encode::video::render_composite_video(
-        &paths, &config, &activity, &dense, &controller,
-        &video_path, "10M",
-        0.0, 30000, 1001, 35.0,
-        Some(5.0), Some(15.0), Some(1),
+        &paths,
+        &config,
+        &activity,
+        &dense,
+        &controller,
+        &video_path,
+        "10M",
+        0.0,
+        30000,
+        1001,
+        35.0,
+        Some(5.0),
+        Some(15.0),
+        Some(1),
     );
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();

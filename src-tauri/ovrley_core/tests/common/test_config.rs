@@ -42,10 +42,7 @@ pub fn test_1080p_video_path() -> PathBuf {
 }
 
 pub fn workspace_root() -> PathBuf {
-    repo_root()
-        .parent()
-        .unwrap()
-        .to_path_buf()
+    repo_root().parent().unwrap().to_path_buf()
 }
 
 pub fn repo_git_root() -> PathBuf {

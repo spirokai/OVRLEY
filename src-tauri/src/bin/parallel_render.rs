@@ -37,14 +37,14 @@ fn main() -> Result<(), String> {
     let _ = estimate_max_parallelism();
     let root = repo_root()?;
     let paths = AppPaths::from_repo_root(root.clone());
-    paths.ensure_dirs()?;
+    paths.ensure_dirs().map_err(|e| e.to_string())?;
 
     let payload_path = root.join("debug/activities/Test_FIT-parse-debug.json");
 
     println!("Loading payload: {}", payload_path.display());
     let payload_json = fs::read_to_string(&payload_path)
         .map_err(|error| format!("Failed to read payload: {error}"))?;
-    let activity = parse_activity_json(&payload_json)?;
+    let activity = parse_activity_json(&payload_json).map_err(|e| e.to_string())?;
 
     println!("Loading configs...");
     let mut configs = Vec::new();
@@ -54,15 +54,16 @@ fn main() -> Result<(), String> {
         let config_path = root.join(format!("templates/parallel{}.json", i));
         let config_json = fs::read_to_string(&config_path)
             .map_err(|error| format!("Failed to read config{}: {error}", i))?;
-        let config = parse_config_json(&config_json)?;
-        let dense = build_dense_activity_report(&activity, &config)?;
+        let config = parse_config_json(&config_json).map_err(|e| e.to_string())?;
+        let dense = build_dense_activity_report(&activity, &config).map_err(|e| e.to_string())?;
         configs.push(config);
         reports.push(dense);
     }
 
     println!("Starting parallel renders (2 sessions)...");
     let duration =
-        ovrley_core::encode::video::run_parallel_renders(&paths, configs, &activity, reports)?;
+        ovrley_core::encode::video::run_parallel_renders(&paths, configs, &activity, reports)
+            .map_err(|e| e.to_string())?;
 
     println!("\nTotal execution time: {:.2}s", duration.as_secs_f64());
 
