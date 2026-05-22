@@ -10,10 +10,10 @@ Replace `Result<T, String>` with structured `CoreError`/`CoreResult<T>` and repl
 
 Before starting Phase 2, Phase 1 must be complete:
 
-- [ ] All tests are in dedicated `tests/` directories (no inline `#[cfg(test)] mod tests`, no `#[path]`)
-- [ ] Shared test config (`tests/common/test_config.rs`) exists and is used by all tests
-- [ ] `cargo test` passes
-- [ ] No production behavior changed
+- [x] All tests are in dedicated `tests/` directories (no inline `#[cfg(test)] mod tests`, no `#[path]`)
+- [x] Shared test config (`tests/common/test_config.rs`) exists and is used by all tests
+- [x] `cargo test` passes
+- [x] No production behavior changed
 
 If Phase 1 is incomplete, stop and complete it first. Phase 2 builds on the test safety net created in Phase 1.
 
@@ -829,18 +829,18 @@ cargo fmt -- --check
 
 After completing all steps, manually verify:
 
-- [ ] App starts (Tauri window opens)
-- [ ] Load an existing template — no error
-- [ ] Save a template — no error
-- [ ] Import a GPX/FIT file — activity parses correctly
-- [ ] Preview render works — overlay displays on video
-- [ ] Render transparent overlay — output file created, valid
-- [ ] Render composite MP4 — output file created, valid
-- [ ] Cancel a render — cancellation works, UI updates correctly
-- [ ] Error messages in frontend are readable (not raw Rust debug output like `CoreError::Config("...")`)
-- [ ] Metric display in preview matches previous behavior (speed, HR, elevation, etc. show correct values with correct formatting)
-- [ ] Old saved templates with `"metric": "speed"` strings still load
-- [ ] All metric types display correctly in the preview overlay
+- [x] App starts (Tauri window opens)
+- [x] Load an existing template — no error
+- [x] Save a template — no error
+- [x] Import a GPX/FIT file — activity parses correctly
+- [x] Preview render works — overlay displays on video
+- [x] Render transparent overlay — output file created, valid
+- [x] Render composite MP4 — output file created, valid
+- [x] Cancel a render — cancellation works, UI updates correctly
+- [x] Error messages in frontend are readable (not raw Rust debug output like `CoreError::Config("...")`)
+- [x] Metric display in preview matches previous behavior (speed, HR, elevation, etc. show correct values with correct formatting)
+- [x] Old saved templates with `"metric": "speed"` strings still load
+- [x] All metric types display correctly in the preview overlay
 
 **If any manual test fails, stop and fix before proceeding.** Do not mark Phase 2 complete with broken behavior.
 
@@ -867,19 +867,19 @@ config → activity → render → encode → commands
 
 ## Completion Criteria
 
-- [ ] `cargo fmt` passes
-- [ ] `cargo test` passes (all tests, including new Phase 2 tests)
+- [x] `cargo fmt` passes
+- [x] `cargo test` passes (all tests, including new Phase 2 tests)
 - [ ] `cargo clippy -- -D warnings` passes
-- [ ] Zero functions in `ovrley_core` return `Result<T, String>` (only `CoreResult<T>`)
-- [ ] Tauri commands in `src-tauri/src/lib.rs` still return `Result<String, String>` (unchanged signature)
-- [ ] All metric string matching in business logic replaced with `MetricKind` enum matching
-- [ ] Metric string literals (`"speed"`, `"heartrate"`, etc.) remain ONLY at serde boundaries (`#[serde(rename)]`)
-- [ ] Serde round-trip tests for `MetricKind` pass
-- [ ] Error display tests pass, including `Cancelled` containing `"cancelled"`
-- [ ] Frontend receives readable error messages (`.to_string()` on `CoreError`)
-- [ ] No production behavior changed
-- [ ] No new circular dependencies introduced
-- [ ] `error.rs` and `types.rs` are clean, documented, and follow master plan conventions
+- [x] Zero functions in `ovrley_core` return `Result<T, String>` (only `CoreResult<T>`)
+- [x] Tauri commands in `src-tauri/src/lib.rs` still return `Result<String, String>` (unchanged signature)
+- [x] All metric string matching in business logic replaced with `MetricKind` enum matching
+- [x] Metric string literals (`"speed"`, `"heartrate"`, etc.) remain ONLY at serde boundaries (`#[serde(rename)]`)
+- [x] Serde round-trip tests for `MetricKind` pass
+- [x] Error display tests pass, including `Cancelled` containing `"cancelled"`
+- [x] Frontend receives readable error messages (`.to_string()` on `CoreError`)
+- [x] No production behavior changed
+- [x] No new circular dependencies introduced
+- [x] `error.rs` and `types.rs` are clean, documented, and follow master plan conventions
 
 ---
 
@@ -948,19 +948,19 @@ If Phase 1 did not fully migrate all inline tests, the `#[cfg(test)]` modules in
 
 ## Summary Checklist Before Marking Phase 2 Complete
 
-1. [ ] `thiserror` added to Cargo.toml
-2. [ ] `error.rs` created with `CoreError` and `CoreResult`
-3. [ ] `types.rs` created with `MetricKind`
-4. [ ] `lib.rs` updated with module declarations and re-exports
-5. [ ] All `Result<T, String>` in `ovrley_core` migrated to `CoreResult<T>`
-6. [ ] All metric string matching replaced with `MetricKind`
-7. [ ] Tauri boundary updated (`.to_string()` conversion)
-8. [ ] Cancellation detection uses `matches!(CoreError::Cancelled)` not string matching
-9. [ ] New tests added and passing
+1. [x] `thiserror` added to Cargo.toml
+2. [x] `error.rs` created with `CoreError` and `CoreResult`
+3. [x] `types.rs` created with `MetricKind`
+4. [x] `lib.rs` updated with module declarations and re-exports
+5. [x] All `Result<T, String>` in `ovrley_core` migrated to `CoreResult<T>`
+6. [x] All metric string matching replaced with `MetricKind`
+7. [x] Tauri boundary updated (`.to_string()` conversion)
+8. [x] Cancellation detection uses `matches!(CoreError::Cancelled)` not string matching
+9. [x] New tests added and passing
 10. [ ] `cargo fmt`, `cargo test`, `cargo clippy -- -D warnings` all pass
-11. [ ] Manual testing checklist (Step 17) complete
-12. [ ] No behavior changes (except intentional unknown-metric rejection)
-13. [ ] No new `#[allow(...)]` suppressions
-14. [ ] No circular dependencies
-15. [ ] `error.rs` Display messages are user-readable
-16. [ ] `MetricKind` serde names match existing JSON exactly
+11. [x] Manual testing checklist (Step 17) complete
+12. [x] No behavior changes (except intentional unknown-metric rejection)
+13. [x] No new `#[allow(...)]` suppressions
+14. [x] No circular dependencies
+15. [x] `error.rs` Display messages are user-readable
+16. [x] `MetricKind` serde names match existing JSON exactly
