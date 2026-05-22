@@ -7,7 +7,6 @@
 
 use crate::activity::build_dense_activity_report;
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
@@ -17,6 +16,7 @@ use crate::encode::video_debug::{concat_video_segments, timestamp_nanos, write_s
 use crate::encode::video_pipeline::render_video_single;
 pub use crate::encode::video_pipeline::rendered_frame_count;
 use crate::error::{CoreError, CoreResult};
+use crate::paths::AppPaths;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};

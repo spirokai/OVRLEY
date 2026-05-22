@@ -13,11 +13,7 @@
 /// Perpendicular distance from `point` to the line segment `start`→`end`.
 ///
 /// Returns Euclidean distance if the segment has zero length.
-pub fn perpendicular_distance(
-    point: (f32, f32),
-    start: (f32, f32),
-    end: (f32, f32),
-) -> f32 {
+pub fn perpendicular_distance(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> f32 {
     let (x0, y0) = point;
     let (x1, y1) = start;
     let (x2, y2) = end;

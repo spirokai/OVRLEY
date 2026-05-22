@@ -11,7 +11,9 @@ use std::time::{Duration, Instant};
 
 #[path = "../bin_common.rs"]
 mod common;
-use common::{format_mmss, read_optional_arg, read_positional, repo_root, resolve_path, unix_timestamp};
+use common::{
+    format_mmss, read_optional_arg, read_positional, repo_root, resolve_path, unix_timestamp,
+};
 
 #[cfg(windows)]
 extern "system" {

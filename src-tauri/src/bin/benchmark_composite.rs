@@ -15,7 +15,7 @@ mod common;
 use common::{format_mmss, read_positional, repo_root, resolve_path, unix_timestamp};
 
 const COMPOSITE_CODECS: &[(&str, &str)] = &[
-     ("software_h264", "libx264"),
+    ("software_h264", "libx264"),
     ("software_hevc", "libx265"),
     ("nvgpu_h264", "h264_nvenc"),
     ("nvgpu_hevc", "hevc_nvenc"),
@@ -65,7 +65,7 @@ fn is_composite_codec_available(codecs: &AvailableCodecs, name: &str) -> bool {
     match name {
         // "software_h264" => codecs.libx264,
         //   "software_hevc" => codecs.libx265,
-            "nvgpu_h264" => codecs.h264_nvenc,
+        "nvgpu_h264" => codecs.h264_nvenc,
         //    "nvgpu_hevc" => codecs.hevc_nvenc,
         //     "nnvgpu_h264" => codecs.nnvgpu,
         //     "nnvgpu_hevc" => codecs.nnvgpu,

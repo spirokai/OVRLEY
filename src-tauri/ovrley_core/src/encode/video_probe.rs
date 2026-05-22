@@ -164,21 +164,27 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
         .and_then(|f| f.get("tags"))
         .and_then(|t| t.get("creation_time"))
         .and_then(|v| v.as_str());
-    if let Some(t) = format_creation_time { log::debug!("Found format.tags.creation_time: {}", t); }
+    if let Some(t) = format_creation_time {
+        log::debug!("Found format.tags.creation_time: {}", t);
+    }
 
     // 2. streams[0].tags.creation_time
     let stream_creation_time = video_stream
         .and_then(|s| s.get("tags"))
         .and_then(|t| t.get("creation_time"))
         .and_then(|v| v.as_str());
-    if let Some(t) = stream_creation_time { log::debug!("Found streams[0].tags.creation_time: {}", t); }
+    if let Some(t) = stream_creation_time {
+        log::debug!("Found streams[0].tags.creation_time: {}", t);
+    }
 
     // 3. format.tags.com.apple.quicktime.creationdate
     let apple_creation_date = format
         .and_then(|f| f.get("tags"))
         .and_then(|t| t.get("com.apple.quicktime.creationdate"))
         .and_then(|v| v.as_str());
-    if let Some(t) = apple_creation_date { log::debug!("Found format.tags.com.apple.quicktime.creationdate: {}", t); }
+    if let Some(t) = apple_creation_date {
+        log::debug!("Found format.tags.com.apple.quicktime.creationdate: {}", t);
+    }
 
     metadata.creation_time = format_creation_time
         .or(stream_creation_time)

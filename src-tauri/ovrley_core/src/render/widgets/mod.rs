@@ -17,12 +17,12 @@ mod marker;
 mod polyline;
 /// Route/course widget implementation.
 mod route;
+/// Skia path and coordinate transform helpers.
+mod transform;
 /// Shared widget cache and report types.
 mod types;
 /// Metric value widgets, including icons and gradient triangles.
 pub mod value;
-/// Skia path and coordinate transform helpers.
-mod transform;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::RenderConfig;

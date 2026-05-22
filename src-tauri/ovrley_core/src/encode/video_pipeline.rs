@@ -6,7 +6,6 @@
 //! while the writer thread keeps expensive IO off the render loop.
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::encode::ffmpeg::{build_ffmpeg_settings, resolve_ffmpeg_binary, suppress_child_console};
@@ -17,6 +16,7 @@ use crate::encode::video_debug::{
     write_sample_frame, write_timing_summary_with_phase,
 };
 use crate::error::{CoreError, CoreResult};
+use crate::paths::AppPaths;
 use crate::render::{prepare_preview_assets, render_frame_rgba, RenderTarget};
 use std::collections::BTreeMap;
 use std::fs;

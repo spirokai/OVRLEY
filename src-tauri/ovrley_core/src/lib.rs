@@ -20,10 +20,10 @@ pub mod debug;
 pub mod encode;
 /// Structured error types and result alias used by all core modules.
 pub mod error;
-/// Application path configuration and resolution.
-pub mod paths;
 /// Shared interpolation utilities used by activity and render modules.
 pub mod interpolation;
+/// Application path configuration and resolution.
+pub mod paths;
 /// Shared Ramer-Douglas-Peucker line simplification.
 pub mod rdp;
 /// Skia-based overlay rendering.

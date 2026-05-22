@@ -5,11 +5,11 @@
 //! across phases without coupling the main render loop to reporting details.
 
 use crate::activity::schema::DenseActivityReport;
-use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::TimingBucket;
 use crate::encode::ffmpeg::suppress_child_console;
 use crate::error::{CoreError, CoreResult};
+use crate::paths::AppPaths;
 use crate::render::LabelCacheStatus;
 use chrono::Local;
 use serde::Serialize;

@@ -10,11 +10,12 @@ Reduce duplication (RDP, interpolation, CLI boilerplate), improve cohesion (spli
 
 Before starting Phase 3, Phase 2 must be complete:
 
-- [ ] `error.rs` exists with `CoreError` and `CoreResult<T>`
-- [ ] `types.rs` exists with `MetricKind`
-- [ ] All functions in `ovrley_core` return `CoreResult<T>` (no `Result<T, String>`)
-- [ ] `cargo test` and `cargo clippy -- -D warnings` pass
-- [ ] No production behavior changed
+- [x] `error.rs` exists with `CoreError` and `CoreResult<T>`
+- [x] `types.rs` exists with `MetricKind`
+- [x] All functions in `ovrley_core` return `CoreResult<T>` (no `Result<T, String>`)
+- [x] `cargo test` passes
+- [~] `cargo clippy -- -D warnings` — 9 pre-existing clippy errors, none from Phase 2/3
+- [x] No production behavior changed
 
 If Phase 2 is incomplete, stop and complete it first. Phase 3 relies on typed errors (`CoreResult`) for the composite module migration (deliverable 6) and `MetricKind` for safe refactoring of any metric-related logic in `common.rs`.
 
@@ -1462,31 +1463,31 @@ If Phase 2 did not fully migrate all modules to `CoreResult`, the `ffmpeg_compos
 
 ## Summary Checklist Before Marking Phase 3 Complete
 
-1. [ ] Step 1 audit complete — all target files read, line numbers verified
-2. [ ] RDP snapshot tests added and passing (Step 2)
-3. [ ] `interpolation.rs` created, `activity/interpolate.rs` delegates to it, `common.rs` delegates to it (Step 3)
-4. [ ] `rdp.rs` created, `route.rs` and `elevation.rs` delegate to it (Step 4)
-5. [ ] `common.rs` split into `geometry.rs`, `polyline.rs`, `marker.rs`, `transform.rs` (Step 5)
-6. [ ] `common.rs` reduced to ~200 lines (Step 5)
-7. [ ] `paths.rs` created, `AppPaths` moved, `encode` imports from `paths` not `commands` (Step 6)
-8. [ ] `bin_common.rs` created, all 7 binaries updated (Step 7)
-9. [ ] Commented-out `println!` in `video_probe.rs` replaced with `log::debug!`/`log::warn!` (Step 8)
-10. [ ] `ffmpeg_composite_profiles.rs` returns `CoreResult`, tests added (Step 9a)
-11. [ ] `video_composite_debug.rs` verified for `CoreResult`, hardcoded path extracted (Step 9b)
-12. [ ] `cargo fmt` passes
-13. [ ] `cargo test` passes (all tests, including new Phase 3 tests)
-14. [ ] `cargo clippy -- -D warnings` passes
-15. [ ] No duplicated RDP logic in `route.rs` or `elevation.rs`
-16. [ ] No duplicated interpolation logic in `common.rs`
-17. [ ] `encode` does not depend on `commands` (no `use crate::commands` in encode/)
-18. [ ] All 7 diagnostic binaries compile and run correctly
-19. [ ] No commented-out `println!` in `video_probe.rs`
-20. [ ] Manual testing checklist (Step 11) complete
-21. [ ] No production behavior changed (except intentional improvements documented as such)
-22. [ ] No new `#[allow(...)]` suppressions
-23. [ ] No circular dependencies introduced (all new modules are leaves)
-24. [ ] New public functions in `interpolation.rs` and `rdp.rs` have documentation
-25. [ ] `AppPaths` re-export in `commands/mod.rs` has a TODO comment for Phase 6 removal
+1. [x] Step 1 audit complete — all target files read, line numbers verified
+2. [x] RDP snapshot tests added and passing (Step 2) — 11 module-local + 8 integration = 19 total
+3. [x] `interpolation.rs` created, `activity/interpolate.rs` delegates to it, `common.rs` delegates to it (Step 3)
+4. [x] `rdp.rs` created, `route.rs` and `elevation.rs` delegate to it (Step 4)
+5. [x] `common.rs` split into `geometry.rs`, `polyline.rs`, `marker.rs`, `transform.rs` (Step 5)
+6. [~] `common.rs` reduced to ~200 lines (Step 5) — landed at 472 lines; remaining progress/style/coord code is tightly coupled, further extraction deferred
+7. [x] `paths.rs` created, `AppPaths` moved, `encode` imports from `paths` not `commands` (Step 6)
+8. [x] `bin_common.rs` created, all 7 binaries updated (Step 7)
+9. [x] Commented-out `println!` in `video_probe.rs` replaced with `log::debug!`/`log::warn!` (Step 8)
+10. [x] `ffmpeg_composite_profiles.rs` returns `CoreResult`, tests added — 4 tests passing (Step 9a)
+11. [x] `video_composite_debug.rs` verified for `CoreResult`, hardcoded path extracted (Step 9b)
+12. [x] `cargo fmt` passes
+13. [x] `cargo test` passes (all tests, including new Phase 3 tests — 20 suites, 0 failures)
+14. [~] `cargo clippy -- -D warnings` passes — 9 pre-existing clippy errors (too_many_arguments, clamp, while_let_loop, loop variable), none introduced by Phase 3
+15. [x] No duplicated RDP logic in `route.rs` or `elevation.rs`
+16. [x] No duplicated interpolation logic in `common.rs`
+17. [x] `encode` does not depend on `commands` (no `use crate::commands` in encode/)
+18. [x] All 7 diagnostic binaries compile and run correctly — manual test passed
+19. [x] No commented-out `println!` in `video_probe.rs`
+20. [x] Manual testing checklist (Step 11) complete
+21. [x] No production behavior changed (except intentional improvements documented as such)
+22. [~] No new `#[allow(...)]` suppressions — one `#![allow(dead_code)]` on `bin_common.rs` (shared module with per-binary subset usage; reported)
+23. [x] No circular dependencies introduced (all new modules are leaves)
+24. [x] New public functions in `interpolation.rs` and `rdp.rs` have documentation
+25. [x] `AppPaths` re-export in `commands/mod.rs` has a TODO comment for Phase 6 removal
 
 ---
 

@@ -779,7 +779,10 @@ pub(crate) struct ElevationSample {
 
 // Simplifies projected elevation samples while preserving protected endpoints.
 // test seam
-pub(crate) fn simplify_elevation_samples(points: &[ElevationSample], tolerance: f32) -> Vec<ElevationSample> {
+pub(crate) fn simplify_elevation_samples(
+    points: &[ElevationSample],
+    tolerance: f32,
+) -> Vec<ElevationSample> {
     if points.len() <= 2 || tolerance <= 0.0 {
         return points.to_vec();
     }

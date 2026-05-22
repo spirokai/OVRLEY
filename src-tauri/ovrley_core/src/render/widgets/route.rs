@@ -6,13 +6,13 @@
 //! for each frame.
 
 use super::common::{
-    custom_export_range_active, draw_static_layer, fallback_marker_points,
-    frame_progress_values, legacy_line_width, marker_size_from_weights,
-    normalize_optional_progress_window, normalize_shadow_style, plot_base_color,
-    point_at_metric_progress_with_cursor, relative_distance_frame_progress_values,
-    resolve_style_color, scale_marker_points, shadow_with_screen_offset, static_layer_padding,
-    widget_render_report, DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER,
-    DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
+    custom_export_range_active, draw_static_layer, fallback_marker_points, frame_progress_values,
+    legacy_line_width, marker_size_from_weights, normalize_optional_progress_window,
+    normalize_shadow_style, plot_base_color, point_at_metric_progress_with_cursor,
+    relative_distance_frame_progress_values, resolve_style_color, scale_marker_points,
+    shadow_with_screen_offset, static_layer_padding, widget_render_report,
+    DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER, DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER,
+    DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX,
 };
 use super::geometry::{distance, fit_points_to_widget_with_inset, normalize_opacity};
 use super::marker::{draw_marker, marker_layers_from_points};

@@ -16,7 +16,6 @@ use std::time::Duration;
 use std::time::Instant;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
@@ -31,6 +30,7 @@ use crate::encode::video_composite_debug::{
 };
 use crate::encode::video_debug::timestamp_nanos;
 use crate::error::{CoreError, CoreResult};
+use crate::paths::AppPaths;
 use crate::render::{prepare_preview_assets, render_frame_rgba, RenderTarget};
 
 /// Reusable raw RGBA frame buffer.
