@@ -12,19 +12,6 @@
 //! subsets of the registry. All entries are intentionally retained as
 //! the canonical fixture catalogue.
 //!
-//! ## Available fixtures
-//!
-//! | Function | Path relative to `tests/fixtures/` |
-//! |----------|-------------------------------------|
-//! | `parsed_activity_path()` | `activity/gpx-parse-debug.json` |
-//! | `fit_activity_path()` | `activity/fit-parse-debug.json` |
-//! | `simple_config_path()` | `config/simple.json` |
-//! | `composite_config_path()` | `config/composite.json` |
-//! | `ffprobe_1080p_path()` | `ffprobe/1080p.json` |
-//! | `sample_video_path()` | `video/test-1080p.mp4` (alias: `test_1080p_video_path()`) |
-//! | `workspace_root()` | `CARGO_MANIFEST_DIR.parent()` — Tauri workspace root |
-//! | `repo_git_root()` | Git repository root (two levels up from the crate) |
-//!
 //! ## Thread Safety
 //!
 //! All functions are pure path constructors — no shared state, no mutex,
@@ -34,11 +21,6 @@
 //!
 //! This is test infrastructure code, not production code. Production code
 //! must never import from the test configuration layer.
-
-// Each test crate compiles independently and uses a different subset of
-// fixture paths. All functions in this file are intentional registry entries
-// and must be kept even if some are not referenced by every test crate.
-#![allow(dead_code)]
 
 use std::path::PathBuf;
 
@@ -50,38 +32,42 @@ pub fn fixtures() -> PathBuf {
     repo_root().join("tests").join("fixtures")
 }
 
+#[allow(dead_code)]
 pub fn parsed_activity_path() -> PathBuf {
     fixtures().join("activity").join("gpx-parse-debug.json")
 }
 
+#[allow(dead_code)]
 pub fn fit_activity_path() -> PathBuf {
     fixtures().join("activity").join("fit-parse-debug.json")
 }
 
+#[allow(dead_code)]
 pub fn simple_config_path() -> PathBuf {
     fixtures().join("config").join("simple.json")
 }
 
+#[allow(dead_code)]
 pub fn composite_config_path() -> PathBuf {
     fixtures().join("config").join("composite.json")
 }
 
+#[allow(dead_code)]
 pub fn ffprobe_1080p_path() -> PathBuf {
     fixtures().join("ffprobe").join("1080p.json")
 }
 
+#[allow(dead_code)]
 pub fn sample_video_path() -> PathBuf {
     fixtures().join("video").join("test-1080p.mp4")
 }
 
-pub fn test_1080p_video_path() -> PathBuf {
-    fixtures().join("video").join("test-1080p.mp4")
-}
-
+#[allow(dead_code)]
 pub fn workspace_root() -> PathBuf {
     repo_root().parent().unwrap().to_path_buf()
 }
 
+#[allow(dead_code)]
 pub fn repo_git_root() -> PathBuf {
     repo_root()
         .parent()

@@ -59,7 +59,16 @@ fn io_error_display() {
 
 #[test]
 fn ffmpeg_error_display() {
-    let _err = CoreError::FfmpegNotFound("ffmpeg binary not in PATH".into());
+    let err = CoreError::FfmpegNotFound("ffmpeg binary not in PATH".into());
+    let msg = err.to_string();
+    assert!(
+        msg.contains("FFmpeg not found"),
+        "FFmpeg not found error should contain 'FFmpeg not found', got: '{msg}'"
+    );
+    assert!(
+        msg.contains("ffmpeg binary not in PATH"),
+        "FFmpeg not found error should preserve the original message, got: '{msg}'"
+    );
 }
 
 #[test]

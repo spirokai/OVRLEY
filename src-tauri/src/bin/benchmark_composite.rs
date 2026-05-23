@@ -1,7 +1,7 @@
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::paths::AppPaths;
 use ovrley_core::config::parse_config_json;
-use ovrley_core::encode::codec_detect::{detect_codecs, AvailableCodecs};
+use ovrley_core::encode::codec_detect::detect_codecs;
 use ovrley_core::encode::video::{
     render_composite_video, CompositeRenderRequest, RenderController,
 };
@@ -10,11 +10,19 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[path = "../bin_common.rs"]
 mod common;
 use common::{format_mmss, read_positional, repo_root, resolve_path, unix_timestamp};
+
+#[path = "../benchmark_common.rs"]
+mod benchmark_common;
+use benchmark_common::{
+    average_successful_runs, file_size_mb, is_composite_codec_available, prevent_sleep,
+    sleep_between_benchmark_groups, sleep_between_benchmark_runs, summarize_run_outcome,
+    CommonRunMetrics,
+};
 
 const COMPOSITE_CODECS: &[(&str, &str)] = &[
     ("software_h264", "libx264"),
@@ -35,18 +43,6 @@ const COMPOSITE_CODECS: &[(&str, &str)] = &[
     ("amd_hevc", "hevc_amf"),
 ];
 
-#[cfg(windows)]
-extern "system" {
-    fn SetThreadExecutionState(es_flags: u32) -> u32;
-}
-
-#[cfg(windows)]
-const ES_CONTINUOUS: u32 = 0x8000_0000;
-#[cfg(windows)]
-const ES_SYSTEM_REQUIRED: u32 = 0x0000_0001;
-#[cfg(windows)]
-const ES_DISPLAY_REQUIRED: u32 = 0x0000_0002;
-
 fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     let program = &args[0];
     let rest = &args[1..];
@@ -63,27 +59,7 @@ fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     }
 }
 
-fn is_composite_codec_available(codecs: &AvailableCodecs, name: &str) -> bool {
-    match name {
-        // "software_h264" => codecs.libx264,
-        //   "software_hevc" => codecs.libx265,
-        "nvgpu_h264" => codecs.h264_nvenc,
-        //    "nvgpu_hevc" => codecs.hevc_nvenc,
-        //     "nnvgpu_h264" => codecs.nnvgpu,
-        //     "nnvgpu_hevc" => codecs.nnvgpu,
-        //     "qsv_h264" => codecs.h264_qsv,
-        //     "qsv_hevc" => codecs.hevc_qsv,
-        //     "qsv_full_h264" => codecs.qsv_full,
-        //     "qsv_full_hevc" => codecs.qsv_full,
-        //     "mac_h264" => codecs.h264_videotoolbox,
-        //     "mac_hevc" => codecs.hevc_videotoolbox,
-        //     "vaapi_h264" => codecs.h264_vaapi,
-        //    "vaapi_hevc" => codecs.hevc_vaapi,
-        //     "amd_h264" => codecs.h264_amf,
-        //     "amd_hevc" => codecs.hevc_amf,
-        _ => false,
-    }
-}
+
 
 #[derive(Serialize)]
 struct RunResult {
@@ -160,10 +136,7 @@ struct BenchmarkOutput {
 }
 
 fn main() -> Result<(), String> {
-    #[cfg(windows)]
-    unsafe {
-        SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
-    }
+    prevent_sleep();
 
     let args: Vec<String> = std::env::args().collect();
     let (activity_path, template_path, video_path) = parse_args(&args)?;
@@ -288,7 +261,7 @@ fn main() -> Result<(), String> {
         println!("  → Available, running 3 iterations...");
 
         let mut runs = Vec::with_capacity(3);
-        let mut successful_run_data: Vec<(f64, f64)> = Vec::new();
+        let mut successful_run_data: Vec<CommonRunMetrics> = Vec::new();
 
         for run_num in 1..=3 {
             print!("    Run {run_num}/3... ");
@@ -364,9 +337,7 @@ fn main() -> Result<(), String> {
             match render_result {
                 Ok(filename) => {
                     let output_path = paths.downloads_dir.join(&filename);
-                    let file_size = fs::metadata(&output_path)
-                        .map(|m| m.len() as f64 / 1_048_576.0)
-                        .unwrap_or(0.0);
+                    let file_size = file_size_mb(&output_path);
 
                     println!(
                         "OK  job_time={}  file_size={:.1}MB",
@@ -387,11 +358,13 @@ fn main() -> Result<(), String> {
                         error: None,
                     });
 
-                    successful_run_data.push((elapsed_secs, file_size));
+                    successful_run_data.push(CommonRunMetrics {
+                        job_time_seconds: elapsed_secs,
+                        file_size_mb: file_size,
+                    });
 
                     if run_num < 3 {
-                        println!("      Cooldown 60s...");
-                        std::thread::sleep(Duration::from_secs(60));
+                        sleep_between_benchmark_runs();
                     }
                 }
                 Err(e) => {
@@ -412,27 +385,19 @@ fn main() -> Result<(), String> {
             }
         }
 
-        // Cooldown between codec groups
         if !successful_run_data.is_empty() && codec_index + 1 < COMPOSITE_CODECS.len() {
-            println!("      Codec done, cooldown 60s before next codec...");
-            std::thread::sleep(Duration::from_secs(60));
+            sleep_between_benchmark_groups("Codec");
         }
 
-        let successful_count = successful_run_data.len() as u32;
-        let failed_count = runs.len() as u32 - successful_count;
+        let (successful_count, failed_count) =
+            summarize_run_outcome(successful_run_data.len(), runs.len());
 
-        let average = if successful_run_data.is_empty() {
-            None
-        } else {
-            let count = successful_run_data.len() as f64;
-            let avg_time = successful_run_data.iter().map(|(t, _)| t).sum::<f64>() / count;
-            let avg_size = successful_run_data.iter().map(|(_, s)| s).sum::<f64>() / count;
-            Some(AverageResult {
-                job_time: format_mmss(avg_time),
-                job_time_seconds: avg_time,
-                file_size_mb: avg_size,
-            })
-        };
+        let average =
+            average_successful_runs(&successful_run_data).map(|avg| AverageResult {
+                job_time: avg.job_time,
+                job_time_seconds: avg.job_time_seconds,
+                file_size_mb: avg.file_size_mb,
+            });
 
         results.insert(
             display_name.to_string(),

@@ -1,13 +1,13 @@
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::paths::AppPaths;
 use ovrley_core::config::parse_config_json;
-use ovrley_core::encode::codec_detect::{detect_codecs, AvailableCodecs};
+use ovrley_core::encode::codec_detect::detect_codecs;
 use ovrley_core::encode::video::{render_video, rendered_frame_count, RenderController};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[path = "../bin_common.rs"]
 mod common;
@@ -15,17 +15,13 @@ use common::{
     format_mmss, read_optional_arg, read_positional, repo_root, resolve_path, unix_timestamp,
 };
 
-#[cfg(windows)]
-extern "system" {
-    fn SetThreadExecutionState(es_flags: u32) -> u32;
-}
-
-#[cfg(windows)]
-const ES_CONTINUOUS: u32 = 0x8000_0000;
-#[cfg(windows)]
-const ES_SYSTEM_REQUIRED: u32 = 0x0000_0001;
-#[cfg(windows)]
-const ES_DISPLAY_REQUIRED: u32 = 0x0000_0002;
+#[path = "../benchmark_common.rs"]
+mod benchmark_common;
+use benchmark_common::{
+    average_successful_runs, file_size_mb, is_transparent_codec_available, prevent_sleep,
+    sleep_between_benchmark_groups, sleep_between_benchmark_runs, summarize_run_outcome,
+    CommonRunMetrics,
+};
 
 const TRANSPARENT_CODECS: &[&str] = &[
     //"prores_ks",
@@ -47,16 +43,6 @@ fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf), String> {
             "Usage: {program} <activity-path> <template-path>\n\
              Or:    {program} --activity <path> --template <path>"
         )),
-    }
-}
-
-fn is_codec_available(codecs: &AvailableCodecs, name: &str) -> bool {
-    match name {
-        "prores_ks" => codecs.prores_ks,
-        "prores_ks_vulkan" => codecs.prores_ks_vulkan,
-        "prores_videotoolbox" => codecs.prores_videotoolbox,
-        "qtrle" => codecs.qtrle,
-        _ => false,
     }
 }
 
@@ -126,10 +112,7 @@ fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().collect();
     let (activity_path, template_path) = parse_args(&args)?;
 
-    #[cfg(windows)]
-    unsafe {
-        SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
-    }
+    prevent_sleep();
 
     let root = repo_root()?;
     let paths = AppPaths::from_repo_root(root.clone());
@@ -195,7 +178,7 @@ fn main() -> Result<(), String> {
     for (codec_index, codec_name) in TRANSPARENT_CODECS.iter().enumerate() {
         println!("\n=== Codec: {codec_name} ===");
 
-        if !is_codec_available(&available, codec_name) {
+        if !is_transparent_codec_available(&available, codec_name) {
             println!("  → NOT AVAILABLE on this system");
             results.insert(
                 codec_name.to_string(),
@@ -213,7 +196,7 @@ fn main() -> Result<(), String> {
         println!("  → Available, running 3 iterations...");
 
         let mut runs = Vec::with_capacity(3);
-        let mut successful_run_data: Vec<(f64, f64)> = Vec::new();
+        let mut successful_run_data: Vec<CommonRunMetrics> = Vec::new();
 
         for run_num in 1..=3 {
             print!("    Run {run_num}/3... ");
@@ -261,9 +244,7 @@ fn main() -> Result<(), String> {
             match render_result {
                 Ok(filename) => {
                     let output_path = paths.downloads_dir.join(&filename);
-                    let file_size = fs::metadata(&output_path)
-                        .map(|m| m.len() as f64 / 1_048_576.0)
-                        .unwrap_or(0.0);
+                    let file_size = file_size_mb(&output_path);
 
                     println!(
                         "OK  job_time={}  file_size={:.1}MB",
@@ -284,11 +265,13 @@ fn main() -> Result<(), String> {
                         error: None,
                     });
 
-                    successful_run_data.push((elapsed_secs, file_size));
+                    successful_run_data.push(CommonRunMetrics {
+                        job_time_seconds: elapsed_secs,
+                        file_size_mb: file_size,
+                    });
 
                     if run_num < 3 {
-                        println!("      Cooldown 60s...");
-                        std::thread::sleep(Duration::from_secs(60));
+                        sleep_between_benchmark_runs();
                     }
                 }
                 Err(e) => {
@@ -309,27 +292,19 @@ fn main() -> Result<(), String> {
             }
         }
 
-        // Cooldown between codec groups if any runs succeeded
         if !successful_run_data.is_empty() && codec_index + 1 < TRANSPARENT_CODECS.len() {
-            println!("      Codec done, cooldown 60s before next codec...");
-            std::thread::sleep(Duration::from_secs(60));
+            sleep_between_benchmark_groups("Codec");
         }
 
-        let successful_count = successful_run_data.len() as u32;
-        let failed_count = runs.len() as u32 - successful_count;
+        let (successful_count, failed_count) =
+            summarize_run_outcome(successful_run_data.len(), runs.len());
 
-        let average = if successful_run_data.is_empty() {
-            None
-        } else {
-            let count = successful_run_data.len() as f64;
-            let avg_time = successful_run_data.iter().map(|(t, _)| t).sum::<f64>() / count;
-            let avg_size = successful_run_data.iter().map(|(_, s)| s).sum::<f64>() / count;
-            Some(AverageResult {
-                job_time: format_mmss(avg_time),
-                job_time_seconds: avg_time,
-                file_size_mb: avg_size,
-            })
-        };
+        let average =
+            average_successful_runs(&successful_run_data).map(|avg| AverageResult {
+                job_time: avg.job_time,
+                job_time_seconds: avg.job_time_seconds,
+                file_size_mb: avg.file_size_mb,
+            });
 
         results.insert(
             codec_name.to_string(),
