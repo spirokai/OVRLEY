@@ -9,6 +9,7 @@ import { createEditorSlice } from './slices/createEditorSlice'
 import { createMediaSlice } from './slices/createMediaSlice'
 import { createTemplateSlice } from './slices/createTemplateSlice'
 import { createVideoImportSlice } from './slices/createVideoImportSlice'
+import { createLayoutSlice } from './slices/createLayoutSlice'
 
 /**
  * Creates store state.
@@ -23,6 +24,7 @@ function createStoreState(set, get) {
     ...createEditorSlice(set, get),
     ...createMediaSlice(set, get),
     ...createVideoImportSlice(set, get),
+    ...createLayoutSlice(set, get),
   }
 }
 

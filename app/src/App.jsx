@@ -5,6 +5,7 @@
 import { OverlayEditor } from '@/features/overlay-editor'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
+import { WidgetDrawer } from '@/features/widget-drawer'
 import { useAppShellStore } from '@/hooks/useAppStoreSelectors'
 import { useRenderWorkflow } from '@/features/render-video'
 import { NewTemplateConfirmDialog, useTemplateManagement } from '@/features/template-manager'
@@ -114,6 +115,7 @@ function AppShell() {
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="relative flex min-w-0 flex-1 flex-col bg-background">
             <LoadingOverlay show={isProcessing || importingVideo} label={importingVideo ? 'Importing video...' : 'Processing...'} />
+            <WidgetDrawer />
             <div className="min-h-0 flex-1">
               <OverlayEditor
                 config={config}

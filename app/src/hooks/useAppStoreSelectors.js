@@ -6,6 +6,19 @@ import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 
 /**
+ * Provides layout store state and actions.
+ * @returns {*} Result produced by the helper.
+ */
+export function useLayoutStore() {
+  return useStore(
+    useShallow((state) => ({
+      widgetDrawerOpen: state.widgetDrawerOpen,
+      toggleWidgetDrawer: state.toggleWidgetDrawer,
+    })),
+  )
+}
+
+/**
  * Provides app shell store state and actions.
  * @returns {*} Result produced by the helper.
  */
