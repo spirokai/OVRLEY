@@ -8,3 +8,5 @@ Interview me relentlessly about every aspect of this plan until we reach a share
 Ask the questions one at a time.
 
 If a question can be answered by exploring the codebase, explore the codebase instead.
+
+Do not do anything else after we resolved the questions. State that we are done with the grilling process and have reached a shared understanding.

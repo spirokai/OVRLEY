@@ -68,6 +68,7 @@ A list of testing decisions that were made. Include:
 ## Out of Scope
 
 A description of the things that are out of scope for this PRD.
+Do NOT write the code yet.
 
 ## Further Notes
 
