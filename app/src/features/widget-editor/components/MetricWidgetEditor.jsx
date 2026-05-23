@@ -31,6 +31,8 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
               title="Unit"
               checked={widget.data.show_units ?? true}
               onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
+              colorValue={widget.data.unit_color || '#ffffff'}
+              onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
               value={widget.data.speed_unit || 'kmh'}
               onValueChange={(value) => updateWidgetData(widget.id, { speed_unit: value })}
               options={SPEED_UNITS}
@@ -42,6 +44,8 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
               title="Unit"
               checked={widget.data.show_units ?? true}
               onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
+              colorValue={widget.data.unit_color || '#ffffff'}
+              onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
             />
           )
         }

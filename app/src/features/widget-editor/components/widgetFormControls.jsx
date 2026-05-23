@@ -157,7 +157,7 @@ export function NumberField({ label, value, onChange, min, max, disabled = false
  */
 export function ColorField({ label, value, onChange, disabled = false }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
         {label}
       </Label>

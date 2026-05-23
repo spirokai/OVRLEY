@@ -76,7 +76,26 @@ pub(crate) fn draw_gradient_value_widget(
     value_style.y = value_top;
     value_style.line_height = value_line_height;
     // Phase 2: draw the formatted percentage text.
-    draw_text(canvas, &value_text, &value_style, font_dirs);
+    let (gradient_value_prefix, gradient_unit_suffix) = split_gradient_unit_suffix(&value_text);
+    if gradient_value_prefix.is_empty() || gradient_unit_suffix.is_none() {
+        draw_text(canvas, &value_text, &value_style, font_dirs);
+    } else {
+        draw_text(canvas, gradient_value_prefix, &value_style, font_dirs);
+
+        let prefix_measure = measure_text(gradient_value_prefix, &value_style, font_dirs);
+        let mut unit_style = value_style.clone();
+        unit_style.x += prefix_measure.width;
+        unit_style.color = parse_color(
+            value.unit_color.as_deref().unwrap_or("#ffffff"),
+            base_style.opacity,
+        );
+        draw_text(
+            canvas,
+            gradient_unit_suffix.unwrap_or_default(),
+            &unit_style,
+            font_dirs,
+        );
+    }
 
     if !show_triangle {
         return true;
@@ -119,6 +138,12 @@ pub(crate) fn draw_gradient_value_widget(
     }
 
     true
+}
+
+fn split_gradient_unit_suffix(text: &str) -> (&str, Option<&str>) {
+    text.strip_suffix('%')
+        .map(|prefix| (prefix, Some("%")))
+        .unwrap_or((text, None))
 }
 
 /// Returns whether a gradient should be rendered as a flat zero line.

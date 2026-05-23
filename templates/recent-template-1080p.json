@@ -44,7 +44,8 @@
         "icon_size": 84,
         "icon_offset_x": -28,
         "icon_offset_y": 9,
-        "show_units": true
+        "show_units": true,
+        "unit_color": "#00ff00"
       },
       {
         "x": 113,
@@ -63,6 +64,7 @@
         "icon_offset_x": 4,
         "icon_offset_y": -25,
         "show_units": true,
+        "unit_color": "#00ff00",
         "temperature_unit": "celsius"
       },
       {
@@ -81,7 +83,8 @@
         "icon_size": 42,
         "icon_offset_x": 0,
         "icon_offset_y": 0,
-        "show_units": true
+        "show_units": true,
+        "unit_color": "#00ff00"
       },
       {
         "x": 117,
@@ -99,7 +102,8 @@
         "icon_size": 51,
         "icon_offset_x": 0,
         "icon_offset_y": 0,
-        "show_units": true
+        "show_units": true,
+        "unit_color": "#00ff00"
       },
       {
         "x": 129,
@@ -118,6 +122,7 @@
         "icon_offset_x": -2,
         "icon_offset_y": 0,
         "show_units": true,
+        "unit_color": "#00ff00",
         "speed_unit": "kmh"
       },
       {
@@ -131,6 +136,7 @@
         "prefix": "",
         "suffix": "",
         "decimals": 1,
+        "unit_color": "#00ff00",
         "value_offset": 19,
         "triangle_positive_color": "#40e0d0",
         "triangle_negative_color": "#a31bad",

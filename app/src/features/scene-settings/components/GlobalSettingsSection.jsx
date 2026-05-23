@@ -98,6 +98,14 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
             valueClassName="text-[10px] tracking-[0.16em]"
           />
         </div>
+        <div className="space-y-2">
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Units</Label>
+          <HexColorPicker
+            value={globalDefaults.color_units}
+            onChange={(value) => onGlobalDefaultChange('color_units', value)}
+            valueClassName="text-[10px] tracking-[0.16em]"
+          />
+        </div>
       </div>
 
       <div className="space-y-6 pt-2">

@@ -21,6 +21,7 @@ export const DEFAULT_GLOBAL_DEFAULTS = {
   color_values: '#ffffff',
   color_text: '#ffffff',
   color_icons: '#ffffff',
+  color_units: '#ffffff',
   ...SCENE_STYLE_DEFAULTS,
   opacity: 1,
   scale: 1,
@@ -136,6 +137,9 @@ function getEffectiveValueData(widgetData = {}, globals, previewOverrides = null
   }
   if (nextData.icon_color === undefined) {
     nextData.icon_color = globals?.color_icons || getThemeColor('aqua')
+  }
+  if (nextData.unit_color === undefined && widgetData.value !== 'time') {
+    nextData.unit_color = globals?.color_units || '#ffffff'
   }
   if (nextData.opacity === undefined) {
     nextData.opacity = globals?.opacity
@@ -256,6 +260,9 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null) 
       }
       if (shouldApply('color_icons') && Object.hasOwn(value, 'icon_color')) {
         value.icon_color = globals.color_icons
+      }
+      if (shouldApply('color_units') && value.value !== 'time') {
+        value.unit_color = globals.color_units
       }
     })
   }

@@ -44,13 +44,13 @@ export const VALUE_ICON_KEYS = ['show_icon', 'icon_color', 'icon_size', 'icon_of
 
 /** Per-type additional keys preserved when normalizing a value widget. */
 export const VALUE_TYPE_KEYS = {
-  speed: [...VALUE_ICON_KEYS, 'show_units', 'speed_unit'],
-  heartrate: [...VALUE_ICON_KEYS, 'show_units'],
-  cadence: [...VALUE_ICON_KEYS, 'show_units'],
-  power: [...VALUE_ICON_KEYS, 'show_units'],
-  temperature: [...VALUE_ICON_KEYS, 'show_units', 'temperature_unit'],
+  speed: [...VALUE_ICON_KEYS, 'show_units', 'unit_color', 'speed_unit'],
+  heartrate: [...VALUE_ICON_KEYS, 'show_units', 'unit_color'],
+  cadence: [...VALUE_ICON_KEYS, 'show_units', 'unit_color'],
+  power: [...VALUE_ICON_KEYS, 'show_units', 'unit_color'],
+  temperature: [...VALUE_ICON_KEYS, 'show_units', 'unit_color', 'temperature_unit'],
   time: [...VALUE_ICON_KEYS, 'format'],
-  gradient: ['value_offset', 'triangle_positive_color', 'triangle_negative_color', 'show_sign', 'show_triangle', 'triangle_width'],
+  gradient: ['unit_color', 'value_offset', 'triangle_positive_color', 'triangle_negative_color', 'show_sign', 'show_triangle', 'triangle_width'],
 }
 
 /** Keys preserved when normalizing a course plot widget. */

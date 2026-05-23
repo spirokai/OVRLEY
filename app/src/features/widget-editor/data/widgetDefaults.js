@@ -38,14 +38,15 @@ export const ICON_DEFAULTS = {
 
 /** Type-specific default fields for each metric value widget type (dynamic fields omitted). */
 export const TYPE_DEFAULTS = {
-  speed: { show_units: true, speed_unit: 'kmh' },
-  temperature: { show_units: true, temperature_unit: 'celsius' },
-  heartrate: { show_units: false },
-  cadence: { show_units: false },
-  power: { show_units: false },
+  speed: { show_units: true, speed_unit: 'kmh', unit_color: '#ffffff' },
+  temperature: { show_units: true, temperature_unit: 'celsius', unit_color: '#ffffff' },
+  heartrate: { show_units: false, unit_color: '#ffffff' },
+  cadence: { show_units: false, unit_color: '#ffffff' },
+  power: { show_units: false, unit_color: '#ffffff' },
   time: { format: 'time-24' },
   gradient: {
     decimals: 0,
+    unit_color: '#ffffff',
     value_offset: 0,
     show_sign: true,
     show_triangle: true,

@@ -250,22 +250,31 @@ export function UnitsControlRow({
   checked = widget.data.show_units ?? true,
   onCheckedChange = (nextChecked) => updateWidgetData(widget.id, { show_units: nextChecked }),
   title = 'Unit',
+  showToggle = true,
   value,
   onValueChange,
   options,
   selectLabel = 'Unit',
+  colorValue,
+  onColorChange,
+  colorLabel = 'Color',
 }) {
   const showSelect = Array.isArray(options) && options.length > 0 && value !== undefined && typeof onValueChange === 'function'
+  const showColor = colorValue !== undefined && typeof onColorChange === 'function'
+  const controlsDisabled = showToggle && !checked
 
   return (
     <div className="space-y-2">
       <div className="flex w-full justify-between items-center">
         <SectionHeading icon={Ruler} title={title} />
-        <ToggleField checked={checked} onCheckedChange={onCheckedChange} />
+        {showToggle ? <ToggleField checked={checked} onCheckedChange={onCheckedChange} /> : null}
       </div>
-      {showSelect ? (
-        <div className="grid grid-cols-2 gap-3">
-          <SelectField label={selectLabel} value={value} onValueChange={onValueChange} options={options} />
+      {showSelect || showColor ? (
+        <div className="grid grid-cols-2 gap-3 items-start">
+          {showColor ? <ColorField label={colorLabel} value={colorValue} onChange={onColorChange} disabled={controlsDisabled} /> : null}
+          {showSelect ? (
+            <SelectField label={selectLabel} value={value} onValueChange={onValueChange} options={options} disabled={controlsDisabled} />
+          ) : null}
         </div>
       ) : null}
     </div>

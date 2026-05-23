@@ -4,7 +4,7 @@
 
 import { ColorField, SliderField, ToggleField } from './widgetFormControls'
 import { Label } from '@/components/ui/label'
-import { FontSection, SectionHeading } from './widgetEditorSections'
+import { FontSection, SectionHeading, UnitsControlRow } from './widgetEditorSections'
 import { TrendingUp } from 'lucide-react'
 import { getThemeColor } from '@/lib/theme'
 
@@ -24,6 +24,15 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
   return (
     <>
       <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Typography" fontSizeLabel="Font Size" colorLabel="Value Color" />
+      <UnitsControlRow
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        title="Unit"
+        showToggle={false}
+        colorLabel="Percent Color"
+        colorValue={widget.data.unit_color || '#ffffff'}
+        onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
+      />
 
       <SliderField
         label="Value Offset"

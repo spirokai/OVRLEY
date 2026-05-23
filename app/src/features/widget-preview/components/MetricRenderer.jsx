@@ -22,7 +22,7 @@
 
 import { buildMetricWidgetPreviewModel } from '../utils/metricWidgetPreviewModel'
 import { METRIC_ICON_SVGS, DEFAULT_GRADIENT_TRIANGLE_WIDTH, GRADIENT_ZERO_LINE_WIDTH_PX } from '@/features/overlay-editor'
-import { getPreviewFontFamily, getWidgetOpacity } from '../utils/textMeasurement'
+import { getPreviewFontFamily, getWidgetOpacity, measurePreviewText } from '../utils/textMeasurement'
 import { getTextShadowParts } from '../utils/shadowUtils'
 import { getInterpolatedActivityValue } from '@/features/overlay-editor'
 import { buildGradientTrianglePath, formatGradientValue, getGradientWidgetLayout } from '../utils/formatUtils'
@@ -30,12 +30,17 @@ import { sanitizeSvgId } from '../utils/svgPreviewUtils'
 import { PreviewMetricIcon, PreviewSvgText } from './previewSvgComponents'
 import { useFontMetricsVersion } from '../hooks/useFontMetricsVersion'
 
+function splitGradientUnitSuffix(text) {
+  return text.endsWith('%') ? [text.slice(0, -1), '%'] : [text, '']
+}
+
 export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpacity, globalScale, metricPreviewModel, sceneStyle }) {
   // Base styling — resolve font, color, opacity, and shadow from widget config and scene
   const fontSize = widget.data.font_size ?? 60
   const fontFamily = getPreviewFontFamily(widget.data.font || widget.data.font_family)
   useFontMetricsVersion(fontFamily, fontSize)
   const color = widget.data.color || '#ffffff'
+  const unitColor = widget.data.unit_color || '#ffffff'
   const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)
   const shadow = getTextShadowParts(sceneStyle)
 
@@ -140,7 +145,7 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
                 text={unitText}
                 x={metricLayout.units.left + contentOffsetX}
                 baseline={metricLayout.units.baseline + contentOffsetY}
-                color={color}
+                color={unitColor}
                 fontFamily={fontFamily}
                 fontSize={metricLayout.units.fontSize}
                 opacity={widgetOpacity}
@@ -159,9 +164,12 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
   // Gradient rendering — value text + direction triangle (up for positive, down for negative, line for zero)
   if (widget.type === 'gradient' && gradientLayout) {
     const valueShadowFilterId = sanitizeSvgId(`${widget.id}-value-shadow`)
+    const unitShadowFilterId = sanitizeSvgId(`${widget.id}-unit-shadow`)
     const trianglePath = gradientLayout.triangle
       ? buildGradientTrianglePath(currentGradientValue, gradientLayout.triangle.width, gradientLayout.triangle.height)
       : ''
+    const [gradientValuePrefix, gradientUnitSuffix] = splitGradientUnitSuffix(valueText)
+    const gradientPrefixWidth = gradientValuePrefix ? measurePreviewText(gradientValuePrefix, fontSize, fontFamily).width : 0
 
     return (
       <svg
@@ -170,19 +178,36 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
         viewBox={`0 0 ${gradientLayout.width} ${gradientLayout.height}`}
         className="block overflow-visible"
       >
-        <PreviewSvgText
-          text={valueText}
-          x={gradientLayout.value.left}
-          baseline={gradientLayout.value.baseline}
-          color={color}
-          fontFamily={fontFamily}
-          fontSize={fontSize}
-          opacity={widgetOpacity}
-          shadow={shadow}
-          shadowFilterId={valueShadowFilterId}
-          borderColor={sceneStyle?.border_color}
-          borderThickness={sceneStyle?.border_thickness}
-        />
+        {gradientValuePrefix ? (
+          <PreviewSvgText
+            text={gradientValuePrefix}
+            x={gradientLayout.value.left}
+            baseline={gradientLayout.value.baseline}
+            color={color}
+            fontFamily={fontFamily}
+            fontSize={fontSize}
+            opacity={widgetOpacity}
+            shadow={shadow}
+            shadowFilterId={valueShadowFilterId}
+            borderColor={sceneStyle?.border_color}
+            borderThickness={sceneStyle?.border_thickness}
+          />
+        ) : null}
+        {gradientUnitSuffix ? (
+          <PreviewSvgText
+            text={gradientUnitSuffix}
+            x={gradientLayout.value.left + gradientPrefixWidth}
+            baseline={gradientLayout.value.baseline}
+            color={unitColor}
+            fontFamily={fontFamily}
+            fontSize={fontSize}
+            opacity={widgetOpacity}
+            shadow={shadow}
+            shadowFilterId={unitShadowFilterId}
+            borderColor={sceneStyle?.border_color}
+            borderThickness={sceneStyle?.border_thickness}
+          />
+        ) : null}
         {gradientLayout.triangle ? (
           gradientLayout.triangle.isZero ? (
             <line

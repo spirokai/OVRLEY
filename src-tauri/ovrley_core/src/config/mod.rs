@@ -221,6 +221,8 @@ pub struct ValueConfig {
     #[serde(default)]
     pub show_units: Option<bool>,
     #[serde(default)]
+    pub unit_color: Option<String>,
+    #[serde(default)]
     pub speed_unit: Option<String>,
     #[serde(default)]
     pub temperature_unit: Option<String>,

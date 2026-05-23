@@ -132,6 +132,7 @@ export function createMetricValueDefaults(type, globalDefaults) {
     return {
       ...sharedDefaults,
       ...TYPE_DEFAULTS.gradient,
+      unit_color: getGlobalColor(globalDefaults, 'color_units', '#ffffff'),
     }
   }
 
@@ -139,6 +140,7 @@ export function createMetricValueDefaults(type, globalDefaults) {
     ...sharedDefaults,
     ...ICON_DEFAULTS,
     icon_color: getGlobalColor(globalDefaults, 'color_icons'),
+    unit_color: getGlobalColor(globalDefaults, 'color_units', '#ffffff'),
     ...TYPE_DEFAULTS[type],
   }
 }

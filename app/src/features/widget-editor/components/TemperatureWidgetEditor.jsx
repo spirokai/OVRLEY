@@ -30,6 +30,8 @@ export default function TemperatureWidgetEditor({ widget, updateWidgetData, setN
             title="Units"
             checked={widget.data.show_units ?? true}
             onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
+            colorValue={widget.data.unit_color || '#ffffff'}
+            onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
             selectLabel="Unit"
             value={widget.data.temperature_unit || 'celsius'}
             onValueChange={(value) => updateWidgetData(widget.id, { temperature_unit: value })}
