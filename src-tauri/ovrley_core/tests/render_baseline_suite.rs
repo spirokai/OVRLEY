@@ -8,6 +8,8 @@
 //! `OVRLEY_RECORD_BASELINES=1 cargo test -p ovrley_core --test render_baseline_suite -- --nocapture`
 
 mod common;
+#[path = "common/render_baseline_support.rs"]
+mod render_baseline_support;
 
 use anyhow::Result;
 
@@ -15,28 +17,28 @@ use anyhow::Result;
 /// committed pixel baselines.
 #[test]
 fn rendered_frames_match_baselines() -> Result<()> {
-    let _guard = common::render_baseline_support::suite_lock()
+    let _guard = render_baseline_support::suite_lock()
         .lock()
         .expect("render baseline suite lock poisoned");
-    common::render_baseline_support::run_frame_cases()
+    render_baseline_support::run_frame_cases()
 }
 
 /// Renders short transparent overlay videos and compares selected decoded
 /// output frames to committed baselines.
 #[test]
 fn transparent_videos_match_baselines() -> Result<()> {
-    let _guard = common::render_baseline_support::suite_lock()
+    let _guard = render_baseline_support::suite_lock()
         .lock()
         .expect("render baseline suite lock poisoned");
-    common::render_baseline_support::run_transparent_video_cases()
+    render_baseline_support::run_transparent_video_cases()
 }
 
 /// Renders short composite MP4 outputs against the source fixture video and
 /// compares selected decoded output frames to committed baselines.
 #[test]
 fn composite_videos_match_baselines() -> Result<()> {
-    let _guard = common::render_baseline_support::suite_lock()
+    let _guard = render_baseline_support::suite_lock()
         .lock()
         .expect("render baseline suite lock poisoned");
-    common::render_baseline_support::run_composite_video_cases()
+    render_baseline_support::run_composite_video_cases()
 }

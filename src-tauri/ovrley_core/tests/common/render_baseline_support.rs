@@ -11,7 +11,7 @@
 //! top-level suite file into one helper at a time without having to understand
 //! the entire rendering subsystem at once.
 
-use super::test_config;
+use crate::common::test_config;
 use anyhow::{anyhow, bail, Context, Result};
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};

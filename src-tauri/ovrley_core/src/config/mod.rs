@@ -109,6 +109,11 @@ pub struct SceneConfig {
     /// Reserved legacy border distance option.
     #[serde(default)]
     pub border_distance: Option<f32>,
+    /// Whether the template is rendering a custom scene subset rather than the
+    /// full activity. When true, widget trim-window and progress behavior
+    /// adjusts to show only the selected export range.
+    #[serde(default)]
+    pub custom_export_range_active: Option<bool>,
     /// Unknown scene fields preserved for compatibility.
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,

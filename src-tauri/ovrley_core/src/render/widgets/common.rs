@@ -93,14 +93,13 @@ pub(crate) fn frame_progress_values(
         .collect()
 }
 
-// Returns whether the template is rendering a custom scene subset.
+/// Returns whether the template is rendering a custom scene subset.
+///
+/// Reads the typed `SceneConfig::custom_export_range_active` field.
+/// Templates that omit the field (including all older JSON) default to `false`,
+/// preserving backward-compatible behavior.
 pub(crate) fn custom_export_range_active(config: &RenderConfig) -> bool {
-    config
-        .scene
-        .extra
-        .get("custom_export_range_active")
-        .and_then(|value| value.as_bool())
-        .unwrap_or(false)
+    config.scene.custom_export_range_active.unwrap_or(false)
 }
 
 // Interpolates absolute activity distance progress at an elapsed second.

@@ -2,7 +2,7 @@
 //!
 //! Owns: `path_from_points` (converts point arrays into Skia paths with optional
 //!       closure and baseline-y), `with_widget_transform` (applies Skia canvas
-//!       save/restore with translation, rotation, and clipping for a widget rect).
+//!       save/restore with translation and rotation for a widget rect).
 //! Does not own: polyline drawing (see [`super::polyline`]), route/elevation
 //!       point projection (see [`super::common`]).
 //!
@@ -47,8 +47,6 @@ pub(crate) fn with_widget_transform(
     canvas: &skia_safe::Canvas,
     x: f32,
     y: f32,
-    _width: f32,
-    _height: f32,
     rotation_deg: f32,
     draw: impl FnOnce(&skia_safe::Canvas),
 ) {
