@@ -240,6 +240,7 @@ fn test_8_1_software_h264_profile_uses_cpu_overlay_and_libx264() {
     assert_argument_pair(&built.output_args, "-c:v", "libx264");
     assert_argument_pair(&built.output_args, "-b:v", "20M");
     assert!(built.filter_complex.contains("overlay=0:0"));
+    assert!(built.filter_complex.contains("format=yuv420p[out]"));
     assert!(built.hw_init_args.is_empty());
 }
 
@@ -256,7 +257,7 @@ fn test_8_2_software_h265_profile_uses_cpu_overlay_and_libx265() {
 
     assert_argument_pair(&built.output_args, "-c:v", "libx265");
     assert_argument_pair(&built.output_args, "-b:v", "60M");
-    assert!(built.filter_complex.contains("format=yuv420p[out]"));
+    assert!(built.filter_complex.contains("format=yuv420p10le[out]"));
 }
 
 #[test]
@@ -367,10 +368,33 @@ fn test_8_7_qsv_h264_simple_path_when_available() {
     assert_argument_pair(&built.output_args, "-c:v", "h264_qsv");
     assert_argument_pair(&built.output_args, "-b:v", "60M");
     assert!(built.filter_complex.contains("overlay=0:0"));
+    assert!(built.filter_complex.contains("format=yuv420p[out]"));
 }
 
 #[test]
-fn test_8_7a_amf_h264_simple_path_when_available() {
+fn test_8_7a_qsv_hevc_simple_path_uses_10_bit_filter_when_available() {
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        hevc_qsv: true,
+        qsv: true,
+        ..AvailableCodecs::default()
+    });
+    let built = settings_for_codec(
+        "hevc_qsv",
+        "60M",
+        Fps::new(30, 1).unwrap(),
+        Fps::new(30, 1).unwrap(),
+        0.0,
+        &hwaccel,
+    );
+
+    assert_argument_pair(&built.output_args, "-c:v", "hevc_qsv");
+    assert_argument_pair(&built.output_args, "-b:v", "60M");
+    assert!(built.filter_complex.contains("overlay=0:0"));
+    assert!(built.filter_complex.contains("format=yuv420p10le[out]"));
+}
+
+#[test]
+fn test_8_7b_amf_h264_simple_path_when_available() {
     let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
         h264_amf: true,
         ..AvailableCodecs::default()
@@ -394,7 +418,7 @@ fn test_8_7a_amf_h264_simple_path_when_available() {
 }
 
 #[test]
-fn test_8_7b_amf_hevc_unavailable_fails_clearly() {
+fn test_8_7c_amf_hevc_unavailable_fails_clearly() {
     let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
         codec_name: "hevc_amf",
         bitrate: "60M",
@@ -526,7 +550,7 @@ fn test_9_2_cuda_h264_full_profile_uses_overlay_cuda_when_available() {
     assert_argument_pair(&built.input_0_args, "-filter_hw_device", "cuda");
     assert_argument_pair(&built.input_0_args, "-hwaccel", "cuda");
     assert_argument_pair(&built.input_0_args, "-hwaccel_output_format", "cuda");
-    assert!(built.filter_complex.contains("scale_cuda"));
+    assert!(built.filter_complex.contains("scale_cuda=format=yuv420p"));
     assert!(built.filter_complex.contains("overlay_cuda"));
     assert_argument_pair(&built.output_args, "-c:v", "h264_nvenc");
 }
@@ -553,6 +577,7 @@ fn test_9_3_cuda_hevc_full_profile_uses_overlay_cuda_when_available() {
 
     assert_eq!(built.selected_profile_name, "nnvgpu_hevc");
     assert_eq!(built.fallback_profile_name.as_deref(), Some("nvgpu_hevc"));
+    assert!(built.filter_complex.contains("scale_cuda=format=yuv420p"));
     assert!(built.filter_complex.contains("overlay_cuda"));
     assert_argument_pair(&built.output_args, "-c:v", "hevc_nvenc");
 }
