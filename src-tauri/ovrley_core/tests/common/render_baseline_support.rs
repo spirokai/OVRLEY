@@ -448,11 +448,23 @@ fn prepare_case_runtime(kind: &str, case_name: &str) -> Result<CaseRuntime> {
     })
 }
 
-/// Loads a `RenderConfig` from the fixture tree.
+/// Loads a `RenderConfig` from the fixture tree or a real template file.
+///
+/// Plain config fixtures (the `RenderConfig` shape directly) are parsed as-is.
+/// Real template files (wrapping `{ "format": "ovrley-template", "config": {...} }`)
+/// have their `config` sub-object extracted first.
 fn load_config(relative_path: &str) -> Result<RenderConfig> {
-    let json = fs::read_to_string(fixtures_root().join(relative_path))
-        .with_context(|| format!("failed to read config fixture {relative_path}"))?;
-    parse_config_json(&json).context("failed to parse config fixture")
+    let path = fixtures_root().join(relative_path);
+    let json = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read config fixture {}", path.display()))?;
+    let value: serde_json::Value = serde_json::from_str(&json)
+        .with_context(|| format!("failed to parse JSON from {}", path.display()))?;
+    let config_str = match value.get("config") {
+        Some(config_obj) => serde_json::to_string(config_obj)
+            .context("failed to serialize extracted template config")?,
+        None => json,
+    };
+    parse_config_json(&config_str).context("failed to parse config")
 }
 
 /// Loads a `ParsedActivity` from the fixture tree.
