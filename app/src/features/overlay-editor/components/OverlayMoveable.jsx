@@ -59,7 +59,7 @@ export default function OverlayMoveable({
 }) {
   const isGroupSelection = selectedTargets.length > 1
   const gridSize = getEditorGridSize(sceneSize)
-  const moveableZoom = MOVEABLE_ZOOM / Math.max(displayScale, Number.EPSILON) / 2
+  const moveableZoom = MOVEABLE_ZOOM / Math.max(displayScale, Number.EPSILON) / 3
   const horizontalGuidelines = useMemo(() => getGridGuidelines(sceneSize.height, gridSize, snapToGrid), [gridSize, sceneSize.height, snapToGrid])
   const verticalGuidelines = useMemo(() => getGridGuidelines(sceneSize.width, gridSize, snapToGrid), [gridSize, sceneSize.width, snapToGrid])
 
