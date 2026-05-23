@@ -33,7 +33,8 @@ use serde_json::Value;
 
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::commands::{backend_render, is_composite_render, AppPaths};
+use ovrley_core::commands::{backend_render, is_composite_render};
+use ovrley_core::paths::AppPaths;
 use ovrley_core::config::parse_config_json;
 use ovrley_core::config::RenderConfig;
 use ovrley_core::debug::RenderProgress;

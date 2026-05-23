@@ -18,7 +18,7 @@ pub mod text;
 pub mod widgets;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::commands::AppPaths;
+use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::error::{CoreError, CoreResult};

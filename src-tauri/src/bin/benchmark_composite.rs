@@ -1,5 +1,5 @@
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::commands::AppPaths;
+use ovrley_core::paths::AppPaths;
 use ovrley_core::config::parse_config_json;
 use ovrley_core::encode::codec_detect::{detect_codecs, AvailableCodecs};
 use ovrley_core::encode::video::{

@@ -19,7 +19,7 @@ use std::thread;
 
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::commands::AppPaths;
+use ovrley_core::paths::AppPaths;
 use ovrley_core::config::{parse_config_json, RenderConfig};
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::encode::ffmpeg_composite::{

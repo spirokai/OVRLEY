@@ -1,5 +1,5 @@
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::commands::AppPaths;
+use ovrley_core::paths::AppPaths;
 use ovrley_core::config::parse_config_json;
 use ovrley_core::encode::video::{render_video, RenderController};
 use serde_json::{Map, Value};

@@ -1,5 +1,5 @@
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::commands::AppPaths;
+use ovrley_core::paths::AppPaths;
 use ovrley_core::config::parse_config_json;
 
 #[path = "../bin_common.rs"]

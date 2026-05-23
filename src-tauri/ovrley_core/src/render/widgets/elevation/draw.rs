@@ -12,7 +12,7 @@ use super::super::polyline::{draw_area, draw_polyline};
 use super::super::transform::with_widget_transform;
 use super::super::types::{ElevationWidgetCache, WidgetRenderReport};
 use super::frame_state::build_elevation_completed_points;
-use crate::commands::AppPaths;
+use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
 use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};

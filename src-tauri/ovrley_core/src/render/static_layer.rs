@@ -6,7 +6,7 @@
 //! the cached-image and base-RGBA paths use the same static drawing loop.
 
 use super::LabelCacheStatus;
-use crate::commands::AppPaths;
+use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;

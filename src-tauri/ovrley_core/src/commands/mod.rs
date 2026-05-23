@@ -28,8 +28,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-// TODO: Remove re-export in Phase 6 after all callers use crate::paths.
-pub use crate::paths::AppPaths;
+use crate::paths::AppPaths;
 
 /// Health-check response sent to the frontend.
 #[derive(Debug, Serialize)]
@@ -91,7 +90,7 @@ pub fn backend_render(
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
     if is_composite_render(&config) {
-        return backend_render_composite_phase3(paths, controller, config, parsed_activity);
+        return start_composite_render(paths, controller, config, parsed_activity);
     }
 
     let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
@@ -135,11 +134,11 @@ pub fn is_composite_render(config: &RenderConfig) -> bool {
     config.scene.composite_video_path.is_some()
 }
 
-/// Starts the composite branch after deriving composite timing.
+/// Starts the composite render branch after deriving composite timing.
 ///
 /// This branch validates inputs, builds the adjusted dense report, starts
-/// progress, and dispatches to the Phase 4 composite pipeline shell.
-fn backend_render_composite_phase3(
+/// progress, and dispatches to the composite pipeline shell.
+fn start_composite_render(
     paths: &AppPaths,
     controller: &RenderController,
     mut config: RenderConfig,
