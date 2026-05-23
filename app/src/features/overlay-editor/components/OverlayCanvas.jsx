@@ -7,12 +7,12 @@ import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { getWidgetSceneOrigin } from '../utils/overlayEditorHelpers'
-import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
+import { buildMetricWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
 import { useFontMetricsVersion } from '@/features/widget-preview/hooks/useFontMetricsVersion'
 import { getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
 import { buildWidgetTransform } from '@/lib/geometryUtils'
 import { CANVAS_BACKGROUND_COLORS, METRIC_WIDGET_LINE_HEIGHT } from '../data/overlayEditorConstants'
-import { measurePreviewText, getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
+import { measurePreviewText } from '@/features/widget-preview/utils/textMeasurement'
 import { useVideoPreview } from '@/features/video-preview'
 
 /**
@@ -102,11 +102,6 @@ const OverlayCanvasWidget = memo(
       activity,
       previewSecond,
     })
-<<<<<<< Updated upstream
-    const textPreviewModel = buildTextWidgetPreviewModel({ widget })
-    const widgetPreviewModel = metricPreviewModel ?? textPreviewModel
-    const metricVisualBounds = widgetPreviewModel?.visualBounds ?? null
-=======
     const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
 
     const isLabelWidget = widget.category === 'labels' || widget.type === 'label'
@@ -129,7 +124,6 @@ const OverlayCanvasWidget = memo(
       : null
 
     const visualBounds = metricVisualBounds ?? labelVisualBounds
->>>>>>> Stashed changes
     const isPlotWidget = widget.category === 'plots'
     const origin = getWidgetSceneOrigin(widget, null, visualBounds, {
       boundsScale: isPlotWidget ? 1 : globalScale,
@@ -172,7 +166,7 @@ const OverlayCanvasWidget = memo(
           globalOpacity={globalOpacity}
           globalScale={globalScale}
           metricPreviewModel={metricPreviewModel}
-          textPreviewModel={textPreviewModel}
+          textPreviewModel={undefined}
           sceneFont={sceneFont}
           sceneFontSize={sceneFontSize}
           sceneStyle={sceneStyle}
