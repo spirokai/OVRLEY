@@ -18,7 +18,7 @@ describe('WidgetDrawer', () => {
   test('renders a tab with Grid3X3 icon when collapsed', () => {
     render(<WidgetDrawer />)
 
-    const tab = screen.getByRole('button')
+    const tab = screen.getByRole('button', { name: /drawer/i })
     expect(tab).toBeInTheDocument()
 
     const icon = tab.querySelector('svg')
@@ -29,7 +29,7 @@ describe('WidgetDrawer', () => {
     const user = userEvent.setup()
     render(<WidgetDrawer />)
 
-    const tab = screen.getByRole('button')
+    const tab = screen.getByRole('button', { name: /drawer/i })
     expect(tab).toHaveAttribute('aria-label', 'Open widget drawer')
 
     await user.click(tab)
@@ -41,7 +41,7 @@ describe('WidgetDrawer', () => {
     const user = userEvent.setup()
     render(<WidgetDrawer />)
 
-    const tab = screen.getByRole('button')
+    const tab = screen.getByRole('button', { name: /drawer/i })
 
     await user.click(tab)
     expect(tab).toHaveAttribute('aria-label', 'Close widget drawer')
@@ -54,7 +54,7 @@ describe('WidgetDrawer', () => {
     const user = userEvent.setup()
     render(<WidgetDrawer />)
 
-    const tab = screen.getByRole('button')
+    const tab = screen.getByRole('button', { name: /drawer/i })
 
     await user.click(tab)
     expect(tab).toHaveAttribute('aria-label', 'Close widget drawer')
@@ -68,7 +68,7 @@ describe('WidgetDrawer', () => {
     const user = userEvent.setup()
     render(<WidgetDrawer />)
 
-    const tab = screen.getByRole('button')
+    const tab = screen.getByRole('button', { name: /drawer/i })
     expect(tab).toHaveAttribute('aria-label', 'Open widget drawer')
 
     await user.keyboard('{Escape}')
@@ -80,7 +80,7 @@ describe('WidgetDrawer', () => {
     const user = userEvent.setup()
     const { container } = render(<WidgetDrawer />)
 
-    const tab = screen.getByRole('button')
+    const tab = screen.getByRole('button', { name: /drawer/i })
     await user.click(tab)
 
     // No overlay/backdrop element should exist

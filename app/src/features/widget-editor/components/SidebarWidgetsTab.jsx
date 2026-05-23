@@ -5,9 +5,8 @@
 
 import { RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { QUICKMENU_ITEMS, TYPE_ICONS } from '../data/widgetDefinitions'
+import { TYPE_ICONS } from '../data/widgetDefinitions'
 import { useWidgetManager } from '../hooks/useWidgetManager'
 import { PositionSection } from './widgetEditorSections'
 import ElevationWidgetEditor from './ElevationWidgetEditor'
@@ -66,29 +65,12 @@ function renderWidgetEditor(widget, updateWidgetData, setNumericField, sceneFont
  * @returns {JSX.Element} Rendered component output.
  */
 export default function SidebarWidgetsTab() {
-  const { config, widgets, selectedWidgetId, updateWidgetData, setNumericField, addWidget, deleteWidget, resetWidget, setSelectedWidgetId } =
-    useWidgetManager()
+  const { config, widgets, selectedWidgetId, updateWidgetData, setNumericField, deleteWidget, resetWidget, setSelectedWidgetId } = useWidgetManager()
 
   if (!config) return null
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-5 gap-3 pt-4">
-        {QUICKMENU_ITEMS.map((item) => (
-          <Button
-            key={item.type}
-            variant="outline"
-            size="icon"
-            className="h-12 w-full border-border/70 bg-surface transition-all group hover:border-accent-border hover:bg-surface-accent-soft"
-            onClick={() => addWidget(item.type)}
-          >
-            <item.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-          </Button>
-        ))}
-      </div>
-
-      <Separator className="bg-border/60" />
-
+    <div className="space-y-6 pt-4">
       <div className="space-y-3">
         <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Active Widgets</h4>
 
