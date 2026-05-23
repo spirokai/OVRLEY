@@ -21,21 +21,21 @@ struct CompositeProfileTemplate {
     output_args: &'static [&'static str],
 }
 
-const SOFTWARE_H264_FILTER: &str = "[0:v]{base_video_filters}scale={width}:{height}[base];\
+const SOFTWARE_H264_FILTER: &str = "[0:v]{base_video_filters}null[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=yuv420p[out]";
 
-const SOFTWARE_HEVC_FILTER: &str = "[0:v]{base_video_filters}scale={width}:{height}[base];\
+const SOFTWARE_HEVC_FILTER: &str = "[0:v]{base_video_filters}null[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
-[base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=yuv420p10le[out]";
+[base][ovr]overlay=0:0:eof_action=repeat:shortest=1[out]";
 
-const VAAPI_FILTER: &str = "[0:v]{base_video_filters}scale={width}:{height}[base];\
+const VAAPI_FILTER: &str = "[0:v]{base_video_filters}null[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=nv12,hwupload[out]";
 
 const AMF_D3D11_INPUT_ARGS: &[&str] = &["-init_hw_device", "d3d11va=dx", "-filter_hw_device", "dx"];
 
-const AMF_D3D11_FILTER: &str = "[0:v]{base_video_filters}scale={width}:{height}[base];\
+const AMF_D3D11_FILTER: &str = "[0:v]{base_video_filters}null[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=nv12,hwupload[out]";
 
@@ -58,14 +58,18 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
         codec: "libx264",
         input_args: &[],
         filter_complex: Some(SOFTWARE_H264_FILTER),
-        output_args: &["-c:v", "libx264"],
+        output_args: &["-c:v", "libx264",  "-preset", "veryfast",],
     },
     CompositeProfileTemplate {
         name: "software_hevc",
         codec: "libx265",
         input_args: &[],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
-        output_args: &["-c:v", "libx265"],
+        output_args: &["-c:v", "libx265",
+    "-pix_fmt", "yuv420p10le",
+    "-profile:v", "main10",
+    "-preset", "veryfast",
+    "-tag:v", "hvc1",],
     },
     CompositeProfileTemplate {
         name: "nvgpu_h264",
@@ -82,7 +86,7 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
             "-profile:v",
             "high",
             "-spatial-aq",
-            "true",
+            "true",    
         ],
     },
     CompositeProfileTemplate {
