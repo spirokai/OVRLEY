@@ -15,7 +15,7 @@
 //! | Monitor (composite) | `render_composite_video_single` | ffmpeg stderr, `Arc<Mutex<Vec>>` | ffmpeg exits → stderr EOF | Spawning function |
 //! | Segment render worker | `render_video_segmented` / `render_composite_video_segmented` | Per-segment ffmpeg + buffer pool | Child-controller cancel flag | Aggregator loop |
 //! | Parallel render worker | `run_parallel_renders` | Independent config + ffmpeg | Work queue exhaustion | `run_parallel_renders` |
-//! | Command dispatch | `backend_render` / `backend_render_composite_phase3` | Full render call | Completion / cancel / error (updates controller) | Fire-and-forget |
+//! | Command dispatch | `backend_render` / composite render dispatcher | Full render call | Completion / cancel / error (updates controller) | Fire-and-forget |
 
 /// Canonical codec/profile catalog shared by detection and FFmpeg builders.
 pub mod codec_catalog;
@@ -39,6 +39,12 @@ pub(crate) mod pipeline_shared;
 pub mod progress; // test seam
 /// Render controller and public video render orchestration.
 pub mod video;
+/// Internal benchmark and multi-render orchestration helpers.
+pub(crate) mod video_parallel;
+/// Internal segmented render orchestration for transparent and composite paths.
+pub(crate) mod video_segmented;
+/// Internal time-window helpers for segmented video orchestration.
+pub(crate) mod video_windows;
 /// Composite-only debug summaries for MP4 compositing diagnostics.
 pub mod video_composite_debug; // test seam
 /// Composite MP4 render pipeline used by the composite render entry point.
