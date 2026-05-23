@@ -1,3 +1,15 @@
+//! Offline preview render binary.
+//!
+//! Renders one or more still-frame preview images (PNG) from an activity
+//! payload and overlay config. Used as a subprocess by the frontend to
+//! generate the preview thumbnails shown in the timeline scrubber.
+//!
+//! Supports single-second (`--second`) and batch (`--seconds a,b,c`)
+//! previews. Outputs a timing summary JSON to stdout, and optionally a
+//! separate timing file via `--timing-out`.
+//!
+//! Does not own: rendering — delegates to `ovrley_core::render`.
+
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::config::parse_config_json;
 use ovrley_core::debug::TimingBucket;
@@ -15,6 +27,8 @@ use std::path::PathBuf;
 mod common;
 use common::{read_arg, read_optional_arg, repo_root};
 
+/// Parses `--seconds a,b,c` or `--second N` into a sorted list of activity
+/// seconds to render. Returns an error when no valid seconds are provided.
 fn parse_seconds(args: &[String]) -> Result<Vec<u32>, String> {
     if let Some(seconds) = read_optional_arg("--seconds", args) {
         let parsed = seconds
@@ -38,6 +52,7 @@ fn parse_seconds(args: &[String]) -> Result<Vec<u32>, String> {
     )?])
 }
 
+/// Aggregate timing summary sent to stdout and optionally to a file.
 #[derive(Serialize)]
 struct PreviewBatchSummary {
     frame_count: usize,
@@ -56,6 +71,8 @@ struct PreviewBatchSummary {
     reports: Vec<PreviewRenderReport>,
 }
 
+/// Averages `TimingBucket` maps across multiple preview reports by summing
+/// totals and maxes, then dividing totals by accumulated counts.
 fn average_timing_buckets(
     reports: &[PreviewRenderReport],
     extractor: fn(&PreviewRenderReport) -> &BTreeMap<String, TimingBucket>,
@@ -83,6 +100,8 @@ fn average_timing_buckets(
     combined
 }
 
+/// Produces aggregate timing statistics from a batch of per-frame reports,
+/// including min/max/avg total render time and per-phase bucket averages.
 fn summarize_reports(reports: Vec<PreviewRenderReport>) -> PreviewBatchSummary {
     let frame_count = reports.len();
     let seconds = reports
@@ -120,14 +139,32 @@ fn summarize_reports(reports: Vec<PreviewRenderReport>) -> PreviewBatchSummary {
     }
 }
 
+/// Renders one or more preview frames and outputs timing data.
+///
+/// # Phases
+///
+/// 1. **Argument parsing** — resolve payload, config, output path, and
+///    optional timing output path from CLI flags.
+/// 2. **Asset preparation** — parse activity + config, build dense report,
+///    and call `prepare_preview_assets` once so label caching is shared.
+/// 3. **Per-second render loop** — for each target second, reconstruct the
+///    output filename (first frame uses `--out` verbatim; subsequent frames
+///    append `_<second>` to avoid overwriting) and call
+///    `render_preview_with_prepared_assets`. The first iteration receives
+///    the real prepare timings and label cache status; subsequent iterations
+///    receive empty or `Hit` variants to avoid double-counting.
+/// 4. **Summarization** — aggregate per-frame reports into `PreviewBatchSummary`.
+/// 5. **Output** — write timing JSON to file if requested, then print to stdout.
 fn main() -> Result<(), String> {
     let args = std::env::args().collect::<Vec<_>>();
+    // -- Phase 1: parse CLI arguments --
     let payload_path = PathBuf::from(read_arg("--payload", &args)?);
     let config_path = PathBuf::from(read_arg("--config", &args)?);
     let out_path = PathBuf::from(read_arg("--out", &args)?);
     let timing_out_path = read_optional_arg("--timing-out", &args).map(PathBuf::from);
     let seconds = parse_seconds(&args)?;
 
+    // -- Phase 2: load payload, config, and prepare shared preview assets --
     let payload_json = fs::read_to_string(&payload_path)
         .map_err(|error| format!("Failed to read {}: {error}", payload_path.display()))?;
     let config_json = fs::read_to_string(&config_path)
@@ -143,7 +180,10 @@ fn main() -> Result<(), String> {
         prepare_preview_assets(&paths, &config, &activity, &dense_activity)
             .map_err(|e| e.to_string())?;
     let mut reports = Vec::with_capacity(seconds.len());
+    // -- Phase 3: render one preview frame per requested second --
     for (index, second) in seconds.into_iter().enumerate() {
+        // First iteration writes to --out verbatim; subsequent iterations
+        // append _<second> so multi-frame batches don't overwrite.
         let target_out_path = if reports.is_empty() {
             out_path.clone()
         } else {
@@ -192,8 +232,10 @@ fn main() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
         reports.push(report);
     }
+    // -- Phase 4: aggregate per-frame timing data into a summary --
     let summary = summarize_reports(reports);
 
+    // -- Phase 5: write timing file if requested, then print to stdout --
     if let Some(timing_out_path) = timing_out_path {
         if let Some(parent) = timing_out_path.parent() {
             fs::create_dir_all(parent)

@@ -18,6 +18,14 @@ use crate::activity::schema::DenseActivityReport;
 
 /// Draws the gradient value widget — percentage text with a slope triangle.
 ///
+/// # Three-phase layout
+///
+/// 1. **Layout** — resolve gradient data, measure text, and compute position for
+///    the value text and slope triangle so both stay stable across frames.
+/// 2. **Text** — draw the formatted percentage at the computed position.
+/// 3. **Triangle** — render a zero-line stroke or filled triangle depending on
+///    whether the raw grade is near zero, positive, or negative.
+///
 /// Color switches between positive and negative config colors based on the
 /// sign of the raw gradient value. The triangle is filled for non-zero grades
 /// and drawn as a flat zero-line stroke when the gradient is within epsilon
@@ -33,6 +41,7 @@ pub(crate) fn draw_gradient_value_widget(
     scale: f32,
     font_dirs: &[PathBuf],
 ) -> bool {
+    // Phase 1: resolve gradient data, measure text, and compute stable layout coordinates.
     let raw_gradient = dense_activity
         .series
         .gradient
@@ -66,12 +75,14 @@ pub(crate) fn draw_gradient_value_widget(
     value_style.x = value_left;
     value_style.y = value_top;
     value_style.line_height = value_line_height;
+    // Phase 2: draw the formatted percentage text.
     draw_text(canvas, &value_text, &value_style, font_dirs);
 
     if !show_triangle {
         return true;
     }
 
+    // Phase 3: render the slope triangle — zero-line stroke or filled triangle.
     let triangle_left = base_style.x + ((content_width - triangle_width) * 0.5);
     let triangle_color = if raw_gradient.unwrap_or(0.0) < 0.0 {
         value

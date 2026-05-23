@@ -65,6 +65,18 @@ fn trim_numeric_series(
 /// The returned timeline starts at `0.0` seconds and ends at `end - start`.
 /// Optional telemetry series are only copied when requested by
 /// [`RenderDataRequirements`].
+///
+/// Phases:
+/// 1. Validate that the activity has enough samples and the trim window fits
+///    within the activity duration.
+/// 2. Find the source-sample indices that lie strictly inside the trim
+///    boundaries (synthetic boundary values are added separately below).
+/// 3. Build a trim-relative elapsed-seconds vector (first value is `0.0`,
+///    last value is `end - start`).
+/// 4. Trim distance progress, course, and compute the trim-adjusted start
+///    timestamp.
+/// 5. Trim every requested numeric telemetry series, each with interpolated
+///    boundary values so downstream interpolation has exact endpoints.
 #[must_use = "trimmed activity must be consumed for densification"]
 pub fn trim_activity(
     activity: &ParsedActivity,
@@ -72,6 +84,7 @@ pub fn trim_activity(
     end: f64,
     requirements: &RenderDataRequirements,
 ) -> CoreResult<TrimmedActivity> {
+    // ── Phase 1: validate inputs ─────────────────────────────────────────
     if activity.sample_elapsed_seconds.len() < 2 {
         return Err(CoreError::Activity(
             "parsedActivity must contain at least two sample_elapsed_seconds values".into(),
@@ -87,9 +100,13 @@ pub fn trim_activity(
     );
     validate_trim_window(duration, start, end)?;
 
+    // ── Phase 2: find interior source-sample indices ─────────────────────
     let elapsed = &activity.sample_elapsed_seconds;
     let (start_inner_index, end_inner_index) = split_trim_indices(elapsed, start, end);
 
+    // ── Phase 3: build trim-relative elapsed timeline ────────────────────
+    // The first entry is always 0.0, the last is end - start. Interior
+    // samples are offset so the timeline is contiguous from zero.
     let mut trimmed_elapsed =
         Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
     trimmed_elapsed.push(0.0);
@@ -100,6 +117,10 @@ pub fn trim_activity(
     );
     trimmed_elapsed.push(end - start);
 
+    // ── Phase 4: trim distance progress, course, and start timestamp ─────
+    // Absolute distance progress is not re-normalized to the trim — route
+    // and elevation widgets decide whether they need absolute or
+    // trim-relative progress at render time.
     let trimmed_distance_progress = if !requirements.distance_progress
         || activity.sample_distance_progress.is_empty()
     {
@@ -142,6 +163,9 @@ pub fn trim_activity(
         Vec::new()
     };
 
+    // The trim-adjusted start time is the source start offset forward by
+    // the scene start, so per-frame timestamps in the dense report always
+    // correspond to the correct wall-clock moment.
     let start_time = activity
         .source_start_time
         .as_deref()
@@ -152,6 +176,10 @@ pub fn trim_activity(
         })
         .map(|value| value.to_rfc3339_opts(SecondsFormat::Millis, true));
 
+    // ── Phase 5: trim each requested numeric series ──────────────────────
+    // Each series gets interpolated boundary values at the exact start/end
+    // positions so downstream interpolation has precise endpoints even when
+    // the trim window cuts through a source sampling interval.
     Ok(TrimmedActivity {
         source_start_time: start_time,
         sample_elapsed_seconds: trimmed_elapsed,

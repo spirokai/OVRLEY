@@ -1,4 +1,4 @@
-# Phase 6 - Rust Documentation Pass: Reusable Execution Brief
+# Rust Documentation Pass: Reusable Execution Brief
 
 ## Purpose
 

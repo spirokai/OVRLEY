@@ -1,10 +1,10 @@
-Execute the documentation pass described in `.agents/backend-refactor-Phase6.md`.
+Execute the documentation pass described in `.agents/rust-documentation.md`.
 
 Your job is to apply that plan to the Rust code under `src-tauri/` exactly as written. Treat the plan file as the source of truth for scope, workflow, quality bar, anti-laziness guardrails, and completion criteria.
 
 Requirements:
 
-1. Read `.agents/backend-refactor-Phase6.md` first and follow it literally.
+1. Read `.agents/rust-documentation.md` first and follow it literally.
 2. Inventory every `.rs` file under `src-tauri/` before making edits, record the starting file count, and maintain a reviewed-file checklist.
 3. Review every file in scope, including production code, binaries, `build.rs`, unit tests, integration tests, nested test modules, and shared test helpers.
 4. Do not skip files because they look small, obvious, repetitive, or unimportant.
@@ -22,7 +22,7 @@ Requirements:
 
 Execution workflow:
 
-1. Read `.agents/backend-refactor-Phase6.md`.
+1. Read `.agents/rust-documentation.md`.
 2. Build the full Rust file inventory under `src-tauri/`.
 3. Group the inventory by crate/subsystem or file category.
 4. Review each file and classify it as:
@@ -43,4 +43,4 @@ Final output requirements:
 5. Report verification results honestly, including anything not run.
 6. Explicitly call out any skipped files, blockers, or incomplete areas. Silent omissions are not allowed.
 
-Begin by reading `.agents/backend-refactor-Phase6.md` and building the full `src-tauri/**/*.rs` inventory.
+Begin by reading `.agents/rust-documentation.md` and building the full `src-tauri/**/*.rs` inventory.

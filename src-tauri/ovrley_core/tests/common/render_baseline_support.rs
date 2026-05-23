@@ -278,7 +278,10 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
 /// 3. Render through the public `render_composite_video` entry point.
 /// 4. Validate output metadata and compare selected decoded frames.
 fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
+    // ── Phase 1: prepare isolated runtime sandbox ────────────────────
     let runtime = prepare_case_runtime("composite", &case.name)?;
+
+    // ── Phase 2: probe source video to get its real FPS/duration ────
     let source_video = fixtures_root().join(&case.source_video);
     ensure_source_video_exists(&source_video)?;
     let source_metadata = probe_video(
@@ -296,6 +299,7 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
         .duration
         .ok_or_else(|| anyhow!("source video is missing duration metadata"))?;
 
+    // ── Phase 3: load fixtures and apply case-specific scene timing ──
     let activity = load_activity(&case.activity)?;
     let mut config = load_config(&case.config)?;
     config.scene.start = case.sync_offset;
@@ -311,6 +315,7 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     config.scene.composite_video_trim_start = Some(case.trim_start_seconds);
     config.scene.composite_widget_update_rate = Some(1);
 
+    // ── Phase 4: build dense activity and prepare render controller ──
     let dense_activity = build_dense_activity_report(&activity, &config)
         .context("failed to build dense activity for composite case")?;
     let total_frames = (case.duration_seconds * f64::from(source_fps_num)
@@ -322,6 +327,7 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
         .try_start(total_frames, &format!("composite baseline {}", case.name))
         .context("failed to start composite render controller")?;
 
+    // ── Phase 5: dispatch composite render through public entry point ──
     let filename = render_composite_video(&CompositeRenderRequest {
         paths: &runtime.app_paths,
         config: &config,
@@ -350,6 +356,7 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     let output_path = runtime.app_paths.downloads_dir.join(filename);
     assert_nonempty_output(&output_path)?;
 
+    // ── Phase 6: validate output metadata and compare decoded frames ──
     let output_metadata = probe_video(&runtime.app_paths.repo_root, &output_path.to_string_lossy())
         .context("failed to probe composite output")?;
     let expected_audio = if case.expect_source_audio_passthrough {
@@ -378,6 +385,12 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
 }
 
 /// Creates a clean repo-local runtime sandbox for one case.
+///
+/// Each case gets its own subdirectory under
+/// `target/render-baseline-suite/{kind}/{case_name}` with isolated
+/// downloads, temp, debug, artifacts, and failure directories. Previous
+/// output is removed before creating fresh directories so that re-runs
+/// are isolated.
 fn prepare_case_runtime(kind: &str, case_name: &str) -> Result<CaseRuntime> {
     let case_root = test_config::workspace_root()
         .join("target")
@@ -535,11 +548,13 @@ fn compare_or_record_png(
     baseline_path: &Path,
     failure_dir: &Path,
 ) -> Result<()> {
+    // ── Phase 1: ensure baseline directory exists ────────────────────
     if let Some(parent) = baseline_path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("failed to create {}", parent.display()))?;
     }
 
+    // ── Phase 2: record mode — copy actual over baseline and return ──
     if should_record_baselines() {
         fs::copy(actual_path, baseline_path).with_context(|| {
             format!(
@@ -555,6 +570,7 @@ fn compare_or_record_png(
         return Ok(());
     }
 
+    // ── Phase 3: compare mode — ensure baseline exists ──────────────
     if !baseline_path.is_file() {
         bail!(
             "missing baseline for {case_label}: {}. Record baselines with `OVRLEY_RECORD_BASELINES=1 cargo test -p ovrley_core --test render_baseline_suite -- --nocapture`.",
@@ -562,10 +578,12 @@ fn compare_or_record_png(
         );
     }
 
+    // ── Phase 4: decode both images to raw RGBA ─────────────────────
     let repo_root = test_config::repo_git_root();
     let actual = decode_png_to_rgba(&repo_root, actual_path)?;
     let baseline = decode_png_to_rgba(&repo_root, baseline_path)?;
 
+    // ── Phase 5: check dimension equality ───────────────────────────
     if (actual.width, actual.height) != (baseline.width, baseline.height) {
         let mismatch_dir = failure_dir.join(sanitize_case_label(case_label));
         fs::create_dir_all(&mismatch_dir)
@@ -579,6 +597,7 @@ fn compare_or_record_png(
         );
     }
 
+    // ── Phase 6: per-pixel comparison — build diff image and parity stats ──
     let width = actual.width;
     let height = actual.height;
     let mut stats = ParityStats {
@@ -612,6 +631,7 @@ fn compare_or_record_png(
         return Ok(());
     }
 
+    // ── Phase 7: produce mismatch artifacts only on failure ─────────
     let mismatch_dir = failure_dir.join(sanitize_case_label(case_label));
     fs::create_dir_all(&mismatch_dir)
         .with_context(|| format!("failed to create {}", mismatch_dir.display()))?;

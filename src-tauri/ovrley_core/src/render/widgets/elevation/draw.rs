@@ -1,8 +1,14 @@
 /// Per-frame elevation widget drawing.
 ///
-/// Composites the static remaining-area/line layer, draws the completed
-/// polyline and area fill up to the frame's marker position, draws the
-/// marker itself, and renders optional metric/imperial/legacy labels.
+/// # Five-phase composition
+///
+/// 1. **Fetch** — retrieve precomputed frame state and build completed points.
+/// 2. **Static layer** — draw the cached remaining area/line (unchanging per frame).
+/// 3. **Completed overlay** — draw the area fill, polyline, and marker for the
+///    portion of the profile the marker has already passed.
+/// 4. **Labels** — draw metric, imperial, or legacy elevation labels outside the
+///    widget transform so text stays upright regardless of rotation.
+/// 5. **Report** — build preview diagnostics from widget geometry and frame state.
 use super::super::common::{
     draw_static_layer, format_elevation_label, rotate_point_to_canvas, widget_render_report,
 };
@@ -26,6 +32,7 @@ pub(crate) fn draw_elevation_widget(
     frame_index: usize,
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
+    // Phase 1: fetch precomputed frame state and build the completed-points prefix.
     let scene_scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let state = elevation_cache
         .frame_states
@@ -38,6 +45,7 @@ pub(crate) fn draw_elevation_widget(
     );
     let baseline_y = elevation_cache.plot.height as f32;
 
+    // Phase 2–3: draw the static remaining layer, then the completed area/polyline/marker.
     frame_profiler.measure("composite.elevation", || {
         with_widget_transform(
             canvas,
@@ -45,7 +53,9 @@ pub(crate) fn draw_elevation_widget(
             elevation_cache.plot.y,
             elevation_cache.plot.rotation,
             |canvas| {
+                // Phase 2: static remaining layer (drawn first so completed content sits on top).
                 draw_static_layer(canvas, elevation_cache.remaining_layer.as_ref());
+                // Phase 3: completed overlay — area, polyline, and marker for the traversed portion.
                 draw_area(
                     canvas,
                     &completed_points,
@@ -83,6 +93,8 @@ pub(crate) fn draw_elevation_widget(
         elevation_cache.plot.rotation,
     );
 
+    // Phase 4: draw elevation labels outside the widget transform so text orientation
+    // stays upright even when the widget itself is rotated.
     if elevation_cache.plot.show_elevation_metric {
         frame_profiler.measure("text.elevation_label", || {
             draw_elevation_label(
@@ -148,6 +160,7 @@ pub(crate) fn draw_elevation_widget(
         });
     }
 
+    // Phase 5: build preview diagnostics from widget geometry and current frame state.
     Some(widget_render_report(
         elevation_cache.plot.x,
         elevation_cache.plot.y,

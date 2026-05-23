@@ -1,3 +1,17 @@
+//! Offline overlay rendering binary.
+//!
+//! This binary accepts pre-built activity and config JSON files (typically
+//! produced by the frontend) and runs a single-pass Skia + ffmpeg render
+//! without a Tauri window. It is used as a subprocess by the frontend so that
+//! long renders don't block the UI.
+//!
+//! Responsibilities:
+//! - Deserialize activity data and render config.
+//! - Inject optional ffmpeg overrides (codec, container, pix_fmt) from CLI.
+//! - Run the full render pipeline and print the output filename as JSON.
+//!
+//! Does not own: parsing or encoding — those live in `ovrley_core`.
+
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::config::parse_config_json;
 use ovrley_core::encode::video::{render_video, RenderController};
@@ -10,6 +24,9 @@ use std::path::PathBuf;
 mod common;
 use common::{read_arg, read_optional_arg, repo_root};
 
+/// Ensures `config.scene.ffmpeg` is a JSON object, defaulting to an empty
+/// one if it was null. Returns a mutable reference so callers can insert
+/// override keys without repeated null checks.
 fn ensure_ffmpeg_object(
     config: &mut ovrley_core::config::RenderConfig,
 ) -> Result<&mut Map<String, Value>, String> {
@@ -23,6 +40,10 @@ fn ensure_ffmpeg_object(
         .ok_or_else(|| "scene.ffmpeg must be a JSON object".to_string())
 }
 
+/// Inserts a string key into the ffmpeg config object when a value is given.
+///
+/// A no-op when `value` is `None`, so callers can pass optional CLI flags
+/// without branching on presence.
 fn set_ffmpeg_string(
     config: &mut ovrley_core::config::RenderConfig,
     key: &str,
@@ -34,6 +55,18 @@ fn set_ffmpeg_string(
     Ok(())
 }
 
+/// Runs a single-pass overlay video render from pre-built JSON files.
+///
+/// # Arguments (via `--flag value` CLI)
+///
+/// * `--payload <path>` — parsed activity JSON (required).
+/// * `--config <path>` — render configuration JSON (required).
+/// * `--codec`, `--container`, `--pix-fmt`, `--loglevel` — optional ffmpeg overrides.
+///
+/// # Output
+///
+/// Prints `{"filename":"<output>"}` to stdout on success so the frontend can
+/// pick up the generated file path.
 fn main() -> Result<(), String> {
     let args = std::env::args().collect::<Vec<_>>();
     let payload_path = PathBuf::from(read_arg("--payload", &args)?);

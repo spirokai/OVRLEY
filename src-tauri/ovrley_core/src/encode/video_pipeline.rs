@@ -111,6 +111,7 @@ pub(crate) fn render_video_single(
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> CoreResult<String> {
+    // ── PHASE 1: SETUP — derive dimensions, frame counts, paths, and ffmpeg args ──
     // The render loop is the producer; ffmpeg stdin is the consumer. A bounded
     // frame queue plus a free-buffer pool limit peak memory while allowing
     // encoder IO to overlap with Skia rendering.
@@ -125,6 +126,7 @@ pub(crate) fn render_video_single(
     let total_frames = rendered_frame_count(dense_activity.frame_count, update_rate) as u32;
     let container_fps = config.container_fps();
     let debug_dir = create_debug_dir(paths, "phase_6")?;
+    // ── PHASE 2: BUILD SKIA ASSETS — pre-render maps, fonts, and label cache ──
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
         prepare_preview_assets(paths, config, activity, dense_activity)?;
     write_prepare_summary(
@@ -147,6 +149,7 @@ pub(crate) fn render_video_single(
     let mut aggregate_profiler = RenderProfiler::default();
     let render_started = Instant::now();
 
+    // ── PHASE 3: CREATE BUFFER POOL (N+1 buffers for N-slot bounded channel) ──
     let frame_byte_len = (width as usize) * (height as usize) * 4;
     let (sender, receiver) = mpsc::sync_channel::<FrameBuffer>(FRAME_QUEUE_SIZE);
     let (free_sender, free_receiver) = mpsc::sync_channel::<FrameBuffer>(FRAME_QUEUE_SIZE + 1);
@@ -157,6 +160,9 @@ pub(crate) fn render_video_single(
             })
             .map_err(|_| CoreError::Encode("Failed to initialize frame buffer pool".to_string()))?;
     }
+    // ── PHASE 4: SPAWN FFMPEG & WORKER THREADS (writer + monitor) ──
+    // ffmpeg is spawned before the render loop starts. The writer owns stdin
+    // and drains the bounded frame queue; the monitor parses stderr for progress.
     let mut child = spawn_ffmpeg_process(
         &ffmpeg_bin,
         &ffmpeg_settings,
@@ -326,6 +332,8 @@ pub(crate) fn render_video_single(
     }
 
     let total_time_taken = render_started.elapsed().as_secs_f64();
+
+    // ── PHASE 7: FINALIZATION — write debug summary, return public filename ──
     let merged_timings = merge_timing_maps(aggregate_profiler.summary(), writer_result.timings);
     write_timing_summary_with_phase(
         &debug_dir,

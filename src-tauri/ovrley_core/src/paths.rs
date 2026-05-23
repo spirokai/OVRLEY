@@ -103,6 +103,11 @@ impl AppPaths {
     }
 }
 
+// Resolves the platform-specific OVRLEY documents directory.
+//
+// On Windows this is `%USERPROFILE%\Documents\OVRLEY`; on other platforms it
+// is `$HOME/Documents/OVRLEY`. Falls back to `.` if the home directory cannot
+// be determined.
 fn documents_ovrley_dir() -> PathBuf {
     let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)
@@ -110,6 +115,11 @@ fn documents_ovrley_dir() -> PathBuf {
     home.join("Documents").join("OVRLEY")
 }
 
+// Resolves the platform-specific OVRLEY downloads directory.
+//
+// On Windows this is `%USERPROFILE%\Downloads\OVRLEY`; on other platforms it
+// is `$HOME/Downloads/OVRLEY`. This directory doubles as the runtime scratch
+// space (`.runtime/` subdirectory) for temporary files and debug artifacts.
 fn downloads_ovrley_dir() -> PathBuf {
     let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)

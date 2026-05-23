@@ -1,3 +1,14 @@
+//! Composite widget-update-rate scaling benchmark binary.
+//!
+//! Measures how widget update rate (1, 2, 3, 6 frames) affects composite
+//! render throughput for each available composite GPU codec. Runs 3 iterations
+//! per (codec, update_rate) pair with 60-second cooldowns between groups.
+//!
+//! Outputs aggregated timing and file-size results to
+//! `debug/benchmarks/update_rate.json`.
+//!
+//! Does not own: rendering or encoding — delegates to `ovrley_core`.
+
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::config::parse_config_json;
 use ovrley_core::encode::codec_detect::detect_codecs;
@@ -24,13 +35,16 @@ use benchmark_common::{
     CommonRunMetrics,
 };
 
+/// GPU composite codec profiles exercised by this benchmark.
 const CODECS: &[(&str, &str)] = &[
     ("nnvgpu_h264", "nnvgpu_h264"),
     ("qsv_full_h264", "qsv_full_h264"),
 ];
 
+/// Widget update rates tested (activity-seconds between widget recomputes).
 const UPDATE_RATES: &[u32] = &[1, 2, 3, 6];
 
+/// Parses three positional CLI arguments: activity path, template path, video path.
 fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     let program = &args[0];
     let rest = &args[1..];
@@ -47,6 +61,7 @@ fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     }
 }
 
+/// Per-run result for one (codec, update_rate) iteration.
 #[derive(Serialize)]
 struct RunResult {
     update_rate: u32,
@@ -73,6 +88,7 @@ struct RunResult {
     overlay_frame_count: Option<u32>,
 }
 
+/// Averaged metrics over successful runs for one (codec, update_rate) pair.
 #[derive(Serialize)]
 struct AverageResult {
     job_time: String,
@@ -80,6 +96,7 @@ struct AverageResult {
     file_size_mb: f64,
 }
 
+/// Aggregated results for one update rate (3 runs).
 #[derive(Serialize)]
 struct UpdateRateResults {
     available: bool,
@@ -90,16 +107,19 @@ struct UpdateRateResults {
     failed_runs: u32,
 }
 
+/// One codec's results across all update rates.
 #[derive(Serialize)]
 struct CodecEntry {
     update_rates: BTreeMap<String, UpdateRateResults>,
 }
 
+/// Resolution info extracted from the template.
 #[derive(Serialize)]
 struct ConfigInfo {
     resolution: String,
 }
 
+/// Activity and video trim window used for the render.
 #[derive(Serialize)]
 struct RenderWindow {
     start: f64,
@@ -107,6 +127,7 @@ struct RenderWindow {
     duration_seconds: f64,
 }
 
+/// Source video metadata included in the benchmark output.
 #[derive(Serialize)]
 struct VideoInfo {
     path: String,
@@ -116,6 +137,7 @@ struct VideoInfo {
     duration_seconds: f64,
 }
 
+/// Root JSON schema written to `debug/benchmarks/update_rate.json`.
 #[derive(Serialize)]
 struct BenchmarkOutput {
     generated_at: String,
@@ -128,7 +150,24 @@ struct BenchmarkOutput {
     results: BTreeMap<String, CodecEntry>,
 }
 
+/// Runs the widget-update-rate composite encoding benchmark.
+///
+/// # Phases
+///
+/// 1. **Setup** — parse CLI args, prevent system sleep, resolve paths, detect
+///    available codecs, probe video metadata, compute a 60-second render window.
+/// 2. **Outer codec loop** — for each GPU codec (nnvgpu_h264, qsv_full_h264),
+///    check availability.
+/// 3. **Middle update-rate loop** — for each update rate (1, 2, 3, 6), compute
+///    overlay FPS and run 3 iterations with cooldowns between update-rate groups.
+/// 4. **Inner run loop** — serialize per-run config (injecting the update rate
+///    and QSV init args if applicable), build dense activity report, create a
+///    `RenderController`, call `render_composite_video`, measure elapsed time
+///    and output file size, and record success/failure.
+/// 5. **Output** — aggregate results into `BenchmarkOutput` and write to
+///    `debug/benchmarks/update_rate.json`.
 fn main() -> Result<(), String> {
+    // -- Phase 1: setup and codec detection --
     prevent_sleep();
 
     let args: Vec<String> = std::env::args().collect();
@@ -166,6 +205,7 @@ fn main() -> Result<(), String> {
         video_res_text,
     );
 
+    // -- Compute a 60-second render window from video duration --
     let (activity_start, activity_end, render_duration, trim_start) = if video_duration >= 360.0 {
         (300.0, 360.0, 60.0, 300.0)
     } else if video_duration >= 60.0 {
@@ -216,6 +256,7 @@ fn main() -> Result<(), String> {
 
     let mut results = BTreeMap::new();
 
+    // -- Phase 2: outer loop — iterate over GPU composite codec profiles --
     for (codec_index, &(display_name, codec_key)) in CODECS.iter().enumerate() {
         println!("\n=== Codec: {display_name} ===");
 
@@ -234,6 +275,7 @@ fn main() -> Result<(), String> {
 
         let mut update_rate_entries = BTreeMap::new();
 
+        // -- Phase 3: middle loop — iterate over widget update rates (1,2,3,6) --
         for (ur_index, &update_rate) in UPDATE_RATES.iter().enumerate() {
             let rate_label = format!("ur{}", update_rate);
             println!("    Update rate: {update_rate}");
@@ -247,6 +289,7 @@ fn main() -> Result<(), String> {
             let mut runs = Vec::with_capacity(3);
             let mut successful_run_data: Vec<CommonRunMetrics> = Vec::new();
 
+            // -- Phase 4: inner loop — run 3 composite renders for this (codec, rate) --
             for run_num in 1..=3 {
                 print!("      Run {run_num}/3... ");
 
@@ -416,6 +459,7 @@ fn main() -> Result<(), String> {
         );
     }
 
+    // -- Phase 5: serialize results and write to debug/benchmarks/update_rate.json --
     let output = BenchmarkOutput {
         generated_at: unix_timestamp(),
         template: template_name,

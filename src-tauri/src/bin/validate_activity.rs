@@ -1,3 +1,12 @@
+//! Activity parsing validation binary.
+//!
+//! Reads a raw activity payload and a render config, then produces the
+//! dense activity report (`DenseActivityReport`) that the render pipeline
+//! consumes. Writes the report as JSON to the `--out` path so developers
+//! can inspect the internal frame-by-frame data.
+//!
+//! This binary is a diagnostic tool — it does no rendering.
+
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::config::parse_config_json;
 use std::fs;
@@ -7,6 +16,14 @@ use std::path::PathBuf;
 mod common;
 use common::read_arg;
 
+/// Validates that a given activity file and config produce a parse-able
+/// dense activity report, and writes the report to disk.
+///
+/// # Arguments
+///
+/// * `--payload <path>` — activity JSON (required).
+/// * `--config <path>` — render config JSON (required).
+/// * `--out <path>` — output path for the dense report JSON (required).
 fn main() -> Result<(), String> {
     let args = std::env::args().collect::<Vec<_>>();
     let payload_path = PathBuf::from(read_arg("--payload", &args)?);

@@ -169,14 +169,22 @@ pub struct CompositeFfmpegBuildRequest<'a> {
 /// apply frame-accurate video trimming. Input 1 is the raw RGBA overlay stream
 /// on `pipe:0`, and input 2 is a separately trimmed source-media input used for
 /// copying audio without re-encoding it.
+///
+/// The function validates inputs, selects and configures an encoder profile,
+/// then assembles four argument groups that callers concatenate in order: HW
+/// init args, input 0 (unseeked video), input 1 (overlay pipe), input 2 (trimmed
+/// audio source), filter_complex, and output args.
 pub fn build_composite_ffmpeg_settings(
     request: &CompositeFfmpegBuildRequest<'_>,
 ) -> CoreResult<CompositeFfmpegSettings> {
+    // ── PHASE 1: VALIDATE INPUTS & REDUCE FPS ──
     validate_composite_inputs(request)?;
 
     let source_fps = request.source_fps.reduced();
     let overlay_pipe_fps = request.overlay_pipe_fps.reduced();
     let video_path = request.video_path.to_string_lossy().to_string();
+
+    // ── PHASE 2: SELECT & CONFIGURE PROFILE ──
     let mut selected_profile =
         select_composite_profile(request.codec_name, request.hwaccel_available)?;
     if selected_profile.name.starts_with("qsv_full_") {
@@ -189,9 +197,11 @@ pub fn build_composite_ffmpeg_settings(
         selected_profile.input_args = request.hwaccel_available.qsv_full_init_args().to_vec();
     }
 
+    // ── PHASE 3: BUILD INPUT 0 ARGS (unseeked source video for filter-side trim) ──
     let mut input_0_args = selected_profile.input_args.clone();
     input_0_args.extend(["-i".to_string(), video_path.clone()]);
 
+    // ── PHASE 4: BUILD INPUT 1 ARGS (raw RGBA overlay via stdin pipe) ──
     let input_1_args = vec![
         "-thread_queue_size".to_string(),
         "512".to_string(),
@@ -211,6 +221,7 @@ pub fn build_composite_ffmpeg_settings(
         "pipe:0".to_string(),
     ];
 
+    // ── PHASE 5: BUILD INPUT 2 ARGS (trimmed audio source for stream copy) ──
     let mut input_2_args = Vec::new();
     if request.video_trim_start > 0.0 {
         input_2_args.push("-ss".to_string());
@@ -223,6 +234,7 @@ pub fn build_composite_ffmpeg_settings(
         video_path,
     ]);
 
+    // ── PHASE 6: BUILD FILTER COMPLEX (video trim + scale + overlay + format) ──
     let filter_complex = composite_filter_complex(
         request.width,
         request.height,
@@ -230,6 +242,8 @@ pub fn build_composite_ffmpeg_settings(
         request.render_duration,
         &selected_profile,
     )?;
+
+    // ── PHASE 7: BUILD OUTPUT ARGS (map, codec, bitrate, audio copy, mux flags) ──
     let mut output_args = vec![
         "-map".to_string(),
         "[out]".to_string(),

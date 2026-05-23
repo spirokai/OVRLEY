@@ -65,6 +65,15 @@ pub(crate) fn should_parallelize_composite(
 }
 
 /// Renders output as multiple second-aligned transparent segments and stitches them.
+///
+/// # Phases
+/// 1. Determine segment boundaries from integer-second scene edges
+/// 2. Build per-segment configs and dense activity reports
+/// 3. Spawn one render thread per segment with a shared cancel flag
+/// 4. Aggregate child progress into the parent controller via polling loop
+/// 5. On first failure, cancel sibling segments and clean up
+/// 6. Stitch successful segment outputs with ffmpeg concat (stream copy)
+/// 7. Clean up temporary segment files
 pub(crate) fn render_video_segmented(
     paths: &AppPaths,
     config: &RenderConfig,
@@ -72,6 +81,7 @@ pub(crate) fn render_video_segmented(
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> CoreResult<String> {
+    // ── PHASE 1: FALL BACK TO SINGLE PASS FOR SHORT RENDERS ──
     let Some(total_seconds) = integer_second_duration(config) else {
         return render_video_single(paths, config, activity, dense_activity, controller);
     };
@@ -80,6 +90,7 @@ pub(crate) fn render_video_segmented(
         return render_video_single(paths, config, activity, dense_activity, controller);
     }
 
+    // ── PHASE 2: BUILD PER-SEGMENT CONFIGS & DENSE REPORTS ──
     let mut segment_configs = Vec::with_capacity(segment_count);
     let mut segment_reports = Vec::with_capacity(segment_count);
     for (segment_start, segment_end) in integer_second_windows(config, total_seconds, segment_count)
@@ -106,6 +117,7 @@ pub(crate) fn render_video_segmented(
         })
         .sum::<u32>();
 
+    // ── PHASE 3: CREATE CHILD CONTROLLERS WITH SHARED CANCEL FLAG ──
     let child_cancel_flag = controller.cancel_flag();
     let segment_controllers = segment_reports
         .iter()
@@ -122,6 +134,7 @@ pub(crate) fn render_video_segmented(
         Completed(usize, CoreResult<String>),
     }
 
+    // ── PHASE 4: SPAWN ONE RENDER THREAD PER SEGMENT ──
     let (tx, rx) = mpsc::channel::<SegmentEvent>();
     let mut handles = Vec::with_capacity(actual_segment_count);
     for index in 0..actual_segment_count {
@@ -144,11 +157,13 @@ pub(crate) fn render_video_segmented(
         handles.push(handle);
     }
 
-    // Layer 1 aggregates child progress into the parent controller.
-    // Layer 2 collects filenames and propagates the first failure through the
-    // shared cancel flag so the remaining segments stop promptly.
     drop(tx);
 
+    // ── PHASE 5: AGGREGATE PROGRESS & COLLECT RESULTS ──
+    // Layer 1 aggregates child progress into the parent controller via 200ms
+    // polling so the frontend sees progress across all segments. Layer 2
+    // collects filenames and propagates the first failure through the shared
+    // cancel flag so remaining segments stop promptly.
     let mut results = vec![None; actual_segment_count];
     let mut completed = 0usize;
     let mut first_error: Option<CoreError> = None;
@@ -194,12 +209,14 @@ pub(crate) fn render_video_segmented(
         }
     }
 
+    // ── PHASE 6: JOIN ALL SEGMENT THREADS ──
     for handle in handles {
         handle
             .join()
             .map_err(|_| CoreError::Encode("Segmented render thread panicked".to_string()))?;
     }
 
+    // ── PHASE 7: PROPAGATE FIRST ERROR OR CANCELLATION ──
     if let Some(error) = first_error {
         cleanup_segment_outputs(paths, &results);
         return Err(error);
@@ -227,6 +244,7 @@ pub(crate) fn render_video_segmented(
         None,
     );
 
+    // ── PHASE 8: STITCH SEGMENTS WITH FFMPEG CONCAT DEMUXER ──
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let public_filename = format!("video_{}.mov", timestamp_nanos()?);
     let output_path = paths.downloads_dir.join(&public_filename);
@@ -254,12 +272,22 @@ pub(crate) fn render_video_segmented(
 }
 
 /// Renders a composite MP4 as parallel time-window segments stitched together.
+///
+/// # Phases
+/// 1. Compute overlay frame count and segment count — fall back to single pass if < 2
+/// 2. Derive composite output-frame windows from total frames and source FPS
+/// 3. Spawn one render thread per segment, each running its own ffmpeg
+/// 4. Aggregate progress across segments into the parent controller
+/// 5. On first failure, cancel siblings and clean up
+/// 6. Stitch successful segments with ffmpeg concat demuxer (stream copy)
+/// 7. Clean up temporary segment output files
 pub(crate) fn render_composite_video_segmented(
     request: &CompositeRenderRequest<'_>,
     render_duration: f64,
     trim_start: f64,
     update_rate: u32,
 ) -> CoreResult<String> {
+    // ── PHASE 1: COMPUTE SEGMENT COUNT & GUARD SINGLE-PASS FALLBACK ──
     let codec = request
         .config
         .scene
@@ -279,6 +307,7 @@ pub(crate) fn render_composite_video_segmented(
         return render_composite_single_pass(request, render_duration, trim_start, update_rate);
     }
 
+    // ── PHASE 2: DERIVE COMPOSITE OUTPUT-FRAME WINDOWS ──
     let total_output_frames = (render_duration * source_fps.as_f64()).ceil().max(0.0) as u32;
     let segments = composite_output_frame_windows(
         total_output_frames,
@@ -301,6 +330,7 @@ pub(crate) fn render_composite_video_segmented(
 
     let combined_frames = segment_output_frames.iter().copied().sum::<u32>();
 
+    // ── PHASE 3: CREATE CHILD CONTROLLERS WITH SHARED CANCEL FLAG ──
     let child_cancel_flag = request.controller.cancel_flag();
     let segment_controllers: Vec<RenderController> = segment_output_frames
         .iter()
@@ -311,6 +341,7 @@ pub(crate) fn render_composite_video_segmented(
         Completed(usize, CoreResult<String>),
     }
 
+    // ── PHASE 4: SPAWN ONE RENDER THREAD PER SEGMENT ──
     let (tx, rx) = mpsc::channel::<SegmentEvent>();
     let mut handles = Vec::with_capacity(actual_segment_count);
     for index in 0..actual_segment_count {
@@ -352,9 +383,10 @@ pub(crate) fn render_composite_video_segmented(
         handles.push(handle);
     }
 
-    // Layer 1 aggregates child progress into the parent controller.
-    // Layer 2 collects filenames, cancels sibling segments on first failure,
-    // then stitches the successful outputs.
+    // ── PHASE 5: AGGREGATE PROGRESS & COLLECT RESULTS ──
+    // Layer 1 aggregates child progress into the parent controller via 200ms
+    // polling. Layer 2 collects filenames, cancels sibling segments on first
+    // failure, then orchestrates the final stitch.
     drop(tx);
 
     let mut results = vec![None; actual_segment_count];
@@ -405,12 +437,14 @@ pub(crate) fn render_composite_video_segmented(
         }
     }
 
+    // ── PHASE 6: JOIN ALL SEGMENT THREADS ──
     for handle in handles {
         handle.join().map_err(|_| {
             CoreError::Encode("Composite segment render thread panicked".to_string())
         })?;
     }
 
+    // ── PHASE 7: PROPAGATE FIRST ERROR OR CANCELLATION ──
     if let Some(error) = first_error {
         cleanup_segment_outputs(request.paths, &results);
         return Err(error);
@@ -440,6 +474,7 @@ pub(crate) fn render_composite_video_segmented(
         None,
     );
 
+    // ── PHASE 8: STITCH SEGMENTS WITH FFMPEG CONCAT ──
     let ffmpeg_bin = resolve_ffmpeg_binary(&request.paths.repo_root)?;
     let public_filename = format!("video_composited_{}.mp4", timestamp_nanos()?);
     let output_path = request.paths.downloads_dir.join(&public_filename);
@@ -449,6 +484,7 @@ pub(crate) fn render_composite_video_segmented(
         cleanup_segment_outputs(request.paths, &results);
         return Err(error);
     }
+    // ── PHASE 9: CLEAN UP TEMPORARY SEGMENT FILES ──
     cleanup_segment_outputs(request.paths, &results);
     Ok(public_filename)
 }

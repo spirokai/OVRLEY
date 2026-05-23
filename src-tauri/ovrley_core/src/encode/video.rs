@@ -40,6 +40,11 @@ pub fn render_video(
 ///
 /// The request shape stays public and stable while the facade can delegate the
 /// same bundle to either single-pass or segmented composite paths.
+///
+/// Fields such as `composite_render_duration` and `composite_video_trim_start`
+/// are optional because callers that have already computed them from the render
+/// plan can pass them directly, while the facade falls back to defaults derived
+/// from `composite_video_duration`.
 pub struct CompositeRenderRequest<'a> {
     pub paths: &'a AppPaths,
     pub config: &'a RenderConfig,

@@ -449,11 +449,14 @@ pub fn parse_range(header: Option<&str>, file_size: u64) -> ParsedRange {
     let Some(rest) = header.trim().strip_prefix("bytes=") else {
         return ParsedRange::Ignore;
     };
+    // Per RFC 7233, multi-range headers list comma-separated ranges. We only
+    // serve single ranges, so pick the first one and ignore the rest.
     let first_range = rest.split(',').next().unwrap_or("").trim();
     if first_range.is_empty() || file_size == 0 {
         return ParsedRange::Unsatisfiable;
     }
 
+    // Suffix range: `bytes=-N` → last N bytes of the file.
     if let Some(suffix) = first_range.strip_prefix('-') {
         let Ok(length) = suffix.parse::<u64>() else {
             return ParsedRange::Ignore;
@@ -468,6 +471,7 @@ pub fn parse_range(header: Option<&str>, file_size: u64) -> ParsedRange {
         });
     }
 
+    // Open-ended or bounded range: `bytes=START-` or `bytes=START-END`.
     let Some((start_raw, end_raw)) = first_range.split_once('-') else {
         return ParsedRange::Ignore;
     };
@@ -478,6 +482,8 @@ pub fn parse_range(header: Option<&str>, file_size: u64) -> ParsedRange {
         return ParsedRange::Unsatisfiable;
     }
 
+    // Empty end_raw means an open-ended request (`bytes=START-`), which
+    // extends to the last byte of the file.
     let end = if end_raw.trim().is_empty() {
         file_size - 1
     } else {
@@ -487,12 +493,19 @@ pub fn parse_range(header: Option<&str>, file_size: u64) -> ParsedRange {
         if parsed_end < start {
             return ParsedRange::Unsatisfiable;
         }
+        // Clamp `end` to the last valid byte index so the client can request
+        // an oversized end without getting a 416.
         parsed_end.min(file_size - 1)
     };
 
     ParsedRange::Valid(ByteRange { start, end })
 }
 
+/// Adapts a reader so each `read` call returns at most `CHUNK_SIZE` bytes.
+///
+/// This prevents the tiny_http response serializer from allocating a buffer
+/// large enough to hold an entire video file at once, which would cause
+/// OOM at 4K resolutions.
 struct ChunkedRead<R> {
     inner: R,
 }

@@ -67,7 +67,14 @@ pub struct Resolution {
 /// Creation time is resolved with this priority:
 /// 1. Stream-level `creation_time` tag from the first video stream
 /// 2. Container-level `creation_time` from the format tags
-/// 3. File-system modification time (converted to RFC 3339)
+/// 3. QuickTime-specific `com.apple.quicktime.creationdate` tag
+/// 4. File-system modification time (converted to RFC 3339) as final fallback
+///
+/// # Phases
+/// 1. Resolve ffprobe binary and spawn the subprocess
+/// 2. Parse JSON output into structured metadata fields
+/// 3. Extract video stream properties (codec, resolution, FPS, rotation)
+/// 4. Build creation_time via priority chain
 ///
 /// # Errors
 /// Returns [`CoreError::FfmpegNotFound`] if ffmpeg/ffprobe cannot be located.
@@ -78,6 +85,7 @@ pub struct Resolution {
 /// time < 1 second for 1080p files.
 #[must_use = "probe result contains video metadata required for rendering"]
 pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadata> {
+    // ── PHASE 1: RESOLVE FFPROBE BINARY & SPAWN SUBPROCESS ──
     let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
     let ffprobe_name = if cfg!(windows) {
         "ffprobe.exe"
@@ -109,6 +117,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
         });
     }
 
+    // ── PHASE 2: PARSE JSON INTO STRUCTURED METADATA ──
     let json: Value = serde_json::from_slice(&output.stdout)?;
 
     let mut metadata = VideoMetadata {
@@ -158,6 +167,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
             .any(|stream| stream.get("codec_type").and_then(|v| v.as_str()) == Some("audio"));
     }
 
+    // ── PHASE 3: EXTRACT VIDEO STREAM PROPERTIES ──
     if let Some(stream) = video_stream {
         metadata.codec_name = stream
             .get("codec_name")
@@ -202,6 +212,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
         metadata.duration = read_video_stream_duration(stream, metadata.fps).or(metadata.duration);
     }
 
+    // ── PHASE 4: BUILD CREATION TIME VIA PRIORITY CHAIN ──
     log::debug!("Probing video: {}", file_path);
 
     // Priority order:

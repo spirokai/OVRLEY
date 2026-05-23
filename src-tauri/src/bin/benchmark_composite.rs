@@ -1,3 +1,15 @@
+//! Composite (overlay-on-video) encoding benchmark binary.
+//!
+//! Iterates over every available composite codec profile (software, NVENC,
+//! QSV, VideoToolbox, VAAPI, AMF), runs 3 full composite renders per codec,
+//! and writes aggregated timing and file-size results to
+//! `debug/benchmarks/composite.json`.
+//!
+//! The binary sleep-cooldowns between codec groups to reduce thermal throttling
+//! bias. On Windows, it also prevents system sleep for the duration of the run.
+//!
+//! Does not own: rendering or encoding — delegates to `ovrley_core`.
+
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::config::parse_config_json;
 use ovrley_core::encode::codec_detect::detect_codecs;
@@ -24,6 +36,10 @@ use benchmark_common::{
     CommonRunMetrics,
 };
 
+/// All composite codec profiles exercised by this benchmark.
+///
+/// Each entry pairs a human-readable display name with the ffmpeg encoder
+/// name so availability can be checked via the shared codec catalog.
 const COMPOSITE_CODECS: &[(&str, &str)] = &[
     ("software_h264", "libx264"),
     ("software_hevc", "libx265"),
@@ -43,6 +59,7 @@ const COMPOSITE_CODECS: &[(&str, &str)] = &[
     ("amd_hevc", "hevc_amf"),
 ];
 
+/// Parses three positional CLI arguments: activity path, template path, video path.
 fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     let program = &args[0];
     let rest = &args[1..];
@@ -59,6 +76,7 @@ fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     }
 }
 
+/// Per-run result for a single composite encode iteration.
 #[derive(Serialize)]
 struct RunResult {
     run: u32,
@@ -81,6 +99,7 @@ struct RunResult {
     error: Option<String>,
 }
 
+/// Averaged metrics over successful runs for one codec.
 #[derive(Serialize)]
 struct AverageResult {
     job_time: String,
@@ -88,6 +107,7 @@ struct AverageResult {
     file_size_mb: f64,
 }
 
+/// Aggregated results for one codec across all runs.
 #[derive(Serialize)]
 struct CodecResults {
     available: bool,
@@ -99,12 +119,14 @@ struct CodecResults {
     failed_runs: u32,
 }
 
+/// Resolution and update-rate config extracted from the template.
 #[derive(Serialize)]
 struct ConfigInfo {
     resolution: String,
     widget_update_rate: u32,
 }
 
+/// Activity and video trim window used for the render.
 #[derive(Serialize)]
 struct RenderWindow {
     start: f64,
@@ -112,6 +134,7 @@ struct RenderWindow {
     duration_seconds: f64,
 }
 
+/// Source video metadata included in the benchmark output.
 #[derive(Serialize)]
 struct VideoInfo {
     path: String,
@@ -121,6 +144,7 @@ struct VideoInfo {
     duration_seconds: f64,
 }
 
+/// Root JSON schema written to `debug/benchmarks/composite.json`.
 #[derive(Serialize)]
 struct BenchmarkOutput {
     generated_at: String,
@@ -133,7 +157,23 @@ struct BenchmarkOutput {
     results: BTreeMap<String, CodecResults>,
 }
 
+/// Runs the composite overlay encoding benchmark across all available codecs.
+///
+/// # Phases
+///
+/// 1. **Setup** — parse CLI args, prevent system sleep, resolve paths, detect
+///    available codecs, probe the source video for FPS and duration.
+/// 2. **Render window calculation** — choose a 60-second activity segment
+///    (preferably 300–360s) aligned with the video timeline.
+/// 3. **Per-codec loop** — for each composite codec profile, check availability
+///    and run 3 full composite render iterations with cooldowns between groups.
+/// 4. **Per-run loop** — serialize config, build dense activity report, create a
+///    `RenderController`, call `render_composite_video`, measure elapsed time
+///    and output file size, and record success/failure.
+/// 5. **Output** — aggregate results into `BenchmarkOutput` and write to
+///    `debug/benchmarks/composite.json`.
 fn main() -> Result<(), String> {
+    // -- Phase 1: setup and codec detection --
     prevent_sleep();
 
     let args: Vec<String> = std::env::args().collect();
@@ -159,21 +199,7 @@ fn main() -> Result<(), String> {
         .map(|r| format!("{}x{}", r.width, r.height))
         .unwrap_or_else(|| "unknown".to_string());
 
-    println!(
-        "Video: {}  {}  {:.1}s  {}",
-        resolved_video
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy(),
-        if fps_den == 1 {
-            format!("{}fps", fps_num)
-        } else {
-            format!("{}/{}fps", fps_num, fps_den)
-        },
-        video_duration,
-        video_res_text,
-    );
-
+    // -- Phase 2: compute a 60-second render window from video duration --
     let (activity_start, activity_end, render_duration, trim_start) = if video_duration >= 360.0 {
         (300.0, 360.0, 60.0, 300.0)
     } else if video_duration >= 60.0 {
@@ -237,6 +263,7 @@ fn main() -> Result<(), String> {
 
     let mut results = BTreeMap::new();
 
+    // -- Phase 3: iterate over every composite codec profile --
     for (codec_index, &(display_name, codec_key)) in COMPOSITE_CODECS.iter().enumerate() {
         println!("\n=== Codec: {display_name} ===");
 
@@ -261,6 +288,7 @@ fn main() -> Result<(), String> {
         let mut runs = Vec::with_capacity(3);
         let mut successful_run_data: Vec<CommonRunMetrics> = Vec::new();
 
+        // -- Phase 4: run 3 full composite render iterations for this codec --
         for run_num in 1..=3 {
             print!("    Run {run_num}/3... ");
 
@@ -409,6 +437,7 @@ fn main() -> Result<(), String> {
         );
     }
 
+    // -- Phase 5: serialize results and write to debug/benchmarks/composite.json --
     let output = BenchmarkOutput {
         generated_at: unix_timestamp(),
         template: template_name,

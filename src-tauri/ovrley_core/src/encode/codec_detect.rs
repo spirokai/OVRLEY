@@ -145,6 +145,14 @@ impl AvailableCodecs {
 /// without a meaningful speedup since probe time is dominated by subprocess
 /// startup, not encode work.
 ///
+/// # Phases
+/// 1. Probe transparent codecs (prores_ks, prores_ks_vulkan, prores_videotoolbox, qtrle)
+/// 2. Probe composite codecs (libx264, libx265, h264_nvenc, hevc_nvenc, etc.)
+/// 3. Probe hardware-accelerated encode paths (QSV, AMF, VideoToolbox, VAAPI)
+/// 4. Detect CUDA and filter availability via `ffmpeg -filters`
+/// 5. Probe experimental QSV full-overlay hardware init arguments
+/// 6. Assemble the `AvailableCodecs` result struct
+///
 /// # Performance
 /// Called once at application startup. Worst case ~160s for all ~20 probes if
 /// every subprocess hits the 8-second timeout. Typical time is < 10s because
@@ -159,6 +167,7 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
     let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
     let vaapi_device = find_vaapi_device();
 
+    // ── PHASE 1: PROBE TRANSPARENT CODECS ──
     let prores_ks = probe_codec(
         "prores_ks",
         &ffmpeg_path,
@@ -260,6 +269,7 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
         ],
     );
 
+    // ── PHASE 2: PROBE SOFTWARE COMPOSITE CODECS ──
     let libx264 = probe_codec(
         "libx264",
         &ffmpeg_path,
@@ -300,6 +310,7 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
             "-",
         ],
     );
+    // ── PHASE 3: PROBE HARDWARE-ACCELERATED COMPOSITE CODECS ──
     let h264_nvenc = probe_codec(
         "h264_nvenc",
         &ffmpeg_path,
@@ -551,6 +562,8 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
         ],
     );
     let cuda = cuda_h264_nvenc || cuda_hevc_nvenc;
+
+    // ── PHASE 4: DETECT FILTER CAPABILITIES ──
     let filters = detect_ffmpeg_filters(&ffmpeg_path);
     let overlay_cuda = filters.contains("overlay_cuda");
     let scale_cuda = filters.contains("scale_cuda");
@@ -560,6 +573,8 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
     let hwdownload_filter = filters.contains("hwdownload");
     let cuda_filter_stack = cuda && overlay_cuda && scale_cuda && hwupload_filter;
     let qsv_filter_stack = overlay_qsv && scale_qsv && hwupload_filter;
+
+    // ── PHASE 5: PROBE EXPERIMENTAL QSV FULL-OVERLAY PATH ──
     let qsv_full_init_args = if (h264_qsv || hevc_qsv) && qsv_filter_stack {
         detect_qsv_full_init_args(&ffmpeg_path).unwrap_or_default()
     } else {
@@ -567,6 +582,7 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
     };
     let qsv_full = !qsv_full_init_args.is_empty();
 
+    // ── PHASE 6: ASSEMBLE RESULT ──
     Ok(AvailableCodecs {
         prores_ks,
         prores_ks_vulkan,

@@ -69,14 +69,24 @@ fn parse_xml_attr<'a>(markup: &'a str, name: &str) -> Option<&'a str> {
 
 /// Converts supported SVG path data into a Skia path.
 ///
+/// # Two-phase conversion
+///
+/// 1. **Tokenize** — split compact SVG path data into command letters and
+///    operand numbers (handles implicit separators like `M1-2.5`).
+/// 2. **Emit** — walk the token stream, mapping each SVG command to the
+///    equivalent Skia path method. Maintains current position and subpath
+///    start for relative commands and `Z` closure.
+///
 /// Implements only the path commands emitted by the bundled Lucide-style
 /// icons. Returning None for unsupported commands fails closed.
 pub(crate) fn svg_path_to_skia_path(data: &str) -> Option<Path> {
+    // Phase 1: tokenize the compact SVG path data into commands and numbers.
     let tokens = tokenize_path_data(data);
     if tokens.is_empty() {
         return None;
     }
 
+    // Phase 2: walk the token stream, mapping SVG commands to Skia path calls.
     let mut path = Path::new();
     let mut index = 0usize;
     let mut current_command = None;

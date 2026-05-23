@@ -169,19 +169,30 @@ fn interpolate_time_series(
 ///
 /// Only the series requested through [`RenderDataRequirements`] are produced;
 /// all other vectors are left empty to reduce allocation and per-frame work.
+///
+/// Phases:
+/// 1. Build the canonical frame timeline from scene duration and FPS.
+/// 2. Interpolate distance progress, course, and timestamps onto the frame
+///    timeline (only if the active template requested each one).
+/// 3. Densify every requested numeric telemetry series into per-frame vectors.
 pub fn densify_activity(
     trimmed: &TrimmedActivity,
     fps: f64,
     requirements: &RenderDataRequirements,
 ) -> DenseActivityReport {
-    // Build the canonical frame timeline first. Every enabled series uses this
-    // same target vector so all rendered values and widgets stay frame-aligned.
+    // ── Phase 1: build the canonical frame timeline ──────────────────────
+    // Every enabled series uses this same target vector so all rendered
+    // values and widgets stay frame-aligned.
     let duration = trimmed
         .sample_elapsed_seconds
         .last()
         .copied()
         .unwrap_or_default();
     let frame_elapsed_seconds = build_target_x_values(duration, fps);
+
+    // ── Phase 2: interpolate distance progress, course, timestamps ───────
+    // Distance progress is absolute (not trim-relative) so route/elevation
+    // widgets can use it without additional normalization.
     let frame_distance_progress =
         if !requirements.distance_progress || trimmed.sample_distance_progress.is_empty() {
             Vec::new()
@@ -192,6 +203,9 @@ pub fn densify_activity(
                 &frame_elapsed_seconds,
             )
         };
+
+    // Course lat/lon are interpolated independently because either component
+    // may be missing in source data.
     let (course_lat, course_lon) = if requirements.course && !trimmed.course.is_empty() {
         interpolate_course_series(
             &trimmed.sample_elapsed_seconds,
@@ -201,6 +215,9 @@ pub fn densify_activity(
     } else {
         (Vec::new(), Vec::new())
     };
+
+    // Timestamps use the source_start_time to generate synthetic values when
+    // available, falling back to interpolation from sparse source samples.
     let time = if requirements.time && !trimmed.time.is_empty() {
         interpolate_time_series(
             trimmed.source_start_time.as_deref(),
@@ -212,6 +229,9 @@ pub fn densify_activity(
         Vec::new()
     };
 
+    // ── Phase 3: densify each requested numeric series ───────────────────
+    // Empty vectors signal to render code that the series is not needed,
+    // avoiding wasted per-frame lookups and allocations.
     DenseActivityReport {
         frame_count: frame_elapsed_seconds.len(),
         frame_elapsed_seconds: frame_elapsed_seconds.clone(),

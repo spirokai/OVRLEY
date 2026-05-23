@@ -1,3 +1,14 @@
+//! Transparent (alpha-channel) overlay encoding benchmark binary.
+//!
+//! Iterates over each available transparent codec (currently `qtrle`), runs 3
+//! full transparent overlay renders per codec, and writes aggregated timing
+//! and file-size results to `debug/benchmarks/transparent.json`.
+//!
+//! The binary uses a fixed 60-second activity window (300s–360s) and cooldown
+//! sleeps between codec groups to reduce thermal bias.
+//!
+//! Does not own: rendering or encoding — delegates to `ovrley_core`.
+
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::config::parse_config_json;
 use ovrley_core::encode::codec_detect::detect_codecs;
@@ -23,6 +34,10 @@ use benchmark_common::{
     CommonRunMetrics,
 };
 
+/// Transparent codec profiles exercised by this benchmark.
+///
+/// Each entry is a display name that maps to a `TransparentCodecId` via the
+/// shared codec catalog.
 const TRANSPARENT_CODECS: &[&str] = &[
     //"prores_ks",
     //"prores_ks_vulkan",
@@ -30,6 +45,8 @@ const TRANSPARENT_CODECS: &[&str] = &[
     "qtrle",
 ];
 
+/// Parses CLI arguments: accepts `--activity <path>` / `--template <path>` or
+/// positional arguments in that order.
 fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf), String> {
     let program = &args[0];
     let rest = &args[1..];
@@ -46,6 +63,7 @@ fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf), String> {
     }
 }
 
+/// Per-run result for a single transparent encode iteration.
 #[derive(Serialize)]
 struct RunResult {
     run: u32,
@@ -68,6 +86,7 @@ struct RunResult {
     error: Option<String>,
 }
 
+/// Averaged metrics over successful runs for one codec.
 #[derive(Serialize)]
 struct AverageResult {
     job_time: String,
@@ -75,6 +94,7 @@ struct AverageResult {
     file_size_mb: f64,
 }
 
+/// Aggregated results for one codec across all runs.
 #[derive(Serialize)]
 struct CodecResults {
     available: bool,
@@ -85,12 +105,14 @@ struct CodecResults {
     failed_runs: u32,
 }
 
+/// Resolution and update-rate config extracted from the template.
 #[derive(Serialize)]
 struct ConfigInfo {
     resolution: String,
     widget_update_rate: u32,
 }
 
+/// Activity render window used for the benchmark (always 300s–360s).
 #[derive(Serialize)]
 struct RenderWindow {
     start: f64,
@@ -98,6 +120,7 @@ struct RenderWindow {
     duration_seconds: f64,
 }
 
+/// Root JSON schema written to `debug/benchmarks/transparent.json`.
 #[derive(Serialize)]
 struct BenchmarkOutput {
     generated_at: String,
@@ -108,7 +131,22 @@ struct BenchmarkOutput {
     results: BTreeMap<String, CodecResults>,
 }
 
+/// Runs the transparent overlay encoding benchmark across all available codecs.
+///
+/// # Phases
+///
+/// 1. **Setup** — parse CLI args, prevent system sleep, resolve paths, detect
+///    available codecs, load activity and template.
+/// 2. **Per-codec loop** — for each transparent codec, check availability and
+///    run 3 full transparent renders with a fixed 300s–360s activity window.
+///    Cooldown sleeps between groups.
+/// 3. **Per-run loop** — serialize config, build dense activity report, create
+///    a `RenderController`, call `render_video`, measure elapsed time and
+///    output file size, and record success/failure.
+/// 4. **Output** — aggregate results into `BenchmarkOutput` and write to
+///    `debug/benchmarks/transparent.json`.
 fn main() -> Result<(), String> {
+    // -- Phase 1: setup and codec detection --
     let args: Vec<String> = std::env::args().collect();
     let (activity_path, template_path) = parse_args(&args)?;
 
@@ -175,6 +213,7 @@ fn main() -> Result<(), String> {
 
     let mut results = BTreeMap::new();
 
+    // -- Phase 2: iterate over every transparent codec profile --
     for (codec_index, codec_name) in TRANSPARENT_CODECS.iter().enumerate() {
         println!("\n=== Codec: {codec_name} ===");
 
@@ -198,6 +237,7 @@ fn main() -> Result<(), String> {
         let mut runs = Vec::with_capacity(3);
         let mut successful_run_data: Vec<CommonRunMetrics> = Vec::new();
 
+        // -- Phase 3: run 3 full transparent render iterations for this codec --
         for run_num in 1..=3 {
             print!("    Run {run_num}/3... ");
 
@@ -317,6 +357,7 @@ fn main() -> Result<(), String> {
         );
     }
 
+    // -- Phase 4: serialize results and write to debug/benchmarks/transparent.json --
     let output = BenchmarkOutput {
         generated_at: unix_timestamp(),
         template: template_name,

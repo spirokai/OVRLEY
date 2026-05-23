@@ -44,6 +44,10 @@ use ovrley_core::encode::video_composite_pipeline::{
 };
 use ovrley_core::paths::AppPaths;
 
+/// Verifies the transparent render branch does not alter dense activity
+/// timing. A transparent config with 5–15s window at 30 FPS should produce
+/// exactly 300 frames with the first speed sample at 5.0 (the synthetic
+/// activity uses elapsed seconds as speed values).
 #[test]
 fn test_3_1_transparent_render_branch_keeps_original_dense_timing() {
     let config = transparent_config(5.0, 15.0, 30.0);
@@ -57,6 +61,10 @@ fn test_3_1_transparent_render_branch_keeps_original_dense_timing() {
     assert_eq!(dense.frame_elapsed_seconds.first().copied(), Some(0.0));
 }
 
+/// Verifies `is_composite_render` gates correctly: `backend_render` must
+/// activate the composite branch only when `composite_video_path` is set.
+/// Uses a synthetic activity and validates the render starts (controller
+/// reports `total > 0`).
 #[test]
 fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
     let paths = AppPaths::from_repo_root(PathBuf::from("."));
@@ -135,6 +143,7 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
         .starts_with("video_composited_"));
 }
 
+/// Plan derivation must reject composite configs that omit `composite_bitrate`.
 #[test]
 fn test_3_3_missing_bitrate_validation() {
     let config = composite_config(
@@ -154,6 +163,8 @@ fn test_3_3_missing_bitrate_validation() {
     );
 }
 
+/// Plan derivation must reject composite configs that omit either FPS field
+/// (numerator or denominator), giving a field-specific error for each.
 #[test]
 fn test_3_4_missing_fps_validation() {
     let missing_num = composite_config(
@@ -256,6 +267,8 @@ fn test_3_6_dense_report_timing_for_lower_overlay_update_rate() {
     assert_eq!(dense.frame_count, 300);
 }
 
+/// When `composite_render_duration` is missing, the planner defaults to
+/// remaining video duration after trim start (60s video - 10s trim = 50s).
 #[test]
 fn test_3_7_render_duration_defaults_to_remaining_video_after_trim() {
     let config = composite_config(
@@ -274,6 +287,8 @@ fn test_3_7_render_duration_defaults_to_remaining_video_after_trim() {
     assert_eq!(plan.render_duration, 50.0);
 }
 
+/// Trim start >= video duration is an immediate plan-derivation error,
+/// not a silent default.
 #[test]
 fn test_3_8_rejects_impossible_trim() {
     let config = composite_config(
@@ -295,6 +310,8 @@ fn test_3_8_rejects_impossible_trim() {
     );
 }
 
+/// Builds a minimal transparent-render config with one speed value and no
+/// composite fields — used to verify the transparent branch is selected.
 fn transparent_config(start: f64, end: f64, fps: f64) -> RenderConfig {
     parse_config_json(&format!(
         r#"{{
@@ -307,10 +324,14 @@ fn transparent_config(start: f64, end: f64, fps: f64) -> RenderConfig {
     .unwrap()
 }
 
+/// Builds a composite config from extra scene-level JSON fields injected
+/// into a boilerplate `scene` block — keeps individual tests concise.
 fn composite_config(extra_scene_fields: &str) -> RenderConfig {
     parse_config_json(&composite_config_json(extra_scene_fields)).unwrap()
 }
 
+/// Returns the full JSON template string for a composite config, splicing
+/// `extra_scene_fields` into the `scene` block.
 fn composite_config_json(extra_scene_fields: &str) -> String {
     format!(
         r#"{{
@@ -328,10 +349,13 @@ fn composite_config_json(extra_scene_fields: &str) -> String {
     )
 }
 
+/// Parses the shared synthetic activity fixture used by command tests.
+/// The fixture uses elapsed seconds as speed values so that speed == time.
 fn synthetic_activity() -> ParsedActivity {
     parse_activity_json(&synthetic_activity_json()).unwrap()
 }
 
+/// Provides the shared synthetic activity JSON string used by command tests.
 fn synthetic_activity_json() -> String {
     r#"{
             "sample_elapsed_seconds":[0.0,600.0],
@@ -343,6 +367,9 @@ fn synthetic_activity_json() -> String {
     .to_string()
 }
 
+/// Builds an isolated `AppPaths` workspace for the command integration
+/// tests, rooted under `target/command_tests` so side effects never land
+/// in user-facing directories.
 fn test_paths(ws_root: PathBuf) -> AppPaths {
     let git_root = common::test_config::repo_git_root();
     let test_root = ws_root.join("target").join("command_tests");
@@ -357,6 +384,9 @@ fn test_paths(ws_root: PathBuf) -> AppPaths {
     }
 }
 
+/// Polls the controller every 20ms for up to 6 seconds, returning the
+/// final progress snapshot once the render reaches `complete` or `error`.
+/// If the timeout expires, returns whatever progress exists at that point.
 fn wait_for_completed_progress(controller: &RenderController) -> RenderProgress {
     for _ in 0..300 {
         let progress = controller.progress();

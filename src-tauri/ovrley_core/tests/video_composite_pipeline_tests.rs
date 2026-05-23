@@ -64,6 +64,9 @@ use common::composite::{
 };
 
 #[test]
+/// Derives a plan from a 29.97 FPS source with 2x widget update rate and
+/// verifies output_fps matches source, overlay_pipe_fps is halved, and
+/// overlay/output frame counts are correct.
 fn test_4_3_derives_composite_shell_timing_without_rounding() {
     let plan = derive_fixture_composite_plan(
         r#""width":3840,"height":2160,"ffmpeg":{"codec":"libx264"}"#,
@@ -83,6 +86,8 @@ fn test_4_3_derives_composite_shell_timing_without_rounding() {
 }
 
 #[test]
+/// After deriving a plan, verifies the FFmpeg settings embedded in the plan
+/// have correct FPS args, codec/bitrate args, and filter graph labels.
 fn test_4_4_builds_ffmpeg_settings_inside_composite_shell() {
     let plan = derive_fixture_composite_plan(
         r#""width":3840,"height":2160,"ffmpeg":{"codec":"libx264"}"#,
@@ -105,6 +110,9 @@ fn test_4_4_builds_ffmpeg_settings_inside_composite_shell() {
     assert!(plan.output_filename.ends_with(".mp4"));
 }
 
+/// Verifies the fractional overrun guard: the first overlay-index whose
+/// timestamp reaches or exceeds the render duration is correctly rejected,
+/// while the previous frame's timestamp is strictly before duration.
 #[test]
 fn fractional_overrun_guard_rejects_first_timestamp_at_or_after_duration() {
     let fps = Fps::new(30000, 1001).unwrap();
@@ -117,6 +125,8 @@ fn fractional_overrun_guard_rejects_first_timestamp_at_or_after_duration() {
     assert!(overrun_time >= 1.0);
 }
 
+/// When no codec is specified in ffmpeg settings, the plan defaults to
+/// libx264 for MP4 output.
 #[test]
 fn composite_shell_defaults_to_libx264_for_mp4_output() {
     let plan = derive_fixture_composite_plan(
@@ -132,6 +142,8 @@ fn composite_shell_defaults_to_libx264_for_mp4_output() {
     assert_argument_pair(&plan.ffmpeg_settings.output_args, "-c:v", "libx264");
 }
 
+/// End-to-end composite render at 29.97 FPS with 1x update rate and 4K
+/// resolution. Verifies output file exists and is non-empty.
 #[test]
 fn test_5_1_basic_software_h264_composite_creates_mp4() {
     let result =
@@ -141,6 +153,9 @@ fn test_5_1_basic_software_h264_composite_creates_mp4() {
     assert!(result.output_size > 0);
 }
 
+/// Probes the output of a 29.97 FPS composite render and asserts the
+/// container reports 30000/1001 (not a rounded integer) in r_frame_rate
+/// or avg_frame_rate.
 #[test]
 fn test_5_2_preserves_29_97_output_fps() {
     let result =
@@ -151,6 +166,8 @@ fn test_5_2_preserves_29_97_output_fps() {
     assert!(!fps.contains("30/1"));
 }
 
+/// Probes the output of a 59.94 FPS composite render and asserts the
+/// container reports 60000/1001 (not a rounded 60/1).
 #[test]
 fn test_5_3_preserves_59_94_output_fps_when_requested() {
     let result = render_fixture_composite(
@@ -169,6 +186,8 @@ fn test_5_3_preserves_59_94_output_fps_when_requested() {
     assert!(!fps.contains("60/1"));
 }
 
+/// 60→30 overlay FPS at 2x update rate: 0.2s render = 12 output frames
+/// (6 overlay frames halved in pipe). Verifies progress matches.
 #[test]
 fn test_5_4_lower_overlay_update_rate_renders_half_overlay_frames() {
     let result =
@@ -180,6 +199,8 @@ fn test_5_4_lower_overlay_update_rate_renders_half_overlay_frames() {
     assert!(fps.contains("r_frame_rate=60000/1001") || fps.contains("avg_frame_rate=60000/1001"));
 }
 
+/// At 6x update rate the overlay pipe runs at 10 FPS (60÷6) but the output
+/// stays at 59.94 FPS. Progress still reports output frame count (12).
 #[test]
 fn test_5_5_aggressive_overlay_update_rate_renders_one_sixth_overlay_frames() {
     let result =
@@ -191,6 +212,9 @@ fn test_5_5_aggressive_overlay_update_rate_renders_one_sixth_overlay_frames() {
     assert!(fps.contains("r_frame_rate=60000/1001") || fps.contains("avg_frame_rate=60000/1001"));
 }
 
+/// Sync offset must be applied as a timing/dense-activity offset, never as
+/// an ffmpeg `-ss` seek argument on the video input. Verifies the video
+/// input uses trim-based seeking and the filter graph uses `trim=start=0`.
 #[test]
 fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
     let config = recent_template_config(3840, 2160);
@@ -221,6 +245,9 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
         .contains("trim=start=0:end=0.2,setpts=PTS-STARTPTS,"));
 }
 
+/// Fractional render durations (0.101s) must use the overrun guard so that
+/// the last written frame's timestamp is before duration and the first
+/// rejected frame's timestamp is at or after duration.
 #[test]
 fn test_5_7_fractional_duration_uses_overrun_guard() {
     let plan = derive_fixture_composite_plan(
@@ -243,6 +270,8 @@ fn test_5_7_fractional_duration_uses_overrun_guard() {
     assert!(first_rejected_time >= plan.render_duration);
 }
 
+/// Composite render of a source video that has an audio track must produce
+/// output with AAC audio copy (the probe should report codec_name=aac).
 #[test]
 fn test_5_8_video_with_audio_copies_audio_track() {
     let result = render_fixture_composite("tmp/test-1080p.mp4", 30, 1, 0.2, 1, 600.0, 1920, 1080);
@@ -251,6 +280,9 @@ fn test_5_8_video_with_audio_copies_audio_track() {
     assert!(audio.contains("codec_name=aac"));
 }
 
+/// When a sync offset places the active window outside the dense activity
+/// range, `dense_frame_index_for_overlay` must return an error that
+/// mentions "outside dense activity range".
 #[test]
 fn test_5_9_invalid_dense_frame_range_fails_clearly() {
     let mut config = recent_template_config(1920, 1080);
@@ -317,6 +349,8 @@ fn test_6_1_cancel_mid_render_stops_and_cleans_partial_output() {
 }
 
 #[test]
+/// After a successful composite render, progress must show `current ==
+/// total == encoded` and the total must match the expected output frame count.
 fn test_6_2_progress_reaches_completion_on_success() {
     let result = render_fixture_composite("tmp/test-1080p.mp4", 30, 1, 0.2, 1, 600.0, 1920, 1080);
     let progress = result.controller.progress();
@@ -326,6 +360,9 @@ fn test_6_2_progress_reaches_completion_on_success() {
     assert_eq!(progress.total, 6);
 }
 
+/// Progress reporting must use output frame count (not overlay count):
+/// at 6x update rate, 60 output frames = 10 overlays, and each overlay
+/// tick advances progress by 6.
 #[test]
 fn test_6_3_progress_uses_output_frames_with_lower_overlay_fps() {
     let plan = derive_fixture_composite_plan(
@@ -347,6 +384,8 @@ fn test_6_3_progress_uses_output_frames_with_lower_overlay_fps() {
     assert_eq!(second_overlay_progress, 6);
 }
 
+/// Spawns a composite render with an unknown codec name and verifies the
+/// error message contains "FFmpeg stderr" and references encoder errors.
 #[test]
 fn test_6_4_ffmpeg_failure_reports_stderr() {
     let error = spawn_fixture_composite_render(
@@ -417,6 +456,8 @@ fn test_6_5_broken_pipe_error_includes_ffmpeg_exit_context() {
     assert!(message.contains("Unknown filter"));
 }
 
+/// On success, `verify_successful_composite_output` must not error for a
+/// real rendered composite MP4.
 #[test]
 fn test_6_6_output_file_exists_and_is_nonzero_on_success() {
     let result = render_fixture_composite("tmp/test-1080p.mp4", 30, 1, 0.2, 1, 600.0, 1920, 1080);
@@ -426,6 +467,8 @@ fn test_6_6_output_file_exists_and_is_nonzero_on_success() {
     verify_successful_composite_output(&result.output_path).unwrap();
 }
 
+/// After writing a fixture debug summary, the timing summary JSON file must
+/// exist on disk under the expected path.
 #[test]
 fn test_7_1_timing_summary_exists() {
     let paths = write_fixture_composite_debug_summary("composite_debug_summary_exists");
@@ -437,6 +480,8 @@ fn test_7_1_timing_summary_exists() {
         .ends_with("1778853729503903000"));
 }
 
+/// The debug timing summary must record `phase: "composite"` and
+/// `mode: "mp4_composite"` so downstream tooling can distinguish render types.
 #[test]
 fn test_7_2_phase_marker_is_correct() {
     let paths = write_fixture_composite_debug_summary("composite_debug_phase_marker");
@@ -446,6 +491,9 @@ fn test_7_2_phase_marker_is_correct() {
     assert_eq!(summary["mode"], "mp4_composite");
 }
 
+/// FPS values in the debug summary must be recorded as rational strings
+/// ("60000/1001") not as floats. The decoded `fps` and `layout_fps` must
+/// match the expected NTSC-approximate values.
 #[test]
 fn test_7_3_fps_values_are_recorded_as_rationals() {
     let paths = write_fixture_composite_debug_summary("composite_debug_rational_fps");
@@ -458,6 +506,8 @@ fn test_7_3_fps_values_are_recorded_as_rationals() {
     assert_eq!(summary["layout_fps"], 29.97);
 }
 
+/// The debug summary records `rendered_frames`, `layout_total_frames`,
+/// and `total_frames` so tests can verify overlay/output frame ratio.
 #[test]
 fn test_7_4_frame_counts_are_recorded() {
     let paths = write_fixture_composite_debug_summary("composite_debug_frame_counts");
@@ -468,6 +518,10 @@ fn test_7_4_frame_counts_are_recorded() {
     assert_eq!(summary["total_frames"], 12);
 }
 
+/// The debug summary must record positive total wall time, render loop ms,
+/// per-frame timings, and a note that ffmpeg.timing is not isolated. Also
+/// verifies the `composite.widget_update_rate` timing key is not emitted
+/// (it's a plan-level constant, not a per-frame measurement).
 #[test]
 fn test_7_5_total_wall_time_is_recorded() {
     let paths = write_fixture_composite_debug_summary("composite_debug_total_wall_time");
@@ -505,6 +559,9 @@ fn test_7_5_total_wall_time_is_recorded() {
         .is_none());
 }
 
+/// The composite debug directory must NOT exist for a workspace that has
+/// never seen a composite render — the debug output is only created by
+/// composite rendering, never by transparent renders.
 #[test]
 fn test_7_6_composite_debug_output_is_only_created_by_composite_render() {
     let paths = test_paths_named("composite_debug_transparent_unaffected");
@@ -512,6 +569,9 @@ fn test_7_6_composite_debug_output_is_only_created_by_composite_render() {
     assert!(!paths.debug_render_dir.join("composite").exists());
 }
 
+/// Manual validation test: renders a full ~20s 4K composite at 29.97 FPS
+/// and verifies output exists, is non-empty, and the container FPS is
+/// preserved as a rational. Ignored by default to keep CI fast.
 #[test]
 #[ignore = "Long-running 4K end-to-end render for manual validation."]
 fn test_manual_full_duration_4k_composite() {

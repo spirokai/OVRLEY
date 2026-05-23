@@ -143,6 +143,15 @@ fn raw_value(
 }
 
 /// Builds separated value/unit/icon display parts for rich metric widgets.
+///
+/// # Two-phase dispatch
+///
+/// 1. **Metric dispatch** — match the metric kind and produce raw `(value_text,
+///    unit_text, icon_kind)` tuples, applying unit conversion and number
+///    formatting per metric type. The `Time` and `Temperature` cases involve
+///    secondary branching for format and unit selections.
+/// 2. **Prefix/suffix application** — prepend and append user-configured affix
+///    text around the resolved value string before returning the final parts.
 pub fn format_metric_parts(
     config: &RenderConfig,
     value_config: &ValueConfig,
@@ -151,6 +160,9 @@ pub fn format_metric_parts(
 ) -> Option<MetricDisplayParts> {
     // Metric widgets need the value and units separately so units can be drawn
     // at a smaller size while sharing the same raw telemetry formatting rules.
+    //
+    // Phase 1: dispatch by metric kind — each arm normalizes raw telemetry into
+    // a (value_text, unit_text, icon_kind) tuple with unit conversion applied.
     let raw = raw_value(value_config.value, dense_activity, frame_index);
     let (mut value_text, unit_text, icon_kind) = match value_config.value {
         MetricKind::Speed => {
@@ -246,6 +258,7 @@ pub fn format_metric_parts(
         _ => return None,
     };
 
+    // Phase 2: apply user-configured prefix and suffix around the resolved value.
     if let Some(prefix) = &value_config.prefix {
         value_text = format!("{prefix}{value_text}");
     }

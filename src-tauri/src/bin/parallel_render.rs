@@ -1,3 +1,12 @@
+//! Parallel render stress-test binary.
+//!
+//! Loads two overlay configs (`parallel1.json`, `parallel2.json`) and a
+//! shared activity payload, then dispatches simultaneous ffmpeg render
+//! sessions to test encoder concurrency and resource contention.
+//!
+//! Does not accept CLI arguments — paths are hardcoded relative to the repo
+//! root for reproducible stress testing.
+
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::config::parse_config_json;
 use ovrley_core::paths::AppPaths;
@@ -6,6 +15,10 @@ use ovrley_core::paths::AppPaths;
 mod common;
 use common::repo_root;
 
+/// Estimates a safe maximum for concurrent render sessions.
+///
+/// Caps at 3 to avoid GPU context exhaustion; floors at 1. Uses logical core
+/// count divided by 4 as a rough proxy for GPU encoder pipeline depth.
 fn estimate_max_parallelism() -> usize {
     let cores = std::thread::available_parallelism()
         .map(|n| n.get())
@@ -23,6 +36,9 @@ fn estimate_max_parallelism() -> usize {
     estimate
 }
 
+/// Loads two overlay configs, builds dense activity reports for each, and
+/// runs them concurrently through the video render pipeline. Prints combined
+/// elapsed time.
 fn main() -> Result<(), String> {
     let _ = estimate_max_parallelism();
     let root = repo_root()?;

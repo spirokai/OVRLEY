@@ -28,6 +28,8 @@ use ovrley_core::encode::ffmpeg_composite::{
 };
 use ovrley_core::encode::fps::Fps;
 
+/// Builds composite FFmpeg settings with default libx264 codec for quick tests
+/// that only care about FPS/timing/trim behavior, not codec selection.
 fn settings(source_fps: Fps, overlay_pipe_fps: Fps, trim_start: f64) -> CompositeFfmpegSettings {
     settings_for_codec(
         "libx264",
@@ -39,6 +41,8 @@ fn settings(source_fps: Fps, overlay_pipe_fps: Fps, trim_start: f64) -> Composit
     )
 }
 
+/// Builds composite FFmpeg settings with an explicit codec, bitrate, and
+/// hardware-acceleration info — used for codec-path and hardware tests.
 fn settings_for_codec(
     codec: &str,
     bitrate: &str,
@@ -62,7 +66,9 @@ fn settings_for_codec(
     .unwrap()
 }
 
-/// Wraps a canonical codec snapshot in the composite hardware-info shell.
+/// Wraps a canonical codec snapshot in the composite hardware-info shell so
+/// that tests can selectively mark individual codecs as available while
+/// keeping all other fields at their defaults.
 fn hwaccel_with_available_codecs(available_codecs: AvailableCodecs) -> HwAccelInfo {
     HwAccelInfo {
         available_codecs,
@@ -495,6 +501,9 @@ fn test_9_1_cuda_full_profile_requires_cuda_filter_stack() {
 }
 
 #[test]
+/// Verifies the full-CUDA path (nnvgpu_h264) produces a complete filter stack:
+/// scale_cuda → overlay_cuda with hwupload on the overlay input. Also checks
+/// the fallback profile is recorded as `nvgpu_h264`.
 fn test_9_2_cuda_h264_full_profile_uses_overlay_cuda_when_available() {
     let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
         h264_nvenc: true,
@@ -523,6 +532,9 @@ fn test_9_2_cuda_h264_full_profile_uses_overlay_cuda_when_available() {
 }
 
 #[test]
+/// Verifies the full-CUDA HEVC path (nnvgpu_hevc) produces the CUDA filter
+/// stack with hevc_nvenc as the output codec. Fallback profile must be
+/// recorded as `nvgpu_hevc`.
 fn test_9_3_cuda_hevc_full_profile_uses_overlay_cuda_when_available() {
     let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
         hevc_nvenc: true,
@@ -573,6 +585,10 @@ fn test_9_5_qsv_full_profile_requires_qsv_filter_stack() {
 }
 
 #[test]
+/// Full-QSV path (qsv_full_h264) with all filters available exercises the
+/// complete QSV filter stack: scale_qsv for scaling → hwupload for overlay
+/// input → overlay_qsv for composite. Verifies no hwdownload (stays on GPU)
+/// and that detected init args are used verbatim.
 fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
     let detected_args = vec![
         "-init_hw_device".to_string(),
@@ -619,6 +635,9 @@ fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
 }
 
 #[test]
+/// When `qsv_full_init_args` is empty, the full-QSV path must fail with a
+/// clear error about missing hardware-device init args rather than silently
+/// producing broken args.
 fn test_9_6_qsv_full_profile_requires_detected_init_args() {
     let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
         h264_qsv: true,
@@ -645,6 +664,8 @@ fn test_9_6_qsv_full_profile_requires_detected_init_args() {
 }
 
 #[test]
+/// When `qsv_full_init_args` is populated (e.g., from a prior `ffmpeg -init_hw_device` probe),
+/// the full-QSV profile must use those exact init args as the input_0 prefix.
 fn test_9_6_qsv_full_profile_uses_detected_init_args_when_available() {
     let detected_args = vec![
         "-init_hw_device".to_string(),

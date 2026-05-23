@@ -86,6 +86,10 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> CoreResult<FfmpegSettings
 }
 
 /// Resolves a supported output pixel-format override for one transparent profile.
+///
+/// Vulkan profiles use `vulkan` as their required pixel format and must not be
+/// overridden; the field is excluded via a hardcoded guard rather than a
+/// catalog-level flag to keep the profile data purely about FFmpeg args.
 fn resolved_output_pix_fmt(
     object: Option<&serde_json::Map<String, Value>>,
     profile: &TransparentProfile,

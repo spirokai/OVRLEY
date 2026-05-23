@@ -25,12 +25,20 @@ pub use crate::encode::progress::RenderController;
 ///
 /// This is primarily a diagnostic and benchmark helper. Each job receives an
 /// independent controller, then ffmpeg concatenates the produced files.
+///
+/// # Phases
+/// 1. Validate config/report count match
+/// 2. Distribute work across worker threads via a shared queue
+/// 3. Collect results in order while workers produce independently
+/// 4. Join all worker threads
+/// 5. Stitch produced output files with ffmpeg concat demuxer (stream copy)
 pub fn run_parallel_renders(
     paths: &AppPaths,
     configs: Vec<RenderConfig>,
     activity: &ParsedActivity,
     reports: Vec<DenseActivityReport>,
 ) -> CoreResult<Duration> {
+    // ── PHASE 1: VALIDATE INPUTS ──
     if configs.len() != reports.len() {
         return Err(CoreError::Encode(
             "Configs and reports vectors must have the same length".to_string(),
@@ -40,6 +48,8 @@ pub fn run_parallel_renders(
     let start_time = Instant::now();
     let total_jobs = configs.len();
     let worker_count = estimate_parallel_render_worker_count(total_jobs);
+
+    // ── PHASE 2: DISTRIBUTE WORK — shared queue across worker threads ──
     let work_queue = Arc::new(Mutex::new(
         configs
             .into_iter()
@@ -83,6 +93,7 @@ pub fn run_parallel_renders(
     }
     drop(result_tx);
 
+    // ── PHASE 3: COLLECT RESULTS IN ORDER ──
     let mut filenames = vec![None; total_jobs];
     for _ in 0..filenames.len() {
         let (index, result) = result_rx.recv().map_err(|_| {
@@ -91,12 +102,14 @@ pub fn run_parallel_renders(
         filenames[index] = Some(result?);
     }
 
+    // ── PHASE 4: JOIN ALL WORKER THREADS ──
     for handle in handles {
         handle
             .join()
             .map_err(|_| CoreError::Encode("Parallel render thread panicked".to_string()))?;
     }
 
+    // ── PHASE 5: STITCH OUTPUTS WITH FFMPEG CONCAT DEMUXER ──
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let output_filename = format!("parallel_stitch_{}.mov", timestamp_nanos()?);
     let output_path = paths.downloads_dir.join(&output_filename);

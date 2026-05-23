@@ -190,6 +190,14 @@ pub struct CompositePipelinePlan {
 ///
 /// This renders only overlay-frame timestamps, writes raw RGBA frames to
 /// FFmpeg stdin, and lets FFmpeg repeat overlay frames between updates.
+///
+/// # Phases
+/// 1. Derive pipeline plan (timing, FPS, FFmpeg args, output path)
+/// 2. Prepare Skia assets
+/// 3. Spawn ffmpeg, monitor thread, and writer thread
+/// 4. Hot render loop: produce overlay frames into bounded queue, track progress
+/// 5. Drain writer, wait for ffmpeg, join monitor
+/// 6. Verify output, write debug summary
 // Called from multiple sites across video.rs, tests, and benchmarks;
 // request-struct refactor deferred to avoid destabilising test seams.
 #[allow(clippy::too_many_arguments)]
@@ -214,6 +222,7 @@ pub fn render_composite_video_single(
         return Err(CoreError::Cancelled);
     }
 
+    // ── PHASE 1: DERIVE PIPELINE PLAN (timing, FPS, FFmpeg args, output path) ──
     let plan = derive_composite_pipeline_plan(
         paths,
         config,
@@ -239,9 +248,12 @@ pub fn render_composite_video_single(
         None,
     );
 
+    // ── PHASE 2: PREPARE SKIA ASSETS ──
     let (prepared_preview_assets, _, _, _) =
         prepare_preview_assets(paths, config, activity, dense_activity)?;
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
+
+    // ── PHASE 3: SPAWN FFMPEG & WORKER THREADS ──
     let mut child = spawn_composite_ffmpeg_process(&ffmpeg_bin, &plan)?;
     let stdin = child
         .stdin
@@ -297,6 +309,10 @@ pub fn render_composite_video_single(
         )
     });
 
+    // ── PHASE 4: HOT RENDER LOOP — produce overlay frames into bounded queue ──
+    // The bounded channel (capacity 4 for composite) provides backpressure; the
+    // writer drains it and feeds ffmpeg stdin. Overlay frames are rendered at
+    // the pipe FPS; ffmpeg repeats them across output frames internally.
     let render_result = (|| -> CoreResult<()> {
         loop {
             if cancel_flag.load(Ordering::SeqCst) {
@@ -371,6 +387,7 @@ pub fn render_composite_video_single(
     })();
     let render_loop_ms = render_loop_started.elapsed().as_secs_f64() * 1000.0;
 
+    // ── PHASE 5: DRAIN WRITER, FINALIZE FFMPEG, JOIN MONITOR ──
     drop(sender);
     let writer_result = writer_thread
         .join()
@@ -449,6 +466,7 @@ pub fn render_composite_video_single(
     }
     verify_successful_composite_output(&plan.output_path)?;
 
+    // ── PHASE 6: WRITE DEBUG SUMMARY ──
     let total_ms = render_started.elapsed().as_secs_f64() * 1000.0;
     let merged_timings = merge_timing_maps(profiler.summary(), writer.timings);
     write_composite_timing_summary(CompositeTimingSummaryInput {
@@ -513,6 +531,12 @@ fn terminate_composite_ffmpeg_after_cancel(
 ///
 /// This helper mirrors the render loop's timing math, including the
 /// fractional-frame overrun guard, without producing any overlay frames.
+///
+/// # Phases
+/// 1. Validate required fields and derive FPS / durations
+/// 2. Compute frame counts and overrun guard index
+/// 3. Build FFmpeg settings from the composite profile catalog
+/// 4. Generate output filename and assemble the plan
 #[allow(clippy::too_many_arguments)]
 pub fn derive_composite_pipeline_plan(
     // test seam
@@ -527,6 +551,7 @@ pub fn derive_composite_pipeline_plan(
     composite_video_trim_start: Option<f64>,
     composite_widget_update_rate: Option<u32>,
 ) -> CoreResult<CompositePipelinePlan> {
+    // ── PHASE 1: VALIDATE & DERIVE TIMING VALUES ──
     let source_fps = Fps::new(composite_video_fps_num, composite_video_fps_den)?;
     let output_fps = source_fps;
     let update_rate = composite_widget_update_rate.unwrap_or(1).max(1);
@@ -559,12 +584,14 @@ pub fn derive_composite_pipeline_plan(
         )));
     }
 
+    // ── PHASE 2: COMPUTE FRAME COUNTS & OVERRUN GUARD ──
     let overlay_frame_count = (render_duration * overlay_pipe_fps.as_f64())
         .ceil()
         .max(0.0) as u64;
     let output_frame_count = (render_duration * output_fps.as_f64()).ceil().max(0.0) as u64;
     let first_overrun_overlay_index =
         first_fractional_overrun_overlay_index(render_duration, overlay_pipe_fps);
+    // ── PHASE 3: BUILD COMPOSITE FFMPEG SETTINGS ──
     let mut hwaccel_info = HwAccelInfo::trust_selected_profile();
     hwaccel_info.available_codecs.qsv_full_init_args = composite_qsv_full_init_args(config);
     let ffmpeg_settings = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
@@ -579,6 +606,7 @@ pub fn derive_composite_pipeline_plan(
         overlay_pipe_fps,
         hwaccel_available: &hwaccel_info,
     })?;
+    // ── PHASE 4: GENERATE OUTPUT FILENAME ──
     let output_filename = format!("video_composited_{}.mp4", timestamp_nanos()?);
     let output_path = paths.downloads_dir.join(&output_filename);
 

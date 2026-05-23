@@ -198,11 +198,19 @@ pub struct FrameRenderRequest<'a> {
 
 /// Renders a preview using already-prepared assets.
 ///
+/// # Phases
+///
+/// 1. **Setup** — resolve dimensions, frame index, and initialize profilers.
+/// 2. **Surface render** — draw all overlay layers into a Skia surface.
+/// 3. **PNG export** — encode the surface snapshot to disk.
+/// 4. **Report** — collect timing data and build the preview report.
+///
 /// This is useful for repeated preview generation where static labels and widget
 /// geometry should be prepared once and reused.
 pub fn render_preview_with_prepared_assets(
     request: PreviewRenderRequest<'_>,
 ) -> CoreResult<((), PreviewRenderReport)> {
+    // Phase 1: resolve dimensions, frame index, and create profilers.
     let width = request.config.scene.width.unwrap_or(1920);
     let height = request.config.scene.height.unwrap_or(1080);
     let scale = request.config.scene.scale.unwrap_or(1.0).max(0.1);
@@ -212,6 +220,7 @@ pub fn render_preview_with_prepared_assets(
     let mut preview_profiler = RenderProfiler::default();
     let total_started = Instant::now();
 
+    // Phase 2: draw all overlay layers into a Skia surface.
     let (mut surface, route_widget, elevation_widget) = render_frame_surface(
         request.paths,
         request.config,
@@ -224,11 +233,13 @@ pub fn render_preview_with_prepared_assets(
         Some(&mut preview_profiler),
     )?;
 
+    // Phase 3: encode the surface snapshot as PNG to disk.
     preview_profiler.measure("preview.png_write", || {
         write_surface_png(&mut surface, request.out_path)
             .map_err(|error| CoreError::Render(format!("Failed to render preview frame: {error}")))
     })?;
 
+    // Phase 4: collect timing data and build the preview report.
     let frame_timings =
         annotate_timing_aliases(frame_profiler.summary(), &[("base.restore", "base.copy")]);
     let preview_only_timings = annotate_timing_aliases(

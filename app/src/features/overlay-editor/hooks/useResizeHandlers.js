@@ -71,7 +71,9 @@ export function useResizeHandlers({
       }
 
       setLiveWidgetDraft(origin.id, nextDraft)
-      applyLiveWidgetStyles(target ?? drag.target, selectedWidget, nextDraft, globalScale)
+      if (selectedWidget?.category === 'plots') {
+        applyLiveWidgetStyles(target ?? drag.target, selectedWidget, nextDraft, globalScale)
+      }
     },
     onResizeEnd: () => {
       const origin = interactionStartRef.current

@@ -188,14 +188,19 @@ pub fn render_fixture_composite_with_paths(
     height: u32,
     codec: &str,
 ) -> Result<RenderFixtureResult, String> {
+    // ── Phase 1: resolve fixture video path ────────────────────────
     let absolute_video_path = crate::common::test_config::fixtures()
         .join("video")
         .join(video_path.trim_start_matches("tmp/"));
     let absolute_video_path = absolute_video_path.to_string_lossy().to_string();
     let mut config = recent_template_config(width, height);
     config.scene.ffmpeg = serde_json::json!({"codec": codec});
+
+    // ── Phase 2: compute FPS hierarchy from source → overlay pipe ──
     let source_fps = Fps::new(fps_num, fps_den).unwrap();
     let overlay_fps = source_fps.divided_by(update_rate).unwrap();
+
+    // ── Phase 3: apply composite scene timing and metadata ───────────
     config.scene.start = sync_offset;
     config.scene.end = sync_offset + render_duration;
     config.scene.fps = overlay_fps.as_f64();
@@ -211,6 +216,8 @@ pub fn render_fixture_composite_with_paths(
 
     let activity = fixture_activity();
     let dense_activity = build_dense_activity_report(&activity, &config).unwrap();
+
+    // ── Phase 4: execute single-segment composite render ─────────────
     let filename = render_composite_video_single(
         &paths,
         &config,
@@ -228,6 +235,8 @@ pub fn render_fixture_composite_with_paths(
         Some(update_rate),
     )
     .map_err(|error| error.to_string())?;
+
+    // ── Phase 5: validate output and collect metadata ─────────────────
     let output_path = paths.downloads_dir.join(filename);
     let output_size = fs::metadata(&output_path)
         .map_err(|error| format!("Failed to read output metadata: {error}"))?

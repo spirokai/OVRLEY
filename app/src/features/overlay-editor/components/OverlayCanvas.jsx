@@ -11,7 +11,8 @@ import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPrevi
 import { useFontMetricsVersion } from '@/features/widget-preview/hooks/useFontMetricsVersion'
 import { getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
 import { buildWidgetTransform } from '@/lib/geometryUtils'
-import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
+import { CANVAS_BACKGROUND_COLORS, METRIC_WIDGET_LINE_HEIGHT } from '../data/overlayEditorConstants'
+import { measurePreviewText, getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
 import { useVideoPreview } from '@/features/video-preview'
 
 /**
@@ -101,25 +102,50 @@ const OverlayCanvasWidget = memo(
       activity,
       previewSecond,
     })
+<<<<<<< Updated upstream
     const textPreviewModel = buildTextWidgetPreviewModel({ widget })
     const widgetPreviewModel = metricPreviewModel ?? textPreviewModel
     const metricVisualBounds = widgetPreviewModel?.visualBounds ?? null
+=======
+    const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
+
+    const isLabelWidget = widget.category === 'labels' || widget.type === 'label'
+    const labelVisualBounds = isLabelWidget
+      ? (() => {
+          const fontSize = widget.data.font_size ?? 60
+          const fontFamily = getPreviewFontFamily(widget.data.font || widget.data.font_family)
+          const text = widget.data.text || 'TEXT'
+          const measurement = measurePreviewText(text, fontSize, fontFamily)
+          const lineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
+          return {
+            minX: 0,
+            minY: 0,
+            maxX: measurement.width,
+            maxY: lineHeight,
+            width: measurement.width,
+            height: lineHeight,
+          }
+        })()
+      : null
+
+    const visualBounds = metricVisualBounds ?? labelVisualBounds
+>>>>>>> Stashed changes
     const isPlotWidget = widget.category === 'plots'
-    const origin = getWidgetSceneOrigin(widget, null, metricVisualBounds, {
+    const origin = getWidgetSceneOrigin(widget, null, visualBounds, {
       boundsScale: isPlotWidget ? 1 : globalScale,
     })
     const scale = isPlotWidget ? 1 : globalScale
     const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
-    const width = isPlotWidget ? (widget.data.width ?? 0) * (globalScale || 1) : (metricVisualBounds?.width ?? widget.data.width)
-    const height = isPlotWidget ? (widget.data.height ?? 0) * (globalScale || 1) : (metricVisualBounds?.height ?? widget.data.height)
+    const width = isPlotWidget ? (widget.data.width ?? 0) * (globalScale || 1) : (visualBounds?.width ?? widget.data.width)
+    const height = isPlotWidget ? (widget.data.height ?? 0) * (globalScale || 1) : (visualBounds?.height ?? widget.data.height)
     return (
       <div
         ref={registerNode}
         data-widget-id={widget.id}
-        data-widget-bounds-left={metricVisualBounds?.minX ?? 0}
-        data-widget-bounds-top={metricVisualBounds?.minY ?? 0}
-        data-widget-bounds-right={metricVisualBounds?.maxX ?? 0}
-        data-widget-bounds-bottom={metricVisualBounds?.maxY ?? 0}
+        data-widget-bounds-left={visualBounds?.minX ?? 0}
+        data-widget-bounds-top={visualBounds?.minY ?? 0}
+        data-widget-bounds-right={visualBounds?.maxX ?? 0}
+        data-widget-bounds-bottom={visualBounds?.maxY ?? 0}
         className="group absolute cursor-move select-none rounded-xl outline-1 outline-transparent transition-shadow hover:z-50"
         style={{
           left: origin.x,
