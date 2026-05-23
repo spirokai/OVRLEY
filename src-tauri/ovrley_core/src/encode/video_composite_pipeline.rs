@@ -568,7 +568,7 @@ pub fn derive_composite_pipeline_plan(
     let first_overrun_overlay_index =
         first_fractional_overrun_overlay_index(render_duration, overlay_pipe_fps);
     let mut hwaccel_info = HwAccelInfo::trust_selected_profile();
-    hwaccel_info.qsv_full_init_args = composite_qsv_full_init_args(config);
+    hwaccel_info.available_codecs.qsv_full_init_args = composite_qsv_full_init_args(config);
     let ffmpeg_settings = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
         codec_name: &codec_name,
         bitrate: composite_bitrate,

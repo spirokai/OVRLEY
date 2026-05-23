@@ -26,8 +26,8 @@ fn prores_ks_defaults() -> CoreResult<()> {
         "loglevel": "info"
     }))?;
     assert_eq!(settings.codec, "prores_ks");
-    assert_eq!(settings.pix_fmt, "yuva444p10le");
     assert_eq!(settings.extension, "mov");
+    assert_argument_pair(&settings.output_args, "-pix_fmt", "yuva444p10le");
     Ok(())
 }
 
@@ -38,10 +38,10 @@ fn prores_ks_vulkan_defaults() -> CoreResult<()> {
         "loglevel": "info"
     }))?;
     assert_eq!(settings.codec, "prores_ks_vulkan");
-    assert_eq!(settings.pix_fmt, "vulkan");
     assert_eq!(settings.extension, "mov");
-    assert_eq!(settings.hw_init_args.len(), 4);
-    assert!(settings.filters.is_some());
+    assert_eq!(settings.input_args.len(), 4);
+    assert!(settings.filter_complex.is_some());
+    assert_argument_pair(&settings.output_args, "-pix_fmt", "vulkan");
     Ok(())
 }
 
@@ -52,8 +52,8 @@ fn prores_videotoolbox_defaults() -> CoreResult<()> {
         "loglevel": "info"
     }))?;
     assert_eq!(settings.codec, "prores_videotoolbox");
-    assert_eq!(settings.pix_fmt, "yuva444p10le");
     assert_eq!(settings.extension, "mov");
+    assert_argument_pair(&settings.output_args, "-pix_fmt", "yuva444p10le");
     Ok(())
 }
 
@@ -64,8 +64,8 @@ fn qtrle_settings() -> CoreResult<()> {
         "loglevel": "error"
     }))?;
     assert_eq!(settings.codec, "qtrle");
-    assert_eq!(settings.pix_fmt, "argb");
     assert_eq!(settings.extension, "mov");
+    assert_argument_pair(&settings.output_args, "-pix_fmt", "argb");
     Ok(())
 }
 
@@ -106,5 +106,96 @@ fn custom_container_override() -> CoreResult<()> {
         "container": "mkv"
     }))?;
     assert_eq!(settings.extension, "mkv");
+    assert_argument_pair(&settings.output_args, "-f", "mkv");
     Ok(())
+}
+
+#[test]
+fn prores_ks_defaults_are_applied_once() -> CoreResult<()> {
+    let settings = build_ffmpeg_settings(&json!({
+        "codec": "prores_ks",
+        "loglevel": "info"
+    }))?;
+    assert_argument_pair(&settings.output_args, "-threads", "0");
+    assert_argument_pair(&settings.output_args, "-profile:v", "4444");
+    assert_argument_pair(&settings.output_args, "-qscale:v", "4");
+    assert_eq!(count_flag(&settings.output_args, "-qscale:v"), 1);
+    Ok(())
+}
+
+#[test]
+fn pix_fmt_override_rewrites_output_arg_when_allowed() -> CoreResult<()> {
+    let settings = build_ffmpeg_settings(&json!({
+        "codec": "prores_ks",
+        "loglevel": "info",
+        "pix_fmt": "yuva444p12le"
+    }))?;
+    assert_argument_pair(&settings.output_args, "-pix_fmt", "yuva444p12le");
+    assert!(!has_argument_pair(
+        &settings.output_args,
+        "-pix_fmt",
+        "yuva444p10le"
+    ));
+    Ok(())
+}
+
+#[test]
+fn vulkan_pix_fmt_override_is_ignored() -> CoreResult<()> {
+    let settings = build_ffmpeg_settings(&json!({
+        "codec": "prores_ks_vulkan",
+        "loglevel": "info",
+        "pix_fmt": "yuva444p10le"
+    }))?;
+    assert_argument_pair(&settings.output_args, "-pix_fmt", "vulkan");
+    assert!(!has_argument_pair(
+        &settings.output_args,
+        "-pix_fmt",
+        "yuva444p10le"
+    ));
+    Ok(())
+}
+
+#[test]
+fn profile_specific_json_knobs_do_not_override_catalog_defaults() -> CoreResult<()> {
+    let settings = build_ffmpeg_settings(&json!({
+        "codec": "prores_ks",
+        "loglevel": "info",
+        "threads": 3,
+        "prores_profile": "hq",
+        "qscale": 7,
+        "bits_per_mb": 8000,
+        "vendor": "ap10",
+        "alpha_bits": 8
+    }))?;
+    assert_argument_pair(&settings.output_args, "-threads", "0");
+    assert_argument_pair(&settings.output_args, "-profile:v", "4444");
+    assert_argument_pair(&settings.output_args, "-qscale:v", "4");
+    assert_eq!(count_flag(&settings.output_args, "-qscale:v"), 1);
+    assert!(!has_argument_pair(&settings.output_args, "-threads", "3"));
+    assert!(!has_argument_pair(
+        &settings.output_args,
+        "-profile:v",
+        "hq"
+    ));
+    assert!(!has_argument_pair(&settings.output_args, "-qscale:v", "7"));
+    assert!(!settings.output_args.iter().any(|arg| arg == "-bits_per_mb"));
+    assert!(!settings.output_args.iter().any(|arg| arg == "ap10"));
+    assert!(!settings.output_args.iter().any(|arg| arg == "8"));
+    Ok(())
+}
+
+fn assert_argument_pair(args: &[String], key: &str, value: &str) {
+    assert!(
+        has_argument_pair(args, key, value),
+        "missing argument pair {key} {value} in {args:?}"
+    );
+}
+
+fn has_argument_pair(args: &[String], key: &str, value: &str) -> bool {
+    args.windows(2)
+        .any(|window| window[0] == key && window[1] == value)
+}
+
+fn count_flag(args: &[String], key: &str) -> usize {
+    args.iter().filter(|arg| arg.as_str() == key).count()
 }

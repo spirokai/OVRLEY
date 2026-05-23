@@ -407,8 +407,8 @@ fn spawn_ffmpeg_process(
     suppress_child_console(&mut command);
     command.arg("-loglevel").arg(&ffmpeg_settings.loglevel);
 
-    if !ffmpeg_settings.hw_init_args.is_empty() {
-        command.args(&ffmpeg_settings.hw_init_args);
+    if !ffmpeg_settings.input_args.is_empty() {
+        command.args(&ffmpeg_settings.input_args);
     }
 
     command
@@ -423,20 +423,12 @@ fn spawn_ffmpeg_process(
         .arg("-i")
         .arg("-");
 
-    if let Some(filters) = &ffmpeg_settings.filters {
+    if let Some(filters) = &ffmpeg_settings.filter_complex {
         command.arg("-vf").arg(filters);
     }
 
     command
         .args(&ffmpeg_settings.output_args)
-        .args(
-            ffmpeg_settings
-                .muxer
-                .iter()
-                .flat_map(|muxer| ["-f".to_string(), muxer.clone()]),
-        )
-        .arg("-pix_fmt")
-        .arg(&ffmpeg_settings.pix_fmt)
         .arg("-y")
         .arg(output_path)
         .stdin(Stdio::piped())

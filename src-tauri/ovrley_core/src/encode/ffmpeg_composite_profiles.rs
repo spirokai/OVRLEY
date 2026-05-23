@@ -5,6 +5,7 @@
 //! FPS, dimensions, trim filters, and output path are injected by the
 //! composite builder.
 
+use super::codec_catalog::composite_codec;
 use super::ffmpeg_composite::CompositeProfile;
 use crate::error::{CoreError, CoreResult};
 
@@ -225,23 +226,9 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
 /// Callers may pass either profile names such as `nvgpu_h264` or encoder codec
 /// names such as `h264_nvenc`; codec names resolve to the safe CPU-overlay path.
 pub fn composite_profile_template(name_or_codec: &str) -> CoreResult<CompositeProfile> {
-    let normalized = match name_or_codec {
-        "auto" | "auto_h264" => "software_h264",
-        "auto_hevc" | "auto_h265" => "software_hevc",
-        "libx264" => "software_h264",
-        "libx265" => "software_hevc",
-        "h264_nvenc" => "nvgpu_h264",
-        "hevc_nvenc" => "nvgpu_hevc",
-        "h264_qsv" => "qsv_h264",
-        "hevc_qsv" => "qsv_hevc",
-        "h264_videotoolbox" => "mac_h264",
-        "hevc_videotoolbox" => "mac_hevc",
-        "h264_vaapi" => "vaapi_h264",
-        "hevc_vaapi" => "vaapi_hevc",
-        "h264_amf" => "amf_h264",
-        "hevc_amf" => "amf_hevc",
-        other => other,
-    };
+    let normalized = composite_codec(name_or_codec)
+        .map(|metadata| metadata.profile_name)
+        .unwrap_or(name_or_codec);
 
     BUILTIN_PROFILES
         .iter()

@@ -6,6 +6,7 @@
 //! Allowed dependencies: serde_json, crate::error.
 //! Forbidden dependencies: crate::commands, crate::render.
 
+use crate::encode::ffmpeg_transparent_profiles::{transparent_profile, TransparentProfile};
 use serde_json::Value;
 
 use crate::error::{CoreError, CoreResult};
@@ -17,23 +18,20 @@ pub struct FfmpegSettings {
     pub codec: String,
     /// ffmpeg loglevel passed to `-loglevel`.
     pub loglevel: String,
-    /// Output pixel format passed after codec args.
-    pub pix_fmt: String,
+    /// Input-side hardware-device setup args required before rawvideo input.
+    pub input_args: Vec<String>,
+    /// Optional filter chain applied between rawvideo input and encode output.
+    pub filter_complex: Option<String>,
     /// Codec-specific output args appended before output path.
     pub output_args: Vec<String>,
     /// Public output file extension.
     pub extension: String,
-    /// Optional explicit muxer/container passed with `-f`.
-    pub muxer: Option<String>,
-    /// Hardware-device setup args required before input declaration.
-    pub hw_init_args: Vec<String>,
-    /// Optional video filter graph, such as upload to Vulkan.
-    pub filters: Option<String>,
 }
 
 /// Builds validated ffmpeg settings from `scene.ffmpeg`.
 ///
 /// Supported codecs are alpha-preserving formats suitable for overlay exports.
+/// Profile-specific FFmpeg defaults come from the transparent profile catalog.
 /// Unknown keys are ignored except `output_args`, which appends raw extra args
 /// for advanced users.
 pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> CoreResult<FfmpegSettings> {
@@ -48,236 +46,71 @@ pub fn build_ffmpeg_settings(ffmpeg_config: &Value) -> CoreResult<FfmpegSettings
         .and_then(Value::as_str)
         .unwrap_or("info")
         .to_string();
-    let container_override = object
+    let profile = transparent_profile(&codec).ok_or_else(|| {
+        CoreError::Encode(format!(
+            "Unsupported scene.ffmpeg.codec '{codec}'. Supported codecs are prores_ks, prores_ks_vulkan, prores_videotoolbox, and qtrle."
+        ))
+    })?;
+    let mut output_args = profile
+        .output_args
+        .iter()
+        .map(|arg| (*arg).to_string())
+        .collect::<Vec<_>>();
+    if let Some(container) = object
         .and_then(|map| map.get("container"))
         .and_then(Value::as_str)
-        .map(str::to_string);
-
-    match codec.as_str() {
-        "prores_ks" => {
-            let pix_fmt = object
-                .and_then(|map| map.get("pix_fmt"))
-                .and_then(Value::as_str)
-                .unwrap_or("yuva444p10le")
-                .to_string();
-            let mut output_args = vec!["-c:v".to_string(), "prores_ks".to_string()];
-            append_ffmpeg_option(
-                &mut output_args,
-                "-threads",
-                object.and_then(|map| map.get("threads")),
-            );
-            if !output_args.iter().any(|value| value == "-threads") {
-                output_args.push("-threads".to_string());
-                output_args.push("0".to_string());
-            }
-            append_ffmpeg_option(
-                &mut output_args,
-                "-profile:v",
-                object.and_then(|map| map.get("prores_profile")),
-            );
-            if !output_args.iter().any(|value| value == "-profile:v") {
-                output_args.push("-profile:v".to_string());
-                output_args.push("4444".to_string());
-            }
-            append_ffmpeg_option(
-                &mut output_args,
-                "-qscale:v",
-                object.and_then(|map| map.get("qscale")),
-            );
-            if !output_args.iter().any(|value| value == "-qscale:v") {
-                output_args.push("-qscale:v".to_string());
-                output_args.push("4".to_string());
-            }
-            append_ffmpeg_option(
-                &mut output_args,
-                "-bits_per_mb",
-                object.and_then(|map| map.get("bits_per_mb")),
-            );
-            append_ffmpeg_option(
-                &mut output_args,
-                "-qscale:v",
-                object.and_then(|map| map.get("qscale")),
-            );
-            if !output_args.iter().any(|value| value == "-qscale:v") {
-                output_args.push("-qscale:v".to_string());
-                output_args.push("4".to_string());
-            }
-            append_ffmpeg_option(
-                &mut output_args,
-                "-mbs_per_slice",
-                object.and_then(|map| map.get("mbs_per_slice")),
-            );
-            append_ffmpeg_option(
-                &mut output_args,
-                "-vendor",
-                object.and_then(|map| map.get("vendor")),
-            );
-            append_ffmpeg_option(
-                &mut output_args,
-                "-alpha_bits",
-                object.and_then(|map| map.get("alpha_bits")),
-            );
-            append_extra_output_args(&mut output_args, ffmpeg_config);
-            Ok(FfmpegSettings {
-                codec,
-                loglevel,
-                pix_fmt,
-                output_args,
-                extension: container_override
-                    .clone()
-                    .unwrap_or_else(|| "mov".to_string()),
-                muxer: container_override,
-                hw_init_args: Vec::new(),
-                filters: None,
-            })
-        }
-        "prores_ks_vulkan" => {
-            let pix_fmt = "vulkan".to_string();
-            let mut output_args = vec!["-c:v".to_string(), "prores_ks_vulkan".to_string()];
-            append_ffmpeg_option(
-                &mut output_args,
-                "-profile:v",
-                object.and_then(|map| map.get("prores_profile")),
-            );
-            if !output_args.iter().any(|value| value == "-profile:v") {
-                output_args.push("-profile:v".to_string());
-                output_args.push("4".to_string()); // Default to 4444 for alpha parity
-            }
-            append_ffmpeg_option(
-                &mut output_args,
-                "-bits_per_mb",
-                object.and_then(|map| map.get("bits_per_mb")),
-            );
-            append_ffmpeg_option(
-                &mut output_args,
-                "-mbs_per_slice",
-                object.and_then(|map| map.get("mbs_per_slice")),
-            );
-            if !output_args.iter().any(|value| value == "-mbs_per_slice") {
-                output_args.push("-mbs_per_slice".to_string());
-                output_args.push("4".to_string());
-            }
-            append_ffmpeg_option(
-                &mut output_args,
-                "-vendor",
-                object.and_then(|map| map.get("vendor")),
-            );
-            if !output_args.iter().any(|value| value == "-vendor") {
-                output_args.push("-vendor".to_string());
-                output_args.push("apl0".to_string());
-            }
-            append_ffmpeg_option(
-                &mut output_args,
-                "-alpha_bits",
-                object.and_then(|map| map.get("alpha_bits")),
-            );
-            if !output_args.iter().any(|value| value == "-alpha_bits") {
-                output_args.push("-alpha_bits".to_string());
-                output_args.push("16".to_string());
-            }
-            append_extra_output_args(&mut output_args, ffmpeg_config);
-
-            Ok(FfmpegSettings {
-                codec,
-                loglevel,
-                pix_fmt,
-                output_args,
-                extension: container_override
-                    .clone()
-                    .unwrap_or_else(|| "mov".to_string()),
-                muxer: container_override,
-                hw_init_args: vec![
-                    "-init_hw_device".to_string(),
-                    "vulkan=vk".to_string(),
-                    "-filter_hw_device".to_string(),
-                    "vk".to_string(),
-                ],
-                filters: Some("format=yuva444p10le,hwupload".to_string()),
-            })
-        }
-        "prores_videotoolbox" => {
-            let pix_fmt = object
-                .and_then(|map| map.get("pix_fmt"))
-                .and_then(Value::as_str)
-                .unwrap_or("yuva444p10le")
-                .to_string();
-            let mut output_args = vec!["-c:v".to_string(), "prores_videotoolbox".to_string()];
-            append_ffmpeg_option(
-                &mut output_args,
-                "-profile:v",
-                object.and_then(|map| map.get("prores_profile")),
-            );
-            if !output_args.iter().any(|value| value == "-profile:v") {
-                output_args.push("-profile:v".to_string());
-                output_args.push("4".to_string()); // Default to 4444 for parity with other ProRes paths
-            }
-            append_extra_output_args(&mut output_args, ffmpeg_config);
-
-            Ok(FfmpegSettings {
-                codec,
-                loglevel,
-                pix_fmt,
-                output_args,
-                extension: container_override
-                    .clone()
-                    .unwrap_or_else(|| "mov".to_string()),
-                muxer: container_override,
-                hw_init_args: Vec::new(),
-                filters: None,
-            })
-        }
-        "qtrle" => {
-            let pix_fmt = object
-                .and_then(|map| map.get("pix_fmt"))
-                .and_then(Value::as_str)
-                .unwrap_or("argb")
-                .to_string();
-            let mut output_args = vec!["-c:v".to_string(), "qtrle".to_string()];
-            append_extra_output_args(&mut output_args, ffmpeg_config);
-
-            Ok(FfmpegSettings {
-                codec,
-                loglevel,
-                pix_fmt,
-                output_args,
-                extension: container_override
-                    .clone()
-                    .unwrap_or_else(|| "mov".to_string()),
-                muxer: container_override,
-                hw_init_args: Vec::new(),
-                filters: None,
-            })
-        }
-        other => Err(CoreError::Encode(format!(
-            "Unsupported scene.ffmpeg.codec '{other}'. Supported codecs are prores_ks, prores_ks_vulkan, prores_videotoolbox, and qtrle."
-        ))),
+    {
+        replace_arg_pair_value(&mut output_args, "-f", container);
     }
+    if let Some(pix_fmt) = resolved_output_pix_fmt(object, &profile) {
+        replace_arg_pair_value(&mut output_args, "-pix_fmt", &pix_fmt);
+    }
+    append_extra_output_args(&mut output_args, ffmpeg_config);
+
+    Ok(FfmpegSettings {
+        codec: profile.codec.to_string(),
+        loglevel,
+        input_args: profile
+            .input_args
+            .iter()
+            .map(|arg| (*arg).to_string())
+            .collect(),
+        filter_complex: profile.filter_complex.map(str::to_string),
+        output_args,
+        extension: object
+            .and_then(|map| map.get("container"))
+            .and_then(Value::as_str)
+            .unwrap_or("mov")
+            .to_string(),
+    })
 }
 
-// Appends one scalar ffmpeg option from template JSON when present.
-fn append_ffmpeg_option(args: &mut Vec<String>, flag: &str, value: Option<&Value>) {
-    // Accept primitive JSON values only. Complex values are ignored so malformed
-    // template extras cannot produce surprising command-line fragments.
-    let Some(value) = value else {
-        return;
-    };
-    match value {
-        Value::Null => {}
-        Value::String(text) if text.is_empty() => {}
-        Value::String(text) => {
-            args.push(flag.to_string());
-            args.push(text.clone());
+/// Resolves a supported output pixel-format override for one transparent profile.
+fn resolved_output_pix_fmt(
+    object: Option<&serde_json::Map<String, Value>>,
+    profile: &TransparentProfile,
+) -> Option<String> {
+    (!matches!(profile.name, "prores_ks_vulkan"))
+        .then(|| {
+            object
+                .and_then(|map| map.get("pix_fmt"))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+        .flatten()
+}
+
+/// Replaces one flag/value pair or appends it if the pair does not exist yet.
+fn replace_arg_pair_value(args: &mut Vec<String>, flag: &str, value: &str) {
+    if let Some(index) = args.iter().position(|arg| arg == flag) {
+        if let Some(existing) = args.get_mut(index + 1) {
+            *existing = value.to_string();
+            return;
         }
-        Value::Number(number) => {
-            args.push(flag.to_string());
-            args.push(number.to_string());
-        }
-        Value::Bool(boolean) => {
-            args.push(flag.to_string());
-            args.push(if *boolean { "1" } else { "0" }.to_string());
-        }
-        _ => {}
     }
+
+    args.push(flag.to_string());
+    args.push(value.to_string());
 }
 
 // Appends user-provided extra ffmpeg output arguments from `scene.ffmpeg.output_args`.

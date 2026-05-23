@@ -2,7 +2,7 @@ use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::commands::AppPaths;
 use ovrley_core::config::parse_config_json;
 use ovrley_core::encode::video::{render_video, RenderController};
-use serde_json::{Map, Number, Value};
+use serde_json::{Map, Value};
 use std::fs;
 use std::path::PathBuf;
 
@@ -34,20 +34,6 @@ fn set_ffmpeg_string(
     Ok(())
 }
 
-fn set_ffmpeg_u64(
-    config: &mut ovrley_core::config::RenderConfig,
-    key: &str,
-    value: Option<String>,
-) -> Result<(), String> {
-    if let Some(value) = value {
-        let parsed = value
-            .parse::<u64>()
-            .map_err(|error| format!("Invalid {key} value '{value}': {error}"))?;
-        ensure_ffmpeg_object(config)?.insert(key.to_string(), Value::Number(Number::from(parsed)));
-    }
-    Ok(())
-}
-
 fn main() -> Result<(), String> {
     let args = std::env::args().collect::<Vec<_>>();
     let payload_path = PathBuf::from(read_arg("--payload", &args)?);
@@ -73,18 +59,8 @@ fn main() -> Result<(), String> {
     )?;
     set_ffmpeg_string(
         &mut config,
-        "prores_profile",
-        read_optional_arg("--prores-profile", &args),
-    )?;
-    set_ffmpeg_string(
-        &mut config,
         "loglevel",
         read_optional_arg("--loglevel", &args),
-    )?;
-    set_ffmpeg_u64(
-        &mut config,
-        "threads",
-        read_optional_arg("--threads", &args),
     )?;
     let dense_activity =
         build_dense_activity_report(&activity, &config).map_err(|e| e.to_string())?;

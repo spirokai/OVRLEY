@@ -23,6 +23,9 @@
 
 use std::path::Path;
 
+use crate::encode::codec_catalog::{
+    composite_codec, CompositeAvailabilityRule, CompositeCodecMetadata,
+};
 use crate::encode::codec_detect::AvailableCodecs;
 use crate::error::{CoreError, CoreResult};
 
@@ -65,28 +68,13 @@ pub struct CompositeFfmpegSettings {
 
 /// Hardware capability flags used by composite profile selection.
 ///
-/// Phase 2 only builds the robust software-overlay path, but this placeholder
-/// keeps the builder signature ready for later hardware profile selection.
+/// The canonical boolean availability now lives in [`AvailableCodecs`]. This
+/// wrapper keeps the builder inputs small while still carrying non-boolean
+/// context such as a resolved VAAPI device path.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HwAccelInfo {
-    pub h264_nvenc_available: bool,
-    pub hevc_nvenc_available: bool,
-    pub h264_qsv_available: bool,
-    pub hevc_qsv_available: bool,
-    pub h264_amf_available: bool,
-    pub hevc_amf_available: bool,
-    pub h264_videotoolbox_available: bool,
-    pub hevc_videotoolbox_available: bool,
-    pub h264_vaapi_available: bool,
-    pub hevc_vaapi_available: bool,
-    pub nvenc_available: bool,
-    pub cuda_filters_available: bool,
-    pub qsv_available: bool,
-    pub qsv_filters_available: bool,
-    pub videotoolbox_available: bool,
-    pub vaapi_available: bool,
+    pub available_codecs: AvailableCodecs,
     pub vaapi_device: Option<String>,
-    pub qsv_full_init_args: Vec<String>,
 }
 
 impl HwAccelInfo {
@@ -96,25 +84,51 @@ impl HwAccelInfo {
     /// choices, avoiding a second FFmpeg capability probe during export.
     pub fn trust_selected_profile() -> Self {
         Self {
-            h264_nvenc_available: true,
-            hevc_nvenc_available: true,
-            h264_qsv_available: true,
-            hevc_qsv_available: true,
-            h264_amf_available: true,
-            hevc_amf_available: true,
-            h264_videotoolbox_available: true,
-            hevc_videotoolbox_available: true,
-            h264_vaapi_available: true,
-            hevc_vaapi_available: true,
-            nvenc_available: true,
-            cuda_filters_available: true,
-            qsv_available: true,
-            qsv_filters_available: true,
-            videotoolbox_available: true,
-            vaapi_available: true,
+            available_codecs: AvailableCodecs {
+                prores_ks: true,
+                prores_ks_vulkan: true,
+                prores_videotoolbox: true,
+                qtrle: true,
+                libx264: true,
+                libx265: true,
+                h264_nvenc: true,
+                hevc_nvenc: true,
+                h264_qsv: true,
+                hevc_qsv: true,
+                h264_vaapi: true,
+                hevc_vaapi: true,
+                h264_amf: true,
+                hevc_amf: true,
+                h264_videotoolbox: true,
+                hevc_videotoolbox: true,
+                cuda: true,
+                nvdec: true,
+                qsv: true,
+                vaapi: true,
+                videotoolbox: true,
+                nvgpu: true,
+                nnvgpu: true,
+                overlay_cuda: true,
+                scale_cuda: true,
+                scale_qsv: true,
+                hwupload_filter: true,
+                overlay_qsv: true,
+                hwdownload_filter: true,
+                qsv_full: true,
+                qsv_full_init_args: Vec::new(),
+            },
             vaapi_device: None,
-            qsv_full_init_args: Vec::new(),
         }
+    }
+
+    /// Returns whether the requested composite profile is available.
+    pub fn has_composite_codec(&self, codec: super::codec_catalog::CompositeCodecId) -> bool {
+        self.available_codecs.has_composite_codec(codec)
+    }
+
+    /// Returns the detected QSV full-path hardware init args, if any.
+    pub fn qsv_full_init_args(&self) -> &[String] {
+        &self.available_codecs.qsv_full_init_args
     }
 }
 
@@ -125,24 +139,8 @@ impl From<&AvailableCodecs> for HwAccelInfo {
     /// the detector output directly for explicit hardware profile validation.
     fn from(codecs: &AvailableCodecs) -> Self {
         Self {
-            h264_nvenc_available: codecs.h264_nvenc,
-            hevc_nvenc_available: codecs.hevc_nvenc,
-            h264_qsv_available: codecs.h264_qsv,
-            hevc_qsv_available: codecs.hevc_qsv,
-            h264_amf_available: codecs.h264_amf,
-            hevc_amf_available: codecs.hevc_amf,
-            h264_videotoolbox_available: codecs.h264_videotoolbox,
-            hevc_videotoolbox_available: codecs.hevc_videotoolbox,
-            h264_vaapi_available: codecs.h264_vaapi,
-            hevc_vaapi_available: codecs.hevc_vaapi,
-            nvenc_available: codecs.h264_nvenc || codecs.hevc_nvenc,
-            cuda_filters_available: codecs.nnvgpu,
-            qsv_available: codecs.qsv,
-            qsv_filters_available: codecs.qsv_full,
-            videotoolbox_available: codecs.videotoolbox,
-            vaapi_available: codecs.vaapi,
+            available_codecs: codecs.clone(),
             vaapi_device: None,
-            qsv_full_init_args: codecs.qsv_full_init_args.clone(),
         }
     }
 }
@@ -181,13 +179,13 @@ pub fn build_composite_ffmpeg_settings(
     let mut selected_profile =
         select_composite_profile(request.codec_name, request.hwaccel_available)?;
     if selected_profile.name.starts_with("qsv_full_") {
-        if request.hwaccel_available.qsv_full_init_args.is_empty() {
+        if request.hwaccel_available.qsv_full_init_args().is_empty() {
             return Err(CoreError::Encode(format!(
                 "Requested experimental QSV overlay profile {} is unavailable; codec detection did not provide working QSV hardware-device init args.",
                 selected_profile.name
             )));
         }
-        selected_profile.input_args = request.hwaccel_available.qsv_full_init_args.clone();
+        selected_profile.input_args = request.hwaccel_available.qsv_full_init_args().to_vec();
     }
 
     let mut input_0_args = selected_profile.input_args.clone();
@@ -289,6 +287,7 @@ fn select_composite_profile(
     codec_name: &str,
     hwaccel_available: &HwAccelInfo,
 ) -> CoreResult<CompositeProfile> {
+    let requested_profile = composite_codec(codec_name);
     let profile = composite_profile_template(codec_name).unwrap_or_else(|_| CompositeProfile {
         name: "custom_passthrough",
         codec: "custom",
@@ -297,56 +296,159 @@ fn select_composite_profile(
         output_args: vec!["-c:v".to_string(), codec_name.to_string()],
     });
 
-    if profile.name.starts_with("nnvgpu_") && !hwaccel_available.cuda_filters_available {
-        return Err(CoreError::Encode(format!(
-            "Requested experimental CUDA overlay profile {} is unavailable; FFmpeg must support overlay_cuda, scale_cuda, and hwupload.",
-            profile.name
-        )));
-    }
-    if profile.name.starts_with("qsv_full_") && !hwaccel_available.qsv_filters_available {
-        return Err(CoreError::Encode(format!(
-            "Requested experimental QSV overlay profile {} is unavailable; FFmpeg must support overlay_qsv, scale_qsv, and hwupload.",
-            profile.name
-        )));
+    if let Some(metadata) = requested_profile {
+        validate_catalog_profile_availability(metadata, hwaccel_available)?;
     }
 
-    match profile.codec {
-        "h264_nvenc" if !hwaccel_available.h264_nvenc_available => Err(CoreError::Encode(
-            "Requested hardware encoder h264_nvenc is unavailable.".to_string(),
-        )),
-        "hevc_nvenc" if !hwaccel_available.hevc_nvenc_available => Err(CoreError::Encode(
-            "Requested hardware encoder hevc_nvenc is unavailable.".to_string(),
-        )),
-        "h264_qsv" if !hwaccel_available.h264_qsv_available => Err(CoreError::Encode(
-            "Requested hardware encoder h264_qsv is unavailable.".to_string(),
-        )),
-        "hevc_qsv" if !hwaccel_available.hevc_qsv_available => Err(CoreError::Encode(
-            "Requested hardware encoder hevc_qsv is unavailable.".to_string(),
-        )),
-        "h264_amf" if !hwaccel_available.h264_amf_available => Err(CoreError::Encode(
-            "Requested hardware encoder h264_amf is unavailable.".to_string(),
-        )),
-        "hevc_amf" if !hwaccel_available.hevc_amf_available => Err(CoreError::Encode(
-            "Requested hardware encoder hevc_amf is unavailable.".to_string(),
-        )),
-        "h264_videotoolbox" if !hwaccel_available.h264_videotoolbox_available => {
-            Err(CoreError::Encode(
-                "Requested hardware encoder h264_videotoolbox is unavailable.".to_string(),
-            ))
-        }
-        "hevc_videotoolbox" if !hwaccel_available.hevc_videotoolbox_available => {
-            Err(CoreError::Encode(
-                "Requested hardware encoder hevc_videotoolbox is unavailable.".to_string(),
-            ))
-        }
-        "h264_vaapi" if !hwaccel_available.h264_vaapi_available => Err(CoreError::Encode(
-            "Requested hardware encoder h264_vaapi is unavailable.".to_string(),
-        )),
-        "hevc_vaapi" if !hwaccel_available.hevc_vaapi_available => Err(CoreError::Encode(
-            "Requested hardware encoder hevc_vaapi is unavailable.".to_string(),
-        )),
-        _ => Ok(profile),
+    Ok(profile)
+}
+
+/// Validates one catalog-backed composite profile request.
+///
+/// This keeps availability messages centralized on typed catalog metadata
+/// instead of relying on string prefixes or codec-name match trees.
+fn validate_catalog_profile_availability(
+    metadata: &CompositeCodecMetadata,
+    hwaccel_available: &HwAccelInfo,
+) -> CoreResult<()> {
+    match metadata.availability_rule {
+        CompositeAvailabilityRule::Always => Ok(()),
+        CompositeAvailabilityRule::H264Nvenc => validate_simple_catalog_profile(
+            hwaccel_available,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+        ),
+        CompositeAvailabilityRule::HevcNvenc => validate_simple_catalog_profile(
+            hwaccel_available,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+        ),
+        CompositeAvailabilityRule::H264Qsv => validate_simple_catalog_profile(
+            hwaccel_available,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+        ),
+        CompositeAvailabilityRule::HevcQsv => validate_simple_catalog_profile(
+            hwaccel_available,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+        ),
+        CompositeAvailabilityRule::H264Amf => validate_simple_catalog_profile(
+            hwaccel_available,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+        ),
+        CompositeAvailabilityRule::HevcAmf => validate_simple_catalog_profile(
+            hwaccel_available,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+        ),
+        CompositeAvailabilityRule::H264Videotoolbox => validate_simple_catalog_profile(
+            hwaccel_available,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+        ),
+        CompositeAvailabilityRule::HevcVideotoolbox => validate_simple_catalog_profile(
+            hwaccel_available,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+        ),
+        CompositeAvailabilityRule::H264Vaapi => validate_simple_catalog_profile(
+            hwaccel_available,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+        ),
+        CompositeAvailabilityRule::HevcVaapi => validate_simple_catalog_profile(
+            hwaccel_available,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+        ),
+        CompositeAvailabilityRule::H264NvencWithCudaFilters => validate_stacked_catalog_profile(
+            hwaccel_available,
+            super::codec_catalog::CompositeCodecId::NvgpuH264,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+            metadata.profile_name,
+            unavailable_cuda_overlay_profile,
+        ),
+        CompositeAvailabilityRule::HevcNvencWithCudaFilters => validate_stacked_catalog_profile(
+            hwaccel_available,
+            super::codec_catalog::CompositeCodecId::NvgpuHevc,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+            metadata.profile_name,
+            unavailable_cuda_overlay_profile,
+        ),
+        CompositeAvailabilityRule::H264QsvWithFullFilters => validate_stacked_catalog_profile(
+            hwaccel_available,
+            super::codec_catalog::CompositeCodecId::QsvH264,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+            metadata.profile_name,
+            unavailable_qsv_overlay_profile,
+        ),
+        CompositeAvailabilityRule::HevcQsvWithFullFilters => validate_stacked_catalog_profile(
+            hwaccel_available,
+            super::codec_catalog::CompositeCodecId::QsvHevc,
+            metadata.id,
+            metadata.ffmpeg_codec_name,
+            metadata.profile_name,
+            unavailable_qsv_overlay_profile,
+        ),
     }
+}
+
+/// Validates a profile whose availability is represented by one canonical rule.
+fn validate_simple_catalog_profile(
+    hwaccel_available: &HwAccelInfo,
+    codec_id: super::codec_catalog::CompositeCodecId,
+    codec_name: &str,
+) -> CoreResult<()> {
+    if hwaccel_available.has_composite_codec(codec_id) {
+        Ok(())
+    } else {
+        unavailable_encoder(codec_name)
+    }
+}
+
+/// Validates an experimental stacked profile while preserving legacy errors.
+fn validate_stacked_catalog_profile(
+    hwaccel_available: &HwAccelInfo,
+    safe_codec_id: super::codec_catalog::CompositeCodecId,
+    stacked_codec_id: super::codec_catalog::CompositeCodecId,
+    codec_name: &str,
+    profile_name: &str,
+    unavailable_stack: fn(&str) -> CoreResult<()>,
+) -> CoreResult<()> {
+    if !hwaccel_available.has_composite_codec(safe_codec_id) {
+        return unavailable_encoder(codec_name);
+    }
+    if hwaccel_available.has_composite_codec(stacked_codec_id) {
+        Ok(())
+    } else {
+        unavailable_stack(profile_name)
+    }
+}
+
+/// Returns the standard "hardware encoder unavailable" error.
+fn unavailable_encoder(codec_name: &str) -> CoreResult<()> {
+    Err(CoreError::Encode(format!(
+        "Requested hardware encoder {codec_name} is unavailable."
+    )))
+}
+
+/// Returns the standard "CUDA overlay stack unavailable" error.
+fn unavailable_cuda_overlay_profile(profile_name: &str) -> CoreResult<()> {
+    Err(CoreError::Encode(format!(
+        "Requested experimental CUDA overlay profile {profile_name} is unavailable; FFmpeg must support overlay_cuda, scale_cuda, and hwupload."
+    )))
+}
+
+/// Returns the standard "QSV overlay stack unavailable" error.
+fn unavailable_qsv_overlay_profile(profile_name: &str) -> CoreResult<()> {
+    Err(CoreError::Encode(format!(
+        "Requested experimental QSV overlay profile {profile_name} is unavailable; FFmpeg must support overlay_qsv, scale_qsv, and hwupload."
+    )))
 }
 
 /// Returns the safe CPU-overlay profile that corresponds to an experimental path.

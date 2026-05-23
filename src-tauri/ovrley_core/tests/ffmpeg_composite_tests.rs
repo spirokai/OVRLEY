@@ -21,6 +21,7 @@
 
 use std::path::Path;
 
+use ovrley_core::encode::codec_detect::AvailableCodecs;
 use ovrley_core::encode::ffmpeg_composite::{
     build_composite_ffmpeg_settings, CompositeFfmpegBuildRequest, CompositeFfmpegSettings,
     HwAccelInfo,
@@ -59,6 +60,14 @@ fn settings_for_codec(
         hwaccel_available: hwaccel,
     })
     .unwrap()
+}
+
+/// Wraps a canonical codec snapshot in the composite hardware-info shell.
+fn hwaccel_with_available_codecs(available_codecs: AvailableCodecs) -> HwAccelInfo {
+    HwAccelInfo {
+        available_codecs,
+        ..HwAccelInfo::default()
+    }
 }
 
 #[test]
@@ -246,11 +255,11 @@ fn test_8_2_software_h265_profile_uses_cpu_overlay_and_libx265() {
 
 #[test]
 fn test_8_3_nvenc_h264_simple_path_uses_cpu_overlay_when_available() {
-    let hwaccel = HwAccelInfo {
-        h264_nvenc_available: true,
-        nvenc_available: true,
-        ..HwAccelInfo::default()
-    };
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_nvenc: true,
+        nvgpu: true,
+        ..AvailableCodecs::default()
+    });
     let built = settings_for_codec(
         "h264_nvenc",
         "60M",
@@ -292,11 +301,11 @@ fn test_8_4_nvenc_hevc_unavailable_fails_clearly() {
 
 #[test]
 fn test_8_5_videotoolbox_h264_simple_path_when_available() {
-    let hwaccel = HwAccelInfo {
-        h264_videotoolbox_available: true,
-        videotoolbox_available: true,
-        ..HwAccelInfo::default()
-    };
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_videotoolbox: true,
+        videotoolbox: true,
+        ..AvailableCodecs::default()
+    });
     let built = settings_for_codec(
         "h264_videotoolbox",
         "10M",
@@ -335,11 +344,11 @@ fn test_8_6_videotoolbox_hevc_unavailable_fails_clearly() {
 
 #[test]
 fn test_8_7_qsv_h264_simple_path_when_available() {
-    let hwaccel = HwAccelInfo {
-        h264_qsv_available: true,
-        qsv_available: true,
-        ..HwAccelInfo::default()
-    };
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_qsv: true,
+        qsv: true,
+        ..AvailableCodecs::default()
+    });
     let built = settings_for_codec(
         "h264_qsv",
         "60M",
@@ -356,10 +365,10 @@ fn test_8_7_qsv_h264_simple_path_when_available() {
 
 #[test]
 fn test_8_7a_amf_h264_simple_path_when_available() {
-    let hwaccel = HwAccelInfo {
-        h264_amf_available: true,
-        ..HwAccelInfo::default()
-    };
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_amf: true,
+        ..AvailableCodecs::default()
+    });
     let built = settings_for_codec(
         "h264_amf",
         "60M",
@@ -417,16 +426,16 @@ fn test_8_8_automatic_h264_uses_software_fallback() {
 
 #[test]
 fn test_8_9_bitrate_override_is_respected_for_every_profile() {
-    let hwaccel = HwAccelInfo {
-        h264_nvenc_available: true,
-        h264_qsv_available: true,
-        h264_amf_available: true,
-        h264_videotoolbox_available: true,
-        nvenc_available: true,
-        qsv_available: true,
-        videotoolbox_available: true,
-        ..HwAccelInfo::default()
-    };
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_nvenc: true,
+        h264_qsv: true,
+        h264_amf: true,
+        h264_videotoolbox: true,
+        nvgpu: true,
+        qsv: true,
+        videotoolbox: true,
+        ..AvailableCodecs::default()
+    });
 
     for codec in [
         "libx264",
@@ -460,12 +469,12 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
 
 #[test]
 fn test_9_1_cuda_full_profile_requires_cuda_filter_stack() {
-    let hwaccel = HwAccelInfo {
-        h264_nvenc_available: true,
-        nvenc_available: true,
-        cuda_filters_available: false,
-        ..HwAccelInfo::default()
-    };
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_nvenc: true,
+        nvgpu: true,
+        nnvgpu: false,
+        ..AvailableCodecs::default()
+    });
     let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
         codec_name: "nnvgpu_h264",
         bitrate: "60M",
@@ -487,12 +496,12 @@ fn test_9_1_cuda_full_profile_requires_cuda_filter_stack() {
 
 #[test]
 fn test_9_2_cuda_h264_full_profile_uses_overlay_cuda_when_available() {
-    let hwaccel = HwAccelInfo {
-        h264_nvenc_available: true,
-        nvenc_available: true,
-        cuda_filters_available: true,
-        ..HwAccelInfo::default()
-    };
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_nvenc: true,
+        nvgpu: true,
+        nnvgpu: true,
+        ..AvailableCodecs::default()
+    });
     let built = settings_for_codec(
         "nnvgpu_h264",
         "60M",
@@ -515,12 +524,12 @@ fn test_9_2_cuda_h264_full_profile_uses_overlay_cuda_when_available() {
 
 #[test]
 fn test_9_3_cuda_hevc_full_profile_uses_overlay_cuda_when_available() {
-    let hwaccel = HwAccelInfo {
-        hevc_nvenc_available: true,
-        nvenc_available: true,
-        cuda_filters_available: true,
-        ..HwAccelInfo::default()
-    };
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        hevc_nvenc: true,
+        nvgpu: true,
+        nnvgpu: true,
+        ..AvailableCodecs::default()
+    });
     let built = settings_for_codec(
         "nnvgpu_hevc",
         "60M",
@@ -538,12 +547,12 @@ fn test_9_3_cuda_hevc_full_profile_uses_overlay_cuda_when_available() {
 
 #[test]
 fn test_9_5_qsv_full_profile_requires_qsv_filter_stack() {
-    let hwaccel = HwAccelInfo {
-        h264_qsv_available: true,
-        qsv_available: true,
-        qsv_filters_available: false,
-        ..HwAccelInfo::default()
-    };
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_qsv: true,
+        qsv: true,
+        qsv_full: false,
+        ..AvailableCodecs::default()
+    });
     let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
         codec_name: "qsv_full_h264",
         bitrate: "60M",
@@ -577,13 +586,13 @@ fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
         "-hwaccel_output_format".to_string(),
         "qsv".to_string(),
     ];
-    let hwaccel = HwAccelInfo {
-        h264_qsv_available: true,
-        qsv_available: true,
-        qsv_filters_available: true,
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_qsv: true,
+        qsv: true,
+        qsv_full: true,
         qsv_full_init_args: detected_args.clone(),
-        ..HwAccelInfo::default()
-    };
+        ..AvailableCodecs::default()
+    });
     let built = settings_for_codec(
         "qsv_full_h264",
         "60M",
@@ -611,13 +620,13 @@ fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
 
 #[test]
 fn test_9_6_qsv_full_profile_requires_detected_init_args() {
-    let hwaccel = HwAccelInfo {
-        h264_qsv_available: true,
-        qsv_available: true,
-        qsv_filters_available: true,
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_qsv: true,
+        qsv: true,
+        qsv_full: true,
         qsv_full_init_args: Vec::new(),
-        ..HwAccelInfo::default()
-    };
+        ..AvailableCodecs::default()
+    });
     let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
         codec_name: "qsv_full_h264",
         bitrate: "60M",
@@ -649,13 +658,13 @@ fn test_9_6_qsv_full_profile_uses_detected_init_args_when_available() {
         "-hwaccel_output_format".to_string(),
         "qsv".to_string(),
     ];
-    let hwaccel = HwAccelInfo {
-        h264_qsv_available: true,
-        qsv_available: true,
-        qsv_filters_available: true,
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_qsv: true,
+        qsv: true,
+        qsv_full: true,
         qsv_full_init_args: detected_args.clone(),
-        ..HwAccelInfo::default()
-    };
+        ..AvailableCodecs::default()
+    });
     let built = settings_for_codec(
         "qsv_full_h264",
         "60M",
@@ -670,15 +679,15 @@ fn test_9_6_qsv_full_profile_uses_detected_init_args_when_available() {
 
 #[test]
 fn test_9_7_safe_codec_names_do_not_select_experimental_profiles() {
-    let hwaccel = HwAccelInfo {
-        h264_nvenc_available: true,
-        h264_qsv_available: true,
-        nvenc_available: true,
-        qsv_available: true,
-        cuda_filters_available: true,
-        qsv_filters_available: true,
-        ..HwAccelInfo::default()
-    };
+    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
+        h264_nvenc: true,
+        h264_qsv: true,
+        nvgpu: true,
+        qsv: true,
+        nnvgpu: true,
+        qsv_full: true,
+        ..AvailableCodecs::default()
+    });
 
     let nvenc = settings_for_codec(
         "h264_nvenc",

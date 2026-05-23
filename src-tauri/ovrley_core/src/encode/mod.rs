@@ -17,6 +17,8 @@
 //! | Parallel render worker | `run_parallel_renders` | Independent config + ffmpeg | Work queue exhaustion | `run_parallel_renders` |
 //! | Command dispatch | `backend_render` / `backend_render_composite_phase3` | Full render call | Completion / cancel / error (updates controller) | Fire-and-forget |
 
+/// Canonical codec/profile catalog shared by detection and FFmpeg builders.
+pub mod codec_catalog;
 /// ffmpeg codec and hardware-acceleration detection.
 pub mod codec_detect;
 /// ffmpeg discovery and codec argument construction.
@@ -27,6 +29,8 @@ pub mod ffmpeg_composite;
 pub mod ffmpeg_composite_profiles;
 /// FFmpeg codec settings resolution (separated from binary discovery).
 pub mod ffmpeg_settings;
+/// Editable FFmpeg command templates for transparent overlay encoder profiles.
+pub mod ffmpeg_transparent_profiles;
 /// Rational frame-rate helpers shared by composite encoding modules.
 pub mod fps;
 /// Shared internal queueing and timing helpers for encode pipelines.
