@@ -7,12 +7,11 @@ import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { getWidgetSceneOrigin } from '../utils/overlayEditorHelpers'
-import { buildMetricWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
+import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
 import { useFontMetricsVersion } from '@/features/widget-preview/hooks/useFontMetricsVersion'
 import { getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
 import { buildWidgetTransform } from '@/lib/geometryUtils'
-import { CANVAS_BACKGROUND_COLORS, METRIC_WIDGET_LINE_HEIGHT } from '../data/overlayEditorConstants'
-import { measurePreviewText } from '@/features/widget-preview/utils/textMeasurement'
+import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
 
 /**
@@ -103,27 +102,8 @@ const OverlayCanvasWidget = memo(
       previewSecond,
     })
     const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
-
-    const isLabelWidget = widget.category === 'labels' || widget.type === 'label'
-    const labelVisualBounds = isLabelWidget
-      ? (() => {
-          const fontSize = widget.data.font_size ?? 60
-          const fontFamily = getPreviewFontFamily(widget.data.font || widget.data.font_family)
-          const text = widget.data.text || 'TEXT'
-          const measurement = measurePreviewText(text, fontSize, fontFamily)
-          const lineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
-          return {
-            minX: 0,
-            minY: 0,
-            maxX: measurement.width,
-            maxY: lineHeight,
-            width: measurement.width,
-            height: lineHeight,
-          }
-        })()
-      : null
-
-    const visualBounds = metricVisualBounds ?? labelVisualBounds
+    const textPreviewModel = buildTextWidgetPreviewModel({ widget })
+    const visualBounds = metricVisualBounds ?? textPreviewModel?.visualBounds ?? null
     const isPlotWidget = widget.category === 'plots'
     const origin = getWidgetSceneOrigin(widget, null, visualBounds, {
       boundsScale: isPlotWidget ? 1 : globalScale,
@@ -166,7 +146,7 @@ const OverlayCanvasWidget = memo(
           globalOpacity={globalOpacity}
           globalScale={globalScale}
           metricPreviewModel={metricPreviewModel}
-          textPreviewModel={undefined}
+          textPreviewModel={textPreviewModel}
           sceneFont={sceneFont}
           sceneFontSize={sceneFontSize}
           sceneStyle={sceneStyle}

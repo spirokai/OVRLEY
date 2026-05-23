@@ -1,3 +1,7 @@
+## UNRELATED
+
+-- test this format yuv420p10le for high fidelity; yuv444p or yuv444p10le if alpha is needed (but beware of compatibility issues with some players)
+
 # Planned Widgets — Data Type Research
 
 Cross-sport analysis of per-sample dynamic data types that could be implemented as widgets.
