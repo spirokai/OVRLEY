@@ -39,10 +39,10 @@ use benchmark_common::{
 /// Each entry is a display name that maps to a `TransparentCodecId` via the
 /// shared codec catalog.
 const TRANSPARENT_CODECS: &[&str] = &[
-    //"prores_ks",
+    "prores_ks",
     //"prores_ks_vulkan",
     //"prores_videotoolbox",
-    "qtrle",
+    //"qtrle",
 ];
 
 /// Parses CLI arguments: accepts `--activity <path>` / `--template <path>` or
