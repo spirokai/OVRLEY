@@ -12,11 +12,11 @@
 //! - `simplify` — RDP and LTTB point decimation helpers.
 //! - `draw` — per-frame canvas composition of layers, polyline, and marker.
 
+mod draw;
+mod frame_state;
 mod normalize;
 mod prepare;
-mod frame_state;
 mod simplify;
-mod draw;
 
 pub(crate) use draw::draw_route_widget;
 pub(crate) use prepare::prepare_route_cache;

@@ -3,10 +3,13 @@
 ///
 /// Preparation owns smoothing, downsampling, simplification, static layers,
 /// and frame-state generation so the render loop stays predictable.
-
-use super::super::common::{custom_export_range_active, static_layer_padding, normalize_optional_progress_window};
+use super::super::common::{
+    custom_export_range_active, normalize_optional_progress_window, static_layer_padding,
+};
 use super::super::polyline::{draw_area, draw_polyline_with_shadow};
-use super::super::types::{NormalizedElevationPlot, ElevationWidgetCache, StaticLayer, WidgetGeometry};
+use super::super::types::{
+    ElevationWidgetCache, NormalizedElevationPlot, StaticLayer, WidgetGeometry,
+};
 use super::reduction::{
     downsample_elevation_points, project_elevation_points, simplify_elevation_samples,
 };
@@ -31,26 +34,22 @@ pub(crate) fn prepare_elevation_cache(
     let show_full_activity = plot.show_full_activity.unwrap_or(false);
     let plot = super::normalize::normalize_elevation_plot(config, plot);
     let raw_points = build_elevation_source_points(config, activity, show_full_activity)?;
-    let geometry =
-        prepare_profiler.measure("build_elevation_cache.geometry", || {
-            build_elevation_geometry(&plot, &raw_points)
-        })?;
-    let marker_layers =
-        super::super::marker::marker_layers_from_points(&plot.marker_points);
-    let remaining_layer = prepare_profiler
-        .measure("build_elevation_cache.layers", || {
-            build_elevation_remaining_layer(&plot, &geometry)
-        })?;
-    let frame_states = prepare_profiler
-        .measure("build_elevation_cache.frame_states", || {
-            super::frame_state::build_elevation_frame_states(
-                config,
-                activity,
-                dense_activity,
-                &geometry,
-                show_full_activity,
-            )
-        });
+    let geometry = prepare_profiler.measure("build_elevation_cache.geometry", || {
+        build_elevation_geometry(&plot, &raw_points)
+    })?;
+    let marker_layers = super::super::marker::marker_layers_from_points(&plot.marker_points);
+    let remaining_layer = prepare_profiler.measure("build_elevation_cache.layers", || {
+        build_elevation_remaining_layer(&plot, &geometry)
+    })?;
+    let frame_states = prepare_profiler.measure("build_elevation_cache.frame_states", || {
+        super::frame_state::build_elevation_frame_states(
+            config,
+            activity,
+            dense_activity,
+            &geometry,
+            show_full_activity,
+        )
+    });
     prepare_profiler.record_ms(
         "build_elevation_cache",
         prepare_started.elapsed().as_secs_f64() * 1000.0,
@@ -127,11 +126,10 @@ fn build_elevation_geometry(
         ));
     }
 
-    let target_count = ((plot.width as f32)
-        * DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER
-        * plot.target_density)
-        .round()
-        .max(2.0) as usize;
+    let target_count =
+        ((plot.width as f32) * DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER * plot.target_density)
+            .round()
+            .max(2.0) as usize;
     let downsampled = downsample_elevation_points(raw_points, target_count.min(raw_points.len()));
     let projected = project_elevation_points(
         &downsampled,
@@ -220,7 +218,10 @@ fn build_elevation_source_points(
         } else {
             &activity.sample_elevations
         };
-        return Ok(raw_elevation_points(source, &activity.sample_distance_progress));
+        return Ok(raw_elevation_points(
+            source,
+            &activity.sample_distance_progress,
+        ));
     }
 
     let trimmed = trim_activity(

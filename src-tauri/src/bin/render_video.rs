@@ -1,7 +1,7 @@
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::paths::AppPaths;
 use ovrley_core::config::parse_config_json;
 use ovrley_core::encode::video::{render_video, RenderController};
+use ovrley_core::paths::AppPaths;
 use serde_json::{Map, Value};
 use std::fs;
 use std::path::PathBuf;

@@ -1,11 +1,11 @@
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::paths::AppPaths;
 use ovrley_core::config::parse_config_json;
 use ovrley_core::encode::codec_detect::detect_codecs;
 use ovrley_core::encode::video::{
     render_composite_video, CompositeRenderRequest, RenderController,
 };
 use ovrley_core::encode::video_probe::probe_video;
+use ovrley_core::paths::AppPaths;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -58,8 +58,6 @@ fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
         )),
     }
 }
-
-
 
 #[derive(Serialize)]
 struct RunResult {
@@ -392,12 +390,11 @@ fn main() -> Result<(), String> {
         let (successful_count, failed_count) =
             summarize_run_outcome(successful_run_data.len(), runs.len());
 
-        let average =
-            average_successful_runs(&successful_run_data).map(|avg| AverageResult {
-                job_time: avg.job_time,
-                job_time_seconds: avg.job_time_seconds,
-                file_size_mb: avg.file_size_mb,
-            });
+        let average = average_successful_runs(&successful_run_data).map(|avg| AverageResult {
+            job_time: avg.job_time,
+            job_time_seconds: avg.job_time_seconds,
+            file_size_mb: avg.file_size_mb,
+        });
 
         results.insert(
             display_name.to_string(),

@@ -5,7 +5,6 @@
 /// resolves color/opacity precedence chains. Called once per widget build.
 ///
 /// Owns the normalization logic for route plot configuration.
-
 use super::super::common::{
     fallback_marker_points, legacy_line_width, marker_size_from_weights, normalize_shadow_style,
     plot_base_color, resolve_style_color, scale_marker_points, shadow_with_screen_offset,

@@ -4,7 +4,6 @@
 /// scene scale to all dimension/stroke/marker/label values, and resolves color
 /// precedence chains so draw code receives only concrete values. Runs once per
 /// widget build, not per-frame.
-
 use super::super::common::{
     fallback_marker_points, legacy_line_width, marker_size_from_weights, normalize_shadow_style,
     plot_base_color, resolve_style_color, scale_marker_points, shadow_with_screen_offset,
@@ -25,14 +24,11 @@ pub(crate) fn normalize_elevation_plot(
         plot.line.as_ref().and_then(|line| line.width),
         DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER,
     ) * scale;
-    let marker_size = plot
-        .marker_size
-        .unwrap_or_else(|| {
-            marker_size_from_weights(&plot.points, 16.0, |weight| {
-                weight.sqrt() * DEFAULT_ELEVATION_MARKER_SCALE.sqrt()
-            })
+    let marker_size = plot.marker_size.unwrap_or_else(|| {
+        marker_size_from_weights(&plot.points, 16.0, |weight| {
+            weight.sqrt() * DEFAULT_ELEVATION_MARKER_SCALE.sqrt()
         })
-        * scale;
+    }) * scale;
     let point_label = plot.point_label.clone().unwrap_or_default();
     let marker_color = plot
         .marker_color

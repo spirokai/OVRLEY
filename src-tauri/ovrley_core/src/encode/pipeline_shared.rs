@@ -7,10 +7,10 @@
 //! loops, and progress math stay in their owning pipeline modules.
 //!
 //! The shared writer helpers are deliberately compatibility-oriented rather
-//! than "line-for-line duplicate" moves. Phase 1 first aligned two important
-//! differences before sharing more code:
+//! than "line-for-line duplicate" moves. Two important differences were aligned
+//! before sharing code:
 //!
-//! - Transparent and composite writers now both count written frames as `u64`.
+//! - Transparent and composite writers both count written frames as `u64`.
 //! - Writer cancellation policy is explicit: transparent stops on cancel,
 //!   while composite keeps draining until the sender closes.
 //! - This module stays `pub(crate)` so the transparent pipeline does not gain

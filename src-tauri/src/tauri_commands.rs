@@ -14,8 +14,8 @@
 
 use crate::preview_import::{content_type_for_path, preview_warnings_for_metadata};
 use crate::runtime_paths;
-use crate::BackendState;
 use crate::video_server::VideoServerHandle;
+use crate::BackendState;
 use ovrley_core::commands;
 use std::path::PathBuf;
 use tauri::AppHandle;
@@ -83,17 +83,14 @@ pub(crate) async fn backend_progress(
 /// Opens the application's downloads/output directory in the platform file manager.
 #[tauri::command]
 pub(crate) async fn backend_open_downloads(app: AppHandle) -> Result<String, String> {
-    call_and_serialize(commands::backend_open_downloads(
-        &runtime_paths::app_paths(&app)?,
-    ))
+    call_and_serialize(commands::backend_open_downloads(&runtime_paths::app_paths(
+        &app,
+    )?))
 }
 
 /// Opens a rendered video file from the output directory.
 #[tauri::command]
-pub(crate) async fn backend_open_video(
-    app: AppHandle,
-    filename: String,
-) -> Result<String, String> {
+pub(crate) async fn backend_open_video(app: AppHandle, filename: String) -> Result<String, String> {
     call_and_serialize(commands::backend_open_video(
         &runtime_paths::app_paths(&app)?,
         &filename,
@@ -103,9 +100,9 @@ pub(crate) async fn backend_open_video(
 /// Lists bundled and user-created overlay templates.
 #[tauri::command]
 pub(crate) async fn backend_list_templates(app: AppHandle) -> Result<String, String> {
-    call_and_serialize(commands::backend_list_templates(
-        &runtime_paths::app_paths(&app)?,
-    ))
+    call_and_serialize(commands::backend_list_templates(&runtime_paths::app_paths(
+        &app,
+    )?))
 }
 
 /// Reads one overlay template by filename.
@@ -167,9 +164,8 @@ pub(crate) async fn backend_import_preview_video(
         return Err(format!("Video path is not a file: {}", path_buf.display()));
     }
 
-    let video_metadata =
-        commands::backend_probe_video(&runtime_paths::app_paths(&app)?, &path)
-            .map_err(|e| e.to_string())?;
+    let video_metadata = commands::backend_probe_video(&runtime_paths::app_paths(&app)?, &path)
+        .map_err(|e| e.to_string())?;
     let preview_url = state.set_video(path_buf, content_type_for_path(&path))?;
     let import_id = preview_url
         .rsplit('/')
@@ -212,7 +208,7 @@ pub(crate) async fn backend_get_video_state(
 /// Detects available ffmpeg encoders and hardware acceleration paths.
 #[tauri::command]
 pub(crate) async fn backend_detect_codecs(app: AppHandle) -> Result<String, String> {
-    call_and_serialize(commands::backend_detect_codecs(
-        &runtime_paths::app_paths(&app)?,
-    ))
+    call_and_serialize(commands::backend_detect_codecs(&runtime_paths::app_paths(
+        &app,
+    )?))
 }

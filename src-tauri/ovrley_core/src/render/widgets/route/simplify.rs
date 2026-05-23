@@ -3,15 +3,11 @@
 /// Uses Ramer-Douglas-Peucker (shared `rdp` module) for shape-preserving
 /// decimation and Largest-Triangle-Three-Buckets for density reduction
 /// before simplification.
-
 use super::super::types::RouteSample;
 use crate::rdp::simplify_rdp_indices;
 
 /// Simplifies route samples using Ramer-Douglas-Peucker.
-pub(crate) fn simplify_route_samples(
-    points: &[RouteSample],
-    tolerance: f32,
-) -> Vec<RouteSample> {
+pub(crate) fn simplify_route_samples(points: &[RouteSample], tolerance: f32) -> Vec<RouteSample> {
     let tuples: Vec<(f32, f32)> = points.iter().map(|p| p.point).collect();
     let indices = simplify_rdp_indices(&tuples, tolerance);
     indices.iter().map(|&i| points[i]).collect()
@@ -61,8 +57,7 @@ pub(crate) fn downsample_route_samples(
         let mut next_a = candidate_start;
         let mut max_area = -1.0f64;
 
-        for (offset, point_b) in points
-            [candidate_start..candidate_end.max(candidate_start + 1)]
+        for (offset, point_b) in points[candidate_start..candidate_end.max(candidate_start + 1)]
             .iter()
             .enumerate()
         {

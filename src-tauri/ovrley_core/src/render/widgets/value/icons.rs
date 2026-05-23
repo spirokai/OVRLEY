@@ -4,12 +4,9 @@
 /// Each icon kind is parsed once from bundled SVG markup (`include_str!`-imported
 /// at compile time) and cached in a `OnceLock<Option<ParsedSvgIcon>>` for the
 /// lifetime of the process.
-
 use crate::render::format::MetricIconKind;
 use crate::MetricKind;
-use skia_safe::{
-    image_filters, paint::Style, Canvas, Color, Paint, PaintCap, PaintJoin, Point,
-};
+use skia_safe::{image_filters, paint::Style, Canvas, Color, Paint, PaintCap, PaintJoin, Point};
 use std::sync::OnceLock;
 
 pub(crate) const ICON_VIEWBOX_SIZE: f32 = 24.0;

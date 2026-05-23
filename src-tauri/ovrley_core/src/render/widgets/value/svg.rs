@@ -4,7 +4,6 @@
 /// stroke width) and converts path data into Skia paths. The bundled Lucide-
 /// style icons use only a handful of commands, so the parser does not attempt
 /// full SVG compliance.
-
 use skia_safe::{path::ArcSize, Path, PathDirection, Point};
 
 use super::icons::{ParsedSvgIcon, SvgPrimitive};
@@ -229,10 +228,8 @@ fn tokenize_path_data(data: &str) -> Vec<PathToken> {
         while index < chars.len() {
             let next = chars[index];
             let previous = chars[index - 1];
-            let is_sign_break =
-                (next == '-' || next == '+') && previous != 'e' && previous != 'E';
-            let is_decimal_break =
-                next == '.' && saw_decimal && previous != 'e' && previous != 'E';
+            let is_sign_break = (next == '-' || next == '+') && previous != 'e' && previous != 'E';
+            let is_decimal_break = next == '.' && saw_decimal && previous != 'e' && previous != 'E';
             if next.is_ascii_alphabetic()
                 || next == ','
                 || next.is_ascii_whitespace()

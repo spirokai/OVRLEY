@@ -78,7 +78,7 @@ struct CompositeDiagnostics {
     ffmpeg_timing_note: String,
 }
 
-/// Immutable inputs needed to write a Phase 7 composite timing summary.
+/// Immutable inputs needed to write a composite timing summary.
 pub struct CompositeTimingSummaryInput<'a> {
     // test seam
     pub debug_render_dir: &'a Path,
@@ -102,7 +102,7 @@ pub struct CompositeTimingSummaryInput<'a> {
     pub sync_offset: f64,
 }
 
-/// Writes the Phase 7 composite timing summary JSON.
+/// Writes the composite timing summary JSON.
 ///
 /// The summary is stored under `debug_render/composite/<video-id>/timing_summary.json`
 /// and includes rational FPS values, frame counts, timings, and FFmpeg diagnostics.
@@ -243,7 +243,7 @@ fn round3(value: f64) -> f64 {
     (value * 1000.0).round() / 1000.0
 }
 
-/// Derives the Phase 7 debug directory name from the output video filename.
+/// Derives the composite debug directory name from the output video filename.
 ///
 /// Composite outputs use `video_composited_<id>.mp4`, so this keeps diagnostics
 /// tied to the user-visible render artifact instead of a separate write time.

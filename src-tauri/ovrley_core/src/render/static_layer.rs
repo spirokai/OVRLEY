@@ -6,10 +6,10 @@
 //! the cached-image and base-RGBA paths use the same static drawing loop.
 
 use super::LabelCacheStatus;
-use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
+use crate::paths::AppPaths;
 use crate::render::surface::{create_surface, wrap_native_surface};
 use crate::render::text::{draw_text, label_style, value_style};
 use crate::render::widgets::{draw_static_metric_icon_for_value, has_static_metric_icon};

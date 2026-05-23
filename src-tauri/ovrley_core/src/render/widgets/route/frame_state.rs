@@ -2,7 +2,6 @@
 ///
 /// Computes marker coordinates and completed-polyline prefix points for every
 /// render frame so per-frame drawing performs minimal arithmetic.
-
 use super::super::common::{
     custom_export_range_active, frame_progress_values, point_at_metric_progress_with_cursor,
     relative_distance_frame_progress_values,

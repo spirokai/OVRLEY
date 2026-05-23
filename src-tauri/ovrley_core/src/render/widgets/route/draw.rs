@@ -2,7 +2,6 @@
 ///
 /// Composites the static remaining-route layer, draws the completed-route
 /// polyline up to the frame's marker position, and draws the marker itself.
-
 use super::super::common::{draw_static_layer, widget_render_report};
 use super::super::marker::draw_marker;
 use super::super::polyline::draw_polyline;

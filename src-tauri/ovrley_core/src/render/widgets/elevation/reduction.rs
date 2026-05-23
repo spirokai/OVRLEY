@@ -4,7 +4,6 @@
 /// Smooths using a Savitzky-Golay kernel, downsamples via even spacing, then
 /// applies RDP in screen space to produce geometry that preserves the visual
 /// profile shape with fewer points.
-
 use crate::rdp::simplify_rdp_indices;
 
 /// Elevation sample selected for geometry reduction.

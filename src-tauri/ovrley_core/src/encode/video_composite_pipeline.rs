@@ -67,7 +67,7 @@ pub struct CompositeRenderPlan {
 /// Validates composite render fields and derives timing/FPS values.
 ///
 /// Required fields fail before dense activity is built, while optional fields
-/// receive the Phase 3 defaults from the implementation plan.
+/// receive standard defaults.
 pub fn derive_composite_render_plan(config: &RenderConfig) -> CoreResult<CompositeRenderPlan> {
     // test seam
     let video_path = config
@@ -165,8 +165,8 @@ pub fn apply_composite_scene_timing(config: &mut RenderConfig, plan: &CompositeR
 
 /// Timing and command values derived by the composite pipeline shell.
 ///
-/// Keeping this as a small data object makes Phase 4 behavior easy to test and
-/// gives the Phase 5 render loop one place to read its exact frame counts.
+/// Keeping this as a small data object makes timing math easy to test and
+/// gives the render loop one place to read its exact frame counts.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompositePipelinePlan {
     // test seam
@@ -509,12 +509,10 @@ fn terminate_composite_ffmpeg_after_cancel(
         .map_err(|error| CoreError::Encode(error.to_string()))
 }
 
-/// Derives Phase 4 composite timing and FFmpeg settings.
+/// Derives composite timing and FFmpeg settings.
 ///
-/// This helper mirrors the future render loop's timing math, including the
+/// This helper mirrors the render loop's timing math, including the
 /// fractional-frame overrun guard, without producing any overlay frames.
-// Called only from render_composite_video_single; request-struct deferred
-// because the parameters mirror CompositeRenderRequest fields exactly.
 #[allow(clippy::too_many_arguments)]
 pub fn derive_composite_pipeline_plan(
     // test seam
@@ -674,8 +672,9 @@ pub fn dense_frame_index_for_overlay(
 
 /// Returns whether the dense report was rebuilt for the composite window.
 ///
-/// This checks the Phase 3 timing contract with a small floating-point tolerance
-/// so the hot render loop can use direct frame-index mapping when valid.
+/// This checks the composite timing contract with a small floating-point
+/// tolerance so the hot render loop can use direct frame-index mapping
+/// when valid.
 fn dense_report_matches_composite_window(
     config: &RenderConfig,
     plan: &CompositePipelinePlan,

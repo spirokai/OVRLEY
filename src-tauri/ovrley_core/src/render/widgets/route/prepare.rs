@@ -3,14 +3,15 @@
 ///
 /// Builds all expensive geometry and frame-position data once before the render
 /// loop. Per-frame drawing then only composites cached/static pieces.
-
 use super::super::common::{
     custom_export_range_active, normalize_optional_progress_window, static_layer_padding,
 };
 use super::super::geometry::fit_points_to_widget_with_inset;
 use super::super::marker::marker_layers_from_points;
 use super::super::polyline::draw_polyline_with_shadow;
-use super::super::types::{NormalizedRoutePlot, RouteSample, RouteWidgetCache, StaticLayer, WidgetGeometry};
+use super::super::types::{
+    NormalizedRoutePlot, RouteSample, RouteWidgetCache, StaticLayer, WidgetGeometry,
+};
 use super::simplify::{downsample_route_samples, simplify_route_samples};
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
@@ -32,24 +33,22 @@ pub(crate) fn prepare_route_cache(
     let show_full_activity = plot.show_full_activity.unwrap_or(false);
     let plot = super::normalize::normalize_route_plot(config, plot);
     let route_samples = build_route_samples(config, activity, show_full_activity)?;
-    let geometry =
-        prepare_profiler.measure("build_route_cache.geometry", || {
-            build_route_geometry(&plot, &route_samples)
-        })?;
+    let geometry = prepare_profiler.measure("build_route_cache.geometry", || {
+        build_route_geometry(&plot, &route_samples)
+    })?;
     let marker_layers = marker_layers_from_points(&plot.marker_points);
     let remaining_layer = prepare_profiler.measure("build_route_cache.layers", || {
         build_route_remaining_layer(&plot, &geometry)
     })?;
-    let frame_states = prepare_profiler
-        .measure("build_route_cache.frame_states", || {
-            super::frame_state::build_route_frame_states(
-                config,
-                activity,
-                &geometry,
-                dense_activity,
-                show_full_activity,
-            )
-        });
+    let frame_states = prepare_profiler.measure("build_route_cache.frame_states", || {
+        super::frame_state::build_route_frame_states(
+            config,
+            activity,
+            &geometry,
+            dense_activity,
+            show_full_activity,
+        )
+    });
     prepare_profiler.record_ms(
         "build_route_cache",
         prepare_started.elapsed().as_secs_f64() * 1000.0,

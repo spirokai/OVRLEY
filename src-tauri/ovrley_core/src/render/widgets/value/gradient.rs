@@ -3,7 +3,6 @@
 /// Draws the percentage text with a slope triangle. The triangle uses a fixed
 /// maximum visual height (based on the largest allowed grade) so text and
 /// triangle layout remain stable across frames.
-
 use crate::config::{RenderConfig, ValueConfig};
 use crate::render::text::{draw_text, measure_text, parse_color, ResolvedTextStyle};
 use skia_safe::{paint::Style, Canvas, Paint, PaintCap, Path, Point};

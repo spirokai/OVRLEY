@@ -135,8 +135,9 @@ impl HwAccelInfo {
 impl From<&AvailableCodecs> for HwAccelInfo {
     /// Converts the existing codec detector response into composite profile flags.
     ///
-    /// The frontend and backend share the same codec names, so Phase 8 can use
-    /// the detector output directly for explicit hardware profile validation.
+    /// The frontend and backend share the same codec names, so the
+    /// hardware-info adapter can use the detector output directly for
+    /// explicit hardware profile validation.
     fn from(codecs: &AvailableCodecs) -> Self {
         Self {
             available_codecs: codecs.clone(),
@@ -263,7 +264,7 @@ pub fn build_composite_ffmpeg_settings(
 
 /// Builds global FFmpeg hardware initialization args for the selected profile.
 ///
-/// Most Phase 8 profiles use hardware encode only and need no global setup;
+/// Most hardware profiles use hardware encode only and need no global setup;
 /// VAAPI is the exception because FFmpeg requires a render device.
 fn profile_hw_init_args(
     profile: &CompositeProfile,

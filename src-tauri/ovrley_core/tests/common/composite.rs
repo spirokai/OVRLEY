@@ -19,7 +19,6 @@ use std::thread;
 
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::paths::AppPaths;
 use ovrley_core::config::{parse_config_json, RenderConfig};
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::encode::ffmpeg_composite::{
@@ -33,6 +32,7 @@ use ovrley_core::encode::video_composite_debug::{
 use ovrley_core::encode::video_composite_pipeline::{
     derive_composite_pipeline_plan, render_composite_video_single, CompositePipelinePlan,
 };
+use ovrley_core::paths::AppPaths;
 use serde_json::Value;
 
 /// Bundles the key artifacts produced by a fixture composite render.

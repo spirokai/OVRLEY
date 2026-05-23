@@ -3,7 +3,6 @@
 /// Composites the static remaining-area/line layer, draws the completed
 /// polyline and area fill up to the frame's marker position, draws the
 /// marker itself, and renders optional metric/imperial/legacy labels.
-
 use super::super::common::{
     draw_static_layer, format_elevation_label, rotate_point_to_canvas, widget_render_report,
 };
@@ -12,9 +11,9 @@ use super::super::polyline::{draw_area, draw_polyline};
 use super::super::transform::with_widget_transform;
 use super::super::types::{ElevationWidgetCache, WidgetRenderReport};
 use super::frame_state::build_elevation_completed_points;
-use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
+use crate::paths::AppPaths;
 use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};
 use skia_safe::Canvas;
 
@@ -180,7 +179,13 @@ fn draw_elevation_label(
         unit,
         elevation_cache.plot.label_decimal_rounding,
     );
-    let style = elevation_label_style(config, elevation_cache, base_x + offset_x, base_y + offset_y, scene_scale);
+    let style = elevation_label_style(
+        config,
+        elevation_cache,
+        base_x + offset_x,
+        base_y + offset_y,
+        scene_scale,
+    );
     draw_text(canvas, &text, &style, &paths.font_dirs);
 }
 

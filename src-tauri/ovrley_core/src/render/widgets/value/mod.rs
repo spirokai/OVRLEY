@@ -11,9 +11,9 @@
 //! - `icons` — icon kind mapping, SVG cache, paint creation, primitives drawing.
 //! - `svg` — lightweight SVG parser, path tokenizer, and Skia path conversion.
 
-mod layout;
 mod gradient;
 mod icons;
+mod layout;
 mod svg;
 
 use crate::activity::schema::DenseActivityReport;

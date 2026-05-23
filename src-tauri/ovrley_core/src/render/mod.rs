@@ -18,10 +18,10 @@ pub mod text;
 pub mod widgets;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::paths::AppPaths;
 use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::error::{CoreError, CoreResult};
+use crate::paths::AppPaths;
 use crate::render::format::{format_value, frame_index_for_second};
 use crate::render::static_layer::{cached_labels_image, config_has_static_metric_icons};
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};

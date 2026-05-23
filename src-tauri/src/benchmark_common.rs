@@ -88,11 +88,7 @@ pub fn average_successful_runs(successful_runs: &[CommonRunMetrics]) -> Option<A
         .map(|r| r.job_time_seconds)
         .sum::<f64>()
         / count;
-    let avg_size = successful_runs
-        .iter()
-        .map(|r| r.file_size_mb)
-        .sum::<f64>()
-        / count;
+    let avg_size = successful_runs.iter().map(|r| r.file_size_mb).sum::<f64>() / count;
     Some(AverageRunMetrics {
         job_time: format_mmss(avg_time),
         job_time_seconds: avg_time,

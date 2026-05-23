@@ -3,7 +3,6 @@
 ///
 /// The metric row is manually laid out so icon, value, and units can each use
 /// their own size while sharing one top-left anchor.
-
 use crate::config::ValueConfig;
 use crate::render::text::{draw_text, measure_text, ResolvedTextStyle};
 use skia_safe::Canvas;

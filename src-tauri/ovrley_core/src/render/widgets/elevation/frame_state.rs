@@ -3,7 +3,6 @@
 /// Computes marker positions, elevation values, and completed-polyline prefix
 /// points for every render frame so per-frame drawing performs minimal
 /// arithmetic.
-
 use super::super::common::{
     custom_export_range_active, frame_progress_values, interpolate_optional_numeric_series,
     point_at_metric_progress_with_cursor, point_at_progress_x,
@@ -97,11 +96,7 @@ pub(crate) fn build_elevation_completed_points(
     if result.is_empty() {
         result.push(points[0]);
     }
-    if super::super::geometry::distance(
-        *result.last().unwrap_or(&points[0]),
-        marker_point,
-    ) > 1e-3
-    {
+    if super::super::geometry::distance(*result.last().unwrap_or(&points[0]), marker_point) > 1e-3 {
         result.push(marker_point);
     }
     result
