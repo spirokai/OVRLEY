@@ -1,3 +1,24 @@
+//! Route-sample RDP simplification tests.
+//!
+//! Verifies `simplify_route_samples` against `RouteSample` data with
+//! straight-line, collinear, peak-preservation, empty, and single-point
+//! scenarios.
+//!
+//! ## Why nested test modules
+//!
+//! These tests require access to `render::widgets::route` internals
+//! that are `pub(crate)` and not reachable from crate-level integration
+//! tests. The parent module's `#[cfg(test)] mod tests;` wiring is retained
+//! for this reason.
+//!
+//! ## Type
+//! Unit test (module-local). No I/O, no fixtures — pure geometry.
+//!
+//! ## Regressions guarded
+//! - Route RDP removing peaks it should preserve
+//! - Empty or single-point inputs panicking
+//! - Collinear simplification diverging from expected endpoints
+
 use super::super::route::simplify_route_samples;
 use super::super::types::RouteSample;
 

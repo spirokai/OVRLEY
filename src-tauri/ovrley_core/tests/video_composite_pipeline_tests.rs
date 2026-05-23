@@ -1,3 +1,39 @@
+//! Composite video pipeline integration tests.
+//!
+//! The largest test suite in the crate. Covers the full composite pipeline:
+//! `derive_composite_pipeline_plan`, `render_composite_video_single`,
+//! `render_composite_video` (segmented/parallel), frame-window partitioning,
+//! fractional overrun guards, sync-offset correctness, FPS preservation,
+//! audio track copying, progress reporting, cancellation lifecycle,
+//! FFmpeg failure diagnostics, broken-pipe handling, and composite debug
+//! timing summaries.
+//!
+//! ## Fixtures
+//!
+//! - `test_config::sample_video_path()` (test-1080p.mp4) — representative
+//!   H.264 video with audio track for most composite render-through tests.
+//! - `test_config::fit_activity_path()` — activity data for dense reports.
+//! - `templates/recent-template.json` — real template for realistic widget
+//!   configuration in render-through tests.
+//! - Temporary 4K video fixture (`tmp/test-4k.mp4`) — required for the
+//!   parallel segmented render tests.
+//!
+//! ## Type
+//! Integration test. Requires live ffmpeg and ffprobe in `vendor/ffmpeg/bin/`.
+//! Runs full render pipelines that produce MP4 output files. Tests marked
+//! `#[ignore]` are long-running 4K renders for manual validation only.
+//!
+//! ## Regressions guarded
+//! - Composite pipeline producing wrong FPS (integer rounding of rationals)
+//! - Sync offset incorrectly applied as ffmpeg seek (should be timing offset)
+//! - Fractional render durations writing past the declared duration
+//! - Audio track dropped during composite rendering
+//! - Cancellation leaving partial output files or zombie processes
+//! - FFmpeg crash producing unhelpful error messages
+//! - Parallel segmentation producing wrong frame windows or overlapping segments
+//! - Lower overlay update rate producing incorrect frame counts
+//! - Debug timing summaries missing expected fields
+
 mod common;
 
 use std::fs;
@@ -237,6 +273,17 @@ fn test_5_9_invalid_dense_frame_range_fails_clearly() {
 }
 
 #[test]
+/// Multi-threaded cancellation test: spawns a composite render on a
+/// background thread, cancels after 100ms, and verifies the render returns
+/// a Cancelled error and no partial output files are left behind.
+///
+/// Uses snapshots of the downloads directory before and after the render
+/// to confirm cleanup. Sets the cancel flag on the controller's AtomicBool
+/// directly via `cancel_flag().store(true, Ordering::SeqCst)`.
+///
+/// Regressions guarded: cancelled renders leaving stale output files,
+/// cancel flag not respected by the render loop, error from cancel path
+/// not containing "cancelled".
 fn test_6_1_cancel_mid_render_stops_and_cleans_partial_output() {
     let paths = test_paths_named("phase6_cancel");
     let before = composited_outputs(&paths);
@@ -323,6 +370,13 @@ fn test_6_4_ffmpeg_failure_reports_stderr() {
 }
 
 #[test]
+/// Verifies broken-pipe errors from ffmpeg crashes include diagnostic
+/// context: the FFmpeg exit status, selected profile name, filter graph,
+/// and stderr tail. Uses a synthetic `ExitStatus` from `cmd /C exit 1`
+/// and exercises `format_pipe_write_failure` directly.
+///
+/// Regressions guarded: pipe-write errors producing empty or misleading
+/// messages, missing filter graph in crash diagnostics.
 fn test_6_5_broken_pipe_error_includes_ffmpeg_exit_context() {
     let status = Command::new(if cfg!(windows) { "cmd" } else { "false" })
         .args(if cfg!(windows) {
@@ -758,6 +812,18 @@ fn recent_template_config(width: u32, height: u32) -> RenderConfig {
 }
 
 #[test]
+/// End-to-end parallel composite render with 2 segments.
+///
+/// Configures a 5-second composite render at 29.97 FPS split across 2
+/// parallel segments. Uses `render_composite_video` (the segmented
+/// dispatcher) rather than `render_composite_video_single`. Verifies
+/// output file exists and is non-empty.
+///
+/// Requires live ffmpeg and the test-1080p.mp4 fixture.
+///
+/// Regressions guarded: parallel segmentation producing corrupt output,
+/// segment boundary misalignment, render_composite_video returning error
+/// for valid inputs.
 fn test_parallel_composite_render_2_segments() {
     let paths = test_paths();
     let config = composite_test_config(5.0);
@@ -796,6 +862,19 @@ fn test_parallel_composite_render_2_segments() {
 }
 
 #[test]
+/// End-to-end parallel composite render with audio-copy and trim start.
+///
+/// Configures a 5-second composite render at 29.97 FPS with a 15-second
+/// video trim start (trimming the first 15 seconds of the source video)
+/// and audio track copying. Uses `render_composite_video` (segmented
+/// dispatcher). Verifies output file exists and is non-empty.
+///
+/// Requires live ffmpeg and the test-1080p.mp4 fixture (which has an
+/// audio track).
+///
+/// Regressions guarded: trim start with audio causing sync issues,
+/// parallel segments dropping audio, render_composite_video failing
+/// when trim and audio are both active.
 fn test_parallel_composite_render_with_audio() {
     let paths = test_paths();
     let config = composite_test_config(5.0);

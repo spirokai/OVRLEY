@@ -1,3 +1,18 @@
+//! Composite encoder profile tests.
+//!
+//! Verifies `composite_profile_template` resolution for all built-in
+//! encoder profiles (software h264/hevc, NVENC, QSV, VideoToolbox, VAAPI,
+//! AMF). Confirms unknown names produce errors and every built-in profile
+//! has non-empty output arguments.
+//!
+//! ## Type
+//! Unit test. Pure data-driven lookup — no ffmpeg or video fixtures.
+//!
+//! ## Regressions guarded
+//! - Profile table entries silently breaking (empty output args)
+//! - New profiles not added to the canonical list
+//! - Unknown codec names panicking instead of returning errors
+
 use ovrley_core::encode::ffmpeg_composite_profiles::composite_profile_template;
 
 #[test]

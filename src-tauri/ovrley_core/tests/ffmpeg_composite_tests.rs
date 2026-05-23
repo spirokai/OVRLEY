@@ -1,3 +1,24 @@
+//! Composite FFmpeg command construction tests.
+//!
+//! Verifies `build_composite_ffmpeg_settings` produces correct argument
+//! arrays for every codec path: software (libx264, libx265), hardware
+//! (NVENC, QSV, AMF, VideoToolbox), automatic fallback, and full-CUDA/QSV
+//! filter stacks. Covers FPS preservation with rational values, trim/seeking,
+//! audio copy, filter-graph labeling, bitrate overrides, and clear errors
+//! for unavailable encoders.
+//!
+//! ## Type
+//! Unit test. No subprocesses — builds FFmpeg args and inspects the
+//! resulting argument arrays.
+//!
+//! ## Regressions guarded
+//! - Rational FPS values rounded to integers in ffmpeg args
+//! - Composite trim using `-ss` on video input instead of filter-side
+//! - Filter graph labels breaking output mapping
+//! - Hardware encoder fallback paths silently degrading
+//! - Bitrate overrides ignored for specific profiles
+//! - Full-CUDA/QSV paths crashing when filters are unavailable
+
 use std::path::Path;
 
 use ovrley_core::encode::ffmpeg_composite::{

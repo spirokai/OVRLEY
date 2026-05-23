@@ -1,3 +1,20 @@
+//! Transparent-overlay FFmpeg settings tests.
+//!
+//! Verifies `build_ffmpeg_settings` produces correct pixel formats,
+//! codec selection, container extensions, output-arg passthrough, and
+//! Vulkan hardware initialization for transparent render codec paths
+//! (prores_ks, prores_ks_vulkan, prores_videotoolbox, qtrle).
+//!
+//! ## Type
+//! Unit test. No ffmpeg subprocess — exercises the settings builder with
+//! controlled JSON input.
+//!
+//! ## Regressions guarded
+//! - ProRes variants using wrong pixel formats (alpha channel loss)
+//! - Vulkan path missing hardware init args
+//! - Unknown codecs panicking instead of returning errors
+//! - Custom container overrides ignored
+
 use ovrley_core::encode::ffmpeg_settings::build_ffmpeg_settings;
 use ovrley_core::error::CoreResult;
 use serde_json::json;

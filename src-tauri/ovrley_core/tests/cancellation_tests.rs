@@ -1,7 +1,28 @@
+//! Render cancellation lifecycle tests.
+//!
+//! Verifies the `RenderController` state machine: start → cancel →
+//! progress-state → reset. Covers idempotent cancel, clean reset after
+//! cancel, and progress initialization.
+//!
+//! ## Type
+//! Unit-level test. No ffmpeg, no video fixtures, no threads —
+//! exercises `RenderController` Mutex/AtomicBool state machine directly.
+//! Tests marked `#[ignore]` require a running render pipeline and are
+//! kept as integration-only documentation of the expected lifecycle.
+//!
+//! ## Regressions guarded
+//! - Stale `running` state preventing subsequent renders
+//! - Deadlock from double-cancel
+//! - Progress reporting zeros before any frames
+
 use ovrley_core::encode::video::RenderController;
 
-/// Start then immediate cancel.
-/// The render controller must cleanly transition from Running to Cancelled.
+/// Start then immediate cancel. Verifies the RenderController state
+/// machine cleanly transitions from Running to Cancelled.
+///
+/// Marked `#[ignore]` because this requires a live render pipeline to
+/// exercise the real state transitions through a render thread. The
+/// unit-level tests below exercise the controller directly.
 #[test]
 #[ignore = "Requires render pipeline to be running for state transitions"]
 fn start_immediate_cancel_cancels_cleanly() {
@@ -31,7 +52,13 @@ fn double_cancel_is_idempotent() {
     assert!(progress.status == "cancelled" || progress.status == "running");
 }
 
-/// Cancel resets state so a new render can start cleanly.
+/// Cancel resets the controller so a subsequent render can start cleanly
+/// without a stale running flag blocking `try_start`.
+///
+/// Marked `#[ignore]` — requires a live render pipeline to exercise the
+/// full cancel-reset-start lifecycle through a render thread. The
+/// `controller_lifecycle_start_and_cancel` test below exercises the
+/// Mutex/AtomicBool state machine directly.
 #[test]
 #[ignore = "Requires render pipeline to be running for state transitions"]
 fn cancel_resets_state_for_next_render() {

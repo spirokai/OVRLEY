@@ -1,3 +1,26 @@
+//! Elevation-sample RDP simplification tests.
+//!
+//! Verifies `simplify_elevation_samples_segment` and
+//! `simplify_elevation_samples` against `ElevationSample` data with
+//! straight-line, collinear, peak-preservation, empty, single-point,
+//! and flagged-preserve scenarios.
+//!
+//! ## Why nested test modules
+//!
+//! These tests require access to `render::widgets::elevation` internals
+//! (`ElevationSample`, `simplify_elevation_samples_segment`) that are
+//! `pub(crate)` and not reachable from crate-level integration tests.
+//! The parent module's `#[cfg(test)] mod tests;` wiring is retained
+//! for this reason.
+//!
+//! ## Type
+//! Unit test (module-local). No I/O, no fixtures — pure geometry.
+//!
+//! ## Regressions guarded
+//! - Elevation RDP removing flagged/preserved peaks
+//! - Empty or single-point inputs panicking
+//! - Collinear points producing wrong simplification
+
 use super::super::elevation::{
     simplify_elevation_samples, simplify_elevation_samples_segment, ElevationSample,
 };

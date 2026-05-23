@@ -1,3 +1,19 @@
+//! Metric value widget layout and rendering behavior tests.
+//!
+//! Verifies `gradient_triangle_height` (zero-input and half-angle geometry),
+//! `metric_vertical_metrics_text` (stable preview-compatible vertical
+//! metrics selection), and `metric_icon_top_from_value_layout` (icon
+//! centering on value glyph bounding box rather than row box).
+//!
+//! ## Type
+//! Unit test. Uses `MeasuredText` structs constructed in memory —
+//! no Skia, no I/O, no fixtures.
+//!
+//! ## Regressions guarded
+//! - Gradient triangle height for zero/missing gradient values
+//! - Non-numeric text using wrong vertical metrics (misaligned icons)
+//! - Icon placement math diverging from glyph-center anchoring
+
 use ovrley_core::render::text::MeasuredText;
 use ovrley_core::render::widgets::value::{
     gradient_triangle_height, metric_icon_top_from_value_layout, metric_vertical_metrics_text,

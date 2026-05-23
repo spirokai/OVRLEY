@@ -1,3 +1,18 @@
+//! Progress estimator unit tests.
+//!
+//! Verifies `ProgressEstimator` EMA-based FPS calculation: warmup period
+//! behavior (no estimates for the first few frames), wall-clock clamping
+//! (optimistic EMA capped by overall throughput), ETA calculation,
+//! and scaled frame-second input for output-equivalent FPS.
+//!
+//! ## Type
+//! Unit test. Pure math — no I/O, no fixtures, no threading.
+//!
+//! ## Regressions guarded
+//! - Warmup returning flawed early estimates (NaN, Infinity)
+//! - Overly optimistic EMA causing misleading ETA
+//! - Scaled frame seconds not producing correct output-equivalent FPS
+
 use ovrley_core::encode::progress::ProgressEstimator;
 
 #[test]

@@ -1,3 +1,17 @@
+//! CoreError display-string tests.
+//!
+//! Verifies every `CoreError` variant's `Display` impl produces a
+//! human-readable message that the frontend receives via Tauri IPC.
+//! Ensures IO errors include the file path, FFmpeg errors include
+//! stderr, and serialization errors propagate the parse failure context.
+//!
+//! ## Type
+//! Unit test. No I/O, no fixtures — pure string assertion.
+//!
+//! ## Regressions guarded
+//! - Error variant messages changing format (frontend string matching)
+//! - CoreError losing source context (path, stderr) in Display output
+
 use ovrley_core::CoreError;
 use std::path::PathBuf;
 

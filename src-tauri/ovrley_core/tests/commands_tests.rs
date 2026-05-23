@@ -1,3 +1,30 @@
+//! Command orchestration integration tests.
+//!
+//! Exercises `backend_render`, `derive_composite_render_plan`,
+//! `apply_composite_scene_timing`, and `is_composite_render` — the
+//! main Tauri-command dispatch layer. Verifies transparent vs composite
+//! branch routing, missing-field validation, sync-offset timing, overlay
+//! update-rate calculations, and default render duration derivation.
+//!
+//! ## Fixtures
+//!
+//! - `test_config::sample_video_path()` — representative MP4 for composite
+//!   render-through tests (requires ffmpeg).
+//! - Synthetic activity JSON and config JSON constructed in-line for
+//!   controlled timing scenarios.
+//!
+//! ## Type
+//! Integration test. Runs live renders through the full pipeline for
+//! composite paths; transparent-branch tests are pure data path.
+//! Requires ffmpeg for composite render-through tests.
+//!
+//! ## Regressions guarded
+//! - Transparent/composite branch misrouting
+//! - Composite validation rejecting required fields
+//! - Sync-offset misaligning dense activity timing
+//! - Lower update rate producing wrong overlay FPS
+//! - Impossible trim windows silently defaulting instead of erroring
+
 mod common;
 
 use std::path::PathBuf;
@@ -55,6 +82,18 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
 }
 
 #[test]
+/// Verifies the composite render branch is activated and reaches the pipeline
+/// shell for a short composite render using a real video fixture.
+///
+/// Uses `test_config::sample_video_path()` (test-1080p.mp4). Configures a
+/// 0.2s composite render at 29.97 FPS with 2x widget update rate and 300s
+/// sync offset. Polls the controller until completion and verifies the
+/// output filename starts with `video_composited_`.
+///
+/// Requires live ffmpeg and the video fixture on disk.
+///
+/// Regressions guarded: composite branch silently falling back to transparent
+/// path, progress never reaching `complete`, encoded frame count mismatch.
 fn test_4_3_composite_branch_reaches_pipeline_shell() {
     let ws_root = common::test_config::workspace_root();
     let paths = test_paths(ws_root.clone());
@@ -148,6 +187,16 @@ fn test_3_4_missing_fps_validation() {
 }
 
 #[test]
+/// Verifies the sync offset is correctly applied to dense activity timing.
+///
+/// Configures a composite render with a 300-second sync offset, derives the
+/// composite render plan, applies scene timing, and builds a dense activity
+/// report. Verifies that scene.start equals the sync offset and that the
+/// first speed value in the dense report matches the offset (synthetic
+/// activity data uses elapsed seconds as speed values).
+///
+/// Regressions guarded: sync offset not propagated to scene timing,
+/// dense activity report using wrong time base after trim.
 fn test_3_5_dense_report_timing_for_sync_offset() {
     let mut config = composite_config(
         r#"
@@ -173,6 +222,16 @@ fn test_3_5_dense_report_timing_for_sync_offset() {
 }
 
 #[test]
+/// Verifies overlay update rate reduces the overlay pipe FPS by exactly
+/// the integer factor while preserving the output FPS.
+///
+/// Configures a 59.94 FPS source with 2x widget update rate. Expects the
+/// overlay pipe FPS to be halved (29.97 FPS), scene.fps to match the
+/// overlay pipe FPS, and widget_update_rate() to return 1 (the per-frame
+/// multiplier, not the divisor).
+///
+/// Regressions guarded: update rate applied as a multiplier instead of
+/// divisor, output FPS incorrectly overridden by overlay pipe FPS.
 fn test_3_6_dense_report_timing_for_lower_overlay_update_rate() {
     let mut config = composite_config(
         r#"

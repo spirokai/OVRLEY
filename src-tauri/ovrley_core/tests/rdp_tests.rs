@@ -1,9 +1,24 @@
 //! RDP (Ramer-Douglas-Peucker) behavior tests.
 //!
 //! These tests validate the perpendicular-distance math and simplification
-//! invariants that both `route.rs` and `elevation.rs` rely on. Since the
-//! implementations are currently private and duplicated, these tests serve as
-//! a behavioral specification for the Phase 3 extraction.
+//! invariants that both the route and elevation widget RDP implementations
+//! rely on. Tests include: straight-line preservation, collinear point
+//! removal, peak preservation, empty/single-point edge cases, and
+//! tolerance-at-threshold behavior.
+//!
+//! The RDP implementation in this file is a behavioral specification for
+//! the shared `rdp.rs` module extracted in Phase 3. It is not imported
+//! from `ovrley_core` — the test verifies the algorithm independently.
+//!
+//! ## Type
+//! Unit test (behavioral spec). No I/O, no fixtures — pure math.
+//!
+//! ## Regressions guarded
+//! - Perpendicular distance returning wrong values for offset points
+//! - RDP simplification removing peaks it should preserve
+//! - Empty/single-point inputs panicking
+//! - Tolerance boundary (exactly at max distance) removing or keeping
+//!   the wrong points
 
 /// Straight line (2 points) — both endpoints kept.
 #[test]

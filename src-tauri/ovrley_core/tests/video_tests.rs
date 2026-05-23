@@ -1,3 +1,18 @@
+//! Video/encode orchestration unit tests.
+//!
+//! Verifies `composite_output_frame_windows` segmentation logic: exact
+//! frame-boundary alignment between adjacent segments, fractional tail
+//! on last segment, and render-duration partitioning proportional to
+//! frame count per segment.
+//!
+//! ## Type
+//! Unit test. Pure math — no I/O, no fixtures, no ffmpeg.
+//!
+//! ## Regressions guarded
+//! - Segment boundaries producing overlapping or missing frames
+//! - Last segment losing fractional tail frames
+//! - Render duration not proportionally split across segments
+
 use ovrley_core::encode::fps::Fps;
 use ovrley_core::encode::video::composite_output_frame_windows;
 

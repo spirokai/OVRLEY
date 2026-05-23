@@ -1,3 +1,20 @@
+//! Metric formatting tests.
+//!
+//! Verifies `format_metric_parts` and `format_time_key` produce correct
+//! display text, units, and icon assignments for speed (with unit
+//! conversion) and temperature (with Fahrenheit conversion). Confirms
+//! built-in time format presets generate the expected time strings.
+//!
+//! ## Type
+//! Unit test. Constructs `RenderConfig`/`ValueConfig`/`DenseActivityReport`
+//! in memory — no fixtures, no I/O.
+//!
+//! ## Regressions guarded
+//! - Speed unit conversion (m/s → km/h) incorrect
+//! - Temperature conversion (C → F) incorrect
+//! - Time format presets producing wrong strings
+//! - Icon kind assignment diverging from MetricKind
+
 use chrono::DateTime;
 use serde_json::json;
 

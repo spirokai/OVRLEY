@@ -1,3 +1,25 @@
+//! Video probe (ffprobe metadata) tests.
+//!
+//! Verifies `read_video_stream_duration` priority logic (stream duration
+//! before container duration, frame-count fallback), and validates the
+//! stored ffprobe JSON fixture has expected resolution, codec, duration,
+//! stream count, and parsable r_frame_rate.
+//!
+//! ## Fixtures
+//!
+//! - `test_config::ffprobe_1080p_path()` — stored ffprobe JSON output for
+//!   a representative 1080p H.264 video.
+//!
+//! ## Type
+//! Integration test. Reads fixture files from disk but does not invoke
+//! ffprobe or ffmpeg at runtime.
+//!
+//! ## Regressions guarded
+//! - Stream duration ignored when container duration is also present
+//! - Frame-count fallback producing wrong duration
+//! - ffprobe fixture schema drift (fields renamed, removed, or retyped)
+//! - r_frame_rate format changes (e.g., "30" instead of "30000/1001")
+
 use serde_json::json;
 
 use ovrley_core::encode::video_probe::read_video_stream_duration;

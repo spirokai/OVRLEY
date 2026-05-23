@@ -1,3 +1,27 @@
+//! Configuration parsing and serialization tests.
+//!
+//! Verifies `parse_config_json` for transparent and composite configs,
+//! default handling, composite-field serialization suppression, input
+//! validation, and serde round-trip idempotency.
+//!
+//! ## Fixtures
+//!
+//! - `test_config::simple_config_path()` — minimal valid transparent config.
+//! - `test_config::composite_config_path()` — valid composite config with
+//!   all render-time fields.
+//! - `fixtures/config/invalid.json` — deliberately malformed config for
+//!   error-reporting tests.
+//!
+//! ## Type
+//! Integration test. Reads fixture files from disk; does not require
+//! ffmpeg or video assets.
+//!
+//! ## Regressions guarded
+//! - Old transparent templates silently failing due to new composite fields
+//! - Composite render-time fields leaking into serialized output
+//! - Zero widget update rate accepted (division by zero)
+//! - Serde round-trip losing fields
+
 use ovrley_core::config::parse_config_json;
 
 mod common;

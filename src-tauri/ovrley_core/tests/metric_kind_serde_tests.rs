@@ -1,3 +1,18 @@
+//! MetricKind serde compatibility tests.
+//!
+//! Verifies each `MetricKind` variant serializes to the exact legacy
+//! JSON string expected by the frontend (e.g., `"speed"`, `"heartrate"`),
+//! and that deserialization of old string values works correctly.
+//! Confirms unknown metric names produce deserialization errors.
+//!
+//! ## Type
+//! Unit test. Pure JSON round-trip — no I/O, no fixtures.
+//!
+//! ## Regressions guarded
+//! - `#[serde(rename)]` changes breaking old templates/configs
+//! - Unknown metric strings silently mapping to a default variant
+//! - Variant name refactors breaking frontend communication
+
 use ovrley_core::MetricKind;
 use serde_json;
 

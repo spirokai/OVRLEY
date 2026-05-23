@@ -1,3 +1,17 @@
+//! MetricKind behavior tests.
+//!
+//! Verifies all eight `MetricKind` variants have distinct serde names,
+//! individually round-trip through JSON, and the total variant count
+//! stays at eight (guarding against accidental additions or removals).
+//!
+//! ## Type
+//! Unit test. Pure Rust — no I/O, no fixtures.
+//!
+//! ## Regressions guarded
+//! - Duplicate serde names causing silent mis-deserialization
+//! - Accidental variant additions/removals
+//! - Individual variant serde round-trip breaking
+
 use ovrley_core::MetricKind;
 
 #[test]

@@ -1,3 +1,31 @@
+//! Video preview HTTP server integration tests.
+//!
+//! Verifies the `VideoServerHandle` lifecycle (startup, video set/clear,
+//! port allocation) and the full HTTP range-request behavior: full
+//! responses (200), HEAD requests, byte-range requests (206), suffix
+//! ranges, unsatisfiable ranges (416), stale import IDs (404), cleared
+//! videos (404), and deleted source files (404).
+//!
+//! ## Fixtures/resources
+//!
+//! - Temporary `.mp4` files with deterministic byte content written to
+//!   the system temp directory and deleted after the test.
+//! - Real TCP loopback connections to the preview server.
+//! - `uuid` dependency for unique temp file names.
+//!
+//! ## Type
+//! Integration test. Starts a real `VideoServerHandle` on a random local
+//! port, sends raw HTTP over TCP, and verifies response bytes. Requires
+//! no external video files — generates synthetic content in-memory.
+//!
+//! ## Regressions guarded
+//! - Range parsing rejecting valid multi-range headers (must ignore)
+//! - Unsatisfiable ranges returning 200 instead of 416
+//! - Content-Length mismatch for range responses
+//! - Server leaking state: old import IDs still serving after clear/set
+//! - Deleted source files causing panics instead of 404
+//! - Server failing to start on a random available port
+
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};

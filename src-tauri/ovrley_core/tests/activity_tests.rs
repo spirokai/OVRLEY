@@ -1,3 +1,28 @@
+//! Activity parsing, trimming, and densification integration tests.
+//!
+//! Covers `parse_activity_json`, `trim_activity`, and
+//! `build_dense_activity_report` against real GPX- and FIT-derived JSON
+//! fixtures. Verifies frame count correctness at common FPS values,
+//! non-integer trim windows, and that only explicitly requested telemetry
+//! series are densified.
+//!
+//! ## Fixtures
+//!
+//! - `test_config::parsed_activity_path()` — GPX-derived debug JSON with
+//!   full telemetry (speed, elevation, heartrate, course, timestamps).
+//! - `test_config::fit_activity_path()` — FIT-derived debug JSON used
+//!   for trim-window and selective-densification tests.
+//!
+//! ## Type
+//! Integration test. Does not require ffmpeg or video fixtures — pure data
+//! pipeline testing. No I/O beyond fixture reads.
+//!
+//! ## Regressions guarded
+//! - Frame count mismatch after non-integer trim windows
+//! - Unnecessary densification of unrequested telemetry series
+//! - Distance progress breaking on trimmed exports
+//! - JSON schema drift in activity fixtures
+
 mod common;
 
 use std::fs;

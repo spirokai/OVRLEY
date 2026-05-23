@@ -1,3 +1,17 @@
+//! Codec probing unit tests.
+//!
+//! Verifies `parse_ffmpeg_filter_names` against synthetic `ffmpeg -filters`
+//! output containing CUDA, QSV, and hardware upload/download filter
+//! entries. The `detect_codecs` function itself requires live ffmpeg and
+//! is tested indirectly through composite pipeline integration tests.
+//!
+//! ## Type
+//! Unit test. No subprocesses — exercises string parsing logic only.
+//!
+//! ## Regressions guarded
+//! - Filter name extraction breaking after ffmpeg output format changes
+//! - Missing hardware filter detection (overlay_cuda, scale_qsv, etc.)
+
 use ovrley_core::encode::codec_detect::parse_ffmpeg_filter_names;
 
 #[test]

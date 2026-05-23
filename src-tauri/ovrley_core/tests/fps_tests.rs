@@ -1,3 +1,19 @@
+//! Rational FPS type tests.
+//!
+//! Verifies `Fps` arithmetic: construction, float fallback for common
+//! NTSC rates (23.976, 29.97, 59.94), division for overlay pipe FPS
+//! derivation, ffmpeg argument formatting, equality/comparison, and
+//! rejection of invalid values (zero denominator, zero division factor).
+//!
+//! ## Type
+//! Unit test. Pure math — no I/O, no fixtures.
+//!
+//! ## Regressions guarded
+//! - NTSC rates rounding to integer FPS in ffmpeg args
+//! - Zero denominators or division factors accepted
+//! - Overlay FPS division producing unrepresentable rationals
+//! - Float fallback missing a common NTSC rate
+
 use ovrley_core::encode::fps::Fps;
 
 #[test]

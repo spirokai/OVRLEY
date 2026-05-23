@@ -51,6 +51,10 @@ fn source_repo_root() -> PathBuf {
 /// under the user's documents directory in `OVRLEY`.
 fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
     let repo_root = source_repo_root();
+    // cfg!() is intentional here, not #[cfg(debug_assertions)]. Both branches
+    // must compile because this function serves both debug and release builds.
+    // #[cfg] would exclude the release branch during debug compilation, causing
+    // compile errors when a debug build of the app runs in dev mode.
     let resource_root = if cfg!(debug_assertions) {
         repo_root.clone()
     } else {
@@ -374,7 +378,8 @@ pub fn run() {
             write_parse_debug_file
         ])
         .setup(|app| {
-            if cfg!(debug_assertions) {
+            #[cfg(debug_assertions)]
+            {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
                         .level(log::LevelFilter::Info)
