@@ -268,7 +268,10 @@ pub(crate) fn render_composite_video_segmented(
         .and_then(|map| map.get("codec"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or("libx264");
-    let source_fps = Fps::new(request.composite_video_fps_num, request.composite_video_fps_den)?;
+    let source_fps = Fps::new(
+        request.composite_video_fps_num,
+        request.composite_video_fps_den,
+    )?;
     let overlay_pipe_fps = source_fps.divided_by(update_rate)?;
     let total_overlay_frames = (render_duration * overlay_pipe_fps.as_f64()).ceil() as usize;
     let segment_count = estimate_composite_segment_count(total_overlay_frames.max(1), codec);
@@ -390,7 +393,10 @@ pub(crate) fn render_composite_video_segmented(
             Ok(SegmentEvent::Completed(_, Err(error))) => {
                 if first_error.is_none() {
                     first_error = Some(error);
-                    request.controller.cancel_flag().store(true, Ordering::SeqCst);
+                    request
+                        .controller
+                        .cancel_flag()
+                        .store(true, Ordering::SeqCst);
                 }
                 completed += 1;
             }

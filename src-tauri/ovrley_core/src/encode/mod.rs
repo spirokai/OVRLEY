@@ -39,12 +39,6 @@ pub(crate) mod pipeline_shared;
 pub mod progress; // test seam
 /// Render controller and public video render orchestration.
 pub mod video;
-/// Internal benchmark and multi-render orchestration helpers.
-pub(crate) mod video_parallel;
-/// Internal segmented render orchestration for transparent and composite paths.
-pub(crate) mod video_segmented;
-/// Internal time-window helpers for segmented video orchestration.
-pub(crate) mod video_windows;
 /// Composite-only debug summaries for MP4 compositing diagnostics.
 pub mod video_composite_debug; // test seam
 /// Composite MP4 render pipeline used by the composite render entry point.
@@ -54,7 +48,13 @@ pub mod video_composite_pipeline; // test seam
 pub mod video_composite_support;
 /// Debug summaries, sample-frame exports, and segment stitching helpers.
 mod video_debug;
+/// Internal benchmark and multi-render orchestration helpers.
+pub(crate) mod video_parallel;
 /// Single-render video pipeline used by normal and segmented renders.
 pub(crate) mod video_pipeline;
 /// Video metadata extraction via ffprobe.
 pub mod video_probe;
+/// Internal segmented render orchestration for transparent and composite paths.
+pub(crate) mod video_segmented;
+/// Internal time-window helpers for segmented video orchestration.
+pub(crate) mod video_windows;

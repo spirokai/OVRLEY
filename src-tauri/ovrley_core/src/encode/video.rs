@@ -20,9 +20,7 @@ use crate::paths::AppPaths;
 pub use crate::encode::progress::RenderController;
 pub use crate::encode::video_parallel::run_parallel_renders;
 pub use crate::encode::video_pipeline::rendered_frame_count;
-pub use crate::encode::video_windows::{
-    CompositeSegmentWindow, composite_output_frame_windows,
-};
+pub use crate::encode::video_windows::{composite_output_frame_windows, CompositeSegmentWindow};
 
 /// Renders a video, using segmentation when the selected codec benefits from it.
 pub fn render_video(

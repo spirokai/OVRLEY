@@ -8,6 +8,8 @@
 
 /// Value formatting and metric display helpers.
 pub mod format;
+/// Shared static label/icon caching and base-layer preparation helpers.
+mod static_layer;
 /// Skia surface allocation and PNG output helpers.
 pub mod surface;
 /// Font resolution, text measurement, and text drawing helpers.
@@ -21,21 +23,20 @@ use crate::config::RenderConfig;
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::error::{CoreError, CoreResult};
 use crate::render::format::{format_value, frame_index_for_second};
+use crate::render::static_layer::{cached_labels_image, config_has_static_metric_icons};
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
-use crate::render::text::{draw_text, label_style, value_style};
+use crate::render::text::{draw_text, value_style};
 use crate::render::widgets::value::MetricWidgetRequest;
 use crate::render::widgets::{
     draw_elevation_widget, draw_metric_value_widget_with_config, draw_route_widget,
-    draw_static_metric_icon_for_value, has_static_metric_icon, prepare_render_assets,
-    PreparedRenderAssets, WidgetRenderReport,
+    has_static_metric_icon, prepare_render_assets, PreparedRenderAssets, WidgetRenderReport,
 };
-use serde_json::{json, Value};
 use skia_safe::Image;
-use std::collections::{BTreeMap, HashMap};
-use std::hash::{Hash, Hasher};
+use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
+
+pub use self::static_layer::prepare_base_rgba;
 
 /// Indicates whether the static label layer was not needed, reused, or rebuilt.
 #[derive(Clone, Copy, Debug)]
@@ -452,141 +453,4 @@ fn annotate_timing_aliases(
         }
     }
     timings
-}
-
-// Returns a cached static label/icon layer or renders a new one.
-//
-// The cache is a global `OnceLock<Mutex<HashMap<u64, Image>>>` keyed by a hash
-// of all config-dependent inputs (width, height, scale, scene, labels, values —
-// see `labels_cache_key` below). Because the key covers every input that affects
-// label/icon appearance, different configs produce different keys — cross-render
-// staleness is structurally impossible.
-//
-// This cache is consulted once during asset preparation (`prepare_preview_assets`),
-// not inside the per-frame render loop. The `Mutex` guard is held only during
-// `get`/`insert`; once the image is stored in `PreparedPreviewAssets`, the cache
-// is not touched again for the remainder of the render.
-fn cached_labels_image(
-    paths: &AppPaths,
-    config: &RenderConfig,
-    width: u32,
-    height: u32,
-    scale: f32,
-    prepare_profiler: &mut RenderProfiler,
-) -> CoreResult<(Option<Image>, LabelCacheStatus)> {
-    // Preview surfaces can reuse a Skia image cache keyed by all inputs that can
-    // affect static text/icon pixels.
-    if config.labels.is_empty() && !config_has_static_metric_icons(config) {
-        return Ok((None, LabelCacheStatus::None));
-    }
-
-    static CACHE: OnceLock<Mutex<HashMap<u64, Image>>> = OnceLock::new();
-    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    let cache_key = labels_cache_key(config, width, height, scale)?;
-
-    if let Ok(cache) = cache.lock() {
-        if let Some(image) = cache.get(&cache_key) {
-            return Ok((Some(image.clone()), LabelCacheStatus::Hit));
-        }
-    }
-
-    let prepare_started = Instant::now();
-    let mut surface =
-        prepare_profiler.measure("create_base_image", || create_surface(width, height))?;
-    prepare_profiler.measure("prepare.surface.clear", || {
-        surface.canvas().clear(skia_safe::Color::TRANSPARENT);
-    });
-    prepare_profiler.measure("text.static.cache", || {
-        for label in &config.labels {
-            let style = label_style(&config.scene, label, scale);
-            draw_text(surface.canvas(), &label.text, &style, &paths.font_dirs);
-        }
-        draw_static_metric_icons(surface.canvas(), paths, config, scale);
-    });
-    let image = surface.image_snapshot();
-    prepare_profiler.record_ms(
-        "prepare_render_assets.total",
-        prepare_started.elapsed().as_secs_f64() * 1000.0,
-    );
-
-    if let Ok(mut cache) = cache.lock() {
-        cache.insert(cache_key, image.clone());
-    }
-
-    Ok((Some(image), LabelCacheStatus::Miss))
-}
-
-/// Pre-renders static labels/icons into a reusable RGBA base buffer.
-pub fn prepare_base_rgba(
-    paths: &AppPaths,
-    config: &RenderConfig,
-    width: u32,
-    height: u32,
-    scale: f32,
-    prepare_profiler: &mut RenderProfiler,
-) -> CoreResult<Option<Vec<u8>>> {
-    // Video rendering copies this base buffer into each frame before drawing
-    // dynamic values. That is faster than asking Skia to redraw static labels on
-    // every frame.
-    let row_bytes = (width as usize) * 4;
-    let mut pixels = vec![0u8; row_bytes * (height as usize)];
-    if config.labels.is_empty() && !config_has_static_metric_icons(config) {
-        return Ok(Some(pixels));
-    }
-
-    let mut surface = prepare_profiler.measure("create_base_image", || {
-        wrap_native_surface(width, height, pixels.as_mut_slice())
-    })?;
-    prepare_profiler.measure("text.static.cache", || {
-        for label in &config.labels {
-            let style = label_style(&config.scene, label, scale);
-            draw_text(surface.canvas(), &label.text, &style, &paths.font_dirs);
-        }
-        draw_static_metric_icons(surface.canvas(), paths, config, scale);
-    });
-    drop(surface);
-    Ok(Some(pixels))
-}
-
-// Computes the cache key for the static label/icon layer.
-fn labels_cache_key(config: &RenderConfig, width: u32, height: u32, scale: f32) -> CoreResult<u64> {
-    // Include dynamic values because static metric icons are derived from value
-    // configs even though the numeric text itself is drawn every frame.
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    width.hash(&mut hasher);
-    height.hash(&mut hasher);
-    scale.to_bits().hash(&mut hasher);
-    serde_json::to_string(&config.scene)?.hash(&mut hasher);
-    serde_json::to_string(&config.labels)?.hash(&mut hasher);
-    serde_json::to_string(&config.values)?.hash(&mut hasher);
-    Ok(hasher.finish())
-}
-
-// Returns whether any value widget contributes an icon to the static layer.
-fn config_has_static_metric_icons(config: &RenderConfig) -> bool {
-    config.values.iter().any(has_static_metric_icon)
-}
-
-// Draws metric icons that do not depend on the current frame value.
-fn draw_static_metric_icons(
-    canvas: &skia_safe::Canvas,
-    paths: &AppPaths,
-    config: &RenderConfig,
-    scale: f32,
-) {
-    for value in &config.values {
-        let style = value_style(&config.scene, value, scale);
-        draw_static_metric_icon_for_value(canvas, value, &style, scale, &paths.font_dirs);
-    }
-}
-
-/// Legacy placeholder response retained for callers that still expect it.
-pub fn stub_render_response(config: &RenderConfig, dense_activity: &DenseActivityReport) -> Value {
-    json!({
-        "error": "Phase 3 partial: preview rendering is implemented, but video rendering is not implemented yet.",
-        "error_code": "UNIMPLEMENTED",
-        "validated": true,
-        "frame_count": dense_activity.frame_count,
-        "fps": config.scene.fps
-    })
 }
