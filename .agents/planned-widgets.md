@@ -19,33 +19,33 @@ Cross-sport analysis of per-sample dynamic data types that could be implemented 
 
 ### Already parsed/derived, no widget yet
 
-| Data Type               | Sport                        | fit-parse                               | GPX parser                                                   | Derivation                    | Status       |
-| ----------------------- | ---------------------------- | --------------------------------------- | ------------------------------------------------------------ | ----------------------------- | ------------ |
-| **Pace**                | Run, Swim                    | ✅ `pace`                               | ✅ `pace`                                                    | Fallback: 1000/speed          | ✅ Derived   |
-| **G-Force**             | Motor, Cycle, Ski, Paraglide | ✅ `g_force`, `gforce`                  | ✅ `g_force`, `gforce`                                       | No                            | ✅ Extracted |
-| **Air Pressure**        | Hike, Paraglide, Ski         | ✅ `absolute_pressure`                  | ✅ `air_pressure`, `pressure`                                | No                            | ✅ Extracted |
-| **Ground Contact Time** | Run                          | ✅ `ground_contact_time`, `stance_time` | ✅ `ground_contact_time`, `groundcontacttime`, `stance_time` | No                            | ✅ Extracted |
-| **Left/Right Balance**  | Run                          | ✅ `left_right_balance`                 | ✅ `left_right_balance`, `balance`                           | No                            | ✅ Extracted |
-| **Stride Length**       | Run                          | ✅ `stride_length`, `step_length`       | ✅ `stride_length`, `stridelength`, `step_length`            | No                            | ✅ Extracted |
-| **Stroke Rate**         | Swim, Row                    | ✅ `stroke_rate`, `running_cadence`     | ✅ `stroke_rate`, `strokerate`                               | No                            | ✅ Extracted |
-| **Torque**              | Cycle                        | ✅ `torque`                             | ✅ `torque`                                                  | Fallback: P/(2π × cadence/60) | ✅ Derived   |
-| **Vertical Speed**      | Paraglide, Hike, Cycle       | ✅ `vertical_speed`                     | ✅ `vertical_speed`, `verticalspeed`, `vam`                  | Fallback: Δele/Δt             | ✅ Derived   |
+| Data Type               | Icon         | Sport                        | fit-parse                               | GPX parser                                                   | Derivation                    | Status       | Unambiguous  | Unit choices                          |
+| ----------------------- | ------------ | ---------------------------- | --------------------------------------- | ------------------------------------------------------------ | ----------------------------- | ------------ | ------------ | ------------------------------------- |
+| **Pace**                | `Footprints` | Run, Swim                    | ✅ `pace`                               | ✅ `pace`                                                    | Fallback: 1000/speed          | ✅ Derived   | ✅ Yes       | min/km, min/mi                        |
+| **G-Force**             | Custom       | Motor, Cycle, Ski, Paraglide | ✅ `g_force`, `gforce`                  | ✅ `g_force`, `gforce`                                       | No                            | ✅ Extracted | ✅ Yes       | g, m/s²                               |
+| **Air Pressure**        | `Wind`       | Hike, Paraglide, Ski         | ✅ `absolute_pressure`                  | ✅ `air_pressure`, `pressure`                                | No                            | ✅ Extracted | ✅ Yes       | hPa, mbar, inHg, mmHg                 |
+| **Ground Contact Time** | Custom       | Run                          | ✅ `ground_contact_time`, `stance_time` | ✅ `ground_contact_time`, `groundcontacttime`, `stance_time` | No                            | ✅ Extracted | ✅ Yes       | ms                                    |
+| **Left/Right Balance**  | `Scale`      | Run                          | ✅ `left_right_balance`                 | ✅ `left_right_balance`, `balance`                           | No                            | ✅ Extracted | ❌ Ambiguous | %, ratio (L/R split or 50/50 display) |
+| **Stride Length**       | `Ruler`      | Run                          | ✅ `stride_length`, `step_length`       | ✅ `stride_length`, `stridelength`, `step_length`            | No                            | ✅ Extracted | ✅ Yes       | m, cm, ft, in                         |
+| **Stroke Rate**         | `Waves`      | Swim, Row                    | ✅ `stroke_rate`, `running_cadence`     | ✅ `stroke_rate`, `strokerate`                               | No                            | ✅ Extracted | ✅ Yes       | spm                                   |
+| **Torque**              | Custom       | Cycle                        | ✅ `torque`                             | ✅ `torque`                                                  | Fallback: P/(2π × cadence/60) | ✅ Derived   | ✅ Yes       | Nm, lb-ft                             |
+| **Vertical Speed**      | `TrendingUp` | Paraglide, Hike, Cycle       | ✅ `vertical_speed`                     | ✅ `vertical_speed`, `verticalspeed`, `vam`                  | Fallback: Δele/Δt             | ✅ Derived   | ✅ Yes       | m/s, ft/min, m/h (VAM)                |
 
 ### New parser fields needed
 
-| Data Type            | Sport        | fit-parse             | GPX parser | Derivation | Status        |
-| -------------------- | ------------ | --------------------- | ---------- | ---------- | ------------- |
-| **Gear Position**    | Cycle, Motor | ✅ `gear`             | ❌ rare    | No         | ❌ Not parsed |
-| **Vertical Ratio**   | Run          | ✅ `vertical_ratio`   | ❌         | No         | ❌ Not parsed |
-| **Core Temperature** | All (heat)   | ✅ `core_temperature` | ❌         | No         | ❌ Not parsed |
+| Data Type            | Icon          | Sport        | fit-parse             | GPX parser | Derivation | Status        | Unambiguous | Unit choices      |
+| -------------------- | ------------- | ------------ | --------------------- | ---------- | ---------- | ------------- | ----------- | ----------------- |
+| **Gear Position**    | Custom        | Cycle, Motor | ✅ `gear`             | ❌ rare    | No         | ❌ Not parsed | ✅ Yes      | unitless (gear #) |
+| **Vertical Ratio**   | `Percent`     | Run          | ✅ `vertical_ratio`   | ❌         | No         | ❌ Not parsed | ✅ Yes      | %, ratio          |
+| **Core Temperature** | `Thermometer` | All (heat)   | ✅ `core_temperature` | ❌         | No         | ❌ Not parsed | ✅ Yes      | °C, °F            |
 
 ---
 
 ## Advanced Graphical Widget (visual representation)
 
-| Data Type                     | Sport                               | fit-parse                                                                              | GPX parser                                       | Derivation                                     | Status                 |
-| ----------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------- | ---------------------- |
-| **Heading / Compass Needle**  | Motor, Cycle, Hike, Sail, Paraglide | ✅ `gps_heading`, `compass_heading`, `heading`, `course_heading`, `navigation_heading` | ✅ `heading`, `course`, `bearing`, `gps_heading` | Fallback: bearing between course points        | ✅ Extracted + derived |
-| **G-Meter** (lat/lon G split) | Motor, Ski, MTB                     | G-Force is scalar; vector needs derivation                                             | ❌                                               | ✅ split from g-force + heading + speed deltas | ❌ Not derived         |
+| Data Type                     | Icon          | Sport                               | fit-parse                                                                              | GPX parser                                       | Derivation                                     | Status                 |
+| ----------------------------- | ------------- | ----------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------- | ---------------------- |
+| **Heading / Compass Needle**  | `Compass`     | Motor, Cycle, Hike, Sail, Paraglide | ✅ `gps_heading`, `compass_heading`, `heading`, `course_heading`, `navigation_heading` | ✅ `heading`, `course`, `bearing`, `gps_heading` | Fallback: bearing between course points        | ✅ Extracted + derived |
+| **G-Meter** (lat/lon G split) | `CircleGauge` | Motor, Ski, MTB                     | G-Force is scalar; vector needs derivation                                             | ❌                                               | ✅ split from g-force + heading + speed deltas | ❌ Not derived         |
 
 ---
