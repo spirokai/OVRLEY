@@ -9,12 +9,11 @@
 //! overlay FPS and streams them to FFmpeg, which composites them over input
 //! video frames and writes the final MP4 output.
 
-use std::collections::BTreeMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::Ordering;
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -22,17 +21,25 @@ use std::time::Instant;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::RenderConfig;
-use crate::debug::{RenderProfiler, TimingBucket};
+use crate::debug::RenderProfiler;
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
 use crate::encode::ffmpeg_composite::{
     build_composite_ffmpeg_settings, CompositeFfmpegBuildRequest, CompositeFfmpegSettings,
     HwAccelInfo,
 };
 use crate::encode::fps::Fps;
+use crate::encode::pipeline_shared::{
+    acquire_frame_buffer, merge_timing_maps, queue_frame, writer_worker, FrameBuffer,
+    WriterCancellation, WriterWorkerConfig,
+};
 use crate::encode::progress::ProgressEstimator;
 use crate::encode::video::RenderController;
 use crate::encode::video_composite_debug::{
     write_composite_timing_summary, CompositeTimingSummaryInput,
+};
+use crate::encode::video_composite_support::{
+    format_pipe_write_failure, is_pipe_write_error, output_progress_for_overlay_time, stderr_tail,
+    verify_successful_composite_output,
 };
 use crate::encode::video_debug::timestamp_nanos;
 use crate::error::{CoreError, CoreResult};
@@ -156,17 +163,6 @@ pub fn apply_composite_scene_timing(config: &mut RenderConfig, plan: &CompositeR
     config.scene.update_rate = Some(1);
 }
 
-/// Reusable raw RGBA frame buffer.
-struct FrameBuffer {
-    pixels: Vec<u8>,
-}
-
-/// Result returned by the ffmpeg stdin writer thread.
-struct WriterResult {
-    written_frames: u64,
-    timings: BTreeMap<String, TimingBucket>,
-}
-
 /// Timing and command values derived by the composite pipeline shell.
 ///
 /// Keeping this as a small data object makes Phase 4 behavior easy to test and
@@ -285,7 +281,21 @@ pub fn render_composite_video_single(
             })?;
     }
 
-    let writer_thread = thread::spawn(move || writer_worker(stdin, receiver, free_sender));
+    let writer_thread = thread::spawn(move || {
+        writer_worker(
+            stdin,
+            receiver,
+            free_sender,
+            WriterWorkerConfig {
+                cancellation: WriterCancellation::DrainUntilQueueCloses,
+                write_error_context: "Failed writing composite overlay frame",
+                queue_wait_metric: None,
+                release_wait_metric: None,
+                release_error_message: None,
+                flush_error_is_fatal: false,
+            },
+        )
+    });
 
     let render_result = (|| -> CoreResult<()> {
         loop {
@@ -472,17 +482,6 @@ pub fn render_composite_video_single(
     Ok(plan.output_filename)
 }
 
-/// Converts one overlay timestamp into user-facing output-frame progress.
-///
-/// Composite renders may write fewer overlay frames than final video frames, so
-/// progress is based on the source/output FPS rather than the overlay pipe FPS.
-fn output_progress_for_overlay_time(video_local_time: f64, plan: &CompositePipelinePlan) -> u32 {
-    (video_local_time * plan.output_fps.as_f64())
-        .round()
-        .max(0.0)
-        .min(plan.output_frame_count as f64) as u32
-}
-
 /// Terminates FFmpeg after a user cancellation request.
 ///
 /// Closing stdin gives FFmpeg a short chance to exit cleanly; if it keeps
@@ -508,66 +507,6 @@ fn terminate_composite_ffmpeg_after_cancel(
     child
         .wait()
         .map_err(|error| CoreError::Encode(error.to_string()))
-}
-
-/// Confirms that FFmpeg finalized a usable output file on success.
-///
-/// A successful process exit without a non-empty MP4 is treated as a render
-/// failure because callers need a playable artifact, not just a clean status.
-fn verify_successful_composite_output(output_path: &Path) -> CoreResult<()> {
-    let metadata = std::fs::metadata(output_path).map_err(|error| CoreError::Io {
-        path: output_path.to_path_buf(),
-        source: error,
-    })?;
-    if metadata.len() == 0 {
-        return Err(CoreError::Encode(format!(
-            "Composite render finished but output file is empty: {}",
-            output_path.display()
-        )));
-    }
-    Ok(())
-}
-
-/// Returns whether an overlay write error indicates FFmpeg closed the pipe.
-///
-/// Broken-pipe wording varies by platform, so this uses the common error text
-/// and OS error fragment instead of matching a single exact message.
-fn is_pipe_write_error(error: &str) -> bool {
-    let lower = error.to_lowercase();
-    lower.contains("failed writing composite overlay frame")
-        && (lower.contains("broken pipe")
-            || lower.contains("pipe is being closed")
-            || lower.contains("os error 32")
-            || lower.contains("os error 109")
-            || lower.contains("os error 232"))
-}
-
-/// Formats a pipe-write failure with FFmpeg status and stderr diagnostics.
-///
-/// This makes early FFmpeg exits distinguishable from renderer bugs while still
-/// preserving the underlying write error and recent encoder output.
-fn format_pipe_write_failure(
-    error: String,
-    status: std::process::ExitStatus,
-    stderr: &str,
-    plan: &CompositePipelinePlan,
-) -> String {
-    let mut message = format!(
-        "{error}. FFmpeg terminated before all overlay frames were written (status {status}) for profile {}.",
-        plan.ffmpeg_settings.selected_profile_name
-    );
-    if let Some(fallback) = &plan.ffmpeg_settings.fallback_profile_name {
-        message.push_str(&format!(
-            "\nSafe fallback profile available: {fallback}. This explicit experimental render was not silently retried."
-        ));
-    }
-    message.push_str("\nFilter graph:\n");
-    message.push_str(&plan.ffmpeg_settings.filter_complex);
-    if !stderr.trim().is_empty() {
-        message.push_str("\nFFmpeg stderr:\n");
-        message.push_str(&stderr_tail(stderr));
-    }
-    message
 }
 
 /// Derives Phase 4 composite timing and FFmpeg settings.
@@ -779,13 +718,6 @@ fn stderr_snapshot(lines: &Arc<Mutex<Vec<String>>>) -> String {
         .unwrap_or_default()
 }
 
-/// Returns the final part of FFmpeg stderr for concise error messages.
-fn stderr_tail(stderr: &str) -> String {
-    let lines = stderr.lines().collect::<Vec<_>>();
-    let start = lines.len().saturating_sub(30);
-    lines[start..].join("\n")
-}
-
 /// Returns the composite video codec requested by `scene.ffmpeg`.
 ///
 /// MP4 compositing defaults to software H.264 because the transparent-export
@@ -838,108 +770,4 @@ pub fn first_fractional_overrun_overlay_index(render_duration: f64, overlay_pipe
         }
         index += 1;
     }
-}
-
-/// Writes queued frame buffers into ffmpeg stdin and returns buffers to the pool.
-fn writer_worker(
-    mut stdin: std::process::ChildStdin,
-    receiver: Receiver<FrameBuffer>,
-    free_sender: SyncSender<FrameBuffer>,
-) -> CoreResult<WriterResult> {
-    let mut profiler = crate::debug::RenderProfiler::default();
-    let mut written_frames = 0u64;
-    while let Ok(frame) = receiver.recv() {
-        let write_started = Instant::now();
-        stdin.write_all(frame.pixels.as_slice()).map_err(|error| {
-            CoreError::Encode(format!("Failed writing composite overlay frame: {error}"))
-        })?;
-        profiler.record_ms(
-            "ffmpeg.write",
-            write_started.elapsed().as_secs_f64() * 1000.0,
-        );
-        written_frames += 1;
-        let _ = free_sender.send(frame);
-    }
-    let _ = stdin.flush();
-    Ok(WriterResult {
-        written_frames,
-        timings: profiler.summary(),
-    })
-}
-
-/// Waits for a reusable frame buffer from the free-buffer pool.
-fn acquire_frame_buffer(
-    receiver: &Receiver<FrameBuffer>,
-    cancel_flag: &std::sync::atomic::AtomicBool,
-    profiler: &mut RenderProfiler,
-) -> CoreResult<FrameBuffer> {
-    let started = Instant::now();
-    loop {
-        if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err(CoreError::Cancelled);
-        }
-        match receiver.recv_timeout(Duration::from_millis(25)) {
-            Ok(buffer) => {
-                profiler.record_ms(
-                    "buffer.acquire_wait",
-                    started.elapsed().as_secs_f64() * 1000.0,
-                );
-                return Ok(buffer);
-            }
-            Err(RecvTimeoutError::Timeout) => {}
-            Err(RecvTimeoutError::Disconnected) => {
-                return Err(CoreError::Encode(
-                    "Frame buffer pool disconnected".to_string(),
-                ));
-            }
-        }
-    }
-}
-
-/// Sends a completed frame to the writer thread while respecting cancellation.
-fn queue_frame(
-    sender: &SyncSender<FrameBuffer>,
-    frame_buffer: FrameBuffer,
-    cancel_flag: &std::sync::atomic::AtomicBool,
-    profiler: &mut RenderProfiler,
-) -> CoreResult<()> {
-    let started = Instant::now();
-    let mut payload = frame_buffer;
-    loop {
-        if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err(CoreError::Cancelled);
-        }
-        match sender.try_send(payload) {
-            Ok(()) => {
-                profiler.record_ms("queue.put_wait", started.elapsed().as_secs_f64() * 1000.0);
-                return Ok(());
-            }
-            Err(TrySendError::Full(returned_payload)) => {
-                payload = returned_payload;
-                thread::sleep(Duration::from_millis(10));
-            }
-            Err(TrySendError::Disconnected(_)) => {
-                return Err(CoreError::Encode("Encoder queue disconnected".to_string()));
-            }
-        }
-    }
-}
-
-/// Merges timing buckets recorded on separate render/writer threads.
-fn merge_timing_maps(
-    mut left: BTreeMap<String, TimingBucket>,
-    right: BTreeMap<String, TimingBucket>,
-) -> BTreeMap<String, TimingBucket> {
-    for (name, bucket) in right {
-        let entry = left.entry(name).or_default();
-        entry.count += bucket.count;
-        entry.total_ms += bucket.total_ms;
-        entry.avg_ms = if entry.count == 0 {
-            0.0
-        } else {
-            entry.total_ms / f64::from(entry.count)
-        };
-        entry.max_ms = entry.max_ms.max(bucket.max_ms);
-    }
-    left
 }

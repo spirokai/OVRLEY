@@ -28,9 +28,13 @@
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::RenderConfig;
-use crate::debug::{RenderProfiler, TimingBucket};
+use crate::debug::RenderProfiler;
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
 use crate::encode::ffmpeg_settings::{build_ffmpeg_settings, FfmpegSettings};
+use crate::encode::pipeline_shared::{
+    acquire_frame_buffer, merge_timing_maps, queue_frame, writer_worker, FrameBuffer,
+    WriterCancellation, WriterWorkerConfig,
+};
 use crate::encode::progress::ProgressEstimator;
 use crate::encode::video::RenderController;
 use crate::encode::video_debug::{
@@ -40,32 +44,17 @@ use crate::encode::video_debug::{
 use crate::error::{CoreError, CoreResult};
 use crate::paths::AppPaths;
 use crate::render::{prepare_preview_assets, render_frame_rgba, FrameRenderRequest, RenderTarget};
-use std::collections::BTreeMap;
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 const FRAME_QUEUE_SIZE: usize = 12;
-
-/// Reusable raw RGBA frame buffer.
-struct FrameBuffer {
-    /// Pixel bytes in row-major RGBA order.
-    pixels: Vec<u8>,
-}
-
-/// Result returned by the ffmpeg stdin writer thread.
-struct WriterResult {
-    /// Number of complete frames written to ffmpeg.
-    written_frames: u32,
-    /// Writer-side timing buckets.
-    timings: BTreeMap<String, TimingBucket>,
-}
 
 /// Renders one transparent-overlay video by streaming Skia frames to ffmpeg.
 ///
@@ -189,8 +178,21 @@ pub(crate) fn render_video_single(
     let encoded_frames_for_monitor = encoded_frames.clone();
     let monitor_thread = thread::spawn(move || monitor_ffmpeg(stderr, encoded_frames_for_monitor));
     let cancel_flag_for_writer = cancel_flag.clone();
-    let writer_thread =
-        thread::spawn(move || writer_worker(stdin, receiver, free_sender, cancel_flag_for_writer));
+    let writer_thread = thread::spawn(move || {
+        writer_worker(
+            stdin,
+            receiver,
+            free_sender,
+            WriterWorkerConfig {
+                cancellation: WriterCancellation::StopWhenCancelled(cancel_flag_for_writer),
+                write_error_context: "Failed writing frame to ffmpeg",
+                queue_wait_metric: Some("encoder.queue_wait"),
+                release_wait_metric: Some("buffer.release_wait"),
+                release_error_message: Some("Frame buffer pool disconnected"),
+                flush_error_is_fatal: true,
+            },
+        )
+    });
 
     let sample_frames = if render_sample_frames_enabled() {
         sample_frame_indices(total_frames as usize)
@@ -312,7 +314,7 @@ pub(crate) fn render_video_single(
             "ffmpeg encoding failed ({status})"
         )));
     }
-    if writer_result.written_frames != total_frames {
+    if writer_result.written_frames != u64::from(total_frames) {
         // Frame-count mismatch means ffmpeg accepted stdin but produced fewer
         // frames than expected — typically a pipe-write error partway through
         // that ffmpeg didn't report via exit status. Clean up and fail.
@@ -381,37 +383,6 @@ fn source_frame_index(
         .min(max_frame_index)
 }
 
-// Sends a completed frame to the writer thread while respecting cancellation.
-fn queue_frame(
-    sender: &SyncSender<FrameBuffer>,
-    frame_buffer: FrameBuffer,
-    cancel_flag: &AtomicBool,
-    profiler: &mut RenderProfiler,
-) -> CoreResult<()> {
-    // `try_send` lets us poll the cancel flag while waiting for encoder
-    // backpressure to clear.
-    let started = Instant::now();
-    let mut payload = frame_buffer;
-    loop {
-        if cancel_flag.load(Ordering::SeqCst) {
-            return Err(CoreError::Cancelled);
-        }
-        match sender.try_send(payload) {
-            Ok(()) => {
-                profiler.record_ms("queue.put_wait", started.elapsed().as_secs_f64() * 1000.0);
-                return Ok(());
-            }
-            Err(TrySendError::Full(returned_payload)) => {
-                payload = returned_payload;
-                thread::sleep(Duration::from_millis(10));
-            }
-            Err(TrySendError::Disconnected(_)) => {
-                return Err(CoreError::Encode("Encoder queue disconnected".to_string()));
-            }
-        }
-    }
-}
-
 /// Spawns ffmpeg configured to accept raw RGBA video via stdin.
 ///
 /// All arguments are separate argv entries so user-supplied paths are not
@@ -477,65 +448,6 @@ fn spawn_ffmpeg_process(
         .map_err(|error| CoreError::Encode(format!("Could not start ffmpeg: {error}")))
 }
 
-// Writes queued frame buffers into ffmpeg stdin and returns buffers to the pool.
-fn writer_worker(
-    mut stdin: std::process::ChildStdin,
-    receiver: Receiver<FrameBuffer>,
-    free_sender: SyncSender<FrameBuffer>,
-    cancel_flag: Arc<AtomicBool>,
-) -> CoreResult<WriterResult> {
-    // The writer owns ffmpeg stdin. It returns buffers to the free pool after a
-    // successful write so the renderer can reuse allocations across frames.
-    let mut profiler = RenderProfiler::default();
-    let mut written_frames = 0u32;
-    loop {
-        let queue_started = Instant::now();
-        let frame = match receiver.recv() {
-            Ok(frame) => {
-                profiler.record_ms(
-                    "encoder.queue_wait",
-                    queue_started.elapsed().as_secs_f64() * 1000.0,
-                );
-                frame
-            }
-            Err(_) => {
-                profiler.record_ms(
-                    "encoder.queue_wait",
-                    queue_started.elapsed().as_secs_f64() * 1000.0,
-                );
-                break;
-            }
-        };
-        if cancel_flag.load(Ordering::SeqCst) {
-            break;
-        }
-        let write_started = Instant::now();
-        stdin.write_all(frame.pixels.as_slice()).map_err(|error| {
-            CoreError::Encode(format!("Failed writing frame to ffmpeg: {error}"))
-        })?;
-        profiler.record_ms(
-            "ffmpeg.write",
-            write_started.elapsed().as_secs_f64() * 1000.0,
-        );
-        written_frames += 1;
-        let release_started = Instant::now();
-        free_sender
-            .send(frame)
-            .map_err(|_| CoreError::Encode("Frame buffer pool disconnected".to_string()))?;
-        profiler.record_ms(
-            "buffer.release_wait",
-            release_started.elapsed().as_secs_f64() * 1000.0,
-        );
-    }
-    stdin
-        .flush()
-        .map_err(|error| CoreError::Encode(error.to_string()))?;
-    Ok(WriterResult {
-        written_frames,
-        timings: profiler.summary(),
-    })
-}
-
 // Monitors ffmpeg stderr and updates the encoded-frame counter.
 fn monitor_ffmpeg(stderr: std::process::ChildStderr, encoded_frames: Arc<AtomicU32>) {
     // ffmpeg progress is emitted on stderr as human-readable status lines. We
@@ -559,57 +471,6 @@ fn parse_ffmpeg_frame(line: &str) -> Option<u32> {
         .take_while(|ch| ch.is_ascii_digit())
         .collect::<String>();
     digits.parse::<u32>().ok()
-}
-
-// Merges timing buckets recorded on separate render/writer threads.
-fn merge_timing_maps(
-    mut left: BTreeMap<String, TimingBucket>,
-    right: BTreeMap<String, TimingBucket>,
-) -> BTreeMap<String, TimingBucket> {
-    // Combine render-thread and writer-thread buckets for one summary file.
-    for (name, bucket) in right {
-        let entry = left.entry(name).or_default();
-        entry.count += bucket.count;
-        entry.total_ms += bucket.total_ms;
-        entry.avg_ms = if entry.count == 0 {
-            0.0
-        } else {
-            entry.total_ms / f64::from(entry.count)
-        };
-        entry.max_ms = entry.max_ms.max(bucket.max_ms);
-    }
-    left
-}
-
-// Waits for a reusable frame buffer from the free-buffer pool.
-fn acquire_frame_buffer(
-    receiver: &Receiver<FrameBuffer>,
-    cancel_flag: &AtomicBool,
-    profiler: &mut RenderProfiler,
-) -> CoreResult<FrameBuffer> {
-    // Timeout polling gives cancellation a chance to interrupt even when all
-    // buffers are currently held by the writer/encoder.
-    let started = Instant::now();
-    loop {
-        if cancel_flag.load(Ordering::SeqCst) {
-            return Err(CoreError::Cancelled);
-        }
-        match receiver.recv_timeout(Duration::from_millis(25)) {
-            Ok(buffer) => {
-                profiler.record_ms(
-                    "buffer.acquire_wait",
-                    started.elapsed().as_secs_f64() * 1000.0,
-                );
-                return Ok(buffer);
-            }
-            Err(RecvTimeoutError::Timeout) => {}
-            Err(RecvTimeoutError::Disconnected) => {
-                return Err(CoreError::Encode(
-                    "Frame buffer pool disconnected".to_string(),
-                ));
-            }
-        }
-    }
 }
 
 // Rounds a dimension up to the next even value when needed.

@@ -15,8 +15,8 @@
 //! - `test_config::fit_activity_path()` — activity data for dense reports.
 //! - `templates/recent-template.json` — real template for realistic widget
 //!   configuration in render-through tests.
-//! - Temporary 4K video fixture (`tmp/test-4k.mp4`) — required for the
-//!   parallel segmented render tests.
+//! - Shared sample video fixture (`tmp/test-1080p.mp4`) — used for composite
+//!   render-through tests on machines without the old temporary 4K asset.
 //!
 //! ## Type
 //! Integration test. Requires live ffmpeg and ffprobe in `vendor/ffmpeg/bin/`.
@@ -137,7 +137,7 @@ fn composite_shell_defaults_to_libx264_for_mp4_output() {
 #[test]
 fn test_5_1_basic_software_h264_composite_creates_mp4() {
     let result =
-        render_fixture_composite("tmp/test-4k.mp4", 30000, 1001, 0.2, 1, 600.0, 3840, 2160);
+        render_fixture_composite("tmp/test-1080p.mp4", 30000, 1001, 0.2, 1, 600.0, 3840, 2160);
 
     assert!(result.output_path.is_file());
     assert!(result.output_size > 0);
@@ -146,7 +146,7 @@ fn test_5_1_basic_software_h264_composite_creates_mp4() {
 #[test]
 fn test_5_2_preserves_29_97_output_fps() {
     let result =
-        render_fixture_composite("tmp/test-4k.mp4", 30000, 1001, 0.2, 1, 600.0, 3840, 2160);
+        render_fixture_composite("tmp/test-1080p.mp4", 30000, 1001, 0.2, 1, 600.0, 3840, 2160);
     let fps = ffprobe_video_rates(&result.output_path);
 
     assert!(fps.contains("r_frame_rate=30000/1001") || fps.contains("avg_frame_rate=30000/1001"));
@@ -156,7 +156,7 @@ fn test_5_2_preserves_29_97_output_fps() {
 #[test]
 fn test_5_3_preserves_59_94_output_fps_when_requested() {
     let result =
-        render_fixture_composite("tmp/test-4k.mp4", 60000, 1001, 0.12, 1, 600.0, 3840, 2160);
+        render_fixture_composite("tmp/test-1080p.mp4", 60000, 1001, 0.12, 1, 600.0, 3840, 2160);
     let fps = ffprobe_video_rates(&result.output_path);
 
     assert!(fps.contains("r_frame_rate=60000/1001") || fps.contains("avg_frame_rate=60000/1001"));
@@ -166,7 +166,7 @@ fn test_5_3_preserves_59_94_output_fps_when_requested() {
 #[test]
 fn test_5_4_lower_overlay_update_rate_renders_half_overlay_frames() {
     let result =
-        render_fixture_composite("tmp/test-4k.mp4", 60000, 1001, 0.2, 2, 600.0, 3840, 2160);
+        render_fixture_composite("tmp/test-1080p.mp4", 60000, 1001, 0.2, 2, 600.0, 3840, 2160);
     let fps = ffprobe_video_rates(&result.output_path);
 
     assert_eq!(result.controller.progress().encoded, 12);
@@ -177,7 +177,7 @@ fn test_5_4_lower_overlay_update_rate_renders_half_overlay_frames() {
 #[test]
 fn test_5_5_aggressive_overlay_update_rate_renders_one_sixth_overlay_frames() {
     let result =
-        render_fixture_composite("tmp/test-4k.mp4", 60000, 1001, 0.2, 6, 600.0, 3840, 2160);
+        render_fixture_composite("tmp/test-1080p.mp4", 60000, 1001, 0.2, 6, 600.0, 3840, 2160);
     let fps = ffprobe_video_rates(&result.output_path);
 
     assert_eq!(result.controller.progress().encoded, 12);
@@ -192,7 +192,7 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
     let plan = derive_composite_pipeline_plan(
         &paths,
         &config,
-        "tmp/test-4k.mp4",
+        "tmp/test-1080p.mp4",
         "20M",
         30000,
         1001,
@@ -511,7 +511,7 @@ fn test_7_6_composite_debug_output_is_only_created_by_composite_render() {
 #[ignore = "Long-running 4K end-to-end render for manual validation."]
 fn test_manual_full_duration_4k_composite() {
     let result = render_fixture_composite(
-        "tmp/test-4k.mp4",
+        "tmp/test-1080p.mp4",
         30000,
         1001,
         20.353667,
