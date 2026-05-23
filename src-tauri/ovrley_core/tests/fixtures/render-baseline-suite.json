@@ -1,0 +1,43 @@
+{
+  "frameCases": [
+    {
+      "name": "recent_template_preview_600s",
+      "activity": "activity/gpx-parse-debug.json",
+      "config": "config/render-baseline-rich.json",
+      "second": 600,
+      "baseline": "baselines/frame/recent_template_preview_600s.png"
+    }
+  ],
+  "transparentVideoCases": [
+    {
+      "name": "recent_template_qtrle_short",
+      "activity": "activity/gpx-parse-debug.json",
+      "config": "config/render-baseline-rich.json",
+      "startSeconds": 600.0,
+      "durationSeconds": 4.0,
+      "codec": "qtrle",
+      "frameIndices": [0, 50, 100],
+      "baselineDir": "baselines/transparent/recent_template_qtrle_short",
+      "expectedCodecName": "qtrle",
+      "expectedPixFmt": "argb"
+    }
+  ],
+  "compositeVideoCases": [
+    {
+      "name": "recent_template_libx264_short",
+      "activity": "activity/gpx-parse-debug.json",
+      "config": "config/render-baseline-rich.json",
+      "sourceVideo": "video/test-1080p.mp4",
+      "syncOffset": 600.0,
+      "trimStartSeconds": 0.0,
+      "durationSeconds": 4.0,
+      "bitrate": "20M",
+      "codec": "libx264",
+      "frameIndices": [0, 50, 100],
+      "baselineDir": "baselines/composite/recent_template_libx264_short",
+      "expectedCodecName": "h264",
+      "expectedPixFmt": "yuv420p",
+      "expectSourceAudioPassthrough": true
+    }
+  ]
+}

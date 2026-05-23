@@ -12,7 +12,9 @@ use crate::config::parse_config_json;
 use crate::config::RenderConfig;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
-use crate::encode::video::{render_composite_video, render_video, CompositeRenderRequest, RenderController};
+use crate::encode::video::{
+    render_composite_video, render_video, CompositeRenderRequest, RenderController,
+};
 use crate::encode::video_composite_pipeline::{
     apply_composite_scene_timing, derive_composite_render_plan,
 };

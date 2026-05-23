@@ -2,7 +2,9 @@ use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
 use ovrley_core::commands::AppPaths;
 use ovrley_core::config::parse_config_json;
 use ovrley_core::encode::codec_detect::{detect_codecs, AvailableCodecs};
-use ovrley_core::encode::video::{render_composite_video, CompositeRenderRequest, RenderController};
+use ovrley_core::encode::video::{
+    render_composite_video, CompositeRenderRequest, RenderController,
+};
 use ovrley_core::encode::video_probe::probe_video;
 use serde::Serialize;
 use std::collections::BTreeMap;

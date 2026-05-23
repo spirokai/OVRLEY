@@ -13,3 +13,6 @@ serde_json = "1.0"
 thiserror = "2"
 log = "0.4"
 skia-safe = { version = "0.75", features = ["binary-cache"] }
+
+[dev-dependencies]
+anyhow = "1.0"

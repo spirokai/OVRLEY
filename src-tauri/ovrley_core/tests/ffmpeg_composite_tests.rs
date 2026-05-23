@@ -191,7 +191,18 @@ fn test_2_8_float_fps_fallback_can_feed_rational_builder_args() {
 
 #[test]
 fn validates_zero_direct_fps_values() {
-    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest { codec_name: "libx264", bitrate: "60M", video_path: Path::new("test.mp4"), video_trim_start: 0.0, render_duration: 10.0, width: 3840, height: 2160, source_fps: Fps { num: 0, den: 1 }, overlay_pipe_fps: Fps::new(30000, 1001).unwrap(), hwaccel_available: &HwAccelInfo::default(), })
+    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
+        codec_name: "libx264",
+        bitrate: "60M",
+        video_path: Path::new("test.mp4"),
+        video_trim_start: 0.0,
+        render_duration: 10.0,
+        width: 3840,
+        height: 2160,
+        source_fps: Fps { num: 0, den: 1 },
+        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        hwaccel_available: &HwAccelInfo::default(),
+    })
     .unwrap_err();
 
     assert_eq!(
@@ -259,7 +270,18 @@ fn test_8_3_nvenc_h264_simple_path_uses_cpu_overlay_when_available() {
 
 #[test]
 fn test_8_4_nvenc_hevc_unavailable_fails_clearly() {
-    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest { codec_name: "hevc_nvenc", bitrate: "60M", video_path: Path::new("test.mp4"), video_trim_start: 0.0, render_duration: 10.0, width: 3840, height: 2160, source_fps: Fps::new(30000, 1001).unwrap(), overlay_pipe_fps: Fps::new(30000, 1001).unwrap(), hwaccel_available: &HwAccelInfo::default(), })
+    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
+        codec_name: "hevc_nvenc",
+        bitrate: "60M",
+        video_path: Path::new("test.mp4"),
+        video_trim_start: 0.0,
+        render_duration: 10.0,
+        width: 3840,
+        height: 2160,
+        source_fps: Fps::new(30000, 1001).unwrap(),
+        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        hwaccel_available: &HwAccelInfo::default(),
+    })
     .unwrap_err();
 
     assert_eq!(
@@ -291,7 +313,18 @@ fn test_8_5_videotoolbox_h264_simple_path_when_available() {
 
 #[test]
 fn test_8_6_videotoolbox_hevc_unavailable_fails_clearly() {
-    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest { codec_name: "hevc_videotoolbox", bitrate: "60M", video_path: Path::new("test.mp4"), video_trim_start: 0.0, render_duration: 10.0, width: 3840, height: 2160, source_fps: Fps::new(30000, 1001).unwrap(), overlay_pipe_fps: Fps::new(30000, 1001).unwrap(), hwaccel_available: &HwAccelInfo::default(), })
+    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
+        codec_name: "hevc_videotoolbox",
+        bitrate: "60M",
+        video_path: Path::new("test.mp4"),
+        video_trim_start: 0.0,
+        render_duration: 10.0,
+        width: 3840,
+        height: 2160,
+        source_fps: Fps::new(30000, 1001).unwrap(),
+        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        hwaccel_available: &HwAccelInfo::default(),
+    })
     .unwrap_err();
 
     assert_eq!(
@@ -347,7 +380,18 @@ fn test_8_7a_amf_h264_simple_path_when_available() {
 
 #[test]
 fn test_8_7b_amf_hevc_unavailable_fails_clearly() {
-    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest { codec_name: "hevc_amf", bitrate: "60M", video_path: Path::new("test.mp4"), video_trim_start: 0.0, render_duration: 10.0, width: 3840, height: 2160, source_fps: Fps::new(30000, 1001).unwrap(), overlay_pipe_fps: Fps::new(30000, 1001).unwrap(), hwaccel_available: &HwAccelInfo::default(), })
+    let error = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
+        codec_name: "hevc_amf",
+        bitrate: "60M",
+        video_path: Path::new("test.mp4"),
+        video_trim_start: 0.0,
+        render_duration: 10.0,
+        width: 3840,
+        height: 2160,
+        source_fps: Fps::new(30000, 1001).unwrap(),
+        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        hwaccel_available: &HwAccelInfo::default(),
+    })
     .unwrap_err();
 
     assert_eq!(

@@ -178,7 +178,8 @@ pub fn build_composite_ffmpeg_settings(
     let source_fps = request.source_fps.reduced();
     let overlay_pipe_fps = request.overlay_pipe_fps.reduced();
     let video_path = request.video_path.to_string_lossy().to_string();
-    let mut selected_profile = select_composite_profile(request.codec_name, request.hwaccel_available)?;
+    let mut selected_profile =
+        select_composite_profile(request.codec_name, request.hwaccel_available)?;
     if selected_profile.name.starts_with("qsv_full_") {
         if request.hwaccel_available.qsv_full_init_args.is_empty() {
             return Err(CoreError::Encode(format!(
@@ -200,7 +201,11 @@ pub fn build_composite_ffmpeg_settings(
         "-pix_fmt".to_string(),
         "rgba".to_string(),
         "-s".to_string(),
-        format!("{width}x{height}", width = request.width, height = request.height),
+        format!(
+            "{width}x{height}",
+            width = request.width,
+            height = request.height
+        ),
         "-r".to_string(),
         overlay_pipe_fps.ffmpeg_arg(),
         "-i".to_string(),

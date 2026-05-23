@@ -179,20 +179,26 @@ pub struct CompositeRenderRequest<'a> {
 /// Longer renders are automatically split into parallel segments for better CPU
 /// utilization and then stitched with FFmpeg stream copy.
 pub fn render_composite_video(request: &CompositeRenderRequest<'_>) -> CoreResult<String> {
-    let render_duration = request
-        .composite_render_duration
-        .unwrap_or(request.composite_video_duration - request.composite_video_trim_start.unwrap_or(0.0));
+    let render_duration = request.composite_render_duration.unwrap_or(
+        request.composite_video_duration - request.composite_video_trim_start.unwrap_or(0.0),
+    );
     let trim_start = request.composite_video_trim_start.unwrap_or(0.0);
     let update_rate = request.composite_widget_update_rate.unwrap_or(1).max(1);
 
-    let codec = request.config
+    let codec = request
+        .config
         .scene
         .ffmpeg
         .as_object()
         .and_then(|map| map.get("codec"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or("libx264");
-    if should_parallelize_composite(render_duration, request.composite_video_fps_num, update_rate, codec) {
+    if should_parallelize_composite(
+        render_duration,
+        request.composite_video_fps_num,
+        update_rate,
+        codec,
+    ) {
         return render_composite_video_segmented(
             request.paths,
             request.config,

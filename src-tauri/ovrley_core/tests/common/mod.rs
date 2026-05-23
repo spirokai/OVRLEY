@@ -9,4 +9,5 @@
 //! shared fixture-path resolver and any common test utilities needed by
 //! the crate-level integration test suite under `ovrley_core/tests/`.
 
+pub mod render_baseline_support;
 pub mod test_config;
