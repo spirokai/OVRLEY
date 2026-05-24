@@ -76,7 +76,9 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 
 ## Testing
 
-No test framework is set up. No test files exist. Manual verification is the only testing approach.
+- **Frontend**: Vitest + Testing Library. Run with `pnpm test` (or `pnpm test:watch` for watch mode). Test files live in `app/src/tests/`.
+- **Rust backend**: `cargo test` inside `src-tauri/ovrley_core/`. Integration tests in `tests/`, unit tests are `#[cfg(test)] mod tests` blocks inline or in `src/*/tests/`.
+- Run both with `pnpm test && cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml`.
 
 ## Agent skills
 
