@@ -28,7 +28,7 @@ Cross-sport analysis of per-sample dynamic data types that could be implemented 
 | **Left/Right Balance**  | `Scale`      | Run                          | ✅ `left_right_balance`                 | ✅ `left_right_balance`, `balance`                           | No                            | ✅ Extracted | ❌ Ambiguous | %, ratio (L/R split or 50/50 display) |
 | **Stride Length**       | `Ruler`      | Run                          | ✅ `stride_length`, `step_length`       | ✅ `stride_length`, `stridelength`, `step_length`            | No                            | ✅ Extracted | ✅ Yes       | m, cm, ft, in                         |
 | **Stroke Rate**         | `Waves`      | Swim, Row                    | ✅ `stroke_rate`, `running_cadence`     | ✅ `stroke_rate`, `strokerate`                               | No                            | ✅ Extracted | ✅ Yes       | spm                                   |
-| **Torque**              | Custom       | Cycle                        | ✅ `torque`                             | ✅ `torque`                                                  | Fallback: P/(2π × cadence/60) | ✅ Derived   | ✅ Yes       | Nm, lb-ft                             |
+| **Torque**              | Custom       | Cycle                        | ✅ `torque`                             | ✅ `torque`                                                  | Fallback: P/(2π × cadence/60) | ✅ Derived   | ✅ Yes       | Nm                                    |
 | **Vertical Speed**      | `TrendingUp` | Paraglide, Hike, Cycle       | ✅ `vertical_speed`                     | ✅ `vertical_speed`, `verticalspeed`, `vam`                  | Fallback: Δele/Δt             | ✅ Derived   | ✅ Yes       | m/s, ft/min, m/h (VAM)                |
 
 ### New parser fields needed
