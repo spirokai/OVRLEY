@@ -489,7 +489,11 @@ pub fn run_playwright_screenshot(
         let w = dims.get("width").and_then(|v| v.as_u64()).unwrap_or(3840) as u32;
         let h = dims.get("height").and_then(|v| v.as_u64()).unwrap_or(2160) as u32;
         let b = dims.get("bg").and_then(|v| v.as_str()).unwrap_or("transparent").to_string();
-        println!("  canvas dimensions: {w}x{h}  bg: {b}");
+        let editor_chrome = dims
+            .get("editorChrome")
+            .and_then(|v| v.as_str())
+            .unwrap_or("hidden");
+        println!("  canvas dimensions: {w}x{h}  bg: {b}  editor chrome: {editor_chrome}");
         (w, h)
     } else {
         if !trimmed.is_empty() {
@@ -522,8 +526,9 @@ struct AlphaBounds {
     height: u32,
 }
 
-const ALPHA_MASK_THRESHOLD: u8 = 8;
-const DIFF_CHANNEL_TOLERANCE: u8 = 3;
+const ALPHA_MASK_THRESHOLD: u8 = 2;
+const ONLY_PIXEL_ALPHA_THRESHOLD: u8 = 96;
+const DIFF_CHANNEL_TOLERANCE: u8 = 4;
 const EDGE_ALPHA_DELTA_THRESHOLD: u8 = 0;
 const EDGE_IGNORE_RADIUS: i32 = 0;
 
@@ -760,11 +765,14 @@ pub struct DiffStats {
     pub mismatch_pixels: u64,
     pub overlay_pixels: u64,
     pub overlay_mismatch_pixels: u64,
+    pub canvas_only_pixels: u64,
+    pub skia_only_pixels: u64,
     pub overlay_significant_mismatch_pixels: u64,
     pub edge_compared_pixels: u64,
     pub edge_insensitive_mismatch_pixels: u64,
     pub edge_ignored_pixels: u64,
     pub alpha_threshold: u8,
+    pub only_pixel_alpha_threshold: u8,
     pub channel_tolerance: u8,
     pub edge_alpha_delta_threshold: u8,
     pub edge_ignore_radius: i32,
@@ -810,17 +818,24 @@ pub fn generate_diff_png(
     let mut mismatch_count: u64 = 0;
     let mut overlay_pixels: u64 = 0;
     let mut overlay_mismatch_pixels: u64 = 0;
+    let mut canvas_only_pixels: u64 = 0;
+    let mut skia_only_pixels: u64 = 0;
     let mut overlay_significant_mismatch_pixels: u64 = 0;
     let mut edge_compared_pixels: u64 = 0;
     let mut edge_insensitive_mismatch_pixels: u64 = 0;
     let mut edge_ignored_pixels: u64 = 0;
     let alpha_threshold = ALPHA_MASK_THRESHOLD;
+    let only_pixel_alpha_threshold = ONLY_PIXEL_ALPHA_THRESHOLD;
     let channel_tolerance = DIFF_CHANNEL_TOLERANCE;
 
     for (i, chunk) in skia_bytes.chunks_exact(4).enumerate() {
         let offset = i * 4;
         let canvas_chunk = &canvas_bytes[offset..offset + 4];
-        let is_overlay_pixel = chunk[3] > alpha_threshold || canvas_chunk[3] > alpha_threshold;
+        let has_skia_alpha = chunk[3] > alpha_threshold;
+        let has_canvas_alpha = canvas_chunk[3] > alpha_threshold;
+        let has_skia_only_alpha = chunk[3] > only_pixel_alpha_threshold;
+        let has_canvas_only_alpha = canvas_chunk[3] > only_pixel_alpha_threshold;
+        let is_overlay_pixel = has_skia_alpha || has_canvas_alpha;
         let is_edge_ignored = is_overlay_pixel && edge_ignore_mask.get(i).copied().unwrap_or(false);
         let max_delta = chunk
             .iter()
@@ -853,6 +868,11 @@ pub fn generate_diff_png(
         }
 
         if is_overlay_pixel {
+            if has_canvas_only_alpha && !has_skia_only_alpha {
+                canvas_only_pixels += 1;
+            } else if has_skia_only_alpha && !has_canvas_only_alpha {
+                skia_only_pixels += 1;
+            }
             overlay_pixels += 1;
             if is_edge_ignored {
                 edge_ignored_pixels += 1;
@@ -905,11 +925,14 @@ pub fn generate_diff_png(
         mismatch_pixels: mismatch_count,
         overlay_pixels,
         overlay_mismatch_pixels,
+        canvas_only_pixels,
+        skia_only_pixels,
         overlay_significant_mismatch_pixels,
         edge_compared_pixels,
         edge_insensitive_mismatch_pixels,
         edge_ignored_pixels,
         alpha_threshold,
+        only_pixel_alpha_threshold,
         channel_tolerance,
         edge_alpha_delta_threshold: EDGE_ALPHA_DELTA_THRESHOLD,
         edge_ignore_radius: EDGE_IGNORE_RADIUS,

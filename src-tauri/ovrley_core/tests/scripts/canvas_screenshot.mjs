@@ -13,6 +13,22 @@ function parseArg(name) {
 const mockDir = parseArg('--mock-dir')
 const viteUrl = parseArg('--vite-url')
 const outPath = parseArg('--out')
+const showEditorChrome = process.env.OVRLEY_CANVAS_PARITY_SHOW_EDITOR_CHROME === '1'
+const hideEditorChromeCss = showEditorChrome
+  ? ''
+  : `
+      .ovrley-moveable,
+      .moveable-control-box,
+      .moveable-line,
+      .moveable-control,
+      .moveable-area,
+      [data-testid="widget-badge-layer"],
+      [data-testid="canvas-status-badges"] {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
+    `
 
 if (!viteUrl || !outPath) {
   console.error('Usage: node canvas_screenshot.mjs --mock-dir <path> --vite-url <url> --out <path>')
@@ -61,17 +77,7 @@ async function main() {
         box-shadow: none !important;
       }
 
-      .ovrley-moveable,
-      .moveable-control-box,
-      .moveable-line,
-      .moveable-control,
-      .moveable-area,
-      [data-testid="widget-badge-layer"],
-      [data-testid="canvas-status-badges"] {
-        display: none !important;
-        opacity: 0 !important;
-        visibility: hidden !important;
-      }
+      ${hideEditorChromeCss}
     `,
   })
 
@@ -120,7 +126,7 @@ async function main() {
   //
   // Also remove overflow-hidden on the viewport wrapper so nothing gets
   // clipped if the native-size overlay is larger than the available space.
-  await page.evaluate(() => {
+  await page.evaluate((shouldHideEditorChrome) => {
     document.documentElement.style.background = 'transparent'
     document.body.style.background = 'transparent'
 
@@ -151,24 +157,37 @@ async function main() {
       el.style.boxShadow = 'none'
     }
 
-    const editorChromeSelectors = [
-      '.ovrley-moveable',
-      '.moveable-control-box',
-      '.moveable-line',
-      '.moveable-control',
-      '.moveable-area',
-      '[data-testid="widget-badge-layer"]',
-      '[data-testid="canvas-status-badges"]',
-    ]
-    for (const selector of editorChromeSelectors) {
-      for (const el of document.querySelectorAll(selector)) {
-        el.style.display = 'none'
-        el.style.opacity = '0'
-        el.style.visibility = 'hidden'
+    if (shouldHideEditorChrome) {
+      const editorChromeSelectors = [
+        '.ovrley-moveable',
+        '.moveable-control-box',
+        '.moveable-line',
+        '.moveable-control',
+        '.moveable-area',
+        '[data-testid="widget-badge-layer"]',
+        '[data-testid="canvas-status-badges"]',
+      ]
+      for (const selector of editorChromeSelectors) {
+        for (const el of document.querySelectorAll(selector)) {
+          el.style.display = 'none'
+          el.style.opacity = '0'
+          el.style.visibility = 'hidden'
+        }
       }
     }
-  })
+  }, !showEditorChrome)
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)))
+
+  if (showEditorChrome) {
+    await page.evaluate(() => {
+      const widget = document.querySelector('[data-testid="widget-layer"] [data-widget-id]')
+      const widgetId = widget?.getAttribute('data-widget-id')
+      if (widgetId) {
+        window.__STORE__?.getState?.().setSelectedWidgetId?.(widgetId)
+      }
+    })
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  }
 
   // Get the widget layer bounding box and take a screenshot
   const widgetLayer = page.locator('[data-testid="widget-layer"]').first()
@@ -198,6 +217,7 @@ async function main() {
         width: Math.round(box.width),
         height: Math.round(box.height),
         bg: 'transparent',
+        editorChrome: showEditorChrome ? 'visible' : 'hidden',
       }),
     )
   } else {
@@ -207,7 +227,7 @@ async function main() {
       animations: 'disabled',
     })
     writeFileSync(resolve(outPath), buffer)
-    console.log(JSON.stringify({ width: 3840, height: 2160, bg: 'transparent' }))
+    console.log(JSON.stringify({ width: 3840, height: 2160, bg: 'transparent', editorChrome: showEditorChrome ? 'visible' : 'hidden' }))
   }
 
   await browser.close()

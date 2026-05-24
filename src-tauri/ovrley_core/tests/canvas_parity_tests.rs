@@ -125,6 +125,16 @@ fn e2e_canvas_parity() -> Result<()> {
     } else {
         0.0
     };
+    let canvas_only_pct = if diff_stats.overlay_pixels > 0 {
+        (diff_stats.canvas_only_pixels as f64 / diff_stats.overlay_pixels as f64) * 100.0
+    } else {
+        0.0
+    };
+    let skia_only_pct = if diff_stats.overlay_pixels > 0 {
+        (diff_stats.skia_only_pixels as f64 / diff_stats.overlay_pixels as f64) * 100.0
+    } else {
+        0.0
+    };
     let edge_insensitive_pct = if diff_stats.edge_compared_pixels > 0 {
         (diff_stats.edge_insensitive_mismatch_pixels as f64
             / diff_stats.edge_compared_pixels as f64)
@@ -144,6 +154,20 @@ fn e2e_canvas_parity() -> Result<()> {
         "  alpha_masked_mismatch_count (alpha > {}): {} / {} ({alpha_masked_pct:.4}%)",
         diff_stats.alpha_threshold,
         diff_stats.overlay_mismatch_pixels,
+        diff_stats.overlay_pixels
+    );
+    println!(
+        "  canvas_only_pixels (canvas alpha > {}, skia alpha <= {}): {} / {} ({canvas_only_pct:.4}%)",
+        diff_stats.only_pixel_alpha_threshold,
+        diff_stats.only_pixel_alpha_threshold,
+        diff_stats.canvas_only_pixels,
+        diff_stats.overlay_pixels
+    );
+    println!(
+        "  skia_only_pixels (skia alpha > {}, canvas alpha <= {}): {} / {} ({skia_only_pct:.4}%)",
+        diff_stats.only_pixel_alpha_threshold,
+        diff_stats.only_pixel_alpha_threshold,
+        diff_stats.skia_only_pixels,
         diff_stats.overlay_pixels
     );
     println!(
