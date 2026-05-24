@@ -51,6 +51,15 @@ export const WIDGET_DRAWER_LABELS = {
   temperature: 'Temp.',
   gradient: 'Grad.',
   course: 'Map',
+  pace: 'Pace',
+  g_force: 'G-Force',
+  air_pressure: 'Air Press.',
+  ground_contact_time: 'GCT',
+  left_right_balance: 'L/R Bal.',
+  stride_length: 'Stride',
+  stroke_rate: 'S/R',
+  torque: 'Torque',
+  vertical_speed: 'V. Speed',
 }
 
 const widgetTypes = Object.keys(TYPE_LABELS).filter((type) => type !== 'label')
@@ -72,10 +81,28 @@ export const TYPE_ICONS = {
   ...widgetIconComponents,
 }
 
-export const QUICKMENU_ITEMS = ['label', 'speed', 'elevation', 'heartrate', 'power', 'cadence', 'time', 'temperature', 'gradient', 'course'].map(
-  (type) => ({
-    type,
-    icon: TYPE_ICONS[type],
-    label: WIDGET_DRAWER_LABELS[type] ?? TYPE_LABELS[type],
-  }),
-)
+export const QUICKMENU_ITEMS = [
+  'label',
+  'speed',
+  'elevation',
+  'heartrate',
+  'power',
+  'cadence',
+  'time',
+  'temperature',
+  'gradient',
+  'course',
+  'pace',
+  'g_force',
+  'air_pressure',
+  'ground_contact_time',
+  'left_right_balance',
+  'stride_length',
+  'stroke_rate',
+  'torque',
+  'vertical_speed',
+].map((type) => ({
+  type,
+  icon: TYPE_ICONS[type],
+  label: WIDGET_DRAWER_LABELS[type] ?? TYPE_LABELS[type],
+}))

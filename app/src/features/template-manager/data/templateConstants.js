@@ -43,7 +43,7 @@ export const VALUE_SHARED_KEYS = ['x', 'y', 'value', 'font', 'font_size', 'color
 /** Keys for the icon sub-object within a value widget. */
 export const VALUE_ICON_KEYS = ['show_icon', 'icon_color', 'icon_size', 'icon_offset_x', 'icon_offset_y']
 
-const STANDARD_METRIC_VALUE_KEYS = [...VALUE_ICON_KEYS, 'show_units', 'unit_color', 'display_unit']
+const STANDARD_METRIC_VALUE_KEYS = [...VALUE_ICON_KEYS, 'show_units', 'unit_color', 'display_unit', 'balance_format']
 
 /** Per-type additional keys preserved when normalizing a value widget. */
 export const VALUE_TYPE_KEYS = {

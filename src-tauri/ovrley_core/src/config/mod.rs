@@ -228,6 +228,8 @@ pub struct ValueConfig {
     #[serde(default)]
     pub display_unit: Option<String>,
     #[serde(default)]
+    pub balance_format: Option<String>,
+    #[serde(default)]
     pub value_offset: Option<f32>,
     #[serde(default)]
     pub triangle_positive_color: Option<String>,

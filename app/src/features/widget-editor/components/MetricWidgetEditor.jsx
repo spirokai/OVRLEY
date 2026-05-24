@@ -3,7 +3,10 @@
  */
 
 import { getStandardMetricDefinition, getStandardMetricDisplayUnit, getStandardMetricUnitOptions } from '@/lib/standard-metrics'
+import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/utils/formatUtils'
 import { FontSection, IconSection, UnitsControlRow } from './widgetEditorSections'
+import { ToggleField, SelectField } from './widgetFormControls'
+import { useCallback } from 'react'
 
 /**
  * Renders the metric widget editor component.
@@ -19,10 +22,34 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
   const unitOptions = getStandardMetricUnitOptions(widget.type)
   const showUnits = widget.data.show_units ?? definition?.showUnitsByDefault ?? false
   const supportsUnitSelection = unitOptions.length > 1
+  const hasDecimalControl = definition?.formatter === 'decimal'
+  const hasBalanceFormat = definition?.formatter === 'balance'
+
+  const toggleDecimals = useCallback(() => {
+    const current = widget.data.decimals ?? 0
+    updateWidgetData(widget.id, { decimals: current === 0 ? 1 : 0 })
+  }, [widget.id, widget.data.decimals, updateWidgetData])
 
   return (
     <>
       <FontSection widget={widget} updateWidgetData={updateWidgetData} />
+
+      {hasDecimalControl ? (
+        <div className="flex items-center justify-between py-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Decimals</span>
+          <ToggleField checked={Boolean(widget.data.decimals)} onCheckedChange={toggleDecimals} />
+        </div>
+      ) : null}
+
+      {hasBalanceFormat ? (
+        <SelectField
+          label="Balance Format"
+          value={widget.data.balance_format || 'percent_label'}
+          onValueChange={(value) => updateWidgetData(widget.id, { balance_format: value })}
+          options={BALANCE_FORMAT_OPTIONS}
+        />
+      ) : null}
+
       <IconSection
         widget={widget}
         updateWidgetData={updateWidgetData}

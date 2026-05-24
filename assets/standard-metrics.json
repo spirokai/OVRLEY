@@ -81,7 +81,7 @@
     },
     {
       "type": "pace",
-      "current": false,
+      "current": true,
       "label": "Pace",
       "defaultDisplayUnit": "min_per_km",
       "supportedDisplayUnits": [
@@ -98,7 +98,7 @@
     },
     {
       "type": "g_force",
-      "current": false,
+      "current": true,
       "label": "G-Force",
       "defaultDisplayUnit": "g",
       "supportedDisplayUnits": [
@@ -114,7 +114,7 @@
     },
     {
       "type": "air_pressure",
-      "current": false,
+      "current": true,
       "label": "Air Pressure",
       "defaultDisplayUnit": "hpa",
       "supportedDisplayUnits": [
@@ -133,7 +133,7 @@
     },
     {
       "type": "ground_contact_time",
-      "current": false,
+      "current": true,
       "label": "Ground Contact Time",
       "defaultDisplayUnit": "ms",
       "supportedDisplayUnits": [
@@ -148,7 +148,7 @@
     },
     {
       "type": "left_right_balance",
-      "current": false,
+      "current": true,
       "label": "Left/Right Balance",
       "defaultDisplayUnit": "percent",
       "supportedDisplayUnits": [
@@ -164,7 +164,7 @@
     },
     {
       "type": "stride_length",
-      "current": false,
+      "current": true,
       "label": "Stride Length",
       "defaultDisplayUnit": "m",
       "supportedDisplayUnits": [
@@ -183,7 +183,7 @@
     },
     {
       "type": "stroke_rate",
-      "current": false,
+      "current": true,
       "label": "Stroke Rate",
       "defaultDisplayUnit": "spm",
       "supportedDisplayUnits": [
@@ -199,7 +199,7 @@
     },
     {
       "type": "torque",
-      "current": false,
+      "current": true,
       "label": "Torque",
       "defaultDisplayUnit": "nm",
       "supportedDisplayUnits": [
@@ -214,7 +214,7 @@
     },
     {
       "type": "vertical_speed",
-      "current": false,
+      "current": true,
       "label": "Vertical Speed",
       "defaultDisplayUnit": "mps",
       "supportedDisplayUnits": [

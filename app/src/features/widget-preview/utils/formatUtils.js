@@ -147,11 +147,27 @@ function convertStandardMetricValue(type, value, displayUnit) {
   }
 }
 
-function formatBalance(value, decimals = 0) {
+const BALANCE_FORMATS = {
+  plain: { valueTemplate: (l, r) => `${l} / ${r}`, placeholder: '-- / --' },
+  l_prefix: { valueTemplate: (l, r) => `L${l} / R${r}`, placeholder: '-- / --' },
+  percent_label: { valueTemplate: (l, r) => `${l}% / ${r}%`, placeholder: '-- / --' },
+  l_suffix: { valueTemplate: (l, r) => `${l}L / ${r}R`, placeholder: '-- / --' },
+}
+
+export const BALANCE_FORMAT_OPTIONS = [
+  { value: 'percent_label', label: '52% / 48%' },
+  { value: 'plain', label: '52 / 48' },
+  { value: 'l_prefix', label: 'L52 / R48' },
+  { value: 'l_suffix', label: '52L / 48R' },
+]
+
+function formatBalance(value, decimals = 0, balanceFormat = 'percent_label') {
+  const fmt = BALANCE_FORMATS[balanceFormat] || BALANCE_FORMATS.percent_label
+
   if (value === null || value === undefined) {
     return {
-      value: '--',
-      units: '%',
+      value: fmt.placeholder,
+      units: '',
     }
   }
 
@@ -161,8 +177,8 @@ function formatBalance(value, decimals = 0) {
   const rightText = decimals > 0 ? rightValue.toFixed(decimals).replace(/\.?0+$/, '') : Math.round(rightValue).toString()
 
   return {
-    value: `${leftText}/${rightText}`,
-    units: '%',
+    value: fmt.valueTemplate(leftText, rightText),
+    units: '',
   }
 }
 
@@ -191,7 +207,7 @@ export function formatStandardMetricDisplay(type, value, widgetData = {}) {
   }
 
   if (definition.formatter === 'balance') {
-    return formatBalance(value, widgetData.decimals ?? 0)
+    return formatBalance(value, widgetData.decimals ?? 0, widgetData.balance_format)
   }
 
   return formatRoundedMetric(

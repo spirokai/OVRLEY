@@ -8,11 +8,11 @@ import userEvent from '@testing-library/user-event'
 import { WidgetButtonGrid } from '@/features/widget-drawer/components/WidgetButtonGrid'
 
 describe('WidgetButtonGrid', () => {
-  test('renders a button for each widget type', () => {
+  test('renders a button for each widget type including Wave 1 standard metrics', () => {
     render(<WidgetButtonGrid onAddWidget={() => {}} />)
 
     const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(10)
+    expect(buttons).toHaveLength(19)
   })
 
   test('each button displays an icon', () => {
@@ -24,12 +24,19 @@ describe('WidgetButtonGrid', () => {
     })
   })
 
-  test('each button displays the widget drawer label', () => {
+  test('each button displays the widget drawer label, including Wave 1 standard metrics', () => {
     render(<WidgetButtonGrid onAddWidget={() => {}} />)
 
     expect(screen.getByText('HR')).toBeInTheDocument()
     expect(screen.getByText('Map')).toBeInTheDocument()
     expect(screen.getByText('Temp.')).toBeInTheDocument()
+    expect(screen.getByText('G-Force')).toBeInTheDocument()
+    expect(screen.getByText('Air Press.')).toBeInTheDocument()
+    expect(screen.getByText('GCT')).toBeInTheDocument()
+    expect(screen.getByText('L/R Bal.')).toBeInTheDocument()
+    expect(screen.getByText('Stride')).toBeInTheDocument()
+    expect(screen.getByText('S/R')).toBeInTheDocument()
+    expect(screen.getByText('V. Speed')).toBeInTheDocument()
   })
 
   test('clicking a button calls onAddWidget with the correct type', async () => {

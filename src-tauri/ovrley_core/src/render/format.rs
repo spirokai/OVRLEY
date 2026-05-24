@@ -358,7 +358,7 @@ fn format_standard_metric_parts(
             .map(|value| format_number(convert_standard_metric_value(kind, display_unit, value), decimals))
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Balance) => raw
-            .map(|left_value| format_balance_value(left_value, decimals))
+            .map(|left_value| format_balance_value(left_value, decimals, value_config.balance_format.as_deref()))
             .unwrap_or_else(|| "--".to_string()),
         None => "--".to_string(),
     };
@@ -576,10 +576,16 @@ fn format_pace_value(total_seconds: f64) -> String {
     format!("{minutes}:{seconds:02}")
 }
 
-fn format_balance_value(left_value: f64, decimals: usize) -> String {
-    let left = left_value.clamp(0.0, 100.0);
-    let right = (100.0 - left).clamp(0.0, 100.0);
-    format!("{}/{}", format_number(left, decimals), format_number(right, decimals))
+fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option<&str>) -> String {
+    let left = format_number(left_value.clamp(0.0, 100.0), decimals);
+    let right = format_number((100.0 - left_value).clamp(0.0, 100.0), decimals);
+    match balance_format.unwrap_or("plain") {
+        "percent_label" => format!("{left}% / {right}%"),
+        "plain" => format!("{left} / {right}"),
+        "l_prefix" => format!("L{left} / R{right}"),
+        "l_suffix" => format!("{left}L / {right}R"),
+        _ => format!("{left} / {right}"),
+    }
 }
 
 fn metric_icon_kind_for_metric(kind: MetricKind) -> Option<MetricIconKind> {

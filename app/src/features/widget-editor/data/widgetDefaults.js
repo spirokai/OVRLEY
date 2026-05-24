@@ -57,6 +57,10 @@ const STANDARD_METRIC_TYPE_DEFAULTS = Object.fromEntries(
 export const TYPE_DEFAULTS = {
   ...STANDARD_METRIC_TYPE_DEFAULTS,
   time: { format: 'time-24' },
+  left_right_balance: {
+    ...STANDARD_METRIC_TYPE_DEFAULTS.left_right_balance,
+    balance_format: 'percent_label',
+  },
   gradient: {
     decimals: 0,
     unit_color: '#ffffff',

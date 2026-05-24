@@ -108,11 +108,20 @@ After all tests pass, look for [refactor candidates](refactoring.md):
 [ ] No speculative features added
 ```
 
-## Final Checklist Before Stopping
+## Final Audit: Acceptance Criteria Sign-off
 
 Do NOT stop until ALL acceptance criteria from the document are met.
 
-Before stopping your work:
+After completing the incremental RED→GREEN loops:
 
-- Check all acceptance criteria boxes in the issue or PRD. If any are unchecked, continue the TDD loop until they are all satisfied.
-- Before stoppping, ALWAYS verify against acceptance criteria given in the issue or PRD.
+1. **Go through every acceptance criterion** in the issue or PRD one by one. For each:
+   - If it's satisfied (code, tests, or config proves it), change `[ ]` to `[x]` in the document.
+   - If it's not satisfied, leave it unchecked and continue implementing.
+2. **Group related criteria** — a single feature may satisfy several criteria. Don't artificially split RED→GREEN cycles to chase checkmarks; close them in bulk when the feature is done.
+3. **Verify each claimed criterion** — don't check a box based on intent. Run the relevant test or verify the behavior.
+4. **If any criteria remain unchecked** after the audit, pick the next one, start a new RED→GREEN cycle, and repeat.
+5. **Before stopping**, re-run lint and all relevant tests. Then report:
+   - Which criteria were fulfilled
+   - Which were not (if any)
+   - Verification actually run and its result
+   - Any deviations, assumptions, or residual risks

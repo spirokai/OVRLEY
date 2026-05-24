@@ -106,6 +106,7 @@ fn formats_metric_parts_for_speed() {
         show_units: Some(true),
         unit_color: None,
         display_unit: Some("kmh".to_string()),
+        balance_format: None,
         value_offset: None,
         triangle_positive_color: None,
         triangle_negative_color: None,
@@ -227,6 +228,7 @@ fn formats_metric_parts_for_temperature_with_degree_units() {
         show_units: Some(true),
         unit_color: None,
         display_unit: Some("fahrenheit".to_string()),
+        balance_format: None,
         value_offset: None,
         triangle_positive_color: None,
         triangle_negative_color: None,
@@ -348,6 +350,7 @@ fn formats_metric_parts_for_pace() {
         show_units: Some(true),
         unit_color: None,
         display_unit: Some("min_per_km".to_string()),
+        balance_format: None,
         value_offset: None,
         triangle_positive_color: None,
         triangle_negative_color: None,
@@ -469,6 +472,7 @@ fn formats_metric_parts_for_left_right_balance() {
         show_units: Some(false),
         unit_color: None,
         display_unit: Some("percent".to_string()),
+        balance_format: None,
         value_offset: None,
         triangle_positive_color: None,
         triangle_negative_color: None,
@@ -515,7 +519,7 @@ fn formats_metric_parts_for_left_right_balance() {
     };
 
     let parts = format_metric_parts(&config, &value, &dense, 0).unwrap();
-    assert_eq!(parts.value_text, "54/46");
+    assert_eq!(parts.value_text, "54 / 46");
     assert_eq!(parts.unit_text, None);
     assert_eq!(parts.icon_kind, Some(MetricIconKind::Scale));
     assert!(parts.show_icon);

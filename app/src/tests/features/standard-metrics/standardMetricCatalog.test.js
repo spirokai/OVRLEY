@@ -9,8 +9,23 @@ import {
 import { TYPE_LABELS } from '@/lib/widget-icons'
 
 describe('standard metric widget catalog', () => {
-  test('covers the existing shared standard metric widgets', () => {
-    expect(CURRENT_STANDARD_METRIC_WIDGET_TYPES).toEqual(['speed', 'heartrate', 'cadence', 'power', 'temperature'])
+  test('covers the existing and Wave 1 shared standard metric widgets', () => {
+    expect(CURRENT_STANDARD_METRIC_WIDGET_TYPES).toEqual([
+      'speed',
+      'heartrate',
+      'cadence',
+      'power',
+      'temperature',
+      'pace',
+      'g_force',
+      'air_pressure',
+      'ground_contact_time',
+      'left_right_balance',
+      'stride_length',
+      'stroke_rate',
+      'torque',
+      'vertical_speed',
+    ])
     expect(STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(CURRENT_STANDARD_METRIC_WIDGET_TYPES))
 
     const speed = getStandardMetricDefinition('speed')

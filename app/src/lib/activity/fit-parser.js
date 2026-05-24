@@ -63,7 +63,10 @@ export default async function parseFitActivityFile(file) {
     heading: safeNumber(getOptionalRecordValue(record, ['gps_heading', 'compass_heading', 'heading', 'course_heading', 'navigation_heading'])),
     heartrate: safeNumber(record.heart_rate),
     latitude: safeNumber(record.position_lat),
-    leftRightBalance: record.left_right_balance ?? null,
+    leftRightBalance: (() => {
+      const raw = getOptionalRecordValue(record, ['left_right_balance'])
+      return raw !== null && typeof raw === 'object' ? safeNumber(raw.value) : safeNumber(raw)
+    })(),
     longitude: safeNumber(record.position_long),
     pace: safeNumber(record.pace),
     power: safeNumber(record.power),

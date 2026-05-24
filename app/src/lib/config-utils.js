@@ -145,6 +145,10 @@ function getEffectiveValueData(widgetData = {}, globals, previewOverrides = null
     nextData.opacity = globals?.opacity
   }
 
+  if (nextData.value === 'left_right_balance' && nextData.balance_format === undefined) {
+    nextData.balance_format = 'percent_label'
+  }
+
   return applyPreviewOverrides(nextData, previewOverrides)
 }
 
