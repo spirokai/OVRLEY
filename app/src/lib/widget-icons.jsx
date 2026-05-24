@@ -60,6 +60,8 @@ export const WIDGET_DRAWER_LABELS = {
   stroke_rate: 'S/R',
   torque: 'Torque',
   vertical_speed: 'V. Speed',
+  gear_position: 'Gear',
+  vertical_oscillation: 'V. Osc.',
 }
 
 const widgetTypes = Object.keys(TYPE_LABELS).filter((type) => type !== 'label')
@@ -101,6 +103,8 @@ export const QUICKMENU_ITEMS = [
   'stroke_rate',
   'torque',
   'vertical_speed',
+  'gear_position',
+  'vertical_oscillation',
 ].map((type) => ({
   type,
   icon: TYPE_ICONS[type],

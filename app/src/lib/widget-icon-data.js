@@ -14,6 +14,7 @@ import strokeRateIconSvg from '../../../assets/widget-icons/widget-stroke-rate.s
 import temperatureIconSvg from '../../../assets/widget-icons/widget-temperature.svg?raw'
 import timeIconSvg from '../../../assets/widget-icons/widget-time.svg?raw'
 import torqueIconSvg from '../../../assets/widget-icons/widget-torque.svg?raw'
+import verticalOscillationIconSvg from '../../../assets/widget-icons/widget-vertical-oscillation.svg?raw'
 import verticalRatioIconSvg from '../../../assets/widget-icons/widget-vertical-ratio.svg?raw'
 import verticalSpeedIconSvg from '../../../assets/widget-icons/widget-vertical-speed.svg?raw'
 import gradientIconSvg from '../components/widgets/icons/widget-gradient.svg?raw'
@@ -47,6 +48,7 @@ export const METRIC_ICON_SVGS = {
   temperature: parseMetricIconSvg(temperatureIconSvg),
   time: parseMetricIconSvg(timeIconSvg),
   torque: parseMetricIconSvg(torqueIconSvg),
+  vertical_oscillation: parseMetricIconSvg(verticalOscillationIconSvg),
   vertical_ratio: parseMetricIconSvg(verticalRatioIconSvg),
   vertical_speed: parseMetricIconSvg(verticalSpeedIconSvg),
   gradient: parseMetricIconSvg(gradientIconSvg),

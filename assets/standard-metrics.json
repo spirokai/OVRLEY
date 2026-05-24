@@ -232,7 +232,7 @@
     },
     {
       "type": "gear_position",
-      "current": false,
+      "current": true,
       "label": "Gear Position",
       "defaultDisplayUnit": "gear",
       "supportedDisplayUnits": [
@@ -259,6 +259,23 @@
         "source": "lucide",
         "name": "Percent",
         "assetFile": "widget-vertical-ratio.svg"
+      }
+    },
+    {
+      "type": "vertical_oscillation",
+      "current": true,
+      "label": "Vertical Oscillation",
+      "defaultDisplayUnit": "mm",
+      "supportedDisplayUnits": [
+        { "value": "mm", "label": "mm", "renderLabel": "MM" },
+        { "value": "cm", "label": "cm", "renderLabel": "CM" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "icon": {
+        "source": "lucide",
+        "name": "ArrowUpDown",
+        "assetFile": "widget-vertical-oscillation.svg"
       }
     },
     {

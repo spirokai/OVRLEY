@@ -345,6 +345,12 @@ pub fn densify_activity(
                 &frame_elapsed_seconds,
                 requirements.vertical_ratio,
             ),
+            vertical_oscillation: densify_optional_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.vertical_oscillation,
+                &frame_elapsed_seconds,
+                requirements.vertical_oscillation,
+            ),
             core_temperature: densify_optional_numeric_series(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.core_temperature,

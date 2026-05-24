@@ -303,6 +303,7 @@ pub struct RenderDataRequirements {
     pub vertical_speed: bool,
     pub gear_position: bool,
     pub vertical_ratio: bool,
+    pub vertical_oscillation: bool,
     pub core_temperature: bool,
     pub time: bool,
     pub distance_progress: bool,
@@ -627,6 +628,7 @@ impl RenderConfig {
                 MetricKind::VerticalSpeed => requirements.vertical_speed = true,
                 MetricKind::GearPosition => requirements.gear_position = true,
                 MetricKind::VerticalRatio => requirements.vertical_ratio = true,
+                MetricKind::VerticalOscillation => requirements.vertical_oscillation = true,
                 MetricKind::CoreTemperature => requirements.core_temperature = true,
                 MetricKind::Time => requirements.time = true,
             }

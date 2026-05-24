@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: ready-for-human
 
 # Gear Position Parser Extraction and Widget
 
@@ -16,18 +16,18 @@ The widget should behave like the rest of the standard metric value family: it a
 
 ## Acceptance criteria
 
-- [ ] `gear_position` is extracted into the parsed activity payload where supported
-- [ ] `gear_position` is represented in the standard metric widget contract and can be created from the widget drawer
-- [ ] `gear_position` uses the agreed default display behavior as a unitless standard metric widget
-- [ ] The widget renders end-to-end in the editor preview and Rust export path
-- [ ] The widget renders a placeholder when the loaded activity does not provide `gear_position`
-- [ ] The widget uses the agreed standard metric widget schema and shared icon/source-of-truth asset rules
-- [ ] `gear_position` ships with a final custom shared SVG asset that fits the Lucide visual language and current backend SVG subset
-- [ ] Frontend automated tests cover widget creation, placeholder behavior, and standard metric integration for `gear_position`
-- [ ] Backend automated tests cover parser extraction, formatter/render behavior, and standard metric integration for `gear_position`
-- [ ] No lint errors (`pnpm lint`)
-- [ ] Relevant frontend tests pass (`cd app && pnpm test`)
-- [ ] Relevant Rust tests pass for the touched activity/render/widget areas
+- [x] `gear_position` is extracted into the parsed activity payload where supported
+- [x] `gear_position` is represented in the standard metric widget contract and can be created from the widget drawer
+- [x] `gear_position` uses the agreed default display behavior as a unitless standard metric widget
+- [x] The widget renders end-to-end in the editor preview and Rust export path
+- [x] The widget renders a placeholder when the loaded activity does not provide `gear_position`
+- [x] The widget uses the agreed standard metric widget schema and shared icon/source-of-truth asset rules
+- [x] `gear_position` ships with a final custom shared SVG asset that fits the Lucide visual language and current backend SVG subset
+- [x] Frontend automated tests cover widget creation, placeholder behavior, and standard metric integration for `gear_position`
+- [x] Backend automated tests cover parser extraction, formatter/render behavior, and standard metric integration for `gear_position`
+- [x] No lint errors (`pnpm lint`)
+- [x] Relevant frontend tests pass (`cd app && pnpm test`)
+- [x] Relevant Rust tests pass for the touched activity/render/widget areas
 
 ## Blocked by
 

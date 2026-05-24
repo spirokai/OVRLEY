@@ -58,6 +58,7 @@ export default async function parseFitActivityFile(file) {
     elapsedSeconds: safeNumber(getOptionalRecordValue(record, ['elapsed_time'])),
     elevation: safeNumber(record.enhanced_altitude ?? record.altitude),
     gForce: safeNumber(getOptionalRecordValue(record, ['g_force', 'gforce'])),
+    gearPosition: safeNumber(getOptionalRecordValue(record, ['gear_ratio', 'gear', 'front_gear'])),
     gradient: safeNumber(record.grade),
     groundContactTime: safeNumber(getOptionalRecordValue(record, ['ground_contact_time', 'stance_time'])),
     heading: safeNumber(getOptionalRecordValue(record, ['gps_heading', 'compass_heading', 'heading', 'course_heading', 'navigation_heading'])),

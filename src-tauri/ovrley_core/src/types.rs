@@ -62,6 +62,8 @@ pub enum MetricKind {
     GearPosition,
     #[serde(rename = "vertical_ratio")]
     VerticalRatio,
+    #[serde(rename = "vertical_oscillation")]
+    VerticalOscillation,
     #[serde(rename = "core_temperature")]
     CoreTemperature,
 }

@@ -141,6 +141,7 @@ function parseGpxActivityFile(file, textContent) {
       distance: readTrackPointMetric(extensionValues, ['distance', 'distance_m', 'distancemeters']),
       elevation,
       gForce: readTrackPointMetric(extensionValues, ['g_force', 'gforce']),
+      gearPosition: readTrackPointMetric(extensionValues, ['gear_position', 'gear', 'gear_ratio']),
       gradient: readTrackPointMetric(extensionValues, ['gradient', 'grade', 'slope']),
       groundContactTime: readTrackPointMetric(extensionValues, ['ground_contact_time', 'groundcontacttime', 'stance_time']),
       heading: readTrackPointMetric(extensionValues, ['heading', 'course', 'bearing', 'gps_heading']),

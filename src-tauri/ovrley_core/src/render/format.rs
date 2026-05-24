@@ -36,6 +36,7 @@ pub enum MetricIconKind {
     GroundContactTime,
     Torque,
     GearPosition,
+    ArrowUpDown,
 }
 
 /// Split metric text used by icon+value+unit widgets.
@@ -217,6 +218,12 @@ fn raw_value(
         MetricKind::VerticalRatio => dense_activity
             .series
             .vertical_ratio
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::VerticalOscillation => dense_activity
+            .series
+            .vertical_oscillation
             .get(frame_index)
             .copied()
             .flatten(),
@@ -536,7 +543,14 @@ fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, v
         | MetricKind::GroundContactTime
         | MetricKind::StrokeRate
         | MetricKind::GearPosition
-        | MetricKind::VerticalRatio => value,
+        |         MetricKind::VerticalRatio => value,
+        MetricKind::VerticalOscillation => {
+            if display_unit == Some("cm") {
+                value / 10.0
+            } else {
+                value
+            }
+        }
         MetricKind::GForce => {
             if display_unit == Some("mps2") {
                 value * 9.806_65
@@ -617,6 +631,9 @@ fn metric_icon_kind_for_metric(kind: MetricKind) -> Option<MetricIconKind> {
         crate::standard_metrics::MetricIconAssetKey::Torque => Some(MetricIconKind::Torque),
         crate::standard_metrics::MetricIconAssetKey::GearPosition => {
             Some(MetricIconKind::GearPosition)
+        }
+        crate::standard_metrics::MetricIconAssetKey::VerticalOscillation => {
+            Some(MetricIconKind::ArrowUpDown)
         }
     }
 }

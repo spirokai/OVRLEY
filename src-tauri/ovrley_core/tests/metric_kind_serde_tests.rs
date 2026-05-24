@@ -38,6 +38,7 @@ fn metric_kind_round_trip_all_variants() {
         (MetricKind::VerticalSpeed, r#""vertical_speed""#),
         (MetricKind::GearPosition, r#""gear_position""#),
         (MetricKind::VerticalRatio, r#""vertical_ratio""#),
+        (MetricKind::VerticalOscillation, r#""vertical_oscillation""#),
         (MetricKind::CoreTemperature, r#""core_temperature""#),
     ];
 

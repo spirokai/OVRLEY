@@ -142,6 +142,13 @@ function convertStandardMetricValue(type, value, displayUnit) {
         default:
           return numericValue
       }
+    case 'vertical_oscillation':
+      switch (displayUnit) {
+        case 'cm':
+          return numericValue / 10
+        default:
+          return numericValue
+      }
     default:
       return numericValue
   }

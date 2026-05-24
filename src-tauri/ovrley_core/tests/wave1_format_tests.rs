@@ -50,6 +50,7 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
         vertical_speed: vec![],
         gear_position: vec![],
         vertical_ratio: vec![],
+        vertical_oscillation: vec![],
         core_temperature: vec![],
         course_lat: vec![],
         course_lon: vec![],
@@ -66,6 +67,8 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
         "stroke_rate" => s.stroke_rate = series,
         "torque" => s.torque = series,
         "vertical_speed" => s.vertical_speed = series,
+        "gear_position" => s.gear_position = series,
+        "vertical_oscillation" => s.vertical_oscillation = series,
         _ => {}
     }
     DenseActivityReport {
@@ -170,6 +173,46 @@ fn vertical_speed_converts_to_ftmin() {
     let (value, unit) = format_parts("vertical_speed", "vertical_speed", Some(1.0), &[("display_unit", r#""ftmin""#), ("decimals", "1")]);
     assert_eq!(value, "196.9");
     assert_eq!(unit, Some("FT/MIN".to_string()));
+}
+
+#[test]
+fn vertical_oscillation_formats_as_mm() {
+    let (value, unit) = format_parts("vertical_oscillation", "vertical_oscillation", Some(85.0), &[("display_unit", r#""mm""#), ("decimals", "1")]);
+    assert_eq!(value, "85");
+    assert_eq!(unit, Some("MM".to_string()));
+}
+
+#[test]
+fn vertical_oscillation_converts_to_cm() {
+    let (value, unit) = format_parts("vertical_oscillation", "vertical_oscillation", Some(100.0), &[("display_unit", r#""cm""#), ("decimals", "1")]);
+    assert_eq!(value, "10");
+    assert_eq!(unit, Some("CM".to_string()));
+}
+
+#[test]
+fn vertical_oscillation_shows_placeholder_when_missing() {
+    let (value, _) = format_parts("vertical_oscillation", "vertical_oscillation", None, &[("display_unit", r#""mm""#)]);
+    assert_eq!(value, "--");
+}
+
+#[test]
+fn gear_position_formats_as_integer_no_units_by_default() {
+    let (value, unit) = format_parts("gear_position", "gear_position", Some(5.0), &[("display_unit", r#""gear""#)]);
+    assert_eq!(value, "5");
+    assert_eq!(unit, None);
+}
+
+#[test]
+fn gear_position_shows_unit_when_configured() {
+    let (value, unit) = format_parts("gear_position", "gear_position", Some(5.0), &[("display_unit", r#""gear""#), ("show_units", "true")]);
+    assert_eq!(value, "5");
+    assert_eq!(unit, Some("GEAR".to_string()));
+}
+
+#[test]
+fn gear_position_shows_placeholder_when_missing() {
+    let (value, _) = format_parts("gear_position", "gear_position", None, &[("display_unit", r#""gear""#)]);
+    assert_eq!(value, "--");
 }
 
 #[test]

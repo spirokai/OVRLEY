@@ -173,6 +173,9 @@ pub struct ParsedActivity {
     /// Vertical ratio in percent.
     #[serde(default)]
     pub vertical_ratio: NumericSeries,
+    /// Vertical oscillation in millimeters.
+    #[serde(default)]
+    pub vertical_oscillation: NumericSeries,
     /// Core temperature in degrees Celsius.
     #[serde(default)]
     pub core_temperature: NumericSeries,
@@ -254,6 +257,8 @@ pub struct DenseSeriesReport {
     pub gear_position: Vec<Option<f64>>,
     /// Vertical ratio in percent.
     pub vertical_ratio: Vec<Option<f64>>,
+    /// Vertical oscillation in millimeters.
+    pub vertical_oscillation: Vec<Option<f64>>,
     /// Core temperature in degrees Celsius.
     pub core_temperature: Vec<Option<f64>>,
     /// Course latitude values.
@@ -313,6 +318,8 @@ pub struct TrimmedActivity {
     pub gear_position: NumericSeries,
     /// Trimmed vertical ratio samples in percent.
     pub vertical_ratio: NumericSeries,
+    /// Trimmed vertical oscillation samples in millimeters.
+    pub vertical_oscillation: NumericSeries,
     /// Trimmed core temperature samples in Celsius.
     pub core_temperature: NumericSeries,
     /// Trimmed gradient samples in percent.

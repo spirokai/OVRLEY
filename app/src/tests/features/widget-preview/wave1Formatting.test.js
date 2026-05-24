@@ -21,6 +21,38 @@ function makeActivity(type, value) {
   }
 }
 
+describe('Wave 2 metric formatting', () => {
+  test('vertical_oscillation formats as mm', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('vertical_oscillation', { display_unit: 'mm', decimals: 1 }),
+      activity: makeActivity('vertical_oscillation', 85),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('85')
+    expect(model?.unitText).toBe('MM')
+  })
+
+  test('vertical_oscillation converts to cm', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('vertical_oscillation', { display_unit: 'cm', decimals: 1 }),
+      activity: makeActivity('vertical_oscillation', 100),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('10')
+    expect(model?.unitText).toBe('CM')
+  })
+
+  test('vertical_oscillation shows placeholder when missing', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('vertical_oscillation', { display_unit: 'mm' }),
+      activity: { sample_elapsed_seconds: [0], vertical_oscillation: [null] },
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('--')
+    expect(model?.unitText).toBe('MM')
+  })
+})
+
 describe('Wave 1 metric formatting', () => {
   test('g_force formats with g unit', () => {
     const model = buildMetricWidgetPreviewModel({
@@ -100,6 +132,26 @@ describe('Wave 1 metric formatting', () => {
     })
     expect(model?.valueText).toBe('5.2')
     expect(model?.unitText).toBe('M/S')
+  })
+
+  test('gear_position formats as integer', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('gear_position', { display_unit: 'gear' }),
+      activity: makeActivity('gear_position', 5),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('5')
+    expect(model?.unitText).toBe('GEAR')
+  })
+
+  test('gear_position shows placeholder when missing', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('gear_position', { display_unit: 'gear' }),
+      activity: { sample_elapsed_seconds: [0], gear_position: [null] },
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('--')
+    expect(model?.unitText).toBe('GEAR')
   })
 
   test('vertical_speed converts to ft/min', () => {

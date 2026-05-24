@@ -61,6 +61,13 @@ describe('MetricWidgetEditor decimal control', () => {
     expect(screen.queryByText('Decimals')).not.toBeInTheDocument()
   })
 
+  test('shows decimal toggle for vertical_oscillation', () => {
+    render(
+      <MetricWidgetEditor widget={makeWidget('vertical_oscillation', { display_unit: 'mm' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />,
+    )
+    expect(screen.getByText('Decimals')).toBeInTheDocument()
+  })
+
   test('hides decimal toggle for left_right_balance', () => {
     render(
       <MetricWidgetEditor

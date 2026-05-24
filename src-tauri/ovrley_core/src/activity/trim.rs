@@ -389,6 +389,18 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
+        vertical_oscillation: if requirements.vertical_oscillation {
+            trim_numeric_series(
+                elapsed,
+                &activity.vertical_oscillation,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
         core_temperature: if requirements.core_temperature {
             trim_numeric_series(
                 elapsed,

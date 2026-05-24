@@ -36,6 +36,7 @@ pub enum MetricIconAssetKey {
     StrokeRate,
     VerticalSpeed,
     VerticalRatio,
+    VerticalOscillation,
     CoreTemperature,
     GForce,
     GroundContactTime,
@@ -160,6 +161,7 @@ fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
         "vertical_speed" => Some(MetricKind::VerticalSpeed),
         "gear_position" => Some(MetricKind::GearPosition),
         "vertical_ratio" => Some(MetricKind::VerticalRatio),
+        "vertical_oscillation" => Some(MetricKind::VerticalOscillation),
         "core_temperature" => Some(MetricKind::CoreTemperature),
         _ => None,
     }
@@ -207,6 +209,7 @@ pub fn metric_icon_asset_key(kind: MetricKind) -> Option<MetricIconAssetKey> {
         "widget-stroke-rate.svg" => Some(MetricIconAssetKey::StrokeRate),
         "widget-vertical-speed.svg" => Some(MetricIconAssetKey::VerticalSpeed),
         "widget-vertical-ratio.svg" => Some(MetricIconAssetKey::VerticalRatio),
+        "widget-vertical-oscillation.svg" => Some(MetricIconAssetKey::VerticalOscillation),
         "widget-core-temperature.svg" => Some(MetricIconAssetKey::CoreTemperature),
         "widget-g-force.svg" => Some(MetricIconAssetKey::GForce),
         "widget-ground-contact-time.svg" => Some(MetricIconAssetKey::GroundContactTime),

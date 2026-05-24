@@ -37,6 +37,7 @@ fn all_metrics_have_distinct_serde_names() {
         MetricKind::VerticalSpeed,
         MetricKind::GearPosition,
         MetricKind::VerticalRatio,
+        MetricKind::VerticalOscillation,
         MetricKind::CoreTemperature,
     ]
     .iter()
@@ -52,7 +53,7 @@ fn all_metrics_have_distinct_serde_names() {
 }
 
 #[test]
-fn metric_kind_count_is_twenty() {
+fn metric_kind_count_is_twenty_one() {
     let all = [
         MetricKind::Speed,
         MetricKind::Heartrate,
@@ -73,9 +74,10 @@ fn metric_kind_count_is_twenty() {
         MetricKind::VerticalSpeed,
         MetricKind::GearPosition,
         MetricKind::VerticalRatio,
+        MetricKind::VerticalOscillation,
         MetricKind::CoreTemperature,
     ];
-    assert_eq!(all.len(), 20);
+    assert_eq!(all.len(), 21);
 }
 
 #[test]
@@ -100,6 +102,7 @@ fn each_variant_roundtrips_individually() {
         MetricKind::VerticalSpeed,
         MetricKind::GearPosition,
         MetricKind::VerticalRatio,
+        MetricKind::VerticalOscillation,
         MetricKind::CoreTemperature,
     ];
     for kind in all {

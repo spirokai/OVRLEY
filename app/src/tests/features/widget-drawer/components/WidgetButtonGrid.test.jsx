@@ -12,7 +12,7 @@ describe('WidgetButtonGrid', () => {
     render(<WidgetButtonGrid onAddWidget={() => {}} />)
 
     const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(19)
+    expect(buttons).toHaveLength(21)
   })
 
   test('each button displays an icon', () => {
@@ -37,6 +37,8 @@ describe('WidgetButtonGrid', () => {
     expect(screen.getByText('Stride')).toBeInTheDocument()
     expect(screen.getByText('S/R')).toBeInTheDocument()
     expect(screen.getByText('V. Speed')).toBeInTheDocument()
+    expect(screen.getByText('Gear')).toBeInTheDocument()
+    expect(screen.getByText('V. Osc.')).toBeInTheDocument()
   })
 
   test('clicking a button calls onAddWidget with the correct type', async () => {
