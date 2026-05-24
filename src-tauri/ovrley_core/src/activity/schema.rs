@@ -26,7 +26,7 @@
 //! parse-and-prepare phase. The `DenseActivityReport` is read heavily during
 //! per-frame rendering (O(1) lookup via `frame_index`).
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -36,6 +36,30 @@ use std::collections::BTreeMap;
 /// interpolate through available values and preserve empty vectors for series
 /// that a template did not request.
 pub type NumericSeries = Vec<Option<f64>>;
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum NumericOrBalanceSample {
+    Number(f64),
+    Balance { value: Option<f64> },
+}
+
+fn deserialize_optional_numeric_or_balance_series<'de, D>(
+    deserializer: D,
+) -> Result<NumericSeries, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let values = Vec::<Option<NumericOrBalanceSample>>::deserialize(deserializer)?;
+    Ok(values
+        .into_iter()
+        .map(|value| match value {
+            Some(NumericOrBalanceSample::Number(number)) => Some(number),
+            Some(NumericOrBalanceSample::Balance { value }) => value,
+            None => None,
+        })
+        .collect())
+}
 
 /// Timestamp series aligned with `sample_elapsed_seconds`.
 ///
@@ -116,6 +140,42 @@ pub struct ParsedActivity {
     /// Temperature in degrees Celsius.
     #[serde(default)]
     pub temperature: NumericSeries,
+    /// Pace in seconds per kilometer.
+    #[serde(default)]
+    pub pace: NumericSeries,
+    /// G-force in multiples of Earth gravity.
+    #[serde(default)]
+    pub g_force: NumericSeries,
+    /// Air pressure in bar.
+    #[serde(default)]
+    pub air_pressure: NumericSeries,
+    /// Ground contact time in milliseconds.
+    #[serde(default)]
+    pub ground_contact_time: NumericSeries,
+    /// Left/right balance as percent-left.
+    #[serde(default, deserialize_with = "deserialize_optional_numeric_or_balance_series")]
+    pub left_right_balance: NumericSeries,
+    /// Stride length in meters.
+    #[serde(default)]
+    pub stride_length: NumericSeries,
+    /// Stroke rate in strokes per minute.
+    #[serde(default)]
+    pub stroke_rate: NumericSeries,
+    /// Torque in newton-meters.
+    #[serde(default)]
+    pub torque: NumericSeries,
+    /// Vertical speed in meters per second.
+    #[serde(default)]
+    pub vertical_speed: NumericSeries,
+    /// Gear position as a discrete numeric value.
+    #[serde(default)]
+    pub gear_position: NumericSeries,
+    /// Vertical ratio in percent.
+    #[serde(default)]
+    pub vertical_ratio: NumericSeries,
+    /// Core temperature in degrees Celsius.
+    #[serde(default)]
+    pub core_temperature: NumericSeries,
     /// Road grade in percent.
     #[serde(default)]
     pub gradient: NumericSeries,
@@ -172,6 +232,30 @@ pub struct DenseSeriesReport {
     pub power: Vec<Option<f64>>,
     /// Temperature in degrees Celsius.
     pub temperature: Vec<Option<f64>>,
+    /// Pace in seconds per kilometer.
+    pub pace: Vec<Option<f64>>,
+    /// G-force in multiples of Earth gravity.
+    pub g_force: Vec<Option<f64>>,
+    /// Air pressure in bar.
+    pub air_pressure: Vec<Option<f64>>,
+    /// Ground contact time in milliseconds.
+    pub ground_contact_time: Vec<Option<f64>>,
+    /// Left/right balance as percent-left.
+    pub left_right_balance: Vec<Option<f64>>,
+    /// Stride length in meters.
+    pub stride_length: Vec<Option<f64>>,
+    /// Stroke rate in strokes per minute.
+    pub stroke_rate: Vec<Option<f64>>,
+    /// Torque in newton-meters.
+    pub torque: Vec<Option<f64>>,
+    /// Vertical speed in meters per second.
+    pub vertical_speed: Vec<Option<f64>>,
+    /// Gear position as a discrete numeric value.
+    pub gear_position: Vec<Option<f64>>,
+    /// Vertical ratio in percent.
+    pub vertical_ratio: Vec<Option<f64>>,
+    /// Core temperature in degrees Celsius.
+    pub core_temperature: Vec<Option<f64>>,
     /// Course latitude values.
     pub course_lat: Vec<Option<f64>>,
     /// Course longitude values.
@@ -207,6 +291,30 @@ pub struct TrimmedActivity {
     pub power: NumericSeries,
     /// Trimmed temperature samples in Celsius.
     pub temperature: NumericSeries,
+    /// Trimmed pace samples in seconds per kilometer.
+    pub pace: NumericSeries,
+    /// Trimmed g-force samples.
+    pub g_force: NumericSeries,
+    /// Trimmed air pressure samples in bar.
+    pub air_pressure: NumericSeries,
+    /// Trimmed ground contact time samples in milliseconds.
+    pub ground_contact_time: NumericSeries,
+    /// Trimmed left/right balance samples as percent-left.
+    pub left_right_balance: NumericSeries,
+    /// Trimmed stride length samples in meters.
+    pub stride_length: NumericSeries,
+    /// Trimmed stroke rate samples in strokes per minute.
+    pub stroke_rate: NumericSeries,
+    /// Trimmed torque samples in newton-meters.
+    pub torque: NumericSeries,
+    /// Trimmed vertical speed samples in meters per second.
+    pub vertical_speed: NumericSeries,
+    /// Trimmed gear position samples.
+    pub gear_position: NumericSeries,
+    /// Trimmed vertical ratio samples in percent.
+    pub vertical_ratio: NumericSeries,
+    /// Trimmed core temperature samples in Celsius.
+    pub core_temperature: NumericSeries,
     /// Trimmed gradient samples in percent.
     pub gradient: NumericSeries,
     /// Trimmed timestamp samples.

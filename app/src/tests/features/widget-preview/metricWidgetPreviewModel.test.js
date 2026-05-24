@@ -46,4 +46,26 @@ describe('metric widget preview model standard metric units', () => {
     expect(model?.valueText).toBe('68')
     expect(model?.unitText).toBe('\u00B0F')
   })
+
+  test('formats pace widgets from display_unit', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'pace',
+        data: {
+          display_unit: 'min_per_km',
+          show_units: true,
+          show_icon: false,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0],
+        pace: [275],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('4:35')
+    expect(model?.unitText).toBe('MIN/KM')
+  })
 })

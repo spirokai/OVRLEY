@@ -5,6 +5,7 @@
 /// at compile time) and cached in a `OnceLock<Option<ParsedSvgIcon>>` for the
 /// lifetime of the process.
 use crate::render::format::MetricIconKind;
+use crate::standard_metrics::metric_icon_asset_key;
 use crate::MetricKind;
 use skia_safe::{image_filters, paint::Style, Canvas, Color, Paint, PaintCap, PaintJoin, Point};
 use std::sync::OnceLock;
@@ -28,14 +29,35 @@ pub(crate) enum SvgPrimitive {
 
 /// Maps a telemetry value key to its built-in icon kind.
 pub(crate) fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconKind> {
-    match kind {
-        MetricKind::Speed => Some(MetricIconKind::Gauge),
-        MetricKind::Heartrate => Some(MetricIconKind::Heart),
-        MetricKind::Cadence => Some(MetricIconKind::RefreshCw),
-        MetricKind::Power => Some(MetricIconKind::Zap),
-        MetricKind::Time => Some(MetricIconKind::Clock3),
-        MetricKind::Temperature => Some(MetricIconKind::Thermometer),
-        _ => None,
+    match metric_icon_asset_key(kind)? {
+        crate::standard_metrics::MetricIconAssetKey::Speed => Some(MetricIconKind::Gauge),
+        crate::standard_metrics::MetricIconAssetKey::Heartrate => Some(MetricIconKind::Heart),
+        crate::standard_metrics::MetricIconAssetKey::Cadence => Some(MetricIconKind::RefreshCw),
+        crate::standard_metrics::MetricIconAssetKey::Power => Some(MetricIconKind::Zap),
+        crate::standard_metrics::MetricIconAssetKey::Time => Some(MetricIconKind::Clock3),
+        crate::standard_metrics::MetricIconAssetKey::Temperature => Some(MetricIconKind::Thermometer),
+        crate::standard_metrics::MetricIconAssetKey::CoreTemperature => {
+            Some(MetricIconKind::CoreTemperature)
+        }
+        crate::standard_metrics::MetricIconAssetKey::Pace => Some(MetricIconKind::Footprints),
+        crate::standard_metrics::MetricIconAssetKey::AirPressure => Some(MetricIconKind::Wind),
+        crate::standard_metrics::MetricIconAssetKey::LeftRightBalance => Some(MetricIconKind::Scale),
+        crate::standard_metrics::MetricIconAssetKey::StrideLength => Some(MetricIconKind::Ruler),
+        crate::standard_metrics::MetricIconAssetKey::StrokeRate => Some(MetricIconKind::Waves),
+        crate::standard_metrics::MetricIconAssetKey::VerticalSpeed => {
+            Some(MetricIconKind::TrendingUp)
+        }
+        crate::standard_metrics::MetricIconAssetKey::VerticalRatio => {
+            Some(MetricIconKind::Percent)
+        }
+        crate::standard_metrics::MetricIconAssetKey::GForce => Some(MetricIconKind::GForce),
+        crate::standard_metrics::MetricIconAssetKey::GroundContactTime => {
+            Some(MetricIconKind::GroundContactTime)
+        }
+        crate::standard_metrics::MetricIconAssetKey::Torque => Some(MetricIconKind::Torque),
+        crate::standard_metrics::MetricIconAssetKey::GearPosition => {
+            Some(MetricIconKind::GearPosition)
+        }
     }
 }
 
@@ -47,43 +69,59 @@ pub(crate) fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconK
 /// pre-initialized `OnceLock` and returns an `Option<&>` without locking.
 fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIcon> {
     match icon_kind {
-        MetricIconKind::Gauge => {
-            static CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
-            CACHE
-                .get_or_init(|| super::svg::parse_svg_icon(metric_icon_svg_markup(icon_kind)))
-                .as_ref()
+        MetricIconKind::Gauge => parsed_metric_icon_cached(icon_kind, &GAUGE_ICON_CACHE),
+        MetricIconKind::Heart => parsed_metric_icon_cached(icon_kind, &HEART_ICON_CACHE),
+        MetricIconKind::RefreshCw => parsed_metric_icon_cached(icon_kind, &REFRESH_CW_ICON_CACHE),
+        MetricIconKind::Zap => parsed_metric_icon_cached(icon_kind, &ZAP_ICON_CACHE),
+        MetricIconKind::Clock3 => parsed_metric_icon_cached(icon_kind, &CLOCK3_ICON_CACHE),
+        MetricIconKind::Thermometer => parsed_metric_icon_cached(icon_kind, &THERMOMETER_ICON_CACHE),
+        MetricIconKind::CoreTemperature => {
+            parsed_metric_icon_cached(icon_kind, &CORE_TEMPERATURE_ICON_CACHE)
         }
-        MetricIconKind::Heart => {
-            static CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
-            CACHE
-                .get_or_init(|| super::svg::parse_svg_icon(metric_icon_svg_markup(icon_kind)))
-                .as_ref()
+        MetricIconKind::Footprints => parsed_metric_icon_cached(icon_kind, &FOOTPRINTS_ICON_CACHE),
+        MetricIconKind::Wind => parsed_metric_icon_cached(icon_kind, &WIND_ICON_CACHE),
+        MetricIconKind::Scale => parsed_metric_icon_cached(icon_kind, &SCALE_ICON_CACHE),
+        MetricIconKind::Ruler => parsed_metric_icon_cached(icon_kind, &RULER_ICON_CACHE),
+        MetricIconKind::Waves => parsed_metric_icon_cached(icon_kind, &WAVES_ICON_CACHE),
+        MetricIconKind::TrendingUp => parsed_metric_icon_cached(icon_kind, &TRENDING_UP_ICON_CACHE),
+        MetricIconKind::Percent => parsed_metric_icon_cached(icon_kind, &PERCENT_ICON_CACHE),
+        MetricIconKind::GForce => parsed_metric_icon_cached(icon_kind, &G_FORCE_ICON_CACHE),
+        MetricIconKind::GroundContactTime => {
+            parsed_metric_icon_cached(icon_kind, &GROUND_CONTACT_TIME_ICON_CACHE)
         }
-        MetricIconKind::RefreshCw => {
-            static CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
-            CACHE
-                .get_or_init(|| super::svg::parse_svg_icon(metric_icon_svg_markup(icon_kind)))
-                .as_ref()
-        }
-        MetricIconKind::Zap => {
-            static CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
-            CACHE
-                .get_or_init(|| super::svg::parse_svg_icon(metric_icon_svg_markup(icon_kind)))
-                .as_ref()
-        }
-        MetricIconKind::Clock3 => {
-            static CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
-            CACHE
-                .get_or_init(|| super::svg::parse_svg_icon(metric_icon_svg_markup(icon_kind)))
-                .as_ref()
-        }
-        MetricIconKind::Thermometer => {
-            static CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
-            CACHE
-                .get_or_init(|| super::svg::parse_svg_icon(metric_icon_svg_markup(icon_kind)))
-                .as_ref()
+        MetricIconKind::Torque => parsed_metric_icon_cached(icon_kind, &TORQUE_ICON_CACHE),
+        MetricIconKind::GearPosition => {
+            parsed_metric_icon_cached(icon_kind, &GEAR_POSITION_ICON_CACHE)
         }
     }
+}
+
+static GAUGE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static HEART_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static REFRESH_CW_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static ZAP_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static CLOCK3_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static THERMOMETER_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static CORE_TEMPERATURE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static FOOTPRINTS_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static WIND_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static SCALE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static RULER_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static WAVES_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static TRENDING_UP_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static PERCENT_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static G_FORCE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static GROUND_CONTACT_TIME_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static TORQUE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static GEAR_POSITION_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+
+fn parsed_metric_icon_cached(
+    icon_kind: MetricIconKind,
+    cache: &'static OnceLock<Option<ParsedSvgIcon>>,
+) -> Option<&'static ParsedSvgIcon> {
+    cache
+        .get_or_init(|| super::svg::parse_svg_icon(metric_icon_svg_markup(icon_kind)))
+        .as_ref()
 }
 
 /// Returns bundled SVG markup for a metric icon kind.
@@ -115,6 +153,54 @@ fn metric_icon_svg_markup(icon_kind: MetricIconKind) -> &'static str {
         MetricIconKind::Thermometer => include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../assets/widget-icons/widget-temperature.svg"
+        )),
+        MetricIconKind::CoreTemperature => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-core-temperature.svg"
+        )),
+        MetricIconKind::Footprints => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-pace.svg"
+        )),
+        MetricIconKind::Wind => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-air-pressure.svg"
+        )),
+        MetricIconKind::Scale => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-left-right-balance.svg"
+        )),
+        MetricIconKind::Ruler => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-stride-length.svg"
+        )),
+        MetricIconKind::Waves => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-stroke-rate.svg"
+        )),
+        MetricIconKind::TrendingUp => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-vertical-speed.svg"
+        )),
+        MetricIconKind::Percent => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-vertical-ratio.svg"
+        )),
+        MetricIconKind::GForce => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-g-force.svg"
+        )),
+        MetricIconKind::GroundContactTime => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-ground-contact-time.svg"
+        )),
+        MetricIconKind::Torque => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-torque.svg"
+        )),
+        MetricIconKind::GearPosition => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-gear-position.svg"
         )),
     }
 }

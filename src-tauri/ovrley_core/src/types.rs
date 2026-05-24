@@ -1,7 +1,9 @@
 //! Cross-cutting domain types shared by config, render, and activity modules.
 //!
 //! Owns: `MetricKind` — the canonical enum for supported telemetry metrics
-//!       (speed, heartrate, elevation, cadence, power, temperature, gradient, time).
+//!       (speed, heartrate, cadence, power, temperature, pace, g_force, and
+//!       the rest of the shared standard-metric family, plus specialized
+//!       elevation/gradient/time values).
 //!       Replaces the pre-refactor pattern of matching raw `"speed"` / `"heartrate"`
 //!       string literals scattered across 5+ files.
 //! Does not own: metric formatting (see [`crate::render::format`]), metric widget
@@ -38,4 +40,28 @@ pub enum MetricKind {
     Power,
     #[serde(rename = "temperature")]
     Temperature,
+    #[serde(rename = "pace")]
+    Pace,
+    #[serde(rename = "g_force")]
+    GForce,
+    #[serde(rename = "air_pressure")]
+    AirPressure,
+    #[serde(rename = "ground_contact_time")]
+    GroundContactTime,
+    #[serde(rename = "left_right_balance")]
+    LeftRightBalance,
+    #[serde(rename = "stride_length")]
+    StrideLength,
+    #[serde(rename = "stroke_rate")]
+    StrokeRate,
+    #[serde(rename = "torque")]
+    Torque,
+    #[serde(rename = "vertical_speed")]
+    VerticalSpeed,
+    #[serde(rename = "gear_position")]
+    GearPosition,
+    #[serde(rename = "vertical_ratio")]
+    VerticalRatio,
+    #[serde(rename = "core_temperature")]
+    CoreTemperature,
 }

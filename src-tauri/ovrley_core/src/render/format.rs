@@ -7,6 +7,11 @@
 
 use crate::activity::schema::DenseActivityReport;
 use crate::config::{RenderConfig, ValueConfig};
+use crate::standard_metrics::{
+    is_standard_metric, metric_icon_asset_key, standard_metric_default_display_unit,
+    standard_metric_formatter, standard_metric_show_units, standard_metric_unit_label,
+    StandardMetricFormatterKind,
+};
 use crate::MetricKind;
 use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
 
@@ -19,6 +24,18 @@ pub enum MetricIconKind {
     Zap,
     Clock3,
     Thermometer,
+    CoreTemperature,
+    Footprints,
+    Wind,
+    Scale,
+    Ruler,
+    Waves,
+    TrendingUp,
+    Percent,
+    GForce,
+    GroundContactTime,
+    Torque,
+    GearPosition,
 }
 
 /// Split metric text used by icon+value+unit widgets.
@@ -61,8 +78,6 @@ pub fn format_value(
 ) -> String {
     let raw = raw_value(value_config.value, dense_activity, frame_index);
     let mut formatted = match value_config.value {
-        MetricKind::Speed => format_speed(config, value_config, raw),
-        MetricKind::Temperature => format_temperature(config, value_config, raw),
         MetricKind::Time => format_time(
             config,
             value_config,
@@ -74,6 +89,7 @@ pub fn format_value(
         ),
         MetricKind::Gradient => format_gradient(config, value_config, raw),
         MetricKind::Elevation => format_elevation(config, value_config, raw),
+        kind if is_standard_metric(kind) => format_standard_metric_text(config, value_config, raw),
         _ => format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
     };
 
@@ -138,6 +154,78 @@ fn raw_value(
             .get(frame_index)
             .copied()
             .flatten(),
+        MetricKind::Pace => dense_activity
+            .series
+            .pace
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::GForce => dense_activity
+            .series
+            .g_force
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::AirPressure => dense_activity
+            .series
+            .air_pressure
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::GroundContactTime => dense_activity
+            .series
+            .ground_contact_time
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::LeftRightBalance => dense_activity
+            .series
+            .left_right_balance
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::StrideLength => dense_activity
+            .series
+            .stride_length
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::StrokeRate => dense_activity
+            .series
+            .stroke_rate
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::Torque => dense_activity
+            .series
+            .torque
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::VerticalSpeed => dense_activity
+            .series
+            .vertical_speed
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::GearPosition => dense_activity
+            .series
+            .gear_position
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::VerticalRatio => dense_activity
+            .series
+            .vertical_ratio
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::CoreTemperature => dense_activity
+            .series
+            .core_temperature
+            .get(frame_index)
+            .copied()
+            .flatten(),
         _ => None,
     }
 }
@@ -165,75 +253,6 @@ pub fn format_metric_parts(
     // a (value_text, unit_text, icon_kind) tuple with unit conversion applied.
     let raw = raw_value(value_config.value, dense_activity, frame_index);
     let (mut value_text, unit_text, icon_kind) = match value_config.value {
-        MetricKind::Speed => {
-            let unit = standard_metric_unit_label(MetricKind::Speed, value_config).to_string();
-            let value_text = raw
-                .map(|speed_mps| {
-                    let factor = match standard_metric_display_unit(MetricKind::Speed, value_config)
-                        .unwrap_or("kmh")
-                    {
-                        "mph" | "imperial" => 2.23694,
-                        "kn" => 1.943844,
-                        "mps" => 1.0,
-                        _ => 3.6,
-                    };
-                    format_number(
-                        speed_mps * factor,
-                        effective_decimals(config, value_config, Some(0)),
-                    )
-                })
-                .unwrap_or_else(|| "--".to_string());
-            let unit_text =
-                standard_metric_show_units(MetricKind::Speed, value_config).then_some(unit);
-            (value_text, unit_text, Some(MetricIconKind::Gauge))
-        }
-        MetricKind::Temperature => {
-            let unit = standard_metric_display_unit(MetricKind::Temperature, value_config)
-                .unwrap_or("celsius");
-            let formatted_unit =
-                standard_metric_unit_label(MetricKind::Temperature, value_config).to_string();
-            let (value_text, unit_text) = match raw {
-                Some(temp_c) if unit == "fahrenheit" => (
-                    format_number(
-                        (temp_c * 9.0 / 5.0) + 32.0,
-                        effective_decimals(config, value_config, Some(0)),
-                    ),
-                    standard_metric_show_units(MetricKind::Temperature, value_config)
-                        .then_some(formatted_unit.clone()),
-                ),
-                Some(temp_c) => (
-                    format_number(temp_c, effective_decimals(config, value_config, Some(0))),
-                    standard_metric_show_units(MetricKind::Temperature, value_config)
-                        .then_some(formatted_unit.clone()),
-                ),
-                None => (
-                    "--".to_string(),
-                    standard_metric_show_units(MetricKind::Temperature, value_config)
-                        .then_some(formatted_unit),
-                ),
-            };
-            (value_text, unit_text, Some(MetricIconKind::Thermometer))
-        }
-        MetricKind::Heartrate => (
-            format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
-            standard_metric_show_units(MetricKind::Heartrate, value_config).then_some(
-                standard_metric_unit_label(MetricKind::Heartrate, value_config).to_string(),
-            ),
-            Some(MetricIconKind::Heart),
-        ),
-        MetricKind::Cadence => (
-            format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
-            standard_metric_show_units(MetricKind::Cadence, value_config).then_some(
-                standard_metric_unit_label(MetricKind::Cadence, value_config).to_string(),
-            ),
-            Some(MetricIconKind::RefreshCw),
-        ),
-        MetricKind::Power => (
-            format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
-            standard_metric_show_units(MetricKind::Power, value_config)
-                .then_some(standard_metric_unit_label(MetricKind::Power, value_config).to_string()),
-            Some(MetricIconKind::Zap),
-        ),
         MetricKind::Time => (
             format_time(
                 config,
@@ -247,6 +266,7 @@ pub fn format_metric_parts(
             None,
             Some(MetricIconKind::Clock3),
         ),
+        kind if is_standard_metric(kind) => format_standard_metric_parts(config, value_config, raw),
         _ => return None,
     };
 
@@ -268,63 +288,82 @@ pub fn format_metric_parts(
     })
 }
 
-// Formats speed with unit conversion and optional unit suffix.
-fn format_speed(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f64>) -> String {
-    let Some(speed_mps) = raw else {
-        return missing_value_with_units(
-            standard_metric_show_units(MetricKind::Speed, value_config),
-            standard_metric_unit_label(MetricKind::Speed, value_config),
-        );
-    };
-    let unit = standard_metric_display_unit(MetricKind::Speed, value_config).unwrap_or("kmh");
-    let (factor, units) = match unit {
-        "mph" | "imperial" => (2.23694, "MPH"),
-        "kn" => (1.943844, "KN"),
-        "mps" => (1.0, "M/S"),
-        _ => (3.6, "KM/H"),
-    };
-    let mut text = format_number(
-        speed_mps * factor,
-        effective_decimals(config, value_config, Some(0)),
-    );
-    if standard_metric_show_units(MetricKind::Speed, value_config) {
-        text.push(' ');
-        text.push_str(units);
-    }
-    text
-}
-
-// Formats temperature as Celsius or Fahrenheit.
-fn format_temperature(
+fn format_standard_metric_text(
     config: &RenderConfig,
     value_config: &ValueConfig,
     raw: Option<f64>,
 ) -> String {
-    let unit =
-        standard_metric_display_unit(MetricKind::Temperature, value_config).unwrap_or("celsius");
-    let Some(temp_c) = raw else {
-        return missing_value_with_units(
-            standard_metric_show_units(MetricKind::Temperature, value_config),
-            standard_metric_unit_label(MetricKind::Temperature, value_config),
-        );
-    };
-    let (value, units) = if unit == "fahrenheit" {
-        (
-            (temp_c * 9.0 / 5.0) + 32.0,
-            standard_metric_unit_label(MetricKind::Temperature, value_config),
-        )
+    let (value_text, unit_text, _) = format_standard_metric_parts(config, value_config, raw);
+    if let Some(unit_text) = unit_text {
+        format!("{value_text} {unit_text}")
     } else {
-        (
-            temp_c,
-            standard_metric_unit_label(MetricKind::Temperature, value_config),
-        )
-    };
-    let mut text = format_number(value, effective_decimals(config, value_config, Some(0)));
-    if standard_metric_show_units(MetricKind::Temperature, value_config) {
-        text.push(' ');
-        text.push_str(units);
+        value_text
     }
-    text
+}
+
+fn format_standard_metric_parts(
+    config: &RenderConfig,
+    value_config: &ValueConfig,
+    raw: Option<f64>,
+) -> (String, Option<String>, Option<MetricIconKind>) {
+    let kind = value_config.value;
+    let display_unit = resolved_standard_metric_display_unit(kind, value_config);
+    let decimals = match standard_metric_formatter(kind) {
+        Some(StandardMetricFormatterKind::Decimal) => {
+            effective_decimals(config, value_config, Some(1))
+        }
+        Some(StandardMetricFormatterKind::Balance) => {
+            effective_decimals(config, value_config, Some(0))
+        }
+        _ => effective_decimals(config, value_config, Some(0)),
+    };
+    let show_units = standard_metric_show_units(kind, value_config.show_units);
+    let unit_text = show_units.then(|| standard_metric_unit_label(kind, display_unit).to_string());
+    let value_text = match standard_metric_formatter(kind) {
+        Some(StandardMetricFormatterKind::Speed) => raw
+            .map(|speed_mps| {
+                let factor = match display_unit.unwrap_or("kmh") {
+                    "mph" | "imperial" => 2.23694,
+                    "kn" => 1.943844,
+                    "mps" => 1.0,
+                    _ => 3.6,
+                };
+                format_number(speed_mps * factor, decimals)
+            })
+            .unwrap_or_else(|| "--".to_string()),
+        Some(StandardMetricFormatterKind::Temperature) => raw
+            .map(|temp_c| {
+                let resolved = if display_unit == Some("fahrenheit") {
+                    (temp_c * 9.0 / 5.0) + 32.0
+                } else {
+                    temp_c
+                };
+                format_number(resolved, decimals)
+            })
+            .unwrap_or_else(|| "--".to_string()),
+        Some(StandardMetricFormatterKind::Pace) => raw
+            .map(|seconds_per_km| {
+                let total_seconds = if display_unit == Some("min_per_mi") {
+                    seconds_per_km * 1.609_344
+                } else {
+                    seconds_per_km
+                };
+                format_pace_value(total_seconds)
+            })
+            .unwrap_or_else(|| "--".to_string()),
+        Some(StandardMetricFormatterKind::Integer) => raw
+            .map(|value| format_number(convert_standard_metric_value(kind, display_unit, value), decimals))
+            .unwrap_or_else(|| "--".to_string()),
+        Some(StandardMetricFormatterKind::Decimal) => raw
+            .map(|value| format_number(convert_standard_metric_value(kind, display_unit, value), decimals))
+            .unwrap_or_else(|| "--".to_string()),
+        Some(StandardMetricFormatterKind::Balance) => raw
+            .map(|left_value| format_balance_value(left_value, decimals))
+            .unwrap_or_else(|| "--".to_string()),
+        None => "--".to_string(),
+    };
+
+    (value_text, unit_text, metric_icon_kind_for_metric(kind))
 }
 
 // Formats elevation, converting to feet for imperial templates.
@@ -479,8 +518,7 @@ fn format_number(value: f64, decimals: usize) -> String {
     text
 }
 
-// Resolves the configured speed unit key.
-fn standard_metric_display_unit<'a>(
+fn resolved_standard_metric_display_unit<'a>(
     kind: MetricKind,
     value_config: &'a ValueConfig,
 ) -> Option<&'a str> {
@@ -490,56 +528,89 @@ fn standard_metric_display_unit<'a>(
         .or(standard_metric_default_display_unit(kind))
 }
 
-fn standard_metric_default_display_unit(kind: MetricKind) -> Option<&'static str> {
+fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, value: f64) -> f64 {
     match kind {
-        MetricKind::Speed => Some("kmh"),
-        MetricKind::Heartrate => Some("bpm"),
-        MetricKind::Cadence => Some("rpm"),
-        MetricKind::Power => Some("w"),
-        MetricKind::Temperature => Some("celsius"),
-        _ => None,
-    }
-}
-
-fn standard_metric_show_units(kind: MetricKind, value_config: &ValueConfig) -> bool {
-    value_config
-        .show_units
-        .unwrap_or(standard_metric_default_show_units(kind))
-}
-
-fn standard_metric_default_show_units(kind: MetricKind) -> bool {
-    matches!(kind, MetricKind::Speed | MetricKind::Temperature)
-}
-
-fn standard_metric_unit_label(kind: MetricKind, value_config: &ValueConfig) -> &'static str {
-    match kind {
-        MetricKind::Speed => {
-            match standard_metric_display_unit(kind, value_config).unwrap_or("kmh") {
-                "mph" | "imperial" => "MPH",
-                "kn" => "KN",
-                "mps" => "M/S",
-                _ => "KM/H",
-            }
-        }
-        MetricKind::Heartrate => "BPM",
-        MetricKind::Cadence => "RPM",
-        MetricKind::Power => "W",
-        MetricKind::Temperature => {
-            if standard_metric_display_unit(kind, value_config) == Some("fahrenheit") {
-                "\u{00B0}F"
+        MetricKind::Heartrate
+        | MetricKind::Cadence
+        | MetricKind::Power
+        | MetricKind::GroundContactTime
+        | MetricKind::StrokeRate
+        | MetricKind::GearPosition
+        | MetricKind::VerticalRatio => value,
+        MetricKind::GForce => {
+            if display_unit == Some("mps2") {
+                value * 9.806_65
             } else {
-                "\u{00B0}C"
+                value
             }
         }
-        _ => "",
+        MetricKind::AirPressure => match display_unit.unwrap_or("hpa") {
+            "inhg" => value * 29.529_983_071_4,
+            "mmhg" => value * 750.061_561_303,
+            "mbar" => value * 1000.0,
+            _ => value * 1000.0,
+        },
+        MetricKind::StrideLength => match display_unit.unwrap_or("m") {
+            "cm" => value * 100.0,
+            "ft" => value * 3.280_84,
+            "in" => value * 39.370_1,
+            _ => value,
+        },
+        MetricKind::Torque => value,
+        MetricKind::VerticalSpeed => match display_unit.unwrap_or("mps") {
+            "ftmin" => value * 196.850_394,
+            "mph_vertical" => value * 3600.0,
+            _ => value,
+        },
+        _ => value,
     }
 }
 
-// Formats a missing-value placeholder with optional unit text.
-fn missing_value_with_units(show_units: bool, units: &str) -> String {
-    if show_units {
-        format!("-- {units}")
-    } else {
-        "--".to_string()
+fn format_pace_value(total_seconds: f64) -> String {
+    if !total_seconds.is_finite() || total_seconds < 0.0 {
+        return "--".to_string();
+    }
+    let rounded_seconds = total_seconds.round().max(0.0) as i64;
+    let minutes = rounded_seconds / 60;
+    let seconds = rounded_seconds % 60;
+    format!("{minutes}:{seconds:02}")
+}
+
+fn format_balance_value(left_value: f64, decimals: usize) -> String {
+    let left = left_value.clamp(0.0, 100.0);
+    let right = (100.0 - left).clamp(0.0, 100.0);
+    format!("{}/{}", format_number(left, decimals), format_number(right, decimals))
+}
+
+fn metric_icon_kind_for_metric(kind: MetricKind) -> Option<MetricIconKind> {
+    match metric_icon_asset_key(kind)? {
+        crate::standard_metrics::MetricIconAssetKey::Speed => Some(MetricIconKind::Gauge),
+        crate::standard_metrics::MetricIconAssetKey::Heartrate => Some(MetricIconKind::Heart),
+        crate::standard_metrics::MetricIconAssetKey::Cadence => Some(MetricIconKind::RefreshCw),
+        crate::standard_metrics::MetricIconAssetKey::Power => Some(MetricIconKind::Zap),
+        crate::standard_metrics::MetricIconAssetKey::Time => Some(MetricIconKind::Clock3),
+        crate::standard_metrics::MetricIconAssetKey::Temperature => Some(MetricIconKind::Thermometer),
+        crate::standard_metrics::MetricIconAssetKey::CoreTemperature => {
+            Some(MetricIconKind::CoreTemperature)
+        }
+        crate::standard_metrics::MetricIconAssetKey::Pace => Some(MetricIconKind::Footprints),
+        crate::standard_metrics::MetricIconAssetKey::AirPressure => Some(MetricIconKind::Wind),
+        crate::standard_metrics::MetricIconAssetKey::LeftRightBalance => Some(MetricIconKind::Scale),
+        crate::standard_metrics::MetricIconAssetKey::StrideLength => Some(MetricIconKind::Ruler),
+        crate::standard_metrics::MetricIconAssetKey::StrokeRate => Some(MetricIconKind::Waves),
+        crate::standard_metrics::MetricIconAssetKey::VerticalSpeed => {
+            Some(MetricIconKind::TrendingUp)
+        }
+        crate::standard_metrics::MetricIconAssetKey::VerticalRatio => {
+            Some(MetricIconKind::Percent)
+        }
+        crate::standard_metrics::MetricIconAssetKey::GForce => Some(MetricIconKind::GForce),
+        crate::standard_metrics::MetricIconAssetKey::GroundContactTime => {
+            Some(MetricIconKind::GroundContactTime)
+        }
+        crate::standard_metrics::MetricIconAssetKey::Torque => Some(MetricIconKind::Torque),
+        crate::standard_metrics::MetricIconAssetKey::GearPosition => {
+            Some(MetricIconKind::GearPosition)
+        }
     }
 }

@@ -27,6 +27,18 @@ fn metric_kind_round_trip_all_variants() {
         (MetricKind::Cadence, r#""cadence""#),
         (MetricKind::Power, r#""power""#),
         (MetricKind::Temperature, r#""temperature""#),
+        (MetricKind::Pace, r#""pace""#),
+        (MetricKind::GForce, r#""g_force""#),
+        (MetricKind::AirPressure, r#""air_pressure""#),
+        (MetricKind::GroundContactTime, r#""ground_contact_time""#),
+        (MetricKind::LeftRightBalance, r#""left_right_balance""#),
+        (MetricKind::StrideLength, r#""stride_length""#),
+        (MetricKind::StrokeRate, r#""stroke_rate""#),
+        (MetricKind::Torque, r#""torque""#),
+        (MetricKind::VerticalSpeed, r#""vertical_speed""#),
+        (MetricKind::GearPosition, r#""gear_position""#),
+        (MetricKind::VerticalRatio, r#""vertical_ratio""#),
+        (MetricKind::CoreTemperature, r#""core_temperature""#),
     ];
 
     for (kind, expected_json) in cases {

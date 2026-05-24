@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 
 import { Type } from 'lucide-react'
+import { STANDARD_METRIC_WIDGET_TYPES, getStandardMetricDefinition } from './standard-metrics'
 import { METRIC_ICON_SVGS } from './widget-icon-data'
 
 export { METRIC_ICON_SVGS }
@@ -22,30 +23,19 @@ export function WidgetIcon({ type, className, ...props }) {
     />
   )
 }
-// General widget labels used throughout the app
+
+const STANDARD_METRIC_TYPE_LABELS = Object.fromEntries(
+  STANDARD_METRIC_WIDGET_TYPES.map((type) => [type, getStandardMetricDefinition(type)?.label || type]),
+)
+
+// General widget labels used throughout the app.
 export const TYPE_LABELS = {
   label: 'Text',
-  air_pressure: 'Air Pressure',
-  cadence: 'Cadence',
-  core_temperature: 'Core Temperature',
   course: 'Route Map',
   elevation: 'Elevation',
-  g_force: 'G-Force',
-  gear_position: 'Gear Position',
   gradient: 'Gradient',
-  ground_contact_time: 'Ground Contact Time',
-  heartrate: 'Heart Rate',
-  left_right_balance: 'Left/Right Balance',
-  pace: 'Pace',
-  power: 'Power',
-  speed: 'Speed',
-  stride_length: 'Stride Length',
-  stroke_rate: 'Stroke Rate',
-  temperature: 'Temperature',
   time: 'Time',
-  torque: 'Torque',
-  vertical_ratio: 'Vertical Ratio',
-  vertical_speed: 'Vertical Speed',
+  ...STANDARD_METRIC_TYPE_LABELS,
 }
 
 // Labels for the widget drawer, which may be shorter than the general labels

@@ -28,6 +28,8 @@ pub mod paths;
 pub mod rdp;
 /// Skia-based overlay rendering.
 pub mod render;
+/// Shared standard-metric widget definitions.
+pub mod standard_metrics;
 /// Cross-cutting domain types (MetricKind, etc.) shared by config, render, and activity.
 pub mod types;
 

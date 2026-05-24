@@ -68,6 +68,26 @@ export function formatTemperature(value, unit) {
   }
 }
 
+export function formatPace(value, unit) {
+  if (value === null || value === undefined) {
+    return {
+      value: '--',
+      units: unit === 'min_per_mi' ? 'MIN/MI' : 'MIN/KM',
+    }
+  }
+
+  const numericValue = Number(value)
+  const totalSeconds = unit === 'min_per_mi' ? numericValue * 1.609344 : numericValue
+  const roundedSeconds = Math.max(Math.round(totalSeconds), 0)
+  const minutes = Math.floor(roundedSeconds / 60)
+  const seconds = roundedSeconds % 60
+
+  return {
+    value: `${minutes}:${String(seconds).padStart(2, '0')}`,
+    units: unit === 'min_per_mi' ? 'MIN/MI' : 'MIN/KM',
+  }
+}
+
 function formatRoundedMetric(value, units, decimals = 0) {
   if (value === null || value === undefined) {
     return {
@@ -82,6 +102,67 @@ function formatRoundedMetric(value, units, decimals = 0) {
   return {
     value: roundedValue,
     units,
+  }
+}
+
+function convertStandardMetricValue(type, value, displayUnit) {
+  const numericValue = Number(value)
+
+  switch (type) {
+    case 'g_force':
+      return displayUnit === 'mps2' ? numericValue * 9.80665 : numericValue
+    case 'air_pressure':
+      switch (displayUnit) {
+        case 'inhg':
+          return numericValue * 29.5299830714
+        case 'mmhg':
+          return numericValue * 750.061561303
+        case 'mbar':
+        case 'hpa':
+        default:
+          return numericValue * 1000
+      }
+    case 'stride_length':
+      switch (displayUnit) {
+        case 'cm':
+          return numericValue * 100
+        case 'ft':
+          return numericValue * 3.28084
+        case 'in':
+          return numericValue * 39.3701
+        default:
+          return numericValue
+      }
+    case 'vertical_speed':
+      switch (displayUnit) {
+        case 'ftmin':
+          return numericValue * 196.850394
+        case 'mph_vertical':
+          return numericValue * 3600
+        default:
+          return numericValue
+      }
+    default:
+      return numericValue
+  }
+}
+
+function formatBalance(value, decimals = 0) {
+  if (value === null || value === undefined) {
+    return {
+      value: '--',
+      units: '%',
+    }
+  }
+
+  const leftValue = Math.min(Math.max(Number(value), 0), 100)
+  const rightValue = Math.min(Math.max(100 - leftValue, 0), 100)
+  const leftText = decimals > 0 ? leftValue.toFixed(decimals).replace(/\.?0+$/, '') : Math.round(leftValue).toString()
+  const rightText = decimals > 0 ? rightValue.toFixed(decimals).replace(/\.?0+$/, '') : Math.round(rightValue).toString()
+
+  return {
+    value: `${leftText}/${rightText}`,
+    units: '%',
   }
 }
 
@@ -105,7 +186,19 @@ export function formatStandardMetricDisplay(type, value, widgetData = {}) {
     return formatTemperature(value, displayUnit)
   }
 
-  return formatRoundedMetric(value, unitLabel, widgetData.decimals ?? 0)
+  if (definition.formatter === 'pace') {
+    return formatPace(value, displayUnit)
+  }
+
+  if (definition.formatter === 'balance') {
+    return formatBalance(value, widgetData.decimals ?? 0)
+  }
+
+  return formatRoundedMetric(
+    value === null || value === undefined ? value : convertStandardMetricValue(type, value, displayUnit),
+    unitLabel,
+    widgetData.decimals ?? (definition.formatter === 'decimal' ? 1 : 0),
+  )
 }
 
 function padNumber(value) {

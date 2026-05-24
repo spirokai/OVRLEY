@@ -1,8 +1,8 @@
 //! MetricKind behavior tests.
 //!
-//! Verifies all eight `MetricKind` variants have distinct serde names,
+//! Verifies all `MetricKind` variants have distinct serde names,
 //! individually round-trip through JSON, and the total variant count
-//! stays at eight (guarding against accidental additions or removals).
+//! stays stable (guarding against accidental additions or removals).
 //!
 //! ## Type
 //! Unit test. Pure Rust — no I/O, no fixtures.
@@ -26,6 +26,18 @@ fn all_metrics_have_distinct_serde_names() {
         MetricKind::Cadence,
         MetricKind::Power,
         MetricKind::Temperature,
+        MetricKind::Pace,
+        MetricKind::GForce,
+        MetricKind::AirPressure,
+        MetricKind::GroundContactTime,
+        MetricKind::LeftRightBalance,
+        MetricKind::StrideLength,
+        MetricKind::StrokeRate,
+        MetricKind::Torque,
+        MetricKind::VerticalSpeed,
+        MetricKind::GearPosition,
+        MetricKind::VerticalRatio,
+        MetricKind::CoreTemperature,
     ]
     .iter()
     .map(|k| serde_json::to_string(k).unwrap())
@@ -40,7 +52,7 @@ fn all_metrics_have_distinct_serde_names() {
 }
 
 #[test]
-fn metric_kind_count_is_eight() {
+fn metric_kind_count_is_twenty() {
     let all = [
         MetricKind::Speed,
         MetricKind::Heartrate,
@@ -50,8 +62,20 @@ fn metric_kind_count_is_eight() {
         MetricKind::Cadence,
         MetricKind::Power,
         MetricKind::Temperature,
+        MetricKind::Pace,
+        MetricKind::GForce,
+        MetricKind::AirPressure,
+        MetricKind::GroundContactTime,
+        MetricKind::LeftRightBalance,
+        MetricKind::StrideLength,
+        MetricKind::StrokeRate,
+        MetricKind::Torque,
+        MetricKind::VerticalSpeed,
+        MetricKind::GearPosition,
+        MetricKind::VerticalRatio,
+        MetricKind::CoreTemperature,
     ];
-    assert_eq!(all.len(), 8);
+    assert_eq!(all.len(), 20);
 }
 
 #[test]
@@ -65,6 +89,18 @@ fn each_variant_roundtrips_individually() {
         MetricKind::Cadence,
         MetricKind::Power,
         MetricKind::Temperature,
+        MetricKind::Pace,
+        MetricKind::GForce,
+        MetricKind::AirPressure,
+        MetricKind::GroundContactTime,
+        MetricKind::LeftRightBalance,
+        MetricKind::StrideLength,
+        MetricKind::StrokeRate,
+        MetricKind::Torque,
+        MetricKind::VerticalSpeed,
+        MetricKind::GearPosition,
+        MetricKind::VerticalRatio,
+        MetricKind::CoreTemperature,
     ];
     for kind in all {
         let json = serde_json::to_string(&kind).unwrap();

@@ -6,6 +6,7 @@ import {
   getStandardMetricDefinition,
   isStandardMetricWidgetType,
 } from '@/lib/standard-metrics'
+import { TYPE_LABELS } from '@/lib/widget-icons'
 
 describe('standard metric widget catalog', () => {
   test('covers the existing shared standard metric widgets', () => {
@@ -52,5 +53,11 @@ describe('standard metric widget catalog', () => {
     expect(isStandardMetricWidgetType('time')).toBe(false)
     expect(isStandardMetricWidgetType('gradient')).toBe(false)
     expect(isStandardMetricWidgetType('course')).toBe(false)
+  })
+
+  test('feeds standard metric labels into shared widget label lookups', () => {
+    expect(TYPE_LABELS.speed).toBe(getStandardMetricDefinition('speed').label)
+    expect(TYPE_LABELS.pace).toBe(getStandardMetricDefinition('pace').label)
+    expect(TYPE_LABELS.core_temperature).toBe(getStandardMetricDefinition('core_temperature').label)
   })
 })

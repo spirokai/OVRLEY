@@ -257,6 +257,150 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
+        pace: if requirements.pace {
+            trim_numeric_series(
+                elapsed,
+                &activity.pace,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        g_force: if requirements.g_force {
+            trim_numeric_series(
+                elapsed,
+                &activity.g_force,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        air_pressure: if requirements.air_pressure {
+            trim_numeric_series(
+                elapsed,
+                &activity.air_pressure,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        ground_contact_time: if requirements.ground_contact_time {
+            trim_numeric_series(
+                elapsed,
+                &activity.ground_contact_time,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        left_right_balance: if requirements.left_right_balance {
+            trim_numeric_series(
+                elapsed,
+                &activity.left_right_balance,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        stride_length: if requirements.stride_length {
+            trim_numeric_series(
+                elapsed,
+                &activity.stride_length,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        stroke_rate: if requirements.stroke_rate {
+            trim_numeric_series(
+                elapsed,
+                &activity.stroke_rate,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        torque: if requirements.torque {
+            trim_numeric_series(
+                elapsed,
+                &activity.torque,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        vertical_speed: if requirements.vertical_speed {
+            trim_numeric_series(
+                elapsed,
+                &activity.vertical_speed,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        gear_position: if requirements.gear_position {
+            trim_numeric_series(
+                elapsed,
+                &activity.gear_position,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        vertical_ratio: if requirements.vertical_ratio {
+            trim_numeric_series(
+                elapsed,
+                &activity.vertical_ratio,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        core_temperature: if requirements.core_temperature {
+            trim_numeric_series(
+                elapsed,
+                &activity.core_temperature,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
         gradient: if requirements.gradient {
             trim_numeric_series(
                 elapsed,
