@@ -1,0 +1,282 @@
+{
+  "definitions": [
+    {
+      "type": "speed",
+      "current": true,
+      "label": "Speed",
+      "defaultDisplayUnit": "kmh",
+      "supportedDisplayUnits": [
+        { "value": "kmh", "label": "km/h", "renderLabel": "KM/H" },
+        { "value": "mph", "label": "mph", "renderLabel": "MPH" },
+        { "value": "kn", "label": "kn", "renderLabel": "KN" },
+        { "value": "mps", "label": "m/s", "renderLabel": "M/S" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "speed",
+      "icon": {
+        "source": "shared",
+        "assetFile": "widget-speed.svg"
+      }
+    },
+    {
+      "type": "heartrate",
+      "current": true,
+      "label": "Heart Rate",
+      "defaultDisplayUnit": "bpm",
+      "supportedDisplayUnits": [
+        { "value": "bpm", "label": "BPM" }
+      ],
+      "showUnitsByDefault": false,
+      "formatter": "integer",
+      "icon": {
+        "source": "shared",
+        "assetFile": "widget-heartrate.svg"
+      }
+    },
+    {
+      "type": "cadence",
+      "current": true,
+      "label": "Cadence",
+      "defaultDisplayUnit": "rpm",
+      "supportedDisplayUnits": [
+        { "value": "rpm", "label": "RPM" }
+      ],
+      "showUnitsByDefault": false,
+      "formatter": "integer",
+      "icon": {
+        "source": "shared",
+        "assetFile": "widget-cadence.svg"
+      }
+    },
+    {
+      "type": "power",
+      "current": true,
+      "label": "Power",
+      "defaultDisplayUnit": "w",
+      "supportedDisplayUnits": [
+        { "value": "w", "label": "W" }
+      ],
+      "showUnitsByDefault": false,
+      "formatter": "integer",
+      "icon": {
+        "source": "shared",
+        "assetFile": "widget-power.svg"
+      }
+    },
+    {
+      "type": "temperature",
+      "current": true,
+      "label": "Temperature",
+      "defaultDisplayUnit": "celsius",
+      "supportedDisplayUnits": [
+        { "value": "celsius", "label": "\u00B0C" },
+        { "value": "fahrenheit", "label": "\u00B0F" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "temperature",
+      "icon": {
+        "source": "shared",
+        "assetFile": "widget-temperature.svg"
+      }
+    },
+    {
+      "type": "pace",
+      "current": false,
+      "label": "Pace",
+      "defaultDisplayUnit": "min_per_km",
+      "supportedDisplayUnits": [
+        { "value": "min_per_km", "label": "min/km", "renderLabel": "MIN/KM" },
+        { "value": "min_per_mi", "label": "min/mi", "renderLabel": "MIN/MI" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "pace",
+      "icon": {
+        "source": "lucide",
+        "name": "Footprints",
+        "assetFile": "widget-pace.svg"
+      }
+    },
+    {
+      "type": "g_force",
+      "current": false,
+      "label": "G-Force",
+      "defaultDisplayUnit": "g",
+      "supportedDisplayUnits": [
+        { "value": "g", "label": "g", "renderLabel": "G" },
+        { "value": "mps2", "label": "m/s^2", "renderLabel": "M/S^2" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-g-force.svg"
+      }
+    },
+    {
+      "type": "air_pressure",
+      "current": false,
+      "label": "Air Pressure",
+      "defaultDisplayUnit": "hpa",
+      "supportedDisplayUnits": [
+        { "value": "hpa", "label": "hPa", "renderLabel": "HPA" },
+        { "value": "mbar", "label": "mbar", "renderLabel": "MBAR" },
+        { "value": "inhg", "label": "inHg", "renderLabel": "INHG" },
+        { "value": "mmhg", "label": "mmHg", "renderLabel": "MMHG" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "integer",
+      "icon": {
+        "source": "lucide",
+        "name": "Wind",
+        "assetFile": "widget-air-pressure.svg"
+      }
+    },
+    {
+      "type": "ground_contact_time",
+      "current": false,
+      "label": "Ground Contact Time",
+      "defaultDisplayUnit": "ms",
+      "supportedDisplayUnits": [
+        { "value": "ms", "label": "ms", "renderLabel": "MS" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "integer",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-ground-contact-time.svg"
+      }
+    },
+    {
+      "type": "left_right_balance",
+      "current": false,
+      "label": "Left/Right Balance",
+      "defaultDisplayUnit": "percent",
+      "supportedDisplayUnits": [
+        { "value": "percent", "label": "52% / 48%", "renderLabel": "%" }
+      ],
+      "showUnitsByDefault": false,
+      "formatter": "balance",
+      "icon": {
+        "source": "lucide",
+        "name": "Scale",
+        "assetFile": "widget-left-right-balance.svg"
+      }
+    },
+    {
+      "type": "stride_length",
+      "current": false,
+      "label": "Stride Length",
+      "defaultDisplayUnit": "m",
+      "supportedDisplayUnits": [
+        { "value": "m", "label": "m", "renderLabel": "M" },
+        { "value": "cm", "label": "cm", "renderLabel": "CM" },
+        { "value": "ft", "label": "ft", "renderLabel": "FT" },
+        { "value": "in", "label": "in", "renderLabel": "IN" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "icon": {
+        "source": "lucide",
+        "name": "Ruler",
+        "assetFile": "widget-stride-length.svg"
+      }
+    },
+    {
+      "type": "stroke_rate",
+      "current": false,
+      "label": "Stroke Rate",
+      "defaultDisplayUnit": "spm",
+      "supportedDisplayUnits": [
+        { "value": "spm", "label": "SPM" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "integer",
+      "icon": {
+        "source": "lucide",
+        "name": "Waves",
+        "assetFile": "widget-stroke-rate.svg"
+      }
+    },
+    {
+      "type": "torque",
+      "current": false,
+      "label": "Torque",
+      "defaultDisplayUnit": "nm",
+      "supportedDisplayUnits": [
+        { "value": "nm", "label": "Nm", "renderLabel": "NM" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-torque.svg"
+      }
+    },
+    {
+      "type": "vertical_speed",
+      "current": false,
+      "label": "Vertical Speed",
+      "defaultDisplayUnit": "mps",
+      "supportedDisplayUnits": [
+        { "value": "mps", "label": "m/s", "renderLabel": "M/S" },
+        { "value": "ftmin", "label": "ft/min", "renderLabel": "FT/MIN" },
+        { "value": "mph_vertical", "label": "m/h", "renderLabel": "M/H" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "icon": {
+        "source": "lucide",
+        "name": "TrendingUp",
+        "assetFile": "widget-vertical-speed.svg"
+      }
+    },
+    {
+      "type": "gear_position",
+      "current": false,
+      "label": "Gear Position",
+      "defaultDisplayUnit": "gear",
+      "supportedDisplayUnits": [
+        { "value": "gear", "label": "Gear", "renderLabel": "GEAR" }
+      ],
+      "showUnitsByDefault": false,
+      "formatter": "integer",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-gear-position.svg"
+      }
+    },
+    {
+      "type": "vertical_ratio",
+      "current": false,
+      "label": "Vertical Ratio",
+      "defaultDisplayUnit": "percent",
+      "supportedDisplayUnits": [
+        { "value": "percent", "label": "%" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "icon": {
+        "source": "lucide",
+        "name": "Percent",
+        "assetFile": "widget-vertical-ratio.svg"
+      }
+    },
+    {
+      "type": "core_temperature",
+      "current": false,
+      "label": "Core Temperature",
+      "defaultDisplayUnit": "celsius",
+      "supportedDisplayUnits": [
+        { "value": "celsius", "label": "\u00B0C" },
+        { "value": "fahrenheit", "label": "\u00B0F" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "temperature",
+      "icon": {
+        "source": "lucide",
+        "name": "Thermometer",
+        "assetFile": "widget-core-temperature.svg"
+      }
+    }
+  ]
+}

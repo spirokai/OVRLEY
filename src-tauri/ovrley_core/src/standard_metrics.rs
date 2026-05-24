@@ -1,13 +1,17 @@
-//! Shared standard-metric widget definitions used by config, activity, and render.
+//! Shared standard-metric widget definitions loaded from the repo manifest.
 //!
-//! This module owns the backend contract for metadata-driven standard metrics:
-//! display-unit defaults, formatter families, default unit visibility, and
-//! shared SVG icon bindings. `time`, `gradient`, and `elevation` remain
-//! specialized render paths outside this contract.
+//! The canonical standard-metric contract lives in `assets/standard-metrics.json`
+//! so the frontend and backend share one source of truth for labels, display
+//! units, formatter families, and icon asset bindings. `time`, `gradient`, and
+//! `elevation` remain specialized render paths outside this contract.
 
 use crate::MetricKind;
+use serde::Deserialize;
+use std::collections::HashMap;
+use std::sync::OnceLock;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum StandardMetricFormatterKind {
     Speed,
     Temperature,
@@ -39,186 +43,130 @@ pub enum MetricIconAssetKey {
     GearPosition,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct StandardMetricDefinition {
-    pub kind: MetricKind,
-    pub label: &'static str,
-    pub default_display_unit: &'static str,
-    pub show_units_by_default: bool,
-    pub formatter: StandardMetricFormatterKind,
-    pub icon: MetricIconAssetKey,
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StandardMetricUnitOption {
+    pub value: String,
+    pub label: String,
+    #[serde(default)]
+    pub render_label: Option<String>,
 }
 
-pub const CURRENT_STANDARD_METRIC_KINDS: &[MetricKind] = &[
-    MetricKind::Speed,
-    MetricKind::Heartrate,
-    MetricKind::Cadence,
-    MetricKind::Power,
-    MetricKind::Temperature,
-];
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StandardMetricIconDefinition {
+    pub source: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    pub asset_file: String,
+}
 
-pub const STANDARD_METRIC_KINDS: &[MetricKind] = &[
-    MetricKind::Speed,
-    MetricKind::Heartrate,
-    MetricKind::Cadence,
-    MetricKind::Power,
-    MetricKind::Temperature,
-    MetricKind::Pace,
-    MetricKind::GForce,
-    MetricKind::AirPressure,
-    MetricKind::GroundContactTime,
-    MetricKind::LeftRightBalance,
-    MetricKind::StrideLength,
-    MetricKind::StrokeRate,
-    MetricKind::Torque,
-    MetricKind::VerticalSpeed,
-    MetricKind::GearPosition,
-    MetricKind::VerticalRatio,
-    MetricKind::CoreTemperature,
-];
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StandardMetricDefinition {
+    pub kind: MetricKind,
+    pub key: String,
+    pub current: bool,
+    pub label: String,
+    pub default_display_unit: String,
+    pub supported_display_units: Vec<StandardMetricUnitOption>,
+    pub show_units_by_default: bool,
+    pub formatter: StandardMetricFormatterKind,
+    pub icon: StandardMetricIconDefinition,
+}
 
-pub fn standard_metric_definition(kind: MetricKind) -> Option<StandardMetricDefinition> {
-    let definition = match kind {
-        MetricKind::Speed => StandardMetricDefinition {
-            kind,
-            label: "Speed",
-            default_display_unit: "kmh",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Speed,
-            icon: MetricIconAssetKey::Speed,
-        },
-        MetricKind::Heartrate => StandardMetricDefinition {
-            kind,
-            label: "Heart Rate",
-            default_display_unit: "bpm",
-            show_units_by_default: false,
-            formatter: StandardMetricFormatterKind::Integer,
-            icon: MetricIconAssetKey::Heartrate,
-        },
-        MetricKind::Cadence => StandardMetricDefinition {
-            kind,
-            label: "Cadence",
-            default_display_unit: "rpm",
-            show_units_by_default: false,
-            formatter: StandardMetricFormatterKind::Integer,
-            icon: MetricIconAssetKey::Cadence,
-        },
-        MetricKind::Power => StandardMetricDefinition {
-            kind,
-            label: "Power",
-            default_display_unit: "w",
-            show_units_by_default: false,
-            formatter: StandardMetricFormatterKind::Integer,
-            icon: MetricIconAssetKey::Power,
-        },
-        MetricKind::Temperature => StandardMetricDefinition {
-            kind,
-            label: "Temperature",
-            default_display_unit: "celsius",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Temperature,
-            icon: MetricIconAssetKey::Temperature,
-        },
-        MetricKind::Pace => StandardMetricDefinition {
-            kind,
-            label: "Pace",
-            default_display_unit: "min_per_km",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Pace,
-            icon: MetricIconAssetKey::Pace,
-        },
-        MetricKind::GForce => StandardMetricDefinition {
-            kind,
-            label: "G-Force",
-            default_display_unit: "g",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Decimal,
-            icon: MetricIconAssetKey::GForce,
-        },
-        MetricKind::AirPressure => StandardMetricDefinition {
-            kind,
-            label: "Air Pressure",
-            default_display_unit: "hpa",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Integer,
-            icon: MetricIconAssetKey::AirPressure,
-        },
-        MetricKind::GroundContactTime => StandardMetricDefinition {
-            kind,
-            label: "Ground Contact Time",
-            default_display_unit: "ms",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Integer,
-            icon: MetricIconAssetKey::GroundContactTime,
-        },
-        MetricKind::LeftRightBalance => StandardMetricDefinition {
-            kind,
-            label: "Left/Right Balance",
-            default_display_unit: "percent",
-            show_units_by_default: false,
-            formatter: StandardMetricFormatterKind::Balance,
-            icon: MetricIconAssetKey::LeftRightBalance,
-        },
-        MetricKind::StrideLength => StandardMetricDefinition {
-            kind,
-            label: "Stride Length",
-            default_display_unit: "m",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Decimal,
-            icon: MetricIconAssetKey::StrideLength,
-        },
-        MetricKind::StrokeRate => StandardMetricDefinition {
-            kind,
-            label: "Stroke Rate",
-            default_display_unit: "spm",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Integer,
-            icon: MetricIconAssetKey::StrokeRate,
-        },
-        MetricKind::Torque => StandardMetricDefinition {
-            kind,
-            label: "Torque",
-            default_display_unit: "nm",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Decimal,
-            icon: MetricIconAssetKey::Torque,
-        },
-        MetricKind::VerticalSpeed => StandardMetricDefinition {
-            kind,
-            label: "Vertical Speed",
-            default_display_unit: "mps",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Decimal,
-            icon: MetricIconAssetKey::VerticalSpeed,
-        },
-        MetricKind::GearPosition => StandardMetricDefinition {
-            kind,
-            label: "Gear Position",
-            default_display_unit: "gear",
-            show_units_by_default: false,
-            formatter: StandardMetricFormatterKind::Integer,
-            icon: MetricIconAssetKey::GearPosition,
-        },
-        MetricKind::VerticalRatio => StandardMetricDefinition {
-            kind,
-            label: "Vertical Ratio",
-            default_display_unit: "percent",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Decimal,
-            icon: MetricIconAssetKey::VerticalRatio,
-        },
-        MetricKind::CoreTemperature => StandardMetricDefinition {
-            kind,
-            label: "Core Temperature",
-            default_display_unit: "celsius",
-            show_units_by_default: true,
-            formatter: StandardMetricFormatterKind::Temperature,
-            icon: MetricIconAssetKey::CoreTemperature,
-        },
-        _ => return None,
-    };
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawStandardMetricDefinition {
+    #[serde(rename = "type")]
+    key: String,
+    current: bool,
+    label: String,
+    default_display_unit: String,
+    supported_display_units: Vec<StandardMetricUnitOption>,
+    show_units_by_default: bool,
+    formatter: StandardMetricFormatterKind,
+    icon: StandardMetricIconDefinition,
+}
 
-    Some(definition)
+#[derive(Clone, Debug, Deserialize)]
+struct RawStandardMetricManifest {
+    definitions: Vec<RawStandardMetricDefinition>,
+}
+
+#[derive(Clone, Debug)]
+struct StandardMetricManifest {
+    definitions: HashMap<MetricKind, StandardMetricDefinition>,
+}
+
+static STANDARD_METRIC_MANIFEST: OnceLock<StandardMetricManifest> = OnceLock::new();
+
+fn manifest() -> &'static StandardMetricManifest {
+    STANDARD_METRIC_MANIFEST.get_or_init(load_manifest)
+}
+
+fn load_manifest() -> StandardMetricManifest {
+    let raw = serde_json::from_str::<RawStandardMetricManifest>(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../assets/standard-metrics.json"
+    )))
+    .expect("shared standard metrics manifest must be valid JSON");
+
+    let definitions = raw
+        .definitions
+        .into_iter()
+        .map(|definition| {
+            let kind = metric_kind_from_key(&definition.key).unwrap_or_else(|| {
+                panic!(
+                    "shared standard metrics manifest contains unknown metric type: {}",
+                    definition.key
+                )
+            });
+
+            (
+                kind,
+                StandardMetricDefinition {
+                    kind,
+                    key: definition.key,
+                    current: definition.current,
+                    label: definition.label,
+                    default_display_unit: definition.default_display_unit,
+                    supported_display_units: definition.supported_display_units,
+                    show_units_by_default: definition.show_units_by_default,
+                    formatter: definition.formatter,
+                    icon: definition.icon,
+                },
+            )
+        })
+        .collect();
+
+    StandardMetricManifest { definitions }
+}
+
+fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
+    match key {
+        "speed" => Some(MetricKind::Speed),
+        "heartrate" => Some(MetricKind::Heartrate),
+        "cadence" => Some(MetricKind::Cadence),
+        "power" => Some(MetricKind::Power),
+        "temperature" => Some(MetricKind::Temperature),
+        "pace" => Some(MetricKind::Pace),
+        "g_force" => Some(MetricKind::GForce),
+        "air_pressure" => Some(MetricKind::AirPressure),
+        "ground_contact_time" => Some(MetricKind::GroundContactTime),
+        "left_right_balance" => Some(MetricKind::LeftRightBalance),
+        "stride_length" => Some(MetricKind::StrideLength),
+        "stroke_rate" => Some(MetricKind::StrokeRate),
+        "torque" => Some(MetricKind::Torque),
+        "vertical_speed" => Some(MetricKind::VerticalSpeed),
+        "gear_position" => Some(MetricKind::GearPosition),
+        "vertical_ratio" => Some(MetricKind::VerticalRatio),
+        "core_temperature" => Some(MetricKind::CoreTemperature),
+        _ => None,
+    }
+}
+
+pub fn standard_metric_definition(kind: MetricKind) -> Option<&'static StandardMetricDefinition> {
+    manifest().definitions.get(&kind)
 }
 
 pub fn is_standard_metric(kind: MetricKind) -> bool {
@@ -226,7 +174,7 @@ pub fn is_standard_metric(kind: MetricKind) -> bool {
 }
 
 pub fn standard_metric_default_display_unit(kind: MetricKind) -> Option<&'static str> {
-    standard_metric_definition(kind).map(|definition| definition.default_display_unit)
+    standard_metric_definition(kind).map(|definition| definition.default_display_unit.as_str())
 }
 
 pub fn standard_metric_show_units(kind: MetricKind, configured: Option<bool>) -> bool {
@@ -246,66 +194,39 @@ pub fn metric_icon_asset_key(kind: MetricKind) -> Option<MetricIconAssetKey> {
         return Some(MetricIconAssetKey::Time);
     }
 
-    standard_metric_definition(kind).map(|definition| definition.icon)
+    match standard_metric_definition(kind)?.icon.asset_file.as_str() {
+        "widget-speed.svg" => Some(MetricIconAssetKey::Speed),
+        "widget-heartrate.svg" => Some(MetricIconAssetKey::Heartrate),
+        "widget-cadence.svg" => Some(MetricIconAssetKey::Cadence),
+        "widget-power.svg" => Some(MetricIconAssetKey::Power),
+        "widget-temperature.svg" => Some(MetricIconAssetKey::Temperature),
+        "widget-pace.svg" => Some(MetricIconAssetKey::Pace),
+        "widget-air-pressure.svg" => Some(MetricIconAssetKey::AirPressure),
+        "widget-left-right-balance.svg" => Some(MetricIconAssetKey::LeftRightBalance),
+        "widget-stride-length.svg" => Some(MetricIconAssetKey::StrideLength),
+        "widget-stroke-rate.svg" => Some(MetricIconAssetKey::StrokeRate),
+        "widget-vertical-speed.svg" => Some(MetricIconAssetKey::VerticalSpeed),
+        "widget-vertical-ratio.svg" => Some(MetricIconAssetKey::VerticalRatio),
+        "widget-core-temperature.svg" => Some(MetricIconAssetKey::CoreTemperature),
+        "widget-g-force.svg" => Some(MetricIconAssetKey::GForce),
+        "widget-ground-contact-time.svg" => Some(MetricIconAssetKey::GroundContactTime),
+        "widget-torque.svg" => Some(MetricIconAssetKey::Torque),
+        "widget-gear-position.svg" => Some(MetricIconAssetKey::GearPosition),
+        _ => None,
+    }
 }
 
 pub fn standard_metric_unit_label(kind: MetricKind, display_unit: Option<&str>) -> &'static str {
-    let resolved = display_unit.or(standard_metric_default_display_unit(kind));
+    let definition = match standard_metric_definition(kind) {
+        Some(definition) => definition,
+        None => return "",
+    };
+    let resolved = display_unit.unwrap_or(definition.default_display_unit.as_str());
 
-    match kind {
-        MetricKind::Speed => match resolved.unwrap_or("kmh") {
-            "mph" | "imperial" => "MPH",
-            "kn" => "KN",
-            "mps" => "M/S",
-            _ => "KM/H",
-        },
-        MetricKind::Heartrate => "BPM",
-        MetricKind::Cadence => "RPM",
-        MetricKind::Power => "W",
-        MetricKind::Temperature | MetricKind::CoreTemperature => {
-            if resolved == Some("fahrenheit") {
-                "\u{00B0}F"
-            } else {
-                "\u{00B0}C"
-            }
-        }
-        MetricKind::Pace => {
-            if resolved == Some("min_per_mi") {
-                "MIN/MI"
-            } else {
-                "MIN/KM"
-            }
-        }
-        MetricKind::GForce => {
-            if resolved == Some("mps2") {
-                "M/S^2"
-            } else {
-                "G"
-            }
-        }
-        MetricKind::AirPressure => match resolved.unwrap_or("hpa") {
-            "inhg" => "INHG",
-            "mmhg" => "MMHG",
-            "mbar" => "MBAR",
-            _ => "HPA",
-        },
-        MetricKind::GroundContactTime => "MS",
-        MetricKind::LeftRightBalance => "%",
-        MetricKind::StrideLength => match resolved.unwrap_or("m") {
-            "cm" => "CM",
-            "ft" => "FT",
-            "in" => "IN",
-            _ => "M",
-        },
-        MetricKind::StrokeRate => "SPM",
-        MetricKind::Torque => "NM",
-        MetricKind::VerticalSpeed => match resolved.unwrap_or("mps") {
-            "ftmin" => "FT/MIN",
-            "mph_vertical" => "M/H",
-            _ => "M/S",
-        },
-        MetricKind::GearPosition => "GEAR",
-        MetricKind::VerticalRatio => "%",
-        _ => "",
-    }
+    definition
+        .supported_display_units
+        .iter()
+        .find(|option| option.value == resolved)
+        .map(|option| option.render_label.as_deref().unwrap_or(option.label.as_str()))
+        .unwrap_or("")
 }

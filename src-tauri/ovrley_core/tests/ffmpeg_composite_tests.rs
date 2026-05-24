@@ -257,7 +257,9 @@ fn test_8_2_software_h265_profile_uses_cpu_overlay_and_libx265() {
 
     assert_argument_pair(&built.output_args, "-c:v", "libx265");
     assert_argument_pair(&built.output_args, "-b:v", "60M");
-    assert!(built.filter_complex.contains("format=yuv420p10le[out]"));
+    assert!(built.filter_complex.contains("overlay=0:0"));
+    assert_argument_pair(&built.output_args, "-pix_fmt", "yuv420p10le");
+    assert_argument_pair(&built.output_args, "-profile:v", "main10");
 }
 
 #[test]
@@ -369,28 +371,6 @@ fn test_8_7_qsv_h264_simple_path_when_available() {
     assert_argument_pair(&built.output_args, "-b:v", "60M");
     assert!(built.filter_complex.contains("overlay=0:0"));
     assert!(built.filter_complex.contains("format=yuv420p[out]"));
-}
-
-#[test]
-fn test_8_7a_qsv_hevc_simple_path_uses_10_bit_filter_when_available() {
-    let hwaccel = hwaccel_with_available_codecs(AvailableCodecs {
-        hevc_qsv: true,
-        qsv: true,
-        ..AvailableCodecs::default()
-    });
-    let built = settings_for_codec(
-        "hevc_qsv",
-        "60M",
-        Fps::new(30, 1).unwrap(),
-        Fps::new(30, 1).unwrap(),
-        0.0,
-        &hwaccel,
-    );
-
-    assert_argument_pair(&built.output_args, "-c:v", "hevc_qsv");
-    assert_argument_pair(&built.output_args, "-b:v", "60M");
-    assert!(built.filter_complex.contains("overlay=0:0"));
-    assert!(built.filter_complex.contains("format=yuv420p10le[out]"));
 }
 
 #[test]

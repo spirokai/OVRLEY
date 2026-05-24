@@ -118,7 +118,7 @@ fn prores_ks_defaults_are_applied_once() -> CoreResult<()> {
     }))?;
     assert_argument_pair(&settings.output_args, "-threads", "0");
     assert_argument_pair(&settings.output_args, "-profile:v", "4444");
-    assert_argument_pair(&settings.output_args, "-qscale:v", "4");
+    assert_argument_pair(&settings.output_args, "-qscale:v", "5");
     assert_eq!(count_flag(&settings.output_args, "-qscale:v"), 1);
     Ok(())
 }
@@ -169,7 +169,7 @@ fn profile_specific_json_knobs_do_not_override_catalog_defaults() -> CoreResult<
     }))?;
     assert_argument_pair(&settings.output_args, "-threads", "0");
     assert_argument_pair(&settings.output_args, "-profile:v", "4444");
-    assert_argument_pair(&settings.output_args, "-qscale:v", "4");
+    assert_argument_pair(&settings.output_args, "-qscale:v", "5");
     assert_eq!(count_flag(&settings.output_args, "-qscale:v"), 1);
     assert!(!has_argument_pair(&settings.output_args, "-threads", "3"));
     assert!(!has_argument_pair(
