@@ -514,6 +514,17 @@ pub struct SsimResult {
     pub v: f64,
 }
 
+#[derive(Clone, Copy)]
+struct AlphaBounds {
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+}
+
+const ALPHA_MASK_THRESHOLD: u8 = 8;
+const DIFF_CHANNEL_TOLERANCE: u8 = 3;
+
 /// Queries (width, height) of a PNG file via ffprobe.
 pub fn probe_png_dimensions(ffprobe: &Path, path: &Path) -> Result<(u32, u32)> {
     let output = Command::new(ffprobe)
@@ -552,8 +563,9 @@ pub fn resolve_ffprobe(ffmpeg: &Path) -> PathBuf {
 
 /// Runs ffmpeg SSIM filter comparing two PNG images.
 ///
-/// Both inputs must have the same pixel dimensions.  The Skia PNG is first
-/// scaled to match the canvas dimensions if needed.
+/// The comparison is cropped to the union of non-transparent pixels so the
+/// large empty transparent canvas does not dominate the score. This is not a
+/// true arbitrary alpha mask, but it is a close approximation for overlay QA.
 pub fn run_ssim(
     skia_path: &Path,
     canvas_path: &Path,
@@ -590,12 +602,44 @@ pub fn run_ssim(
         skia_path.to_path_buf()
     };
 
+    let (_, _, skia_bytes) = decode_png_to_rgba(&ffmpeg, &input_a)?;
+    let (_, _, canvas_bytes) = decode_png_to_rgba(&ffmpeg, canvas_path)?;
+    let bounds = alpha_union_bounds(
+        &skia_bytes,
+        &canvas_bytes,
+        canvas_w,
+        canvas_h,
+        ALPHA_MASK_THRESHOLD,
+    )
+    .unwrap_or(AlphaBounds {
+        x: 0,
+        y: 0,
+        width: canvas_w,
+        height: canvas_h,
+    });
+    println!(
+        "  SSIM crop from alpha union (alpha > {ALPHA_MASK_THRESHOLD}): {}x{} at {},{}",
+        bounds.width, bounds.height, bounds.x, bounds.y
+    );
+
+    let filter = format!(
+        "[0:v]crop={}:{}:{}:{}[skia];[1:v]crop={}:{}:{}:{}[canvas];[skia][canvas]ssim",
+        bounds.width,
+        bounds.height,
+        bounds.x,
+        bounds.y,
+        bounds.width,
+        bounds.height,
+        bounds.x,
+        bounds.y
+    );
+
     let output = Command::new(&ffmpeg)
         .args(["-hide_banner", "-nostats", "-v", "info", "-y", "-i"])
         .arg(&input_a)
         .arg("-i")
         .arg(canvas_path)
-        .args(["-lavfi", "ssim", "-f", "null", "-"])
+        .args(["-filter_complex", &filter, "-f", "null", "-"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
@@ -671,20 +715,66 @@ fn parse_ssim_output(stderr: &str) -> Result<SsimResult> {
     Ok(SsimResult { combined, y: c1, u: c2, v: c3 })
 }
 
+fn alpha_union_bounds(
+    left: &[u8],
+    right: &[u8],
+    width: u32,
+    height: u32,
+    alpha_threshold: u8,
+) -> Option<AlphaBounds> {
+    let mut min_x = width;
+    let mut min_y = height;
+    let mut max_x = 0u32;
+    let mut max_y = 0u32;
+    let mut found = false;
+
+    for y in 0..height {
+        for x in 0..width {
+            let offset = ((y * width + x) as usize) * 4;
+            let left_alpha = left.get(offset + 3).copied().unwrap_or(0);
+            let right_alpha = right.get(offset + 3).copied().unwrap_or(0);
+            if left_alpha > alpha_threshold || right_alpha > alpha_threshold {
+                found = true;
+                min_x = min_x.min(x);
+                min_y = min_y.min(y);
+                max_x = max_x.max(x);
+                max_y = max_y.max(y);
+            }
+        }
+    }
+
+    found.then_some(AlphaBounds {
+        x: min_x,
+        y: min_y,
+        width: max_x - min_x + 1,
+        height: max_y - min_y + 1,
+    })
+}
+
 // ── Diff image generation ────────────────────────────────────────────────────
+
+/// Pixel-level diff statistics for the parity failure image.
+pub struct DiffStats {
+    pub mismatch_pixels: u64,
+    pub overlay_pixels: u64,
+    pub overlay_mismatch_pixels: u64,
+    pub overlay_significant_mismatch_pixels: u64,
+    pub alpha_threshold: u8,
+    pub channel_tolerance: u8,
+}
 
 /// Decodes both PNGs to raw RGBA, compares pixel-by-pixel, and writes a diff PNG
 /// where differing pixels are highlighted in red and matching pixels are dimmed.
 ///
 /// Both images must already have the same pixel dimensions.
 ///
-/// Returns the pixel mismatch count.
+/// Returns total and overlay-masked mismatch counts.
 pub fn generate_diff_png(
     skia_path: &Path,
     canvas_path: &Path,
     diff_path: &Path,
     repo_root: &Path,
-) -> Result<u64> {
+) -> Result<DiffStats> {
     let ffmpeg =
         resolve_ffmpeg_binary(repo_root).context("failed to resolve ffmpeg for diff")?;
     let ffprobe = resolve_ffprobe(&ffmpeg);
@@ -702,20 +792,43 @@ pub fn generate_diff_png(
     let (_, _, canvas_bytes) = decode_png_to_rgba(&ffmpeg, canvas_path)?;
     let mut diff_bytes = Vec::with_capacity(skia_bytes.len());
     let mut mismatch_count: u64 = 0;
+    let mut overlay_pixels: u64 = 0;
+    let mut overlay_mismatch_pixels: u64 = 0;
+    let mut overlay_significant_mismatch_pixels: u64 = 0;
+    let alpha_threshold = ALPHA_MASK_THRESHOLD;
+    let channel_tolerance = DIFF_CHANNEL_TOLERANCE;
 
     for (i, chunk) in skia_bytes.chunks_exact(4).enumerate() {
         let offset = i * 4;
         let canvas_chunk = &canvas_bytes[offset..offset + 4];
+        let is_overlay_pixel = chunk[3] > alpha_threshold || canvas_chunk[3] > alpha_threshold;
+        let max_delta = chunk
+            .iter()
+            .zip(canvas_chunk.iter())
+            .map(|(left, right)| left.abs_diff(*right))
+            .max()
+            .unwrap_or(0);
+        let is_exact_mismatch = max_delta > 0;
+        let is_significant_mismatch = max_delta > channel_tolerance;
 
-        if chunk[0] != canvas_chunk[0]
-            || chunk[1] != canvas_chunk[1]
-            || chunk[2] != canvas_chunk[2]
-            || chunk[3] != canvas_chunk[3]
-        {
+        if is_exact_mismatch {
             mismatch_count += 1;
+            if is_overlay_pixel {
+                overlay_mismatch_pixels += 1;
+            }
+        }
+
+        if is_significant_mismatch {
+            if is_overlay_pixel {
+                overlay_significant_mismatch_pixels += 1;
+            }
             diff_bytes.extend_from_slice(&[255, 0, 0, 255]);
         } else {
             diff_bytes.extend_from_slice(&[chunk[0] / 2, chunk[1] / 2, chunk[2] / 2, 255]);
+        }
+
+        if is_overlay_pixel {
+            overlay_pixels += 1;
         }
     }
 
@@ -758,7 +871,14 @@ pub fn generate_diff_png(
     let _ = fs::remove_file(&raw_path);
 
     println!("  {mismatch_count} differing pixels");
-    Ok(mismatch_count)
+    Ok(DiffStats {
+        mismatch_pixels: mismatch_count,
+        overlay_pixels,
+        overlay_mismatch_pixels,
+        overlay_significant_mismatch_pixels,
+        alpha_threshold,
+        channel_tolerance,
+    })
 }
 
 /// Decodes a PNG to raw RGBA bytes via ffmpeg.

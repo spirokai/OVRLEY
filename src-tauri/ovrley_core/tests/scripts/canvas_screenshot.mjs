@@ -70,9 +70,17 @@ async function main() {
   if (mockDir) {
     const storeStatePath = resolve(mockDir, 'store-state.json')
     const activityPath = resolve(mockDir, 'activity.json')
+    const storeState = existsSync(storeStatePath) ? JSON.parse(readFileSync(storeStatePath, 'utf-8')) : null
+    const rawActivity = existsSync(activityPath) ? JSON.parse(readFileSync(activityPath, 'utf-8')) : null
+    const activity = rawActivity?.parsed_activity ?? rawActivity
 
-    if (existsSync(storeStatePath)) {
-      const storeState = JSON.parse(readFileSync(storeStatePath, 'utf-8'))
+    if (activity) {
+      await page.evaluate((data) => {
+        window.setCurrentActivityCache(data)
+      }, activity)
+    }
+
+    if (storeState) {
       await page.evaluate((state) => {
         const store = window.__STORE__
         store.getState().setConfig(state.config)
@@ -84,14 +92,6 @@ async function main() {
           widgetDrawerOpen: false,
         })
       }, storeState)
-    }
-
-    if (existsSync(activityPath)) {
-      const rawActivity = JSON.parse(readFileSync(activityPath, 'utf-8'))
-      const activity = rawActivity.parsed_activity ?? rawActivity
-      await page.evaluate((data) => {
-        window.setCurrentActivityCache(data)
-      }, activity)
     }
   }
 

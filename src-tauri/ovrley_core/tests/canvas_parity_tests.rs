@@ -109,15 +109,43 @@ fn e2e_canvas_parity() -> Result<()> {
             ssim.combined
         );
         println!("  Y: {:.4}  U: {:.4}  V: {:.4}", ssim.y, ssim.u, ssim.v);
-
-        // On failure: generate diff image
-        let mismatch = generate_diff_png(&skia_png, &canvas_png, &diff_png, &git_root)?;
-        let total_pixels = info.width as u64 * info.height as u64;
-        let pct = (mismatch as f64 / total_pixels as f64) * 100.0;
-        println!(
-            "  mismatched pixels: {mismatch} / {total_pixels} ({pct:.4}%)"
-        );
     }
+
+    // Always generate a diff image so passing runs remain inspectable.
+    let diff_stats = generate_diff_png(&skia_png, &canvas_png, &diff_png, &git_root)?;
+    let total_pixels = info.width as u64 * info.height as u64;
+    let raw_pct = (diff_stats.mismatch_pixels as f64 / total_pixels as f64) * 100.0;
+    let alpha_masked_pct = if diff_stats.overlay_pixels > 0 {
+        (diff_stats.overlay_mismatch_pixels as f64 / diff_stats.overlay_pixels as f64) * 100.0
+    } else {
+        0.0
+    };
+    let alpha_tolerant_pct = if diff_stats.overlay_pixels > 0 {
+        (diff_stats.overlay_significant_mismatch_pixels as f64 / diff_stats.overlay_pixels as f64) * 100.0
+    } else {
+        0.0
+    };
+    println!(
+        "  diff image: {}",
+        diff_png.display()
+    );
+    println!(
+        "  raw_mismatch_count: {} / {total_pixels} ({raw_pct:.4}%)",
+        diff_stats.mismatch_pixels
+    );
+    println!(
+        "  alpha_masked_mismatch_count (alpha > {}): {} / {} ({alpha_masked_pct:.4}%)",
+        diff_stats.alpha_threshold,
+        diff_stats.overlay_mismatch_pixels,
+        diff_stats.overlay_pixels
+    );
+    println!(
+        "  alpha_tolerant_mismatch_count (alpha > {}, channel delta > {}): {} / {} ({alpha_tolerant_pct:.4}%)",
+        diff_stats.alpha_threshold,
+        diff_stats.channel_tolerance,
+        diff_stats.overlay_significant_mismatch_pixels,
+        diff_stats.overlay_pixels
+    );
 
     if !pass {
         anyhow::bail!(
