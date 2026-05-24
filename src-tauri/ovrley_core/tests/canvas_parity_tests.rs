@@ -31,7 +31,6 @@ fn e2e_canvas_parity() -> Result<()> {
     // ── Resolve paths ──────────────────────────────────────────────────
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let fixture_root = manifest_dir.join("tests").join("fixtures");
-    // Git repo root for font discovery, npx, and output dirs
     let git_root = manifest_dir
         .parent()
         .and_then(|p| p.parent())
@@ -82,11 +81,15 @@ fn e2e_canvas_parity() -> Result<()> {
     // 7. Run Playwright screenshot script
     println!("[7/9] Running Playwright screenshot...");
     let script_path = manifest_dir.join("tests").join("scripts").join("canvas_screenshot.mjs");
-    let (canvas_w, canvas_h) = run_playwright_screenshot(&script_path, &mock_dir, &vite.url(), &canvas_png)?;
+    let info = run_playwright_screenshot(&script_path, &mock_dir, &vite.url(), &canvas_png)?;
+    println!(
+        "  Playwright captured transparent widget layer at {}x{}",
+        info.width, info.height
+    );
 
     // 8. Run ffmpeg SSIM comparison
     println!("[8/9] Running SSIM comparison...");
-    let ssim = run_ssim(&skia_png, &canvas_png, (canvas_w, canvas_h), &git_root)?;
+    let ssim = run_ssim(&skia_png, &canvas_png, &git_root)?;
 
     // 9. Assert threshold
     println!("[9/9] Checking SSIM threshold...");
@@ -109,7 +112,7 @@ fn e2e_canvas_parity() -> Result<()> {
 
         // On failure: generate diff image
         let mismatch = generate_diff_png(&skia_png, &canvas_png, &diff_png, &git_root)?;
-        let total_pixels = canvas_w as u64 * canvas_h as u64;
+        let total_pixels = info.width as u64 * info.height as u64;
         let pct = (mismatch as f64 / total_pixels as f64) * 100.0;
         println!(
             "  mismatched pixels: {mismatch} / {total_pixels} ({pct:.4}%)"

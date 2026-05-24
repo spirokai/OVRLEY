@@ -424,14 +424,20 @@ fn find_free_port() -> Result<u16> {
 
 // ── Playwright runner ────────────────────────────────────────────────────────
 
+/// Result from the Playwright screenshot step.
+pub struct CanvasScreenshotInfo {
+    pub width: u32,
+    pub height: u32,
+}
+
 /// Runs the Playwright screenshot script, waiting for it to complete.
-/// Returns the (width, height) of the captured canvas.
+/// Returns the captured dimensions.
 pub fn run_playwright_screenshot(
     script_path: &Path,
     mock_dir: &Path,
     vite_url: &str,
     out_path: &Path,
-) -> Result<(u32, u32)> {
+) -> Result<CanvasScreenshotInfo> {
     println!("  running Playwright screenshot script...");
 
     let mut cmd = platform_command("node");
@@ -478,11 +484,12 @@ pub fn run_playwright_screenshot(
 
     println!("  Playwright screenshot saved: {} kB", file_size_kb(out_path));
 
-    // Parse JSON dimensions from stdout: {"width": 3360, "height": 1890}
+    // Parse JSON from stdout: {"width": 3840, "height": 2160, "bg": "transparent"}
     let (canvas_w, canvas_h) = if let Ok(dims) = serde_json::from_str::<serde_json::Value>(trimmed) {
         let w = dims.get("width").and_then(|v| v.as_u64()).unwrap_or(3840) as u32;
         let h = dims.get("height").and_then(|v| v.as_u64()).unwrap_or(2160) as u32;
-        println!("  canvas dimensions: {w}x{h}");
+        let b = dims.get("bg").and_then(|v| v.as_str()).unwrap_or("transparent").to_string();
+        println!("  canvas dimensions: {w}x{h}  bg: {b}");
         (w, h)
     } else {
         if !trimmed.is_empty() {
@@ -491,7 +498,10 @@ pub fn run_playwright_screenshot(
         (3840, 2160)
     };
 
-    Ok((canvas_w, canvas_h))
+    Ok(CanvasScreenshotInfo {
+        width: canvas_w,
+        height: canvas_h,
+    })
 }
 
 // ── SSIM runner ──────────────────────────────────────────────────────────────
@@ -504,92 +514,85 @@ pub struct SsimResult {
     pub v: f64,
 }
 
+/// Queries (width, height) of a PNG file via ffprobe.
+pub fn probe_png_dimensions(ffprobe: &Path, path: &Path) -> Result<(u32, u32)> {
+    let output = Command::new(ffprobe)
+        .args([
+            "-v", "error",
+            "-show_entries", "stream=width,height",
+            "-of", "csv=p=0",
+            &path.to_string_lossy().to_string(),
+        ])
+        .output()
+        .with_context(|| format!("failed to probe {}", path.display()))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let dims: Vec<u32> = stdout
+        .trim()
+        .split(',')
+        .filter_map(|s| s.trim().parse::<u32>().ok())
+        .collect();
+    if dims.len() >= 2 {
+        Ok((dims[0], dims[1]))
+    } else {
+        bail!("failed to parse PNG dimensions from ffprobe: {stdout}")
+    }
+}
+
+/// Derives the ffprobe path from the resolved ffmpeg path.
+pub fn resolve_ffprobe(ffmpeg: &Path) -> PathBuf {
+    let mut p = ffmpeg.to_path_buf();
+    let name = if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" };
+    p.set_file_name(name);
+    if p.is_file() {
+        return p;
+    }
+    let fallback = ffmpeg.parent().unwrap().join(name);
+    if fallback.is_file() { fallback } else { ffmpeg.to_path_buf() }
+}
+
 /// Runs ffmpeg SSIM filter comparing two PNG images.
 ///
-/// The canvas PNG's actual pixel dimensions are always detected via ffprobe,
-/// and the Skia PNG is scaled to match exactly before SSIM comparison.
-///
-/// Parses the ffmpeg stderr output to extract the combined and per-plane
-/// SSIM scores (Y = luminance, U/V = chroma).
+/// Both inputs must have the same pixel dimensions.  The Skia PNG is first
+/// scaled to match the canvas dimensions if needed.
 pub fn run_ssim(
     skia_path: &Path,
     canvas_path: &Path,
-    _canvas_size: (u32, u32),
     repo_root: &Path,
 ) -> Result<SsimResult> {
     println!("  running ffmpeg SSIM comparison...");
 
     let ffmpeg =
         resolve_ffmpeg_binary(repo_root).context("failed to resolve ffmpeg binary")?;
-
-    // Derive ffprobe path from ffmpeg path (same directory, name differs)
-    let ffprobe = {
-        let mut p = ffmpeg.clone();
-        let name = if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" };
-        p.set_file_name(name);
-        if !p.is_file() {
-            // fallback: try sibling in the same dir
-            let dir = ffmpeg.parent().unwrap();
-            let fallback = dir.join(name);
-            if fallback.is_file() {
-                fallback
-            } else {
-                ffmpeg.clone() // will fail gracefully below
-            }
-        } else {
-            p
-        }
-    };
+    let ffprobe = resolve_ffprobe(&ffmpeg);
 
     // Detect exact canvas PNG dimensions via ffprobe
-    let probe_output = Command::new(&ffprobe)
-        .args([
-            "-v", "error",
-            "-show_entries", "stream=width,height",
-            "-of", "csv=p=0",
-            &canvas_path.to_string_lossy().to_string(),
-        ])
-        .output()
-        .with_context(|| format!("failed to probe {}", canvas_path.display()))?;
-
-    let probe_stdout = String::from_utf8_lossy(&probe_output.stdout);
-    let canvas_dims: Vec<u32> = probe_stdout
-        .trim()
-        .split(',')
-        .filter_map(|s| s.trim().parse::<u32>().ok())
-        .collect();
-
-    let (canvas_w, canvas_h) = if canvas_dims.len() >= 2 {
-        (canvas_dims[0], canvas_dims[1])
-    } else {
-        bail!(
-            "failed to parse canvas PNG dimensions from ffprobe output: {probe_stdout}"
-        );
-    };
+    let (canvas_w, canvas_h) = probe_png_dimensions(&ffprobe, canvas_path)?;
 
     println!(
-        "  canvas PNG: {canvas_w}x{canvas_h}, Skia PNG: resizing to match"
+        "  canvas PNG: {canvas_w}x{canvas_h}"
     );
 
-    // Always scale the Skia PNG to match the canvas dimensions exactly
-    let scaled = skia_path.with_extension("scaled.png");
-    let scale_filter = format!("scale={canvas_w}:{canvas_h}:flags=lanczos");
-    let scale_output = Command::new(&ffmpeg)
-        .args(["-v", "error", "-y", "-i"])
-        .arg(skia_path)
-        .args(["-vf", &scale_filter, &scaled.to_string_lossy()])
-        .output()
-        .with_context(|| format!("failed to scale Skia PNG to {canvas_w}x{canvas_h}"))?;
-    if !scale_output.status.success() {
-        bail!(
-            "ffmpeg scale failed: {}",
-            String::from_utf8_lossy(&scale_output.stderr).trim()
-        );
-    }
+    // Scale the Skia PNG to match canvas dimensions if needed
+    let (skia_w, skia_h) = probe_png_dimensions(&ffprobe, skia_path)?;
+    let input_a = if skia_w != canvas_w || skia_h != canvas_h {
+        let scaled = skia_path.with_extension("ssim-scaled.png");
+        let scale_filter = format!("scale={canvas_w}:{canvas_h}:flags=lanczos");
+        let scale_output = Command::new(&ffmpeg)
+            .args(["-v", "error", "-y", "-i"])
+            .arg(skia_path)
+            .args(["-vf", &scale_filter, &scaled.to_string_lossy()])
+            .output()?;
+        if !scale_output.status.success() {
+            bail!("ffmpeg scale failed: {}", String::from_utf8_lossy(&scale_output.stderr).trim());
+        }
+        scaled
+    } else {
+        skia_path.to_path_buf()
+    };
 
     let output = Command::new(&ffmpeg)
         .args(["-hide_banner", "-nostats", "-v", "info", "-y", "-i"])
-        .arg(&scaled)
+        .arg(&input_a)
         .arg("-i")
         .arg(canvas_path)
         .args(["-lavfi", "ssim", "-f", "null", "-"])
@@ -601,8 +604,9 @@ pub fn run_ssim(
              Check vendor/ffmpeg/ or PATH."
         })?;
 
-    // Clean up scaled file
-    let _ = fs::remove_file(&scaled);
+    if input_a != skia_path {
+        let _ = fs::remove_file(&input_a);
+    }
 
     if !output.status.success() {
         bail!(
@@ -672,6 +676,8 @@ fn parse_ssim_output(stderr: &str) -> Result<SsimResult> {
 /// Decodes both PNGs to raw RGBA, compares pixel-by-pixel, and writes a diff PNG
 /// where differing pixels are highlighted in red and matching pixels are dimmed.
 ///
+/// Both images must already have the same pixel dimensions.
+///
 /// Returns the pixel mismatch count.
 pub fn generate_diff_png(
     skia_path: &Path,
@@ -681,35 +687,18 @@ pub fn generate_diff_png(
 ) -> Result<u64> {
     let ffmpeg =
         resolve_ffmpeg_binary(repo_root).context("failed to resolve ffmpeg for diff")?;
+    let ffprobe = resolve_ffprobe(&ffmpeg);
 
-    // Ensure both images are the same size by scaling Skia to match canvas dimensions
-    let (canvas_width, canvas_height, _) = decode_png_to_rgba(&ffmpeg, canvas_path)?;
-    let (skia_width, skia_height, _) = decode_png_to_rgba(&ffmpeg, skia_path)?;
+    let (canvas_width, canvas_height) = probe_png_dimensions(&ffprobe, canvas_path)?;
+    let (skia_width, skia_height) = probe_png_dimensions(&ffprobe, skia_path)?;
 
-    let skia_input = if skia_width != canvas_width || skia_height != canvas_height {
-        let scaled = skia_path.with_extension("diff-scaled.png");
-        let scale_filter = format!("scale={canvas_width}:{canvas_height}:flags=lanczos");
-        let scale_output = Command::new(&ffmpeg)
-            .args(["-v", "error", "-y", "-i"])
-            .arg(skia_path)
-            .args(["-vf", &scale_filter, &scaled.to_string_lossy()])
-            .output()?;
-        if !scale_output.status.success() {
-            bail!("failed to scale Skia PNG for diff: {}", String::from_utf8_lossy(&scale_output.stderr).trim());
-        }
-        scaled
-    } else {
-        skia_path.to_path_buf()
-    };
+    if skia_width != canvas_width || skia_height != canvas_height {
+        bail!(
+            "dimension mismatch: Skia {skia_width}x{skia_height}, Canvas {canvas_width}x{canvas_height}"
+        );
+    }
 
-    let (width, height, skia_bytes) = if skia_input != skia_path {
-        let r = decode_png_to_rgba(&ffmpeg, &skia_input)?;
-        let _ = fs::remove_file(&skia_input);
-        r
-    } else {
-        decode_png_to_rgba(&ffmpeg, skia_path)?
-    };
-
+    let (width, height, skia_bytes) = decode_png_to_rgba(&ffmpeg, skia_path)?;
     let (_, _, canvas_bytes) = decode_png_to_rgba(&ffmpeg, canvas_path)?;
     let mut diff_bytes = Vec::with_capacity(skia_bytes.len());
     let mut mismatch_count: u64 = 0;

@@ -44,7 +44,28 @@ async function main() {
 
   await page.goto(viteUrl, { waitUntil: 'load', timeout: 15000 })
 
-  await page.waitForFunction(() => typeof window.__STORE__ !== 'undefined', { timeout: 30000 })
+  await page.addStyleTag({
+    content: `
+      html,
+      body,
+      #root,
+      .app-shell {
+        background: transparent !important;
+        background-color: transparent !important;
+      }
+
+      [data-testid="overlay-scene"] > div:first-child {
+        background: transparent !important;
+        background-color: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+      }
+    `,
+  })
+
+  await page.waitForFunction(() => typeof window.__STORE__ !== 'undefined', {
+    timeout: 30000,
+  })
 
   if (mockDir) {
     const storeStatePath = resolve(mockDir, 'store-state.json')
@@ -74,7 +95,7 @@ async function main() {
     }
   }
 
-  await page.waitForFunction(() => document.querySelectorAll('[data-widget-id]').length > 0, { timeout: 15000 })
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="widget-layer"] [data-widget-id]').length > 0, { timeout: 15000 })
 
   await page.evaluate(() => document.fonts.ready)
 
@@ -88,6 +109,9 @@ async function main() {
   // Also remove overflow-hidden on the viewport wrapper so nothing gets
   // clipped if the native-size overlay is larger than the available space.
   await page.evaluate(() => {
+    document.documentElement.style.background = 'transparent'
+    document.body.style.background = 'transparent'
+
     const scaled = document.querySelector('div.absolute.left-0\\.top-0[style*="scale"]')
     if (scaled) {
       scaled.style.transform = 'scale(1)'
@@ -99,25 +123,62 @@ async function main() {
     for (const el of viewportWrappers) {
       el.style.overflow = 'visible'
     }
+
+    const sceneBackground = document.querySelector('[data-testid="overlay-scene"] > div:first-child')
+    if (sceneBackground) {
+      sceneBackground.style.background = 'transparent'
+      sceneBackground.style.backgroundColor = 'transparent'
+      sceneBackground.style.borderColor = 'transparent'
+      sceneBackground.style.boxShadow = 'none'
+    }
+
+    const widgetLayer = document.querySelector('[data-testid="widget-layer"]')
+    for (let el = widgetLayer; el; el = el.parentElement) {
+      el.style.background = 'transparent'
+      el.style.backgroundColor = 'transparent'
+      el.style.boxShadow = 'none'
+    }
   })
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)))
 
   // Get the widget layer bounding box and take a screenshot
-  const widgetLayer = page.locator('div.overflow-visible').filter({ has: page.locator('[data-widget-id]') }).first()
+  const widgetLayer = page.locator('[data-testid="widget-layer"]').first()
   const hasWidgetLayer = await widgetLayer.count()
 
   if (hasWidgetLayer > 0) {
     const box = await widgetLayer.boundingBox()
-    const buffer = await widgetLayer.screenshot()
+    if (!box) {
+      throw new Error('Widget layer exists but has no bounding box')
+    }
+
+    const clip = {
+      x: box.x,
+      y: box.y,
+      width: box.width,
+      height: box.height,
+    }
+    const buffer = await page.screenshot({
+      clip,
+      omitBackground: true,
+      animations: 'disabled',
+    })
     writeFileSync(resolve(outPath), buffer)
-    console.log(JSON.stringify({
-      width: Math.round(box.width),
-      height: Math.round(box.height),
-    }))
+
+    console.log(
+      JSON.stringify({
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+        bg: 'transparent',
+      }),
+    )
   } else {
-    const buffer = await page.screenshot({ fullPage: false })
+    const buffer = await page.screenshot({
+      fullPage: false,
+      omitBackground: true,
+      animations: 'disabled',
+    })
     writeFileSync(resolve(outPath), buffer)
-    console.log(JSON.stringify({ width: 3840, height: 2160 }))
+    console.log(JSON.stringify({ width: 3840, height: 2160, bg: 'transparent' }))
   }
 
   await browser.close()

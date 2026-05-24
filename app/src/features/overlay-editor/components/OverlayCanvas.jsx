@@ -190,10 +190,12 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const { setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const videoRef = useRef(null)
   const { videoSrc, importId, isOutOfRange, videoPreviewMessages } = useVideoPreview(videoRef, backgroundMode === 'video')
+  const hasTransparentBackground = backgroundMode === 'transparent'
 
   return (
     <div
       ref={setSceneElement}
+      data-testid="overlay-scene"
       className="relative overflow-visible"
       onMouseDown={handleSceneMouseDown}
       style={{
@@ -201,15 +203,17 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
         height: sceneSize.height,
       }}
     >
-      <div
-        className={cn(
-          'pointer-events-none absolute inset-0 rounded-sm shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)] border border-border/50',
-          backgroundMode === 'checker' && !gridVisible && 'bg-overlay-grid-muted',
-        )}
-        style={{
-          backgroundColor: CANVAS_BACKGROUND_COLORS[backgroundMode] || CANVAS_BACKGROUND_COLORS.black,
-        }}
-      />
+      {!hasTransparentBackground ? (
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-0 rounded-sm shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)] border border-border/50',
+            backgroundMode === 'checker' && !gridVisible && 'bg-overlay-grid-muted',
+          )}
+          style={{
+            backgroundColor: CANVAS_BACKGROUND_COLORS[backgroundMode] || CANVAS_BACKGROUND_COLORS.black,
+          }}
+        />
+      ) : null}
       {backgroundMode === 'video' && videoSrc && (
         <video
           key={importId ?? 'no-video'}
@@ -236,7 +240,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
         </div>
       ) : null}
       {gridVisible ? <CanvasGrid displayScale={displayScale} sceneSize={sceneSize} /> : null}
-      <div className="absolute inset-0 overflow-visible">
+      <div data-testid="widget-layer" className="absolute inset-0 overflow-visible">
         {widgets.map((widget) => {
           return (
             <OverlayCanvasWidget
