@@ -280,7 +280,7 @@
     },
     {
       "type": "core_temperature",
-      "current": false,
+      "current": true,
       "label": "Core Temperature",
       "defaultDisplayUnit": "celsius",
       "supportedDisplayUnits": [

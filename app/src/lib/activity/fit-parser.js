@@ -54,6 +54,7 @@ export default async function parseFitActivityFile(file) {
     airPressure: safeNumber(record.absolute_pressure),
     altitude: safeNumber(record.enhanced_altitude ?? record.altitude),
     cadence: safeNumber(record.cadence),
+    coreTemperature: safeNumber(record.core_temperature),
     distance: safeNumber(record.distance),
     elapsedSeconds: safeNumber(getOptionalRecordValue(record, ['elapsed_time'])),
     elevation: safeNumber(record.enhanced_altitude ?? record.altitude),

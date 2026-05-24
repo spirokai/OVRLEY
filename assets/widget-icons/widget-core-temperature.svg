@@ -1,1 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-thermometer" aria-hidden="true"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"></path></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- User head -->
+  <circle cx="9" cy="8.8" r="3.6" />
+  <!-- User body -->
+  <path d="M 16.7 21 v-2 a4 4 0 0 0-4-4 H 5.3 a4 4 0 0 0-4 4 v2" />
+  <!-- Thermometer stem -->
+  <path d="M 19 4 v4.3" />
+  <!-- Thermometer bulb -->
+  <circle cx="19" cy="10" r="1.7" />
+</svg>

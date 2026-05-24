@@ -27,6 +27,7 @@ describe('standard metric widget catalog', () => {
       'vertical_speed',
       'gear_position',
       'vertical_oscillation',
+      'core_temperature',
     ])
     expect(STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(CURRENT_STANDARD_METRIC_WIDGET_TYPES))
 

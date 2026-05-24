@@ -138,6 +138,7 @@ function parseGpxActivityFile(file, textContent) {
       airPressure: readTrackPointMetric(extensionValues, ['air_pressure', 'absolute_pressure', 'pressure']),
       altitude: elevation,
       cadence: readTrackPointMetric(extensionValues, ['cad', 'cadence']),
+      coreTemperature: readTrackPointMetric(extensionValues, ['core_temperature', 'coretemp', 'core_temp']),
       distance: readTrackPointMetric(extensionValues, ['distance', 'distance_m', 'distancemeters']),
       elevation,
       gForce: readTrackPointMetric(extensionValues, ['g_force', 'gforce']),

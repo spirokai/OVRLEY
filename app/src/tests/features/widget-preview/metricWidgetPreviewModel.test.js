@@ -40,6 +40,90 @@ describe('vertical_oscillation extraction pipeline', () => {
   })
 })
 
+describe('core_temperature extraction pipeline', () => {
+  test('extracts coreTemperature from normalizedRawSamples into metricSeriesMap', () => {
+    const { metricSeriesMap } = deriveActivityMetricSeries({
+      courseSeries: [],
+      distanceSeries: [0, 100],
+      elevationBaseSeries: [0, 0],
+      elapsedSeries: [0, 10],
+      normalizedRawSamples: [{ coreTemperature: null }, { coreTemperature: 37.5 }],
+      useLegacyGpxDerivations: false,
+      helpers: { isFiniteNumber, roundValue, safeNumber },
+    })
+
+    expect(metricSeriesMap.core_temperature).toBeDefined()
+    expect(metricSeriesMap.core_temperature.source).toBe('direct')
+    expect(metricSeriesMap.core_temperature.series).toEqual([null, 37.5])
+  })
+})
+
+describe('core_temperature widget preview', () => {
+  test('formats core_temperature from display_unit celsius', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'core_temperature',
+        data: {
+          display_unit: 'celsius',
+          show_units: true,
+          show_icon: false,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0],
+        core_temperature: [38.5],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('39')
+    expect(model?.unitText).toBe('\u00B0C')
+  })
+
+  test('formats core_temperature from display_unit fahrenheit', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'core_temperature',
+        data: {
+          display_unit: 'fahrenheit',
+          show_units: true,
+          show_icon: false,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0],
+        core_temperature: [37],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('99')
+    expect(model?.unitText).toBe('\u00B0F')
+  })
+
+  test('shows placeholder when core_temperature data is missing', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'core_temperature',
+        data: {
+          display_unit: 'celsius',
+          show_units: true,
+          show_icon: false,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('--')
+  })
+})
+
 describe('metric widget preview model standard metric units', () => {
   test('formats speed widgets from display_unit', () => {
     const model = buildMetricWidgetPreviewModel({

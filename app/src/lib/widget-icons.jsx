@@ -62,6 +62,7 @@ export const WIDGET_DRAWER_LABELS = {
   vertical_speed: 'V. Speed',
   gear_position: 'Gear',
   vertical_oscillation: 'V. Osc.',
+  core_temperature: 'Core T.',
 }
 
 const widgetTypes = Object.keys(TYPE_LABELS).filter((type) => type !== 'label')
@@ -105,6 +106,7 @@ export const QUICKMENU_ITEMS = [
   'vertical_speed',
   'gear_position',
   'vertical_oscillation',
+  'core_temperature',
 ].map((type) => ({
   type,
   icon: TYPE_ICONS[type],

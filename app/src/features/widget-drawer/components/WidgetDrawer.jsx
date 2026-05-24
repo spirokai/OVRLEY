@@ -2,7 +2,7 @@
  * WidgetDrawer — collapsible left-side panel for widgets.
  */
 
-import { Grid3X3 } from 'lucide-react'
+
 import { useEffect } from 'react'
 import { useLayoutStore } from '@/hooks/useAppStoreSelectors'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
@@ -44,10 +44,10 @@ export function WidgetDrawer() {
           <div style={{ height: '15%' }} />
           <button
             onClick={toggleWidgetDrawer}
-            className="flex items-center justify-center w-6 h-25 bg-card rounded-r-md cursor-pointer shrink-0"
+            className="flex items-center justify-center w-6 h-25 bg-primary text-primary-foreground rounded-r-md cursor-pointer shrink-0"
             aria-label={widgetDrawerOpen ? 'Close widget drawer' : 'Open widget drawer'}
           >
-            <Grid3X3 className="h-3 w-3" />
+            <span className="[writing-mode:vertical-lr] rotate-180 text-[10px] font-bold tracking-wider">WIDGETS</span>
           </button>
           <div className="flex-1" />
         </div>
