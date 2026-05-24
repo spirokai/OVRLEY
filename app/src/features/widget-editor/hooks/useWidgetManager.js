@@ -7,8 +7,9 @@ import { useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { getCurrentParsedActivity } from '@/lib/activity/cache'
+import { TYPE_LABELS } from '@/lib/widget-icons'
 import { buildConfigWidgets, deleteWidgetInConfig, groupWidgetsForSidebar, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget-config'
-import { TYPE_LABELS } from '../data/widgetDefinitions'
+import { isStandardMetricWidgetType } from '@/lib/standard-metrics'
 import { createLabelDefaults, createMetricValueDefaults, createPlotDefaults, clamp, parseInteger } from '../utils/widgetUtils'
 
 /**
@@ -85,7 +86,7 @@ export function useWidgetManager() {
       if (!nextConfig.labels) nextConfig.labels = []
       nextConfig.labels.push(createLabelDefaults(globalDefaults))
       newId = `label-${nextConfig.labels.length - 1}`
-    } else if (['speed', 'gradient', 'heartrate', 'power', 'cadence', 'time', 'temperature'].includes(type)) {
+    } else if (isStandardMetricWidgetType(type) || ['gradient', 'time'].includes(type)) {
       if (!nextConfig.values) nextConfig.values = []
       nextConfig.values.push(createMetricValueDefaults(type, globalDefaults))
       newId = `value-${nextConfig.values.length - 1}`

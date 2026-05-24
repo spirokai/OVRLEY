@@ -2,8 +2,8 @@
  * Supports widget editing flows related to metric widget editor.
  */
 
+import { getStandardMetricDefinition, getStandardMetricDisplayUnit, getStandardMetricUnitOptions } from '@/lib/standard-metrics'
 import { FontSection, IconSection, UnitsControlRow } from './widgetEditorSections'
-import { SPEED_UNITS } from './widgetFormControls'
 
 /**
  * Renders the metric widget editor component.
@@ -15,6 +15,11 @@ import { SPEED_UNITS } from './widgetFormControls'
  * @returns {JSX.Element} Rendered component output.
  */
 export default function MetricWidgetEditor({ widget, updateWidgetData, setNumericField }) {
+  const definition = getStandardMetricDefinition(widget.type)
+  const unitOptions = getStandardMetricUnitOptions(widget.type)
+  const showUnits = widget.data.show_units ?? definition?.showUnitsByDefault ?? false
+  const supportsUnitSelection = unitOptions.length > 1
+
   return (
     <>
       <FontSection widget={widget} updateWidgetData={updateWidgetData} />
@@ -24,30 +29,19 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
         setNumericField={setNumericField}
         showUnitsToggle
         unitsField={
-          widget.type === 'speed' ? (
-            <UnitsControlRow
-              widget={widget}
-              updateWidgetData={updateWidgetData}
-              title="Unit"
-              checked={widget.data.show_units ?? true}
-              onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
-              colorValue={widget.data.unit_color || '#ffffff'}
-              onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
-              value={widget.data.speed_unit || 'kmh'}
-              onValueChange={(value) => updateWidgetData(widget.id, { speed_unit: value })}
-              options={SPEED_UNITS}
-            />
-          ) : (
-            <UnitsControlRow
-              widget={widget}
-              updateWidgetData={updateWidgetData}
-              title="Unit"
-              checked={widget.data.show_units ?? true}
-              onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
-              colorValue={widget.data.unit_color || '#ffffff'}
-              onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
-            />
-          )
+          <UnitsControlRow
+            widget={widget}
+            updateWidgetData={updateWidgetData}
+            title={supportsUnitSelection ? 'Units' : 'Unit'}
+            checked={showUnits}
+            onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
+            colorValue={widget.data.unit_color || '#ffffff'}
+            onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
+            selectLabel="Unit"
+            value={getStandardMetricDisplayUnit(widget.type, widget.data)}
+            onValueChange={(value) => updateWidgetData(widget.id, { display_unit: value })}
+            options={supportsUnitSelection ? unitOptions : undefined}
+          />
         }
       />
     </>

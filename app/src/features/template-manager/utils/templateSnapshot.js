@@ -198,6 +198,10 @@ export function normalizeTemplateFilePayload(rawTemplate, _fallbackState = {}) {
   }
 
   if (rawTemplate.format === TEMPLATE_FILE_FORMAT && rawTemplate.config && rawTemplate.settings) {
+    if (rawTemplate.version !== TEMPLATE_FILE_VERSION) {
+      throw new Error(`Unsupported template file version: ${rawTemplate.version}. Expected ${TEMPLATE_FILE_VERSION}.`)
+    }
+
     const nextGlobalDefaults = mergeSceneGlobalDefaults(rawTemplate.config.scene, rawTemplate.settings.globalDefaults)
 
     return {

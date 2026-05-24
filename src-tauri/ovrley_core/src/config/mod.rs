@@ -13,6 +13,9 @@ use std::collections::BTreeMap;
 use crate::error::{CoreError, CoreResult};
 use crate::types::MetricKind;
 
+pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
+pub const TEMPLATE_FILE_VERSION: u32 = 2;
+
 /// Global render settings shared by labels, metric values, plots, and ffmpeg.
 ///
 /// Coordinates are in canvas pixels before applying `scale`. Most style fields
@@ -223,9 +226,7 @@ pub struct ValueConfig {
     #[serde(default)]
     pub unit_color: Option<String>,
     #[serde(default)]
-    pub speed_unit: Option<String>,
-    #[serde(default)]
-    pub temperature_unit: Option<String>,
+    pub display_unit: Option<String>,
     #[serde(default)]
     pub value_offset: Option<f32>,
     #[serde(default)]
@@ -536,6 +537,42 @@ pub fn parse_config_json(input: &str) -> CoreResult<RenderConfig> {
         )));
     }
     Ok(config)
+}
+
+/// Parses either a raw render config or a wrapped OVRLEY template file.
+#[must_use = "parsed config must be consumed for rendering"]
+pub fn parse_template_json(input: &str) -> CoreResult<RenderConfig> {
+    let value: Value = serde_json::from_str(input)
+        .map_err(|error| CoreError::Config(format!("template JSON: {error}")))?;
+
+    let Some(format) = value.get("format").and_then(Value::as_str) else {
+        return parse_config_json(input);
+    };
+
+    if format != TEMPLATE_FILE_FORMAT {
+        return Err(CoreError::Config(format!(
+            "template format: expected {TEMPLATE_FILE_FORMAT}, got {format}"
+        )));
+    }
+
+    let Some(version) = value.get("version").and_then(Value::as_u64) else {
+        return Err(CoreError::Config("template version missing".into()));
+    };
+
+    if version != u64::from(TEMPLATE_FILE_VERSION) {
+        return Err(CoreError::Config(format!(
+            "unsupported template version: {version}. expected {TEMPLATE_FILE_VERSION}"
+        )));
+    }
+
+    let config_value = value
+        .get("config")
+        .cloned()
+        .ok_or_else(|| CoreError::Config("template config missing".into()))?;
+    let config_json = serde_json::to_string(&config_value)
+        .map_err(|error| CoreError::Config(format!("template config JSON: {error}")))?;
+
+    parse_config_json(&config_json)
 }
 
 impl RenderConfig {

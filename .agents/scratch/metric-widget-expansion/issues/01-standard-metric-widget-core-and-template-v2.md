@@ -36,20 +36,20 @@ This core slice should establish the explicit planned icon mapping contract:
 - [ ] Existing standard metric value widgets run through a shared metadata-driven standard metric widget contract instead of scattered per-type configuration
 - [ ] The shared metadata-driven standard metric widget contract covers the existing standard metric widgets `speed`, `heartrate`, `cadence`, `power`, and `temperature`
 - [ ] The metadata-driven layer covers the current standard metric widgets and is ready to host new standard metric widgets without introducing a second system
-- [ ] `time` and `gradient` are allowed to remain specialized paths if they do not fit the shared standard metric widget model cleanly
-- [ ] `display_unit` is the canonical unit-selection field for standard metric value widgets
-- [ ] The old standard-metric unit field behavior is removed from the standard metric widget path
-- [ ] Template serialization and normalization for standard metric value widgets use the new schema consistently
-- [ ] The template file version is bumped
-- [ ] The template files and extracted configs within this repo are patched to the new version and to match the new schema.
-- [ ] Loading an older template version fails fast with an explicit rejection path rather than silently loading a mismatched schema
+- [x] `time` and `gradient` are allowed to remain specialized paths if they do not fit the shared standard metric widget model cleanly
+- [x] `display_unit` is the canonical unit-selection field for standard metric value widgets
+- [x] The old standard-metric unit field behavior is removed from the standard metric widget path
+- [x] Template serialization and normalization for standard metric value widgets use the new schema consistently
+- [x] The template file version is bumped
+- [x] The template files and extracted configs within this repo are patched to the new version and to match the new schema.
+- [x] Loading an older template version fails fast with an explicit rejection path rather than silently loading a mismatched schema
 - [ ] Shared standard metric widget SVG assets are sourced from `assets/widget-icons/` and used by both preview and export
-- [ ] The shared icon catalog records which planned widgets use extracted Lucide SVG assets and which require custom SVG assets
-- [ ] Frontend automated tests cover the metadata-driven standard metric widget contract at the behavior level
-- [ ] Backend automated tests cover template version rejection, standard metric config behavior, and the shared formatter contract at the behavior level
-- [ ] No lint errors (`pnpm lint`)
-- [ ] Relevant frontend tests pass (`cd app && pnpm test`)
-- [ ] Relevant Rust tests pass for the touched standard metric/config areas
+- [x] The shared icon catalog records which planned widgets use extracted Lucide SVG assets and which require custom SVG assets
+- [x] Frontend automated tests cover the metadata-driven standard metric widget contract at the behavior level
+- [x] Backend automated tests cover template version rejection, standard metric config behavior, and the shared formatter contract at the behavior level
+- [x] No lint errors (`pnpm lint`)
+- [x] Relevant frontend tests pass (`cd app && pnpm test`)
+- [x] Relevant Rust tests pass for the touched standard metric/config areas
 
 ## Blocked by
 

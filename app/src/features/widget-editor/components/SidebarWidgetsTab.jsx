@@ -6,14 +6,14 @@
 import { RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { TYPE_ICONS } from '../data/widgetDefinitions'
+import { TYPE_ICONS } from '@/lib/widget-icons'
+import { isStandardMetricWidgetType } from '@/lib/standard-metrics'
 import { useWidgetManager } from '../hooks/useWidgetManager'
 import { PositionSection } from './widgetEditorSections'
 import ElevationWidgetEditor from './ElevationWidgetEditor'
 import GradientWidgetEditor from './GradientWidgetEditor'
 import MetricWidgetEditor from './MetricWidgetEditor'
 import RouteMapWidgetEditor from './RouteMapWidgetEditor'
-import TemperatureWidgetEditor from './TemperatureWidgetEditor'
 import TextWidgetEditor from './TextWidgetEditor'
 import TimeWidgetEditor from './TimeWidgetEditor'
 
@@ -31,16 +31,12 @@ function renderWidgetEditor(widget, updateWidgetData, setNumericField, sceneFont
     return <TextWidgetEditor widget={widget} updateWidgetData={updateWidgetData} />
   }
 
-  if (['speed', 'heartrate', 'cadence', 'power'].includes(widget.type)) {
+  if (isStandardMetricWidgetType(widget.type)) {
     return <MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
   }
 
   if (widget.type === 'time') {
     return <TimeWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
-  }
-
-  if (widget.type === 'temperature') {
-    return <TemperatureWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
   }
 
   if (widget.type === 'gradient') {
@@ -86,7 +82,7 @@ export default function SidebarWidgetsTab() {
             className="space-y-1"
           >
             {widgets.map((widget) => {
-              const Icon = TYPE_ICONS[widget.type]
+              const Icon = TYPE_ICONS[widget.type] || TYPE_ICONS.label
 
               return (
                 <div key={widget.id} className="space-y-1">

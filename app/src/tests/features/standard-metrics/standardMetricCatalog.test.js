@@ -1,0 +1,56 @@
+import { describe, expect, test } from 'vitest'
+
+import {
+  CURRENT_STANDARD_METRIC_WIDGET_TYPES,
+  STANDARD_METRIC_WIDGET_TYPES,
+  getStandardMetricDefinition,
+  isStandardMetricWidgetType,
+} from '@/lib/standard-metrics'
+
+describe('standard metric widget catalog', () => {
+  test('covers the existing shared standard metric widgets', () => {
+    expect(CURRENT_STANDARD_METRIC_WIDGET_TYPES).toEqual(['speed', 'heartrate', 'cadence', 'power', 'temperature'])
+    expect(STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(CURRENT_STANDARD_METRIC_WIDGET_TYPES))
+
+    const speed = getStandardMetricDefinition('speed')
+
+    expect(speed).toMatchObject({
+      label: 'Speed',
+      defaultDisplayUnit: 'kmh',
+      showUnitsByDefault: true,
+      icon: {
+        assetFile: 'widget-speed.svg',
+      },
+    })
+    expect(speed.supportedDisplayUnits.map((option) => option.value)).toEqual(['kmh', 'mph', 'kn', 'mps'])
+  })
+
+  test('records the planned icon catalog for future standard metric widgets', () => {
+    expect(getStandardMetricDefinition('pace').icon).toEqual({
+      source: 'lucide',
+      name: 'Footprints',
+      assetFile: 'widget-pace.svg',
+    })
+    expect(getStandardMetricDefinition('air_pressure').icon).toEqual({
+      source: 'lucide',
+      name: 'Wind',
+      assetFile: 'widget-air-pressure.svg',
+    })
+    expect(getStandardMetricDefinition('g_force').icon).toEqual({
+      source: 'custom',
+      assetFile: 'widget-g-force.svg',
+    })
+    expect(getStandardMetricDefinition('gear_position').icon).toEqual({
+      source: 'custom',
+      assetFile: 'widget-gear-position.svg',
+    })
+  })
+
+  test('identifies standard metric widgets without folding in specialized widgets', () => {
+    expect(isStandardMetricWidgetType('speed')).toBe(true)
+    expect(isStandardMetricWidgetType('temperature')).toBe(true)
+    expect(isStandardMetricWidgetType('time')).toBe(false)
+    expect(isStandardMetricWidgetType('gradient')).toBe(false)
+    expect(isStandardMetricWidgetType('course')).toBe(false)
+  })
+})

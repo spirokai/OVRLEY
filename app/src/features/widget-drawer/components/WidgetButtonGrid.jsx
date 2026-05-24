@@ -2,13 +2,7 @@
  * WidgetButtonGrid — scrollable grid of widget-type buttons inside the drawer.
  */
 
-import { QUICKMENU_ITEMS, TYPE_LABELS } from '@/features/widget-editor/data/widgetDefinitions'
-
-const TOOLBAR_LABELS = {
-  ...TYPE_LABELS,
-  temperature: 'Temp',
-  course: 'Route',
-}
+import { QUICKMENU_ITEMS } from '@/lib/widget-icons'
 
 /**
  * Renders a scrollable 2-column grid of widget-type buttons.
@@ -23,7 +17,6 @@ export function WidgetButtonGrid({ onAddWidget }) {
       <div className="grid grid-cols-2 gap-2">
         {QUICKMENU_ITEMS.map((item) => {
           const Icon = item.icon
-          const fullLabel = TOOLBAR_LABELS[item.type] || item.label
 
           return (
             <button
@@ -33,7 +26,7 @@ export function WidgetButtonGrid({ onAddWidget }) {
             >
               <Icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
               <span className="text-[8px] leading-tight font-light text-muted-foreground text-center px-0.5 group-hover:text-primary">
-                {fullLabel}
+                {item.label}
               </span>
             </button>
           )

@@ -24,12 +24,12 @@ describe('WidgetButtonGrid', () => {
     })
   })
 
-  test('each button displays the full widget label', () => {
+  test('each button displays the widget drawer label', () => {
     render(<WidgetButtonGrid onAddWidget={() => {}} />)
 
-    expect(screen.getByText('Heart Rate')).toBeInTheDocument()
-    expect(screen.getByText('Route Map')).toBeInTheDocument()
-    expect(screen.getByText('Temp')).toBeInTheDocument()
+    expect(screen.getByText('HR')).toBeInTheDocument()
+    expect(screen.getByText('Map')).toBeInTheDocument()
+    expect(screen.getByText('Temp.')).toBeInTheDocument()
   })
 
   test('clicking a button calls onAddWidget with the correct type', async () => {
@@ -47,7 +47,7 @@ describe('WidgetButtonGrid', () => {
     const user = userEvent.setup()
     render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
 
-    await user.click(screen.getByText('Heart Rate').closest('button'))
+    await user.click(screen.getByText('HR').closest('button'))
 
     // onAddWidget is called but nothing else — drawer state is managed externally
     expect(onAddWidget).toHaveBeenCalledTimes(1)

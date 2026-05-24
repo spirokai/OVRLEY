@@ -15,7 +15,7 @@ use crate::common::test_config;
 use anyhow::{anyhow, bail, Context, Result};
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::config::{parse_config_json, RenderConfig};
+use ovrley_core::config::{parse_template_json, RenderConfig};
 use ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary;
 use ovrley_core::encode::video::{
     render_composite_video, render_video, rendered_frame_count, CompositeRenderRequest,
@@ -464,7 +464,7 @@ fn load_config(relative_path: &str) -> Result<RenderConfig> {
             .context("failed to serialize extracted template config")?,
         None => json,
     };
-    parse_config_json(&config_str).context("failed to parse config")
+    parse_template_json(&config_str).context("failed to parse config")
 }
 
 /// Loads a `ParsedActivity` from the fixture tree.

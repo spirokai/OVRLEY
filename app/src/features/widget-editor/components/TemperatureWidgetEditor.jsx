@@ -33,8 +33,8 @@ export default function TemperatureWidgetEditor({ widget, updateWidgetData, setN
             colorValue={widget.data.unit_color || '#ffffff'}
             onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
             selectLabel="Unit"
-            value={widget.data.temperature_unit || 'celsius'}
-            onValueChange={(value) => updateWidgetData(widget.id, { temperature_unit: value })}
+            value={widget.data.display_unit || 'celsius'}
+            onValueChange={(value) => updateWidgetData(widget.id, { display_unit: value })}
             options={TEMPERATURE_UNITS}
           />
         }

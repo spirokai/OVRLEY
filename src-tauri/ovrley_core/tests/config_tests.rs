@@ -22,7 +22,9 @@
 //! - Zero widget update rate accepted (division by zero)
 //! - Serde round-trip losing fields
 
-use ovrley_core::config::parse_config_json;
+use ovrley_core::config::{
+    parse_config_json, parse_template_json, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION,
+};
 
 mod common;
 
@@ -215,4 +217,63 @@ fn config_roundtrip_is_idempotent() {
     assert_eq!(config1.scene.fps, config2.scene.fps);
     assert_eq!(config1.scene.width, config2.scene.width);
     assert_eq!(config1.scene.height, config2.scene.height);
+}
+
+#[test]
+fn parses_standard_metric_display_unit_from_config_json() {
+    let config = parse_config_json(
+        r#"{
+            "scene": {
+                "fps": 30,
+                "start": 0,
+                "end": 10,
+                "ffmpeg": {}
+            },
+            "labels": [],
+            "values": [
+                {
+                    "value": "speed",
+                    "x": 0,
+                    "y": 0,
+                    "display_unit": "mph"
+                }
+            ],
+            "plots": []
+        }"#,
+    )
+    .unwrap();
+
+    assert_eq!(config.values[0].display_unit.as_deref(), Some("mph"));
+}
+
+#[test]
+fn rejects_older_template_versions_explicitly() {
+    let error = parse_template_json(&format!(
+        r#"{{
+            "format": "{TEMPLATE_FILE_FORMAT}",
+            "version": {},
+            "config": {{
+                "scene": {{
+                    "fps": 30,
+                    "start": 0,
+                    "end": 10,
+                    "ffmpeg": {{}}
+                }},
+                "labels": [],
+                "values": [],
+                "plots": []
+            }}
+        }}"#,
+        TEMPLATE_FILE_VERSION - 1
+    ))
+    .unwrap_err();
+
+    assert!(
+        error.to_string().contains(&format!(
+            "unsupported template version: {}. expected {}",
+            TEMPLATE_FILE_VERSION - 1,
+            TEMPLATE_FILE_VERSION
+        )),
+        "got: '{error}'"
+    );
 }

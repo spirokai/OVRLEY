@@ -98,12 +98,6 @@ After all tests pass, look for [refactor candidates](refactoring.md):
 
 **Never refactor while RED.** Get to GREEN first.
 
-### 5. Verify
-
-Before you finish the work:
--verify ALL acceptance criteria are met, tests are meaningful, and code is clean
--verify against acceptance criteria given in the issue or PRD, not just that tests pass
-
 ## Checklist Per Cycle
 
 ```
@@ -113,3 +107,12 @@ Before you finish the work:
 [ ] Code is minimal for this test
 [ ] No speculative features added
 ```
+
+## Final Checklist Before Stopping
+
+Do NOT stop until ALL acceptance criteria from the document are met.
+
+Before stopping your work:
+
+- Check all acceptance criteria boxes in the issue or PRD. If any are unchecked, continue the TDD loop until they are all satisfied.
+- Before stoppping, ALWAYS verify against acceptance criteria given in the issue or PRD.

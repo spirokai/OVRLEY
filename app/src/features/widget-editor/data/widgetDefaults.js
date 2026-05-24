@@ -1,7 +1,9 @@
+import { STANDARD_METRIC_WIDGET_TYPES, getStandardMetricDefinition } from '@/lib/standard-metrics'
+
 /**
  * Static default value objects for widget creation.
  * Used as base templates by the factory functions in ../utils/widgetUtils.js.
- * Only contains static constants — no function calls or side effects.
+ * Only contains static constants - no function calls or side effects.
  */
 
 /** Default position and label fields for a text/label widget. */
@@ -36,13 +38,24 @@ export const ICON_DEFAULTS = {
   icon_offset_y: 0,
 }
 
+const STANDARD_METRIC_TYPE_DEFAULTS = Object.fromEntries(
+  STANDARD_METRIC_WIDGET_TYPES.map((type) => {
+    const definition = getStandardMetricDefinition(type)
+
+    return [
+      type,
+      {
+        show_units: definition?.showUnitsByDefault ?? false,
+        unit_color: '#ffffff',
+        display_unit: definition?.defaultDisplayUnit,
+      },
+    ]
+  }),
+)
+
 /** Type-specific default fields for each metric value widget type (dynamic fields omitted). */
 export const TYPE_DEFAULTS = {
-  speed: { show_units: true, speed_unit: 'kmh', unit_color: '#ffffff' },
-  temperature: { show_units: true, temperature_unit: 'celsius', unit_color: '#ffffff' },
-  heartrate: { show_units: false, unit_color: '#ffffff' },
-  cadence: { show_units: false, unit_color: '#ffffff' },
-  power: { show_units: false, unit_color: '#ffffff' },
+  ...STANDARD_METRIC_TYPE_DEFAULTS,
   time: { format: 'time-24' },
   gradient: {
     decimals: 0,

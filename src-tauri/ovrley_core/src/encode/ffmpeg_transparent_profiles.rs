@@ -50,7 +50,6 @@ const BUILTIN_PROFILES: &[TransparentProfile] = &[
             "4",
             "-mbs_per_slice",
             "8",
-           
             "-vendor",
             "apl0",
             "-alpha_bits",

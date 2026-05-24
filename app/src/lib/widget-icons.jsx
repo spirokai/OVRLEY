@@ -22,8 +22,48 @@ export function WidgetIcon({ type, className, ...props }) {
     />
   )
 }
+// General widget labels used throughout the app
+export const TYPE_LABELS = {
+  label: 'Text',
+  air_pressure: 'Air Pressure',
+  cadence: 'Cadence',
+  core_temperature: 'Core Temperature',
+  course: 'Route Map',
+  elevation: 'Elevation',
+  g_force: 'G-Force',
+  gear_position: 'Gear Position',
+  gradient: 'Gradient',
+  ground_contact_time: 'Ground Contact Time',
+  heartrate: 'Heart Rate',
+  left_right_balance: 'Left/Right Balance',
+  pace: 'Pace',
+  power: 'Power',
+  speed: 'Speed',
+  stride_length: 'Stride Length',
+  stroke_rate: 'Stroke Rate',
+  temperature: 'Temperature',
+  time: 'Time',
+  torque: 'Torque',
+  vertical_ratio: 'Vertical Ratio',
+  vertical_speed: 'Vertical Speed',
+}
 
-const widgetTypes = ['cadence', 'heartrate', 'power', 'speed', 'temperature', 'time', 'gradient', 'course', 'elevation']
+// Labels for the widget drawer, which may be shorter than the general labels
+
+export const WIDGET_DRAWER_LABELS = {
+  label: 'Text',
+  speed: 'Speed',
+  elevation: 'Elev.',
+  heartrate: 'HR',
+  power: 'Power',
+  cadence: 'Cadence',
+  time: 'Time',
+  temperature: 'Temp.',
+  gradient: 'Grad.',
+  course: 'Map',
+}
+
+const widgetTypes = Object.keys(TYPE_LABELS).filter((type) => type !== 'label')
 
 const widgetIconComponents = {}
 widgetTypes.forEach((type) => {
@@ -39,26 +79,13 @@ export const WIDGET_ICONS = {
 
 export const TYPE_ICONS = {
   label: Type,
-  speed: widgetIconComponents.speed,
-  elevation: widgetIconComponents.elevation,
-  heartrate: widgetIconComponents.heartrate,
-  power: widgetIconComponents.power,
-  cadence: widgetIconComponents.cadence,
-  time: widgetIconComponents.time,
-  temperature: widgetIconComponents.temperature,
-  gradient: widgetIconComponents.gradient,
-  course: widgetIconComponents.course,
+  ...widgetIconComponents,
 }
 
-export const QUICKMENU_ITEMS = [
-  { type: 'label', icon: Type, label: 'Text' },
-  { type: 'speed', icon: widgetIconComponents.speed, label: 'Speed' },
-  { type: 'elevation', icon: widgetIconComponents.elevation, label: 'Elev.' },
-  { type: 'heartrate', icon: widgetIconComponents.heartrate, label: 'HR' },
-  { type: 'power', icon: widgetIconComponents.power, label: 'Power' },
-  { type: 'cadence', icon: widgetIconComponents.cadence, label: 'Cadence' },
-  { type: 'time', icon: widgetIconComponents.time, label: 'Time' },
-  { type: 'temperature', icon: widgetIconComponents.temperature, label: 'Temp.' },
-  { type: 'gradient', icon: widgetIconComponents.gradient, label: 'Grad.' },
-  { type: 'course', icon: widgetIconComponents.course, label: 'Map' },
-]
+export const QUICKMENU_ITEMS = ['label', 'speed', 'elevation', 'heartrate', 'power', 'cadence', 'time', 'temperature', 'gradient', 'course'].map(
+  (type) => ({
+    type,
+    icon: TYPE_ICONS[type],
+    label: WIDGET_DRAWER_LABELS[type] ?? TYPE_LABELS[type],
+  }),
+)

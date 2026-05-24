@@ -1,6 +1,6 @@
 /**
  * Pure helper functions for widget creation, parsing, and geometry.
- * Domain constants used by these functions live in ../data/widgetDefinitions.js.
+ * Domain constants used by these functions live in @/lib/widget-icons and ../data/widgetDefaults.
  */
 
 export { clamp } from '@/lib/utils'

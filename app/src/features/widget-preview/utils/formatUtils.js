@@ -9,6 +9,7 @@ import {
   MAX_GRADIENT_ABS_PERCENT,
   GRADIENT_ZERO_EPSILON,
 } from '@/features/overlay-editor'
+import { getStandardMetricDefinition, getStandardMetricDisplayUnit, getStandardMetricUnitLabel } from '@/lib/standard-metrics'
 import { measurePreviewText, getPreviewTextBaseline } from './textMeasurement'
 
 /**
@@ -65,6 +66,46 @@ export function formatTemperature(value, unit) {
     value: Math.round(numericValue).toString(),
     units: '\u00B0C',
   }
+}
+
+function formatRoundedMetric(value, units, decimals = 0) {
+  if (value === null || value === undefined) {
+    return {
+      value: '--',
+      units,
+    }
+  }
+
+  const numericValue = Number(value)
+  const roundedValue = decimals > 0 ? numericValue.toFixed(decimals).replace(/\.?0+$/, '') : Math.round(numericValue).toString()
+
+  return {
+    value: roundedValue,
+    units,
+  }
+}
+
+export function formatStandardMetricDisplay(type, value, widgetData = {}) {
+  const definition = getStandardMetricDefinition(type)
+  if (!definition) {
+    return {
+      value: '--',
+      units: '',
+    }
+  }
+
+  const displayUnit = getStandardMetricDisplayUnit(type, widgetData)
+  const unitLabel = getStandardMetricUnitLabel(type, displayUnit)
+
+  if (definition.formatter === 'speed') {
+    return formatSpeed(value, displayUnit)
+  }
+
+  if (definition.formatter === 'temperature') {
+    return formatTemperature(value, displayUnit)
+  }
+
+  return formatRoundedMetric(value, unitLabel, widgetData.decimals ?? 0)
 }
 
 function padNumber(value) {

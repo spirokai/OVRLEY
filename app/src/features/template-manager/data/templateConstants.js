@@ -3,13 +3,14 @@
  * Used by templateSnapshot.js for config normalization and file I/O.
  */
 
+import { STANDARD_METRIC_WIDGET_TYPES } from '@/lib/standard-metrics'
 import { TYPE_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS } from '../../widget-editor/data/widgetDefaults'
 
 /** File format identifier for OVRLEY template files. */
 export const TEMPLATE_FILE_FORMAT = 'ovrley-template'
 
 /** Current template file format version. */
-export const TEMPLATE_FILE_VERSION = 1
+export const TEMPLATE_FILE_VERSION = 2
 
 /** Default export range when no custom range has been configured. */
 export const DEFAULT_EXPORT_RANGE = {
@@ -42,13 +43,11 @@ export const VALUE_SHARED_KEYS = ['x', 'y', 'value', 'font', 'font_size', 'color
 /** Keys for the icon sub-object within a value widget. */
 export const VALUE_ICON_KEYS = ['show_icon', 'icon_color', 'icon_size', 'icon_offset_x', 'icon_offset_y']
 
+const STANDARD_METRIC_VALUE_KEYS = [...VALUE_ICON_KEYS, 'show_units', 'unit_color', 'display_unit']
+
 /** Per-type additional keys preserved when normalizing a value widget. */
 export const VALUE_TYPE_KEYS = {
-  speed: [...VALUE_ICON_KEYS, 'show_units', 'unit_color', 'speed_unit'],
-  heartrate: [...VALUE_ICON_KEYS, 'show_units', 'unit_color'],
-  cadence: [...VALUE_ICON_KEYS, 'show_units', 'unit_color'],
-  power: [...VALUE_ICON_KEYS, 'show_units', 'unit_color'],
-  temperature: [...VALUE_ICON_KEYS, 'show_units', 'unit_color', 'temperature_unit'],
+  ...Object.fromEntries(STANDARD_METRIC_WIDGET_TYPES.map((type) => [type, STANDARD_METRIC_VALUE_KEYS])),
   time: [...VALUE_ICON_KEYS, 'format'],
   gradient: ['unit_color', 'value_offset', 'triangle_positive_color', 'triangle_negative_color', 'show_sign', 'show_triangle', 'triangle_width'],
 }
