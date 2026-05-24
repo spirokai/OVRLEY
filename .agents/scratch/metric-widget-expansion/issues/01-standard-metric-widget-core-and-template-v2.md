@@ -41,6 +41,7 @@ This core slice should establish the explicit planned icon mapping contract:
 - [ ] The old standard-metric unit field behavior is removed from the standard metric widget path
 - [ ] Template serialization and normalization for standard metric value widgets use the new schema consistently
 - [ ] The template file version is bumped
+- [ ] The template files and extracted configs within this repo are patched to the new version and to match the new schema.
 - [ ] Loading an older template version fails fast with an explicit rejection path rather than silently loading a mismatched schema
 - [ ] Shared standard metric widget SVG assets are sourced from `assets/widget-icons/` and used by both preview and export
 - [ ] The shared icon catalog records which planned widgets use extracted Lucide SVG assets and which require custom SVG assets
