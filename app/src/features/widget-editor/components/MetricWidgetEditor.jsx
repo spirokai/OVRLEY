@@ -22,7 +22,7 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
   const unitOptions = getStandardMetricUnitOptions(widget.type)
   const showUnits = widget.data.show_units ?? definition?.showUnitsByDefault ?? false
   const supportsUnitSelection = unitOptions.length > 1
-  const hasDecimalControl = definition?.formatter === 'decimal'
+  const hasDecimalControl = definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
   const hasBalanceFormat = definition?.formatter === 'balance'
 
   const toggleDecimals = useCallback(() => {

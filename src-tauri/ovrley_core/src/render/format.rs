@@ -345,7 +345,11 @@ fn format_standard_metric_parts(
                 } else {
                     temp_c
                 };
-                format_number(resolved, decimals)
+                if decimals > 0 {
+                    format!("{resolved:.decimals$}")
+                } else {
+                    (resolved as i64).to_string()
+                }
             })
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Pace) => raw

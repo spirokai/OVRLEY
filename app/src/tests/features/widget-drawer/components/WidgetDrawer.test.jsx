@@ -15,14 +15,12 @@ beforeEach(() => {
 })
 
 describe('WidgetDrawer', () => {
-  test('renders a tab with Grid3X3 icon when collapsed', () => {
+  test('renders a tab with WIDGETS label when collapsed', () => {
     render(<WidgetDrawer />)
 
     const tab = screen.getByRole('button', { name: /drawer/i })
     expect(tab).toBeInTheDocument()
-
-    const icon = tab.querySelector('svg')
-    expect(icon).toBeInTheDocument()
+    expect(tab).toHaveTextContent('WIDGETS')
   })
 
   test('clicking the tab opens the drawer', async () => {

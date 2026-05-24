@@ -46,7 +46,7 @@ export function formatSpeed(value, unit) {
  * @param {string} unit - Target unit ('celsius' or 'fahrenheit').
  * @returns {{ value: string, units: string }} Formatted temperature string and unit symbol.
  */
-export function formatTemperature(value, unit) {
+export function formatTemperature(value, unit, decimals = 0) {
   if (value === null || value === undefined) {
     return {
       value: '--',
@@ -55,16 +55,12 @@ export function formatTemperature(value, unit) {
   }
 
   const numericValue = Number(value)
-  if (unit === 'fahrenheit') {
-    return {
-      value: Math.round((numericValue * 9) / 5 + 32).toString(),
-      units: '\u00B0F',
-    }
-  }
+  const temp = unit === 'fahrenheit' ? (numericValue * 9) / 5 + 32 : numericValue
+  const roundedValue = decimals > 0 ? temp.toFixed(decimals) : Math.round(temp).toString()
 
   return {
-    value: Math.round(numericValue).toString(),
-    units: '\u00B0C',
+    value: roundedValue,
+    units: unit === 'fahrenheit' ? '\u00B0F' : '\u00B0C',
   }
 }
 
@@ -206,7 +202,7 @@ export function formatStandardMetricDisplay(type, value, widgetData = {}) {
   }
 
   if (definition.formatter === 'temperature') {
-    return formatTemperature(value, displayUnit)
+    return formatTemperature(value, displayUnit, widgetData.decimals ?? 0)
   }
 
   if (definition.formatter === 'pace') {
