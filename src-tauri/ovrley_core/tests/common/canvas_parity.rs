@@ -524,6 +524,8 @@ struct AlphaBounds {
 
 const ALPHA_MASK_THRESHOLD: u8 = 8;
 const DIFF_CHANNEL_TOLERANCE: u8 = 3;
+const EDGE_ALPHA_DELTA_THRESHOLD: u8 = 0;
+const EDGE_IGNORE_RADIUS: i32 = 0;
 
 /// Queries (width, height) of a PNG file via ffprobe.
 pub fn probe_png_dimensions(ffprobe: &Path, path: &Path) -> Result<(u32, u32)> {
@@ -759,8 +761,13 @@ pub struct DiffStats {
     pub overlay_pixels: u64,
     pub overlay_mismatch_pixels: u64,
     pub overlay_significant_mismatch_pixels: u64,
+    pub edge_compared_pixels: u64,
+    pub edge_insensitive_mismatch_pixels: u64,
+    pub edge_ignored_pixels: u64,
     pub alpha_threshold: u8,
     pub channel_tolerance: u8,
+    pub edge_alpha_delta_threshold: u8,
+    pub edge_ignore_radius: i32,
 }
 
 /// Decodes both PNGs to raw RGBA, compares pixel-by-pixel, and writes a diff PNG
@@ -790,11 +797,23 @@ pub fn generate_diff_png(
 
     let (width, height, skia_bytes) = decode_png_to_rgba(&ffmpeg, skia_path)?;
     let (_, _, canvas_bytes) = decode_png_to_rgba(&ffmpeg, canvas_path)?;
+    let edge_ignore_mask = build_alpha_edge_ignore_mask(
+        &skia_bytes,
+        &canvas_bytes,
+        width,
+        height,
+        ALPHA_MASK_THRESHOLD,
+        EDGE_ALPHA_DELTA_THRESHOLD,
+        EDGE_IGNORE_RADIUS,
+    );
     let mut diff_bytes = Vec::with_capacity(skia_bytes.len());
     let mut mismatch_count: u64 = 0;
     let mut overlay_pixels: u64 = 0;
     let mut overlay_mismatch_pixels: u64 = 0;
     let mut overlay_significant_mismatch_pixels: u64 = 0;
+    let mut edge_compared_pixels: u64 = 0;
+    let mut edge_insensitive_mismatch_pixels: u64 = 0;
+    let mut edge_ignored_pixels: u64 = 0;
     let alpha_threshold = ALPHA_MASK_THRESHOLD;
     let channel_tolerance = DIFF_CHANNEL_TOLERANCE;
 
@@ -802,6 +821,7 @@ pub fn generate_diff_png(
         let offset = i * 4;
         let canvas_chunk = &canvas_bytes[offset..offset + 4];
         let is_overlay_pixel = chunk[3] > alpha_threshold || canvas_chunk[3] > alpha_threshold;
+        let is_edge_ignored = is_overlay_pixel && edge_ignore_mask.get(i).copied().unwrap_or(false);
         let max_delta = chunk
             .iter()
             .zip(canvas_chunk.iter())
@@ -822,13 +842,23 @@ pub fn generate_diff_png(
             if is_overlay_pixel {
                 overlay_significant_mismatch_pixels += 1;
             }
-            diff_bytes.extend_from_slice(&[255, 0, 0, 255]);
+            if is_overlay_pixel && !is_edge_ignored {
+                edge_insensitive_mismatch_pixels += 1;
+                diff_bytes.extend_from_slice(&[255, 0, 0, 255]);
+            } else {
+                diff_bytes.extend_from_slice(&[chunk[0] / 2, chunk[1] / 2, chunk[2] / 2, 255]);
+            }
         } else {
             diff_bytes.extend_from_slice(&[chunk[0] / 2, chunk[1] / 2, chunk[2] / 2, 255]);
         }
 
         if is_overlay_pixel {
             overlay_pixels += 1;
+            if is_edge_ignored {
+                edge_ignored_pixels += 1;
+            } else {
+                edge_compared_pixels += 1;
+            }
         }
     }
 
@@ -876,9 +906,118 @@ pub fn generate_diff_png(
         overlay_pixels,
         overlay_mismatch_pixels,
         overlay_significant_mismatch_pixels,
+        edge_compared_pixels,
+        edge_insensitive_mismatch_pixels,
+        edge_ignored_pixels,
         alpha_threshold,
         channel_tolerance,
+        edge_alpha_delta_threshold: EDGE_ALPHA_DELTA_THRESHOLD,
+        edge_ignore_radius: EDGE_IGNORE_RADIUS,
     })
+}
+
+fn build_alpha_edge_ignore_mask(
+    left: &[u8],
+    right: &[u8],
+    width: u32,
+    height: u32,
+    alpha_threshold: u8,
+    edge_alpha_delta_threshold: u8,
+    edge_ignore_radius: i32,
+) -> Vec<bool> {
+    let pixel_count = (width as usize).saturating_mul(height as usize);
+    let mut seeds = vec![false; pixel_count];
+    let mut mask = vec![false; pixel_count];
+
+    for y in 0..height {
+        for x in 0..width {
+            let index = (y * width + x) as usize;
+            // Seed from alpha transitions, not simply alpha < 255, so uniformly
+            // translucent fills remain part of the strict comparison.
+            if is_alpha_edge_pixel(
+                left,
+                width,
+                height,
+                x,
+                y,
+                alpha_threshold,
+                edge_alpha_delta_threshold,
+            )
+                || is_alpha_edge_pixel(
+                    right,
+                    width,
+                    height,
+                    x,
+                    y,
+                    alpha_threshold,
+                    edge_alpha_delta_threshold,
+                )
+            {
+                seeds[index] = true;
+            }
+        }
+    }
+
+    for y in 0..height {
+        for x in 0..width {
+            let index = (y * width + x) as usize;
+            if !seeds[index] {
+                continue;
+            }
+
+            let min_y = (y as i32 - edge_ignore_radius).max(0) as u32;
+            let max_y = (y as i32 + edge_ignore_radius).min(height as i32 - 1) as u32;
+            let min_x = (x as i32 - edge_ignore_radius).max(0) as u32;
+            let max_x = (x as i32 + edge_ignore_radius).min(width as i32 - 1) as u32;
+
+            for mask_y in min_y..=max_y {
+                for mask_x in min_x..=max_x {
+                    mask[(mask_y * width + mask_x) as usize] = true;
+                }
+            }
+        }
+    }
+
+    mask
+}
+
+fn is_alpha_edge_pixel(
+    bytes: &[u8],
+    width: u32,
+    height: u32,
+    x: u32,
+    y: u32,
+    alpha_threshold: u8,
+    edge_alpha_delta_threshold: u8,
+) -> bool {
+    let alpha = alpha_at(bytes, width, x, y);
+    if alpha <= alpha_threshold || alpha == u8::MAX {
+        return false;
+    }
+
+    let min_y = y.saturating_sub(1);
+    let max_y = (y + 1).min(height.saturating_sub(1));
+    let min_x = x.saturating_sub(1);
+    let max_x = (x + 1).min(width.saturating_sub(1));
+
+    for neighbor_y in min_y..=max_y {
+        for neighbor_x in min_x..=max_x {
+            if neighbor_x == x && neighbor_y == y {
+                continue;
+            }
+            let neighbor_alpha = alpha_at(bytes, width, neighbor_x, neighbor_y);
+            if alpha.abs_diff(neighbor_alpha) > edge_alpha_delta_threshold {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+fn alpha_at(bytes: &[u8], width: u32, x: u32, y: u32) -> u8 {
+    let offset = ((y * width + x) as usize) * 4 + 3;
+    bytes.get(offset).copied().unwrap_or(0)
 }
 
 /// Decodes a PNG to raw RGBA bytes via ffmpeg.

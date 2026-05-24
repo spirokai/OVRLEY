@@ -125,6 +125,13 @@ fn e2e_canvas_parity() -> Result<()> {
     } else {
         0.0
     };
+    let edge_insensitive_pct = if diff_stats.edge_compared_pixels > 0 {
+        (diff_stats.edge_insensitive_mismatch_pixels as f64
+            / diff_stats.edge_compared_pixels as f64)
+            * 100.0
+    } else {
+        0.0
+    };
     println!(
         "  diff image: {}",
         diff_png.display()
@@ -145,6 +152,16 @@ fn e2e_canvas_parity() -> Result<()> {
         diff_stats.channel_tolerance,
         diff_stats.overlay_significant_mismatch_pixels,
         diff_stats.overlay_pixels
+    );
+    println!(
+        "  edge_insensitive_mismatch_count (alpha > {}, channel delta > {}, edge alpha delta > {}, edge radius {}px): {} / {} ({edge_insensitive_pct:.4}%; ignored {} edge pixels)",
+        diff_stats.alpha_threshold,
+        diff_stats.channel_tolerance,
+        diff_stats.edge_alpha_delta_threshold,
+        diff_stats.edge_ignore_radius,
+        diff_stats.edge_insensitive_mismatch_pixels,
+        diff_stats.edge_compared_pixels,
+        diff_stats.edge_ignored_pixels
     );
 
     if !pass {

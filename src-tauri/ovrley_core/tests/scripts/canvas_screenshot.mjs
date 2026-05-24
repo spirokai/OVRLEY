@@ -60,6 +60,18 @@ async function main() {
         border-color: transparent !important;
         box-shadow: none !important;
       }
+
+      .ovrley-moveable,
+      .moveable-control-box,
+      .moveable-line,
+      .moveable-control,
+      .moveable-area,
+      [data-testid="widget-badge-layer"],
+      [data-testid="canvas-status-badges"] {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
     `,
   })
 
@@ -137,6 +149,23 @@ async function main() {
       el.style.background = 'transparent'
       el.style.backgroundColor = 'transparent'
       el.style.boxShadow = 'none'
+    }
+
+    const editorChromeSelectors = [
+      '.ovrley-moveable',
+      '.moveable-control-box',
+      '.moveable-line',
+      '.moveable-control',
+      '.moveable-area',
+      '[data-testid="widget-badge-layer"]',
+      '[data-testid="canvas-status-badges"]',
+    ]
+    for (const selector of editorChromeSelectors) {
+      for (const el of document.querySelectorAll(selector)) {
+        el.style.display = 'none'
+        el.style.opacity = '0'
+        el.style.visibility = 'hidden'
+      }
     }
   })
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)))

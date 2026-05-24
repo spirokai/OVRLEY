@@ -35,7 +35,7 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-50 overflow-visible">
+    <div data-testid="widget-badge-layer" className="pointer-events-none absolute inset-0 z-50 overflow-visible">
       {visibleWidgets.map((widget) => {
         const Icon = WIDGET_ICONS[widget.type] || Tag
         const metricPreviewModel = buildMetricWidgetPreviewModel({
@@ -72,7 +72,7 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
  */
 function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
   return (
-    <div className="pointer-events-none absolute left-4 top-4 z-50 flex items-center gap-2">
+    <div data-testid="canvas-status-badges" className="pointer-events-none absolute left-4 top-4 z-50 flex items-center gap-2">
       <div className="rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
         {width} &times; {height}
       </div>
