@@ -1,7 +1,7 @@
 # Canvas Parity Test
 
 Compares a Rust Skia-rendered frame against a Playwright-captured browser SVG
-frame to detect pixel-level rendering differences between the two pipelines.
+frame to detect pixel-level rendering differences between the two pipelines. Generates screenshots from both pipelines, computes SSIM scores, and produces a diff image highlighting mismatches, and a JSON summary of the results.
 
 ## How to run
 
@@ -54,12 +54,13 @@ respectively.
 
 All written to `src-tauri/ovrley_core/tests/canvas_parity/`:
 
-| File                | Contents                                                        |
-| ------------------- | --------------------------------------------------------------- |
-| `skia.png`          | Frame rendered by Rust Skia                                     |
-| `canvas.png`        | Frame captured from the browser via Playwright                  |
-| `canvas-parity.png` | Pixel diff overlay (red = significant mismatch; dimmed = match) |
-| `summary.json`      | SSIM scores + mismatch statistics + artifact paths              |
+| File                | Contents                                           |
+| ------------------- | -------------------------------------------------- |
+| `skia.png`          | Frame rendered by Rust Skia                        |
+| `canvas.png`        | Frame captured from the browser via Playwright     |
+| `canvas-parity.png` | Pixel diff overlay (red = significant mismatch     |
+| )                   |
+| `summary.json`      | SSIM scores + mismatch statistics + artifact paths |
 
 Intermediate temp files (mock data, debug renders) go under
 `src-tauri/target/canvas-parity/` and are not cleaned up after the run.
@@ -84,9 +85,13 @@ Printed to stdout and written to `summary.json`:
 | **Preview exclusive**   | Content present in Canvas but not Skia.                                                                   |
 | **Render exclusive**    | Content present in Skia but not Canvas.                                                                   |
 
+Clean (AA excluded) metric along with SSIM are the most meaningful; but visual inspection of the diff image should always be a priority. Pixel is considered mismatched even if a single channel differs by a single point - because of this, a tiny threshold is applied to allow for rasterization/export artifacts.
+
+Minor mismatch (<2% of pixels), even in AA-excluded results, **is expected and completely normal** due to rendering pipeline differences - e.g. slightly different character spacing in strings which cannot be perceived by a naked eye. Significant mismatch (>3% of pixels) likely indicates a real rendering bug, such as a missing widget, incorrect colors, or a compositing error.
+
 ### Diff image colours
 
-- **Bright red** pixel = significant mismatch on a non-edge overlay pixel.
+- **Bright red** pixel = significant mismatch between the two renders.
 
 ### Threshold constants
 
