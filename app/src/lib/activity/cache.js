@@ -30,3 +30,7 @@ export function getCurrentParsedActivity() {
 export function clearCurrentActivityCache() {
   currentParsedActivity = null
 }
+
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  window.setCurrentActivityCache = setCurrentActivityCache
+}

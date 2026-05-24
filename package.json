@@ -24,6 +24,7 @@
   "license": "GPL-3.0-or-later",
   "packageManager": "pnpm@10.25.0",
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@tauri-apps/cli": "^2.9.6",
     "semantic-release": "^25.0.3"

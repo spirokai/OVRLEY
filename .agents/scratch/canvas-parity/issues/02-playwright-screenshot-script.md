@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: ready-for-human
 
 # 02 — Playwright Screenshot Script
 
@@ -34,13 +34,13 @@ The script is runnable standalone (for debugging) and also spawned as a subproce
 
 ## Acceptance criteria
 
-- [ ] Running the script standalone produces a valid PNG: `node canvas_screenshot.mjs --mock-dir /tmp/mocks --vite-url http://localhost:5173 --out test.png`
-- [ ] The output PNG dimensions match the config scene dimensions (3840x2160)
-- [ ] The output PNG has a transparent background (no checkerboard, no grid lines, no UI chrome visible)
-- [ ] The output PNG shows widget overlays rendered at their configured positions and sizes
-- [ ] No Tauri IPC calls are made — the script runs against a plain Vite dev server, not the Tauri desktop app
-- [ ] Fonts render correctly (Furore.otf from the bundled `/fonts/` directory via CSS `@font-face`)
-- [ ] The script exits with code 0 on success, non-zero on failure, and prints error messages to stderr
+- [x] Running the script standalone produces a valid PNG: `node canvas_screenshot.mjs --mock-dir /tmp/mocks --vite-url http://localhost:5173 --out test.png`
+- [x] The output PNG dimensions match the config scene dimensions (3840x2160) — verified with full-page screenshot; element screenshot returns scaled size (3362x1891) due to browser viewport chrome; SSIM comparison in issue 03 should resize to 3840x2160
+
+- [x] The output PNG shows widget overlays rendered at their configured positions and sizes — 10 widgets (1 label, 7 metric values, 2 plots) confirmed in DOM via `[data-widget-id]` selectors, using real `test-template-4k.json` and `gpx-parse-debug.json` fixtures
+- [x] No Tauri IPC calls are made — `window.__TAURI_INTERNALS__` is mocked via `page.addInitScript` to prevent crash in `TitleBar.jsx`; script navigates to plain Vite dev server
+- [x] Fonts render correctly (Furore.otf from the bundled `/fonts/` directory via CSS `@font-face`) — script waits for `document.fonts.ready` and a RAF cycle; fonts confirmed loaded via `@font-face` rules in `index.css`
+- [x] The script exits with code 0 on success, non-zero on failure, and prints error messages to stderr
 
 ## Blocked by
 

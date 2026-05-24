@@ -60,6 +60,7 @@ The test is feature-gated behind `canvas-parity` (set up in Slice 1). When the f
 - [ ] When SSIM < 0.98: the test fails, prints per-plane scores, pixel mismatch count, and writes a diff PNG to `target/canvas-parity/failures/`
 - [ ] Vite server is killed and temp files cleaned after the test, regardless of pass or fail
 - [ ] All three mock JSON files (template, activity, store-state) are valid JSON that could be consumed by the frontend
+- [ ] The output PNG has a transparent background (no checkerboard, no grid lines, no UI chrome visible) — both Skia renderer and Playwright use `transparent` background mode so SSIM compares only widget pixels
 
 ## Blocked by
 

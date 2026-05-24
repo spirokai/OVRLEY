@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: ready-for-human
 
 # 01 — Feature Gate, Dependencies, and Store Export
 
@@ -18,12 +18,12 @@ Set up all infrastructure required before any testing can begin. This slice adds
 
 ## Acceptance criteria
 
-- [ ] `ovrley_core/Cargo.toml` has `[features] canvas-parity = []` and a `[[test]]` target with `required-features = ["canvas-parity"]`
-- [ ] Running `cargo test -p ovrley_core` does NOT compile the canvas parity test binary (feature not enabled)
-- [ ] Running `cargo test -p ovrley_core --features canvas-parity --test canvas_parity_tests` compiles the test binary (an empty stub test is acceptable)
-- [ ] `package.json` includes `@playwright/test` in devDependencies
-- [ ] `window.__STORE__` is accessible in the browser console when running `pnpm dev:frontend` (it is an object with `.setState`, `.getState`, `.subscribe` methods matching the Zustand store API)
-- [ ] `window.__STORE__` is undefined when running `pnpm build:frontend` and inspecting the production bundle
+- [x] `ovrley_core/Cargo.toml` has `[features] canvas-parity = []` and a `[[test]]` target with `required-features = ["canvas-parity"]`
+- [x] Running `cargo test -p ovrley_core` does NOT compile the canvas parity test binary (feature not enabled)
+- [x] Running `cargo test -p ovrley_core --features canvas-parity --test canvas_parity_tests` compiles the test binary (an empty stub test is acceptable)
+- [x] `package.json` includes `@playwright/test` in devDependencies
+- [x] `window.__STORE__` is accessible in the browser console when running `pnpm dev:frontend` (it is an object with `.setState`, `.getState`, `.subscribe` methods matching the Zustand store API)
+- [x] `window.__STORE__` is undefined when running `pnpm build:frontend` and inspecting the production bundle
 
 ## Blocked by
 

@@ -14,5 +14,12 @@ thiserror = "2"
 log = "0.4"
 skia-safe = { version = "0.75", features = ["binary-cache"] }
 
+[features]
+canvas-parity = []
+
 [dev-dependencies]
 anyhow = "1.0"
+
+[[test]]
+name = "canvas_parity_tests"
+required-features = ["canvas-parity"]

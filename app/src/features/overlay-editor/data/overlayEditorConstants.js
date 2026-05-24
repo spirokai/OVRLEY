@@ -20,6 +20,8 @@ export const CANVAS_BACKGROUND_COLORS = {
   black: '#000000',
   checker: '#000000',
   white: '#f4ead2',
+  // for pixel parity debugging purposes
+  transparent: 'transparent',
 }
 
 // ---- From metricTextUtils.js ----
