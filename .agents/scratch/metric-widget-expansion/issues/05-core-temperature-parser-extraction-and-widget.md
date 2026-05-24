@@ -12,14 +12,17 @@ Add `core_temperature` as a Wave 2 standard metric widget. Extend activity parsi
 
 The widget should behave like the rest of the standard metric value family: it appears in the widget drawer even when the loaded activity does not provide the metric, uses the shared editor and render paths, supports the approved temperature-unit behavior, and renders a placeholder when the activity data is missing.
 
+`core_temperature` uses an extracted Lucide `Thermometer` SVG asset as its shared icon.
+
 ## Acceptance criteria
 
 - [ ] `core_temperature` is extracted into the parsed activity payload where supported
 - [ ] `core_temperature` is represented in the standard metric widget contract and can be created from the widget drawer
+- [ ] `core_temperature` uses `°C` as its default display unit and supports the approved temperature-unit behavior through the shared standard metric widget schema
 - [ ] The widget renders end-to-end in the editor preview and Rust export path
-- [ ] The widget supports the approved temperature unit-selection behavior through the shared standard metric widget schema
 - [ ] The widget renders a placeholder when the loaded activity does not provide `core_temperature`
 - [ ] The widget uses the agreed shared icon/source-of-truth asset rules
+- [ ] `core_temperature` ships with the extracted Lucide `Thermometer` SVG asset in the shared icon catalog
 - [ ] Frontend automated tests cover widget creation, unit behavior, placeholder behavior, and standard metric integration for `core_temperature`
 - [ ] Backend automated tests cover parser extraction, formatter/render behavior, and standard metric integration for `core_temperature`
 - [ ] No lint errors (`pnpm lint`)

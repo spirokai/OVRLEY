@@ -98,6 +98,12 @@ After all tests pass, look for [refactor candidates](refactoring.md):
 
 **Never refactor while RED.** Get to GREEN first.
 
+### 5. Verify
+
+Before you finish the work:
+-verify ALL acceptance criteria are met, tests are meaningful, and code is clean
+-verify against acceptance criteria given in the issue or PRD, not just that tests pass
+
 ## Checklist Per Cycle
 
 ```

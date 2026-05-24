@@ -34,6 +34,26 @@ The implementation will keep explicit widget types per metric, but standardize h
 
 All Wave 1 widgets will appear in the widget drawer regardless of activity coverage. If the loaded activity does not provide a metric, the widget will render a placeholder while preserving layout. Advanced graphical widgets are explicitly excluded from this PRD.
 
+The icon plan is also part of the feature contract. The following standard metric widgets use extracted Lucide SVGs as their shared assets:
+
+- `pace` -> `Footprints`
+- `air_pressure` -> `Wind`
+- `left_right_balance` -> `Scale`
+- `stride_length` -> `Ruler`
+- `stroke_rate` -> `Waves`
+- `vertical_speed` -> `TrendingUp`
+- `vertical_ratio` -> `Percent`
+- `core_temperature` -> `Thermometer`
+
+The following standard metric widgets require custom shared SVG assets that fit seamlessly with the Lucide icon family:
+
+- `g_force`
+- `ground_contact_time`
+- `torque`
+- `gear_position`
+
+All shared standard metric widget icon assets live canonically in `assets/widget-icons/`. Extracted Lucide icons for these widgets must be committed there as SVG files and consumed from there by both preview and export. They must not remain runtime-only `lucide-react` component references for the widget system.
+
 ## User Stories
 
 1. As an overlay editor user, I want to add Pace as a standard metric widget, so that I can show running or swimming pace in my overlay.
@@ -93,25 +113,71 @@ All Wave 1 widgets will appear in the widget drawer regardless of activity cover
 - All standard metric widgets remain available in the widget drawer regardless of whether the currently loaded activity contains that metric.
 - Missing telemetry for a configured widget renders a placeholder rather than conditionally hiding the widget.
 - Wave 1 defaults are metric-first.
+- Wave 1 default display units and formats are fixed as follows:
+  `pace` -> `min/km`
+  `g_force` -> `g`
+  `air_pressure` -> `hPa`
+  `ground_contact_time` -> `ms`
+  `left_right_balance` -> `52% / 48%`
+  `stride_length` -> `m`
+  `stroke_rate` -> `spm`
+  `torque` -> `Nm`
+  `vertical_speed` -> `m/s`
 - Wave 1 unit sets are shipped in full rather than as reduced first-pass subsets.
 - Pace defaults to `m:ss min/km`.
 - Pace supports `min/km` and `min/mi`.
 - Left/Right Balance uses a single value-string layout in Wave 1 rather than a specialized split renderer.
 - Left/Right Balance offers these formats: `52 / 48`, `L52 / R48`, `52% / 48%`, `52L / 48R`.
 - Left/Right Balance defaults to `52% / 48%`.
+- The placeholder for `left_right_balance` is format-aware and defaults to a single-string empty form such as `-- / --`.
 - Left/Right Balance is normalized at parse time into a canonical left-percent scalar series. Formatter and renderer logic derive all supported display formats from that scalar.
 - Left/Right Balance normalization is a second deep module opportunity. Parser-specific balance object shapes should be collapsed before the widget system sees them.
 - The simple `0 / 1 decimal` editor control reuses the existing `decimals` field instead of introducing a new boolean or display-specific field.
 - The `0 / 1 decimal` control is only exposed for metrics where fractional display carries signal. Pace and Left/Right Balance do not use this control. Fixed-integer metrics that do not meaningfully benefit from fractions do not use this control.
+- The metrics that expose the `0 / 1 decimal` control are:
+  `g_force`
+  `stride_length`
+  `torque`
+  `vertical_speed`
+- The Wave 1 metrics that do not expose the `0 / 1 decimal` control are:
+  `pace`
+  `air_pressure`
+  `ground_contact_time`
+  `stroke_rate`
+  `left_right_balance`
 - Final production-quality icons are part of the Wave 1 definition of done. Temporary placeholder icons are not acceptable.
 - When a planned icon has a suitable Lucide source, the SVG must be extracted into a shared asset file rather than referenced only as a frontend component.
 - Custom icons are only created when needed and must visually fit the Lucide icon family.
-- Shared standard metric widget icons live in one canonical shared asset location so both the React preview renderer and the Rust export renderer read from the same source of truth.
+- Shared standard metric widget icons live in `assets/widget-icons/` so both the React preview renderer and the Rust export renderer read from the same source of truth.
 - Wave 1 custom icons must fit the current backend SVG subset rather than expanding the backend SVG parser as part of this feature.
+- The icon mapping for the planned standard metric widgets is fixed as follows:
+  `pace` -> `Footprints`
+  `air_pressure` -> `Wind`
+  `left_right_balance` -> `Scale`
+  `stride_length` -> `Ruler`
+  `stroke_rate` -> `Waves`
+  `vertical_speed` -> `TrendingUp`
+  `vertical_ratio` -> `Percent`
+  `core_temperature` -> `Thermometer`
+  `g_force` -> custom
+  `ground_contact_time` -> custom
+  `torque` -> custom
+  `gear_position` -> custom
 - The shared standard metric widget icon catalog is another deep module opportunity. The rest of the system should consume icon definitions through a stable registry rather than through scattered hardcoded mappings.
 - Wave 2 is allowed to be parser-source-dependent. If a metric is available in FIT but not in most GPX activities, the widget still exists and renders a placeholder when the activity lacks the metric.
 - Wave 2 metrics are `gear_position`, `vertical_ratio`, and `core_temperature`.
+- Wave 2 default display units are fixed as follows:
+  `gear_position` -> unitless
+  `vertical_ratio` -> `%`
+  `core_temperature` -> `°C`
 - Existing standard metric widgets should be folded into the new metadata-driven path so OVRLEY does not end up with two standard metric systems side by side.
+- The existing standard metric widgets that must be covered by the shared metadata-driven path are:
+  `speed`
+  `heartrate`
+  `cadence`
+  `power`
+  `temperature`
+- `time` and `gradient` may remain specialized paths rather than being forced into the shared standard metric widget path.
 - The implementation should preserve the current explicit distinction between standard metric value widgets and plot widgets. The refactor expands the standard metric value widget family; it does not collapse the entire widget system into one universal abstraction.
 
 ## Testing Decisions

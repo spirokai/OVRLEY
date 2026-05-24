@@ -12,13 +12,17 @@ Add `vertical_ratio` as a Wave 2 standard metric widget. Extend activity parsing
 
 The widget should behave like the rest of the standard metric value family: it appears in the widget drawer even when the loaded activity does not provide the metric, uses the shared editor and render paths, and renders a placeholder when the activity data is missing.
 
+`vertical_ratio` uses an extracted Lucide `Percent` SVG asset as its shared icon.
+
 ## Acceptance criteria
 
 - [ ] `vertical_ratio` is extracted into the parsed activity payload where supported
 - [ ] `vertical_ratio` is represented in the standard metric widget contract and can be created from the widget drawer
+- [ ] `vertical_ratio` uses `%` as its default display unit
 - [ ] The widget renders end-to-end in the editor preview and Rust export path
 - [ ] The widget renders a placeholder when the loaded activity does not provide `vertical_ratio`
 - [ ] The widget uses the agreed standard metric widget schema and shared icon/source-of-truth asset rules
+- [ ] `vertical_ratio` ships with the extracted Lucide `Percent` SVG asset in the shared icon catalog
 - [ ] Frontend automated tests cover widget creation, placeholder behavior, and standard metric integration for `vertical_ratio`
 - [ ] Backend automated tests cover parser extraction, formatter/render behavior, and standard metric integration for `vertical_ratio`
 - [ ] No lint errors (`pnpm lint`)
