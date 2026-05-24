@@ -131,6 +131,7 @@ pub(crate) fn normalize_elevation_plot(
         imperial_label_offset_y: plot.imperial_label_offset_y.unwrap_or(6.0) * scale,
         label_font: point_label
             .font
+            .or(point_label.font_family)
             .or_else(|| first_value_font(config))
             .or_else(|| config.scene.font.clone()),
         label_font_size: point_label

@@ -353,6 +353,8 @@ pub struct PointLabelConfig {
     #[serde(default)]
     pub font: Option<String>,
     #[serde(default)]
+    pub font_family: Option<String>,
+    #[serde(default)]
     pub font_size: Option<f32>,
     #[serde(default)]
     pub color: Option<String>,
@@ -586,8 +588,33 @@ pub fn parse_template_json(input: &str) -> CoreResult<RenderConfig> {
         .ok_or_else(|| CoreError::Config("template config missing".into()))?;
     let config_json = serde_json::to_string(&config_value)
         .map_err(|error| CoreError::Config(format!("template config JSON: {error}")))?;
+    let mut config = parse_config_json(&config_json)?;
+    apply_template_global_defaults(&mut config, &value);
+    Ok(config)
+}
 
-    parse_config_json(&config_json)
+fn apply_template_global_defaults(config: &mut RenderConfig, template: &Value) {
+    let Some(globals) = template.get("settings").and_then(|settings| settings.get("globalDefaults")) else {
+        return;
+    };
+
+    let font_values = globals
+        .get("font_values")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+
+    if let Some(font_values) = font_values {
+        for value in &mut config.values {
+            if value.font.is_none() {
+                value.font = Some(font_values.clone());
+            }
+            if value.font_family.is_none() {
+                value.font_family = Some(font_values.clone());
+            }
+        }
+    }
 }
 
 impl RenderConfig {

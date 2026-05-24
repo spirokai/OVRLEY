@@ -1,8 +1,14 @@
-//! End-to-end pixel parity test comparing Rust Skia rendering to the
+//! Pixel parity test comparing Rust Skia rendering to the
 //! frontend React SVG canvas via Playwright.
 //!
 //! Feature-gated behind `canvas-parity`:
 //!   cargo test -p ovrley_core --features canvas-parity --test canvas_parity_tests -- --nocapture
+//!
+//! Output artifacts (skia.png, canvas.png, canvas-parity.png, summary.json) are
+//! written to:
+//!   src-tauri/ovrley_core/tests/canvas_parity/
+//! with intermediate temp files under:
+//!   src-tauri/target/canvas-parity/
 //!
 //! Requires: Node.js, pnpm (or npm), ffmpeg, Playwright browsers installed.
 
@@ -16,6 +22,7 @@ use canvas_parity::{
     test_app_paths, write_mock_data, ViteServer,
 };
 use ovrley_core::activity::build_dense_activity_report;
+use std::fs;
 use std::path::PathBuf;
 
 /// The second within the activity to render (mid-activity, all widgets active).
@@ -27,7 +34,7 @@ const SSIM_THRESHOLD: f64 = 0.98;
 
 /// Compares a Skia-rendered frame to a Playwright-captured browser SVG frame.
 #[test]
-fn e2e_canvas_parity() -> Result<()> {
+fn canvas_parity() -> Result<()> {
     // ── Resolve paths ──────────────────────────────────────────────────
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let fixture_root = manifest_dir.join("tests").join("fixtures");
@@ -36,16 +43,19 @@ fn e2e_canvas_parity() -> Result<()> {
         .and_then(|p| p.parent())
         .unwrap_or(&manifest_dir)
         .to_path_buf();
+    let src_tauri = manifest_dir.parent().unwrap();
 
-    let case_name = "e2e-canvas-parity";
-    let case_root = git_root.join("target").join("canvas-parity").join(case_name);
+    let case_name = "canvas-parity";
+    let case_root = src_tauri.join("target").join("canvas-parity").join(case_name);
     let mock_dir = case_root.join("mock-data");
-    let skia_png = case_root.join("skia.png");
-    let canvas_png = case_root.join("canvas.png");
-    let failure_dir = git_root.join("target").join("canvas-parity").join("failures");
-    let diff_png = failure_dir.join("e2e-canvas-parity.png");
+    let artifacts_dir = manifest_dir.join("tests").join("canvas_parity");
+    let skia_png = artifacts_dir.join("skia.png");
+    let canvas_png = artifacts_dir.join("canvas.png");
+    let diff_png = artifacts_dir.join("canvas-parity.png");
+    let summary_json = artifacts_dir.join("summary.json");
+    fs::create_dir_all(&artifacts_dir)?;
 
-    println!("=== Canvas Parity E2E Test ===");
+    println!("=== Canvas Parity Test ===");
     println!("  fixture root: {}", fixture_root.display());
     println!("  case root:    {}", case_root.display());
 
@@ -64,7 +74,7 @@ fn e2e_canvas_parity() -> Result<()> {
 
     // 3. Set up AppPaths and prepare assets
     println!("[3/9] Setting up AppPaths...");
-    let app_paths = test_app_paths(&git_root, case_name)?;
+    let app_paths = test_app_paths(&git_root, &case_root)?;
 
     // 4. Render Skia PNG
     println!("[4/9] Rendering Skia preview...");
@@ -86,6 +96,7 @@ fn e2e_canvas_parity() -> Result<()> {
         "  Playwright captured transparent widget layer at {}x{}",
         info.width, info.height
     );
+    drop(vite); // Vite no longer needed; kill early so it doesn't block the terminal.
 
     // 8. Run ffmpeg SSIM comparison
     println!("[8/9] Running SSIM comparison...");
@@ -96,7 +107,7 @@ fn e2e_canvas_parity() -> Result<()> {
     let pass = ssim.combined >= SSIM_THRESHOLD;
     if pass {
         println!(
-            "  ✓ SSIM: {:.4} (threshold: {SSIM_THRESHOLD}) — PASS",
+            "  SSIM: {:.4} (threshold: {SSIM_THRESHOLD}) — PASS",
             ssim.combined
         );
         println!(
@@ -105,7 +116,7 @@ fn e2e_canvas_parity() -> Result<()> {
         );
     } else {
         println!(
-            "  ✗ SSIM: {:.4} (threshold: {SSIM_THRESHOLD}) — FAIL",
+            "  SSIM: {:.4} (threshold: {SSIM_THRESHOLD}) — FAIL",
             ssim.combined
         );
         println!("  Y: {:.4}  U: {:.4}  V: {:.4}", ssim.y, ssim.u, ssim.v);
@@ -146,47 +157,105 @@ fn e2e_canvas_parity() -> Result<()> {
         "  diff image: {}",
         diff_png.display()
     );
-    println!(
-        "  raw_mismatch_count: {} / {total_pixels} ({raw_pct:.4}%)",
-        diff_stats.mismatch_pixels
+     println!(
+        "  ---------------------------------------------------------",
+    ); 
+     println!(
+        "  PIXEL MISMATCH COUNT:",
     );
     println!(
-        "  alpha_masked_mismatch_count (alpha > {}): {} / {} ({alpha_masked_pct:.4}%)",
-        diff_stats.alpha_threshold,
+        "  FULL FRAME ({} / {})- {raw_pct:.2}% ",
+        diff_stats.mismatch_pixels,
+        total_pixels
+    );
+    println!(
+        "  OVERLAY ONLY ({} / {}) - {alpha_masked_pct:.2}%",
         diff_stats.overlay_mismatch_pixels,
         diff_stats.overlay_pixels
     );
     println!(
-        "  canvas_only_pixels (canvas alpha > {}, skia alpha <= {}): {} / {} ({canvas_only_pct:.4}%)",
-        diff_stats.only_pixel_alpha_threshold,
-        diff_stats.only_pixel_alpha_threshold,
-        diff_stats.canvas_only_pixels,
-        diff_stats.overlay_pixels
-    );
-    println!(
-        "  skia_only_pixels (skia alpha > {}, canvas alpha <= {}): {} / {} ({skia_only_pct:.4}%)",
-        diff_stats.only_pixel_alpha_threshold,
-        diff_stats.only_pixel_alpha_threshold,
-        diff_stats.skia_only_pixels,
-        diff_stats.overlay_pixels
-    );
-    println!(
-        "  alpha_tolerant_mismatch_count (alpha > {}, channel delta > {}): {} / {} ({alpha_tolerant_pct:.4}%)",
-        diff_stats.alpha_threshold,
-        diff_stats.channel_tolerance,
+        "  THRESHOLD APPLIED ({} / {}) - {alpha_tolerant_pct:.2}%",
         diff_stats.overlay_significant_mismatch_pixels,
         diff_stats.overlay_pixels
     );
     println!(
-        "  edge_insensitive_mismatch_count (alpha > {}, channel delta > {}, edge alpha delta > {}, edge radius {}px): {} / {} ({edge_insensitive_pct:.4}%; ignored {} edge pixels)",
-        diff_stats.alpha_threshold,
-        diff_stats.channel_tolerance,
-        diff_stats.edge_alpha_delta_threshold,
-        diff_stats.edge_ignore_radius,
+        "  CLEAN (AA EXCLUDED) ({} / {}; ignored {}) - {edge_insensitive_pct:.2}%",
         diff_stats.edge_insensitive_mismatch_pixels,
         diff_stats.edge_compared_pixels,
         diff_stats.edge_ignored_pixels
     );
+     println!(
+        "  ---------------------------------------------------------",
+    ); 
+     println!(
+        "  ORPHANED PIXELS:",
+    );    
+    println!(
+        "  PREVIEW EXCLUSIVE ({} / {}) - {canvas_only_pct:.2}%",
+        diff_stats.canvas_only_pixels,
+        diff_stats.overlay_pixels
+    );
+    println!(
+        "  RENDER EXCLUSIVE ({} / {}) - {skia_only_pct:.2}%",
+        diff_stats.skia_only_pixels,
+        diff_stats.overlay_pixels
+    );
+    println!(
+        "  summary: {}",
+        summary_json.display()
+    );
+
+    let summary = serde_json::json!({
+        "ssim": {
+            "combined": ssim.combined,
+            "y": ssim.y,
+            "u": ssim.u,
+            "v": ssim.v,
+            "threshold": SSIM_THRESHOLD,
+            "pass": pass,
+        },
+        "pixel_mismatch": {
+            "full_frame": {
+                "count": diff_stats.mismatch_pixels,
+                "total": total_pixels,
+                "percent": format!("{:.2}", raw_pct),
+            },
+            "overlay": {
+                "count": diff_stats.overlay_mismatch_pixels,
+                "total": diff_stats.overlay_pixels,
+                "percent": format!("{:.2}", alpha_masked_pct),
+            },
+            "threshold_applied": {
+                "count": diff_stats.overlay_significant_mismatch_pixels,
+                "total": diff_stats.overlay_pixels,
+                "percent": format!("{:.2}", alpha_tolerant_pct),
+            },
+            "clean_aa_excluded": {
+                "mismatch": diff_stats.edge_insensitive_mismatch_pixels,
+                "compared": diff_stats.edge_compared_pixels,
+                "ignored": diff_stats.edge_ignored_pixels,
+                "percent": format!("{:.2}", edge_insensitive_pct),
+            },
+        },
+        "orphaned_pixels": {
+            "canvas_exclusive": {
+                "count": diff_stats.canvas_only_pixels,
+                "total": diff_stats.overlay_pixels,
+                "percent": format!("{:.2}", canvas_only_pct),
+            },
+            "skia_exclusive": {
+                "count": diff_stats.skia_only_pixels,
+                "total": diff_stats.overlay_pixels,
+                "percent": format!("{:.2}", skia_only_pct),
+            },
+        },
+        "artifacts": {
+            "skia": skia_png.to_string_lossy(),
+            "canvas": canvas_png.to_string_lossy(),
+            "diff": diff_png.to_string_lossy(),
+        },
+    });
+    fs::write(&summary_json, serde_json::to_string_pretty(&summary)?)?;
 
     if !pass {
         anyhow::bail!(

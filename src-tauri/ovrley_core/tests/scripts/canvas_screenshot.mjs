@@ -1,3 +1,21 @@
+/**
+ * Playwright screenshot script for canvas-parity tests.
+ *
+ * Launches a headless Chromium browser, navigates to a Vite dev server,
+ * injects mock data (template, activity, store state), hides editor chrome,
+ * forces the overlay to native scale, and captures a transparent-background
+ * screenshot of the widget layer.
+ *
+ * CLI arguments:
+ *   --mock-dir <path>    Directory containing mock data JSON files
+ *   --vite-url <url>     URL of the running Vite dev server
+ *   --out <path>         Output PNG path
+ *
+ * Environment:
+ *   OVRLEY_CANVAS_PARITY_SHOW_EDITOR_CHROME=1  — keep editor chrome visible
+ *
+ * Called by the Rust test via `run_playwright_screenshot`.
+ */
 import { chromium } from '@playwright/test'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { resolve } from 'path'

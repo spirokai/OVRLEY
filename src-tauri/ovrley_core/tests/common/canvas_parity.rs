@@ -1,4 +1,39 @@
-//! Helper functions for the canvas-parity end-to-end integration test.
+//! Helper functions for the canvas-parity integration test.
+//!
+//! This module provides all the machinery to compare a Rust Skia-rendered
+//! frame against a Playwright-captured browser SVG frame.  The pipeline:
+//!
+//! 1. Parse activity + config fixtures
+//! 2. Build a dense activity report (interpolated frame data)
+//! 3. Render the frame via Skia → `skia.png`
+//! 4. Serialize mock data for the frontend (`template.json`, `activity.json`,
+//!    `store-state.json`)
+//! 5. Start a Vite dev server hosting the React editor app
+//! 6. Run a Playwright script that loads the app, injects the mock data,
+//!    hides editor chrome, forces native-scale rendering, and screenshots
+//!    the widget layer → `canvas.png`
+//! 7. Compare the two PNGs via ffmpeg SSIM (cropped to alpha union)
+//! 8. Generate a pixel-level diff image + detailed mismatch statistics
+//!
+//! # Pixel comparison layers
+//!
+//! The diff analysis categorises every pixel RGBA channel into several
+//! concentric buckets so a developer can distinguish genuine rendering bugs
+//! from harmless anti-aliasing divergence:
+//!
+//! | Category | Meaning |
+//! |---|---|
+//! | **Full-frame mismatch** | Any pixel where at least one RGBA channel differs between Skia and Canvas. Includes transparent / empty pixels. |
+//! | **Overlay pixel** | A pixel where *either* image has alpha > `ALPHA_MASK_THRESHOLD` (2). Ignores the vast transparent area. |
+//! | **Overlay mismatch** | Overlay pixel with *any* channel difference. |
+//! | **Significant mismatch** | Overlay pixel where the max channel delta exceeds `DIFF_CHANNEL_TOLERANCE` (4). Filters out sub-threshold noise. |
+//! | **Edge-insensitive mismatch** | Significant mismatch that is *not* on an alpha edge. The cleanest proxy for "real rendering differences." |
+//! | **Canvas-only / Skia-only** | Overlay pixel where only one image has alpha > `ONLY_PIXEL_ALPHA_THRESHOLD` (96). Indicates content present in one renderer but absent in the other. |
+//!
+//! # Threshold constants
+//!
+//! All five constants at the module level (lines 548-552) control the
+//! sensitivity of the diff.  See their individual doc comments for details.
 //!
 //! All functions in this module are only compiled when the `canvas-parity`
 //! Cargo feature is enabled.
@@ -89,12 +124,8 @@ fn file_size_kb(path: &Path) -> u64 {
 
 // ── AppPaths builder ──────────────────────────────────────────────────────
 
-/// Builds an AppPaths targeting a test workspace inside `target/canvas-parity/`.
-pub fn test_app_paths(git_root: &Path, case_name: &str) -> Result<AppPaths> {
-    let case_root = git_root
-        .join("target")
-        .join("canvas-parity")
-        .join(case_name);
+/// Builds an AppPaths targeting a test workspace inside a case directory.
+pub fn test_app_paths(git_root: &Path, case_root: &Path) -> Result<AppPaths> {
     let downloads_dir = case_root.join("downloads");
     let temp_dir = case_root.join("tmp");
     let debug_render_dir = case_root.join("debug_render");
@@ -138,6 +169,7 @@ pub fn write_mock_data(
 ) -> Result<()> {
     fs::create_dir_all(mock_dir)
         .with_context(|| format!("failed to create mock dir {}", mock_dir.display()))?;
+    let global_defaults = resolve_global_defaults(config, config_raw);
 
     // 1. template.json — ovrley-template envelope wrapping the config
     let config_obj = config_raw
@@ -151,7 +183,7 @@ pub fn write_mock_data(
         "savedAt": "2026-05-10T00:00:00.000Z",
         "config": config_obj,
         "settings": {
-            "globalDefaults": derive_global_defaults(config)
+            "globalDefaults": global_defaults.clone()
         }
     });
     write_json(&mock_dir.join("template.json"), &template)?;
@@ -166,7 +198,7 @@ pub fn write_mock_data(
         .context("failed to serialize config for store state")?;
     let store_state = serde_json::json!({
         "config": config_value,
-        "globalDefaults": derive_global_defaults(config),
+        "globalDefaults": global_defaults,
         "selectedSecond": selected_second,
         "startSecond": config.scene.start,
         "endSecond": config.scene.end,
@@ -181,6 +213,14 @@ pub fn write_mock_data(
     println!("  wrote store-state.json");
 
     Ok(())
+}
+
+fn resolve_global_defaults(config: &RenderConfig, config_raw: &Value) -> Value {
+    config_raw
+        .get("settings")
+        .and_then(|settings| settings.get("globalDefaults"))
+        .cloned()
+        .unwrap_or_else(|| derive_global_defaults(config))
 }
 
 /// Derives global default values from a RenderConfig.
@@ -238,8 +278,11 @@ fn write_json(path: &Path, value: &Value) -> Result<()> {
 
 // ── Cross-platform command helpers ───────────────────────────────────────────
 
-/// Creates a Command that works on both Windows and Unix.
-/// On Windows, wraps via `cmd.exe /c` to ensure PATH resolution for `.cmd` files.
+/// Creates a [`Command`] that works on both Windows and Unix.
+///
+/// On Windows, wraps the program via `cmd.exe /c <program>` so that
+/// `.cmd` batch files (e.g. `pnpm.cmd`, `node.cmd`) are found on PATH.
+/// On Unix, directly spawns the program.
 fn platform_command(program: &str) -> Command {
     if cfg!(windows) {
         let mut cmd = Command::new("cmd.exe");
@@ -391,7 +434,21 @@ impl ViteServer {
 impl Drop for ViteServer {
     fn drop(&mut self) {
         if let Some(mut process) = self.process.take() {
-            let _ = process.kill();
+            #[cfg(windows)]
+            {
+                // On Windows, process.kill() only kills cmd.exe, not the
+                // actual Node.js child.  Use taskkill /T to kill the tree.
+                let pid = process.id();
+                let _ = Command::new("taskkill")
+                    .args(["/f", "/t", "/pid", &pid.to_string()])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status();
+            }
+            #[cfg(not(windows))]
+            {
+                let _ = process.kill();
+            }
             let _ = process.wait();
         }
     }
@@ -510,11 +567,19 @@ pub fn run_playwright_screenshot(
 
 // ── SSIM runner ──────────────────────────────────────────────────────────────
 
-/// SSIM comparison scores.
+/// SSIM (Structural Similarity Index) comparison scores from ffmpeg.
+///
+/// Fields are named `y`/`u`/`v` for YUV pixel formats or `r`/`g`/`b` for
+/// RGB formats — the parser tries YUV first, then falls back to RGB.
+/// `combined` is the aggregate (All:) score.
 pub struct SsimResult {
+    /// Aggregate SSIM score (All:).
     pub combined: f64,
+    /// Channel 1 — either Y (luma) or R.
     pub y: f64,
+    /// Channel 2 — either U (chroma blue) or G.
     pub u: f64,
+    /// Channel 3 — either V (chroma red) or B.
     pub v: f64,
 }
 
@@ -526,10 +591,48 @@ struct AlphaBounds {
     height: u32,
 }
 
+/// Minimum alpha value (0-255) for a pixel to be considered part of the overlay.
+///
+/// Pixels with alpha ≤ this threshold in *both* images are treated as
+/// empty/transparent background and excluded from overlay-level statistics.
+/// Set to 2 so that nearly-transparent anti-aliased fringe pixels are still
+/// included in the overlay comparison.
 const ALPHA_MASK_THRESHOLD: u8 = 2;
+
+/// Alpha threshold for classifying a pixel as "only present in one renderer."
+///
+/// If the Skia image has alpha > this value while the Canvas image has
+/// alpha ≤ this value, the pixel is counted as **Skia-only** (and vice versa
+/// for Canvas-only).  Set to 96 (roughly 38 % opacity) so that very faint
+/// translucent artifacts do not pollute the orphaned-pixel counts.
 const ONLY_PIXEL_ALPHA_THRESHOLD: u8 = 96;
+
+/// Maximum per-channel difference below which a pixel is *not* considered a
+/// significant mismatch.
+///
+/// Tiny channel deltas arise from different FreeType glyph rasterisation
+/// (sub-pixel hinting, gamma correction, ClearType vs. greyscale AA).
+/// Pixels whose R, G, B, and A all differ by ≤ this value are treated as
+/// matching.  Set to 4, which is barely perceptible and filters out
+/// harmless sub-pixel positioning noise while catching real colour errors.
 const DIFF_CHANNEL_TOLERANCE: u8 = 4;
+
+/// Minimum absolute difference in alpha between a pixel and any of its
+/// 8 neighbours for that pixel to be flagged as an "alpha edge."
+///
+/// A value of 0 means *any* alpha gradient qualifies.  Because uniformly
+/// translucent fills (e.g. a semi-transparent shape) should *not* be
+/// treated as edges, the edge detector also requires that the pixel's
+/// alpha is neither fully transparent nor fully opaque (see
+/// [`is_alpha_edge_pixel`]).
 const EDGE_ALPHA_DELTA_THRESHOLD: u8 = 0;
+
+/// Radius (in pixels) around each alpha-edge seed pixel that is excluded
+/// from "edge-insensitive" mismatch counting.
+///
+/// When > 0, a band of pixels around every alpha transition is ignored
+/// for the clean mismatch metric.  Currently set to 0 so every
+/// non-edge pixel is compared strictly.
 const EDGE_IGNORE_RADIUS: i32 = 0;
 
 /// Queries (width, height) of a PNG file via ffprobe.
@@ -568,11 +671,21 @@ pub fn resolve_ffprobe(ffmpeg: &Path) -> PathBuf {
     if fallback.is_file() { fallback } else { ffmpeg.to_path_buf() }
 }
 
-/// Runs ffmpeg SSIM filter comparing two PNG images.
+/// Runs ffmpeg's SSIM filter comparing two same-sized PNG images.
 ///
-/// The comparison is cropped to the union of non-transparent pixels so the
-/// large empty transparent canvas does not dominate the score. This is not a
-/// true arbitrary alpha mask, but it is a close approximation for overlay QA.
+/// The comparison is **cropped to the union of non-transparent pixels**
+/// (alpha > `ALPHA_MASK_THRESHOLD`).  This prevents the large empty
+/// transparent canvas area from dominating the score.  The crop is
+/// computed via [`alpha_union_bounds`] on the raw RGBA data of both images.
+///
+/// If the Skia PNG has different dimensions from the Canvas PNG, it is
+/// scaled via Lanczos to match before the comparison.
+///
+/// Returns an [`SsimResult`] with per-channel + aggregate scores.
+///
+/// # Requirements
+///
+/// - ffmpeg must be available (resolved via [`resolve_ffmpeg_binary`]).
 pub fn run_ssim(
     skia_path: &Path,
     canvas_path: &Path,
@@ -722,6 +835,12 @@ fn parse_ssim_output(stderr: &str) -> Result<SsimResult> {
     Ok(SsimResult { combined, y: c1, u: c2, v: c3 })
 }
 
+/// Scans both RGBA byte buffers and returns the bounding rectangle of all
+/// pixels where *either* image has alpha > `alpha_threshold`.
+///
+/// This union bounds is used by [`run_ssim`] to crop the SSIM comparison
+/// to only the non-empty overlay area, preventing the transparent
+/// background from inflating the score.
 fn alpha_union_bounds(
     left: &[u8],
     right: &[u8],
@@ -760,30 +879,85 @@ fn alpha_union_bounds(
 
 // ── Diff image generation ────────────────────────────────────────────────────
 
-/// Pixel-level diff statistics for the parity failure image.
+/// Pixel-level diff statistics produced by [`generate_diff_png`].
+///
+/// Fields are ordered from coarsest to finest granularity:
+///
+/// 1. **`mismatch_pixels`** — every pixel with any channel difference (incl. background).
+/// 2. **`overlay_pixels`** / **`overlay_mismatch_pixels`** — restricted to the overlay mask.
+/// 3. **`overlay_significant_mismatch_pixels`** — mismatches exceeding
+///    `DIFF_CHANNEL_TOLERANCE`.
+/// 4. **`edge_insensitive_mismatch_pixels`** / **`edge_compared_pixels`** —
+///    significant mismatches on non-edge pixels (the "clean" metric).
+/// 5. **`canvas_only_pixels`** / **`skia_only_pixels`** — content exclusive to one renderer.
+///
+/// See the module-level documentation for a full explanation of each category.
 pub struct DiffStats {
+    /// Total pixels with any channel difference (full frame, including transparent area).
     pub mismatch_pixels: u64,
+    /// Pixels where either image has alpha > `ALPHA_MASK_THRESHOLD`.
     pub overlay_pixels: u64,
+    /// Overlay pixels with any channel difference.
     pub overlay_mismatch_pixels: u64,
+    /// Overlay pixels where Canvas has alpha > `ONLY_PIXEL_ALPHA_THRESHOLD` but Skia does not.
     pub canvas_only_pixels: u64,
+    /// Overlay pixels where Skia has alpha > `ONLY_PIXEL_ALPHA_THRESHOLD` but Canvas does not.
     pub skia_only_pixels: u64,
+    /// Overlay pixels whose max channel delta exceeds `DIFF_CHANNEL_TOLERANCE`.
     pub overlay_significant_mismatch_pixels: u64,
+    /// Overlay non-edge pixels (used as denominator for edge-insensitive %).
     pub edge_compared_pixels: u64,
+    /// Significant mismatches on non-edge pixels — the cleanest rendering-diff metric.
     pub edge_insensitive_mismatch_pixels: u64,
+    /// Overlay pixels that fall on an alpha edge and are excluded from the clean count.
     pub edge_ignored_pixels: u64,
+    /// Value of [`ALPHA_MASK_THRESHOLD`] used for this comparison.
     pub alpha_threshold: u8,
+    /// Value of [`ONLY_PIXEL_ALPHA_THRESHOLD`] used for this comparison.
     pub only_pixel_alpha_threshold: u8,
+    /// Value of [`DIFF_CHANNEL_TOLERANCE`] used for this comparison.
     pub channel_tolerance: u8,
+    /// Value of [`EDGE_ALPHA_DELTA_THRESHOLD`] used for this comparison.
     pub edge_alpha_delta_threshold: u8,
+    /// Value of [`EDGE_IGNORE_RADIUS`] used for this comparison.
     pub edge_ignore_radius: i32,
 }
 
-/// Decodes both PNGs to raw RGBA, compares pixel-by-pixel, and writes a diff PNG
-/// where differing pixels are highlighted in red and matching pixels are dimmed.
+/// Decodes both PNGs to raw RGBA via ffmpeg, compares every pixel, writes a
+/// visual diff PNG, and returns detailed [`DiffStats`].
 ///
-/// Both images must already have the same pixel dimensions.
+/// # Visual encoding of the diff PNG
 ///
-/// Returns total and overlay-masked mismatch counts.
+/// | Pixel status | Colour |
+/// |---|---|
+/// | **Significant mismatch** on a non-edge overlay pixel | Bright red `(255,0,0)` |
+/// | All other pixels (matching, sub-threshold, or edge-ignored) | Dimmed copy of the Skia pixel `(R/2, G/2, B/2)` |
+///
+/// # Pixel classification logic (per pixel)
+///
+/// For every pixel index `i` in the RGBA byte arrays:
+///
+/// 1. Read the 4-byte chunks from Skia and Canvas images.
+/// 2. Compute `max_delta` — the largest absolute difference across all four
+///    channels (R/G/B/A).
+/// 3. Determine overlay membership: a pixel is "overlay" if *either* image
+///    has alpha > [`ALPHA_MASK_THRESHOLD`].
+/// 4. Determine edge membership: a pixel on an alpha gradient is "edge"
+///    (see [`build_alpha_edge_ignore_mask`]).
+/// 5. Classify mismatches:
+///    - `max_delta > 0` → **exact mismatch** (counted in `mismatch_pixels`)
+///    - `max_delta > DIFF_CHANNEL_TOLERANCE` → **significant mismatch**
+///    - Significant + overlay + non-edge → **edge-insensitive mismatch**
+///      (the most useful "real diff" metric)
+/// 6. Classify orphaned content:
+///    - Skia alpha > `ONLY_PIXEL_ALPHA_THRESHOLD` && Canvas alpha ≤ that
+///      → **Skia-only**
+///    - Canvas alpha > threshold && Skia alpha ≤ → **Canvas-only**
+///
+/// # Requirements
+///
+/// - Both PNGs must have identical pixel dimensions (checked at the top).
+/// - ffmpeg must be available (resolved via [`resolve_ffmpeg_binary`]).
 pub fn generate_diff_png(
     skia_path: &Path,
     canvas_path: &Path,
@@ -939,6 +1113,20 @@ pub fn generate_diff_png(
     })
 }
 
+/// Builds a boolean mask indicating which overlay pixels lie on an "alpha edge."
+///
+/// An alpha edge pixel is one whose alpha value differs from at least one
+/// of its 8 neighbours by more than `edge_alpha_delta_threshold`, *and*
+/// whose alpha is neither fully transparent (≤ `alpha_threshold`) nor fully
+/// opaque (`== u8::MAX`).  This excludes uniformly translucent fills from
+/// being flagged as edges.
+///
+/// Every seed pixel then expands into a radius of `edge_ignore_radius`
+/// pixels around it.
+///
+/// Edge pixels are excluded from the "edge-insensitive" mismatch count so
+/// that anti-aliased boundaries between transparent and opaque regions do
+/// not pollute the clean comparison metric.
 fn build_alpha_edge_ignore_mask(
     left: &[u8],
     right: &[u8],
@@ -1004,6 +1192,17 @@ fn build_alpha_edge_ignore_mask(
     mask
 }
 
+/// Returns `true` if the pixel at `(x, y)` sits on a visible alpha transition.
+///
+/// A pixel is an "alpha edge" when:
+/// - Its alpha is between `alpha_threshold + 1` and `254` (i.e. neither
+///   transparent nor fully opaque).
+/// - At least one of its 8 neighbours has an alpha differing by more than
+///   `edge_alpha_delta_threshold`.
+///
+/// With `EDGE_ALPHA_DELTA_THRESHOLD = 0`, *any* gradient qualifies, so
+/// only uniformly translucent or fully opaque/transparent regions are
+/// excluded.
 fn is_alpha_edge_pixel(
     bytes: &[u8],
     width: u32,
@@ -1043,7 +1242,14 @@ fn alpha_at(bytes: &[u8], width: u32, x: u32, y: u32) -> u8 {
     bytes.get(offset).copied().unwrap_or(0)
 }
 
-/// Decodes a PNG to raw RGBA bytes via ffmpeg.
+/// Decodes a PNG to raw RGBA bytes via ffmpeg `rawvideo` pipe.
+///
+/// Steps:
+/// 1. Probes dimensions from ffmpeg stderr.
+/// 2. Decodes to raw RGBA via `ffmpeg -f rawvideo -pix_fmt rgba pipe:1`.
+/// 3. Validates that the output byte count matches `width * height * 4`.
+///
+/// Returns `(width, height, rgba_bytes)`.
 fn decode_png_to_rgba(ffmpeg: &Path, png_path: &Path) -> Result<(u32, u32, Vec<u8>)> {
     // Probe for dimensions
     let probe = Command::new(ffmpeg)
