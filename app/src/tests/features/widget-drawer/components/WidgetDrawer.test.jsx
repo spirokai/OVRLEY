@@ -74,19 +74,28 @@ describe('WidgetDrawer', () => {
     expect(tab).toHaveAttribute('aria-label', 'Open widget drawer')
   })
 
-  test('does not render a modal backdrop when open', async () => {
+  test('clicking the backdrop closes the drawer', async () => {
     const user = userEvent.setup()
-    const { container } = render(<WidgetDrawer />)
+    render(<WidgetDrawer />)
 
     const tab = screen.getByRole('button', { name: /drawer/i })
     await user.click(tab)
 
-    // No overlay/backdrop element should exist
-    const overlays = container.querySelectorAll('[role="dialog"], [role="presentation"]')
-    expect(overlays.length).toBe(0)
+    const backdrop = screen.getByTestId('widget-drawer-backdrop')
+    await user.click(backdrop)
 
-    // No fixed full-screen backdrop div
-    const backdrop = container.querySelector('.fixed.inset-0')
-    expect(backdrop).toBeNull()
+    expect(tab).toHaveAttribute('aria-label', 'Open widget drawer')
+  })
+
+  test('clicking a widget closes the drawer', async () => {
+    const user = userEvent.setup()
+    render(<WidgetDrawer />)
+
+    const tab = screen.getByRole('button', { name: /drawer/i })
+    await user.click(tab)
+
+    await user.click(screen.getByText('HR').closest('button'))
+
+    expect(tab).toHaveAttribute('aria-label', 'Open widget drawer')
   })
 })

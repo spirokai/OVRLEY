@@ -14,6 +14,14 @@ export function createLayoutSlice(set, _get) {
     widgetDrawerOpen: false,
 
     /**
+     * Closes the widget drawer.
+     */
+    closeWidgetDrawer: () =>
+      set((state) => {
+        state.widgetDrawerOpen = false
+      }),
+
+    /**
      * Toggles the widget drawer open or closed.
      */
     toggleWidgetDrawer: () =>

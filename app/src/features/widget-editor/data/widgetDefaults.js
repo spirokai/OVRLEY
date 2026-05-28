@@ -33,7 +33,7 @@ export const FONT_SIZE_BY_TYPE = {
 /** Default icon fields shared by metric value widgets that show an icon. */
 export const ICON_DEFAULTS = {
   show_icon: true,
-  icon_size: 28,
+  icon_size: 45,
   icon_offset_x: 0,
   icon_offset_y: 0,
 }

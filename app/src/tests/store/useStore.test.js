@@ -20,12 +20,29 @@ describe('useStore — layout slice composition', () => {
     expect(typeof state.toggleWidgetDrawer).toBe('function')
   })
 
+  test('store exposes closeWidgetDrawer action', () => {
+    const state = useStore.getState()
+
+    expect(state).toHaveProperty('closeWidgetDrawer')
+    expect(typeof state.closeWidgetDrawer).toBe('function')
+  })
+
   test('toggleWidgetDrawer toggles widgetDrawerOpen in the store', () => {
     useStore.getState().toggleWidgetDrawer()
 
     expect(useStore.getState().widgetDrawerOpen).toBe(true)
 
     useStore.getState().toggleWidgetDrawer()
+
+    expect(useStore.getState().widgetDrawerOpen).toBe(false)
+  })
+
+  test('closeWidgetDrawer closes widgetDrawerOpen in the store', () => {
+    useStore.getState().toggleWidgetDrawer()
+
+    expect(useStore.getState().widgetDrawerOpen).toBe(true)
+
+    useStore.getState().closeWidgetDrawer()
 
     expect(useStore.getState().widgetDrawerOpen).toBe(false)
   })

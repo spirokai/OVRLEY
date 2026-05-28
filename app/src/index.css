@@ -261,6 +261,10 @@ body {
   border-color: var(--theme-color-ice) !important;
 }
 
+.moveable-guideline-group .moveable-size-value {
+  font-size: calc(14px * var(--app-scale, 1)) !important;
+}
+
 /* Sidebar scrollbar — cross-browser styling */
 .sidebar-scrollbar {
   scrollbar-width: thin;

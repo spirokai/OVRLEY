@@ -45,4 +45,16 @@ describe('createLayoutSlice', () => {
 
     expect(state.widgetDrawerOpen).toBe(false)
   })
+
+  test('closeWidgetDrawer closes the drawer when open', () => {
+    const { state, set } = createMockSet()
+    state.widgetDrawerOpen = true
+    const get = () => state
+
+    const slice = createLayoutSlice(set, get)
+
+    slice.closeWidgetDrawer()
+
+    expect(state.widgetDrawerOpen).toBe(false)
+  })
 })

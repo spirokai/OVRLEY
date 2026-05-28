@@ -12,6 +12,7 @@ import useStore from '@/store/useStore'
 export function useLayoutStore() {
   return useStore(
     useShallow((state) => ({
+      closeWidgetDrawer: state.closeWidgetDrawer,
       widgetDrawerOpen: state.widgetDrawerOpen,
       toggleWidgetDrawer: state.toggleWidgetDrawer,
     })),

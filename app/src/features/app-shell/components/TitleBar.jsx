@@ -10,9 +10,7 @@ export default function TitleBar() {
 
   return (
     <div data-tauri-drag-region className="flex h-6 shrink-0 items-center justify-between bg-background select-none">
-      <div className="flex items-center pl-4">
-        <img src="/logo.svg" alt="OVRLEY" className="h-4" />
-      </div>
+      <div className="flex items-center pl-4"></div>
 
       <div className="flex h-full items-center" style={{ pointerEvents: 'auto' }}>
         <button
