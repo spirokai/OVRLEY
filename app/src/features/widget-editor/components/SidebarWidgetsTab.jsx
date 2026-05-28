@@ -88,10 +88,10 @@ export default function SidebarWidgetsTab() {
                 <div key={widget.id} className="space-y-1">
                   <AccordionItem
                     value={widget.id}
-                    className="overflow-hidden rounded-lg border border-border/60 bg-surface/80 transition-all data-[state=open]:border-accent-border data-[state=open]:bg-surface-accent-soft hover:border-primary "
+                    className="overflow-hidden rounded-lg border border-border/60 bg-surface/80 transition-all data-[state=open]:border-accent-border  hover:border-primary "
                   >
                     <div className="relative group">
-                      <AccordionTrigger className="group w-full px-3 py-2 pr-10 hover:no-underline data-[state=open]:text-primary hover:text-primary ">
+                      <AccordionTrigger className="group w-full px-3 py-2 pr-10 hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
                         <div className="flex items-center gap-2.5 flex-1 min-w-0">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-surface-strong group-hover:bg-surface-accent-strong group-data-[state=open]:bg-surface-accent-strong">
                             <Icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-data-[state=open]:text-primary" />
@@ -129,7 +129,7 @@ export default function SidebarWidgetsTab() {
                           <RotateCcw className="h-3 w-3" />
                         </Button>
 
-                        <div className="space-y-3 pt-1">
+                        <div className="space-y-6 pt-4">
                           <PositionSection widget={widget} setNumericField={setNumericField} updateWidgetData={updateWidgetData} />
                           {renderWidgetEditor(widget, updateWidgetData, setNumericField, config?.scene?.font_size)}
                         </div>

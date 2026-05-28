@@ -21,7 +21,7 @@ import { getThemeColor } from '@/lib/theme'
  */
 export function SectionHeading({ icon: Icon, title }) {
   return (
-    <div className="flex items-center gap-2 pt-2">
+    <div className="flex items-center gap-2">
       <Icon className="h-3.5 w-3.5 text-primary" />
       <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</h5>
     </div>
@@ -143,7 +143,7 @@ export function FontSection({
         valueDisplay={`${fontSize}px`}
         onSliderChange={(value) => updateWidgetData(widget.id, { font_size: value })}
       />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 items-end">
         <FontSelectField
           label="Font Family"
           value={getWidgetFont(widget)}
@@ -264,7 +264,7 @@ export function UnitsControlRow({
   const controlsDisabled = showToggle && !checked
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 pt-4">
       <div className="flex w-full justify-between items-center">
         <SectionHeading icon={Ruler} title={title} />
         {showToggle ? <ToggleField checked={checked} onCheckedChange={onCheckedChange} /> : null}

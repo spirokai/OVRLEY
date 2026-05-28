@@ -17,7 +17,7 @@ import { SidebarWidgetsTab } from '@/features/widget-editor'
  */
 export default function ControlPanel({ config, onConfigChange }) {
   return (
-    <div className="flex flex-col h-full bg-card/10">
+    <div className="flex flex-col h-full bg-card">
       <Tabs defaultValue="settings" className="flex-1 flex flex-col min-h-0">
         <div className="px-4 pt-4 shrink-0">
           <TabsList className="grid w-full grid-cols-2 bg-surface p-1">

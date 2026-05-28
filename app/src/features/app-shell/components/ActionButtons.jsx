@@ -22,18 +22,6 @@ import { FolderOpen, Play } from 'lucide-react'
 export default function ActionButtons({ onOpenRenderDialog, renderDisabled, renderTooltipContent, renderingVideo, backendStatus, onOpenDownloads }) {
   return (
     <div className="flex min-w-fit items-center justify-end gap-3">
-      <SimpleTooltip side="bottom" content={renderTooltipContent}>
-        <Button
-          size="sm"
-          className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
-          disabled={renderDisabled}
-          onClick={onOpenRenderDialog}
-        >
-          <Play className="mr-2 h-4 w-4" />
-          {renderingVideo ? 'Rendering...' : 'Render'}
-        </Button>
-      </SimpleTooltip>
-
       <SimpleTooltip side="bottom" content={backendStatus !== 'connected' ? 'Backend offline' : null}>
         <Button
           variant="outline"
@@ -44,6 +32,17 @@ export default function ActionButtons({ onOpenRenderDialog, renderDisabled, rend
         >
           <FolderOpen className="h-3.5 w-3.5" />
           <span>Overlays</span>
+        </Button>
+      </SimpleTooltip>
+      <SimpleTooltip side="bottom" content={renderTooltipContent}>
+        <Button
+          size="sm"
+          className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+          disabled={renderDisabled}
+          onClick={onOpenRenderDialog}
+        >
+          <Play className="mr-2 h-4 w-4" />
+          {renderingVideo ? 'Rendering...' : 'Render'}
         </Button>
       </SimpleTooltip>
     </div>

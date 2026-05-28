@@ -2,11 +2,10 @@
  * WidgetDrawer — collapsible left-side panel for widgets.
  */
 
-
-import { useEffect } from 'react'
 import { useLayoutStore } from '@/hooks/useAppStoreSelectors'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { WidgetButtonGrid } from './WidgetButtonGrid'
+import { useEffect } from 'react'
 
 /**
  * Provides widget drawer.
@@ -30,14 +29,14 @@ export function WidgetDrawer() {
   }, [widgetDrawerOpen, toggleWidgetDrawer])
 
   return (
-    <div className="absolute top-6 bottom-6 left-0 pointer-events-none z-500 ">
+    <div className="absolute top-6 bottom-6 left-0 pointer-events-none z-60 ">
       <div
         className="h-full flex transition-transform duration-300 ease-in-out pointer-events-auto "
         style={{
           transform: widgetDrawerOpen ? 'translateX(0)' : 'translateX(calc(-100% + 24px))',
         }}
       >
-        <div className="w-40 h-full bg-card rounded-r-lg flex flex-col overflow-hidden">
+        <div className="w-40 h-full bg-card rounded-r-lg flex flex-col overflow-hidden border border-border/60 ">
           <WidgetButtonGrid onAddWidget={addWidget} />
         </div>
         <div className="flex flex-col h-full">

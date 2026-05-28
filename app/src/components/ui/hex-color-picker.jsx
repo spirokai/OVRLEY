@@ -120,7 +120,7 @@ export default function HexColorPicker({
           <button
             type="button"
             className={cn(
-              'flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border/70 bg-surface px-2 text-left shadow-xs transition-colors hover:border-accent-border hover:bg-surface-highlight-soft',
+              'flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border/70 bg-transparent px-2 text-left shadow-xs transition-colors hover:border-accent-border hover:bg-surface-highlight-soft',
               triggerClassName,
             )}
           >
@@ -136,7 +136,7 @@ export default function HexColorPicker({
         <ColorPickerContent
           align="start"
           sideOffset={8}
-          className="w-[320px] rounded-md border-border/80 bg-card/95 p-3 shadow-2xl shadow-background/40 backdrop-blur-sm"
+          className=" rounded-md border-border/80 bg-card/95 p-3 shadow-2xl shadow-background/40 backdrop-blur-sm"
         >
           <div className="space-y-4">
             <ColorPickerArea

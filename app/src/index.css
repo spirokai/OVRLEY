@@ -62,12 +62,12 @@
   --theme-color-background: #00111b;
   --theme-color-accent: #c65102;
   --theme-color-aqua: #40e0d0;
-  --theme-color-ice: #afeeee;
+  --theme-color-ice: #86aaaa;
   --theme-color-teal: #005b5b;
   --moveable-color: var(--theme-color-accent) !important;
   --background: var(--theme-color-background);
   --foreground: var(--theme-color-ice);
-  --card: color-mix(in srgb, var(--theme-color-background) 78%, var(--theme-color-teal) 22%);
+  --card: color-mix(in srgb, var(--theme-color-background) 98%, var(--theme-color-teal) 2%);
   --card-foreground: var(--theme-color-ice);
   --popover: color-mix(in srgb, var(--theme-color-background) 82%, var(--theme-color-teal) 18%);
   --popover-foreground: var(--theme-color-ice);
@@ -105,6 +105,7 @@
   --surface-accent-strong: color-mix(in srgb, var(--theme-color-background) 74%, var(--theme-color-accent) 26%);
   --surface-highlight: color-mix(in srgb, var(--theme-color-background) 76%, var(--theme-color-aqua) 24%);
   --surface-highlight-soft: color-mix(in srgb, var(--theme-color-background) 88%, var(--theme-color-aqua) 12%);
+  --surface-darken: color-mix(in srgb, var(--theme-color-background) 70%, black 30%);
   --accent-border: color-mix(in srgb, var(--theme-color-background) 48%, var(--theme-color-accent) 52%);
   --highlight: var(--theme-color-aqua);
   --highlight-foreground: var(--theme-color-background);
@@ -183,6 +184,7 @@ body {
   --color-surface-accent-strong: var(--surface-accent-strong);
   --color-surface-highlight: var(--surface-highlight);
   --color-surface-highlight-soft: var(--surface-highlight-soft);
+  --color-surface-darken: var(--surface-darken);
   --color-accent-border: var(--accent-border);
   --color-highlight: var(--highlight);
   --color-highlight-foreground: var(--highlight-foreground);

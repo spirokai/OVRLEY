@@ -113,7 +113,7 @@ function AppShell() {
         />
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <div className="relative flex min-w-0 flex-1 flex-col bg-background">
+          <div className="relative flex min-w-0 flex-1 flex-col bg-surface-darken">
             <LoadingOverlay show={isProcessing || importingVideo} label={importingVideo ? 'Importing video...' : 'Processing...'} />
             <WidgetDrawer />
             <div className="min-h-0 flex-1">
@@ -133,7 +133,7 @@ function AppShell() {
             <OverlayPlayer backgroundMode={editorShell.editorBackgroundMode} />
           </div>
 
-          <div className="w-96 min-w-96 max-w-96 shrink-0 overflow-y-auto border-l border-border/70 bg-card/60 backdrop-blur-sm">
+          <div className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto border-l border-border/70 bg-card/60 backdrop-blur-sm">
             <ControlPanel config={config} onConfigChange={setConfig} />
           </div>
         </div>

@@ -17,12 +17,13 @@ OVRLEY turns .fit and .gpx activity data into customizable overlays for action-c
 - **Universal Import**: Supports `.fit` and `.gpx` files from any device or service (Strava, Garmin, etc.). Works for any activity: running, cycling, skiing, sailing, motorcycling, and more.
 - **Interactive Editor**: Drag-and-drop editor for live layout editing and template sharing.
 - **Full Customization**: Shape every widget with your own styling, color, font, and size.
-- **10+ Widgets**: Speed, heartrate, power, cadence, date, temperature, elevation profile, map route, and more.
+- **23+ Widgets**: Speed, heartrate, power, cadence, date, temperature, elevation profile, map route, and more.
 - **Transparent Overlays**: Export with alpha channel for maximum flexibility in post-production. Use in Premiere Pro, DaVinci Resolve, Final Cut Pro, or any editor that supports layered video.
-- **Direct Video Export**: Export your video footage with overlays baked in; no separate compositing step required. Choose from multiple codecs and hardware-accelerated pipelines, customize bitrate, and more.
-- **Hardware-Accelerated Export**: State-of-the-art export pipelines leveraging GPU acceleration for maximum render times.
+- **Direct Final Video Export**: Export your video footage with overlays baked in; no separate compositing step required. Choose from multiple codecs and hardware-accelerated pipelines, customize bitrate, and more.
+- **Hardware-Accelerated Export**: Export pipelines using GPU acceleration for maximum export speed.
 - **Preview & Sync**: Preview your footage directly inside the app in full quality. Automatically syncs activity to your video, with manual offset possible.
 - **100% Free & Offline**: No subscriptions. All data processing, rendering, and encoding happen locally on your machine. Your data never leaves your computer.
+- **Cross-Platform & Portable**: Runs on Windows, macOS, and Linux. No installation required; just download and run.
 
 > ## Using OVRLEY: Download the exe/app file from latest release and just run it - no installation or setup required.
 

@@ -57,7 +57,7 @@ export default function AppHeader({
   const { importedVideoFilename, handleImportVideo, clearImportedVideo } = videoControls
 
   return (
-    <header className="relative z-50 shrink-0 border-b border-border/70 bg-card/80 backdrop-blur-sm">
+    <header className="relative z-50 shrink-0 border-b border-border/70 bg-card backdrop-blur-sm">
       <div className="grid grid-cols-[55%_auto_minmax(12rem,1fr)] items-center gap-6 px-6 py-3">
         <ActivitySection
           activityLabel={activityLabel}
