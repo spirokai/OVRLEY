@@ -69,7 +69,7 @@ export default function OverlayPlayer({ backgroundMode }) {
         </div>
 
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">{formatTimelineTime(displayedPlayhead)}</span>
+          {/* <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground"></span> */}
           <div className="relative min-w-0 flex-1">
             <Slider
               min={0}
@@ -93,7 +93,9 @@ export default function OverlayPlayer({ backgroundMode }) {
               }
             />
           </div>
-          <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">{formatTimelineTime(totalDuration)}</span>
+          <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground w-30 justify-end flex pr-2">
+            {formatTimelineTime(displayedPlayhead)} / {formatTimelineTime(totalDuration)}
+          </span>
         </div>
       </div>
     </div>
