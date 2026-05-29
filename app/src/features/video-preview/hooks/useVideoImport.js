@@ -1,44 +1,39 @@
 /**
- * Video import — Tauri dialog-based video file selection and preview management.
- * Handles importing video files for overlay preview and clearing the imported video.
+ * Video import â€” Tauri dialog-based background media selection and preview management.
  */
 
 import { open } from '@tauri-apps/plugin-dialog'
 import { clearPreviewVideo, importPreviewVideo } from '@/api/backend'
 import useStore from '@/store/useStore'
 
-/**
- * Container hook for video import functionality.
- * Provides the filename, import handler, and clear handler for the
- * Tauri-native video import flow.
- *
- * @returns {{
- *   importedVideoFilename: string|null,
- *   handleImportVideo: Function,
- *   clearImportedVideo: Function,
- * }}
- */
-export default function useVideoImport() {
-  // Store selectors — individual selectors to avoid unnecessary re-renders
+const DEBUG_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg'])
+
+function pathExtension(path) {
+  return typeof path === 'string' ? path.split('.').pop()?.toLowerCase() || '' : ''
+}
+
+export default function useVideoImport({ debugModeEnabled = false, onSetBackgroundMode }) {
   const importedVideoPath = useStore((state) => state.importedVideoPath)
+  const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
   const setImportedVideo = useStore((state) => state.setImportedVideo)
+  const setImportedBackgroundImage = useStore((state) => state.setImportedBackgroundImage)
   const clearImportedVideo = useStore((state) => state.clearImportedVideo)
   const setImportingVideo = useStore((state) => state.setImportingVideo)
   const config = useStore((state) => state.config)
   const setConfig = useStore((state) => state.setConfig)
 
-  // Derived state — extract filename from the full path
   const importedVideoFilename = importedVideoPath ? importedVideoPath.split(/[/\\]/).pop() : null
+  const importedBackgroundImageFilename = importedBackgroundImagePath ? importedBackgroundImagePath.split(/[/\\]/).pop() : null
+  const importedMediaFilename = importedBackgroundImageFilename || importedVideoFilename
 
-  // Video import handler — opens Tauri file dialog, imports preview, syncs scene FPS
   const handleImportVideo = async () => {
     try {
       const selected = await open({
         multiple: false,
         filters: [
           {
-            name: 'Video',
-            extensions: ['mp4', 'mov', 'mkv'],
+            name: debugModeEnabled ? 'Video or Image' : 'Video',
+            extensions: debugModeEnabled ? ['mp4', 'mov', 'mkv', 'png', 'jpg', 'jpeg'] : ['mp4', 'mov', 'mkv'],
           },
         ],
       })
@@ -47,6 +42,16 @@ export default function useVideoImport() {
       }
 
       setImportingVideo(true)
+
+      if (debugModeEnabled && DEBUG_IMAGE_EXTENSIONS.has(pathExtension(selected))) {
+        if (importedVideoPath) {
+          await clearPreviewVideo()
+        }
+        setImportedBackgroundImage(selected)
+        onSetBackgroundMode?.('image')
+        return
+      }
+
       const response = await importPreviewVideo(selected)
       const metadata = {
         ...response.metadata,
@@ -62,26 +67,31 @@ export default function useVideoImport() {
           scene: { ...config.scene, fps: Math.round(metadata.fps) },
         })
       }
-      // Phase 2: computeVideoSync will be called here
+      onSetBackgroundMode?.('video')
     } catch (err) {
-      console.error('Failed to import video:', err)
+      console.error('Failed to import background media:', err)
     } finally {
       setImportingVideo(false)
     }
   }
 
-  // Clear handler — removes the preview video from the backend and resets store state
   const handleClearImportedVideo = async () => {
     try {
-      await clearPreviewVideo()
+      if (importedVideoPath) {
+        await clearPreviewVideo()
+      }
     } catch (err) {
       console.error('Failed to clear preview video:', err)
     } finally {
       clearImportedVideo()
+      onSetBackgroundMode?.('checker')
     }
   }
 
   return {
+    debugModeEnabled,
+    importedBackgroundImageFilename,
+    importedMediaFilename,
     importedVideoFilename,
     handleImportVideo,
     clearImportedVideo: handleClearImportedVideo,

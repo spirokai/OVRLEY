@@ -16,7 +16,8 @@ import { getTemplateGroups } from '../utils/templateGroups'
  * @param {object} props
  * @param {string} props.activityLabel - Label for the activity file button.
  * @param {function} props.onOpenActivityFile - Opens the activity file picker.
- * @param {string|null} props.importedVideoFilename - Filename of the imported video, or null.
+ * @param {boolean} props.debugModeEnabled - Whether debug-only media features are enabled.
+ * @param {string|null} props.importedMediaFilename - Filename of the imported background media, or null.
  * @param {function} props.handleImportVideo - Opens the video import picker.
  * @param {function} props.clearImportedVideo - Clears the imported video.
  * @param {string|null} props.loadedTemplateSource - Source of the loaded template ('backend' | 'file' | null).
@@ -33,7 +34,8 @@ import { getTemplateGroups } from '../utils/templateGroups'
 export default function ActivitySection({
   activityLabel,
   onOpenActivityFile,
-  importedVideoFilename,
+  debugModeEnabled,
+  importedMediaFilename,
   handleImportVideo,
   clearImportedVideo,
   loadedTemplateSource,
@@ -63,11 +65,11 @@ export default function ActivitySection({
             <span className="max-w-28 truncate">{activityLabel}</span>
           </Button>
 
-          {importedVideoFilename ? (
+          {importedMediaFilename ? (
             <div className="max-w-[min(14rem,22vw)] mr-2 flex h-9 items-center rounded-md border border-border/70 bg-surface-elevated pl-3 pr-2 text-xs text-foreground justify-between">
               <div className="flex items-center gap-2 truncate">
                 <Film className="mr-2 h-4 w-4 text-primary" />
-                <span className="truncate">{importedVideoFilename}</span>
+                <span className="truncate">{importedMediaFilename}</span>
               </div>
               <Button
                 variant="ghost"
@@ -85,7 +87,7 @@ export default function ActivitySection({
               onClick={handleImportVideo}
             >
               <Film className="h-3.5 w-3.5" />
-              <span className="truncate">Import Video</span>
+              <span className="truncate">{debugModeEnabled ? 'Import Video / Image' : 'Import Video'}</span>
             </Button>
           )}
 

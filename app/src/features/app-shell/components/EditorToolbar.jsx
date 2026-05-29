@@ -5,14 +5,15 @@
 
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
-import { Film, Grid3X3, LayoutGrid, Magnet, Minus, RotateCcw, Square, ZoomIn } from 'lucide-react'
+import { Film, Grid3X3, Image, LayoutGrid, Magnet, Minus, RotateCcw, Square, ZoomIn } from 'lucide-react'
 
 /**
  * Renders the editor toolbar controls for background mode, zoom, grid, and snap.
  *
  * @param {object} props
- * @param {string} props.backgroundMode - Current background mode ('checker' | 'black' | 'white' | 'video').
+ * @param {string} props.backgroundMode - Current background mode ('checker' | 'black' | 'white' | 'video' | 'image').
  * @param {function} props.onSetBackgroundMode - Sets the background mode.
+ * @param {string|null} props.importedBackgroundImageFilename - Imported image filename; if set shows image background toggle.
  * @param {string|null} props.importedVideoFilename - Video filename; if set shows video background toggle.
  * @param {number} props.zoomLevel - Current zoom level (0–1 range).
  * @param {function} props.onZoomIn - Increases zoom level.
@@ -27,6 +28,7 @@ import { Film, Grid3X3, LayoutGrid, Magnet, Minus, RotateCcw, Square, ZoomIn } f
 export default function EditorToolbar({
   backgroundMode,
   onSetBackgroundMode,
+  importedBackgroundImageFilename,
   importedVideoFilename,
   zoomLevel,
   onZoomIn,
@@ -74,9 +76,22 @@ export default function EditorToolbar({
           </Button>
         </SimpleTooltip>
 
-        {importedVideoFilename && (
+        {(importedBackgroundImageFilename || importedVideoFilename) && (
           <>
             <div className="mx-1 h-5 w-px bg-border/70" />
+            {importedBackgroundImageFilename ? (
+              <SimpleTooltip side="bottom" content="Image background">
+                <Button
+                  type="button"
+                  variant={backgroundMode === 'image' ? 'default' : 'ghost'}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => onSetBackgroundMode('image')}
+                >
+                  <Image className="h-4 w-4" />
+                </Button>
+              </SimpleTooltip>
+            ) : null}
             <SimpleTooltip side="bottom" content="Video background">
               <Button
                 type="button"

@@ -7,9 +7,12 @@
  * @returns {object} Render workflow API for use by AppShell.
  */
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
+import { getCurrentParsedActivity } from '@/lib/activity/cache'
+import { applyGlobalDefaults } from '@/lib/config-utils'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
@@ -20,7 +23,6 @@ import useRenderProgressPolling from './useRenderProgressPolling'
 import useRenderCompletion from './useRenderCompletion'
 
 export default function useRenderWorkflow({ backendStatus }) {
-  // Store selectors
   const {
     activitySummary,
     config,
@@ -39,9 +41,12 @@ export default function useRenderWorkflow({ backendStatus }) {
     setVideoFilename,
     updateRate,
   } = useRenderStore()
+  const globalDefaults = useStore((state) => state.globalDefaults)
   const importedVideoFps = useStore((state) => state.importedVideoFps)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoResolution = useStore((state) => state.importedVideoResolution)
+  const selectedSecond = useStore((state) => state.selectedSecond)
+  const [renderingPreviewFrame, setRenderingPreviewFrame] = useState(false)
 
   // Derived state — computed flags and tooltip messages for render readiness
   const hasParsedActivity = Boolean(activitySummary)
@@ -66,6 +71,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     }
     return null
   }, [backendStatus, config, hasParsedActivity, hasResolutionMismatch, renderingVideo])
+  const renderPreviewFrameDisabled = !canRender || renderingVideo || renderingPreviewFrame || backendStatus !== 'connected'
 
   // Build render settings draft — assembles initial FPS, codec, bitrate, and export range from store
   const buildRenderSettingsDraft = useCallback(() => {
@@ -187,12 +193,51 @@ export default function useRenderWorkflow({ backendStatus }) {
     setRenderDialogPhase,
   ])
 
+  const handleRenderPreviewFrame = useCallback(async () => {
+    if (renderPreviewFrameDisabled || !config?.scene) {
+      return
+    }
+
+    try {
+      const parsedActivity = getCurrentParsedActivity()
+      if (!parsedActivity) {
+        throw new Error('No parsed activity available')
+      }
+
+      setRenderingPreviewFrame(true)
+      const nextConfig = applyGlobalDefaults(config, globalDefaults)
+      const previewFps = sanitizeIntegerFps(nextConfig.scene.fps || 30)
+      nextConfig.scene = {
+        ...nextConfig.scene,
+        fps: previewFps,
+        update_rate: normalizeUpdateRateForFps(previewFps, updateRate),
+      }
+
+      const second = Math.max(0, Math.trunc(Number(selectedSecond) || 0))
+      const result = await backend.renderPreviewFrame(nextConfig, parsedActivity, second)
+      if (result?.filename) {
+        try {
+          await backend.openVideo(result.filename)
+        } catch (openError) {
+          console.warn('Preview frame rendered, but opening the output failed:', openError)
+        }
+      }
+    } catch (error) {
+      console.error('Preview frame render failed:', error)
+      setErrorMessage(error.message || 'Failed to render preview frame')
+    } finally {
+      setRenderingPreviewFrame(false)
+    }
+  }, [config, globalDefaults, renderPreviewFrameDisabled, selectedSecond, setErrorMessage, updateRate])
+
   return {
     closeRenderDialog,
+    handleRenderPreviewFrame,
     handleRenderVideoConfirm,
     openRenderDialog,
     renderDialogPhase,
     renderDisabled,
+    renderPreviewFrameDisabled,
     renderSettingsDraft,
     renderTooltipContent,
     renderingVideo,
