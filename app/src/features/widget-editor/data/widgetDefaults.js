@@ -123,3 +123,38 @@ export const ELEVATION_PLOT_DEFAULTS = {
 
 /** Fallback dimensions when course points data is unavailable. */
 export const COURSE_DIMENSIONS_FALLBACK = { width: 400, height: 200 }
+
+/** Default configuration for heading compass tape widgets. */
+export const HEADING_DEFAULTS = {
+  x: 100,
+  y: 200,
+  width: 400,
+  height: 80,
+  rotation: 0,
+  opacity: 1,
+  pixels_per_degree: 5,
+  major_tick_interval: 15,
+  minor_ticks_per_major: 3,
+  show_major_ticks: true,
+  show_minor_ticks: true,
+  major_tick_length_pct: 40,
+  minor_tick_length_pct: 20,
+  tick_thickness: 2,
+  tick_color: '#ffffff',
+  cardinal_tick_color: '#ff0000',
+  tick_alignment: 'below',
+  shadow_distance: 0,
+  shadow_strength: 0,
+  shadow_color: null,
+  show_numeric_labels: true,
+  show_cardinal_labels: true,
+  numeric_label_color: '#cccccc',
+  cardinal_label_color: '#ff0000',
+  label_font_size: 12,
+  label_offset: 4,
+  indicator_style: 'chevron',
+  indicator_placement: 'top',
+  show_indicator: true,
+  indicator_color: '#ff0000',
+  indicator_size: 10,
+}

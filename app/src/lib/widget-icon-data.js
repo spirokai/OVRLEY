@@ -21,6 +21,7 @@ import gradientIconSvg from '../components/widgets/icons/widget-gradient.svg?raw
 import courseIconSvg from '../components/widgets/icons/widget-course.svg?raw'
 import elevationIconSvg from '../components/widgets/icons/widget-elevation.svg?raw'
 import labelIconSvg from '../components/widgets/icons/widget-label.svg?raw'
+import headingIconSvg from '../../../assets/widget-icons/widget-heading.svg?raw'
 
 function parseMetricIconSvg(svgMarkup) {
   const strokeWidthMatch = svgMarkup.match(/stroke-width="([^"]+)"/)
@@ -54,5 +55,6 @@ export const METRIC_ICON_SVGS = {
   gradient: parseMetricIconSvg(gradientIconSvg),
   course: parseMetricIconSvg(courseIconSvg),
   elevation: parseMetricIconSvg(elevationIconSvg),
+  heading: parseMetricIconSvg(headingIconSvg),
   label: parseMetricIconSvg(labelIconSvg),
 }

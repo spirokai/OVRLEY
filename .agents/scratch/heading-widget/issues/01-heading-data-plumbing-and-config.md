@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 01 — Heading Data Plumbing + Config Struct
 
@@ -18,14 +18,14 @@ No rendering happens in this slice. Verification is through backend tests: seria
 
 ## Acceptance criteria
 
-- [ ] `MetricKind::Heading` variant exists and serializes/deserializes correctly
-- [ ] `ParsedActivity` accepts `heading` from the JSON payload (extracted from the `extra` serde map or directly parsed)
-- [ ] `DenseSeriesReport` and `TrimmedActivity` carry `heading` as `Vec<Option<f64>>`
-- [ ] `RenderDataRequirements` includes `heading: bool`
-- [ ] Heading flows through trim→densify: nulls are forward-filled (last known valid value carried forward)
-- [ ] `HeadingWidgetConfig` struct exists with all PRD-specified fields, derives Serialize/Deserialize/Clone, and preserves `#[serde(flatten)] pub extra` for forward compatibility
-- [ ] `RenderConfig.plots` deserialization recognizes a `heading` plot entry
-- [ ] Backend tests pass: `cargo test` covers metric kind serde, activity data flow, and config deserialization
+- [x] `MetricKind::Heading` variant exists and serializes/deserializes correctly
+- [x] `ParsedActivity` accepts `heading` from the JSON payload (extracted from the `extra` serde map or directly parsed)
+- [x] `DenseSeriesReport` and `TrimmedActivity` carry `heading` as `Vec<Option<f64>>`
+- [x] `RenderDataRequirements` includes `heading: bool`
+- [x] Heading flows through trim→densify: nulls are forward-filled (last known valid value carried forward)
+- [x] `HeadingWidgetConfig` struct exists with all PRD-specified fields, derives Serialize/Deserialize/Clone, and preserves `#[serde(flatten)] pub extra` for forward compatibility
+- [x] `RenderConfig.plots` deserialization recognizes a `heading` plot entry
+- [x] Backend tests pass: `cargo test` covers metric kind serde, activity data flow, and config deserialization
 
 ## Blocked by
 

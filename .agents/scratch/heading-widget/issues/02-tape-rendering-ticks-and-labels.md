@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 02 — Tape Rendering: Ticks and Labels
 
@@ -22,14 +22,14 @@ Integrate heading into `prepare_render_assets` and `render_frame_to_surface`. Th
 
 ## Acceptance criteria
 
-- [ ] `prepare_render_assets` generates a heading widget cache (`HeadingWidgetCache`) when heading config is present, containing the cached tape `SkiaImage` and precomputed per-frame heading offsets
-- [ ] Per-frame rendering draws the tiled tape image with correct `heading × pixels_per_degree` offset, clipped to widget bounds
-- [ ] All tick config parameters are honored (show/hide, length, thickness, color, cardinal color, alignment)
-- [ ] All label config parameters are honored (show/hide, color, font size, offset, cardinal priority override)
-- [ ] Shadows appear on ticks and labels matching the widget's shadow override
-- [ ] The 0°/360° wrap boundary renders seamlessly (no gap, no duplicate/overlapping ticks)
-- [ ] Heading widget is skipped when no heading config is present in the template
-- [ ] Backend tests pass: at minimum a baseline render test producing a non-empty PNG and tick/label position calculation tests
+- [x] `prepare_render_assets` generates a heading widget cache (`HeadingWidgetCache`) when heading config is present, containing the cached tape `SkiaImage` and precomputed per-frame heading offsets
+- [x] Per-frame rendering draws the tiled tape image with correct `heading × pixels_per_degree` offset, clipped to widget bounds
+- [x] All tick config parameters are honored (show/hide, length, thickness, color, cardinal color, alignment)
+- [x] All label config parameters are honored (show/hide, color, font size, offset, cardinal priority override)
+- [x] Shadows appear on ticks and labels matching the widget's shadow override
+- [x] The 0°/360° wrap boundary renders seamlessly (no gap, no duplicate/overlapping ticks)
+- [x] Heading widget is skipped when no heading config is present in the template
+- [x] Backend tests pass: at minimum a baseline render test producing a non-empty PNG and tick/label position calculation tests
 
 ## Blocked by
 

@@ -39,6 +39,7 @@ fn all_metrics_have_distinct_serde_names() {
         MetricKind::VerticalRatio,
         MetricKind::VerticalOscillation,
         MetricKind::CoreTemperature,
+        MetricKind::Heading,
     ]
     .iter()
     .map(|k| serde_json::to_string(k).unwrap())
@@ -53,7 +54,7 @@ fn all_metrics_have_distinct_serde_names() {
 }
 
 #[test]
-fn metric_kind_count_is_twenty_one() {
+fn metric_kind_count_is_twenty_two() {
     let all = [
         MetricKind::Speed,
         MetricKind::Heartrate,
@@ -76,8 +77,9 @@ fn metric_kind_count_is_twenty_one() {
         MetricKind::VerticalRatio,
         MetricKind::VerticalOscillation,
         MetricKind::CoreTemperature,
+        MetricKind::Heading,
     ];
-    assert_eq!(all.len(), 21);
+    assert_eq!(all.len(), 22);
 }
 
 #[test]
@@ -104,6 +106,7 @@ fn each_variant_roundtrips_individually() {
         MetricKind::VerticalRatio,
         MetricKind::VerticalOscillation,
         MetricKind::CoreTemperature,
+        MetricKind::Heading,
     ];
     for kind in all {
         let json = serde_json::to_string(&kind).unwrap();

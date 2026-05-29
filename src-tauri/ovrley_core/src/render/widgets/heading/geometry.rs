@@ -1,0 +1,249 @@
+//! Heading tape geometry: tick positions, label placement, and scroll offsets.
+//!
+//! Pure functions that compute which ticks and labels are visible at a given
+//! heading value, widget dimensions, and scale. These are shared conceptually
+//! between the Skia backend (cached tape image) and the frontend SVG preview.
+
+/// A single visible tick on the tape.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TapeTick {
+    /// Degree position (0–360) on the compass.
+    pub degree: f32,
+    /// Pixel x-position relative to the tape image origin.
+    pub x: f32,
+    /// Whether this tick is at a cardinal/intercardinal position (45° multiple).
+    pub is_cardinal: bool,
+    /// Whether this tick is a major tick (at `major_tick_interval` multiples).
+    pub is_major: bool,
+}
+
+/// A single visible label on the tape.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TapeLabel {
+    /// Degree position (0–360) on the compass.
+    pub degree: f32,
+    /// Pixel x-position relative to the tape image origin.
+    pub x: f32,
+    /// Text to display (e.g. "N", "NE", "30", "60").
+    pub text: String,
+    /// Whether this is a cardinal label (takes priority over numeric).
+    pub is_cardinal: bool,
+}
+
+/// Cardinal direction labels at 45° multiples.
+const CARDINAL_LABELS: &[(f32, &str)] = &[
+    (0.0, "N"),
+    (45.0, "NE"),
+    (90.0, "E"),
+    (135.0, "SE"),
+    (180.0, "S"),
+    (225.0, "SW"),
+    (270.0, "W"),
+    (315.0, "NW"),
+];
+
+/// Checks if a degree value is at a cardinal/intercardinal position (45° multiple).
+pub fn is_cardinal_degree(degree: f32) -> bool {
+    CARDINAL_LABELS
+        .iter()
+        .any(|(cardinal, _)| (degree - cardinal).abs() < 0.01)
+}
+
+/// Returns the cardinal label for a degree, or None if not cardinal.
+pub fn cardinal_label_for_degree(degree: f32) -> Option<&'static str> {
+    CARDINAL_LABELS
+        .iter()
+        .find(|(cardinal, _)| (degree - cardinal).abs() < 0.01)
+        .map(|(_, label)| *label)
+}
+
+/// Computes the scroll offset in pixels for a given heading.
+///
+/// The tape scrolls left as heading increases, so offset = heading × ppd.
+pub fn heading_offset(heading: f32, pixels_per_degree: f32) -> f32 {
+    heading * pixels_per_degree
+}
+
+/// Computes which ticks are visible within the widget bounds.
+///
+/// The tape image is 360 × pixels_per_degree wide and repeats via TileMode::Repeat.
+/// We need to find all tick degree positions whose pixel x falls within
+/// [0, width) after accounting for the scroll offset.
+///
+/// # Arguments
+/// * `heading` - Current heading in degrees (0–360)
+/// * `pixels_per_degree` - Horizontal scale
+/// * `width` - Widget width in pixels
+/// * `major_tick_interval` - Degrees between major ticks (default 15)
+/// * `minor_ticks_per_major` - Subdivisions between majors (default 3)
+/// * `show_major_ticks` - Whether to include major ticks
+/// * `show_minor_ticks` - Whether to include minor ticks
+pub fn visible_ticks(
+    heading: f32,
+    pixels_per_degree: f32,
+    width: f32,
+    major_tick_interval: u32,
+    minor_ticks_per_major: u32,
+    show_major_ticks: bool,
+    show_minor_ticks: bool,
+) -> Vec<TapeTick> {
+    if pixels_per_degree <= 0.0 || width <= 0.0 {
+        return Vec::new();
+    }
+
+    let tape_width = 360.0 * pixels_per_degree;
+    let offset = heading_offset(heading, pixels_per_degree);
+    let minor_interval = major_tick_interval as f32 / minor_ticks_per_major as f32;
+
+    let mut ticks = Vec::new();
+    let mut degree = 0.0_f32;
+
+    while degree < 360.0 {
+        let is_major = (degree % major_tick_interval as f32).abs() < 0.01;
+        let is_minor = !is_major;
+
+        let show = (is_major && show_major_ticks) || (is_minor && show_minor_ticks);
+
+        if show {
+            // Compute pixel position in the tape image
+            let tape_x = degree * pixels_per_degree;
+            // Apply scroll offset and wrap into [0, tape_width)
+            let wrapped_x = ((tape_x - offset) % tape_width + tape_width) % tape_width;
+
+            // Check if this tick falls within the visible widget width
+            if wrapped_x < width {
+                ticks.push(TapeTick {
+                    degree,
+                    x: wrapped_x,
+                    is_cardinal: is_cardinal_degree(degree),
+                    is_major,
+                });
+            }
+        }
+
+        degree += minor_interval;
+        // Safety: prevent infinite loop from degenerate intervals
+        if minor_interval <= 0.0 {
+            break;
+        }
+    }
+
+    ticks
+}
+
+/// Computes labels for visible tick positions, with cardinal priority override.
+///
+/// Cardinal labels (N/NE/E/SE/S/SW/W/NW) at 45° multiples take priority over
+/// numeric labels at the same position. Both label types share a single row
+/// below the ticks.
+///
+/// # Arguments
+/// * `ticks` - Pre-computed visible ticks from `visible_ticks`
+/// * `show_numeric_labels` - Whether to show degree numbers
+/// * `show_cardinal_labels` - Whether to show cardinal letters
+pub fn visible_labels(
+    ticks: &[TapeTick],
+    show_numeric_labels: bool,
+    show_cardinal_labels: bool,
+) -> Vec<TapeLabel> {
+    if !show_numeric_labels && !show_cardinal_labels {
+        return Vec::new();
+    }
+
+    let mut labels = Vec::new();
+
+    for tick in ticks {
+        if tick.is_cardinal && show_cardinal_labels {
+            // Cardinal label takes priority
+            if let Some(text) = cardinal_label_for_degree(tick.degree) {
+                labels.push(TapeLabel {
+                    degree: tick.degree,
+                    x: tick.x,
+                    text: text.to_string(),
+                    is_cardinal: true,
+                });
+            }
+        } else if show_numeric_labels {
+            // Numeric label at non-cardinal positions (or when cardinals are off)
+            labels.push(TapeLabel {
+                degree: tick.degree,
+                x: tick.x,
+                text: format!("{}", tick.degree as u32),
+                is_cardinal: false,
+            });
+        }
+    }
+
+    labels
+}
+
+// ── Indicator geometry ────────────────────────────────────────────────
+
+/// A single triangle point for indicator shapes.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct IndicatorPoint {
+    pub x: f32,
+    pub y: f32,
+}
+
+/// Computes chevron triangle vertices for a given placement edge.
+///
+/// The chevron is an isosceles triangle pointing toward the tape center.
+/// At the top edge it points downward; at the bottom edge it points upward.
+///
+/// # Arguments
+/// * `center_x` - Horizontal center of the widget
+/// * `edge_y` - Y coordinate of the edge (top or bottom of widget)
+/// * `size` - Chevron height in pixels
+/// * `pointing_down` - true for top placement (points toward tape center)
+pub fn chevron_vertices(
+    center_x: f32,
+    edge_y: f32,
+    size: f32,
+    pointing_down: bool,
+) -> [IndicatorPoint; 3] {
+    let half_base = size * 0.6;
+    if pointing_down {
+        // Top edge: triangle points down
+        [
+            IndicatorPoint { x: center_x - half_base, y: edge_y },
+            IndicatorPoint { x: center_x + half_base, y: edge_y },
+            IndicatorPoint { x: center_x, y: edge_y + size },
+        ]
+    } else {
+        // Bottom edge: triangle points up
+        [
+            IndicatorPoint { x: center_x - half_base, y: edge_y },
+            IndicatorPoint { x: center_x + half_base, y: edge_y },
+            IndicatorPoint { x: center_x, y: edge_y - size },
+        ]
+    }
+}
+
+/// Computes highlight bar edge marker triangle vertices.
+///
+/// Small triangular markers at the top and/or bottom edges of the
+/// highlight bar, pointing inward toward the bar center.
+pub fn highlight_bar_marker_vertices(
+    center_x: f32,
+    edge_y: f32,
+    bar_half_width: f32,
+    pointing_down: bool,
+) -> [IndicatorPoint; 3] {
+    let marker_size = bar_half_width * 0.4;
+    if pointing_down {
+        // Top marker: points down
+        [
+            IndicatorPoint { x: center_x - bar_half_width, y: edge_y },
+            IndicatorPoint { x: center_x + bar_half_width, y: edge_y },
+            IndicatorPoint { x: center_x, y: edge_y + marker_size },
+        ]
+    } else {
+        // Bottom marker: points up
+        [
+            IndicatorPoint { x: center_x - bar_half_width, y: edge_y },
+            IndicatorPoint { x: center_x + bar_half_width, y: edge_y },
+            IndicatorPoint { x: center_x, y: edge_y - marker_size },
+        ]
+    }
+}

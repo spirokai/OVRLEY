@@ -11,6 +11,7 @@ import { TYPE_LABELS } from '@/lib/widget-icons'
 import { buildConfigWidgets, deleteWidgetInConfig, groupWidgetsForSidebar, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget-config'
 import { isStandardMetricWidgetType } from '@/lib/standard-metrics'
 import { createLabelDefaults, createMetricValueDefaults, createPlotDefaults, clamp, parseInteger } from '../utils/widgetUtils'
+import { HEADING_DEFAULTS } from '../data/widgetDefaults'
 
 /**
  * Container hook for SidebarWidgetsTab that owns all store access,
@@ -99,6 +100,14 @@ export function useWidgetManager() {
         }),
       )
       newId = `plot-${nextConfig.plots.length - 1}`
+    } else if (type === 'heading') {
+      if (!nextConfig.plots) nextConfig.plots = []
+      nextConfig.plots.push({
+        value: 'heading',
+        ...HEADING_DEFAULTS,
+        opacity: globalDefaults?.opacity ?? 1,
+      })
+      newId = `plot-${nextConfig.plots.length - 1}`
     }
 
     setConfig(nextConfig)
@@ -129,6 +138,17 @@ export function useWidgetManager() {
             sceneFontSize: config?.scene?.font_size,
           }),
         ),
+      )
+      return
+    }
+
+    if (widget.type === 'heading') {
+      setConfig(
+        replaceWidgetInConfig(config, id, {
+          value: 'heading',
+          ...HEADING_DEFAULTS,
+          opacity: globalDefaults?.opacity ?? 1,
+        }),
       )
       return
     }

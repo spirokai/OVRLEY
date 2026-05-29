@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 04 — Frontend Preview (SVG Tape + Indicator)
 
@@ -24,15 +24,15 @@ The preview must render correctly even before an activity is loaded (using a dem
 
 ## Acceptance criteria
 
-- [ ] `HeadingRenderer.jsx` renders a scrolling tape with ticks and labels via SVG `<pattern>`
-- [ ] Indicator (chevron or highlight bar) renders as SVG elements on top of the tape
-- [ ] All visual properties match backend output: tick lengths, colors, label positioning, cardinal override, alignment (`"below"` / `"centered"`), indicator style and placement
-- [ ] Shadows render on ticks, labels, and indicator via SVG `<filter>`, matching the backend's shadow model
-- [ ] `headingGeometry.js` computes tick/label/indicator positions correctly
-- [ ] The 0°/360° wrap boundary renders seamlessly in the preview
-- [ ] Preview renders a fallback display when no activity/heading data is loaded
-- [ ] `WidgetPreview.jsx` dispatches heading widgets to `HeadingRenderer` (not the generic text/metric renderer)
-- [ ] `headingGeometry.js` unit tests pass: verify tick positions, label placement, cardinal override, wrap behavior
+- [x] `HeadingRenderer.jsx` renders a scrolling tape with ticks and labels via SVG `<pattern>`
+- [x] Indicator (chevron or highlight bar) renders as SVG elements on top of the tape
+- [x] All visual properties match backend output: tick lengths, colors, label positioning, cardinal override, alignment (`"below"` / `"centered"`), indicator style and placement
+- [x] Shadows render on ticks, labels, and indicator via SVG `<filter>`, matching the backend's shadow model
+- [x] `headingGeometry.js` computes tick/label/indicator positions correctly
+- [x] The 0°/360° wrap boundary renders seamlessly in the preview
+- [x] Preview renders a fallback display when no activity/heading data is loaded
+- [x] `WidgetPreview.jsx` dispatches heading widgets to `HeadingRenderer` (not the generic text/metric renderer)
+- [x] `headingGeometry.js` unit tests pass: verify tick positions, label placement, cardinal override, wrap behavior
 
 ## Blocked by
 

@@ -16,6 +16,7 @@ import {
   VALUE_TYPE_KEYS,
   COURSE_PLOT_KEYS,
   ELEVATION_PLOT_KEYS,
+  HEADING_PLOT_KEYS,
   VALUE_DEFAULTS,
   PLOT_DEFAULTS,
 } from '../data/templateConstants'
@@ -116,7 +117,7 @@ function normalizePlot(plot = {}, config, globalDefaults) {
     withDefaults.point_label = normalizePointLabel(plot.point_label, config, globalDefaults)
   }
 
-  const keys = type === 'elevation' ? ELEVATION_PLOT_KEYS : COURSE_PLOT_KEYS
+  const keys = type === 'elevation' ? ELEVATION_PLOT_KEYS : type === 'heading' ? HEADING_PLOT_KEYS : COURSE_PLOT_KEYS
   return normalizeColorFields(pickDefined(withDefaults, keys))
 }
 

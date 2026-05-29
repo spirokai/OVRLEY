@@ -425,6 +425,18 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
+        heading: if requirements.heading {
+            trim_numeric_series(
+                elapsed,
+                &activity.heading,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
         time: if requirements.time {
             let start_value = interpolate_time_series_value(elapsed, &activity.time, start);
             let end_value = interpolate_time_series_value(elapsed, &activity.time, end);

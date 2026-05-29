@@ -1,50 +1,50 @@
 {
   "artifacts": {
-    "canvas": "D:\\github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas.png",
-    "diff": "D:\\github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas-parity.png",
-    "skia": "D:\\github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\skia.png"
+    "canvas": "H:\\tools\\cyclemetry\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas.png",
+    "diff": "H:\\tools\\cyclemetry\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas-parity.png",
+    "skia": "H:\\tools\\cyclemetry\\src-tauri\\ovrley_core\\tests\\canvas_parity\\skia.png"
   },
   "orphaned_pixels": {
     "canvas_exclusive": {
-      "count": 10478,
-      "percent": "1.48",
-      "total": 705704
+      "count": 14288,
+      "percent": "5.86",
+      "total": 243786
     },
     "skia_exclusive": {
-      "count": 14129,
-      "percent": "2.00",
-      "total": 705704
+      "count": 10834,
+      "percent": "4.44",
+      "total": 243786
     }
   },
   "pixel_mismatch": {
     "clean_aa_excluded": {
-      "compared": 635775,
-      "ignored": 69929,
-      "mismatch": 8534,
-      "percent": "1.34"
+      "compared": 158450,
+      "ignored": 85336,
+      "mismatch": 7903,
+      "percent": "4.99"
     },
     "full_frame": {
-      "count": 464365,
-      "percent": "5.60",
-      "total": 8294400
+      "count": 206527,
+      "percent": "8.54",
+      "total": 2418284
     },
     "overlay": {
-      "count": 464058,
-      "percent": "65.76",
-      "total": 705704
+      "count": 194438,
+      "percent": "79.76",
+      "total": 243786
     },
     "threshold_applied": {
-      "count": 61669,
-      "percent": "8.74",
-      "total": 705704
+      "count": 74676,
+      "percent": "30.63",
+      "total": 243786
     }
   },
   "ssim": {
-    "combined": 0.987166,
-    "pass": true,
+    "combined": 0.953481,
+    "pass": false,
     "threshold": 0.98,
-    "u": 0.986604,
-    "v": 0.987689,
-    "y": 0.987205
+    "u": 0.954174,
+    "v": 0.956186,
+    "y": 0.950081
   }
 }

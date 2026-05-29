@@ -11,6 +11,7 @@ export { OverlayRouteWidget } from './components/RouteRenderer'
 export { OverlayElevationWidget } from './components/ElevationRenderer'
 export { OverlayMetricWidget } from './components/MetricRenderer'
 export { OverlayTextWidget } from './components/TextRenderer'
+export { OverlayHeadingWidget } from './components/HeadingRenderer'
 
 export { buildMetricWidgetPreviewModel } from './utils/metricWidgetPreviewModel'
 export { buildTextWidgetPreviewModel } from './utils/textWidgetPreviewModel'

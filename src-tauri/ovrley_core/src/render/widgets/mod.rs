@@ -9,6 +9,8 @@
 mod common;
 /// Elevation profile widget implementation.
 mod elevation;
+/// Heading compass tape widget implementation.
+mod heading;
 /// Point/rect/math and layout-fitting helpers.
 mod geometry;
 /// Marker and dot drawing helpers.
@@ -30,6 +32,7 @@ use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 
 pub(crate) use elevation::draw_elevation_widget;
+pub(crate) use heading::draw_heading_widget;
 pub(crate) use route::draw_route_widget;
 pub use types::{PreparedRenderAssets, WidgetRenderReport};
 pub(crate) use value::{
@@ -74,6 +77,13 @@ pub fn prepare_render_assets(
             activity,
             dense_activity,
             &elevation_plot,
+            prepare_profiler,
+        )?);
+    }
+
+    if let Some(heading_plot) = config.heading_plot()? {
+        assets.heading_cache = Some(heading::prepare_heading_cache(
+            &heading_plot,
             prepare_profiler,
         )?);
     }

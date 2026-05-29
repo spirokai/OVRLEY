@@ -66,4 +66,6 @@ pub enum MetricKind {
     VerticalOscillation,
     #[serde(rename = "core_temperature")]
     CoreTemperature,
+    #[serde(rename = "heading")]
+    Heading,
 }

@@ -61,8 +61,16 @@ use std::time::{Duration, Instant};
 ///
 /// Returns `(parsed_activity, render_config, raw_activity_json, raw_config_json)`.
 pub fn parse_fixtures(fixture_root: &Path) -> Result<(ParsedActivity, RenderConfig, Value, Value)> {
+    parse_fixtures_with_config(fixture_root, "test-template-4k.json")
+}
+
+/// Parses the activity and config fixtures, using the specified config filename.
+pub fn parse_fixtures_with_config(
+    fixture_root: &Path,
+    config_filename: &str,
+) -> Result<(ParsedActivity, RenderConfig, Value, Value)> {
     let activity_path = fixture_root.join("activity").join("gpx-parse-debug.json");
-    let config_path = fixture_root.join("config").join("test-template-4k.json");
+    let config_path = fixture_root.join("config").join(config_filename);
 
     let activity_raw: Value = read_json(&activity_path)?;
     let config_raw: Value = read_json(&config_path)?;
@@ -971,13 +979,24 @@ pub fn generate_diff_png(
     let (canvas_width, canvas_height) = probe_png_dimensions(&ffprobe, canvas_path)?;
     let (skia_width, skia_height) = probe_png_dimensions(&ffprobe, skia_path)?;
 
-    if skia_width != canvas_width || skia_height != canvas_height {
-        bail!(
-            "dimension mismatch: Skia {skia_width}x{skia_height}, Canvas {canvas_width}x{canvas_height}"
-        );
-    }
+    // Scale Skia to match canvas dimensions if needed (same approach as run_ssim)
+    let input_a = if skia_width != canvas_width || skia_height != canvas_height {
+        let scaled = skia_path.with_extension("diff-scaled.png");
+        let scale_filter = format!("scale={canvas_width}:{canvas_height}:flags=lanczos");
+        let scale_output = Command::new(&ffmpeg)
+            .args(["-v", "error", "-y", "-i"])
+            .arg(skia_path)
+            .args(["-vf", &scale_filter, &scaled.to_string_lossy()])
+            .output()?;
+        if !scale_output.status.success() {
+            bail!("ffmpeg scale failed for diff: {}", String::from_utf8_lossy(&scale_output.stderr).trim());
+        }
+        scaled
+    } else {
+        skia_path.to_path_buf()
+    };
 
-    let (width, height, skia_bytes) = decode_png_to_rgba(&ffmpeg, skia_path)?;
+    let (width, height, skia_bytes) = decode_png_to_rgba(&ffmpeg, &input_a)?;
     let (_, _, canvas_bytes) = decode_png_to_rgba(&ffmpeg, canvas_path)?;
     let edge_ignore_mask = build_alpha_edge_ignore_mask(
         &skia_bytes,

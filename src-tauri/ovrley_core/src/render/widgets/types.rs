@@ -44,6 +44,7 @@ pub struct WidgetRenderReport {
 pub struct PreparedRenderAssets {
     pub(crate) route_cache: Option<RouteWidgetCache>,
     pub(crate) elevation_cache: Option<ElevationWidgetCache>,
+    pub(crate) heading_cache: Option<HeadingWidgetCache>,
     pub(crate) base_rgba: Option<Vec<u8>>,
 }
 
@@ -92,6 +93,34 @@ pub(crate) struct RouteWidgetCache {
     pub(crate) frame_states: Vec<RouteFrameState>,
     pub(crate) marker_layers: Vec<MarkerLayer>,
     pub(crate) remaining_layer: Option<StaticLayer>,
+}
+
+/// Prepared heading widget cache.
+#[derive(Clone, Debug)]
+pub(crate) struct HeadingWidgetCache {
+    /// The cached 360° tape image (ticks + labels + shadows baked in).
+    pub(crate) tape_image: Image,
+    /// Tape image width in pixels (360 × pixels_per_degree).
+    pub(crate) tape_width: f32,
+    /// Widget position and dimensions.
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    /// Horizontal scale in pixels per degree.
+    pub(crate) pixels_per_degree: f32,
+    /// Whether to draw the indicator.
+    pub(crate) show_indicator: bool,
+    /// Indicator style: "chevron" or "highlight_bar".
+    pub(crate) indicator_style: String,
+    /// Indicator placement: "top", "bottom", or "both".
+    pub(crate) indicator_placement: String,
+    /// Indicator color as hex string.
+    pub(crate) indicator_color: String,
+    /// Indicator size in pixels (chevron height or bar width).
+    pub(crate) indicator_size: f32,
+    /// Shadow style for the indicator (inherited from widget config).
+    pub(crate) indicator_shadow: Option<ShadowStyle>,
 }
 
 /// Prepared elevation widget cache.

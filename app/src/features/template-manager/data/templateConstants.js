@@ -4,7 +4,7 @@
  */
 
 import { STANDARD_METRIC_WIDGET_TYPES } from '@/lib/standard-metrics'
-import { TYPE_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS } from '../../widget-editor/data/widgetDefaults'
+import { TYPE_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS, HEADING_DEFAULTS } from '../../widget-editor/data/widgetDefaults'
 
 /** File format identifier for OVRLEY template files. */
 export const TEMPLATE_FILE_FORMAT = 'ovrley-template'
@@ -93,6 +93,42 @@ export const ELEVATION_PLOT_KEYS = [
   'point_label',
 ]
 
+/** Keys preserved when normalizing a heading plot widget. */
+export const HEADING_PLOT_KEYS = [
+  'x',
+  'y',
+  'value',
+  'width',
+  'height',
+  'opacity',
+  'rotation',
+  'pixels_per_degree',
+  'major_tick_interval',
+  'minor_ticks_per_major',
+  'show_major_ticks',
+  'show_minor_ticks',
+  'major_tick_length_pct',
+  'minor_tick_length_pct',
+  'tick_thickness',
+  'tick_color',
+  'cardinal_tick_color',
+  'tick_alignment',
+  'shadow_distance',
+  'shadow_strength',
+  'shadow_color',
+  'show_numeric_labels',
+  'show_cardinal_labels',
+  'numeric_label_color',
+  'cardinal_label_color',
+  'label_font_size',
+  'label_offset',
+  'indicator_style',
+  'indicator_placement',
+  'show_indicator',
+  'indicator_color',
+  'indicator_size',
+]
+
 /** Default values applied to value widgets of each type during normalization. */
 export const VALUE_DEFAULTS = Object.fromEntries(
   Object.entries(TYPE_DEFAULTS).map(([type, defaults]) => [type, type === 'gradient' ? defaults : { show_icon: true, ...defaults }]),
@@ -108,5 +144,10 @@ export const PLOT_DEFAULTS = {
     remaining_line_width: 6,
     area_remaining_color: '#00565c',
     ...ELEVATION_PLOT_DEFAULTS,
+  },
+  heading: {
+    opacity: 1,
+    rotation: 0,
+    ...HEADING_DEFAULTS,
   },
 }

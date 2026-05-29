@@ -185,6 +185,9 @@ pub struct ParsedActivity {
     /// Absolute timestamps aligned with sample times.
     #[serde(default)]
     pub time: TimeSeries,
+    /// Heading in degrees (0–360).
+    #[serde(default)]
+    pub heading: NumericSeries,
     /// Unrecognized fields preserved for compatibility with frontend payloads.
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -261,6 +264,8 @@ pub struct DenseSeriesReport {
     pub vertical_oscillation: Vec<Option<f64>>,
     /// Core temperature in degrees Celsius.
     pub core_temperature: Vec<Option<f64>>,
+    /// Heading in degrees (0–360).
+    pub heading: Vec<Option<f64>>,
     /// Course latitude values.
     pub course_lat: Vec<Option<f64>>,
     /// Course longitude values.
@@ -324,6 +329,8 @@ pub struct TrimmedActivity {
     pub core_temperature: NumericSeries,
     /// Trimmed gradient samples in percent.
     pub gradient: NumericSeries,
+    /// Trimmed heading samples in degrees.
+    pub heading: NumericSeries,
     /// Trimmed timestamp samples.
     pub time: TimeSeries,
 }

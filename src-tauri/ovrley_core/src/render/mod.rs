@@ -28,8 +28,9 @@ use crate::render::surface::{create_surface, wrap_native_surface, write_surface_
 use crate::render::text::{draw_text, value_style};
 use crate::render::widgets::value::MetricWidgetRequest;
 use crate::render::widgets::{
-    draw_elevation_widget, draw_metric_value_widget_with_config, draw_route_widget,
-    has_static_metric_icon, prepare_render_assets, PreparedRenderAssets, WidgetRenderReport,
+    draw_elevation_widget, draw_heading_widget, draw_metric_value_widget_with_config,
+    draw_route_widget, has_static_metric_icon, prepare_render_assets, PreparedRenderAssets,
+    WidgetRenderReport,
 };
 use skia_safe::Image;
 use std::collections::BTreeMap;
@@ -66,6 +67,7 @@ pub struct PreviewRenderReport {
     pub label_cache_status: String,
     pub route_widget: Option<WidgetRenderReport>,
     pub elevation_widget: Option<WidgetRenderReport>,
+    pub heading_widget: Option<WidgetRenderReport>,
     pub prepare_timings: BTreeMap<String, TimingBucket>,
     pub frame_timings: BTreeMap<String, TimingBucket>,
     pub preview_only_timings: BTreeMap<String, TimingBucket>,
@@ -221,7 +223,7 @@ pub fn render_preview_with_prepared_assets(
     let total_started = Instant::now();
 
     // Phase 2: draw all overlay layers into a Skia surface.
-    let (mut surface, route_widget, elevation_widget) = render_frame_surface(
+    let (mut surface, route_widget, elevation_widget, heading_widget) = render_frame_surface(
         request.paths,
         request.config,
         request.dense_activity,
@@ -285,6 +287,7 @@ pub fn render_preview_with_prepared_assets(
         },
         route_widget,
         elevation_widget,
+        heading_widget,
         prepare_timings: request.prepare_timings,
         frame_timings,
         preview_only_timings,
@@ -357,6 +360,7 @@ fn render_frame_surface(
     skia_safe::Surface,
     Option<WidgetRenderReport>,
     Option<WidgetRenderReport>,
+    Option<WidgetRenderReport>,
 )> {
     // Preview rendering owns its surface and writes a PNG, while video rendering
     // wraps caller-owned pixels. This helper is the preview-side equivalent of
@@ -390,7 +394,7 @@ fn render_frame_surface(
         false,
         frame_profiler,
     );
-    Ok((surface, widgets.0, widgets.1))
+    Ok((surface, widgets.0, widgets.1, widgets.2))
 }
 
 // Draws all overlay layers for one frame onto an existing Skia canvas.
@@ -406,7 +410,7 @@ fn render_frame_to_surface(
     labels_image: Option<&Image>,
     base_layer_restored: bool,
     frame_profiler: &mut RenderProfiler,
-) -> (Option<WidgetRenderReport>, Option<WidgetRenderReport>) {
+) -> (Option<WidgetRenderReport>, Option<WidgetRenderReport>, Option<WidgetRenderReport>) {
     // Draw order is important: static labels/icons first, dynamic metric text,
     // then plot widgets. Static metric icons can be skipped here when they were
     // already included in the restored base layer.
@@ -449,8 +453,17 @@ fn render_frame_to_surface(
     let elevation_widget = prepared_assets.elevation_cache.as_ref().and_then(|cache| {
         draw_elevation_widget(canvas, paths, config, cache, frame_index, frame_profiler)
     });
+    let heading_widget = prepared_assets.heading_cache.as_ref().and_then(|cache| {
+        let heading = dense_activity
+            .series
+            .heading
+            .get(frame_index)
+            .and_then(|v| *v)
+            .unwrap_or(0.0) as f32;
+        draw_heading_widget(canvas, cache, heading, frame_profiler)
+    });
     frame_profiler.record_ms("frame.draw", frame_started.elapsed().as_secs_f64() * 1000.0);
-    (route_widget, elevation_widget)
+    (route_widget, elevation_widget, heading_widget)
 }
 
 // Adds legacy alternate names to timing buckets for compatibility with reports.

@@ -35,6 +35,7 @@ export const TYPE_LABELS = {
   elevation: 'Elevation',
   gradient: 'Gradient',
   time: 'Time',
+  heading: 'Heading',
   ...STANDARD_METRIC_TYPE_LABELS,
 }
 
@@ -63,6 +64,7 @@ export const WIDGET_DRAWER_LABELS = {
   gear_position: 'Gear',
   vertical_oscillation: 'V. Osc.',
   core_temperature: 'Core T.',
+  heading: 'Heading',
 }
 
 const widgetTypes = Object.keys(TYPE_LABELS).filter((type) => type !== 'label')
@@ -107,6 +109,7 @@ export const QUICKMENU_ITEMS = [
   'gear_position',
   'vertical_oscillation',
   'core_temperature',
+  'heading',
 ].map((type) => ({
   type,
   icon: TYPE_ICONS[type],

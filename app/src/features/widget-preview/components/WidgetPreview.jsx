@@ -28,6 +28,7 @@ import { OverlayTextWidget } from './TextRenderer'
 import { OverlayMetricWidget } from './MetricRenderer'
 import { OverlayRouteWidget } from './RouteRenderer'
 import { OverlayElevationWidget } from './ElevationRenderer'
+import { OverlayHeadingWidget } from './HeadingRenderer'
 
 function WidgetPreview({
   widget,
@@ -74,6 +75,17 @@ function WidgetPreview({
         sceneStyle={sceneStyle}
         valueFont={valueFont}
         exportRange={exportRange}
+      />
+    )
+  }
+
+  if (widget.type === 'heading') {
+    return (
+      <OverlayHeadingWidget
+        widget={widget}
+        activity={activity}
+        previewSecond={previewSecond}
+        globalOpacity={globalOpacity}
       />
     )
   }

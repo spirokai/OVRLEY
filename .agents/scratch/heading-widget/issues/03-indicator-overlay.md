@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 03 — Indicator Overlay
 
@@ -19,13 +19,13 @@ The indicator is drawn after the tape in the per-frame draw function, so it corr
 
 ## Acceptance criteria
 
-- [ ] Chevron indicator renders correctly at top, bottom, or both placements
-- [ ] Highlight bar renders as a semi-transparent full-height vertical band with triangular edge markers at the configured placement edges
-- [ ] Indicator color is configurable independently of tick/label colors
-- [ ] Indicator shadow matches the widget's shadow override
-- [ ] Toggling `show_indicator: false` hides the indicator completely
-- [ ] Indicator always stays at the widget's horizontal center — it is viewport-static, never scrolls with the tape
-- [ ] Backend render test produces correct output with indicator enabled
+- [x] Chevron indicator renders correctly at top, bottom, or both placements
+- [x] Highlight bar renders as a semi-transparent full-height vertical band with triangular edge markers at the configured placement edges
+- [x] Indicator color is configurable independently of tick/label colors
+- [x] Indicator shadow matches the widget's shadow override
+- [x] Toggling `show_indicator: false` hides the indicator completely
+- [x] Indicator always stays at the widget's horizontal center — it is viewport-static, never scrolls with the tape
+- [x] Backend render test produces correct output with indicator enabled
 
 ## Blocked by
 

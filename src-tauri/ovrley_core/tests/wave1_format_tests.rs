@@ -52,6 +52,7 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
         vertical_ratio: vec![],
         vertical_oscillation: vec![],
         core_temperature: vec![],
+        heading: vec![],
         course_lat: vec![],
         course_lon: vec![],
         time: vec![],

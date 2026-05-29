@@ -12,6 +12,7 @@ import { useWidgetManager } from '../hooks/useWidgetManager'
 import { PositionSection } from './widgetEditorSections'
 import ElevationWidgetEditor from './ElevationWidgetEditor'
 import GradientWidgetEditor from './GradientWidgetEditor'
+import HeadingWidgetEditor from './HeadingWidgetEditor'
 import MetricWidgetEditor from './MetricWidgetEditor'
 import RouteMapWidgetEditor from './RouteMapWidgetEditor'
 import TextWidgetEditor from './TextWidgetEditor'
@@ -51,6 +52,10 @@ function renderWidgetEditor(widget, updateWidgetData, setNumericField, sceneFont
     return (
       <ElevationWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} sceneFontSize={sceneFontSize} />
     )
+  }
+
+  if (widget.type === 'heading') {
+    return <HeadingWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
   }
 
   return null

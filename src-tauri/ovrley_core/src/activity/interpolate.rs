@@ -120,6 +120,33 @@ fn densify_optional_numeric_series(
     interpolate_numeric_series(x_values, y_values, target_x_values)
 }
 
+// Densifies a numeric series with forward-fill of nulls.
+// Null values are replaced by the last known valid value, so the widget
+// holds its last known state during data gaps.
+fn densify_forward_fill_series(
+    x_values: &[f64],
+    y_values: &NumericSeries,
+    target_x_values: &[f64],
+) -> Vec<Option<f64>> {
+    if y_values.is_empty() {
+        return Vec::new();
+    }
+    // First, do standard interpolation to get frame-aligned values
+    let interpolated = interpolate_numeric_series(x_values, y_values, target_x_values);
+    // Then forward-fill: carry last known value across null gaps
+    let mut last_known: Option<f64> = None;
+    interpolated
+        .into_iter()
+        .map(|value| match value {
+            Some(v) => {
+                last_known = Some(v);
+                Some(v)
+            }
+            None => last_known,
+        })
+        .collect()
+}
+
 // Interpolates latitude and longitude vectors over all target frame times.
 fn interpolate_course_series(
     x_values: &[f64],
@@ -357,6 +384,15 @@ pub fn densify_activity(
                 &frame_elapsed_seconds,
                 requirements.core_temperature,
             ),
+            heading: if requirements.heading && !trimmed.heading.is_empty() {
+                densify_forward_fill_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &trimmed.heading,
+                    &frame_elapsed_seconds,
+                )
+            } else {
+                Vec::new()
+            },
             course_lat,
             course_lon,
             time,

@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 05 — Widget Editor and Drawer Registration
 
@@ -31,13 +31,13 @@ The widget must serialize cleanly into template JSON and deserialize correctly w
 
 ## Acceptance criteria
 
-- [ ] `HeadingWidgetEditor.jsx` shows all controls organized in collapsible sections (tape, ticks, labels, indicator)
-- [ ] All config changes update the widget preview in real time
-- [ ] Factory defaults match the PRD spec
-- [ ] Heading widget appears in the widget drawer grid with the Compass icon
-- [ ] Heading widget can be added to the overlay, dragged, resized, and rotated
-- [ ] Template save/load round-trips heading widget config without loss
-- [ ] Editor tests pass: defaults validation, control interaction, template serialization
+- [x] `HeadingWidgetEditor.jsx` shows all controls organized in collapsible sections (tape, ticks, labels, indicator)
+- [x] All config changes update the widget preview in real time
+- [x] Factory defaults match the PRD spec
+- [x] Heading widget appears in the widget drawer grid with the Compass icon
+- [x] Heading widget can be added to the overlay, dragged, resized, and rotated
+- [x] Template save/load round-trips heading widget config without loss
+- [x] Editor tests pass: defaults validation, control interaction, template serialization
 
 ## Blocked by
 

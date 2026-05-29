@@ -18,8 +18,8 @@ mod canvas_parity;
 
 use anyhow::{Context, Result};
 use canvas_parity::{
-    generate_diff_png, parse_fixtures, render_skia_preview, run_playwright_screenshot, run_ssim,
-    test_app_paths, write_mock_data, ViteServer,
+    generate_diff_png, parse_fixtures_with_config, render_skia_preview, run_playwright_screenshot,
+    run_ssim, test_app_paths, write_mock_data, ViteServer,
 };
 use ovrley_core::activity::build_dense_activity_report;
 use std::fs;
@@ -61,7 +61,8 @@ fn canvas_parity() -> Result<()> {
 
     // 1. Parse fixtures
     println!("[1/9] Parsing fixtures...");
-    let (activity, config, activity_raw, config_raw) = parse_fixtures(&fixture_root)?;
+    let (activity, config, activity_raw, config_raw) =
+        parse_fixtures_with_config(&fixture_root, "test-template-1080p.json")?;
     println!("  activity: {} samples, {}s duration",
         activity.sample_elapsed_seconds.len(),
         activity.trim_end_seconds);

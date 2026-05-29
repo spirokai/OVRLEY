@@ -305,6 +305,7 @@ pub struct RenderDataRequirements {
     pub vertical_ratio: bool,
     pub vertical_oscillation: bool,
     pub core_temperature: bool,
+    pub heading: bool,
     pub time: bool,
     pub distance_progress: bool,
     pub course: bool,
@@ -509,6 +510,143 @@ pub struct ElevationPlotConfig {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Heading compass tape widget configuration.
+///
+/// Controls a horizontal compass tape that scrolls with the heading value.
+/// The tape renders as a 360-degree wrapped strip with configurable ticks,
+/// labels, and a center indicator.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct HeadingWidgetConfig {
+    /// Metric key — always `heading`.
+    pub value: MetricKind,
+    /// Left position in canvas pixels.
+    pub x: f32,
+    /// Top position in canvas pixels.
+    pub y: f32,
+    /// Widget width in pixels.
+    pub width: u32,
+    /// Widget height in pixels.
+    pub height: u32,
+    /// Widget rotation in degrees.
+    #[serde(default)]
+    pub rotation: f32,
+    /// Widget opacity 0.0–1.0.
+    #[serde(default = "default_one")]
+    pub opacity: f32,
+    /// Horizontal tape scale in pixels per degree.
+    #[serde(default = "default_ppd")]
+    pub pixels_per_degree: f32,
+    /// Degrees between major ticks. Default 15.
+    #[serde(default = "default_major_tick_interval")]
+    pub major_tick_interval: u32,
+    /// Subdivisions between major ticks. Default 3 (= every 5°).
+    #[serde(default = "default_minor_ticks_per_major")]
+    pub minor_ticks_per_major: u32,
+    /// Show major ticks.
+    #[serde(default = "default_true")]
+    pub show_major_ticks: bool,
+    /// Show minor ticks.
+    #[serde(default = "default_true")]
+    pub show_minor_ticks: bool,
+    /// Major tick length as percentage of widget height.
+    #[serde(default = "default_major_tick_length")]
+    pub major_tick_length_pct: f32,
+    /// Minor tick length as percentage of widget height.
+    #[serde(default = "default_minor_tick_length")]
+    pub minor_tick_length_pct: f32,
+    /// Tick thickness in pixels.
+    #[serde(default = "default_tick_thickness")]
+    pub tick_thickness: f32,
+    /// Regular (non-cardinal) tick color as hex.
+    #[serde(default)]
+    pub tick_color: Option<String>,
+    /// Cardinal tick color (N/NE/E/SE/S/SW/W/NW) as hex.
+    #[serde(default)]
+    pub cardinal_tick_color: Option<String>,
+    /// Tick alignment: `"below"` or `"centered"`.
+    #[serde(default = "default_tick_alignment")]
+    pub tick_alignment: String,
+    /// Shadow distance override for all elements.
+    #[serde(default)]
+    pub shadow_distance: Option<f32>,
+    /// Shadow strength override for all elements.
+    #[serde(default)]
+    pub shadow_strength: Option<f32>,
+    /// Shadow color override for all elements.
+    #[serde(default)]
+    pub shadow_color: Option<String>,
+    /// Show numeric degree labels.
+    #[serde(default = "default_true")]
+    pub show_numeric_labels: bool,
+    /// Show cardinal labels (N/NE/E/SE/S/SW/W/NW).
+    #[serde(default = "default_true")]
+    pub show_cardinal_labels: bool,
+    /// Numeric label color as hex.
+    #[serde(default)]
+    pub numeric_label_color: Option<String>,
+    /// Cardinal label color as hex.
+    #[serde(default)]
+    pub cardinal_label_color: Option<String>,
+    /// Label font size in pixels.
+    #[serde(default)]
+    pub label_font_size: Option<f32>,
+    /// Distance from bottom of ticks to label baseline in pixels.
+    #[serde(default)]
+    pub label_offset: Option<f32>,
+    /// Indicator style: `"chevron"` or `"highlight_bar"`.
+    #[serde(default = "default_indicator_style")]
+    pub indicator_style: String,
+    /// Indicator placement: `"top"`, `"bottom"`, or `"both"`.
+    #[serde(default = "default_indicator_placement")]
+    pub indicator_placement: String,
+    /// Show the indicator.
+    #[serde(default = "default_true")]
+    pub show_indicator: bool,
+    /// Indicator color as hex.
+    #[serde(default)]
+    pub indicator_color: Option<String>,
+    /// Indicator size in pixels (chevron height or bar width).
+    #[serde(default)]
+    pub indicator_size: Option<f32>,
+    /// Unknown fields preserved for forward compatibility.
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+fn default_one() -> f32 {
+    1.0
+}
+fn default_ppd() -> f32 {
+    5.0
+}
+fn default_major_tick_interval() -> u32 {
+    15
+}
+fn default_minor_ticks_per_major() -> u32 {
+    3
+}
+fn default_true() -> bool {
+    true
+}
+fn default_major_tick_length() -> f32 {
+    40.0
+}
+fn default_minor_tick_length() -> f32 {
+    20.0
+}
+fn default_tick_thickness() -> f32 {
+    2.0
+}
+fn default_tick_alignment() -> String {
+    "below".to_string()
+}
+fn default_indicator_style() -> String {
+    "chevron".to_string()
+}
+fn default_indicator_placement() -> String {
+    "top".to_string()
+}
+
 /// Parses and validates render configuration JSON.
 ///
 /// Validation focuses on constraints that would otherwise break frame timing:
@@ -657,6 +795,7 @@ impl RenderConfig {
                 MetricKind::VerticalRatio => requirements.vertical_ratio = true,
                 MetricKind::VerticalOscillation => requirements.vertical_oscillation = true,
                 MetricKind::CoreTemperature => requirements.core_temperature = true,
+                MetricKind::Heading => requirements.heading = true,
                 MetricKind::Time => requirements.time = true,
             }
         }
@@ -670,6 +809,10 @@ impl RenderConfig {
             requirements.distance_progress = true;
         }
 
+        if self.heading_plot()?.is_some() {
+            requirements.heading = true;
+        }
+
         Ok(requirements)
     }
 
@@ -681,6 +824,11 @@ impl RenderConfig {
     /// Returns the elevation plot config if present.
     pub fn elevation_plot(&self) -> CoreResult<Option<ElevationPlotConfig>> {
         self.parse_plot("elevation")
+    }
+
+    /// Returns the heading plot config if present.
+    pub fn heading_plot(&self) -> CoreResult<Option<HeadingWidgetConfig>> {
+        self.parse_plot("heading")
     }
 
     /// Parses one plot entry from the legacy object/array `plots` container.
