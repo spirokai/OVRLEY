@@ -59,12 +59,12 @@ The goal is not to eliminate async behavior from the app. The goal is to ensure 
 
 ## Acceptance criteria
 
-- [ ] Targeted store actions no longer perform fetches, backend calls, `alert()` calls, or imperative editor manipulation directly
-- [ ] Template-related network and UI orchestration lives in explicit hooks or modules outside the store slices
-- [ ] App bootstrap still loads templates and codecs successfully
-- [ ] Community template selection still updates the editor and related state correctly from a user perspective
-- [ ] Error handling remains visible to the user but is no longer buried inside the store layer
-- [ ] Tests cover at least one happy path and one failure path for the moved orchestration logic
+- [x] Targeted store actions no longer perform fetches, backend calls, `alert()` calls, or imperative editor manipulation directly
+- [x] Template-related network and UI orchestration lives in explicit hooks or modules outside the store slices
+- [x] App bootstrap still loads templates and codecs successfully
+- [x] Community template selection still updates the editor and related state correctly from a user perspective
+- [x] Error handling remains visible to the user but is no longer buried inside the store layer
+- [x] Tests cover at least one happy path and one failure path for the moved orchestration logic
 
 ## Blocked by
 

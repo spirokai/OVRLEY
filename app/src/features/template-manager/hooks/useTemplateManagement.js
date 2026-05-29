@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react'
 import * as backend from '@/api/backend'
 import { hasTauriRuntime } from '@/features/app-shell'
 import { useTemplateStore } from '@/hooks/useAppStoreSelectors'
+import useTemplateFetching from './useTemplateFetching'
 import {
   createTemplateFilePayload,
   downloadTemplateFile,
@@ -32,7 +33,6 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     createNewTemplate,
     exportCodec,
     exportRange,
-    fetchTemplates,
     globalDefaults,
     hydrateTemplateState,
     lastSavedTemplateState,
@@ -45,6 +45,8 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     templates,
     updateRate,
   } = useTemplateStore()
+
+  const { fetchTemplates } = useTemplateFetching()
 
   // Local UI state — manages the new-template confirmation dialog visibility
   const [showNewTemplateConfirm, setShowNewTemplateConfirm] = useState(false)

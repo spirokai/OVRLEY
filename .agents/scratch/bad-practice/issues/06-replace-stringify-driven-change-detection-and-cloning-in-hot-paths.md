@@ -58,11 +58,11 @@ The refactor should focus first on hot or central paths, especially state compar
 
 ## Acceptance criteria
 
-- [ ] The targeted hot or central paths no longer rely on `JSON.stringify` as a generic equality, clone, or dependency mechanism
-- [ ] Dirty-state tracking remains functionally equivalent for template and config edits within a session
-- [ ] Widget remeasurement still triggers when relevant widget data changes and does not regress selection behavior
-- [ ] Any remaining JSON serialization is limited to true serialization concerns, not general state coordination
-- [ ] Tests cover the behavior that replaced stringify-based equality or dependency logic
+- [x] The targeted hot or central paths no longer rely on `JSON.stringify` as a generic equality, clone, or dependency mechanism
+- [x] Dirty-state tracking remains functionally equivalent for template and config edits within a session
+- [x] Widget remeasurement still triggers when relevant widget data changes and does not regress selection behavior
+- [x] Any remaining JSON serialization is limited to true serialization concerns, not general state coordination
+- [x] Tests cover the behavior that replaced stringify-based equality or dependency logic
 
 ## Blocked by
 

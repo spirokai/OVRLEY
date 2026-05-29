@@ -1,12 +1,16 @@
 /**
  * Creates the create template slice Zustand slice used by the application store.
+ *
+ * Store actions in this slice are pure state transitions only — no network I/O,
+ * browser UI primitives, or imperative editor manipulation. Orchestration
+ * concerns such as fetching template lists or loading community templates live
+ * in dedicated hooks under features/template-manager/hooks/.
  */
 
-import * as backend from '../../api/backend'
 import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
 import { DEFAULT_GLOBAL_DEFAULTS, syncGlobalDefaultsToConfig } from '../../lib/config-utils'
 import { DEFAULT_EXPORT_RANGE } from '../../features/template-manager'
-import { cloneSerializable, DEFAULT_CONFIG, updateConfigPersistence } from '../store-utils'
+import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, updateConfigPersistence } from '../store-utils'
 
 const initialUpdateRate = 1
 const initialExportRange = { ...DEFAULT_EXPORT_RANGE }
@@ -60,7 +64,7 @@ export function createTemplateSlice(set, get) {
 
   const updateUnrenderedChanges = (state, nextConfig) => {
     if (state.lastRenderedConfig) {
-      state.hasUnrenderedChanges = JSON.stringify(nextConfig) !== JSON.stringify(state.lastRenderedConfig)
+      state.hasUnrenderedChanges = hasSerializableChanged(nextConfig, state.lastRenderedConfig)
       return
     }
 
@@ -85,16 +89,10 @@ export function createTemplateSlice(set, get) {
         state.templates = templates
       }),
 
-    fetchTemplates: async () => {
-      try {
-        const templates = await backend.listTemplates()
-        set((state) => {
-          state.templates = templates
-        })
-      } catch (err) {
-        console.error('Failed to fetch templates:', err)
-      }
-    },
+    setCommunityTemplateFilename: (filename) =>
+      set((state) => {
+        state.communityTemplateFilename = filename
+      }),
 
     setLastSavedTemplateState: (templateState) =>
       set((state) => {
@@ -216,45 +214,6 @@ export function createTemplateSlice(set, get) {
         applySceneTimingToState(state, nextConfig.scene)
         updateUnrenderedChanges(state, nextConfig)
       })
-    },
-
-    SelectCommunityTemplateFilename: async (filename) => {
-      set((state) => {
-        state.loadedTemplateFilename = null
-        state.communityTemplateFilename = filename
-      })
-
-      if (!filename) return
-
-      try {
-        const url = `/templates/${filename}`
-        const response = await fetch(url)
-
-        if (!response.ok) {
-          throw new Error(`Network response was not ok: ${response.status}`)
-        }
-
-        const data = await response.json()
-        const state = get()
-
-        if (!state.gpxFilename) {
-          get().setGpxFilename('demo.gpxinit')
-          const demoDuration = 7946
-          get().setDummyDurationSeconds(demoDuration)
-          get().setStartSecond(0)
-          get().setEndSecond(demoDuration)
-          get().setSelectedSecond(0)
-        }
-
-        get().setConfig(data)
-
-        if (state.editor) {
-          state.editor.setValue(data)
-        }
-      } catch (error) {
-        console.error('Error with community templates:', error)
-        alert(`Failed to load template: ${error.message}`)
-      }
     },
   }
 }

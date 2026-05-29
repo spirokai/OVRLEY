@@ -91,7 +91,9 @@ describe('HeadingWidgetEditor', () => {
   test('major tick toggle calls updateWidgetData with correct value', async () => {
     const updateWidgetData = vi.fn()
     const user = userEvent.setup()
-    render(<HeadingWidgetEditor widget={makeHeadingWidget({ show_major_ticks: true })} updateWidgetData={updateWidgetData} setNumericField={vi.fn()} />)
+    render(
+      <HeadingWidgetEditor widget={makeHeadingWidget({ show_major_ticks: true })} updateWidgetData={updateWidgetData} setNumericField={vi.fn()} />,
+    )
 
     // Find the Major Ticks toggle and click it
     const majorTicksLabel = screen.getByText('Major Ticks')
@@ -102,7 +104,9 @@ describe('HeadingWidgetEditor', () => {
   })
 
   test('indicator style select shows current value', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingWidget({ indicator_style: 'highlight_bar' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(
+      <HeadingWidgetEditor widget={makeHeadingWidget({ indicator_style: 'highlight_bar' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />,
+    )
     // The Select component shows the current value
     expect(screen.getByText('Highlight Bar')).toBeInTheDocument()
   })

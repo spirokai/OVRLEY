@@ -2,10 +2,16 @@
  * Template snapshot utilities — config normalization, file serialization,
  * and state comparison for OVRLEY template files.
  * Static constants live in ../data/templateConstants.js.
+ *
+ * Cloning uses the platform structuredClone API instead of JSON round-tripping.
+ * Equality comparisons use structural deepEqual rather than JSON.stringify.
+ * File serialization (stringifyTemplateFile / downloadTemplateFile) remains
+ * legitimate JSON serialization for disk output.
  */
 
 import { normalizeColorFields } from '@/lib/color-utils'
 import { DEFAULT_GLOBAL_DEFAULTS, GLOBAL_DEFAULT_KEYS, SCENE_DERIVED_SETTING_KEYS, SCENE_GLOBAL_DEFAULT_KEYS } from '@/lib/config-utils'
+import { deepEqual } from '@/store/store-utils'
 import {
   TEMPLATE_FILE_FORMAT,
   TEMPLATE_FILE_VERSION,
@@ -24,14 +30,18 @@ import {
 export { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/config-utils'
 
 /**
- * Handles clone serializable.
+ * Deep-clones a plain serializable value using structuredClone.
  *
- * @param {*} value - Input value processed by the helper.
- * @returns {*} Result produced by the helper.
+ * Handles undefined explicitly for consistency with the previous
+ * JSON.parse(JSON.stringify(...)) guard, though structuredClone
+ * natively accepts undefined.
+ *
+ * @param {*} value - Value to deep-clone.
+ * @returns {*} Deep clone of the input value.
  */
 function cloneSerializable(value) {
   if (value === undefined) return undefined
-  return JSON.parse(JSON.stringify(value))
+  return structuredClone(value)
 }
 
 function pickDefined(source, keys) {
@@ -218,14 +228,18 @@ export function normalizeTemplateFilePayload(rawTemplate, _fallbackState = {}) {
 }
 
 /**
- * Handles template states equal.
+ * Compares template state objects for structural equality.
  *
- * @param {*} left - Left-hand comparison value.
- * @param {*} right - Right-hand comparison value.
- * @returns {*} Result produced by the helper.
+ * Uses deep field-by-field traversal rather than JSON.stringify so the
+ * comparison is semantic and does not depend on property ordering or
+ * hidden serializability assumptions.
+ *
+ * @param {*} left - Left-hand template state.
+ * @param {*} right - Right-hand template state.
+ * @returns {boolean} Whether the two template states are structurally equivalent.
  */
 export function templateStatesEqual(left, right) {
-  return JSON.stringify(left) === JSON.stringify(right)
+  return deepEqual(left, right)
 }
 
 /**

@@ -15,13 +15,7 @@
  */
 
 import { useMemo } from 'react'
-import {
-  headingOffset,
-  visibleTicks,
-  visibleLabels,
-  chevronVertices,
-  highlightBarMarkerVertices,
-} from '../utils/headingGeometry'
+import { headingOffset, visibleTicks, visibleLabels, chevronVertices, highlightBarMarkerVertices } from '../utils/headingGeometry'
 import { sanitizeSvgId } from '../utils/svgPreviewUtils'
 
 const DEMO_HEADING = 90
@@ -79,17 +73,7 @@ function renderTicks(ticks, height, config) {
     const top = config.tick_alignment === 'centered' ? centerY - length / 2 : centerY
     const color = tick.isCardinal ? cardinalColor : tickColor
 
-    return (
-      <line
-        key={`tick-${i}`}
-        x1={tick.x}
-        y1={top}
-        x2={tick.x}
-        y2={top + length}
-        stroke={color}
-        strokeWidth={thickness}
-      />
-    )
+    return <line key={`tick-${i}`} x1={tick.x} y1={top} x2={tick.x} y2={top + length} stroke={color} strokeWidth={thickness} />
   })
 }
 
@@ -131,14 +115,7 @@ function renderChevron(centerX, topY, bottomY, config, shadowFilterId) {
   const drawOne = (edgeY, pointingDown, key) => {
     const verts = chevronVertices(centerX, edgeY, size, pointingDown)
     const points = verts.map((v) => `${v.x},${v.y}`).join(' ')
-    return (
-      <polygon
-        key={key}
-        points={points}
-        fill={color}
-        filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}
-      />
-    )
+    return <polygon key={key} points={points} fill={color} filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined} />
   }
 
   if (placement === 'top') return drawOne(topY, true, 'chevron-top')
@@ -166,14 +143,7 @@ function renderHighlightBar(centerX, topY, bottomY, height, config, shadowFilter
   const drawMarker = (edgeY, pointingDown, key) => {
     const verts = highlightBarMarkerVertices(centerX, edgeY, barHalfWidth, pointingDown)
     const points = verts.map((v) => `${v.x},${v.y}`).join(' ')
-    return (
-      <polygon
-        key={key}
-        points={points}
-        fill={color}
-        filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}
-      />
-    )
+    return <polygon key={key} points={points} fill={color} filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined} />
   }
 
   return (
@@ -220,10 +190,7 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
   const opacity = parseOpacity(globalOpacity, data.opacity)
   const tapeWidth = 360 * ppd
 
-  const heading = useMemo(
-    () => interpolateHeading(activity, previewSecond),
-    [activity, previewSecond]
-  )
+  const heading = useMemo(() => interpolateHeading(activity, previewSecond), [activity, previewSecond])
 
   const offset = headingOffset(heading, ppd)
 
@@ -236,14 +203,14 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
         Number(data.major_tick_interval) || 15,
         Number(data.minor_ticks_per_major) || 3,
         data.show_major_ticks !== false,
-        data.show_minor_ticks !== false
+        data.show_minor_ticks !== false,
       ),
-    [ppd, tapeWidth, data.major_tick_interval, data.minor_ticks_per_major, data.show_major_ticks, data.show_minor_ticks]
+    [ppd, tapeWidth, data.major_tick_interval, data.minor_ticks_per_major, data.show_major_ticks, data.show_minor_ticks],
   )
 
   const labels = useMemo(
     () => visibleLabels(ticks, data.show_numeric_labels !== false, data.show_cardinal_labels !== false),
-    [ticks, data.show_numeric_labels, data.show_cardinal_labels]
+    [ticks, data.show_numeric_labels, data.show_cardinal_labels],
   )
 
   const shadowFilterId = sanitizeSvgId(`${widget.id}-indicator-shadow`)
@@ -280,21 +247,8 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
       {data.show_indicator !== false && (
         <>
           {data.indicator_style === 'highlight_bar'
-            ? renderHighlightBar(
-                width / 2,
-                0,
-                height,
-                height,
-                data,
-                shadow ? shadowFilterId : null
-              )
-            : renderChevron(
-                width / 2,
-                0,
-                height,
-                data,
-                shadow ? shadowFilterId : null
-              )}
+            ? renderHighlightBar(width / 2, 0, height, height, data, shadow ? shadowFilterId : null)
+            : renderChevron(width / 2, 0, height, data, shadow ? shadowFilterId : null)}
         </>
       )}
     </svg>

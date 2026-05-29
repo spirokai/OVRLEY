@@ -68,7 +68,7 @@ export function visibleTicks(
   majorTickInterval = 15,
   minorTicksPerMajor = 3,
   showMajorTicks = true,
-  showMinorTicks = true
+  showMinorTicks = true,
 ) {
   if (pixelsPerDegree <= 0 || width <= 0) return []
 
@@ -85,7 +85,7 @@ export function visibleTicks(
 
     if ((isMajor && showMajorTicks) || (isMinor && showMinorTicks)) {
       const tapeX = degree * pixelsPerDegree
-      const wrappedX = ((tapeX - offset) % tapeWidth + tapeWidth) % tapeWidth
+      const wrappedX = (((tapeX - offset) % tapeWidth) + tapeWidth) % tapeWidth
 
       if (wrappedX < width) {
         ticks.push({

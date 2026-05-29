@@ -44,7 +44,6 @@ export function useBootstrapStore() {
   return useStore(
     useShallow((state) => ({
       fetchAvailableCodecs: state.fetchAvailableCodecs,
-      fetchTemplates: state.fetchTemplates,
       setPlatformOs: state.setPlatformOs,
     })),
   )
@@ -77,7 +76,6 @@ export function useTemplateStore() {
       createNewTemplate: state.createNewTemplate,
       exportCodec: state.exportCodec,
       exportRange: state.exportRange,
-      fetchTemplates: state.fetchTemplates,
       globalDefaults: state.globalDefaults,
       hydrateTemplateState: state.hydrateTemplateState,
       lastSavedTemplateState: state.lastSavedTemplateState,

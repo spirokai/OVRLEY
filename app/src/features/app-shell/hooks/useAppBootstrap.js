@@ -1,11 +1,15 @@
 /**
  * App bootstrap - one-time initialization effects on mount.
  * Hydrates platform OS info and fetches templates and available codecs.
+ *
+ * Template fetching uses the dedicated useTemplateFetching orchestration hook
+ * instead of calling a store action that performs network I/O directly.
  */
 
 import { useEffect } from 'react'
 import * as backend from '@/api/backend'
 import { useBootstrapStore } from '@/hooks/useAppStoreSelectors'
+import useTemplateFetching from '@/features/template-manager/hooks/useTemplateFetching'
 
 /**
  * Container hook for app-level bootstrap effects.
@@ -15,7 +19,8 @@ import { useBootstrapStore } from '@/hooks/useAppStoreSelectors'
  */
 export default function useAppBootstrap() {
   // Store selectors - bootstrap action dispatchers from the global store.
-  const { fetchAvailableCodecs, fetchTemplates, setPlatformOs } = useBootstrapStore()
+  const { fetchAvailableCodecs, setPlatformOs } = useBootstrapStore()
+  const { fetchTemplates } = useTemplateFetching()
 
   // Platform OS detection - reads OS info from the Tauri backend on mount.
   useEffect(() => {

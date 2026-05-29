@@ -3,11 +3,12 @@
  * selection management, viewport tracking, keyboard shortcuts, and sub-hooks.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentParsedActivity } from '@/lib/activity/cache'
 import useStore from '@/store/useStore'
 import { buildConfigWidgets, updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget-config'
 import { getEffectiveWidgetData } from '@/lib/config-utils'
+import { deepEqual } from '@/store/store-utils'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
 import useOverlayMoveableHandlers from './createOverlayMoveableHandlers'
 import useOverlayPointerHandlers from '../utils/createOverlayPointerHandlers'
@@ -87,6 +88,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   const selectionSyncRef = useRef(false)
   const marqueeCleanupRef = useRef(null)
   const marqueeSelectionRef = useRef(null)
+  const prevWidgetDataRef = useRef(null)
 
   // Local UI state — group drag, scene element, widget nodes, selection, marquee
   const [isGroupDragActive, setIsGroupDragActive] = useState(false)
@@ -256,7 +258,20 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   )
   const primarySelectedWidgetId = getPrimarySelectionId(effectiveSelectedWidgetIds, selectedWidgetId)
   const selectedWidget = primarySelectedWidgetId ? renderedWidgetMap[primarySelectedWidgetId] || null : null
-  const selectedWidgetDataSignature = useMemo(() => JSON.stringify(selectedWidgets.map((widget) => widget?.data ?? null)), [selectedWidgets])
+  const [widgetDataVersion, setWidgetDataVersion] = useState(0)
+
+  const selectedWidgetData = useMemo(() => selectedWidgets.map((widget) => widget?.data ?? null), [selectedWidgets])
+
+  useLayoutEffect(() => {
+    const prev = prevWidgetDataRef.current
+
+    if (!prev || !deepEqual(selectedWidgetData, prev)) {
+      setWidgetDataVersion((v) => v + 1)
+    }
+    prevWidgetDataRef.current = selectedWidgetData
+  }, [selectedWidgetData])
+
+  const selectedWidgetDataSignature = widgetDataVersion
   const isGroupSelection = effectiveSelectedWidgetIds.length > 1
   const selectedTarget = !isGroupSelection && primarySelectedWidgetId ? widgetNodes[primarySelectedWidgetId] || null : null
   const selectedTargets = useMemo(

@@ -241,6 +241,11 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null) 
 
   const changedKeySet = changedKeys ? new Set(changedKeys) : null
   const shouldApply = (key) => !changedKeySet || changedKeySet.has(key)
+  // Use JSON round-trip for deep clone instead of structuredClone because
+  // this function is called inside Immer producers where config is a draft
+  // (Proxy-wrapped). structuredClone cannot clone Proxy objects, but
+  // JSON.parse(JSON.stringify(...)) strips the proxy wrapper and produces
+  // a plain object suitable for safe mutation.
   const nextConfig = JSON.parse(JSON.stringify(config))
 
   if (nextConfig.labels) {
