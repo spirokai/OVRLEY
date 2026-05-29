@@ -60,11 +60,11 @@ Use local draft state only where the user can temporarily diverge from committed
 
 ## Acceptance criteria
 
-- [ ] Local state that only mirrors props or store values without a real draft lifecycle is removed from the targeted hooks
-- [ ] Draft input behavior that users rely on is preserved
-- [ ] Synchronization `useEffect` usage is reduced in the targeted hooks because fewer values need repair
-- [ ] Settings and render dialogs still display the same committed values and make the same updates as before
-- [ ] External state changes while a panel or dialog is open behave predictably and are covered by tests
+- [x] Local state that only mirrors props or store values without a real draft lifecycle is removed from the targeted hooks
+- [x] Draft input behavior that users rely on is preserved
+- [x] Synchronization `useEffect` usage is reduced in the targeted hooks because fewer values need repair
+- [x] Settings and render dialogs still display the same committed values and make the same updates as before
+- [x] External state changes while a panel or dialog is open behave predictably and are covered by tests
 
 ## Blocked by
 

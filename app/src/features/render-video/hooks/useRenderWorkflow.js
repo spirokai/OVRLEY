@@ -45,7 +45,6 @@ export default function useRenderWorkflow({ backendStatus }) {
   const importedVideoFps = useStore((state) => state.importedVideoFps)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoResolution = useStore((state) => state.importedVideoResolution)
-  const selectedSecond = useStore((state) => state.selectedSecond)
   const [renderingPreviewFrame, setRenderingPreviewFrame] = useState(false)
 
   // Derived state — computed flags and tooltip messages for render readiness
@@ -213,7 +212,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         update_rate: normalizeUpdateRateForFps(previewFps, updateRate),
       }
 
-      const second = Math.max(0, Math.trunc(Number(selectedSecond) || 0))
+      const second = Math.max(0, Math.trunc(Number(useStore.getState().selectedSecond) || 0))
       const result = await backend.renderPreviewFrame(nextConfig, parsedActivity, second)
       if (result?.filename) {
         try {
@@ -228,7 +227,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     } finally {
       setRenderingPreviewFrame(false)
     }
-  }, [config, globalDefaults, renderPreviewFrameDisabled, selectedSecond, setErrorMessage, updateRate])
+  }, [config, globalDefaults, renderPreviewFrameDisabled, setErrorMessage, updateRate])
 
   return {
     closeRenderDialog,
