@@ -1,5 +1,5 @@
 /**
- * App bootstrap — one-time initialization effects on mount.
+ * App bootstrap - one-time initialization effects on mount.
  * Hydrates platform OS info and fetches templates and available codecs.
  */
 
@@ -9,15 +9,15 @@ import { useBootstrapStore } from '@/hooks/useAppStoreSelectors'
 
 /**
  * Container hook for app-level bootstrap effects.
- * Runs on mount to detect the platform OS and pre-load templates/codecs.
+ * Runs on mount to detect the platform OS and preload templates/codecs.
  *
  * @returns {void}
  */
 export default function useAppBootstrap() {
-  // Store selectors — bootstrap action dispatchers from the global store
+  // Store selectors - bootstrap action dispatchers from the global store.
   const { fetchAvailableCodecs, fetchTemplates, setPlatformOs } = useBootstrapStore()
 
-  // Platform OS detection — reads OS info from the Tauri backend on mount
+  // Platform OS detection - reads OS info from the Tauri backend on mount.
   useEffect(() => {
     let cancelled = false
 
@@ -38,7 +38,7 @@ export default function useAppBootstrap() {
     }
   }, [setPlatformOs])
 
-  // Template and codec data fetching — pre-load templates and available codecs on mount
+  // Template and codec data fetching - preload templates and available codecs.
   useEffect(() => {
     fetchTemplates()
     fetchAvailableCodecs()

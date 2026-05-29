@@ -1,7 +1,6 @@
 /**
  * Container hook for RenderVideoDialog.
- * Orchestrates derived state, side effects, and event handlers.
- * The component receives a single object with everything it needs for rendering.
+ * Orchestrates derived state, synchronization effects, and event handlers.
  *
  * @param {object} props
  * @param {string} props.phase - Dialog phase ('closed'|'confirm'|'progress').
@@ -14,6 +13,7 @@
 
 import { useCallback, useState } from 'react'
 import { cancelRender } from '@/api/backend'
+import { getFpsModeValue, normalizeUpdateRateForFps, PRESET_FPS_VALUES, sanitizeIntegerFps } from '@/lib/update-rate'
 import { OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
 import {
   getExportCodecForSelection,
@@ -21,50 +21,52 @@ import {
   getVisibleAccelerationOptions,
   isOutputFormatAvailable,
 } from '../utils/codecUtils'
-import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import useRenderVideoDerivedState from './useRenderVideoDerivedState'
 import useRenderVideoEffects from './useRenderVideoEffects'
 
 export default function useRenderVideoDialogState({ phase, settings, onSettingsChange, onClose, onConfirm }) {
-  // Derived state (store selectors + computed values)
   const derived = useRenderVideoDerivedState({ settings })
 
-  // Local UI state
-  const [fpsMode, setFpsMode] = useState([24, 30, 60].includes(settings?.fps) ? settings.fps.toString() : 'custom')
+  // The dialog only owns whether the user deliberately opened the custom FPS
+  // path for the current committed FPS. The FPS value itself remains derived
+  // from the committed draft settings.
+  const [customFpsAnchor, setCustomFpsAnchor] = useState(null)
+  const fpsMode = customFpsAnchor !== null && Number(settings?.fps) === customFpsAnchor ? 'custom' : getFpsModeValue(settings?.fps)
 
-  // Side effects (sync props/store → local state, auto-select codecs)
   useRenderVideoEffects({
     settings,
     derivedState: derived,
     onSettingsChange,
-    setFpsMode,
   })
 
-  // Cancel handler — sends cancel-render IPC to the backend
   const handleCancel = useCallback(async () => {
     await cancelRender()
   }, [])
 
-  // Backdrop click to close — closes the dialog when clicking outside, blocked while render is in progress
   const isProgress = phase === 'progress'
+
   const handleBackdropPointerDown = (event) => {
     if (isProgress || event.target !== event.currentTarget) {
       return
     }
+
     onClose()
   }
 
-  // Codec / output format change handler
   const handleOutputFormatChange = (value) => {
     const format = OUTPUT_FORMATS_BY_VALUE[value]
-    if (!format) return
+    if (!format) {
+      return
+    }
 
     const acceleration =
       getVisibleAccelerationOptions(format, derived.platformOs, derived.availableCodecs).find(
         (option) => option.value === derived.selectedAccelerationValue && option.available,
       ) || getFirstAvailableAcceleration(format, derived.platformOs, derived.availableCodecs)
 
-    if (!acceleration) return
+    if (!acceleration) {
+      return
+    }
 
     const nextExportCodec = getExportCodecForSelection(format.value, acceleration.value)
     const nextIsMp4Codec = format.group === 'mp4'
@@ -76,25 +78,27 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     })
   }
 
-  // FPS selection handler
   const handleFpsModeChange = useCallback(
     (value) => {
-      setFpsMode(value)
-      if (value !== 'custom') {
-        const fps = sanitizeIntegerFps(value)
-        onSettingsChange({
-          fps,
-          updateRate: normalizeUpdateRateForFps(fps, settings?.updateRate),
-        })
+      if (value === 'custom') {
+        setCustomFpsAnchor(Number(settings?.fps))
+        return
       }
+
+      setCustomFpsAnchor(null)
+      const fps = sanitizeIntegerFps(value)
+      onSettingsChange({
+        fps,
+        updateRate: normalizeUpdateRateForFps(fps, settings?.updateRate),
+      })
     },
-    [onSettingsChange, settings?.updateRate],
+    [onSettingsChange, settings?.fps, settings?.updateRate],
   )
 
-  // Custom FPS input handler
   const handleCustomFpsChange = useCallback(
     (rawValue) => {
       const fps = sanitizeIntegerFps(rawValue)
+      setCustomFpsAnchor(PRESET_FPS_VALUES.includes(fps) ? null : fps)
       onSettingsChange({
         fps,
         updateRate: normalizeUpdateRateForFps(fps, settings?.updateRate),
@@ -103,10 +107,11 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     [onSettingsChange, settings?.updateRate],
   )
 
-  // Hardware acceleration change handler
   const handleAccelerationChange = (value) => {
     const nextExportCodec = getExportCodecForSelection(derived.selectedOutputFormatValue, value)
-    if (!nextExportCodec) return
+    if (!nextExportCodec) {
+      return
+    }
 
     onSettingsChange({
       exportCodec: nextExportCodec,

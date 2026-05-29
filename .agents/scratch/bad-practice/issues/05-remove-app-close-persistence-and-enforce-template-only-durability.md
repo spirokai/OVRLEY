@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: ready-for-human
 
 # 05 - Remove App-Close Persistence and Enforce Template-Only Durability
 
@@ -60,12 +60,12 @@ Call sites should no longer write app-close durable state to browser storage. If
 
 ## Acceptance criteria
 
-- [ ] App-close persistence via browser storage is removed for the targeted app-state domains
-- [ ] Closing and reopening the app starts from clean in-memory defaults rather than restoring prior unsaved state
-- [ ] Template save/load through `.json` files remains intact and is the only durable user-data path
-- [ ] Any legacy browser-storage cleanup is explicit and non-restorative
-- [ ] Raw storage key usage is removed or reduced to migration-only behavior in the targeted modules
-- [ ] Tests cover launch-reset semantics and template-only durability
+- [x] App-close persistence via browser storage is removed for the targeted app-state domains
+- [x] Closing and reopening the app starts from clean in-memory defaults rather than restoring prior unsaved state
+- [x] Template save/load through `.json` files remains intact and is the only durable user-data path
+- [x] Any legacy browser-storage cleanup is explicit and non-restorative
+- [x] Raw storage key usage is removed or reduced to migration-only behavior in the targeted modules
+- [x] Tests cover launch-reset semantics and template-only durability
 
 ## Blocked by
 

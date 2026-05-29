@@ -11,15 +11,12 @@ import { DEFAULT_RENDER_PROGRESS } from '../store-utils'
  * @returns {object} Derived data structure for downstream use.
  */
 export function createMediaSlice(set, get) {
-  localStorage.removeItem('gpxFilename')
-  localStorage.removeItem('imageFilename')
-
   return {
     isProcessing: false,
     importingVideo: false,
     renderingVideo: false,
     errorMessage: null,
-    videoFilename: localStorage.getItem('videoFilename') || null,
+    videoFilename: null,
     gpxFilename: null,
     activitySummary: null,
     activeRenderId: null,
@@ -67,12 +64,10 @@ export function createMediaSlice(set, get) {
         state.errorMessage = null
       }),
 
-    setVideoFilename: (filename) => {
-      localStorage.setItem('videoFilename', filename)
+    setVideoFilename: (filename) =>
       set((state) => {
         state.videoFilename = filename
-      })
-    },
+      }),
 
     setGpxFilename: async (filename) => {
       set((state) => {

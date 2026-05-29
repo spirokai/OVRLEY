@@ -5,11 +5,10 @@
 import {
   beginConfigUpdate,
   cloneSerializable,
+  DEFAULT_CONFIG,
   endConfigUpdateSoon,
   hasSerializableChanged,
   isConfigUpdateInProgress,
-  readStoredConfig,
-  readStoredInt,
   updateConfigPersistence,
 } from '../store-utils'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '../../lib/previewPerf'
@@ -30,23 +29,21 @@ export function createEditorSlice(set, get) {
   return {
     editor: null,
     selectedWidgetId: null,
-    previewInterpolationEnabled: localStorage.getItem('previewInterpolationEnabled') !== 'false',
+    previewInterpolationEnabled: true,
     hasUnrenderedChanges: false,
     lastRenderedConfig: null,
-    dummyDurationSeconds: readStoredInt('dummyDurationSeconds', 73),
-    startSecond: readStoredInt('startSecond', 0),
-    endSecond: readStoredInt('endSecond', 73),
-    selectedSecond: readStoredInt('selectedSecond', 0),
+    dummyDurationSeconds: 73,
+    startSecond: 0,
+    endSecond: 73,
+    selectedSecond: 0,
     previewPlaybackState: 'paused',
     previewPlaybackSource: 'timeline',
-    config: readStoredConfig(),
-    autoRender: localStorage.getItem('autoRender') === 'true',
+    config: cloneSerializable(DEFAULT_CONFIG),
+    autoRender: false,
 
     setConfig: (val) => {
       const currentState = get()
       const isDifferent = currentState.lastRenderedConfig ? hasSerializableChanged(val, currentState.lastRenderedConfig) : false
-
-      localStorage.setItem('editorConfig', JSON.stringify(val))
 
       const wasUpdating = beginConfigUpdate()
 
@@ -69,11 +66,9 @@ export function createEditorSlice(set, get) {
           } else {
             if (val.scene.start !== undefined && val.scene.start !== state.startSecond) {
               state.startSecond = val.scene.start
-              localStorage.setItem('startSecond', val.scene.start.toString())
             }
             if (val.scene.end !== undefined && val.scene.end !== state.endSecond) {
               state.endSecond = val.scene.end
-              localStorage.setItem('endSecond', val.scene.end.toString())
             }
           }
         }
@@ -96,23 +91,17 @@ export function createEditorSlice(set, get) {
         state.lastRenderedConfig = cloneSerializable(config)
       }),
 
-    setAutoRender: (val) => {
-      localStorage.setItem('autoRender', val.toString())
+    setAutoRender: (val) =>
       set((state) => {
         state.autoRender = val
-      })
-    },
+      }),
 
-    setDummyDurationSeconds: (duration) => {
-      localStorage.setItem('dummyDurationSeconds', duration.toString())
+    setDummyDurationSeconds: (duration) =>
       set((state) => {
         state.dummyDurationSeconds = duration
-      })
-    },
+      }),
 
     setStartSecond: (second) => {
-      localStorage.setItem('startSecond', second.toString())
-
       const state = get()
       if (state.startSecond === second) return
 
@@ -129,8 +118,6 @@ export function createEditorSlice(set, get) {
     },
 
     setEndSecond: (second) => {
-      localStorage.setItem('endSecond', second.toString())
-
       const state = get()
       if (state.endSecond === second) return
 
@@ -149,7 +136,6 @@ export function createEditorSlice(set, get) {
     setSelectedSecond: (second) => {
       const safeSecond = normalizePreviewSecond(second)
 
-      localStorage.setItem('selectedSecond', safeSecond.toString())
       set((state) => {
         state.selectedSecond = safeSecond
       })
@@ -179,7 +165,6 @@ export function createEditorSlice(set, get) {
     pausePreviewPlayback: (second) => {
       const safeSecond = normalizePreviewSecond(second)
 
-      localStorage.setItem('selectedSecond', safeSecond.toString())
       set((state) => {
         state.previewPlaybackState = 'paused'
         state.selectedSecond = safeSecond
@@ -207,19 +192,16 @@ export function createEditorSlice(set, get) {
     commitPreviewScrub: (second) => {
       const safeSecond = normalizePreviewSecond(second)
 
-      localStorage.setItem('selectedSecond', safeSecond.toString())
       set((state) => {
         state.previewPlaybackState = 'paused'
         state.selectedSecond = safeSecond
       })
     },
 
-    setPreviewInterpolationEnabled: (enabled) => {
-      localStorage.setItem('previewInterpolationEnabled', enabled.toString())
+    setPreviewInterpolationEnabled: (enabled) =>
       set((state) => {
         state.previewInterpolationEnabled = enabled
-      })
-    },
+      }),
 
     setEditor: (editor) =>
       set((state) => {

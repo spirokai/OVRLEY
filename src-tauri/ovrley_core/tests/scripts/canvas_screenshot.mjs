@@ -67,8 +67,6 @@ async function main() {
   const page = await context.newPage()
 
   await page.addInitScript(() => {
-    localStorage.setItem('overlayBackgroundMode', 'transparent')
-    localStorage.setItem('overlayGridVisible', 'false')
     window.__TAURI_INTERNALS__ = {
       metadata: {
         currentWindow: { label: 'main' },
@@ -130,6 +128,25 @@ async function main() {
       }, storeState)
     }
   }
+
+  // The editor shell no longer hydrates background/grid prefs from browser
+  // storage, so the screenshot path must force a transparent scene explicitly.
+  await page.evaluate(() => {
+    const scene = document.querySelector('[data-testid="overlay-scene"]')
+    if (scene) {
+      scene.style.background = 'transparent'
+      scene.style.backgroundColor = 'transparent'
+    }
+
+    const sceneBackground = document.querySelector('[data-testid="overlay-scene"] > div:first-child')
+    if (sceneBackground) {
+      sceneBackground.style.background = 'transparent'
+      sceneBackground.style.backgroundColor = 'transparent'
+      sceneBackground.style.backgroundImage = 'none'
+      sceneBackground.style.borderColor = 'transparent'
+      sceneBackground.style.boxShadow = 'none'
+    }
+  })
 
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="widget-layer"] [data-widget-id]').length > 0, { timeout: 15000 })
 

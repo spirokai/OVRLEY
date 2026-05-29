@@ -1,6 +1,16 @@
 /**
- * Editor shell state — local UI state for the overlay editor chrome.
- * Owns zoom level, background mode, grid visibility, snap-to-grid, and UI scale.
+ * Editor shell state for the overlay editor chrome.
+ *
+ * This hook owns session-scoped UI preferences that affect how the editor is
+ * presented, not how a template is serialized. The values intentionally live
+ * only in React state:
+ *
+ * - They must start from explicit in-memory defaults on every launch.
+ * - They must not hydrate from browser storage during startup.
+ * - They must not write browser storage as the user toggles them.
+ *
+ * That keeps module evaluation pure, avoids hidden durability rules, and makes
+ * the hook safe to render in non-browser test environments.
  */
 
 import { clamp } from '@/lib/utils'
@@ -9,7 +19,11 @@ import { DEBUG_MODE_ENABLED } from '@/App'
 
 /**
  * Derives the UI scale factor from the viewport width.
- * Scaled from a 1440px reference, clamped to 0.9–1.08.
+ *
+ * The editor chrome scales gently with available width so controls stay usable
+ * on narrower layouts without overgrowing on large monitors. The factor is
+ * derived from a 1440px reference width and then clamped to a conservative
+ * range so the shell remains visually stable across desktop sizes.
  *
  * @param {number} width - Viewport width in pixels.
  * @returns {number} UI scale factor.
@@ -20,7 +34,16 @@ function getUiScale(width) {
 
 /**
  * Container hook for editor shell chrome state.
- * Manages zoom, background/grid/snap toggles, and responsive UI scale.
+ *
+ * Responsibilities:
+ *
+ * - Own editor-only presentation state such as zoom and background mode.
+ * - Expose direct setters for toolbar controls.
+ * - Keep UI scale in sync with the current window width when running in a browser.
+ * - Remain safe when `window` is unavailable during tests or server-style renders.
+ *
+ * The returned state is deliberately local to the current session. Template
+ * loading and store hydration do not participate in these values.
  *
  * @returns {{
  *   decreaseZoom: Function,
@@ -39,28 +62,19 @@ function getUiScale(width) {
  * }}
  */
 export default function useEditorShellState() {
-  // Local UI state — editor viewport settings with localStorage hydration
+  // Session-only editor presentation state. These defaults are the canonical
+  // launch values and are not restored from previous app runs.
   const [editorZoomLevel, setEditorZoomLevel] = useState(1)
-  const [editorBackgroundMode, setEditorBackgroundMode] = useState(() => localStorage.getItem('overlayBackgroundMode') || 'checker')
-  const [editorGridVisible, setEditorGridVisible] = useState(() => localStorage.getItem('overlayGridVisible') === 'true')
-  const [editorSnapToGrid, setEditorSnapToGrid] = useState(() => localStorage.getItem('overlaySnapToGrid') === 'true')
+  const [editorBackgroundMode, setEditorBackgroundMode] = useState('checker')
+  const [editorGridVisible, setEditorGridVisible] = useState(false)
+  const [editorSnapToGrid, setEditorSnapToGrid] = useState(false)
   const [uiScale, setUiScale] = useState(() => (typeof window === 'undefined' ? 1 : getUiScale(window.innerWidth)))
+  // Debug-only controls are surfaced from the app-level development flag.
   const debugModeEnabled = import.meta.env.DEV && DEBUG_MODE_ENABLED
 
-  // Persistence effects — sync each toggle to localStorage on change
-  useEffect(() => {
-    localStorage.setItem('overlayBackgroundMode', editorBackgroundMode)
-  }, [editorBackgroundMode])
-
-  useEffect(() => {
-    localStorage.setItem('overlayGridVisible', String(editorGridVisible))
-  }, [editorGridVisible])
-
-  useEffect(() => {
-    localStorage.setItem('overlaySnapToGrid', String(editorSnapToGrid))
-  }, [editorSnapToGrid])
-
-  // UI scale — recalculate scale on window resize
+  // Resize subscription for responsive chrome scaling. In non-browser
+  // environments there is nothing to subscribe to, so the hook becomes a
+  // predictable no-op and keeps the default scale of `1`.
   useEffect(() => {
     if (typeof window === 'undefined') {
       return undefined
@@ -77,7 +91,8 @@ export default function useEditorShellState() {
     }
   }, [])
 
-  // Zoom handlers — step-based zoom in/out/reset with clamped bounds
+  // Zoom adjustments use fixed increments and clamp to editor-supported bounds
+  // so wheel/toolbar interactions cannot push the viewport into unusable ranges.
   const decreaseZoom = () => {
     setEditorZoomLevel((current) => clamp(Number((current - 0.05).toFixed(2)), 0.35, 4))
   }

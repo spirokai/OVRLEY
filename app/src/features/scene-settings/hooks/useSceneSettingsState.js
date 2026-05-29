@@ -12,9 +12,29 @@ import { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import useAvailableFonts from '@/hooks/useAvailableFonts'
-import { getUpdateRateOptions, normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
+import { getFpsModeValue, getUpdateRateOptions, normalizeUpdateRateForFps, PRESET_FPS_VALUES, sanitizeIntegerFps } from '@/lib/update-rate'
 import { RESOLUTIONS } from '../data/sceneSettingsConstants'
 import { parseTimeOffset, sanitizeNumber } from '../utils/sceneSettingsUtils'
+
+function getResolutionPresetId(scene) {
+  if (!scene) {
+    return '1080p'
+  }
+
+  const match = Object.values(RESOLUTIONS)
+    .flat()
+    .find((resolution) => resolution.w === scene.width && resolution.h === scene.height)
+
+  return match ? match.id : 'custom'
+}
+
+function getSceneResolutionKey(scene) {
+  if (!scene) {
+    return null
+  }
+
+  return `${Number(scene.width)}x${Number(scene.height)}`
+}
 
 export default function useSceneSettingsState({ config, onConfigChange }) {
   // Store selectors
@@ -67,17 +87,16 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   // Derived state (from props)
   const scene = config?.scene
   const systemFonts = useAvailableFonts()
+  const sceneResolutionKey = getSceneResolutionKey(scene)
+  const derivedResId = getResolutionPresetId(scene)
+  const derivedFpsMode = getFpsModeValue(scene?.fps)
 
-  // Local UI state
-  const [resId, setResId] = useState(() => {
-    if (!scene) return '1080p'
-    const match = Object.values(RESOLUTIONS)
-      .flat()
-      .find((r) => r.w === scene.width && r.h === scene.height)
-    return match ? match.id : 'custom'
-  })
-
-  const [fpsMode, setFpsMode] = useState([24, 30, 60].includes(scene?.fps) ? scene?.fps?.toString() : 'custom')
+  // Local UI state remains only for transient modes that intentionally diverge
+  // from committed scene values until the relevant field actually changes.
+  const [customResolutionAnchor, setCustomResolutionAnchor] = useState(null)
+  const [customFpsAnchor, setCustomFpsAnchor] = useState(null)
+  const resId = customResolutionAnchor && customResolutionAnchor === sceneResolutionKey ? 'custom' : derivedResId
+  const fpsMode = customFpsAnchor !== null && Number(scene?.fps) === customFpsAnchor ? 'custom' : derivedFpsMode
 
   const updateRateOptions = useMemo(() => getUpdateRateOptions(scene?.fps), [scene?.fps])
 
@@ -87,17 +106,6 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   useEffect(() => {
     setOffsetInput(videoSyncOffsetSeconds?.toString() || '0')
   }, [videoSyncOffsetSeconds])
-
-  useEffect(() => {
-    if (scene) {
-      const match = Object.values(RESOLUTIONS)
-        .flat()
-        .find((r) => r.w === scene.width && r.h === scene.height)
-      setResId(match ? match.id : 'custom')
-      if ([24, 30, 60].includes(scene.fps)) setFpsMode(scene.fps.toString())
-      else setFpsMode('custom')
-    }
-  }, [scene])
 
   useEffect(() => {
     const normalizedUpdateRate = normalizeUpdateRateForFps(scene?.fps, updateRate)
@@ -137,7 +145,12 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   }
 
   const handleResolutionChange = (v) => {
-    setResId(v)
+    if (v === 'custom') {
+      setCustomResolutionAnchor(sceneResolutionKey)
+      return
+    }
+
+    setCustomResolutionAnchor(null)
     const preset = RESOLUTIONS[aspectRatio]?.find((r) => r.id === v)
     if (preset) {
       onConfigChange({
@@ -152,7 +165,12 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   }
 
   const handleFpsModeChange = (v) => {
-    setFpsMode(v)
+    if (v === 'custom') {
+      setCustomFpsAnchor(Number(scene?.fps))
+      return
+    }
+
+    setCustomFpsAnchor(null)
     if (v !== 'custom') {
       const fps = sanitizeIntegerFps(v)
       setUpdateRate(normalizeUpdateRateForFps(fps, updateRate))
@@ -162,6 +180,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
 
   const handleCustomFpsChange = (e) => {
     const fps = sanitizeIntegerFps(e.target.value)
+    setCustomFpsAnchor(PRESET_FPS_VALUES.includes(fps) ? null : fps)
     setUpdateRate(normalizeUpdateRateForFps(fps, updateRate))
     updateScene('fps', fps)
   }
@@ -219,8 +238,6 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     resId,
     fpsMode,
     offsetInput,
-    setResId,
-    setFpsMode,
     setOffsetInput,
 
     // Handlers

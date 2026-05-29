@@ -33,11 +33,7 @@ function createStoreState(set, get) {
  * @returns {boolean} Whether the condition is satisfied.
  */
 function shouldEnableStoreDevtools() {
-  if (!import.meta.env.DEV || typeof window === 'undefined') {
-    return false
-  }
-
-  return window.localStorage.getItem('ovrley:store-devtools') === 'true'
+  return import.meta.env.DEV && typeof window !== 'undefined'
 }
 
 const storeInitializer = subscribeWithSelector(immer(createStoreState))

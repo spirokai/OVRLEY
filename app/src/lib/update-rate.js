@@ -4,6 +4,8 @@ const PRESET_UPDATE_RATES = {
   60: [1, 2, 6, 10],
 }
 
+export const PRESET_FPS_VALUES = [24, 30, 60]
+
 /**
  * Returns a positive integer FPS value.
  *
@@ -12,6 +14,17 @@ const PRESET_UPDATE_RATES = {
  */
 export function sanitizeIntegerFps(fps) {
   return Math.max(Math.trunc(Number(fps) || 1), 1)
+}
+
+/**
+ * Returns the FPS selector mode for a committed FPS value.
+ *
+ * @param {*} fps - Input FPS value.
+ * @returns {string} One of the preset FPS string values or 'custom'.
+ */
+export function getFpsModeValue(fps) {
+  const normalizedFps = Number(fps)
+  return PRESET_FPS_VALUES.includes(normalizedFps) ? normalizedFps.toString() : 'custom'
 }
 
 /**

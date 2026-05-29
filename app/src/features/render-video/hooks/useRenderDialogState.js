@@ -1,5 +1,5 @@
 /**
- * Manages render dialog phase state and settings draft.
+ * Manages render dialog phase state and the dialog-scoped settings draft.
  * Composed by useRenderWorkflow.
  *
  * @param {object} params
@@ -12,18 +12,20 @@
 import { useCallback, useEffect, useState } from 'react'
 
 export default function useRenderDialogState({ buildRenderSettingsDraft, renderDisabled, renderingVideo, renderStatus }) {
-  // Local UI state — dialog phase ('closed'|'confirm'|'progress') and the current settings draft
+  // Dialog phase and renderSettingsDraft are true dialog-local state, not
+  // mirrors of store values. The draft exists only for the lifetime of the
+  // open dialog and can intentionally diverge from committed store settings.
   const [renderDialogPhase, setRenderDialogPhase] = useState('closed')
   const [renderSettingsDraft, setRenderSettingsDraft] = useState(null)
 
-  // Side effects — auto-close the dialog when a render finishes, is cancelled, or errors out
+  // Auto-close the dialog after a render finishes, is cancelled, or errors.
   useEffect(() => {
     if (renderDialogPhase === 'progress' && !renderingVideo && ['complete', 'cancelled', 'error'].includes(renderStatus)) {
       setRenderDialogPhase('closed')
     }
   }, [renderDialogPhase, renderStatus, renderingVideo])
 
-  // Open handler — populates the settings draft from store and transitions to confirm phase
+  // Opening creates a fresh draft from the current store-backed defaults.
   const openRenderDialog = useCallback(() => {
     if (renderDisabled) {
       return
@@ -33,7 +35,7 @@ export default function useRenderDialogState({ buildRenderSettingsDraft, renderD
     setRenderDialogPhase('confirm')
   }, [buildRenderSettingsDraft, renderDisabled])
 
-  // Close handler — resets the dialog to closed phase, blocked while render is active
+  // Closing is blocked while an active render is in progress.
   const closeRenderDialog = useCallback(() => {
     if (renderDialogPhase === 'progress' || renderingVideo) {
       return
@@ -42,7 +44,7 @@ export default function useRenderDialogState({ buildRenderSettingsDraft, renderD
     setRenderDialogPhase('closed')
   }, [renderDialogPhase, renderingVideo])
 
-  // Update handler — merges partial updates into the current settings draft
+  // Draft updates merge partial changes without mutating the current object.
   const updateRenderSettingsDraft = useCallback((updates) => {
     setRenderSettingsDraft((currentDraft) => {
       if (!currentDraft) {

@@ -1,10 +1,6 @@
 /**
- * Provides store utilities related to store utils.
+ * Shared store utilities.
  */
-
-import { DEFAULT_EXPORT_RANGE, normalizeTemplateConfig } from '@/features/template-manager'
-import { normalizeColorFields } from '../lib/color-utils'
-import { DEFAULT_GLOBAL_DEFAULTS } from '../lib/config-utils'
 
 let isUpdatingFromConfig = false
 
@@ -38,81 +34,32 @@ export const DEFAULT_RENDER_PROGRESS = {
 }
 
 /**
- * Reads stored json.
+ * Clones a JSON-serializable value.
  *
- * @param {*} key - Lookup key for the requested value.
- * @param {*} fallback - Fallback value returned when input is invalid.
- * @returns {*} Requested value or structure.
- */
-export function readStoredJson(key, fallback) {
-  const value = localStorage.getItem(key)
-  if (!value) return fallback
-
-  try {
-    return JSON.parse(value)
-  } catch {
-    return fallback
-  }
-}
-
-/**
- * Reads stored int.
- *
- * @param {*} key - Lookup key for the requested value.
- * @param {*} fallback - Fallback value returned when input is invalid.
- * @returns {*} Requested value or structure.
- */
-export function readStoredInt(key, fallback) {
-  const value = parseInt(localStorage.getItem(key) || `${fallback}`, 10)
-  return Number.isFinite(value) ? value : fallback
-}
-
-/**
- * Handles persist serializable.
- *
- * @param {*} key - Lookup key for the requested value.
- * @param {*} value - Input value processed by the helper.
- * @returns {*} Result produced by the helper.
- */
-export function persistSerializable(key, value) {
-  if (value === null || value === undefined) {
-    localStorage.removeItem(key)
-    return
-  }
-
-  localStorage.setItem(key, JSON.stringify(value))
-}
-
-/**
- * Handles clone serializable.
- *
- * @param {*} value - Input value processed by the helper.
- * @returns {*} Result produced by the helper.
+ * @param {*} value - Value to clone.
+ * @returns {*} Cloned value.
  */
 export function cloneSerializable(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
 /**
- * Checks whether has serializable changed.
+ * Checks whether two JSON-serializable values differ.
  *
  * @param {*} left - Left-hand comparison value.
  * @param {*} right - Right-hand comparison value.
- * @returns {boolean} Whether the condition is satisfied.
+ * @returns {boolean} Whether the values differ.
  */
 export function hasSerializableChanged(left, right) {
   return JSON.stringify(left) !== JSON.stringify(right)
 }
 
 /**
- * Updates config persistence.
+ * Updates derived dirty state after config changes.
  *
- * @param {*} state - Value for state.
- * @returns {*} Result produced by the helper.
+ * @param {*} state - Current store draft state.
  */
 export function updateConfigPersistence(state) {
-  localStorage.setItem('editorConfig', JSON.stringify(state.config))
-
   if (state.lastRenderedConfig) {
     state.hasUnrenderedChanges = hasSerializableChanged(state.config, state.lastRenderedConfig)
     return
@@ -122,45 +69,9 @@ export function updateConfigPersistence(state) {
 }
 
 /**
- * Reads stored config.
- * @returns {*} Requested value or structure.
- */
-export function readStoredConfig() {
-  const loadedTemplateFilename = localStorage.getItem('loadedTemplateFilename')
-  const lastSavedTemplateState = readStoredJson('lastSavedTemplateState', null)
-  if (loadedTemplateFilename && lastSavedTemplateState?.config?.scene) {
-    const savedGlobalDefaults = normalizeColorFields(lastSavedTemplateState.settings?.globalDefaults || {})
-    const globalDefaults = {
-      ...DEFAULT_GLOBAL_DEFAULTS,
-      ...savedGlobalDefaults,
-    }
-    const savedConfig = normalizeTemplateConfig(lastSavedTemplateState.config, globalDefaults)
-    localStorage.setItem('editorConfig', JSON.stringify(savedConfig))
-    return savedConfig
-  }
-
-  const savedConfig = localStorage.getItem('editorConfig')
-  if (savedConfig) {
-    try {
-      const parsed = JSON.parse(savedConfig)
-      if (parsed && parsed.scene) {
-        const globalDefaults = {
-          ...DEFAULT_GLOBAL_DEFAULTS,
-          ...normalizeColorFields(readStoredJson('globalDefaults', {}) || {}),
-        }
-        return normalizeTemplateConfig(parsed, globalDefaults)
-      }
-    } catch {
-      console.warn('Failed to parse saved config, using default')
-    }
-  }
-
-  return DEFAULT_CONFIG
-}
-
-/**
- * Handles begin config update.
- * @returns {*} Result produced by the helper.
+ * Marks a config-driven update as in progress.
+ *
+ * @returns {boolean} Whether a config update was already in progress.
  */
 export function beginConfigUpdate() {
   const wasUpdating = isUpdatingFromConfig
@@ -169,8 +80,7 @@ export function beginConfigUpdate() {
 }
 
 /**
- * Handles end config update soon.
- * @returns {*} Result produced by the helper.
+ * Clears the config-update guard after the current tick settles.
  */
 export function endConfigUpdateSoon() {
   setTimeout(() => {
@@ -179,33 +89,10 @@ export function endConfigUpdateSoon() {
 }
 
 /**
- * Checks whether is config update in progress.
- * @returns {boolean} Whether the condition is satisfied.
+ * Checks whether a config update is currently in progress.
+ *
+ * @returns {boolean} Whether config synchronization is active.
  */
 export function isConfigUpdateInProgress() {
   return isUpdatingFromConfig
-}
-
-/**
- * Reads stored template settings.
- * @returns {object} Requested value or structure.
- */
-export function readStoredTemplateSettings() {
-  localStorage.removeItem('exportRange')
-  const storedGlobalDefaults = normalizeColorFields(readStoredJson('globalDefaults', {}) || {})
-  const globalDefaults = Object.keys(DEFAULT_GLOBAL_DEFAULTS).reduce(
-    (result, key) => ({
-      ...result,
-      [key]: storedGlobalDefaults[key] === undefined ? DEFAULT_GLOBAL_DEFAULTS[key] : storedGlobalDefaults[key],
-    }),
-    {},
-  )
-
-  return {
-    updateRate: readStoredInt('updateRate', 1),
-    exportRange: { ...DEFAULT_EXPORT_RANGE },
-    exportCodec: localStorage.getItem('exportCodec') || 'prores_ks',
-    globalDefaults,
-    aspectRatio: localStorage.getItem('aspectRatio') || '16:9',
-  }
 }

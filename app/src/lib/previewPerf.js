@@ -1,4 +1,12 @@
-const PREVIEW_PERF_FLAG = 'ovrley:preview-perf'
+/**
+ * Preview performance diagnostics for local development.
+ *
+ * Counters stay disabled unless the current browser session explicitly opts in
+ * through `window.__OVRLEY_PREVIEW_PERF_ENABLED__ = true`. Snapshots are
+ * published to `window.__OVRLEY_PREVIEW_PERF__` once per second while enabled.
+ */
+
+const PREVIEW_PERF_ENABLED_FLAG = '__OVRLEY_PREVIEW_PERF_ENABLED__'
 
 const counterState = {
   counts: Object.create(null),
@@ -11,11 +19,7 @@ function isPreviewPerfEnabled() {
     return false
   }
 
-  try {
-    return window.localStorage.getItem(PREVIEW_PERF_FLAG) === 'true'
-  } catch {
-    return false
-  }
+  return window[PREVIEW_PERF_ENABLED_FLAG] === true
 }
 
 function flushPreviewPerfCounters() {

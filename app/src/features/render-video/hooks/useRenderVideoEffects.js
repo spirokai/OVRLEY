@@ -1,13 +1,12 @@
 /**
- * Side effects for RenderVideoDialog: FPS mode sync, codec auto-switching,
- * and update rate normalization. Single concern: synchronization.
+ * Side effects for RenderVideoDialog: codec auto-switching and update rate
+ * normalization. Single concern: synchronization of committed render settings.
  * Composed by useRenderVideoDialogState.
  *
  * @param {object} params
  * @param {object|null} params.settings - Current render settings draft.
  * @param {object} params.derivedState - Output from useRenderVideoDerivedState.
  * @param {function} params.onSettingsChange - Callback to update settings draft.
- * @param {function} params.setFpsMode - State setter for the FPS mode selector.
  * @returns {void}
  */
 
@@ -16,23 +15,9 @@ import { EXPORT_CODEC_LOOKUP } from '../data/renderConstants'
 import { getFirstAvailableMp4ExportCodec } from '../utils/codecUtils'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 
-export default function useRenderVideoEffects({ settings, derivedState, onSettingsChange, setFpsMode }) {
+export default function useRenderVideoEffects({ settings, derivedState, onSettingsChange }) {
   const { defaultBitrateForCodec, hasImportedVideo, platformOs, availableCodecs, selectedCodecIsMp4, selectedExportCodecAvailable, updateRateFps } =
     derivedState
-
-  // Sync fpsMode local state when settings.fps changes externally
-  useEffect(() => {
-    if (!settings) {
-      return
-    }
-
-    if ([24, 30, 60].includes(settings.fps)) {
-      setFpsMode(settings.fps.toString())
-      return
-    }
-
-    setFpsMode('custom')
-  }, [settings, setFpsMode])
 
   // Auto-select MP4 codec when video is imported or codec availability changes
   useEffect(() => {

@@ -10,11 +10,16 @@ import { useEffect, useMemo, useRef } from 'react'
 import useStore from '@/store/useStore'
 import { getEffectivePreviewFps } from '@/features/overlay-editor'
 import { incrementPreviewPerfCounter, previewPerfCounterName, setPreviewPerfValue } from '@/lib/previewPerf'
-import { PREVIEW_CLOCK_MODE_FLAG } from '../data/videoPreviewConstants'
+
+const PREVIEW_CLOCK_MODE_FLAG = '__OVRLEY_PREVIEW_CLOCK_MODE__'
 
 /**
- * Reads the preview clock mode from localStorage, defaulting to `'auto'`.
- * In `'auto'` mode the hook prefers `requestVideoFrameCallback` when the browser supports it.
+ * Reads the preview clock mode from the current browser session.
+ *
+ * The override is intentionally runtime-only: it helps debugging without
+ * recreating app-close persistence. In `'auto'` mode the hook prefers
+ * `requestVideoFrameCallback` when the browser supports it.
+ *
  * @returns {'auto'|'raf'} The resolved clock mode.
  */
 function resolvePreviewClockMode() {
@@ -22,11 +27,7 @@ function resolvePreviewClockMode() {
     return 'auto'
   }
 
-  try {
-    return window.localStorage.getItem(PREVIEW_CLOCK_MODE_FLAG) || 'auto'
-  } catch {
-    return 'auto'
-  }
+  return window[PREVIEW_CLOCK_MODE_FLAG] === 'raf' ? 'raf' : 'auto'
 }
 
 /**

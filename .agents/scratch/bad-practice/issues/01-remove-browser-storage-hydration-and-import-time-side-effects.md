@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: ready-for-human
 
 # 01 - Remove Browser Storage Hydration and Import-Time Side Effects
 
@@ -58,12 +58,12 @@ The final design does not need a new library. Simple deletion of browser-storage
 
 ## Acceptance criteria
 
-- [ ] Importing the store modules and editor preference modules no longer reads from or writes to browser storage as a side effect of module evaluation
-- [ ] App startup no longer hydrates editor state, settings, timeline state, or template state from browser storage
-- [ ] In-memory defaults and explicit template loading are the only sources of initial app state
-- [ ] Cleanup or migration behavior, if still needed, is explicit and does not restore app state on launch
-- [ ] App startup remains safe when `window` or `localStorage` is unavailable
-- [ ] Tests cover launch behavior without browser-storage hydration and confirm template load behavior still works
+- [x] Importing the store modules and editor preference modules no longer reads from or writes to browser storage as a side effect of module evaluation
+- [x] App startup no longer hydrates editor state, settings, timeline state, or template state from browser storage
+- [x] In-memory defaults and explicit template loading are the only sources of initial app state
+- [x] Cleanup or migration behavior, if still needed, is explicit and does not restore app state on launch
+- [x] App startup remains safe when `window` or `localStorage` is unavailable
+- [x] Tests cover launch behavior without browser-storage hydration and confirm template load behavior still works
 
 ## Blocked by
 
