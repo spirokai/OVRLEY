@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: ready-for-human
 
 # 02 - Replace Timer-Based Config Synchronization Guard with Explicit Update Flow
 
@@ -53,12 +53,12 @@ The module should make loop prevention structural instead of time-based. The res
 
 ## Acceptance criteria
 
-- [ ] No config synchronization behavior depends on a module-global boolean plus delayed timeout reset
-- [ ] The flow for config-originated updates versus timeline-originated updates is explicit in the store or its helper seam
-- [ ] Timeline edits still update config scene timing correctly
-- [ ] Config replacement and template hydration still update timeline state correctly
-- [ ] Dirty-state tracking remains functionally equivalent within a session and no app-close persistence is reintroduced
-- [ ] Tests cover consecutive rapid updates without relying on timer timing windows
+- [x] No config synchronization behavior depends on a module-global boolean plus delayed timeout reset
+- [x] The flow for config-originated updates versus timeline-originated updates is explicit in the store or its helper seam
+- [x] Timeline edits still update config scene timing correctly
+- [x] Config replacement and template hydration still update timeline state correctly
+- [x] Dirty-state tracking remains functionally equivalent within a session and no app-close persistence is reintroduced
+- [x] Tests cover consecutive rapid updates without relying on timer timing windows
 
 ## Blocked by
 

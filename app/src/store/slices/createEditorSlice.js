@@ -3,13 +3,11 @@
  */
 
 import {
-  beginConfigUpdate,
+  applyConfigOriginatedSceneTiming,
+  applyTimelineOriginatedSceneTiming,
   cloneSerializable,
   DEFAULT_CONFIG,
-  endConfigUpdateSoon,
   hasSerializableChanged,
-  isConfigUpdateInProgress,
-  updateConfigPersistence,
 } from '../store-utils'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '../../lib/previewPerf'
 
@@ -45,40 +43,11 @@ export function createEditorSlice(set, get) {
       const currentState = get()
       const isDifferent = currentState.lastRenderedConfig ? hasSerializableChanged(val, currentState.lastRenderedConfig) : false
 
-      const wasUpdating = beginConfigUpdate()
-
       set((state) => {
         state.config = val
-
-        if (val.scene) {
-          const hasExistingTimeline = state.startSecond !== 0 || state.endSecond !== state.dummyDurationSeconds
-
-          if (!hasExistingTimeline) {
-            if (val.scene.start !== undefined) {
-              state.startSecond = val.scene.start
-            }
-            if (val.scene.end !== undefined) {
-              state.endSecond = val.scene.end
-            }
-            if (val.scene.start !== undefined) {
-              state.selectedSecond = val.scene.start
-            }
-          } else {
-            if (val.scene.start !== undefined && val.scene.start !== state.startSecond) {
-              state.startSecond = val.scene.start
-            }
-            if (val.scene.end !== undefined && val.scene.end !== state.endSecond) {
-              state.endSecond = val.scene.end
-            }
-          }
-        }
-
-        if (!wasUpdating) {
-          state.hasUnrenderedChanges = isDifferent
-        }
+        applyConfigOriginatedSceneTiming(state, val, { previousConfig: currentState.config })
+        state.hasUnrenderedChanges = isDifferent
       })
-
-      endConfigUpdateSoon()
     },
 
     setHasUnrenderedChanges: (val) =>
@@ -107,13 +76,7 @@ export function createEditorSlice(set, get) {
 
       set((draft) => {
         draft.startSecond = second
-
-        if (!isConfigUpdateInProgress() && draft.config && draft.config.scene) {
-          if (draft.config.scene.start === second) return
-
-          draft.config.scene.start = second
-          updateConfigPersistence(draft)
-        }
+        applyTimelineOriginatedSceneTiming(draft, { startSecond: second })
       })
     },
 
@@ -123,13 +86,7 @@ export function createEditorSlice(set, get) {
 
       set((draft) => {
         draft.endSecond = second
-
-        if (!isConfigUpdateInProgress() && draft.config && draft.config.scene) {
-          if (draft.config.scene.end === second) return
-
-          draft.config.scene.end = second
-          updateConfigPersistence(draft)
-        }
+        applyTimelineOriginatedSceneTiming(draft, { endSecond: second })
       })
     },
 

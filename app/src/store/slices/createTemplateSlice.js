@@ -10,7 +10,7 @@
 import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
 import { DEFAULT_GLOBAL_DEFAULTS, syncGlobalDefaultsToConfig } from '../../lib/config-utils'
 import { DEFAULT_EXPORT_RANGE } from '../../features/template-manager'
-import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, updateConfigPersistence } from '../store-utils'
+import { applyConfigOriginatedSceneTiming, cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, updateConfigPersistence } from '../store-utils'
 
 const initialUpdateRate = 1
 const initialExportRange = { ...DEFAULT_EXPORT_RANGE }
@@ -36,19 +36,6 @@ export function createTemplateSlice(set, get) {
     }
 
     return codec || 'prores_ks'
-  }
-
-  const applySceneTimingToState = (state, scene) => {
-    if (!scene) return
-
-    if (scene.start !== undefined) {
-      state.startSecond = scene.start
-      state.selectedSecond = scene.start
-    }
-
-    if (scene.end !== undefined) {
-      state.endSecond = scene.end
-    }
   }
 
   const normalizeGlobalDefaultsForState = (globalDefaults) => {
@@ -164,7 +151,7 @@ export function createTemplateSlice(set, get) {
         state.loadedTemplateFilename = null
         state.loadedTemplateSource = null
         state.lastSavedTemplateState = null
-        applySceneTimingToState(state, nextConfig.scene)
+        applyConfigOriginatedSceneTiming(state, nextConfig, { resetSelectedSecond: true })
         updateUnrenderedChanges(state, nextConfig)
       })
     },
@@ -211,7 +198,7 @@ export function createTemplateSlice(set, get) {
         state.loadedTemplateFilename = filename
         state.loadedTemplateSource = source
 
-        applySceneTimingToState(state, nextConfig.scene)
+        applyConfigOriginatedSceneTiming(state, nextConfig, { resetSelectedSecond: true })
         updateUnrenderedChanges(state, nextConfig)
       })
     },

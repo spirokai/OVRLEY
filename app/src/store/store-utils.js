@@ -3,12 +3,10 @@
  *
  * Cloning and structural comparison helpers use purpose-built mechanisms
  * (structuredClone for cloning, deep field-by-field traversal for equality)
- * instead of JSON.stringify-based workarounds. This makes intent explicit,
- * avoids hidden serialization overhead, and does not depend on property
- * ordering.
+ * instead of JSON.stringify-based workarounds. Synchronization helpers make
+ * config-originated versus timeline-originated timing updates explicit so
+ * store actions do not depend on hidden module state or timer windows.
  */
-
-let isUpdatingFromConfig = false
 
 export const DEFAULT_CONFIG = {
   scene: {
@@ -115,30 +113,77 @@ export function updateConfigPersistence(state) {
 }
 
 /**
- * Marks a config-driven update as in progress.
+ * Applies scene timing from a config-originated update into timeline state.
  *
- * @returns {boolean} Whether a config update was already in progress.
+ * Config replacement and template hydration both flow through this helper.
+ * Callers choose whether the playhead should snap back to the new scene start;
+ * template hydration does, ordinary config replacement only does so when the
+ * incoming scene start actually changes and the playhead is still anchored to
+ * the previous start.
+ *
+ * @param {*} state - Current store draft state.
+ * @param {*} nextConfig - Incoming config value that owns the scene timing.
+ * @param {object} [options] - Synchronization options.
+ * @param {*} [options.previousConfig] - Config value before the current replacement.
+ * @param {boolean} [options.resetSelectedSecond=false] - Whether the playhead should adopt the incoming start second immediately.
  */
-export function beginConfigUpdate() {
-  const wasUpdating = isUpdatingFromConfig
-  isUpdatingFromConfig = true
-  return wasUpdating
+export function applyConfigOriginatedSceneTiming(state, nextConfig, options = {}) {
+  const { previousConfig, resetSelectedSecond = false } = options
+  const scene = nextConfig?.scene
+  if (!scene) return
+
+  const previousScene = previousConfig?.scene
+  const previousStartSecond = state.startSecond
+  const previousEndSecond = state.endSecond
+  const previousSelectedSecond = state.selectedSecond
+  const timelineIsUntouched = previousStartSecond === 0 && previousEndSecond === state.dummyDurationSeconds && previousSelectedSecond === 0
+
+  const sceneStartChangedInConfig = scene.start !== previousScene?.start
+  const sceneEndChangedInConfig = scene.end !== previousScene?.end
+
+  if (scene.start !== undefined && (resetSelectedSecond || sceneStartChangedInConfig)) {
+    state.startSecond = scene.start
+
+    const playheadIsAnchoredToPreviousStart = previousSelectedSecond === previousStartSecond
+
+    if (resetSelectedSecond || (sceneStartChangedInConfig && (timelineIsUntouched || playheadIsAnchoredToPreviousStart))) {
+      state.selectedSecond = scene.start
+    }
+  }
+
+  if (scene.end !== undefined && (resetSelectedSecond || sceneEndChangedInConfig)) {
+    state.endSecond = scene.end
+  }
 }
 
 /**
- * Clears the config-update guard after the current tick settles.
- */
-export function endConfigUpdateSoon() {
-  setTimeout(() => {
-    isUpdatingFromConfig = false
-  }, 100)
-}
-
-/**
- * Checks whether a config update is currently in progress.
+ * Applies timeline-originated edits back into config scene timing.
  *
- * @returns {boolean} Whether config synchronization is active.
+ * Timeline edits are the source of truth for this path. The helper writes the
+ * changed bounds into config and refreshes dirty-state tracking if any config
+ * field actually changed.
+ *
+ * @param {*} state - Current store draft state.
+ * @param {object} timing - Timeline timing values to persist into config.
+ * @param {number} [timing.startSecond] - Updated timeline start second.
+ * @param {number} [timing.endSecond] - Updated timeline end second.
  */
-export function isConfigUpdateInProgress() {
-  return isUpdatingFromConfig
+export function applyTimelineOriginatedSceneTiming(state, timing) {
+  if (!state.config?.scene) return
+
+  let sceneChanged = false
+
+  if (timing.startSecond !== undefined && state.config.scene.start !== timing.startSecond) {
+    state.config.scene.start = timing.startSecond
+    sceneChanged = true
+  }
+
+  if (timing.endSecond !== undefined && state.config.scene.end !== timing.endSecond) {
+    state.config.scene.end = timing.endSecond
+    sceneChanged = true
+  }
+
+  if (sceneChanged) {
+    updateConfigPersistence(state)
+  }
 }
