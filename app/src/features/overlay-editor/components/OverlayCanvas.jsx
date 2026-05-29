@@ -3,6 +3,7 @@
  */
 
 import { memo, useEffect, useRef } from 'react'
+import { convertFileSrc } from '@tauri-apps/api/core'
 import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
@@ -13,6 +14,7 @@ import { getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasur
 import { buildWidgetTransform } from '@/lib/geometryUtils'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
+import useStore from '@/store/useStore'
 
 /**
  * Canvas overlay grid — draws a teal-colored grid on an HTML canvas element
@@ -189,8 +191,10 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const { widgets, activity, previewSecond, selectionRect, exportRange } = dataProps
   const { setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const videoRef = useRef(null)
+  const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
   const { videoSrc, importId, isOutOfRange, videoPreviewMessages } = useVideoPreview(videoRef, backgroundMode === 'video')
   const hasTransparentBackground = backgroundMode === 'transparent'
+  const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
 
   return (
     <div
@@ -226,6 +230,9 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
         />
       )}
+      {backgroundMode === 'image' && backgroundImageSrc ? (
+        <img src={backgroundImageSrc} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" draggable="false" />
+      ) : null}
       {backgroundMode === 'video' && videoPreviewMessages.length > 0 ? (
         <div
           className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex max-w-xl items-start gap-2 rounded-md border border-amber-400/40 bg-black/75 px-3 py-2 text-xs leading-snug text-amber-100 shadow-lg"

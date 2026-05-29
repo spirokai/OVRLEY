@@ -42,7 +42,8 @@ export default function AppHeader({
     snapToGrid,
     zoomLevel,
   } = editorControls
-  const { onOpenRenderDialog, renderDisabled, renderTooltipContent, renderingVideo } = renderControls
+  const { onOpenRenderDialog, onRenderPreviewFrame, renderDisabled, renderPreviewFrameDisabled, renderTooltipContent, renderingVideo } =
+    renderControls
   const {
     config,
     handleCreateNewTemplate,
@@ -54,7 +55,8 @@ export default function AppHeader({
     showTemplateStatus,
     templates,
   } = templateControls
-  const { importedVideoFilename, handleImportVideo, clearImportedVideo } = videoControls
+  const { debugModeEnabled, importedBackgroundImageFilename, importedMediaFilename, importedVideoFilename, handleImportVideo, clearImportedVideo } =
+    videoControls
 
   return (
     <header className="relative z-50 shrink-0 border-b border-border/70 bg-card backdrop-blur-sm">
@@ -62,7 +64,8 @@ export default function AppHeader({
         <ActivitySection
           activityLabel={activityLabel}
           onOpenActivityFile={onOpenActivityFile}
-          importedVideoFilename={importedVideoFilename}
+          debugModeEnabled={debugModeEnabled}
+          importedMediaFilename={importedMediaFilename}
           handleImportVideo={handleImportVideo}
           clearImportedVideo={clearImportedVideo}
           loadedTemplateSource={loadedTemplateSource}
@@ -79,6 +82,7 @@ export default function AppHeader({
         <EditorToolbar
           backgroundMode={backgroundMode}
           onSetBackgroundMode={onSetBackgroundMode}
+          importedBackgroundImageFilename={importedBackgroundImageFilename}
           importedVideoFilename={importedVideoFilename}
           zoomLevel={zoomLevel}
           onZoomIn={onZoomIn}
@@ -92,7 +96,9 @@ export default function AppHeader({
 
         <ActionButtons
           onOpenRenderDialog={onOpenRenderDialog}
+          onRenderPreviewFrame={onRenderPreviewFrame}
           renderDisabled={renderDisabled}
+          renderPreviewFrameDisabled={renderPreviewFrameDisabled}
           renderTooltipContent={renderTooltipContent}
           renderingVideo={renderingVideo}
           backendStatus={backendStatus}

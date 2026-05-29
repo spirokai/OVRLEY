@@ -5,6 +5,7 @@
 
 import { clamp } from '@/lib/utils'
 import { useEffect, useState } from 'react'
+import { DEBUG_MODE_ENABLED } from '@/App'
 
 /**
  * Derives the UI scale factor from the viewport width.
@@ -23,6 +24,7 @@ function getUiScale(width) {
  *
  * @returns {{
  *   decreaseZoom: Function,
+ *   debugModeEnabled: boolean,
  *   editorBackgroundMode: string,
  *   editorGridVisible: boolean,
  *   editorSnapToGrid: boolean,
@@ -43,6 +45,7 @@ export default function useEditorShellState() {
   const [editorGridVisible, setEditorGridVisible] = useState(() => localStorage.getItem('overlayGridVisible') === 'true')
   const [editorSnapToGrid, setEditorSnapToGrid] = useState(() => localStorage.getItem('overlaySnapToGrid') === 'true')
   const [uiScale, setUiScale] = useState(() => (typeof window === 'undefined' ? 1 : getUiScale(window.innerWidth)))
+  const debugModeEnabled = import.meta.env.DEV && DEBUG_MODE_ENABLED
 
   // Persistence effects — sync each toggle to localStorage on change
   useEffect(() => {
@@ -89,6 +92,7 @@ export default function useEditorShellState() {
 
   return {
     decreaseZoom,
+    debugModeEnabled,
     editorBackgroundMode,
     editorGridVisible,
     editorSnapToGrid,

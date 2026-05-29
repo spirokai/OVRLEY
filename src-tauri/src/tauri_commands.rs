@@ -72,6 +72,34 @@ pub(crate) async fn backend_render(
     ))
 }
 
+/// Renders one transparent preview PNG for the requested second.
+#[tauri::command]
+pub(crate) async fn backend_render_preview_frame(
+    app: AppHandle,
+    config_json: String,
+    parsed_activity_json: String,
+    second: u32,
+) -> Result<String, String> {
+    #[cfg(debug_assertions)]
+    {
+        return call_and_serialize(commands::backend_render_preview_frame(
+            &runtime_paths::app_paths(&app)?,
+            &config_json,
+            &parsed_activity_json,
+            second,
+        ));
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = app;
+        let _ = config_json;
+        let _ = parsed_activity_json;
+        let _ = second;
+        Err("Preview-frame rendering is only available in debug builds.".to_string())
+    }
+}
+
 /// Returns progress for the currently active or most recent render job.
 #[tauri::command]
 pub(crate) async fn backend_progress(

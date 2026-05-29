@@ -27,8 +27,10 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::paths::AppPaths;
+use crate::render::render_preview_to_path;
 
 /// Health-check response sent to the frontend.
 #[derive(Debug, Serialize)]
@@ -122,6 +124,41 @@ pub fn backend_render(
     Ok(json!({
         "started": true,
         "render_id": render_id
+    }))
+}
+
+/// Renders one transparent preview PNG for the requested second.
+///
+/// The file is written into the public downloads directory so it is easy to
+/// inspect from the desktop app during development workflows.
+pub fn backend_render_preview_frame(
+    paths: &AppPaths,
+    config_json: &str,
+    parsed_activity_json: &str,
+    second: u32,
+) -> CoreResult<Value> {
+    let config = parse_config_json(config_json)?;
+    let parsed_activity = parse_activity_json(parsed_activity_json)?;
+    let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| CoreError::Encode(format!("Failed to read system time: {error}")))?
+        .as_nanos();
+    let filename = format!("preview_frame_{timestamp}_t{second}.png");
+    let output_path = paths.downloads_dir.join(&filename);
+    render_preview_to_path(
+        paths,
+        &config,
+        &parsed_activity,
+        &dense_activity,
+        second,
+        &output_path,
+    )?;
+
+    Ok(json!({
+        "filename": filename,
+        "path": output_path,
+        "second": second
     }))
 }
 

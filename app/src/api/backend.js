@@ -116,6 +116,24 @@ export async function renderVideo(config, parsedActivity) {
 }
 
 /**
+ * Renders a transparent PNG for a single preview second.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} parsedActivity - Normalized activity payload used by the app.
+ * @param {number} second - Timeline second to render.
+ * @returns {Promise<object>} Promise resolving to the generated preview metadata.
+ */
+export async function renderPreviewFrame(config, parsedActivity, second) {
+  const safeConfig = safeJsonStringify(config)
+  const safeParsedActivity = safeJsonStringify(parsedActivity)
+  return apiCall('backend_render_preview_frame', {
+    configJson: safeConfig,
+    parsedActivityJson: safeParsedActivity,
+    second,
+  })
+}
+
+/**
  * Returns platform info.
  * @returns {Promise<object>} Promise resolving to the operation result.
  */

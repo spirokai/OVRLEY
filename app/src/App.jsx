@@ -24,6 +24,10 @@ import { useVideoImport } from '@/features/video-preview'
 import './index.css'
 import * as backend from './api/backend'
 
+// Dev-only feature flag for background-image import and single-frame PNG render.
+// Flip to `true` when you want the debug UI enabled in local development.
+export const DEBUG_MODE_ENABLED = true
+
 /**
  * Renders the main application shell.
  * @returns {JSX.Element} Rendered component output.
@@ -37,7 +41,10 @@ function AppShell() {
     onTemplateCreated: editorShell.resetZoom,
   })
   const renderWorkflow = useRenderWorkflow({ backendStatus })
-  const videoControls = useVideoImport()
+  const videoControls = useVideoImport({
+    debugModeEnabled: editorShell.debugModeEnabled,
+    onSetBackgroundMode: editorShell.setEditorBackgroundMode,
+  })
 
   useAppBootstrap()
 
@@ -93,6 +100,8 @@ function AppShell() {
           onOpenDownloads={handleOpenDownloads}
           renderControls={{
             onOpenRenderDialog: renderWorkflow.openRenderDialog,
+            onRenderPreviewFrame: editorShell.debugModeEnabled ? renderWorkflow.handleRenderPreviewFrame : undefined,
+            renderPreviewFrameDisabled: editorShell.debugModeEnabled ? renderWorkflow.renderPreviewFrameDisabled : undefined,
             renderDisabled: renderWorkflow.renderDisabled,
             renderTooltipContent: renderWorkflow.renderTooltipContent,
             renderingVideo: renderWorkflow.renderingVideo,
@@ -114,7 +123,7 @@ function AppShell() {
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="relative flex min-w-0 flex-1 flex-col bg-surface-darken">
-            <LoadingOverlay show={isProcessing || importingVideo} label={importingVideo ? 'Importing video...' : 'Processing...'} />
+            <LoadingOverlay show={isProcessing || importingVideo} label={importingVideo ? 'Importing media...' : 'Processing...'} />
             <WidgetDrawer />
             <div className="min-h-0 flex-1">
               <OverlayEditor

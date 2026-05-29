@@ -14,6 +14,7 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoPreviewUrl: null, // local HTTP preview URL for the video element
   importedVideoPreviewWarnings: [],
   importedVideoPreviewError: null,
+  importedBackgroundImagePath: null, // absolute path from Tauri file dialog
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
   videoSyncWarning: null, // string warning or null
   availableCodecs: null,
@@ -31,11 +32,30 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoPreviewUrl: metadata.previewUrl ?? null,
       importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
       importedVideoPreviewError: metadata.previewError ?? null,
+      importedBackgroundImagePath: null,
     })
 
     const activitySummary = get().activitySummary
     get().computeVideoSync(activitySummary)
   },
+
+  setImportedBackgroundImage: (path) =>
+    set({
+      importedVideoPath: null,
+      importedVideoDuration: null,
+      importedVideoFps: null,
+      importedVideoFpsNum: null,
+      importedVideoFpsDen: null,
+      importedVideoResolution: null,
+      importedVideoCreationTime: null,
+      importedVideoImportId: null,
+      importedVideoPreviewUrl: null,
+      importedVideoPreviewWarnings: [],
+      importedVideoPreviewError: null,
+      importedBackgroundImagePath: path || null,
+      videoSyncOffsetSeconds: 0,
+      videoSyncWarning: null,
+    }),
 
   clearImportedVideo: () =>
     set({
@@ -50,6 +70,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoPreviewUrl: null,
       importedVideoPreviewWarnings: [],
       importedVideoPreviewError: null,
+      importedBackgroundImagePath: null,
       videoSyncOffsetSeconds: 0,
       videoSyncWarning: null,
     }),
