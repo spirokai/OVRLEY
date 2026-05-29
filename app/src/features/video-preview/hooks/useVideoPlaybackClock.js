@@ -98,11 +98,16 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSecon
       callbackTypeRef.current = null
     }
 
-    /** Computes the current timeline second from video.currentTime + offset and publishes it via onPreviewSecond if the frame index changed (dedup). */
-    const publishPreviewSecond = () => {
+    /**
+     * Computes the timeline second from the video presentation time + offset
+     * and publishes it via onPreviewSecond if the frame index changed (dedup).
+     *
+     * @param {number} [mediaTime=video.currentTime] - Presentation timestamp from rVFC metadata, or fallback.
+     */
+    const publishPreviewSecond = (mediaTime = video.currentTime) => {
       incrementPreviewPerfCounter(previewPerfCounterName('video frame callbacks'))
 
-      const previewSecond = video.currentTime + videoSyncOffsetSeconds
+      const previewSecond = mediaTime + videoSyncOffsetSeconds
       const nextFrame = Math.floor(previewSecond * effectivePreviewFps)
 
       if (nextFrame === publishedFrameRef.current) {
@@ -145,9 +150,9 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSecon
 
       if (!shouldForceAnimationClock && typeof video.requestVideoFrameCallback === 'function') {
         callbackTypeRef.current = 'video'
-        callbackIdRef.current = video.requestVideoFrameCallback(() => {
+        callbackIdRef.current = video.requestVideoFrameCallback((_now, metadata) => {
           syncVideoSource()
-          publishPreviewSecond()
+          publishPreviewSecond(metadata.mediaTime)
           scheduleNextFrame()
         })
         return
@@ -163,6 +168,7 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSecon
 
     // Event handlers — respond to video play/pause/ended/src changes
     const handlePlaybackStart = () => {
+      cancelScheduledFrame()
       syncVideoSource()
       publishPreviewSecond()
       scheduleNextFrame()
