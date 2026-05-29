@@ -13,10 +13,9 @@ import { isEditableElement } from '../utils/overlayEditorHelpers'
  * @param {*} options.config - Current overlay template config.
  * @param {Function} options.onConfigChange - Callback to update config.
  * @param {Array} options.selectedWidgetIds - Currently selected widget IDs.
- * @param {Function} options.setSelectedWidgetIds - Set selected widget IDs.
- * @param {Function} options.syncPrimarySelectionId - Sync primary selection to store.
+ * @param {Function} options.setWidgetSelection - Store-backed selection intent action.
  */
-export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, setSelectedWidgetIds, syncPrimarySelectionId }) {
+export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, setWidgetSelection }) {
   useEffect(() => {
     if (!selectedWidgetIds.length || !config) {
       return undefined
@@ -33,11 +32,10 @@ export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, s
 
       event.preventDefault()
       onConfigChange(deleteWidgetsInConfig(config, selectedWidgetIds))
-      setSelectedWidgetIds([])
-      syncPrimarySelectionId(null)
+      setWidgetSelection([])
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [config, onConfigChange, selectedWidgetIds, setSelectedWidgetIds, syncPrimarySelectionId])
+  }, [config, onConfigChange, selectedWidgetIds, setWidgetSelection])
 }

@@ -63,17 +63,11 @@ function mergeDraftsIntoWidgets(widgets, liveWidgetDrafts) {
   })
 }
 
-/**
- * Checks whether two selection ID arrays differ in content or order.
- */
-function selectionIdsChanged(leftIds, rightIds) {
-  return leftIds.length !== rightIds.length || leftIds.some((widgetId, index) => widgetId !== rightIds[index])
-}
-
 export default function useOverlayEditorState({ config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange }) {
   // Store selectors — shallow-pick zustand state needed for overlay editor
   const selectedWidgetId = useStore((state) => state.selectedWidgetId)
-  const setSelectedWidgetId = useStore((state) => state.setSelectedWidgetId)
+  const selectedWidgetIds = useStore((state) => state.selectedWidgetIds)
+  const setWidgetSelection = useStore((state) => state.setWidgetSelection)
   const selectedSecond = useStore((state) => state.selectedSecond)
   const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
   const exportRange = useStore((state) => state.exportRange)
@@ -85,17 +79,15 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
   const scalePreviewFrameRef = useRef(null)
-  const selectionSyncRef = useRef(false)
   const marqueeCleanupRef = useRef(null)
   const marqueeSelectionRef = useRef(null)
   const prevWidgetDataRef = useRef(null)
 
-  // Local UI state — group drag, scene element, widget nodes, selection, marquee
+  // Local UI state — group drag, scene element, widget nodes, and marquee UI
   const [isGroupDragActive, setIsGroupDragActive] = useState(false)
   const [groupDragSelectionIds, setGroupDragSelectionIds] = useState([])
   const [sceneElement, setSceneElement] = useState(null)
   const [widgetNodes, setWidgetNodes] = useState({})
-  const [selectedWidgetIds, setSelectedWidgetIds] = useState([])
   const [selectionRect, setSelectionRect] = useState(null)
 
   // Widget draft state — live edits during drag/resize/scale/rotate
@@ -190,66 +182,27 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   const renderedWidgetMap = useMemo(() => Object.fromEntries(renderedWidgets.map((widget) => [widget.id, widget])), [renderedWidgets])
   const orderedWidgetIds = useMemo(() => renderedWidgets.map((widget) => widget.id), [renderedWidgets])
 
-  // Selection management — normalize, commit, sync with store
-  const setSelectionState = (widgetIds) => {
-    setSelectedWidgetIds(normalizeSelectionIds(widgetIds, orderedWidgetIds))
-  }
-
-  const syncPrimarySelectionId = useCallback(
-    (nextPrimaryId) => {
-      if (selectedWidgetId === nextPrimaryId) {
-        selectionSyncRef.current = false
-        return
-      }
-
-      selectionSyncRef.current = true
-      setSelectedWidgetId(nextPrimaryId)
+  // Selection management — the store owns canonical selection state while the
+  // editor passes intentful updates (single-select, toggle, marquee).
+  const setSelectionState = useCallback(
+    (widgetIds) => {
+      setWidgetSelection(normalizeSelectionIds(widgetIds, orderedWidgetIds))
     },
-    [selectedWidgetId, setSelectedWidgetId],
+    [orderedWidgetIds, setWidgetSelection],
   )
 
-  const commitSelection = (widgetIds, preferredId = null) => {
-    const normalizedIds = normalizeSelectionIds(widgetIds, orderedWidgetIds)
-    const nextPrimaryId = getPrimarySelectionId(normalizedIds, preferredId)
-
-    setSelectedWidgetIds(normalizedIds)
-    syncPrimarySelectionId(nextPrimaryId)
-  }
+  const commitSelection = useCallback(
+    (widgetIds, preferredId = null) => {
+      const normalizedIds = normalizeSelectionIds(widgetIds, orderedWidgetIds)
+      setWidgetSelection(normalizedIds, getPrimarySelectionId(normalizedIds, preferredId))
+    },
+    [orderedWidgetIds, setWidgetSelection],
+  )
 
   const effectiveSelectedWidgetIds = useMemo(
     () => (isGroupDragActive ? normalizeSelectionIds(groupDragSelectionIds, orderedWidgetIds) : selectedWidgetIds),
     [groupDragSelectionIds, isGroupDragActive, orderedWidgetIds, selectedWidgetIds],
   )
-
-  useEffect(() => {
-    if (isGroupDragActive) {
-      return
-    }
-
-    if (selectionSyncRef.current) {
-      selectionSyncRef.current = false
-      return
-    }
-
-    setSelectedWidgetIds(normalizeSelectionIds(selectedWidgetId ? [selectedWidgetId] : [], orderedWidgetIds))
-  }, [isGroupDragActive, orderedWidgetIds, selectedWidgetId])
-
-  useEffect(() => {
-    if (isGroupDragActive) {
-      return
-    }
-
-    const normalizedIds = normalizeSelectionIds(selectedWidgetIds, orderedWidgetIds)
-    const selectionChanged = selectionIdsChanged(normalizedIds, selectedWidgetIds)
-
-    if (!selectionChanged) {
-      return
-    }
-
-    const nextPrimaryId = getPrimarySelectionId(normalizedIds, selectedWidgetId)
-    setSelectedWidgetIds(normalizedIds)
-    syncPrimarySelectionId(nextPrimaryId)
-  }, [isGroupDragActive, orderedWidgetIds, selectedWidgetId, selectedWidgetIds, setSelectedWidgetId, syncPrimarySelectionId])
 
   // Selected widget derivation — primary selection, targets, guidelines
   const selectedWidgets = useMemo(
@@ -348,8 +301,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     config,
     onConfigChange,
     selectedWidgetIds,
-    setSelectedWidgetIds,
-    syncPrimarySelectionId,
+    setWidgetSelection,
   })
 
   // Pointer handlers — scene mousedown, widget mousedown, wheel zoom

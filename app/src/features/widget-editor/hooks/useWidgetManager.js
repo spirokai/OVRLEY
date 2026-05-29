@@ -1,9 +1,9 @@
 /**
  * Container hook for SidebarWidgetsTab.
- * Owns store selectors, derived state, side effects, and CRUD operations for widget management.
+ * Owns store selectors, derived state, and CRUD operations for widget management.
  */
 
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { getCurrentParsedActivity } from '@/lib/activity/cache'
@@ -15,7 +15,7 @@ import { HEADING_DEFAULTS } from '../data/widgetDefaults'
 
 /**
  * Container hook for SidebarWidgetsTab that owns all store access,
- * derived state, side effects, and CRUD operations.
+ * derived state, and CRUD operations.
  *
  * @returns {{
  *   config: object,
@@ -46,23 +46,6 @@ export function useWidgetManager() {
   const widgets = useMemo(() => {
     return groupWidgetsForSidebar(buildConfigWidgets(config), TYPE_LABELS)
   }, [config])
-
-  // Side effect — sync selectedWidgetId when widgets change (removal, empty state, initial selection)
-  useEffect(() => {
-    if (widgets.length === 0) {
-      if (selectedWidgetId !== null) setSelectedWidgetId(null)
-      return
-    }
-
-    if (!selectedWidgetId) {
-      setSelectedWidgetId(widgets[widgets.length - 1].id)
-      return
-    }
-
-    if (!widgets.some((widget) => widget.id === selectedWidgetId)) {
-      setSelectedWidgetId(widgets[0].id)
-    }
-  }, [widgets, selectedWidgetId, setSelectedWidgetId])
 
   // Update handler — applies partial updates to a widget via config utility
   const updateWidgetData = (id, updates) => {

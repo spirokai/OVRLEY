@@ -58,12 +58,12 @@ The external interface should let callers express selection intents without manu
 
 ## Acceptance criteria
 
-- [ ] Overlay selection has one clear owning seam rather than local and global state repairing each other with effects
-- [ ] Primary selection and selected-id list remain consistent after widget add, remove, reorder, and config replacement flows
-- [ ] Multi-selection and group-drag behavior remain functionally unchanged for users
-- [ ] Keyboard delete and pointer-driven selection flows still work exactly as before
-- [ ] Any synchronization refs used only to suppress feedback loops are removed or reduced to truly imperative concerns
-- [ ] Tests cover the main selection transitions and stale-selection edge cases
+- [x] Overlay selection has one clear owning seam rather than local and global state repairing each other with effects
+- [x] Primary selection and selected-id list remain consistent after widget add, remove, reorder, and config replacement flows
+- [x] Multi-selection and group-drag behavior remain functionally unchanged for users
+- [x] Keyboard delete and pointer-driven selection flows still work exactly as before
+- [x] Any synchronization refs used only to suppress feedback loops are removed or reduced to truly imperative concerns
+- [x] Tests cover the main selection transitions and stale-selection edge cases
 
 ## Blocked by
 
