@@ -1,0 +1,32 @@
+/* Font-face declarations for bundled overlay fonts */
+@font-face {
+  font-family: 'Evogria';
+  src: url('../../../fonts/Evogria.otf') format('opentype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Furore';
+  src: url('../../../fonts/Furore.otf') format('opentype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Saira Stencil';
+  src: url('../../../fonts/Saira Stencil.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Teko';
+  src: url('../../../fonts/Teko.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}

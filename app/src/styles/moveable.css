@@ -1,0 +1,30 @@
+/* Moveable library style overrides — control handles, guidelines, and rotation lines */
+.moveable-bold,
+.moveable-control,
+.moveable-normal,
+.moveable-direction,
+.moveable-rotation-line {
+  background-color: var(--theme-color-accent) !important;
+}
+
+/* control box points */
+.moveable-control {
+  height: calc(12px / var(--app-scale, 1)) !important;
+  width: calc(12px / var(--app-scale, 1)) !important;
+  margin-top: calc(-6.5px / var(--app-scale, 1)) !important;
+  margin-left: calc(-6.5px / var(--app-scale, 1)) !important;
+}
+
+.moveable-direction,
+.moveable-rotation-control {
+  border-color: var(--theme-color-accent) !important;
+}
+
+/* dashed guides */
+.moveable-dashed {
+  border-color: var(--theme-color-ice) !important;
+}
+
+.moveable-guideline-group .moveable-size-value {
+  font-size: calc(14px * var(--app-scale, 1)) !important;
+}

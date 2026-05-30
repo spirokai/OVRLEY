@@ -3,7 +3,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getEffectivePreviewFps } from '@/features/overlay-editor'
+import { getContainerFps } from '@/lib/update-rate'
 import { clamp, createPlaybackAnchor, getTotalPlaybackDuration, resolvePlaybackSource } from '../utils/playerTimeline'
 import { usePlaybackSourceHandoff } from './usePlaybackSourceHandoff'
 import { useTimelinePlaybackLoop } from './useTimelinePlaybackLoop'
@@ -83,7 +83,7 @@ export default function usePlaybackEngine({
   const isTimelinePlaybackActive = previewPlaybackState === 'playing' && previewPlaybackSource === 'timeline'
   const clampedPlayhead = clamp(Number(selectedSecond) || 0, 0, totalDuration)
   const displayedPlayhead = clamp(dragSecond === null ? clampedPlayhead : dragSecond, 0, totalDuration)
-  const effectivePreviewFps = useMemo(() => getEffectivePreviewFps(sceneFps, updateRate), [sceneFps, updateRate])
+  const effectivePreviewFps = useMemo(() => getContainerFps(sceneFps, updateRate), [sceneFps, updateRate])
 
   // Shared playback bookkeeping - clears transient UI ownership and resets frame dedup state.
   const resetPlaybackOrchestration = useCallback(() => {

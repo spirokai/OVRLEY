@@ -19,7 +19,24 @@ import TextWidgetEditor from './TextWidgetEditor'
 import TimeWidgetEditor from './TimeWidgetEditor'
 
 /**
- * Maps widget type to its editor component.
+ * Widget type → editor component dispatch map.
+ *
+ * Each entry maps a widget type to its dedicated editor component.
+ * Standard metric widgets (speed, cadence, heartrate, power, etc.) are
+ * handled by MetricWidgetEditor and checked first via
+ * isStandardMetricWidgetType().
+ */
+const WIDGET_EDITOR_MAP = {
+  label: TextWidgetEditor,
+  time: TimeWidgetEditor,
+  gradient: GradientWidgetEditor,
+  course: RouteMapWidgetEditor,
+  elevation: ElevationWidgetEditor,
+  heading: HeadingWidgetEditor,
+}
+
+/**
+ * Resolves the appropriate editor component for a widget type.
  *
  * @param {object} widget - Widget definition being rendered or edited.
  * @param {Function} updateWidgetData - Callback to update widget data.
@@ -28,37 +45,14 @@ import TimeWidgetEditor from './TimeWidgetEditor'
  * @returns {JSX.Element|null} Rendered editor component or null.
  */
 function renderWidgetEditor(widget, updateWidgetData, setNumericField, sceneFontSize) {
-  if (widget.type === 'label') {
-    return <TextWidgetEditor widget={widget} updateWidgetData={updateWidgetData} />
-  }
-
   if (isStandardMetricWidgetType(widget.type)) {
     return <MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
   }
 
-  if (widget.type === 'time') {
-    return <TimeWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
-  }
+  const Editor = WIDGET_EDITOR_MAP[widget.type]
+  if (!Editor) return null
 
-  if (widget.type === 'gradient') {
-    return <GradientWidgetEditor widget={widget} updateWidgetData={updateWidgetData} />
-  }
-
-  if (widget.type === 'course') {
-    return <RouteMapWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
-  }
-
-  if (widget.type === 'elevation') {
-    return (
-      <ElevationWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} sceneFontSize={sceneFontSize} />
-    )
-  }
-
-  if (widget.type === 'heading') {
-    return <HeadingWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
-  }
-
-  return null
+  return <Editor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} sceneFontSize={sceneFontSize} />
 }
 
 /**

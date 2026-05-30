@@ -19,7 +19,6 @@ export {
 } from '@/lib/export-range'
 
 export {
-  getEffectivePreviewFps,
   getInterpolatedActivityValue,
   getInterpolatedTimeValue,
   getDistanceProgressAtElapsed,

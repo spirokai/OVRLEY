@@ -1,14 +1,15 @@
 /**
  * Overlay editor utilities — scene size, activity data interpolation,
- * grid size computation, and FPS resolution.
+ * grid size computation, and series-value extraction.
  *
  * Pure functions. No React imports, no side effects.
+ *
+ * @module overlayEditorUtils
  */
 
 import { clamp } from '@/lib/utils'
 import { DEFAULT_ACTIVITY_PREVIEW } from '../data/overlayEditorConfig'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
-import { getContainerFps } from '@/lib/update-rate'
 
 /**
  * Returns the configured scene dimensions with defaults of 1920x1080.
@@ -265,16 +266,4 @@ export function getEditorGridSize(sceneSize) {
   }
 
   return Math.max(1, Math.round(Math.min(width, height) / EDITOR_GRID_DIVISIONS))
-}
-
-/**
- * Resolves the effective preview FPS from the configured FPS and update rate.
- * Delegates to the shared getContainerFps utility.
- *
- * @param {number} fps - Configured FPS value.
- * @param {number} updateRate - Container update rate.
- * @returns {number} Effective FPS for preview rendering.
- */
-export function getEffectivePreviewFps(fps, updateRate) {
-  return getContainerFps(fps, updateRate)
 }

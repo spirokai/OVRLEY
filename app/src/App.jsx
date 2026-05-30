@@ -1,5 +1,10 @@
 /**
  * Composes the main application shell for the OVRLEY overlay editor.
+ *
+ * The useAppShellComposition hook orchestrates all shell-level hooks and
+ * returns domain-grouped objects consumed by AppHeader and child components.
+ * This keeps the render tree clean while avoiding hand-rolled grouping in
+ * the JSX body.
  */
 
 import { OverlayEditor } from '@/features/overlay-editor'
@@ -28,22 +33,39 @@ import { DEBUG_MODE_ENABLED } from '@/lib/dev-config'
 export { DEBUG_MODE_ENABLED }
 
 /**
- * Renders the main application shell.
- * @returns {JSX.Element} Rendered component output.
+ * Orchestrates all shell-level hooks and returns domain-grouped objects.
+ *
+ * Each group is owned by the hook that produces the data (e.g. editorControls
+ * from useEditorShellState, renderControls from useRenderWorkflow). The JSX
+ * render tree destructures these groups — no hand-rolled intermediate objects
+ * in the component body.
+ *
+ * @returns {{
+ *   activityControls: { activityLabel: string, onOpenActivityFile: Function },
+ *   backendStatus: string,
+ *   config: object,
+ *   editorControls: object,
+ *   editorShell: object,
+ *   globalDefaults: object,
+ *   handleOpenDownloads: Function,
+ *   importingVideo: boolean,
+ *   isProcessing: boolean,
+ *   renderControls: object,
+ *   renderWorkflow: object,
+ *   setConfig: Function,
+ *   templateControls: object,
+ *   templateManagement: object,
+ *   videoControls: object,
+ * }}
  */
-function AppShell() {
+function useAppShellComposition() {
   const { config, isProcessing, globalDefaults, importingVideo, setConfig, setErrorMessage } = useAppShellStore()
   const { backendStatus } = useBackendStatus()
   const editorShell = useEditorShellState()
   const { gpxFilename, handleGpxFileOpen } = useActivityImport()
-  const templateManagement = useTemplateManagement({
-    onTemplateCreated: editorShell.resetZoom,
-  })
+  const templateManagement = useTemplateManagement({ onTemplateCreated: editorShell.resetZoom })
   const renderWorkflow = useRenderWorkflow({ backendStatus })
-  const videoControls = useVideoImport({
-    debugModeEnabled: editorShell.debugModeEnabled,
-    onSetBackgroundMode: editorShell.setEditorBackgroundMode,
-  })
+  const videoControls = useVideoImport({ debugModeEnabled: editorShell.debugModeEnabled, onSetBackgroundMode: editorShell.setEditorBackgroundMode })
 
   useAppBootstrap()
 
@@ -55,6 +77,88 @@ function AppShell() {
       setErrorMessage(`Failed to open downloads folder: ${error.message}`)
     }
   }
+
+  const activityControls = {
+    activityLabel: gpxFilename === 'demo.gpxinit' ? 'Load GPX/FIT' : gpxFilename || 'Load GPX/FIT',
+    onOpenActivityFile: handleGpxFileOpen,
+  }
+
+  const editorControls = {
+    backgroundMode: editorShell.editorBackgroundMode,
+    gridVisible: editorShell.editorGridVisible,
+    onResetZoom: editorShell.resetZoom,
+    onSetBackgroundMode: editorShell.setEditorBackgroundMode,
+    onSetGridVisible: editorShell.setEditorGridVisible,
+    onSetSnapToGrid: editorShell.setEditorSnapToGrid,
+    onZoomIn: editorShell.increaseZoom,
+    onZoomOut: editorShell.decreaseZoom,
+    snapToGrid: editorShell.editorSnapToGrid,
+    zoomLevel: editorShell.editorZoomLevel,
+  }
+
+  const renderControls = {
+    onOpenRenderDialog: renderWorkflow.openRenderDialog,
+    onRenderPreviewFrame: editorShell.debugModeEnabled ? renderWorkflow.handleRenderPreviewFrame : undefined,
+    renderPreviewFrameDisabled: editorShell.debugModeEnabled ? renderWorkflow.renderPreviewFrameDisabled : undefined,
+    renderDisabled: renderWorkflow.renderDisabled,
+    renderTooltipContent: renderWorkflow.renderTooltipContent,
+    renderingVideo: renderWorkflow.renderingVideo,
+  }
+
+  const templateControls = {
+    config,
+    handleCreateNewTemplate: templateManagement.handleCreateNewTemplate,
+    handleImportTemplate: templateManagement.handleImportTemplate,
+    handleSaveTemplate: templateManagement.handleSaveTemplate,
+    handleTemplateChange: templateManagement.handleTemplateChange,
+    loadedTemplateFilename: templateManagement.loadedTemplateFilename,
+    loadedTemplateSource: templateManagement.loadedTemplateSource,
+    showTemplateStatus: templateManagement.showTemplateStatus,
+    status: templateManagement.status,
+    templates: templateManagement.templates,
+  }
+
+  return {
+    activityControls,
+    backendStatus,
+    config,
+    editorControls,
+    editorShell,
+    globalDefaults,
+    handleOpenDownloads,
+    importingVideo,
+    isProcessing,
+    renderControls,
+    renderWorkflow,
+    setConfig,
+    templateControls,
+    templateManagement,
+    videoControls,
+  }
+}
+
+/**
+ * Renders the main application shell.
+ * @returns {JSX.Element} Rendered component output.
+ */
+function AppShell() {
+  const {
+    activityControls,
+    backendStatus,
+    config,
+    editorControls,
+    editorShell,
+    globalDefaults,
+    handleOpenDownloads,
+    importingVideo,
+    isProcessing,
+    renderControls,
+    renderWorkflow,
+    setConfig,
+    templateControls,
+    templateManagement,
+    videoControls,
+  } = useAppShellComposition()
 
   return (
     <div
@@ -79,44 +183,12 @@ function AppShell() {
         />
         <TitleBar />
         <AppHeader
-          activityControls={{
-            activityLabel: gpxFilename === 'demo.gpxinit' ? 'Load GPX/FIT' : gpxFilename || 'Load GPX/FIT',
-            onOpenActivityFile: handleGpxFileOpen,
-          }}
+          activityControls={activityControls}
           backendStatus={backendStatus}
-          editorControls={{
-            backgroundMode: editorShell.editorBackgroundMode,
-            gridVisible: editorShell.editorGridVisible,
-            onResetZoom: editorShell.resetZoom,
-            onSetBackgroundMode: editorShell.setEditorBackgroundMode,
-            onSetGridVisible: editorShell.setEditorGridVisible,
-            onSetSnapToGrid: editorShell.setEditorSnapToGrid,
-            onZoomIn: editorShell.increaseZoom,
-            onZoomOut: editorShell.decreaseZoom,
-            snapToGrid: editorShell.editorSnapToGrid,
-            zoomLevel: editorShell.editorZoomLevel,
-          }}
+          editorControls={editorControls}
           onOpenDownloads={handleOpenDownloads}
-          renderControls={{
-            onOpenRenderDialog: renderWorkflow.openRenderDialog,
-            onRenderPreviewFrame: editorShell.debugModeEnabled ? renderWorkflow.handleRenderPreviewFrame : undefined,
-            renderPreviewFrameDisabled: editorShell.debugModeEnabled ? renderWorkflow.renderPreviewFrameDisabled : undefined,
-            renderDisabled: renderWorkflow.renderDisabled,
-            renderTooltipContent: renderWorkflow.renderTooltipContent,
-            renderingVideo: renderWorkflow.renderingVideo,
-          }}
-          templateControls={{
-            config,
-            handleCreateNewTemplate: templateManagement.handleCreateNewTemplate,
-            handleImportTemplate: templateManagement.handleImportTemplate,
-            handleSaveTemplate: templateManagement.handleSaveTemplate,
-            handleTemplateChange: templateManagement.handleTemplateChange,
-            loadedTemplateFilename: templateManagement.loadedTemplateFilename,
-            loadedTemplateSource: templateManagement.loadedTemplateSource,
-            showTemplateStatus: templateManagement.showTemplateStatus,
-            status: templateManagement.status,
-            templates: templateManagement.templates,
-          }}
+          renderControls={renderControls}
+          templateControls={templateControls}
           videoControls={videoControls}
         />
 

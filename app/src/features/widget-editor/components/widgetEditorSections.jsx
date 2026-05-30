@@ -230,25 +230,28 @@ export function IconSection({ widget, updateWidgetData, setNumericField, title =
 }
 
 /**
- * Renders the units control row component.
+ * Renders a control row with optional toggle, color picker, and unit selector.
+ *
+ * Settled contract: always pass explicit `checked` and `onCheckedChange` values.
+ * The old convenience path (widget + updateWidgetData) has been removed.
  *
  * @param {object} props - Component props.
- * @param {*} props.widget - Widget definition being rendered or edited.
- * @param {*} props.updateWidgetData - Value for update widget data.
- * @param {*} props.checked - Value for checked.
- * @param {*} props.onCheckedChange - Callback invoked to checked change.
- * @param {*} props.title - Value for title.
- * @param {*} props.value - Input value processed by the helper.
- * @param {*} props.onValueChange - Callback invoked to value change.
- * @param {*} props.options - Configuration options for the helper.
- * @param {*} props.selectLabel - Value for select label.
+ * @param {boolean} props.checked - Whether the toggle is on.
+ * @param {Function} props.onCheckedChange - Callback for toggle changes.
+ * @param {string} [props.title='Unit'] - Section heading title.
+ * @param {boolean} [props.showToggle=true] - Whether to show the toggle.
+ * @param {string} [props.value] - Current select field value.
+ * @param {Function} [props.onValueChange] - Callback for select changes.
+ * @param {Array} [props.options] - Select field options.
+ * @param {string} [props.selectLabel='Unit'] - Select field label.
+ * @param {string} [props.colorValue] - Current color picker value.
+ * @param {Function} [props.onColorChange] - Callback for color changes.
+ * @param {string} [props.colorLabel='Color'] - Color field label.
  * @returns {JSX.Element} Rendered component output.
  */
 export function UnitsControlRow({
-  widget,
-  updateWidgetData,
-  checked = widget.data.show_units ?? true,
-  onCheckedChange = (nextChecked) => updateWidgetData(widget.id, { show_units: nextChecked }),
+  checked,
+  onCheckedChange,
   title = 'Unit',
   showToggle = true,
   value,

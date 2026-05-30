@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import useStore from '@/store/useStore'
-import { getEffectivePreviewFps } from '@/features/overlay-editor'
+import { getContainerFps } from '@/lib/update-rate'
 import { incrementPreviewPerfCounter, previewPerfCounterName, setPreviewPerfValue } from '@/lib/previewPerf'
 
 const PREVIEW_CLOCK_MODE_FLAG = '__OVRLEY_PREVIEW_CLOCK_MODE__'
@@ -54,7 +54,7 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSecon
   const lastVideoSourceRef = useRef('')
 
   // Derived state — computes effective preview FPS from scene FPS / update rate and resolves the clock mode
-  const effectivePreviewFps = useMemo(() => Math.max(1, getEffectivePreviewFps(sceneFps, updateRate) || 0), [sceneFps, updateRate])
+  const effectivePreviewFps = useMemo(() => Math.max(1, getContainerFps(sceneFps, updateRate) || 0), [sceneFps, updateRate])
   const previewClockMode = resolvePreviewClockMode()
   const shouldForceAnimationClock = previewClockMode === 'raf'
 
