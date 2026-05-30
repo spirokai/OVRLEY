@@ -1,373 +1,301 @@
-# Refactoring Analysis — `app/src/`
+# Codebase Refactoring Analysis
 
-> **Implementation plans:** See `.agents/scratch/FE-refactor/` for phased execution.
-> - [Phase 1 — Clean Slate](FE-refactor/phase-1-clean-slate.md): Duplicates, dead code, library consolidation
-> - [Phase 2 — Store Hygiene](FE-refactor/phase-2-store-hygiene.md): Mutable state, leaks, module boundaries
-> - [Phase 3 — State Architecture](FE-refactor/phase-3-state-architecture.md): God objects, data flow, helpers anti-pattern
-> - [Phase 4 — Component Cleanup](FE-refactor/phase-4-component-cleanup.md): Prop flow, dispatch, CSS, inconsistent APIs
+## Files < 50 LOC — Validity Assessment
 
-Every source file under `app/src/` has been read. This document identifies concrete, actionable refactoring targets ranked by severity.
+| File | LOC | Verdict | Recommendation |
+|------|-----|---------|---------------|
+| `src/test-setup.js` | 5 | Valid | Vitest setup — required by framework |
+| `src/lib/dev-config.js` | 5 | Valid | Single flag used across app; reasonable extraction |
+| `src/lib/tauri-runtime.js` | 8 | Weak | Merge into `src/api/backend.js` where it's the only consumer |
+| `src/lib/utils.js` | 20 | Valid | `cn()` and `clamp()` used across entire codebase |
+| `src/lib/theme.js` | 27 | Valid | `getThemeColor()` used by 5+ widget editors and template-state |
+| `src/lib/cached-promise.js` | 34 | Valid | Self-contained utility with clear contract; used by 3 modules |
+| `src/hooks/use-refs.js` | 26 | Weak | Move to `src/lib/compose-refs.js` — it's only consumed there and is a React utility, not a feature hook |
+| `src/store/slices/createLayoutSlice.js` | 32 | Valid | Zustand slice pattern is consistent across all slices |
+| `src/features/overlay-editor/data/metricWidgetAssets.js` | 1 | **Remove** | Single re-export line. Callers should import directly from `src/lib/widget-icon-data.js` |
+| `src/styles/moveable.css` | 30 | Valid | Moveable library overrides — reasonable |
+| `src/styles/fonts.css` | 32 | Valid | Font-face declarations |
+| `src/styles/theme.css` | 57 | Valid | Tailwind v4 @theme block |
+| `src/styles/utilities.css` | 60 | Valid | App-shell scaling and grid utilities |
+| `src/lib/compose-refs.js` | 73 | Valid | Radix-UI pattern — reasonable |
+| `src/lib/color-utils.js` | 69 | Valid | Color normalization used by multiple modules |
+| `src/lib/fonts.js` | 73 | Valid | Font utilities used by widget-editor, template-state, widget-icons |
+| `src/lib/previewPerf.js` | 78 | Valid | Development diagnostics — well-isolated concern |
+| `src/lib/widget-presentation.js` | 73 | Valid | Widget grouping for sidebar — clean separation from widget-config.js |
+| `src/features/render-video/utils/format.js` | 46 | Weak | Merge into `src/features/render-video/utils/codecUtils.js` — only 2 tiny functions |
+| `src/features/video-preview/data/videoPreviewConstants.js` | 53 | Valid | Constants file |
+| `src/features/scene-settings/data/sceneSettingsConstants.js` | 43 | Valid | Constants file |
+| `src/features/scene-settings/utils/sceneSettingsUtils.js` | 33 | Valid | 2 pure functions used by useSceneSettingsState |
+| `src/features/template-manager/utils/templateFileUtils.js` | 45 | Valid | File dialog helpers — self-contained |
+| `src/features/widget-editor/components/TextWidgetEditor.jsx` | 12 | Weak | Only renders `FontSection`. Justify: per-type dispatch pattern in SidebarWidgetsTab requires consistent component signature per type. OK. |
+| `src/features/widget-editor/components/TimeWidgetEditor.jsx` | 14 | Weak | Same justification as TextWidgetEditor. OK. |
+| `src/features/widget-preview/utils/textWidgetPreviewModel.js` | 57 | Valid | Self-contained preview model builder |
 
----
+## Severe Bad Practices
 
-## CRITICAL — Duplicate Code & Drift
+### 1. Duplicate functions in `createEditorSlice.js` and `overlayEditorHelpers.js`
 
-### 1. `bitrateDefaults.js` duplicated in two locations
-**Files:** `features/render-video/data/bitrateDefaults.js` and `features/render-video/utils/bitrateDefaults.js`
+Two functions are defined identically in both files:
+- `normalizeSelectionIds` (createEditorSlice.js:19-22, overlayEditorHelpers.js:83-90)
+- `getPrimarySelectionId` (createEditorSlice.js:31-37, overlayEditorHelpers.js:100-104)
 
-Two identical files with the same purpose in different directories. Pick one location (the `data/` directory is canonical for static config) and delete the utility copy. Ensure all imports point to the survivor.
+**Recommendation:** Delete the duplicates from `createEditorSlice.js` and import them from `overlayEditorHelpers.js`. The store slice should not own selection normalization logic that the editor also needs.
 
-### 2. `isTauri()` / `hasTauriRuntime()` duplicated check
-**Files:** `api/backend.js:30` and `features/app-shell/utils/backendDebug.js:149`
+### 2. Duplicate `updateUnrenderedChanges` logic
 
-The same runtime-detection logic appears in two places:
+`createTemplateSlice.js:41-48` has `updateUnrenderedChanges` which is a near-copy of `updateConfigPersistence` in `store-utils.js:106-112`.
+
+**Recommendation:** Delete the duplicate and use `updateConfigPersistence` from `store-utils.js`.
+
+### 3. `useCommunityTemplate.js` directly mutates store via `useStore.getState()`
+
+This hook calls `useStore.getState()` 4 times inside the async callback and imperatively calls `setGpxFilename`, `setDummyDurationSeconds`, `setStartSecond`, `setEndSecond`, `setSelectedSecond`, and `setConfig` as raw calls. It also uses `alert()` directly.
+
+**Recommendation:** Move the demo GPX fallback logic into a store action (e.g., `setDemoActivity`) and have the hook call that single action. Remove the `alert()` call — use the standard error message store mechanism.
+
+### 4. `import-activity.js` imports `useStore` from Zustand in a non-React utility
+
+`saveFile` at line 268 calls `useStore.getState()` to access store selectors. This module is a pure utility but has a hidden dependency on Zustand.
+
+**Recommendation:** The caller (`useActivityImport.js`) already passes `storeActions` as a second argument. Make `storeActions` required instead of falling back to `useStore.getState()`, removing the Zustand import from this utility.
+
+### 5. `render-video.js` (the utility) calls `useStore.getState()` in a non-React function
+
+The default export `renderVideo()` uses `useStore.getState()` extensively. This is invoked from `useRenderWorkflow.handleRenderVideoConfirm`.
+
+**Recommendation:** Accept all required store state as an explicit parameter object instead of reaching into Zustand. The caller already constructs a params object; expand it to include the store state.
+
+### 6. App.jsx exports `DEBUG_MODE_ENABLED`
+
+Line 33: `export { DEBUG_MODE_ENABLED }` — this is a side effect that also happens to be a re-export. The only consumer that imports `DEBUG_MODE_ENABLED` from App.jsx is `useEditorShellState.js`, which also imports `src/lib/dev-config.js` directly.
+
+**Recommendation:** Remove the export from App.jsx. All consumers already import from `src/lib/dev-config.js`.
+
+### 7. `widgetIconData.js` uses fragile relative imports from `../../../assets/`
+
+Every SVG import uses `../../../assets/widget-icons/...` paths. Two imports (gradient, course, elevation, label) even cross into `src/components/widgets/icons/`.
+
+**Recommendation:** Use Vite path aliases (`@/assets/widget-icons/...`) for consistency and maintainability.
+
+### 8. `index.css` imported twice
+
+Line 7 of `main.jsx` and line 29 of `App.jsx` both import `./index.css`. The App.jsx import is redundant.
+
+**Recommendation:** Remove the `import './index.css'` from App.jsx.
+
+### 9. `setGpxFilename` declared `async` in `createMediaSlice.js` but never `await`s
+
+Line 72: `setGpxFilename: async (filename) => {` — the function body is synchronous. `async` is misleading.
+
+**Recommendation:** Remove the `async` keyword.
+
+## Duplicate Code (Non-DRM)
+
+### 1. FPS Mode / Custom FPS pattern duplicated
+
+`useRenderVideoDialogState.js` and `useSceneSettingsState.js` both implement:
+- `customFpsAnchor` state tracking
+- `fpsMode` derivation
+- `handleFpsModeChange` 
+- `handleCustomFpsChange`
+
+**Recommendation:** Extract a `useFpsMode` hook in `src/lib/` or a shared feature-level hooks directory.
+
+### 2. Editable element detection duplicated
+
+`overlayEditorHelpers.js` has `isEditableElement()` and `usePlayerKeyboard.js` has `isPlaybackShortcutTarget()`. Both check if focus is in an input/textarea/select/contenteditable.
+
+**Recommendation:** Extract a shared `isInteractiveElement(target)` to `src/lib/utils.js` or similar.
+
+### 3. Time formatting duplicated
+
+`useOverlayEditorState.js` has `formatRangeTime()` and `playerTimeline.js` has `formatTimelineTime()`. Both format seconds to `HH:MM:SS`.
+
+**Recommendation:** Keep `formatTimelineTime` in `playerTimeline.js`, have `formatRangeTime` import it.
+
+### 4. Time parsing duplicated
+
+`export-range.js` has `timeToSeconds()` and `sceneSettingsUtils.js` has `parseTimeOffset()`. Nearly identical purpose.
+
+**Recommendation:** Consolidate into a single `parseTimeStringToSeconds()` in `export-range.js` (or `src/lib/utils.js`).
+
+## Poor Separation of Concerns
+
+### 1. `src/hooks/useAppStoreSelectors.js` — mixed concerns
+
+This file defines 6 selector hooks (`useLayoutStore`, `useAppShellStore`, `useBootstrapStore`, `useActivityStore`, `useTemplateStore`, `useRenderStore`) that serve completely different feature domains.
+
+**Recommendation:** Split by domain:
+- `useLayoutStore` → `src/features/widget-drawer/` (its only consumer)
+- `useAppShellStore` → `src/features/app-shell/`
+- `useBootstrapStore` → already only used by app-shell
+- `useActivityStore` → `src/lib/activity/` (consumed by app-shell)
+- `useTemplateStore` → `src/features/template-manager/`
+- `useRenderStore` → `src/features/render-video/`
+
+### 2. `src/hooks/useAvailableFonts.js` location
+
+Defined in `src/hooks/` but only consumed by `scene-settings` feature.
+
+**Recommendation:** Move to `src/features/scene-settings/hooks/useAvailableFonts.js`.
+
+### 3. `src/lib/tauri-runtime.js`
+
+Re-exported by both `src/features/app-shell/utils/backendDebug.js` and `src/features/app-shell/index.js`, used by `src/api/backend.js`.
+
+**Recommendation:** This is NOT a library utility — it's a runtime detection for the backend API. Merge the single 3-line function into `src/api/backend.js` where it's the primary consumer.
+
+## Files in `src/lib/` — Feature Folder Assessment
+
+| File | Should stay in lib? | Reason |
+|------|---------------------|--------|
+| `cached-promise.js` | Yes | Generic utility used by 3+ modules |
+| `color-utils.js` | Yes | Used by template-state, widget-config, widget-editor |
+| `compose-refs.js` | Yes | Generic React utility |
+| `dev-config.js` | Yes | Global development flag |
+| `export-range.js` | **No** → `src/features/overlay-editor/` | Only consumed by overlay-editor and widget-preview; already re-exported from overlay-editor/index.js |
+| `fonts.js` | Yes | Used by template-state, widget-editor, widget-icons |
+| `geometryUtils.js` | Yes | Domain-agnostic; used by multiple features |
+| `interpolation.js` | Yes | Domain-agnostic pure functions |
+| `previewPerf.js` | Yes | Development diagnostics |
+| `standard-metrics.js` | Yes | Canonical metric catalog; used by template-manager, widget-icons, widget-editor |
+| `tauri-runtime.js` | **No** → merge into `src/api/backend.js` | Only consumer |
+| `template-defaults.js` | Yes | Well-documented sibling module pattern |
+| `template-normalization.js` | Yes | Well-documented sibling module pattern |
+| `template-state.js` | Yes | Orchestration for the two above |
+| `theme.js` | Yes | Used by 5+ modules |
+| `update-rate.js` | Yes | Used by render-video, scene-settings, player |
+| `utils.js` | Yes | `cn()` and `clamp()` used everywhere |
+| `widget-config.js` | Yes | CRUD operations used by widget-editor and store |
+| `widget-icon-data.js` | Yes | Icon data registry |
+| `widget-icons.jsx` | Yes | Widget icon components and labels |
+| `widget-presentation.js` | Yes | Sidebar grouping logic |
+
+## Excessive Fragmentation
+
+### 1. Render-video hooks (7 files for one workflow)
+
+- `useRenderCompletion.js` (48 lines)
+- `useRenderDialogState.js` (58 lines)
+- `useRenderProgressPolling.js` (32 lines)
+- `useRenderVideoDerivedState.js` (99 lines)
+- `useRenderVideoDialogState.js` (127 lines)
+- `useRenderVideoEffects.js` (70 lines)
+- `useRenderWorkflow.js` (187 lines)
+
+Total: ~620 lines across 7 files, all composed by `useRenderWorkflow`.
+
+**Recommendation:** Merge `useRenderCompletion`, `useRenderProgressPolling`, and `useRenderVideoEffects` into `useRenderWorkflow.js`. These are small 30-70 line hooks that are only ever used together. Keep `useRenderVideoDerivedState` and `useRenderVideoDialogState` separate since they have distinct responsibilities (data access vs dialog orchestration).
+
+### 2. Player hooks
+
+- `usePlaybackSourceHandoff.js` (48 lines) — only used by `usePlaybackEngine.js`
+- `useTimelinePlaybackLoop.js` (65 lines) — only used by `usePlaybackEngine.js`
+
+**Recommendation:** Merge both into `usePlaybackEngine.js`. They are implementation details of the playback engine, not independent concerns.
+
+### 3. Moveable handler hooks (4 files, identical parameter patterns)
+
+- `useDragHandlers.js` (substancial)
+- `useResizeHandlers.js`
+- `useScaleHandlers.js`
+- `useRotateHandlers.js`
+
+All 4 accept the same 10+ parameter context objects.
+
+**Recommendation:** Keep as-is. Each has distinct, non-trivial logic. The identical parameter pattern is a consequence of Moveable's event model, not poor design. Consider a single shared context object (`ctx`) to reduce boilerplate, but don't merge the files.
+
+### 4. Template-state sibling module trio
+
+- `template-defaults.js` (43 lines)
+- `template-normalization.js` (182 lines)
+- `template-state.js` (179 lines)
+
+**Verdict:** Well-justified split. Each module has clear ownership declared in file-level JSDoc. Total ~400 lines — splitting into smaller files here improves navigability.
+
+## Overly Long / Ambiguous Function Names
+
+| Function | Location | Issue | Suggestion |
+|----------|----------|-------|------------|
+| `saveFile` | `lib/activity/import-activity.js:265` | It imports an activity, not saves a file | `importActivityFile` |
+| `handleStep` | `features/player/hooks/usePlaybackEngine.js` | Ambiguous — step which direction? The callback parameter is `direction` but the name doesn't convey this | `handleStepBySecond` or split into `handleStepForward`/`handleStepBackward` |
+| `apiCall` | `src/api/backend.js:60` | Generic — doesn't indicate it wraps Tauri IPC calls | `tauriInvoke` (but this is internal, low priority) |
+| `setGpxFilename` | `src/store/slices/createMediaSlice.js:72` | `gpx` is misleading — the app handles both GPX and FIT files | `setActivityFilename` |
+| `buildConfigWidgets` | `src/lib/widget-presentation.js:29` | The name sounds like it builds widgets, not transforms config arrays | `flattenWidgetConfig` or `getWidgetsFromConfig` |
+| `buildScopedRouteSamples` | `src/lib/export-range.js:203` | "Scoped" is imprecise — these are export-range-window-scoped | `buildExportWindowRouteSamples` |
+| `buildScopedElevationSeries` | `src/lib/export-range.js:277` | Same issue | `buildExportWindowElevationSeries` |
+
+## Nested Function Calls (Function as Argument)
+
+### 1. `type` → `do` pattern spread across store slices
+
+Every Zustand action uses the pattern:
 ```js
-// backend.js
-const isTauri = () => typeof window !== 'undefined' && typeof window.__TAURI_INTERNALS__ !== 'undefined'
-// backendDebug.js
-export function hasTauriRuntime() { ... }
-```
-Move the check into a single shared location (`lib/` or `api/backend.js` already has it as a module-private function) and have both consumers import it from one place.
-
-### 3. `combineSeries` and `combineSeriesPreferDerived` are ~90% identical
-**File:** `lib/activity/metric-series.js:300,328`
-
-Two nearly identical 20-line functions that differ only in argument order and the fallback direction. Merge into a single function with an option flag or unified parameter order.
-
-### 4. `setSelectedSecond` vs `setSelectedSecondTransient` — copy-paste
-**File:** `store/slices/createEditorSlice.js:199-215`
-
-`setSelectedSecondTransient` is literally `setSelectedSecond` with one extra perf-counter call. Delete the transient variant and move the perf counter into a middleware or subscriber on the store, or inline it at the call site.
-
-### 5. Duplicate "cached promise with pending guard" pattern
-**Files:** `hooks/useAvailableFonts.js:7-16` and `store/slices/createVideoImportSlice.js:3-4,98-127`
-
-Both implement a `cachedPromise + pendingPromise` memoization pattern but with different variable naming and error handling. Extract a shared utility to `lib/`.
-
-### 6. `clamp` is re-exported redundantly
-**Files:** `lib/geometryUtils.js:8-9`, `features/widget-editor/utils/widgetUtils.js`
-
-`geometryUtils.js` does `import { clamp } from './utils'; export { clamp };`. `widgetUtils.js` does the same. This is noise — just import `clamp` directly from `@/lib/utils` everywhere.
-
----
-
-## SEVERE — Monolithic Files & God Objects
-
-### 7. `App.jsx` — 100+ line `AppShell` component that wires everything
-**File:** `app/src/App.jsx:32-131`
-
-The `AppShell` function destructures 4 hooks and constructs deeply nested grouped prop objects (e.g. `activityControls`, `editorControls`, `renderControls`, `templateControls`, `videoControls`) that get spread back into destructuring in child components. This is not "orchestration" — it's indirection that obscures the data flow.
-
-**Fix:** Collapse the grouped-props pattern. Let `AppHeader` call its own hooks or accept flat props for the values it actually needs. Remove the intermediate grouping objects that serve only to be immediately destructured.
-
-### 8. `template-state.js` — 530 lines doing too many things
-**File:** `lib/template-state.js`
-
-This module owns:
-- Global defaults management (lines 26-106)
-- Scene normalization for save/load (lines 119-168)
-- Label/value/plot normalization (lines 152-210)
-- Durable template state serialization (lines 257-266)
-- Editor-effective config materialization (lines 418-453)
-- Global-to-config sync logic (lines 478-529)
-
-These are distinct concerns. The "seam" between durable and effective config is a good idea but all of it lives in one file. Move the normalization helpers to a dedicated normalization module and keep `template-state.js` as the orchestration layer.
-
-### 9. `widget-config.js` — 428 lines of config mutation
-**File:** `lib/widget-config.js`
-
-Widget ID management, find/update/replace/delete operations (single and batch), plus sidebar grouping. The file has 8 exported functions and 3 internal-only helpers. Consider whether `buildConfigWidgets` and `groupWidgetsForSidebar` (sidebar-presentation concerns) belong in the same module as the config mutation functions.
-
-### 10. `useOverlayEditorState.js` — the "god hook" at 384 lines
-**File:** `features/overlay-editor/hooks/useOverlayEditorState.js`
-
-This hook composes 6+ other hooks and resolves derived state for the entire overlay editor. It returns a flat object mixing state, handlers, and computed values. The hook is the single point of coupling between the canvas, moveable, keyboard, viewport, and pointer systems.
-
-**Fix:** Split into focused hooks that each own one concern (viewport, selection, widget-moveable binding) and compose them at the component level, not inside a single mega-hook.
-
-### 11. `gap-utils.js` — `helpers` parameter threaded through 10+ functions instead of using imports
-**File:** `lib/activity/gap-utils.js`
-
-Every internal function receives a `helpers` bag (`{ isFiniteNumber, roundValue, safeNumber, ... }`) as its last parameter. The helpers are already available as direct imports from `parse-helpers.js`. Drop the `helpers` parameter from all internal functions and import directly.
-
----
-
-## SEVERE — Poor Separation of Concerns
-
-### 12. Sidebar `ControlPanel.jsx` imports feature internals directly
-**File:** `features/app-shell/components/ControlPanel.jsx`
-
-```
-import { SidebarSettingsTab } from '@/features/scene-settings'
-import { SidebarWidgetsTab } from '@/features/widget-editor'
-```
-
-The app-shell feature cross-imports scene-settings and widget-editor internals. This makes feature boundaries porous. Have `SidebarSettingsTab` and `SidebarWidgetsTab` be composed at the `App.jsx` level or use the feature `index.js` barrel exports.
-
-### 13. `useSceneSettingsState` returns everything as one flat object
-**File:** `features/scene-settings/hooks/useSceneSettingsState.js`
-
-The return value mixes store state, store actions, derived values, local UI state, and handler functions — over 40 keys flat. This forces `SidebarSettingsTab.jsx` to manually deconstruct and pass each field. Group the return value into logical blocks (e.g. `overlaySettings`, `videoSyncSettings`, `globalSettings`) so consumers can pass them as coherent groups.
-
-### 14. `OnboardingState.jsx` drags in `react-bootstrap` for a single unused component
-**File:** `features/app-shell/components/OnboardingState.jsx`
-
-Imports `Alert` from `react-bootstrap` while the rest of the app uses shadcn/ui. This component appears to be dead code — nothing imports it. Remove the file and the `react-bootstrap` dependency if it exists only for this.
-
-### 15. `SidebarWidgetsTab.renderWidgetEditor` — massive if-else chain
-**File:** `features/widget-editor/components/SidebarWidgetsTab.jsx`
-
-A 20-line if-else chain dispatches widget type to editor component. Replace with an object lookup:
-```js
-const EDITOR_MAP = {
-  label: TextWidgetEditor,
-  course: RouteMapWidgetEditor,
-  elevation: ElevationWidgetEditor,
-  // ... etc
+setConfig: (val) => {
+  const currentState = get()
+  ...
+  set((state) => { ... })
 }
 ```
-where the fallback to `isStandardMetricWidgetType` is checked first.
 
-### 16. `widgetEditorSections.UnitsControlRow` — inconsistent prop API
-**File:** `features/widget-editor/components/widgetEditorSections.jsx`
+**Verdict:** This is standard Zustand/zustand+immer pattern. Not refactorable without changing state management library. Acceptable.
 
-`UnitsControlRow` takes both `widget`+`updateWidgetData` (convenience) AND individual `checked`/`onCheckedChange` (explicit) props with default-fallback logic that does the same thing. Pick one contract: either always pass widget/updater or always pass explicit values. Don't do both.
+### 2. `OverlayEditor.jsx` — hook composition
 
-### 17. CSS sprawl — `index.css` is 500+ lines
-**File:** `app/src/index.css`
+The `OverlayEditor` component composes ~8 hooks and then passes their return values directly as props. This is a deliberate "composition at component level" pattern documented in JSDoc.
 
-This file contains:
-- Font-face declarations (4 fonts)
-- CSS custom properties (~50 vars)
-- Tailwind `@theme inline` block
-- Base layer styles
-- Utility classes (`bg-overlay-grid-muted`, `.sidebar-scrollbar`)
-- Moveable library overrides
-- `input[type='number']` resets
+**Verdict:** Acceptable. Each hook owns one concern. The component body is the composition point.
 
-The tailwind-theme inline block alone is ~110 lines that could live in `tailwind.config` or a separate `theme.css`. Fonts could live in `fonts.css`. Moveable overrides could be in a component-scoped CSS module.
+## Poor Code Location
 
----
+### 1. `metricWidgetAssets.js`
 
-## MODERATE — Code Location & Splitting Issues
-
-### 18. `TitleBar.jsx` crashes outside Tauri
-**File:** `features/app-shell/components/TitleBar.jsx:1`
-
+File at `src/features/overlay-editor/data/metricWidgetAssets.js` contains a single re-export:
 ```js
-import { getCurrentWindow } from '@tauri-apps/api/window'
+export { METRIC_ICON_SVGS } from '@/lib/widget-icon-data'
 ```
 
-This runs at module evaluation time. In a browser context this will throw. Guard with a lazy import or a platform check.
+**Recommendation:** Remove this file. Update imports in overlay-editor/index.js to import directly from `@/lib/widget-icon-data`.
 
-### 19. `useEditorShellState` imports `DEBUG_MODE_ENABLED` from `App.jsx`
-**File:** `features/app-shell/hooks/useEditorShellState.js:26`
+### 2. Activity parsing in `src/lib/activity/`
 
-A hook in `features/app-shell` imports a development flag from the top-level `App.jsx`. This creates a circular-ish dependency where a feature reaches into the app root. Move `DEBUG_MODE_ENABLED` to a dedicated constants or config file.
+The entire `src/lib/activity/` directory (fit-parser.js, gap-utils.js, import-activity.js, metric-series.js, parse-helpers.js, parser.js) contains activity parsing logic. This is a domain concern, not a "library."
 
-### 20. `useActivityImport` dynamically imports `saveFileFromPath`
-**File:** `features/app-shell/hooks/useActivityImport.js:59`
+**Recommendation:** The directory is reasonably placed in `lib/` because it's consumed by both the store slices and the app-shell import hook. It has no React dependencies and consists of pure data transformation. Keep as-is.
 
-```js
-const { default: saveFileFromPath } = await import('@/lib/activity/import-activity')
-```
+### 3. `useAppStoreSelectors.js` as a grab-bag
 
-This dynamic import inside a callback means the activity parser is code-split, but the hook already depends on `@/lib/activity/import-activity` logically. Either make this a static import (simpler) or document why it's code-split (bundle size).
+This file in `src/hooks/` is a collection of Zustand selectors for 6 different domains.
 
-### 21. `import-activity.js` reaches into the zustand store directly
-**File:** `lib/activity/import-activity.js:275`
+**Recommendation:** Already covered above — split by feature domain.
 
-```js
-const storeState = useStore.getState()
-```
+## Summary of Recommended Actions (Priority Order)
 
-A library module (`lib/`) directly accesses the zustand store. This couples the pure activity-parsing layer to the application state management. Pass the store state (or callbacks) in as parameters from the calling hook instead.
+### High Priority
+1. **Remove `metricWidgetAssets.js`** (1-line re-export file, dead weight)
+2. **Deduplicate `normalizeSelectionIds`/`getPrimarySelectionId`** — leave only in `overlayEditorHelpers.js`
+3. **Deduplicate `updateUnrenderedChanges`** — use `updateConfigPersistence` from store-utils
+4. **Fix `useCommunityTemplate.js`** — remove `alert()`, move to store action pattern
+5. **Remove duplicate `import './index.css'` from App.jsx**
+6. **Remove redundant exports — `DEBUG_MODE_ENABLED` from App.jsx**
 
-### 22. `lib/activity/cache.js` exposes a mutable module-level singleton
-**File:** `lib/activity/cache.js:5`
+### Medium Priority
+7. **Extract `useFpsMode` hook** from the duplicated FPS mode logic in render-video and scene-settings
+8. **Deduplicate `isEditableElement`/`isPlaybackShortcutTarget`** into a shared utility
+9. **Consolidate `formatRangeTime`/`formatTimelineTime`** (just have the former call the latter)
+10. **Consolidate `timeToSeconds`/`parseTimeOffset`** into one function
+11. **Merge `hasTauriRuntime` into `src/api/backend.js`** — it's a 3-line function with one consumer
+12. **Split `useAppStoreSelectors.js`** by domain
+13. **Move `useAvailableFonts.js`** to `src/features/scene-settings/hooks/`
+14. **Move `use-refs.js`** into `src/lib/compose-refs.js`
+15. **Rename `saveFile`** → `importActivityFile` in import-activity.js
+16. **Remove `async` from `setGpxFilename`** in createMediaSlice.js
 
-```js
-let currentParsedActivity = null
-```
-
-Plus it leaks onto `window` in dev mode (line 35). Module-level mutable state is fragile and untestable. Move this to the zustand store where the rest of the application state lives, or use a proper cache layer.
-
-### 23. `useStore.js` leaks the store onto `window` in dev mode
-**File:** `store/useStore.js:52-57`
-
-Three different window properties set (`useStore`, `__OVRLEY_STORE__`, `__STORE__`). Pick one name. Also, this has a side effect at module evaluation time — it runs before any component mounts.
-
-### 24. `overlayEditorUtils.js` exports `getEffectivePreviewFps` that delegates to another module
-**File:** `features/overlay-editor/utils/overlayEditorUtils.js`
-
-The function `getEffectivePreviewFps` is a one-liner that delegates to a shared FPS resolver. Either inline it at the call site or just have callers import the shared resolver directly.
-
----
-
-## MODERATE — JSDoc Noise / Comment Bloat
-
-Nearly every file has JSDoc comments on every function that restate the function name in prose. Examples:
-
-```
-/**
- * Handles timestamp ms.
- * @param {*} value ...
- */
-function timestampMs(value) { ... }
-```
-
-```
-/**
- * Checks whether is tauri.
- * @returns {boolean} Whether the condition is satisfied.
- */
-const isTauri = () => ...
-```
-
-Generic `@param {*}` annotations with meaningless descriptions ("Value for X") add zero information. Either write meaningful JSDoc where the function contract is non-obvious, or drop the boilerplate. Do not batch-reformat — do this gradually as files are touched for other reasons.
-
----
-
-## LOW — Naming & Consistency
-
-### 25. Inconsistent filename conventions
-- `use-as-ref.js` vs `useAppStoreSelectors.js` (kebab vs PascalCase)
-- `color-utils.js` vs `widget-icon-data.js` (kebab vs kebab with single dash)
-- Most imports use `@/` aliases but a few peers use relative `../` imports
-
-Pick one convention and align. The most common pattern is kebab-case for utility modules and PascalCase for component/hook files, which is fine — just fix the few outliers.
-
-### 26. `metric-series.js` functions are not exported but are tested via `parser.js`
-**File:** `lib/activity/metric-series.js`
-
-All functions are module-private. They are only testable through the public `deriveActivityMetricSeries` export. Export the individual derivation functions if they need unit tests, or explicitly mark them as internal.
-
-### 27. `exportRange.js` lives in overlay-editor but is also re-exported from render-video
-**File:** `features/overlay-editor/utils/exportRange.js`
-
-The export range helpers are used by both the overlay editor (for scoped visualization) and the render-video feature (for export window settings). Move this to `lib/` if it's shared between features.
-
----
-
----
-
-## HOOK CONSOLIDATION AUDIT
-
-Every hook in the codebase was reviewed for size, call count, and logic-to-wrapping ratio. The line counts below are actual (rounded to nearest 5 lines).
-
-### Tier 1 — Should consolidate (tiny wrappers with zero domain logic)
-
-#### A) `use-isomorphic-layout-effect.js` (5 lines) → merge into `use-as-ref.js`
-```
-hooks/use-isomorphic-layout-effect.js — 5 lines, 1 export
-hooks/use-as-ref.js                   — 20 lines, imports it
-```
-`use-isomorphic-layout-effect` is used **only** by `use-as-ref.js`. It is a single ternary. Move it into `use-as-ref.js` as a file-private constant and delete the dedicated file.
-
-#### B) `use-as-ref.js` (20 lines) + `use-lazy-ref.js` (18 lines) → single `hooks/use-refs.js`
-```
-hooks/use-as-ref.js  — wraps useRef + useIsomorphicLayoutEffect
-hooks/use-lazy-ref.js — wraps useRef with lazy init
-```
-Both are generic React ref helpers. Consolidate into one ~40-line file with two named exports (`useAsRef`, `useLazyRef`). They share a common concern (ref management) and are always imported together or not at all. A single file is easier to find and reason about than two 20-line files.
-
-#### C) `usePlayerStore.js` (34 lines) → inline into its sole consumer
-```
-player/hooks/usePlayerStore.js        — 34 lines, used ONLY by useOverlayPlayerState.js
-player/hooks/useOverlayPlayerState.js — 39 lines, imports it
-```
-`usePlayerStore` is a `useStore(useShallow(...))` selector hook used exactly once. Move the selector inline into `useOverlayPlayerState.js`. This eliminates an entire file and one hop in the call chain.
-
-#### D) `useOverlayPlayerState.js` (39 lines) → inline into `OverlayPlayer.jsx`
-```
-player/hooks/useOverlayPlayerState.js — 39 lines, used ONLY by OverlayPlayer.jsx
-player/components/OverlayPlayer.jsx
-```
-This hook does three things:
-1. Calls `usePlayerStore()` (store selectors)
-2. Calls `usePlaybackEngine(…)` (playback logic, the real work)
-3. Calls `usePlayerKeyboard(…)` (side effect)
-
-And returns the result of step 2 unchanged. It is a pure pass-through composition layer. `OverlayPlayer.jsx` could call these three hooks directly and reduce one level of indirection. No domain logic is lost — the orchestration just moves to the component.
-
-#### E) `createOverlayMoveableHandlers.js` (47 lines) → inline into `useOverlayEditorState.js`
-```
-overlay-editor/hooks/createOverlayMoveableHandlers.js — 47 lines
-overlay-editor/hooks/useOverlayEditorState.js          — 384 lines (imports it)
-```
-Used **only** by the god hook. Contains zero domain logic — it calls 4 other hooks and merges their results into an object. The god hook already composes 6+ other hooks directly; this one should be no different. Inline it.
-
-### Tier 2 — Keep separate (real logic, but check the note)
-
-#### `useEditorKeyboard.js` (41 lines) + `usePlayerKeyboard.js` (68 lines)
-Both are single-effect keyboard hooks. Despite the similar shape (one `useEffect` + `window.addEventListener('keydown')`), they serve different concerns:
-- Editor: Delete key → removes widgets
-- Player: Space/Arrow keys → playback control
-
-**Do NOT consolidate.** The shared key-handling logic they could extract (the `isPlaybackShortcutTarget` / `isEditableElement` guard) is not identical and would over-generalize.
-
-#### `useRenderProgressPolling.js` (48 lines)
-Single `useEffect` with `setInterval` + renderId validation. Real logic. Keep.
-
-#### `useRenderCompletion.js` (62 lines)
-Single `useEffect` with zustand `subscribe` + status-machine evaluation. Real logic. Keep.
-
-### Tier 3 — NOT candidates (substantial, keep as-is)
-
-These hooks are 75+ lines with significant domain logic. They earn their file:
-- `usePlaybackEngine.js` (~270 lines) — core playback state machine
-- `useRenderWorkflow.js` (~260 lines) — render orchestration
-- `useRenderVideoDialogState.js` (~160 lines) — dialog state machine
-- `useDragHandlers.js` (~196 lines) — drag interaction logic
-- `useScaleHandlers.js` (~162 lines) — scale interaction logic
-- `useEditorShellState.js` (~130 lines) — editor chrome state
-- `useWidgetDraftState.js` (~102 lines) — dual-storage draft system
-- `useBackendStatus.js` (~93 lines) — polling + strike counter
-- `useResizeHandlers.js` (~97 lines) — resize interaction logic
-
-### Hook consolidation summary
-
-| Action | Files eliminated | Lines saved (net) |
-|--------|-----------------|-------------------|
-| Merge `use-isomorphic-layout-effect` into `use-as-ref.js` | 1 | ~5 (file overhead) |
-| Merge `use-as-ref.js` + `use-lazy-ref.js` → `use-refs.js` | 1 | ~10 (deduplicated imports) |
-| Inline `usePlayerStore` → `useOverlayPlayerState.js` | 1 | ~34 |
-| Inline `useOverlayPlayerState` → `OverlayPlayer.jsx` | 1 | ~39 |
-| Inline `createOverlayMoveableHandlers` → `useOverlayEditorState` | 1 | ~47 |
-| **Total** | **5 files removed** | **~135 lines eliminated** |
-
-No domain logic is lost in any of these. No hook that performs actual computation is touched. Only pure composition/indirection layers are removed.
-
----
-
-## SUMMARY TABLE
-
-| # | Severity | File | Issue |
-|---|----------|------|-------|
-| 1 | Critical | `render-video/data/` + `utils/` | Duplicate `bitrateDefaults.js` |
-| 2 | Critical | `backend.js` + `backendDebug.js` | Duplicate `isTauri` check |
-| 3 | Critical | `metric-series.js` | Duplicate combine functions |
-| 4 | Critical | `createEditorSlice.js` | Duplicate setSelectedSecond variants |
-| 5 | Critical | `useAvailableFonts.js` + `createVideoImportSlice.js` | Duplicate cache pattern |
-| 6 | Critical | Multiple | `clamp` re-exported redundantly |
-| 7 | Severe | `App.jsx` | Monolithic wiring with grouped props |
-| 8 | Severe | `template-state.js` | 530-line god module |
-| 9 | Severe | `widget-config.js` | 428-line config mutation module |
-| 10 | Severe | `useOverlayEditorState.js` | 384-line god hook |
-| 11 | Severe | `gap-utils.js` | Helpers threaded instead of imported |
-| 12 | Severe | `ControlPanel.jsx` | Cross-feature internal imports |
-| 13 | Severe | `useSceneSettingsState.js` | Flat 40-key return object |
-| 14 | Severe | `OnboardingState.jsx` | Dead code, wrong UI library |
-| 15 | Severe | `SidebarWidgetsTab.jsx` | if-else chain for editor dispatch |
-| 16 | Severe | `widgetEditorSections.jsx` | Inconsistent prop API |
-| 17 | Severe | `index.css` | 500+ lines, mixed concerns |
-| 18 | Moderate | `TitleBar.jsx` | Tauri import crashes in browser |
-| 19 | Moderate | `useEditorShellState.js` | Imports from `App.jsx` |
-| 20 | Moderate | `useActivityImport.js` | Dynamic import vs logical dep |
-| 21 | Moderate | `import-activity.js` | Direct zustand access from lib |
-| 22 | Moderate | `activity/cache.js` | Module-level mutable singleton |
-| 23 | Moderate | `useStore.js` | Triple window leak in dev |
-| 24 | Moderate | `overlayEditorUtils.js` | Pointless one-liner delegation |
-| 25 | Low | Multiple | Inconsistent filename casing |
-| 26 | Low | `metric-series.js` | Internal functions untestable |
-| 27 | Low | `exportRange.js` | Lives in wrong feature dir |
+### Low Priority
+17. **Merge `useRenderCompletion`, `useRenderProgressPolling`, `useRenderVideoEffects`** into `useRenderWorkflow.js`
+18. **Merge `usePlaybackSourceHandoff` and `useTimelinePlaybackLoop`** into `usePlaybackEngine.js`
+19. **Move `export-range.js`** to `src/features/overlay-editor/utils/`
+20. **Replace fragile relative SVG imports** in `widgetIconData.js` with `@/` aliases
+21. **Pass store state as parameter** to `render-video.js` utility instead of calling `useStore.getState()`
+22. **Pass store state as parameter** to `import-activity.js` `saveFile` instead of falling back to `useStore.getState()`
+23. **Merge `format.js` (render-video)** into `codecUtils.js`
