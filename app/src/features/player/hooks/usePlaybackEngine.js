@@ -4,7 +4,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getEffectivePreviewFps } from '@/features/overlay-editor'
-import { clamp, resolvePlaybackSource } from '../utils/playerTimeline'
+import { clamp, createPlaybackAnchor, getTotalPlaybackDuration, resolvePlaybackSource } from '../utils/playerTimeline'
+import { usePlaybackSourceHandoff } from './usePlaybackSourceHandoff'
+import { useTimelinePlaybackLoop } from './useTimelinePlaybackLoop'
 
 /**
  * Orchestrates playback state, timeline scrubbing, and timeline-driven RAF playback.
@@ -48,64 +50,62 @@ export default function usePlaybackEngine({
   updateRate,
   videoSyncOffsetSeconds,
 }) {
-  // Local playback state - dragSecond temporarily owns the rendered playhead while the slider is being scrubbed
+  // Local playback state - dragSecond temporarily owns the rendered playhead while the slider is being scrubbed.
   const [dragSecond, setDragSecond] = useState(null)
 
-  // Playback anchors - timeline playback is computed from a fixed start time and start second instead of accumulating deltas
+  // Playback anchors - timeline playback uses a wall-clock anchor instead of accumulated deltas.
   const playbackAnchorRef = useRef({
     startedAtMs: 0,
     startedSecond: 0,
   })
 
-  // Imperative playback refs - keep high-frequency playback bookkeeping outside React render state
+  // Imperative refs - keep high-frequency frame bookkeeping out of React render state.
   const totalDurationRef = useRef(0)
   const previewFrameRef = useRef(-1)
-  const pendingTimelineSecondRef = useRef(null)
-  const timelineChangeFrameRef = useRef(0)
 
-  // Derived timeline duration - activity metadata, dummy templates, and imported video can each extend the playable range
-  const totalDuration = useMemo(() => {
-    const metadataDuration = Number(activitySummary?.durationSeconds) || 0
-    const fallbackDuration = Number(dummyDurationSeconds) || 0
-    const videoEnd = importedVideoPath ? videoSyncOffsetSeconds + importedVideoDuration : 0
+  // Derived timeline duration - activity metadata, dummy templates, and imported video can each extend the playable range.
+  const totalDuration = useMemo(
+    () =>
+      getTotalPlaybackDuration({
+        activityDurationSeconds: activitySummary?.durationSeconds,
+        dummyDurationSeconds,
+        importedVideoDuration,
+        importedVideoPath,
+        videoSyncOffsetSeconds,
+      }),
+    [activitySummary?.durationSeconds, dummyDurationSeconds, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds],
+  )
 
-    return Math.max(metadataDuration, fallbackDuration, videoEnd, 0)
-  }, [activitySummary?.durationSeconds, dummyDurationSeconds, importedVideoPath, videoSyncOffsetSeconds, importedVideoDuration])
-
-  // Derived playback state - these values describe the active clock and the playhead shown by the UI
+  // Derived playback state - describes the active clock and the playhead shown by the UI.
   const hasActivity = Boolean(activitySummary && totalDuration > 0)
   const shouldUseVideoPlayback = backgroundMode === 'video' && Boolean(importedVideoPath)
   const isPlaying = previewPlaybackState === 'playing'
   const isTimelinePlaybackActive = previewPlaybackState === 'playing' && previewPlaybackSource === 'timeline'
-  const isVideoPlaybackActive = previewPlaybackState === 'playing' && previewPlaybackSource === 'video'
   const clampedPlayhead = clamp(Number(selectedSecond) || 0, 0, totalDuration)
   const displayedPlayhead = clamp(dragSecond === null ? clampedPlayhead : dragSecond, 0, totalDuration)
   const effectivePreviewFps = useMemo(() => getEffectivePreviewFps(sceneFps, updateRate), [sceneFps, updateRate])
 
-  // Pending timeline cleanup - clears queued timeline work before playback mode changes, scrubs, or unmount
-  const cancelPendingTimelineChange = useCallback(() => {
-    if (timelineChangeFrameRef.current) {
-      window.cancelAnimationFrame(timelineChangeFrameRef.current)
-      timelineChangeFrameRef.current = 0
-    }
-
-    pendingTimelineSecondRef.current = null
+  // Shared playback bookkeeping - clears transient UI ownership and resets frame dedup state.
+  const resetPlaybackOrchestration = useCallback(() => {
+    previewFrameRef.current = -1
+    setDragSecond(null)
   }, [])
 
-  // Duration ref sync - RAF callbacks read the latest duration without resubscribing the animation loop every frame
+  // Playback anchors - timeline playback stores wall-clock time, while paused/video-backed states only keep the playhead.
+  const setPlaybackAnchor = useCallback((source, second) => {
+    playbackAnchorRef.current = createPlaybackAnchor({
+      source,
+      second,
+      nowMs: performance.now(),
+    })
+  }, [])
+
+  // Duration ref sync - RAF callbacks read the latest duration without resubscribing the animation loop every frame.
   useEffect(() => {
     totalDurationRef.current = totalDuration
   }, [totalDuration])
 
-  // Unmount cleanup - prevents delayed timeline updates from firing after the player leaves the tree
-  useEffect(
-    () => () => {
-      cancelPendingTimelineChange()
-    },
-    [cancelPendingTimelineChange],
-  )
-
-  // Playhead bounds sync - clamps persisted or externally changed selectedSecond into the current timeline duration
+  // Playhead bounds sync - clamps persisted or externally changed selectedSecond into the current timeline duration.
   useEffect(() => {
     if (!hasActivity) {
       playbackAnchorRef.current = {
@@ -120,105 +120,35 @@ export default function usePlaybackEngine({
     }
   }, [clampedPlayhead, hasActivity, selectedSecond, setSelectedSecondTransient])
 
-  // Video playback availability sync - falls back to paused timeline playback if the active video clock disappears
-  useEffect(() => {
-    if (isVideoPlaybackActive && !shouldUseVideoPlayback) {
-      cancelPendingTimelineChange()
-      setDragSecond(null)
-      pausePreviewPlayback(clampedPlayhead)
-    }
-  }, [cancelPendingTimelineChange, clampedPlayhead, isVideoPlaybackActive, pausePreviewPlayback, shouldUseVideoPlayback])
-
-  // Playback source handoff - switches between timeline and video clocks when the playhead crosses video bounds
-  useEffect(() => {
-    if (!isPlaying || !shouldUseVideoPlayback) {
-      return
-    }
-
-    const nextSource = resolvePlaybackSource({
-      shouldUseVideoPlayback,
-      playheadSecond: clampedPlayhead,
-      videoSyncOffsetSeconds,
-      importedVideoDuration,
-    })
-
-    if (nextSource === previewPlaybackSource) {
-      return
-    }
-
-    previewFrameRef.current = -1
-    cancelPendingTimelineChange()
-    setDragSecond(null)
-
-    // Timeline playback needs a fresh wall-clock anchor; video playback is driven by the video element clock.
-    if (nextSource === 'timeline') {
-      playbackAnchorRef.current = {
-        startedAtMs: performance.now(),
-        startedSecond: clampedPlayhead,
-      }
-    } else {
-      playbackAnchorRef.current = {
-        startedAtMs: 0,
-        startedSecond: clampedPlayhead,
-      }
-    }
-
-    startPreviewPlayback({
-      source: nextSource,
-      second: clampedPlayhead,
-    })
-  }, [
-    cancelPendingTimelineChange,
+  usePlaybackSourceHandoff({
     clampedPlayhead,
     importedVideoDuration,
     isPlaying,
+    pausePreviewPlayback,
     previewPlaybackSource,
+    resetPlaybackOrchestration,
+    setPlaybackAnchor,
     shouldUseVideoPlayback,
     startPreviewPlayback,
     videoSyncOffsetSeconds,
-  ])
+  })
 
-  // Timeline playback loop - advances selectedSecond on animation frames while timeline playback is active
-  useEffect(() => {
-    if (!isTimelinePlaybackActive || !hasActivity) return undefined
+  useTimelinePlaybackLoop({
+    effectivePreviewFps,
+    hasActivity,
+    isTimelinePlaybackActive,
+    pausePreviewPlayback,
+    playbackAnchorRef,
+    previewFrameRef,
+    setSelectedSecondTransient,
+    totalDurationRef,
+  })
 
-    let animationFrameId = 0
-
-    const tick = (now) => {
-      const elapsedSeconds = (now - playbackAnchorRef.current.startedAtMs) / 1000
-      const nextSecond = playbackAnchorRef.current.startedSecond + elapsedSeconds
-      const safeDuration = totalDurationRef.current
-
-      // Reaching the end commits a paused playhead at the exact duration and stops scheduling RAF ticks.
-      if (nextSecond >= safeDuration) {
-        pausePreviewPlayback(safeDuration)
-        playbackAnchorRef.current = {
-          startedAtMs: 0,
-          startedSecond: safeDuration,
-        }
-        previewFrameRef.current = -1
-        return
-      }
-
-      const frameIndex = Math.floor(nextSecond * effectivePreviewFps)
-
-      // Publish only when the effective preview frame changes to avoid excessive transient store updates.
-      if (frameIndex !== previewFrameRef.current) {
-        previewFrameRef.current = frameIndex
-        setSelectedSecondTransient(clamp(frameIndex / effectivePreviewFps, 0, safeDuration))
-      }
-
-      animationFrameId = window.requestAnimationFrame(tick)
-    }
-
-    animationFrameId = window.requestAnimationFrame(tick)
-
-    return () => window.cancelAnimationFrame(animationFrameId)
-  }, [effectivePreviewFps, hasActivity, isTimelinePlaybackActive, pausePreviewPlayback, setSelectedSecondTransient])
-
-  // Playback control handlers - button and keyboard commands share these paths to keep behavior identical
+  // Playback control handlers - button and keyboard commands share these paths to keep behavior identical.
   const handlePlay = useCallback(() => {
-    if (!hasActivity) return
+    if (!hasActivity) {
+      return
+    }
 
     const initialSecond = clampedPlayhead >= totalDuration ? 0 : clampedPlayhead
     const nextSource = resolvePlaybackSource({
@@ -228,31 +158,18 @@ export default function usePlaybackEngine({
       importedVideoDuration,
     })
 
-    // Starting from the timeline clock captures a wall-clock anchor; video starts from the requested second in store.
-    if (nextSource === 'timeline') {
-      playbackAnchorRef.current = {
-        startedAtMs: performance.now(),
-        startedSecond: initialSecond,
-      }
-    } else {
-      playbackAnchorRef.current = {
-        startedAtMs: 0,
-        startedSecond: initialSecond,
-      }
-    }
-
-    previewFrameRef.current = -1
-    cancelPendingTimelineChange()
-    setDragSecond(null)
+    setPlaybackAnchor(nextSource, initialSecond)
+    resetPlaybackOrchestration()
     startPreviewPlayback({
       source: nextSource,
       second: initialSecond,
     })
   }, [
-    cancelPendingTimelineChange,
     clampedPlayhead,
     hasActivity,
     importedVideoDuration,
+    resetPlaybackOrchestration,
+    setPlaybackAnchor,
     shouldUseVideoPlayback,
     startPreviewPlayback,
     totalDuration,
@@ -260,53 +177,34 @@ export default function usePlaybackEngine({
   ])
 
   const handlePause = useCallback(() => {
-    playbackAnchorRef.current = {
-      startedAtMs: 0,
-      startedSecond: clampedPlayhead,
-    }
-    previewFrameRef.current = -1
-    cancelPendingTimelineChange()
-    setDragSecond(null)
+    setPlaybackAnchor('video', clampedPlayhead)
+    resetPlaybackOrchestration()
     pausePreviewPlayback(clampedPlayhead)
-  }, [cancelPendingTimelineChange, clampedPlayhead, pausePreviewPlayback])
+  }, [clampedPlayhead, pausePreviewPlayback, resetPlaybackOrchestration, setPlaybackAnchor])
 
   const handleReset = useCallback(() => {
-    playbackAnchorRef.current = {
-      startedAtMs: 0,
-      startedSecond: 0,
-    }
-    previewFrameRef.current = -1
-    cancelPendingTimelineChange()
-    setDragSecond(null)
+    setPlaybackAnchor('video', 0)
+    resetPlaybackOrchestration()
     pausePreviewPlayback(0)
-  }, [cancelPendingTimelineChange, pausePreviewPlayback])
+  }, [pausePreviewPlayback, resetPlaybackOrchestration, setPlaybackAnchor])
 
   const handleStep = useCallback(
     (direction) => {
       const nextSecond = clamp(clampedPlayhead + direction, 0, totalDuration)
 
-      playbackAnchorRef.current = {
-        startedAtMs: 0,
-        startedSecond: nextSecond,
-      }
-      previewFrameRef.current = -1
-      cancelPendingTimelineChange()
-      setDragSecond(null)
+      setPlaybackAnchor('video', nextSecond)
+      resetPlaybackOrchestration()
       pausePreviewPlayback(nextSecond)
     },
-    [cancelPendingTimelineChange, clampedPlayhead, pausePreviewPlayback, totalDuration],
+    [clampedPlayhead, pausePreviewPlayback, resetPlaybackOrchestration, setPlaybackAnchor, totalDuration],
   )
 
-  // Timeline scrub handlers - slider movement enters scrub state until commit stores the final paused playhead
+  // Timeline scrub handlers - slider movement enters scrub state until commit stores the final paused playhead.
   const handleTimelineChange = useCallback(
     ([nextValue]) => {
       const nextSecond = clamp(nextValue, 0, totalDuration)
 
-      playbackAnchorRef.current = {
-        startedAtMs: 0,
-        startedSecond: nextSecond,
-      }
-      cancelPendingTimelineChange()
+      setPlaybackAnchor('video', nextSecond)
       setDragSecond(nextSecond)
       previewFrameRef.current = -1
 
@@ -317,22 +215,19 @@ export default function usePlaybackEngine({
 
       updatePreviewScrub(nextSecond)
     },
-    [beginPreviewScrub, cancelPendingTimelineChange, previewPlaybackState, totalDuration, updatePreviewScrub],
+    [beginPreviewScrub, previewPlaybackState, setPlaybackAnchor, totalDuration, updatePreviewScrub],
   )
 
   const handleTimelineCommit = useCallback(
     ([nextValue]) => {
       const nextSecond = clamp(nextValue, 0, totalDuration)
-      playbackAnchorRef.current = {
-        startedAtMs: 0,
-        startedSecond: nextSecond,
-      }
+
+      setPlaybackAnchor('video', nextSecond)
       previewFrameRef.current = -1
-      cancelPendingTimelineChange()
       setDragSecond(null)
       commitPreviewScrub(nextSecond)
     },
-    [cancelPendingTimelineChange, commitPreviewScrub, totalDuration],
+    [commitPreviewScrub, setPlaybackAnchor, totalDuration],
   )
 
   return {

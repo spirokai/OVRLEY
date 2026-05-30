@@ -50,3 +50,69 @@ export function resolvePlaybackSource({ shouldUseVideoPlayback, playheadSecond, 
 
   return 'video'
 }
+
+/**
+ * Computes the largest playable duration across activity, template fallback,
+ * and imported-video timing.
+ *
+ * @param {object} options - Duration inputs.
+ * @param {number} options.activityDurationSeconds - Activity-backed duration.
+ * @param {number} options.dummyDurationSeconds - Fallback template duration.
+ * @param {number} options.importedVideoDuration - Imported video duration.
+ * @param {string|null} options.importedVideoPath - Imported video path when available.
+ * @param {number} options.videoSyncOffsetSeconds - Timeline second where the video starts.
+ * @returns {number} Total playable duration in seconds.
+ */
+export function getTotalPlaybackDuration({
+  activityDurationSeconds,
+  dummyDurationSeconds,
+  importedVideoDuration,
+  importedVideoPath,
+  videoSyncOffsetSeconds,
+}) {
+  const metadataDuration = Number(activityDurationSeconds) || 0
+  const fallbackDuration = Number(dummyDurationSeconds) || 0
+  const videoEnd = importedVideoPath ? (Number(videoSyncOffsetSeconds) || 0) + (Number(importedVideoDuration) || 0) : 0
+
+  return Math.max(metadataDuration, fallbackDuration, videoEnd, 0)
+}
+
+/**
+ * Builds a playback anchor for the active preview clock.
+ *
+ * Timeline playback stores a wall-clock start time. Paused or video-backed
+ * states only preserve the playhead second.
+ *
+ * @param {object} options - Anchor inputs.
+ * @param {'timeline'|'video'} options.source - Playback source that owns the clock.
+ * @param {number} options.second - Timeline second to anchor.
+ * @param {number} options.nowMs - Current wall-clock time in milliseconds.
+ * @returns {{ startedAtMs: number, startedSecond: number }} Playback anchor.
+ */
+export function createPlaybackAnchor({ source, second, nowMs }) {
+  const safeSecond = Number(second) || 0
+
+  if (source === 'timeline') {
+    return {
+      startedAtMs: nowMs,
+      startedSecond: safeSecond,
+    }
+  }
+
+  return {
+    startedAtMs: 0,
+    startedSecond: safeSecond,
+  }
+}
+
+/**
+ * Resolves the elapsed timeline second from an active timeline anchor.
+ *
+ * @param {object} options - Timeline playback inputs.
+ * @param {{ startedAtMs: number, startedSecond: number }} options.anchor - Active timeline anchor.
+ * @param {number} options.nowMs - Current wall-clock time in milliseconds.
+ * @returns {number} Elapsed timeline second.
+ */
+export function getTimelinePlaybackSecond({ anchor, nowMs }) {
+  return anchor.startedSecond + (nowMs - anchor.startedAtMs) / 1000
+}

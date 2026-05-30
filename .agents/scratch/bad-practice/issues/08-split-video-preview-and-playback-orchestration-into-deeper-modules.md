@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: ready-for-human
 
 # 08 - Split Video Preview and Playback Orchestration Into Deeper Modules
 
@@ -60,12 +60,12 @@ The final design does not need a formal state-machine library. Small focused hoo
 
 ## Acceptance criteria
 
-- [ ] `useVideoPreview` and `usePlaybackEngine` no longer each own multiple unrelated playback concerns in one large effect-driven seam
-- [ ] Extracted modules or hooks have explicit, focused responsibilities for source resolution, warning lifecycle, scheduling, or clock behavior
-- [ ] User-visible playback and scrubbing behavior remain functionally identical
-- [ ] Video-to-timeline and timeline-to-video handoff behavior remains correct
-- [ ] Metadata and slow-seek warnings still appear under the same conditions as before
-- [ ] Tests cover both extracted logic seams and at least one end-to-end playback regression path
+- [x] `useVideoPreview` and `usePlaybackEngine` no longer each own multiple unrelated playback concerns in one large effect-driven seam
+- [x] Extracted modules or hooks have explicit, focused responsibilities for source resolution, warning lifecycle, scheduling, or clock behavior
+- [x] User-visible playback and scrubbing behavior remain functionally identical
+- [x] Video-to-timeline and timeline-to-video handoff behavior remains correct
+- [x] Metadata and slow-seek warnings still appear under the same conditions as before
+- [x] Tests cover both extracted logic seams and at least one end-to-end playback regression path
 
 ## Blocked by
 
