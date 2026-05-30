@@ -138,16 +138,27 @@ export function applyLiveScalePositionStyles(target, widget, draft, globalScale,
     return
   }
 
+  const nextRotation = draft.rotation ?? (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
+  const transforms = []
+
+  if (draft.scale_factor !== undefined) {
+    const tx = draft.translate_x ?? 0
+    const ty = draft.translate_y ?? 0
+    transforms.push(`translate(${tx}px, ${ty}px)`)
+    if (nextRotation) {
+      transforms.push(`rotate(${nextRotation}deg)`)
+    }
+    transforms.push(`scale(${globalScale * draft.scale_factor})`)
+    target.style.left = `${draft.scale_start_left}px`
+    target.style.top = `${draft.scale_start_top}px`
+    target.style.transform = transforms.join(' ')
+    return
+  }
+
   const visualBounds = visualBoundsOverride ?? getWidgetVisualBoundsFromTarget(target)
   const draftOrigin = getWidgetSceneOrigin(widget, draft, visualBounds, {
     boundsScale: widget.category === 'plots' ? 1 : globalScale,
   })
-  const nextRotation = draft.rotation ?? (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
-  const transforms = []
-
-  if (nextRotation) {
-    transforms.push(`rotate(${nextRotation}deg)`)
-  }
 
   if (globalScale !== 1) {
     transforms.push(`scale(${globalScale})`)

@@ -136,13 +136,14 @@ export function getWidgetSceneOrigin(widget, draft = null, visualBounds = null, 
  * @param {object} widget - Widget definition (used to determine category).
  * @returns {object} Draft with scaled properties.
  */
-export function buildScaledWidgetDataDraft(origin, scaleFactor, widget) {
-  const nextFontSize = clamp(Math.round((origin.fontSize || 60) * scaleFactor), 8, 400)
-  const nextIconSize = clamp(Math.round((origin.iconSize || 28) * scaleFactor), 0, 400)
-  const nextIconOffsetX = Math.round((origin.iconOffsetX || 0) * scaleFactor)
-  const nextIconOffsetY = Math.round((origin.iconOffsetY || 0) * scaleFactor)
-  const nextTriangleWidth = clamp(Math.round((origin.triangleWidth ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH) * scaleFactor), 0, 600)
-  const nextValueOffset = Math.round((origin.valueOffset || 0) * scaleFactor)
+export function buildScaledWidgetDataDraft(origin, scaleFactor, widget, { round = true } = {}) {
+  const r = round ? Math.round : (v) => v
+  const nextFontSize = clamp(r((origin.fontSize || 60) * scaleFactor), 8, 400)
+  const nextIconSize = clamp(r((origin.iconSize || 28) * scaleFactor), 0, 400)
+  const nextIconOffsetX = r((origin.iconOffsetX || 0) * scaleFactor)
+  const nextIconOffsetY = r((origin.iconOffsetY || 0) * scaleFactor)
+  const nextTriangleWidth = clamp(r((origin.triangleWidth ?? DEFAULT_GRADIENT_TRIANGLE_WIDTH) * scaleFactor), 0, 600)
+  const nextValueOffset = r((origin.valueOffset || 0) * scaleFactor)
 
   const nextDraft = {
     font_size: nextFontSize,

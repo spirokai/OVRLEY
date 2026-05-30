@@ -107,13 +107,33 @@ const OverlayCanvasWidget = memo(
     const textPreviewModel = buildTextWidgetPreviewModel({ widget })
     const visualBounds = metricVisualBounds ?? textPreviewModel?.visualBounds ?? null
     const isPlotWidget = widget.category === 'plots'
-    const origin = getWidgetSceneOrigin(widget, null, visualBounds, {
-      boundsScale: isPlotWidget ? 1 : globalScale,
-    })
-    const scale = isPlotWidget ? 1 : globalScale
+    const scaleFactor = widget.data.scale_factor
+    const isScaling = scaleFactor !== undefined
+
+    const origin = isScaling
+      ? { x: widget.data.scale_start_left, y: widget.data.scale_start_top }
+      : getWidgetSceneOrigin(widget, null, visualBounds, {
+          boundsScale: isPlotWidget ? 1 : globalScale,
+        })
+    const scale = isScaling ? globalScale * scaleFactor : isPlotWidget ? 1 : globalScale
     const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
-    const width = isPlotWidget ? (widget.data.width ?? 0) * (globalScale || 1) : (visualBounds?.width ?? widget.data.width)
-    const height = isPlotWidget ? (widget.data.height ?? 0) * (globalScale || 1) : (visualBounds?.height ?? widget.data.height)
+    const width = isScaling
+      ? widget.data.scale_start_width
+      : isPlotWidget
+        ? (widget.data.width ?? 0) * (globalScale || 1)
+        : (visualBounds?.width ?? widget.data.width)
+    const height = isScaling
+      ? widget.data.scale_start_height
+      : isPlotWidget
+        ? (widget.data.height ?? 0) * (globalScale || 1)
+        : (visualBounds?.height ?? widget.data.height)
+
+    let transformStr = buildWidgetTransform({ scale, rotation })
+    if (isScaling) {
+      const tx = widget.data.translate_x ?? 0
+      const ty = widget.data.translate_y ?? 0
+      transformStr = `translate(${tx}px, ${ty}px)${transformStr ? ' ' + transformStr : ''}`
+    }
     return (
       <div
         ref={registerNode}
@@ -128,7 +148,7 @@ const OverlayCanvasWidget = memo(
           top: origin.y,
           width,
           height,
-          transform: buildWidgetTransform({ scale, rotation }),
+          transform: transformStr,
           transformOrigin: 'top left',
         }}
         onMouseDown={(event) => {
