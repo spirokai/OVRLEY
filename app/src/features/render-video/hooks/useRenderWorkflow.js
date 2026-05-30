@@ -1,13 +1,13 @@
 /**
- * Orchestrates the render video workflow by composing sub-hooks for
- * dialog state, progress polling, and completion handling.
+ * Orchestrates the render video workflow by composing dialog state,
+ * progress polling, and completion handling.
  *
  * @param {object} options
  * @param {string} options.backendStatus - Current backend connection status.
  * @returns {object} Render workflow API for use by AppShell.
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
@@ -18,8 +18,6 @@ import useStore from '@/store/useStore'
 import { getDefaultBitrate } from '../data/bitrateDefaults'
 import { resolutionsMismatch } from '../utils/codecUtils'
 import useRenderDialogState from './useRenderDialogState'
-import useRenderProgressPolling from './useRenderProgressPolling'
-import useRenderCompletion from './useRenderCompletion'
 
 export default function useRenderWorkflow({ backendStatus }) {
   const {
@@ -46,7 +44,6 @@ export default function useRenderWorkflow({ backendStatus }) {
   const importedVideoResolution = useStore((state) => state.importedVideoResolution)
   const [renderingPreviewFrame, setRenderingPreviewFrame] = useState(false)
 
-  // Derived state — computed flags and tooltip messages for render readiness
   const hasParsedActivity = Boolean(activitySummary)
   const canRender = Boolean(config && hasParsedActivity)
   const hasResolutionMismatch = resolutionsMismatch(config?.scene, importedVideoResolution)
@@ -71,7 +68,6 @@ export default function useRenderWorkflow({ backendStatus }) {
   }, [backendStatus, config, hasParsedActivity, hasResolutionMismatch, renderingVideo])
   const renderPreviewFrameDisabled = !canRender || renderingVideo || renderingPreviewFrame || backendStatus !== 'connected'
 
-  // Build render settings draft — assembles initial FPS, codec, bitrate, and export range from store
   const buildRenderSettingsDraft = useCallback(() => {
     const templateFps = sanitizeIntegerFps(config?.scene?.fps || 30)
     const fps = importedVideoPath && importedVideoFps ? sanitizeIntegerFps(Math.round(importedVideoFps)) : templateFps
@@ -113,15 +109,81 @@ export default function useRenderWorkflow({ backendStatus }) {
       renderStatus,
     })
 
-  useRenderProgressPolling({ renderingVideo, setRenderProgress })
+  // Progress polling — polls backend for render progress at 500ms intervals while rendering is active
+  useEffect(() => {
+    if (!renderingVideo) return
 
-  useRenderCompletion({
-    renderingVideo,
-    setActiveRenderId,
-    setRenderingVideo,
-    setErrorMessage,
-    setVideoFilename,
-  })
+    const pollProgress = async () => {
+      try {
+        const data = await backend.getRenderProgress()
+        const expectedRenderId = useStore.getState().activeRenderId
+        if (expectedRenderId === null || expectedRenderId === undefined || data.render_id !== expectedRenderId) {
+          return
+        }
+
+        setRenderProgress({
+          renderId: data.render_id ?? null,
+          current: data.current || 0,
+          total: data.total || 0,
+          encoded: data.encoded || 0,
+          status: data.status || 'rendering',
+          message: data.message || '',
+          estimatedSecondsRemaining: data.estimated_seconds_remaining,
+          renderingFps: data.rendering_fps ?? null,
+          filename: data.filename || null,
+        })
+      } catch (error) {
+        console.error('Error polling render progress:', error)
+      }
+    }
+
+    const interval = setInterval(pollProgress, 500)
+    pollProgress()
+    return () => clearInterval(interval)
+  }, [renderingVideo, setRenderProgress])
+
+  // Render completion handler — subscribes to render progress store to handle completion, cancellation, and errors
+  useEffect(() => {
+    if (!renderingVideo) return
+
+    const unsubscribe = useStore.subscribe(
+      (state) => state.renderProgress,
+      (nextProgress) => {
+        const { activeRenderId: nextActiveRenderId } = useStore.getState()
+        if (nextProgress.renderId !== nextActiveRenderId) {
+          return
+        }
+
+        const { filename, message, status } = nextProgress
+
+        if (status === 'complete' && filename) {
+          setVideoFilename(filename)
+          setActiveRenderId(null)
+          setRenderingVideo(false)
+          backend.openVideo(filename).catch((error) => {
+            console.error('Error calling open-video:', error)
+          })
+          return
+        }
+
+        if (status === 'cancelled') {
+          setActiveRenderId(null)
+          setRenderingVideo(false)
+          return
+        }
+
+        if (status === 'error') {
+          setActiveRenderId(null)
+          setRenderingVideo(false)
+          if (message) {
+            setErrorMessage(message)
+          }
+        }
+      },
+    )
+
+    return unsubscribe
+  }, [renderingVideo, setErrorMessage, setActiveRenderId, setRenderingVideo, setVideoFilename])
 
   // Confirm handler — persists render settings, kicks off the render IPC call, and manages error/recovery flow
   const handleRenderVideoConfirm = useCallback(async () => {

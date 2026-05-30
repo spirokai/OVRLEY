@@ -28,6 +28,7 @@
 **Change the signature of `renderVideo()`:**
 
 Currently:
+
 ```js
 export default async function renderVideo(overrides = {}) {
   const {
@@ -53,6 +54,7 @@ export default async function renderVideo(overrides = {}) {
 ```
 
 Changed to:
+
 ```js
 export default async function renderVideo(overrides = {}) {
   const {
@@ -78,14 +80,16 @@ export default async function renderVideo(overrides = {}) {
 ```
 
 **Also fix the error handler** at line ~130 which calls `useStore.getState()`:
+
 ```js
 // Old:
-const { setActiveRenderId, setRenderingVideo, setRenderProgress } = useStore.getState()
+const { setActiveRenderId, setRenderingVideo, setRenderProgress } = useStore.getState();
 
 // New: pass these in via overrides
 ```
 
 **Update the caller** in `useRenderWorkflow.js`:
+
 ```js
 const result = await renderVideo({
   config: nextConfig,
@@ -106,12 +110,13 @@ const result = await renderVideo({
   setActiveRenderId,
   setRenderingVideo,
   setRenderProgress,
-})
+});
 ```
 
 **Note:** The caller still uses `useStore.getState()` but it's inside a React hook (`useRenderWorkflow`), which is acceptable. The key change is that the utility function no longer reaches into the store itself.
 
 ### Affected Files
+
 - `src/features/render-video/utils/render-video.js` — accept all state via params, remove `useStore` import
 - `src/features/render-video/hooks/useRenderWorkflow.js` — pass additional params
 
@@ -135,6 +140,7 @@ const result = await renderVideo({
 2. In `useActivityImport.js` — already passes `useStore.getState()`, no change needed.
 
 ### Affected Files
+
 - `src/lib/activity/import-activity.js` — remove Zustand import, make storeActions required
 - No changes to callers (they already pass storeActions)
 
@@ -145,6 +151,7 @@ const result = await renderVideo({
 ### Problem
 
 `useRenderVideoDialogState.js` and `useSceneSettingsState.js` both implement identical FPS mode logic:
+
 - `customFpsAnchor` state
 - `fpsMode` derivation
 - `handleFpsModeChange(callback)`
@@ -155,43 +162,52 @@ const result = await renderVideo({
 Create a new shared hook: `src/hooks/useFpsMode.js` (or `src/lib/useFpsMode.js`)
 
 ```js
-import { useState, useCallback } from 'react'
-import { getFpsModeValue, sanitizeIntegerFps, PRESET_FPS_VALUES } from '@/lib/update-rate'
+import { useState, useCallback } from "react";
+import { getFpsModeValue, sanitizeIntegerFps, PRESET_FPS_VALUES } from "@/lib/update-rate";
 
 export function useFpsMode({ fps, onFpsChange, onUpdateRateChange, updateRate }) {
-  const [customFpsAnchor, setCustomFpsAnchor] = useState(null)
-  const fpsMode = customFpsAnchor !== null && Number(fps) === customFpsAnchor ? 'custom' : getFpsModeValue(fps)
+  const [customFpsAnchor, setCustomFpsAnchor] = useState(null);
+  const fpsMode = customFpsAnchor !== null && Number(fps) === customFpsAnchor ? "custom" : getFpsModeValue(fps);
 
-  const handleFpsModeChange = useCallback((value) => {
-    if (value === 'custom') {
-      setCustomFpsAnchor(Number(fps))
-      return
-    }
-    setCustomFpsAnchor(null)
-    const nextFps = sanitizeIntegerFps(value)
-    onFpsChange(nextFps)
-  }, [fps, onFpsChange])
+  const handleFpsModeChange = useCallback(
+    (value) => {
+      if (value === "custom") {
+        setCustomFpsAnchor(Number(fps));
+        return;
+      }
+      setCustomFpsAnchor(null);
+      const nextFps = sanitizeIntegerFps(value);
+      onFpsChange(nextFps);
+    },
+    [fps, onFpsChange],
+  );
 
-  const handleCustomFpsChange = useCallback((rawValue) => {
-    const nextFps = sanitizeIntegerFps(rawValue)
-    setCustomFpsAnchor(PRESET_FPS_VALUES.includes(nextFps) ? null : nextFps)
-    onFpsChange(nextFps)
-  }, [onFpsChange])
+  const handleCustomFpsChange = useCallback(
+    (rawValue) => {
+      const nextFps = sanitizeIntegerFps(rawValue);
+      setCustomFpsAnchor(PRESET_FPS_VALUES.includes(nextFps) ? null : nextFps);
+      onFpsChange(nextFps);
+    },
+    [onFpsChange],
+  );
 
-  return { fpsMode, handleFpsModeChange, handleCustomFpsChange, customFpsAnchor, setCustomFpsAnchor }
+  return { fpsMode, handleFpsModeChange, handleCustomFpsChange, customFpsAnchor, setCustomFpsAnchor };
 }
 ```
 
 **Replace in `useSceneSettingsState.js`:**
+
 - Remove local `customFpsAnchor` state and `fpsMode` derivation
 - Remove local `handleFpsModeChange` and `handleCustomFpsChange`
 - Add: `const { fpsMode, handleFpsModeChange, handleCustomFpsChange } = useFpsMode({ fps: scene?.fps, onFpsChange: ..., updateRate })`
 
 **Replace in `useRenderVideoDialogState.js`:**
+
 - Same pattern — the hook's `handleFpsModeChange` already calls `onSettingsChange(...)`, so pass that as the `onFpsChange` callback
 - Note: `useRenderVideoDialogState` also calls `normalizeUpdateRateForFps` inside `handleFpsModeChange`. The shared hook should NOT own update-rate logic — the callers provide that.
 
 ### Affected Files
+
 - `src/hooks/useFpsMode.js` — **NEW**
 - `src/features/scene-settings/hooks/useSceneSettingsState.js` — use new hook, delete local impl
 - `src/features/render-video/hooks/useRenderVideoDialogState.js` — use new hook, delete local impl
@@ -211,16 +227,19 @@ Both check if focus is in input/textarea/select/contenteditable.
 ### Action
 
 1. Add to `src/lib/utils.js`:
+
 ```js
 export function isInteractiveElement(target) {
-  if (!(target instanceof HTMLElement)) return false
-  return Boolean(target.closest('input, textarea, select, button, a, [role="slider"], [contenteditable="true"]'))
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest('input, textarea, select, button, a, [role="slider"], [contenteditable="true"]'));
 }
 ```
+
 2. Update `overlayEditorHelpers.js` — replace `isEditableElement` with re-export/import of `isInteractiveElement`
 3. Update `usePlayerKeyboard.js` — replace `isPlaybackShortcutTarget` with `isInteractiveElement`
 
 ### Affected Files
+
 - `src/lib/utils.js` — add function
 - `src/features/overlay-editor/utils/overlayEditorHelpers.js` — delete local, import from lib
 - `src/features/player/hooks/usePlayerKeyboard.js` — delete local, import from lib
@@ -238,14 +257,15 @@ export function isInteractiveElement(target) {
 1. Replace `alert(...)` with `useStore.getState().setErrorMessage(...)`
 2. Move the demo GPX fallback logic (setting dummy duration, start/end second, gpxFilename) into a new store action `setDemoActivity` on the media slice:
    ```js
-   setDemoActivity: () => set((state) => {
-     const demoDuration = 7946
-     state.gpxFilename = 'demo.gpxinit'
-     state.dummyDurationSeconds = demoDuration
-     state.startSecond = 0
-     state.endSecond = demoDuration
-     state.selectedSecond = 0
-   })
+   setDemoActivity: () =>
+     set((state) => {
+       const demoDuration = 7946;
+       state.gpxFilename = "demo.gpxinit";
+       state.dummyDurationSeconds = demoDuration;
+       state.startSecond = 0;
+       state.endSecond = demoDuration;
+       state.selectedSecond = 0;
+     });
    ```
 3. In `useCommunityTemplate.js`, call `useStore.getState().setDemoActivity()` instead of the 5 individual setter calls.
 4. The config replacement (`useStore.getState().setConfig(data)`) and editor sync can stay since they need the actual config object — but wrap them in a helper that takes the data as a parameter.
@@ -253,6 +273,7 @@ export function isInteractiveElement(target) {
 **Note:** This hook still uses `useStore.getState().setConfig(data)` which is a store action — this is less bad since it's calling a registered action. But ideally we'd move this into a named store action too: `importTemplateConfig(config)`.
 
 ### Affected Files
+
 - `src/features/template-manager/hooks/useCommunityTemplate.js` — replace alert, use store actions
 - `src/store/slices/createMediaSlice.js` — add `setDemoActivity` action
 - `src/store/slices/createTemplateSlice.js` or editor slice — add `importTemplateConfig` action (optional, for cleaner separation)
@@ -277,6 +298,7 @@ export function isInteractiveElement(target) {
 Check `vite.config.js` for alias resolution. If `@` points to `src/` and assets are at `D:\github\cyclemetry-reloaded\app\assets\`, then `@/assets/` won't resolve. May need a separate alias or keep as-is.
 
 ### Affected Files
+
 - `src/lib/widget-icon-data.js` — update every SVG import
 
 ---
@@ -290,6 +312,7 @@ Check `vite.config.js` for alias resolution. If `@` points to `src/` and assets 
 ### B. `setGpxFilename` → `setActivityFilename` in `createMediaSlice.js`
 
 **Action:** Rename the action in the store slice. Update all references:
+
 - `src/store/slices/createMediaSlice.js`
 - Every call to `store.setGpxFilename(...)` or `state.gpxFilename`
 - The selector in `useAppStoreSelectors.js` (will already be split by now from Phase 2)
@@ -297,10 +320,12 @@ Check `vite.config.js` for alias resolution. If `@` points to `src/` and assets 
 ### C. `buildScopedRouteSamples` → `buildExportWindowRouteSamples` in `export-range.js`
 
 **Action:** Rename. Update callers:
+
 - `src/features/widget-preview/components/RouteRenderer.jsx`
 - `src/features/overlay-editor/index.js` (barrel re-export)
 
 ### Affected Files
+
 - `src/features/player/hooks/usePlaybackEngine.js` — rename function
 - `src/features/player/hooks/usePlayerKeyboard.js` — rename call
 - `src/store/slices/createMediaSlice.js` — rename action + property
@@ -321,5 +346,5 @@ Check `vite.config.js` for alias resolution. If `@` points to `src/` and assets 
 6. Apply step 5 (useCommunityTemplate alert removal) → test
 7. Apply step 6 (SVG imports) — conditional on alias investigation
 8. Apply step 7 (renames) — run `npm run lint` to verify no dead references
-9. Final: `npm run test && npm run lint && npm run build`
+9. Final: `npm run test && npm run lint`
 10. Manual verification: import GPX, add widgets, render preview frame, render video

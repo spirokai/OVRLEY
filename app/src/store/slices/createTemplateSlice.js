@@ -10,7 +10,7 @@
 import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
 import { DEFAULT_EXPORT_RANGE } from '../../features/template-manager/data/templateConstants'
 import { createDurableTemplateState, DEFAULT_GLOBAL_DEFAULTS, normalizeGlobalDefaults, syncGlobalDefaultsToConfig } from '../../lib/template-state'
-import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, updateConfigPersistence } from '../store-utils'
+import { cloneSerializable, DEFAULT_CONFIG, syncSceneTimingFromConfig, updateConfigPersistence } from '../store-utils'
 
 const initialUpdateRate = 1
 const initialExportRange = { ...DEFAULT_EXPORT_RANGE }
@@ -36,15 +36,6 @@ export function createTemplateSlice(set, get) {
     }
 
     return codec || 'prores_ks'
-  }
-
-  const updateUnrenderedChanges = (state, nextConfig) => {
-    if (state.lastRenderedConfig) {
-      state.hasUnrenderedChanges = hasSerializableChanged(nextConfig, state.lastRenderedConfig)
-      return
-    }
-
-    state.hasUnrenderedChanges = true
   }
 
   return {
@@ -141,7 +132,7 @@ export function createTemplateSlice(set, get) {
         state.loadedTemplateSource = null
         state.lastSavedTemplateState = null
         syncSceneTimingFromConfig(state, nextConfig, { resetSelectedSecond: true })
-        updateUnrenderedChanges(state, nextConfig)
+        updateConfigPersistence(state)
       })
     },
 
@@ -191,7 +182,7 @@ export function createTemplateSlice(set, get) {
         state.loadedTemplateSource = source
 
         syncSceneTimingFromConfig(state, nextConfig, { resetSelectedSecond: true })
-        updateUnrenderedChanges(state, nextConfig)
+        updateConfigPersistence(state)
       })
     },
   }

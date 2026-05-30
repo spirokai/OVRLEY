@@ -11,33 +11,85 @@
  * @returns {object} State and handlers for RenderVideoDialog.
  */
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { cancelRender } from '@/api/backend'
 import { getFpsModeValue, normalizeUpdateRateForFps, PRESET_FPS_VALUES, sanitizeIntegerFps } from '@/lib/update-rate'
-import { OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
+import { EXPORT_CODEC_LOOKUP, OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
 import {
   getExportCodecForSelection,
   getFirstAvailableAcceleration,
+  getFirstAvailableMp4ExportCodec,
   getVisibleAccelerationOptions,
   isOutputFormatAvailable,
 } from '../utils/codecUtils'
 import useRenderVideoDerivedState from './useRenderVideoDerivedState'
-import useRenderVideoEffects from './useRenderVideoEffects'
 
 export default function useRenderVideoDialogState({ phase, settings, onSettingsChange, onClose, onConfirm }) {
   const derived = useRenderVideoDerivedState({ settings })
 
-  // The dialog only owns whether the user deliberately opened the custom FPS
-  // path for the current committed FPS. The FPS value itself remains derived
-  // from the committed draft settings.
   const [customFpsAnchor, setCustomFpsAnchor] = useState(null)
   const fpsMode = customFpsAnchor !== null && Number(settings?.fps) === customFpsAnchor ? 'custom' : getFpsModeValue(settings?.fps)
 
-  useRenderVideoEffects({
-    settings,
-    derivedState: derived,
+  // Auto-select MP4 codec when video is imported or codec availability changes
+  useEffect(() => {
+    if (!settings) {
+      return
+    }
+
+    if (!derived.hasImportedVideo && derived.selectedCodecIsMp4) {
+      onSettingsChange({
+        exportCodec: 'prores_ks',
+        exportAcceleration: 'cpu',
+        exportBitrate: undefined,
+      })
+      return
+    }
+
+    if (!derived.hasImportedVideo) {
+      return
+    }
+
+    const firstAvailableMp4Codec = getFirstAvailableMp4ExportCodec(derived.platformOs, derived.availableCodecs)
+
+    if (!derived.selectedCodecIsMp4 || !derived.selectedExportCodecAvailable) {
+      if (firstAvailableMp4Codec) {
+        onSettingsChange({
+          exportCodec: firstAvailableMp4Codec,
+          exportAcceleration: EXPORT_CODEC_LOOKUP[firstAvailableMp4Codec]?.acceleration || 'cpu',
+          exportBitrate: derived.defaultBitrateForCodec(firstAvailableMp4Codec),
+        })
+      }
+      return
+    }
+
+    if (!Number.isFinite(settings.exportBitrate)) {
+      onSettingsChange({
+        exportBitrate: derived.defaultBitrateForCodec(settings.exportCodec),
+      })
+    }
+  }, [
+    derived.hasImportedVideo,
+    derived.defaultBitrateForCodec,
+    derived,
     onSettingsChange,
-  })
+    derived.platformOs,
+    derived.selectedCodecIsMp4,
+    derived.selectedExportCodecAvailable,
+    settings,
+    derived.availableCodecs,
+  ])
+
+  // Normalize update rate when FPS changes
+  useEffect(() => {
+    if (!settings) {
+      return
+    }
+
+    const normalizedUpdateRate = normalizeUpdateRateForFps(derived.updateRateFps, settings.updateRate)
+    if (normalizedUpdateRate !== settings.updateRate) {
+      onSettingsChange({ updateRate: normalizedUpdateRate })
+    }
+  }, [settings, derived.updateRateFps, onSettingsChange])
 
   const handleCancel = useCallback(async () => {
     await cancelRender()

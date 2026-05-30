@@ -3,7 +3,7 @@
  * Manages the window.__BACKEND_DEBUG__ object for tracking backend connection state and logs.
  */
 
-import { hasTauriRuntime } from '@/lib/tauri-runtime'
+import { hasTauriRuntime } from '@/api/backend'
 
 /**
  * Ensures the backend debug state object exists on window.

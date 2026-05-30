@@ -6,7 +6,7 @@
 import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
 import { ColorField, NumberField, SelectField, SliderField, TextField, TIME_FORMATS, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
-import useAvailableFonts from '@/hooks/useAvailableFonts'
+import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { createFontSelection } from '@/lib/fonts'
 import { getWidgetFont } from '../utils/widgetUtils'
 import { getThemeColor } from '@/lib/theme'

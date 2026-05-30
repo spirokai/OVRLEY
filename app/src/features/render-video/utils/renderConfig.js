@@ -7,7 +7,7 @@
  * composite metadata.
  */
 
-import { timeToSeconds } from '@/lib/export-range'
+import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
 import { createEditorEffectiveConfig } from '@/lib/template-state'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { formatCompositeBitrate, isCompositeCodec, isQsvFullCodec, resolveCompositeFps } from './render-execution'

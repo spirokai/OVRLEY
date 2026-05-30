@@ -16,7 +16,7 @@ export {
   getActivityDurationSeconds,
   getExportWindowDistanceSpan,
   normalizeDistanceProgressToWindow,
-} from '@/lib/export-range'
+} from './utils/exportRange'
 
 export {
   getInterpolatedActivityValue,
@@ -30,4 +30,4 @@ export * from './data/overlayEditorConstants'
 
 export { FONT_FAMILY_MAP, WIDGET_ICONS, DEFAULT_ACTIVITY_PREVIEW } from './data/overlayEditorConfig'
 
-export { METRIC_ICON_SVGS } from './data/metricWidgetAssets'
+export { METRIC_ICON_SVGS } from '@/lib/widget-icon-data'

@@ -32,7 +32,7 @@ function resolvePreviewSecond({ dummyDurationSeconds, selectedSecond, sourceActi
   return clamp(rawSecond, 0, maxSecond)
 }
 
-function formatRangeTime(seconds) {
+function formatExportRangeTime(seconds) {
   const safeSeconds = Math.max(0, Math.trunc(Number(seconds) || 0))
   const hours = Math.floor(safeSeconds / 3600)
   const minutes = Math.floor((safeSeconds % 3600) / 60)
@@ -96,7 +96,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     if (!Number.isFinite(duration) || duration <= 0) return null
     const start = Math.max(0, Number(videoSyncOffsetSeconds) || 0)
     const end = start + duration
-    return { type: 'custom', fromTime: formatRangeTime(start), toTime: formatRangeTime(end) }
+    return { type: 'custom', fromTime: formatExportRangeTime(start), toTime: formatExportRangeTime(end) }
   }, [exportRange, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds])
 
   useEffect(() => {

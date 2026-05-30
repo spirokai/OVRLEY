@@ -262,7 +262,7 @@ async function ensureFileObject(fileOrPath) {
  * @param {object} [storeActions] - Injected store actions. Falls back to useStore.getState() if absent.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
-export default async function saveFile(fileOrPath, storeActions) {
+export default async function importActivityFile(fileOrPath, storeActions) {
   const file = await ensureFileObject(fileOrPath)
   const filename = file.name
   const store = storeActions || useStore.getState()

@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react'
 import { Activity, Film, Loader2, Timer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { formatFps, formatTime } from '../utils/format'
+import { formatFps, formatTime } from '../utils/codecUtils'
 
 function RenderProgressPanel({ renderProgress, onCancel }) {
   const [isCancelling, setIsCancelling] = useState(false)

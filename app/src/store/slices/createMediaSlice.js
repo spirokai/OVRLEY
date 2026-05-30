@@ -69,7 +69,7 @@ export function createMediaSlice(set, get) {
         state.videoFilename = filename
       }),
 
-    setGpxFilename: async (filename) => {
+    setGpxFilename: (filename) => {
       set((state) => {
         state.gpxFilename = filename
       })

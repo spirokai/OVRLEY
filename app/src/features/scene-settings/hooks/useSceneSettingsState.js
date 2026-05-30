@@ -18,10 +18,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { createEditorEffectiveConfig } from '@/lib/template-state'
 import useStore from '@/store/useStore'
-import useAvailableFonts from '@/hooks/useAvailableFonts'
+import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { getFpsModeValue, getUpdateRateOptions, normalizeUpdateRateForFps, PRESET_FPS_VALUES, sanitizeIntegerFps } from '@/lib/update-rate'
 import { RESOLUTIONS } from '../data/sceneSettingsConstants'
-import { parseTimeOffset, sanitizeNumber } from '../utils/sceneSettingsUtils'
+import { timeToSeconds, sanitizeNumber } from '../utils/sceneSettingsUtils'
 
 function getResolutionPresetId(scene) {
   if (!scene) return '1080p'
@@ -161,7 +161,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   const handleUpdateRateChange = (v) => setUpdateRate(parseInt(v))
 
   const handleOffsetBlur = (val) => {
-    const parsed = parseTimeOffset(val)
+    const parsed = timeToSeconds(val)
     const rounded = Math.round(parsed * 10) / 10
     setVideoSyncOffset(rounded)
     setVideoSyncWarning(null)
@@ -169,7 +169,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   }
 
   const handleIncrement = (amount) => {
-    const current = parseTimeOffset(offsetInput)
+    const current = timeToSeconds(offsetInput)
     const newOffset = Math.round((current + amount) * 10) / 10
     setVideoSyncOffset(newOffset)
     setOffsetInput(Number.isInteger(newOffset) ? newOffset.toString() : newOffset.toFixed(1))

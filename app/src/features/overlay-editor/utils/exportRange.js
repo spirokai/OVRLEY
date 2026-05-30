@@ -17,16 +17,25 @@ export function timeToSeconds(timeStr) {
     return 0
   }
 
-  const parts = String(timeStr)
-    .split(':')
-    .map((part) => Math.trunc(Number(part) || 0))
-  if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  const str = String(timeStr).trim()
+  if (str === '') return 0
+
+  const isNegative = str.startsWith('-')
+  const absStr = isNegative ? str.substring(1) : str
+
+  if (absStr.includes(':')) {
+    const parts = absStr.split(':')
+    let seconds = 0
+    if (parts.length === 3) {
+      seconds = parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2])
+    } else if (parts.length === 2) {
+      seconds = parseInt(parts[0], 10) * 60 + parseFloat(parts[1])
+    }
+    return isNegative ? -seconds : seconds
   }
-  if (parts.length === 2) {
-    return parts[0] * 60 + parts[1]
-  }
-  return parts[0] || 0
+
+  const parsed = parseFloat(str)
+  return isNaN(parsed) ? 0 : parsed
 }
 
 /**

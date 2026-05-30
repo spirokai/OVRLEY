@@ -2,12 +2,8 @@
  * Pure helper functions for scene settings — sanitization and time parsing.
  */
 
-/**
- * Sanitizes a numeric value by stripping commas and leading zeros.
- *
- * @param {*} val - Raw input value.
- * @returns {number} Sanitized integer, or the original value if null/undefined.
- */
+export { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
+
 export function sanitizeNumber(val) {
   if (val === undefined || val === null) return val
   const sanitized = val

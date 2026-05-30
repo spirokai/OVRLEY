@@ -26,11 +26,7 @@ import {
   useEditorShellState,
 } from '@/features/app-shell'
 import { useVideoImport } from '@/features/video-preview'
-import './index.css'
 import * as backend from './api/backend'
-import { DEBUG_MODE_ENABLED } from '@/lib/dev-config'
-
-export { DEBUG_MODE_ENABLED }
 
 /**
  * Orchestrates all shell-level hooks and returns domain-grouped objects.

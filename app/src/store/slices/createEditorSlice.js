@@ -8,33 +8,7 @@
 import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, syncSceneTimingToConfig } from '../store-utils'
 import { ensureWidgetIdsInConfig } from '../../lib/widget-config'
 import { buildConfigWidgets } from '../../lib/widget-presentation'
-
-/**
- * Filters and orders selection IDs to match the current widget order.
- *
- * @param {string[]} widgetIds - Requested selected widget IDs.
- * @param {string[]} orderedWidgetIds - Canonical widget order for the config.
- * @returns {string[]} Normalized selection IDs.
- */
-function normalizeSelectionIds(widgetIds, orderedWidgetIds) {
-  const idSet = new Set((widgetIds || []).filter(Boolean))
-  return orderedWidgetIds.filter((widgetId) => idSet.has(widgetId))
-}
-
-/**
- * Picks the primary widget from the normalized selection list.
- *
- * @param {string[]} widgetIds - Normalized selected widget IDs.
- * @param {string|null} [preferredId=null] - Preferred primary widget ID.
- * @returns {string|null} Primary widget ID.
- */
-function getPrimarySelectionId(widgetIds, preferredId = null) {
-  if (preferredId && widgetIds.includes(preferredId)) {
-    return preferredId
-  }
-
-  return widgetIds[widgetIds.length - 1] ?? null
-}
+import { getPrimarySelectionId, normalizeSelectionIds } from '../../features/overlay-editor/utils/overlayEditorHelpers'
 
 /**
  * Builds widget wrappers for selection normalization.

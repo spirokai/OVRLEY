@@ -4,9 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getContainerFps } from '@/lib/update-rate'
-import { clamp, createPlaybackAnchor, getTotalPlaybackDuration, resolvePlaybackSource } from '../utils/playerTimeline'
-import { usePlaybackSourceHandoff } from './usePlaybackSourceHandoff'
-import { useTimelinePlaybackLoop } from './useTimelinePlaybackLoop'
+import { clamp, createPlaybackAnchor, getTimelinePlaybackSecond, getTotalPlaybackDuration, resolvePlaybackSource } from '../utils/playerTimeline'
 
 /**
  * Orchestrates playback state, timeline scrubbing, and timeline-driven RAF playback.
@@ -120,20 +118,91 @@ export default function usePlaybackEngine({
     }
   }, [clampedPlayhead, hasActivity, selectedSecond, setSelectedSecond])
 
-  usePlaybackSourceHandoff({
+  // Handles playback ownership between timeline and imported video clocks.
+  useEffect(() => {
+    if (previewPlaybackSource !== 'video' || shouldUseVideoPlayback) {
+      return
+    }
+
+    resetPlaybackOrchestration()
+    setPlaybackAnchor('video', clampedPlayhead)
+    pausePreviewPlayback(clampedPlayhead)
+  }, [clampedPlayhead, pausePreviewPlayback, previewPlaybackSource, resetPlaybackOrchestration, setPlaybackAnchor, shouldUseVideoPlayback])
+
+  useEffect(() => {
+    if (!isPlaying || !shouldUseVideoPlayback) {
+      return
+    }
+
+    const nextSource = resolvePlaybackSource({
+      shouldUseVideoPlayback,
+      playheadSecond: clampedPlayhead,
+      videoSyncOffsetSeconds,
+      importedVideoDuration,
+    })
+
+    if (nextSource === previewPlaybackSource) {
+      return
+    }
+
+    resetPlaybackOrchestration()
+    setPlaybackAnchor(nextSource, clampedPlayhead)
+    startPreviewPlayback({
+      source: nextSource,
+      second: clampedPlayhead,
+    })
+  }, [
     clampedPlayhead,
     importedVideoDuration,
     isPlaying,
-    pausePreviewPlayback,
     previewPlaybackSource,
     resetPlaybackOrchestration,
     setPlaybackAnchor,
     shouldUseVideoPlayback,
     startPreviewPlayback,
     videoSyncOffsetSeconds,
-  })
+  ])
 
-  useTimelinePlaybackLoop({
+  // Runs the timeline-backed preview playback loop via requestAnimationFrame.
+  useEffect(() => {
+    if (!isTimelinePlaybackActive || !hasActivity) {
+      return undefined
+    }
+
+    let animationFrameId = 0
+
+    const tick = (now) => {
+      const nextSecond = getTimelinePlaybackSecond({
+        anchor: playbackAnchorRef.current,
+        nowMs: now,
+      })
+      const safeDuration = totalDurationRef.current
+
+      if (nextSecond >= safeDuration) {
+        pausePreviewPlayback(safeDuration)
+        playbackAnchorRef.current = createPlaybackAnchor({
+          source: 'video',
+          second: safeDuration,
+          nowMs: now,
+        })
+        previewFrameRef.current = -1
+        return
+      }
+
+      const frameIndex = Math.floor(nextSecond * effectivePreviewFps)
+
+      if (frameIndex !== previewFrameRef.current) {
+        previewFrameRef.current = frameIndex
+        setSelectedSecond(clamp(frameIndex / effectivePreviewFps, 0, safeDuration))
+      }
+
+      animationFrameId = window.requestAnimationFrame(tick)
+    }
+
+    animationFrameId = window.requestAnimationFrame(tick)
+
+    return () => window.cancelAnimationFrame(animationFrameId)
+  }, [
     effectivePreviewFps,
     hasActivity,
     isTimelinePlaybackActive,
@@ -142,7 +211,7 @@ export default function usePlaybackEngine({
     previewFrameRef,
     setSelectedSecond,
     totalDurationRef,
-  })
+  ])
 
   // Playback control handlers - button and keyboard commands share these paths to keep behavior identical.
   const handlePlay = useCallback(() => {

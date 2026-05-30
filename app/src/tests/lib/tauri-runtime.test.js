@@ -12,14 +12,14 @@ describe('hasTauriRuntime', () => {
   })
 
   test('returns false when window.__TAURI_INTERNALS__ is undefined', async () => {
-    const mod = await import('@/lib/tauri-runtime')
+    const mod = await import('@/api/backend')
     hasTauriRuntime = mod.hasTauriRuntime
     expect(hasTauriRuntime()).toBe(false)
   })
 
   test('returns true when window.__TAURI_INTERNALS__ is an object (typeof null === object)', async () => {
     window.__TAURI_INTERNALS__ = {}
-    const mod = await import('@/lib/tauri-runtime')
+    const mod = await import('@/api/backend')
     hasTauriRuntime = mod.hasTauriRuntime
     expect(hasTauriRuntime()).toBe(true)
   })
