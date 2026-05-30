@@ -584,12 +584,12 @@ pub struct HeadingWidgetConfig {
     /// Show major labels (N/NE/E/SE/S/SW/W/NW).
     #[serde(default = "default_true", alias = "show_cardinal_labels")]
     pub show_major_labels: bool,
-    /// Minor label color as hex.
-    #[serde(default, alias = "numeric_label_color")]
-    pub minor_label_color: Option<String>,
-    /// Major label color as hex.
-    #[serde(default, alias = "cardinal_label_color")]
-    pub major_label_color: Option<String>,
+    /// Label color for non-cardinal numeric labels as hex.
+    #[serde(default, alias = "numeric_label_color", alias = "minor_label_color")]
+    pub label_color: Option<String>,
+    /// Cardinal label color (N/NE/E/SE/S/SW/W/NW) as hex.
+    #[serde(default, alias = "major_label_color")]
+    pub cardinal_label_color: Option<String>,
     /// Label font filename or family.
     #[serde(default)]
     pub label_font: Option<String>,

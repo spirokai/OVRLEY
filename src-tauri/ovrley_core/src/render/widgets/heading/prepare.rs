@@ -48,11 +48,11 @@ pub fn prepare_heading_cache(
     // Resolve colors
     let tick_color = plot.tick_color.as_deref().unwrap_or("#ffffff");
     let cardinal_tick_color = plot.cardinal_tick_color.as_deref().unwrap_or(tick_color);
-    let minor_label_color = plot.minor_label_color.as_deref().unwrap_or("#ffffff");
-    let major_label_color = plot
-        .major_label_color
+    let label_color = plot.label_color.as_deref().unwrap_or("#ffffff");
+    let cardinal_label_color = plot
+        .cardinal_label_color
         .as_deref()
-        .unwrap_or(minor_label_color);
+        .unwrap_or(label_color);
 
     // Compute tick lengths in pixels
     let major_tick_length = tape_height as f32 * plot.major_tick_length_pct / 100.0;
@@ -135,9 +135,9 @@ pub fn prepare_heading_cache(
 
         for label in &labels {
             let color_str = if label.is_major_label {
-                major_label_color
+                cardinal_label_color
             } else {
-                minor_label_color
+                label_color
             };
             label_paint.set_color(parse_color(color_str, 1.0));
 
@@ -198,9 +198,9 @@ pub fn prepare_heading_cache(
 
                 for label in &labels {
                     let color_str = if label.is_major_label {
-                        major_label_color
+                        cardinal_label_color
                     } else {
-                        minor_label_color
+                        label_color
                     };
                     shadow_label_paint.set_color(parse_color(color_str, 1.0));
                     canvas.draw_str(

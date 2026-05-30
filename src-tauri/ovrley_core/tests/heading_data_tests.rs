@@ -300,7 +300,7 @@ fn heading_widget_config_deserializes_from_json() {
         "shadow_color": "#000000",
         "show_numeric_labels": true,
         "show_cardinal_labels": true,
-        "numeric_label_color": "#CCCCCC",
+        "label_color": "#CCCCCC",
         "cardinal_label_color": "#FF0000",
         "label_font": "Teko.ttf",
         "label_font_family": "Teko",
@@ -354,8 +354,8 @@ fn heading_widget_config_defaults_via_serde_default() {
     assert!(config.show_minor_ticks);
     assert!((config.major_tick_thickness - 2.0).abs() < f32::EPSILON);
     assert!((config.minor_tick_thickness - 2.0).abs() < f32::EPSILON);
-    assert!(config.show_numeric_labels);
-    assert!(config.show_cardinal_labels);
+    assert!(config.show_minor_labels);
+    assert!(config.show_major_labels);
     assert!(config.show_indicator);
     assert_eq!(config.indicator_style, "chevron");
     assert_eq!(config.indicator_placement, "top");

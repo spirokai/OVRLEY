@@ -14,6 +14,7 @@
 //! - Per-frame drawing producing a valid render report
 
 use ovrley_core::config::HeadingWidgetConfig;
+use ovrley_core::config::RenderConfig;
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::render::surface::create_surface;
 use ovrley_core::render::widgets::heading::draw::draw_heading_widget;
@@ -77,9 +78,9 @@ fn default_plot() -> HeadingWidgetConfig {
         shadow_distance: None,
         shadow_strength: None,
         shadow_color: None,
-        show_numeric_labels: true,
-        show_cardinal_labels: true,
-        numeric_label_color: Some("#CCCCCC".to_string()),
+        show_minor_labels: true,
+        show_major_labels: true,
+        label_color: Some("#CCCCCC".to_string()),
         cardinal_label_color: Some("#FF0000".to_string()),
         label_font: Some("Arial.ttf".to_string()),
         label_font_family: Some("Arial".to_string()),
@@ -90,6 +91,22 @@ fn default_plot() -> HeadingWidgetConfig {
         show_indicator: true,
         indicator_color: Some("#FF0000".to_string()),
         indicator_size: Some(10.0),
+        extra: BTreeMap::new(),
+    }
+}
+
+fn default_render_config() -> RenderConfig {
+    let scene: ovrley_core::config::SceneConfig = serde_json::from_value(serde_json::json!({
+        "fps": 30.0,
+        "start": 0.0,
+        "end": 10.0
+    }))
+    .unwrap();
+    RenderConfig {
+        scene,
+        labels: vec![],
+        values: vec![],
+        plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
     }
 }
@@ -223,9 +240,9 @@ fn visible_labels_cardinal_overrides_numeric() {
     let labels = visible_labels(&ticks, true, true);
     assert_eq!(labels.len(), 3);
     assert_eq!(labels[0].text, "N");
-    assert!(labels[0].is_cardinal);
+    assert!(labels[0].is_major_label);
     assert_eq!(labels[1].text, "15");
-    assert!(!labels[1].is_cardinal);
+    assert!(!labels[1].is_major_label);
     assert_eq!(labels[2].text, "30");
 }
 
@@ -281,7 +298,7 @@ fn prepare_heading_cache_produces_non_empty_tape() {
     let plot = default_plot();
     let mut profiler = RenderProfiler::default();
 
-    let cache = prepare_heading_cache(&plot, &mut profiler).unwrap();
+    let cache = prepare_heading_cache(&default_render_config(), &plot, &[], &mut profiler).unwrap();
 
     assert!((cache.tape_width - 1800.0).abs() < 1.0);
     assert_eq!(cache.width, 400);
@@ -294,13 +311,13 @@ fn prepare_heading_cache_produces_non_empty_tape() {
 #[test]
 fn prepare_heading_cache_with_no_labels() {
     let mut plot = default_plot();
-    plot.show_numeric_labels = false;
-    plot.show_cardinal_labels = false;
+    plot.show_minor_labels = false;
+    plot.show_major_labels = false;
     plot.show_major_ticks = false;
     plot.show_minor_ticks = false;
     let mut profiler = RenderProfiler::default();
 
-    let cache = prepare_heading_cache(&plot, &mut profiler).unwrap();
+    let cache = prepare_heading_cache(&default_render_config(), &plot, &[], &mut profiler).unwrap();
 
     assert_eq!(cache.width, 400);
     assert_eq!(cache.height, 80);
@@ -316,7 +333,7 @@ fn prepare_heading_cache_stores_indicator_config() {
     plot.indicator_size = Some(20.0);
     let mut profiler = RenderProfiler::default();
 
-    let cache = prepare_heading_cache(&plot, &mut profiler).unwrap();
+    let cache = prepare_heading_cache(&default_render_config(), &plot, &[], &mut profiler).unwrap();
 
     assert!(cache.show_indicator);
     assert_eq!(cache.indicator_style, "highlight_bar");
@@ -332,7 +349,7 @@ fn prepare_heading_cache_indicator_defaults() {
     plot.indicator_size = None;
     let mut profiler = RenderProfiler::default();
 
-    let cache = prepare_heading_cache(&plot, &mut profiler).unwrap();
+    let cache = prepare_heading_cache(&default_render_config(), &plot, &[], &mut profiler).unwrap();
 
     assert_eq!(cache.indicator_color, "#ffffff");
     assert!((cache.indicator_size - 10.0).abs() < f32::EPSILON);

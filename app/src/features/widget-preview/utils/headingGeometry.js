@@ -100,12 +100,14 @@ export function visibleTicks(
       const wrappedX = (((tapeX - offset) % tapeWidth) + tapeWidth) % tapeWidth
 
       if (wrappedX < width) {
-        return [{
-          degree,
-          x: wrappedX,
-          isCardinal,
-          isMajor,
-        }]
+        return [
+          {
+            degree,
+            x: wrappedX,
+            isCardinal,
+            isMajor,
+          },
+        ]
       }
       return []
     })
@@ -123,17 +125,22 @@ export function visibleTicks(
  * @returns {Array<{degree: number, x: number, text: string, isCardinal: boolean}>}
  */
 export function visibleLabels(ticks, showMinorLabels, showMajorLabels) {
-  if (!showMinorLabels && !showMajorLabels) return []
-
   const labels = []
 
   for (const tick of ticks) {
-    if (tick.isCardinal && showMajorLabels) {
+    if (tick.isCardinal) {
       const text = cardinalLabelForDegree(tick.degree)
       if (text) {
         labels.push({ degree: tick.degree, x: tick.x, text, isMajorLabel: true })
       }
-    } else if (showMinorLabels) {
+    } else if (tick.isMajor && showMajorLabels) {
+      labels.push({
+        degree: tick.degree,
+        x: tick.x,
+        text: String(Math.round(tick.degree)),
+        isMajorLabel: false,
+      })
+    } else if (!tick.isMajor && showMinorLabels) {
       labels.push({
         degree: tick.degree,
         x: tick.x,

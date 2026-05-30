@@ -149,28 +149,22 @@ export default function HeadingWidgetEditor({ widget, updateWidgetData }) {
         />
         <div className="flex items-center justify-between gap-2 px-1">
           <span className="text-[9px] text-muted-foreground uppercase font-bold">Minor Labels</span>
-          <ToggleField
-            checked={showMinorLabels}
-            onCheckedChange={(checked) => updateWidgetData(widget.id, { show_minor_labels: checked })}
-          />
+          <ToggleField checked={showMinorLabels} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_minor_labels: checked })} />
         </div>
         <div className="flex items-center justify-between gap-2 px-1">
           <span className="text-[9px] text-muted-foreground uppercase font-bold">Major Labels</span>
-          <ToggleField
-            checked={showMajorLabels}
-            onCheckedChange={(checked) => updateWidgetData(widget.id, { show_major_labels: checked })}
-          />
+          <ToggleField checked={showMajorLabels} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_major_labels: checked })} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <ColorField
-            label="Minor Color"
-            value={data.minor_label_color || data.numeric_label_color || '#cccccc'}
-            onChange={(value) => updateWidgetData(widget.id, { minor_label_color: value })}
+            label="Label Color"
+            value={data.label_color || data.numeric_label_color || data.minor_label_color || '#cccccc'}
+            onChange={(value) => updateWidgetData(widget.id, { label_color: value })}
           />
           <ColorField
-            label="Major Color"
-            value={data.major_label_color || data.cardinal_label_color || '#ff0000'}
-            onChange={(value) => updateWidgetData(widget.id, { major_label_color: value })}
+            label="Cardinal Color"
+            value={data.cardinal_label_color || data.major_label_color || '#ff0000'}
+            onChange={(value) => updateWidgetData(widget.id, { cardinal_label_color: value })}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">

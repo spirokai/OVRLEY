@@ -152,15 +152,10 @@ pub fn visible_labels(
     show_minor_labels: bool,
     show_major_labels: bool,
 ) -> Vec<TapeLabel> {
-    if !show_minor_labels && !show_major_labels {
-        return Vec::new();
-    }
-
     let mut labels = Vec::new();
 
     for tick in ticks {
-        if tick.is_cardinal && show_major_labels {
-            // Cardinal label takes priority
+        if tick.is_cardinal {
             if let Some(text) = cardinal_label_for_degree(tick.degree) {
                 labels.push(TapeLabel {
                     degree: tick.degree,
@@ -169,8 +164,14 @@ pub fn visible_labels(
                     is_major_label: true,
                 });
             }
-        } else if show_minor_labels {
-            // Numeric label at non-cardinal positions (or when cardinals are off)
+        } else if tick.is_major && show_major_labels {
+            labels.push(TapeLabel {
+                degree: tick.degree,
+                x: tick.x,
+                text: format!("{}", tick.degree as u32),
+                is_major_label: false,
+            });
+        } else if !tick.is_major && show_minor_labels {
             labels.push(TapeLabel {
                 degree: tick.degree,
                 x: tick.x,

@@ -52,8 +52,8 @@ function renderLabels(labels, height, config, fontFamily) {
   const tickBottom = config.tick_alignment === 'centered' ? centerY + majorLength / 2 : centerY + majorLength
   const labelY = tickBottom + (config.label_offset ?? 4) + (config.label_font_size ?? 12)
   const fontSize = config.label_font_size ?? 12
-  const minorColor = config.minor_label_color || config.numeric_label_color || '#ffffff'
-  const majorColor = config.major_label_color || config.cardinal_label_color || minorColor
+  const labelColor = config.label_color || config.numeric_label_color || config.minor_label_color || '#ffffff'
+  const cardinalColor = config.cardinal_label_color || config.major_label_color || labelColor
 
   return labels.map((label, i) => (
     <text
@@ -61,7 +61,7 @@ function renderLabels(labels, height, config, fontFamily) {
       x={label.x}
       y={labelY}
       textAnchor="middle"
-      fill={(label.isMajorLabel ?? label.isCardinal) ? majorColor : minorColor}
+      fill={label.isMajorLabel ? cardinalColor : labelColor}
       fontSize={fontSize}
       fontFamily={fontFamily}
     >
