@@ -301,6 +301,10 @@ export function getMetricWidgetVisualBounds(layout, { iconOffsetX = 0, iconOffse
       bounds = expandMetricBounds(bounds, segmentBounds.left, segmentBounds.top, segmentBounds.right, segmentBounds.bottom)
     })
 
+  if (!layout.icon) {
+    bounds.minX = Math.max(bounds.minX, 0)
+  }
+
   if (!Number.isFinite(bounds.minX)) {
     bounds = expandMetricBounds(bounds, 0, 0, layout.width, layout.height)
   }
