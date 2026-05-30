@@ -6,7 +6,8 @@
  */
 
 import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, syncSceneTimingToConfig } from '../store-utils'
-import { buildConfigWidgets, ensureWidgetIdsInConfig } from '../../lib/widget-config'
+import { ensureWidgetIdsInConfig } from '../../lib/widget-config'
+import { buildConfigWidgets } from '../../lib/widget-presentation'
 
 /**
  * Filters and orders selection IDs to match the current widget order.

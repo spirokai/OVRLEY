@@ -1,23 +1,20 @@
 /**
- * Gap detection, distance/elapsed/progress series building for activity parsing.
+ * @file gap-utils – Gap detection, idle sample insertion, and distance /
+ * elapsed / progress series building for activity parsing.
+ *
+ * All internal functions now import shared numeric and geospatial helpers
+ * directly from parse-helpers.js instead of receiving them through a
+ * threaded helpers-bag parameter.
+ *
+ * @module gap-utils
  */
 
-/**
- * Handles clone raw sample.
- *
- * @param {*} sample - Value for sample.
- * @returns {object} Result produced by the helper.
- */
+import { haversineDistanceMeters, isFiniteNumber, roundValue, safeNumber, safeTimestamp } from './parse-helpers'
+
 function cloneRawSample(sample) {
   return { ...sample }
 }
 
-/**
- * Handles timestamp ms.
- *
- * @param {*} value - Input value processed by the helper.
- * @returns {number} Result produced by the helper.
- */
 function timestampMs(value) {
   if (!value) return null
   const date = value instanceof Date ? value : new Date(value)
@@ -25,28 +22,14 @@ function timestampMs(value) {
   return Number.isFinite(time) ? time : null
 }
 
-/**
- * Handles median.
- *
- * @param {*} values - Input values processed by the helper.
- * @returns {*} Result produced by the helper.
- */
 function median(values) {
   if (!values.length) return null
   const sorted = [...values].sort((left, right) => left - right)
   const middle = Math.floor(sorted.length / 2)
-  if (sorted.length % 2 === 0) {
-    return (sorted[middle - 1] + sorted[middle]) / 2
-  }
+  if (sorted.length % 2 === 0) return (sorted[middle - 1] + sorted[middle]) / 2
   return sorted[middle]
 }
 
-/**
- * Handles lower half median.
- *
- * @param {*} values - Input values processed by the helper.
- * @returns {*} Result produced by the helper.
- */
 function lowerHalfMedian(values) {
   if (!values.length) return null
   const sorted = [...values].sort((left, right) => left - right)
@@ -54,17 +37,7 @@ function lowerHalfMedian(values) {
   return median(sorted.slice(0, cutoff))
 }
 
-/**
- * Handles zero filled idle sample.
- *
- * @param {*} sample - Value for sample.
- * @param {*} elapsedSeconds - Numeric elapsed seconds value.
- * @param {*} timestampMsValue - Value for timestamp ms value.
- * @param {*} helpers - Shared numeric and geospatial helper functions.
- * @returns {*} Result produced by the helper.
- */
-function zeroFilledIdleSample(sample, elapsedSeconds, timestampMsValue, helpers) {
-  const { roundValue } = helpers
+function zeroFilledIdleSample(sample, elapsedSeconds, timestampMsValue) {
   const synthetic = cloneRawSample(sample)
   synthetic.elapsedSeconds = roundValue(elapsedSeconds, 3)
   synthetic.timestamp = timestampMsValue === null ? null : new Date(timestampMsValue).toISOString()
@@ -84,15 +57,7 @@ function zeroFilledIdleSample(sample, elapsedSeconds, timestampMsValue, helpers)
   return synthetic
 }
 
-/**
- * Handles estimate recording interval seconds.
- *
- * @param {*} rawSamples - Raw activity samples from the source file.
- * @param {*} helpers - Shared numeric and geospatial helper functions.
- * @returns {*} Result produced by the helper.
- */
-function estimateRecordingIntervalSeconds(rawSamples, helpers) {
-  const { isFiniteNumber, safeNumber } = helpers
+function estimateRecordingIntervalSeconds(rawSamples) {
   const deltas = []
   let previousElapsed = null
   let previousTimestampMs = null
@@ -120,43 +85,18 @@ function estimateRecordingIntervalSeconds(rawSamples, helpers) {
   return lowerHalfMedian(deltas) ?? 1
 }
 
-/**
- * Handles elapsed seconds for sample.
- *
- * @param {*} sample - Value for sample.
- * @param {*} fallbackOriginTimestampMs - Value for fallback origin timestamp ms.
- * @param {*} helpers - Shared numeric and geospatial helper functions.
- * @returns {*} Result produced by the helper.
- */
-function elapsedSecondsForSample(sample, fallbackOriginTimestampMs, helpers) {
-  const { isFiniteNumber, safeNumber } = helpers
+function elapsedSecondsForSample(sample, fallbackOriginTimestampMs) {
   const explicit = safeNumber(sample.elapsedSeconds)
   if (isFiniteNumber(explicit)) return explicit
-
   const timeMs = timestampMs(sample.timestamp)
-  if (timeMs !== null && fallbackOriginTimestampMs !== null) {
-    return (timeMs - fallbackOriginTimestampMs) / 1000
-  }
-
+  if (timeMs !== null && fallbackOriginTimestampMs !== null) return (timeMs - fallbackOriginTimestampMs) / 1000
   return null
 }
 
-/**
- * Handles distance meters for pair.
- *
- * @param {*} previousSample - Previous activity sample under evaluation.
- * @param {*} currentSample - Current activity sample under evaluation.
- * @param {*} helpers - Shared numeric and geospatial helper functions.
- * @returns {*} Result produced by the helper.
- */
-function distanceMetersForPair(previousSample, currentSample, helpers) {
-  const { haversineDistanceMeters, isFiniteNumber, safeNumber } = helpers
+function distanceMetersForPair(previousSample, currentSample) {
   const previousDistance = safeNumber(previousSample.distance)
   const currentDistance = safeNumber(currentSample.distance)
-  if (isFiniteNumber(previousDistance) && isFiniteNumber(currentDistance)) {
-    return Math.max(0, currentDistance - previousDistance)
-  }
-
+  if (isFiniteNumber(previousDistance) && isFiniteNumber(currentDistance)) return Math.max(0, currentDistance - previousDistance)
   return haversineDistanceMeters(
     safeNumber(previousSample.latitude),
     safeNumber(previousSample.longitude),
@@ -165,16 +105,7 @@ function distanceMetersForPair(previousSample, currentSample, helpers) {
   )
 }
 
-/**
- * Builds distance series.
- *
- * @param {*} coursePoints - Value for course points.
- * @param {*} directDistanceSeries - Value for direct distance series.
- * @param {*} helpers - Shared numeric and geospatial helper functions.
- * @returns {*} Derived data structure for downstream use.
- */
-export function buildDistanceSeries(coursePoints, directDistanceSeries, helpers) {
-  const { haversineDistanceMeters, isFiniteNumber, roundValue } = helpers
+export function buildDistanceSeries(coursePoints, directDistanceSeries) {
   const distanceSeries = []
   let totalDistanceMeters = 0
 
@@ -185,29 +116,16 @@ export function buildDistanceSeries(coursePoints, directDistanceSeries, helpers)
       distanceSeries.push(roundValue(totalDistanceMeters, 3))
       continue
     }
-
     const previousPoint = index > 0 ? coursePoints[index - 1] : null
     const currentPoint = coursePoints[index]
-    if (index > 0) {
-      totalDistanceMeters += haversineDistanceMeters(previousPoint?.[0], previousPoint?.[1], currentPoint?.[0], currentPoint?.[1])
-    }
-
+    if (index > 0) totalDistanceMeters += haversineDistanceMeters(previousPoint?.[0], previousPoint?.[1], currentPoint?.[0], currentPoint?.[1])
     distanceSeries.push(roundValue(totalDistanceMeters, 3))
   }
 
   return distanceSeries
 }
 
-/**
- * Builds elapsed series.
- *
- * @param {*} rawSamples - Raw activity samples from the source file.
- * @param {*} timeSeries - Timestamp series for the activity.
- * @param {*} helpers - Shared numeric and geospatial helper functions.
- * @returns {*} Derived data structure for downstream use.
- */
-export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
-  const { isFiniteNumber, roundValue, safeNumber } = helpers
+export function buildElapsedSeries(rawSamples, timeSeries) {
   const explicitElapsed = rawSamples.map((sample) => safeNumber(sample.elapsedSeconds))
   const hasExplicitElapsed = explicitElapsed.some(isFiniteNumber)
 
@@ -217,7 +135,6 @@ export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
   if (hasExplicitElapsed) {
     const elapsedSeries = []
     let lastValue = 0
-
     for (let index = 0; index < explicitElapsed.length; index += 1) {
       const currentExplicit = explicitElapsed[index]
       if (isFiniteNumber(currentExplicit)) {
@@ -225,7 +142,6 @@ export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
         elapsedSeries.push(roundValue(lastValue, 3))
         continue
       }
-
       if (origin) {
         const timestamp = validTimestamps[index]
         if (timestamp && Number.isFinite(timestamp.getTime())) {
@@ -235,22 +151,17 @@ export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
           continue
         }
       }
-
       if (index === 0) {
         elapsedSeries.push(0)
         continue
       }
-
       lastValue = elapsedSeries[index - 1]
       elapsedSeries.push(roundValue(lastValue, 3))
     }
-
     return elapsedSeries
   }
 
-  if (!origin) {
-    return rawSamples.map((_, index) => roundValue(index, 3))
-  }
+  if (!origin) return rawSamples.map((_, index) => roundValue(index, 3))
 
   let lastValue = 0
   return validTimestamps.map((timestamp, index) => {
@@ -258,59 +169,29 @@ export function buildElapsedSeries(rawSamples, timeSeries, helpers) {
       lastValue = index === 0 ? 0 : lastValue
       return roundValue(lastValue, 3)
     }
-
     const nextValue = Math.max(0, (timestamp.getTime() - origin.getTime()) / 1000)
-
     if (nextValue <= lastValue && index > 0) {
       lastValue += 0.001
       return roundValue(lastValue, 3)
     }
-
     lastValue = nextValue
     return roundValue(nextValue, 3)
   })
 }
 
-/**
- * Builds progress series.
- *
- * @param {*} distanceSeries - Value for distance series.
- * @param {*} helpers - Shared numeric and geospatial helper functions.
- * @returns {*} Derived data structure for downstream use.
- */
-export function buildProgressSeries(distanceSeries, helpers) {
-  const { isFiniteNumber, roundValue } = helpers
+export function buildProgressSeries(distanceSeries) {
   const totalDistanceMeters = distanceSeries[distanceSeries.length - 1] ?? 0
-  if (!isFiniteNumber(totalDistanceMeters) || totalDistanceMeters <= 0) {
-    return distanceSeries.map(() => 0)
-  }
-
+  if (!isFiniteNumber(totalDistanceMeters) || totalDistanceMeters <= 0) return distanceSeries.map(() => 0)
   return distanceSeries.map((value) => roundValue(value / totalDistanceMeters, 6))
 }
 
-/**
- * Handles insert idle gap samples.
- *
- * @param {*} rawSamples - Raw activity samples from the source file.
- * @param {*} helpers - Shared numeric and geospatial helper functions.
- * @returns {object} Result produced by the helper.
- */
-export function insertIdleGapSamples(rawSamples, helpers) {
-  const { isFiniteNumber, roundValue, safeTimestamp } = helpers
-
+export function insertIdleGapSamples(rawSamples) {
   if (rawSamples.length < 2) {
-    return {
-      rawSamples,
-      gapDebug: {
-        detected_gaps: [],
-        inserted_sample_count: 0,
-        recording_interval_seconds: 1,
-      },
-    }
+    return { rawSamples, gapDebug: { detected_gaps: [], inserted_sample_count: 0, recording_interval_seconds: 1 } }
   }
 
   const originTimestampMs = rawSamples.map((sample) => timestampMs(sample.timestamp)).find((value) => value !== null)
-  const recordingIntervalSeconds = Math.max(0.2, estimateRecordingIntervalSeconds(rawSamples, helpers))
+  const recordingIntervalSeconds = Math.max(0.2, estimateRecordingIntervalSeconds(rawSamples))
   const gapThresholdSeconds = Math.max(3, recordingIntervalSeconds * 3)
   const stationaryDistanceThresholdMeters = Math.max(5, recordingIntervalSeconds * 2.5)
   const detectedGaps = []
@@ -320,13 +201,13 @@ export function insertIdleGapSamples(rawSamples, helpers) {
   for (let index = 1; index < rawSamples.length; index += 1) {
     const previousSample = rawSamples[index - 1]
     const currentSample = rawSamples[index]
-    const previousElapsed = elapsedSecondsForSample(previousSample, originTimestampMs, helpers)
-    const currentElapsed = elapsedSecondsForSample(currentSample, originTimestampMs, helpers)
+    const previousElapsed = elapsedSecondsForSample(previousSample, originTimestampMs)
+    const currentElapsed = elapsedSecondsForSample(currentSample, originTimestampMs)
     const elapsedDelta = isFiniteNumber(previousElapsed) && isFiniteNumber(currentElapsed) ? currentElapsed - previousElapsed : null
 
     let insertedForGap = 0
     if (isFiniteNumber(elapsedDelta) && elapsedDelta > gapThresholdSeconds) {
-      const distanceDelta = distanceMetersForPair(previousSample, currentSample, helpers)
+      const distanceDelta = distanceMetersForPair(previousSample, currentSample)
       if (distanceDelta <= stationaryDistanceThresholdMeters) {
         const previousTimestampMs = timestampMs(previousSample.timestamp)
         const currentTimestampMs = timestampMs(currentSample.timestamp)
@@ -341,7 +222,7 @@ export function insertIdleGapSamples(rawSamples, helpers) {
             syntheticTimestampMs = Math.min(currentTimestampMs, previousTimestampMs + Math.round(recordingIntervalSeconds * 1000 * insertIndex))
           }
 
-          filledSamples.push(zeroFilledIdleSample(previousSample, syntheticElapsed, syntheticTimestampMs, helpers))
+          filledSamples.push(zeroFilledIdleSample(previousSample, syntheticElapsed, syntheticTimestampMs))
           insertedForGap += 1
         }
       }

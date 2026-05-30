@@ -7,14 +7,8 @@ import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { TYPE_LABELS } from '@/lib/widget-icons'
-import {
-  buildConfigWidgets,
-  deleteWidgetInConfig,
-  ensureWidgetIdsInConfig,
-  groupWidgetsForSidebar,
-  replaceWidgetInConfig,
-  updateWidgetInConfig,
-} from '@/lib/widget-config'
+import { deleteWidgetInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget-config'
+import { buildConfigWidgets, groupWidgetsForSidebar } from '@/lib/widget-presentation'
 import { isStandardMetricWidgetType } from '@/lib/standard-metrics'
 import { clamp } from '@/lib/utils'
 import { createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'

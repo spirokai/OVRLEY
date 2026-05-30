@@ -53,21 +53,6 @@ const METRIC_UNITS = {
 }
 
 /**
- * Creates activity helpers.
- * @returns {object} Derived data structure for downstream use.
- */
-function createActivityHelpers() {
-  return {
-    calculateBearingDegrees,
-    haversineDistanceMeters,
-    isFiniteNumber,
-    roundValue,
-    safeNumber,
-    safeTimestamp,
-  }
-}
-
-/**
  * Builds course series.
  *
  * @param {*} rawSamples - Raw activity samples from the source file.
@@ -130,14 +115,14 @@ function buildExtendedAttributes(metricSeriesMap) {
  * @returns {object} Result produced by the helper.
  */
 export function finalizeParsedActivity({ fileName, fileFormat, metadata = {}, rawSamples = [], options = {} }) {
-  const helpers = createActivityHelpers()
+  const helpers = { calculateBearingDegrees, haversineDistanceMeters, isFiniteNumber, roundValue, safeNumber, safeTimestamp }
   const useLegacyGpxDerivations = options.useLegacyGpxDerivations === true
-  const { rawSamples: normalizedRawSamples, gapDebug } = insertIdleGapSamples(rawSamples, helpers)
+  const { rawSamples: normalizedRawSamples, gapDebug } = insertIdleGapSamples(rawSamples)
   const timeSeries = buildTimeSeries(normalizedRawSamples)
   const courseSeries = buildCourseSeries(normalizedRawSamples)
   const directDistanceSeries = normalizedRawSamples.map((sample) => safeNumber(sample.distance))
-  const distanceSeries = buildDistanceSeries(courseSeries, directDistanceSeries, helpers)
-  const elapsedSeries = buildElapsedSeries(normalizedRawSamples, timeSeries, helpers)
+  const distanceSeries = buildDistanceSeries(courseSeries, directDistanceSeries)
+  const elapsedSeries = buildElapsedSeries(normalizedRawSamples, timeSeries)
   const elevationBaseSeries = normalizedRawSamples.map((sample) => safeNumber(sample.elevation))
   const { metricSeriesMap } = deriveActivityMetricSeries({
     courseSeries,
@@ -156,7 +141,7 @@ export function finalizeParsedActivity({ fileName, fileFormat, metadata = {}, ra
   const startTime = timeSeries.find(Boolean) ?? null
   const endTime = [...timeSeries].reverse().find(Boolean) ?? null
   const coverage = buildMetricCoverage(metricSeriesMap)
-  const distanceProgressSeries = buildProgressSeries(distanceSeries, helpers)
+  const distanceProgressSeries = buildProgressSeries(distanceSeries)
 
   const parsedActivity = {
     file_name: fileName,

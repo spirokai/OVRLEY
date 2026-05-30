@@ -1,5 +1,19 @@
 /**
- * Provides shared widget config utilities for the app.
+ * @file widget-config – Widget identity management and config mutation (CRUD).
+ *
+ * Owns all config-level widget operations: ID assignment, find, update
+ * (single and batch), replace, and delete. Does NOT own sidebar presentation
+ * concerns — those live in the sibling module widget-presentation.js.
+ *
+ * What this module owns:
+ * - ensureWidgetIdsInConfig, findWidgetInConfig
+ * - updateWidgetInConfig, updateWidgetsInConfig, replaceWidgetInConfig
+ * - deleteWidgetInConfig, deleteWidgetsInConfig
+ *
+ * What widget-presentation.js owns:
+ * - buildConfigWidgets, groupWidgetsForSidebar
+ *
+ * @module widget-config
  */
 
 import { normalizeColorFields } from './color-utils'
@@ -195,80 +209,6 @@ function updateWidgetEntry(config, widgetId, updater) {
     ...target.config,
     [target.category]: nextCollection,
   }
-}
-
-/**
- * Builds config widgets.
- *
- * @param {*} config - Overlay template configuration data.
- * @returns {*} Derived data structure for downstream use.
- */
-export function buildConfigWidgets(config) {
-  if (!config) return []
-
-  const normalizedConfig = ensureWidgetIdsInConfig(config)
-  const widgets = []
-
-  ;(normalizedConfig.labels || []).forEach((item, index) => {
-    widgets.push({
-      id: item.id,
-      type: 'label',
-      category: 'labels',
-      index,
-      name: item.text || 'Text',
-      data: item,
-    })
-  })
-  ;(normalizedConfig.values || []).forEach((item, index) => {
-    widgets.push({
-      id: item.id,
-      type: item.value,
-      category: 'values',
-      index,
-      name: item.value,
-      data: item,
-    })
-  })
-  ;(normalizedConfig.plots || []).forEach((item, index) => {
-    widgets.push({
-      id: item.id,
-      type: item.value,
-      category: 'plots',
-      index,
-      name: item.value,
-      data: item,
-    })
-  })
-
-  return widgets
-}
-
-/**
- * Handles group widgets for sidebar.
- *
- * @param {*} widgets - Widget collection in the current template.
- * @param {*} typeLabels - Value for type labels.
- * @returns {*} Result produced by the helper.
- */
-export function groupWidgetsForSidebar(widgets, typeLabels) {
-  const grouped = widgets.reduce((accumulator, widget) => {
-    const typeName = typeLabels[widget.type] || widget.type
-    if (!accumulator[typeName]) accumulator[typeName] = []
-    accumulator[typeName].push({
-      ...widget,
-      name: widget.type === 'label' ? widget.name : typeName,
-    })
-    return accumulator
-  }, {})
-
-  return Object.keys(grouped)
-    .sort()
-    .flatMap((typeName) =>
-      grouped[typeName].map((widget, widgetIndex) => ({
-        ...widget,
-        groupLabel: widgetIndex === 0 ? typeName : null,
-      })),
-    )
 }
 
 /**

@@ -2,52 +2,46 @@
  * Main overlay editor component — renders the canvas, Moveable resize handles,
  * widget badge labels, zoom-to-fit viewport, and empty state.
  *
- * Acts as a thin shell that delegates state orchestration to useOverlayEditorState
- * and passes grouped props to child components.
+ * Composes focused hooks at the component level instead of relying on a single
+ * god hook. Each hook owns one concern and receives only the data it needs.
  */
 
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutGrid, Tag } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import useStore from '@/store/useStore'
 import OverlayCanvas from './OverlayCanvas'
 import OverlayMoveable from './OverlayMoveable'
 import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel } from '@/features/widget-preview'
 import { WIDGET_ICONS } from '../data/overlayEditorConfig'
 import { getWidgetSceneOrigin } from '../utils/overlayEditorHelpers'
 import useOverlayEditorState from '../hooks/useOverlayEditorState'
+import useWidgetSelection from '../hooks/useWidgetSelection'
+import { useEditorViewport } from '../hooks/useEditorViewport'
+import { useEditorKeyboard } from '../hooks/useEditorKeyboard'
+import useOverlayPointerHandlers from '../utils/createOverlayPointerHandlers'
+import { useDragHandlers } from '../hooks/useDragHandlers'
+import { useResizeHandlers } from '../hooks/useResizeHandlers'
+import { useScaleHandlers } from '../hooks/useScaleHandlers'
+import { useRotateHandlers } from '../hooks/useRotateHandlers'
 
-/**
- * Renders floating badge labels above selected/hovered widgets showing their type.
- * Only visible during widget selection — hidden entirely when no widgets are selected.
- */
 function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId, previewSecond, selectedWidgetIds, widgets }) {
   const visibleWidgets = useMemo(() => {
     const visibleIds = new Set(selectedWidgetIds)
-    if (hoveredWidgetId) {
-      visibleIds.add(hoveredWidgetId)
-    }
-
+    if (hoveredWidgetId) visibleIds.add(hoveredWidgetId)
     return widgets.filter((widget) => visibleIds.has(widget.id))
   }, [hoveredWidgetId, selectedWidgetIds, widgets])
 
-  if (!visibleWidgets.length) {
-    return null
-  }
+  if (!visibleWidgets.length) return null
 
   return (
     <div data-testid="widget-badge-layer" className="pointer-events-none absolute inset-0 z-50 overflow-visible">
       {visibleWidgets.map((widget) => {
         const Icon = WIDGET_ICONS[widget.type] || Tag
-        const metricPreviewModel = buildMetricWidgetPreviewModel({
-          widget,
-          activity,
-          previewSecond,
-        })
+        const metricPreviewModel = buildMetricWidgetPreviewModel({ widget, activity, previewSecond })
         const textPreviewModel = buildTextWidgetPreviewModel({ widget })
         const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
-        const origin = getWidgetSceneOrigin(widget, null, visualBounds, {
-          boundsScale: widget.category === 'plots' ? 1 : globalScale,
-        })
+        const origin = getWidgetSceneOrigin(widget, null, visualBounds, { boundsScale: widget.category === 'plots' ? 1 : globalScale })
         const left = origin.x * displayScale
         const top = Math.max(origin.y * displayScale - 24, 0)
 
@@ -66,10 +60,6 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
   )
 }
 
-/**
- * Displays scene resolution and optional template save status badge
- * in the top-left corner of the editor viewport.
- */
 function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
   return (
     <div data-testid="canvas-status-badges" className="pointer-events-none absolute left-4 top-4 z-50 flex items-center gap-2">
@@ -79,9 +69,7 @@ function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
       {showTemplateStatus ? (
         <Badge
           variant={status === 'Modified' ? 'secondary' : 'outline'}
-          className={`h-6 rounded-full text-[10px] shadow-lg backdrop-blur-sm ${
-            status === 'Modified' ? 'border-accent-border bg-surface-accent-soft text-primary' : 'bg-card/85'
-          }`}
+          className={`h-6 rounded-full text-[10px] shadow-lg backdrop-blur-sm ${status === 'Modified' ? 'border-accent-border bg-surface-accent-soft text-primary' : 'bg-card/85'}`}
         >
           {status}
         </Badge>
@@ -90,10 +78,6 @@ function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
   )
 }
 
-/**
- * Placeholder shown when no config is loaded — guides the user to load a template
- * or add widgets to begin editing.
- */
 function EmptyOverlayState() {
   return (
     <div className="flex h-full items-center justify-center p-8">
@@ -108,20 +92,6 @@ function EmptyOverlayState() {
   )
 }
 
-/**
- * @param {object} props
- * @param {object|null} props.config - Current overlay template config.
- * @param {object} props.globalDefaults - Global default values (opacity, scale, styles).
- * @param {Function} props.onConfigChange - Callback to update the template config.
- * @param {number} props.zoomLevel - Current viewport zoom multiplier.
- * @param {Function} props.onZoomLevelChange - Callback to change zoom level.
- * @param {string} props.backgroundMode - Canvas background mode (black, checker, white, video).
- * @param {boolean} props.gridVisible - Whether the editor grid overlay is visible.
- * @param {boolean} props.snapToGrid - Whether Moveable snapping is enabled.
- * @param {boolean} props.showTemplateStatus - Whether to display the template save-status badge.
- * @param {string} props.templateStatus - Current template save status text.
- * @returns {JSX.Element} Rendered component output.
- */
 function OverlayEditor({
   config,
   globalDefaults,
@@ -135,106 +105,222 @@ function OverlayEditor({
   templateStatus,
 }) {
   const [hoveredWidgetId, setHoveredWidgetId] = useState(null)
-  const {
-    activity,
-    canResizeSelected,
-    canRotateSelected,
-    canScaleSelected,
-    displayScale,
-    elementGuidelines,
-    exportRange,
-    globalOpacity,
-    globalScale,
-    handleSceneMouseDown,
-    handleWidgetMouseDown,
-    handleWheel,
-    handlers,
+  const [isGroupDragActive, setIsGroupDragActive] = useState(false)
+  const [groupDragSelectionIds, setGroupDragSelectionIds] = useState([])
+  const [selectionRect, setSelectionRect] = useState(null)
+  const marqueeCleanupRef = useRef(null)
+  const marqueeSelectionRef = useRef(null)
+
+  // Derived state hook — widgets, scene, preview, drafts
+  const overlayState = useOverlayEditorState({ config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange })
+
+  // Selection management — composed after overlayState so it can consume orderedWidgetIds, renderedWidgetMap, widgetNodes
+  const selection = useWidgetSelection({
+    orderedWidgetIds: overlayState.orderedWidgetIds,
+    renderedWidgetMap: overlayState.renderedWidgetMap,
+    widgetNodes: overlayState.widgetNodes,
     isGroupDragActive,
-    maintainAspectRatio,
-    moveableRef,
-    previewSecond,
-    sceneElement,
-    sceneStyle,
-    sceneSize,
-    selectedTarget,
-    selectedTargets,
-    selectedWidgetIds,
-    selectionRect,
-    setSceneElement,
-    showEdgeResizeHandles,
-    viewportRef,
-    widgetRefCallbacks,
-    widgets,
-  } = useOverlayEditorState({
-    config,
-    globalDefaults,
-    onConfigChange,
-    zoomLevel,
-    onZoomLevelChange,
+    groupDragSelectionIds,
   })
 
+  // Viewport tracking
+  const { viewportRef, fitScale } = useEditorViewport(overlayState.sceneSize)
+  const displayScale = fitScale * overlayState.zoomLevel
+
+  // Keyboard shortcuts
+  useEditorKeyboard({ config, onConfigChange, selectedWidgetIds: selection.selectedWidgetIds, setWidgetSelection: selection.setWidgetSelection })
+
+  // Pointer handlers
+  const { handleSceneMouseDown, handleWidgetMouseDown, handleWheel } = useOverlayPointerHandlers({
+    commitSelection: selection.commitSelection,
+    displayScale,
+    moveableRef: overlayState.moveableRef,
+    marqueeCleanupRef,
+    marqueeSelectionRef,
+    onZoomLevelChange,
+    orderedWidgetIds: overlayState.orderedWidgetIds,
+    sceneElement: overlayState.sceneElement,
+    sceneSize: overlayState.sceneSize,
+    selectedWidgetId: selection.selectedWidgetId,
+    selectedWidgetIds: selection.selectedWidgetIds,
+    setGroupDragSelectionIds,
+    setIsGroupDragActive,
+    setSelectionRect,
+    setSelectionState: selection.setSelectionState,
+    widgetNodes: overlayState.widgetNodes,
+  })
+
+  // Moveable interaction hooks
+  const activity = useStore.getState().parsedActivity
+  const effectiveSelectedWidgetIds = selection.effectiveSelectedWidgetIds
+
+  const dragHandlers = useDragHandlers({
+    clearWidgetDraft: overlayState.clearWidgetDraft,
+    clearWidgetDrafts: overlayState.clearWidgetDrafts,
+    commitWidgetUpdate: overlayState.commitWidgetUpdate,
+    commitWidgetUpdates: overlayState.commitWidgetUpdates,
+    draftWidgetsRef: overlayState.draftWidgetsRef,
+    activity,
+    effectiveSelectedWidgetIds,
+    globalScale: overlayState.globalScale,
+    groupDragSelectionIds,
+    interactionStartRef: overlayState.interactionStartRef,
+    renderedWidgetMap: overlayState.renderedWidgetMap,
+    previewSecond: overlayState.previewSecond,
+    scalePreviewFrameRef: overlayState.scalePreviewFrameRef,
+    selectedTarget: selection.selectedTarget,
+    selectedWidget: selection.selectedWidget,
+    selectedWidgets: selection.selectedWidgets,
+    setGroupDragSelectionIds,
+    setIsGroupDragActive,
+    setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
+    setLiveWidgetDraftsBatch: overlayState.setLiveWidgetDraftsBatch,
+  })
+
+  const resizeHandlers = useResizeHandlers({
+    clearWidgetDraft: overlayState.clearWidgetDraft,
+    commitWidgetUpdate: overlayState.commitWidgetUpdate,
+    draftWidgetsRef: overlayState.draftWidgetsRef,
+    activity,
+    effectiveSelectedWidgetIds,
+    globalScale: overlayState.globalScale,
+    interactionStartRef: overlayState.interactionStartRef,
+    renderedWidgetMap: overlayState.renderedWidgetMap,
+    previewSecond: overlayState.previewSecond,
+    scalePreviewFrameRef: overlayState.scalePreviewFrameRef,
+    selectedTarget: selection.selectedTarget,
+    selectedWidget: selection.selectedWidget,
+    setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
+  })
+
+  const scaleHandlers = useScaleHandlers({
+    clearWidgetDraft: overlayState.clearWidgetDraft,
+    commitWidgetUpdate: overlayState.commitWidgetUpdate,
+    draftWidgetsRef: overlayState.draftWidgetsRef,
+    activity,
+    effectiveSelectedWidgetIds,
+    globalScale: overlayState.globalScale,
+    interactionStartRef: overlayState.interactionStartRef,
+    renderedWidgetMap: overlayState.renderedWidgetMap,
+    previewSecond: overlayState.previewSecond,
+    scalePreviewFrameRef: overlayState.scalePreviewFrameRef,
+    selectedTarget: selection.selectedTarget,
+    selectedWidget: selection.selectedWidget,
+    setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
+  })
+
+  const rotateHandlers = useRotateHandlers({
+    clearWidgetDraft: overlayState.clearWidgetDraft,
+    commitWidgetUpdate: overlayState.commitWidgetUpdate,
+    draftWidgetsRef: overlayState.draftWidgetsRef,
+    activity,
+    effectiveSelectedWidgetIds,
+    globalScale: overlayState.globalScale,
+    interactionStartRef: overlayState.interactionStartRef,
+    renderedWidgetMap: overlayState.renderedWidgetMap,
+    previewSecond: overlayState.previewSecond,
+    scalePreviewFrameRef: overlayState.scalePreviewFrameRef,
+    selectedTarget: selection.selectedTarget,
+    selectedWidget: selection.selectedWidget,
+    setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
+  })
+
+  const handlers = { ...dragHandlers, ...resizeHandlers, ...scaleHandlers, ...rotateHandlers }
+
+  // Capability flags
+  const canResizeSelected = !selection.isGroupSelection && selection.selectedWidget?.category === 'plots'
+  const showEdgeResizeHandles = canResizeSelected && selection.selectedWidget?.type === 'elevation'
+  const canScaleSelected = Boolean(!selection.isGroupSelection && selection.selectedWidget && selection.selectedWidget.category !== 'plots')
+  const canRotateSelected = !selection.isGroupSelection && selection.selectedWidget?.type === 'course'
+  const maintainAspectRatio = !selection.isGroupSelection && (selection.selectedWidget?.type === 'course' || canScaleSelected)
+
+  // Marquee cleanup
+  useEffect(
+    () => () => {
+      marqueeCleanupRef.current?.()
+    },
+    [],
+  )
+
   const valueFont =
-    config?.values?.find((value) => value.font || value.font_family)?.font ||
-    config?.values?.find((value) => value.font || value.font_family)?.font_family ||
+    config?.values?.find((v) => v.font || v.font_family)?.font ||
+    config?.values?.find((v) => v.font || v.font_family)?.font_family ||
     globalDefaults?.font_values
 
   const canvasSceneProps = useMemo(
-    () => ({ sceneFont: config?.scene?.font, sceneFontSize: config?.scene?.font_size, sceneStyle, valueFont, sceneSize }),
-    [config?.scene?.font, config?.scene?.font_size, sceneStyle, valueFont, sceneSize],
+    () => ({
+      sceneFont: config?.scene?.font,
+      sceneFontSize: config?.scene?.font_size,
+      sceneStyle: overlayState.sceneStyle,
+      valueFont,
+      sceneSize: overlayState.sceneSize,
+    }),
+    [config?.scene?.font, config?.scene?.font_size, overlayState.sceneStyle, valueFont, overlayState.sceneSize],
   )
   const canvasDisplayProps = useMemo(
-    () => ({ displayScale, globalScale, globalOpacity, backgroundMode, gridVisible }),
-    [displayScale, globalScale, globalOpacity, backgroundMode, gridVisible],
+    () => ({ displayScale, globalScale: overlayState.globalScale, globalOpacity: overlayState.globalOpacity, backgroundMode, gridVisible }),
+    [displayScale, overlayState.globalScale, overlayState.globalOpacity, backgroundMode, gridVisible],
   )
   const canvasDataProps = useMemo(
-    () => ({ widgets, activity, previewSecond, selectionRect, exportRange }),
-    [widgets, activity, previewSecond, selectionRect, exportRange],
+    () => ({
+      widgets: overlayState.renderedWidgets,
+      activity,
+      previewSecond: overlayState.previewSecond,
+      selectionRect,
+      exportRange: overlayState.previewExportRange,
+    }),
+    [overlayState.renderedWidgets, activity, overlayState.previewSecond, selectionRect, overlayState.previewExportRange],
   )
   const canvasCallbacks = useMemo(
-    () => ({ setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks }),
-    [setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks],
+    () => ({
+      setSceneElement: overlayState.setSceneElement,
+      handleSceneMouseDown,
+      handleWidgetMouseDown,
+      setHoveredWidgetId,
+      widgetRefCallbacks: overlayState.widgetRefCallbacks,
+    }),
+    [overlayState.setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, overlayState.widgetRefCallbacks],
   )
 
-  if (!config) {
-    return <EmptyOverlayState />
-  }
+  if (!config) return <EmptyOverlayState />
 
   return (
     <div ref={viewportRef} className="relative flex h-full flex-1 overflow-hidden" onWheel={handleWheel}>
       <div className="relative flex h-full w-full items-center justify-center overflow-hidden p-8">
-        <CanvasStatusBadges height={sceneSize.height} showTemplateStatus={showTemplateStatus} status={templateStatus} width={sceneSize.width} />
+        <CanvasStatusBadges
+          height={overlayState.sceneSize.height}
+          showTemplateStatus={showTemplateStatus}
+          status={templateStatus}
+          width={overlayState.sceneSize.width}
+        />
         <div
           className="relative shrink-0"
-          style={{
-            width: sceneSize.width * displayScale,
-            height: sceneSize.height * displayScale,
-          }}
+          style={{ width: overlayState.sceneSize.width * displayScale, height: overlayState.sceneSize.height * displayScale }}
         >
           <div
             className="absolute left-0 top-0"
             style={{
-              width: sceneSize.width,
-              height: sceneSize.height,
+              width: overlayState.sceneSize.width,
+              height: overlayState.sceneSize.height,
               transform: `scale(${displayScale})`,
               transformOrigin: 'top left',
             }}
           >
             <OverlayCanvas sceneProps={canvasSceneProps} displayProps={canvasDisplayProps} dataProps={canvasDataProps} callbacks={canvasCallbacks} />
-
             <OverlayMoveable
-              moveableRef={moveableRef}
-              selectedTarget={selectedTarget}
-              selectedTargets={selectedTargets}
+              moveableRef={overlayState.moveableRef}
+              selectedTarget={selection.selectedTarget}
+              selectedTargets={selection.selectedTargets}
               isGroupDragActive={isGroupDragActive}
-              sceneElement={sceneElement}
+              sceneElement={overlayState.sceneElement}
               displayScale={displayScale}
               canResizeSelected={canResizeSelected}
               canScaleSelected={canScaleSelected}
               canRotateSelected={canRotateSelected}
               maintainAspectRatio={maintainAspectRatio}
               showEdgeResizeHandles={showEdgeResizeHandles}
-              elementGuidelines={elementGuidelines}
-              sceneSize={sceneSize}
+              elementGuidelines={selection.elementGuidelines}
+              sceneSize={overlayState.sceneSize}
               snapToGrid={snapToGrid}
               handlers={handlers}
             />
@@ -242,11 +328,11 @@ function OverlayEditor({
           <WidgetBadgeLayer
             activity={activity}
             displayScale={displayScale}
-            globalScale={globalScale}
+            globalScale={overlayState.globalScale}
             hoveredWidgetId={hoveredWidgetId}
-            previewSecond={previewSecond}
-            selectedWidgetIds={selectedWidgetIds}
-            widgets={widgets}
+            previewSecond={overlayState.previewSecond}
+            selectedWidgetIds={selection.selectedWidgetIds}
+            widgets={overlayState.renderedWidgets}
           />
         </div>
       </div>

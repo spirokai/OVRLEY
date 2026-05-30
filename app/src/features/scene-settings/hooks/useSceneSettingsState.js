@@ -1,11 +1,17 @@
 /**
- * Container hook for the scene settings sidebar tab.
- * Orchestrates store access, local state, derived state, effects, and event handlers.
+ * @file useSceneSettingsState – Container hook for the scene settings sidebar tab.
  *
- * @param {object} props
- * @param {object} props.config - Overlay template configuration.
- * @param {function} props.onConfigChange - Callback to update the config.
- * @returns {object} State, derived values, and handlers for rendering.
+ * Orchestrates store access, local state, derived state, effects, and event
+ * handlers. Returns grouped objects so consumers can pass them as coherent
+ * blocks instead of manually destructuring 40+ individual keys.
+ *
+ * Return shape:
+ * - overlaySettings   scene resolution, FPS, update rate, aspect ratio
+ * - videoSyncSettings imported video metadata and sync configuration
+ * - globalSettings    global defaults, fonts, scene style accessor
+ * - handlers          all event handlers (each section destructures what it needs)
+ *
+ * @module useSceneSettingsState
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -18,27 +24,19 @@ import { RESOLUTIONS } from '../data/sceneSettingsConstants'
 import { parseTimeOffset, sanitizeNumber } from '../utils/sceneSettingsUtils'
 
 function getResolutionPresetId(scene) {
-  if (!scene) {
-    return '1080p'
-  }
-
+  if (!scene) return '1080p'
   const match = Object.values(RESOLUTIONS)
     .flat()
     .find((resolution) => resolution.w === scene.width && resolution.h === scene.height)
-
   return match ? match.id : 'custom'
 }
 
 function getSceneResolutionKey(scene) {
-  if (!scene) {
-    return null
-  }
-
+  if (!scene) return null
   return `${Number(scene.width)}x${Number(scene.height)}`
 }
 
 export default function useSceneSettingsState({ config, onConfigChange }) {
-  // Store selectors
   const {
     activitySummary,
     aspectRatio,
@@ -85,7 +83,6 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     })),
   )
 
-  // Derived state (from props)
   const systemFonts = useAvailableFonts()
   const editorConfig = useMemo(() => createEditorEffectiveConfig({ config, globalDefaults }), [config, globalDefaults])
   const scene = editorConfig?.scene
@@ -93,8 +90,6 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   const derivedResId = getResolutionPresetId(scene)
   const derivedFpsMode = getFpsModeValue(scene?.fps)
 
-  // Local UI state remains only for transient modes that intentionally diverge
-  // from committed scene values until the relevant field actually changes.
   const [customResolutionAnchor, setCustomResolutionAnchor] = useState(null)
   const [customFpsAnchor, setCustomFpsAnchor] = useState(null)
   const resId = customResolutionAnchor && customResolutionAnchor === sceneResolutionKey ? 'custom' : derivedResId
@@ -104,19 +99,15 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
 
   const [offsetInput, setOffsetInput] = useState(videoSyncOffsetSeconds?.toString() || '0')
 
-  // Side effects — sync local input state when store values change and normalize update rate on FPS changes
   useEffect(() => {
     setOffsetInput(videoSyncOffsetSeconds?.toString() || '0')
   }, [videoSyncOffsetSeconds])
 
   useEffect(() => {
     const normalizedUpdateRate = normalizeUpdateRateForFps(scene?.fps, updateRate)
-    if (normalizedUpdateRate !== updateRate) {
-      setUpdateRate(normalizedUpdateRate)
-    }
+    if (normalizedUpdateRate !== updateRate) setUpdateRate(normalizedUpdateRate)
   }, [scene?.fps, setUpdateRate, updateRate])
 
-  // Handlers — scene config mutations (aspect ratio, resolution, FPS, widget update rate, sync offset)
   const videoResolutionMismatch =
     Boolean(scene?.width && scene?.height && importedVideoResolution) &&
     (Number(scene.width) !== Number(importedVideoResolution.width) || Number(scene.height) !== Number(importedVideoResolution.height))
@@ -125,9 +116,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
 
   const updateScene = (key, value) => {
     let finalValue = value
-    if (['width', 'height', 'x', 'y', 'start', 'end'].includes(key)) {
-      finalValue = sanitizeNumber(value)
-    }
+    if (['width', 'height', 'x', 'y', 'start', 'end'].includes(key)) finalValue = sanitizeNumber(value)
     onConfigChange({ ...config, scene: { ...config.scene, [key]: finalValue } })
   }
 
@@ -135,14 +124,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     setAspectRatio(v)
     if (v !== 'custom' && RESOLUTIONS[v]) {
       const preset = RESOLUTIONS[v][0]
-      onConfigChange({
-        ...config,
-        scene: {
-          ...config.scene,
-          width: preset.w,
-          height: preset.h,
-        },
-      })
+      onConfigChange({ ...config, scene: { ...config.scene, width: preset.w, height: preset.h } })
     }
   }
 
@@ -151,19 +133,9 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       setCustomResolutionAnchor(sceneResolutionKey)
       return
     }
-
     setCustomResolutionAnchor(null)
     const preset = RESOLUTIONS[aspectRatio]?.find((r) => r.id === v)
-    if (preset) {
-      onConfigChange({
-        ...config,
-        scene: {
-          ...config.scene,
-          width: preset.w,
-          height: preset.h,
-        },
-      })
-    }
+    if (preset) onConfigChange({ ...config, scene: { ...config.scene, width: preset.w, height: preset.h } })
   }
 
   const handleFpsModeChange = (v) => {
@@ -171,7 +143,6 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       setCustomFpsAnchor(Number(scene?.fps))
       return
     }
-
     setCustomFpsAnchor(null)
     if (v !== 'custom') {
       const fps = sanitizeIntegerFps(v)
@@ -204,45 +175,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     setOffsetInput(Number.isInteger(newOffset) ? newOffset.toString() : newOffset.toFixed(1))
   }
 
-  return {
-    // Store state
-    activitySummary,
-    aspectRatio,
-    computeVideoSync,
-    exportRange,
-    globalDefaults,
-    importedVideoCreationTime,
-    importedVideoDuration,
-    importedVideoFps,
-    importedVideoPath,
-    importedVideoResolution,
-    updateRate,
-    videoSyncOffsetSeconds,
-    videoSyncWarning,
-
-    // Store actions
-    resetGlobalDefaults,
-    setAspectRatio,
-    setExportRange,
-    setGlobalDefault,
-    setUpdateRate,
-    setVideoSyncOffset,
-    setVideoSyncWarning,
-
-    // Derived
-    scene,
-    systemFonts,
-    updateRateOptions,
-    videoResolutionMismatch,
-    sceneStyleValue,
-
-    // Local state
-    resId,
-    fpsMode,
-    offsetInput,
-    setOffsetInput,
-
-    // Handlers
+  const handlers = {
     handleAspectRatioChange,
     handleCustomFpsChange,
     handleFpsModeChange,
@@ -251,5 +184,46 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     handleResolutionChange,
     handleUpdateRateChange,
     updateScene,
+  }
+
+  return {
+    overlaySettings: {
+      activitySummary,
+      aspectRatio,
+      exportRange,
+      fpsMode,
+      importedVideoFps,
+      importedVideoPath,
+      resId,
+      scene,
+      updateRate,
+      updateRateOptions,
+    },
+    videoSyncSettings: {
+      activitySummary,
+      computeVideoSync,
+      importedVideoCreationTime,
+      importedVideoDuration,
+      importedVideoFps,
+      importedVideoPath,
+      importedVideoResolution,
+      offsetInput,
+      setOffsetInput,
+      videoResolutionMismatch,
+      videoSyncOffsetSeconds,
+      videoSyncWarning,
+    },
+    globalSettings: {
+      globalDefaults,
+      resetGlobalDefaults,
+      sceneStyleValue,
+      setGlobalDefault,
+      systemFonts,
+    },
+    handlers,
+    // Store actions exposed directly for callers that need them
+    setAspectRatio,
+    setExportRange,
+    setUpdateRate,
   }
 }
