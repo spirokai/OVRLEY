@@ -26,15 +26,19 @@ pub fn prepare_heading_cache(
 ) -> CoreResult<HeadingWidgetCache> {
     let prepare_started = Instant::now();
 
-    let tape_width = (360.0 * plot.pixels_per_degree).ceil() as u32;
-    let tape_height = plot.height;
+    let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
+    let scaled_ppd = plot.pixels_per_degree * scale;
+    let tape_width = (360.0 * scaled_ppd).ceil() as u32;
+    let tape_height = ((plot.height as f32) * scale).ceil().max(1.0) as u32;
+    let scaled_width = ((plot.width as f32) * scale).round().max(1.0) as u32;
+    let scaled_height = ((plot.height as f32) * scale).round().max(1.0) as u32;
 
     // Resolve shadow style from scene defaults
     let shadow = normalize_shadow_style(
         config.scene.shadow_color.as_ref(),
         config.scene.shadow_strength,
         config.scene.shadow_distance,
-        1.0,
+        scale,
     );
 
     // Create the tape surface
@@ -54,9 +58,11 @@ pub fn prepare_heading_cache(
         .as_deref()
         .unwrap_or(label_color);
 
-    // Compute tick lengths in pixels
+    // Compute tick lengths in pixels (percentage of scaled height)
     let major_tick_length = tape_height as f32 * plot.major_tick_length_pct / 100.0;
     let minor_tick_length = tape_height as f32 * plot.minor_tick_length_pct / 100.0;
+    let major_tick_thickness = plot.major_tick_thickness * scale;
+    let minor_tick_thickness = plot.minor_tick_thickness * scale;
 
     // Compute tick y positions based on alignment
     let center_y = tape_height as f32 / 2.0;
@@ -68,7 +74,7 @@ pub fn prepare_heading_cache(
     };
 
     // Font for labels
-    let font_size = plot.label_font_size.unwrap_or(12.0);
+    let font_size = plot.label_font_size.unwrap_or(12.0) * scale;
     let label_font = plot
         .label_font
         .as_deref()
@@ -78,12 +84,13 @@ pub fn prepare_heading_cache(
     let font = crate::render::text::resolve_font(font_dirs, label_font, font_size);
 
     // Label y-position: below the ticks
-    let label_y = tick_bottom + plot.label_offset.unwrap_or(4.0) + font_size;
+    let label_offset = plot.label_offset.unwrap_or(4.0) * scale;
+    let label_y = tick_bottom + label_offset + font_size;
 
     // Collect all ticks to draw
     let ticks = visible_ticks(
         0.0, // heading=0 for the static tape image
-        plot.pixels_per_degree,
+        scaled_ppd,
         tape_width as f32,
         plot.major_tick_interval,
         plot.minor_ticks_per_major,
@@ -110,29 +117,29 @@ pub fn prepare_heading_cache(
                 shadow_tick_paint.set_anti_alias(true);
                 shadow_tick_paint.set_image_filter(filter.clone());
 
-                for tick in &ticks {
-                    shadow_tick_paint.set_color(parse_color(tick_color, 1.0));
-                    shadow_tick_paint.set_stroke_width(if tick.is_major {
-                        plot.major_tick_thickness
-                    } else {
-                        plot.minor_tick_thickness
-                    });
-                    let length = if tick.is_major {
-                        major_tick_length
-                    } else {
-                        minor_tick_length
-                    };
-                    let top = if plot.tick_alignment == "centered" {
-                        center_y - length / 2.0
-                    } else {
-                        tick_bottom - length
-                    };
-                    canvas.draw_line(
-                        Point::new(tick.x, top),
-                        Point::new(tick.x, top + length),
-                        &shadow_tick_paint,
-                    );
-                }
+        for tick in &ticks {
+            shadow_tick_paint.set_color(parse_color(tick_color, 1.0));
+            shadow_tick_paint.set_stroke_width(if tick.is_major {
+                major_tick_thickness
+            } else {
+                minor_tick_thickness
+            });
+            let length = if tick.is_major {
+                major_tick_length
+            } else {
+                minor_tick_length
+            };
+            let top = if plot.tick_alignment == "centered" {
+                center_y - length / 2.0
+            } else {
+                tick_bottom - length
+            };
+            canvas.draw_line(
+                Point::new(tick.x, top),
+                Point::new(tick.x, top + length),
+                &shadow_tick_paint,
+            );
+        }
 
                 // Shadow pass for labels
                 let mut shadow_label_paint = Paint::default();
@@ -169,9 +176,9 @@ pub fn prepare_heading_cache(
         };
         tick_paint.set_color(parse_color(color_str, 1.0));
         tick_paint.set_stroke_width(if tick.is_major {
-            plot.major_tick_thickness
+            major_tick_thickness
         } else {
-            plot.minor_tick_thickness
+            minor_tick_thickness
         });
 
         let length = if tick.is_major {
@@ -226,9 +233,9 @@ pub fn prepare_heading_cache(
         tape_width: tape_width as f32,
         x: plot.x,
         y: plot.y,
-        width: plot.width,
-        height: plot.height,
-        pixels_per_degree: plot.pixels_per_degree,
+        width: scaled_width,
+        height: scaled_height,
+        pixels_per_degree: scaled_ppd,
         show_indicator: plot.show_indicator,
         indicator_style: plot.indicator_style.clone(),
         indicator_placement: plot.indicator_placement.clone(),
@@ -236,7 +243,7 @@ pub fn prepare_heading_cache(
             .indicator_color
             .clone()
             .unwrap_or_else(|| "#ffffff".to_string()),
-        indicator_size: plot.indicator_size.unwrap_or(10.0),
+        indicator_size: plot.indicator_size.unwrap_or(10.0) * scale,
         indicator_shadow: shadow,
     })
 }

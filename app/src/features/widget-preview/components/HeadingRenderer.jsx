@@ -11,6 +11,7 @@
  * @param {object|null} [props.activity] - Activity data with heading series.
  * @param {number} [props.previewSecond] - Current preview time in seconds.
  * @param {number} [props.globalOpacity] - Global opacity multiplier.
+ * @param {number} [props.globalScale] - Global scale multiplier.
  * @param {object} [props.sceneStyle] - Scene style object (shadow, border).
  * @returns {JSX.Element} SVG element for heading widget preview.
  */
@@ -102,22 +103,12 @@ function renderChevron(centerX, topY, bottomY, config, shadowFilterId) {
 /**
  * Renders the highlight bar indicator.
  */
-function renderHighlightBar(centerX, topY, height, config, shadowFilterId) {
+function renderHighlightBar(centerX, topY, height, config) {
   const barWidth = config.indicator_size ?? 10
   const barHalfWidth = barWidth / 2
   const color = config.indicator_color || '#ffffff'
 
-  return (
-    <rect
-      x={centerX - barHalfWidth}
-      y={topY}
-      width={barWidth}
-      height={height}
-      fill={color}
-      fillOpacity={0.3}
-      filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}
-    />
-  )
+  return <rect x={centerX - barHalfWidth} y={topY} width={barWidth} height={height} fill={color} fillOpacity={0.3} />
 }
 
 /**
@@ -187,7 +178,7 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      className="block overflow-visible"
+      className="block h-full w-full"
       style={{ opacity: opacity < 1 ? opacity : undefined }}
     >
       <defs>
@@ -216,7 +207,7 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
       {data.show_indicator !== false && (
         <>
           {data.indicator_style === 'highlight_bar'
-            ? renderHighlightBar(width / 2, 0, height, data, null)
+            ? renderHighlightBar(width / 2, 0, height, data)
             : renderChevron(width / 2, 0, height, data, shadow ? shadowFilterId : null)}
         </>
       )}
