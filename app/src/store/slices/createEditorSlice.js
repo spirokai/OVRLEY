@@ -5,15 +5,9 @@
  * model shared between the canvas and widget sidebar.
  */
 
-import {
-  applyConfigOriginatedSceneTiming,
-  applyTimelineOriginatedSceneTiming,
-  cloneSerializable,
-  DEFAULT_CONFIG,
-  hasSerializableChanged,
-} from '../store-utils'
+import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, syncSceneTimingToConfig } from '../store-utils'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '../../lib/previewPerf'
-import { buildConfigWidgets } from '../../lib/widget-config'
+import { buildConfigWidgets, ensureWidgetIdsInConfig } from '../../lib/widget-config'
 
 /**
  * Filters and orders selection IDs to match the current widget order.
@@ -43,7 +37,7 @@ function getPrimarySelectionId(widgetIds, preferredId = null) {
 }
 
 /**
- * Builds widget wrappers for selection normalization and remapping.
+ * Builds widget wrappers for selection normalization.
  *
  * @param {object|null} config - Overlay config to inspect.
  * @returns {Array<{ id: string, data: object }>} Config widgets.
@@ -53,21 +47,18 @@ function getConfigWidgets(config) {
 }
 
 /**
- * Rebuilds selection after a config replacement.
+ * Reconciles selection after a config replacement.
  *
- * When config helpers preserve widget object references, this remaps selection
- * to the widget's new index-derived ID so deleting or reordering sibling
- * widgets does not silently jump selection to a different widget.
+ * Widget ids are durable, so selection only needs to retain ids that still
+ * exist in the incoming config and then choose an appropriate primary widget.
  *
  * @param {object} options
- * @param {object|null} options.previousConfig - Previous config value.
  * @param {object|null} options.nextConfig - Incoming config value.
  * @param {string[]} options.selectedWidgetIds - Previously selected widget IDs.
  * @param {string|null} options.selectedWidgetId - Previously selected primary widget ID.
  * @returns {{ selectedWidgetIds: string[], selectedWidgetId: string|null }} Next selection state.
  */
-function deriveSelectionStateFromConfigChange({ previousConfig, nextConfig, selectedWidgetIds, selectedWidgetId }) {
-  const previousWidgetsById = new Map(getConfigWidgets(previousConfig).map((widget) => [widget.id, widget.data]))
+function reconcileSelection({ nextConfig, selectedWidgetIds, selectedWidgetId }) {
   const nextWidgets = getConfigWidgets(nextConfig)
   const orderedWidgetIds = nextWidgets.map((widget) => widget.id)
 
@@ -78,29 +69,19 @@ function deriveSelectionStateFromConfigChange({ previousConfig, nextConfig, sele
     }
   }
 
-  const remapWidgetId = (widgetId) => {
-    const previousData = previousWidgetsById.get(widgetId)
-    if (!previousData) {
-      return null
-    }
+  const retainedWidgetIds = normalizeSelectionIds(selectedWidgetIds || [], orderedWidgetIds)
 
-    return nextWidgets.find((widget) => widget.data === previousData)?.id ?? null
-  }
-
-  const remappedWidgetIds = normalizeSelectionIds((selectedWidgetIds || []).map(remapWidgetId).filter(Boolean), orderedWidgetIds)
-  const remappedPrimaryId = remapWidgetId(selectedWidgetId)
-
-  if (remappedWidgetIds.length) {
+  if (retainedWidgetIds.length) {
     return {
-      selectedWidgetIds: remappedWidgetIds,
-      selectedWidgetId: getPrimarySelectionId(remappedWidgetIds, remappedPrimaryId),
+      selectedWidgetIds: retainedWidgetIds,
+      selectedWidgetId: getPrimarySelectionId(retainedWidgetIds, selectedWidgetId),
     }
   }
 
-  if (remappedPrimaryId) {
+  if (selectedWidgetId && orderedWidgetIds.includes(selectedWidgetId)) {
     return {
-      selectedWidgetIds: [remappedPrimaryId],
-      selectedWidgetId: remappedPrimaryId,
+      selectedWidgetIds: [selectedWidgetId],
+      selectedWidgetId,
     }
   }
 
@@ -113,13 +94,13 @@ function deriveSelectionStateFromConfigChange({ previousConfig, nextConfig, sele
 }
 
 /**
- * Applies an explicit selection intent against the current config.
+ * Sets widget selection against the current config order.
  *
  * @param {object} state - Current Zustand state.
  * @param {string[]} widgetIds - Requested selection IDs.
  * @param {string|null} [preferredWidgetId=null] - Preferred primary widget ID.
  */
-function applyWidgetSelectionIntent(state, widgetIds, preferredWidgetId = null) {
+function setWidgetSelectionState(state, widgetIds, preferredWidgetId = null) {
   const orderedWidgetIds = getConfigWidgets(state.config).map((widget) => widget.id)
   const nextSelectedWidgetIds = normalizeSelectionIds(widgetIds, orderedWidgetIds)
 
@@ -158,19 +139,19 @@ export function createEditorSlice(set, get) {
 
     setConfig: (val) => {
       const currentState = get()
-      const isDifferent = currentState.lastRenderedConfig ? hasSerializableChanged(val, currentState.lastRenderedConfig) : false
-      const nextSelectionState = deriveSelectionStateFromConfigChange({
-        previousConfig: currentState.config,
-        nextConfig: val,
+      const normalizedConfig = ensureWidgetIdsInConfig(val)
+      const isDifferent = currentState.lastRenderedConfig ? hasSerializableChanged(normalizedConfig, currentState.lastRenderedConfig) : false
+      const nextSelectionState = reconcileSelection({
+        nextConfig: normalizedConfig,
         selectedWidgetIds: currentState.selectedWidgetIds,
         selectedWidgetId: currentState.selectedWidgetId,
       })
 
       set((state) => {
-        state.config = val
+        state.config = normalizedConfig
         state.selectedWidgetIds = nextSelectionState.selectedWidgetIds
         state.selectedWidgetId = nextSelectionState.selectedWidgetId
-        applyConfigOriginatedSceneTiming(state, val, { previousConfig: currentState.config })
+        syncSceneTimingFromConfig(state, normalizedConfig, { previousConfig: currentState.config })
         state.hasUnrenderedChanges = isDifferent
       })
     },
@@ -201,7 +182,7 @@ export function createEditorSlice(set, get) {
 
       set((draft) => {
         draft.startSecond = second
-        applyTimelineOriginatedSceneTiming(draft, { startSecond: second })
+        syncSceneTimingToConfig(draft, { startSecond: second })
       })
     },
 
@@ -211,7 +192,7 @@ export function createEditorSlice(set, get) {
 
       set((draft) => {
         draft.endSecond = second
-        applyTimelineOriginatedSceneTiming(draft, { endSecond: second })
+        syncSceneTimingToConfig(draft, { endSecond: second })
       })
     },
 
@@ -292,12 +273,12 @@ export function createEditorSlice(set, get) {
 
     setWidgetSelection: (widgetIds, preferredWidgetId = null) =>
       set((state) => {
-        applyWidgetSelectionIntent(state, widgetIds, preferredWidgetId)
+        setWidgetSelectionState(state, widgetIds, preferredWidgetId)
       }),
 
     setSelectedWidgetId: (widgetId) =>
       set((state) => {
-        applyWidgetSelectionIntent(state, widgetId ? [widgetId] : [], widgetId)
+        setWidgetSelectionState(state, widgetId ? [widgetId] : [], widgetId)
       }),
   }
 }

@@ -150,7 +150,7 @@ export function normalizeDistanceProgressToWindow(value, distanceSpan) {
  * @param {number} elapsedSecond - Current elapsed second.
  * @returns {number|null} Window-normalized progress (0–1) or null if not applicable.
  */
-export function getExportWindowDistanceProgressAtElapsed(activity, window, elapsedSecond) {
+export function getWindowProgressAtTime(activity, window, elapsedSecond) {
   const distanceSpan = getExportWindowDistanceSpan(activity, window)
   if (!distanceSpan) {
     return null

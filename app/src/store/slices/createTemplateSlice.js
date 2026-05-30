@@ -9,8 +9,8 @@
 
 import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
 import { DEFAULT_GLOBAL_DEFAULTS, syncGlobalDefaultsToConfig } from '../../lib/config-utils'
-import { DEFAULT_EXPORT_RANGE } from '../../features/template-manager'
-import { applyConfigOriginatedSceneTiming, cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, updateConfigPersistence } from '../store-utils'
+import { DEFAULT_EXPORT_RANGE } from '../../features/template-manager/data/templateConstants'
+import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, updateConfigPersistence } from '../store-utils'
 
 const initialUpdateRate = 1
 const initialExportRange = { ...DEFAULT_EXPORT_RANGE }
@@ -38,7 +38,7 @@ export function createTemplateSlice(set, get) {
     return codec || 'prores_ks'
   }
 
-  const normalizeGlobalDefaultsForState = (globalDefaults) => {
+  const buildGlobalDefaults = (globalDefaults) => {
     const normalizedDefaults = normalizeColorFields(globalDefaults || {})
     return Object.keys(DEFAULT_GLOBAL_DEFAULTS).reduce(
       (result, key) => ({
@@ -151,7 +151,7 @@ export function createTemplateSlice(set, get) {
         state.loadedTemplateFilename = null
         state.loadedTemplateSource = null
         state.lastSavedTemplateState = null
-        applyConfigOriginatedSceneTiming(state, nextConfig, { resetSelectedSecond: true })
+        syncSceneTimingFromConfig(state, nextConfig, { resetSelectedSecond: true })
         updateUnrenderedChanges(state, nextConfig)
       })
     },
@@ -178,7 +178,7 @@ export function createTemplateSlice(set, get) {
       const { filename = null, source = null } = options
       const nextConfig = templateState?.config || DEFAULT_CONFIG
       const nextSettings = templateState?.settings || {}
-      const nextGlobalDefaults = normalizeGlobalDefaultsForState(nextSettings.globalDefaults)
+      const nextGlobalDefaults = buildGlobalDefaults(nextSettings.globalDefaults)
       const nextExportRange = {
         ...DEFAULT_EXPORT_RANGE,
         ...(get().exportRange || {}),
@@ -198,7 +198,7 @@ export function createTemplateSlice(set, get) {
         state.loadedTemplateFilename = filename
         state.loadedTemplateSource = source
 
-        applyConfigOriginatedSceneTiming(state, nextConfig, { resetSelectedSecond: true })
+        syncSceneTimingFromConfig(state, nextConfig, { resetSelectedSecond: true })
         updateUnrenderedChanges(state, nextConfig)
       })
     },

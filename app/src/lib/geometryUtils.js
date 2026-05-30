@@ -83,7 +83,7 @@ export function getPointAtProgress(points, progress01) {
  * @returns {number[]|null} Interpolated [x, y] point or null.
  */
 export function getPointAtMetricProgress(points, progressValues, targetProgress) {
-  const result = getPointAtMetricProgressWithIndex(points, progressValues, targetProgress)
+  const result = findPointAtProgress(points, progressValues, targetProgress)
 
   return result ? result.point : null
 }
@@ -98,7 +98,7 @@ export function getPointAtMetricProgress(points, progressValues, targetProgress)
  * @param {number} targetProgress - Target progress to interpolate at.
  * @returns {{ index: number, point: number[] }|null} Point with segment index or null.
  */
-export function getPointAtMetricProgressWithIndex(points, progressValues, targetProgress) {
+export function findPointAtProgress(points, progressValues, targetProgress) {
   if (!Array.isArray(points) || !Array.isArray(progressValues) || !points.length) {
     return null
   }

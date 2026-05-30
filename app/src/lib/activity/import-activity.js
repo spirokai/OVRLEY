@@ -222,7 +222,7 @@ function syncSceneDurationWithActivity(durationSeconds, storeState) {
 }
 
 /**
- * Applies parsed activity to store.
+ * Loads a parsed activity into store state.
  *
  * @param {object} options - Structured options for the helper.
  * @param {*} options.filename - Target filename for the operation.
@@ -231,7 +231,7 @@ function syncSceneDurationWithActivity(durationSeconds, storeState) {
  * @param {*} options.storeState - Current store snapshot used for synchronization.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
-async function applyParsedActivityToStore({ filename, parsedActivity, debugPayload, storeState }) {
+async function loadActivityIntoStore({ filename, parsedActivity, debugPayload, storeState }) {
   const { setActivitySummary, setGpxFilename } = storeState
 
   setGpxFilename(filename)
@@ -287,7 +287,7 @@ export default async function saveFile(fileOrPath) {
       validAttributes: parsedActivity?.valid_attributes,
     })
 
-    await applyParsedActivityToStore({
+    await loadActivityIntoStore({
       filename,
       parsedActivity,
       debugPayload,

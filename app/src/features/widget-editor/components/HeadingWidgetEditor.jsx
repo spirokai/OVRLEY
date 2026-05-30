@@ -8,7 +8,6 @@
  * @param {object} props
  * @param {object} props.widget - Widget configuration object.
  * @param {Function} props.updateWidgetData - Updates widget data immutably.
- * @param {Function} props.setNumericField - Parses and clamps numeric input.
  * @returns {JSX.Element} Rendered editor controls.
  */
 
@@ -32,7 +31,7 @@ const INDICATOR_PLACEMENT_OPTIONS = [
   { value: 'both', label: 'Both' },
 ]
 
-export default function HeadingWidgetEditor({ widget, updateWidgetData, setNumericField }) {
+export default function HeadingWidgetEditor({ widget, updateWidgetData }) {
   const data = widget.data ?? {}
 
   return (

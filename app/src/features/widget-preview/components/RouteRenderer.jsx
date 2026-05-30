@@ -16,7 +16,7 @@
  */
 
 import { useMemo } from 'react'
-import { buildScopedRouteSamples, getExportWindowDistanceProgressAtElapsed, resolveExportRangeWindow } from '@/features/overlay-editor'
+import { buildScopedRouteSamples, getWindowProgressAtTime, resolveExportRangeWindow } from '@/features/overlay-editor'
 import { normalizeRouteGeometry } from '../utils/routeGeometry'
 import { getDistanceProgressAtElapsed } from '@/features/overlay-editor'
 import { getWidgetOpacity } from '../utils/textMeasurement'
@@ -89,7 +89,7 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
 
   // Playhead position — compute 0–1 progress and determine marker + completed route segment
   const progress01 = exportWindow.active
-    ? (getExportWindowDistanceProgressAtElapsed(activity, exportWindow, previewSecond) ?? 0)
+    ? (getWindowProgressAtTime(activity, exportWindow, previewSecond) ?? 0)
     : getDistanceProgressAtElapsed(activity, previewSecond)
   const { markerPoint, completedPoints } = useMemo(
     () => buildRouteFramePreview(routeGeometry.points, pointProgress, progress01),

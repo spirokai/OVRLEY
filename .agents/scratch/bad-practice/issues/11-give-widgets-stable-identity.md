@@ -64,11 +64,11 @@ The main user-visible outcome is that editor behavior stays the same while selec
 
 ## Acceptance criteria
 
-- [ ] Widget identity is persisted independently of array position
-- [ ] Legacy templates without stable widget ids still load successfully
-- [ ] Selection no longer depends on remapping index-derived widget ids after config replacement
-- [ ] Add, delete, reorder, and reset behavior preserve the correct widget identity
-- [ ] Tests cover identity upgrade, template persistence, and selection regression paths
+- [x] Widget identity is persisted independently of array position
+- [x] Legacy templates without stable widget ids still load successfully
+- [x] Selection no longer depends on remapping index-derived widget ids after config replacement
+- [x] Add, delete, reorder, and reset behavior preserve the correct widget identity
+- [x] Tests cover identity upgrade, template persistence, and selection regression paths
 
 ## Blocked by
 

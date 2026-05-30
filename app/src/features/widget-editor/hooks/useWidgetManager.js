@@ -8,7 +8,14 @@ import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { getCurrentParsedActivity } from '@/lib/activity/cache'
 import { TYPE_LABELS } from '@/lib/widget-icons'
-import { buildConfigWidgets, deleteWidgetInConfig, groupWidgetsForSidebar, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget-config'
+import {
+  buildConfigWidgets,
+  deleteWidgetInConfig,
+  ensureWidgetIdsInConfig,
+  groupWidgetsForSidebar,
+  replaceWidgetInConfig,
+  updateWidgetInConfig,
+} from '@/lib/widget-config'
 import { isStandardMetricWidgetType } from '@/lib/standard-metrics'
 import { createLabelDefaults, createMetricValueDefaults, createPlotDefaults, clamp, parseInteger } from '../utils/widgetUtils'
 import { HEADING_DEFAULTS } from '../data/widgetDefaults'
@@ -64,16 +71,13 @@ export function useWidgetManager() {
   // Add widget — creates a new widget of the given type with defaults and appends to config
   const addWidget = (type) => {
     const nextConfig = structuredClone(config)
-    let newId = ''
 
     if (type === 'label') {
       if (!nextConfig.labels) nextConfig.labels = []
       nextConfig.labels.push(createLabelDefaults(globalDefaults))
-      newId = `label-${nextConfig.labels.length - 1}`
     } else if (isStandardMetricWidgetType(type) || ['gradient', 'time'].includes(type)) {
       if (!nextConfig.values) nextConfig.values = []
       nextConfig.values.push(createMetricValueDefaults(type, globalDefaults))
-      newId = `value-${nextConfig.values.length - 1}`
     } else if (['course', 'elevation'].includes(type)) {
       if (!nextConfig.plots) nextConfig.plots = []
       nextConfig.plots.push(
@@ -82,7 +86,6 @@ export function useWidgetManager() {
           sceneFontSize: nextConfig.scene?.font_size,
         }),
       )
-      newId = `plot-${nextConfig.plots.length - 1}`
     } else if (type === 'heading') {
       if (!nextConfig.plots) nextConfig.plots = []
       nextConfig.plots.push({
@@ -90,10 +93,12 @@ export function useWidgetManager() {
         ...HEADING_DEFAULTS,
         opacity: globalDefaults?.opacity ?? 1,
       })
-      newId = `plot-${nextConfig.plots.length - 1}`
     }
 
-    setConfig(nextConfig)
+    const normalizedConfig = ensureWidgetIdsInConfig(nextConfig)
+    const newId = buildConfigWidgets(normalizedConfig).at(-1)?.id || null
+
+    setConfig(normalizedConfig)
     if (newId) setSelectedWidgetId(newId)
   }
 

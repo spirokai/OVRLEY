@@ -22,7 +22,7 @@ export const DEFAULT_EXPORT_RANGE = {
 }
 
 /** Keys preserved when normalizing a label widget. */
-export const LABEL_KEYS = ['x', 'y', 'font', 'font_size', 'text', 'color', 'opacity']
+export const LABEL_KEYS = ['id', 'x', 'y', 'font', 'font_size', 'text', 'color', 'opacity']
 
 /** Scene keys that are render-time-only artifacts, stripped during normalization. */
 export const SCENE_RENDER_TIME_ONLY_KEYS = [
@@ -38,7 +38,7 @@ export const SCENE_RENDER_TIME_ONLY_KEYS = [
 ]
 
 /** Keys shared by all metric value widgets during normalization. */
-export const VALUE_SHARED_KEYS = ['x', 'y', 'value', 'font', 'font_size', 'color', 'opacity', 'prefix', 'suffix', 'decimals']
+export const VALUE_SHARED_KEYS = ['id', 'x', 'y', 'value', 'font', 'font_size', 'color', 'opacity', 'prefix', 'suffix', 'decimals']
 
 /** Keys for the icon sub-object within a value widget. */
 export const VALUE_ICON_KEYS = ['show_icon', 'icon_color', 'icon_size', 'icon_offset_x', 'icon_offset_y']
@@ -54,6 +54,7 @@ export const VALUE_TYPE_KEYS = {
 
 /** Keys preserved when normalizing a course plot widget. */
 export const COURSE_PLOT_KEYS = [
+  'id',
   'x',
   'y',
   'value',
@@ -95,6 +96,7 @@ export const ELEVATION_PLOT_KEYS = [
 
 /** Keys preserved when normalizing a heading plot widget. */
 export const HEADING_PLOT_KEYS = [
+  'id',
   'x',
   'y',
   'value',

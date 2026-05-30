@@ -12,7 +12,7 @@ export {
   buildScopedRouteSamples,
   buildScopedElevationSeries,
   resolveExportRangeWindow,
-  getExportWindowDistanceProgressAtElapsed,
+  getWindowProgressAtTime,
   getActivityDurationSeconds,
   getExportWindowDistanceSpan,
   normalizeDistanceProgressToWindow,

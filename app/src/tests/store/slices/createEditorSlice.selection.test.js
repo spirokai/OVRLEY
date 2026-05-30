@@ -1,9 +1,10 @@
 /**
  * Behavior tests for store-owned overlay selection.
  *
- * These specs document the selection contract after the ownership refactor:
- * callers express selection intent once, while the store keeps the ordered
- * selection list and primary selection consistent across config changes.
+ * These specs document the selection contract after the widget-identity
+ * refactor: callers express selection intent once, while the store keeps the
+ * ordered selection list and primary selection consistent across config
+ * changes using durable widget ids.
  */
 
 import { beforeEach, describe, expect, test } from 'vitest'
@@ -37,43 +38,56 @@ describe('createEditorSlice selection ownership', () => {
   })
 
   test('stores canonical multi-selection order and preferred primary selection', () => {
-    const config = makeConfig([makeLabel('A'), makeLabel('B'), makeLabel('C')])
+    const config = makeConfig([makeLabel('A', { id: 'widget-3' }), makeLabel('B', { id: 'widget-1' }), makeLabel('C', { id: 'widget-2' })])
 
     useStore.getState().setConfig(config)
-    useStore.getState().setWidgetSelection(['label-2', 'label-0'], 'label-0')
+    useStore.getState().setWidgetSelection(['widget-2', 'widget-3'], 'widget-3')
 
     const state = useStore.getState()
 
-    expect(state.selectedWidgetIds).toEqual(['label-0', 'label-2'])
-    expect(state.selectedWidgetId).toBe('label-0')
+    expect(state.selectedWidgetIds).toEqual(['widget-3', 'widget-2'])
+    expect(state.selectedWidgetId).toBe('widget-3')
   })
 
-  test('remaps selected widgets when config deletion shifts widget indexes', () => {
-    const first = makeLabel('A')
-    const second = makeLabel('B')
-    const third = makeLabel('C')
-    const config = makeConfig([first, second, third])
+  test('keeps the same selected widgets when deleting siblings changes array indexes', () => {
+    const config = makeConfig([makeLabel('A', { id: 'widget-1' }), makeLabel('B', { id: 'widget-2' }), makeLabel('C', { id: 'widget-3' })])
 
     useStore.getState().setConfig(config)
-    useStore.getState().setWidgetSelection(['label-1', 'label-2'], 'label-1')
+    useStore.getState().setWidgetSelection(['widget-2', 'widget-3'], 'widget-2')
 
-    useStore.getState().setConfig(deleteWidgetInConfig(config, 'label-0'))
+    useStore.getState().setConfig(deleteWidgetInConfig(config, 'widget-1'))
 
     const state = useStore.getState()
 
-    expect(state.selectedWidgetIds).toEqual(['label-0', 'label-1'])
-    expect(state.selectedWidgetId).toBe('label-0')
+    expect(state.selectedWidgetIds).toEqual(['widget-2', 'widget-3'])
+    expect(state.selectedWidgetId).toBe('widget-2')
+  })
+
+  test('keeps the same selected widgets when config replacement reorders them', () => {
+    useStore
+      .getState()
+      .setConfig(makeConfig([makeLabel('A', { id: 'widget-1' }), makeLabel('B', { id: 'widget-2' }), makeLabel('C', { id: 'widget-3' })]))
+    useStore.getState().setWidgetSelection(['widget-1', 'widget-3'], 'widget-1')
+
+    useStore
+      .getState()
+      .setConfig(makeConfig([makeLabel('C', { id: 'widget-3' }), makeLabel('B', { id: 'widget-2' }), makeLabel('A', { id: 'widget-1' })]))
+
+    const state = useStore.getState()
+
+    expect(state.selectedWidgetIds).toEqual(['widget-3', 'widget-1'])
+    expect(state.selectedWidgetId).toBe('widget-1')
   })
 
   test('falls back to the first widget when config replacement invalidates the previous selection', () => {
-    useStore.getState().setConfig(makeConfig([makeLabel('A'), makeLabel('B')]))
-    useStore.getState().setWidgetSelection(['label-1'], 'label-1')
+    useStore.getState().setConfig(makeConfig([makeLabel('A', { id: 'widget-1' }), makeLabel('B', { id: 'widget-2' })]))
+    useStore.getState().setWidgetSelection(['widget-2'], 'widget-2')
 
-    useStore.getState().setConfig(makeConfig([makeLabel('X'), makeLabel('Y')]))
+    useStore.getState().setConfig(makeConfig([makeLabel('X', { id: 'widget-9' }), makeLabel('Y', { id: 'widget-10' })]))
 
     const state = useStore.getState()
 
-    expect(state.selectedWidgetIds).toEqual(['label-0'])
-    expect(state.selectedWidgetId).toBe('label-0')
+    expect(state.selectedWidgetIds).toEqual(['widget-9'])
+    expect(state.selectedWidgetId).toBe('widget-9')
   })
 })

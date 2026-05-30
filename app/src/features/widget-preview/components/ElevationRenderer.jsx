@@ -20,7 +20,7 @@
  */
 
 import { useMemo } from 'react'
-import { buildScopedElevationSeries, getExportWindowDistanceProgressAtElapsed, resolveExportRangeWindow } from '@/features/overlay-editor'
+import { buildScopedElevationSeries, getWindowProgressAtTime, resolveExportRangeWindow } from '@/features/overlay-editor'
 import { normalizeElevationGeometry } from '../utils/elevationGeometry'
 import { getDistanceProgressAtElapsed, getInterpolatedSeriesValue, getSeriesValueAtProgress } from '@/features/overlay-editor'
 import { getPreviewFontFamily, getPreviewTextBaseline, getWidgetOpacity, measurePreviewText } from '../utils/textMeasurement'
@@ -123,7 +123,7 @@ export function OverlayElevationWidget({
 
   // Playhead position — compute 0–1 progress and locate the marker point on the elevation profile
   const progress01 = exportWindow.active
-    ? (getExportWindowDistanceProgressAtElapsed(activity, exportWindow, previewSecond) ?? 0)
+    ? (getWindowProgressAtTime(activity, exportWindow, previewSecond) ?? 0)
     : getDistanceProgressAtElapsed(activity, previewSecond)
   const markerPoint =
     getPointAtMetricProgress(points, pointProgress, progress01) || getPointAtProgress(points, progress01) || points[points.length - 1]

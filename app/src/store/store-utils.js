@@ -113,7 +113,7 @@ export function updateConfigPersistence(state) {
 }
 
 /**
- * Applies scene timing from a config-originated update into timeline state.
+ * Syncs scene timing from config into the preview timeline state.
  *
  * Config replacement and template hydration both flow through this helper.
  * Callers choose whether the playhead should snap back to the new scene start;
@@ -127,7 +127,7 @@ export function updateConfigPersistence(state) {
  * @param {*} [options.previousConfig] - Config value before the current replacement.
  * @param {boolean} [options.resetSelectedSecond=false] - Whether the playhead should adopt the incoming start second immediately.
  */
-export function applyConfigOriginatedSceneTiming(state, nextConfig, options = {}) {
+export function syncSceneTimingFromConfig(state, nextConfig, options = {}) {
   const { previousConfig, resetSelectedSecond = false } = options
   const scene = nextConfig?.scene
   if (!scene) return
@@ -157,7 +157,7 @@ export function applyConfigOriginatedSceneTiming(state, nextConfig, options = {}
 }
 
 /**
- * Applies timeline-originated edits back into config scene timing.
+ * Syncs timeline edits back into config scene timing.
  *
  * Timeline edits are the source of truth for this path. The helper writes the
  * changed bounds into config and refreshes dirty-state tracking if any config
@@ -168,7 +168,7 @@ export function applyConfigOriginatedSceneTiming(state, nextConfig, options = {}
  * @param {number} [timing.startSecond] - Updated timeline start second.
  * @param {number} [timing.endSecond] - Updated timeline end second.
  */
-export function applyTimelineOriginatedSceneTiming(state, timing) {
+export function syncSceneTimingToConfig(state, timing) {
   if (!state.config?.scene) return
 
   let sceneChanged = false

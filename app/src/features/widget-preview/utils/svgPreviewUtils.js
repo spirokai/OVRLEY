@@ -2,7 +2,7 @@
  * Shared SVG preview utility functions used across per-widget renderers.
  */
 
-import { getPointAtMetricProgressWithIndex, getPointAtProgress } from '@/lib/geometryUtils'
+import { findPointAtProgress, getPointAtProgress } from '@/lib/geometryUtils'
 
 /**
  * Sanitizes a string for use as an SVG element ID.
@@ -193,7 +193,7 @@ export function buildRouteFramePreview(points, progressValues, progress01) {
     return { markerPoint: null, completedPoints: [] }
   }
 
-  const metricPoint = getPointAtMetricProgressWithIndex(points, progressValues, progress01)
+  const metricPoint = findPointAtProgress(points, progressValues, progress01)
   const markerPoint = metricPoint?.point || getPointAtProgress(points, progress01) || points[points.length - 1]
   const lastPoint = points[points.length - 1]
   let completedPoints =

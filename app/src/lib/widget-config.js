@@ -4,37 +4,155 @@
 
 import { normalizeColorFields } from './color-utils'
 
-const WIDGET_ID_PATTERN = /^(label|value|plot)-(\d+)$/
+const LEGACY_WIDGET_ID_PATTERN = /^(label|value|plot)-\d+$/
+const GENERATED_WIDGET_ID_PATTERN = /^widget-(\d+)$/
+const WIDGET_ID_PREFIX = 'widget-'
+const WIDGET_CATEGORIES = ['labels', 'values', 'plots']
 
 /**
- * Resolves widget target details directly from a widget id.
+ * Returns whether a widget id is durable enough to preserve across saves.
  *
- * @param {*} widgetId - Identifier of the target widget.
- * @returns {object|null} Derived data structure for downstream use.
+ * Legacy index-derived ids are treated as unstable even if they are present in
+ * widget data, because they still encode array position.
+ *
+ * @param {*} widgetId - Identifier to validate.
+ * @returns {boolean} Whether the id can be preserved as-is.
  */
-function resolveWidgetTarget(widgetId) {
-  const match = WIDGET_ID_PATTERN.exec(String(widgetId || ''))
-  if (!match) {
-    return null
+function isDurableWidgetId(widgetId) {
+  if (typeof widgetId !== 'string') {
+    return false
   }
 
-  const [, prefix, rawIndex] = match
-  const index = Number.parseInt(rawIndex, 10)
-  if (!Number.isInteger(index) || index < 0) {
-    return null
+  const normalizedId = widgetId.trim()
+  if (!normalizedId) {
+    return false
   }
 
-  const category = prefix === 'label' ? 'labels' : prefix === 'value' ? 'values' : prefix === 'plot' ? 'plots' : null
+  return !LEGACY_WIDGET_ID_PATTERN.test(normalizedId)
+}
 
-  if (!category) {
-    return null
+function getNextGeneratedId(usedIds, nextIdRef) {
+  let nextWidgetId = `${WIDGET_ID_PREFIX}${nextIdRef.current}`
+  while (usedIds.has(nextWidgetId)) {
+    nextIdRef.current += 1
+    nextWidgetId = `${WIDGET_ID_PREFIX}${nextIdRef.current}`
   }
 
-  return {
-    category,
-    id: `${prefix}-${index}`,
-    index,
+  usedIds.add(nextWidgetId)
+  nextIdRef.current += 1
+  return nextWidgetId
+}
+
+function getStartingGeneratedId(config) {
+  let maxGeneratedId = 0
+
+  WIDGET_CATEGORIES.forEach((category) => {
+    const collection = config?.[category]
+    if (!Array.isArray(collection)) {
+      return
+    }
+
+    collection.forEach((widget) => {
+      const match = GENERATED_WIDGET_ID_PATTERN.exec(String(widget?.id || ''))
+      if (!match) {
+        return
+      }
+
+      maxGeneratedId = Math.max(maxGeneratedId, Number.parseInt(match[1], 10) || 0)
+    })
+  })
+
+  return maxGeneratedId + 1
+}
+
+/**
+ * Ensures every persisted widget carries a unique durable id.
+ *
+ * The helper upgrades legacy templates on contact by copying the config only
+ * when a widget is missing an id, carries an index-derived legacy id, or
+ * collides with another widget's id.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @returns {*} Config with durable widget ids.
+ */
+export function ensureWidgetIdsInConfig(config) {
+  if (!config) {
+    return config
   }
+
+  const usedIds = new Set()
+  const nextIdRef = { current: getStartingGeneratedId(config) }
+  let nextConfig = config
+
+  WIDGET_CATEGORIES.forEach((category) => {
+    const collection = config[category]
+    if (!Array.isArray(collection)) {
+      return
+    }
+
+    let nextCollection = null
+
+    collection.forEach((widget, index) => {
+      const currentId = widget?.id
+      const nextId = isDurableWidgetId(currentId) && !usedIds.has(currentId) ? currentId : getNextGeneratedId(usedIds, nextIdRef)
+
+      if (nextId !== currentId) {
+        if (!nextCollection) {
+          nextCollection = [...collection]
+        }
+
+        nextCollection[index] = {
+          ...widget,
+          id: nextId,
+        }
+      } else {
+        usedIds.add(nextId)
+      }
+    })
+
+    if (nextCollection) {
+      if (nextConfig === config) {
+        nextConfig = { ...config }
+      }
+
+      nextConfig[category] = nextCollection
+    }
+  })
+
+  return nextConfig
+}
+
+/**
+ * Finds a widget by durable id inside the config's widget collections.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} widgetId - Identifier of the target widget.
+ * @returns {object|null} Resolved widget location and data.
+ */
+export function findWidgetInConfig(config, widgetId) {
+  const normalizedConfig = ensureWidgetIdsInConfig(config)
+
+  for (const category of WIDGET_CATEGORIES) {
+    const currentCollection = normalizedConfig?.[category]
+    if (!Array.isArray(currentCollection)) {
+      continue
+    }
+
+    const index = currentCollection.findIndex((widget) => widget?.id === widgetId)
+    if (index === -1) {
+      continue
+    }
+
+    return {
+      category,
+      config: normalizedConfig,
+      data: currentCollection[index],
+      id: widgetId,
+      index,
+    }
+  }
+
+  return null
 }
 
 /**
@@ -50,12 +168,12 @@ function updateWidgetEntry(config, widgetId, updater) {
     return config
   }
 
-  const target = resolveWidgetTarget(widgetId)
+  const target = findWidgetInConfig(config, widgetId)
   if (!target) {
     return config
   }
 
-  const currentCollection = config[target.category]
+  const currentCollection = target.config[target.category]
   if (!Array.isArray(currentCollection)) {
     return config
   }
@@ -67,14 +185,14 @@ function updateWidgetEntry(config, widgetId, updater) {
 
   const nextWidget = updater(currentWidget, target)
   if (!nextWidget || nextWidget === currentWidget) {
-    return config
+    return target.config
   }
 
   const nextCollection = [...currentCollection]
   nextCollection[target.index] = nextWidget
 
   return {
-    ...config,
+    ...target.config,
     [target.category]: nextCollection,
   }
 }
@@ -88,11 +206,12 @@ function updateWidgetEntry(config, widgetId, updater) {
 export function buildConfigWidgets(config) {
   if (!config) return []
 
+  const normalizedConfig = ensureWidgetIdsInConfig(config)
   const widgets = []
 
-  ;(config.labels || []).forEach((item, index) => {
+  ;(normalizedConfig.labels || []).forEach((item, index) => {
     widgets.push({
-      id: `label-${index}`,
+      id: item.id,
       type: 'label',
       category: 'labels',
       index,
@@ -100,9 +219,9 @@ export function buildConfigWidgets(config) {
       data: item,
     })
   })
-  ;(config.values || []).forEach((item, index) => {
+  ;(normalizedConfig.values || []).forEach((item, index) => {
     widgets.push({
-      id: `value-${index}`,
+      id: item.id,
       type: item.value,
       category: 'values',
       index,
@@ -110,9 +229,9 @@ export function buildConfigWidgets(config) {
       data: item,
     })
   })
-  ;(config.plots || []).forEach((item, index) => {
+  ;(normalizedConfig.plots || []).forEach((item, index) => {
     widgets.push({
-      id: `plot-${index}`,
+      id: item.id,
       type: item.value,
       category: 'plots',
       index,
@@ -153,13 +272,6 @@ export function groupWidgetsForSidebar(widgets, typeLabels) {
 }
 
 /**
- * Finds widget by id.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {*} widgetId - Identifier of the target widget.
- * @returns {*} Requested value or structure.
- */
-/**
  * Updates widget in config.
  *
  * @param {*} config - Overlay template configuration data.
@@ -172,6 +284,7 @@ export function updateWidgetInConfig(config, widgetId, updates) {
   return updateWidgetEntry(config, widgetId, (currentWidget) => ({
     ...currentWidget,
     ...normalizedUpdates,
+    id: currentWidget.id,
   }))
 }
 
@@ -187,21 +300,24 @@ export function updateWidgetsInConfig(config, updatesById) {
     return config
   }
 
+  const normalizedConfig = ensureWidgetIdsInConfig(config)
   const widgetUpdates = Object.entries(updatesById).filter(([, updates]) => updates && typeof updates === 'object')
   if (!widgetUpdates.length) {
-    return config
+    return normalizedConfig
   }
 
   const nextCollectionsByCategory = new Map()
   let hasChanges = false
 
   widgetUpdates.forEach(([widgetId, updates]) => {
-    const target = resolveWidgetTarget(widgetId)
+    const target = findWidgetInConfig(normalizedConfig, widgetId)
     if (!target) {
       return
     }
 
-    const sourceCollection = nextCollectionsByCategory.has(target.category) ? nextCollectionsByCategory.get(target.category) : config[target.category]
+    const sourceCollection = nextCollectionsByCategory.has(target.category)
+      ? nextCollectionsByCategory.get(target.category)
+      : normalizedConfig[target.category]
     const currentWidget = Array.isArray(sourceCollection) ? sourceCollection[target.index] : null
 
     if (!currentWidget) {
@@ -211,6 +327,7 @@ export function updateWidgetsInConfig(config, updatesById) {
     const nextWidget = {
       ...currentWidget,
       ...normalizeColorFields(updates),
+      id: currentWidget.id,
     }
     const nextCollection = [...sourceCollection]
     nextCollection[target.index] = nextWidget
@@ -219,11 +336,11 @@ export function updateWidgetsInConfig(config, updatesById) {
   })
 
   if (!hasChanges) {
-    return config
+    return normalizedConfig
   }
 
   return {
-    ...config,
+    ...normalizedConfig,
     ...Object.fromEntries(nextCollectionsByCategory),
   }
 }
@@ -237,7 +354,10 @@ export function updateWidgetsInConfig(config, updatesById) {
  * @returns {*} Result produced by the helper.
  */
 export function replaceWidgetInConfig(config, widgetId, nextWidgetData) {
-  return updateWidgetEntry(config, widgetId, () => nextWidgetData)
+  return updateWidgetEntry(config, widgetId, (currentWidget) => ({
+    ...nextWidgetData,
+    id: currentWidget.id,
+  }))
 }
 
 /**
@@ -250,18 +370,18 @@ export function replaceWidgetInConfig(config, widgetId, nextWidgetData) {
 export function deleteWidgetInConfig(config, widgetId) {
   if (!config) return config
 
-  const target = resolveWidgetTarget(widgetId)
+  const target = findWidgetInConfig(config, widgetId)
   if (!target) {
     return config
   }
 
-  const currentCollection = config[target.category]
+  const currentCollection = target.config[target.category]
   if (!Array.isArray(currentCollection) || !currentCollection[target.index]) {
     return config
   }
 
   return {
-    ...config,
+    ...target.config,
     [target.category]: currentCollection.filter((_, index) => index !== target.index),
   }
 }
@@ -278,9 +398,10 @@ export function deleteWidgetsInConfig(config, widgetIds) {
     return config
   }
 
+  const normalizedConfig = ensureWidgetIdsInConfig(config)
   const indexesByCategory = widgetIds.reduce((accumulator, widgetId) => {
-    const target = resolveWidgetTarget(widgetId)
-    if (!target || !config?.[target.category]?.[target.index]) {
+    const target = findWidgetInConfig(normalizedConfig, widgetId)
+    if (!target || !normalizedConfig?.[target.category]?.[target.index]) {
       return accumulator
     }
 
@@ -302,6 +423,6 @@ export function deleteWidgetsInConfig(config, widgetIds) {
       ...nextConfig,
       [category]: (nextConfig[category] || []).filter((_, index) => !indexesByCategory[category].has(index)),
     }),
-    config,
+    normalizedConfig,
   )
 }

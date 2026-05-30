@@ -89,7 +89,7 @@ describe('OverlayEditor selection flow', () => {
   })
 
   test('supports pointer multi-select and delete through the shared selection store', () => {
-    const config = makeConfig([makeLabel('A'), makeLabel('B')])
+    const config = makeConfig([makeLabel('A', { id: 'widget-1' }), makeLabel('B', { id: 'widget-2' })])
     const onConfigChange = vi.fn()
 
     useStore.getState().setConfig(config)
@@ -109,21 +109,21 @@ describe('OverlayEditor selection flow', () => {
       />,
     )
 
-    const firstWidget = container.querySelector('[data-widget-id="label-0"]')
-    const secondWidget = container.querySelector('[data-widget-id="label-1"]')
+    const firstWidget = container.querySelector('[data-widget-id="widget-1"]')
+    const secondWidget = container.querySelector('[data-widget-id="widget-2"]')
 
     expect(firstWidget).toBeTruthy()
     expect(secondWidget).toBeTruthy()
 
     fireEvent.mouseDown(firstWidget, { button: 0 })
 
-    expect(useStore.getState().selectedWidgetIds).toEqual(['label-0'])
-    expect(useStore.getState().selectedWidgetId).toBe('label-0')
+    expect(useStore.getState().selectedWidgetIds).toEqual(['widget-1'])
+    expect(useStore.getState().selectedWidgetId).toBe('widget-1')
 
     fireEvent.mouseDown(secondWidget, { button: 0, ctrlKey: true })
 
-    expect(useStore.getState().selectedWidgetIds).toEqual(['label-0', 'label-1'])
-    expect(useStore.getState().selectedWidgetId).toBe('label-1')
+    expect(useStore.getState().selectedWidgetIds).toEqual(['widget-1', 'widget-2'])
+    expect(useStore.getState().selectedWidgetId).toBe('widget-2')
 
     fireEvent.keyDown(window, { key: 'Delete' })
 

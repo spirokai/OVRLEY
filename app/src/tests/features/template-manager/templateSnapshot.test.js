@@ -58,6 +58,40 @@ describe('template snapshot standard metric schema', () => {
     expect(payload.version).toBe(TEMPLATE_FILE_VERSION)
   })
 
+  test('preserves stable widget ids when saving a template payload', () => {
+    const payload = createTemplateFilePayload({
+      config: {
+        scene: {},
+        labels: [{ id: 'widget-1', text: 'Label', x: 0, y: 0, color: '#ffffff' }],
+        values: [{ id: 'widget-2', value: 'speed', x: 10, y: 20 }],
+        plots: [{ id: 'widget-3', value: 'heading', x: 30, y: 40 }],
+      },
+      globalDefaults: {},
+    })
+
+    expect(payload.config.labels[0].id).toBe('widget-1')
+    expect(payload.config.values[0].id).toBe('widget-2')
+    expect(payload.config.plots[0].id).toBe('widget-3')
+  })
+
+  test('upgrades legacy templates without widget ids when loading them', () => {
+    const normalized = normalizeTemplateFilePayload({
+      format: TEMPLATE_FILE_FORMAT,
+      version: TEMPLATE_FILE_VERSION,
+      config: {
+        scene: {},
+        labels: [{ text: 'Legacy label', x: 0, y: 0 }],
+        values: [{ value: 'speed', x: 10, y: 20 }],
+        plots: [{ value: 'heading', x: 30, y: 40 }],
+      },
+      settings: { globalDefaults: {} },
+    })
+
+    expect(normalized.config.labels[0].id).toMatch(/^widget-\d+$/)
+    expect(normalized.config.values[0].id).toMatch(/^widget-\d+$/)
+    expect(normalized.config.plots[0].id).toMatch(/^widget-\d+$/)
+  })
+
   test('templateStatesEqual returns true for structurally equal template states', () => {
     const state = {
       config: { scene: { width: 1920, height: 1080, fps: 30 }, labels: [], values: [{ value: 'speed', x: 10 }], plots: [] },

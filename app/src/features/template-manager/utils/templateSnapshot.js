@@ -11,6 +11,7 @@
 
 import { normalizeColorFields } from '@/lib/color-utils'
 import { DEFAULT_GLOBAL_DEFAULTS, GLOBAL_DEFAULT_KEYS, SCENE_DERIVED_SETTING_KEYS, SCENE_GLOBAL_DEFAULT_KEYS } from '@/lib/config-utils'
+import { ensureWidgetIdsInConfig } from '@/lib/widget-config'
 import { deepEqual } from '@/store/store-utils'
 import {
   TEMPLATE_FILE_FORMAT,
@@ -132,7 +133,7 @@ function normalizePlot(plot = {}, config, globalDefaults) {
 }
 
 export function normalizeTemplateConfig(config, globalDefaults) {
-  const nextConfig = cloneSerializable(config) || {}
+  const nextConfig = ensureWidgetIdsInConfig(cloneSerializable(config) || {})
   const normalizedConfig = {
     scene: normalizeScene(nextConfig.scene),
     labels: Array.isArray(nextConfig.labels) ? nextConfig.labels.map(normalizeLabel) : [],
