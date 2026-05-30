@@ -31,7 +31,7 @@ function createOptions(overrides = {}) {
     previewPlaybackState: 'paused',
     sceneFps: 30,
     selectedSecond: 1,
-    setSelectedSecondTransient: vi.fn(),
+    setSelectedSecond: vi.fn(),
     startPreviewPlayback: vi.fn(),
     updatePreviewScrub: vi.fn(),
     updateRate: 1,
@@ -147,7 +147,7 @@ describe('usePlaybackEngine', () => {
       raf.fireNextFrame(1500)
     })
 
-    expect(options.setSelectedSecondTransient).toHaveBeenCalledWith(1.5)
+    expect(options.setSelectedSecond).toHaveBeenCalledWith(1.5)
 
     act(() => {
       raf.fireNextFrame(3500)

@@ -2,20 +2,14 @@
  * Implements API helpers for backend.
  */
 
-// Check if the Tauri IPC runtime is actually available.
-
-/**
- * Checks whether is tauri.
- * @returns {boolean} Whether the condition is satisfied.
- */
-const isTauri = () => typeof window !== 'undefined' && typeof window.__TAURI_INTERNALS__ !== 'undefined'
+import { hasTauriRuntime } from '@/lib/tauri-runtime'
 
 /**
  * Returns invoke.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 async function getInvoke() {
-  if (!isTauri()) return null
+  if (!hasTauriRuntime()) return null
   const { invoke } = await import('@tauri-apps/api/core')
   return invoke
 }

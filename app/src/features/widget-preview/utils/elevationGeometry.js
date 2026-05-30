@@ -12,7 +12,7 @@ import {
   SIMPLIFY_TOLERANCE_CLAMP_MAX,
   GEOMETRY_EPSILON,
 } from '@/features/overlay-editor'
-import { clamp } from '@/lib/geometryUtils'
+import { clamp } from '@/lib/utils'
 
 /**
  * Normalizes elevation data into projected SVG points with smoothing, downsampling, and simplification.

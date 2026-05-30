@@ -3,6 +3,8 @@
  * Manages the window.__BACKEND_DEBUG__ object for tracking backend connection state and logs.
  */
 
+import { hasTauriRuntime } from '@/lib/tauri-runtime'
+
 /**
  * Ensures the backend debug state object exists on window.
  * @returns {object|null} The debug state object, or null if window is not available.
@@ -60,12 +62,6 @@ function updateBackendStatus(status, error = null) {
   debugState.error = error
 }
 
-/**
- * Checks whether the code is running in a Tauri runtime environment.
- * @returns {boolean} True if running inside Tauri (window.__TAURI_INTERNALS__ is defined).
- */
-export function hasTauriRuntime() {
-  return typeof window !== 'undefined' && typeof window.__TAURI_INTERNALS__ !== 'undefined'
-}
+export { hasTauriRuntime }
 
 export { ensureBackendDebugState, logBackend, updateBackendStatus }

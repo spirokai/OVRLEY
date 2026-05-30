@@ -19,7 +19,7 @@ import {
   resolutionsMismatch,
 } from '../utils/codecUtils'
 import { getContainerFps, getUpdateRateOptions, sanitizeIntegerFps } from '@/lib/update-rate'
-import { getDefaultBitrate } from '../utils/bitrateDefaults'
+import { getDefaultBitrate } from '../data/bitrateDefaults'
 
 export default function useRenderVideoDerivedState({ settings }) {
   // Store selectors

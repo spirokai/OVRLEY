@@ -3,7 +3,6 @@
  * Domain constants used by these functions live in @/lib/widget-icons and ../data/widgetDefaults.
  */
 
-export { clamp } from '@/lib/utils'
 import { createFontSelection } from '@/lib/fonts'
 import {
   LABEL_DEFAULTS,

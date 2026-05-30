@@ -297,53 +297,32 @@ function deriveTorqueSeries(powerSeries, cadenceSeries, helpers) {
  * @param {*} derivedSeries - Value for derived series.
  * @returns {object} Result produced by the helper.
  */
-function combineSeries(directSeries, derivedSeries) {
-  const combinedSeries = directSeries.map((value, index) => value ?? derivedSeries[index] ?? null)
-
-  const directCount = directSeries.filter((value) => value !== null).length
-  const derivedOnlyCount = combinedSeries.filter((value, index) => value !== null && directSeries[index] === null).length
-
-  let source = 'missing'
-  if (directCount > 0 && derivedOnlyCount > 0) {
-    source = 'mixed'
-  } else if (directCount > 0) {
-    source = 'direct'
-  } else if (derivedOnlyCount > 0) {
-    source = 'derived'
-  }
-
-  return {
-    series: combinedSeries,
-    source,
-  }
-}
-
 /**
- * Combines series prefer derived.
- *
- * @param {*} derivedSeries - Value for derived series.
- * @param {*} directSeries - Value for direct series.
- * @returns {object} Result produced by the helper.
+ * Combines a primary series with a fallback series at each index.
+ * @param {number[]} primarySeries - Values to prefer (direct or derived depending on options).
+ * @param {number[]} fallbackSeries - Values to use when primary is null.
+ * @param {{ preferDerived?: boolean }} [options] - When true, source labels reflect derived-first preference.
+ * @returns {{ series: number[], source: 'direct'|'derived'|'mixed'|'missing' }}
  */
-function combineSeriesPreferDerived(derivedSeries, directSeries) {
-  const combinedSeries = derivedSeries.map((value, index) => value ?? directSeries[index] ?? null)
+function combineSeries(primarySeries, fallbackSeries, { preferDerived = false } = {}) {
+  const combinedSeries = primarySeries.map((value, index) => value ?? fallbackSeries[index] ?? null)
 
-  const derivedCount = derivedSeries.filter((value) => value !== null).length
-  const directFallbackCount = combinedSeries.filter((value, index) => value !== null && derivedSeries[index] === null).length
+  const primaryCount = primarySeries.filter((value) => value !== null).length
+  const fallbackOnlyCount = combinedSeries.filter((value, index) => value !== null && primarySeries[index] === null).length
+
+  const primarySource = preferDerived ? 'derived' : 'direct'
+  const fallbackSource = preferDerived ? 'direct' : 'derived'
 
   let source = 'missing'
-  if (derivedCount > 0 && directFallbackCount > 0) {
+  if (primaryCount > 0 && fallbackOnlyCount > 0) {
     source = 'mixed'
-  } else if (derivedCount > 0) {
-    source = 'derived'
-  } else if (directFallbackCount > 0) {
-    source = 'direct'
+  } else if (primaryCount > 0) {
+    source = primarySource
+  } else if (fallbackOnlyCount > 0) {
+    source = fallbackSource
   }
 
-  return {
-    series: combinedSeries,
-    source,
-  }
+  return { series: combinedSeries, source }
 }
 
 /**
@@ -441,7 +420,7 @@ export function deriveActivityMetricSeries({
       elevation: combineSeries(directMetrics.elevation, nullSeries),
       g_force: combineSeries(directMetrics.g_force, nullSeries),
       gear_position: combineSeries(directMetrics.gear_position, nullSeries),
-      gradient: combineSeriesPreferDerived(derivedGradient, directMetrics.gradient),
+      gradient: combineSeries(derivedGradient, directMetrics.gradient, { preferDerived: true }),
       ground_contact_time: combineSeries(directMetrics.ground_contact_time, nullSeries),
       heading: combineSeries(directMetrics.heading, derivedHeading),
       heartrate: combineSeries(directMetrics.heartrate, nullSeries),

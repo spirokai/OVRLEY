@@ -4,7 +4,7 @@
  */
 
 import { DENSITY_CLAMP_MIN, DENSITY_CLAMP_MAX, SIMPLIFY_MIN_TOLERANCE, ROUTE_FALLBACK_INSET_MAX_RATIO } from '@/features/overlay-editor'
-import { clamp } from '@/lib/geometryUtils'
+import { clamp } from '@/lib/utils'
 
 /**
  * Builds a synthetic fallback route when no valid GPS samples are available.

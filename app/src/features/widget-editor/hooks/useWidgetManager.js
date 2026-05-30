@@ -17,7 +17,8 @@ import {
   updateWidgetInConfig,
 } from '@/lib/widget-config'
 import { isStandardMetricWidgetType } from '@/lib/standard-metrics'
-import { createLabelDefaults, createMetricValueDefaults, createPlotDefaults, clamp, parseInteger } from '../utils/widgetUtils'
+import { clamp } from '@/lib/utils'
+import { createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
 import { HEADING_DEFAULTS } from '../data/widgetDefaults'
 
 /**

@@ -13,7 +13,7 @@ import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previ
 import useOverlayMoveableHandlers from './createOverlayMoveableHandlers'
 import useOverlayPointerHandlers from '../utils/createOverlayPointerHandlers'
 import { getPrimarySelectionId, normalizeSelectionIds } from '../utils/overlayEditorHelpers'
-import { clamp } from '@/lib/geometryUtils'
+import { clamp } from '@/lib/utils'
 import { getSceneSize } from '../utils/overlayEditorUtils'
 import { useEditorViewport } from './useEditorViewport'
 import { useEditorKeyboard } from './useEditorKeyboard'

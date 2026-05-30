@@ -1,44 +1,24 @@
 /**
- * Implements the use Available Fonts hook and related behavior for the app.
+ * Provides available fonts state from system and bundled fonts.
  */
 
 import { useEffect, useState } from 'react'
 import * as backend from '@/api/backend'
+import { createCachedPromise } from '@/lib/cached-promise'
 
-let cachedFonts = null
-let pendingFontsPromise = null
+const loadAvailableFonts = createCachedPromise(() => backend.listAvailableFonts())
 
-/**
- * Handles load available fonts.
- * @returns {Promise<*>} Promise resolving to the operation result.
- */
-async function loadAvailableFonts() {
-  if (cachedFonts) {
-    return cachedFonts
+const initialFonts = (() => {
+  try {
+    const cached = loadAvailableFonts()
+    return cached instanceof Promise ? [] : cached
+  } catch {
+    return []
   }
+})()
 
-  if (!pendingFontsPromise) {
-    pendingFontsPromise = backend
-      .listAvailableFonts()
-      .then((fonts) => {
-        cachedFonts = fonts
-        return fonts
-      })
-      .catch((error) => {
-        pendingFontsPromise = null
-        throw error
-      })
-  }
-
-  return pendingFontsPromise
-}
-
-/**
- * Provides available fonts state and actions.
- * @returns {*} Result produced by the helper.
- */
 export default function useAvailableFonts() {
-  const [systemFonts, setSystemFonts] = useState(cachedFonts || [])
+  const [systemFonts, setSystemFonts] = useState(initialFonts)
 
   useEffect(() => {
     let cancelled = false

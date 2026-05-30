@@ -29,7 +29,7 @@ export function useVideoPreview(videoRef, isActive = true) {
   const selectedSecond = useStore((state) => state.selectedSecond)
   const previewPlaybackState = useStore((state) => state.previewPlaybackState)
   const previewPlaybackSource = useStore((state) => state.previewPlaybackSource)
-  const setSelectedSecondTransient = useStore((state) => state.setSelectedSecondTransient)
+  const setSelectedSecond = useStore((state) => state.setSelectedSecond)
   const setImportedVideoPreviewError = useStore((state) => state.setImportedVideoPreviewError)
   const videoDuration = useStore((state) => state.importedVideoDuration || 0)
 
@@ -56,7 +56,7 @@ export function useVideoPreview(videoRef, isActive = true) {
     videoRef,
     isActive: Boolean(videoSrc) && isVideoPlaybackMode,
     videoSyncOffsetSeconds,
-    onPreviewSecond: setSelectedSecondTransient,
+    onPreviewSecond: setSelectedSecond,
   })
 
   // Video sync - keeps play/pause/scrub ownership focused on the active video element.

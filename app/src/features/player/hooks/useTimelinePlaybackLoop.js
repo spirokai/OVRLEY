@@ -15,7 +15,7 @@ import { clamp, createPlaybackAnchor, getTimelinePlaybackSecond } from '../utils
  * @param {function} options.pausePreviewPlayback - Store action that pauses playback.
  * @param {React.MutableRefObject<{ startedAtMs: number, startedSecond: number }>} options.playbackAnchorRef - Playback anchor ref.
  * @param {React.MutableRefObject<number>} options.previewFrameRef - Last published preview frame index.
- * @param {function} options.setSelectedSecondTransient - Store action for transient playhead updates.
+ * @param {function} options.setSelectedSecond - Store action for transient playhead updates.
  * @param {React.MutableRefObject<number>} options.totalDurationRef - Total playable duration ref.
  * @returns {void}
  */
@@ -26,7 +26,7 @@ export function useTimelinePlaybackLoop({
   pausePreviewPlayback,
   playbackAnchorRef,
   previewFrameRef,
-  setSelectedSecondTransient,
+  setSelectedSecond,
   totalDurationRef,
 }) {
   useEffect(() => {
@@ -58,7 +58,7 @@ export function useTimelinePlaybackLoop({
 
       if (frameIndex !== previewFrameRef.current) {
         previewFrameRef.current = frameIndex
-        setSelectedSecondTransient(clamp(frameIndex / effectivePreviewFps, 0, safeDuration))
+        setSelectedSecond(clamp(frameIndex / effectivePreviewFps, 0, safeDuration))
       }
 
       animationFrameId = window.requestAnimationFrame(tick)
@@ -74,7 +74,7 @@ export function useTimelinePlaybackLoop({
     pausePreviewPlayback,
     playbackAnchorRef,
     previewFrameRef,
-    setSelectedSecondTransient,
+    setSelectedSecond,
     totalDurationRef,
   ])
 }

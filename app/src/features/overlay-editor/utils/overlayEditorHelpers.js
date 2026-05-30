@@ -4,7 +4,7 @@
  */
 
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from '../data/overlayEditorConstants'
-import { clamp } from '@/lib/geometryUtils'
+import { clamp } from '@/lib/utils'
 
 /**
  * Checks whether the target element is inside an editable input, textarea,

@@ -6,7 +6,6 @@
  */
 
 import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, syncSceneTimingToConfig } from '../store-utils'
-import { incrementPreviewPerfCounter, previewPerfCounterName } from '../../lib/previewPerf'
 import { buildConfigWidgets, ensureWidgetIdsInConfig } from '../../lib/widget-config'
 
 /**
@@ -198,16 +197,6 @@ export function createEditorSlice(set, get) {
 
     setSelectedSecond: (second) => {
       const safeSecond = normalizePreviewSecond(second)
-
-      set((state) => {
-        state.selectedSecond = safeSecond
-      })
-    },
-
-    setSelectedSecondTransient: (second) => {
-      const safeSecond = normalizePreviewSecond(second)
-
-      incrementPreviewPerfCounter(previewPerfCounterName('transient selectedSecond updates'))
 
       set((state) => {
         state.selectedSecond = safeSecond

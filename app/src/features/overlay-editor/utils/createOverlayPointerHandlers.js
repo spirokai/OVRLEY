@@ -3,7 +3,7 @@
  */
 
 import { ZOOM_MIN, ZOOM_MAX } from '../data/overlayEditorConstants'
-import { clamp } from '@/lib/geometryUtils'
+import { clamp } from '@/lib/utils'
 import { buildSelectionRect, getPrimarySelectionId, hasSelectionModifier, normalizeSelectionIds, rectanglesIntersect } from './overlayEditorHelpers'
 
 /**

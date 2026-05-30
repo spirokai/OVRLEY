@@ -16,7 +16,7 @@ export {
   getActivityDurationSeconds,
   getExportWindowDistanceSpan,
   normalizeDistanceProgressToWindow,
-} from './utils/exportRange'
+} from '@/lib/export-range'
 
 export {
   getEffectivePreviewFps,

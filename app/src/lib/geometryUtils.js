@@ -6,7 +6,6 @@
  */
 
 import { clamp } from './utils'
-export { clamp }
 
 /**
  * Builds a CSS transform string from scale and rotation values.

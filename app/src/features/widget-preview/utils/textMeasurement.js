@@ -10,7 +10,7 @@ import {
   METRIC_WIDGET_UNITS_GAP_PX,
   NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT,
 } from '@/features/overlay-editor'
-import { clamp } from '@/lib/geometryUtils'
+import { clamp } from '@/lib/utils'
 
 let metricMeasureContext = null
 

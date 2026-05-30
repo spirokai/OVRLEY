@@ -3,7 +3,7 @@
  */
 
 import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
-import { clamp } from '@/lib/geometryUtils'
+import { clamp } from '@/lib/utils'
 
 /**
  * Creates resize-related moveable handlers.

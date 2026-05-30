@@ -1,6 +1,7 @@
 import { detectCodecs } from '@/api/backend'
+import { createCachedPromise } from '@/lib/cached-promise'
 
-let availableCodecsPromise = null
+let fetchCodecsOnce = null
 
 export const createVideoImportSlice = (set, get) => ({
   importedVideoPath: null, // absolute path from Tauri file dialog
@@ -101,29 +102,19 @@ export const createVideoImportSlice = (set, get) => ({
       return cachedCodecs
     }
 
-    if (availableCodecsPromise) {
-      return availableCodecsPromise
+    if (!fetchCodecsOnce) {
+      fetchCodecsOnce = createCachedPromise(detectCodecs)
     }
 
-    availableCodecsPromise = detectCodecs()
-      .then((availableCodecs) => {
-        set({
-          availableCodecs,
-        })
-        return availableCodecs
-      })
-      .catch((error) => {
-        console.error('Failed to detect ffmpeg codecs:', error)
-        set({
-          availableCodecs: null,
-        })
-        return null
-      })
-      .finally(() => {
-        availableCodecsPromise = null
-      })
-
-    return availableCodecsPromise
+    try {
+      const availableCodecs = await fetchCodecsOnce()
+      set({ availableCodecs })
+      return availableCodecs
+    } catch (error) {
+      console.error('Failed to detect ffmpeg codecs:', error)
+      set({ availableCodecs: null })
+      return null
+    }
   },
 
   computeVideoSync: (activitySummary) =>

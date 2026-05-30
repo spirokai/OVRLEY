@@ -24,7 +24,7 @@ import { useTimelinePlaybackLoop } from './useTimelinePlaybackLoop'
  * @param {string} options.previewPlaybackState - Active playback state.
  * @param {number} options.sceneFps - Scene frames per second.
  * @param {number} options.selectedSecond - Current selected timeline second.
- * @param {function} options.setSelectedSecondTransient - Store action for transient playhead updates.
+ * @param {function} options.setSelectedSecond - Store action for playhead updates.
  * @param {function} options.startPreviewPlayback - Store action to start playback.
  * @param {function} options.updatePreviewScrub - Store action to update an active scrub.
  * @param {number} options.updateRate - Preview update rate.
@@ -44,7 +44,7 @@ export default function usePlaybackEngine({
   previewPlaybackState,
   sceneFps,
   selectedSecond,
-  setSelectedSecondTransient,
+  setSelectedSecond,
   startPreviewPlayback,
   updatePreviewScrub,
   updateRate,
@@ -116,9 +116,9 @@ export default function usePlaybackEngine({
     }
 
     if (clampedPlayhead !== selectedSecond) {
-      setSelectedSecondTransient(clampedPlayhead)
+      setSelectedSecond(clampedPlayhead)
     }
-  }, [clampedPlayhead, hasActivity, selectedSecond, setSelectedSecondTransient])
+  }, [clampedPlayhead, hasActivity, selectedSecond, setSelectedSecond])
 
   usePlaybackSourceHandoff({
     clampedPlayhead,
@@ -140,7 +140,7 @@ export default function usePlaybackEngine({
     pausePreviewPlayback,
     playbackAnchorRef,
     previewFrameRef,
-    setSelectedSecondTransient,
+    setSelectedSecond,
     totalDurationRef,
   })
 
