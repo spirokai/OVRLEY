@@ -87,6 +87,7 @@ function WidgetPreview({
         previewSecond={previewSecond}
         globalOpacity={globalOpacity}
         sceneFont={sceneFont}
+        sceneStyle={sceneStyle}
         valueFont={valueFont}
       />
     )

@@ -29,11 +29,11 @@ pub fn prepare_heading_cache(
     let tape_width = (360.0 * plot.pixels_per_degree).ceil() as u32;
     let tape_height = plot.height;
 
-    // Resolve shadow style from widget config (overrides scene defaults)
+    // Resolve shadow style from scene defaults
     let shadow = normalize_shadow_style(
-        plot.shadow_color.as_ref(),
-        plot.shadow_strength,
-        plot.shadow_distance,
+        config.scene.shadow_color.as_ref(),
+        config.scene.shadow_strength,
+        config.scene.shadow_distance,
         1.0,
     );
 
@@ -93,64 +93,7 @@ pub fn prepare_heading_cache(
 
     let labels = visible_labels(&ticks, plot.show_minor_labels, plot.show_major_labels);
 
-    // Draw ticks
-    let mut tick_paint = Paint::default();
-    tick_paint.set_anti_alias(true);
-
-    for tick in &ticks {
-        let color_str = if tick.is_cardinal {
-            cardinal_tick_color
-        } else {
-            tick_color
-        };
-        tick_paint.set_color(parse_color(color_str, 1.0));
-        tick_paint.set_stroke_width(if tick.is_major {
-            plot.major_tick_thickness
-        } else {
-            plot.minor_tick_thickness
-        });
-
-        let length = if tick.is_major {
-            major_tick_length
-        } else {
-            minor_tick_length
-        };
-        let top = if plot.tick_alignment == "centered" {
-            center_y - length / 2.0
-        } else {
-            tick_bottom - length
-        };
-
-        canvas.draw_line(
-            Point::new(tick.x, top),
-            Point::new(tick.x, top + length),
-            &tick_paint,
-        );
-    }
-
-    // Draw labels
-    if !labels.is_empty() {
-        let mut label_paint = Paint::default();
-        label_paint.set_anti_alias(true);
-
-        for label in &labels {
-            let color_str = if label.is_major_label {
-                cardinal_label_color
-            } else {
-                label_color
-            };
-            label_paint.set_color(parse_color(color_str, 1.0));
-
-            canvas.draw_str(
-                &label.text,
-                Point::new(label.x, label_y),
-                &font,
-                &label_paint,
-            );
-        }
-    }
-
-    // Apply shadow as a second pass: redraw ticks and labels with shadow filter
+    // Draw shadow pass first so shadows sit behind the main content
     if let Some(ref shadow) = shadow {
         if shadow.strength > 0.0 || shadow.distance != 0.0 {
             let shadow_filter = image_filters::drop_shadow_only(
@@ -211,6 +154,63 @@ pub fn prepare_heading_cache(
                     );
                 }
             }
+        }
+    }
+
+    // Draw ticks on top of shadows
+    let mut tick_paint = Paint::default();
+    tick_paint.set_anti_alias(true);
+
+    for tick in &ticks {
+        let color_str = if tick.is_cardinal {
+            cardinal_tick_color
+        } else {
+            tick_color
+        };
+        tick_paint.set_color(parse_color(color_str, 1.0));
+        tick_paint.set_stroke_width(if tick.is_major {
+            plot.major_tick_thickness
+        } else {
+            plot.minor_tick_thickness
+        });
+
+        let length = if tick.is_major {
+            major_tick_length
+        } else {
+            minor_tick_length
+        };
+        let top = if plot.tick_alignment == "centered" {
+            center_y - length / 2.0
+        } else {
+            tick_bottom - length
+        };
+
+        canvas.draw_line(
+            Point::new(tick.x, top),
+            Point::new(tick.x, top + length),
+            &tick_paint,
+        );
+    }
+
+    // Draw labels on top of shadows
+    if !labels.is_empty() {
+        let mut label_paint = Paint::default();
+        label_paint.set_anti_alias(true);
+
+        for label in &labels {
+            let color_str = if label.is_major_label {
+                cardinal_label_color
+            } else {
+                label_color
+            };
+            label_paint.set_color(parse_color(color_str, 1.0));
+
+            canvas.draw_str(
+                &label.text,
+                Point::new(label.x, label_y),
+                &font,
+                &label_paint,
+            );
         }
     }
 

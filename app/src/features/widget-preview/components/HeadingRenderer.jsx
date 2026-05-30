@@ -11,6 +11,7 @@
  * @param {object|null} [props.activity] - Activity data with heading series.
  * @param {number} [props.previewSecond] - Current preview time in seconds.
  * @param {number} [props.globalOpacity] - Global opacity multiplier.
+ * @param {object} [props.sceneStyle] - Scene style object (shadow, border).
  * @returns {JSX.Element} SVG element for heading widget preview.
  */
 
@@ -20,6 +21,7 @@ import { getPreviewFontFamily, getWidgetOpacity } from '../utils/textMeasurement
 import { headingOffset, visibleTicks, visibleLabels, chevronVertices } from '../utils/headingGeometry'
 import { sanitizeSvgId } from '../utils/svgPreviewUtils'
 import { useFontMetricsVersion } from '../hooks/useFontMetricsVersion'
+import { getTextShadowParts } from '../utils/shadowUtils'
 
 /**
  * Renders tick marks into the tape pattern.
@@ -137,7 +139,7 @@ function buildShadowFilter(id, shadow) {
   )
 }
 
-export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOpacity, sceneFont, valueFont }) {
+export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOpacity, sceneFont, valueFont, sceneStyle }) {
   const data = widget.data ?? {}
   const width = Math.max(Number(data.width) || 400, 80)
   const height = Math.max(Number(data.height) || 80, 20)
@@ -176,10 +178,9 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
     [ticks, data.show_minor_labels, data.show_numeric_labels, data.show_major_labels, data.show_cardinal_labels],
   )
 
-  const shadowFilterId = sanitizeSvgId(`${widget.id}-indicator-shadow`)
-  const shadow = data.shadow_color
-    ? { color: data.shadow_color, distance: Number(data.shadow_distance) || 0, strength: Number(data.shadow_strength) || 0 }
-    : null
+  const shadow = useMemo(() => getTextShadowParts(sceneStyle), [sceneStyle])
+
+  const shadowFilterId = sanitizeSvgId(`${widget.id}-shadow`)
 
   return (
     <svg
@@ -203,14 +204,19 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
         {shadow && buildShadowFilter(shadowFilterId, shadow)}
       </defs>
 
-      {/* Tape background filled with the scrolling pattern */}
+      {/* Shadow layer: pattern fill with feDropShadow behind the main tape */}
+      {shadow && (
+        <rect width={width} height={height} fill={`url(#${sanitizeSvgId(`${widget.id}-tape-pattern`)})`} filter={`url(#${shadowFilterId})`} />
+      )}
+
+      {/* Main tape layer on top */}
       <rect width={width} height={height} fill={`url(#${sanitizeSvgId(`${widget.id}-tape-pattern`)})`} />
 
-      {/* Indicator overlay */}
+      {/* Indicator overlay — shadow only applies to chevron, not highlight bar */}
       {data.show_indicator !== false && (
         <>
           {data.indicator_style === 'highlight_bar'
-            ? renderHighlightBar(width / 2, 0, height, data, shadow ? shadowFilterId : null)
+            ? renderHighlightBar(width / 2, 0, height, data, null)
             : renderChevron(width / 2, 0, height, data, shadow ? shadowFilterId : null)}
         </>
       )}

@@ -122,27 +122,7 @@ fn draw_chevron_indicator(
     paint.set_anti_alias(true);
     paint.set_color(color);
 
-    let draw_chevron = |edge_y: f32, pointing_down: bool| {
-        let verts = chevron_vertices(center_x - cache.x, edge_y - cache.y, size, pointing_down);
-        let mut path = Path::new();
-        path.move_to(Point::new(verts[0].x + cache.x, verts[0].y + cache.y));
-        path.line_to(Point::new(verts[1].x + cache.x, verts[1].y + cache.y));
-        path.line_to(Point::new(verts[2].x + cache.x, verts[2].y + cache.y));
-        path.close();
-        canvas.draw_path(&path, &paint);
-    };
-
-    match cache.indicator_placement.as_str() {
-        "top" => draw_chevron(top_y, true),
-        "bottom" => draw_chevron(bottom_y, false),
-        "both" => {
-            draw_chevron(top_y, true);
-            draw_chevron(bottom_y, false);
-        }
-        _ => {}
-    }
-
-    // Apply shadow if configured
+    // Apply shadow first so it sits behind the chevron
     if let Some(ref shadow) = cache.indicator_shadow {
         if shadow.strength > 0.0 || shadow.distance != 0.0 {
             if let Some(filter) = skia_safe::image_filters::drop_shadow_only(
@@ -180,6 +160,26 @@ fn draw_chevron_indicator(
             }
         }
     }
+
+    let draw_chevron = |edge_y: f32, pointing_down: bool| {
+        let verts = chevron_vertices(center_x - cache.x, edge_y - cache.y, size, pointing_down);
+        let mut path = Path::new();
+        path.move_to(Point::new(verts[0].x + cache.x, verts[0].y + cache.y));
+        path.line_to(Point::new(verts[1].x + cache.x, verts[1].y + cache.y));
+        path.line_to(Point::new(verts[2].x + cache.x, verts[2].y + cache.y));
+        path.close();
+        canvas.draw_path(&path, &paint);
+    };
+
+    match cache.indicator_placement.as_str() {
+        "top" => draw_chevron(top_y, true),
+        "bottom" => draw_chevron(bottom_y, false),
+        "both" => {
+            draw_chevron(top_y, true);
+            draw_chevron(bottom_y, false);
+        }
+        _ => {}
+    }
 }
 
 /// Draws a highlight bar indicator: a semi-transparent vertical band spanning
@@ -206,28 +206,4 @@ fn draw_highlight_bar_indicator(
         Rect::from_xywh(bar_left, top_y, bar_width, bottom_y - top_y),
         &bar_paint,
     );
-
-    // Apply shadow if configured
-    if let Some(ref shadow) = cache.indicator_shadow {
-        if shadow.strength > 0.0 || shadow.distance != 0.0 {
-            if let Some(filter) = skia_safe::image_filters::drop_shadow_only(
-                (shadow.offset_x, shadow.offset_y),
-                (shadow.strength, shadow.strength),
-                parse_color(&shadow.color, 1.0),
-                None,
-                None,
-            ) {
-                let mut shadow_bar_paint = Paint::default();
-                shadow_bar_paint.set_anti_alias(true);
-                shadow_bar_paint.set_color(color);
-                shadow_bar_paint.set_alpha(76);
-                shadow_bar_paint.set_image_filter(filter);
-
-                canvas.draw_rect(
-                    Rect::from_xywh(bar_left, top_y, bar_width, bottom_y - top_y),
-                    &shadow_bar_paint,
-                );
-            }
-        }
-    }
 }
