@@ -84,15 +84,15 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 
 ### Issue tracker
 
-Local markdown files under `.agents/scratch/`. See `docs/agents/issue-tracker.md`.
+Local markdown files under `.agents/scratch/`. See `.agents/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Five canonical roles: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Recorded as `Status:` in issue frontmatter. See `docs/agents/triage-labels.md`.
+Five canonical roles: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Recorded as `Status:` in issue frontmatter. See `.agents/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: `.agents/agents.md` for project overview and glossary, `docs/ARCHITECTURE.md` for detailed architecture. See `docs/agents/domain.md`.
+Single-context: `.agents/agents.md` for project overview and glossary, `docs/CONTEXT.md` for detailed architecture. See `.agents/agents/domain.md`.
 
 ## Stale documentation to be aware of
 

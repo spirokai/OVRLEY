@@ -5,7 +5,7 @@ How the engineering skills should consume this repo's domain documentation when 
 ## Before exploring, read these
 
 - **`.agents/agents.md`** — project overview, glossary, code style, state management patterns, build commands. This is the canonical source for the project's domain language.
-- **`docs/ARCHITECTURE.md`** — detailed architecture guide covering frontend component tree, Rust backend pipeline, data flow, widget system, and key architectural decisions.
+- **`docs/CONTEXT.md`** — detailed architecture guide covering frontend component tree, Rust backend pipeline, data flow, widget system, and key architectural decisions.
 - **`docs/adr/`** — if any exist, read ADRs that touch the area you're about to work in. (Currently none exist.)
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront.

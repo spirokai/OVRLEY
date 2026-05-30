@@ -23,7 +23,7 @@ Agent: reads issue -> reads PRD -> inspects repo conventions -> implements -> ve
 4. Read the parent PRD from the `## Parent` path.
 5. Read repo guidance before making stack assumptions:
    - `.agents/agents.md`, `AGENTS.md`, `CLAUDE.md`, or equivalent
-   - issue-tracker docs under `docs/agents/`
+   - issue-tracker docs under `.agents/agents/`
    - stack manifests and scripts such as `package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `Makefile`, or workspace config
 6. Explore the touched code paths and identify the smallest set of files needed to satisfy the issue.
 

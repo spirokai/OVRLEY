@@ -1,4 +1,4 @@
-# OVRLEY — Architecture Guide
+# OVRLEY — Project Context
 
 ## 1. Project Overview
 
@@ -24,15 +24,30 @@ cyclemetry/
 │   │   ├── main.jsx              # Entry point
 │   │   ├── App.jsx               # Shell composition
 │   │   ├── index.css             # Tailwind CSS 4 + dark theme + custom fonts
-│   │   ├── api/                  # Tauri IPC bridge + activity parsing
-│   │   ├── store/                # Zustand state (4 slices)
-│   │   ├── hooks/                # Shared hooks (selectors, workflows, lifecycle)
-│   │   ├── lib/                  # Utility library (config, template, color, etc.)
-│   │   ├── features/             # Feature modules (scene-settings, render-video)
-│   │   └── components/           # React components
-│   │       ├── ui/               # shadcn/ui primitives (Radix-based)
-│   │       ├── overlay-editor/   # Editor canvas, moveable, widget renderers
-│   │       └── ...               # Shell, player, sidebar, editors
+│   │   ├── api/                  # Tauri IPC bridge (backend.js)
+│   │   ├── store/                # Zustand state (5 slices)
+│   │   ├── hooks/                # Shared hooks (selectors, useFpsMode)
+│   │   ├── lib/                  # Utility library
+│   │   │   ├── activity/         #   Activity parsing pipeline (FIT/GPX)
+│   │   │   ├── utils.js          #   isInteractiveElement, clamp, cn
+│   │   │   ├── update-rate.js    #   FPS normalization, rate options
+│   │   │   ├── widget-config.js  #   Widget CRUD operations
+│   │   │   └── ...               #   color, geometry, interpolation, template, etc.
+│   │   ├── features/             # 10 feature modules
+│   │   │   ├── app-shell/        #   Shell: header, title bar, bootstrap, activity import, backend status
+│   │   │   ├── overlay-editor/   #   Editor canvas, moveable, widget selection, keyboard
+│   │   │   ├── player/           #   Playback engine, timeline, shortcuts
+│   │   │   ├── render-video/     #   Render dialog, codec selection, progress, workflow
+│   │   │   ├── scene-settings/   #   Resolution, FPS, video sync, global defaults
+│   │   │   ├── template-manager/ #   Template CRUD, community templates, save status
+│   │   │   ├── video-preview/    #   Video import, preview playback, sync
+│   │   │   ├── widget-drawer/    #   Widget quick-add sidebar panel
+│   │   │   ├── widget-editor/    #   Widget property editors, sidebar tab
+│   │   │   └── widget-preview/   #   SVG widget preview renderers
+│   │   ├── components/           # Shared React components
+│   │   │   ├── ui/               #   shadcn/ui primitives (Radix-based, 19 components)
+│   │   │   └── widgets/          #   Widget SVG icons
+│   │   └── tests/                # Vitest tests (50 suites, 320 tests)
 │   ├── package.json
 │   ├── vite.config.js
 │   └── eslint.config.js
@@ -191,7 +206,7 @@ OVRLEY follows a **two-process desktop architecture** via Tauri v2:
 │  │              ▼                    │  │
 │  │    ┌─────────────────┐            │  │
 │  │    │  Zustand Store  │            │  │
-│  │    │  (4 slices)     │            │  │
+│  │    │  (5 slices)     │            │  │
 │  │    └────────┬────────┘            │  │
 │  │             │                     │  │
 │  │    ┌────────▼────────┐            │  │
@@ -263,7 +278,7 @@ OVRLEY follows a **two-process desktop architecture** via Tauri v2:
 
 1. **Skia for rendering, not HTML Canvas:** Overlays are rendered in Rust using Skia, mirroring what will be in the final video. The frontend's `WidgetPreview` components render SVG approximations for preview only.
 2. **No TypeScript:** The frontend is plain JSX. Type documentation is via JSDoc.
-3. **Widget rendering is duplicated:** The JSX SVG preview renderers (`widgetPreviewRenderers.jsx`) approximately match the Rust Skia renderers (`render/widgets/*.rs`). Minor discrepancies exist — the Rust output is authoritative.
+3. **Widget rendering is duplicated:** The JSX SVG preview renderers (in `features/widget-preview/components/`) approximately match the Rust Skia renderers (`render/widgets/*.rs`). Minor discrepancies exist — the Rust output is authoritative.
 4. **Cached static layers:** Labels and static widget backgrounds are rendered once and cached as Skia images. Only dynamic metric values + marker positions are redrawn per frame.
 5. **Composite video timing is tricky:** Overlay FPS = source video FPS / update_rate. Timing mapping goes: overlay_frame -> video_local_time -> activity_time -> dense_frame_index.
 
@@ -273,21 +288,23 @@ OVRLEY follows a **two-process desktop architecture** via Tauri v2:
 
 ### 5.1 State Management (Zustand)
 
-The Zustand store is composed of 4 slices, merged via `create()` with `immer` + `subscribeWithSelector` middleware:
+The Zustand store is composed of 5 slices, merged via `create()` with `immer` + `subscribeWithSelector` middleware:
 
 ```
 useStore
 ├── createEditorSlice
-│   # Config, preview playback, widget selection, autoRender, editor, selectedWidgetId, previewPlaybackState, config
+│   # Preview playback, widget selection, editor config, draft state, selectedSecond
+├── createLayoutSlice
+│   # Widget drawer open/close toggle
 ├── createMediaSlice
-│   # Activity, render status, errors, activitySummary, renderingVideo, errorMessage, renderProgress
+│   # Activity summary, render progress, errors, parsedActivity, videoFilename, activityFilename
 ├── createTemplateSlice
-│   # Templates, export settings, global defaults, templates, loadedTemplateFilename, updateRate, exportRange, globalDefaults
+│   # Templates, export settings, global defaults, aspectRatio, updateRate, config hydration
 └── createVideoImportSlice
-    # Imported video metadata, sync offset, codecs, importedVideoPath, videoSyncOffsetSeconds, availableCodecs
+    # Imported video metadata, sync offset, codec availability, platformOs
 ```
 
-Store access from components goes through selector hooks in `hooks/useAppStoreSelectors.js`, which use `useShallow` to prevent unnecessary re-renders.
+Store access from components goes through selector hooks in `hooks/useAppStoreSelectors.js`, which use `useShallow` to prevent unnecessary re-renders. Non-React utility functions must NOT call `useStore.getState()` — they receive state via parameters from their hook callers. React hooks may use `useStore.getState()` for imperative state reads (e.g. inside callbacks and effects).
 
 ### 5.2 Component Architecture
 
@@ -295,36 +312,48 @@ Components follow a **container/presentational pattern** via hooks:
 
 ```
 App.jsx
-├── useAppBootstrap         # On mount: fetch platform, templates, codecs
-├── useActivityImport       # File input for .gpx/.fit parsing
-├── useTemplateManagement   # CRUD lifecycle for templates
-├── useRenderWorkflow       # Render dialog orchestration
-├── useEditorShellState     # Zoom, grid, background mode
-├── useVideoImport          # Video file import dialog
-├── useBackendStatus        # Backend health polling (2s interval)
+├── useAppBootstrap                 # On mount: fetch platform, templates, codecs    (app-shell)
+├── useActivityImport               # File input for .gpx/.fit parsing               (app-shell)
+├── useTemplateManagement           # CRUD lifecycle for templates                   (template-manager)
+├── useRenderWorkflow               # Render dialog orchestration                    (render-video)
+├── useEditorShellState             # Zoom, grid, background mode                    (app-shell)
+├── useVideoImport                  # Video file import dialog                       (video-preview)
+├── useBackendStatus                # Backend health polling (2s interval)           (app-shell)
 │
-├── TitleBar                # Custom window decorations
-├── AppHeader               # Main toolbar
-├── ControlPanel            # Sidebar with Settings/Widgets tabs
-│   ├── SidebarSettingsTab  # Scene settings, video sync, global defaults
-│   └── SidebarWidgetsTab   # Widget quick-add + property editors
-├── OverlayEditor           # Main editor canvas
-│   ├── OverlayCanvas       # Scene compositing (grid, video bg, widgets)
-│   ├── OverlayMoveable     # Drag/resize/rotate/scale wrapper
-│   ├── WidgetPreview       # Routes to correct renderer by type
-│   └── useOverlayEditorState  # Central editor state hook
-├── OverlayPlayer           # Timeline playback controls
-├── RenderVideoDialog       # Export settings + progress panel
-├── ErrorAlert              # Toast error notification
-└── LoadingOverlay          # Activity spinner
+├── TitleBar                        # Custom window decorations
+├── AppHeader                       # Main toolbar
+├── ControlPanel                    # Sidebar with Settings/Widgets tabs
+│   ├── SidebarSettingsTab          # Scene settings, video sync, global defaults    (scene-settings)
+│   └── SidebarWidgetsTab           # Widget quick-add + property editors            (widget-editor)
+├── OverlayEditor                   # Main editor canvas                             (overlay-editor)
+│   ├── OverlayCanvas               # Scene compositing (grid, video bg, widgets)
+│   ├── OverlayMoveable             # Drag/resize/rotate/scale wrapper
+│   ├── WidgetPreview               # Routes to correct renderer by type             (widget-preview)
+│   └── useOverlayEditorState       # Central editor state hook                      (overlay-editor)
+├── OverlayPlayer                   # Timeline playback controls                     (player)
+├── RenderVideoDialog               # Export settings + progress panel               (render-video)
+├── ErrorAlert                      # Toast error notification
+└── LoadingOverlay                  # Activity spinner
 ```
 
 ### 5.3 Feature Modules
 
-Well-defined features with their own `data/`, `utils/`, `hooks/`, and `components/`:
+10 feature modules each with their own `data/`, `utils/`, `hooks/`, and/or `components/` subdirectories:
 
-- **`features/scene-settings/`** — Sidebar settings tab: aspect ratio, resolution, FPS, widget update rate, video sync offset, global font/color/opacity defaults.
-- **`features/render-video/`** — Render dialog: codec selection (ProRes, QTRLE, H.264, H.265), hardware acceleration (NVENC, QSV, VAAPI, VideoToolbox, Vulkan), bitrate slider, FPS mode, export range, progress polling.
+| Feature | Purpose |
+|---|---|
+| **`app-shell/`** | App header, title bar, control panel, loading overlay, error alert, backend health polling, activity import, app bootstrap, editor shell state (zoom/grid/background) |
+| **`overlay-editor/`** | Main editor canvas, moveable (drag/resize/rotate), widget selection, editor keyboard shortcuts, viewport management, drag/rotate/scale/resize handlers |
+| **`player/`** | Overlay player component, playback engine (timeline + video-backed RAF loops), keyboard shortcuts (Space/Arrow keys), timeline scrubbing |
+| **`render-video/`** | Render dialog: codec selection (ProRes, QTRLE, H.264, H.265), hardware acceleration (NVENC, QSV, VAAPI, VideoToolbox, Vulkan), bitrate slider, FPS mode, export range, progress polling, render workflow orchestration |
+| **`scene-settings/`** | Sidebar settings tab: aspect ratio, resolution, FPS, widget update rate, video sync offset, global font/color/opacity defaults |
+| **`template-manager/`** | Template CRUD, community template loading, template save status tracking, new-template dialog |
+| **`video-preview/`** | Video file import, local HTTP preview server, video playback clock, scrub scheduling, sync with activity timeline |
+| **`widget-drawer/`** | Widget quick-add sidebar panel (button grid) |
+| **`widget-editor/`** | Per-widget property editors: metric value, text, time, gradient, elevation, route map, heading. Sidebar widgets tab composition. |
+| **`widget-preview/`** | SVG widget preview renderers: metric, text, route, elevation, heading. Geometry computation, text measurement, shadow rendering. |
+
+Shared cross-feature utilities live in `lib/` (e.g. `isInteractiveElement` in `utils.js`) and `hooks/` (e.g. `useFpsMode`).
 
 ### 5.4 Widget System
 
@@ -336,17 +365,18 @@ Widgets are stored in the `config` object as arrays: `config.labels[]`, `config.
 - `groupWidgetsForSidebar` — groups by type
 - `findWidgetById`, `updateWidgetInConfig`, `deleteWidgetInConfig`
 
-**10 widget types** and their preview renderers (`components/widgetPreviewRenderers.jsx`):
+**10 widget types** and their preview renderers (`features/widget-preview/components/`):
 
-| Widget Type                      | Renderer                                   | Editor                    |
-| -------------------------------- | ------------------------------------------ | ------------------------- |
-| text                             | `OverlayTextWidget`                        | `TextWidgetEditor`        |
-| speed, heartrate, power, cadence | `OverlayMetricWidget`                      | `MetricWidgetEditor`      |
-| time                             | `OverlayMetricWidget`                      | `TimeWidgetEditor`        |
-| temperature                      | `OverlayMetricWidget`                      | `TemperatureWidgetEditor` |
-| gradient                         | `OverlayMetricWidget` (triangle indicator) | `GradientWidgetEditor`    |
-| route_map                        | `OverlayRouteWidget`                       | `RouteMapWidgetEditor`    |
-| elevation                        | `OverlayElevationWidget`                   | `ElevationWidgetEditor`   |
+| Widget Type                      | Renderer                | Editor                       |
+| -------------------------------- | ----------------------- | ---------------------------- |
+| text                             | `TextRenderer`          | `TextWidgetEditor`           |
+| speed, heartrate, power, cadence | `MetricRenderer`        | `MetricWidgetEditor`         |
+| time                             | `MetricRenderer`        | `TimeWidgetEditor`           |
+| temperature                      | `MetricRenderer`        | `TemperatureWidgetEditor`    |
+| gradient                         | `MetricRenderer` (triangle) | `GradientWidgetEditor`   |
+| heading                          | `HeadingRenderer`       | `HeadingWidgetEditor`        |
+| route_map                        | `RouteRenderer`         | `RouteMapWidgetEditor`       |
+| elevation                        | `ElevationRenderer`     | `ElevationWidgetEditor`      |
 
 ### 5.5 Activity Parsing Pipeline
 
@@ -354,20 +384,20 @@ Widgets are stored in the `config` object as arrays: `config.labels[]`, `config.
 .gpx/.fit file
     │
     ▼
-gpxUtils.jsx                        # File type detection + parser dispatch
+import-activity.js                        # File type detection + parser dispatch
     │
-    ├── .fit → fitParserUtils.js    # fit-file-parser library
-    └── .gpx → DOMParser            # Native XML parsing
+    ├── .fit → fit-parser.js              # fit-file-parser library
+    └── .gpx → DOMParser                  # Native XML parsing
     │
     ▼
-activityParserUtils.js              # finalizeParsedActivity()
+parser.js                                 # finalizeParsedActivity()
     ├── Build elapsed/distance/course series
     ├── Insert idle gap samples (stationary detection)
     ├── Compute metric series (speed from distance, gradient from elevation, etc.)
     └── Returns { parsedActivity, debugPayload }
     │
     ▼
-activityMetricSeries.js             # deriveActivityMetricSeries()
+metric-series.js                          # deriveActivityMetricSeries()
     ├── Speed from distance
     ├── Gradient from elevation (Savitzky-Golay smoothing)
     ├── Heading from course
@@ -375,9 +405,11 @@ activityMetricSeries.js             # deriveActivityMetricSeries()
     └── Torque from power/cadence
     │
     ▼
-activityCache.js                       # In-memory cache
-Zustand (activitySummary)
+parse-helpers.js                          # safeNumber, numeric sanitization
+Zustand (activitySummary, parsedActivity)
 ```
+
+All activity parsing utilities live under `lib/activity/`. The `importActivityFile()` function accepts `storeActions` as a required parameter (no implicit `useStore.getState()` fallback).
 
 ### 5.6 Video Preview System
 
@@ -388,7 +420,7 @@ User selects video
     │
     ▼
 useVideoImport.js → backend.importPreviewVideo(path)
-    │
+    │                          (features/video-preview/hooks/)
     ▼
 lib.rs: backend_import_preview_video
     ├── Assigns UUIDv4 import_id
@@ -396,7 +428,7 @@ lib.rs: backend_import_preview_video
     └── Returns preview_url (http://127.0.0.1:PORT/video/<uuid>)
     │
     ▼
-useVideoPreview.jsx
+useVideoPreview.js
     ├── Sets <video> src to preview_url
     ├── Handles play/pause/scrub via useVideoPlaybackClock
     ├── Syncs with activity timeline via videoSyncOffsetSeconds
@@ -592,15 +624,10 @@ The Rust backend receives already-parsed activity JSON from the frontend (the JS
 File picker (.gpx/.fit)
     │
     ▼
-gpxUtils.jsx → activityParserUtils → activityMetricSeries
+lib/activity/import-activity.js → parser.js → metric-series.js
     │
     ▼
-Zustand: activitySummary set
-    │
-    ▼
-Rust: backend_render (preview mode)
-    ├── trim + densify activity
-    └── Skia renders preview PNG → returned to frontend
+Zustand: activitySummary, parsedActivity set
     │
     ▼
 OverlayCanvas displays widget previews
@@ -661,7 +688,7 @@ RenderVideoDialog opens → user selects codec, bitrate, FPS, etc.
 [User clicks "Start Render"]
     │
     ▼
-renderVideo.jsx → build final config
+render-video.js → build final config
     ├── Apply global defaults
     ├── Override with export settings (FPS, update rate, codec)
     ├── Set composite_video_path if MP4 mode
@@ -781,11 +808,14 @@ Templates are JSON files following the `ovrley-template` format (v1):
 ### Frontend
 
 - **No TypeScript** — JSDoc for type documentation on exported functions
-- **Zustand** — global state with Immer, `subscribeWithSelector`, 4 slices, selector hooks with `useShallow`
+- **Zustand** — global state with Immer, `subscribeWithSelector`, 5 slices, selector hooks with `useShallow`
+- **No `useStore.getState()` in utilities** — non-React functions (e.g. `renderVideo()`, `importActivityFile()`) receive store state via parameters from their hook callers. Only React hooks and store slices may call `useStore.getState()`.
 - **Container hooks** — extract store access, side effects, and derived state from components
 - **Presentational components** — receive grouped props, minimal logic
 - **shadcn/ui** — Radix-based primitives in `components/ui/`
 - **Feature folders** — `data/` (constants), `utils/` (pure functions), `hooks/`, `components/`
+- **Shared hooks** — `useFpsMode` (FPS mode selector logic shared between scene-settings and render-video)
+- **Shared utilities** — `isInteractiveElement` (input-focus guard shared between player keyboard and editor keyboard shortcuts)
 
 ### Rust
 
@@ -810,9 +840,9 @@ Templates are JSON files following the `ovrley-template` format (v1):
 
 ## 11. Known Architectural Notes
 
-1. **Widget rendering is duplicated** — JSX SVG preview vs. Rust Skia render. Expect minor visual discrepancies. Rust output is authoritative.
+1. **Widget rendering is duplicated** — JSX SVG preview (in `features/widget-preview/components/`) vs. Rust Skia render. Expect minor visual discrepancies. Rust output is authoritative.
 2. **Composite timing is the most complex part** — involves mapping between 3 time domains: video time, activity time, and overlay frame index.
 3. **QTRLE parallel render** — only activates for >= 2 second integer-second durations, uses `logical_cores / 4` workers.
-4. **No test framework for frontend** — all testing is manual. Rust has unit tests in `render/widgets/tests/` and integration tests in `ovrley_core/tests/` and `src-tauri/tests/`.
+4. **Frontend testing** — 50 Vitest test suites (320 tests) in `app/src/tests/`. Rust has unit tests in `render/widgets/tests/` and integration tests in `ovrley_core/tests/` and `src-tauri/tests/`.
 5. **Browser fallback** — the frontend has a fallback path for running outside Tauri (browser dev mode), using local file APIs instead of Tauri IPC.
 6. **CSS zoom** — the editor shell supports zoom via `--app-scale` CSS variable (0.35x–4x).
