@@ -7,7 +7,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { getCurrentParsedActivity } from '@/lib/activity/cache'
 import useStore from '@/store/useStore'
 import { buildConfigWidgets, updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget-config'
-import { getEffectiveWidgetData } from '@/lib/config-utils'
+import { getEffectiveWidgetData } from '@/lib/template-state'
 import { deepEqual } from '@/store/store-utils'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
 import useOverlayMoveableHandlers from './createOverlayMoveableHandlers'

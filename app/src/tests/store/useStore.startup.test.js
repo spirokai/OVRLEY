@@ -12,7 +12,8 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
-import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/config-utils'
+import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template-state'
+import { createEditorEffectiveConfig } from '@/lib/template-state'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
 /**
@@ -126,7 +127,7 @@ describe('useStore startup', () => {
     expect(removeItemSpy).not.toHaveBeenCalled()
   })
 
-  test('explicit template loading updates active template state without browser storage persistence', async () => {
+  test('explicit template loading updates durable active state without browser storage persistence', async () => {
     // Template loading is the allowed initialization path now, but it must
     // update live state directly instead of rebuilding persistence.
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
@@ -158,8 +159,18 @@ describe('useStore startup', () => {
     )
 
     const state = useStore.getState()
+    const effectiveConfig = createEditorEffectiveConfig({
+      config: state.config,
+      globalDefaults: state.globalDefaults,
+    })
 
-    expect(state.config).toEqual(templateConfig)
+    expect(state.config.scene.start).toBe(5)
+    expect(state.config.scene.end).toBe(90)
+    expect(state.config.scene).not.toHaveProperty('font')
+    expect(state.config.scene).not.toHaveProperty('color')
+    expect(state.config.scene).not.toHaveProperty('font_size')
+    expect(effectiveConfig.scene.font).toBe('Arial.ttf')
+    expect(effectiveConfig.scene.color).toBe('#123456')
     expect(state.startSecond).toBe(5)
     expect(state.endSecond).toBe(90)
     expect(state.selectedSecond).toBe(5)

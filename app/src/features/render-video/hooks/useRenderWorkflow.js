@@ -12,7 +12,7 @@ import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
 import { getCurrentParsedActivity } from '@/lib/activity/cache'
-import { applyGlobalDefaults } from '@/lib/config-utils'
+import { createEditorEffectiveConfig } from '@/lib/template-state'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
@@ -204,7 +204,7 @@ export default function useRenderWorkflow({ backendStatus }) {
       }
 
       setRenderingPreviewFrame(true)
-      const nextConfig = applyGlobalDefaults(config, globalDefaults)
+      const nextConfig = createEditorEffectiveConfig({ config, globalDefaults })
       const previewFps = sanitizeIntegerFps(nextConfig.scene.fps || 30)
       nextConfig.scene = {
         ...nextConfig.scene,

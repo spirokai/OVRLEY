@@ -8,8 +8,8 @@
  */
 
 import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
-import { DEFAULT_GLOBAL_DEFAULTS, syncGlobalDefaultsToConfig } from '../../lib/config-utils'
 import { DEFAULT_EXPORT_RANGE } from '../../features/template-manager/data/templateConstants'
+import { createDurableTemplateState, DEFAULT_GLOBAL_DEFAULTS, normalizeGlobalDefaults, syncGlobalDefaultsToConfig } from '../../lib/template-state'
 import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, updateConfigPersistence } from '../store-utils'
 
 const initialUpdateRate = 1
@@ -36,17 +36,6 @@ export function createTemplateSlice(set, get) {
     }
 
     return codec || 'prores_ks'
-  }
-
-  const buildGlobalDefaults = (globalDefaults) => {
-    const normalizedDefaults = normalizeColorFields(globalDefaults || {})
-    return Object.keys(DEFAULT_GLOBAL_DEFAULTS).reduce(
-      (result, key) => ({
-        ...result,
-        [key]: normalizedDefaults[key] === undefined ? DEFAULT_GLOBAL_DEFAULTS[key] : normalizedDefaults[key],
-      }),
-      {},
-    )
   }
 
   const updateUnrenderedChanges = (state, nextConfig) => {
@@ -112,10 +101,10 @@ export function createTemplateSlice(set, get) {
     },
 
     setGlobalDefault: (key, value) => {
-      const nextDefaults = {
+      const nextDefaults = normalizeGlobalDefaults({
         ...get().globalDefaults,
         [key]: isColorFieldKey(key) ? normalizeColorFields({ [key]: value })[key] : value,
-      }
+      })
 
       set((state) => {
         state.globalDefaults = nextDefaults
@@ -176,9 +165,12 @@ export function createTemplateSlice(set, get) {
 
     hydrateTemplateState: (templateState, options = {}) => {
       const { filename = null, source = null } = options
-      const nextConfig = templateState?.config || DEFAULT_CONFIG
-      const nextSettings = templateState?.settings || {}
-      const nextGlobalDefaults = buildGlobalDefaults(nextSettings.globalDefaults)
+      const durableTemplateState = createDurableTemplateState({
+        config: templateState?.config || DEFAULT_CONFIG,
+        globalDefaults: templateState?.settings?.globalDefaults,
+      })
+      const nextConfig = durableTemplateState.config
+      const nextGlobalDefaults = durableTemplateState.settings.globalDefaults
       const nextExportRange = {
         ...DEFAULT_EXPORT_RANGE,
         ...(get().exportRange || {}),

@@ -73,11 +73,11 @@ The rest of the app should stop re-encoding these rules directly. Scene settings
 
 ## Acceptance criteria
 
-- [ ] One deeper template-state seam owns durable template normalization and effective config materialization
-- [ ] Scene settings, store hydration, template file IO, and render preparation stop re-encoding those representation rules independently
-- [ ] Saving and loading templates produce the same durable file behavior as before
-- [ ] Editor-visible config and render-visible config remain functionally equivalent for the same template input
-- [ ] Tests cover the transformation seam directly plus at least one editor and one render regression path
+- [x] One deeper template-state seam owns durable template normalization and effective config materialization
+- [x] Scene settings, store hydration, template file IO, and render preparation stop re-encoding those representation rules independently
+- [x] Saving and loading templates produce the same durable file behavior as before
+- [x] Editor-visible config and render-visible config remain functionally equivalent for the same template input
+- [x] Tests cover the transformation seam directly plus at least one editor and one render regression path
 
 ## Blocked by
 

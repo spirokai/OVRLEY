@@ -9,7 +9,8 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
-import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/config-utils'
+import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template-state'
+import { createEditorEffectiveConfig } from '@/lib/template-state'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
 /**
@@ -84,10 +85,37 @@ describe('createTemplateSlice — pure state actions', () => {
     expect(useStore.getState().platformOs).toBe('macos')
   })
 
-  test('setGlobalDefault is pure — updates globalDefaults and syncs config', () => {
+  test('setGlobalDefault is pure — updates globalDefaults and keeps widget config synchronized for editing', () => {
+    useStore.getState().setConfig({
+      ...DEFAULT_CONFIG,
+      values: [
+        {
+          id: 'value-1',
+          value: 'speed',
+          x: 10,
+          y: 20,
+          icon_color: '#111111',
+          unit_color: '#222222',
+        },
+      ],
+    })
+
+    useStore.getState().setGlobalDefault('color_values', '#ff0000')
+    useStore.getState().setGlobalDefault('color_icons', '#00ff00')
+    useStore.getState().setGlobalDefault('color_units', '#0000ff')
+
+    const effectiveConfig = createEditorEffectiveConfig({
+      config: useStore.getState().config,
+      globalDefaults: useStore.getState().globalDefaults,
+    })
+
     useStore.getState().setGlobalDefault('color_text', '#ff0000')
 
     expect(useStore.getState().globalDefaults.color_text).toBe('#ff0000')
+    expect(useStore.getState().config.values[0].color).toBe('#ff0000')
+    expect(useStore.getState().config.values[0].icon_color).toBe('#00ff00')
+    expect(useStore.getState().config.values[0].unit_color).toBe('#0000ff')
+    expect(effectiveConfig.values[0].color).toBe('#ff0000')
   })
 
   test('setAspectRatio is pure — updates aspectRatio', () => {
@@ -137,7 +165,7 @@ describe('createTemplateSlice — pure state actions', () => {
     expect(alertSpy).not.toHaveBeenCalled()
   })
 
-  test('hydrateTemplateState is pure — hydrates full template state without network', () => {
+  test('hydrateTemplateState is pure — hydrates durable template state and keeps editor-effective values materializable', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const templateConfig = {
       ...DEFAULT_CONFIG,
@@ -153,7 +181,18 @@ describe('createTemplateSlice — pure state actions', () => {
     )
 
     const state = useStore.getState()
-    expect(state.config).toEqual(templateConfig)
+    const effectiveConfig = createEditorEffectiveConfig({
+      config: state.config,
+      globalDefaults: state.globalDefaults,
+    })
+
+    expect(state.config.scene.start).toBe(10)
+    expect(state.config.scene.end).toBe(120)
+    expect(state.config.scene).not.toHaveProperty('font')
+    expect(state.config.scene).not.toHaveProperty('color')
+    expect(state.config.scene).not.toHaveProperty('font_size')
+    expect(effectiveConfig.scene.font).toBe('Arial.ttf')
+    expect(effectiveConfig.scene.color).toBe('#abcdef')
     expect(state.startSecond).toBe(10)
     expect(state.endSecond).toBe(120)
     expect(state.loadedTemplateFilename).toBe('imported.json')

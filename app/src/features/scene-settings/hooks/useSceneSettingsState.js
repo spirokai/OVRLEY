@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { createEditorEffectiveConfig } from '@/lib/template-state'
 import useStore from '@/store/useStore'
 import useAvailableFonts from '@/hooks/useAvailableFonts'
 import { getFpsModeValue, getUpdateRateOptions, normalizeUpdateRateForFps, PRESET_FPS_VALUES, sanitizeIntegerFps } from '@/lib/update-rate'
@@ -85,8 +86,9 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   )
 
   // Derived state (from props)
-  const scene = config?.scene
   const systemFonts = useAvailableFonts()
+  const editorConfig = useMemo(() => createEditorEffectiveConfig({ config, globalDefaults }), [config, globalDefaults])
+  const scene = editorConfig?.scene
   const sceneResolutionKey = getSceneResolutionKey(scene)
   const derivedResId = getResolutionPresetId(scene)
   const derivedFpsMode = getFpsModeValue(scene?.fps)
@@ -119,7 +121,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     Boolean(scene?.width && scene?.height && importedVideoResolution) &&
     (Number(scene.width) !== Number(importedVideoResolution.width) || Number(scene.height) !== Number(importedVideoResolution.height))
 
-  const sceneStyleValue = (key, fallback) => globalDefaults?.[key] ?? scene?.[key] ?? fallback
+  const sceneStyleValue = (key, fallback) => scene?.[key] ?? fallback
 
   const updateScene = (key, value) => {
     let finalValue = value

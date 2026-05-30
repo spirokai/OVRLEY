@@ -1,148 +1,16 @@
 /**
- * Template snapshot utilities — config normalization, file serialization,
- * and state comparison for OVRLEY template files.
- * Static constants live in ../data/templateConstants.js.
+ * Template snapshot utilities for OVRLEY template files.
  *
- * Cloning uses the platform structuredClone API instead of JSON round-tripping.
- * Equality comparisons use structural deepEqual rather than JSON.stringify.
- * File serialization (stringifyTemplateFile / downloadTemplateFile) remains
- * legitimate JSON serialization for disk output.
+ * Durable template normalization lives in the template-state seam. This module
+ * focuses on file-oriented concerns: payload stamping, payload validation,
+ * stringification, download, and structural state comparison.
  */
 
-import { normalizeColorFields } from '@/lib/color-utils'
-import { DEFAULT_GLOBAL_DEFAULTS, GLOBAL_DEFAULT_KEYS, SCENE_DERIVED_SETTING_KEYS, SCENE_GLOBAL_DEFAULT_KEYS } from '@/lib/config-utils'
-import { ensureWidgetIdsInConfig } from '@/lib/widget-config'
 import { deepEqual } from '@/store/store-utils'
-import {
-  TEMPLATE_FILE_FORMAT,
-  TEMPLATE_FILE_VERSION,
-  LABEL_KEYS,
-  SCENE_RENDER_TIME_ONLY_KEYS,
-  VALUE_SHARED_KEYS,
-  VALUE_ICON_KEYS,
-  VALUE_TYPE_KEYS,
-  COURSE_PLOT_KEYS,
-  ELEVATION_PLOT_KEYS,
-  HEADING_PLOT_KEYS,
-  VALUE_DEFAULTS,
-  PLOT_DEFAULTS,
-} from '../data/templateConstants'
+import { createDurableTemplateState } from '@/lib/template-state'
+import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '../data/templateConstants'
 
-export { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/config-utils'
-
-/**
- * Deep-clones a plain serializable value using structuredClone.
- *
- * Handles undefined explicitly for consistency with the previous
- * JSON.parse(JSON.stringify(...)) guard, though structuredClone
- * natively accepts undefined.
- *
- * @param {*} value - Value to deep-clone.
- * @returns {*} Deep clone of the input value.
- */
-function cloneSerializable(value) {
-  if (value === undefined) return undefined
-  return structuredClone(value)
-}
-
-function pickDefined(source, keys) {
-  return keys.reduce((result, key) => {
-    if (source?.[key] !== undefined) {
-      result[key] = source[key]
-    }
-    return result
-  }, {})
-}
-
-function normalizeGlobalDefaults(globalDefaults) {
-  return normalizeColorFields({
-    ...DEFAULT_GLOBAL_DEFAULTS,
-    ...pickDefined(cloneSerializable(globalDefaults) || {}, GLOBAL_DEFAULT_KEYS),
-  })
-}
-
-function mergeSceneGlobalDefaults(scene, globalDefaults) {
-  const sceneDefaults = {}
-  SCENE_GLOBAL_DEFAULT_KEYS.forEach((key) => {
-    if (scene?.[key] !== undefined) {
-      sceneDefaults[key] = scene[key]
-    }
-  })
-
-  return {
-    ...normalizeGlobalDefaults({
-      ...sceneDefaults,
-      ...(cloneSerializable(globalDefaults) || {}),
-    }),
-  }
-}
-
-function normalizeScene(scene = {}) {
-  const nextScene = cloneSerializable(scene) || {}
-
-  SCENE_DERIVED_SETTING_KEYS.forEach((key) => {
-    delete nextScene[key]
-  })
-  SCENE_RENDER_TIME_ONLY_KEYS.forEach((key) => {
-    delete nextScene[key]
-  })
-
-  return normalizeColorFields(nextScene)
-}
-
-function normalizeLabel(label = {}) {
-  return normalizeColorFields(pickDefined(label, LABEL_KEYS))
-}
-
-function normalizeValue(value = {}) {
-  const type = value.value
-  const withDefaults = {
-    ...VALUE_DEFAULTS[type],
-    ...value,
-  }
-  const keys = [...VALUE_SHARED_KEYS, ...(VALUE_TYPE_KEYS[type] || VALUE_ICON_KEYS)]
-
-  return normalizeColorFields(pickDefined(withDefaults, keys))
-}
-
-function normalizePointLabel(pointLabel, config, globalDefaults) {
-  const fallbackFont = globalDefaults?.font_values || config?.scene?.font
-  const fallbackColor = pointLabel?.color || globalDefaults?.color_values || '#ffffff'
-
-  return normalizeColorFields({
-    ...(fallbackFont ? { font: fallbackFont } : {}),
-    font_size: pointLabel?.font_size ?? config?.scene?.font_size ?? 12.5,
-    color: fallbackColor,
-    ...pickDefined(pointLabel, ['font', 'font_size', 'color']),
-  })
-}
-
-function normalizePlot(plot = {}, config, globalDefaults) {
-  const type = plot.value
-  const withDefaults = {
-    ...PLOT_DEFAULTS[type],
-    ...plot,
-  }
-
-  if (type === 'elevation') {
-    withDefaults.point_label = normalizePointLabel(plot.point_label, config, globalDefaults)
-  }
-
-  const keys = type === 'elevation' ? ELEVATION_PLOT_KEYS : type === 'heading' ? HEADING_PLOT_KEYS : COURSE_PLOT_KEYS
-  return normalizeColorFields(pickDefined(withDefaults, keys))
-}
-
-export function normalizeTemplateConfig(config, globalDefaults) {
-  const nextConfig = ensureWidgetIdsInConfig(cloneSerializable(config) || {})
-  const normalizedConfig = {
-    scene: normalizeScene(nextConfig.scene),
-    labels: Array.isArray(nextConfig.labels) ? nextConfig.labels.map(normalizeLabel) : [],
-    values: Array.isArray(nextConfig.values) ? nextConfig.values.map(normalizeValue) : [],
-    plots: Array.isArray(nextConfig.plots) ? nextConfig.plots.map((plot) => normalizePlot(plot, nextConfig, globalDefaults)) : [],
-  }
-
-  return normalizedConfig
-}
+export { DEFAULT_GLOBAL_DEFAULTS, normalizeTemplateConfig } from '@/lib/template-state'
 
 /**
  * Handles sanitize template filename.
@@ -162,22 +30,15 @@ export function sanitizeTemplateFilename(name) {
 }
 
 /**
- * Creates template state.
+ * Creates durable template state for save-status tracking and file output.
  *
  * @param {object} options - Structured options for the helper.
  * @param {*} options.config - Overlay template configuration data.
  * @param {*} options.globalDefaults - Value for global defaults.
- * @returns {object} Derived data structure for downstream use.
+ * @returns {object} Durable template state.
  */
 export function createTemplateState({ config, globalDefaults }) {
-  const nextGlobalDefaults = mergeSceneGlobalDefaults(config?.scene, globalDefaults)
-
-  return {
-    config: normalizeTemplateConfig(config, nextGlobalDefaults),
-    settings: {
-      globalDefaults: nextGlobalDefaults,
-    },
-  }
+  return createDurableTemplateState({ config, globalDefaults })
 }
 
 /**
@@ -198,42 +59,37 @@ export function createTemplateFilePayload(state, meta = {}) {
 }
 
 /**
- * Normalizes template file payload.
+ * Normalizes template file payload to durable in-memory template state.
  *
  * @param {*} rawTemplate - Value for raw template.
- * @param {*} fallbackState - Value for fallback state.
- * @returns {object} Derived data structure for downstream use.
+ * @returns {object} Normalized durable template state plus optional name.
  */
-export function normalizeTemplateFilePayload(rawTemplate, _fallbackState = {}) {
+export function normalizeTemplateFilePayload(rawTemplate) {
   if (!rawTemplate || typeof rawTemplate !== 'object') {
     throw new Error('Template file is empty or invalid.')
   }
 
-  if (rawTemplate.format === TEMPLATE_FILE_FORMAT && rawTemplate.config && rawTemplate.settings) {
-    if (rawTemplate.version !== TEMPLATE_FILE_VERSION) {
-      throw new Error(`Unsupported template file version: ${rawTemplate.version}. Expected ${TEMPLATE_FILE_VERSION}.`)
-    }
-
-    const nextGlobalDefaults = mergeSceneGlobalDefaults(rawTemplate.config.scene, rawTemplate.settings.globalDefaults)
-
-    return {
-      ...createTemplateState({
-        config: rawTemplate.config,
-        globalDefaults: nextGlobalDefaults,
-      }),
-      name: rawTemplate.name || null,
-    }
+  if (rawTemplate.format !== TEMPLATE_FILE_FORMAT || !rawTemplate.config || !rawTemplate.settings) {
+    throw new Error('Unsupported template file format.')
   }
 
-  throw new Error('Unsupported template file format.')
+  if (rawTemplate.version !== TEMPLATE_FILE_VERSION) {
+    throw new Error(`Unsupported template file version: ${rawTemplate.version}. Expected ${TEMPLATE_FILE_VERSION}.`)
+  }
+
+  const normalizedState = createDurableTemplateState({
+    config: rawTemplate.config,
+    globalDefaults: rawTemplate.settings.globalDefaults,
+  })
+
+  return {
+    ...normalizedState,
+    name: rawTemplate.name || null,
+  }
 }
 
 /**
  * Compares template state objects for structural equality.
- *
- * Uses deep field-by-field traversal rather than JSON.stringify so the
- * comparison is semantic and does not depend on property ordering or
- * hidden serializability assumptions.
  *
  * @param {*} left - Left-hand template state.
  * @param {*} right - Right-hand template state.
