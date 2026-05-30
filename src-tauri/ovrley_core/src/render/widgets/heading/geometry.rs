@@ -26,8 +26,8 @@ pub struct TapeLabel {
     pub x: f32,
     /// Text to display (e.g. "N", "NE", "30", "60").
     pub text: String,
-    /// Whether this is a cardinal label (takes priority over numeric).
-    pub is_cardinal: bool,
+    /// Whether this is a major label (takes priority over minor numeric labels).
+    pub is_major_label: bool,
 }
 
 /// Cardinal direction labels at 45° multiples.
@@ -94,15 +94,27 @@ pub fn visible_ticks(
     let tape_width = 360.0 * pixels_per_degree;
     let offset = heading_offset(heading, pixels_per_degree);
     let minor_interval = major_tick_interval as f32 / minor_ticks_per_major as f32;
+    let mut degrees: Vec<f32> = CARDINAL_LABELS.iter().map(|(degree, _)| *degree).collect();
+
+    if major_tick_interval > 0 && minor_ticks_per_major > 0 && minor_interval > 0.0 {
+        let mut degree = 0.0_f32;
+        while degree < 360.0 {
+            degrees.push((degree * 1000.0).round() / 1000.0);
+            degree += minor_interval;
+        }
+    }
+
+    degrees.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    degrees.dedup_by(|a, b| (*a - *b).abs() < 0.01);
 
     let mut ticks = Vec::new();
-    let mut degree = 0.0_f32;
 
-    while degree < 360.0 {
-        let is_major = (degree % major_tick_interval as f32).abs() < 0.01;
+    for degree in degrees {
+        let is_cardinal = is_cardinal_degree(degree);
+        let is_major = is_cardinal || (degree % major_tick_interval as f32).abs() < 0.01;
         let is_minor = !is_major;
 
-        let show = (is_major && show_major_ticks) || (is_minor && show_minor_ticks);
+        let show = is_cardinal || (is_major && show_major_ticks) || (is_minor && show_minor_ticks);
 
         if show {
             // Compute pixel position in the tape image
@@ -115,16 +127,10 @@ pub fn visible_ticks(
                 ticks.push(TapeTick {
                     degree,
                     x: wrapped_x,
-                    is_cardinal: is_cardinal_degree(degree),
+                    is_cardinal,
                     is_major,
                 });
             }
-        }
-
-        degree += minor_interval;
-        // Safety: prevent infinite loop from degenerate intervals
-        if minor_interval <= 0.0 {
-            break;
         }
     }
 
@@ -139,37 +145,37 @@ pub fn visible_ticks(
 ///
 /// # Arguments
 /// * `ticks` - Pre-computed visible ticks from `visible_ticks`
-/// * `show_numeric_labels` - Whether to show degree numbers
-/// * `show_cardinal_labels` - Whether to show cardinal letters
+/// * `show_minor_labels` - Whether to show degree numbers
+/// * `show_major_labels` - Whether to show cardinal letters
 pub fn visible_labels(
     ticks: &[TapeTick],
-    show_numeric_labels: bool,
-    show_cardinal_labels: bool,
+    show_minor_labels: bool,
+    show_major_labels: bool,
 ) -> Vec<TapeLabel> {
-    if !show_numeric_labels && !show_cardinal_labels {
+    if !show_minor_labels && !show_major_labels {
         return Vec::new();
     }
 
     let mut labels = Vec::new();
 
     for tick in ticks {
-        if tick.is_cardinal && show_cardinal_labels {
+        if tick.is_cardinal && show_major_labels {
             // Cardinal label takes priority
             if let Some(text) = cardinal_label_for_degree(tick.degree) {
                 labels.push(TapeLabel {
                     degree: tick.degree,
                     x: tick.x,
                     text: text.to_string(),
-                    is_cardinal: true,
+                    is_major_label: true,
                 });
             }
-        } else if show_numeric_labels {
+        } else if show_minor_labels {
             // Numeric label at non-cardinal positions (or when cardinals are off)
             labels.push(TapeLabel {
                 degree: tick.degree,
                 x: tick.x,
                 text: format!("{}", tick.degree as u32),
-                is_cardinal: false,
+                is_major_label: false,
             });
         }
     }
@@ -206,44 +212,34 @@ pub fn chevron_vertices(
     if pointing_down {
         // Top edge: triangle points down
         [
-            IndicatorPoint { x: center_x - half_base, y: edge_y },
-            IndicatorPoint { x: center_x + half_base, y: edge_y },
-            IndicatorPoint { x: center_x, y: edge_y + size },
+            IndicatorPoint {
+                x: center_x - half_base,
+                y: edge_y,
+            },
+            IndicatorPoint {
+                x: center_x + half_base,
+                y: edge_y,
+            },
+            IndicatorPoint {
+                x: center_x,
+                y: edge_y + size,
+            },
         ]
     } else {
         // Bottom edge: triangle points up
         [
-            IndicatorPoint { x: center_x - half_base, y: edge_y },
-            IndicatorPoint { x: center_x + half_base, y: edge_y },
-            IndicatorPoint { x: center_x, y: edge_y - size },
-        ]
-    }
-}
-
-/// Computes highlight bar edge marker triangle vertices.
-///
-/// Small triangular markers at the top and/or bottom edges of the
-/// highlight bar, pointing inward toward the bar center.
-pub fn highlight_bar_marker_vertices(
-    center_x: f32,
-    edge_y: f32,
-    bar_half_width: f32,
-    pointing_down: bool,
-) -> [IndicatorPoint; 3] {
-    let marker_size = bar_half_width * 0.4;
-    if pointing_down {
-        // Top marker: points down
-        [
-            IndicatorPoint { x: center_x - bar_half_width, y: edge_y },
-            IndicatorPoint { x: center_x + bar_half_width, y: edge_y },
-            IndicatorPoint { x: center_x, y: edge_y + marker_size },
-        ]
-    } else {
-        // Bottom marker: points up
-        [
-            IndicatorPoint { x: center_x - bar_half_width, y: edge_y },
-            IndicatorPoint { x: center_x + bar_half_width, y: edge_y },
-            IndicatorPoint { x: center_x, y: edge_y - marker_size },
+            IndicatorPoint {
+                x: center_x - half_base,
+                y: edge_y,
+            },
+            IndicatorPoint {
+                x: center_x + half_base,
+                y: edge_y,
+            },
+            IndicatorPoint {
+                x: center_x,
+                y: edge_y - size,
+            },
         ]
     }
 }

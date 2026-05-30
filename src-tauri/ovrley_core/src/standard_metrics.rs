@@ -230,6 +230,11 @@ pub fn standard_metric_unit_label(kind: MetricKind, display_unit: Option<&str>) 
         .supported_display_units
         .iter()
         .find(|option| option.value == resolved)
-        .map(|option| option.render_label.as_deref().unwrap_or(option.label.as_str()))
+        .map(|option| {
+            option
+                .render_label
+                .as_deref()
+                .unwrap_or(option.label.as_str())
+        })
         .unwrap_or("")
 }

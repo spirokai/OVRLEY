@@ -35,6 +35,7 @@ export { WIDGET_ICONS }
 export const DEFAULT_ACTIVITY_PREVIEW = {
   cadence: 92,
   gradient: -7,
+  heading: 90,
   heartrate: 154,
   power: 286,
   speed: 8.4,

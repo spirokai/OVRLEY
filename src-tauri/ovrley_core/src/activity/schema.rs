@@ -153,7 +153,10 @@ pub struct ParsedActivity {
     #[serde(default)]
     pub ground_contact_time: NumericSeries,
     /// Left/right balance as percent-left.
-    #[serde(default, deserialize_with = "deserialize_optional_numeric_or_balance_series")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_optional_numeric_or_balance_series"
+    )]
     pub left_right_balance: NumericSeries,
     /// Stride length in meters.
     #[serde(default)]

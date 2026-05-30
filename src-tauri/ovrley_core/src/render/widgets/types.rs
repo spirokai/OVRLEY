@@ -97,30 +97,30 @@ pub(crate) struct RouteWidgetCache {
 
 /// Prepared heading widget cache.
 #[derive(Clone, Debug)]
-pub(crate) struct HeadingWidgetCache {
+pub struct HeadingWidgetCache {
     /// The cached 360° tape image (ticks + labels + shadows baked in).
-    pub(crate) tape_image: Image,
+    pub tape_image: Image,
     /// Tape image width in pixels (360 × pixels_per_degree).
-    pub(crate) tape_width: f32,
+    pub tape_width: f32,
     /// Widget position and dimensions.
-    pub(crate) x: f32,
-    pub(crate) y: f32,
-    pub(crate) width: u32,
-    pub(crate) height: u32,
+    pub x: f32,
+    pub y: f32,
+    pub width: u32,
+    pub height: u32,
     /// Horizontal scale in pixels per degree.
-    pub(crate) pixels_per_degree: f32,
+    pub pixels_per_degree: f32,
     /// Whether to draw the indicator.
-    pub(crate) show_indicator: bool,
+    pub show_indicator: bool,
     /// Indicator style: "chevron" or "highlight_bar".
-    pub(crate) indicator_style: String,
+    pub indicator_style: String,
     /// Indicator placement: "top", "bottom", or "both".
-    pub(crate) indicator_placement: String,
+    pub indicator_placement: String,
     /// Indicator color as hex string.
-    pub(crate) indicator_color: String,
+    pub indicator_color: String,
     /// Indicator size in pixels (chevron height or bar width).
-    pub(crate) indicator_size: f32,
+    pub indicator_size: f32,
     /// Shadow style for the indicator (inherited from widget config).
-    pub(crate) indicator_shadow: Option<ShadowStyle>,
+    pub indicator_shadow: Option<ShadowStyle>,
 }
 
 /// Prepared elevation widget cache.
@@ -154,7 +154,7 @@ impl fmt::Debug for StaticLayer {
 
 /// Drop-shadow style normalized from scene/template fields.
 #[derive(Clone, Debug)]
-pub(crate) struct ShadowStyle {
+pub struct ShadowStyle {
     pub(crate) color: String,
     pub(crate) strength: f32,
     pub(crate) distance: f32,

@@ -4,21 +4,24 @@
 //! rendered once into a cached Skia image surface. Per-frame, the tape is
 //! drawn offset by `heading × pixels_per_degree`.
 
-use super::geometry::{visible_labels, visible_ticks};
 use super::super::common::normalize_shadow_style;
 use super::super::types::HeadingWidgetCache;
-use crate::config::HeadingWidgetConfig;
+use super::geometry::{visible_labels, visible_ticks};
+use crate::config::{HeadingWidgetConfig, RenderConfig};
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::render::surface::create_surface;
 use crate::render::text::parse_color;
 use skia_safe::{image_filters, Paint, Point};
+use std::path::PathBuf;
 use std::time::Instant;
 
 /// Prepares the heading widget cache by rendering the full 360° tape to a
 /// cached Skia image.
 pub fn prepare_heading_cache(
+    config: &RenderConfig,
     plot: &HeadingWidgetConfig,
+    font_dirs: &[PathBuf],
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<HeadingWidgetCache> {
     let prepare_started = Instant::now();
@@ -45,8 +48,11 @@ pub fn prepare_heading_cache(
     // Resolve colors
     let tick_color = plot.tick_color.as_deref().unwrap_or("#ffffff");
     let cardinal_tick_color = plot.cardinal_tick_color.as_deref().unwrap_or(tick_color);
-    let numeric_label_color = plot.numeric_label_color.as_deref().unwrap_or("#ffffff");
-    let cardinal_label_color = plot.cardinal_label_color.as_deref().unwrap_or(numeric_label_color);
+    let minor_label_color = plot.minor_label_color.as_deref().unwrap_or("#ffffff");
+    let major_label_color = plot
+        .major_label_color
+        .as_deref()
+        .unwrap_or(minor_label_color);
 
     // Compute tick lengths in pixels
     let major_tick_length = tape_height as f32 * plot.major_tick_length_pct / 100.0;
@@ -63,12 +69,13 @@ pub fn prepare_heading_cache(
 
     // Font for labels
     let font_size = plot.label_font_size.unwrap_or(12.0);
-    let font_dirs: Vec<std::path::PathBuf> = Vec::new();
-    let font = crate::render::text::resolve_font(
-        &font_dirs,
-        None, // use default system font
-        font_size,
-    );
+    let label_font = plot
+        .label_font
+        .as_deref()
+        .or(plot.label_font_family.as_deref())
+        .or_else(|| first_value_font(config))
+        .or(config.scene.font.as_deref());
+    let font = crate::render::text::resolve_font(font_dirs, label_font, font_size);
 
     // Label y-position: below the ticks
     let label_y = tick_bottom + plot.label_offset.unwrap_or(4.0) + font_size;
@@ -84,12 +91,11 @@ pub fn prepare_heading_cache(
         plot.show_minor_ticks,
     );
 
-    let labels = visible_labels(&ticks, plot.show_numeric_labels, plot.show_cardinal_labels);
+    let labels = visible_labels(&ticks, plot.show_minor_labels, plot.show_major_labels);
 
     // Draw ticks
     let mut tick_paint = Paint::default();
     tick_paint.set_anti_alias(true);
-    tick_paint.set_stroke_width(plot.tick_thickness);
 
     for tick in &ticks {
         let color_str = if tick.is_cardinal {
@@ -98,6 +104,11 @@ pub fn prepare_heading_cache(
             tick_color
         };
         tick_paint.set_color(parse_color(color_str, 1.0));
+        tick_paint.set_stroke_width(if tick.is_major {
+            plot.major_tick_thickness
+        } else {
+            plot.minor_tick_thickness
+        });
 
         let length = if tick.is_major {
             major_tick_length
@@ -123,10 +134,10 @@ pub fn prepare_heading_cache(
         label_paint.set_anti_alias(true);
 
         for label in &labels {
-            let color_str = if label.is_cardinal {
-                cardinal_label_color
+            let color_str = if label.is_major_label {
+                major_label_color
             } else {
-                numeric_label_color
+                minor_label_color
             };
             label_paint.set_color(parse_color(color_str, 1.0));
 
@@ -154,11 +165,15 @@ pub fn prepare_heading_cache(
                 // Shadow pass for ticks
                 let mut shadow_tick_paint = Paint::default();
                 shadow_tick_paint.set_anti_alias(true);
-                shadow_tick_paint.set_stroke_width(plot.tick_thickness);
                 shadow_tick_paint.set_image_filter(filter.clone());
 
                 for tick in &ticks {
                     shadow_tick_paint.set_color(parse_color(tick_color, 1.0));
+                    shadow_tick_paint.set_stroke_width(if tick.is_major {
+                        plot.major_tick_thickness
+                    } else {
+                        plot.minor_tick_thickness
+                    });
                     let length = if tick.is_major {
                         major_tick_length
                     } else {
@@ -182,10 +197,10 @@ pub fn prepare_heading_cache(
                 shadow_label_paint.set_image_filter(filter);
 
                 for label in &labels {
-                    let color_str = if label.is_cardinal {
-                        cardinal_label_color
+                    let color_str = if label.is_major_label {
+                        major_label_color
                     } else {
-                        numeric_label_color
+                        minor_label_color
                     };
                     shadow_label_paint.set_color(parse_color(color_str, 1.0));
                     canvas.draw_str(
@@ -217,8 +232,18 @@ pub fn prepare_heading_cache(
         show_indicator: plot.show_indicator,
         indicator_style: plot.indicator_style.clone(),
         indicator_placement: plot.indicator_placement.clone(),
-        indicator_color: plot.indicator_color.clone().unwrap_or_else(|| "#ffffff".to_string()),
+        indicator_color: plot
+            .indicator_color
+            .clone()
+            .unwrap_or_else(|| "#ffffff".to_string()),
         indicator_size: plot.indicator_size.unwrap_or(10.0),
         indicator_shadow: shadow,
     })
+}
+
+fn first_value_font(config: &RenderConfig) -> Option<&str> {
+    config
+        .values
+        .iter()
+        .find_map(|value| value.font.as_deref().or(value.font_family.as_deref()))
 }

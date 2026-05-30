@@ -20,14 +20,15 @@ function makeHeadingWidget(overrides = {}) {
       show_minor_ticks: true,
       major_tick_length_pct: 40,
       minor_tick_length_pct: 20,
-      tick_thickness: 2,
+      major_tick_thickness: 2,
+      minor_tick_thickness: 1,
       tick_color: '#ffffff',
       cardinal_tick_color: '#ff0000',
       tick_alignment: 'below',
-      show_numeric_labels: true,
-      show_cardinal_labels: true,
-      numeric_label_color: '#cccccc',
-      cardinal_label_color: '#ff0000',
+      show_minor_labels: true,
+      show_major_labels: true,
+      minor_label_color: '#cccccc',
+      major_label_color: '#ff0000',
       label_font_size: 12,
       show_indicator: true,
       indicator_style: 'chevron',
@@ -86,9 +87,9 @@ describe('OverlayHeadingWidget', () => {
   test('renders highlight bar indicator when indicator_style is highlight_bar', () => {
     const widget = makeHeadingWidget({ indicator_style: 'highlight_bar', indicator_placement: 'both' })
     const { container } = render(<OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} />)
-    // Highlight bar has a rect for the bar + polygons for edge markers
     const elements = container.querySelectorAll('rect, polygon')
     expect(elements.length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('polygon')).toHaveLength(0)
   })
 
   test('hides indicator when show_indicator is false', () => {
@@ -112,5 +113,36 @@ describe('OverlayHeadingWidget', () => {
     const svg = container.querySelector('svg')
     expect(svg).toBeTruthy()
     expect(svg.style.opacity).toBe('0.5')
+  })
+
+  test('renders major and minor ticks with separate thickness values', () => {
+    const widget = makeHeadingWidget({ major_tick_thickness: 4, minor_tick_thickness: 1 })
+    const { container } = render(<OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} />)
+    const lines = Array.from(container.querySelectorAll('line'))
+    const majorTick = lines.find((line) => line.getAttribute('stroke-width') === '4')
+    const minorTick = lines.find((line) => line.getAttribute('stroke-width') === '1')
+
+    expect(majorTick).toBeTruthy()
+    expect(minorTick).toBeTruthy()
+  })
+
+  test('heading labels inherit the value font when no label font is set', () => {
+    const widget = makeHeadingWidget({ label_font: undefined, label_font_family: undefined })
+    const { container } = render(
+      <OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} valueFont="Furore.otf" />,
+    )
+    const label = container.querySelector('text')
+
+    expect(label).toHaveAttribute('font-family', '"Furore", "Arial Black", Impact, sans-serif')
+  })
+
+  test('heading label font overrides the inherited value font', () => {
+    const widget = makeHeadingWidget({ label_font: 'Teko.ttf' })
+    const { container } = render(
+      <OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} valueFont="Furore.otf" />,
+    )
+    const label = container.querySelector('text')
+
+    expect(label).toHaveAttribute('font-family', '"Teko", "Arial Narrow", sans-serif')
   })
 })

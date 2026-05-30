@@ -75,33 +75,40 @@ export function visibleTicks(
   const tapeWidth = 360 * pixelsPerDegree
   const offset = headingOffset(heading, pixelsPerDegree)
   const minorInterval = majorTickInterval / minorTicksPerMajor
+  const degrees = new Set(CARDINAL_LABELS.map(([degree]) => degree))
 
-  const ticks = []
-  let degree = 0
+  if (majorTickInterval > 0 && minorTicksPerMajor > 0 && minorInterval > 0) {
+    let degree = 0
+    while (degree < 360) {
+      degrees.add(Math.round(degree * 1000) / 1000)
+      degree += minorInterval
+    }
+  }
 
-  while (degree < 360) {
-    const isMajor = Math.abs(degree % majorTickInterval) < 0.01
-    const isMinor = !isMajor
+  return Array.from(degrees)
+    .sort((a, b) => a - b)
+    .flatMap((degree) => {
+      const isCardinal = isCardinalDegree(degree)
+      const isMajor = isCardinal || Math.abs(degree % majorTickInterval) < 0.01
+      const isMinor = !isMajor
 
-    if ((isMajor && showMajorTicks) || (isMinor && showMinorTicks)) {
+      if (!isCardinal && !((isMajor && showMajorTicks) || (isMinor && showMinorTicks))) {
+        return []
+      }
+
       const tapeX = degree * pixelsPerDegree
       const wrappedX = (((tapeX - offset) % tapeWidth) + tapeWidth) % tapeWidth
 
       if (wrappedX < width) {
-        ticks.push({
+        return [{
           degree,
           x: wrappedX,
-          isCardinal: isCardinalDegree(degree),
+          isCardinal,
           isMajor,
-        })
+        }]
       }
-    }
-
-    degree += minorInterval
-    if (minorInterval <= 0) break
-  }
-
-  return ticks
+      return []
+    })
 }
 
 /**
@@ -115,23 +122,23 @@ export function visibleTicks(
  * @param {boolean} showCardinalLabels
  * @returns {Array<{degree: number, x: number, text: string, isCardinal: boolean}>}
  */
-export function visibleLabels(ticks, showNumericLabels, showCardinalLabels) {
-  if (!showNumericLabels && !showCardinalLabels) return []
+export function visibleLabels(ticks, showMinorLabels, showMajorLabels) {
+  if (!showMinorLabels && !showMajorLabels) return []
 
   const labels = []
 
   for (const tick of ticks) {
-    if (tick.isCardinal && showCardinalLabels) {
+    if (tick.isCardinal && showMajorLabels) {
       const text = cardinalLabelForDegree(tick.degree)
       if (text) {
-        labels.push({ degree: tick.degree, x: tick.x, text, isCardinal: true })
+        labels.push({ degree: tick.degree, x: tick.x, text, isMajorLabel: true })
       }
-    } else if (showNumericLabels) {
+    } else if (showMinorLabels) {
       labels.push({
         degree: tick.degree,
         x: tick.x,
         text: String(Math.round(tick.degree)),
-        isCardinal: false,
+        isMajorLabel: false,
       })
     }
   }
@@ -164,33 +171,5 @@ export function chevronVertices(centerX, edgeY, size, pointingDown) {
     { x: centerX - halfBase, y: edgeY },
     { x: centerX + halfBase, y: edgeY },
     { x: centerX, y: edgeY - size },
-  ]
-}
-
-/**
- * Computes highlight bar edge marker triangle vertices.
- *
- * Small triangular markers at the top and/or bottom edges of the
- * highlight bar, pointing inward toward the bar center.
- *
- * @param {number} centerX - Horizontal center of the widget
- * @param {number} edgeY - Y coordinate of the edge
- * @param {number} barHalfWidth - Half width of the highlight bar
- * @param {boolean} pointingDown - true for top marker
- * @returns {Array<{x: number, y: number}>} 3 vertices
- */
-export function highlightBarMarkerVertices(centerX, edgeY, barHalfWidth, pointingDown) {
-  const markerSize = barHalfWidth * 0.4
-  if (pointingDown) {
-    return [
-      { x: centerX - barHalfWidth, y: edgeY },
-      { x: centerX + barHalfWidth, y: edgeY },
-      { x: centerX, y: edgeY + markerSize },
-    ]
-  }
-  return [
-    { x: centerX - barHalfWidth, y: edgeY },
-    { x: centerX + barHalfWidth, y: edgeY },
-    { x: centerX, y: edgeY - markerSize },
   ]
 }

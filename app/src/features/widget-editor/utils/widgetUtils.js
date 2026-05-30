@@ -13,6 +13,7 @@ import {
   PLOT_BASE_DEFAULTS,
   COURSE_PLOT_DEFAULTS,
   ELEVATION_PLOT_DEFAULTS,
+  HEADING_DEFAULTS,
   COURSE_DIMENSIONS_FALLBACK,
 } from '../data/widgetDefaults'
 
@@ -180,5 +181,24 @@ export function createPlotDefaults(type, globalDefaults, options = {}) {
       font_size: options.sceneFontSize ?? 12.5,
       color: getGlobalColor(globalDefaults, 'color_values'),
     },
+  }
+}
+
+/**
+ * Creates heading compass tape widget defaults.
+ *
+ * @param {*} globalDefaults - Value for global defaults.
+ * @returns {object} Derived data structure for downstream use.
+ */
+export function createHeadingDefaults(globalDefaults) {
+  const labelFont = globalDefaults?.font_values || HEADING_DEFAULTS.label_font
+  const labelFontSelection = createFontSelection(labelFont)
+
+  return {
+    ...HEADING_DEFAULTS,
+    value: 'heading',
+    label_font: labelFontSelection.font,
+    label_font_family: labelFontSelection.font_family,
+    opacity: globalDefaults?.opacity ?? 1,
   }
 }

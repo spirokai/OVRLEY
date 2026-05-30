@@ -363,13 +363,25 @@ fn format_standard_metric_parts(
             })
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Integer) => raw
-            .map(|value| format_number(convert_standard_metric_value(kind, display_unit, value), decimals))
+            .map(|value| {
+                format_number(
+                    convert_standard_metric_value(kind, display_unit, value),
+                    decimals,
+                )
+            })
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Decimal) => raw
-            .map(|value| format_number(convert_standard_metric_value(kind, display_unit, value), decimals))
+            .map(|value| {
+                format_number(
+                    convert_standard_metric_value(kind, display_unit, value),
+                    decimals,
+                )
+            })
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Balance) => raw
-            .map(|left_value| format_balance_value(left_value, decimals, value_config.balance_format.as_deref()))
+            .map(|left_value| {
+                format_balance_value(left_value, decimals, value_config.balance_format.as_deref())
+            })
             .unwrap_or_else(|| "--".to_string()),
         None => "--".to_string(),
     };
@@ -547,7 +559,7 @@ fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, v
         | MetricKind::GroundContactTime
         | MetricKind::StrokeRate
         | MetricKind::GearPosition
-        |         MetricKind::VerticalRatio => value,
+        | MetricKind::VerticalRatio => value,
         MetricKind::VerticalOscillation => {
             if display_unit == Some("cm") {
                 value / 10.0
@@ -613,21 +625,23 @@ fn metric_icon_kind_for_metric(kind: MetricKind) -> Option<MetricIconKind> {
         crate::standard_metrics::MetricIconAssetKey::Cadence => Some(MetricIconKind::RefreshCw),
         crate::standard_metrics::MetricIconAssetKey::Power => Some(MetricIconKind::Zap),
         crate::standard_metrics::MetricIconAssetKey::Time => Some(MetricIconKind::Clock3),
-        crate::standard_metrics::MetricIconAssetKey::Temperature => Some(MetricIconKind::Thermometer),
+        crate::standard_metrics::MetricIconAssetKey::Temperature => {
+            Some(MetricIconKind::Thermometer)
+        }
         crate::standard_metrics::MetricIconAssetKey::CoreTemperature => {
             Some(MetricIconKind::CoreTemperature)
         }
         crate::standard_metrics::MetricIconAssetKey::Pace => Some(MetricIconKind::Footprints),
         crate::standard_metrics::MetricIconAssetKey::AirPressure => Some(MetricIconKind::Wind),
-        crate::standard_metrics::MetricIconAssetKey::LeftRightBalance => Some(MetricIconKind::Scale),
+        crate::standard_metrics::MetricIconAssetKey::LeftRightBalance => {
+            Some(MetricIconKind::Scale)
+        }
         crate::standard_metrics::MetricIconAssetKey::StrideLength => Some(MetricIconKind::Ruler),
         crate::standard_metrics::MetricIconAssetKey::StrokeRate => Some(MetricIconKind::Waves),
         crate::standard_metrics::MetricIconAssetKey::VerticalSpeed => {
             Some(MetricIconKind::TrendingUp)
         }
-        crate::standard_metrics::MetricIconAssetKey::VerticalRatio => {
-            Some(MetricIconKind::Percent)
-        }
+        crate::standard_metrics::MetricIconAssetKey::VerticalRatio => Some(MetricIconKind::Percent),
         crate::standard_metrics::MetricIconAssetKey::GForce => Some(MetricIconKind::GForce),
         crate::standard_metrics::MetricIconAssetKey::GroundContactTime => {
             Some(MetricIconKind::GroundContactTime)

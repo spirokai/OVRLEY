@@ -15,47 +15,11 @@
  */
 
 import { useMemo } from 'react'
-import { headingOffset, visibleTicks, visibleLabels, chevronVertices, highlightBarMarkerVertices } from '../utils/headingGeometry'
+import { getInterpolatedActivityValue } from '@/features/overlay-editor'
+import { getPreviewFontFamily, getWidgetOpacity } from '../utils/textMeasurement'
+import { headingOffset, visibleTicks, visibleLabels, chevronVertices } from '../utils/headingGeometry'
 import { sanitizeSvgId } from '../utils/svgPreviewUtils'
-
-const DEMO_HEADING = 90
-
-function resolveColor(color, fallback = '#ffffff') {
-  return color || fallback
-}
-
-function parseOpacity(globalOpacity, widgetOpacity) {
-  const base = Number(widgetOpacity) || 1
-  return Math.min(1, Math.max(0, base * (Number(globalOpacity) || 1)))
-}
-
-/**
- * Interpolates the heading value at a given preview second from the activity data.
- */
-function interpolateHeading(activity, previewSecond) {
-  if (!activity?.heading?.length || !activity?.sample_elapsed_seconds?.length) {
-    return DEMO_HEADING
-  }
-
-  const elapsed = activity.sample_elapsed_seconds
-  const heading = activity.heading
-  const target = Number(previewSecond) || 0
-
-  if (elapsed.length === 1) return heading[0] ?? DEMO_HEADING
-  if (target <= elapsed[0]) return heading[0] ?? DEMO_HEADING
-  if (target >= elapsed[elapsed.length - 1]) return heading[heading.length - 1] ?? DEMO_HEADING
-
-  for (let i = 0; i < elapsed.length - 1; i++) {
-    if (target >= elapsed[i] && target <= elapsed[i + 1]) {
-      const t = (target - elapsed[i]) / (elapsed[i + 1] - elapsed[i])
-      const a = heading[i] ?? heading[i + 1] ?? DEMO_HEADING
-      const b = heading[i + 1] ?? heading[i] ?? DEMO_HEADING
-      return a + (b - a) * t
-    }
-  }
-
-  return DEMO_HEADING
-}
+import { useFontMetricsVersion } from '../hooks/useFontMetricsVersion'
 
 /**
  * Renders tick marks into the tape pattern.
@@ -63,15 +27,17 @@ function interpolateHeading(activity, previewSecond) {
 function renderTicks(ticks, height, config) {
   const majorLength = (height * (config.major_tick_length_pct ?? 40)) / 100
   const minorLength = (height * (config.minor_tick_length_pct ?? 20)) / 100
-  const thickness = config.tick_thickness ?? 2
-  const tickColor = resolveColor(config.tick_color)
-  const cardinalColor = resolveColor(config.cardinal_tick_color, tickColor)
+  const majorThickness = config.major_tick_thickness ?? 2
+  const minorThickness = config.minor_tick_thickness ?? 2
+  const tickColor = config.tick_color || '#ffffff'
+  const cardinalColor = config.cardinal_tick_color || tickColor
   const centerY = height / 2
 
   return ticks.map((tick, i) => {
     const length = tick.isMajor ? majorLength : minorLength
     const top = config.tick_alignment === 'centered' ? centerY - length / 2 : centerY
     const color = tick.isCardinal ? cardinalColor : tickColor
+    const thickness = tick.isMajor ? majorThickness : minorThickness
 
     return <line key={`tick-${i}`} x1={tick.x} y1={top} x2={tick.x} y2={top + length} stroke={color} strokeWidth={thickness} />
   })
@@ -80,14 +46,14 @@ function renderTicks(ticks, height, config) {
 /**
  * Renders labels below the ticks.
  */
-function renderLabels(labels, height, config) {
+function renderLabels(labels, height, config, fontFamily) {
   const majorLength = (height * (config.major_tick_length_pct ?? 40)) / 100
   const centerY = height / 2
   const tickBottom = config.tick_alignment === 'centered' ? centerY + majorLength / 2 : centerY + majorLength
   const labelY = tickBottom + (config.label_offset ?? 4) + (config.label_font_size ?? 12)
   const fontSize = config.label_font_size ?? 12
-  const numericColor = resolveColor(config.numeric_label_color)
-  const cardinalColor = resolveColor(config.cardinal_label_color, numericColor)
+  const minorColor = config.minor_label_color || config.numeric_label_color || '#ffffff'
+  const majorColor = config.major_label_color || config.cardinal_label_color || minorColor
 
   return labels.map((label, i) => (
     <text
@@ -95,9 +61,9 @@ function renderLabels(labels, height, config) {
       x={label.x}
       y={labelY}
       textAnchor="middle"
-      fill={label.isCardinal ? cardinalColor : numericColor}
+      fill={(label.isMajorLabel ?? label.isCardinal) ? majorColor : minorColor}
       fontSize={fontSize}
-      fontFamily="Arial, sans-serif"
+      fontFamily={fontFamily}
     >
       {label.text}
     </text>
@@ -109,7 +75,7 @@ function renderLabels(labels, height, config) {
  */
 function renderChevron(centerX, topY, bottomY, config, shadowFilterId) {
   const size = config.indicator_size ?? 10
-  const color = resolveColor(config.indicator_color)
+  const color = config.indicator_color || '#ffffff'
   const placement = config.indicator_placement ?? 'top'
 
   const drawOne = (edgeY, pointingDown, key) => {
@@ -134,32 +100,21 @@ function renderChevron(centerX, topY, bottomY, config, shadowFilterId) {
 /**
  * Renders the highlight bar indicator.
  */
-function renderHighlightBar(centerX, topY, bottomY, height, config, shadowFilterId) {
+function renderHighlightBar(centerX, topY, height, config, shadowFilterId) {
   const barWidth = config.indicator_size ?? 10
   const barHalfWidth = barWidth / 2
-  const color = resolveColor(config.indicator_color)
-  const placement = config.indicator_placement ?? 'top'
-
-  const drawMarker = (edgeY, pointingDown, key) => {
-    const verts = highlightBarMarkerVertices(centerX, edgeY, barHalfWidth, pointingDown)
-    const points = verts.map((v) => `${v.x},${v.y}`).join(' ')
-    return <polygon key={key} points={points} fill={color} filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined} />
-  }
+  const color = config.indicator_color || '#ffffff'
 
   return (
-    <>
-      <rect
-        x={centerX - barHalfWidth}
-        y={topY}
-        width={barWidth}
-        height={height}
-        fill={color}
-        fillOpacity={0.3}
-        filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}
-      />
-      {(placement === 'top' || placement === 'both') && drawMarker(topY, true, 'marker-top')}
-      {(placement === 'bottom' || placement === 'both') && drawMarker(bottomY, false, 'marker-bottom')}
-    </>
+    <rect
+      x={centerX - barHalfWidth}
+      y={topY}
+      width={barWidth}
+      height={height}
+      fill={color}
+      fillOpacity={0.3}
+      filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}
+    />
   )
 }
 
@@ -182,15 +137,18 @@ function buildShadowFilter(id, shadow) {
   )
 }
 
-export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOpacity }) {
+export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOpacity, sceneFont, valueFont }) {
   const data = widget.data ?? {}
   const width = Math.max(Number(data.width) || 400, 80)
   const height = Math.max(Number(data.height) || 80, 20)
   const ppd = Number(data.pixels_per_degree) || 5
-  const opacity = parseOpacity(globalOpacity, data.opacity)
+  const opacity = getWidgetOpacity(data, globalOpacity)
   const tapeWidth = 360 * ppd
+  const labelFontSize = data.label_font_size ?? 12
+  const labelFontFamily = getPreviewFontFamily(data.label_font || data.label_font_family || valueFont || sceneFont)
+  useFontMetricsVersion(labelFontFamily, labelFontSize)
 
-  const heading = useMemo(() => interpolateHeading(activity, previewSecond), [activity, previewSecond])
+  const heading = getInterpolatedActivityValue(activity, 'heading', previewSecond)
 
   const offset = headingOffset(heading, ppd)
 
@@ -209,8 +167,13 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
   )
 
   const labels = useMemo(
-    () => visibleLabels(ticks, data.show_numeric_labels !== false, data.show_cardinal_labels !== false),
-    [ticks, data.show_numeric_labels, data.show_cardinal_labels],
+    () =>
+      visibleLabels(
+        ticks,
+        (data.show_minor_labels ?? data.show_numeric_labels) !== false,
+        (data.show_major_labels ?? data.show_cardinal_labels) !== false,
+      ),
+    [ticks, data.show_minor_labels, data.show_numeric_labels, data.show_major_labels, data.show_cardinal_labels],
   )
 
   const shadowFilterId = sanitizeSvgId(`${widget.id}-indicator-shadow`)
@@ -235,7 +198,7 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
           patternTransform={`translate(${-offset}, 0)`}
         >
           {renderTicks(ticks, height, data)}
-          {renderLabels(labels, height, data)}
+          {renderLabels(labels, height, data, labelFontFamily)}
         </pattern>
         {shadow && buildShadowFilter(shadowFilterId, shadow)}
       </defs>
@@ -247,7 +210,7 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
       {data.show_indicator !== false && (
         <>
           {data.indicator_style === 'highlight_bar'
-            ? renderHighlightBar(width / 2, 0, height, height, data, shadow ? shadowFilterId : null)
+            ? renderHighlightBar(width / 2, 0, height, data, shadow ? shadowFilterId : null)
             : renderChevron(width / 2, 0, height, data, shadow ? shadowFilterId : null)}
         </>
       )}

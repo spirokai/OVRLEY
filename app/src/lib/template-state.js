@@ -94,6 +94,12 @@ function buildEffectivePlotData(widgetData = {}, globals, previewOverrides = nul
   const nextData = { ...widgetData }
   if (!nextData.color) nextData.color = globals?.color_values || getThemeColor('ice')
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity
+  if (nextData.value === 'heading' && !nextData.label_font && globals?.font_values) {
+    Object.assign(nextData, {
+      label_font: globals.font_values,
+      label_font_family: getFontFamilyName(globals.font_values),
+    })
+  }
   if (nextData.value === 'elevation' && globals?.font_values) {
     nextData.point_label = {
       ...(nextData.point_label || {}),
@@ -171,6 +177,10 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null) 
     for (const plot of nextConfig.plots) {
       if (plot.value === 'elevation' && shouldApply('font_values')) {
         plot.point_label = { ...(plot.point_label || {}), ...createFontSelection(globals.font_values) }
+      }
+      if (plot.value === 'heading' && shouldApply('font_values') && !plot.label_font) {
+        plot.label_font = globals.font_values
+        plot.label_font_family = getFontFamilyName(globals.font_values)
       }
       if (shouldApply('color_values') && Object.hasOwn(plot, 'color')) plot.color = globals.color_values
     }

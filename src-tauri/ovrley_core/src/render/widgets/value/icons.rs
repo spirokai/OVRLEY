@@ -35,21 +35,23 @@ pub(crate) fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconK
         crate::standard_metrics::MetricIconAssetKey::Cadence => Some(MetricIconKind::RefreshCw),
         crate::standard_metrics::MetricIconAssetKey::Power => Some(MetricIconKind::Zap),
         crate::standard_metrics::MetricIconAssetKey::Time => Some(MetricIconKind::Clock3),
-        crate::standard_metrics::MetricIconAssetKey::Temperature => Some(MetricIconKind::Thermometer),
+        crate::standard_metrics::MetricIconAssetKey::Temperature => {
+            Some(MetricIconKind::Thermometer)
+        }
         crate::standard_metrics::MetricIconAssetKey::CoreTemperature => {
             Some(MetricIconKind::CoreTemperature)
         }
         crate::standard_metrics::MetricIconAssetKey::Pace => Some(MetricIconKind::Footprints),
         crate::standard_metrics::MetricIconAssetKey::AirPressure => Some(MetricIconKind::Wind),
-        crate::standard_metrics::MetricIconAssetKey::LeftRightBalance => Some(MetricIconKind::Scale),
+        crate::standard_metrics::MetricIconAssetKey::LeftRightBalance => {
+            Some(MetricIconKind::Scale)
+        }
         crate::standard_metrics::MetricIconAssetKey::StrideLength => Some(MetricIconKind::Ruler),
         crate::standard_metrics::MetricIconAssetKey::StrokeRate => Some(MetricIconKind::Waves),
         crate::standard_metrics::MetricIconAssetKey::VerticalSpeed => {
             Some(MetricIconKind::TrendingUp)
         }
-        crate::standard_metrics::MetricIconAssetKey::VerticalRatio => {
-            Some(MetricIconKind::Percent)
-        }
+        crate::standard_metrics::MetricIconAssetKey::VerticalRatio => Some(MetricIconKind::Percent),
         crate::standard_metrics::MetricIconAssetKey::GForce => Some(MetricIconKind::GForce),
         crate::standard_metrics::MetricIconAssetKey::GroundContactTime => {
             Some(MetricIconKind::GroundContactTime)
@@ -77,7 +79,9 @@ fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIco
         MetricIconKind::RefreshCw => parsed_metric_icon_cached(icon_kind, &REFRESH_CW_ICON_CACHE),
         MetricIconKind::Zap => parsed_metric_icon_cached(icon_kind, &ZAP_ICON_CACHE),
         MetricIconKind::Clock3 => parsed_metric_icon_cached(icon_kind, &CLOCK3_ICON_CACHE),
-        MetricIconKind::Thermometer => parsed_metric_icon_cached(icon_kind, &THERMOMETER_ICON_CACHE),
+        MetricIconKind::Thermometer => {
+            parsed_metric_icon_cached(icon_kind, &THERMOMETER_ICON_CACHE)
+        }
         MetricIconKind::CoreTemperature => {
             parsed_metric_icon_cached(icon_kind, &CORE_TEMPERATURE_ICON_CACHE)
         }

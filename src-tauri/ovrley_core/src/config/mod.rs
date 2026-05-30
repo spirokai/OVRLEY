@@ -554,9 +554,12 @@ pub struct HeadingWidgetConfig {
     /// Minor tick length as percentage of widget height.
     #[serde(default = "default_minor_tick_length")]
     pub minor_tick_length_pct: f32,
-    /// Tick thickness in pixels.
-    #[serde(default = "default_tick_thickness")]
-    pub tick_thickness: f32,
+    /// Major tick thickness in pixels.
+    #[serde(default = "default_major_tick_thickness")]
+    pub major_tick_thickness: f32,
+    /// Minor tick thickness in pixels.
+    #[serde(default = "default_minor_tick_thickness")]
+    pub minor_tick_thickness: f32,
     /// Regular (non-cardinal) tick color as hex.
     #[serde(default)]
     pub tick_color: Option<String>,
@@ -575,18 +578,24 @@ pub struct HeadingWidgetConfig {
     /// Shadow color override for all elements.
     #[serde(default)]
     pub shadow_color: Option<String>,
-    /// Show numeric degree labels.
-    #[serde(default = "default_true")]
-    pub show_numeric_labels: bool,
-    /// Show cardinal labels (N/NE/E/SE/S/SW/W/NW).
-    #[serde(default = "default_true")]
-    pub show_cardinal_labels: bool,
-    /// Numeric label color as hex.
+    /// Show minor degree labels.
+    #[serde(default = "default_true", alias = "show_numeric_labels")]
+    pub show_minor_labels: bool,
+    /// Show major labels (N/NE/E/SE/S/SW/W/NW).
+    #[serde(default = "default_true", alias = "show_cardinal_labels")]
+    pub show_major_labels: bool,
+    /// Minor label color as hex.
+    #[serde(default, alias = "numeric_label_color")]
+    pub minor_label_color: Option<String>,
+    /// Major label color as hex.
+    #[serde(default, alias = "cardinal_label_color")]
+    pub major_label_color: Option<String>,
+    /// Label font filename or family.
     #[serde(default)]
-    pub numeric_label_color: Option<String>,
-    /// Cardinal label color as hex.
+    pub label_font: Option<String>,
+    /// Alternate label font family field used by the editor.
     #[serde(default)]
-    pub cardinal_label_color: Option<String>,
+    pub label_font_family: Option<String>,
     /// Label font size in pixels.
     #[serde(default)]
     pub label_font_size: Option<f32>,
@@ -634,7 +643,10 @@ fn default_major_tick_length() -> f32 {
 fn default_minor_tick_length() -> f32 {
     20.0
 }
-fn default_tick_thickness() -> f32 {
+fn default_major_tick_thickness() -> f32 {
+    2.0
+}
+fn default_minor_tick_thickness() -> f32 {
     2.0
 }
 fn default_tick_alignment() -> String {
@@ -732,7 +744,10 @@ pub fn parse_template_json(input: &str) -> CoreResult<RenderConfig> {
 }
 
 fn apply_template_global_defaults(config: &mut RenderConfig, template: &Value) {
-    let Some(globals) = template.get("settings").and_then(|settings| settings.get("globalDefaults")) else {
+    let Some(globals) = template
+        .get("settings")
+        .and_then(|settings| settings.get("globalDefaults"))
+    else {
         return;
     };
 
@@ -752,6 +767,41 @@ fn apply_template_global_defaults(config: &mut RenderConfig, template: &Value) {
                 value.font_family = Some(font_values.clone());
             }
         }
+        apply_heading_label_font_default(&mut config.plots, &font_values);
+    }
+}
+
+fn apply_heading_label_font_default(plots: &mut Value, font_values: &str) {
+    match plots {
+        Value::Array(items) => {
+            for item in items {
+                apply_heading_label_font_default_to_plot(item, font_values);
+            }
+        }
+        Value::Object(map) => {
+            for item in map.values_mut() {
+                apply_heading_label_font_default_to_plot(item, font_values);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn apply_heading_label_font_default_to_plot(plot: &mut Value, font_values: &str) {
+    let Some(object) = plot.as_object_mut() else {
+        return;
+    };
+    let is_heading = object
+        .get("value")
+        .and_then(Value::as_str)
+        .map(|value| value == "heading")
+        .unwrap_or(false);
+
+    if is_heading && !object.contains_key("label_font") {
+        object.insert(
+            "label_font".to_string(),
+            Value::String(font_values.to_string()),
+        );
     }
 }
 

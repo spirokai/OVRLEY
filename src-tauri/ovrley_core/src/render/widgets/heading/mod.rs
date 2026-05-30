@@ -9,9 +9,9 @@
 //! - `prepare` — Cached tape image rendering and per-frame offset precomputation.
 //! - `draw` — Per-frame tiled tape draw + indicator rendering.
 
-mod draw;
-pub(crate) mod geometry;
-mod prepare;
+pub mod draw;
+pub mod geometry;
+pub mod prepare;
 
 pub(crate) use draw::draw_heading_widget;
 pub(crate) use prepare::prepare_heading_cache;

@@ -11,8 +11,7 @@ import { deleteWidgetInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, u
 import { buildConfigWidgets, groupWidgetsForSidebar } from '@/lib/widget-presentation'
 import { isStandardMetricWidgetType } from '@/lib/standard-metrics'
 import { clamp } from '@/lib/utils'
-import { createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
-import { HEADING_DEFAULTS } from '../data/widgetDefaults'
+import { createHeadingDefaults, createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
 
 /**
  * Container hook for SidebarWidgetsTab that owns all store access,
@@ -82,11 +81,7 @@ export function useWidgetManager() {
       )
     } else if (type === 'heading') {
       if (!nextConfig.plots) nextConfig.plots = []
-      nextConfig.plots.push({
-        value: 'heading',
-        ...HEADING_DEFAULTS,
-        opacity: globalDefaults?.opacity ?? 1,
-      })
+      nextConfig.plots.push(createHeadingDefaults(globalDefaults))
     }
 
     const normalizedConfig = ensureWidgetIdsInConfig(nextConfig)
@@ -125,13 +120,7 @@ export function useWidgetManager() {
     }
 
     if (widget.type === 'heading') {
-      setConfig(
-        replaceWidgetInConfig(config, id, {
-          value: 'heading',
-          ...HEADING_DEFAULTS,
-          opacity: globalDefaults?.opacity ?? 1,
-        }),
-      )
+      setConfig(replaceWidgetInConfig(config, id, createHeadingDefaults(globalDefaults)))
       return
     }
 

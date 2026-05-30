@@ -39,8 +39,8 @@
 //! Cargo feature is enabled.
 
 use anyhow::{bail, Context, Result};
-use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::activity::parse_activity_json;
+use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::config::{parse_template_json, RenderConfig};
 use ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary;
 use ovrley_core::paths::AppPaths;
@@ -48,11 +48,11 @@ use ovrley_core::render::{
     prepare_preview_assets, render_preview_with_prepared_assets, PreviewRenderRequest,
 };
 use serde_json::Value;
+use std::fs;
 use std::io::{BufRead, Read};
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::fs;
-use std::net::TcpListener;
 use std::time::{Duration, Instant};
 
 // ── Fixture parsing ─────────────────────────────────────────────────────────
@@ -85,8 +85,8 @@ pub fn parse_fixtures_with_config(
 
 /// Reads a JSON file as a serde Value.
 fn read_json(path: &Path) -> Result<Value> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
     serde_json::from_str(&content)
         .with_context(|| format!("failed to parse JSON from {}", path.display()))
 }
@@ -139,8 +139,7 @@ pub fn test_app_paths(git_root: &Path, case_root: &Path) -> Result<AppPaths> {
     let debug_render_dir = case_root.join("debug_render");
 
     for dir in [&downloads_dir, &temp_dir, &debug_render_dir] {
-        fs::create_dir_all(dir)
-            .with_context(|| format!("failed to create {}", dir.display()))?;
+        fs::create_dir_all(dir).with_context(|| format!("failed to create {}", dir.display()))?;
     }
 
     let app_paths = AppPaths {
@@ -202,8 +201,8 @@ pub fn write_mock_data(
     println!("  wrote activity.json");
 
     // 3. store-state.json — Zustand store snapshot
-    let config_value = serde_json::to_value(config)
-        .context("failed to serialize config for store state")?;
+    let config_value =
+        serde_json::to_value(config).context("failed to serialize config for store state")?;
     let store_state = serde_json::json!({
         "config": config_value,
         "globalDefaults": global_defaults,
@@ -253,9 +252,13 @@ fn derive_global_defaults(config: &RenderConfig) -> Value {
 
 fn derive_activity_summary(activity: &ParsedActivity) -> Value {
     let sample_count = activity.sample_elapsed_seconds.len();
-    let duration_seconds = activity
-        .trim_end_seconds
-        .max(activity.sample_elapsed_seconds.last().copied().unwrap_or(0.0));
+    let duration_seconds = activity.trim_end_seconds.max(
+        activity
+            .sample_elapsed_seconds
+            .last()
+            .copied()
+            .unwrap_or(0.0),
+    );
     let total_distance = estimate_total_distance(activity);
     serde_json::json!({
         "durationSeconds": duration_seconds as u64,
@@ -279,8 +282,7 @@ fn estimate_total_distance(activity: &ParsedActivity) -> f64 {
 fn write_json(path: &Path, value: &Value) -> Result<()> {
     let json = serde_json::to_string_pretty(value)
         .with_context(|| format!("failed to serialize JSON for {}", path.display()))?;
-    fs::write(path, &json)
-        .with_context(|| format!("failed to write {}", path.display()))?;
+    fs::write(path, &json).with_context(|| format!("failed to write {}", path.display()))?;
     Ok(())
 }
 
@@ -475,8 +477,7 @@ fn drain_stderr(process: &mut Child) -> String {
 
 /// Binds to port 0 and returns the assigned port number.
 fn find_free_port() -> Result<u16> {
-    let listener =
-        TcpListener::bind("127.0.0.1:0").context("failed to bind 127.0.0.1:0")?;
+    let listener = TcpListener::bind("127.0.0.1:0").context("failed to bind 127.0.0.1:0")?;
     let port = listener
         .local_addr()
         .context("failed to get local address")?
@@ -515,11 +516,11 @@ pub fn run_playwright_screenshot(
         .arg(out_path);
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     let output = cmd.output().with_context(|| {
-            format!(
-                "failed to spawn Node.js script at {}. Is Node.js installed?",
-                script_path.display()
-            )
-        })?;
+        format!(
+            "failed to spawn Node.js script at {}. Is Node.js installed?",
+            script_path.display()
+        )
+    })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -547,13 +548,21 @@ pub fn run_playwright_screenshot(
         );
     }
 
-    println!("  Playwright screenshot saved: {} kB", file_size_kb(out_path));
+    println!(
+        "  Playwright screenshot saved: {} kB",
+        file_size_kb(out_path)
+    );
 
     // Parse JSON from stdout: {"width": 3840, "height": 2160, "bg": "transparent"}
-    let (canvas_w, canvas_h) = if let Ok(dims) = serde_json::from_str::<serde_json::Value>(trimmed) {
+    let (canvas_w, canvas_h) = if let Ok(dims) = serde_json::from_str::<serde_json::Value>(trimmed)
+    {
         let w = dims.get("width").and_then(|v| v.as_u64()).unwrap_or(3840) as u32;
         let h = dims.get("height").and_then(|v| v.as_u64()).unwrap_or(2160) as u32;
-        let b = dims.get("bg").and_then(|v| v.as_str()).unwrap_or("transparent").to_string();
+        let b = dims
+            .get("bg")
+            .and_then(|v| v.as_str())
+            .unwrap_or("transparent")
+            .to_string();
         let editor_chrome = dims
             .get("editorChrome")
             .and_then(|v| v.as_str())
@@ -647,9 +656,12 @@ const EDGE_IGNORE_RADIUS: i32 = 0;
 pub fn probe_png_dimensions(ffprobe: &Path, path: &Path) -> Result<(u32, u32)> {
     let output = Command::new(ffprobe)
         .args([
-            "-v", "error",
-            "-show_entries", "stream=width,height",
-            "-of", "csv=p=0",
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=width,height",
+            "-of",
+            "csv=p=0",
             &path.to_string_lossy().to_string(),
         ])
         .output()
@@ -670,13 +682,21 @@ pub fn probe_png_dimensions(ffprobe: &Path, path: &Path) -> Result<(u32, u32)> {
 /// Derives the ffprobe path from the resolved ffmpeg path.
 pub fn resolve_ffprobe(ffmpeg: &Path) -> PathBuf {
     let mut p = ffmpeg.to_path_buf();
-    let name = if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" };
+    let name = if cfg!(windows) {
+        "ffprobe.exe"
+    } else {
+        "ffprobe"
+    };
     p.set_file_name(name);
     if p.is_file() {
         return p;
     }
     let fallback = ffmpeg.parent().unwrap().join(name);
-    if fallback.is_file() { fallback } else { ffmpeg.to_path_buf() }
+    if fallback.is_file() {
+        fallback
+    } else {
+        ffmpeg.to_path_buf()
+    }
 }
 
 /// Runs ffmpeg's SSIM filter comparing two same-sized PNG images.
@@ -694,23 +714,16 @@ pub fn resolve_ffprobe(ffmpeg: &Path) -> PathBuf {
 /// # Requirements
 ///
 /// - ffmpeg must be available (resolved via [`resolve_ffmpeg_binary`]).
-pub fn run_ssim(
-    skia_path: &Path,
-    canvas_path: &Path,
-    repo_root: &Path,
-) -> Result<SsimResult> {
+pub fn run_ssim(skia_path: &Path, canvas_path: &Path, repo_root: &Path) -> Result<SsimResult> {
     println!("  running ffmpeg SSIM comparison...");
 
-    let ffmpeg =
-        resolve_ffmpeg_binary(repo_root).context("failed to resolve ffmpeg binary")?;
+    let ffmpeg = resolve_ffmpeg_binary(repo_root).context("failed to resolve ffmpeg binary")?;
     let ffprobe = resolve_ffprobe(&ffmpeg);
 
     // Detect exact canvas PNG dimensions via ffprobe
     let (canvas_w, canvas_h) = probe_png_dimensions(&ffprobe, canvas_path)?;
 
-    println!(
-        "  canvas PNG: {canvas_w}x{canvas_h}"
-    );
+    println!("  canvas PNG: {canvas_w}x{canvas_h}");
 
     // Scale the Skia PNG to match canvas dimensions if needed
     let (skia_w, skia_h) = probe_png_dimensions(&ffprobe, skia_path)?;
@@ -723,7 +736,10 @@ pub fn run_ssim(
             .args(["-vf", &scale_filter, &scaled.to_string_lossy()])
             .output()?;
         if !scale_output.status.success() {
-            bail!("ffmpeg scale failed: {}", String::from_utf8_lossy(&scale_output.stderr).trim());
+            bail!(
+                "ffmpeg scale failed: {}",
+                String::from_utf8_lossy(&scale_output.stderr).trim()
+            );
         }
         scaled
     } else {
@@ -789,11 +805,13 @@ pub fn run_ssim(
     }
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    parse_ssim_output(&stderr)
-        .with_context(|| {
-            let ssim_line = stderr.lines().find(|l| l.contains("All:")).unwrap_or("(not found)");
-            format!("failed to parse SSIM output — line: {ssim_line}")
-        })
+    parse_ssim_output(&stderr).with_context(|| {
+        let ssim_line = stderr
+            .lines()
+            .find(|l| l.contains("All:"))
+            .unwrap_or("(not found)");
+        format!("failed to parse SSIM output — line: {ssim_line}")
+    })
 }
 
 /// Parses the ffmpeg SSIM stderr output for scores.
@@ -828,7 +846,9 @@ fn parse_ssim_output(stderr: &str) -> Result<SsimResult> {
             .find(prefix)
             .ok_or_else(|| anyhow::anyhow!("missing {prefix} in SSIM line: {ssim_line}"))?;
         let rest = &ssim_line[after + prefix.len()..];
-        let end = rest.find(|c: char| !c.is_ascii_digit() && c != '.').unwrap_or(rest.len());
+        let end = rest
+            .find(|c: char| !c.is_ascii_digit() && c != '.')
+            .unwrap_or(rest.len());
         rest[..end]
             .parse::<f64>()
             .with_context(|| format!("failed to parse {prefix} score from '{rest}'"))
@@ -840,7 +860,12 @@ fn parse_ssim_output(stderr: &str) -> Result<SsimResult> {
     let c3 = extract("V:").or_else(|_| extract("B:"))?;
     let combined = extract("All:")?;
 
-    Ok(SsimResult { combined, y: c1, u: c2, v: c3 })
+    Ok(SsimResult {
+        combined,
+        y: c1,
+        u: c2,
+        v: c3,
+    })
 }
 
 /// Scans both RGBA byte buffers and returns the bounding rectangle of all
@@ -972,8 +997,7 @@ pub fn generate_diff_png(
     diff_path: &Path,
     repo_root: &Path,
 ) -> Result<DiffStats> {
-    let ffmpeg =
-        resolve_ffmpeg_binary(repo_root).context("failed to resolve ffmpeg for diff")?;
+    let ffmpeg = resolve_ffmpeg_binary(repo_root).context("failed to resolve ffmpeg for diff")?;
     let ffprobe = resolve_ffprobe(&ffmpeg);
 
     let (canvas_width, canvas_height) = probe_png_dimensions(&ffprobe, canvas_path)?;
@@ -989,7 +1013,10 @@ pub fn generate_diff_png(
             .args(["-vf", &scale_filter, &scaled.to_string_lossy()])
             .output()?;
         if !scale_output.status.success() {
-            bail!("ffmpeg scale failed for diff: {}", String::from_utf8_lossy(&scale_output.stderr).trim());
+            bail!(
+                "ffmpeg scale failed for diff: {}",
+                String::from_utf8_lossy(&scale_output.stderr).trim()
+            );
         }
         scaled
     } else {
@@ -1172,17 +1199,15 @@ fn build_alpha_edge_ignore_mask(
                 y,
                 alpha_threshold,
                 edge_alpha_delta_threshold,
-            )
-                || is_alpha_edge_pixel(
-                    right,
-                    width,
-                    height,
-                    x,
-                    y,
-                    alpha_threshold,
-                    edge_alpha_delta_threshold,
-                )
-            {
+            ) || is_alpha_edge_pixel(
+                right,
+                width,
+                height,
+                x,
+                y,
+                alpha_threshold,
+                edge_alpha_delta_threshold,
+            ) {
                 seeds[index] = true;
             }
         }
@@ -1272,7 +1297,16 @@ fn alpha_at(bytes: &[u8], width: u32, x: u32, y: u32) -> u8 {
 fn decode_png_to_rgba(ffmpeg: &Path, png_path: &Path) -> Result<(u32, u32, Vec<u8>)> {
     // Probe for dimensions
     let probe = Command::new(ffmpeg)
-        .args(["-hide_banner", "-v", "info", "-i", png_path.to_str().unwrap(), "-f", "null", "-"])
+        .args([
+            "-hide_banner",
+            "-v",
+            "info",
+            "-i",
+            png_path.to_str().unwrap(),
+            "-f",
+            "null",
+            "-",
+        ])
         .stderr(Stdio::piped())
         .output()
         .with_context(|| format!("failed to probe PNG {}", png_path.display()))?;
@@ -1280,15 +1314,27 @@ fn decode_png_to_rgba(ffmpeg: &Path, png_path: &Path) -> Result<(u32, u32, Vec<u
     let stderr = String::from_utf8_lossy(&probe.stderr);
 
     // Parse "Stream ... 3840x2160 ..." from stderr
-    let dims = parse_dimensions_from_ffmpeg_stderr(&stderr)
-        .with_context(|| format!("could not parse dimensions for {}:\n{stderr}", png_path.display()))?;
+    let dims = parse_dimensions_from_ffmpeg_stderr(&stderr).with_context(|| {
+        format!(
+            "could not parse dimensions for {}:\n{stderr}",
+            png_path.display()
+        )
+    })?;
 
     let (width, height) = dims;
 
     // Decode raw RGBA
     let output = Command::new(ffmpeg)
         .args(["-v", "error", "-i", png_path.to_str().unwrap()])
-        .args(["-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgba", "pipe:1"])
+        .args([
+            "-frames:v",
+            "1",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgba",
+            "pipe:1",
+        ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()

@@ -115,8 +115,13 @@ pub fn prepare_preview_assets(
     let prepare_started = Instant::now();
     let (labels_image, label_cache_status) =
         cached_labels_image(paths, config, width, height, scale, &mut prepare_profiler)?;
-    let mut prepared_assets =
-        prepare_render_assets(config, activity, dense_activity, &mut prepare_profiler)?;
+    let mut prepared_assets = prepare_render_assets(
+        paths,
+        config,
+        activity,
+        dense_activity,
+        &mut prepare_profiler,
+    )?;
     prepared_assets.base_rgba =
         prepare_base_rgba(paths, config, width, height, scale, &mut prepare_profiler)?;
     let prepare_timings = annotate_timing_aliases(
@@ -410,7 +415,11 @@ fn render_frame_to_surface(
     labels_image: Option<&Image>,
     base_layer_restored: bool,
     frame_profiler: &mut RenderProfiler,
-) -> (Option<WidgetRenderReport>, Option<WidgetRenderReport>, Option<WidgetRenderReport>) {
+) -> (
+    Option<WidgetRenderReport>,
+    Option<WidgetRenderReport>,
+    Option<WidgetRenderReport>,
+) {
     // Draw order is important: static labels/icons first, dynamic metric text,
     // then plot widgets. Static metric icons can be skipped here when they were
     // already included in the restored base layer.

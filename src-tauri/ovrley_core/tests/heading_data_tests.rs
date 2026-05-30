@@ -17,9 +17,7 @@
 
 use serde_json::json;
 
-use ovrley_core::activity::schema::{
-    DenseSeriesReport, ParsedActivity, TrimmedActivity,
-};
+use ovrley_core::activity::schema::{DenseSeriesReport, ParsedActivity, TrimmedActivity};
 use ovrley_core::config::{RenderConfig, RenderDataRequirements, SceneConfig};
 use ovrley_core::MetricKind;
 
@@ -82,10 +80,7 @@ fn parsed_activity_heading_preserves_nulls() {
         "heading": [90.0, null, 180.0]
     });
     let activity: ParsedActivity = serde_json::from_value(json).unwrap();
-    assert_eq!(
-        activity.heading,
-        vec![Some(90.0), None, Some(180.0)]
-    );
+    assert_eq!(activity.heading, vec![Some(90.0), None, Some(180.0)]);
 }
 
 // ── 3. DenseSeriesReport carries heading ─────────────────────────────────
@@ -295,7 +290,8 @@ fn heading_widget_config_deserializes_from_json() {
         "show_minor_ticks": true,
         "major_tick_length_pct": 40.0,
         "minor_tick_length_pct": 20.0,
-        "tick_thickness": 2.0,
+        "major_tick_thickness": 2.0,
+        "minor_tick_thickness": 1.0,
         "tick_color": "#FFFFFF",
         "cardinal_tick_color": "#FF0000",
         "tick_alignment": "below",
@@ -306,6 +302,8 @@ fn heading_widget_config_deserializes_from_json() {
         "show_cardinal_labels": true,
         "numeric_label_color": "#CCCCCC",
         "cardinal_label_color": "#FF0000",
+        "label_font": "Teko.ttf",
+        "label_font_family": "Teko",
         "label_font_size": 12.0,
         "label_offset": 5.0,
         "indicator_style": "chevron",
@@ -327,6 +325,10 @@ fn heading_widget_config_deserializes_from_json() {
     assert!(config.show_major_ticks);
     assert!(config.show_minor_ticks);
     assert_eq!(config.tick_alignment, "below");
+    assert!((config.major_tick_thickness - 2.0).abs() < f32::EPSILON);
+    assert!((config.minor_tick_thickness - 1.0).abs() < f32::EPSILON);
+    assert_eq!(config.label_font.as_deref(), Some("Teko.ttf"));
+    assert_eq!(config.label_font_family.as_deref(), Some("Teko"));
     assert_eq!(config.indicator_style, "chevron");
     assert_eq!(config.indicator_placement, "top");
     assert!(config.show_indicator);
@@ -350,6 +352,8 @@ fn heading_widget_config_defaults_via_serde_default() {
     assert_eq!(config.minor_ticks_per_major, 3);
     assert!(config.show_major_ticks);
     assert!(config.show_minor_ticks);
+    assert!((config.major_tick_thickness - 2.0).abs() < f32::EPSILON);
+    assert!((config.minor_tick_thickness - 2.0).abs() < f32::EPSILON);
     assert!(config.show_numeric_labels);
     assert!(config.show_cardinal_labels);
     assert!(config.show_indicator);
@@ -587,5 +591,8 @@ fn heading_plot_triggers_heading_data_requirement() {
     };
 
     let reqs = config.render_data_requirements().unwrap();
-    assert!(reqs.heading, "heading plot should trigger heading requirement");
+    assert!(
+        reqs.heading,
+        "heading plot should trigger heading requirement"
+    );
 }

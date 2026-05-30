@@ -80,7 +80,16 @@ function WidgetPreview({
   }
 
   if (widget.type === 'heading') {
-    return <OverlayHeadingWidget widget={widget} activity={activity} previewSecond={previewSecond} globalOpacity={globalOpacity} />
+    return (
+      <OverlayHeadingWidget
+        widget={widget}
+        activity={activity}
+        previewSecond={previewSecond}
+        globalOpacity={globalOpacity}
+        sceneFont={sceneFont}
+        valueFont={valueFont}
+      />
+    )
   }
 
   return (

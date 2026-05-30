@@ -7,7 +7,6 @@ import {
   visibleTicks,
   visibleLabels,
   chevronVertices,
-  highlightBarMarkerVertices,
 } from '@/features/widget-preview/utils/headingGeometry'
 
 describe('headingOffset', () => {
@@ -90,7 +89,13 @@ describe('visibleTicks', () => {
     const all = visibleTicks(0, 5, 200, 15, 3, true, true)
     const minorOnly = visibleTicks(0, 5, 200, 15, 3, false, true)
     expect(all.length).toBeGreaterThan(minorOnly.length)
-    expect(minorOnly.every((t) => !t.isMajor)).toBe(true)
+    expect(minorOnly.every((t) => !t.isMajor || t.isCardinal)).toBe(true)
+  })
+
+  test('keeps cardinal ticks visible when regular ticks are hidden', () => {
+    const ticks = visibleTicks(0, 5, 500, 15, 3, false, false)
+    expect(ticks.map((tick) => tick.degree)).toEqual([0, 45, 90])
+    expect(ticks.every((tick) => tick.isCardinal)).toBe(true)
   })
 
   test('marks cardinal degrees correctly', () => {
@@ -125,9 +130,9 @@ describe('visibleLabels', () => {
     const labels = visibleLabels(ticks, true, true)
     expect(labels.length).toBe(3)
     expect(labels[0].text).toBe('N')
-    expect(labels[0].isCardinal).toBe(true)
+    expect(labels[0].isMajorLabel).toBe(true)
     expect(labels[1].text).toBe('15')
-    expect(labels[1].isCardinal).toBe(false)
+    expect(labels[1].isMajorLabel).toBe(false)
     expect(labels[2].text).toBe('30')
   })
 
@@ -136,10 +141,10 @@ describe('visibleLabels', () => {
     const labels = visibleLabels(ticks, true, true)
     expect(labels.length).toBe(1)
     expect(labels[0].text).toBe('N')
-    expect(labels[0].isCardinal).toBe(true)
+    expect(labels[0].isMajorLabel).toBe(true)
   })
 
-  test('respects show_numeric_labels flag', () => {
+  test('respects show_minor_labels flag', () => {
     const ticks = [
       { degree: 0, x: 0, isCardinal: true, isMajor: true },
       { degree: 15, x: 75, isCardinal: false, isMajor: true },
@@ -147,19 +152,19 @@ describe('visibleLabels', () => {
     const none = visibleLabels(ticks, false, false)
     expect(none.length).toBe(0)
 
-    const numericOnly = visibleLabels(ticks, true, false)
-    expect(numericOnly.length).toBe(2)
-    expect(numericOnly[0].text).toBe('0')
+    const minorOnly = visibleLabels(ticks, true, false)
+    expect(minorOnly.length).toBe(2)
+    expect(minorOnly[0].text).toBe('0')
   })
 
-  test('respects show_cardinal_labels flag', () => {
+  test('respects show_major_labels flag', () => {
     const ticks = [
       { degree: 0, x: 0, isCardinal: true, isMajor: true },
       { degree: 15, x: 75, isCardinal: false, isMajor: true },
     ]
-    const cardinalOnly = visibleLabels(ticks, false, true)
-    expect(cardinalOnly.length).toBe(1)
-    expect(cardinalOnly[0].text).toBe('N')
+    const majorOnly = visibleLabels(ticks, false, true)
+    expect(majorOnly.length).toBe(1)
+    expect(majorOnly[0].text).toBe('N')
   })
 })
 
@@ -174,19 +179,5 @@ describe('chevronVertices', () => {
   test('bottom chevron points up', () => {
     const verts = chevronVertices(200, 80, 10, false)
     expect(verts[2].y).toBeCloseTo(70, 1)
-  })
-})
-
-describe('highlightBarMarkerVertices', () => {
-  test('top marker points down', () => {
-    const verts = highlightBarMarkerVertices(200, 0, 5, true)
-    expect(verts[0].x).toBeCloseTo(195, 1)
-    expect(verts[1].x).toBeCloseTo(205, 1)
-    expect(verts[2].y).toBeCloseTo(2, 1)
-  })
-
-  test('bottom marker points up', () => {
-    const verts = highlightBarMarkerVertices(200, 80, 5, false)
-    expect(verts[2].y).toBeCloseTo(78, 1)
   })
 })

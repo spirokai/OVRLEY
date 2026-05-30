@@ -134,6 +134,34 @@ describe('normalizeTemplateConfig', () => {
     expect(result.plots[0].value).toBe('elevation')
     expect(result.plots[0].point_label.font).toBe('ElevFont.ttf')
   })
+
+  test('normalizes heading plots with label font and separate tick thickness fields', () => {
+    const config = {
+      plots: [
+        {
+          id: 'heading-1',
+          value: 'heading',
+          x: 30,
+          y: 40,
+          width: 400,
+          height: 80,
+          label_font: 'Teko.ttf',
+          label_font_family: 'Teko',
+          major_tick_thickness: 4,
+          minor_tick_thickness: 1,
+          tick_thickness: 9,
+        },
+      ],
+    }
+
+    const result = normalizeTemplateConfig(config)
+
+    expect(result.plots[0].label_font).toBe('Teko.ttf')
+    expect(result.plots[0].label_font_family).toBe('Teko')
+    expect(result.plots[0].major_tick_thickness).toBe(4)
+    expect(result.plots[0].minor_tick_thickness).toBe(1)
+    expect(result.plots[0]).not.toHaveProperty('tick_thickness')
+  })
 })
 
 /* -------------------------------------------------------------------------- */
@@ -268,6 +296,16 @@ describe('createEditorEffectiveConfig', () => {
     const result = createEditorEffectiveConfig({ config, globalDefaults: {} })
 
     expect(result.values[0].balance_format).toBe('percent_label')
+  })
+
+  test('resolves heading label font from value font global when unset', () => {
+    const config = {
+      plots: [{ id: 'heading-1', value: 'heading', x: 10, y: 10, width: 400, height: 80 }],
+    }
+    const result = createEditorEffectiveConfig({ config, globalDefaults: { font_values: 'Teko.ttf' } })
+
+    expect(result.plots[0].label_font).toBe('Teko.ttf')
+    expect(result.plots[0].label_font_family).toBe('Teko')
   })
 })
 

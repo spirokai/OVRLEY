@@ -42,7 +42,8 @@ describe('HeadingWidgetEditor', () => {
     render(<HeadingWidgetEditor widget={makeHeadingWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
     expect(screen.getByText('Major Length')).toBeInTheDocument()
     expect(screen.getByText('Minor Length')).toBeInTheDocument()
-    expect(screen.getByText('Thickness')).toBeInTheDocument()
+    expect(screen.getByText('Major Thickness')).toBeInTheDocument()
+    expect(screen.getByText('Minor Thickness')).toBeInTheDocument()
   })
 
   test('renders tick color controls', () => {
@@ -61,16 +62,15 @@ describe('HeadingWidgetEditor', () => {
   test('renders the Labels section with show/hide toggles', () => {
     render(<HeadingWidgetEditor widget={makeHeadingWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
     expect(screen.getByText('Labels')).toBeInTheDocument()
-    expect(screen.getByText('Numeric Labels')).toBeInTheDocument()
-    expect(screen.getByText('Cardinal Labels')).toBeInTheDocument()
+    expect(screen.getByText('Minor Labels')).toBeInTheDocument()
+    expect(screen.getByText('Major Labels')).toBeInTheDocument()
   })
 
   test('renders label color and font size controls', () => {
     render(<HeadingWidgetEditor widget={makeHeadingWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
-    expect(screen.getByText('Numeric Color')).toBeInTheDocument()
-    // Cardinal label color appears in Labels section
-    const cardinalColors = screen.getAllByText('Cardinal Color')
-    expect(cardinalColors.length).toBe(2) // one in Ticks, one in Labels
+    expect(screen.getByText('Label Font')).toBeInTheDocument()
+    expect(screen.getByText('Minor Color')).toBeInTheDocument()
+    expect(screen.getByText('Major Color')).toBeInTheDocument()
     expect(screen.getByText('Font Size')).toBeInTheDocument()
   })
 
@@ -111,11 +111,44 @@ describe('HeadingWidgetEditor', () => {
     expect(screen.getByText('Highlight Bar')).toBeInTheDocument()
   })
 
+  test('disables major tick options when major ticks are hidden', () => {
+    render(<HeadingWidgetEditor widget={makeHeadingWidget({ show_major_ticks: false })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+
+    const majorLengthSlider = screen.getByText('Major Length').closest('div').parentElement.querySelector('[data-slot="slider"]')
+    const majorThicknessSlider = screen.getByText('Major Thickness').closest('div').parentElement.querySelector('[data-slot="slider"]')
+
+    expect(majorLengthSlider).toHaveAttribute('aria-disabled', 'true')
+    expect(majorThicknessSlider).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  test('disables minor tick options when minor ticks are hidden', () => {
+    render(<HeadingWidgetEditor widget={makeHeadingWidget({ show_minor_ticks: false })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+
+    const minorLengthSlider = screen.getByText('Minor Length').closest('div').parentElement.querySelector('[data-slot="slider"]')
+    const minorThicknessSlider = screen.getByText('Minor Thickness').closest('div').parentElement.querySelector('[data-slot="slider"]')
+
+    expect(minorLengthSlider).toHaveAttribute('aria-disabled', 'true')
+    expect(minorThicknessSlider).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  test('disables indicator placement when style is highlight bar', () => {
+    render(
+      <HeadingWidgetEditor widget={makeHeadingWidget({ indicator_style: 'highlight_bar' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />,
+    )
+
+    const placementTrigger = screen.getByText('Placement').closest('div').querySelector('button')
+
+    expect(placementTrigger).toBeDisabled()
+  })
+
   test('defaults match the PRD spec', () => {
     expect(HEADING_DEFAULTS.major_tick_interval).toBe(15)
     expect(HEADING_DEFAULTS.minor_ticks_per_major).toBe(3)
     expect(HEADING_DEFAULTS.show_major_ticks).toBe(true)
     expect(HEADING_DEFAULTS.show_minor_ticks).toBe(true)
+    expect(HEADING_DEFAULTS.major_tick_thickness).toBe(2)
+    expect(HEADING_DEFAULTS.minor_tick_thickness).toBe(2)
+    expect(HEADING_DEFAULTS.label_font).toBe('Arial.ttf')
     expect(HEADING_DEFAULTS.tick_alignment).toBe('below')
     expect(HEADING_DEFAULTS.indicator_style).toBe('chevron')
     expect(HEADING_DEFAULTS.show_indicator).toBe(true)

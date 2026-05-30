@@ -15,14 +15,13 @@
 
 use ovrley_core::config::HeadingWidgetConfig;
 use ovrley_core::debug::RenderProfiler;
+use ovrley_core::render::surface::create_surface;
+use ovrley_core::render::widgets::heading::draw::draw_heading_widget;
 use ovrley_core::render::widgets::heading::geometry::{
-    chevron_vertices, highlight_bar_marker_vertices, visible_labels, visible_ticks,
-    TapeTick,
+    chevron_vertices, visible_labels, visible_ticks, TapeTick,
 };
 use ovrley_core::render::widgets::heading::prepare::prepare_heading_cache;
-use ovrley_core::render::widgets::heading::draw::draw_heading_widget;
 use ovrley_core::render::widgets::types::HeadingWidgetCache;
-use ovrley_core::render::surface::create_surface;
 use ovrley_core::MetricKind;
 use std::collections::BTreeMap;
 
@@ -70,7 +69,8 @@ fn default_plot() -> HeadingWidgetConfig {
         show_minor_ticks: true,
         major_tick_length_pct: 40.0,
         minor_tick_length_pct: 20.0,
-        tick_thickness: 2.0,
+        major_tick_thickness: 2.0,
+        minor_tick_thickness: 2.0,
         tick_color: Some("#FFFFFF".to_string()),
         cardinal_tick_color: Some("#FF0000".to_string()),
         tick_alignment: "below".to_string(),
@@ -81,6 +81,8 @@ fn default_plot() -> HeadingWidgetConfig {
         show_cardinal_labels: true,
         numeric_label_color: Some("#CCCCCC".to_string()),
         cardinal_label_color: Some("#FF0000".to_string()),
+        label_font: Some("Arial.ttf".to_string()),
+        label_font_family: Some("Arial".to_string()),
         label_font_size: Some(12.0),
         label_offset: Some(4.0),
         indicator_style: "chevron".to_string(),
@@ -187,7 +189,10 @@ fn visible_ticks_marks_cardinals() {
     let ticks = visible_ticks(0.0, 5.0, 200.0, 15, 3, true, false);
     let tick_0 = ticks.iter().find(|t| t.degree.abs() < 0.01).unwrap();
     assert!(tick_0.is_cardinal);
-    let tick_15 = ticks.iter().find(|t| (t.degree - 15.0).abs() < 0.01).unwrap();
+    let tick_15 = ticks
+        .iter()
+        .find(|t| (t.degree - 15.0).abs() < 0.01)
+        .unwrap();
     assert!(!tick_15.is_cardinal);
 }
 
@@ -196,9 +201,24 @@ fn visible_ticks_marks_cardinals() {
 #[test]
 fn visible_labels_cardinal_overrides_numeric() {
     let ticks = vec![
-        TapeTick { degree: 0.0, x: 0.0, is_cardinal: true, is_major: true },
-        TapeTick { degree: 15.0, x: 75.0, is_cardinal: false, is_major: true },
-        TapeTick { degree: 30.0, x: 150.0, is_cardinal: false, is_major: true },
+        TapeTick {
+            degree: 0.0,
+            x: 0.0,
+            is_cardinal: true,
+            is_major: true,
+        },
+        TapeTick {
+            degree: 15.0,
+            x: 75.0,
+            is_cardinal: false,
+            is_major: true,
+        },
+        TapeTick {
+            degree: 30.0,
+            x: 150.0,
+            is_cardinal: false,
+            is_major: true,
+        },
     ];
     let labels = visible_labels(&ticks, true, true);
     assert_eq!(labels.len(), 3);
@@ -212,8 +232,18 @@ fn visible_labels_cardinal_overrides_numeric() {
 #[test]
 fn visible_labels_respects_show_flags() {
     let ticks = vec![
-        TapeTick { degree: 0.0, x: 0.0, is_cardinal: true, is_major: true },
-        TapeTick { degree: 15.0, x: 75.0, is_cardinal: false, is_major: true },
+        TapeTick {
+            degree: 0.0,
+            x: 0.0,
+            is_cardinal: true,
+            is_major: true,
+        },
+        TapeTick {
+            degree: 15.0,
+            x: 75.0,
+            is_cardinal: false,
+            is_major: true,
+        },
     ];
     let none = visible_labels(&ticks, false, false);
     assert!(none.is_empty());
@@ -242,20 +272,6 @@ fn chevron_top_points_down() {
 fn chevron_bottom_points_up() {
     let verts = chevron_vertices(200.0, 80.0, 10.0, false);
     assert!((verts[2].y - 70.0).abs() < 0.01);
-}
-
-#[test]
-fn highlight_bar_marker_top() {
-    let verts = highlight_bar_marker_vertices(200.0, 0.0, 5.0, true);
-    assert!((verts[0].x - 195.0).abs() < 0.01);
-    assert!((verts[1].x - 205.0).abs() < 0.01);
-    assert!((verts[2].y - 2.0).abs() < 0.01);
-}
-
-#[test]
-fn highlight_bar_marker_bottom() {
-    let verts = highlight_bar_marker_vertices(200.0, 80.0, 5.0, false);
-    assert!((verts[2].y - 78.0).abs() < 0.01);
 }
 
 // ── Prepare: cache construction ───────────────────────────────────────────

@@ -9,10 +9,10 @@
 mod common;
 /// Elevation profile widget implementation.
 mod elevation;
-/// Heading compass tape widget implementation.
-mod heading;
 /// Point/rect/math and layout-fitting helpers.
 mod geometry;
+/// Heading compass tape widget implementation.
+pub mod heading;
 /// Marker and dot drawing helpers.
 mod marker;
 /// Polyline and area drawing helpers.
@@ -22,7 +22,7 @@ mod route;
 /// Skia path and coordinate transform helpers.
 mod transform;
 /// Shared widget cache and report types.
-mod types;
+pub mod types;
 /// Metric value widgets, including icons and gradient triangles.
 pub mod value;
 
@@ -30,6 +30,7 @@ use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
+use crate::paths::AppPaths;
 
 pub(crate) use elevation::draw_elevation_widget;
 pub(crate) use heading::draw_heading_widget;
@@ -54,6 +55,7 @@ mod tests;
 /// Plot configuration is parsed lazily; absent widgets produce no cache, while
 /// invalid present widgets return an error before rendering starts.
 pub fn prepare_render_assets(
+    paths: &AppPaths,
     config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
@@ -83,7 +85,9 @@ pub fn prepare_render_assets(
 
     if let Some(heading_plot) = config.heading_plot()? {
         assets.heading_cache = Some(heading::prepare_heading_cache(
+            config,
             &heading_plot,
+            &paths.font_dirs,
             prepare_profiler,
         )?);
     }

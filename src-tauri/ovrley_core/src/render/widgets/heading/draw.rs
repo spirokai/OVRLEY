@@ -5,10 +5,10 @@
 //! drawing twice with the tape width as offset. After the tape, draw the
 //! indicator (chevron or highlight bar) at the widget's horizontal center.
 
-use super::geometry::{chevron_vertices, highlight_bar_marker_vertices};
 use super::super::types::{
     HeadingWidgetCache, WidgetFrameReport, WidgetGeometryReport, WidgetRenderReport,
 };
+use super::geometry::chevron_vertices;
 use crate::debug::RenderProfiler;
 use crate::render::text::parse_color;
 use skia_safe::{Canvas, Paint, Path, Point, Rect};
@@ -183,7 +183,7 @@ fn draw_chevron_indicator(
 }
 
 /// Draws a highlight bar indicator: a semi-transparent vertical band spanning
-/// the full tape height, with small triangular edge markers at placement edges.
+/// the full tape height.
 fn draw_highlight_bar_indicator(
     canvas: &Canvas,
     cache: &HeadingWidgetCache,
@@ -206,36 +206,6 @@ fn draw_highlight_bar_indicator(
         Rect::from_xywh(bar_left, top_y, bar_width, bottom_y - top_y),
         &bar_paint,
     );
-
-    // Draw edge markers (small filled triangles) at configured placements
-    let mut marker_paint = Paint::default();
-    marker_paint.set_anti_alias(true);
-    marker_paint.set_color(color);
-
-    let draw_marker = |edge_y: f32, pointing_down: bool| {
-        let verts = highlight_bar_marker_vertices(
-            center_x - cache.x,
-            edge_y - cache.y,
-            bar_half_width,
-            pointing_down,
-        );
-        let mut path = Path::new();
-        path.move_to(Point::new(verts[0].x + cache.x, verts[0].y + cache.y));
-        path.line_to(Point::new(verts[1].x + cache.x, verts[1].y + cache.y));
-        path.line_to(Point::new(verts[2].x + cache.x, verts[2].y + cache.y));
-        path.close();
-        canvas.draw_path(&path, &marker_paint);
-    };
-
-    match cache.indicator_placement.as_str() {
-        "top" => draw_marker(top_y, true),
-        "bottom" => draw_marker(bottom_y, false),
-        "both" => {
-            draw_marker(top_y, true);
-            draw_marker(bottom_y, false);
-        }
-        _ => {}
-    }
 
     // Apply shadow if configured
     if let Some(ref shadow) = cache.indicator_shadow {

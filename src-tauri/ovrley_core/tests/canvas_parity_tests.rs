@@ -12,9 +12,9 @@
 //!
 //! Requires: Node.js, pnpm (or npm), ffmpeg, Playwright browsers installed.
 
-mod common;
 #[path = "common/canvas_parity.rs"]
 mod canvas_parity;
+mod common;
 
 use anyhow::{Context, Result};
 use canvas_parity::{
@@ -46,7 +46,10 @@ fn canvas_parity() -> Result<()> {
     let src_tauri = manifest_dir.parent().unwrap();
 
     let case_name = "canvas-parity";
-    let case_root = src_tauri.join("target").join("canvas-parity").join(case_name);
+    let case_root = src_tauri
+        .join("target")
+        .join("canvas-parity")
+        .join(case_name);
     let mock_dir = case_root.join("mock-data");
     let artifacts_dir = manifest_dir.join("tests").join("canvas_parity");
     let skia_png = artifacts_dir.join("skia.png");
@@ -63,9 +66,11 @@ fn canvas_parity() -> Result<()> {
     println!("[1/9] Parsing fixtures...");
     let (activity, config, activity_raw, config_raw) =
         parse_fixtures_with_config(&fixture_root, "test-template-1080p.json")?;
-    println!("  activity: {} samples, {}s duration",
+    println!(
+        "  activity: {} samples, {}s duration",
         activity.sample_elapsed_seconds.len(),
-        activity.trim_end_seconds);
+        activity.trim_end_seconds
+    );
 
     // 2. Build dense activity report
     println!("[2/9] Building dense activity report...");
@@ -79,11 +84,25 @@ fn canvas_parity() -> Result<()> {
 
     // 4. Render Skia PNG
     println!("[4/9] Rendering Skia preview...");
-    render_skia_preview(&app_paths, &config, &activity, &dense_activity, SELECTED_SECOND, &skia_png)?;
+    render_skia_preview(
+        &app_paths,
+        &config,
+        &activity,
+        &dense_activity,
+        SELECTED_SECOND,
+        &skia_png,
+    )?;
 
     // 5. Write mock data files for Playwright
     println!("[5/9] Writing mock data files...");
-    write_mock_data(&mock_dir, &config, &config_raw, &activity, &activity_raw, SELECTED_SECOND)?;
+    write_mock_data(
+        &mock_dir,
+        &config,
+        &config_raw,
+        &activity,
+        &activity_raw,
+        SELECTED_SECOND,
+    )?;
 
     // 6. Spawn Vite dev server
     println!("[6/9] Starting Vite dev server...");
@@ -91,7 +110,10 @@ fn canvas_parity() -> Result<()> {
 
     // 7. Run Playwright screenshot script
     println!("[7/9] Running Playwright screenshot...");
-    let script_path = manifest_dir.join("tests").join("scripts").join("canvas_screenshot.mjs");
+    let script_path = manifest_dir
+        .join("tests")
+        .join("scripts")
+        .join("canvas_screenshot.mjs");
     let info = run_playwright_screenshot(&script_path, &mock_dir, &vite.url(), &canvas_png)?;
     println!(
         "  Playwright captured transparent widget layer at {}x{}",
@@ -111,10 +133,7 @@ fn canvas_parity() -> Result<()> {
             "  SSIM: {:.4} (threshold: {SSIM_THRESHOLD}) — PASS",
             ssim.combined
         );
-        println!(
-            "  Y: {:.4}  U: {:.4}  V: {:.4}",
-            ssim.y, ssim.u, ssim.v
-        );
+        println!("  Y: {:.4}  U: {:.4}  V: {:.4}", ssim.y, ssim.u, ssim.v);
     } else {
         println!(
             "  SSIM: {:.4} (threshold: {SSIM_THRESHOLD}) — FAIL",
@@ -133,7 +152,8 @@ fn canvas_parity() -> Result<()> {
         0.0
     };
     let alpha_tolerant_pct = if diff_stats.overlay_pixels > 0 {
-        (diff_stats.overlay_significant_mismatch_pixels as f64 / diff_stats.overlay_pixels as f64) * 100.0
+        (diff_stats.overlay_significant_mismatch_pixels as f64 / diff_stats.overlay_pixels as f64)
+            * 100.0
     } else {
         0.0
     };
@@ -154,30 +174,20 @@ fn canvas_parity() -> Result<()> {
     } else {
         0.0
     };
-    println!(
-        "  diff image: {}",
-        diff_png.display()
-    );
-     println!(
-        "  ---------------------------------------------------------",
-    ); 
-     println!(
-        "  PIXEL MISMATCH COUNT:",
-    );
+    println!("  diff image: {}", diff_png.display());
+    println!("  ---------------------------------------------------------",);
+    println!("  PIXEL MISMATCH COUNT:",);
     println!(
         "  FULL FRAME ({} / {})- {raw_pct:.2}% ",
-        diff_stats.mismatch_pixels,
-        total_pixels
+        diff_stats.mismatch_pixels, total_pixels
     );
     println!(
         "  OVERLAY ONLY ({} / {}) - {alpha_masked_pct:.2}%",
-        diff_stats.overlay_mismatch_pixels,
-        diff_stats.overlay_pixels
+        diff_stats.overlay_mismatch_pixels, diff_stats.overlay_pixels
     );
     println!(
         "  THRESHOLD APPLIED ({} / {}) - {alpha_tolerant_pct:.2}%",
-        diff_stats.overlay_significant_mismatch_pixels,
-        diff_stats.overlay_pixels
+        diff_stats.overlay_significant_mismatch_pixels, diff_stats.overlay_pixels
     );
     println!(
         "  CLEAN (AA EXCLUDED) ({} / {}; ignored {}) - {edge_insensitive_pct:.2}%",
@@ -185,26 +195,17 @@ fn canvas_parity() -> Result<()> {
         diff_stats.edge_compared_pixels,
         diff_stats.edge_ignored_pixels
     );
-     println!(
-        "  ---------------------------------------------------------",
-    ); 
-     println!(
-        "  ORPHANED PIXELS:",
-    );    
+    println!("  ---------------------------------------------------------",);
+    println!("  ORPHANED PIXELS:",);
     println!(
         "  PREVIEW EXCLUSIVE ({} / {}) - {canvas_only_pct:.2}%",
-        diff_stats.canvas_only_pixels,
-        diff_stats.overlay_pixels
+        diff_stats.canvas_only_pixels, diff_stats.overlay_pixels
     );
     println!(
         "  RENDER EXCLUSIVE ({} / {}) - {skia_only_pct:.2}%",
-        diff_stats.skia_only_pixels,
-        diff_stats.overlay_pixels
+        diff_stats.skia_only_pixels, diff_stats.overlay_pixels
     );
-    println!(
-        "  summary: {}",
-        summary_json.display()
-    );
+    println!("  summary: {}", summary_json.display());
 
     let summary = serde_json::json!({
         "ssim": {
@@ -261,7 +262,12 @@ fn canvas_parity() -> Result<()> {
     if !pass {
         anyhow::bail!(
             "SSIM {:.4} < {} — Y={:.4} U={:.4} V={:.4} — diff: {}",
-            ssim.combined, SSIM_THRESHOLD, ssim.y, ssim.u, ssim.v, diff_png.display()
+            ssim.combined,
+            SSIM_THRESHOLD,
+            ssim.y,
+            ssim.u,
+            ssim.v,
+            diff_png.display()
         );
     }
 
