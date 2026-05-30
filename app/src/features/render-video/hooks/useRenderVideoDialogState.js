@@ -11,9 +11,10 @@
  * @returns {object} State and handlers for RenderVideoDialog.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 import { cancelRender } from '@/api/backend'
-import { getFpsModeValue, normalizeUpdateRateForFps, PRESET_FPS_VALUES, sanitizeIntegerFps } from '@/lib/update-rate'
+import { normalizeUpdateRateForFps } from '@/lib/update-rate'
+import { useFpsMode } from '@/hooks/useFpsMode'
 import { EXPORT_CODEC_LOOKUP, OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
 import {
   getExportCodecForSelection,
@@ -27,8 +28,16 @@ import useRenderVideoDerivedState from './useRenderVideoDerivedState'
 export default function useRenderVideoDialogState({ phase, settings, onSettingsChange, onClose, onConfirm }) {
   const derived = useRenderVideoDerivedState({ settings })
 
-  const [customFpsAnchor, setCustomFpsAnchor] = useState(null)
-  const fpsMode = customFpsAnchor !== null && Number(settings?.fps) === customFpsAnchor ? 'custom' : getFpsModeValue(settings?.fps)
+  const { fpsMode, handleFpsModeChange, handleCustomFpsChange } = useFpsMode({
+    fps: settings?.fps,
+    onFpsChange: (fps) => {
+      onSettingsChange({
+        fps,
+        updateRate: normalizeUpdateRateForFps(fps, settings?.updateRate),
+      })
+    },
+    updateRate: settings?.updateRate,
+  })
 
   // Auto-select MP4 codec when video is imported or codec availability changes
   useEffect(() => {
@@ -129,35 +138,6 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
       exportBitrate: nextIsMp4Codec ? derived.defaultBitrateForCodec(nextExportCodec) : undefined,
     })
   }
-
-  const handleFpsModeChange = useCallback(
-    (value) => {
-      if (value === 'custom') {
-        setCustomFpsAnchor(Number(settings?.fps))
-        return
-      }
-
-      setCustomFpsAnchor(null)
-      const fps = sanitizeIntegerFps(value)
-      onSettingsChange({
-        fps,
-        updateRate: normalizeUpdateRateForFps(fps, settings?.updateRate),
-      })
-    },
-    [onSettingsChange, settings?.fps, settings?.updateRate],
-  )
-
-  const handleCustomFpsChange = useCallback(
-    (rawValue) => {
-      const fps = sanitizeIntegerFps(rawValue)
-      setCustomFpsAnchor(PRESET_FPS_VALUES.includes(fps) ? null : fps)
-      onSettingsChange({
-        fps,
-        updateRate: normalizeUpdateRateForFps(fps, settings?.updateRate),
-      })
-    },
-    [onSettingsChange, settings?.updateRate],
-  )
 
   const handleAccelerationChange = (value) => {
     const nextExportCodec = getExportCodecForSelection(derived.selectedOutputFormatValue, value)

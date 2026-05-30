@@ -3,14 +3,7 @@
  */
 
 import { useEffect } from 'react'
-
-function isPlaybackShortcutTarget(target) {
-  if (!(target instanceof HTMLElement)) {
-    return false
-  }
-
-  return Boolean(target.closest('input, textarea, select, button, a, [role="slider"], [contenteditable="true"]'))
-}
+import { isInteractiveElement } from '@/lib/utils'
 
 /**
  * Registers global keyboard shortcuts for player playback and timeline stepping.
@@ -19,13 +12,21 @@ function isPlaybackShortcutTarget(target) {
  * @param {number} options.clampedPlayhead - Current playhead constrained to the timeline duration.
  * @param {function} options.handlePause - Callback that pauses playback at the current playhead.
  * @param {function} options.handlePlay - Callback that starts playback from the current playhead.
- * @param {function} options.handleStep - Callback that steps playback by one second.
+ * @param {function} options.handleStepByDirection - Callback that steps playback by one second.
  * @param {boolean} options.hasActivity - Whether there is an activity timeline to control.
  * @param {boolean} options.isPlaying - Whether preview playback is currently active.
  * @param {number} options.totalDuration - Total timeline duration in seconds.
  * @returns {void}
  */
-export default function usePlayerKeyboard({ clampedPlayhead, handlePause, handlePlay, handleStep, hasActivity, isPlaying, totalDuration }) {
+export default function usePlayerKeyboard({
+  clampedPlayhead,
+  handlePause,
+  handlePlay,
+  handleStepByDirection,
+  hasActivity,
+  isPlaying,
+  totalDuration,
+}) {
   // Global shortcuts - maps Space and Arrow keys to playback controls while focus is outside form controls
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -36,7 +37,7 @@ export default function usePlayerKeyboard({ clampedPlayhead, handlePause, handle
         event.ctrlKey ||
         event.altKey ||
         !hasActivity ||
-        isPlaybackShortcutTarget(event.target)
+        isInteractiveElement(event.target)
       ) {
         return
       }
@@ -44,7 +45,7 @@ export default function usePlayerKeyboard({ clampedPlayhead, handlePause, handle
       if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
         event.preventDefault()
         const direction = event.code === 'ArrowRight' ? 1 : -1
-        handleStep(direction)
+        handleStepByDirection(direction)
         return
       }
 
@@ -64,5 +65,5 @@ export default function usePlayerKeyboard({ clampedPlayhead, handlePause, handle
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [clampedPlayhead, handlePause, handlePlay, handleStep, hasActivity, isPlaying, totalDuration])
+  }, [clampedPlayhead, handlePause, handlePlay, handleStepByDirection, hasActivity, isPlaying, totalDuration])
 }

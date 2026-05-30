@@ -37,7 +37,7 @@ export function useActivityStore() {
   return useStore(
     useShallow((state) => ({
       activitySummary: state.activitySummary,
-      gpxFilename: state.gpxFilename,
+      activityFilename: state.activityFilename,
       setErrorMessage: state.setErrorMessage,
       setProcessing: state.setProcessing,
     })),

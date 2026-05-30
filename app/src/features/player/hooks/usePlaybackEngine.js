@@ -257,7 +257,7 @@ export default function usePlaybackEngine({
     pausePreviewPlayback(0)
   }, [pausePreviewPlayback, resetPlaybackOrchestration, setPlaybackAnchor])
 
-  const handleStep = useCallback(
+  const handleStepByDirection = useCallback(
     (direction) => {
       const nextSecond = clamp(clampedPlayhead + direction, 0, totalDuration)
 
@@ -305,7 +305,7 @@ export default function usePlaybackEngine({
     handlePause,
     handlePlay,
     handleReset,
-    handleStep,
+    handleStepByDirection,
     handleTimelineChange,
     handleTimelineCommit,
     hasActivity,

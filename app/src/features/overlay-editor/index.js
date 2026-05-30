@@ -9,7 +9,7 @@ export { default as OverlayEditor } from './components/OverlayEditor'
 
 export {
   timeToSeconds,
-  buildScopedRouteSamples,
+  buildExportWindowRouteSamples,
   buildScopedElevationSeries,
   resolveExportRangeWindow,
   getWindowProgressAtTime,

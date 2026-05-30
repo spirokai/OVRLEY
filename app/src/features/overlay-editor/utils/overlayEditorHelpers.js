@@ -4,7 +4,7 @@
  */
 
 import { DEFAULT_GRADIENT_TRIANGLE_WIDTH } from '../data/overlayEditorConstants'
-import { clamp } from '@/lib/utils'
+import { clamp, isInteractiveElement } from '@/lib/utils'
 
 /**
  * Checks whether the target element is inside an editable input, textarea,
@@ -14,11 +14,7 @@ import { clamp } from '@/lib/utils'
  * @returns {boolean} True if target is inside an editable element.
  */
 export function isEditableElement(target) {
-  if (!(target instanceof HTMLElement)) {
-    return false
-  }
-
-  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+  return isInteractiveElement(target)
 }
 
 /**

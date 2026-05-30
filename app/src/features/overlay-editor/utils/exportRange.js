@@ -209,7 +209,7 @@ function getElevationSourceValues(activity) {
  * @param {{ active: boolean, start: number, end: number }|null} window - Export window.
  * @returns {Array<{ point: number[], progress: number|null }>} Scoped route samples.
  */
-export function buildScopedRouteSamples(activity, window) {
+export function buildExportWindowRouteSamples(activity, window) {
   const coursePoints = getRouteSourcePoints(activity)
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
   const distanceProgress = Array.isArray(activity?.sample_distance_progress) ? activity.sample_distance_progress : []

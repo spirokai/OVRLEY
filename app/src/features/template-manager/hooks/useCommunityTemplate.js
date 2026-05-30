@@ -40,13 +40,8 @@ export default function useCommunityTemplate() {
       const data = await response.json()
       const state = useStore.getState()
 
-      if (!state.gpxFilename) {
-        useStore.getState().setGpxFilename('demo.gpxinit')
-        const demoDuration = 7946
-        useStore.getState().setDummyDurationSeconds(demoDuration)
-        useStore.getState().setStartSecond(0)
-        useStore.getState().setEndSecond(demoDuration)
-        useStore.getState().setSelectedSecond(0)
+      if (!state.activityFilename) {
+        useStore.getState().setDemoActivity()
       }
 
       useStore.getState().setConfig(data)
@@ -57,7 +52,7 @@ export default function useCommunityTemplate() {
       }
     } catch (error) {
       console.error('Error with community templates:', error)
-      alert(`Failed to load template: ${error.message}`)
+      useStore.getState().setErrorMessage(`Failed to load template: ${error.message}`)
     }
   }, [])
 

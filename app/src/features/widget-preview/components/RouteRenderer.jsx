@@ -16,7 +16,7 @@
  */
 
 import { useMemo } from 'react'
-import { buildScopedRouteSamples, getWindowProgressAtTime, resolveExportRangeWindow } from '@/features/overlay-editor'
+import { buildExportWindowRouteSamples, getWindowProgressAtTime, resolveExportRangeWindow } from '@/features/overlay-editor'
 import { normalizeRouteGeometry } from '../utils/routeGeometry'
 import { getDistanceProgressAtElapsed } from '@/features/overlay-editor'
 import { getWidgetOpacity } from '../utils/textMeasurement'
@@ -58,7 +58,7 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
     [activity, exportRange, widget.data.show_full_activity],
   )
   const routeSamples = useMemo(() => {
-    return buildScopedRouteSamples(activity, exportWindow)
+    return buildExportWindowRouteSamples(activity, exportWindow)
   }, [activity, exportWindow])
 
   // Route geometry — project lat/lng samples to SVG points with Mercator, downsample, and simplify

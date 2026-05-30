@@ -63,7 +63,7 @@ export default function OverlayPlayer({ backgroundMode }) {
     clampedPlayhead: playback.clampedPlayhead,
     handlePause: playback.handlePause,
     handlePlay: playback.handlePlay,
-    handleStep: playback.handleStep,
+    handleStepByDirection: playback.handleStepByDirection,
     hasActivity: playback.hasActivity,
     isPlaying: playback.isPlaying,
     totalDuration: playback.totalDuration,

@@ -55,7 +55,7 @@ describe('renderVideo', () => {
       },
     })
 
-    await renderVideo()
+    await renderVideo(useStore.getState())
 
     expect(backend.renderVideo).toHaveBeenCalledTimes(1)
     expect(backend.renderVideo).toHaveBeenCalledWith(

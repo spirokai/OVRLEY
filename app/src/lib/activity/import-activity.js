@@ -3,7 +3,6 @@
  * cache update, store synchronization, and debug payload persistence.
  */
 
-import useStore from '@/store/useStore'
 import * as backend from '@/api/backend'
 import { finalizeParsedActivity } from './parser.js'
 import { safeNumber } from './parse-helpers.js'
@@ -231,9 +230,9 @@ function syncSceneDurationWithActivity(durationSeconds, storeState) {
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 async function loadActivityIntoStore({ filename, parsedActivity, debugPayload, storeState }) {
-  const { setActivitySummary, setGpxFilename, setParsedActivity } = storeState
+  const { setActivitySummary, setActivityFilename, setParsedActivity } = storeState
 
-  setGpxFilename(filename)
+  setActivityFilename(filename)
   setParsedActivity(parsedActivity)
   setActivitySummary(parsedActivity)
   const debugPath = await persistDebugPayload(filename, debugPayload)
@@ -259,13 +258,13 @@ async function ensureFileObject(fileOrPath) {
  * Handles save file.
  *
  * @param {*} fileOrPath - File object or path pointing to an activity file.
- * @param {object} [storeActions] - Injected store actions. Falls back to useStore.getState() if absent.
+ * @param {object} storeActions - Injected store actions.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export default async function importActivityFile(fileOrPath, storeActions) {
   const file = await ensureFileObject(fileOrPath)
   const filename = file.name
-  const store = storeActions || useStore.getState()
+  const store = storeActions
 
   console.log('Starting activity processing:', {
     source: 'file',

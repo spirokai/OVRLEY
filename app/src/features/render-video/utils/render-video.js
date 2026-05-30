@@ -4,7 +4,6 @@
  */
 
 import * as backend from '@/api/backend'
-import useStore from '@/store/useStore'
 import { createRenderEffectiveConfig } from './renderConfig'
 
 /**
@@ -13,25 +12,26 @@ import { createRenderEffectiveConfig } from './renderConfig'
  * @returns {Promise<object>} Backend render response.
  */
 export default async function renderVideo(overrides = {}) {
+  const {
+    availableCodecs,
+    config: baseConfig,
+    exportCodec,
+    exportRange,
+    globalDefaults,
+    importedVideoDuration,
+    importedVideoFps,
+    importedVideoFpsDen,
+    importedVideoFpsNum,
+    importedVideoPath,
+    parsedActivity,
+    setActiveRenderId,
+    setRenderingVideo,
+    setRenderProgress,
+    updateRate,
+    videoSyncOffsetSeconds,
+  } = overrides
+
   try {
-    const {
-      availableCodecs,
-      config: baseConfig,
-      exportCodec,
-      exportRange,
-      globalDefaults,
-      importedVideoDuration,
-      importedVideoFps,
-      importedVideoFpsDen,
-      importedVideoFpsNum,
-      importedVideoPath,
-      setActiveRenderId,
-      setRenderingVideo,
-      setRenderProgress,
-      updateRate,
-      videoSyncOffsetSeconds,
-    } = useStore.getState()
-    const parsedActivity = useStore.getState().parsedActivity
     const activeConfig = overrides.config || baseConfig
     const activeUpdateRate = overrides.updateRate ?? updateRate
     const activeExportRange = overrides.exportRange ?? exportRange
@@ -104,7 +104,6 @@ export default async function renderVideo(overrides = {}) {
 
     throw new Error('Render did not start')
   } catch (error) {
-    const { setActiveRenderId, setRenderingVideo, setRenderProgress } = useStore.getState()
     setActiveRenderId(null)
     setRenderingVideo(false)
     setRenderProgress({

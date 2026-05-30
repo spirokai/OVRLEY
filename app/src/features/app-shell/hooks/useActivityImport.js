@@ -30,13 +30,13 @@ const selectBrowserGpxFile = () =>
  * triggers the browser file dialog and saves the selected file.
  *
  * @returns {{
- *   gpxFilename: string|null,
+ *   activityFilename: string|null,
  *   handleGpxFileOpen: Function,
  * }}
  */
 export default function useActivityImport() {
   // Store selectors — activity import state from the global store
-  const { gpxFilename, setErrorMessage, setProcessing } = useActivityStore()
+  const { activityFilename, setErrorMessage, setProcessing } = useActivityStore()
 
   // Activity file handler — opens file dialog, imports GPX/FIT, handles errors
   const handleGpxFileOpen = useCallback(async () => {
@@ -56,7 +56,7 @@ export default function useActivityImport() {
   }, [setErrorMessage, setProcessing])
 
   return {
-    gpxFilename,
+    activityFilename,
     handleGpxFileOpen,
   }
 }

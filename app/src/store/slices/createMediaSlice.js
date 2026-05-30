@@ -16,7 +16,7 @@ export function createMediaSlice(set, get) {
     renderingVideo: false,
     errorMessage: null,
     videoFilename: null,
-    gpxFilename: null,
+    activityFilename: null,
     activitySummary: null,
     parsedActivity: null,
     activeRenderId: null,
@@ -69,15 +69,15 @@ export function createMediaSlice(set, get) {
         state.videoFilename = filename
       }),
 
-    setGpxFilename: (filename) => {
+    setActivityFilename: (filename) => {
       set((state) => {
-        state.gpxFilename = filename
+        state.activityFilename = filename
       })
     },
 
-    setGpxFilenameFromFile: (file) => {
+    setActivityFilenameFromFile: (file) => {
       set((state) => {
-        state.gpxFilename = file?.name || null
+        state.activityFilename = file?.name || null
       })
     },
 
@@ -117,6 +117,16 @@ export function createMediaSlice(set, get) {
     setParsedActivity: (activity) =>
       set((state) => {
         state.parsedActivity = activity
+      }),
+
+    setDemoActivity: () =>
+      set((state) => {
+        const demoDuration = 7946
+        state.activityFilename = 'demo.gpxinit'
+        state.dummyDurationSeconds = demoDuration
+        state.startSecond = 0
+        state.endSecond = demoDuration
+        state.selectedSecond = 0
       }),
   }
 }

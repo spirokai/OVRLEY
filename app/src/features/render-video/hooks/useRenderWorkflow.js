@@ -231,6 +231,18 @@ export default function useRenderWorkflow({ backendStatus }) {
         exportRange: nextExportRange,
         exportCodec: renderSettingsDraft.exportCodec,
         exportBitrate: renderSettingsDraft.exportBitrate,
+        availableCodecs: useStore.getState().availableCodecs,
+        globalDefaults,
+        importedVideoDuration: useStore.getState().importedVideoDuration,
+        importedVideoFps: useStore.getState().importedVideoFps,
+        importedVideoFpsDen: useStore.getState().importedVideoFpsDen,
+        importedVideoFpsNum: useStore.getState().importedVideoFpsNum,
+        importedVideoPath: useStore.getState().importedVideoPath,
+        parsedActivity: useStore.getState().parsedActivity,
+        videoSyncOffsetSeconds: useStore.getState().videoSyncOffsetSeconds,
+        setActiveRenderId,
+        setRenderingVideo,
+        setRenderProgress,
       })
       if (result && result.cancelled) {
         console.log('Render video cancelled (UI handled)')
@@ -242,6 +254,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     }
   }, [
     config,
+    globalDefaults,
     renderSettingsDraft,
     setConfig,
     setActiveRenderId,
