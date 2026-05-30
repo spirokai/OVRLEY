@@ -149,6 +149,25 @@ These are barrel imports from feature `index.js` — this is actually the CORREC
 
 ---
 
+### Step 7: JSDoc cleanup on all touched and new files
+
+**Focus files (created or heavily modified in this phase):**
+- `lib/template-state.js` — now an orchestration layer, document what it composes and why the split exists
+- `lib/template-defaults.js` — new file, document each constant group and which keys belong to which concern
+- `lib/template-normalization.js` — new file, document the normalization contract (what gets stripped, what gets preserved)
+- `lib/widget-config.js` — reduced scope, update module-level JSDoc to reflect it no longer owns presentation
+- `lib/widget-presentation.js` — new file, document the sidebar grouping logic
+- `features/overlay-editor/hooks/useOverlayEditorState.js` — reduced to derived state only, document the new boundary
+- `features/scene-settings/hooks/useSceneSettingsState.js` — restructured return, document the grouped return contract
+- `lib/activity/gap-utils.js` — removed helpers bag anti-pattern, document the new direct-import approach
+
+**Rule:** Same as previous phases + additionally:
+- Every new file MUST have a module-level JSDoc comment (`@file` or `@module`) explaining its role in the architecture
+- The split modules (`template-defaults`, `template-normalization`, `widget-presentation`) MUST clearly state what they own vs what their sibling modules own
+- The `@module` comment at the top of each file is the primary documentation — individual function JSDoc can be minimal when the module doc covers the contract
+
+---
+
 ## Acceptance Criteria
 
 - [ ] All existing tests pass
@@ -159,6 +178,8 @@ These are barrel imports from feature `index.js` — this is actually the CORREC
 - [ ] `useSceneSettingsState` returns grouped objects, not a flat 40-key object
 - [ ] `gap-utils.js` internal functions do NOT accept a `helpers` parameter
 - [ ] All public APIs unchanged — callers import from the same paths
+- [ ] All new files have a `@file`/`@module` JSDoc block explaining their architectural role
+- [ ] All touched files have meaningful JSDoc — no generic boilerplate on any function
 - [ ] ESLint zero errors
 - [ ] Prettier zero diffs
 - [ ] `OverlayEditor.jsx` renders without regressions (manual smoke test)

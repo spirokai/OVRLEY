@@ -153,6 +153,26 @@ Current: `UnitsControlRow` accepts both `widget`+`updateWidgetData` AND individu
 
 ---
 
+### Step 6: JSDoc cleanup on all touched files
+
+**Focus files (created or heavily modified in this phase):**
+- `app/src/App.jsx` — now ~60 lines, document the composition hook inline
+- `features/widget-editor/components/SidebarWidgetsTab.jsx` — dispatch map, document the map entries
+- `features/widget-editor/components/widgetEditorSections.jsx` — simplified API, document the settled contract
+- `features/overlay-editor/utils/overlayEditorUtils.js` — removed delegation, document remaining exports
+- `app/src/styles/*.css` — new CSS files, add a comment at the top of each explaining what styles it owns
+
+**Rule for CSS documentation:**
+- Each new CSS file gets a 1-2 line comment at the top: `/* Font-face declarations for bundled overlay fonts */`
+- `index.css` gets a comment listing the `@import` order and rationale
+
+**Rule for component JSDoc:**
+- Components that changed their prop contract MUST have updated `@param` docs
+- The `WIDGET_EDITOR_MAP` object in SidebarWidgetsTab gets an inline comment explaining the dispatch pattern
+- `UnitsControlRow` gets its settled prop contract documented
+
+---
+
 ## Acceptance Criteria
 
 - [ ] All existing tests pass
@@ -163,6 +183,9 @@ Current: `UnitsControlRow` accepts both `widget`+`updateWidgetData` AND individu
 - [ ] `getEffectivePreviewFps` no longer exists in `overlayEditorUtils.js`
 - [ ] CSS is split into 5 files, `index.css` ≤ 100 lines
 - [ ] Visual regression: the app loads and renders identically (manual smoke test — open the app, check the header, sidebar, canvas, CSS-styled elements)
+- [ ] All new CSS files have a top-of-file comment explaining what styles they own
+- [ ] All touched components have accurate `@param` JSDoc matching their new prop contracts
+- [ ] No generic `@param {*}` boilerplate remains in any touched file
 - [ ] ESLint zero errors
 - [ ] Prettier zero diffs
 

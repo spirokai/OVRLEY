@@ -146,6 +146,21 @@ This is unnecessary code-splitting for a module that is already logically depend
 
 ---
 
+### Step 8: JSDoc cleanup on all touched files
+
+**Focus files (created or heavily modified in this phase):**
+- `store/useStore.js` — dev-mode window assignments, document why the window leak exists in dev
+- `features/app-shell/components/TitleBar.jsx` — lazy import pattern, document the guard
+- `lib/dev-config.js` — new file, document what this flag controls and why it's separate from App.jsx
+- `lib/activity/import-activity.js` — parameterized store access, document the new signature
+- `features/app-shell/hooks/useActivityImport.js` — static import change, document why not code-split
+
+**Rule:** Same as Phase 1 + additionally:
+- Any function that changed signature MUST have updated `@param` docs
+- Any function that now accesses the store through parameters (instead of `useStore.getState()`) MUST document the parameter contract
+
+---
+
 ## Acceptance Criteria
 
 - [ ] All existing tests pass
@@ -158,6 +173,8 @@ This is unnecessary code-splitting for a module that is already logically depend
 - [ ] `useActivityImport.js` uses a static import for `import-activity`
 - [ ] `useOverlayPlayerState.js` file deleted
 - [ ] `createOverlayMoveableHandlers.js` file deleted
+- [ ] All touched files have JSDoc cleaned and signatures documented
+- [ ] `lib/dev-config.js` has a clear comment block explaining what belongs here vs App.jsx
 - [ ] ESLint zero errors
 - [ ] Prettier zero diffs
 

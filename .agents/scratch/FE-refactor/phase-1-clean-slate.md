@@ -148,6 +148,37 @@ Verify a single shared `hasTauriRuntime()` function returns `true`/`false` corre
 
 ---
 
+### Step 11: JSDoc cleanup on all touched files
+
+Every file modified or created in this phase must have its JSDoc reviewed and cleaned:
+
+**Rule:** Remove JSDoc on functions where the comment is a prose restatement of the function name. Keep (or write) meaningful JSDoc where the function contract is non-obvious — parameters that have domain meaning, non-trivial return shapes, side effects, edge cases.
+
+**Specifically remove:**
+- `@param {*} name — Value for name` (meaningless)
+- `@returns {*} Result produced by the helper` (meaningless)
+- `@returns {*} Derived data structure for downstream use` (meaningless)
+- `@returns {boolean} Whether the condition is satisfied` (meaningless)
+- `@returns {*} Requested value or structure` (meaningless)
+- `@returns {Promise<*>} Promise resolving to the operation result` (meaningless)
+
+**Specifically keep or upgrade:**
+- `@param {string} hexColor — 3, 4, 6, or 8 character hex string, with or without #`
+- `@param {number} progress01 — Normalized position along the polyline, 0.0–1.0`
+- `@returns {{ series: number[], source: 'direct'|'derived'|'mixed'|'missing' }}`
+- `@throws {Error} When the Tauri runtime is not available`
+
+**Focus files (created or heavily modified in this phase):**
+- `lib/tauri-runtime.js` — new file, write clean JSDoc from scratch
+- `lib/use-refs.js` — merged from two files, clean up both
+- `lib/cached-promise.js` — new file, document the caching contract clearly
+- `lib/color-utils.js` — tests being written, clean up existing boilerplate
+- `lib/fonts.js` — tests being written, clean up existing boilerplate
+- `lib/metric-series.js` — merge combine functions, clean up all function docs
+- `lib/export-range.js` — moved location, clean up during move
+
+---
+
 ## Acceptance Criteria
 
 - [ ] All existing tests pass (`pnpm test`)
@@ -162,6 +193,8 @@ Verify a single shared `hasTauriRuntime()` function returns `true`/`false` corre
 - [ ] `exportRange.js` lives in `lib/`
 - [ ] `use-isomorphic-layout-effect.js` file deleted (logic in `use-refs.js`)
 - [ ] `usePlayerStore.js` file deleted (logic in `useOverlayPlayerState.js`)
+- [ ] All touched files have JSDoc cleaned — no generic `@param {*}` / `@returns {*}` boilerplate remains
+- [ ] New files (`tauri-runtime.js`, `use-refs.js`, `cached-promise.js`) have descriptive JSDoc on their public contracts
 - [ ] ESLint reports zero errors (`pnpm lint`)
 - [ ] Prettier reports zero diffs (`pnpm format`)
 
