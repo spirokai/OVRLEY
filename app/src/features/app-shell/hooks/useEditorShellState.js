@@ -15,7 +15,7 @@
 
 import { clamp } from '@/lib/utils'
 import { useEffect, useState } from 'react'
-import { DEBUG_MODE_ENABLED } from '@/App'
+import { DEBUG_MODE_ENABLED } from '@/lib/dev-config'
 
 /**
  * Derives the UI scale factor from the viewport width.

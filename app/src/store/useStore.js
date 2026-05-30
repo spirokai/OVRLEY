@@ -1,5 +1,5 @@
 /**
- * Provides store utilities related to use store.
+ * Zustand store — combines all feature slices with Immer, devtools, and subscription middleware.
  */
 
 import { create } from 'zustand'
@@ -11,13 +11,6 @@ import { createTemplateSlice } from './slices/createTemplateSlice'
 import { createVideoImportSlice } from './slices/createVideoImportSlice'
 import { createLayoutSlice } from './slices/createLayoutSlice'
 
-/**
- * Creates store state.
- *
- * @param {*} set - Zustand setter callback.
- * @param {*} get - Value for get.
- * @returns {object} Derived data structure for downstream use.
- */
 function createStoreState(set, get) {
   return {
     ...createTemplateSlice(set, get),
@@ -28,10 +21,6 @@ function createStoreState(set, get) {
   }
 }
 
-/**
- * Checks whether should enable store devtools.
- * @returns {boolean} Whether the condition is satisfied.
- */
 function shouldEnableStoreDevtools() {
   return import.meta.env.DEV && typeof window !== 'undefined'
 }
@@ -50,10 +39,8 @@ const useStore = create(
 )
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
-  window.useStore = useStore
   window.__OVRLEY_STORE__ = useStore
-  window.__STORE__ = useStore
-  console.info('[OVRLEY] Store exposed as window.useStore, window.__OVRLEY_STORE__, and window.__STORE__')
+  console.info('[OVRLEY] Store exposed as window.__OVRLEY_STORE__')
 }
 
 export default useStore

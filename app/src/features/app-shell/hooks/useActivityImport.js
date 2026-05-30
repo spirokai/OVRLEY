@@ -4,7 +4,9 @@
  */
 
 import { useCallback } from 'react'
+import useStore from '@/store/useStore'
 import { useActivityStore } from '@/hooks/useAppStoreSelectors'
+import saveFile from '@/lib/activity/import-activity'
 
 /**
  * Opens a browser file-picker dialog for .gpx / .fit files.
@@ -39,13 +41,12 @@ export default function useActivityImport() {
   // Activity file handler — opens file dialog, imports GPX/FIT, handles errors
   const handleGpxFileOpen = useCallback(async () => {
     try {
-      const { default: saveFileFromPath } = await import('@/lib/activity/import-activity')
       const selected = await selectBrowserGpxFile()
 
       if (!selected) return
 
       setProcessing(true)
-      await saveFileFromPath(selected)
+      await saveFile(selected, useStore.getState())
     } catch (error) {
       console.error('GPX selection failed:', error)
       setErrorMessage(`GPX Selection failed: ${error.message}`)

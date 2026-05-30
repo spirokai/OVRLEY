@@ -8,7 +8,6 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import * as backend from '@/api/backend'
-import { getCurrentParsedActivity } from '@/lib/activity/cache'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 import renderVideo from '@/features/render-video/utils/render-video'
@@ -17,15 +16,13 @@ vi.mock('@/api/backend', () => ({
   renderVideo: vi.fn(),
 }))
 
-vi.mock('@/lib/activity/cache', () => ({
-  getCurrentParsedActivity: vi.fn(),
-}))
-
 describe('renderVideo', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
-    vi.mocked(getCurrentParsedActivity).mockReturnValue({
-      sample_elapsed_seconds: [0, 10, 20],
+    useStore.setState({
+      parsedActivity: {
+        sample_elapsed_seconds: [0, 10, 20],
+      },
     })
     vi.mocked(backend.renderVideo).mockResolvedValue({
       started: true,

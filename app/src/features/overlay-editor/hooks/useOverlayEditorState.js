@@ -4,13 +4,15 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { getCurrentParsedActivity } from '@/lib/activity/cache'
 import useStore from '@/store/useStore'
 import { buildConfigWidgets, updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget-config'
 import { getEffectiveWidgetData } from '@/lib/template-state'
 import { deepEqual } from '@/store/store-utils'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
-import useOverlayMoveableHandlers from './createOverlayMoveableHandlers'
+import { useDragHandlers } from './useDragHandlers'
+import { useResizeHandlers } from './useResizeHandlers'
+import { useScaleHandlers } from './useScaleHandlers'
+import { useRotateHandlers } from './useRotateHandlers'
 import useOverlayPointerHandlers from '../utils/createOverlayPointerHandlers'
 import { getPrimarySelectionId, normalizeSelectionIds } from '../utils/overlayEditorHelpers'
 import { clamp } from '@/lib/utils'
@@ -95,7 +97,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     useWidgetDraftState()
 
   // Derived state — computed values from store and props
-  const sourceActivity = getCurrentParsedActivity()
+  const sourceActivity = useStore.getState().parsedActivity
   const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
   const widgets = useMemo(
     () =>
@@ -324,8 +326,8 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     widgetNodes,
   })
 
-  // Moveable handlers — drag, resize, scale, rotate (composed from sub-hooks)
-  const handlers = useOverlayMoveableHandlers({
+  // Moveable handlers — drag, resize, scale, rotate
+  const dragHandlers = useDragHandlers({
     clearWidgetDraft,
     clearWidgetDrafts,
     commitWidgetUpdate,
@@ -347,6 +349,57 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     setLiveWidgetDraft,
     setLiveWidgetDraftsBatch,
   })
+  const resizeHandlers = useResizeHandlers({
+    clearWidgetDraft,
+    commitWidgetUpdate,
+    draftWidgetsRef,
+    activity,
+    effectiveSelectedWidgetIds,
+    globalScale,
+    interactionStartRef,
+    renderedWidgetMap,
+    previewSecond,
+    scalePreviewFrameRef,
+    selectedTarget,
+    selectedWidget,
+    setLiveWidgetDraft,
+  })
+  const scaleHandlers = useScaleHandlers({
+    clearWidgetDraft,
+    commitWidgetUpdate,
+    draftWidgetsRef,
+    activity,
+    effectiveSelectedWidgetIds,
+    globalScale,
+    interactionStartRef,
+    renderedWidgetMap,
+    previewSecond,
+    scalePreviewFrameRef,
+    selectedTarget,
+    selectedWidget,
+    setLiveWidgetDraft,
+  })
+  const rotateHandlers = useRotateHandlers({
+    clearWidgetDraft,
+    commitWidgetUpdate,
+    draftWidgetsRef,
+    activity,
+    effectiveSelectedWidgetIds,
+    globalScale,
+    interactionStartRef,
+    renderedWidgetMap,
+    previewSecond,
+    scalePreviewFrameRef,
+    selectedTarget,
+    selectedWidget,
+    setLiveWidgetDraft,
+  })
+  const handlers = {
+    ...dragHandlers,
+    ...resizeHandlers,
+    ...scaleHandlers,
+    ...rotateHandlers,
+  }
 
   // Return — full editor state object consumed by OverlayEditor component
   return {

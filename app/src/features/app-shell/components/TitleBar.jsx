@@ -1,12 +1,30 @@
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { Minus, Square, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+
+const noopWindow = {
+  minimize: () => {},
+  toggleMaximize: () => {},
+  close: () => {},
+}
 
 /**
- * Renders the custom title bar for the Tauri window with minimize, maximize, and close buttons.
- * @returns {JSX.Element} Rendered component.
+ * Custom Tauri title bar with minimize, maximize, and close buttons.
+ * Lazily loads the Tauri window API — falls back to no-op buttons in browser environments.
  */
 export default function TitleBar() {
-  const appWindow = getCurrentWindow()
+  const [appWindow, setAppWindow] = useState(noopWindow)
+
+  useEffect(() => {
+    let cancelled = false
+    import('@tauri-apps/api/window')
+      .then((mod) => {
+        if (!cancelled) setAppWindow(mod.getCurrentWindow())
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <div data-tauri-drag-region className="flex h-6 shrink-0 items-center justify-between bg-background select-none">

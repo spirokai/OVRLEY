@@ -4,15 +4,13 @@
  */
 
 import * as backend from '@/api/backend'
-import { getCurrentParsedActivity } from '@/lib/activity/cache'
 import useStore from '@/store/useStore'
 import { createRenderEffectiveConfig } from './renderConfig'
 
 /**
- * Renders video.
- *
- * @param {*} overrides - Value for overrides.
- * @returns {Promise<object>} Promise resolving to the operation result.
+ * Prepares and sends a video render request to the backend.
+ * @param {object} [overrides={}] - Render settings overrides merged into effective config.
+ * @returns {Promise<object>} Backend render response.
  */
 export default async function renderVideo(overrides = {}) {
   try {
@@ -33,7 +31,7 @@ export default async function renderVideo(overrides = {}) {
       updateRate,
       videoSyncOffsetSeconds,
     } = useStore.getState()
-    const parsedActivity = getCurrentParsedActivity()
+    const parsedActivity = useStore.getState().parsedActivity
     const activeConfig = overrides.config || baseConfig
     const activeUpdateRate = overrides.updateRate ?? updateRate
     const activeExportRange = overrides.exportRange ?? exportRange

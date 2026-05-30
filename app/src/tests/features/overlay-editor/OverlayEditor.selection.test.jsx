@@ -15,10 +15,6 @@ vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path) => path,
 }))
 
-vi.mock('@/lib/activity/cache', () => ({
-  getCurrentParsedActivity: () => null,
-}))
-
 vi.mock('@/features/video-preview', () => ({
   useVideoPreview: () => ({
     videoSrc: '',

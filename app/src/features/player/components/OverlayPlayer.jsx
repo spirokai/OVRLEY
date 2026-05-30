@@ -3,20 +3,46 @@
  */
 
 import { Pause, Play, RotateCcw } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
+import useStore from '@/store/useStore'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
-import useOverlayPlayerState from '../hooks/useOverlayPlayerState'
+import usePlaybackEngine from '../hooks/usePlaybackEngine'
+import usePlayerKeyboard from '../hooks/usePlayerKeyboard'
 import { formatTimelineTime } from '../utils/playerTimeline'
 
 /**
- * Renders the overlay player component.
+ * Timeline playback bar with play/pause/reset controls, a scrub slider,
+ * and video-sync overlay. Composes store selectors, playback engine, and
+ * keyboard shortcuts directly (no intermediary hook).
  *
- * @param {object} props - Component props.
- * @param {string} props.backgroundMode - Selected canvas background style.
- * @returns {JSX.Element} Rendered component output.
+ * @param {{ backgroundMode: string }} props
  */
 export default function OverlayPlayer({ backgroundMode }) {
+  const playerStore = useStore(
+    useShallow((state) => ({
+      activitySummary: state.activitySummary,
+      beginPreviewScrub: state.beginPreviewScrub,
+      commitPreviewScrub: state.commitPreviewScrub,
+      dummyDurationSeconds: state.dummyDurationSeconds,
+      importedVideoDuration: state.importedVideoDuration,
+      importedVideoPath: state.importedVideoPath,
+      pausePreviewPlayback: state.pausePreviewPlayback,
+      previewPlaybackSource: state.previewPlaybackSource,
+      previewPlaybackState: state.previewPlaybackState,
+      sceneFps: state.config?.scene?.fps ?? 30,
+      selectedSecond: state.selectedSecond,
+      setSelectedSecond: state.setSelectedSecond,
+      startPreviewPlayback: state.startPreviewPlayback,
+      updatePreviewScrub: state.updatePreviewScrub,
+      updateRate: state.updateRate,
+      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+    })),
+  )
+
+  const playback = usePlaybackEngine({ ...playerStore, backgroundMode })
+
   const {
     clampedPlayhead,
     displayedPlayhead,
@@ -31,7 +57,17 @@ export default function OverlayPlayer({ backgroundMode }) {
     isPlaying,
     totalDuration,
     videoSyncOffsetSeconds,
-  } = useOverlayPlayerState({ backgroundMode })
+  } = playback
+
+  usePlayerKeyboard({
+    clampedPlayhead: playback.clampedPlayhead,
+    handlePause: playback.handlePause,
+    handlePlay: playback.handlePlay,
+    handleStep: playback.handleStep,
+    hasActivity: playback.hasActivity,
+    isPlaying: playback.isPlaying,
+    totalDuration: playback.totalDuration,
+  })
 
   return (
     <div className={hasActivity ? 'shrink-0 border-border/70 bg-black/30 px-5 py-2 backdrop-blur-sm' : 'hidden'}>

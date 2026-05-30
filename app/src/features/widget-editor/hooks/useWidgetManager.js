@@ -6,7 +6,6 @@
 import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
-import { getCurrentParsedActivity } from '@/lib/activity/cache'
 import { TYPE_LABELS } from '@/lib/widget-icons'
 import {
   buildConfigWidgets,
@@ -48,7 +47,7 @@ export function useWidgetManager() {
       setSelectedWidgetId: state.setSelectedWidgetId,
     })),
   )
-  const parsedActivity = getCurrentParsedActivity()
+  const parsedActivity = useStore.getState().parsedActivity
 
   // Derived state — group and build the sidebar widget list from config
   const widgets = useMemo(() => {

@@ -5,10 +5,9 @@
 import { DEFAULT_RENDER_PROGRESS } from '../store-utils'
 
 /**
- * Creates media slice.
- *
- * @param {*} set - Zustand setter callback.
- * @returns {object} Derived data structure for downstream use.
+ * Media slice — activity summary, render progress, error state, video/gpx filenames.
+ * @param {Function} set - Zustand setter.
+ * @param {Function} get - Zustand getter.
  */
 export function createMediaSlice(set, get) {
   return {
@@ -19,6 +18,7 @@ export function createMediaSlice(set, get) {
     videoFilename: null,
     gpxFilename: null,
     activitySummary: null,
+    parsedActivity: null,
     activeRenderId: null,
     renderProgress: { ...DEFAULT_RENDER_PROGRESS },
 
@@ -109,7 +109,14 @@ export function createMediaSlice(set, get) {
     clearActivitySummary: () => {
       set((state) => {
         state.activitySummary = null
+        state.parsedActivity = null
       })
     },
+
+    /** Stores the full parsed activity object (with all metric series) for preview and rendering. */
+    setParsedActivity: (activity) =>
+      set((state) => {
+        state.parsedActivity = activity
+      }),
   }
 }

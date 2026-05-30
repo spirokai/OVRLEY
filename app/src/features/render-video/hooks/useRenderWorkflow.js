@@ -11,7 +11,6 @@ import { useCallback, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
-import { getCurrentParsedActivity } from '@/lib/activity/cache'
 import { createEditorEffectiveConfig } from '@/lib/template-state'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
@@ -198,7 +197,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     }
 
     try {
-      const parsedActivity = getCurrentParsedActivity()
+      const parsedActivity = useStore.getState().parsedActivity
       if (!parsedActivity) {
         throw new Error('No parsed activity available')
       }

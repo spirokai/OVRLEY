@@ -23,10 +23,9 @@ import {
 import { useVideoImport } from '@/features/video-preview'
 import './index.css'
 import * as backend from './api/backend'
+import { DEBUG_MODE_ENABLED } from '@/lib/dev-config'
 
-// Dev-only feature flag for background-image import and single-frame PNG render.
-// Flip to `true` when you want the debug UI enabled in local development.
-export const DEBUG_MODE_ENABLED = true
+export { DEBUG_MODE_ENABLED }
 
 /**
  * Renders the main application shell.

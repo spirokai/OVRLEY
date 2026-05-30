@@ -4,7 +4,6 @@
  */
 
 import useStore from '@/store/useStore'
-import { clearCurrentActivityCache, setCurrentActivityCache } from '@/lib/activity/cache'
 import * as backend from '@/api/backend'
 import { finalizeParsedActivity } from './parser.js'
 import { safeNumber } from './parse-helpers.js'
@@ -232,10 +231,10 @@ function syncSceneDurationWithActivity(durationSeconds, storeState) {
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 async function loadActivityIntoStore({ filename, parsedActivity, debugPayload, storeState }) {
-  const { setActivitySummary, setGpxFilename } = storeState
+  const { setActivitySummary, setGpxFilename, setParsedActivity } = storeState
 
   setGpxFilename(filename)
-  setCurrentActivityCache(parsedActivity)
+  setParsedActivity(parsedActivity)
   setActivitySummary(parsedActivity)
   const debugPath = await persistDebugPayload(filename, debugPayload)
   console.log('Parse debug JSON written:', debugPath)
@@ -260,11 +259,13 @@ async function ensureFileObject(fileOrPath) {
  * Handles save file.
  *
  * @param {*} fileOrPath - File object or path pointing to an activity file.
+ * @param {object} [storeActions] - Injected store actions. Falls back to useStore.getState() if absent.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
-export default async function saveFile(fileOrPath) {
+export default async function saveFile(fileOrPath, storeActions) {
   const file = await ensureFileObject(fileOrPath)
   const filename = file.name
+  const store = storeActions || useStore.getState()
 
   console.log('Starting activity processing:', {
     source: 'file',
@@ -272,11 +273,7 @@ export default async function saveFile(fileOrPath) {
   })
 
   try {
-    const storeState = useStore.getState()
-    const { clearActivitySummary } = storeState
-
-    clearCurrentActivityCache()
-    clearActivitySummary()
+    store.clearActivitySummary()
 
     const { parsedActivity, debugPayload } = await parseActivityFile(file)
 
@@ -291,7 +288,7 @@ export default async function saveFile(fileOrPath) {
       filename,
       parsedActivity,
       debugPayload,
-      storeState,
+      storeState: store,
     })
 
     return parsedActivity
