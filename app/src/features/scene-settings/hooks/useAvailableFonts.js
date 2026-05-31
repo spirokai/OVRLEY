@@ -7,18 +7,22 @@ import * as backend from '@/api/backend'
 import { createCachedPromise } from '@/lib/cached-promise'
 
 const loadAvailableFonts = createCachedPromise(() => backend.listAvailableFonts())
+const EMPTY_AVAILABLE_FONTS = {
+  recommendedFonts: [],
+  systemFonts: [],
+}
 
 const initialFonts = (() => {
   try {
     const cached = loadAvailableFonts()
-    return cached instanceof Promise ? [] : cached
+    return cached instanceof Promise ? EMPTY_AVAILABLE_FONTS : cached
   } catch {
-    return []
+    return EMPTY_AVAILABLE_FONTS
   }
 })()
 
 export default function useAvailableFonts() {
-  const [systemFonts, setSystemFonts] = useState(initialFonts)
+  const [availableFonts, setAvailableFonts] = useState(initialFonts)
 
   useEffect(() => {
     let cancelled = false
@@ -26,7 +30,7 @@ export default function useAvailableFonts() {
     loadAvailableFonts()
       .then((fonts) => {
         if (!cancelled) {
-          setSystemFonts(fonts)
+          setAvailableFonts(fonts)
         }
       })
       .catch((error) => {
@@ -38,5 +42,5 @@ export default function useAvailableFonts() {
     }
   }, [])
 
-  return systemFonts
+  return availableFonts
 }

@@ -64,8 +64,8 @@ pub fn backend_current_os() -> Value {
     })
 }
 
-/// Lists system font family names visible to Skia.
-pub fn backend_list_system_fonts() -> Value {
+/// Lists bundled font filenames plus system font family names visible to Skia.
+pub fn backend_list_system_fonts(paths: &AppPaths) -> Value {
     let mut fonts: Vec<String> = FontMgr::default()
         .family_names()
         .map(|name| name.trim().to_string())
@@ -75,7 +75,36 @@ pub fn backend_list_system_fonts() -> Value {
     fonts.sort_by_key(|name| name.to_lowercase());
     fonts.dedup_by(|current, next| current.eq_ignore_ascii_case(next));
 
-    Value::Array(fonts.into_iter().map(Value::String).collect())
+    let mut bundled_fonts = BTreeSet::new();
+    for dir in &paths.font_dirs {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let is_supported_font = path
+                    .extension()
+                    .and_then(|value| value.to_str())
+                    .map(|extension| {
+                        extension.eq_ignore_ascii_case("ttf")
+                            || extension.eq_ignore_ascii_case("otf")
+                            || extension.eq_ignore_ascii_case("ttc")
+                    })
+                    .unwrap_or(false);
+
+                if !is_supported_font {
+                    continue;
+                }
+
+                if let Some(filename) = path.file_name().and_then(|value| value.to_str()) {
+                    bundled_fonts.insert(filename.to_string());
+                }
+            }
+        }
+    }
+
+    json!({
+        "recommendedFonts": bundled_fonts.into_iter().collect::<Vec<_>>(),
+        "systemFonts": fonts,
+    })
 }
 
 /// Starts a background video render.

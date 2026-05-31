@@ -10,6 +10,7 @@ import {
   METRIC_WIDGET_UNITS_GAP_PX,
   NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT,
 } from '@/features/overlay-editor'
+import { getFontFamilyName } from '@/lib/fonts'
 import { clamp } from '@/lib/utils'
 
 let metricMeasureContext = null
@@ -53,7 +54,7 @@ function getMetricMeasureContext() {
  * @returns {string} CSS-compatible font-family string.
  */
 export function getPreviewFontFamily(fontName) {
-  return FONT_FAMILY_MAP[fontName] || fontName || FONT_FAMILY_MAP['Arial.ttf']
+  return FONT_FAMILY_MAP[fontName] || getFontFamilyName(fontName) || FONT_FAMILY_MAP['Arial.ttf']
 }
 
 /**

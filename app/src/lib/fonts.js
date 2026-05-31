@@ -4,12 +4,14 @@
 
 export const RECOMMENDED_FONTS = [
   { id: 'Arial.ttf', name: 'Arial' },
-  { id: 'Evogria.otf', name: 'Evogria' },
-  { id: 'Furore.otf', name: 'Furore' },
-  { id: 'Saira Stencil.ttf', name: 'Saira Stencil' },
-  { id: 'Teko.ttf', name: 'Teko' },
 ]
 
+const FONT_EXTENSION_PATTERN = /\.(ttf|otf|ttc|woff2?|fon)$/i
+
+export function stripFontExtension(value) {
+  const trimmed = String(value || '').trim()
+  return trimmed.replace(FONT_EXTENSION_PATTERN, '')
+}
 /**
  * Normalizes font key.
  *
@@ -45,7 +47,7 @@ export function getFontFamilyName(value) {
     return recommendedFont.name
   }
 
-  return String(value || '').trim() || 'Arial'
+  return stripFontExtension(value) || 'Arial'
 }
 
 /**
@@ -69,5 +71,5 @@ export function createFontSelection(value) {
  */
 export function formatFontLabel(value) {
   const trimmed = String(value || '').trim()
-  return trimmed.replace(/\.[^.]+$/, '') || 'Custom font'
+  return stripFontExtension(trimmed) || 'Custom font'
 }

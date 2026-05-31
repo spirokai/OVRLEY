@@ -2,6 +2,8 @@
  * Implements API helpers for backend.
  */
 
+import { formatFontLabel } from '@/lib/fonts'
+
 /**
  * Shared Tauri runtime detection.
  * Returns true when running inside a Tauri desktop shell (IPC available).
@@ -157,6 +159,29 @@ function sortFontNames(fonts) {
     .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }))
 }
 
+function sortFontOptions(fonts) {
+  const byId = new Map()
+
+  fonts.forEach((font) => {
+    const id = typeof font === 'string' ? font.trim() : String(font?.id || font?.name || '').trim()
+    if (!id) {
+      return
+    }
+
+    const option = {
+      id,
+      name: typeof font === 'object' && typeof font?.name === 'string' && font.name.trim() ? font.name.trim() : formatFontLabel(id),
+    }
+
+    const key = option.id.toLowerCase()
+    if (!byId.has(key)) {
+      byId.set(key, option)
+    }
+  })
+
+  return [...byId.values()].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }))
+}
+
 /**
  * Lists available fonts.
  * @returns {Promise<Array<*>>} Promise resolving to the operation result.
@@ -166,19 +191,35 @@ export async function listAvailableFonts() {
   if (invoke) {
     const payload = await invoke('backend_list_system_fonts')
     const fonts = typeof payload === 'string' ? JSON.parse(payload) : payload
-    return Array.isArray(fonts) ? sortFontNames(fonts) : []
+    if (Array.isArray(fonts)) {
+      return {
+        recommendedFonts: [],
+        systemFonts: sortFontNames(fonts),
+      }
+    }
+
+    return {
+      recommendedFonts: sortFontOptions(fonts?.recommendedFonts || fonts?.bundledFonts || []),
+      systemFonts: sortFontNames(fonts?.systemFonts || []),
+    }
   }
 
   if (typeof window !== 'undefined' && typeof window.queryLocalFonts === 'function') {
     try {
       const fonts = await window.queryLocalFonts()
-      return sortFontNames(fonts.map((font) => font.family || font.fullName || font.postscriptName || ''))
+      return {
+        recommendedFonts: [],
+        systemFonts: sortFontNames(fonts.map((font) => font.family || font.fullName || font.postscriptName || '')),
+      }
     } catch (error) {
       console.warn('Local font access unavailable in browser:', error)
     }
   }
 
-  return []
+  return {
+    recommendedFonts: [],
+    systemFonts: [],
+  }
 }
 
 /**

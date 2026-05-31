@@ -115,7 +115,7 @@ export function FontSection({
   showFormatSelect = false,
 }) {
   const fontSize = widget.data.font_size ?? 60
-  const systemFonts = useAvailableFonts()
+  const availableFonts = useAvailableFonts()
 
   return (
     <div className="space-y-4">
@@ -148,7 +148,8 @@ export function FontSection({
           label="Font Family"
           value={getWidgetFont(widget)}
           onValueChange={(value) => updateWidgetData(widget.id, createFontSelection(value))}
-          systemFonts={systemFonts}
+          recommendedFonts={availableFonts.recommendedFonts}
+          systemFonts={availableFonts.systemFonts}
           triggerClassName="h-9 border-border/70 bg-surface text-xs"
           labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
         />

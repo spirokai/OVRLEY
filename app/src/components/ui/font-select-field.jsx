@@ -14,6 +14,7 @@ import { formatFontLabel, normalizeFontKey, RECOMMENDED_FONTS } from '@/lib/font
  * @param {*} props.label - Field or UI label text.
  * @param {*} props.value - Input value processed by the helper.
  * @param {*} props.onValueChange - Callback invoked to value change.
+ * @param {*} props.recommendedFonts - Value for bundled/recommended fonts.
  * @param {*} props.systemFonts - Value for system fonts.
  * @param {*} props.triggerClassName - Value for trigger class name.
  * @param {*} props.labelClassName - Value for label class name.
@@ -23,20 +24,43 @@ export default function FontSelectField({
   label,
   value,
   onValueChange,
-  systemFonts,
+  recommendedFonts = [],
+  systemFonts = [],
   triggerClassName = 'h-8 text-xs',
   labelClassName = 'text-[10px] text-muted-foreground uppercase font-bold',
 }) {
   const systemFontOptions = useMemo(() => systemFonts.map((fontName) => ({ id: fontName, name: fontName })), [systemFonts])
-  const recommendedNameKeys = useMemo(() => new Set(RECOMMENDED_FONTS.map((font) => normalizeFontKey(font.name))), [])
+  const mergedRecommendedFonts = useMemo(() => {
+    const byId = new Map()
+
+    ;[...RECOMMENDED_FONTS, ...recommendedFonts].forEach((font) => {
+      const id = String(font?.id || font?.name || '').trim()
+      if (!id) {
+        return
+      }
+
+      const option = {
+        id,
+        name: String(font?.name || formatFontLabel(id)).trim(),
+      }
+
+      const key = normalizeFontKey(option.id)
+      if (!byId.has(key)) {
+        byId.set(key, option)
+      }
+    })
+
+    return [...byId.values()]
+  }, [recommendedFonts])
+  const recommendedNameKeys = useMemo(() => new Set(mergedRecommendedFonts.map((font) => normalizeFontKey(font.name))), [mergedRecommendedFonts])
   const currentValueKey = normalizeFontKey(value)
 
   const hasKnownCurrentValue =
     !currentValueKey ||
-    RECOMMENDED_FONTS.some((font) => normalizeFontKey(font.id) === currentValueKey || normalizeFontKey(font.name) === currentValueKey) ||
+    mergedRecommendedFonts.some((font) => normalizeFontKey(font.id) === currentValueKey || normalizeFontKey(font.name) === currentValueKey) ||
     systemFontOptions.some((font) => normalizeFontKey(font.id) === currentValueKey || normalizeFontKey(font.name) === currentValueKey)
 
-  const recommendedOptions = hasKnownCurrentValue ? RECOMMENDED_FONTS : [{ id: value, name: formatFontLabel(value) }, ...RECOMMENDED_FONTS]
+  const recommendedOptions = hasKnownCurrentValue ? mergedRecommendedFonts : [{ id: value, name: formatFontLabel(value) }, ...mergedRecommendedFonts]
 
   const filteredSystemFonts = systemFontOptions.filter((font) => !recommendedNameKeys.has(normalizeFontKey(font.name)))
 

@@ -12,7 +12,12 @@ import useSceneSettingsState from '@/features/scene-settings/hooks/useSceneSetti
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
-vi.mock('@/api/backend', () => ({ listAvailableFonts: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/api/backend', () => ({
+  listAvailableFonts: vi.fn().mockResolvedValue({
+    recommendedFonts: [],
+    systemFonts: [],
+  }),
+}))
 
 describe('useSceneSettingsState', () => {
   beforeEach(() => {

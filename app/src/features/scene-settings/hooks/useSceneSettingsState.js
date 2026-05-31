@@ -84,7 +84,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     })),
   )
 
-  const systemFonts = useAvailableFonts()
+  const availableFonts = useAvailableFonts()
   const editorConfig = useMemo(() => createEditorEffectiveConfig({ config, globalDefaults }), [config, globalDefaults])
   const scene = editorConfig?.scene
   const sceneResolutionKey = getSceneResolutionKey(scene)
@@ -207,7 +207,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       resetGlobalDefaults,
       sceneStyleValue,
       setGlobalDefault,
-      systemFonts,
+      availableFonts,
     },
     handlers,
     // Store actions exposed directly for callers that need them

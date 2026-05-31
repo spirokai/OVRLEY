@@ -36,7 +36,7 @@ const INDICATOR_PLACEMENT_OPTIONS = [
 
 export default function HeadingWidgetEditor({ widget, updateWidgetData }) {
   const data = widget.data ?? {}
-  const systemFonts = useAvailableFonts()
+  const availableFonts = useAvailableFonts()
   const showMajorTicks = data.show_major_ticks !== false
   const showMinorTicks = data.show_minor_ticks !== false
   const showMinorLabels = (data.show_minor_labels ?? data.show_numeric_labels) !== false
@@ -143,7 +143,8 @@ export default function HeadingWidgetEditor({ widget, updateWidgetData }) {
           label="Label Font"
           value={data.label_font || data.label_font_family || 'Arial.ttf'}
           onValueChange={(value) => updateWidgetData(widget.id, { label_font: value, label_font_family: getFontFamilyName(value) })}
-          systemFonts={systemFonts}
+          recommendedFonts={availableFonts.recommendedFonts}
+          systemFonts={availableFonts.systemFonts}
           triggerClassName="h-9 border-border/70 bg-surface text-xs"
           labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
         />

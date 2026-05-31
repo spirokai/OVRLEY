@@ -8,7 +8,7 @@
  * @param {function} props.onGlobalDefaultChange - Callback to set a global default.
  * @param {function} props.onResetDefaults - Callback to reset all global defaults.
  * @param {function} props.sceneStyleValue - Helper to resolve scene vs global default.
- * @param {string[]} props.systemFonts - List of available system fonts.
+ * @param {object} props.availableFonts - Bundled recommended and system fonts.
  * @returns {JSX.Element} Rendered global settings section.
  */
 
@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import FontSelectField from '@/components/ui/font-select-field'
 import HexColorPicker from '@/components/ui/hex-color-picker'
 
-export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultChange, onResetDefaults, sceneStyleValue, systemFonts }) {
+export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultChange, onResetDefaults, sceneStyleValue, availableFonts }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
@@ -44,13 +44,15 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
           label="Font - Values"
           value={globalDefaults.font_values}
           onValueChange={(v) => onGlobalDefaultChange('font_values', v)}
-          systemFonts={systemFonts}
+          recommendedFonts={availableFonts.recommendedFonts}
+          systemFonts={availableFonts.systemFonts}
         />
         <FontSelectField
           label="Font - Labels"
           value={globalDefaults.font_text}
           onValueChange={(v) => onGlobalDefaultChange('font_text', v)}
-          systemFonts={systemFonts}
+          recommendedFonts={availableFonts.recommendedFonts}
+          systemFonts={availableFonts.systemFonts}
         />
       </div>
 

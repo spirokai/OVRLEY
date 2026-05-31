@@ -47,10 +47,12 @@ pub(crate) async fn backend_current_os() -> Result<String, String> {
     serialize_command_result(&commands::backend_current_os())
 }
 
-/// Lists system fonts available to the backend renderer.
+/// Lists bundled and system fonts available to the backend renderer.
 #[tauri::command]
-pub(crate) async fn backend_list_system_fonts() -> Result<String, String> {
-    serialize_command_result(&commands::backend_list_system_fonts())
+pub(crate) async fn backend_list_system_fonts(app: AppHandle) -> Result<String, String> {
+    serialize_command_result(&commands::backend_list_system_fonts(
+        &runtime_paths::app_paths(&app)?,
+    ))
 }
 
 /// Starts an overlay video render from serialized scene config and activity data.

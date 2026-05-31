@@ -67,7 +67,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
         onGlobalDefaultChange={globalSettings.setGlobalDefault}
         onResetDefaults={globalSettings.resetGlobalDefaults}
         sceneStyleValue={globalSettings.sceneStyleValue}
-        systemFonts={globalSettings.systemFonts}
+        availableFonts={globalSettings.availableFonts}
       />
     </div>
   )
