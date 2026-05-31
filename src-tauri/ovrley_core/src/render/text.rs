@@ -281,7 +281,7 @@ fn text_paint(color: Color) -> Paint {
 // first insertion; subsequent lookups hit the cached `Typeface` directly.
 fn resolve_typeface(font_dirs: &[PathBuf], name: Option<&str>) -> Typeface {
     static CACHE: OnceLock<Mutex<HashMap<String, Typeface>>> = OnceLock::new();
-    let key = name.unwrap_or("Arial.ttf").to_string();
+    let key = name.unwrap_or("__default_font__").to_string();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     if let Ok(cache) = cache.lock() {
         if let Some(typeface) = cache.get(&key) {
@@ -290,7 +290,7 @@ fn resolve_typeface(font_dirs: &[PathBuf], name: Option<&str>) -> Typeface {
     }
 
     let resolved = load_typeface(font_dirs, name)
-        .or_else(|| load_typeface(font_dirs, Some("Arial.ttf")))
+        .or_else(|| load_first_bundled_typeface(font_dirs))
         .or_else(|| FontMgr::default().legacy_make_typeface(Some("Arial"), FontStyle::normal()))
         .or_else(|| FontMgr::default().legacy_make_typeface(None, FontStyle::normal()))
         .expect("failed to resolve a usable typeface");
@@ -323,6 +323,44 @@ fn load_typeface(font_dirs: &[PathBuf], name: Option<&str>) -> Option<Typeface> 
 
     if Path::new(name).extension().is_none() {
         return font_mgr.legacy_make_typeface(Some(name), FontStyle::normal());
+    }
+
+    None
+}
+
+fn load_first_bundled_typeface(font_dirs: &[PathBuf]) -> Option<Typeface> {
+    let font_mgr = FontMgr::default();
+    let mut candidates = Vec::new();
+
+    for dir in font_dirs {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let is_supported_font = path
+                    .extension()
+                    .and_then(|value| value.to_str())
+                    .map(|extension| {
+                        extension.eq_ignore_ascii_case("ttf")
+                            || extension.eq_ignore_ascii_case("otf")
+                            || extension.eq_ignore_ascii_case("ttc")
+                    })
+                    .unwrap_or(false);
+
+                if is_supported_font {
+                    candidates.push(path);
+                }
+            }
+        }
+    }
+
+    candidates.sort();
+
+    for candidate in candidates {
+        if let Ok(bytes) = fs::read(&candidate) {
+            if let Some(typeface) = font_mgr.new_from_data(&bytes, None) {
+                return Some(typeface);
+            }
+        }
     }
 
     None

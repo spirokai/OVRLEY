@@ -47,14 +47,14 @@ function getMetricMeasureContext() {
 /**
  * Resolves a font name to its CSS font-family value via the FONT_FAMILY_MAP lookup.
  *
- * Falls back to the font name itself if not found in the map, and further to
- * Arial.ttf as the final fallback.
+ * Falls back to the font name itself if not found in the map, and finally to
+ * the first discovered bundled font family when available.
  *
  * @param {string} fontName - Font name key from FONT_FAMILY_MAP or a raw CSS font-family.
  * @returns {string} CSS-compatible font-family string.
  */
 export function getPreviewFontFamily(fontName) {
-  return FONT_FAMILY_MAP[fontName] || getFontFamilyName(fontName) || FONT_FAMILY_MAP['Arial.ttf']
+  return FONT_FAMILY_MAP[fontName] || getFontFamilyName(fontName) || 'sans-serif'
 }
 
 /**

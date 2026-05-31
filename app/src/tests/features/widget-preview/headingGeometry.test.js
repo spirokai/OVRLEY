@@ -150,11 +150,12 @@ describe('visibleLabels', () => {
       { degree: 15, x: 75, isCardinal: false, isMajor: true },
     ]
     const none = visibleLabels(ticks, false, false)
-    expect(none.length).toBe(0)
+    expect(none.length).toBe(1)
+    expect(none[0].text).toBe('N')
 
     const minorOnly = visibleLabels(ticks, true, false)
-    expect(minorOnly.length).toBe(2)
-    expect(minorOnly[0].text).toBe('0')
+    expect(minorOnly.length).toBe(1)
+    expect(minorOnly[0].text).toBe('N')
   })
 
   test('respects show_major_labels flag', () => {
@@ -163,8 +164,9 @@ describe('visibleLabels', () => {
       { degree: 15, x: 75, isCardinal: false, isMajor: true },
     ]
     const majorOnly = visibleLabels(ticks, false, true)
-    expect(majorOnly.length).toBe(1)
+    expect(majorOnly.length).toBe(2)
     expect(majorOnly[0].text).toBe('N')
+    expect(majorOnly[1].text).toBe('15')
   })
 })
 

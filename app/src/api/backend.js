@@ -2,7 +2,7 @@
  * Implements API helpers for backend.
  */
 
-import { formatFontLabel } from '@/lib/fonts'
+import { formatFontLabel, setBundledRecommendedFonts } from '@/lib/fonts'
 
 /**
  * Shared Tauri runtime detection.
@@ -192,14 +192,17 @@ export async function listAvailableFonts() {
     const payload = await invoke('backend_list_system_fonts')
     const fonts = typeof payload === 'string' ? JSON.parse(payload) : payload
     if (Array.isArray(fonts)) {
+      setBundledRecommendedFonts([])
       return {
         recommendedFonts: [],
         systemFonts: sortFontNames(fonts),
       }
     }
 
+    const recommendedFonts = sortFontOptions(fonts?.recommendedFonts || fonts?.bundledFonts || [])
+    setBundledRecommendedFonts(recommendedFonts)
     return {
-      recommendedFonts: sortFontOptions(fonts?.recommendedFonts || fonts?.bundledFonts || []),
+      recommendedFonts,
       systemFonts: sortFontNames(fonts?.systemFonts || []),
     }
   }
@@ -207,6 +210,7 @@ export async function listAvailableFonts() {
   if (typeof window !== 'undefined' && typeof window.queryLocalFonts === 'function') {
     try {
       const fonts = await window.queryLocalFonts()
+      setBundledRecommendedFonts([])
       return {
         recommendedFonts: [],
         systemFonts: sortFontNames(fonts.map((font) => font.family || font.fullName || font.postscriptName || '')),
@@ -216,6 +220,7 @@ export async function listAvailableFonts() {
     }
   }
 
+  setBundledRecommendedFonts([])
   return {
     recommendedFonts: [],
     systemFonts: [],

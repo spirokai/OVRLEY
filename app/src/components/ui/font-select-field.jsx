@@ -5,7 +5,7 @@
 import { useMemo } from 'react'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { formatFontLabel, normalizeFontKey, RECOMMENDED_FONTS } from '@/lib/fonts'
+import { formatFontLabel, normalizeFontKey } from '@/lib/fonts'
 
 /**
  * Renders the font select field component.
@@ -33,7 +33,7 @@ export default function FontSelectField({
   const mergedRecommendedFonts = useMemo(() => {
     const byId = new Map()
 
-    ;[...RECOMMENDED_FONTS, ...recommendedFonts].forEach((font) => {
+    recommendedFonts.forEach((font) => {
       const id = String(font?.id || font?.name || '').trim()
       if (!id) {
         return

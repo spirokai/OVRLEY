@@ -2,15 +2,40 @@
  * Provides shared fonts utilities for the app.
  */
 
-export const RECOMMENDED_FONTS = [
-  { id: 'Arial.ttf', name: 'Arial' },
-]
+let bundledRecommendedFonts = []
 
 const FONT_EXTENSION_PATTERN = /\.(ttf|otf|ttc|woff2?|fon)$/i
 
 export function stripFontExtension(value) {
   const trimmed = String(value || '').trim()
   return trimmed.replace(FONT_EXTENSION_PATTERN, '')
+}
+
+export function setBundledRecommendedFonts(fonts) {
+  bundledRecommendedFonts = Array.isArray(fonts) ? fonts : []
+}
+
+function getRecommendedFonts() {
+  const byId = new Map()
+
+  bundledRecommendedFonts.forEach((font) => {
+    const id = String(font?.id || font?.name || '').trim()
+    if (!id) {
+      return
+    }
+
+    const option = {
+      id,
+      name: String(font?.name || stripFontExtension(id)).trim(),
+    }
+
+    const key = normalizeFontKey(option.id)
+    if (!byId.has(key)) {
+      byId.set(key, option)
+    }
+  })
+
+  return [...byId.values()]
 }
 /**
  * Normalizes font key.
@@ -32,7 +57,11 @@ export function normalizeFontKey(value) {
  */
 function getRecommendedFont(value) {
   const key = normalizeFontKey(value)
-  return RECOMMENDED_FONTS.find((font) => normalizeFontKey(font.id) === key || normalizeFontKey(font.name) === key) || null
+  return getRecommendedFonts().find((font) => normalizeFontKey(font.id) === key || normalizeFontKey(font.name) === key) || null
+}
+
+function getFirstRecommendedFont() {
+  return getRecommendedFonts()[0] || null
 }
 
 /**
@@ -42,12 +71,19 @@ function getRecommendedFont(value) {
  * @returns {*} Requested value or structure.
  */
 export function getFontFamilyName(value) {
+  if (!String(value || '').trim()) {
+    const firstRecommendedFont = getFirstRecommendedFont()
+    if (firstRecommendedFont) {
+      return firstRecommendedFont.name
+    }
+  }
+
   const recommendedFont = getRecommendedFont(value)
   if (recommendedFont) {
     return recommendedFont.name
   }
 
-  return stripFontExtension(value) || 'Arial'
+  return stripFontExtension(value) || 'sans-serif'
 }
 
 /**

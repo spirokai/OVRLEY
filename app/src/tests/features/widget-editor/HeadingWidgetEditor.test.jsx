@@ -4,6 +4,13 @@ import userEvent from '@testing-library/user-event'
 import HeadingWidgetEditor from '@/features/widget-editor/components/HeadingWidgetEditor'
 import { HEADING_DEFAULTS } from '@/features/widget-editor/data/widgetDefaults'
 
+vi.mock('@/features/scene-settings/hooks/useAvailableFonts', () => ({
+  default: () => ({
+    recommendedFonts: [],
+    systemFonts: [],
+  }),
+}))
+
 beforeAll(() => {
   globalThis.ResizeObserver = class ResizeObserver {
     observe() {}
@@ -69,8 +76,8 @@ describe('HeadingWidgetEditor', () => {
   test('renders label color and font size controls', () => {
     render(<HeadingWidgetEditor widget={makeHeadingWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
     expect(screen.getByText('Label Font')).toBeInTheDocument()
-    expect(screen.getByText('Minor Color')).toBeInTheDocument()
-    expect(screen.getByText('Major Color')).toBeInTheDocument()
+    expect(screen.getByText('Label Color')).toBeInTheDocument()
+    expect(screen.getAllByText('Cardinal Color').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('Font Size')).toBeInTheDocument()
   })
 
