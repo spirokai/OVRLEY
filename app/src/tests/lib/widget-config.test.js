@@ -11,6 +11,7 @@ import { buildConfigWidgets, groupWidgetsForSidebar } from '@/lib/widget-present
 import {
   deleteWidgetInConfig,
   deleteWidgetsInConfig,
+  duplicateWidgetsInConfig,
   ensureWidgetIdsInConfig,
   findWidgetInConfig,
   replaceWidgetInConfig,
@@ -162,6 +163,26 @@ describe('widget-config batch operations', () => {
   test('deleteWidgetsInConfig handles null / empty inputs', () => {
     expect(deleteWidgetsInConfig(null, [])).toBeNull()
     expect(deleteWidgetsInConfig(makeConfig(), [])).toEqual(makeConfig())
+  })
+
+  test('duplicateWidgetsInConfig appends a duplicated widget with a new id and offset', () => {
+    const config = makeConfig({
+      labels: [
+        { id: 'widget-1', text: 'A', x: 10, y: 20 },
+        { id: 'widget-2', text: 'B', x: 30, y: 40 },
+      ],
+    })
+
+    const result = duplicateWidgetsInConfig(config, [{ category: 'labels', data: config.labels[0] }])
+
+    expect(result.config.labels).toHaveLength(3)
+    expect(result.config.labels[2]).toMatchObject({
+      text: 'A',
+      x: 34,
+      y: 44,
+    })
+    expect(result.config.labels[2].id).not.toBe('widget-1')
+    expect(result.insertedWidgetIds).toEqual([result.config.labels[2].id])
   })
 })
 

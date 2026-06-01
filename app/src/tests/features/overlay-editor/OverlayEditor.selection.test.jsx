@@ -131,4 +131,143 @@ describe('OverlayEditor selection flow', () => {
       }),
     )
   })
+
+  test('copies and pastes the selected widget through the shared config flow', () => {
+    const config = makeConfig([makeLabel('A', { id: 'widget-1', x: 10, y: 20 }), makeLabel('B', { id: 'widget-2', x: 40, y: 50 })])
+    const onConfigChange = vi.fn((nextConfig) => {
+      useStore.getState().setConfig(nextConfig)
+    })
+
+    useStore.getState().setConfig(config)
+
+    const { container } = render(
+      <OverlayEditor
+        config={useStore.getState().config}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={onConfigChange}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    const firstWidget = container.querySelector('[data-widget-id="widget-1"]')
+
+    expect(firstWidget).toBeTruthy()
+
+    fireEvent.mouseDown(firstWidget, { button: 0 })
+    fireEvent.keyDown(window, { key: 'c', ctrlKey: true })
+    fireEvent.keyDown(window, { key: 'v', ctrlKey: true })
+
+    const state = useStore.getState()
+    const labels = state.config.labels
+
+    expect(labels).toHaveLength(3)
+    expect(labels[2]).toMatchObject({
+      text: 'A',
+      x: 34,
+      y: 44,
+    })
+    expect(labels[2].id).not.toBe('widget-1')
+    expect(state.selectedWidgetIds).toEqual([labels[2].id])
+    expect(state.selectedWidgetId).toBe(labels[2].id)
+  })
+
+  test('copies and pastes a multi-selection as newly selected duplicates', () => {
+    const config = makeConfig([
+      makeLabel('A', { id: 'widget-1', x: 10, y: 20 }),
+      makeLabel('B', { id: 'widget-2', x: 40, y: 50 }),
+      makeLabel('C', { id: 'widget-3', x: 70, y: 80 }),
+    ])
+    const onConfigChange = vi.fn((nextConfig) => {
+      useStore.getState().setConfig(nextConfig)
+    })
+
+    useStore.getState().setConfig(config)
+
+    const { container } = render(
+      <OverlayEditor
+        config={useStore.getState().config}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={onConfigChange}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    const firstWidget = container.querySelector('[data-widget-id="widget-1"]')
+    const secondWidget = container.querySelector('[data-widget-id="widget-2"]')
+
+    expect(firstWidget).toBeTruthy()
+    expect(secondWidget).toBeTruthy()
+
+    fireEvent.mouseDown(firstWidget, { button: 0 })
+    fireEvent.mouseDown(secondWidget, { button: 0, ctrlKey: true })
+    fireEvent.keyDown(window, { key: 'c', ctrlKey: true })
+    fireEvent.keyDown(window, { key: 'v', ctrlKey: true })
+
+    const state = useStore.getState()
+    const labels = state.config.labels
+
+    expect(labels).toHaveLength(5)
+    expect(labels.slice(3)).toMatchObject([
+      { text: 'A', x: 34, y: 44 },
+      { text: 'B', x: 64, y: 74 },
+    ])
+    expect(state.selectedWidgetIds).toEqual(labels.slice(3).map((label) => label.id))
+    expect(state.selectedWidgetId).toBe(labels[4].id)
+  })
+
+  test('pastes copied widgets even after the current selection is cleared', () => {
+    const config = makeConfig([makeLabel('A', { id: 'widget-1', x: 10, y: 20 }), makeLabel('B', { id: 'widget-2', x: 40, y: 50 })])
+    const onConfigChange = vi.fn((nextConfig) => {
+      useStore.getState().setConfig(nextConfig)
+    })
+
+    useStore.getState().setConfig(config)
+
+    const { container, getByTestId } = render(
+      <OverlayEditor
+        config={useStore.getState().config}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={onConfigChange}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    const firstWidget = container.querySelector('[data-widget-id="widget-1"]')
+
+    expect(firstWidget).toBeTruthy()
+
+    fireEvent.mouseDown(firstWidget, { button: 0 })
+    fireEvent.keyDown(window, { key: 'c', ctrlKey: true })
+    fireEvent.mouseDown(getByTestId('overlay-scene'), { button: 0, clientX: 400, clientY: 300 })
+    fireEvent.mouseUp(window)
+
+    expect(useStore.getState().selectedWidgetIds).toEqual([])
+
+    fireEvent.keyDown(window, { key: 'v', ctrlKey: true })
+
+    const state = useStore.getState()
+    const labels = state.config.labels
+
+    expect(labels).toHaveLength(3)
+    expect(state.selectedWidgetIds).toEqual([labels[2].id])
+    expect(state.selectedWidgetId).toBe(labels[2].id)
+  })
 })

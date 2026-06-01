@@ -16,6 +16,7 @@
  * @module widget-config
  */
 
+import { cloneSerializable } from '@/store/store-utils'
 import { normalizeColorFields } from './color-utils'
 
 const LEGACY_WIDGET_ID_PATTERN = /^(label|value|plot)-\d+$/
@@ -365,4 +366,53 @@ export function deleteWidgetsInConfig(config, widgetIds) {
     }),
     normalizedConfig,
   )
+}
+
+/**
+ * Duplicates the provided widgets into the config and returns their new ids.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {Array<{ category: string, data: object }>} widgetsToDuplicate - Widgets to duplicate.
+ * @param {object} [options] - Duplication options.
+ * @param {number} [options.offsetX=24] - Horizontal paste offset.
+ * @param {number} [options.offsetY=24] - Vertical paste offset.
+ * @returns {{ config: object, insertedWidgetIds: string[] }} Updated config and duplicated widget ids.
+ */
+export function duplicateWidgetsInConfig(config, widgetsToDuplicate, options = {}) {
+  if (!config || !Array.isArray(widgetsToDuplicate) || !widgetsToDuplicate.length) {
+    return { config, insertedWidgetIds: [] }
+  }
+
+  const { offsetX = 24, offsetY = 24 } = options
+  const previousWidgetIds = new Set(
+    WIDGET_CATEGORIES.flatMap((category) => (Array.isArray(config?.[category]) ? config[category].map((widget) => widget?.id).filter(Boolean) : [])),
+  )
+  const nextConfig = {
+    ...config,
+    labels: [...(config.labels || [])],
+    values: [...(config.values || [])],
+    plots: [...(config.plots || [])],
+  }
+
+  widgetsToDuplicate.forEach((widget) => {
+    if (!WIDGET_CATEGORIES.includes(widget?.category) || !widget?.data) {
+      return
+    }
+
+    const duplicatedWidget = cloneSerializable(widget.data)
+    delete duplicatedWidget.id
+    duplicatedWidget.x = (Number(duplicatedWidget.x) || 0) + offsetX
+    duplicatedWidget.y = (Number(duplicatedWidget.y) || 0) + offsetY
+    nextConfig[widget.category].push(duplicatedWidget)
+  })
+
+  const normalizedConfig = ensureWidgetIdsInConfig(nextConfig)
+  const insertedWidgetIds = WIDGET_CATEGORIES.flatMap((category) =>
+    (normalizedConfig[category] || []).map((widget) => widget?.id).filter((widgetId) => widgetId && !previousWidgetIds.has(widgetId)),
+  )
+
+  return {
+    config: normalizedConfig,
+    insertedWidgetIds,
+  }
 }

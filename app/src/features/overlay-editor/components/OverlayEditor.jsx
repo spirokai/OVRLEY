@@ -108,6 +108,7 @@ function OverlayEditor({
   const [isGroupDragActive, setIsGroupDragActive] = useState(false)
   const [groupDragSelectionIds, setGroupDragSelectionIds] = useState([])
   const [selectionRect, setSelectionRect] = useState(null)
+  const clipboardRef = useRef(null)
   const marqueeCleanupRef = useRef(null)
   const marqueeSelectionRef = useRef(null)
 
@@ -128,7 +129,14 @@ function OverlayEditor({
   const displayScale = fitScale * overlayState.zoomLevel
 
   // Keyboard shortcuts
-  useEditorKeyboard({ config, onConfigChange, selectedWidgetIds: selection.selectedWidgetIds, setWidgetSelection: selection.setWidgetSelection })
+  useEditorKeyboard({
+    config,
+    onConfigChange,
+    selectedWidgetIds: selection.selectedWidgetIds,
+    selectedWidgets: selection.selectedWidgets,
+    setWidgetSelection: selection.setWidgetSelection,
+    clipboardRef,
+  })
 
   // Pointer handlers
   const { handleSceneMouseDown, handleWidgetMouseDown, handleWheel } = useOverlayPointerHandlers({
