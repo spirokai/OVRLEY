@@ -270,4 +270,38 @@ describe('OverlayEditor selection flow', () => {
     expect(state.selectedWidgetIds).toEqual([labels[2].id])
     expect(state.selectedWidgetId).toBe(labels[2].id)
   })
+
+  test('starts marquee selection when the drag begins on the editor stage outside the scene', () => {
+    const config = makeConfig([makeLabel('A', { id: 'widget-1' }), makeLabel('B', { id: 'widget-2' })])
+
+    useStore.getState().setConfig(config)
+
+    const { getByTestId, queryByTestId } = render(
+      <OverlayEditor
+        config={useStore.getState().config}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={vi.fn()}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    expect(queryByTestId('selection-rect')).toBeNull()
+
+    fireEvent.mouseDown(getByTestId('overlay-editor-stage'), { button: 0, clientX: 10, clientY: 10 })
+    fireEvent.mouseMove(window, { clientX: 30, clientY: 30 })
+
+    const selectionRect = getByTestId('selection-rect')
+
+    expect(selectionRect).toBeTruthy()
+    expect(getByTestId('overlay-editor-stage').contains(selectionRect)).toBe(true)
+    expect(getByTestId('overlay-scene').contains(selectionRect)).toBe(false)
+
+    fireEvent.mouseUp(window)
+  })
 })

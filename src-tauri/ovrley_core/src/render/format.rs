@@ -610,11 +610,11 @@ fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option
     let left = format_number(left_value.clamp(0.0, 100.0), decimals);
     let right = format_number((100.0 - left_value).clamp(0.0, 100.0), decimals);
     match balance_format.unwrap_or("plain") {
-        "percent_label" => format!("{left}% / {right}%"),
-        "plain" => format!("{left} / {right}"),
-        "l_prefix" => format!("L{left} / R{right}"),
-        "l_suffix" => format!("{left}L / {right}R"),
-        _ => format!("{left} / {right}"),
+        "percent_label" => format!("{left}%/{right}%"),
+        "plain" => format!("{left}/{right}"),
+        "l_prefix" => format!("L{left}/R{right}"),
+        "l_suffix" => format!("{left}L/{right}R"),
+        _ => format!("{left}/{right}"),
     }
 }
 
@@ -653,5 +653,25 @@ fn metric_icon_kind_for_metric(kind: MetricKind) -> Option<MetricIconKind> {
         crate::standard_metrics::MetricIconAssetKey::VerticalOscillation => {
             Some(MetricIconKind::ArrowUpDown)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_balance_value;
+
+    #[test]
+    fn balance_percent_label_omits_spaces_around_slash() {
+        assert_eq!(
+            format_balance_value(52.0, 0, Some("percent_label")),
+            "52%/48%"
+        );
+    }
+
+    #[test]
+    fn balance_variants_omit_spaces_around_slash() {
+        assert_eq!(format_balance_value(60.0, 0, Some("plain")), "60/40");
+        assert_eq!(format_balance_value(48.0, 0, Some("l_prefix")), "L48/R52");
+        assert_eq!(format_balance_value(70.0, 0, Some("l_suffix")), "70L/30R");
     }
 }

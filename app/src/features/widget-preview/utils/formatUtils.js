@@ -151,17 +151,17 @@ function convertStandardMetricValue(type, value, displayUnit) {
 }
 
 const BALANCE_FORMATS = {
-  plain: { valueTemplate: (l, r) => `${l} / ${r}`, placeholder: '-- / --' },
-  l_prefix: { valueTemplate: (l, r) => `L${l} / R${r}`, placeholder: '-- / --' },
-  percent_label: { valueTemplate: (l, r) => `${l}% / ${r}%`, placeholder: '-- / --' },
-  l_suffix: { valueTemplate: (l, r) => `${l}L / ${r}R`, placeholder: '-- / --' },
+  plain: { valueTemplate: (l, r) => `${l}/${r}`, placeholder: '--/--' },
+  l_prefix: { valueTemplate: (l, r) => `L${l}/R${r}`, placeholder: '--/--' },
+  percent_label: { valueTemplate: (l, r) => `${l}%/${r}%`, placeholder: '--/--' },
+  l_suffix: { valueTemplate: (l, r) => `${l}L/${r}R`, placeholder: '--/--' },
 }
 
 export const BALANCE_FORMAT_OPTIONS = [
-  { value: 'percent_label', label: '52% / 48%' },
-  { value: 'plain', label: '52 / 48' },
-  { value: 'l_prefix', label: 'L52 / R48' },
-  { value: 'l_suffix', label: '52L / 48R' },
+  { value: 'percent_label', label: '52%/48%' },
+  { value: 'plain', label: '52/48' },
+  { value: 'l_prefix', label: 'L52/R48' },
+  { value: 'l_suffix', label: '52L/48R' },
 ]
 
 function formatBalance(value, decimals = 0, balanceFormat = 'percent_label') {
@@ -320,8 +320,8 @@ export function getGradientTriangleHeight(value, width) {
     return 0
   }
 
-  const halfAngleRadians = (magnitude * 0.5 * Math.PI) / 180
-  return safeWidth * Math.tan(halfAngleRadians)
+  const fullAngleRadians = (magnitude * Math.PI) / 180
+  return safeWidth * Math.tan(fullAngleRadians)
 }
 
 /**

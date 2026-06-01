@@ -92,7 +92,7 @@ describe('MetricWidgetEditor balance format', () => {
     expect(screen.getByText('Balance Format')).toBeInTheDocument()
   })
 
-  test('defaults to 52% / 48% for left_right_balance', () => {
+  test('defaults to 52%/48% for left_right_balance', () => {
     render(
       <MetricWidgetEditor
         widget={makeWidget('left_right_balance', { display_unit: 'percent', balance_format: 'percent_label' })}
@@ -100,7 +100,7 @@ describe('MetricWidgetEditor balance format', () => {
         setNumericField={vi.fn()}
       />,
     )
-    expect(screen.getByText('52% / 48%')).toBeInTheDocument()
+    expect(screen.getByText('52%/48%')).toBeInTheDocument()
   })
 
   test('does not show balance format for non-balance widgets', () => {

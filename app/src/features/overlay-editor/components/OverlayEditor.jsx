@@ -108,6 +108,7 @@ function OverlayEditor({
   const [isGroupDragActive, setIsGroupDragActive] = useState(false)
   const [groupDragSelectionIds, setGroupDragSelectionIds] = useState([])
   const [selectionRect, setSelectionRect] = useState(null)
+  const [stageElement, setStageElement] = useState(null)
   const clipboardRef = useRef(null)
   const marqueeCleanupRef = useRef(null)
   const marqueeSelectionRef = useRef(null)
@@ -149,6 +150,7 @@ function OverlayEditor({
     orderedWidgetIds: overlayState.orderedWidgetIds,
     sceneElement: overlayState.sceneElement,
     sceneSize: overlayState.sceneSize,
+    stageElement,
     selectedWidgetId: selection.selectedWidgetId,
     selectedWidgetIds: selection.selectedWidgetIds,
     setGroupDragSelectionIds,
@@ -274,27 +276,30 @@ function OverlayEditor({
       widgets: overlayState.renderedWidgets,
       activity,
       previewSecond: overlayState.previewSecond,
-      selectionRect,
       exportRange: overlayState.previewExportRange,
     }),
-    [overlayState.renderedWidgets, activity, overlayState.previewSecond, selectionRect, overlayState.previewExportRange],
+    [overlayState.renderedWidgets, activity, overlayState.previewSecond, overlayState.previewExportRange],
   )
   const canvasCallbacks = useMemo(
     () => ({
       setSceneElement: overlayState.setSceneElement,
-      handleSceneMouseDown,
       handleWidgetMouseDown,
       setHoveredWidgetId,
       widgetRefCallbacks: overlayState.widgetRefCallbacks,
     }),
-    [overlayState.setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, overlayState.widgetRefCallbacks],
+    [overlayState.setSceneElement, handleWidgetMouseDown, overlayState.widgetRefCallbacks],
   )
 
   if (!config) return <EmptyOverlayState />
 
   return (
     <div ref={viewportRef} className="relative flex h-full flex-1 overflow-hidden" onWheel={handleWheel}>
-      <div className="relative flex h-full w-full items-center justify-center overflow-hidden p-8">
+      <div
+        ref={setStageElement}
+        data-testid="overlay-editor-stage"
+        className="relative flex h-full w-full items-center justify-center overflow-hidden p-8"
+        onMouseDown={handleSceneMouseDown}
+      >
         <CanvasStatusBadges
           height={overlayState.sceneSize.height}
           showTemplateStatus={showTemplateStatus}
@@ -343,6 +348,18 @@ function OverlayEditor({
             widgets={overlayState.renderedWidgets}
           />
         </div>
+        {selectionRect ? (
+          <div
+            data-testid="selection-rect"
+            className="pointer-events-none absolute z-40 border border-primary/70 bg-primary/10"
+            style={{
+              left: selectionRect.x,
+              top: selectionRect.y,
+              width: selectionRect.width,
+              height: selectionRect.height,
+            }}
+          />
+        ) : null}
       </div>
     </div>
   )

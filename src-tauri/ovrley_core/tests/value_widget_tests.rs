@@ -1,6 +1,6 @@
 //! Metric value widget layout and rendering behavior tests.
 //!
-//! Verifies `gradient_triangle_height` (zero-input and half-angle geometry),
+//! Verifies `gradient_triangle_height` (zero-input and full-angle geometry),
 //! `metric_vertical_metrics_text` (stable preview-compatible vertical
 //! metrics selection), and `metric_icon_top_from_value_layout` (icon
 //! centering on value glyph bounding box rather than row box).
@@ -11,6 +11,7 @@
 //!
 //! ## Regressions guarded
 //! - Gradient triangle height for zero/missing gradient values
+//! - Gradient triangle height regressing back to compressed half-angle math
 //! - Non-numeric text using wrong vertical metrics (misaligned icons)
 //! - Icon placement math diverging from glyph-center anchoring
 
@@ -28,9 +29,9 @@ fn gradient_triangle_height_is_zero_for_zero_and_missing_values() {
 }
 
 #[test]
-// Verifies grade visualization uses the configured half-angle geometry.
-fn gradient_triangle_height_uses_half_angle_rule() {
-    let expected = (72.0_f32) * (5.0_f32.to_radians().tan());
+// Verifies grade visualization uses the restored full-angle geometry.
+fn gradient_triangle_height_uses_full_angle_rule() {
+    let expected = (72.0_f32) * (10.0_f32.to_radians().tan());
     let actual = gradient_triangle_height(Some(10.0), 72.0);
     assert!((actual - expected).abs() < 0.001);
 }

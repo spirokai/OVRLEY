@@ -201,15 +201,15 @@ const OverlayCanvasWidget = memo(
  * @param {object} props
  * @param {object} props.sceneProps - { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize }
  * @param {object} props.displayProps - { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible }
- * @param {object} props.dataProps - { widgets, activity, previewSecond, selectionRect, exportRange }
- * @param {object} props.callbacks - { setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks }
+ * @param {object} props.dataProps - { widgets, activity, previewSecond, exportRange }
+ * @param {object} props.callbacks - { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks }
  * @returns {JSX.Element} Rendered component output.
  */
 export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks }) {
   const { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize } = sceneProps
   const { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible } = displayProps
-  const { widgets, activity, previewSecond, selectionRect, exportRange } = dataProps
-  const { setSceneElement, handleSceneMouseDown, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
+  const { widgets, activity, previewSecond, exportRange } = dataProps
+  const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const videoRef = useRef(null)
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
   const { videoSrc, importId, isOutOfRange, videoPreviewMessages } = useVideoPreview(videoRef, backgroundMode === 'video')
@@ -221,7 +221,6 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
       ref={setSceneElement}
       data-testid="overlay-scene"
       className="relative overflow-visible"
-      onMouseDown={handleSceneMouseDown}
       style={{
         width: sceneSize.width,
         height: sceneSize.height,
@@ -289,17 +288,6 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           )
         })}
       </div>
-      {selectionRect ? (
-        <div
-          className="pointer-events-none absolute border border-primary/70 bg-primary/10"
-          style={{
-            left: selectionRect.x,
-            top: selectionRect.y,
-            width: selectionRect.width,
-            height: selectionRect.height,
-          }}
-        />
-      ) : null}
     </div>
   )
 }

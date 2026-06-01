@@ -212,7 +212,7 @@ describe('Wave 1 placeholder behavior', () => {
       activity: { sample_elapsed_seconds: [0], left_right_balance: [null] },
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('-- / --')
+    expect(model?.valueText).toBe('--/--')
     expect(model?.unitText).toBe('')
   })
 })
@@ -224,7 +224,7 @@ describe('left_right_balance format variants', () => {
       activity: makeActivity('left_right_balance', 52),
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('52% / 48%')
+    expect(model?.valueText).toBe('52%/48%')
     expect(model?.unitText).toBe('')
   })
 
@@ -234,7 +234,7 @@ describe('left_right_balance format variants', () => {
       activity: makeActivity('left_right_balance', 60),
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('60 / 40')
+    expect(model?.valueText).toBe('60/40')
     expect(model?.unitText).toBe('')
   })
 
@@ -244,7 +244,7 @@ describe('left_right_balance format variants', () => {
       activity: makeActivity('left_right_balance', 48),
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('L48 / R52')
+    expect(model?.valueText).toBe('L48/R52')
     expect(model?.unitText).toBe('')
   })
 
@@ -254,17 +254,17 @@ describe('left_right_balance format variants', () => {
       activity: makeActivity('left_right_balance', 70),
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('70L / 30R')
+    expect(model?.valueText).toBe('70L/30R')
     expect(model?.unitText).toBe('')
   })
 
-  test('placeholder uses -- / -- for all formats', () => {
+  test('placeholder uses --/-- for all formats', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('left_right_balance', { display_unit: 'percent', balance_format: 'percent_label' }),
       activity: { sample_elapsed_seconds: [0], left_right_balance: [null] },
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('-- / --')
+    expect(model?.valueText).toBe('--/--')
     expect(model?.unitText).toBe('')
   })
 })

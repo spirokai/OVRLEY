@@ -7,6 +7,26 @@ import { clamp } from '@/lib/utils'
 import { buildSelectionRect, getPrimarySelectionId, hasSelectionModifier, normalizeSelectionIds, rectanglesIntersect } from './overlayEditorHelpers'
 
 /**
+ * Converts a client-space mouse position to local element coordinates.
+ *
+ * @param {HTMLElement|null} element - Reference element.
+ * @param {number} clientX - Client-space X.
+ * @param {number} clientY - Client-space Y.
+ * @returns {{ x: number, y: number }|null} Element-local point or null.
+ */
+function getElementPoint(element, clientX, clientY) {
+  if (!element) {
+    return null
+  }
+
+  const elementBounds = element.getBoundingClientRect()
+  return {
+    x: clientX - elementBounds.left,
+    y: clientY - elementBounds.top,
+  }
+}
+
+/**
  * Converts a client-space mouse position to scene-space coordinates,
  * clamped to the scene bounds.
  *
@@ -100,6 +120,7 @@ export default function useOverlayPointerHandlers({
   orderedWidgetIds,
   sceneElement,
   sceneSize,
+  stageElement,
   selectedWidgetId,
   selectedWidgetIds,
   setGroupDragSelectionIds,
@@ -166,8 +187,9 @@ export default function useOverlayPointerHandlers({
       return
     }
 
-    const startPoint = getScenePoint(sceneElement, displayScale, sceneSize, event.clientX, event.clientY)
-    if (!startPoint) {
+    const startScenePoint = getScenePoint(sceneElement, displayScale, sceneSize, event.clientX, event.clientY)
+    const startStagePoint = getElementPoint(stageElement, event.clientX, event.clientY)
+    if (!startScenePoint || !startStagePoint) {
       return
     }
 
@@ -181,29 +203,32 @@ export default function useOverlayPointerHandlers({
       baseIds,
       hasMoved: false,
       previewIds: baseIds,
-      startPoint,
+      startScenePoint,
+      startStagePoint,
     }
 
     setSelectionRect({
-      x: startPoint.x,
-      y: startPoint.y,
+      x: startStagePoint.x,
+      y: startStagePoint.y,
       width: 0,
       height: 0,
     })
 
     const handleWindowMouseMove = (moveEvent) => {
-      const nextPoint = getScenePoint(sceneElement, displayScale, sceneSize, moveEvent.clientX, moveEvent.clientY)
+      const nextScenePoint = getScenePoint(sceneElement, displayScale, sceneSize, moveEvent.clientX, moveEvent.clientY)
+      const nextStagePoint = getElementPoint(stageElement, moveEvent.clientX, moveEvent.clientY)
       const gesture = marqueeSelectionRef.current
-      if (!nextPoint || !gesture) {
+      if (!nextScenePoint || !nextStagePoint || !gesture) {
         return
       }
 
-      const nextRect = buildSelectionRect(gesture.startPoint, nextPoint)
-      const hasMoved = nextRect.width > 2 || nextRect.height > 2
+      const nextSceneRect = buildSelectionRect(gesture.startScenePoint, nextScenePoint)
+      const nextStageRect = buildSelectionRect(gesture.startStagePoint, nextStagePoint)
+      const hasMoved = nextStageRect.width > 2 || nextStageRect.height > 2
       const hitIds = hasMoved
         ? getIntersectedWidgetIds({
             displayScale,
-            nextSelectionRect: nextRect,
+            nextSelectionRect: nextSceneRect,
             orderedWidgetIds,
             sceneElement,
             widgetNodes,
@@ -217,7 +242,7 @@ export default function useOverlayPointerHandlers({
         previewIds: nextIds,
       }
 
-      setSelectionRect(nextRect)
+      setSelectionRect(nextStageRect)
       if (hasMoved) {
         setSelectionState(nextIds)
       }

@@ -173,8 +173,8 @@ pub fn gradient_triangle_height(raw_gradient: Option<f64>, triangle_width: f32) 
         return 0.0;
     }
 
-    let half_angle_radians = ((magnitude * 0.5) as f32).to_radians();
-    triangle_width * half_angle_radians.tan()
+    let full_angle_radians = (magnitude as f32).to_radians();
+    triangle_width * full_angle_radians.tan()
 }
 
 /// Builds the filled triangle path that visualizes positive or negative grade.
