@@ -34,4 +34,4 @@ pub mod standard_metrics;
 pub mod types;
 
 pub use error::{CoreError, CoreResult};
-pub use types::MetricKind;
+pub use types::{DisplayType, MetricKind};

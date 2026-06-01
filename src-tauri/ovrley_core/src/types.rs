@@ -20,7 +20,7 @@
 //! corresponding frontend migration. The enum derives `Serialize` and
 //! `Deserialize` so config/activity DTOs can use it directly without conversion.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MetricKind {
@@ -68,4 +68,59 @@ pub enum MetricKind {
     CoreTemperature,
     #[serde(rename = "heading")]
     Heading,
+}
+
+/// Visual representation mode for a value widget.
+///
+/// Controls how a metric value widget is rendered. The default is `Text` which
+/// matches the original icon + value + unit layout. Future slices introduce
+/// rendering paths for the gauge variants (linear, bars, arc, corner, and
+/// heading tape) and use this field to dispatch.
+///
+/// ## Backward compatibility
+/// When deserializing older templates that omit the field, or that carry
+/// `null` or an unrecognized string, this enum falls back to `Text`. The
+/// field is therefore safe to add to existing widget configs without a
+/// migration: anything that does not explicitly opt in keeps its old behavior.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum DisplayType {
+    #[serde(rename = "text")]
+    Text,
+    #[serde(rename = "linear")]
+    Linear,
+    #[serde(rename = "bars")]
+    Bars,
+    #[serde(rename = "arc")]
+    Arc,
+    #[serde(rename = "corner")]
+    Corner,
+    #[serde(rename = "heading_tape")]
+    Tape,
+}
+
+impl Default for DisplayType {
+    fn default() -> Self {
+        DisplayType::Text
+    }
+}
+
+impl<'de> Deserialize<'de> for DisplayType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        match raw {
+            serde_json::Value::String(value) => match value.as_str() {
+                "text" => Ok(DisplayType::Text),
+                "linear" => Ok(DisplayType::Linear),
+                "bars" => Ok(DisplayType::Bars),
+                "arc" => Ok(DisplayType::Arc),
+                "corner" => Ok(DisplayType::Corner),
+                "heading_tape" => Ok(DisplayType::Tape),
+                _ => Ok(DisplayType::default()),
+            },
+            _ => Ok(DisplayType::default()),
+        }
+    }
 }

@@ -21,6 +21,7 @@ export const SHARED_VALUE_DEFAULTS = {
   prefix: '',
   suffix: '',
   decimals: 0,
+  display_type: 'text',
 }
 
 /** Default font sizes per metric type. Falls back to 100 for unlisted types. */

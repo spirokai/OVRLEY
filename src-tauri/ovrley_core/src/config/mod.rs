@@ -11,7 +11,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 use crate::error::{CoreError, CoreResult};
-use crate::types::MetricKind;
+use crate::types::{DisplayType, MetricKind};
 
 pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
 pub const TEMPLATE_FILE_VERSION: u32 = 2;
@@ -255,6 +255,14 @@ pub struct ValueConfig {
     pub border_strength: Option<f32>,
     #[serde(default)]
     pub border_distance: Option<f32>,
+    /// Visual representation mode for this value widget.
+    ///
+    /// Defaults to [`DisplayType::Text`] (the original icon + value + unit
+    /// layout) for any template that omits this field or sets it to `null`.
+    /// Unrecognized string values also default to `Text` so future schema
+    /// additions never break existing templates.
+    #[serde(default)]
+    pub display_type: DisplayType,
     /// Unknown value fields preserved for compatibility.
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,

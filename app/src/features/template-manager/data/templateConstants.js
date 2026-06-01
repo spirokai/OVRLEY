@@ -38,7 +38,7 @@ export const SCENE_RENDER_TIME_ONLY_KEYS = [
 ]
 
 /** Keys shared by all metric value widgets during normalization. */
-export const VALUE_SHARED_KEYS = ['id', 'x', 'y', 'value', 'font', 'font_size', 'color', 'opacity', 'prefix', 'suffix', 'decimals']
+export const VALUE_SHARED_KEYS = ['id', 'x', 'y', 'value', 'font', 'font_size', 'color', 'opacity', 'prefix', 'suffix', 'decimals', 'display_type']
 
 /** Keys for the icon sub-object within a value widget. */
 export const VALUE_ICON_KEYS = ['show_icon', 'icon_color', 'icon_size', 'icon_offset_x', 'icon_offset_y']

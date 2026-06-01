@@ -23,6 +23,53 @@ import standardMetricsManifest from '../../../assets/standard-metrics.json'
 /** Map of type -> definition for O(1) lookups. */
 const STANDARD_METRIC_DEFINITIONS = Object.fromEntries(standardMetricsManifest.definitions.map((definition) => [definition.type, definition]))
 
+// ---------------------------------------------------------------------------
+// Display type metadata (shared with backend via assets/standard-metrics.json)
+// ---------------------------------------------------------------------------
+
+/** Map of display_type value -> human-readable label for dropdown menus. */
+export const DISPLAY_TYPE_LABELS = Object.freeze({ ...standardMetricsManifest.displayTypes.labels })
+
+/** The default set of display types available to all metric value widgets. */
+export const DEFAULT_DISPLAY_TYPES = Object.freeze([...standardMetricsManifest.displayTypes.defaults])
+
+/** Per-metric overrides that restrict which display types are permitted. */
+const DISPLAY_TYPE_OVERRIDES = Object.freeze({ ...standardMetricsManifest.displayTypes.overrides })
+
+/**
+ * Look up the human-readable label for a display_type value.
+ * @param {string} displayType - display_type key (e.g. "text", "linear")
+ * @returns {string} the label, or the key unchanged if unknown
+ */
+export function getDisplayTypeLabel(displayType) {
+  return DISPLAY_TYPE_LABELS[displayType] ?? displayType
+}
+
+/**
+ * Return the set of valid display_type values for a given metric type.
+ * Falls back to the global defaults if no override is present.
+ * @param {string} metricType - metric type string (e.g. "speed", "heading")
+ * @returns {string[]} array of permitted display_type values
+ */
+export function getSupportedDisplayTypes(metricType) {
+  if (Object.hasOwn(DISPLAY_TYPE_OVERRIDES, metricType)) {
+    return DISPLAY_TYPE_OVERRIDES[metricType]
+  }
+  return DEFAULT_DISPLAY_TYPES
+}
+
+/**
+ * Build the {value, label} option list for a display_type dropdown.
+ * @param {string} metricType - metric type string
+ * @returns {Array<{value: string, label: string}>}
+ */
+export function getDisplayTypeOptions(metricType) {
+  return getSupportedDisplayTypes(metricType).map((value) => ({
+    value,
+    label: getDisplayTypeLabel(value),
+  }))
+}
+
 /**
  * Metric types marked as `current` — actively shipping widget types.
  * @type {string[]}

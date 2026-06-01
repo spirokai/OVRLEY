@@ -21,7 +21,7 @@ use serde_json::json;
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
 use ovrley_core::config::{RenderConfig, SceneConfig, ValueConfig};
 use ovrley_core::render::format::{format_metric_parts, format_time_key, MetricIconKind};
-use ovrley_core::MetricKind;
+use ovrley_core::{DisplayType, MetricKind};
 
 #[test]
 // Verifies representative built-in time format presets.
@@ -120,6 +120,7 @@ fn formats_metric_parts_for_speed() {
         border_thickness: None,
         border_strength: None,
         border_distance: None,
+        display_type: DisplayType::Text,
         extra: Default::default(),
     };
     let dense = DenseActivityReport {
@@ -244,6 +245,7 @@ fn formats_metric_parts_for_temperature_with_degree_units() {
         border_thickness: None,
         border_strength: None,
         border_distance: None,
+        display_type: DisplayType::Text,
         extra: Default::default(),
     };
     let dense = DenseActivityReport {
@@ -368,6 +370,7 @@ fn formats_metric_parts_for_pace() {
         border_thickness: None,
         border_strength: None,
         border_distance: None,
+        display_type: DisplayType::Text,
         extra: Default::default(),
     };
     let dense = DenseActivityReport {
@@ -492,6 +495,7 @@ fn formats_metric_parts_for_left_right_balance() {
         border_thickness: None,
         border_strength: None,
         border_distance: None,
+        display_type: DisplayType::Text,
         extra: Default::default(),
     };
     let dense = DenseActivityReport {
@@ -527,7 +531,7 @@ fn formats_metric_parts_for_left_right_balance() {
     };
 
     let parts = format_metric_parts(&config, &value, &dense, 0).unwrap();
-    assert_eq!(parts.value_text, "54 / 46");
+    assert_eq!(parts.value_text, "54/46");
     assert_eq!(parts.unit_text, None);
     assert_eq!(parts.icon_kind, Some(MetricIconKind::Scale));
     assert!(parts.show_icon);

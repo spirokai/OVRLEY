@@ -1,4 +1,21 @@
 {
+  "displayTypes": {
+    "labels": {
+      "text": "Text",
+      "linear": "Linear",
+      "bars": "Bars",
+      "arc": "Arc",
+      "corner": "Corner",
+      "heading_tape": "Heading Tape"
+    },
+    "defaults": ["text", "linear", "bars", "arc", "corner"],
+    "overrides": {
+      "heading": ["text", "heading_tape"],
+      "core_temperature": ["text"],
+      "left_right_balance": ["text"],
+      "time": ["text"]
+    }
+  },
   "definitions": [
     {
       "type": "speed",
@@ -23,9 +40,7 @@
       "current": true,
       "label": "Heart Rate",
       "defaultDisplayUnit": "bpm",
-      "supportedDisplayUnits": [
-        { "value": "bpm", "label": "BPM" }
-      ],
+      "supportedDisplayUnits": [{ "value": "bpm", "label": "BPM" }],
       "showUnitsByDefault": false,
       "formatter": "integer",
       "icon": {
@@ -38,9 +53,7 @@
       "current": true,
       "label": "Cadence",
       "defaultDisplayUnit": "rpm",
-      "supportedDisplayUnits": [
-        { "value": "rpm", "label": "RPM" }
-      ],
+      "supportedDisplayUnits": [{ "value": "rpm", "label": "RPM" }],
       "showUnitsByDefault": false,
       "formatter": "integer",
       "icon": {
@@ -53,9 +66,7 @@
       "current": true,
       "label": "Power",
       "defaultDisplayUnit": "w",
-      "supportedDisplayUnits": [
-        { "value": "w", "label": "W" }
-      ],
+      "supportedDisplayUnits": [{ "value": "w", "label": "W" }],
       "showUnitsByDefault": false,
       "formatter": "integer",
       "icon": {
@@ -136,9 +147,7 @@
       "current": true,
       "label": "Ground Contact Time",
       "defaultDisplayUnit": "ms",
-      "supportedDisplayUnits": [
-        { "value": "ms", "label": "ms", "renderLabel": "MS" }
-      ],
+      "supportedDisplayUnits": [{ "value": "ms", "label": "ms", "renderLabel": "MS" }],
       "showUnitsByDefault": true,
       "formatter": "integer",
       "icon": {
@@ -151,9 +160,7 @@
       "current": true,
       "label": "Left/Right Balance",
       "defaultDisplayUnit": "percent",
-      "supportedDisplayUnits": [
-        { "value": "percent", "label": "52% / 48%", "renderLabel": "%" }
-      ],
+      "supportedDisplayUnits": [{ "value": "percent", "label": "52% / 48%", "renderLabel": "%" }],
       "showUnitsByDefault": false,
       "formatter": "balance",
       "icon": {
@@ -186,9 +193,7 @@
       "current": true,
       "label": "Stroke Rate",
       "defaultDisplayUnit": "spm",
-      "supportedDisplayUnits": [
-        { "value": "spm", "label": "SPM" }
-      ],
+      "supportedDisplayUnits": [{ "value": "spm", "label": "SPM" }],
       "showUnitsByDefault": true,
       "formatter": "integer",
       "icon": {
@@ -202,9 +207,7 @@
       "current": true,
       "label": "Torque",
       "defaultDisplayUnit": "nm",
-      "supportedDisplayUnits": [
-        { "value": "nm", "label": "Nm", "renderLabel": "NM" }
-      ],
+      "supportedDisplayUnits": [{ "value": "nm", "label": "Nm", "renderLabel": "NM" }],
       "showUnitsByDefault": true,
       "formatter": "decimal",
       "icon": {
@@ -235,9 +238,7 @@
       "current": true,
       "label": "Gear Position",
       "defaultDisplayUnit": "gear",
-      "supportedDisplayUnits": [
-        { "value": "gear", "label": "Gear", "renderLabel": "GEAR" }
-      ],
+      "supportedDisplayUnits": [{ "value": "gear", "label": "Gear", "renderLabel": "GEAR" }],
       "showUnitsByDefault": false,
       "formatter": "integer",
       "icon": {
@@ -250,9 +251,7 @@
       "current": false,
       "label": "Vertical Ratio",
       "defaultDisplayUnit": "percent",
-      "supportedDisplayUnits": [
-        { "value": "percent", "label": "%" }
-      ],
+      "supportedDisplayUnits": [{ "value": "percent", "label": "%" }],
       "showUnitsByDefault": true,
       "formatter": "decimal",
       "icon": {

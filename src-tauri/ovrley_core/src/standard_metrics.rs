@@ -90,13 +90,42 @@ struct RawStandardMetricDefinition {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawDisplayTypeManifest {
+    labels: HashMap<String, String>,
+    defaults: Vec<String>,
+    #[serde(default)]
+    overrides: HashMap<String, Vec<String>>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct RawStandardMetricManifest {
+    display_types: RawDisplayTypeManifest,
     definitions: Vec<RawStandardMetricDefinition>,
+}
+
+#[derive(Clone, Debug)]
+struct DisplayTypeManifest {
+    labels: HashMap<String, String>,
+    defaults: Vec<String>,
+    overrides: HashMap<String, Vec<String>>,
+}
+
+impl DisplayTypeManifest {
+    fn from_raw(raw: RawDisplayTypeManifest) -> Self {
+        DisplayTypeManifest {
+            labels: raw.labels,
+            defaults: raw.defaults,
+            overrides: raw.overrides,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 struct StandardMetricManifest {
     definitions: HashMap<MetricKind, StandardMetricDefinition>,
+    display_types: DisplayTypeManifest,
 }
 
 static STANDARD_METRIC_MANIFEST: OnceLock<StandardMetricManifest> = OnceLock::new();
@@ -140,7 +169,10 @@ fn load_manifest() -> StandardMetricManifest {
         })
         .collect();
 
-    StandardMetricManifest { definitions }
+    StandardMetricManifest {
+        definitions,
+        display_types: DisplayTypeManifest::from_raw(raw.display_types),
+    }
 }
 
 fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
@@ -164,6 +196,33 @@ fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
         "vertical_oscillation" => Some(MetricKind::VerticalOscillation),
         "core_temperature" => Some(MetricKind::CoreTemperature),
         _ => None,
+    }
+}
+
+fn metric_kind_to_key(kind: MetricKind) -> &'static str {
+    match kind {
+        MetricKind::Speed => "speed",
+        MetricKind::Heartrate => "heartrate",
+        MetricKind::Elevation => "elevation",
+        MetricKind::Time => "time",
+        MetricKind::Gradient => "gradient",
+        MetricKind::Cadence => "cadence",
+        MetricKind::Power => "power",
+        MetricKind::Temperature => "temperature",
+        MetricKind::Pace => "pace",
+        MetricKind::GForce => "g_force",
+        MetricKind::AirPressure => "air_pressure",
+        MetricKind::GroundContactTime => "ground_contact_time",
+        MetricKind::LeftRightBalance => "left_right_balance",
+        MetricKind::StrideLength => "stride_length",
+        MetricKind::StrokeRate => "stroke_rate",
+        MetricKind::Torque => "torque",
+        MetricKind::VerticalSpeed => "vertical_speed",
+        MetricKind::GearPosition => "gear_position",
+        MetricKind::VerticalRatio => "vertical_ratio",
+        MetricKind::VerticalOscillation => "vertical_oscillation",
+        MetricKind::CoreTemperature => "core_temperature",
+        MetricKind::Heading => "heading",
     }
 }
 
@@ -237,4 +296,37 @@ pub fn standard_metric_unit_label(kind: MetricKind, display_unit: Option<&str>) 
                 .unwrap_or(option.label.as_str())
         })
         .unwrap_or("")
+}
+
+// ---------------------------------------------------------------------------
+// Display type helpers (sourced from assets/standard-metrics.json)
+// ---------------------------------------------------------------------------
+
+/// Look up the human-readable label for a `display_type` value.
+pub fn display_type_label(display_type: &str) -> &str {
+    manifest()
+        .display_types
+        .labels
+        .get(display_type)
+        .map(String::as_str)
+        .unwrap_or(display_type)
+}
+
+/// Return the permitted display types for a given metric kind.
+///
+/// If the manifest contains an override for the metric, that list is returned;
+/// otherwise the global defaults are returned.
+pub fn supported_display_types(kind: MetricKind) -> &'static [String] {
+    let m = manifest();
+    let key = metric_kind_to_key(kind);
+    if let Some(override_list) = m.display_types.overrides.get(key) {
+        override_list.as_slice()
+    } else {
+        m.display_types.defaults.as_slice()
+    }
+}
+
+/// Check whether a given `display_type` value is permitted for a metric kind.
+pub fn is_display_type_supported(kind: MetricKind, display_type: &str) -> bool {
+    supported_display_types(kind).iter().any(|dt| dt == display_type)
 }
