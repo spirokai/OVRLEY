@@ -49,9 +49,9 @@ export function OverlayElevationWidget({
   valueFont,
   exportRange,
 }) {
-  // Dimensions and base styling — clamp widget dimensions and resolve colors, line widths, and opacities from widget config
-  const width = Math.max(widget.data.width ?? 320, 80)
-  const height = Math.max(widget.data.height ?? 180, 80)
+  // Dimensions and base styling — resolve widget dimensions and colors, line widths, and opacities from widget config
+  const width = Math.max(Number(widget.data.width) || 320, 1)
+  const height = Math.max(Number(widget.data.height) || 180, 1)
   const safeGlobalScale = Math.max(Number(globalScale) || 1, 0.1)
   const baseColor = widget.data.color || '#ffffff'
   const remainingLineWidth = resolveScaledPreviewLineWidth(widget.data.remaining_line_width, widget.data.line?.width, safeGlobalScale)
