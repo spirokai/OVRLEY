@@ -50,7 +50,7 @@ pub struct SceneConfig {
     #[serde(default)]
     pub overlay_filename: Option<String>,
     /// Draw every Nth layout frame into the video container.
-    #[serde(default)]
+    #[serde(default, alias = "updateRate")]
     pub update_rate: Option<u32>,
     /// Render-time source video path for MP4 compositing mode.
     #[serde(default, skip_serializing)]

@@ -69,6 +69,10 @@ export function createTemplateSlice(set, get) {
     setUpdateRate: (rate) =>
       set((state) => {
         state.updateRate = rate
+        if (state.config?.scene) {
+          state.config.scene.updateRate = rate
+          updateConfigPersistence(state)
+        }
       }),
 
     setExportRange: (range) =>
@@ -168,7 +172,7 @@ export function createTemplateSlice(set, get) {
       }
       const nextExportCodec = normalizePlatformCodec(get().exportCodec || 'prores_ks', get().platformOs)
       const nextAspectRatio = get().aspectRatio || '16:9'
-      const nextUpdateRate = get().updateRate || 1
+      const nextUpdateRate = nextConfig.scene?.updateRate || get().updateRate || 1
 
       set((state) => {
         state.communityTemplateFilename = null

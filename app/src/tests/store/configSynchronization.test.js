@@ -3,7 +3,8 @@
  *
  * These tests document the supported in-session synchronization contract:
  *
- * - Config-originated updates hydrate timeline state immediately.
+ * - Config-originated runtime updates hydrate timeline state immediately.
+ * - Template hydration does not import activity-specific scene timing.
  * - Timeline-originated edits write back into config scene timing immediately.
  * - Mixed update ordering must work without relying on timer windows.
  */
@@ -51,7 +52,7 @@ describe('config/timeline synchronization', () => {
     expect(state.config.scene.end).toBe(88)
   })
 
-  test('template hydration updates timeline state and immediate timeline edits still sync back into config', () => {
+  test('template hydration strips scene timing, then immediate timeline edits still sync back into config', () => {
     const templateConfig = cloneSerializable(DEFAULT_CONFIG)
     templateConfig.scene.start = 12
     templateConfig.scene.end = 144
@@ -64,9 +65,11 @@ describe('config/timeline synchronization', () => {
       { filename: 'template.json', source: 'file' },
     )
 
-    expect(useStore.getState().startSecond).toBe(12)
-    expect(useStore.getState().endSecond).toBe(144)
-    expect(useStore.getState().selectedSecond).toBe(12)
+    expect(useStore.getState().config.scene).not.toHaveProperty('start')
+    expect(useStore.getState().config.scene).not.toHaveProperty('end')
+    expect(useStore.getState().startSecond).toBe(0)
+    expect(useStore.getState().endSecond).toBe(73)
+    expect(useStore.getState().selectedSecond).toBe(0)
 
     useStore.getState().setStartSecond(14)
     useStore.getState().setEndSecond(140)

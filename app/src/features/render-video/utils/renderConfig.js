@@ -124,7 +124,7 @@ export function createRenderEffectiveConfig(options) {
   const resolvedExportCodec = importedVideoPath && !isCompositeCodec(exportCodec) ? 'libx264' : exportCodec || 'prores_ks'
 
   scene.fps = sanitizeIntegerFps(scene.fps)
-  scene.update_rate = normalizeUpdateRateForFps(scene.fps, updateRate)
+  scene.update_rate = normalizeUpdateRateForFps(scene.fps, updateRate ?? scene.updateRate)
   scene.ffmpeg = {
     ...(scene.ffmpeg || {}),
     codec: resolvedExportCodec,

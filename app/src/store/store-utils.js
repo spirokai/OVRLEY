@@ -13,6 +13,7 @@ export const DEFAULT_CONFIG = {
     width: 1920,
     height: 1080,
     fps: 30,
+    updateRate: 1,
     start: 0,
     end: 60,
     font: 'Arial.ttf',

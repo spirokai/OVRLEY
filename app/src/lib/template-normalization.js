@@ -38,6 +38,8 @@ import {
 } from '@/features/template-manager/data/templateConstants'
 import { DEFAULT_GLOBAL_DEFAULTS, GLOBAL_DEFAULT_KEYS, SCENE_DERIVED_SETTING_KEYS, SCENE_GLOBAL_DEFAULT_KEYS } from './template-defaults'
 
+const SCENE_DURABLE_KEYS = ['width', 'height', 'fps', 'updateRate']
+
 function cloneSerializable(value) {
   if (value === undefined) return undefined
   return structuredClone(value)
@@ -87,14 +89,22 @@ export function mergeSceneGlobalDefaults(scene, globalDefaults) {
 /**
  * Normalizes durable scene config for save/load.
  *
- * Derived editor fields and render-only fields are intentionally removed here
- * so the saved template contains only durable authoring state.
+ * Only template-wide render defaults are persisted here. Scene timing
+ * (`start`/`end`) belongs to the current activity/export session, not to the
+ * reusable overlay template.
  *
  * @param {object} [scene={}] - Raw scene config.
  * @returns {object} Durable normalized scene config.
  */
 function normalizeScene(scene = {}) {
-  const nextScene = cloneSerializable(scene) || {}
+  const sourceScene = cloneSerializable(scene) || {}
+  const nextScene = pickDefined(sourceScene, SCENE_DURABLE_KEYS)
+  const numericUpdateRate = Math.trunc(Number(sourceScene.updateRate))
+  if (Number.isFinite(numericUpdateRate) && numericUpdateRate >= 1) {
+    nextScene.updateRate = numericUpdateRate
+  } else {
+    delete nextScene.updateRate
+  }
   for (const key of SCENE_DERIVED_SETTING_KEYS) delete nextScene[key]
   for (const key of SCENE_RENDER_TIME_ONLY_KEYS) delete nextScene[key]
   return normalizeColorFields(nextScene)

@@ -58,6 +58,56 @@ describe('template snapshot standard metric schema', () => {
     expect(payload.version).toBe(TEMPLATE_FILE_VERSION)
   })
 
+  test('saves only template-wide scene defaults and widget update rate', () => {
+    const payload = createTemplateFilePayload({
+      config: {
+        scene: {
+          width: 1920,
+          height: 1080,
+          fps: 30,
+          updateRate: 5,
+          start: 12,
+          end: 144,
+          font: 'TemplateFont.ttf',
+          color: '#ffffff',
+          ffmpeg: { codec: 'prores_ks' },
+        },
+        labels: [],
+        values: [],
+        plots: [],
+      },
+      globalDefaults: {},
+    })
+
+    expect(payload.config.scene).toEqual({
+      width: 1920,
+      height: 1080,
+      fps: 30,
+      updateRate: 5,
+    })
+  })
+
+  test('loads template scene updateRate without importing scene start/end', () => {
+    const normalized = normalizeTemplateFilePayload({
+      format: TEMPLATE_FILE_FORMAT,
+      version: TEMPLATE_FILE_VERSION,
+      config: {
+        scene: { width: 1920, height: 1080, fps: 30, updateRate: 3, start: 5, end: 90 },
+        labels: [],
+        values: [],
+        plots: [],
+      },
+      settings: { globalDefaults: {} },
+    })
+
+    expect(normalized.config.scene).toEqual({
+      width: 1920,
+      height: 1080,
+      fps: 30,
+      updateRate: 3,
+    })
+  })
+
   test('preserves stable widget ids when saving a template payload', () => {
     const payload = createTemplateFilePayload({
       config: {
