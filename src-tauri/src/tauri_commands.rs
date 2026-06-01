@@ -80,7 +80,7 @@ pub(crate) async fn backend_render_preview_frame(
     app: AppHandle,
     config_json: String,
     parsed_activity_json: String,
-    second: u32,
+    second: f64,
 ) -> Result<String, String> {
     #[cfg(debug_assertions)]
     {

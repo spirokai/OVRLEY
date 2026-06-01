@@ -164,7 +164,7 @@ pub fn backend_render_preview_frame(
     paths: &AppPaths,
     config_json: &str,
     parsed_activity_json: &str,
-    second: u32,
+    second: f64,
 ) -> CoreResult<Value> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
@@ -173,7 +173,8 @@ pub fn backend_render_preview_frame(
         .duration_since(UNIX_EPOCH)
         .map_err(|error| CoreError::Encode(format!("Failed to read system time: {error}")))?
         .as_nanos();
-    let filename = format!("preview_frame_{timestamp}_t{second}.png");
+    let second_label = format!("{second:.3}").replace('.', "_");
+    let filename = format!("preview_frame_{timestamp}_t{second_label}.png");
     let output_path = paths.downloads_dir.join(&filename);
     render_preview_to_path(
         paths,

@@ -199,7 +199,7 @@ fn run_frame_case(case: &FrameCase) -> Result<()> {
         &config,
         &activity,
         &dense_activity,
-        case.second,
+        f64::from(case.second),
         &actual_path,
     )
     .context("preview render failed")?;

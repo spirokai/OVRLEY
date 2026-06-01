@@ -29,7 +29,7 @@ use common::{read_arg, read_optional_arg, repo_root};
 
 /// Parses `--seconds a,b,c` or `--second N` into a sorted list of activity
 /// seconds to render. Returns an error when no valid seconds are provided.
-fn parse_seconds(args: &[String]) -> Result<Vec<u32>, String> {
+fn parse_seconds(args: &[String]) -> Result<Vec<f64>, String> {
     if let Some(seconds) = read_optional_arg("--seconds", args) {
         let parsed = seconds
             .split(',')
@@ -37,7 +37,7 @@ fn parse_seconds(args: &[String]) -> Result<Vec<u32>, String> {
             .map(|value| {
                 value
                     .trim()
-                    .parse::<u32>()
+                    .parse::<f64>()
                     .map_err(|error| format!("Invalid second value '{value}': {error}"))
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -47,7 +47,7 @@ fn parse_seconds(args: &[String]) -> Result<Vec<u32>, String> {
         return Ok(parsed);
     }
 
-    Ok(vec![read_arg("--second", args)?.parse::<u32>().map_err(
+    Ok(vec![read_arg("--second", args)?.parse::<f64>().map_err(
         |error| format!("Invalid --second value: {error}"),
     )?])
 }
@@ -56,7 +56,7 @@ fn parse_seconds(args: &[String]) -> Result<Vec<u32>, String> {
 #[derive(Serialize)]
 struct PreviewBatchSummary {
     frame_count: usize,
-    seconds: Vec<u32>,
+    seconds: Vec<f64>,
     total_ms_sum: f64,
     total_ms_avg: f64,
     total_ms_min: f64,

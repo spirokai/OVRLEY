@@ -18,19 +18,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import useStore from '@/store/useStore'
 import { buildConfigWidgets } from '@/lib/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget-config'
+import { resolvePreviewSecond } from '@/lib/preview-timing'
 import { getEffectiveWidgetData } from '@/lib/template-state'
 import { deepEqual } from '@/store/store-utils'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
-import { clamp } from '@/lib/utils'
 import { getSceneSize } from '../utils/overlayEditorUtils'
 import useWidgetDraftState from './useWidgetDraftState'
-
-function resolvePreviewSecond({ dummyDurationSeconds, selectedSecond, sourceActivity }) {
-  const rawSecond = Number(selectedSecond) || 0
-  const activityDuration = Number(sourceActivity?.trim_end_seconds ?? sourceActivity?.metadata?.duration_seconds ?? dummyDurationSeconds ?? 0)
-  const maxSecond = Math.max(Number.isFinite(activityDuration) ? activityDuration : 0, 0)
-  return clamp(rawSecond, 0, maxSecond)
-}
 
 function formatExportRangeTime(seconds) {
   const safeSeconds = Math.max(0, Math.trunc(Number(seconds) || 0))

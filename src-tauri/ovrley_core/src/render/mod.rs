@@ -53,7 +53,7 @@ pub enum LabelCacheStatus {
 /// Serializable performance and geometry report for one preview render.
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct PreviewRenderReport {
-    pub second: u32,
+    pub second: f64,
     pub frame_index: usize,
     pub width: u32,
     pub height: u32,
@@ -146,7 +146,7 @@ pub fn render_preview_to_path(
     config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
-    second: u32,
+    second: f64,
     out_path: &Path,
 ) -> CoreResult<()> {
     render_preview_with_report(paths, config, activity, dense_activity, second, out_path)
@@ -159,7 +159,7 @@ pub fn render_preview_with_report(
     config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
-    second: u32,
+    second: f64,
     out_path: &Path,
 ) -> CoreResult<((), PreviewRenderReport)> {
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
@@ -183,7 +183,7 @@ pub struct PreviewRenderRequest<'a> {
     pub config: &'a RenderConfig,
     pub dense_activity: &'a DenseActivityReport,
     pub prepared_preview_assets: &'a PreparedPreviewAssets,
-    pub second: u32,
+    pub second: f64,
     pub prepare_timings: BTreeMap<String, TimingBucket>,
     pub label_cache_status: LabelCacheStatus,
     pub extra_total_ms: f64,

@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
+import { buildPreviewFrameWindow, resolveActivityDuration, resolvePreviewSecond } from '@/lib/preview-timing'
 import { createEditorEffectiveConfig } from '@/lib/template-state'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
@@ -280,14 +281,37 @@ export default function useRenderWorkflow({ backendStatus }) {
       setRenderingPreviewFrame(true)
       const nextConfig = createEditorEffectiveConfig({ config, globalDefaults })
       const previewFps = sanitizeIntegerFps(nextConfig.scene.fps || 30)
+
+      // Mirror the editor canvas timing path exactly: first resolve the shared
+      // preview second from the current playhead, then synthesize the minimal
+      // one-frame scene window the backend still requires for dense activity
+      // generation and frame lookup.
+      const dummyDurationSeconds = useStore.getState().dummyDurationSeconds
+      const selectedSecond = useStore.getState().selectedSecond
+      const previewSecond = resolvePreviewSecond({
+        dummyDurationSeconds,
+        selectedSecond,
+        sourceActivity: parsedActivity,
+      })
+      const activityDuration = resolveActivityDuration({
+        dummyDurationSeconds,
+        sourceActivity: parsedActivity,
+      })
+      const previewWindow = buildPreviewFrameWindow({
+        activityDuration,
+        previewSecond,
+        sceneFps: previewFps,
+      })
+
       nextConfig.scene = {
         ...nextConfig.scene,
         fps: previewFps,
+        start: previewWindow.start,
+        end: previewWindow.end,
         update_rate: normalizeUpdateRateForFps(previewFps, updateRate),
       }
 
-      const second = Math.max(0, Math.trunc(Number(useStore.getState().selectedSecond) || 0))
-      const result = await backend.renderPreviewFrame(nextConfig, parsedActivity, second)
+      const result = await backend.renderPreviewFrame(nextConfig, parsedActivity, previewSecond)
       if (result?.filename) {
         try {
           await backend.openVideo(result.filename)

@@ -56,14 +56,13 @@ pub struct MetricDisplayParts {
 pub fn frame_index_for_second(
     config: &RenderConfig,
     dense_activity: &DenseActivityReport,
-    second: u32,
+    second: f64,
 ) -> usize {
     if dense_activity.frame_count == 0 {
         return 0;
     }
 
-    let relative_second =
-        (f64::from(second) - config.scene.start).clamp(0.0, config.scene.end - config.scene.start);
+    let relative_second = (second - config.scene.start).clamp(0.0, config.scene.end - config.scene.start);
     let index = (relative_second * config.scene.fps).round() as isize;
     index.clamp(0, dense_activity.frame_count.saturating_sub(1) as isize) as usize
 }
@@ -522,11 +521,12 @@ fn effective_decimals(
 }
 
 // Converts a number to display text, trimming unnecessary fractional zeros.
+//
+// Zero-decimal values intentionally round instead of truncating so backend
+// preview PNGs match the editor canvas' metric formatting.
 fn format_number(value: f64, decimals: usize) -> String {
-    // The historical renderer truncated zero-decimal values by casting. Preserve
-    // that behavior for visual compatibility with existing templates.
     if decimals == 0 {
-        return (value as i64).to_string();
+        return value.round().to_string();
     }
 
     let factor = 10_f64.powi(decimals as i32);

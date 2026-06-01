@@ -4,6 +4,7 @@
 
 import { clamp } from '@/lib/utils'
 import { interpolateCoursePoint, interpolateNumericSeries, coursePointsEqual } from '@/lib/interpolation'
+import { resolveActivityDuration } from '@/lib/preview-timing'
 
 /**
  * Converts a time string (HH:MM:SS, MM:SS, or plain seconds) to seconds.
@@ -39,17 +40,17 @@ export function timeToSeconds(timeStr) {
 }
 
 /**
- * Returns the activity duration in seconds — the max of the last elapsed
- * sample and the trim_end_seconds.
+ * Returns the activity duration in seconds used by export-window helpers.
+ *
+ * Delegates to the shared preview-timing resolver so export-range logic,
+ * canvas preview clamping, and preview-PNG rendering all agree on the same
+ * duration semantics.
  *
  * @param {object|null} activity - Parsed activity data.
  * @returns {number} Duration in seconds.
  */
 export function getActivityDurationSeconds(activity) {
-  const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []
-  const elapsedDuration = Number(elapsedSeries[elapsedSeries.length - 1]) || 0
-  const trimmedDuration = Number(activity?.trim_end_seconds) || 0
-  return Math.max(elapsedDuration, trimmedDuration, 0)
+  return resolveActivityDuration({ sourceActivity: activity })
 }
 
 /**
