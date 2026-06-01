@@ -6,7 +6,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { clearPreviewVideo, importPreviewVideo } from '@/api/backend'
 import useStore from '@/store/useStore'
 
-const DEBUG_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg'])
+const DEBUG_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
 
 function pathExtension(path) {
   return typeof path === 'string' ? path.split('.').pop()?.toLowerCase() || '' : ''
@@ -33,7 +33,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         filters: [
           {
             name: debugModeEnabled ? 'Video or Image' : 'Video',
-            extensions: debugModeEnabled ? ['mp4', 'mov', 'mkv', 'png', 'jpg', 'jpeg'] : ['mp4', 'mov', 'mkv'],
+            extensions: debugModeEnabled ? ['mp4', 'mov', 'mkv', 'png', 'jpg', 'jpeg', 'webp'] : ['mp4', 'mov', 'mkv'],
           },
         ],
       })

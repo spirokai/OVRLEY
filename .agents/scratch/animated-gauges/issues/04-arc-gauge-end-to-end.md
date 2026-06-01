@@ -13,6 +13,7 @@ Implement the arc gauge display type end-to-end: Skia backend rendering with sta
 - Arc is symmetric along the vertical axis. 180° produces a half-circle starting and ending on a horizontal line.
 - Arc radius derived from widget bounding box: `min(width, height) / 2 - padding` (padding accounts for track thickness and labels).
 - Fill sweeps from the leftmost arc endpoint to the rightmost arc endpoint, always reading left-to-right.
+- Rounded arc ends should be implemented with Skia stroke caps (`Round`) on a stroked arc, not custom rounded path geometry. This is based on the upstream Cyclemetry renderer reviewed in `walkersutton/Cyclemetry/src-tauri/src/render/frame.rs`.
 - Static layer: empty arc track + border + min/max labels (if enabled) + unit label + icon (if enabled).
 - Dynamic per frame: arc fill + value text. Value text changes per frame; unit and icon are static.
 - Inner widget layout: unit appears below value (vertical stacking, not horizontal row). Icon sits to the left of value on the primary line.
@@ -21,6 +22,7 @@ Implement the arc gauge display type end-to-end: Skia backend rendering with sta
 
 **Frontend behavior:**
 - SVG preview renders identically to the Skia backend for the same config.
+- Rounded arc ends should be mirrored with SVG round linecaps / equivalent stroke-cap behavior so preview and export stay aligned.
 - Editor controls: display type dropdown, arc angle slider/input, inner widget x/y offset, icon toggle, plus all shared track styling controls.
 
 **Infrastructure established:**
@@ -36,6 +38,7 @@ Implement the arc gauge display type end-to-end: Skia backend rendering with sta
 - [ ] Arc gauge dynamic fill rendered per-frame with correct sweep direction (left-to-right)
 - [ ] Arc angle range enforced: 30°–360°
 - [ ] Arc radius correctly derived from widget bounding box minus padding
+- [ ] Rounded arc ends rendered via stroke-cap strategy in both Skia and SVG preview
 - [ ] Inner widget value text rendered per-frame inside arc
 - [ ] Inner widget unit label and icon rendered in static layer (vertical stacking layout)
 - [ ] Inner widget positioned by x/y offset from arc center

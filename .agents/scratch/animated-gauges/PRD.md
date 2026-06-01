@@ -113,6 +113,8 @@ The implementation is Skia-backend-first with the React frontend preview mirrore
 - For angle θ, the arc spans from `270° - θ/2` to `270° + θ/2` in standard angle convention.
 - Arc radius is derived from widget bounding box: `min(width, height) / 2 - padding` (padding accounts for track thickness and labels).
 - Track thickness is a fixed pixel value; arc radius auto-adjusts to fit within the bounding box.
+- For arc/corner gauges, rounded ends should be implemented as stroked arcs with round caps, not as custom path corner-rounding geometry. This matches the strategy observed in the upstream Cyclemetry renderer (`walkersutton/Cyclemetry`, `src-tauri/src/render/frame.rs`), where the gauge arc uses Skia `Cap::Round` rather than pre-rendered assets or manually-rounded arc paths.
+- `track_corner_radius` should continue to control true corner rounding for linear/bars. For arc/corner gauges, it should be interpreted through the arc stroke-cap treatment rather than a separate radius applied to path geometry.
 
 ### Inner widget layout in arc/corner
 
@@ -132,6 +134,7 @@ The implementation is Skia-backend-first with the React frontend preview mirrore
 - During `prepare_render_assets`, gauge static layers are baked into `SkiaImage` surfaces per widget, following the existing route/elevation widget cache pattern.
 - Per-frame in `render_frame_rgba`: restore base layer, draw dynamic fill portions and value text.
 - Arc drawing uses `canvas.draw_arc()` or `canvas.draw_path()` with appropriate start/end angles.
+- Arc/corner rounded ends should come from Skia stroke caps (`Round`) on the arc stroke. Avoid bespoke rounded-end path math unless a later visual requirement proves caps insufficient.
 - Linear/bars use `canvas.draw_rect()` with corner radius via `RRect`.
 - Track fill uses `Paint` with configured color and opacity.
 
@@ -140,6 +143,7 @@ The implementation is Skia-backend-first with the React frontend preview mirrore
 - Linear gauge: SVG `<rect>` elements for empty and filled tracks.
 - Bars gauge: SVG `<rect>` elements per bar, filled or empty based on discrete bucket logic.
 - Arc/corner: SVG `<path>` with arc commands (`A`), or `<circle>`/`<ellipse>` with `stroke-dasharray` for partial arcs.
+- Arc/corner rounded ends should be mirrored with SVG stroke-linecap semantics so the frontend preview matches the backend's round-cap arc strategy from the examined Cyclemetry renderer.
 - Min/max labels: SVG `<text>` elements.
 - Inner widget: SVG `<text>` elements following the vertical stacking layout.
 - Preview geometry calculations mirror the Skia backend exactly.

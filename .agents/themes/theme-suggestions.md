@@ -21,14 +21,14 @@
 
 - SAFA Brian theme - pure white (Evogria font required)
 - neutral theme - pure white (any font except Evogria)
-- Champagne (#FFF2C9) + rust/clay (#801F06; accents)
+- Champagne (#FFF2C9) + rust/clay (#C54A2B; accents)
 
 **We need exactly one scheme for each of the following unique combinations (total 6):**
 
 - Cyan (#00E5FF) + light blue (#7DF9FF) futuristic hud
-- Burnt orange (#FF6A2B) + cream orange (#DCB9A6; just minor accents)
-- Neon acid lime (#D7FF3F) + titanium gray (#C6CDD5)
-- Dark navy (#043764) + neon teal (#11E9C5)
+- Burnt orange (#FF6A2B) + cream orange (#DCB9A6; just minor accents) - DONE; screen8
+- Neon acid lime (#D7FF3F) + titanium gray (#C6CDD5) - DONE; screen12
+- Blue navy (#95C4EC) + neon teal (#11E9C5)
 - Lavender (#CAB2FB) + slate brown (#8B5CF6)
 
 ## Non-negotiable settings and fonts

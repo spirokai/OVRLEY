@@ -17,11 +17,13 @@ Implement the corner gauge display type end-to-end: Skia backend rendering with 
   - Bottom-left: left edge → bottom edge (clockwise)
   - Bottom-right: bottom edge → right edge (clockwise)
 - Static layer: empty arc track + border + min/max labels (if enabled) + unit label + icon (if enabled).
+- Rounded corner-gauge arc ends should reuse the arc gauge's stroke-cap strategy (`Round` caps on stroked arcs), following the same approach observed in the upstream Cyclemetry renderer rather than custom rounded path geometry.
 - Dynamic per frame: arc fill + value text.
 - All inner widget customization (x/y offset, icon toggle, font size) works identically to arc gauge.
 
 **Frontend behavior:**
 - SVG preview renders identically to the Skia backend for the same config.
+- Rounded arc ends should be mirrored with SVG round linecaps / equivalent stroke-cap behavior.
 - Editor controls: display type dropdown, corner orientation selector (top-left/top-right/bottom-left/bottom-right), plus all shared track styling and inner widget controls.
 
 ## Acceptance criteria
@@ -29,6 +31,7 @@ Implement the corner gauge display type end-to-end: Skia backend rendering with 
 - [ ] `corner_orientation` field added to `ValueConfig` with variants `"top-left"`, `"top-right"`, `"bottom-left"`, `"bottom-right"` and `#[serde(default)]`
 - [ ] Corner gauge static layer baked into cached `SkiaImage` (reuses arc infrastructure)
 - [ ] Corner gauge dynamic fill rendered per-frame with correct sweep direction per corner orientation
+- [ ] Rounded corner-gauge arc ends rendered via stroke-cap strategy in both Skia and SVG preview
 - [ ] Top-left: counter-clockwise sweep from left edge to top edge
 - [ ] Top-right: counter-clockwise sweep from top edge to right edge
 - [ ] Bottom-left: clockwise sweep from left edge to bottom edge
