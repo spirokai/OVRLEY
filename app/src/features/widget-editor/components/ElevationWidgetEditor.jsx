@@ -3,10 +3,16 @@
  */
 
 import { Mountain, Palette } from 'lucide-react'
-import { ColorField, SliderField, ToggleField } from './widgetFormControls'
+import { ColorField, SelectField, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection, SectionHeading } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 import { Label } from '@/components/ui/label'
+
+const MARKER_VARIANT_OPTIONS = [
+  { value: 'single', label: 'Single Circle' },
+  { value: 'ring', label: 'Concentric Ring' },
+  { value: 'halo', label: 'Solid Halo' },
+]
 
 /**
  * Renders the elevation widget editor component.
@@ -27,7 +33,13 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
   const yScale = widget.data.y_scale ?? 1
   const simplifyTolerance = widget.data.simplify_tolerance_px ?? 1
   const targetDensity = widget.data.target_density ?? 0.75
+  const markerSize = widget.data.marker_size ?? 16
+  const markerOpacity = widget.data.marker_opacity ?? 100
+  const markerVariant = widget.data.marker_variant ?? 'single'
+  const markerVariantDiameter = widget.data.marker_variant_diameter ?? 40
   const labelFontSize = widget.data.point_label?.font_size ?? sceneFontSize ?? 12.5
+  const showVariantDiameter = markerVariant !== 'single'
+  const variantDiameterLabel = markerVariant === 'ring' ? 'Ring Diameter' : 'Halo Diameter'
   const updatePointLabel = (updates) =>
     updateWidgetData(widget.id, {
       point_label: {
@@ -178,23 +190,29 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
       </div>
       <div className="space-y-4">
         <SectionHeading icon={Mountain} title="Marker & Labels" />
+        <SelectField
+          label="Marker Type"
+          value={markerVariant}
+          options={MARKER_VARIANT_OPTIONS}
+          onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
+        />
         <div className="grid grid-cols-2 gap-3">
           <SliderField
             label="Size"
-            value={widget.data.marker_size ?? 16}
+            value={markerSize}
             min={0}
             max={50}
             step={1}
-            valueDisplay={`${widget.data.marker_size ?? 16}px`}
+            valueDisplay={`${markerSize}px`}
             onSliderChange={(value) => updateWidgetData(widget.id, { marker_size: value })}
           />
           <SliderField
             label="Opacity"
-            value={widget.data.marker_opacity ?? 100}
+            value={markerOpacity}
             min={0}
             max={100}
             step={1}
-            valueDisplay={`${widget.data.marker_opacity ?? 100}%`}
+            valueDisplay={`${markerOpacity}%`}
             onSliderChange={(value) => updateWidgetData(widget.id, { marker_opacity: value })}
           />
           <ColorField
@@ -203,6 +221,17 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
             onChange={(value) => updateWidgetData(widget.id, { marker_color: value })}
           />
         </div>
+        {showVariantDiameter ? (
+          <SliderField
+            label={variantDiameterLabel}
+            value={markerVariantDiameter}
+            min={Math.max(Math.round(markerSize * 2), 4)}
+            max={120}
+            step={1}
+            valueDisplay={`${markerVariantDiameter}px`}
+            onSliderChange={(value) => updateWidgetData(widget.id, { marker_variant_diameter: value })}
+          />
+        ) : null}
         <SliderField
           label="Label Size"
           value={labelFontSize}

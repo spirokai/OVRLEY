@@ -138,6 +138,19 @@ export function resolveScaledPreviewLineWidth(explicitWidth, legacyWidth, global
   return resolvePreviewLineWidth(undefined, legacyWidth)
 }
 
+function normalizeMarkerVariant(value) {
+  return value === 'ring' || value === 'halo' ? value : 'single'
+}
+
+function resolveMarkerVariantDiameter(widgetData, fallbackRadius) {
+  const configuredDiameter = Number(widgetData.marker_variant_diameter)
+  if (Number.isFinite(configuredDiameter) && configuredDiameter >= 0) {
+    return configuredDiameter
+  }
+
+  return Math.max(fallbackRadius * 2 + 8, 8)
+}
+
 /**
  * Builds the marker layer definitions for a widget's position indicator.
  *
@@ -163,7 +176,7 @@ export function getPreviewMarkerLayers(widgetData, fallbackRadius, fallbackColor
         },
       ]
 
-  return markerPoints
+  const layers = markerPoints
     .map((point) => ({
       radius: Math.max(Math.sqrt(Math.max(Number(point.weight) || 80, 1)), 2),
       color: point.color || '#ffffff',
@@ -173,7 +186,33 @@ export function getPreviewMarkerLayers(widgetData, fallbackRadius, fallbackColor
     .map((layer, index, layers) => ({
       ...layer,
       solidFill: index === layers.length - 1,
+      strokeWidth: index === layers.length - 1 ? undefined : Math.min(Math.max(Math.round(layer.radius * 0.18), 1), 3),
     }))
+
+  const markerVariant = normalizeMarkerVariant(widgetData.marker_variant)
+  const variantRadius = Math.max(resolveMarkerVariantDiameter(widgetData, fallbackRadius) * 0.5, 0)
+
+  if (markerVariant === 'ring' && variantRadius > 0) {
+    layers.unshift({
+      radius: variantRadius,
+      color: fallbackColor,
+      opacity: fallbackOpacity,
+      solidFill: false,
+      strokeWidth: 1.5,
+    })
+  }
+
+  if (markerVariant === 'halo' && variantRadius > 0) {
+    layers.unshift({
+      radius: variantRadius,
+      color: fallbackColor,
+      opacity: Math.min(Math.max(fallbackOpacity * 0.35, 0), 1),
+      solidFill: true,
+      strokeWidth: undefined,
+    })
+  }
+
+  return layers
 }
 
 /**

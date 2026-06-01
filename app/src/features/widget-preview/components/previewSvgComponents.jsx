@@ -260,7 +260,7 @@ export function PreviewPolylineShadow({ points, shadow, blurFilterId, strokeWidt
  * solid fill while outer layers are stroked outlines.
  *
  * @param {object} props
- * @param {Array<{radius: number, color: string, opacity: number, solidFill: boolean}>} props.layers - Sorted marker layer definitions.
+ * @param {Array<{radius: number, color: string, opacity: number, solidFill: boolean, strokeWidth?: number}>} props.layers - Sorted marker layer definitions.
  * @param {number} props.x - X position of the marker center.
  * @param {number} props.y - Y position of the marker center.
  * @returns {JSX.Element|null} Fragment of SVG circle elements, or null if no valid layers/position.
@@ -280,7 +280,7 @@ export function PreviewMarkerLayers({ layers, x, y }) {
           r={layer.radius}
           fill={layer.solidFill ? layer.color : 'none'}
           stroke={layer.solidFill ? 'none' : layer.color}
-          strokeWidth={layer.solidFill ? undefined : Math.min(Math.max(Math.round(layer.radius * 0.18), 1), 3)}
+          strokeWidth={layer.solidFill ? undefined : layer.strokeWidth ?? Math.min(Math.max(Math.round(layer.radius * 0.18), 1), 3)}
           opacity={layer.opacity}
         />
       ))}

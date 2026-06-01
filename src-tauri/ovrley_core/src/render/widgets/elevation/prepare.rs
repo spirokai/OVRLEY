@@ -37,7 +37,14 @@ pub(crate) fn prepare_elevation_cache(
     let geometry = prepare_profiler.measure("build_elevation_cache.geometry", || {
         build_elevation_geometry(&plot, &raw_points)
     })?;
-    let marker_layers = super::super::marker::marker_layers_from_points(&plot.marker_points);
+    let marker_layers = super::super::marker::marker_layers_from_points(
+        &plot.marker_points,
+        &plot.marker_variant,
+        plot.marker_variant_diameter,
+        plot.marker_variant_stroke_width,
+        &plot.marker_color,
+        plot.marker_opacity,
+    );
     let remaining_layer = prepare_profiler.measure("build_elevation_cache.layers", || {
         build_elevation_remaining_layer(&plot, &geometry)
     })?;

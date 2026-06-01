@@ -83,6 +83,7 @@ pub(crate) struct MarkerLayer {
     pub(crate) color: String,
     pub(crate) opacity: f32,
     pub(crate) solid_fill: bool,
+    pub(crate) stroke_width: f32,
 }
 
 /// Prepared route widget cache.
@@ -179,6 +180,9 @@ pub(crate) struct NormalizedRoutePlot {
     pub(crate) completed_line_width: f32,
     pub(crate) completed_line_color: String,
     pub(crate) completed_line_opacity: f32,
+    pub(crate) marker_variant: String,
+    pub(crate) marker_variant_diameter: f32,
+    pub(crate) marker_variant_stroke_width: f32,
     pub(crate) marker_size: f32,
     pub(crate) marker_color: String,
     pub(crate) marker_opacity: f32,
@@ -208,6 +212,9 @@ pub(crate) struct NormalizedElevationPlot {
     pub(crate) area_remaining_opacity: f32,
     pub(crate) area_completed_color: String,
     pub(crate) area_completed_opacity: f32,
+    pub(crate) marker_variant: String,
+    pub(crate) marker_variant_diameter: f32,
+    pub(crate) marker_variant_stroke_width: f32,
     pub(crate) marker_size: f32,
     pub(crate) marker_color: String,
     pub(crate) marker_opacity: f32,

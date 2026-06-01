@@ -20,6 +20,8 @@ use super::types::MarkerLayer;
 use crate::config::MarkerPointConfig;
 use skia_safe::{Canvas, Paint, Point};
 
+const RING_STROKE_WIDTH: f32 = 1.5;
+
 pub(crate) fn draw_marker(
     canvas: &Canvas,
     layers: &[MarkerLayer],
@@ -53,13 +55,20 @@ pub(crate) fn draw_marker(
             canvas.draw_circle(Point::new(x, y), layer.radius, &paint);
         } else {
             paint.set_style(skia_safe::paint::Style::Stroke);
-            paint.set_stroke_width((layer.radius * 0.18).round().clamp(1.0, 3.0));
+            paint.set_stroke_width(layer.stroke_width.max(1.0));
             canvas.draw_circle(Point::new(x, y), layer.radius, &paint);
         }
     }
 }
 
-pub(crate) fn marker_layers_from_points(points: &[MarkerPointConfig]) -> Vec<MarkerLayer> {
+pub(crate) fn marker_layers_from_points(
+    points: &[MarkerPointConfig],
+    marker_variant: &str,
+    marker_variant_diameter: f32,
+    marker_variant_stroke_width: f32,
+    marker_color: &str,
+    marker_opacity: f32,
+) -> Vec<MarkerLayer> {
     let mut layers = points
         .iter()
         .map(|point| MarkerLayer {
@@ -75,11 +84,50 @@ pub(crate) fn marker_layers_from_points(points: &[MarkerPointConfig]) -> Vec<Mar
                 .unwrap_or_else(|| DEFAULT_COLOR.to_string()),
             opacity: normalize_opacity(point.opacity, 1.0),
             solid_fill: false,
+            stroke_width: 0.0,
         })
         .collect::<Vec<_>>();
     layers.sort_by(|left, right| right.radius.total_cmp(&left.radius));
     if let Some(last) = layers.last_mut() {
         last.solid_fill = true;
     }
+
+    for layer in layers.iter_mut().filter(|layer| !layer.solid_fill) {
+        layer.stroke_width = (layer.radius * 0.18).round().clamp(1.0, 3.0);
+    }
+
+    let variant_radius = (marker_variant_diameter * 0.5).max(0.0);
+    match marker_variant {
+        "ring" if variant_radius > 0.0 => {
+            layers.insert(
+                0,
+                MarkerLayer {
+                    radius: variant_radius,
+                    color: marker_color.to_string(),
+                    opacity: marker_opacity.clamp(0.0, 1.0),
+                    solid_fill: false,
+                    stroke_width: marker_variant_stroke_width.max(1.0),
+                },
+            );
+        }
+        "halo" if variant_radius > 0.0 => {
+            layers.insert(
+                0,
+                MarkerLayer {
+                    radius: variant_radius,
+                    color: marker_color.to_string(),
+                    opacity: (marker_opacity * 0.35).clamp(0.0, 1.0),
+                    solid_fill: true,
+                    stroke_width: 0.0,
+                },
+            );
+        }
+        _ => {}
+    }
+
     layers
+}
+
+pub(crate) fn scaled_ring_stroke_width(scale: f32) -> f32 {
+    RING_STROKE_WIDTH * scale.max(0.1)
 }

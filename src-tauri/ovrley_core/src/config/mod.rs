@@ -406,6 +406,10 @@ pub struct CoursePlotConfig {
     #[serde(default)]
     pub remaining_line_opacity: Option<f32>,
     #[serde(default)]
+    pub marker_variant: Option<String>,
+    #[serde(default)]
+    pub marker_variant_diameter: Option<f32>,
+    #[serde(default)]
     pub marker_size: Option<f32>,
     #[serde(default)]
     pub marker_color: Option<String>,
@@ -458,6 +462,10 @@ pub struct ElevationPlotConfig {
     pub remaining_line_color: Option<String>,
     #[serde(default)]
     pub remaining_line_opacity: Option<f32>,
+    #[serde(default)]
+    pub marker_variant: Option<String>,
+    #[serde(default)]
+    pub marker_variant_diameter: Option<f32>,
     #[serde(default)]
     pub marker_size: Option<f32>,
     #[serde(default)]

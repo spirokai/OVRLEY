@@ -48,6 +48,11 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
   const remainingLineOpacity = normalizePreviewOpacity(widget.data.remaining_line_opacity ?? widget.data.line?.opacity ?? widget.data.opacity, 0.75)
   const completedLineOpacity = normalizePreviewOpacity(widget.data.completed_line_opacity ?? widget.data.line?.opacity ?? widget.data.opacity, 1)
   const markerSize = Number.isFinite(Number(widget.data.marker_size)) ? Number(widget.data.marker_size) : 18
+  const markerVariantDiameter =
+    Number.isFinite(Number(widget.data.marker_variant_diameter)) && Number(widget.data.marker_variant_diameter) >= 0
+      ? Number(widget.data.marker_variant_diameter)
+      : Math.max(markerSize * 2 + 8, 8)
+  const routeMarkerInsetRadius = Math.max(markerSize, markerVariantDiameter * 0.5)
   const svgMarkerSize = markerSize
   const markerColor = widget.data.marker_color || baseColor
   const markerOpacity = normalizePreviewOpacity(widget.data.marker_opacity ?? widget.data.opacity, 1)
@@ -72,13 +77,13 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
         widget.data.simplify_tolerance_px ?? 1,
         geometryRemainingLineWidth,
         geometryCompletedLineWidth,
-        markerSize,
+        routeMarkerInsetRadius,
       ),
     [
       geometryCompletedLineWidth,
       geometryRemainingLineWidth,
       height,
-      markerSize,
+      routeMarkerInsetRadius,
       routeSamples,
       width,
       widget.data.simplify_tolerance_px,

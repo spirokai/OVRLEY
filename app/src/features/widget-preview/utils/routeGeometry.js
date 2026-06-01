@@ -81,15 +81,15 @@ function fitPointsToWidget(points, width, height, insetPx, invertY = true) {
  * @param {number} widgetHeight - Widget height in pixels.
  * @param {number} lineWidth - Remaining route line width in pixels.
  * @param {number} completedLineWidth - Completed route line width in pixels.
- * @param {number} markerSize - Marker diameter in pixels.
+ * @param {number} markerRadius - Largest marker radius in pixels.
  * @returns {number} Computed inset in pixels.
  */
-function routeGeometryInsetPx(widgetWidth, widgetHeight, lineWidth, completedLineWidth, markerSize) {
+function routeGeometryInsetPx(widgetWidth, widgetHeight, lineWidth, completedLineWidth, markerRadius) {
   const safeWidth = Number(lineWidth) || 0
   const safeCompletedWidth = Number(completedLineWidth) || 0
-  const safeMarkerSize = Number(markerSize) || 0
+  const safeMarkerRadius = Number(markerRadius) || 0
   const lineInset = Math.max(safeWidth, safeCompletedWidth) * 0.5
-  return Math.min(Math.max(safeMarkerSize, lineInset) + 1, Math.min(widgetWidth, widgetHeight) * ROUTE_FALLBACK_INSET_MAX_RATIO)
+  return Math.min(Math.max(safeMarkerRadius, lineInset) + 1, Math.min(widgetWidth, widgetHeight) * ROUTE_FALLBACK_INSET_MAX_RATIO)
 }
 
 /**
@@ -220,7 +220,7 @@ function downsampleRouteSamples(samples, targetCount) {
  * @param {number} [simplifyTolerancePx=1] - Ramer-Douglas-Peucker simplification tolerance.
  * @param {number} [lineWidth=6] - Route line width in pixels (affects inset).
  * @param {number} [completedLineWidth=6] - Completed route line width (affects inset).
- * @param {number} [markerSize=18] - Marker size in pixels (affects inset).
+ * @param {number} [markerRadius=18] - Largest marker radius in pixels (affects inset).
  * @returns {{ points: number[][], progressValues: number[] }} Projected points and progress values.
  */
 export function normalizeRouteGeometry(
@@ -231,7 +231,7 @@ export function normalizeRouteGeometry(
   simplifyTolerancePx = 1,
   lineWidth = 6,
   completedLineWidth = 6,
-  markerSize = 18,
+  markerRadius = 18,
 ) {
   // Validate samples — filter out entries with non-finite coordinates, falling back to a synthetic route if none remain
   const validSamples = samples.filter(
@@ -256,7 +256,7 @@ export function normalizeRouteGeometry(
     projectedPoints,
     width,
     height,
-    routeGeometryInsetPx(width, height, lineWidth, completedLineWidth, markerSize),
+    routeGeometryInsetPx(width, height, lineWidth, completedLineWidth, markerRadius),
     true,
   )
   const fittedSamples = validSamples.map((sample, index) => ({

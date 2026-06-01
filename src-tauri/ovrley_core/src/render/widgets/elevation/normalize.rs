@@ -10,6 +10,7 @@ use super::super::common::{
     DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER, DEFAULT_ELEVATION_MARKER_SCALE,
 };
 use super::super::geometry::normalize_opacity;
+use super::super::marker::scaled_ring_stroke_width;
 use super::super::types::NormalizedElevationPlot;
 use crate::config::{ElevationPlotConfig, RenderConfig};
 
@@ -35,6 +36,12 @@ pub(crate) fn normalize_elevation_plot(
         .clone()
         .unwrap_or_else(|| base_color.clone());
     let marker_opacity = normalize_opacity(plot.marker_opacity.or(plot.opacity), 1.0);
+    let marker_variant = normalize_marker_variant(plot.marker_variant.as_deref());
+    let marker_variant_diameter = match plot.marker_variant_diameter {
+        Some(diameter) => diameter.max(0.0) * scale,
+        None => marker_size * 2.0 + 8.0,
+    };
+    let marker_variant_stroke_width = scaled_ring_stroke_width(scale);
     let scaled_width = ((plot.width as f32) * scale).round().max(1.0) as u32;
     let scaled_height = ((plot.height as f32) * scale).round().max(1.0) as u32;
     let scaled_points = scale_marker_points(&plot.points, scale);
@@ -106,6 +113,9 @@ pub(crate) fn normalize_elevation_plot(
                 .or_else(|| plot.fill.as_ref().and_then(|fill| fill.opacity)),
             0.24,
         ),
+        marker_variant,
+        marker_variant_diameter,
+        marker_variant_stroke_width,
         marker_size,
         marker_color: marker_color.clone(),
         marker_opacity,
@@ -144,6 +154,14 @@ pub(crate) fn normalize_elevation_plot(
             .decimal_rounding
             .or(config.scene.decimal_rounding),
         legacy_label_units: point_label.units,
+    }
+}
+
+fn normalize_marker_variant(value: Option<&str>) -> String {
+    match value {
+        Some("ring") => "ring".to_string(),
+        Some("halo") => "halo".to_string(),
+        _ => "single".to_string(),
     }
 }
 

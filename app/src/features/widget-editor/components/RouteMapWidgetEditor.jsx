@@ -3,10 +3,16 @@
  */
 
 import { Map, Palette } from 'lucide-react'
-import { ColorField, SliderField, ToggleField } from './widgetFormControls'
+import { ColorField, SelectField, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection, SectionHeading } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 import { Label } from '@/components/ui/label'
+
+const MARKER_VARIANT_OPTIONS = [
+  { value: 'single', label: 'Single Circle' },
+  { value: 'ring', label: 'Concentric Ring' },
+  { value: 'halo', label: 'Solid Halo' },
+]
 
 /**
  * Renders the route map widget editor component.
@@ -23,9 +29,13 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
   const remainingLineOpacity = widget.data.remaining_line_opacity ?? 35
   const markerSize = widget.data.marker_size ?? 18
   const markerOpacity = widget.data.marker_opacity ?? 100
+  const markerVariant = widget.data.marker_variant ?? 'single'
+  const markerVariantDiameter = widget.data.marker_variant_diameter ?? 44
   const rotation = widget.data.rotation ?? 0
   const simplifyTolerance = widget.data.simplify_tolerance_px ?? 1
   const targetDensity = widget.data.target_density ?? 1
+  const showVariantDiameter = markerVariant !== 'single'
+  const variantDiameterLabel = markerVariant === 'ring' ? 'Ring Diameter' : 'Halo Diameter'
 
   return (
     <>
@@ -137,6 +147,12 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
       </div>
       <div className="space-y-4">
         <SectionHeading icon={Map} title="Marker" />
+        <SelectField
+          label="Type"
+          value={markerVariant}
+          options={MARKER_VARIANT_OPTIONS}
+          onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
+        />
         <SliderField
           label=" Size"
           value={markerSize}
@@ -146,6 +162,17 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
           valueDisplay={`${markerSize}px`}
           onSliderChange={(value) => updateWidgetData(widget.id, { marker_size: value })}
         />
+        {showVariantDiameter ? (
+          <SliderField
+            label={variantDiameterLabel}
+            value={markerVariantDiameter}
+            min={Math.max(Math.round(markerSize * 2), 4)}
+            max={120}
+            step={1}
+            valueDisplay={`${markerVariantDiameter}px`}
+            onSliderChange={(value) => updateWidgetData(widget.id, { marker_variant_diameter: value })}
+          />
+        ) : null}
         <div className="grid grid-cols-2 gap-3">
           <ColorField
             label="Color"

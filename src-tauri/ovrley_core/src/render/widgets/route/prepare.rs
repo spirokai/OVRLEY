@@ -36,7 +36,14 @@ pub(crate) fn prepare_route_cache(
     let geometry = prepare_profiler.measure("build_route_cache.geometry", || {
         build_route_geometry(&plot, &route_samples)
     })?;
-    let marker_layers = marker_layers_from_points(&plot.marker_points);
+    let marker_layers = marker_layers_from_points(
+        &plot.marker_points,
+        &plot.marker_variant,
+        plot.marker_variant_diameter,
+        plot.marker_variant_stroke_width,
+        &plot.marker_color,
+        plot.marker_opacity,
+    );
     let remaining_layer = prepare_profiler.measure("build_route_cache.layers", || {
         build_route_remaining_layer(&plot, &geometry)
     })?;
@@ -152,7 +159,8 @@ fn build_route_remaining_layer(
 /// Computes inset needed to keep route strokes and marker inside widget bounds.
 fn route_geometry_inset_px(plot: &NormalizedRoutePlot) -> f32 {
     let line_inset = (plot.remaining_line_width.max(plot.completed_line_width) * 0.5).max(0.0);
-    plot.marker_size.max(line_inset) + 1.0
+    let marker_inset = plot.marker_size.max(plot.marker_variant_diameter * 0.5);
+    marker_inset.max(line_inset) + 1.0
 }
 
 /// Selects full-activity or trimmed course samples for route geometry.

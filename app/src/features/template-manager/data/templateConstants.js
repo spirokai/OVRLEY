@@ -72,6 +72,8 @@ export const COURSE_PLOT_KEYS = [
   'simplify_tolerance_px',
   'target_density',
   'show_full_activity',
+  'marker_variant',
+  'marker_variant_diameter',
   'marker_size',
   'marker_color',
   'marker_opacity',
