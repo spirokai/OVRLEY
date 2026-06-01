@@ -11,7 +11,7 @@ import { deleteWidgetInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, u
 import { buildConfigWidgets, groupWidgetsForSidebar } from '@/lib/widget-presentation'
 import { isStandardMetricWidgetType } from '@/lib/standard-metrics'
 import { clamp } from '@/lib/utils'
-import { createHeadingDefaults, createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
+import { createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
 
 /**
  * Container hook for SidebarWidgetsTab that owns all store access,
@@ -79,9 +79,6 @@ export function useWidgetManager() {
           sceneFontSize: nextConfig.scene?.font_size,
         }),
       )
-    } else if (type === 'heading') {
-      if (!nextConfig.plots) nextConfig.plots = []
-      nextConfig.plots.push(createHeadingDefaults(globalDefaults))
     }
 
     const normalizedConfig = ensureWidgetIdsInConfig(nextConfig)
@@ -116,11 +113,6 @@ export function useWidgetManager() {
           }),
         ),
       )
-      return
-    }
-
-    if (widget.type === 'heading') {
-      setConfig(replaceWidgetInConfig(config, id, createHeadingDefaults(globalDefaults)))
       return
     }
 

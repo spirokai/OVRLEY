@@ -4,6 +4,7 @@
  */
 
 import { buildWidgetTransform } from '@/lib/geometryUtils'
+import { isPlotLikeWidget } from '@/lib/widget-behavior'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 
 /**
@@ -97,12 +98,12 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
 
   const visualBounds = getWidgetVisualBoundsFromTarget(target)
   const origin = getWidgetSceneOrigin(widget, draft, visualBounds, {
-    boundsScale: widget.category === 'plots' ? 1 : globalScale,
+    boundsScale: isPlotLikeWidget(widget) ? 1 : globalScale,
   })
   const nextWidth = draft.width ?? widget.data.width
   const nextHeight = draft.height ?? widget.data.height
   const nextRotation = draft.rotation ?? (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
-  const isPlotWidget = widget.category === 'plots'
+  const isPlotWidget = isPlotLikeWidget(widget)
   const renderScale = isPlotWidget ? globalScale || 1 : 1
   const nextScale = (draft.scale ?? 1) * (isPlotWidget ? 1 : globalScale)
 
@@ -157,7 +158,7 @@ export function applyLiveScalePositionStyles(target, widget, draft, globalScale,
 
   const visualBounds = visualBoundsOverride ?? getWidgetVisualBoundsFromTarget(target)
   const draftOrigin = getWidgetSceneOrigin(widget, draft, visualBounds, {
-    boundsScale: widget.category === 'plots' ? 1 : globalScale,
+    boundsScale: isPlotLikeWidget(widget) ? 1 : globalScale,
   })
 
   if (globalScale !== 1) {

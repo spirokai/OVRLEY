@@ -42,6 +42,7 @@ pub enum MetricIconAssetKey {
     GroundContactTime,
     Torque,
     GearPosition,
+    Heading,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -195,6 +196,7 @@ fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
         "vertical_ratio" => Some(MetricKind::VerticalRatio),
         "vertical_oscillation" => Some(MetricKind::VerticalOscillation),
         "core_temperature" => Some(MetricKind::CoreTemperature),
+        "heading" => Some(MetricKind::Heading),
         _ => None,
     }
 }
@@ -274,6 +276,7 @@ pub fn metric_icon_asset_key(kind: MetricKind) -> Option<MetricIconAssetKey> {
         "widget-ground-contact-time.svg" => Some(MetricIconAssetKey::GroundContactTime),
         "widget-torque.svg" => Some(MetricIconAssetKey::Torque),
         "widget-gear-position.svg" => Some(MetricIconAssetKey::GearPosition),
+        "widget-heading.svg" => Some(MetricIconAssetKey::Heading),
         _ => None,
     }
 }

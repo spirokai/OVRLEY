@@ -20,10 +20,11 @@ const CARDINAL_LABELS = [
  * Computes the scroll offset in pixels for a given heading.
  * @param {number} heading - Current heading in degrees (0–360)
  * @param {number} pixelsPerDegree - Horizontal scale
+ * @param {number} width - Widget width in pixels
  * @returns {number} Offset in pixels
  */
-export function headingOffset(heading, pixelsPerDegree) {
-  return heading * pixelsPerDegree
+export function headingOffset(heading, pixelsPerDegree, width) {
+  return heading * pixelsPerDegree - width / 2
 }
 
 /**
@@ -73,7 +74,7 @@ export function visibleTicks(
   if (pixelsPerDegree <= 0 || width <= 0) return []
 
   const tapeWidth = 360 * pixelsPerDegree
-  const offset = headingOffset(heading, pixelsPerDegree)
+  const offset = heading * pixelsPerDegree
   const minorInterval = majorTickInterval / minorTicksPerMajor
   const degrees = new Set(CARDINAL_LABELS.map(([degree]) => degree))
 

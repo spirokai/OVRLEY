@@ -36,6 +36,7 @@ pub enum MetricIconKind {
     GroundContactTime,
     Torque,
     GearPosition,
+    Compass,
     ArrowUpDown,
 }
 
@@ -229,6 +230,12 @@ fn raw_value(
         MetricKind::CoreTemperature => dense_activity
             .series
             .core_temperature
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::Heading => dense_activity
+            .series
+            .heading
             .get(frame_index)
             .copied()
             .flatten(),
@@ -650,6 +657,7 @@ fn metric_icon_kind_for_metric(kind: MetricKind) -> Option<MetricIconKind> {
         crate::standard_metrics::MetricIconAssetKey::GearPosition => {
             Some(MetricIconKind::GearPosition)
         }
+        crate::standard_metrics::MetricIconAssetKey::Heading => Some(MetricIconKind::Compass),
         crate::standard_metrics::MetricIconAssetKey::VerticalOscillation => {
             Some(MetricIconKind::ArrowUpDown)
         }

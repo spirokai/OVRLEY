@@ -8,7 +8,7 @@
 use super::super::types::{
     HeadingWidgetCache, WidgetFrameReport, WidgetGeometryReport, WidgetRenderReport,
 };
-use super::geometry::chevron_vertices;
+use super::geometry::{chevron_vertices, heading_offset};
 use crate::debug::RenderProfiler;
 use crate::render::text::parse_color;
 use skia_safe::{Canvas, Paint, Path, Point, Rect};
@@ -25,7 +25,13 @@ pub fn draw_heading_widget(
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
     frame_profiler.measure("heading.draw", || {
-        let offset = heading * heading_cache.pixels_per_degree;
+        let offset = heading_offset(
+            heading,
+            heading_cache.pixels_per_degree,
+            heading_cache.width as f32,
+        );
+        let wrapped_offset =
+            ((offset % heading_cache.tape_width) + heading_cache.tape_width) % heading_cache.tape_width;
 
         // Clip to widget bounds
         canvas.save();
@@ -44,13 +50,13 @@ pub fn draw_heading_widget(
         // Draw twice to handle the 360° wrap: once at offset, once at offset + tape_width.
         canvas.draw_image(
             &heading_cache.tape_image,
-            (heading_cache.x - offset, heading_cache.y),
+            (heading_cache.x - wrapped_offset, heading_cache.y),
             None,
         );
         canvas.draw_image(
             &heading_cache.tape_image,
             (
-                heading_cache.x - offset + heading_cache.tape_width,
+                heading_cache.x - wrapped_offset + heading_cache.tape_width,
                 heading_cache.y,
             ),
             None,

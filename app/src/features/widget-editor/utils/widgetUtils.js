@@ -191,14 +191,13 @@ export function createPlotDefaults(type, globalDefaults, options = {}) {
  * @returns {object} Derived data structure for downstream use.
  */
 export function createHeadingDefaults(globalDefaults) {
-  const labelFont = globalDefaults?.font_values || HEADING_DEFAULTS.label_font
-  const labelFontSelection = createFontSelection(labelFont)
+  const base = createMetricValueDefaults('heading', globalDefaults)
+  const headingFont = globalDefaults?.font_values || base.label_font || 'Arial.ttf'
+  const headingFontSelection = createFontSelection(headingFont)
 
   return {
-    ...HEADING_DEFAULTS,
-    value: 'heading',
-    label_font: labelFontSelection.font,
-    label_font_family: labelFontSelection.font_family,
-    opacity: globalDefaults?.opacity ?? 1,
+    ...base,
+    label_font: headingFontSelection.font,
+    label_font_family: headingFontSelection.font_family,
   }
 }

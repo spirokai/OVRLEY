@@ -234,4 +234,45 @@ describe('metric widget preview model standard metric units', () => {
     expect(model?.valueText).toBe('--')
     expect(model?.unitText).toBe('GEAR')
   })
+
+  test('plain heading value widgets still build a metric preview model when display_type is omitted', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'heading',
+        data: {
+          show_icon: true,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0],
+        heading: [90],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('90')
+    expect(model?.showIcon).toBe(true)
+  })
+
+  test('heading tape widgets skip the metric preview model so plot-like bounds are used', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'heading',
+        data: {
+          display_type: 'heading_tape',
+          width: 400,
+          height: 80,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0],
+        heading: [90],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model).toBeNull()
+  })
 })

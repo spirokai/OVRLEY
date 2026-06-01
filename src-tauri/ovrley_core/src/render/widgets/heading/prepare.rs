@@ -245,6 +245,7 @@ pub fn prepare_heading_cache(
             .unwrap_or_else(|| "#ffffff".to_string()),
         indicator_size: plot.indicator_size.unwrap_or(10.0) * scale,
         indicator_shadow: shadow,
+        display_type: plot.display_type,
     })
 }
 

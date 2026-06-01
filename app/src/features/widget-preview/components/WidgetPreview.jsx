@@ -29,6 +29,7 @@ import { OverlayMetricWidget } from './MetricRenderer'
 import { OverlayRouteWidget } from './RouteRenderer'
 import { OverlayElevationWidget } from './ElevationRenderer'
 import { OverlayHeadingWidget } from './HeadingRenderer'
+import { isHeadingTapeWidget } from '@/lib/widget-behavior'
 
 function WidgetPreview({
   widget,
@@ -79,7 +80,7 @@ function WidgetPreview({
     )
   }
 
-  if (widget.type === 'heading') {
+  if (isHeadingTapeWidget(widget)) {
     return (
       <OverlayHeadingWidget
         widget={widget}

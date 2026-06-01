@@ -20,7 +20,7 @@ use crate::activity::schema::DenseActivityReport;
 use crate::config::{RenderConfig, ValueConfig};
 use crate::render::format::format_metric_parts;
 use crate::render::text::ResolvedTextStyle;
-use crate::MetricKind;
+use crate::types::{DisplayType, MetricKind};
 use skia_safe::Canvas;
 use std::path::PathBuf;
 
@@ -62,6 +62,10 @@ pub(crate) fn draw_metric_value_widget_with_config(request: MetricWidgetRequest<
             request.scale,
             request.font_dirs,
         );
+    }
+
+    if request.value.display_type == DisplayType::Tape && request.value.value == MetricKind::Heading {
+        return true;
     }
 
     let Some(parts) = format_metric_parts(

@@ -28,6 +28,7 @@ describe('standard metric widget catalog', () => {
       'gear_position',
       'vertical_oscillation',
       'core_temperature',
+      'heading',
     ])
     expect(STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(CURRENT_STANDARD_METRIC_WIDGET_TYPES))
 
@@ -68,6 +69,7 @@ describe('standard metric widget catalog', () => {
   test('identifies standard metric widgets without folding in specialized widgets', () => {
     expect(isStandardMetricWidgetType('speed')).toBe(true)
     expect(isStandardMetricWidgetType('temperature')).toBe(true)
+    expect(isStandardMetricWidgetType('heading')).toBe(true)
     expect(isStandardMetricWidgetType('time')).toBe(false)
     expect(isStandardMetricWidgetType('gradient')).toBe(false)
     expect(isStandardMetricWidgetType('course')).toBe(false)

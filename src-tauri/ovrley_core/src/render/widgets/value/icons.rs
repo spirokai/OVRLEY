@@ -60,6 +60,7 @@ pub(crate) fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconK
         crate::standard_metrics::MetricIconAssetKey::GearPosition => {
             Some(MetricIconKind::GearPosition)
         }
+        crate::standard_metrics::MetricIconAssetKey::Heading => Some(MetricIconKind::Compass),
         crate::standard_metrics::MetricIconAssetKey::VerticalOscillation => {
             Some(MetricIconKind::ArrowUpDown)
         }
@@ -100,6 +101,7 @@ fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIco
         MetricIconKind::GearPosition => {
             parsed_metric_icon_cached(icon_kind, &GEAR_POSITION_ICON_CACHE)
         }
+        MetricIconKind::Compass => parsed_metric_icon_cached(icon_kind, &COMPASS_ICON_CACHE),
         MetricIconKind::ArrowUpDown => {
             parsed_metric_icon_cached(icon_kind, &ARROW_UP_DOWN_ICON_CACHE)
         }
@@ -124,6 +126,7 @@ static G_FORCE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static GROUND_CONTACT_TIME_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static TORQUE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static GEAR_POSITION_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static COMPASS_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static ARROW_UP_DOWN_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 
 fn parsed_metric_icon_cached(
@@ -212,6 +215,10 @@ fn metric_icon_svg_markup(icon_kind: MetricIconKind) -> &'static str {
         MetricIconKind::GearPosition => include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../assets/widget-icons/widget-gear-position.svg"
+        )),
+        MetricIconKind::Compass => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-heading.svg"
         )),
         MetricIconKind::ArrowUpDown => include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),

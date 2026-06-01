@@ -543,6 +543,10 @@ pub struct HeadingWidgetConfig {
     pub width: u32,
     /// Widget height in pixels.
     pub height: u32,
+    /// Visual representation mode. Defaults to `text`.
+    /// When set to `heading_tape`, the compass tape is rendered.
+    #[serde(default)]
+    pub display_type: DisplayType,
     /// Widget rotation in degrees.
     #[serde(default)]
     pub rotation: f32,
@@ -875,7 +879,7 @@ impl RenderConfig {
             requirements.distance_progress = true;
         }
 
-        if self.heading_plot()?.is_some() {
+        if self.heading_values()?.is_some() {
             requirements.heading = true;
         }
 
@@ -892,9 +896,25 @@ impl RenderConfig {
         self.parse_plot("elevation")
     }
 
-    /// Returns the heading plot config if present.
+    /// Returns the heading plot config if present (legacy `plots` container).
     pub fn heading_plot(&self) -> CoreResult<Option<HeadingWidgetConfig>> {
         self.parse_plot("heading")
+    }
+
+    /// Returns the heading widget config from `values` if a heading value with
+    /// `display_type: "heading_tape"` is present.
+    pub fn heading_values(&self) -> CoreResult<Option<HeadingWidgetConfig>> {
+        for value in &self.values {
+            if value.value == MetricKind::Heading && value.display_type == DisplayType::Tape {
+                let mut raw = serde_json::to_value(value)
+                    .map_err(|e| CoreError::Config(format!("heading value serialization: {e}")))?;
+                strip_json_nulls(&mut raw);
+                let config: HeadingWidgetConfig = serde_json::from_value(raw)
+                    .map_err(|e| CoreError::Config(format!("heading value config: {e}")))?;
+                return Ok(Some(config));
+            }
+        }
+        Ok(None)
     }
 
     /// Parses one plot entry from the legacy object/array `plots` container.
@@ -931,5 +951,16 @@ fn find_plot_value<'a>(plots: &'a Value, value_key: &str) -> Option<&'a Value> {
             })
         }),
         _ => None,
+    }
+}
+
+/// Removes all `null` values from a JSON object tree so that `#[serde(default)]`
+/// attributes on struct fields can take effect during deserialization.
+fn strip_json_nulls(value: &mut Value) {
+    if let Value::Object(map) = value {
+        map.retain(|_, v| !v.is_null());
+        for v in map.values_mut() {
+            strip_json_nulls(v);
+        }
     }
 }

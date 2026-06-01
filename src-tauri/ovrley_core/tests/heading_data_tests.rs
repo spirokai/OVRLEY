@@ -541,7 +541,7 @@ fn render_config_plots_returns_none_when_no_heading() {
 }
 
 #[test]
-fn heading_plot_triggers_heading_data_requirement() {
+fn heading_values_triggers_heading_data_requirement() {
     let config = RenderConfig {
         scene: SceneConfig {
             width: None,
@@ -579,20 +579,22 @@ fn heading_plot_triggers_heading_data_requirement() {
             extra: Default::default(),
         },
         labels: vec![],
-        values: vec![],
-        plots: json!([{
+        values: serde_json::from_value(json!([{
             "value": "heading",
             "x": 0.0,
             "y": 0.0,
+            "display_type": "heading_tape",
             "width": 400,
             "height": 80
-        }]),
+        }]))
+        .unwrap(),
+        plots: json!({}),
         extra: Default::default(),
     };
 
     let reqs = config.render_data_requirements().unwrap();
     assert!(
         reqs.heading,
-        "heading plot should trigger heading requirement"
+        "heading value should trigger heading requirement"
     );
 }

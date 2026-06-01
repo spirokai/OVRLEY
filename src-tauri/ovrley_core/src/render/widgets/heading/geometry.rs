@@ -59,9 +59,10 @@ pub fn cardinal_label_for_degree(degree: f32) -> Option<&'static str> {
 
 /// Computes the scroll offset in pixels for a given heading.
 ///
-/// The tape scrolls left as heading increases, so offset = heading × ppd.
-pub fn heading_offset(heading: f32, pixels_per_degree: f32) -> f32 {
-    heading * pixels_per_degree
+/// The active heading should sit under the widget's center indicator, so the
+/// tape offset is left-anchored heading minus half the visible width.
+pub fn heading_offset(heading: f32, pixels_per_degree: f32, width: f32) -> f32 {
+    heading * pixels_per_degree - width / 2.0
 }
 
 /// Computes which ticks are visible within the widget bounds.
@@ -92,7 +93,7 @@ pub fn visible_ticks(
     }
 
     let tape_width = 360.0 * pixels_per_degree;
-    let offset = heading_offset(heading, pixels_per_degree);
+    let offset = heading * pixels_per_degree;
     let minor_interval = major_tick_interval as f32 / minor_ticks_per_major as f32;
     let mut degrees: Vec<f32> = CARDINAL_LABELS.iter().map(|(degree, _)| *degree).collect();
 

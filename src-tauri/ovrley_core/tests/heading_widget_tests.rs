@@ -23,13 +23,14 @@ use ovrley_core::render::widgets::heading::geometry::{
 };
 use ovrley_core::render::widgets::heading::prepare::prepare_heading_cache;
 use ovrley_core::render::widgets::types::HeadingWidgetCache;
+use ovrley_core::types::DisplayType;
 use ovrley_core::MetricKind;
 use std::collections::BTreeMap;
 
 // ── Geometry helpers ──────────────────────────────────────────────────────
 
-fn heading_offset(heading: f32, ppd: f32) -> f32 {
-    heading * ppd
+fn heading_offset(heading: f32, ppd: f32, width: f32) -> f32 {
+    heading * ppd - width / 2.0
 }
 
 fn is_cardinal_degree(degree: f32) -> bool {
@@ -91,6 +92,7 @@ fn default_plot() -> HeadingWidgetConfig {
         show_indicator: true,
         indicator_color: Some("#FF0000".to_string()),
         indicator_size: Some(10.0),
+        display_type: DisplayType::Text,
         extra: BTreeMap::new(),
     }
 }
@@ -129,6 +131,7 @@ fn default_cache() -> HeadingWidgetCache {
         indicator_placement: "top".to_string(),
         indicator_color: "#FF0000".to_string(),
         indicator_size: 10.0,
+        display_type: DisplayType::Tape,
         indicator_shadow: None,
     }
 }
@@ -137,9 +140,9 @@ fn default_cache() -> HeadingWidgetCache {
 
 #[test]
 fn heading_offset_basic() {
-    assert!((heading_offset(0.0, 5.0) - 0.0).abs() < f32::EPSILON);
-    assert!((heading_offset(90.0, 5.0) - 450.0).abs() < f32::EPSILON);
-    assert!((heading_offset(360.0, 5.0) - 1800.0).abs() < f32::EPSILON);
+    assert!((heading_offset(0.0, 5.0, 200.0) - (-100.0)).abs() < f32::EPSILON);
+    assert!((heading_offset(90.0, 5.0, 200.0) - 350.0).abs() < f32::EPSILON);
+    assert!((heading_offset(360.0, 5.0, 200.0) - 1700.0).abs() < f32::EPSILON);
 }
 
 // ── Geometry: cardinal detection ──────────────────────────────────────────
@@ -198,7 +201,9 @@ fn visible_ticks_respects_show_flags() {
     assert!(all.len() > major_only.len());
     assert!(all.len() > minor_only.len());
     assert!(major_only.iter().all(|t| t.is_major));
-    assert!(minor_only.iter().all(|t| !t.is_major));
+    // Cardinal ticks are always shown and marked as major; non-cardinal
+    // ticks in the minor-only set must not be major.
+    assert!(minor_only.iter().filter(|t| !t.is_cardinal).all(|t| !t.is_major));
 }
 
 #[test]
@@ -262,17 +267,25 @@ fn visible_labels_respects_show_flags() {
             is_major: true,
         },
     ];
+    // Cardinal labels are always shown regardless of show flags.
     let none = visible_labels(&ticks, false, false);
-    assert!(none.is_empty());
+    assert_eq!(none.len(), 1); // only "N" (cardinal is always shown)
+    assert_eq!(none[0].text, "N");
 
+    // show_minor_labels=true, show_major_labels=false:
+    // - Cardinal (0°) → "N" (always)
+    // - Non-cardinal major (15°) → not shown (not minor, major labels off)
     let numeric_only = visible_labels(&ticks, true, false);
-    assert_eq!(numeric_only.len(), 2);
-    assert_eq!(numeric_only[0].text, "0");
-    assert_eq!(numeric_only[1].text, "15");
+    assert_eq!(numeric_only.len(), 1);
+    assert_eq!(numeric_only[0].text, "N");
 
+    // show_minor_labels=false, show_major_labels=true:
+    // - Cardinal (0°) → "N" (always)
+    // - Non-cardinal major (15°) → "15" (major labels on)
     let cardinal_only = visible_labels(&ticks, false, true);
-    assert_eq!(cardinal_only.len(), 1);
+    assert_eq!(cardinal_only.len(), 2);
     assert_eq!(cardinal_only[0].text, "N");
+    assert_eq!(cardinal_only[1].text, "15");
 }
 
 // ── Geometry: indicator vertices ──────────────────────────────────────────

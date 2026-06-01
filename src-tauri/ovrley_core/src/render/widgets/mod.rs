@@ -83,7 +83,7 @@ pub fn prepare_render_assets(
         )?);
     }
 
-    if let Some(heading_plot) = config.heading_plot()? {
+    if let Some(heading_plot) = config.heading_values()? {
         assets.heading_cache = Some(heading::prepare_heading_cache(
             config,
             &heading_plot,

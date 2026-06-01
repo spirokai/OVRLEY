@@ -24,6 +24,7 @@ import { useDragHandlers } from '../hooks/useDragHandlers'
 import { useResizeHandlers } from '../hooks/useResizeHandlers'
 import { useScaleHandlers } from '../hooks/useScaleHandlers'
 import { useRotateHandlers } from '../hooks/useRotateHandlers'
+import { isPlotLikeWidget } from '@/lib/widget-behavior'
 
 function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId, previewSecond, selectedWidgetIds, widgets }) {
   const visibleWidgets = useMemo(() => {
@@ -41,7 +42,7 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
         const metricPreviewModel = buildMetricWidgetPreviewModel({ widget, activity, previewSecond })
         const textPreviewModel = buildTextWidgetPreviewModel({ widget })
         const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
-        const origin = getWidgetSceneOrigin(widget, null, visualBounds, { boundsScale: widget.category === 'plots' ? 1 : globalScale })
+        const origin = getWidgetSceneOrigin(widget, null, visualBounds, { boundsScale: isPlotLikeWidget(widget) ? 1 : globalScale })
         const left = origin.x * displayScale
         const top = Math.max(origin.y * displayScale - 24, 0)
 
@@ -238,9 +239,9 @@ function OverlayEditor({
   const handlers = { ...dragHandlers, ...resizeHandlers, ...scaleHandlers, ...rotateHandlers }
 
   // Capability flags
-  const canResizeSelected = !selection.isGroupSelection && selection.selectedWidget?.category === 'plots'
+  const canResizeSelected = !selection.isGroupSelection && isPlotLikeWidget(selection.selectedWidget)
   const showEdgeResizeHandles = canResizeSelected && selection.selectedWidget?.type === 'elevation'
-  const canScaleSelected = Boolean(!selection.isGroupSelection && selection.selectedWidget && selection.selectedWidget.category !== 'plots')
+  const canScaleSelected = Boolean(!selection.isGroupSelection && selection.selectedWidget && !isPlotLikeWidget(selection.selectedWidget))
   const canRotateSelected = !selection.isGroupSelection && selection.selectedWidget?.type === 'course'
   const maintainAspectRatio = !selection.isGroupSelection && (selection.selectedWidget?.type === 'course' || canScaleSelected)
 

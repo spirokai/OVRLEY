@@ -10,13 +10,13 @@ import {
 } from '@/features/widget-preview/utils/headingGeometry'
 
 describe('headingOffset', () => {
-  test('returns 0 for heading 0', () => {
-    expect(headingOffset(0, 5)).toBe(0)
+  test('centers heading 0 under the widget indicator', () => {
+    expect(headingOffset(0, 5, 200)).toBe(-100)
   })
 
-  test('scales heading by pixels_per_degree', () => {
-    expect(headingOffset(90, 5)).toBe(450)
-    expect(headingOffset(360, 5)).toBe(1800)
+  test('subtracts half the visible width from the heading offset', () => {
+    expect(headingOffset(90, 5, 200)).toBe(350)
+    expect(headingOffset(360, 5, 200)).toBe(1700)
   })
 })
 

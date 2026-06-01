@@ -63,11 +63,11 @@ describe('OverlayHeadingWidget', () => {
     expect(svg).toHaveAttribute('height', '100')
   })
 
-  test('renders a tape pattern element', () => {
+  test('renders a clip path for the wrapped tape copies', () => {
     const widget = makeHeadingWidget()
     const { container } = render(<OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} />)
-    const pattern = container.querySelector('pattern')
-    expect(pattern).toBeTruthy()
+    const clipPath = container.querySelector('clipPath')
+    expect(clipPath).toBeTruthy()
   })
 
   test('renders the tape rect filled with the pattern', () => {

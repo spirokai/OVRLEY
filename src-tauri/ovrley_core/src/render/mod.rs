@@ -32,6 +32,7 @@ use crate::render::widgets::{
     draw_route_widget, has_static_metric_icon, prepare_render_assets, PreparedRenderAssets,
     WidgetRenderReport,
 };
+use crate::types::DisplayType;
 use skia_safe::Image;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -463,6 +464,9 @@ fn render_frame_to_surface(
         draw_elevation_widget(canvas, paths, config, cache, frame_index, frame_profiler)
     });
     let heading_widget = prepared_assets.heading_cache.as_ref().and_then(|cache| {
+        if cache.display_type == DisplayType::Text {
+            return None;
+        }
         let heading = dense_activity
             .series
             .heading

@@ -293,6 +293,22 @@
         "name": "Thermometer",
         "assetFile": "widget-core-temperature.svg"
       }
+    },
+    {
+      "type": "heading",
+      "current": true,
+      "label": "Heading",
+      "defaultDisplayUnit": "degrees",
+      "supportedDisplayUnits": [
+        { "value": "degrees", "label": "\u00B0" }
+      ],
+      "showUnitsByDefault": false,
+      "formatter": "integer",
+      "icon": {
+        "source": "lucide",
+        "name": "Compass",
+        "assetFile": "widget-heading.svg"
+      }
     }
   ]
 }

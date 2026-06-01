@@ -28,6 +28,7 @@ export const SHARED_VALUE_DEFAULTS = {
 export const FONT_SIZE_BY_TYPE = {
   time: 72,
   gradient: 96,
+  heading: 100,
   default: 100,
 }
 
@@ -53,26 +54,6 @@ const STANDARD_METRIC_TYPE_DEFAULTS = Object.fromEntries(
     ]
   }),
 )
-
-/** Type-specific default fields for each metric value widget type (dynamic fields omitted). */
-export const TYPE_DEFAULTS = {
-  ...STANDARD_METRIC_TYPE_DEFAULTS,
-  time: { format: 'time-24' },
-  left_right_balance: {
-    ...STANDARD_METRIC_TYPE_DEFAULTS.left_right_balance,
-    balance_format: 'percent_label',
-  },
-  gradient: {
-    decimals: 0,
-    unit_color: '#ffffff',
-    value_offset: 0,
-    show_sign: true,
-    show_triangle: true,
-    triangle_width: 72,
-    triangle_positive_color: '#40e0d0',
-    triangle_negative_color: '#c65102',
-  },
-}
 
 /** Default position and geometry fields for a plot (course/elevation) widget. */
 export const PLOT_BASE_DEFAULTS = {
@@ -162,4 +143,28 @@ export const HEADING_DEFAULTS = {
   show_indicator: true,
   indicator_color: '#ff0000',
   indicator_size: 10,
+}
+
+/** Type-specific default fields for each metric value widget type (dynamic fields omitted). */
+export const TYPE_DEFAULTS = {
+  ...STANDARD_METRIC_TYPE_DEFAULTS,
+  heading: {
+    ...STANDARD_METRIC_TYPE_DEFAULTS.heading,
+    ...HEADING_DEFAULTS,
+  },
+  time: { format: 'time-24' },
+  left_right_balance: {
+    ...STANDARD_METRIC_TYPE_DEFAULTS.left_right_balance,
+    balance_format: 'percent_label',
+  },
+  gradient: {
+    decimals: 0,
+    unit_color: '#ffffff',
+    value_offset: 0,
+    show_sign: true,
+    show_triangle: true,
+    triangle_width: 72,
+    triangle_positive_color: '#40e0d0',
+    triangle_negative_color: '#c65102',
+  },
 }

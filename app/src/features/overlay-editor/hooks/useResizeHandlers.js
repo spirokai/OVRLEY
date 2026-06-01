@@ -4,6 +4,7 @@
 
 import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
 import { clamp } from '@/lib/utils'
+import { isPlotLikeWidget } from '@/lib/widget-behavior'
 
 /**
  * Creates resize-related moveable handlers.
@@ -53,7 +54,7 @@ export function useResizeHandlers({
 
       const nextX = origin.x + drag.beforeTranslate[0]
       const nextY = origin.y + drag.beforeTranslate[1]
-      const dimensionScale = selectedWidget?.category === 'plots' ? Math.max(Number(globalScale) || 1, 0.1) : 1
+      const dimensionScale = isPlotLikeWidget(selectedWidget) ? Math.max(Number(globalScale) || 1, 0.1) : 1
       const nextWidth = Math.max(width / dimensionScale, 8)
       const nextHeight = Math.max(height / dimensionScale, 8)
       const widthScale = origin.width ? nextWidth / origin.width : 1
@@ -71,7 +72,7 @@ export function useResizeHandlers({
       }
 
       setLiveWidgetDraft(origin.id, nextDraft)
-      if (selectedWidget?.category === 'plots') {
+      if (isPlotLikeWidget(selectedWidget)) {
         applyLiveWidgetStyles(target ?? drag.target, selectedWidget, nextDraft, globalScale)
       }
     },

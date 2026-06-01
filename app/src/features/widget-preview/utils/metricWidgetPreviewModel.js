@@ -16,10 +16,19 @@ import { formatStandardMetricDisplay, formatTimeValue } from './formatUtils'
 import { getMetricWidgetLayout, getMetricWidgetVisualBounds, getPreviewFontFamily } from './textMeasurement'
 import { getInterpolatedActivityValue, getInterpolatedTimeValue } from '@/features/overlay-editor'
 import { getStandardMetricDefinition, isStandardMetricWidgetType } from '@/lib/standard-metrics'
+import { isHeadingTapeWidget } from '@/lib/widget-behavior'
 
 export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond }) {
-  // Guard — skip non-value widgets and gradient type (handled separately)
-  if (!widget || widget.category !== 'values' || widget.type === 'gradient') {
+  // Guard — skip non-value widgets and gradient type (handled separately).
+  // Heading is a standard metric widget that may live in the plots container
+  // until the full value-widget migration is complete.
+  if (!widget || widget.type === 'gradient') {
+    return null
+  }
+  if (isHeadingTapeWidget(widget)) {
+    return null
+  }
+  if (widget.category !== 'values' && !isStandardMetricWidgetType(widget.type)) {
     return null
   }
 

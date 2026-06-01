@@ -12,6 +12,7 @@ import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPrevi
 import { useFontMetricsVersion } from '@/features/widget-preview/hooks/useFontMetricsVersion'
 import { getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
 import { buildWidgetTransform } from '@/lib/geometryUtils'
+import { isPlotLikeWidget } from '@/lib/widget-behavior'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
 import useStore from '@/store/useStore'
@@ -106,7 +107,7 @@ const OverlayCanvasWidget = memo(
     const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
     const textPreviewModel = buildTextWidgetPreviewModel({ widget })
     const visualBounds = metricVisualBounds ?? textPreviewModel?.visualBounds ?? null
-    const isPlotWidget = widget.category === 'plots'
+    const isPlotWidget = isPlotLikeWidget(widget)
     const scaleFactor = widget.data.scale_factor
     const isScaling = scaleFactor !== undefined
 

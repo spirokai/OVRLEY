@@ -143,7 +143,8 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
 
   const heading = getInterpolatedActivityValue(activity, 'heading', previewSecond)
 
-  const offset = headingOffset(heading, ppd)
+  const offset = headingOffset(heading, ppd, width)
+  const wrappedOffset = ((offset % tapeWidth) + tapeWidth) % tapeWidth
 
   const ticks = useMemo(
     () =>
@@ -172,6 +173,20 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
   const shadow = useMemo(() => getTextShadowParts(sceneStyle), [sceneStyle])
 
   const shadowFilterId = sanitizeSvgId(`${widget.id}-shadow`)
+  const clipPathId = sanitizeSvgId(`${widget.id}-clip`)
+
+  const renderTapeCopies = (filterId = null) => (
+    <g clipPath={`url(#${clipPathId})`} filter={filterId ? `url(#${filterId})` : undefined}>
+      <g transform={`translate(${-wrappedOffset}, 0)`}>
+        {renderTicks(ticks, height, data)}
+        {renderLabels(labels, height, data, labelFontFamily)}
+      </g>
+      <g transform={`translate(${-wrappedOffset + tapeWidth}, 0)`}>
+        {renderTicks(ticks, height, data)}
+        {renderLabels(labels, height, data, labelFontFamily)}
+      </g>
+    </g>
+  )
 
   return (
     <svg
@@ -182,26 +197,17 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
       style={{ opacity: opacity < 1 ? opacity : undefined }}
     >
       <defs>
-        <pattern
-          id={sanitizeSvgId(`${widget.id}-tape-pattern`)}
-          patternUnits="userSpaceOnUse"
-          width={tapeWidth}
-          height={height}
-          patternTransform={`translate(${-offset}, 0)`}
-        >
-          {renderTicks(ticks, height, data)}
-          {renderLabels(labels, height, data, labelFontFamily)}
-        </pattern>
+        <clipPath id={clipPathId}>
+          <rect width={width} height={height} />
+        </clipPath>
         {shadow && buildShadowFilter(shadowFilterId, shadow)}
       </defs>
 
-      {/* Shadow layer: pattern fill with feDropShadow behind the main tape */}
-      {shadow && (
-        <rect width={width} height={height} fill={`url(#${sanitizeSvgId(`${widget.id}-tape-pattern`)})`} filter={`url(#${shadowFilterId})`} />
-      )}
+      {/* Shadow layer behind the main tape */}
+      {shadow && renderTapeCopies(shadowFilterId)}
 
       {/* Main tape layer on top */}
-      <rect width={width} height={height} fill={`url(#${sanitizeSvgId(`${widget.id}-tape-pattern`)})`} />
+      {renderTapeCopies()}
 
       {/* Indicator overlay — shadow only applies to chevron, not highlight bar */}
       {data.show_indicator !== false && (

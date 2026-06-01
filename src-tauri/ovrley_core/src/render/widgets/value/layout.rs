@@ -5,6 +5,7 @@
 /// their own size while sharing one top-left anchor.
 use crate::config::ValueConfig;
 use crate::render::text::{draw_text, measure_text, parse_color, ResolvedTextStyle};
+use crate::types::DisplayType;
 use skia_safe::Canvas;
 use std::path::PathBuf;
 
@@ -109,6 +110,10 @@ pub(crate) fn draw_metric_parts(
 
 /// Returns whether a value contributes an icon that can be cached statically.
 pub(crate) fn has_static_metric_icon(value: &ValueConfig) -> bool {
+    if value.display_type != DisplayType::Text {
+        return false;
+    }
+
     value
         .show_icon
         .unwrap_or(value.value != crate::MetricKind::Gradient)
@@ -127,6 +132,10 @@ pub(crate) fn draw_static_metric_icon_for_value(
     scale: f32,
     font_dirs: &[PathBuf],
 ) -> bool {
+    if value.display_type != DisplayType::Text {
+        return false;
+    }
+
     let Some(icon_kind) = super::icons::metric_icon_kind_for_value(value.value) else {
         return false;
     };

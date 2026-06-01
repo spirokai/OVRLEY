@@ -45,14 +45,15 @@ const WIDGET_EDITOR_MAP = {
  * @returns {JSX.Element|null} Rendered editor component or null.
  */
 function renderWidgetEditor(widget, updateWidgetData, setNumericField, sceneFontSize) {
+  // Specialized editors take priority over the generic metric editor
+  const Editor = WIDGET_EDITOR_MAP[widget.type]
+  if (Editor) {
+    return <Editor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} sceneFontSize={sceneFontSize} />
+  }
   if (isStandardMetricWidgetType(widget.type)) {
     return <MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
   }
-
-  const Editor = WIDGET_EDITOR_MAP[widget.type]
-  if (!Editor) return null
-
-  return <Editor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} sceneFontSize={sceneFontSize} />
+  return null
 }
 
 /**

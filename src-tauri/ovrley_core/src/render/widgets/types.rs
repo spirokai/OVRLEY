@@ -6,6 +6,7 @@
 //! place.
 
 use crate::config::MarkerPointConfig;
+use crate::types::DisplayType;
 use skia_safe::Image;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -122,6 +123,8 @@ pub struct HeadingWidgetCache {
     pub indicator_size: f32,
     /// Shadow style for the indicator (inherited from widget config).
     pub indicator_shadow: Option<ShadowStyle>,
+    /// Visual representation mode. When `Text`, the tape is not drawn.
+    pub display_type: DisplayType,
 }
 
 /// Prepared elevation widget cache.
