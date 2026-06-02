@@ -12,7 +12,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
-import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template-state'
+import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template-constants'
 import { createEditorEffectiveConfig } from '@/lib/template-state'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
@@ -169,8 +169,8 @@ describe('useStore startup', () => {
     expect(state.config.scene).not.toHaveProperty('font')
     expect(state.config.scene).not.toHaveProperty('color')
     expect(state.config.scene).not.toHaveProperty('font_size')
-    expect(effectiveConfig.scene.font).toBe('Arial.ttf')
-    expect(effectiveConfig.scene.color).toBe('#123456')
+    expect(effectiveConfig.scene.font_text).toBe('Arial.ttf')
+    expect(effectiveConfig.scene.color_text).toBe('#123456')
     expect(state.startSecond).toBe(0)
     expect(state.endSecond).toBe(73)
     expect(state.selectedSecond).toBe(0)

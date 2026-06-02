@@ -5,14 +5,11 @@
   "savedAt": "2026-06-01T13:23:10.194Z",
   "config": {
     "scene": {
-      "width": 3840,
-      "height": 2160,
+      "width": 1920,
+      "height": 1080,
       "fps": 30,
-      "start": 0,
-      "end": 4333,
-      "ffmpeg": {
-        "vendor": "ap10"
-      },
+      "updateRate": 1
+    },
       "border_strength": 0,
       "border_distance": 0
     },
@@ -273,6 +270,7 @@
       "shadow_strength": 2,
       "shadow_distance": 0,
       "opacity": 1,
+      "font_size": 30,
       "scale": 2
     }
   }

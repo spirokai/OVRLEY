@@ -8,13 +8,7 @@
       "width": 3840,
       "height": 2160,
       "fps": 30,
-      "start": 0,
-      "end": 4333,
-      "ffmpeg": {
-        "vendor": "ap10"
-      },
-      "border_strength": 0,
-      "border_distance": 0
+      "updateRate": 1
     },
     "labels": [
       {
@@ -191,6 +185,7 @@
       "shadow_strength": 1,
       "shadow_distance": 2,
       "opacity": 1,
+      "font_size": 30,
       "scale": 2
     }
   }

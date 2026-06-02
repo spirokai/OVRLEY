@@ -12,10 +12,9 @@ import {
   createDurableTemplateState,
   createEditorEffectiveConfig,
   getEffectiveWidgetData,
-  normalizeGlobalDefaults,
-  normalizeTemplateConfig,
   syncGlobalDefaultsToConfig,
 } from '@/lib/template-state'
+import { normalizeGlobalDefaults, normalizeTemplateConfig } from '@/lib/template-normalization'
 
 /* -------------------------------------------------------------------------- */
 /* normalizeGlobalDefaults                                                    */
@@ -276,8 +275,8 @@ describe('createEditorEffectiveConfig', () => {
 
     const editorConfig = createEditorEffectiveConfig({ config, globalDefaults })
 
-    expect(editorConfig.scene.font).toBe('TextFont.ttf')
-    expect(editorConfig.scene.color).toBe('#111111')
+    expect(editorConfig.scene.font_text).toBe('TextFont.ttf')
+    expect(editorConfig.scene.color_text).toBe('#111111')
     expect(editorConfig.scene.opacity).toBe(0.8)
     expect(editorConfig.scene.scale).toBe(1.6)
     expect(editorConfig.labels[0].font).toBe('TextFont.ttf')

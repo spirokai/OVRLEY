@@ -260,13 +260,13 @@ function OverlayEditor({
 
   const canvasSceneProps = useMemo(
     () => ({
-      sceneFont: config?.scene?.font,
-      sceneFontSize: config?.scene?.font_size,
+      sceneFont: globalDefaults?.font_text,
+      sceneFontSize: globalDefaults?.font_size,
       sceneStyle: overlayState.sceneStyle,
       valueFont,
       sceneSize: overlayState.sceneSize,
     }),
-    [config?.scene?.font, config?.scene?.font_size, overlayState.sceneStyle, valueFont, overlayState.sceneSize],
+    [globalDefaults?.font_text, globalDefaults?.font_size, overlayState.sceneStyle, valueFont, overlayState.sceneSize],
   )
   const canvasDisplayProps = useMemo(
     () => ({ displayScale, globalScale: overlayState.globalScale, globalOpacity: overlayState.globalOpacity, backgroundMode, gridVisible }),

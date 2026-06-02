@@ -1,0 +1,38 @@
+{
+  "globals": {
+    "border_color": "#000000",
+    "border_thickness": 0,
+    "shadow_color": "#000000",
+    "shadow_strength": 0,
+    "shadow_distance": 0,
+    "font_values": "Arial.ttf",
+    "font_text": "Arial.ttf",
+    "color_values": "#ffffff",
+    "color_text": "#ffffff",
+    "color_icons": "#ffffff",
+    "color_units": "#ffffff",
+    "font_size": 30,
+    "opacity": 1,
+    "scale": 1
+  },
+  "fileFormat": "ovrley-template",
+  "fileVersion": 2,
+  "exportRange": {
+    "type": "all",
+    "from": 0,
+    "to": 0,
+    "fromTime": "00:00:00",
+    "toTime": "00:00:00"
+  },
+  "renderTimeOnlyKeys": [
+    "composite_video_path",
+    "composite_bitrate",
+    "composite_sync_offset",
+    "composite_video_fps_num",
+    "composite_video_fps_den",
+    "composite_video_duration",
+    "composite_render_duration",
+    "composite_video_trim_start",
+    "composite_widget_update_rate"
+  ]
+}

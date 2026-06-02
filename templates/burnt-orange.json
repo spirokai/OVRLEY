@@ -8,11 +8,8 @@
       "width": 3840,
       "height": 2160,
       "fps": 30,
-      "start": 0,
-      "end": 4912,
-      "ffmpeg": {
-        "vendor": "ap10"
-      },
+      "updateRate": 1
+    },
       "border_strength": 0,
       "border_distance": 0
     },
@@ -194,6 +191,7 @@
       "shadow_strength": 0,
       "shadow_distance": 0,
       "opacity": 1,
+      "font_size": 30,
       "scale": 2
     }
   }

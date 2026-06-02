@@ -3,10 +3,12 @@ import { describe, expect, test } from 'vitest'
 import {
   CURRENT_STANDARD_METRIC_WIDGET_TYPES,
   STANDARD_METRIC_WIDGET_TYPES,
-  getStandardMetricDefinition,
-  isStandardMetricWidgetType,
   DISPLAY_TYPE_DEFINITIONS,
   DISPLAY_TYPE_LABELS,
+} from '@/lib/standard-widgets'
+import {
+  getStandardMetricDefinition,
+  isStandardMetricWidgetType,
   getDisplayTypeDefinition,
   getDisplayTypeLabel,
   isBoxedDisplayType,

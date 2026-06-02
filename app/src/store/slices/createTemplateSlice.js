@@ -8,8 +8,9 @@
  */
 
 import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
-import { DEFAULT_EXPORT_RANGE } from '../../features/template-manager/data/templateConstants'
-import { createDurableTemplateState, DEFAULT_GLOBAL_DEFAULTS, normalizeGlobalDefaults, syncGlobalDefaultsToConfig } from '../../lib/template-state'
+import { DEFAULT_EXPORT_RANGE, DEFAULT_GLOBAL_DEFAULTS } from '../../lib/template-constants'
+import { createDurableTemplateState, syncGlobalDefaultsToConfig } from '../../lib/template-state'
+import { normalizeGlobalDefaults } from '../../lib/template-normalization'
 import { cloneSerializable, DEFAULT_CONFIG, syncSceneTimingFromConfig, updateConfigPersistence } from '../store-utils'
 
 const initialUpdateRate = 1

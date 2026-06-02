@@ -16,7 +16,6 @@
  * - Public API composition (createDurableTemplateState, createEditorEffectiveConfig, etc.)
  *
  * Sibling modules:
- * - template-defaults.js    provides the constant default values
  * - template-state.js       orchestrates durable ↔ effective materialization
  *
  * @module template-normalization
@@ -27,19 +26,22 @@ import { ensureWidgetIdsInConfig } from '@/lib/widget-config'
 import { initDisplayVariant } from '@/lib/metric-widget-resolver'
 import {
   COURSE_PLOT_KEYS,
+  DEFAULT_GLOBAL_DEFAULTS,
   DISPLAY_VARIANT_KEYS,
   ELEVATION_PLOT_KEYS,
   LABEL_KEYS,
-  PLOT_DEFAULTS,
+  SCENE_DURABLE_KEYS,
   SCENE_RENDER_TIME_ONLY_KEYS,
-  VALUE_DEFAULTS,
-  VALUE_ICON_KEYS,
   VALUE_SHARED_KEYS,
-  VALUE_TYPE_KEYS,
-} from '@/features/template-manager/data/templateConstants'
-import { DEFAULT_GLOBAL_DEFAULTS, GLOBAL_DEFAULT_KEYS, SCENE_DERIVED_SETTING_KEYS, SCENE_GLOBAL_DEFAULT_KEYS } from './template-defaults'
-
-const SCENE_DURABLE_KEYS = ['width', 'height', 'fps', 'updateRate']
+} from './template-constants'
+import {
+  TYPE_DEFAULTS,
+  TEXT_DEFAULTS,
+  COURSE_PLOT_DEFAULTS,
+  ELEVATION_PLOT_DEFAULTS,
+  METRIC_TYPE_OVERRIDES,
+  GRADIENT_DEFAULTS,
+} from '@/lib/standard-widgets'
 
 function cloneSerializable(value) {
   if (value === undefined) return undefined
@@ -65,7 +67,7 @@ function pickDefined(source, keys) {
  * @returns {object} Normalized durable global defaults.
  */
 export function normalizeGlobalDefaults(globalDefaults) {
-  const pickedDefaults = pickDefined(cloneSerializable(globalDefaults) || {}, GLOBAL_DEFAULT_KEYS)
+  const pickedDefaults = pickDefined(cloneSerializable(globalDefaults) || {}, Object.keys(DEFAULT_GLOBAL_DEFAULTS))
   const mergedDefaults = { ...DEFAULT_GLOBAL_DEFAULTS, ...pickedDefaults }
   return normalizeColorFields(mergedDefaults)
 }
@@ -82,7 +84,7 @@ export function normalizeGlobalDefaults(globalDefaults) {
  * @returns {object} Normalized durable global defaults.
  */
 export function mergeSceneGlobalDefaults(scene, globalDefaults) {
-  const sceneDefaults = pickDefined(scene, SCENE_GLOBAL_DEFAULT_KEYS)
+  const sceneDefaults = pickDefined(scene, Object.keys(DEFAULT_GLOBAL_DEFAULTS))
   const mergedDefaults = { ...sceneDefaults, ...(cloneSerializable(globalDefaults) || {}) }
   return normalizeGlobalDefaults(mergedDefaults)
 }
@@ -106,7 +108,6 @@ function normalizeScene(scene = {}) {
   } else {
     delete nextScene.updateRate
   }
-  for (const key of SCENE_DERIVED_SETTING_KEYS) delete nextScene[key]
   for (const key of SCENE_RENDER_TIME_ONLY_KEYS) delete nextScene[key]
   return normalizeColorFields(nextScene)
 }
@@ -130,8 +131,9 @@ function normalizeDisplayVariants(variants) {
 
 function normalizeValue(value = {}) {
   const type = value.value
-  const keys = [...VALUE_SHARED_KEYS, ...(VALUE_TYPE_KEYS[type] || VALUE_ICON_KEYS)]
-  const withDefaults = { ...VALUE_DEFAULTS[type], ...value }
+  const extraKeys = type === 'gradient' ? Object.keys(GRADIENT_DEFAULTS) : Object.keys(METRIC_TYPE_OVERRIDES[type] || {})
+  const keys = [...VALUE_SHARED_KEYS, ...extraKeys]
+  const withDefaults = { ...TEXT_DEFAULTS, ...TYPE_DEFAULTS[type], ...value }
   const pickedValue = pickDefined(withDefaults, keys)
   if (pickedValue.display_type && pickedValue.display_type !== 'text') {
     pickedValue.display_variants = (initDisplayVariant(pickedValue, pickedValue.display_type) || pickedValue).display_variants
@@ -156,7 +158,8 @@ function normalizePointLabel(pointLabel, config, globalDefaults) {
 
 function normalizePlot(plot = {}, config, globalDefaults) {
   const type = plot.value
-  const withDefaults = { ...PLOT_DEFAULTS[type], ...plot }
+  const plotBase = type === 'course' ? COURSE_PLOT_DEFAULTS : ELEVATION_PLOT_DEFAULTS
+  const withDefaults = { ...plotBase, ...plot }
   if (type === 'elevation') {
     withDefaults.point_label = normalizePointLabel(plot.point_label, config, globalDefaults)
   }

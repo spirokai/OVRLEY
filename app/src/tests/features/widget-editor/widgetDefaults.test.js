@@ -1,5 +1,5 @@
 /**
- * Behavior tests for `standard-metrics.js` TEXT_DEFAULTS.
+ * Behavior tests for `standard-widgets.js` TEXT_DEFAULTS.
  *
  * The `display_type` field on every newly created value widget must default to
  * `"text"` so existing rendering behavior is preserved out of the box. Future
@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, test } from 'vitest'
-import { TEXT_DEFAULTS } from '@/lib/standard-metrics'
+import { TEXT_DEFAULTS } from '@/lib/standard-widgets'
 
 describe('TEXT_DEFAULTS', () => {
   test('includes display_type: "text" so new value widgets default to text rendering', () => {

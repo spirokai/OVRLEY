@@ -4,18 +4,12 @@
     "name":  "recent-template",
     "savedAt":  "2026-05-20T21:22:20.542Z",
     "config":  {
-                   "scene":  {
-                                 "width":  1920,
-                                 "height":  1080,
-                                 "fps":  30,
-                                 "start":  0,
-                                 "end":  4912,
-                                 "ffmpeg":  {
-                                                "vendor":  "ap10"
-                                            },
-                                 "border_strength":  0,
-                                 "border_distance":  0
-                             },
+               "scene":  {
+                              "width":  1920,
+                              "height":  1080,
+                              "fps":  30,
+                              "updateRate":  1
+                          },
                    "labels":  [
                                   {
                                       "x":  1215,
@@ -235,13 +229,15 @@
                                             "font_text":  "Arial.ttf",
                                             "color_values":  "#ffffff",
                                             "color_text":  "#ffffff",
-                                            "color_icons":  "#ffffff",
-                                            "border_color":  "#ff0000",
+                                         "color_icons":  "#ffffff",
+                                         "color_units":  "#ffffff",
+                                         "border_color":  "#ff0000",
                                             "border_thickness":  2,
                                             "shadow_color":  "#0059ff",
                                             "shadow_strength":  4,
-                                            "shadow_distance":  4,
-                                            "opacity":  1,
+                                         "shadow_distance":  4,
+                                         "font_size":  30,
+                                         "opacity":  1,
                                             "scale":  1
                                         }
                  }

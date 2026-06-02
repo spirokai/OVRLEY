@@ -8,9 +8,10 @@
 
 import { deepEqual } from '@/store/store-utils'
 import { createDurableTemplateState } from '@/lib/template-state'
-import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '../data/templateConstants'
+import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template-constants'
 
-export { DEFAULT_GLOBAL_DEFAULTS, normalizeTemplateConfig } from '@/lib/template-state'
+export { normalizeTemplateConfig } from '@/lib/template-normalization'
+export { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template-constants'
 
 /**
  * Handles sanitize template filename.

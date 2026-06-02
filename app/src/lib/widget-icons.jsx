@@ -1,7 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 
 import { Type } from 'lucide-react'
-import { STANDARD_METRIC_WIDGET_TYPES, getStandardMetricDefinition } from './standard-metrics'
+import { STANDARD_METRIC_WIDGET_TYPES } from './standard-widgets'
+import { getStandardMetricDefinition } from './standard-metrics'
 import { METRIC_ICON_SVGS } from './widget-icon-data'
 
 export { METRIC_ICON_SVGS }

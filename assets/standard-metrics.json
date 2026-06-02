@@ -15,19 +15,20 @@
           "show_icon": true,
           "icon_size": 45,
           "icon_offset_x": 0,
-          "icon_offset_y": 0
+          "icon_offset_y": 0,
+          "icon_color": "#ffffff",
+          "font": "Arial.ttf",
+          "font_size": 100,
+          "color": "#ffffff",
+          "opacity": 1,
+          "show_units": false,
+          "display_unit": true
         },
         "fontSizeByType": {
           "time": 72,
           "gradient": 96,
           "heading": 100,
           "default": 100
-        },
-        "labelDefaults": {
-          "x": 100,
-          "y": 100,
-          "font_size": 60,
-          "text": "New Text"
         },
         "metricTypeOverrides": {
           "time": {
@@ -96,27 +97,13 @@
         "defaultFrameHeight": 60
       }
     },
-    "defaults": [
-      "text",
-      "linear",
-      "bars",
-      "arc",
-      "corner"
-    ],
+    "variantFrameKeys": ["width", "height", "rotation"],
+    "defaults": ["text", "linear", "bars", "arc", "corner"],
     "overrides": {
-      "heading": [
-        "text",
-        "heading_tape"
-      ],
-      "core_temperature": [
-        "text"
-      ],
-      "left_right_balance": [
-        "text"
-      ],
-      "time": [
-        "text"
-      ]
+      "heading": ["text", "heading_tape"],
+      "core_temperature": ["text"],
+      "left_right_balance": ["text"],
+      "time": ["text"]
     }
   },
   "definitions": [
