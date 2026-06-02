@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 
 import ElevationWidgetEditor from '@/features/widget-editor/components/ElevationWidgetEditor'
 import RouteMapWidgetEditor from '@/features/widget-editor/components/RouteMapWidgetEditor'
-import { COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS } from '@/features/widget-editor/data/widgetDefaults'
+import { COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS } from '@/lib/standard-widgets'
 
 beforeAll(() => {
   globalThis.ResizeObserver = class ResizeObserver {

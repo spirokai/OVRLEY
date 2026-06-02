@@ -2,7 +2,7 @@ import { describe, test, expect, vi, beforeAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import HeadingWidgetEditor from '@/features/widget-editor/components/HeadingWidgetEditor'
-import { HEADING_TAPE_DEFAULTS } from '@/features/widget-editor/data/widgetDefaults'
+import { HEADING_TAPE_DEFAULTS } from '@/lib/standard-metrics'
 
 vi.mock('@/features/scene-settings/hooks/useAvailableFonts', () => ({
   default: () => ({

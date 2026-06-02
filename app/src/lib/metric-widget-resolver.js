@@ -1,27 +1,12 @@
 /**
- * @file metric-widget-resolver – Resolves the active metric widget config
- * from the hybrid storage shape.
- *
- * The hybrid storage shape preserves per-display settings:
- * - Text-compatible fields remain flat in widget data
- * - Non-text display-specific config lives in `display_variants[display_type]`
- * - Frame geometry (width, height, rotation) is stored per-variant for boxed types
- *
- * This module provides:
- * - `resolveActiveMetricWidgetData` – materializes the active presentation for preview/export
- * - `initDisplayVariant` – initializes a display variant from defaults on first switch
- * - `resetCurrentDisplayConfig` – resets only the active display config
- *
  * Default ownership:
  * - Frame geometry defaults come from the shared manifest (getDefaultFrameDimensions)
- * - Display-specific non-geometry defaults come from widgetDefaults.js
- * - Text reset defaults come from widgetDefaults.js (ICON_DEFAULTS)
- *
- * @module metric-widget-resolver
+ * - Display-specific non-geometry defaults come from the manifest
+ *   (getDisplayVariantNonGeometryDefaults)
+ * - Text reset defaults come from TEXT_DEFAULTS in standard-metrics
  */
 
-import { getDefaultFrameDimensions } from '@/lib/standard-metrics'
-import { DISPLAY_VARIANT_NON_GEOMETRY_DEFAULTS, ICON_DEFAULTS, SHARED_VALUE_DEFAULTS } from '@/features/widget-editor/data/widgetDefaults'
+import { getDefaultFrameDimensions, getDisplayVariantNonGeometryDefaults, TEXT_DEFAULTS } from '@/lib/standard-metrics'
 
 /**
  * Resolves frame geometry from the 3-tier fallback chain:
@@ -97,12 +82,12 @@ export function initDisplayVariant(widgetData, displayType) {
   if (variants[displayType]) return widgetData
 
   const frameDefaults = getDefaultFrameDimensions(displayType)
-  const nonGeometryDefaults = DISPLAY_VARIANT_NON_GEOMETRY_DEFAULTS[displayType]
+  const nonGeometryDefaults = getDisplayVariantNonGeometryDefaults(displayType)
 
   if (!frameDefaults && !nonGeometryDefaults) return widgetData
 
   const variantDefaults = {
-    ...(nonGeometryDefaults ? nonGeometryDefaults() : {}),
+    ...(nonGeometryDefaults || {}),
     ...resolveFrameGeometry(null, widgetData, frameDefaults),
   }
 
@@ -133,10 +118,7 @@ export function resetCurrentDisplayConfig(widgetData) {
   if (displayType === 'text') {
     return {
       ...widgetData,
-      ...ICON_DEFAULTS,
-      decimals: SHARED_VALUE_DEFAULTS.decimals,
-      prefix: SHARED_VALUE_DEFAULTS.prefix,
-      suffix: SHARED_VALUE_DEFAULTS.suffix,
+      ...TEXT_DEFAULTS,
       value: widgetData.value,
       id: widgetData.id,
       font_size: widgetData.font_size,
@@ -146,7 +128,7 @@ export function resetCurrentDisplayConfig(widgetData) {
   }
 
   const frameDefaults = getDefaultFrameDimensions(displayType)
-  const nonGeometryDefaults = DISPLAY_VARIANT_NON_GEOMETRY_DEFAULTS[displayType]
+  const nonGeometryDefaults = getDisplayVariantNonGeometryDefaults(displayType)
 
   if (!frameDefaults && !nonGeometryDefaults) return widgetData
 
@@ -155,7 +137,7 @@ export function resetCurrentDisplayConfig(widgetData) {
     display_variants: {
       ...widgetData.display_variants,
       [displayType]: {
-        ...(nonGeometryDefaults ? nonGeometryDefaults() : {}),
+        ...(nonGeometryDefaults || {}),
         ...resolveFrameGeometry(null, widgetData, frameDefaults),
       },
     },

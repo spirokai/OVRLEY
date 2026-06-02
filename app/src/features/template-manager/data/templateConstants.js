@@ -3,8 +3,8 @@
  * Used by templateSnapshot.js for config normalization and file I/O.
  */
 
-import { STANDARD_METRIC_WIDGET_TYPES } from '@/lib/standard-metrics'
-import { TYPE_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS } from '../../widget-editor/data/widgetDefaults'
+import { STANDARD_METRIC_WIDGET_TYPES, TYPE_DEFAULTS } from '@/lib/standard-metrics'
+import { COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS } from '@/lib/standard-widgets'
 
 /** File format identifier for OVRLEY template files. */
 export const TEMPLATE_FILE_FORMAT = 'ovrley-template'

@@ -1,0 +1,64 @@
+{
+  "plot": {
+    "base": {
+      "x": 100,
+      "y": 100,
+      "rotation": 0,
+      "completed_line_width": 6,
+      "remaining_line_width": 6
+    },
+    "courseDimensionsFallback": {
+      "width": 400,
+      "height": 200
+    },
+    "course": {
+      "completed_line_opacity": 100,
+      "remaining_line_opacity": 35,
+      "simplify_tolerance_px": 1,
+      "target_density": 1,
+      "show_full_activity": false,
+      "marker_variant": "single",
+      "marker_variant_diameter": 44,
+      "marker_size": 18,
+      "marker_opacity": 100,
+      "completed_line_color": "#ffffff",
+      "remaining_line_color": "#ffffff",
+      "marker_color": "#ffffff"
+    },
+    "elevation": {
+      "completed_line_opacity": 100,
+      "remaining_line_opacity": 35,
+      "area_completed_opacity": 24,
+      "area_remaining_opacity": 12,
+      "marker_variant": "single",
+      "marker_variant_diameter": 40,
+      "marker_size": 16,
+      "marker_opacity": 100,
+      "show_elevation_metric": true,
+      "show_elevation_imperial": false,
+      "show_full_activity": false,
+      "y_scale": 1,
+      "simplify_tolerance_px": 1,
+      "target_density": 0.75,
+      "metric_label_offset_x": 0,
+      "metric_label_offset_y": 0,
+      "imperial_label_offset_x": 0,
+      "imperial_label_offset_y": 0,
+      "completed_line_color": "#ffffff",
+      "remaining_line_color": "#ffffff",
+      "area_completed_color": "#ffffff",
+      "area_remaining_color": "#ffffff",
+      "marker_color": "#ffffff"
+    }
+  },
+  "gradient": {
+    "decimals": 0,
+    "unit_color": "#ffffff",
+    "value_offset": 0,
+    "show_sign": true,
+    "show_triangle": true,
+    "triangle_width": 72,
+    "triangle_positive_color": "#40e0d0",
+    "triangle_negative_color": "#c65102"
+  }
+}

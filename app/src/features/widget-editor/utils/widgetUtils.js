@@ -1,21 +1,12 @@
 /**
  * Pure helper functions for widget creation, parsing, and geometry.
- * Domain constants used by these functions live in @/lib/widget-icons and ../data/widgetDefaults.
+ * Domain constants used by these functions live in @/lib/standard-metrics
+ * and @/lib/standard-widgets.
  */
 
 import { createFontSelection } from '@/lib/fonts'
-import {
-  LABEL_DEFAULTS,
-  SHARED_VALUE_DEFAULTS,
-  FONT_SIZE_BY_TYPE,
-  ICON_DEFAULTS,
-  TYPE_DEFAULTS,
-  PLOT_BASE_DEFAULTS,
-  COURSE_PLOT_DEFAULTS,
-  ELEVATION_PLOT_DEFAULTS,
-  COURSE_DIMENSIONS_FALLBACK,
-  HEADING_TAPE_DEFAULTS,
-} from '../data/widgetDefaults'
+import { TEXT_DEFAULTS, TEXT_FONT_SIZES, TEXT_LABEL_DEFAULTS, TYPE_DEFAULTS, HEADING_TAPE_DEFAULTS } from '@/lib/standard-metrics'
+import { PLOT_BASE_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS, COURSE_DIMENSIONS_FALLBACK } from '@/lib/standard-widgets'
 
 /**
  * Parses integer.
@@ -56,7 +47,7 @@ export function getWidgetFont(widget, fallback = 'Arial.ttf') {
  * @param {*} fallback - Fallback value returned when input is invalid.
  * @returns {*} Requested value or structure.
  */
-export function getGlobalColor(globalDefaults, key, fallback) {
+export function getGlobalColor(globalDefaults, key, fallback = '#ffffff') {
   return globalDefaults?.[key] || fallback
 }
 
@@ -102,7 +93,7 @@ export function createLabelDefaults(globalDefaults) {
   const font = globalDefaults?.font_text || 'Arial.ttf'
   const fontSelection = createFontSelection(font)
   return {
-    ...LABEL_DEFAULTS,
+    ...TEXT_LABEL_DEFAULTS,
     ...fontSelection,
     color: getGlobalColor(globalDefaults, 'color_text'),
     opacity: globalDefaults?.opacity ?? 1,
@@ -117,13 +108,13 @@ export function createLabelDefaults(globalDefaults) {
  * @returns {object} Derived data structure for downstream use.
  */
 export function createMetricValueDefaults(type, globalDefaults) {
-  const font = globalDefaults?.font_values || 'Furore.otf'
+  const font = globalDefaults?.font_values || 'Arial.ttf'
   const fontSelection = createFontSelection(font)
   const sharedDefaults = {
-    ...SHARED_VALUE_DEFAULTS,
+    ...TEXT_DEFAULTS,
     value: type,
     ...fontSelection,
-    font_size: FONT_SIZE_BY_TYPE[type] || FONT_SIZE_BY_TYPE.default,
+    font_size: TEXT_FONT_SIZES[type] || TEXT_FONT_SIZES.default,
     color: getGlobalColor(globalDefaults, 'color_values'),
     opacity: globalDefaults?.opacity ?? 1,
   }
@@ -131,15 +122,14 @@ export function createMetricValueDefaults(type, globalDefaults) {
     return {
       ...sharedDefaults,
       ...TYPE_DEFAULTS.gradient,
-      unit_color: getGlobalColor(globalDefaults, 'color_units', '#ffffff'),
+      unit_color: getGlobalColor(globalDefaults, 'color_units'),
     }
   }
   if (type === 'heading') {
     return {
       ...sharedDefaults,
-      ...ICON_DEFAULTS,
       icon_color: getGlobalColor(globalDefaults, 'color_icons'),
-      unit_color: getGlobalColor(globalDefaults, 'color_units', '#ffffff'),
+      unit_color: getGlobalColor(globalDefaults, 'color_units'),
       ...TYPE_DEFAULTS[type],
       display_variants: {
         heading_tape: { ...HEADING_TAPE_DEFAULTS },
@@ -148,9 +138,8 @@ export function createMetricValueDefaults(type, globalDefaults) {
   }
   return {
     ...sharedDefaults,
-    ...ICON_DEFAULTS,
     icon_color: getGlobalColor(globalDefaults, 'color_icons'),
-    unit_color: getGlobalColor(globalDefaults, 'color_units', '#ffffff'),
+    unit_color: getGlobalColor(globalDefaults, 'color_units'),
     ...TYPE_DEFAULTS[type],
   }
 }
@@ -181,7 +170,7 @@ export function createPlotDefaults(type, globalDefaults, options = {}) {
     }
   }
 
-  const labelFont = globalDefaults?.font_values || 'Furore.otf'
+  const labelFont = globalDefaults?.font_values || 'Arial.ttf'
   return {
     ...base,
     ...ELEVATION_PLOT_DEFAULTS,
@@ -192,14 +181,4 @@ export function createPlotDefaults(type, globalDefaults, options = {}) {
       color: getGlobalColor(globalDefaults, 'color_values'),
     },
   }
-}
-
-/**
- * Creates heading compass tape widget defaults.
- *
- * @param {*} globalDefaults - Value for global defaults.
- * @returns {object} Derived data structure for downstream use.
- */
-export function createHeadingDefaults(globalDefaults) {
-  return createMetricValueDefaults('heading', globalDefaults)
 }

@@ -25,6 +25,7 @@
  */
 
 import standardMetricsManifest from '../../../assets/standard-metrics.json'
+import { GRADIENT_DEFAULTS } from '@/lib/standard-widgets'
 
 /** Map of type -> definition for O(1) lookups. */
 const STANDARD_METRIC_DEFINITIONS = Object.fromEntries(standardMetricsManifest.definitions.map((definition) => [definition.type, definition]))
@@ -183,4 +184,95 @@ export function getStandardMetricUnitLabel(type, displayUnit) {
   const resolvedUnit = displayUnit || definition?.defaultDisplayUnit
   const option = definition?.supportedDisplayUnits.find((candidate) => candidate.value === resolvedUnit)
   return option?.renderLabel ?? option?.label ?? ''
+}
+
+// ---------------------------------------------------------------------------
+// Widget defaults owned by display type definitions
+// ---------------------------------------------------------------------------
+
+const _textDef = standardMetricsManifest.displayTypes.definitions.text
+
+/**
+ * Flat default values for the "text" display type (value widgets).
+ * Spread directly into factory-created widget data.
+ * Sourced from displayTypes.definitions.text.defaults in the manifest.
+ * @type {object}
+ */
+export const TEXT_DEFAULTS = Object.freeze(_textDef.defaults)
+
+/**
+ * Default font sizes keyed by metric type for text display.
+ * Sourced from displayTypes.definitions.text.fontSizeByType in the manifest.
+ * @type {{ time: number, gradient: number, heading: number, default: number }}
+ */
+export const TEXT_FONT_SIZES = Object.freeze(_textDef.fontSizeByType)
+
+/**
+ * Default fields for label widgets (text display type).
+ * Sourced from displayTypes.definitions.text.labelDefaults in the manifest.
+ * @type {{ x: number, y: number, font_size: number, text: string }}
+ */
+export const TEXT_LABEL_DEFAULTS = Object.freeze(_textDef.labelDefaults)
+
+/**
+ * Default values for the "heading_tape" display variant.
+ * Sourced from displayTypes.definitions.heading_tape.defaults in the manifest.
+ * @type {object}
+ */
+export const HEADING_TAPE_DEFAULTS = Object.freeze(standardMetricsManifest.displayTypes.definitions.heading_tape.defaults)
+
+/**
+ * Base defaults computed from each standard metric definition.
+ * Each entry provides `show_units` and `display_unit` derived from the
+ * manifest's `showUnitsByDefault` and `defaultDisplayUnit`.
+ * `unit_color` is not here — it is a shared text display default
+ * (TEXT_DEFAULTS.unit_color).
+ * @type {Record<string, {show_units: boolean, display_unit: string|null}>}
+ */
+export const METRIC_TYPE_BASE_DEFAULTS = Object.freeze(
+  Object.fromEntries(
+    STANDARD_METRIC_WIDGET_TYPES.map((type) => {
+      const definition = getStandardMetricDefinition(type)
+      return [
+        type,
+        Object.freeze({
+          show_units: definition?.showUnitsByDefault ?? false,
+          display_unit: definition?.defaultDisplayUnit,
+        }),
+      ]
+    }),
+  ),
+)
+
+const _metricTypeOverrides = _textDef.metricTypeOverrides || {}
+
+/**
+ * Combined metric type defaults: base defaults from each metric definition
+ * overlaid with text display type overrides from the manifest and
+ * gradient-specific defaults from standard-widgets.
+ *
+ * Each override entry is shallow-merged over its base — adding a new
+ * metricTypeOverrides entry in the manifest automatically flows through.
+ *
+ * @type {Record<string, object>}
+ */
+export const TYPE_DEFAULTS = Object.freeze({
+  ...METRIC_TYPE_BASE_DEFAULTS,
+  ...Object.fromEntries(
+    Object.entries(_metricTypeOverrides).map(([type, override]) => [type, Object.freeze({ ...METRIC_TYPE_BASE_DEFAULTS[type], ...override })]),
+  ),
+  gradient: GRADIENT_DEFAULTS,
+})
+
+/**
+ * Look up display-specific non-geometry defaults for a given display type.
+ * For boxed types (like heading_tape), returns the flat defaults object.
+ * For intrinsic types, returns null (consumers read TEXT_DEFAULTS directly).
+ * @param {string} displayType - display_type key
+ * @returns {object|null} defaults object, or `null` if none defined
+ */
+export function getDisplayVariantNonGeometryDefaults(displayType) {
+  const definition = DISPLAY_TYPE_DEFINITIONS[displayType]
+  if (!definition?.defaults || definition.layoutMode === 'intrinsic') return null
+  return definition.defaults
 }

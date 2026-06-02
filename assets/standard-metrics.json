@@ -3,13 +3,73 @@
     "definitions": {
       "text": {
         "label": "Text",
-        "layoutMode": "intrinsic"
+        "layoutMode": "intrinsic",
+        "defaults": {
+          "x": 100,
+          "y": 100,
+          "prefix": "",
+          "suffix": "",
+          "decimals": 0,
+          "display_type": "text",
+          "unit_color": "#ffffff",
+          "show_icon": true,
+          "icon_size": 45,
+          "icon_offset_x": 0,
+          "icon_offset_y": 0
+        },
+        "fontSizeByType": {
+          "time": 72,
+          "gradient": 96,
+          "heading": 100,
+          "default": 100
+        },
+        "labelDefaults": {
+          "x": 100,
+          "y": 100,
+          "font_size": 60,
+          "text": "New Text"
+        },
+        "metricTypeOverrides": {
+          "time": {
+            "format": "time-24"
+          },
+          "left_right_balance": {
+            "balance_format": "percent_label"
+          }
+        }
       },
       "heading_tape": {
         "label": "Heading Tape",
         "layoutMode": "boxed",
         "defaultFrameWidth": 200,
-        "defaultFrameHeight": 60
+        "defaultFrameHeight": 60,
+        "defaults": {
+          "pixels_per_degree": 5,
+          "major_tick_interval": 15,
+          "minor_ticks_per_major": 3,
+          "show_major_ticks": true,
+          "show_minor_ticks": true,
+          "major_tick_length_pct": 40,
+          "minor_tick_length_pct": 20,
+          "major_tick_thickness": 2,
+          "minor_tick_thickness": 2,
+          "tick_color": "#ffffff",
+          "cardinal_tick_color": "#ff0000",
+          "tick_alignment": "below",
+          "show_minor_labels": true,
+          "show_major_labels": true,
+          "label_color": "#cccccc",
+          "cardinal_label_color": "#ff0000",
+          "label_font": "Arial.ttf",
+          "label_font_family": "Arial",
+          "label_font_size": 12,
+          "label_offset": 4,
+          "indicator_style": "chevron",
+          "indicator_placement": "top",
+          "show_indicator": true,
+          "indicator_color": "#ff0000",
+          "indicator_size": 10
+        }
       },
       "linear": {
         "label": "Linear",
@@ -36,12 +96,27 @@
         "defaultFrameHeight": 60
       }
     },
-    "defaults": ["text", "linear", "bars", "arc", "corner"],
+    "defaults": [
+      "text",
+      "linear",
+      "bars",
+      "arc",
+      "corner"
+    ],
     "overrides": {
-      "heading": ["text", "heading_tape"],
-      "core_temperature": ["text"],
-      "left_right_balance": ["text"],
-      "time": ["text"]
+      "heading": [
+        "text",
+        "heading_tape"
+      ],
+      "core_temperature": [
+        "text"
+      ],
+      "left_right_balance": [
+        "text"
+      ],
+      "time": [
+        "text"
+      ]
     }
   },
   "definitions": [
@@ -51,10 +126,26 @@
       "label": "Speed",
       "defaultDisplayUnit": "kmh",
       "supportedDisplayUnits": [
-        { "value": "kmh", "label": "km/h", "renderLabel": "KM/H" },
-        { "value": "mph", "label": "mph", "renderLabel": "MPH" },
-        { "value": "kn", "label": "kn", "renderLabel": "KN" },
-        { "value": "mps", "label": "m/s", "renderLabel": "M/S" }
+        {
+          "value": "kmh",
+          "label": "km/h",
+          "renderLabel": "KM/H"
+        },
+        {
+          "value": "mph",
+          "label": "mph",
+          "renderLabel": "MPH"
+        },
+        {
+          "value": "kn",
+          "label": "kn",
+          "renderLabel": "KN"
+        },
+        {
+          "value": "mps",
+          "label": "m/s",
+          "renderLabel": "M/S"
+        }
       ],
       "showUnitsByDefault": true,
       "formatter": "speed",
@@ -68,7 +159,12 @@
       "current": true,
       "label": "Heart Rate",
       "defaultDisplayUnit": "bpm",
-      "supportedDisplayUnits": [{ "value": "bpm", "label": "BPM" }],
+      "supportedDisplayUnits": [
+        {
+          "value": "bpm",
+          "label": "BPM"
+        }
+      ],
       "showUnitsByDefault": false,
       "formatter": "integer",
       "icon": {
@@ -81,7 +177,12 @@
       "current": true,
       "label": "Cadence",
       "defaultDisplayUnit": "rpm",
-      "supportedDisplayUnits": [{ "value": "rpm", "label": "RPM" }],
+      "supportedDisplayUnits": [
+        {
+          "value": "rpm",
+          "label": "RPM"
+        }
+      ],
       "showUnitsByDefault": false,
       "formatter": "integer",
       "icon": {
@@ -94,7 +195,12 @@
       "current": true,
       "label": "Power",
       "defaultDisplayUnit": "w",
-      "supportedDisplayUnits": [{ "value": "w", "label": "W" }],
+      "supportedDisplayUnits": [
+        {
+          "value": "w",
+          "label": "W"
+        }
+      ],
       "showUnitsByDefault": false,
       "formatter": "integer",
       "icon": {
@@ -108,8 +214,14 @@
       "label": "Temperature",
       "defaultDisplayUnit": "celsius",
       "supportedDisplayUnits": [
-        { "value": "celsius", "label": "\u00B0C" },
-        { "value": "fahrenheit", "label": "\u00B0F" }
+        {
+          "value": "celsius",
+          "label": "°C"
+        },
+        {
+          "value": "fahrenheit",
+          "label": "°F"
+        }
       ],
       "showUnitsByDefault": true,
       "formatter": "temperature",
@@ -124,8 +236,16 @@
       "label": "Pace",
       "defaultDisplayUnit": "min_per_km",
       "supportedDisplayUnits": [
-        { "value": "min_per_km", "label": "min/km", "renderLabel": "MIN/KM" },
-        { "value": "min_per_mi", "label": "min/mi", "renderLabel": "MIN/MI" }
+        {
+          "value": "min_per_km",
+          "label": "min/km",
+          "renderLabel": "MIN/KM"
+        },
+        {
+          "value": "min_per_mi",
+          "label": "min/mi",
+          "renderLabel": "MIN/MI"
+        }
       ],
       "showUnitsByDefault": true,
       "formatter": "pace",
@@ -141,8 +261,16 @@
       "label": "G-Force",
       "defaultDisplayUnit": "g",
       "supportedDisplayUnits": [
-        { "value": "g", "label": "g", "renderLabel": "G" },
-        { "value": "mps2", "label": "m/s^2", "renderLabel": "M/S^2" }
+        {
+          "value": "g",
+          "label": "g",
+          "renderLabel": "G"
+        },
+        {
+          "value": "mps2",
+          "label": "m/s^2",
+          "renderLabel": "M/S^2"
+        }
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
@@ -157,10 +285,26 @@
       "label": "Air Pressure",
       "defaultDisplayUnit": "hpa",
       "supportedDisplayUnits": [
-        { "value": "hpa", "label": "hPa", "renderLabel": "HPA" },
-        { "value": "mbar", "label": "mbar", "renderLabel": "MBAR" },
-        { "value": "inhg", "label": "inHg", "renderLabel": "INHG" },
-        { "value": "mmhg", "label": "mmHg", "renderLabel": "MMHG" }
+        {
+          "value": "hpa",
+          "label": "hPa",
+          "renderLabel": "HPA"
+        },
+        {
+          "value": "mbar",
+          "label": "mbar",
+          "renderLabel": "MBAR"
+        },
+        {
+          "value": "inhg",
+          "label": "inHg",
+          "renderLabel": "INHG"
+        },
+        {
+          "value": "mmhg",
+          "label": "mmHg",
+          "renderLabel": "MMHG"
+        }
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
@@ -175,7 +319,13 @@
       "current": true,
       "label": "Ground Contact Time",
       "defaultDisplayUnit": "ms",
-      "supportedDisplayUnits": [{ "value": "ms", "label": "ms", "renderLabel": "MS" }],
+      "supportedDisplayUnits": [
+        {
+          "value": "ms",
+          "label": "ms",
+          "renderLabel": "MS"
+        }
+      ],
       "showUnitsByDefault": true,
       "formatter": "integer",
       "icon": {
@@ -188,7 +338,13 @@
       "current": true,
       "label": "Left/Right Balance",
       "defaultDisplayUnit": "percent",
-      "supportedDisplayUnits": [{ "value": "percent", "label": "52% / 48%", "renderLabel": "%" }],
+      "supportedDisplayUnits": [
+        {
+          "value": "percent",
+          "label": "52% / 48%",
+          "renderLabel": "%"
+        }
+      ],
       "showUnitsByDefault": false,
       "formatter": "balance",
       "icon": {
@@ -203,10 +359,26 @@
       "label": "Stride Length",
       "defaultDisplayUnit": "m",
       "supportedDisplayUnits": [
-        { "value": "m", "label": "m", "renderLabel": "M" },
-        { "value": "cm", "label": "cm", "renderLabel": "CM" },
-        { "value": "ft", "label": "ft", "renderLabel": "FT" },
-        { "value": "in", "label": "in", "renderLabel": "IN" }
+        {
+          "value": "m",
+          "label": "m",
+          "renderLabel": "M"
+        },
+        {
+          "value": "cm",
+          "label": "cm",
+          "renderLabel": "CM"
+        },
+        {
+          "value": "ft",
+          "label": "ft",
+          "renderLabel": "FT"
+        },
+        {
+          "value": "in",
+          "label": "in",
+          "renderLabel": "IN"
+        }
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
@@ -221,7 +393,12 @@
       "current": true,
       "label": "Stroke Rate",
       "defaultDisplayUnit": "spm",
-      "supportedDisplayUnits": [{ "value": "spm", "label": "SPM" }],
+      "supportedDisplayUnits": [
+        {
+          "value": "spm",
+          "label": "SPM"
+        }
+      ],
       "showUnitsByDefault": true,
       "formatter": "integer",
       "icon": {
@@ -235,7 +412,13 @@
       "current": true,
       "label": "Torque",
       "defaultDisplayUnit": "nm",
-      "supportedDisplayUnits": [{ "value": "nm", "label": "Nm", "renderLabel": "NM" }],
+      "supportedDisplayUnits": [
+        {
+          "value": "nm",
+          "label": "Nm",
+          "renderLabel": "NM"
+        }
+      ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
       "icon": {
@@ -249,9 +432,21 @@
       "label": "Vertical Speed",
       "defaultDisplayUnit": "mps",
       "supportedDisplayUnits": [
-        { "value": "mps", "label": "m/s", "renderLabel": "M/S" },
-        { "value": "ftmin", "label": "ft/min", "renderLabel": "FT/MIN" },
-        { "value": "mph_vertical", "label": "m/h", "renderLabel": "M/H" }
+        {
+          "value": "mps",
+          "label": "m/s",
+          "renderLabel": "M/S"
+        },
+        {
+          "value": "ftmin",
+          "label": "ft/min",
+          "renderLabel": "FT/MIN"
+        },
+        {
+          "value": "mph_vertical",
+          "label": "m/h",
+          "renderLabel": "M/H"
+        }
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
@@ -266,7 +461,13 @@
       "current": true,
       "label": "Gear Position",
       "defaultDisplayUnit": "gear",
-      "supportedDisplayUnits": [{ "value": "gear", "label": "Gear", "renderLabel": "GEAR" }],
+      "supportedDisplayUnits": [
+        {
+          "value": "gear",
+          "label": "Gear",
+          "renderLabel": "GEAR"
+        }
+      ],
       "showUnitsByDefault": false,
       "formatter": "integer",
       "icon": {
@@ -279,7 +480,12 @@
       "current": false,
       "label": "Vertical Ratio",
       "defaultDisplayUnit": "percent",
-      "supportedDisplayUnits": [{ "value": "percent", "label": "%" }],
+      "supportedDisplayUnits": [
+        {
+          "value": "percent",
+          "label": "%"
+        }
+      ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
       "icon": {
@@ -294,8 +500,16 @@
       "label": "Vertical Oscillation",
       "defaultDisplayUnit": "mm",
       "supportedDisplayUnits": [
-        { "value": "mm", "label": "mm", "renderLabel": "MM" },
-        { "value": "cm", "label": "cm", "renderLabel": "CM" }
+        {
+          "value": "mm",
+          "label": "mm",
+          "renderLabel": "MM"
+        },
+        {
+          "value": "cm",
+          "label": "cm",
+          "renderLabel": "CM"
+        }
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
@@ -311,8 +525,14 @@
       "label": "Core Temperature",
       "defaultDisplayUnit": "celsius",
       "supportedDisplayUnits": [
-        { "value": "celsius", "label": "\u00B0C" },
-        { "value": "fahrenheit", "label": "\u00B0F" }
+        {
+          "value": "celsius",
+          "label": "°C"
+        },
+        {
+          "value": "fahrenheit",
+          "label": "°F"
+        }
       ],
       "showUnitsByDefault": true,
       "formatter": "temperature",
@@ -328,7 +548,10 @@
       "label": "Heading",
       "defaultDisplayUnit": "degrees",
       "supportedDisplayUnits": [
-        { "value": "degrees", "label": "\u00B0" }
+        {
+          "value": "degrees",
+          "label": "°"
+        }
       ],
       "showUnitsByDefault": false,
       "formatter": "integer",

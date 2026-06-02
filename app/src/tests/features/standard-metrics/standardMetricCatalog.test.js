@@ -93,7 +93,7 @@ describe('standard metric widget catalog', () => {
 
 describe('display type definitions', () => {
   test('each display type has a formal definition with label and layoutMode', () => {
-    expect(DISPLAY_TYPE_DEFINITIONS.text).toEqual({ label: 'Text', layoutMode: 'intrinsic' })
+    expect(DISPLAY_TYPE_DEFINITIONS.text).toMatchObject({ label: 'Text', layoutMode: 'intrinsic' })
     expect(DISPLAY_TYPE_DEFINITIONS.linear).toMatchObject({ label: 'Linear', layoutMode: 'boxed' })
     expect(DISPLAY_TYPE_DEFINITIONS.bars).toMatchObject({ label: 'Bars', layoutMode: 'boxed' })
     expect(DISPLAY_TYPE_DEFINITIONS.arc).toMatchObject({ label: 'Arc', layoutMode: 'boxed' })
