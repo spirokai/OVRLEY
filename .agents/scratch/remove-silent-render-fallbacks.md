@@ -250,15 +250,12 @@ The architecture change underway will add a **config validation seam** between f
 **Tasks:**
 
 1. **Audit every `#[serde(default)]` field** in `config/mod.rs` and classify:
-   - **Category A — Must become required**: Fields where the renderer has no sensible general-purpose default (colors, sizes, positions, units, formats, opacities, marker variants, indicator styles, codecs).
-   - **Category B — Can stay optional with frontend aware**: Fields where a default is genuinely universal (e.g., `ffmpeg: Value`, `extra: BTreeMap`, `labels: Vec<LabelConfig>` — empty vecs are fine).
-   - **Category C — Remove entirely**: Unused or reserved fields that no code path reads (`border_strength`, `border_distance` on LabelConfig).
+   - **Must become required**: Fields where the backend currently fills in a hardcoded rendering/encoding value (colors, sizes, positions, opacities, units, formats, tolerances, densities, codecs, etc.).
+   - **No change needed**: Fields where the default is genuinely a valid state with no renderer fallback (e.g., `labels: Vec<LabelConfig>` → empty vec = "no labels to draw"; `extra: BTreeMap` → empty map = forward compat; `ffmpeg: Value` → null is fine).
 
-2. **Audit every `unwrap_or` in the render and encode directories** and tag each with the field(s) it corresponds to. Create a spreadsheet mapping `unwrap_or` location → config field → proposed resolution (required field / keep fallback / remove).
+2. **Audit every `unwrap_or` in the render and encode directories** and tag each with the field(s) it corresponds to. Create a mapping of `unwrap_or` location → config field → proposed resolution (required field / keep fallback / remove).
 
-3. **Document the contract** in a new file (e.g., `docs/config-schema-contract.md`) that lists every field the backend consumes, whether it's required, and what it controls.
-
-**Deliverable:** Spreadsheet of all ~413 fallback sites with classification.
+**Deliverable:** Spreadsheet mapping of all ~413 fallback sites with classification.
 
 ### Phase 2: Add Seam Validation
 
