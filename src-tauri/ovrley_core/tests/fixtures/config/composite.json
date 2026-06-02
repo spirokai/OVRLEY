@@ -1,22 +1,33 @@
 {
   "scene": {
-    "fps": 30,
-    "start": 0,
-    "end": 10,
     "width": 1920,
     "height": 1080,
-    "ffmpeg": { "codec": "libx264" },
-    "composite_video_path": "test.mp4",
-    "composite_bitrate": "60M",
-    "composite_sync_offset": 300,
-    "composite_video_fps_num": 30000,
-    "composite_video_fps_den": 1001,
-    "composite_video_duration": 20,
-    "composite_render_duration": 10,
-    "composite_video_trim_start": 0,
-    "composite_widget_update_rate": 2
+    "fps": 30
   },
   "labels": [],
-  "values": [{ "value": "speed", "x": 0, "y": 0 }],
+  "values": [
+    {
+      "x": 0,
+      "y": 0,
+      "prefix": "",
+      "suffix": "",
+      "decimals": 0,
+      "display_type": "text",
+      "unit_color": "#ffffff",
+      "show_icon": true,
+      "icon_size": 45,
+      "icon_offset_x": 0,
+      "icon_offset_y": 0,
+      "icon_color": "#ffffff",
+      "font": "Arial.ttf",
+      "font_size": 100,
+      "color": "#ffffff",
+      "opacity": 1,
+      "show_units": true,
+      "display_unit": "kmh",
+      "id": "widget-1",
+      "value": "speed"
+    }
+  ],
   "plots": []
 }

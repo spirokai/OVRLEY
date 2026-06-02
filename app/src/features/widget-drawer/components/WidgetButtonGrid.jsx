@@ -13,7 +13,7 @@ import { QUICKMENU_ITEMS } from '@/lib/widget-icons'
  */
 export function WidgetButtonGrid({ onAddWidget }) {
   return (
-    <div className="flex-1 overflow-y-auto p-2">
+    <div className="flex-1 overflow-y-auto thin-scrollbar p-2">
       <div className="grid grid-cols-2 gap-2">
         {QUICKMENU_ITEMS.map((item) => {
           const Icon = item.icon
