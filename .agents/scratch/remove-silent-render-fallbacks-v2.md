@@ -19,6 +19,16 @@ This v2 plan changes the target:
 > We do **not** remove every fallback.
 > We remove only the fallbacks that can silently change user-visible output or encoding behavior relative to the validated config contract.
 
+**Non-negotiable rules**
+
+- DO NOT jump into the common "centralize all defaults in Rust" trap. This plan is the exact opposite: the backend should have zero ownership of render-affecting defaults.
+- Define validating contract for the standard metric text/value slice, with zero backend-owned semantic defaults.
+- NEVER encode backend-side constants or defaults.
+- NEVER assume the intent or desired outcome of the user submitting the contract to Rust.
+- Do not inlcude missing values in the contract.
+- Reject missing output-affecting fields with explicit error messages.
+- Failing because the user omitted a field that can change output is the right outcome.
+
 That means:
 
 - No backend-only styling defaults that alter render output.
@@ -139,7 +149,7 @@ But this last one should be treated as:
 
 ---
 
-## 5. Replace "Everything Required in Schema" With "Normalized Render Contract"
+## 5. Replace "Everything Required in Schema" With "Validated Explicit Render Contract"
 
 This is the key simplification.
 
@@ -153,13 +163,50 @@ That is unnecessary.
 
 Instead:
 
-### 5.1 Keep raw template schema ergonomic
+### 5.1 Backend entry must already contain explicit user-intent fields
+
+The editor already owns:
+
+- defaults
+- suggestions
+- widget creation presets
+- migrations
+- effective config materialization
+
+So the backend should make **zero assumptions** about output or user intent.
+
+That means:
+
+- if a field can change the output, it must already be explicit by the time the backend receives the config
+- if it is missing at backend entry, that is an error
+- the backend must not "helpfully" fill it in
+
+Examples of fields that must already be explicit:
+
+- `display_unit`
+- codec/profile/container when they affect output semantics
+- fps / update cadence
+- resolution / scale
+- scene start / end or resolved export window
+- output-affecting styling
+
+### 5.2 Keep raw template schema ergonomic where possible
 
 Templates can stay compact and user-facing.
 
 They do **not** need every heading tick size, every gradient triangle width, every icon color, every derived display field serialized explicitly if those values come from canonical manifests.
 
-### 5.2 Introduce a normalized backend input type
+But the backend-facing render contract must still be explicit.
+
+That means there may be a distinction between:
+
+- durable saved template shape
+- effective editor state
+- backend execution contract
+
+The backend only cares about the last one.
+
+### 5.3 Introduce a validated backend input type
 
 Create an explicit seam:
 
@@ -181,21 +228,77 @@ After that:
 - encode modules stop reading `Option<T>` for output-relevant data
 - no `expect("guaranteed by validation")` scattered through draw code
 
-### 5.3 Validation should validate normalized intent, not raw sparsity
+### 5.4 Validation should validate explicit intent, not invent it
 
 The seam should:
 
 1. parse raw config
-2. normalize with canonical defaults
-3. validate impossible/unsupported states
-4. hand only validated normalized types to renderer/encoder
+2. verify that all output-affecting semantic fields are already explicit
+3. flatten / normalize structure
+4. validate impossible/unsupported states
+5. hand only validated normalized types to renderer/encoder
 
 That is cleaner than:
 
 1. parse raw config
-2. validate raw config for presence of hundreds of fields
+2. silently materialize semantic omissions
 3. keep `Option`s everywhere
 4. `expect(...)` later
+
+### 5.5 The seam may derive mechanical values, but not semantic intent
+
+The backend seam may still do work, but only of the right kind.
+
+Allowed:
+
+- flatten shapes
+- validate invariants
+- derive mechanical values from explicit inputs
+
+Forbidden:
+
+- choosing missing semantic values
+- selecting output-affecting defaults on behalf of the user
+
+Examples:
+
+Allowed:
+
+- parse `"#ff0000"` into an RGBA color
+- convert opacity percentage into normalized float
+- flatten `display_variants.heading_tape` into the active heading-tape config
+- convert degrees to radians
+- convert explicit fps data into a validated `Fps` struct
+- compute render duration from explicit `scene.start` and `scene.end`
+- build a resolved text style struct from explicit `font`, `font_size`, `color`
+
+Forbidden:
+
+- `display_unit` missing -> choose `"kmh"`
+- `icon_color` missing -> choose `"#ffffff"`
+- codec missing -> choose `"libx264"`
+- resolution missing -> choose `1920x1080`
+- scene end missing -> assume full activity range
+
+### 5.6 What "invariants" means
+
+Invariants are rules that must be true for the config to be renderable, but are not guesses about user intent.
+
+Examples:
+
+- `width > 0`
+- `height > 0`
+- `fps > 0`
+- `scene.start <= scene.end`
+- opacity in valid range
+- color string parses successfully
+- `display_type` is supported
+- `heading_tape.width` / `height` exist when heading tape is active
+- simplify tolerance is non-negative
+- target density is positive
+- codec value is one the backend supports
+
+These are validation rules, not defaults.
 
 ---
 
@@ -203,27 +306,31 @@ That is cleaner than:
 
 ### 6.1 Source of defaults
 
-Render-affecting defaults should come from one canonical source:
+Render-affecting defaults should come from one canonical source **upstream of backend execution**:
 
 - shared manifests if possible
 - otherwise a dedicated normalization module
 
 They should **not** be mined from `unwrap_or(...)` calls in Rust implementation code.
 
+Important distinction:
+
+- upstream canonical defaults may exist in editor creation flow, migration logic, or manifest-backed effective state
+- backend execution must not apply those defaults late if the field is still missing
+
 ### 6.2 Recommended ownership
 
 Use this precedence:
 
 1. User-authored widget/config values
-2. Display-type / metric-type manifest defaults
-3. Global normalized defaults
-4. Explicit validation error if still unresolved
+2. Editor-owned explicit materialization of product defaults
+3. Explicit validation error if still unresolved
 
 Not this:
 
 1. User-authored value
-2. draw helper fallback
-3. color helper fallback
+2. backend draw helper fallback
+3. backend color helper fallback
 4. serde default
 5. hardcoded Rust constant
 
@@ -264,6 +371,8 @@ That is the actionable set.
 
 ### Phase 2: Build Normalized Backend Contract
 
+[IMPORTANT] Define validating contract for the standard metric text/value slice, with zero backend-owned semantic defaults. Do NOT encode backend-side constants or defaults. Do NOT assume user's intent or desired outcome. Do not inlcude missing values in the contract. Instead, reject missing output-affecting fields with explicit error messages.
+
 Add a seam module, for example:
 
 ```rust
@@ -274,10 +383,11 @@ pub fn normalize_and_validate_render_config(
 
 Responsibilities:
 
-1. fill canonical contract defaults
+1. verify output-affecting semantic fields are already explicit
 2. resolve inheritance chains into explicit values
-3. reject unsupported states with field paths
-4. produce non-optional render/encode structs
+3. flatten structural variants into execution-friendly structs
+4. reject unsupported states with field paths
+5. produce non-optional render/encode structs
 
 This is where:
 
@@ -285,6 +395,12 @@ This is where:
 - heading tape settings become explicit
 - route/elevation marker settings become explicit
 - encode options become explicit
+
+This is **not** where:
+
+- missing units get chosen
+- missing codec gets selected
+- missing resolution gets guessed
 
 ### Phase 3: Cut Renderer Off From Raw Config
 
@@ -389,6 +505,7 @@ This plan does **not** do the following:
 3. It does not ban all fallbacks everywhere.
 4. It does not require a giant spreadsheet of all fallback syntax sites.
 5. It does not use `expect(...)` as the main safety mechanism in draw code.
+6. It does not allow the backend seam to choose missing semantic values.
 
 Those were the main sources of overengineering in v1.
 
@@ -418,7 +535,7 @@ This proves the architecture before a repo-wide rewrite.
 The work is successful when:
 
 1. The backend render/encode code no longer invents missing output-affecting values.
-2. All output-affecting defaults are owned by one normalization contract.
+2. All output-affecting intent is already explicit at backend entry.
 3. Frontend intention and backend output match for styling, codec, fps, resolution, and render window.
 4. Runtime/environment heuristics still exist where appropriate, without contaminating the render contract.
 5. Renderer modules consume validated, mostly non-optional types instead of raw sparse config.
@@ -433,6 +550,6 @@ If v1 was:
 
 v2 is:
 
-> "remove only backend-side fallbacks that can silently change intended output, and move all legitimate defaults into one normalization seam"
+> "remove only backend-side fallbacks that can silently change intended output, and require semantic intent to be explicit before backend execution"
 
 That achieves the goal without turning the config format into an implementation dump.
