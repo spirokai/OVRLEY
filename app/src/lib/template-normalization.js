@@ -135,6 +135,9 @@ function normalizeValue(value = {}) {
   const keys = [...VALUE_SHARED_KEYS, ...extraKeys]
   const withDefaults = { ...TEXT_DEFAULTS, ...TYPE_DEFAULTS[type], ...value }
   const pickedValue = pickDefined(withDefaults, keys)
+  if (typeof pickedValue.display_unit !== 'string') {
+    delete pickedValue.display_unit
+  }
   if (pickedValue.display_type && pickedValue.display_type !== 'text') {
     pickedValue.display_variants = (initDisplayVariant(pickedValue, pickedValue.display_type) || pickedValue).display_variants
   }

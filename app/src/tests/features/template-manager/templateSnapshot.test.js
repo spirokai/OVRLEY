@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest'
 import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template-constants'
 import {
   createTemplateFilePayload,
+  createTemplateState,
   normalizeTemplateConfig,
   normalizeTemplateFilePayload,
   templateStatesEqual,
@@ -46,6 +47,24 @@ describe('template snapshot standard metric schema', () => {
     ])
     expect(normalized.values[0]).not.toHaveProperty('speed_unit')
     expect(normalized.values[0]).not.toHaveProperty('temperature_unit')
+  })
+
+  test('does not persist boolean display_unit defaults for widgets without a string unit', () => {
+    const state = createTemplateState({
+      config: {
+        scene: { width: 1920, height: 1080, fps: 30, updateRate: 1 },
+        labels: [],
+        values: [
+          { id: 'gradient-1', value: 'gradient', x: 10, y: 20 },
+          { id: 'time-1', value: 'time', x: 30, y: 40 },
+        ],
+        plots: [],
+      },
+      globalDefaults: {},
+    })
+
+    expect(state.config.values[0].display_unit).toBeUndefined()
+    expect(state.config.values[1].display_unit).toBeUndefined()
   })
 
   test('stamps new template payloads with the current template file version', () => {

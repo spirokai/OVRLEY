@@ -22,7 +22,7 @@
           "color": "#ffffff",
           "opacity": 1,
           "show_units": false,
-          "display_unit": true
+          "display_unit": null
         },
         "fontSizeByType": {
           "time": 72,

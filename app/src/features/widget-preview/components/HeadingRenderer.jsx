@@ -1,9 +1,9 @@
 /**
- * Renders the heading compass tape widget SVG preview — a horizontal scrolling
+ * Renders the heading compass tape widget SVG preview â€” a horizontal scrolling
  * tape with ticks, labels, and a configurable center indicator.
  *
  * Receives resolved data from resolveActiveMetricWidgetData, which guarantees
- * all fields are present including frame geometry — no defensive fallback
+ * all fields are present including frame geometry â€” no defensive fallback
  * values are needed. Viewport minimums are raster constraints, not defaults.
  *
  * @param {object} props
@@ -16,13 +16,8 @@
  * @returns {JSX.Element} SVG element for heading widget preview.
  */
 
-import { useMemo } from 'react'
-import { getInterpolatedActivityValue } from '@/features/overlay-editor'
-import { getPreviewFontFamily, getWidgetOpacity } from '../utils/textMeasurement'
-import { headingOffset, visibleTicks, visibleLabels, chevronVertices } from '../utils/headingGeometry'
-import { sanitizeSvgId } from '../utils/svgPreviewUtils'
-import { useFontMetricsVersion } from '../hooks/useFontMetricsVersion'
-import { getTextShadowParts } from '../utils/shadowUtils'
+import { chevronVertices } from '../utils/headingGeometry'
+import { useHeadingPreviewModel } from '../hooks/useHeadingPreviewModel'
 
 function renderTicks(ticks, height, config) {
   const majorLength = (height * config.major_tick_length_pct) / 100
@@ -116,73 +111,46 @@ function buildShadowFilter(id, shadow) {
 }
 
 export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOpacity, sceneFont, valueFont, sceneStyle }) {
-  const data = widget.data ?? {}
-  const width = Math.max(data.width, 80)
-  const height = Math.max(data.height, 20)
-  const ppd = data.pixels_per_degree
-  const opacity = getWidgetOpacity(data, globalOpacity)
-  const tapeWidth = 360 * ppd
-  const labelFontSize = data.label_font_size
-  const labelFontFamily = getPreviewFontFamily(data.label_font || data.label_font_family || valueFont || sceneFont)
-  useFontMetricsVersion(labelFontFamily, labelFontSize)
-
-  const heading = getInterpolatedActivityValue(activity, 'heading', previewSecond)
-
-  const offset = headingOffset(heading, ppd, width)
-  const wrappedOffset = ((offset % tapeWidth) + tapeWidth) % tapeWidth
-
-  const ticks = useMemo(
-    () => visibleTicks(0, ppd, tapeWidth, data.major_tick_interval, data.minor_ticks_per_major, data.show_major_ticks, data.show_minor_ticks),
-    [ppd, tapeWidth, data.major_tick_interval, data.minor_ticks_per_major, data.show_major_ticks, data.show_minor_ticks],
-  )
-
-  const labels = useMemo(
-    () => visibleLabels(ticks, data.show_minor_labels, data.show_major_labels),
-    [ticks, data.show_minor_labels, data.show_major_labels],
-  )
-
-  const shadow = useMemo(() => getTextShadowParts(sceneStyle), [sceneStyle])
-
-  const shadowFilterId = sanitizeSvgId(`${widget.id}-shadow`)
-  const clipPathId = sanitizeSvgId(`${widget.id}-clip`)
+  const model = useHeadingPreviewModel({ widget, activity, previewSecond, globalOpacity, sceneFont, valueFont, sceneStyle })
+  const { data } = model
 
   const renderTapeCopies = (filterId = null) => (
-    <g clipPath={`url(#${clipPathId})`} filter={filterId ? `url(#${filterId})` : undefined}>
-      <g transform={`translate(${-wrappedOffset}, 0)`}>
-        {renderTicks(ticks, height, data)}
-        {renderLabels(labels, height, data, labelFontFamily)}
+    <g clipPath={`url(#${model.clipPathId})`} filter={filterId ? `url(#${filterId})` : undefined}>
+      <g transform={`translate(${-model.wrappedOffset}, 0)`}>
+        {renderTicks(model.ticks, model.height, data)}
+        {renderLabels(model.labels, model.height, data, model.labelFontFamily)}
       </g>
-      <g transform={`translate(${-wrappedOffset + tapeWidth}, 0)`}>
-        {renderTicks(ticks, height, data)}
-        {renderLabels(labels, height, data, labelFontFamily)}
+      <g transform={`translate(${-model.wrappedOffset + model.tapeWidth}, 0)`}>
+        {renderTicks(model.ticks, model.height, data)}
+        {renderLabels(model.labels, model.height, data, model.labelFontFamily)}
       </g>
     </g>
   )
 
   return (
     <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
+      width={model.width}
+      height={model.height}
+      viewBox={`0 0 ${model.width} ${model.height}`}
       className="block h-full w-full"
-      style={{ opacity: opacity < 1 ? opacity : undefined }}
+      style={{ opacity: model.opacity < 1 ? model.opacity : undefined }}
     >
       <defs>
-        <clipPath id={clipPathId}>
-          <rect width={width} height={height} />
+        <clipPath id={model.clipPathId}>
+          <rect width={model.width} height={model.height} />
         </clipPath>
-        {shadow && buildShadowFilter(shadowFilterId, shadow)}
+        {model.shadow && buildShadowFilter(model.shadowFilterId, model.shadow)}
       </defs>
 
-      {shadow && renderTapeCopies(shadowFilterId)}
+      {model.shadow && renderTapeCopies(model.shadowFilterId)}
 
       {renderTapeCopies()}
 
       {data.show_indicator && (
         <>
           {data.indicator_style === 'highlight_bar'
-            ? renderHighlightBar(width / 2, 0, height, data)
-            : renderChevron(width / 2, 0, height, data, shadow ? shadowFilterId : null)}
+            ? renderHighlightBar(model.width / 2, 0, model.height, data)
+            : renderChevron(model.width / 2, 0, model.height, data, model.shadow ? model.shadowFilterId : null)}
         </>
       )}
     </svg>

@@ -4,7 +4,9 @@
 /// The metric row is manually laid out so icon, value, and units can each use
 /// their own size while sharing one top-left anchor.
 use crate::config::ValueConfig;
-use crate::render::text::{draw_text, measure_text, parse_color, ResolvedTextStyle};
+use crate::render::text::{
+    draw_text, draw_text_with_vertical_metrics_text, measure_text, parse_color, ResolvedTextStyle,
+};
 use crate::types::DisplayType;
 use skia_safe::Canvas;
 use std::path::PathBuf;
@@ -93,7 +95,13 @@ pub(crate) fn draw_metric_parts(
         );
     }
 
-    draw_text(canvas, &parts.value_text, &value_style, font_dirs);
+    draw_text_with_vertical_metrics_text(
+        canvas,
+        &parts.value_text,
+        super::metric_vertical_metrics_text(&parts.value_text),
+        &value_style,
+        font_dirs,
+    );
 
     if let (Some(unit_text), Some(unit_measure)) = (parts.unit_text.as_deref(), units_measure) {
         let mut units_style = units_style;
