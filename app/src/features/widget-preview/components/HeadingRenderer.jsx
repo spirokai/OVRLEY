@@ -2,9 +2,9 @@
  * Renders the heading compass tape widget SVG preview — a horizontal scrolling
  * tape with ticks, labels, and a configurable center indicator.
  *
- * The tape is rendered as an SVG `<pattern>` with `patternUnits="userSpaceOnUse"`
- * and width `360 × pixelsPerDegree` px. Scrolling is achieved via
- * `patternTransform="translate(-offset, 0)"`, mirroring Skia's TileMode::Repeat.
+ * Receives resolved data from resolveActiveMetricWidgetData, which guarantees
+ * all fields are present including frame geometry — no defensive fallback
+ * values are needed. Viewport minimums are raster constraints, not defaults.
  *
  * @param {object} props
  * @param {object} props.widget - Widget configuration object.
@@ -24,16 +24,13 @@ import { sanitizeSvgId } from '../utils/svgPreviewUtils'
 import { useFontMetricsVersion } from '../hooks/useFontMetricsVersion'
 import { getTextShadowParts } from '../utils/shadowUtils'
 
-/**
- * Renders tick marks into the tape pattern.
- */
 function renderTicks(ticks, height, config) {
-  const majorLength = (height * (config.major_tick_length_pct ?? 40)) / 100
-  const minorLength = (height * (config.minor_tick_length_pct ?? 20)) / 100
-  const majorThickness = config.major_tick_thickness ?? 2
-  const minorThickness = config.minor_tick_thickness ?? 2
-  const tickColor = config.tick_color || '#ffffff'
-  const cardinalColor = config.cardinal_tick_color || tickColor
+  const majorLength = (height * config.major_tick_length_pct) / 100
+  const minorLength = (height * config.minor_tick_length_pct) / 100
+  const majorThickness = config.major_tick_thickness
+  const minorThickness = config.minor_tick_thickness
+  const tickColor = config.tick_color
+  const cardinalColor = config.cardinal_tick_color
   const centerY = height / 2
 
   return ticks.map((tick, i) => {
@@ -46,17 +43,14 @@ function renderTicks(ticks, height, config) {
   })
 }
 
-/**
- * Renders labels below the ticks.
- */
 function renderLabels(labels, height, config, fontFamily) {
-  const majorLength = (height * (config.major_tick_length_pct ?? 40)) / 100
+  const majorLength = (height * config.major_tick_length_pct) / 100
   const centerY = height / 2
   const tickBottom = config.tick_alignment === 'centered' ? centerY + majorLength / 2 : centerY + majorLength
-  const labelY = tickBottom + (config.label_offset ?? 4) + (config.label_font_size ?? 12)
-  const fontSize = config.label_font_size ?? 12
-  const labelColor = config.label_color || config.numeric_label_color || config.minor_label_color || '#ffffff'
-  const cardinalColor = config.cardinal_label_color || config.major_label_color || labelColor
+  const labelY = tickBottom + config.label_offset + config.label_font_size
+  const fontSize = config.label_font_size
+  const labelColor = config.label_color
+  const cardinalColor = config.cardinal_label_color
 
   return labels.map((label, i) => (
     <text
@@ -73,13 +67,10 @@ function renderLabels(labels, height, config, fontFamily) {
   ))
 }
 
-/**
- * Renders the chevron indicator.
- */
 function renderChevron(centerX, topY, bottomY, config, shadowFilterId) {
-  const size = config.indicator_size ?? 10
-  const color = config.indicator_color || '#ffffff'
-  const placement = config.indicator_placement ?? 'top'
+  const size = config.indicator_size
+  const color = config.indicator_color
+  const placement = config.indicator_placement
 
   const drawOne = (edgeY, pointingDown, key) => {
     const verts = chevronVertices(centerX, edgeY, size, pointingDown)
@@ -100,20 +91,14 @@ function renderChevron(centerX, topY, bottomY, config, shadowFilterId) {
   return null
 }
 
-/**
- * Renders the highlight bar indicator.
- */
 function renderHighlightBar(centerX, topY, height, config) {
-  const barWidth = config.indicator_size ?? 10
+  const barWidth = config.indicator_size
   const barHalfWidth = barWidth / 2
-  const color = config.indicator_color || '#ffffff'
+  const color = config.indicator_color
 
   return <rect x={centerX - barHalfWidth} y={topY} width={barWidth} height={height} fill={color} fillOpacity={0.3} />
 }
 
-/**
- * Builds the shadow filter SVG definition.
- */
 function buildShadowFilter(id, shadow) {
   if (!shadow?.color || (!shadow.strength && !shadow.distance)) return null
 
@@ -132,12 +117,12 @@ function buildShadowFilter(id, shadow) {
 
 export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOpacity, sceneFont, valueFont, sceneStyle }) {
   const data = widget.data ?? {}
-  const width = Math.max(Number(data.width) || 400, 80)
-  const height = Math.max(Number(data.height) || 80, 20)
-  const ppd = Number(data.pixels_per_degree) || 5
+  const width = Math.max(data.width, 80)
+  const height = Math.max(data.height, 20)
+  const ppd = data.pixels_per_degree
   const opacity = getWidgetOpacity(data, globalOpacity)
   const tapeWidth = 360 * ppd
-  const labelFontSize = data.label_font_size ?? 12
+  const labelFontSize = data.label_font_size
   const labelFontFamily = getPreviewFontFamily(data.label_font || data.label_font_family || valueFont || sceneFont)
   useFontMetricsVersion(labelFontFamily, labelFontSize)
 
@@ -147,27 +132,13 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
   const wrappedOffset = ((offset % tapeWidth) + tapeWidth) % tapeWidth
 
   const ticks = useMemo(
-    () =>
-      visibleTicks(
-        0, // heading=0 for the static pattern image
-        ppd,
-        tapeWidth,
-        Number(data.major_tick_interval) || 15,
-        Number(data.minor_ticks_per_major) || 3,
-        data.show_major_ticks !== false,
-        data.show_minor_ticks !== false,
-      ),
+    () => visibleTicks(0, ppd, tapeWidth, data.major_tick_interval, data.minor_ticks_per_major, data.show_major_ticks, data.show_minor_ticks),
     [ppd, tapeWidth, data.major_tick_interval, data.minor_ticks_per_major, data.show_major_ticks, data.show_minor_ticks],
   )
 
   const labels = useMemo(
-    () =>
-      visibleLabels(
-        ticks,
-        (data.show_minor_labels ?? data.show_numeric_labels) !== false,
-        (data.show_major_labels ?? data.show_cardinal_labels) !== false,
-      ),
-    [ticks, data.show_minor_labels, data.show_numeric_labels, data.show_major_labels, data.show_cardinal_labels],
+    () => visibleLabels(ticks, data.show_minor_labels, data.show_major_labels),
+    [ticks, data.show_minor_labels, data.show_major_labels],
   )
 
   const shadow = useMemo(() => getTextShadowParts(sceneStyle), [sceneStyle])
@@ -203,14 +174,11 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
         {shadow && buildShadowFilter(shadowFilterId, shadow)}
       </defs>
 
-      {/* Shadow layer behind the main tape */}
       {shadow && renderTapeCopies(shadowFilterId)}
 
-      {/* Main tape layer on top */}
       {renderTapeCopies()}
 
-      {/* Indicator overlay — shadow only applies to chevron, not highlight bar */}
-      {data.show_indicator !== false && (
+      {data.show_indicator && (
         <>
           {data.indicator_style === 'highlight_bar'
             ? renderHighlightBar(width / 2, 0, height, data)

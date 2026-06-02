@@ -3,6 +3,7 @@
  */
 
 import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
+import { buildFrameGeometryUpdate } from '@/lib/metric-widget-resolver'
 
 /**
  * Creates rotate-related moveable handlers.
@@ -64,12 +65,12 @@ export function useRotateHandlers({
       const draft = draftWidgetsRef.current[origin.id]
       if (draft) {
         const normalizedRotation = (((draft.rotation ?? origin.rotation ?? 0) % 360) + 360) % 360
-
-        commitWidgetUpdate(origin.id, {
+        const geometryPatch = {
           x: Math.round(draft.x ?? origin.x),
           y: Math.round(draft.y ?? origin.y),
           rotation: Number(normalizedRotation.toFixed(1)),
-        })
+        }
+        commitWidgetUpdate(origin.id, buildFrameGeometryUpdate(selectedWidget?.data, geometryPatch))
       }
 
       clearWidgetDraft(origin.id)

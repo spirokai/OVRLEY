@@ -113,15 +113,18 @@ describe('template snapshot standard metric schema', () => {
       config: {
         scene: {},
         labels: [{ id: 'widget-1', text: 'Label', x: 0, y: 0, color: '#ffffff' }],
-        values: [{ id: 'widget-2', value: 'speed', x: 10, y: 20 }],
-        plots: [{ id: 'widget-3', value: 'heading', x: 30, y: 40 }],
+        values: [
+          { id: 'widget-2', value: 'speed', x: 10, y: 20 },
+          { id: 'widget-3', value: 'heading', x: 30, y: 40 },
+        ],
+        plots: [],
       },
       globalDefaults: {},
     })
 
     expect(payload.config.labels[0].id).toBe('widget-1')
     expect(payload.config.values[0].id).toBe('widget-2')
-    expect(payload.config.plots[0].id).toBe('widget-3')
+    expect(payload.config.values[1].id).toBe('widget-3')
   })
 
   test('upgrades legacy templates without widget ids when loading them', () => {
@@ -131,15 +134,18 @@ describe('template snapshot standard metric schema', () => {
       config: {
         scene: {},
         labels: [{ text: 'Legacy label', x: 0, y: 0 }],
-        values: [{ value: 'speed', x: 10, y: 20 }],
-        plots: [{ value: 'heading', x: 30, y: 40 }],
+        values: [
+          { value: 'speed', x: 10, y: 20 },
+          { value: 'heading', x: 30, y: 40 },
+        ],
+        plots: [],
       },
       settings: { globalDefaults: {} },
     })
 
     expect(normalized.config.labels[0].id).toMatch(/^widget-\d+$/)
     expect(normalized.config.values[0].id).toMatch(/^widget-\d+$/)
-    expect(normalized.config.plots[0].id).toMatch(/^widget-\d+$/)
+    expect(normalized.config.values[1].id).toMatch(/^widget-\d+$/)
   })
 
   test('templateStatesEqual returns true for structurally equal template states', () => {

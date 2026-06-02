@@ -12,7 +12,7 @@ import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPrevi
 import { useFontMetricsVersion } from '@/features/widget-preview/hooks/useFontMetricsVersion'
 import { getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
 import { buildWidgetTransform } from '@/lib/geometryUtils'
-import { isPlotLikeWidget } from '@/lib/widget-behavior'
+import { isBoxedMetricWidget } from '@/lib/display-type-behavior'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
 import useStore from '@/store/useStore'
@@ -107,25 +107,25 @@ const OverlayCanvasWidget = memo(
     const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
     const textPreviewModel = buildTextWidgetPreviewModel({ widget })
     const visualBounds = metricVisualBounds ?? textPreviewModel?.visualBounds ?? null
-    const isPlotWidget = isPlotLikeWidget(widget)
+    const isBoxed = isBoxedMetricWidget(widget)
     const scaleFactor = widget.data.scale_factor
     const isScaling = scaleFactor !== undefined
 
     const origin = isScaling
       ? { x: widget.data.scale_start_left, y: widget.data.scale_start_top }
       : getWidgetSceneOrigin(widget, null, visualBounds, {
-          boundsScale: isPlotWidget ? 1 : globalScale,
+          boundsScale: isBoxed ? 1 : globalScale,
         })
-    const scale = isScaling ? globalScale * scaleFactor : isPlotWidget ? 1 : globalScale
+    const scale = isScaling ? globalScale * scaleFactor : isBoxed ? 1 : globalScale
     const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
     const width = isScaling
       ? widget.data.scale_start_width
-      : isPlotWidget
+      : isBoxed
         ? (widget.data.width ?? 0) * (globalScale || 1)
         : (visualBounds?.width ?? widget.data.width)
     const height = isScaling
       ? widget.data.scale_start_height
-      : isPlotWidget
+      : isBoxed
         ? (widget.data.height ?? 0) * (globalScale || 1)
         : (visualBounds?.height ?? widget.data.height)
 

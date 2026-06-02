@@ -28,6 +28,7 @@
 
 import { createFontSelection, getFontFamilyName } from '@/lib/fonts'
 import { getThemeColor } from '@/lib/theme'
+import { resolveActiveMetricWidgetData } from '@/lib/metric-widget-resolver'
 import {
   applyPreviewOverrides,
   mergeSceneGlobalDefaults,
@@ -35,10 +36,12 @@ import {
   normalizeTemplateConfig,
   pickDefined,
 } from './template-normalization'
+import { DEFAULT_GLOBAL_DEFAULTS, DEFAULT_SCENE_FONT_SIZE, SCENE_STYLE_DEFAULTS } from './template-defaults'
 
 // Re-export defaults so callers have a single import path
 export {
   DEFAULT_GLOBAL_DEFAULTS,
+  DEFAULT_SCENE_FONT_SIZE,
   GLOBAL_DEFAULT_KEYS,
   SCENE_DERIVED_SETTING_KEYS,
   SCENE_GLOBAL_DEFAULT_KEYS,
@@ -52,16 +55,12 @@ function buildEffectiveSceneData(sceneData, globals) {
   if (!sceneData) return sceneData
   const globalSceneStyle = pickDefined(globals, ['border_color', 'border_thickness', 'shadow_color', 'shadow_strength', 'shadow_distance'])
   return {
-    border_color: '#000000',
-    border_thickness: 0,
-    shadow_color: '#000000',
-    shadow_strength: 0,
-    shadow_distance: 0,
+    ...SCENE_STYLE_DEFAULTS,
     ...sceneData,
     ...globalSceneStyle,
-    font: globals?.font_text || sceneData.font || 'Arial.ttf',
+    font: globals?.font_text || sceneData.font || DEFAULT_GLOBAL_DEFAULTS.font_text,
     color: globals?.color_text || sceneData.color || getThemeColor('ice'),
-    font_size: sceneData.font_size ?? 30,
+    font_size: sceneData.font_size ?? DEFAULT_SCENE_FONT_SIZE,
     opacity: globals?.opacity,
     scale: globals?.scale,
   }
@@ -78,15 +77,17 @@ function buildEffectiveLabelData(widgetData = {}, globals, previewOverrides = nu
 }
 
 function buildEffectiveValueData(widgetData = {}, globals, previewOverrides = null) {
-  const nextData = { ...widgetData }
-  const font = widgetData.font || globals?.font_values
+  // Resolve display_variants for non-text display types
+  const resolved = resolveActiveMetricWidgetData(widgetData)
+
+  const nextData = { ...resolved }
+  const font = resolved.font || globals?.font_values
   if (!nextData.font && font) nextData.font = font
   if (!nextData.font_family) nextData.font_family = getFontFamilyName(font || nextData.font_family)
   if (!nextData.color) nextData.color = globals?.color_values || getThemeColor('ice')
   if (nextData.icon_color === undefined) nextData.icon_color = globals?.color_icons || getThemeColor('aqua')
-  if (nextData.unit_color === undefined && widgetData.value !== 'time') nextData.unit_color = globals?.color_units || '#ffffff'
+  if (nextData.unit_color === undefined && resolved.value !== 'time') nextData.unit_color = globals?.color_units || '#ffffff'
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity
-  if (nextData.value === 'left_right_balance' && nextData.balance_format === undefined) nextData.balance_format = 'percent_label'
   return applyPreviewOverrides(nextData, previewOverrides)
 }
 
@@ -94,12 +95,6 @@ function buildEffectivePlotData(widgetData = {}, globals, previewOverrides = nul
   const nextData = { ...widgetData }
   if (!nextData.color) nextData.color = globals?.color_values || getThemeColor('ice')
   if (nextData.opacity === undefined) nextData.opacity = globals?.opacity
-  if (nextData.value === 'heading' && !nextData.label_font && globals?.font_values) {
-    Object.assign(nextData, {
-      label_font: globals.font_values,
-      label_font_family: getFontFamilyName(globals.font_values),
-    })
-  }
   if (nextData.value === 'elevation' && globals?.font_values) {
     nextData.point_label = {
       ...(nextData.point_label || {}),
@@ -177,10 +172,6 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null) 
     for (const plot of nextConfig.plots) {
       if (plot.value === 'elevation' && shouldApply('font_values')) {
         plot.point_label = { ...(plot.point_label || {}), ...createFontSelection(globals.font_values) }
-      }
-      if (plot.value === 'heading' && shouldApply('font_values') && !plot.label_font) {
-        plot.label_font = globals.font_values
-        plot.label_font_family = getFontFamilyName(globals.font_values)
       }
       if (shouldApply('color_values') && Object.hasOwn(plot, 'color')) plot.color = globals.color_values
     }

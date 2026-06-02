@@ -24,16 +24,16 @@ const MARKER_VARIANT_OPTIONS = [
  * @returns {JSX.Element} Rendered component output.
  */
 export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNumericField }) {
-  const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width ?? 6
-  const completedLineOpacity = widget.data.completed_line_opacity ?? 100
-  const remainingLineOpacity = widget.data.remaining_line_opacity ?? 35
-  const markerSize = widget.data.marker_size ?? 18
-  const markerOpacity = widget.data.marker_opacity ?? 100
-  const markerVariant = widget.data.marker_variant ?? 'single'
-  const markerVariantDiameter = widget.data.marker_variant_diameter ?? 44
-  const rotation = widget.data.rotation ?? 0
-  const simplifyTolerance = widget.data.simplify_tolerance_px ?? 1
-  const targetDensity = widget.data.target_density ?? 1
+  const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
+  const completedLineOpacity = widget.data.completed_line_opacity
+  const remainingLineOpacity = widget.data.remaining_line_opacity
+  const markerSize = widget.data.marker_size
+  const markerOpacity = widget.data.marker_opacity
+  const markerVariant = widget.data.marker_variant
+  const markerVariantDiameter = widget.data.marker_variant_diameter
+  const rotation = widget.data.rotation
+  const simplifyTolerance = widget.data.simplify_tolerance_px
+  const targetDensity = widget.data.target_density
   const showVariantDiameter = markerVariant !== 'single'
   const variantDiameterLabel = markerVariant === 'ring' ? 'Ring Diameter' : 'Halo Diameter'
 
@@ -61,7 +61,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
         <div className="flex items-center justify-between gap-2 px-1">
           <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Render Full Activity</Label>
           <ToggleField
-            checked={widget.data.show_full_activity ?? false}
+            checked={widget.data.show_full_activity}
             onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_activity: checked })}
           />
         </div>

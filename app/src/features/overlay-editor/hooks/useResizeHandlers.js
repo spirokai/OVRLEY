@@ -4,7 +4,8 @@
 
 import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
 import { clamp } from '@/lib/utils'
-import { isPlotLikeWidget } from '@/lib/widget-behavior'
+import { isBoxedMetricWidget } from '@/lib/display-type-behavior'
+import { buildFrameGeometryUpdate } from '@/lib/metric-widget-resolver'
 
 /**
  * Creates resize-related moveable handlers.
@@ -54,7 +55,7 @@ export function useResizeHandlers({
 
       const nextX = origin.x + drag.beforeTranslate[0]
       const nextY = origin.y + drag.beforeTranslate[1]
-      const dimensionScale = isPlotLikeWidget(selectedWidget) ? Math.max(Number(globalScale) || 1, 0.1) : 1
+      const dimensionScale = isBoxedMetricWidget(selectedWidget) ? Math.max(Number(globalScale) || 1, 0.1) : 1
       const nextWidth = Math.max(width / dimensionScale, 8)
       const nextHeight = Math.max(height / dimensionScale, 8)
       const widthScale = origin.width ? nextWidth / origin.width : 1
@@ -72,7 +73,7 @@ export function useResizeHandlers({
       }
 
       setLiveWidgetDraft(origin.id, nextDraft)
-      if (isPlotLikeWidget(selectedWidget)) {
+      if (isBoxedMetricWidget(selectedWidget)) {
         applyLiveWidgetStyles(target ?? drag.target, selectedWidget, nextDraft, globalScale)
       }
     },
@@ -82,13 +83,14 @@ export function useResizeHandlers({
 
       const draft = draftWidgetsRef.current[origin.id]
       if (draft) {
-        commitWidgetUpdate(origin.id, {
+        const geometryPatch = {
           x: Math.round(draft.x ?? origin.x),
           y: Math.round(draft.y ?? origin.y),
           width: Math.max(Math.round(draft.width ?? 0), 0),
           height: Math.max(Math.round(draft.height ?? 0), 0),
           ...(draft.marker_size === undefined ? {} : { marker_size: Math.max(Math.round(draft.marker_size), 0) }),
-        })
+        }
+        commitWidgetUpdate(origin.id, buildFrameGeometryUpdate(selectedWidget?.data, geometryPatch))
       }
 
       clearWidgetDraft(origin.id)

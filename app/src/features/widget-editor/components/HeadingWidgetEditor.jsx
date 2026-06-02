@@ -6,7 +6,12 @@
  * are shown, matching MetricWidgetEditor.
  *
  * When `display_type` is `heading_tape`, heading-specific controls for tape
- * scale, ticks, labels, and indicator are shown.
+ * scale, ticks, labels, and indicator are shown. Display-specific settings
+ * are stored in `display_variants.heading_tape`.
+ *
+ * Data is guaranteed to be complete by template normalization — no defensive
+ * fallback values are needed. The variant is seeded from defaults on creation,
+ * on display-type switch, and during template load.
  *
  * @param {object} props
  * @param {object} props.widget - Widget configuration object.
@@ -22,6 +27,8 @@ import { getFontFamilyName } from '@/lib/fonts'
 import { ColorField, SliderField, ToggleField, SelectField } from './widgetFormControls'
 import { SectionHeading } from './widgetEditorSections'
 import { getDisplayTypeOptions } from '@/lib/standard-metrics'
+import { isTextDisplayType } from '@/lib/display-type-behavior'
+import { initDisplayVariant, buildFrameGeometryUpdate } from '@/lib/metric-widget-resolver'
 import MetricWidgetEditor from './MetricWidgetEditor'
 
 const ALIGNMENT_OPTIONS = [
@@ -42,28 +49,42 @@ const INDICATOR_PLACEMENT_OPTIONS = [
 
 export default function HeadingWidgetEditor({ widget, updateWidgetData, setNumericField }) {
   const data = widget.data ?? {}
-  const displayType = data.display_type ?? 'text'
+  const displayType = data.display_type
+  const tapeData = data.display_variants?.heading_tape ?? {}
   const availableFonts = useAvailableFonts()
-  const showMajorTicks = data.show_major_ticks !== false
-  const showMinorTicks = data.show_minor_ticks !== false
-  const showMinorLabels = (data.show_minor_labels ?? data.show_numeric_labels) !== false
-  const showMajorLabels = (data.show_major_labels ?? data.show_cardinal_labels) !== false
-  const isChevronIndicator = (data.indicator_style ?? 'chevron') === 'chevron'
+  const showMajorTicks = tapeData.show_major_ticks
+  const showMinorTicks = tapeData.show_minor_ticks
+  const showMinorLabels = tapeData.show_minor_labels
+  const showMajorLabels = tapeData.show_major_labels
+  const isChevronIndicator = tapeData.indicator_style === 'chevron'
+
+  const handleDisplayTypeChange = (value) => {
+    const nextData = initDisplayVariant(data, value)
+    updateWidgetData(widget.id, { display_type: value, display_variants: nextData.display_variants })
+  }
+
+  const updateTapeData = (updates) => {
+    const nextVariant = { ...tapeData, ...updates }
+    const geometryKeys = Object.keys(updates).filter((k) => k === 'width' || k === 'height' || k === 'rotation')
+    const geometryPatch = geometryKeys.length > 0 ? Object.fromEntries(geometryKeys.map((k) => [k, updates[k]])) : null
+
+    const patch = geometryPatch ? buildFrameGeometryUpdate(data, geometryPatch) : {}
+    patch.display_variants = {
+      ...(patch.display_variants || data.display_variants),
+      heading_tape: nextVariant,
+    }
+    updateWidgetData(widget.id, patch)
+  }
 
   return (
     <>
       {/* Display Type */}
       <div className="space-y-4">
         <SectionHeading icon={Compass} title="Display" />
-        <SelectField
-          label="Display Type"
-          value={displayType}
-          onValueChange={(value) => updateWidgetData(widget.id, { display_type: value })}
-          options={getDisplayTypeOptions('heading')}
-        />
+        <SelectField label="Display Type" value={displayType} onValueChange={handleDisplayTypeChange} options={getDisplayTypeOptions('heading')} />
       </div>
 
-      {displayType === 'text' ? (
+      {isTextDisplayType(displayType) ? (
         <MetricWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={setNumericField} />
       ) : (
         <>
@@ -72,12 +93,12 @@ export default function HeadingWidgetEditor({ widget, updateWidgetData, setNumer
             <SectionHeading icon={Compass} title="Tape Scale" />
             <SliderField
               label="Pixels per Degree"
-              value={data.pixels_per_degree ?? 5}
+              value={tapeData.pixels_per_degree}
               min={1}
               max={20}
               step={0.5}
-              valueDisplay={`${data.pixels_per_degree ?? 5}px`}
-              onSliderChange={(value) => updateWidgetData(widget.id, { pixels_per_degree: value })}
+              valueDisplay={`${tapeData.pixels_per_degree}px`}
+              onSliderChange={(value) => updateTapeData({ pixels_per_degree: value })}
             />
           </div>
 
@@ -88,72 +109,68 @@ export default function HeadingWidgetEditor({ widget, updateWidgetData, setNumer
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-2 px-1">
                   <span className="text-[9px] text-muted-foreground uppercase font-bold">Major Ticks</span>
-                  <ToggleField checked={showMajorTicks} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_major_ticks: checked })} />
+                  <ToggleField checked={showMajorTicks} onCheckedChange={(checked) => updateTapeData({ show_major_ticks: checked })} />
                 </div>
                 <SliderField
                   label="Major Length"
-                  value={data.major_tick_length_pct ?? 40}
+                  value={tapeData.major_tick_length_pct}
                   min={5}
                   max={100}
                   step={1}
                   disabled={!showMajorTicks}
-                  valueDisplay={`${data.major_tick_length_pct ?? 40}%`}
-                  onSliderChange={(value) => updateWidgetData(widget.id, { major_tick_length_pct: value })}
+                  valueDisplay={`${tapeData.major_tick_length_pct}%`}
+                  onSliderChange={(value) => updateTapeData({ major_tick_length_pct: value })}
                 />
                 <SliderField
                   label="Major Thickness"
-                  value={data.major_tick_thickness ?? 2}
+                  value={tapeData.major_tick_thickness}
                   min={0.5}
                   max={8}
                   step={0.5}
                   disabled={!showMajorTicks}
-                  valueDisplay={`${data.major_tick_thickness ?? 2}px`}
-                  onSliderChange={(value) => updateWidgetData(widget.id, { major_tick_thickness: value })}
+                  valueDisplay={`${tapeData.major_tick_thickness}px`}
+                  onSliderChange={(value) => updateTapeData({ major_tick_thickness: value })}
                 />
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-2 px-1">
                   <span className="text-[9px] text-muted-foreground uppercase font-bold">Minor Ticks</span>
-                  <ToggleField checked={showMinorTicks} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_minor_ticks: checked })} />
+                  <ToggleField checked={showMinorTicks} onCheckedChange={(checked) => updateTapeData({ show_minor_ticks: checked })} />
                 </div>
                 <SliderField
                   label="Minor Length"
-                  value={data.minor_tick_length_pct ?? 20}
+                  value={tapeData.minor_tick_length_pct}
                   min={5}
                   max={100}
                   step={1}
                   disabled={!showMinorTicks}
-                  valueDisplay={`${data.minor_tick_length_pct ?? 20}%`}
-                  onSliderChange={(value) => updateWidgetData(widget.id, { minor_tick_length_pct: value })}
+                  valueDisplay={`${tapeData.minor_tick_length_pct}%`}
+                  onSliderChange={(value) => updateTapeData({ minor_tick_length_pct: value })}
                 />
                 <SliderField
                   label="Minor Thickness"
-                  value={data.minor_tick_thickness ?? 2}
+                  value={tapeData.minor_tick_thickness}
                   min={0.5}
                   max={8}
                   step={0.5}
                   disabled={!showMinorTicks}
-                  valueDisplay={`${data.minor_tick_thickness ?? 2}px`}
-                  onSliderChange={(value) => updateWidgetData(widget.id, { minor_tick_thickness: value })}
+                  valueDisplay={`${tapeData.minor_tick_thickness}px`}
+                  onSliderChange={(value) => updateTapeData({ minor_tick_thickness: value })}
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <ColorField
-                label="Tick Color"
-                value={data.tick_color || '#ffffff'}
-                onChange={(value) => updateWidgetData(widget.id, { tick_color: value })}
-              />
+              <ColorField label="Tick Color" value={tapeData.tick_color} onChange={(value) => updateTapeData({ tick_color: value })} />
               <ColorField
                 label="Cardinal Color"
-                value={data.cardinal_tick_color || '#ff0000'}
-                onChange={(value) => updateWidgetData(widget.id, { cardinal_tick_color: value })}
+                value={tapeData.cardinal_tick_color}
+                onChange={(value) => updateTapeData({ cardinal_tick_color: value })}
               />
             </div>
             <SelectField
               label="Alignment"
-              value={data.tick_alignment ?? 'below'}
-              onValueChange={(value) => updateWidgetData(widget.id, { tick_alignment: value })}
+              value={tapeData.tick_alignment}
+              onValueChange={(value) => updateTapeData({ tick_alignment: value })}
               options={ALIGNMENT_OPTIONS}
             />
           </div>
@@ -163,8 +180,8 @@ export default function HeadingWidgetEditor({ widget, updateWidgetData, setNumer
             <SectionHeading icon={Type} title="Labels" />
             <FontSelectField
               label="Label Font"
-              value={data.label_font || data.label_font_family || 'Arial.ttf'}
-              onValueChange={(value) => updateWidgetData(widget.id, { label_font: value, label_font_family: getFontFamilyName(value) })}
+              value={tapeData.label_font || tapeData.label_font_family}
+              onValueChange={(value) => updateTapeData({ label_font: value, label_font_family: getFontFamilyName(value) })}
               recommendedFonts={availableFonts.recommendedFonts}
               systemFonts={availableFonts.systemFonts}
               triggerClassName="h-9 border-border/70 bg-surface text-xs"
@@ -172,42 +189,38 @@ export default function HeadingWidgetEditor({ widget, updateWidgetData, setNumer
             />
             <div className="flex items-center justify-between gap-2 px-1">
               <span className="text-[9px] text-muted-foreground uppercase font-bold">Minor Labels</span>
-              <ToggleField checked={showMinorLabels} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_minor_labels: checked })} />
+              <ToggleField checked={showMinorLabels} onCheckedChange={(checked) => updateTapeData({ show_minor_labels: checked })} />
             </div>
             <div className="flex items-center justify-between gap-2 px-1">
               <span className="text-[9px] text-muted-foreground uppercase font-bold">Major Labels</span>
-              <ToggleField checked={showMajorLabels} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_major_labels: checked })} />
+              <ToggleField checked={showMajorLabels} onCheckedChange={(checked) => updateTapeData({ show_major_labels: checked })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <ColorField
-                label="Label Color"
-                value={data.label_color || data.numeric_label_color || data.minor_label_color || '#cccccc'}
-                onChange={(value) => updateWidgetData(widget.id, { label_color: value })}
-              />
+              <ColorField label="Label Color" value={tapeData.label_color} onChange={(value) => updateTapeData({ label_color: value })} />
               <ColorField
                 label="Cardinal Color"
-                value={data.cardinal_label_color || data.major_label_color || '#ff0000'}
-                onChange={(value) => updateWidgetData(widget.id, { cardinal_label_color: value })}
+                value={tapeData.cardinal_label_color}
+                onChange={(value) => updateTapeData({ cardinal_label_color: value })}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <SliderField
                 label="Font Size"
-                value={data.label_font_size ?? 12}
+                value={tapeData.label_font_size}
                 min={6}
                 max={36}
                 step={1}
-                valueDisplay={`${data.label_font_size ?? 12}px`}
-                onSliderChange={(value) => updateWidgetData(widget.id, { label_font_size: value })}
+                valueDisplay={`${tapeData.label_font_size}px`}
+                onSliderChange={(value) => updateTapeData({ label_font_size: value })}
               />
               <SliderField
                 label="Offset"
-                value={data.label_offset ?? 4}
+                value={tapeData.label_offset}
                 min={0}
                 max={20}
                 step={1}
-                valueDisplay={`${data.label_offset ?? 4}px`}
-                onSliderChange={(value) => updateWidgetData(widget.id, { label_offset: value })}
+                valueDisplay={`${tapeData.label_offset}px`}
+                onSliderChange={(value) => updateTapeData({ label_offset: value })}
               />
             </div>
           </div>
@@ -217,40 +230,33 @@ export default function HeadingWidgetEditor({ widget, updateWidgetData, setNumer
             <SectionHeading icon={Target} title="Indicator" />
             <div className="flex items-center justify-between gap-2 px-1">
               <span className="text-[9px] text-muted-foreground uppercase font-bold">Show Indicator</span>
-              <ToggleField
-                checked={data.show_indicator !== false}
-                onCheckedChange={(checked) => updateWidgetData(widget.id, { show_indicator: checked })}
-              />
+              <ToggleField checked={tapeData.show_indicator} onCheckedChange={(checked) => updateTapeData({ show_indicator: checked })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <SelectField
                 label="Style"
-                value={data.indicator_style ?? 'chevron'}
-                onValueChange={(value) => updateWidgetData(widget.id, { indicator_style: value })}
+                value={tapeData.indicator_style}
+                onValueChange={(value) => updateTapeData({ indicator_style: value })}
                 options={INDICATOR_STYLE_OPTIONS}
               />
               <SelectField
                 label="Placement"
-                value={data.indicator_placement ?? 'top'}
-                onValueChange={(value) => updateWidgetData(widget.id, { indicator_placement: value })}
+                value={tapeData.indicator_placement}
+                onValueChange={(value) => updateTapeData({ indicator_placement: value })}
                 options={INDICATOR_PLACEMENT_OPTIONS}
                 disabled={!isChevronIndicator}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <ColorField
-                label="Indicator Color"
-                value={data.indicator_color || '#ff0000'}
-                onChange={(value) => updateWidgetData(widget.id, { indicator_color: value })}
-              />
+              <ColorField label="Indicator Color" value={tapeData.indicator_color} onChange={(value) => updateTapeData({ indicator_color: value })} />
               <SliderField
                 label="Indicator Size"
-                value={data.indicator_size ?? 10}
+                value={tapeData.indicator_size}
                 min={4}
                 max={40}
                 step={1}
-                valueDisplay={`${data.indicator_size ?? 10}px`}
-                onSliderChange={(value) => updateWidgetData(widget.id, { indicator_size: value })}
+                valueDisplay={`${tapeData.indicator_size}px`}
+                onSliderChange={(value) => updateTapeData({ indicator_size: value })}
               />
             </div>
           </div>

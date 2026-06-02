@@ -38,14 +38,14 @@ export function SectionHeading({ icon: Icon, title }) {
  * @returns {JSX.Element} Rendered component output.
  */
 export function PositionSection({ widget, setNumericField, updateWidgetData }) {
-  const opacity = Math.round((widget.data.opacity ?? 1) * 100)
+  const opacity = Math.round(widget.data.opacity * 100)
 
   return (
     <div className="space-y-3">
       <SectionHeading icon={Move} title="General" />
       <div className="grid grid-cols-2 gap-3">
-        <NumberField label="Horizontal Position" value={widget.data.x ?? 0} onChange={(rawValue) => setNumericField(widget.id, 'x', rawValue)} />
-        <NumberField label="Vertical Position" value={widget.data.y ?? 0} onChange={(rawValue) => setNumericField(widget.id, 'y', rawValue)} />
+        <NumberField label="Horizontal Position" value={widget.data.x} onChange={(rawValue) => setNumericField(widget.id, 'x', rawValue)} />
+        <NumberField label="Vertical Position" value={widget.data.y} onChange={(rawValue) => setNumericField(widget.id, 'y', rawValue)} />
       </div>
       <SliderField
         label="Transparency"
@@ -73,16 +73,8 @@ export function DimensionsSection({ widget, setNumericField }) {
     <div className="space-y-3">
       <SectionHeading icon={TrendingUp} title="Dimensions" />
       <div className="grid grid-cols-2 gap-3">
-        <NumberField
-          label="Width"
-          value={widget.data.width ?? 0}
-          onChange={(rawValue) => setNumericField(widget.id, 'width', rawValue, { min: 0 })}
-        />
-        <NumberField
-          label="Height"
-          value={widget.data.height ?? 0}
-          onChange={(rawValue) => setNumericField(widget.id, 'height', rawValue, { min: 0 })}
-        />
+        <NumberField label="Width" value={widget.data.width} onChange={(rawValue) => setNumericField(widget.id, 'width', rawValue, { min: 0 })} />
+        <NumberField label="Height" value={widget.data.height} onChange={(rawValue) => setNumericField(widget.id, 'height', rawValue, { min: 0 })} />
       </div>
     </div>
   )
@@ -114,7 +106,7 @@ export function FontSection({
   colorLabel = 'Font Color',
   showFormatSelect = false,
 }) {
-  const fontSize = widget.data.font_size ?? 60
+  const fontSize = widget.data.font_size
   const availableFonts = useAvailableFonts()
 
   return (
@@ -128,7 +120,7 @@ export function FontSection({
       {showFormatSelect ? (
         <SelectField
           label="Format"
-          value={widget.data.format || 'time-24'}
+          value={widget.data.format}
           onValueChange={(value) => updateWidgetData(widget.id, { format: value })}
           options={TIME_FORMATS}
         />
@@ -176,13 +168,13 @@ export function FontSection({
  * @returns {JSX.Element} Rendered component output.
  */
 export function IconSection({ widget, updateWidgetData, setNumericField, title = 'Icon', showUnitsToggle = false, unitsField = null }) {
-  const iconSize = widget.data.icon_size ?? 28
+  const iconSize = widget.data.icon_size
 
   return (
     <div className="space-y-4">
       <div className="flex w-full justify-between items-center">
         <SectionHeading icon={Palette} title={title} />
-        <ToggleField checked={widget.data.show_icon ?? true} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_icon: checked })} />
+        <ToggleField checked={widget.data.show_icon} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_icon: checked })} />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <ColorField
@@ -206,13 +198,13 @@ export function IconSection({ widget, updateWidgetData, setNumericField, title =
         <NumberField
           disabled={!widget.data.show_icon}
           label="Horizontal Offset"
-          value={widget.data.icon_offset_x ?? 0}
+          value={widget.data.icon_offset_x}
           onChange={(rawValue) => setNumericField(widget.id, 'icon_offset_x', rawValue)}
         />
         <NumberField
           disabled={!widget.data.show_icon}
           label="Vertical Offset"
-          value={widget.data.icon_offset_y ?? 0}
+          value={widget.data.icon_offset_y}
           onChange={(rawValue) => setNumericField(widget.id, 'icon_offset_y', rawValue)}
         />
       </div>
@@ -222,7 +214,7 @@ export function IconSection({ widget, updateWidgetData, setNumericField, title =
       ) : showUnitsToggle ? (
         <ToggleField
           label="Display Units"
-          checked={widget.data.show_units ?? true}
+          checked={widget.data.show_units}
           onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
         />
       ) : null}

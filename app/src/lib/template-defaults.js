@@ -41,3 +41,5 @@ export const GLOBAL_DEFAULT_KEYS = Object.keys(DEFAULT_GLOBAL_DEFAULTS)
 export const SCENE_GLOBAL_DEFAULT_KEYS = [...SCENE_STYLE_KEYS, 'opacity', 'scale']
 
 export const SCENE_DERIVED_SETTING_KEYS = [...SCENE_GLOBAL_DEFAULT_KEYS, 'font', 'color', 'font_size']
+
+export const DEFAULT_SCENE_FONT_SIZE = 30

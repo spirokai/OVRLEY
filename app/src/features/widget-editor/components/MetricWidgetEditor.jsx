@@ -20,13 +20,13 @@ import { useCallback } from 'react'
 export default function MetricWidgetEditor({ widget, updateWidgetData, setNumericField }) {
   const definition = getStandardMetricDefinition(widget.type)
   const unitOptions = getStandardMetricUnitOptions(widget.type)
-  const showUnits = widget.data.show_units ?? definition?.showUnitsByDefault ?? false
+  const showUnits = widget.data.show_units
   const supportsUnitSelection = unitOptions.length > 1
   const hasDecimalControl = definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
   const hasBalanceFormat = definition?.formatter === 'balance'
 
   const toggleDecimals = useCallback(() => {
-    const current = widget.data.decimals ?? 0
+    const current = widget.data.decimals
     updateWidgetData(widget.id, { decimals: current === 0 ? 1 : 0 })
   }, [widget.id, widget.data.decimals, updateWidgetData])
 
@@ -44,7 +44,7 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
       {hasBalanceFormat ? (
         <SelectField
           label="Balance Format"
-          value={widget.data.balance_format || 'percent_label'}
+          value={widget.data.balance_format}
           onValueChange={(value) => updateWidgetData(widget.id, { balance_format: value })}
           options={BALANCE_FORMAT_OPTIONS}
         />
@@ -62,7 +62,7 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
             title={supportsUnitSelection ? 'Units' : 'Unit'}
             checked={showUnits}
             onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
-            colorValue={widget.data.unit_color || '#ffffff'}
+            colorValue={widget.data.unit_color}
             onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
             selectLabel="Unit"
             value={getStandardMetricDisplayUnit(widget.type, widget.data)}

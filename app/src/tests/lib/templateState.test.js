@@ -135,32 +135,36 @@ describe('normalizeTemplateConfig', () => {
     expect(result.plots[0].point_label.font).toBe('ElevFont.ttf')
   })
 
-  test('normalizes heading plots with label font and separate tick thickness fields', () => {
+  test('normalizes heading value widget with display_variants', () => {
     const config = {
-      plots: [
+      values: [
         {
           id: 'heading-1',
           value: 'heading',
           x: 30,
           y: 40,
-          width: 400,
-          height: 80,
-          label_font: 'Teko.ttf',
-          label_font_family: 'Teko',
-          major_tick_thickness: 4,
-          minor_tick_thickness: 1,
-          tick_thickness: 9,
+          display_type: 'heading_tape',
+          display_variants: {
+            heading_tape: {
+              width: 400,
+              height: 80,
+              label_font: 'Teko.ttf',
+              label_font_family: 'Teko',
+              major_tick_thickness: 4,
+              minor_tick_thickness: 1,
+            },
+          },
         },
       ],
     }
 
     const result = normalizeTemplateConfig(config)
 
-    expect(result.plots[0].label_font).toBe('Teko.ttf')
-    expect(result.plots[0].label_font_family).toBe('Teko')
-    expect(result.plots[0].major_tick_thickness).toBe(4)
-    expect(result.plots[0].minor_tick_thickness).toBe(1)
-    expect(result.plots[0]).not.toHaveProperty('tick_thickness')
+    expect(result.values[0].display_type).toBe('heading_tape')
+    expect(result.values[0].display_variants.heading_tape.label_font).toBe('Teko.ttf')
+    expect(result.values[0].display_variants.heading_tape.label_font_family).toBe('Teko')
+    expect(result.values[0].display_variants.heading_tape.major_tick_thickness).toBe(4)
+    expect(result.values[0].display_variants.heading_tape.minor_tick_thickness).toBe(1)
   })
 })
 
@@ -289,23 +293,34 @@ describe('createEditorEffectiveConfig', () => {
     expect(result).toBeNull()
   })
 
-  test('handles left_right_balance with default balance_format', () => {
+  test('preserves left_right_balance balance_format seeded by normalization', () => {
     const config = {
       values: [{ id: 'value-1', value: 'left_right_balance', x: 10, y: 10 }],
     }
-    const result = createEditorEffectiveConfig({ config, globalDefaults: {} })
+    const normalizedConfig = normalizeTemplateConfig(config)
+    const result = createEditorEffectiveConfig({ config: normalizedConfig, globalDefaults: {} })
 
     expect(result.values[0].balance_format).toBe('percent_label')
   })
 
-  test('resolves heading label font from value font global when unset', () => {
+  test('resolves heading value widget with display_variants', () => {
     const config = {
-      plots: [{ id: 'heading-1', value: 'heading', x: 10, y: 10, width: 400, height: 80 }],
+      values: [
+        {
+          id: 'heading-1',
+          value: 'heading',
+          x: 10,
+          y: 10,
+          display_type: 'heading_tape',
+          display_variants: {
+            heading_tape: { width: 400, height: 80, label_font: 'Teko.ttf' },
+          },
+        },
+      ],
     }
-    const result = createEditorEffectiveConfig({ config, globalDefaults: { font_values: 'Teko.ttf' } })
+    const result = createEditorEffectiveConfig({ config, globalDefaults: { font_values: 'Fallback.ttf' } })
 
-    expect(result.plots[0].label_font).toBe('Teko.ttf')
-    expect(result.plots[0].label_font_family).toBe('Teko')
+    expect(result.values[0].display_variants.heading_tape.label_font).toBe('Teko.ttf')
   })
 })
 

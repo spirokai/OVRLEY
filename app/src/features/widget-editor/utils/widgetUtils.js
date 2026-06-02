@@ -14,6 +14,7 @@ import {
   COURSE_PLOT_DEFAULTS,
   ELEVATION_PLOT_DEFAULTS,
   COURSE_DIMENSIONS_FALLBACK,
+  HEADING_TAPE_DEFAULTS,
 } from '../data/widgetDefaults'
 
 /**
@@ -126,7 +127,6 @@ export function createMetricValueDefaults(type, globalDefaults) {
     color: getGlobalColor(globalDefaults, 'color_values'),
     opacity: globalDefaults?.opacity ?? 1,
   }
-
   if (type === 'gradient') {
     return {
       ...sharedDefaults,
@@ -134,7 +134,18 @@ export function createMetricValueDefaults(type, globalDefaults) {
       unit_color: getGlobalColor(globalDefaults, 'color_units', '#ffffff'),
     }
   }
-
+  if (type === 'heading') {
+    return {
+      ...sharedDefaults,
+      ...ICON_DEFAULTS,
+      icon_color: getGlobalColor(globalDefaults, 'color_icons'),
+      unit_color: getGlobalColor(globalDefaults, 'color_units', '#ffffff'),
+      ...TYPE_DEFAULTS[type],
+      display_variants: {
+        heading_tape: { ...HEADING_TAPE_DEFAULTS },
+      },
+    }
+  }
   return {
     ...sharedDefaults,
     ...ICON_DEFAULTS,
@@ -190,13 +201,5 @@ export function createPlotDefaults(type, globalDefaults, options = {}) {
  * @returns {object} Derived data structure for downstream use.
  */
 export function createHeadingDefaults(globalDefaults) {
-  const base = createMetricValueDefaults('heading', globalDefaults)
-  const headingFont = globalDefaults?.font_values || base.label_font || 'Arial.ttf'
-  const headingFontSelection = createFontSelection(headingFont)
-
-  return {
-    ...base,
-    label_font: headingFontSelection.font,
-    label_font_family: headingFontSelection.font_family,
-  }
+  return createMetricValueDefaults('heading', globalDefaults)
 }

@@ -1,12 +1,40 @@
 {
   "displayTypes": {
-    "labels": {
-      "text": "Text",
-      "linear": "Linear",
-      "bars": "Bars",
-      "arc": "Arc",
-      "corner": "Corner",
-      "heading_tape": "Heading Tape"
+    "definitions": {
+      "text": {
+        "label": "Text",
+        "layoutMode": "intrinsic"
+      },
+      "heading_tape": {
+        "label": "Heading Tape",
+        "layoutMode": "boxed",
+        "defaultFrameWidth": 200,
+        "defaultFrameHeight": 60
+      },
+      "linear": {
+        "label": "Linear",
+        "layoutMode": "boxed",
+        "defaultFrameWidth": 200,
+        "defaultFrameHeight": 60
+      },
+      "bars": {
+        "label": "Bars",
+        "layoutMode": "boxed",
+        "defaultFrameWidth": 200,
+        "defaultFrameHeight": 60
+      },
+      "arc": {
+        "label": "Arc",
+        "layoutMode": "boxed",
+        "defaultFrameWidth": 120,
+        "defaultFrameHeight": 120
+      },
+      "corner": {
+        "label": "Corner",
+        "layoutMode": "boxed",
+        "defaultFrameWidth": 200,
+        "defaultFrameHeight": 60
+      }
     },
     "defaults": ["text", "linear", "bars", "arc", "corner"],
     "overrides": {

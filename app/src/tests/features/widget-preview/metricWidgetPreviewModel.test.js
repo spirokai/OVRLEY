@@ -255,7 +255,7 @@ describe('metric widget preview model standard metric units', () => {
     expect(model?.showIcon).toBe(true)
   })
 
-  test('heading tape widgets skip the metric preview model so plot-like bounds are used', () => {
+  test('boxed display types skip the metric preview model so their own presentation path is used', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: {
         category: 'values',
@@ -274,5 +274,29 @@ describe('metric widget preview model standard metric units', () => {
     })
 
     expect(model).toBeNull()
+  })
+
+  test('any boxed display type skips the metric preview model', () => {
+    const linearModel = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'speed',
+        data: { display_type: 'linear' },
+      },
+      activity: { sample_elapsed_seconds: [0], speed: [25] },
+      previewSecond: 0,
+    })
+    expect(linearModel).toBeNull()
+
+    const arcModel = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'power',
+        data: { display_type: 'arc' },
+      },
+      activity: { sample_elapsed_seconds: [0], power: [200] },
+      previewSecond: 0,
+    })
+    expect(arcModel).toBeNull()
   })
 })

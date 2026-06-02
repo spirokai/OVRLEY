@@ -4,7 +4,7 @@
  */
 
 import { STANDARD_METRIC_WIDGET_TYPES } from '@/lib/standard-metrics'
-import { TYPE_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS, HEADING_DEFAULTS } from '../../widget-editor/data/widgetDefaults'
+import { TYPE_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS } from '../../widget-editor/data/widgetDefaults'
 
 /** File format identifier for OVRLEY template files. */
 export const TEMPLATE_FILE_FORMAT = 'ovrley-template'
@@ -38,7 +38,21 @@ export const SCENE_RENDER_TIME_ONLY_KEYS = [
 ]
 
 /** Keys shared by all metric value widgets during normalization. */
-export const VALUE_SHARED_KEYS = ['id', 'x', 'y', 'value', 'font', 'font_size', 'color', 'opacity', 'prefix', 'suffix', 'decimals', 'display_type']
+export const VALUE_SHARED_KEYS = [
+  'id',
+  'x',
+  'y',
+  'value',
+  'font',
+  'font_size',
+  'color',
+  'opacity',
+  'prefix',
+  'suffix',
+  'decimals',
+  'display_type',
+  'display_variants',
+]
 
 /** Keys for the icon sub-object within a value widget. */
 export const VALUE_ICON_KEYS = ['show_icon', 'icon_color', 'icon_size', 'icon_offset_x', 'icon_offset_y']
@@ -48,40 +62,7 @@ const STANDARD_METRIC_VALUE_KEYS = [...VALUE_ICON_KEYS, 'show_units', 'unit_colo
 /** Per-type additional keys preserved when normalizing a value widget. */
 export const VALUE_TYPE_KEYS = {
   ...Object.fromEntries(STANDARD_METRIC_WIDGET_TYPES.map((type) => [type, STANDARD_METRIC_VALUE_KEYS])),
-  heading: [
-    ...VALUE_ICON_KEYS,
-    'show_units',
-    'unit_color',
-    'display_unit',
-    'width',
-    'height',
-    'rotation',
-    'pixels_per_degree',
-    'major_tick_interval',
-    'minor_ticks_per_major',
-    'show_major_ticks',
-    'show_minor_ticks',
-    'major_tick_length_pct',
-    'minor_tick_length_pct',
-    'major_tick_thickness',
-    'minor_tick_thickness',
-    'tick_color',
-    'cardinal_tick_color',
-    'tick_alignment',
-    'show_minor_labels',
-    'show_major_labels',
-    'label_color',
-    'cardinal_label_color',
-    'label_font',
-    'label_font_family',
-    'label_font_size',
-    'label_offset',
-    'indicator_style',
-    'indicator_placement',
-    'show_indicator',
-    'indicator_color',
-    'indicator_size',
-  ],
+  heading: [...VALUE_ICON_KEYS, 'show_units', 'unit_color', 'display_unit'],
   time: [...VALUE_ICON_KEYS, 'format'],
   gradient: ['unit_color', 'value_offset', 'triangle_positive_color', 'triangle_negative_color', 'show_sign', 'show_triangle', 'triangle_width'],
 }
@@ -130,42 +111,42 @@ export const ELEVATION_PLOT_KEYS = [
   'point_label',
 ]
 
-/** Keys preserved when normalizing a heading plot widget. */
-export const HEADING_PLOT_KEYS = [
-  'id',
-  'x',
-  'y',
-  'value',
-  'width',
-  'height',
-  'opacity',
-  'rotation',
-  'pixels_per_degree',
-  'major_tick_interval',
-  'minor_ticks_per_major',
-  'show_major_ticks',
-  'show_minor_ticks',
-  'major_tick_length_pct',
-  'minor_tick_length_pct',
-  'major_tick_thickness',
-  'minor_tick_thickness',
-  'tick_color',
-  'cardinal_tick_color',
-  'tick_alignment',
-  'show_minor_labels',
-  'show_major_labels',
-  'label_color',
-  'cardinal_label_color',
-  'label_font',
-  'label_font_family',
-  'label_font_size',
-  'label_offset',
-  'indicator_style',
-  'indicator_placement',
-  'show_indicator',
-  'indicator_color',
-  'indicator_size',
-]
+/**
+ * Allowed keys for display variant configs during normalization.
+ * Keyed by display_type — each variant is normalized to its own allowed set.
+ */
+export const DISPLAY_VARIANT_KEYS = {
+  heading_tape: [
+    'width',
+    'height',
+    'rotation',
+    'pixels_per_degree',
+    'major_tick_interval',
+    'minor_ticks_per_major',
+    'show_major_ticks',
+    'show_minor_ticks',
+    'major_tick_length_pct',
+    'minor_tick_length_pct',
+    'major_tick_thickness',
+    'minor_tick_thickness',
+    'tick_color',
+    'cardinal_tick_color',
+    'tick_alignment',
+    'show_minor_labels',
+    'show_major_labels',
+    'label_color',
+    'cardinal_label_color',
+    'label_font',
+    'label_font_family',
+    'label_font_size',
+    'label_offset',
+    'indicator_style',
+    'indicator_placement',
+    'show_indicator',
+    'indicator_color',
+    'indicator_size',
+  ],
+}
 
 /** Default values applied to value widgets of each type during normalization. */
 export const VALUE_DEFAULTS = Object.fromEntries(
@@ -182,10 +163,5 @@ export const PLOT_DEFAULTS = {
     remaining_line_width: 6,
     area_remaining_color: '#00565c',
     ...ELEVATION_PLOT_DEFAULTS,
-  },
-  heading: {
-    opacity: 1,
-    rotation: 0,
-    ...HEADING_DEFAULTS,
   },
 }

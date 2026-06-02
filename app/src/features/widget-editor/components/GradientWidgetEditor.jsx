@@ -17,9 +17,9 @@ import { getThemeColor } from '@/lib/theme'
  * @returns {JSX.Element} Rendered component output.
  */
 export default function GradientWidgetEditor({ widget, updateWidgetData }) {
-  const valueOffset = widget.data.value_offset ?? 0
-  const decimals = widget.data.decimals ?? 0
-  const triangleWidth = widget.data.triangle_width ?? 72
+  const valueOffset = widget.data.value_offset
+  const decimals = widget.data.decimals
+  const triangleWidth = widget.data.triangle_width
 
   return (
     <>
@@ -30,7 +30,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
         title="Unit"
         showToggle={false}
         colorLabel="Percent Color"
-        colorValue={widget.data.unit_color || '#ffffff'}
+        colorValue={widget.data.unit_color}
         onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
       />
 
@@ -55,16 +55,13 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
         />
         <div className="flex items-center justify-between rounded-md pl-8 py-2.5 mt-4.5">
           <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Show sign</Label>
-          <ToggleField checked={widget.data.show_sign ?? true} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_sign: checked })} />
+          <ToggleField checked={widget.data.show_sign} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_sign: checked })} />
         </div>
       </div>
       <div className="space-y-4">
         <div className="flex w-full justify-between items-center">
           <SectionHeading icon={TrendingUp} title="Indicator" />
-          <ToggleField
-            checked={widget.data.show_triangle ?? true}
-            onCheckedChange={(checked) => updateWidgetData(widget.id, { show_triangle: checked })}
-          />
+          <ToggleField checked={widget.data.show_triangle} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_triangle: checked })} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <ColorField

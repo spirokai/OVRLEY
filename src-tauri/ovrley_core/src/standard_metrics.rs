@@ -92,8 +92,19 @@ struct RawStandardMetricDefinition {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct RawDisplayTypeDefinition {
+    label: String,
+    layout_mode: DisplayTypeLayoutMode,
+    #[serde(default)]
+    default_frame_width: Option<u32>,
+    #[serde(default)]
+    default_frame_height: Option<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct RawDisplayTypeManifest {
-    labels: HashMap<String, String>,
+    definitions: HashMap<String, RawDisplayTypeDefinition>,
     defaults: Vec<String>,
     #[serde(default)]
     overrides: HashMap<String, Vec<String>>,
@@ -108,15 +119,31 @@ struct RawStandardMetricManifest {
 
 #[derive(Clone, Debug)]
 struct DisplayTypeManifest {
-    labels: HashMap<String, String>,
+    definitions: HashMap<String, DisplayTypeDefinition>,
     defaults: Vec<String>,
     overrides: HashMap<String, Vec<String>>,
 }
 
 impl DisplayTypeManifest {
     fn from_raw(raw: RawDisplayTypeManifest) -> Self {
+        let definitions = raw
+            .definitions
+            .into_iter()
+            .map(|(key, raw_def)| {
+                (
+                    key,
+                    DisplayTypeDefinition {
+                        label: raw_def.label,
+                        layout_mode: raw_def.layout_mode,
+                        default_frame_width: raw_def.default_frame_width,
+                        default_frame_height: raw_def.default_frame_height,
+                    },
+                )
+            })
+            .collect();
+
         DisplayTypeManifest {
-            labels: raw.labels,
+            definitions,
             defaults: raw.defaults,
             overrides: raw.overrides,
         }
@@ -305,14 +332,56 @@ pub fn standard_metric_unit_label(kind: MetricKind, display_unit: Option<&str>) 
 // Display type helpers (sourced from assets/standard-metrics.json)
 // ---------------------------------------------------------------------------
 
+/// Whether a display type uses intrinsic (text) or boxed (framed) layout.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DisplayTypeLayoutMode {
+    Intrinsic,
+    Boxed,
+}
+
+/// Formal definition of a display type from the shared manifest.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DisplayTypeDefinition {
+    pub label: String,
+    pub layout_mode: DisplayTypeLayoutMode,
+    pub default_frame_width: Option<u32>,
+    pub default_frame_height: Option<u32>,
+}
+
+/// Look up the full definition for a `display_type` value.
+pub fn display_type_definition(display_type: &str) -> Option<&'static DisplayTypeDefinition> {
+    manifest().display_types.definitions.get(display_type)
+}
+
 /// Look up the human-readable label for a `display_type` value.
 pub fn display_type_label(display_type: &str) -> &str {
     manifest()
         .display_types
-        .labels
+        .definitions
         .get(display_type)
-        .map(String::as_str)
+        .map(|def| def.label.as_str())
         .unwrap_or(display_type)
+}
+
+/// Check whether a display type uses boxed (framed) layout.
+pub fn is_boxed_display_type(display_type: &str) -> bool {
+    manifest()
+        .display_types
+        .definitions
+        .get(display_type)
+        .is_some_and(|def| def.layout_mode == DisplayTypeLayoutMode::Boxed)
+}
+
+/// Return the default frame dimensions for a boxed display type, if available.
+pub fn default_frame_dimensions(display_type: &str) -> Option<(u32, u32)> {
+    let def = manifest().display_types.definitions.get(display_type)?;
+    if def.layout_mode != DisplayTypeLayoutMode::Boxed {
+        return None;
+    }
+    let w = def.default_frame_width?;
+    let h = def.default_frame_height?;
+    Some((w, h))
 }
 
 /// Return the permitted display types for a given metric kind.

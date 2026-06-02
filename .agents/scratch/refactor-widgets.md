@@ -466,7 +466,7 @@ These modules should be deep:
 
 **Acceptance Criteria**
 
-- Metric widgets no longer store all non-text display-specific fields as one flat mixed bag.
+- Metric widgets no longer store all non-text display-type-specific fields as one flat mixed bag.
 - Existing text-oriented templates remain compatible without requiring a full text-config migration.
 - Switching `display_type` does not discard per-display edits.
 - Text continues to read and write the flat compatible fields, while non-text displays own their nested defaults and durable keys.

@@ -1,8 +1,10 @@
 /**
- * WidgetPreview — renders the appropriate preview component based on widget type.
+ * WidgetPreview — renders the appropriate preview component based on widget type
+ * and display_type.
  *
- * Dispatches to OverlayTextWidget, OverlayRouteWidget, OverlayElevationWidget,
- * or OverlayMetricWidget depending on `widget.type`.
+ * Non-metric widgets (label, course, elevation) dispatch by widget.type.
+ * Metric widgets dispatch by display_type: intrinsic text uses the standard
+ * metric preview, boxed presentations use their presentation-specific preview.
  *
  * Memoized with a custom comparator that checks all individual props to avoid
  * unnecessary re-renders during playback scrubbing.
@@ -29,7 +31,37 @@ import { OverlayMetricWidget } from './MetricRenderer'
 import { OverlayRouteWidget } from './RouteRenderer'
 import { OverlayElevationWidget } from './ElevationRenderer'
 import { OverlayHeadingWidget } from './HeadingRenderer'
-import { isHeadingTapeWidget } from '@/lib/widget-behavior'
+import { isBoxedDisplayType, getDisplayTypeLabel, getDefaultFrameDimensions } from '@/lib/standard-metrics'
+import { resolveActiveMetricWidgetData } from '@/lib/metric-widget-resolver'
+
+/**
+ * Registry mapping boxed display_type values to their preview components.
+ * New boxed presentations add their renderer here — the dispatch logic
+ * is driven by the manifest's set of boxed display types, not by this map.
+ */
+const BOXED_PREVIEW_COMPONENTS = {
+  heading_tape: OverlayHeadingWidget,
+}
+
+/**
+ * Fallback for boxed display types that have a manifest definition but no
+ * renderer registered yet. Renders a visible placeholder so the issue is
+ * obvious rather than silently producing a null render. Frame dimensions
+ * are sourced from the shared display-type manifest defaults.
+ */
+function UnsupportedBoxedPreview({ widget, displayType }) {
+  const label = getDisplayTypeLabel(displayType)
+  const defaults = getDefaultFrameDimensions(displayType)
+  return (
+    <div
+      data-widget-id={widget.id}
+      style={{ width: widget.data.width ?? defaults?.width ?? 200, height: widget.data.height ?? defaults?.height ?? 60, opacity: 0.7 }}
+      className="flex items-center justify-center rounded border border-dashed border-yellow-500/50 bg-yellow-500/10 text-[10px] text-yellow-600"
+    >
+      {label} (preview not implemented)
+    </div>
+  )
+}
 
 function WidgetPreview({
   widget,
@@ -80,20 +112,30 @@ function WidgetPreview({
     )
   }
 
-  if (isHeadingTapeWidget(widget)) {
-    return (
-      <OverlayHeadingWidget
-        widget={widget}
-        activity={activity}
-        previewSecond={previewSecond}
-        globalOpacity={globalOpacity}
-        sceneFont={sceneFont}
-        sceneStyle={sceneStyle}
-        valueFont={valueFont}
-      />
-    )
+  // Metric widgets: dispatch by display_type.
+  const displayType = widget?.data?.display_type
+  if (isBoxedDisplayType(displayType)) {
+    const resolvedData = resolveActiveMetricWidgetData(widget.data)
+    const resolvedWidget = { ...widget, data: resolvedData }
+    const BoxedPreview = BOXED_PREVIEW_COMPONENTS[displayType]
+    if (BoxedPreview) {
+      return (
+        <BoxedPreview
+          widget={resolvedWidget}
+          activity={activity}
+          previewSecond={previewSecond}
+          globalOpacity={globalOpacity}
+          sceneFont={sceneFont}
+          sceneStyle={sceneStyle}
+          valueFont={valueFont}
+        />
+      )
+    }
+    // Boxed type with no renderer — show explicit fallback instead of silent null.
+    return <UnsupportedBoxedPreview widget={resolvedWidget} displayType={displayType} />
   }
 
+  // Intrinsic text presentation.
   return (
     <OverlayMetricWidget
       widget={widget}

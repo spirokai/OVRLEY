@@ -280,7 +280,7 @@ export function PreviewMarkerLayers({ layers, x, y }) {
           r={layer.radius}
           fill={layer.solidFill ? layer.color : 'none'}
           stroke={layer.solidFill ? 'none' : layer.color}
-          strokeWidth={layer.solidFill ? undefined : layer.strokeWidth ?? Math.min(Math.max(Math.round(layer.radius * 0.18), 1), 3)}
+          strokeWidth={layer.solidFill ? undefined : (layer.strokeWidth ?? Math.min(Math.max(Math.round(layer.radius * 0.18), 1), 3))}
           opacity={layer.opacity}
         />
       ))}

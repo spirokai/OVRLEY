@@ -110,14 +110,14 @@ export const ELEVATION_PLOT_DEFAULTS = {
 /** Fallback dimensions when course points data is unavailable. */
 export const COURSE_DIMENSIONS_FALLBACK = { width: 400, height: 200 }
 
-/** Default configuration for heading compass tape widgets. */
-export const HEADING_DEFAULTS = {
-  x: 100,
-  y: 200,
-  width: 400,
-  height: 80,
-  rotation: 0,
-  opacity: 1,
+/**
+ * Display-specific defaults for the heading_tape display variant.
+ *
+ * Frame geometry (width, height, rotation) is NOT stored here — it is
+ * sourced from the shared manifest via getDefaultFrameDimensions() to
+ * maintain a single authoritative default for boxed metric geometry.
+ */
+export const HEADING_TAPE_DEFAULTS = {
   pixels_per_degree: 5,
   major_tick_interval: 15,
   minor_ticks_per_major: 3,
@@ -145,13 +145,20 @@ export const HEADING_DEFAULTS = {
   indicator_size: 10,
 }
 
+/**
+ * Display-type-owned non-geometry defaults keyed by display_type.
+ *
+ * Each entry is a factory returning a fresh defaults object. Frame geometry
+ * is always sourced from the shared manifest — this table only owns
+ * presentation-specific settings beyond frame dimensions.
+ */
+export const DISPLAY_VARIANT_NON_GEOMETRY_DEFAULTS = {
+  heading_tape: () => ({ ...HEADING_TAPE_DEFAULTS }),
+}
+
 /** Type-specific default fields for each metric value widget type (dynamic fields omitted). */
 export const TYPE_DEFAULTS = {
   ...STANDARD_METRIC_TYPE_DEFAULTS,
-  heading: {
-    ...STANDARD_METRIC_TYPE_DEFAULTS.heading,
-    ...HEADING_DEFAULTS,
-  },
   time: { format: 'time-24' },
   left_right_balance: {
     ...STANDARD_METRIC_TYPE_DEFAULTS.left_right_balance,

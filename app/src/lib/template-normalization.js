@@ -24,10 +24,11 @@
 
 import { normalizeColorFields } from '@/lib/color-utils'
 import { ensureWidgetIdsInConfig } from '@/lib/widget-config'
+import { initDisplayVariant } from '@/lib/metric-widget-resolver'
 import {
   COURSE_PLOT_KEYS,
+  DISPLAY_VARIANT_KEYS,
   ELEVATION_PLOT_KEYS,
-  HEADING_PLOT_KEYS,
   LABEL_KEYS,
   PLOT_DEFAULTS,
   SCENE_RENDER_TIME_ONLY_KEYS,
@@ -115,11 +116,29 @@ function normalizeLabel(label = {}) {
   return normalizeColorFields(pickedLabel)
 }
 
+function normalizeDisplayVariants(variants) {
+  if (!variants || typeof variants !== 'object') return undefined
+  const normalized = {}
+  for (const [displayType, variantConfig] of Object.entries(variants)) {
+    if (!variantConfig || typeof variantConfig !== 'object') continue
+    const allowedKeys = DISPLAY_VARIANT_KEYS[displayType]
+    if (!allowedKeys) continue
+    normalized[displayType] = normalizeColorFields(pickDefined(variantConfig, allowedKeys))
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined
+}
+
 function normalizeValue(value = {}) {
   const type = value.value
   const keys = [...VALUE_SHARED_KEYS, ...(VALUE_TYPE_KEYS[type] || VALUE_ICON_KEYS)]
   const withDefaults = { ...VALUE_DEFAULTS[type], ...value }
   const pickedValue = pickDefined(withDefaults, keys)
+  if (pickedValue.display_type && pickedValue.display_type !== 'text') {
+    pickedValue.display_variants = (initDisplayVariant(pickedValue, pickedValue.display_type) || pickedValue).display_variants
+  }
+  if (pickedValue.display_variants) {
+    pickedValue.display_variants = normalizeDisplayVariants(pickedValue.display_variants)
+  }
   return normalizeColorFields(pickedValue)
 }
 
@@ -143,7 +162,6 @@ function normalizePlot(plot = {}, config, globalDefaults) {
   }
   let keys = COURSE_PLOT_KEYS
   if (type === 'elevation') keys = ELEVATION_PLOT_KEYS
-  if (type === 'heading') keys = HEADING_PLOT_KEYS
   const pickedPlot = pickDefined(withDefaults, keys)
   return normalizeColorFields(pickedPlot)
 }

@@ -25,18 +25,18 @@ const MARKER_VARIANT_OPTIONS = [
  * @returns {JSX.Element} Rendered component output.
  */
 export default function ElevationWidgetEditor({ widget, updateWidgetData, setNumericField, sceneFontSize }) {
-  const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width ?? 6
-  const completedLineOpacity = widget.data.completed_line_opacity ?? 100
-  const remainingLineOpacity = widget.data.remaining_line_opacity ?? 35
-  const completedAreaOpacity = widget.data.area_completed_opacity ?? 24
-  const remainingAreaOpacity = widget.data.area_remaining_opacity ?? 12
-  const yScale = widget.data.y_scale ?? 1
-  const simplifyTolerance = widget.data.simplify_tolerance_px ?? 1
-  const targetDensity = widget.data.target_density ?? 0.75
-  const markerSize = widget.data.marker_size ?? 16
-  const markerOpacity = widget.data.marker_opacity ?? 100
-  const markerVariant = widget.data.marker_variant ?? 'single'
-  const markerVariantDiameter = widget.data.marker_variant_diameter ?? 40
+  const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
+  const completedLineOpacity = widget.data.completed_line_opacity
+  const remainingLineOpacity = widget.data.remaining_line_opacity
+  const completedAreaOpacity = widget.data.area_completed_opacity
+  const remainingAreaOpacity = widget.data.area_remaining_opacity
+  const yScale = widget.data.y_scale
+  const simplifyTolerance = widget.data.simplify_tolerance_px
+  const targetDensity = widget.data.target_density
+  const markerSize = widget.data.marker_size
+  const markerOpacity = widget.data.marker_opacity
+  const markerVariant = widget.data.marker_variant
+  const markerVariantDiameter = widget.data.marker_variant_diameter
   const labelFontSize = widget.data.point_label?.font_size ?? sceneFontSize ?? 12.5
   const showVariantDiameter = markerVariant !== 'single'
   const variantDiameterLabel = markerVariant === 'ring' ? 'Ring Diameter' : 'Halo Diameter'
@@ -56,7 +56,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
         <div className="flex items-center justify-between gap-2 px-1">
           <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Render Full Activity</Label>
           <ToggleField
-            checked={widget.data.show_full_activity ?? false}
+            checked={widget.data.show_full_activity}
             onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_activity: checked })}
           />
         </div>
@@ -248,7 +248,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
               <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Metric Label</Label>
               <ToggleField
                 label="Label Metric"
-                checked={widget.data.show_elevation_metric ?? true}
+                checked={widget.data.show_elevation_metric}
                 onCheckedChange={(checked) =>
                   updateWidgetData(widget.id, {
                     show_elevation_metric: checked,
@@ -259,21 +259,21 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
             <SliderField
               label="Metric Offset X"
               disabled={!widget.data.show_elevation_metric}
-              value={widget.data.metric_label_offset_x ?? 16}
+              value={widget.data.metric_label_offset_x}
               min={-100}
               max={100}
               step={1}
-              valueDisplay={`${widget.data.metric_label_offset_x ?? 16}px`}
+              valueDisplay={`${widget.data.metric_label_offset_x}px`}
               onSliderChange={(value) => updateWidgetData(widget.id, { metric_label_offset_x: value })}
             />
             <SliderField
               label="Metric Offset Y"
               disabled={!widget.data.show_elevation_metric}
-              value={widget.data.metric_label_offset_y ?? 16}
+              value={widget.data.metric_label_offset_y}
               min={-100}
               max={100}
               step={1}
-              valueDisplay={`${widget.data.metric_label_offset_y ?? 16}px`}
+              valueDisplay={`${widget.data.metric_label_offset_y}px`}
               onSliderChange={(value) => updateWidgetData(widget.id, { metric_label_offset_y: value })}
             />
           </div>
@@ -282,7 +282,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
               <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Imperial Label</Label>
               <ToggleField
                 label="Label Imperial"
-                checked={widget.data.show_elevation_imperial ?? false}
+                checked={widget.data.show_elevation_imperial}
                 onCheckedChange={(checked) =>
                   updateWidgetData(widget.id, {
                     show_elevation_imperial: checked,
@@ -293,21 +293,21 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
             <SliderField
               label="Imperial Offset X"
               disabled={!widget.data.show_elevation_imperial}
-              value={widget.data.imperial_label_offset_x ?? 16}
+              value={widget.data.imperial_label_offset_x}
               min={-100}
               max={100}
               step={1}
-              valueDisplay={`${widget.data.imperial_label_offset_x ?? 16}px`}
+              valueDisplay={`${widget.data.imperial_label_offset_x}px`}
               onSliderChange={(value) => updateWidgetData(widget.id, { imperial_label_offset_x: value })}
             />
             <SliderField
               label="Imperial Offset Y"
               disabled={!widget.data.show_elevation_imperial}
-              value={widget.data.imperial_label_offset_y ?? 16}
+              value={widget.data.imperial_label_offset_y}
               min={-100}
               max={100}
               step={1}
-              valueDisplay={`${widget.data.imperial_label_offset_y ?? 16}px`}
+              valueDisplay={`${widget.data.imperial_label_offset_y}px`}
               onSliderChange={(value) => updateWidgetData(widget.id, { imperial_label_offset_y: value })}
             />
           </div>

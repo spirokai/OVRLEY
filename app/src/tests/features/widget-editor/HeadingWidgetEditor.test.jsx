@@ -2,7 +2,7 @@ import { describe, test, expect, vi, beforeAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import HeadingWidgetEditor from '@/features/widget-editor/components/HeadingWidgetEditor'
-import { HEADING_DEFAULTS } from '@/features/widget-editor/data/widgetDefaults'
+import { HEADING_TAPE_DEFAULTS } from '@/features/widget-editor/data/widgetDefaults'
 
 vi.mock('@/features/scene-settings/hooks/useAvailableFonts', () => ({
   default: () => ({
@@ -23,17 +23,25 @@ function makeHeadingWidget(overrides = {}) {
   return {
     id: 'plot-0',
     type: 'heading',
-    category: 'plots',
+    category: 'values',
     data: {
       value: 'heading',
-      ...HEADING_DEFAULTS,
+      display_type: 'text',
+      display_variants: {
+        heading_tape: { ...HEADING_TAPE_DEFAULTS },
+      },
       ...overrides,
     },
   }
 }
 
-function makeHeadingTapeWidget(overrides = {}) {
-  return makeHeadingWidget({ display_type: 'heading_tape', ...overrides })
+function makeHeadingTapeWidget(tapeOverrides = {}) {
+  return makeHeadingWidget({
+    display_type: 'heading_tape',
+    display_variants: {
+      heading_tape: { ...HEADING_TAPE_DEFAULTS, ...tapeOverrides },
+    },
+  })
 }
 
 describe('HeadingWidgetEditor', () => {
@@ -71,7 +79,6 @@ describe('HeadingWidgetEditor', () => {
   test('renders tick color controls', () => {
     render(<HeadingWidgetEditor widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
     expect(screen.getByText('Tick Color')).toBeInTheDocument()
-    // Cardinal tick color appears in Ticks section
     const cardinalColors = screen.getAllByText('Cardinal Color')
     expect(cardinalColors.length).toBeGreaterThanOrEqual(1)
   })
@@ -110,26 +117,39 @@ describe('HeadingWidgetEditor', () => {
     expect(screen.getByText('Indicator Size')).toBeInTheDocument()
   })
 
-  test('major tick toggle calls updateWidgetData with correct value', async () => {
+  test('major tick toggle writes to display_variants.heading_tape', async () => {
     const updateWidgetData = vi.fn()
     const user = userEvent.setup()
     render(
-      <HeadingWidgetEditor widget={makeHeadingTapeWidget({ show_major_ticks: true })} updateWidgetData={updateWidgetData} setNumericField={vi.fn()} />,
+      <HeadingWidgetEditor
+        widget={makeHeadingTapeWidget({ show_major_ticks: true })}
+        updateWidgetData={updateWidgetData}
+        setNumericField={vi.fn()}
+      />,
     )
 
-    // Find the Major Ticks toggle and click it
     const majorTicksLabel = screen.getByText('Major Ticks')
     const toggle = majorTicksLabel.closest('div').querySelector('button')
     await user.click(toggle)
 
-    expect(updateWidgetData).toHaveBeenCalledWith('plot-0', { show_major_ticks: false })
+    expect(updateWidgetData).toHaveBeenCalledWith(
+      'plot-0',
+      expect.objectContaining({
+        display_variants: expect.objectContaining({
+          heading_tape: expect.objectContaining({ show_major_ticks: false }),
+        }),
+      }),
+    )
   })
 
   test('indicator style select shows current value', () => {
     render(
-      <HeadingWidgetEditor widget={makeHeadingTapeWidget({ indicator_style: 'highlight_bar' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />,
+      <HeadingWidgetEditor
+        widget={makeHeadingTapeWidget({ indicator_style: 'highlight_bar' })}
+        updateWidgetData={vi.fn()}
+        setNumericField={vi.fn()}
+      />,
     )
-    // The Select component shows the current value
     expect(screen.getByText('Highlight Bar')).toBeInTheDocument()
   })
 
@@ -155,7 +175,11 @@ describe('HeadingWidgetEditor', () => {
 
   test('disables indicator placement when style is highlight bar', () => {
     render(
-      <HeadingWidgetEditor widget={makeHeadingTapeWidget({ indicator_style: 'highlight_bar' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />,
+      <HeadingWidgetEditor
+        widget={makeHeadingTapeWidget({ indicator_style: 'highlight_bar' })}
+        updateWidgetData={vi.fn()}
+        setNumericField={vi.fn()}
+      />,
     )
 
     const placementTrigger = screen.getByText('Placement').closest('div').querySelector('button')
@@ -163,21 +187,21 @@ describe('HeadingWidgetEditor', () => {
     expect(placementTrigger).toBeDisabled()
   })
 
-  test('defaults match the PRD spec', () => {
-    expect(HEADING_DEFAULTS.major_tick_interval).toBe(15)
-    expect(HEADING_DEFAULTS.minor_ticks_per_major).toBe(3)
-    expect(HEADING_DEFAULTS.show_major_ticks).toBe(true)
-    expect(HEADING_DEFAULTS.show_minor_ticks).toBe(true)
-    expect(HEADING_DEFAULTS.major_tick_thickness).toBe(2)
-    expect(HEADING_DEFAULTS.minor_tick_thickness).toBe(2)
-    expect(HEADING_DEFAULTS.label_font).toBe('Arial.ttf')
-    expect(HEADING_DEFAULTS.tick_alignment).toBe('below')
-    expect(HEADING_DEFAULTS.indicator_style).toBe('chevron')
-    expect(HEADING_DEFAULTS.show_indicator).toBe(true)
+  test('tape defaults match the PRD spec', () => {
+    expect(HEADING_TAPE_DEFAULTS.major_tick_interval).toBe(15)
+    expect(HEADING_TAPE_DEFAULTS.minor_ticks_per_major).toBe(3)
+    expect(HEADING_TAPE_DEFAULTS.show_major_ticks).toBe(true)
+    expect(HEADING_TAPE_DEFAULTS.show_minor_ticks).toBe(true)
+    expect(HEADING_TAPE_DEFAULTS.major_tick_thickness).toBe(2)
+    expect(HEADING_TAPE_DEFAULTS.minor_tick_thickness).toBe(2)
+    expect(HEADING_TAPE_DEFAULTS.label_font).toBe('Arial.ttf')
+    expect(HEADING_TAPE_DEFAULTS.tick_alignment).toBe('below')
+    expect(HEADING_TAPE_DEFAULTS.indicator_style).toBe('chevron')
+    expect(HEADING_TAPE_DEFAULTS.show_indicator).toBe(true)
   })
 
   test('widget data serializes cleanly (no undefined values in defaults)', () => {
-    const defaults = HEADING_DEFAULTS
+    const defaults = HEADING_TAPE_DEFAULTS
     Object.entries(defaults).forEach(([key, value]) => {
       expect(value).not.toBeUndefined()
       expect(key).not.toContain('undefined')

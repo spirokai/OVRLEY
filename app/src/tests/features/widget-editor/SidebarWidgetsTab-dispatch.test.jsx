@@ -95,7 +95,7 @@ describe('SidebarWidgetsTab widget type dispatch', () => {
 
   test('heading widget renders HeadingWidgetEditor', () => {
     mockUseWidgetManager.mockReturnValue(
-      makeManagerState({ id: 'w1', type: 'heading', category: 'plots', name: 'Heading', data: { value: 'heading', x: 0, y: 0 } }),
+      makeManagerState({ id: 'w1', type: 'heading', category: 'values', name: 'Heading', data: { value: 'heading', x: 0, y: 0 } }),
     )
     const { getByTestId } = render(<SidebarWidgetsTab />)
     expect(getByTestId('editor-heading')).toBeTruthy()

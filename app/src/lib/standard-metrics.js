@@ -2,10 +2,11 @@
  * @file Standard Metric Widget Builder
  *
  * Bridge between the canonical metric catalog at `assets/standard-metrics.json`
- * and the frontend widget system. Loads all metric definitions at import time
- * and exposes pure lookup functions — no state, no side effects.
+ * and the frontend widget system. Loads all metric definitions and display-type
+ * definitions at import time and exposes pure lookup functions — no state, no
+ * side effects.
  *
- * Each definition in the manifest describes:
+ * Each metric definition in the manifest describes:
  * - `type` — unique key string
  * - `current` — `true` for shipping widgets, `false` for planned/future types
  * - `label` — human-readable name
@@ -14,6 +15,11 @@
  * - `showUnitsByDefault` — whether to show the unit label out of the box
  * - `formatter` — key into the formatting system
  * - `icon` — `{ source, assetFile, name? }`
+ *
+ * Each display-type definition in the manifest describes:
+ * - `label` — human-readable name
+ * - `layoutMode` — `"intrinsic"` (text/metric) or `"boxed"` (framed presentation)
+ * - `defaultFrameWidth` / `defaultFrameHeight` — optional defaults for boxed types
  *
  * @module standard-metrics
  */
@@ -24,11 +30,20 @@ import standardMetricsManifest from '../../../assets/standard-metrics.json'
 const STANDARD_METRIC_DEFINITIONS = Object.fromEntries(standardMetricsManifest.definitions.map((definition) => [definition.type, definition]))
 
 // ---------------------------------------------------------------------------
-// Display type metadata (shared with backend via assets/standard-metrics.json)
+// Display type definitions (shared with backend via assets/standard-metrics.json)
 // ---------------------------------------------------------------------------
 
+/**
+ * Map of display_type value -> definition object.
+ * Each definition includes: `label`, `layoutMode` ("intrinsic" | "boxed"),
+ * and for boxed presentations: `defaultFrameWidth`, `defaultFrameHeight`.
+ */
+export const DISPLAY_TYPE_DEFINITIONS = Object.freeze(
+  Object.fromEntries(Object.entries(standardMetricsManifest.displayTypes.definitions).map(([key, def]) => [key, Object.freeze(def)])),
+)
+
 /** Map of display_type value -> human-readable label for dropdown menus. */
-export const DISPLAY_TYPE_LABELS = Object.freeze({ ...standardMetricsManifest.displayTypes.labels })
+export const DISPLAY_TYPE_LABELS = Object.fromEntries(Object.entries(DISPLAY_TYPE_DEFINITIONS).map(([key, def]) => [key, def.label]))
 
 /** The default set of display types available to all metric value widgets. */
 export const DEFAULT_DISPLAY_TYPES = Object.freeze([...standardMetricsManifest.displayTypes.defaults])
@@ -37,12 +52,42 @@ export const DEFAULT_DISPLAY_TYPES = Object.freeze([...standardMetricsManifest.d
 const DISPLAY_TYPE_OVERRIDES = Object.freeze({ ...standardMetricsManifest.displayTypes.overrides })
 
 /**
+ * Look up the full definition object for a display_type value.
+ * @param {string} displayType - display_type key (e.g. "text", "linear")
+ * @returns {object|null} the definition, or `null` if unknown
+ */
+export function getDisplayTypeDefinition(displayType) {
+  return DISPLAY_TYPE_DEFINITIONS[displayType] ?? null
+}
+
+/**
  * Look up the human-readable label for a display_type value.
  * @param {string} displayType - display_type key (e.g. "text", "linear")
  * @returns {string} the label, or the key unchanged if unknown
  */
 export function getDisplayTypeLabel(displayType) {
   return DISPLAY_TYPE_LABELS[displayType] ?? displayType
+}
+
+/**
+ * Check whether a display_type uses boxed (framed) layout rather than intrinsic text layout.
+ * @param {string} displayType - display_type key
+ * @returns {boolean} `true` if the display type is boxed
+ */
+export function isBoxedDisplayType(displayType) {
+  const definition = getDisplayTypeDefinition(displayType)
+  return definition?.layoutMode === 'boxed'
+}
+
+/**
+ * Return the default frame dimensions for a boxed display type.
+ * @param {string} displayType - display_type key
+ * @returns {{ width: number, height: number } | null} default frame size, or `null` for intrinsic or unknown types
+ */
+export function getDefaultFrameDimensions(displayType) {
+  const definition = getDisplayTypeDefinition(displayType)
+  if (!definition || definition.layoutMode !== 'boxed') return null
+  return { width: definition.defaultFrameWidth, height: definition.defaultFrameHeight }
 }
 
 /**
