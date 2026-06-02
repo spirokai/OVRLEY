@@ -268,6 +268,16 @@ pub struct ValueConfig {
     pub extra: BTreeMap<String, Value>,
 }
 
+impl ValueConfig {
+    pub(crate) fn to_heading_widget_config(&self) -> CoreResult<HeadingWidgetConfig> {
+        let mut raw = serde_json::to_value(self)
+            .map_err(|e| CoreError::Config(format!("heading value serialization: {e}")))?;
+        strip_json_nulls(&mut raw);
+        serde_json::from_value(raw)
+            .map_err(|e| CoreError::Config(format!("heading value config: {e}")))
+    }
+}
+
 /// Complete template render configuration.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RenderConfig {
@@ -879,7 +889,7 @@ impl RenderConfig {
             requirements.distance_progress = true;
         }
 
-        if self.heading_values()?.is_some() {
+        if self.has_heading_tape_value() {
             requirements.heading = true;
         }
 
@@ -897,24 +907,21 @@ impl RenderConfig {
     }
 
     /// Returns the heading plot config if present (legacy `plots` container).
+    ///
+    /// Deprecated for production rendering: heading tape is now provisioned
+    /// through `values` entries with `display_type: "heading_tape"` (see
+    /// [`heading_values`]). This method survives only for the legacy `plots`
+    /// integration tests.
     pub fn heading_plot(&self) -> CoreResult<Option<HeadingWidgetConfig>> {
         self.parse_plot("heading")
     }
 
-    /// Returns the heading widget config from `values` if a heading value with
-    /// `display_type: "heading_tape"` is present.
-    pub fn heading_values(&self) -> CoreResult<Option<HeadingWidgetConfig>> {
-        for value in &self.values {
-            if value.value == MetricKind::Heading && value.display_type == DisplayType::Tape {
-                let mut raw = serde_json::to_value(value)
-                    .map_err(|e| CoreError::Config(format!("heading value serialization: {e}")))?;
-                strip_json_nulls(&mut raw);
-                let config: HeadingWidgetConfig = serde_json::from_value(raw)
-                    .map_err(|e| CoreError::Config(format!("heading value config: {e}")))?;
-                return Ok(Some(config));
-            }
-        }
-        Ok(None)
+    /// Returns whether any `values` entry is a heading metric using the
+    /// `heading_tape` presentation.
+    pub fn has_heading_tape_value(&self) -> bool {
+        self.values.iter().any(|value| {
+            value.value == MetricKind::Heading && value.display_type == DisplayType::Tape
+        })
     }
 
     /// Parses one plot entry from the legacy object/array `plots` container.

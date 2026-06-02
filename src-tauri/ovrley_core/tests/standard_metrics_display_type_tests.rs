@@ -110,6 +110,12 @@ fn is_display_type_supported_checks_permitted_types() {
     assert!(is_display_type_supported(MetricKind::Speed, "text"));
     assert!(is_display_type_supported(MetricKind::Speed, "linear"));
     assert!(!is_display_type_supported(MetricKind::Heading, "linear"));
-    assert!(is_display_type_supported(MetricKind::Heading, "heading_tape"));
-    assert!(!is_display_type_supported(MetricKind::CoreTemperature, "linear"));
+    assert!(is_display_type_supported(
+        MetricKind::Heading,
+        "heading_tape"
+    ));
+    assert!(!is_display_type_supported(
+        MetricKind::CoreTemperature,
+        "linear"
+    ));
 }

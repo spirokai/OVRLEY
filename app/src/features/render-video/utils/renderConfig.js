@@ -98,6 +98,32 @@ function applyCustomExportRange(scene, exportRange, importedVideoPath) {
 }
 
 /**
+ * Rehydrates render-window timing from the editor timeline state when the
+ * committed template config intentionally omits scene start/end.
+ *
+ * Durable template state strips activity-specific timing, but the renderer
+ * still requires an explicit scene window. The editor timeline remains the
+ * source of truth for that session window, so render preparation restores it
+ * here before any export-range overrides are applied.
+ *
+ * @param {object} scene - Render-effective scene config.
+ * @param {number|null|undefined} timelineStart - Active editor timeline start second.
+ * @param {number|null|undefined} timelineEnd - Active editor timeline end second.
+ */
+function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
+  const normalizedStart = Number(timelineStart)
+  const normalizedEnd = Number(timelineEnd)
+
+  if (scene.start === undefined && Number.isFinite(normalizedStart)) {
+    scene.start = normalizedStart
+  }
+
+  if (scene.end === undefined && Number.isFinite(normalizedEnd)) {
+    scene.end = normalizedEnd
+  }
+}
+
+/**
  * Materializes the render-effective config sent to the backend.
  *
  * @param {object} options - Render preparation options.
@@ -107,11 +133,13 @@ function applyCustomExportRange(scene, exportRange, importedVideoPath) {
  * @param {object|null|undefined} options.exportRange - Export range settings.
  * @param {object|null|undefined} options.globalDefaults - Template global defaults.
  * @param {string|null|undefined} options.importedVideoPath - Imported-video path, if any.
+ * @param {number|null|undefined} options.timelineStart - Active editor timeline start second.
+ * @param {number|null|undefined} options.timelineEnd - Active editor timeline end second.
  * @param {*} options.updateRate - Requested widget update-rate divisor.
  * @returns {object} Render-effective config.
  */
 export function createRenderEffectiveConfig(options) {
-  const { availableCodecs, config, exportCodec, exportRange, globalDefaults, importedVideoPath, updateRate } = options
+  const { availableCodecs, config, exportCodec, exportRange, globalDefaults, importedVideoPath, timelineStart, timelineEnd, updateRate } = options
 
   if (!config?.scene) {
     throw new Error('No valid config available')
@@ -124,6 +152,7 @@ export function createRenderEffectiveConfig(options) {
   const resolvedExportCodec = importedVideoPath && !isCompositeCodec(exportCodec) ? 'libx264' : exportCodec || 'prores_ks'
 
   scene.fps = sanitizeIntegerFps(scene.fps)
+  delete scene.updateRate
   scene.update_rate = normalizeUpdateRateForFps(scene.fps, updateRate ?? scene.updateRate)
   scene.ffmpeg = {
     ...(scene.ffmpeg || {}),
@@ -140,6 +169,7 @@ export function createRenderEffectiveConfig(options) {
     applyCompositeSceneFields(scene, options)
   }
 
+  applyTimelineSceneFields(scene, timelineStart, timelineEnd)
   applyCodecDefaults(scene, resolvedExportCodec)
   applyCustomExportRange(scene, exportRange, importedVideoPath)
 

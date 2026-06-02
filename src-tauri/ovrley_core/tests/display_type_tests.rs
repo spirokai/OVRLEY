@@ -16,6 +16,7 @@
 //! - Lossy round-trips (e.g. serializing `Linear` and reading back as `Text`)
 
 use ovrley_core::config::{parse_config_json, ValueConfig};
+use ovrley_core::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
 use ovrley_core::types::DisplayType;
 
 mod common;
@@ -219,4 +220,60 @@ fn value_config_with_display_type_round_trips_through_full_config() {
     assert_eq!(reparsed.values[0].display_type, DisplayType::Linear);
     assert_eq!(reparsed.values[0].x, 10.0);
     assert_eq!(reparsed.values[0].y, 20.0);
+}
+
+#[test]
+fn display_type_is_intrinsic_only_for_text() {
+    assert_eq!(
+        display_type_layout_mode(DisplayType::Text),
+        DisplayTypeLayoutMode::Intrinsic
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::Linear),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::Bars),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::Arc),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::Corner),
+        DisplayTypeLayoutMode::Boxed
+    );
+    assert_eq!(
+        display_type_layout_mode(DisplayType::Tape),
+        DisplayTypeLayoutMode::Boxed
+    );
+}
+
+#[test]
+fn display_type_is_boxed_for_all_non_text_variants() {
+    assert!(!matches!(
+        display_type_layout_mode(DisplayType::Text),
+        DisplayTypeLayoutMode::Boxed
+    ));
+    assert!(matches!(
+        display_type_layout_mode(DisplayType::Linear),
+        DisplayTypeLayoutMode::Boxed
+    ));
+    assert!(matches!(
+        display_type_layout_mode(DisplayType::Bars),
+        DisplayTypeLayoutMode::Boxed
+    ));
+    assert!(matches!(
+        display_type_layout_mode(DisplayType::Arc),
+        DisplayTypeLayoutMode::Boxed
+    ));
+    assert!(matches!(
+        display_type_layout_mode(DisplayType::Corner),
+        DisplayTypeLayoutMode::Boxed
+    ));
+    assert!(matches!(
+        display_type_layout_mode(DisplayType::Tape),
+        DisplayTypeLayoutMode::Boxed
+    ));
 }

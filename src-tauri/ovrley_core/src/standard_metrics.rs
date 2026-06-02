@@ -5,6 +5,7 @@
 //! units, formatter families, and icon asset bindings. `time`, `gradient`, and
 //! `elevation` remain specialized render paths outside this contract.
 
+use crate::DisplayType;
 use crate::MetricKind;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -373,6 +374,17 @@ pub fn is_boxed_display_type(display_type: &str) -> bool {
         .is_some_and(|def| def.layout_mode == DisplayTypeLayoutMode::Boxed)
 }
 
+/// Canonical layout mode for a [`DisplayType`] variant, sourced from the
+/// shared manifest. This is the single adapter that every Rust path should
+/// use when deciding boxed-vs-intrinsic behaviour.
+pub fn display_type_layout_mode(display_type: DisplayType) -> DisplayTypeLayoutMode {
+    if is_boxed_display_type(display_type.as_str()) {
+        DisplayTypeLayoutMode::Boxed
+    } else {
+        DisplayTypeLayoutMode::Intrinsic
+    }
+}
+
 /// Return the default frame dimensions for a boxed display type, if available.
 pub fn default_frame_dimensions(display_type: &str) -> Option<(u32, u32)> {
     let def = manifest().display_types.definitions.get(display_type)?;
@@ -400,5 +412,7 @@ pub fn supported_display_types(kind: MetricKind) -> &'static [String] {
 
 /// Check whether a given `display_type` value is permitted for a metric kind.
 pub fn is_display_type_supported(kind: MetricKind, display_type: &str) -> bool {
-    supported_display_types(kind).iter().any(|dt| dt == display_type)
+    supported_display_types(kind)
+        .iter()
+        .any(|dt| dt == display_type)
 }

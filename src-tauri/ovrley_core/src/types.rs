@@ -82,9 +82,10 @@ pub enum MetricKind {
 /// `null` or an unrecognized string, this enum falls back to `Text`. The
 /// field is therefore safe to add to existing widget configs without a
 /// migration: anything that does not explicitly opt in keeps its old behavior.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 pub enum DisplayType {
     #[serde(rename = "text")]
+    #[default]
     Text,
     #[serde(rename = "linear")]
     Linear,
@@ -98,9 +99,17 @@ pub enum DisplayType {
     Tape,
 }
 
-impl Default for DisplayType {
-    fn default() -> Self {
-        DisplayType::Text
+impl DisplayType {
+    /// Serialises the variant to its shared-manifest key.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DisplayType::Text => "text",
+            DisplayType::Linear => "linear",
+            DisplayType::Bars => "bars",
+            DisplayType::Arc => "arc",
+            DisplayType::Corner => "corner",
+            DisplayType::Tape => "heading_tape",
+        }
     }
 }
 

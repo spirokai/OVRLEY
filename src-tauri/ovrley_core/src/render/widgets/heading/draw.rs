@@ -30,8 +30,8 @@ pub fn draw_heading_widget(
             heading_cache.pixels_per_degree,
             heading_cache.width as f32,
         );
-        let wrapped_offset =
-            ((offset % heading_cache.tape_width) + heading_cache.tape_width) % heading_cache.tape_width;
+        let wrapped_offset = ((offset % heading_cache.tape_width) + heading_cache.tape_width)
+            % heading_cache.tape_width;
 
         // Clip to widget bounds
         canvas.save();

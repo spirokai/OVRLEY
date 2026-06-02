@@ -47,4 +47,37 @@ describe('render config preparation', () => {
     expect(renderConfig.scene.custom_export_range_active).toBe(true)
     expect(renderConfig.values[0].color).toBe('#ffffff')
   })
+
+  test('rehydrates scene start/end from editor timeline when durable template config omits them', () => {
+    const config = {
+      scene: {
+        width: 1920,
+        height: 1080,
+        fps: 60,
+      },
+      labels: [],
+      values: [],
+      plots: [],
+    }
+
+    const renderConfig = createRenderEffectiveConfig({
+      config,
+      globalDefaults: {},
+      updateRate: 1,
+      exportRange: { ...DEFAULT_EXPORT_RANGE },
+      exportCodec: 'prores_ks',
+      importedVideoPath: 'C:\\clip.mp4',
+      importedVideoDuration: 24,
+      importedVideoFps: 30,
+      importedVideoFpsNum: 30,
+      importedVideoFpsDen: 1,
+      timelineStart: 3,
+      timelineEnd: 21,
+      availableCodecs: null,
+    })
+
+    expect(renderConfig.scene.start).toBe(3)
+    expect(renderConfig.scene.end).toBe(21)
+    expect(renderConfig.scene.custom_export_range_active).toBe(true)
+  })
 })

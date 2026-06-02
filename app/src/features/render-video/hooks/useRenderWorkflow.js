@@ -240,6 +240,8 @@ export default function useRenderWorkflow({ backendStatus }) {
         importedVideoFpsNum: useStore.getState().importedVideoFpsNum,
         importedVideoPath: useStore.getState().importedVideoPath,
         parsedActivity: useStore.getState().parsedActivity,
+        startSecond: useStore.getState().startSecond,
+        endSecond: useStore.getState().endSecond,
         videoSyncOffsetSeconds: useStore.getState().videoSyncOffsetSeconds,
         setActiveRenderId,
         setRenderingVideo,
@@ -310,6 +312,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         end: previewWindow.end,
         update_rate: normalizeUpdateRateForFps(previewFps, updateRate),
       }
+      delete nextConfig.scene.updateRate
 
       const result = await backend.renderPreviewFrame(nextConfig, parsedActivity, previewSecond)
       if (result?.filename) {

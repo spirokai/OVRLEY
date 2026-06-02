@@ -63,7 +63,8 @@ pub fn frame_index_for_second(
         return 0;
     }
 
-    let relative_second = (second - config.scene.start).clamp(0.0, config.scene.end - config.scene.start);
+    let relative_second =
+        (second - config.scene.start).clamp(0.0, config.scene.end - config.scene.start);
     let index = (relative_second * config.scene.fps).round() as isize;
     index.clamp(0, dense_activity.frame_count.saturating_sub(1) as isize) as usize
 }

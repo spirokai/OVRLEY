@@ -70,6 +70,10 @@ export function resolveActiveMetricWidgetData(widgetData) {
     ...(variantConfig || {}),
     ...resolveFrameGeometry(variantConfig, widgetData, frameDefaults),
     id: widgetData.id,
+    value: widgetData.value,
+    x: widgetData.x,
+    y: widgetData.y,
+    opacity: widgetData.opacity,
     display_type: displayType,
   }
 }

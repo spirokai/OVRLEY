@@ -27,6 +27,8 @@ export default async function renderVideo(overrides = {}) {
     setActiveRenderId,
     setRenderingVideo,
     setRenderProgress,
+    startSecond,
+    endSecond,
     updateRate,
     videoSyncOffsetSeconds,
   } = overrides
@@ -50,6 +52,8 @@ export default async function renderVideo(overrides = {}) {
       importedVideoFpsDen,
       importedVideoFpsNum,
       importedVideoPath,
+      timelineStart: startSecond,
+      timelineEnd: endSecond,
       updateRate: activeUpdateRate,
       videoSyncOffsetSeconds,
     })

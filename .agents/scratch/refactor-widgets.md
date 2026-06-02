@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: ready-for-human
 
 # Formalize `display_type` Across Metric Widgets
 

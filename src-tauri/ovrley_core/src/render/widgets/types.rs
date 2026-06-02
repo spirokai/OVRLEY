@@ -40,12 +40,28 @@ pub struct WidgetRenderReport {
     pub frame: WidgetFrameReport,
 }
 
+/// One metric-presentation report with enough identity to map diagnostics back
+/// to the source widget in a multi-presentation template.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct MetricPresentationReport {
+    pub value_idx: usize,
+    pub metric_kind: crate::types::MetricKind,
+    pub display_type: crate::types::DisplayType,
+    pub widget: WidgetRenderReport,
+}
+
+/// Per-widget presentation cache, keyed by value index in the config array.
+#[derive(Clone, Debug)]
+pub enum PresentationCache {
+    HeadingTape(HeadingWidgetCache),
+}
+
 /// Prepared assets shared across frame rendering.
 #[derive(Clone, Debug, Default)]
 pub struct PreparedRenderAssets {
     pub(crate) route_cache: Option<RouteWidgetCache>,
     pub(crate) elevation_cache: Option<ElevationWidgetCache>,
-    pub(crate) heading_cache: Option<HeadingWidgetCache>,
+    pub presentation_caches: BTreeMap<usize, PresentationCache>,
     pub(crate) base_rgba: Option<Vec<u8>>,
 }
 

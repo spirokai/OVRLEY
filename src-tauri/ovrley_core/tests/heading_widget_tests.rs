@@ -203,7 +203,10 @@ fn visible_ticks_respects_show_flags() {
     assert!(major_only.iter().all(|t| t.is_major));
     // Cardinal ticks are always shown and marked as major; non-cardinal
     // ticks in the minor-only set must not be major.
-    assert!(minor_only.iter().filter(|t| !t.is_cardinal).all(|t| !t.is_major));
+    assert!(minor_only
+        .iter()
+        .filter(|t| !t.is_cardinal)
+        .all(|t| !t.is_major));
 }
 
 #[test]

@@ -53,10 +53,7 @@ pub fn prepare_heading_cache(
     let tick_color = plot.tick_color.as_deref().unwrap_or("#ffffff");
     let cardinal_tick_color = plot.cardinal_tick_color.as_deref().unwrap_or(tick_color);
     let label_color = plot.label_color.as_deref().unwrap_or("#ffffff");
-    let cardinal_label_color = plot
-        .cardinal_label_color
-        .as_deref()
-        .unwrap_or(label_color);
+    let cardinal_label_color = plot.cardinal_label_color.as_deref().unwrap_or(label_color);
 
     // Compute tick lengths in pixels (percentage of scaled height)
     let major_tick_length = tape_height as f32 * plot.major_tick_length_pct / 100.0;
@@ -117,29 +114,29 @@ pub fn prepare_heading_cache(
                 shadow_tick_paint.set_anti_alias(true);
                 shadow_tick_paint.set_image_filter(filter.clone());
 
-        for tick in &ticks {
-            shadow_tick_paint.set_color(parse_color(tick_color, 1.0));
-            shadow_tick_paint.set_stroke_width(if tick.is_major {
-                major_tick_thickness
-            } else {
-                minor_tick_thickness
-            });
-            let length = if tick.is_major {
-                major_tick_length
-            } else {
-                minor_tick_length
-            };
-            let top = if plot.tick_alignment == "centered" {
-                center_y - length / 2.0
-            } else {
-                tick_bottom - length
-            };
-            canvas.draw_line(
-                Point::new(tick.x, top),
-                Point::new(tick.x, top + length),
-                &shadow_tick_paint,
-            );
-        }
+                for tick in &ticks {
+                    shadow_tick_paint.set_color(parse_color(tick_color, 1.0));
+                    shadow_tick_paint.set_stroke_width(if tick.is_major {
+                        major_tick_thickness
+                    } else {
+                        minor_tick_thickness
+                    });
+                    let length = if tick.is_major {
+                        major_tick_length
+                    } else {
+                        minor_tick_length
+                    };
+                    let top = if plot.tick_alignment == "centered" {
+                        center_y - length / 2.0
+                    } else {
+                        tick_bottom - length
+                    };
+                    canvas.draw_line(
+                        Point::new(tick.x, top),
+                        Point::new(tick.x, top + length),
+                        &shadow_tick_paint,
+                    );
+                }
 
                 // Shadow pass for labels
                 let mut shadow_label_paint = Paint::default();

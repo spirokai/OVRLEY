@@ -15,6 +15,8 @@ mod geometry;
 pub mod heading;
 /// Marker and dot drawing helpers.
 mod marker;
+/// DisplayType-driven metric presentation dispatch.
+pub mod metric_presentation;
 /// Polyline and area drawing helpers.
 mod polyline;
 /// Route/course widget implementation.
@@ -31,11 +33,14 @@ use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::paths::AppPaths;
+use crate::types::{DisplayType, MetricKind};
 
 pub(crate) use elevation::draw_elevation_widget;
-pub(crate) use heading::draw_heading_widget;
+pub use metric_presentation::draw_metric_presentation;
 pub(crate) use route::draw_route_widget;
-pub use types::{PreparedRenderAssets, WidgetRenderReport};
+pub use types::{
+    MetricPresentationReport, PreparedRenderAssets, PresentationCache, WidgetRenderReport,
+};
 pub(crate) use value::{
     draw_metric_value_widget_with_config, draw_static_metric_icon_for_value, has_static_metric_icon,
 };
@@ -83,13 +88,19 @@ pub fn prepare_render_assets(
         )?);
     }
 
-    if let Some(heading_plot) = config.heading_values()? {
-        assets.heading_cache = Some(heading::prepare_heading_cache(
-            config,
-            &heading_plot,
-            &paths.font_dirs,
-            prepare_profiler,
-        )?);
+    for (idx, value) in config.values.iter().enumerate() {
+        if value.value == MetricKind::Heading && value.display_type == DisplayType::Tape {
+            let hw_config = value.to_heading_widget_config()?;
+            let cache = heading::prepare_heading_cache(
+                config,
+                &hw_config,
+                &paths.font_dirs,
+                prepare_profiler,
+            )?;
+            assets
+                .presentation_caches
+                .insert(idx, types::PresentationCache::HeadingTape(cache));
+        }
     }
 
     Ok(assets)

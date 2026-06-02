@@ -84,4 +84,64 @@ describe('renderVideo', () => {
       }),
     )
   })
+
+  test('uses editor timeline bounds when hydrated template config omitted scene timing', async () => {
+    useStore.setState({
+      config: {
+        ...DEFAULT_CONFIG,
+        scene: {
+          width: DEFAULT_CONFIG.scene.width,
+          height: DEFAULT_CONFIG.scene.height,
+          fps: 30,
+        },
+      },
+      startSecond: 8,
+      endSecond: 42,
+      exportRange: {
+        type: 'full',
+        from: 0,
+        to: 0,
+        fromTime: '00:00:00',
+        toTime: '00:00:00',
+      },
+    })
+
+    await renderVideo(useStore.getState())
+
+    expect(backend.renderVideo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scene: expect.objectContaining({
+          start: 8,
+          end: 42,
+        }),
+      }),
+      expect.any(Object),
+    )
+  })
+
+  test('strips durable scene.updateRate before sending backend update_rate', async () => {
+    useStore.setState({
+      config: {
+        ...DEFAULT_CONFIG,
+        scene: {
+          ...DEFAULT_CONFIG.scene,
+          updateRate: 3,
+        },
+      },
+      updateRate: 3,
+    })
+
+    await renderVideo(useStore.getState())
+
+    expect(backend.renderVideo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scene: expect.not.objectContaining({
+          updateRate: expect.anything(),
+        }),
+      }),
+      expect.any(Object),
+    )
+
+    expect(vi.mocked(backend.renderVideo).mock.calls.at(-1)?.[0]?.scene?.update_rate).toBe(3)
+  })
 })
