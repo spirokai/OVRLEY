@@ -357,6 +357,7 @@ These modules should be deep:
   - storage preserves all presentation variants for a widget
   - runtime consumers operate on the resolved active presentation only
 - The frontend and backend should converge on the same presentation vocabulary and semantics from the shared manifest, even if their concrete rendering implementations remain separate.
+
 ## 4-Phase Implementation Plan
 
 ### Phase 1: Shared `display_type` Contract Formalization
@@ -370,8 +371,8 @@ These modules should be deep:
 1. Extend the shared metric manifest so each `display_type` has a first-class definition.
 2. Add shared metadata for each `display_type`, at minimum:
    - human-readable label
-   - layout mode: `intrinsic` or `boxed`
-   - optional default frame dimensions for boxed presentations
+   - layout mode: `intrinsic` (default text/metric/value) or `boxed` (plots, tapes, and future framed presentations)
+   - optional default frame dimensions for boxed presentations but in SHARED_VALUES and similar variables in widgetDefaults
 3. Keep the existing allowed-display-types-per-metric contract, but source labels and behavior from the formal definitions rather than loose string handling.
 4. Update the frontend standard-metrics loader so callers can resolve:
    - all display type definitions
