@@ -12,7 +12,7 @@ import { resolveWidgetRenderGeometry } from '@/features/overlay-editor/utils/wid
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
-const overlayMoveableSpy = vi.fn()
+const moveableUpdateRectMock = vi.fn()
 
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path) => path,
@@ -51,8 +51,8 @@ vi.mock('@/features/widget-preview/utils/textMeasurement', () => ({
 }))
 
 vi.mock('@/features/overlay-editor/components/OverlayMoveable', () => ({
-  default: (props) => {
-    overlayMoveableSpy(props)
+  default: ({ moveableRef }) => {
+    moveableRef.current = { updateRect: moveableUpdateRectMock }
     return null
   },
 }))
@@ -88,7 +88,12 @@ function makeConfig(labels) {
 describe('OverlayEditor selection flow', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
-    overlayMoveableSpy.mockClear()
+    moveableUpdateRectMock.mockReset()
+    vi.stubGlobal('requestAnimationFrame', (callback) => {
+      callback(0)
+      return 1
+    })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
   })
 
   test('supports pointer multi-select and delete through the shared selection store', () => {
@@ -349,15 +354,15 @@ describe('OverlayEditor selection flow', () => {
     expect(renderGeometry.badgeTop).toBe(215)
   })
 
-  test('refreshes moveable geometry token when selected widget geometry changes from config edits', () => {
-    const initialConfig = makeConfig([makeLabel('A', { id: 'widget-1', x: 10, y: 20, font_size: 30 })])
-    const updatedConfig = makeConfig([makeLabel('A', { id: 'widget-1', x: 10, y: 20, font_size: 48 })])
+  test('refreshes moveable bounds when the selected widget changes intrinsic size', () => {
+    const config = makeConfig([makeLabel('A', { id: 'widget-1', font_size: 30 })])
+    const nextConfig = makeConfig([makeLabel('A', { id: 'widget-1', font_size: 60 })])
 
-    useStore.getState().setConfig(initialConfig)
+    useStore.getState().setConfig(config)
 
     const { container, rerender } = render(
       <OverlayEditor
-        config={initialConfig}
+        config={config}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
@@ -370,15 +375,16 @@ describe('OverlayEditor selection flow', () => {
       />,
     )
 
-    fireEvent.mouseDown(container.querySelector('[data-widget-id="widget-1"]'), { button: 0 })
+    const widget = container.querySelector('[data-widget-id="widget-1"]')
+    expect(widget).toBeTruthy()
 
-    const initialGeometryVersion = overlayMoveableSpy.mock.lastCall?.[0]?.geometryVersion
+    fireEvent.mouseDown(widget, { button: 0 })
+    moveableUpdateRectMock.mockClear()
 
-    useStore.getState().setConfig(updatedConfig)
-
+    useStore.getState().setConfig(nextConfig)
     rerender(
       <OverlayEditor
-        config={updatedConfig}
+        config={nextConfig}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
@@ -391,10 +397,6 @@ describe('OverlayEditor selection flow', () => {
       />,
     )
 
-    const updatedGeometryVersion = overlayMoveableSpy.mock.lastCall?.[0]?.geometryVersion
-
-    expect(initialGeometryVersion).toBeTruthy()
-    expect(updatedGeometryVersion).toBeTruthy()
-    expect(updatedGeometryVersion).not.toBe(initialGeometryVersion)
+    expect(moveableUpdateRectMock).toHaveBeenCalled()
   })
 })
