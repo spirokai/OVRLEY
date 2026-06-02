@@ -117,8 +117,10 @@ export function PreviewSvgText({
   shadowFilterId,
   borderColor,
   borderThickness,
+  textTransform,
 }) {
   const hasShadow = Boolean(shadow && shadowFilterId)
+  const textStyle = textTransform ? { textTransform } : undefined
 
   return (
     <>
@@ -133,6 +135,7 @@ export function PreviewSvgText({
           fontSize={fontSize}
           stroke="none"
           filter={`url(#${shadowFilterId})`}
+          style={textStyle}
         >
           {text}
         </text>
@@ -147,6 +150,7 @@ export function PreviewSvgText({
         paintOrder="stroke fill"
         stroke={borderColor || 'none'}
         strokeWidth={borderThickness || 0}
+        style={textStyle}
       >
         {text}
       </text>

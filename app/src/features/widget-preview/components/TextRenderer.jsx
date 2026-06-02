@@ -46,6 +46,7 @@ export function OverlayTextWidget({ widget, globalOpacity, sceneStyle, textPrevi
         shadowFilterId={sanitizeSvgId(`${widget.id}-label-shadow`)}
         borderColor={sceneStyle?.border_color}
         borderThickness={sceneStyle?.border_thickness}
+        textTransform="none"
       />
     </svg>
   )
