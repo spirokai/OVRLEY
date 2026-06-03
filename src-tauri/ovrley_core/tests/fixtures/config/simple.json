@@ -1,13 +1,33 @@
 {
   "scene": {
-    "fps": 30,
-    "start": 0,
-    "end": 10,
     "width": 1920,
     "height": 1080,
-    "ffmpeg": {}
+    "fps": 30
   },
   "labels": [],
-  "values": [{ "value": "speed", "x": 0, "y": 0 }],
+  "values": [
+    {
+      "x": 0,
+      "y": 0,
+      "prefix": "",
+      "suffix": "",
+      "decimals": 0,
+      "display_type": "text",
+      "unit_color": "#ffffff",
+      "show_icon": true,
+      "icon_size": 45,
+      "icon_offset_x": 0,
+      "icon_offset_y": 0,
+      "icon_color": "#ffffff",
+      "font": "Arial.ttf",
+      "font_size": 100,
+      "color": "#ffffff",
+      "opacity": 1,
+      "show_units": true,
+      "display_unit": "kmh",
+      "id": "widget-1",
+      "value": "speed"
+    }
+  ],
   "plots": []
 }

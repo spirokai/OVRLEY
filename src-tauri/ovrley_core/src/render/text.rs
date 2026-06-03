@@ -146,12 +146,34 @@ pub fn value_style(scene: &SceneConfig, value: &ValueConfig, scale: f32) -> Reso
 
 /// Draws text with optional drop shadow and stroke.
 pub fn draw_text(canvas: &Canvas, text: &str, style: &ResolvedTextStyle, font_dirs: &[PathBuf]) {
+    draw_text_with_vertical_metrics_text(canvas, text, text, style, font_dirs);
+}
+
+/// Draws text while allowing baseline alignment to be measured from a stable
+/// reference string instead of the rendered glyphs.
+pub fn draw_text_with_vertical_metrics_text(
+    canvas: &Canvas,
+    text: &str,
+    vertical_metrics_text: &str,
+    style: &ResolvedTextStyle,
+    font_dirs: &[PathBuf],
+) {
     if text.is_empty() {
         return;
     }
 
     let font = resolve_font(font_dirs, style.font_name.as_deref(), style.font_size);
-    let baseline = baseline_for_text_top_with_line_height(text, style.y, &font, style.line_height);
+    let metrics_text = if vertical_metrics_text.is_empty() {
+        text
+    } else {
+        vertical_metrics_text
+    };
+    let baseline = baseline_for_text_top_with_line_height(
+        metrics_text,
+        style.y,
+        &font,
+        style.line_height,
+    );
 
     if let Some(shadow_color) = style.shadow_color {
         if style.shadow_strength > 0.0 || style.shadow_distance != 0.0 {

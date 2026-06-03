@@ -3,10 +3,11 @@
  * - Frame geometry defaults come from the shared manifest (getDefaultFrameDimensions)
  * - Display-specific non-geometry defaults come from the manifest
  *   (getDisplayVariantNonGeometryDefaults)
- * - Text reset defaults come from TEXT_DEFAULTS in standard-metrics
+ * - Text reset defaults come from TEXT_DEFAULTS in standard-widgets
  */
 
-import { getDefaultFrameDimensions, getDisplayVariantNonGeometryDefaults, TEXT_DEFAULTS } from '@/lib/standard-metrics'
+import { TEXT_DEFAULTS } from '@/lib/standard-widgets'
+import { getDefaultFrameDimensions, getDisplayVariantNonGeometryDefaults } from '@/lib/standard-metrics'
 
 /**
  * Resolves frame geometry from the 3-tier fallback chain:

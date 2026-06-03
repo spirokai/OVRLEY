@@ -1,56 +1,24 @@
 /**
- * @file Standard Metric Widget Builder
+ * @file Standard Metric Helpers
  *
- * Bridge between the canonical metric catalog at `assets/standard-metrics.json`
- * and the frontend widget system. Loads all metric definitions and display-type
- * definitions at import time and exposes pure lookup functions — no state, no
- * side effects.
- *
- * Each metric definition in the manifest describes:
- * - `type` — unique key string
- * - `current` — `true` for shipping widgets, `false` for planned/future types
- * - `label` — human-readable name
- * - `defaultDisplayUnit` — fallback unit value
- * - `supportedDisplayUnits` — array of `{ value, label, renderLabel? }`
- * - `showUnitsByDefault` — whether to show the unit label out of the box
- * - `formatter` — key into the formatting system
- * - `icon` — `{ source, assetFile, name? }`
- *
- * Each display-type definition in the manifest describes:
- * - `label` — human-readable name
- * - `layoutMode` — `"intrinsic"` (text/metric) or `"boxed"` (framed presentation)
- * - `defaultFrameWidth` / `defaultFrameHeight` — optional defaults for boxed types
+ * Pure lookup functions for the standard metric catalog. All constants are
+ * owned by `@/lib/standard-widgets`; this module imports only what it needs
+ * and exposes no derived constants — just functions.
  *
  * @module standard-metrics
  */
 
-import standardMetricsManifest from '../../../assets/standard-metrics.json'
-import { GRADIENT_DEFAULTS } from '@/lib/standard-widgets'
-
-/** Map of type -> definition for O(1) lookups. */
-const STANDARD_METRIC_DEFINITIONS = Object.fromEntries(standardMetricsManifest.definitions.map((definition) => [definition.type, definition]))
+import {
+  STANDARD_METRIC_DEFINITIONS,
+  DISPLAY_TYPE_DEFINITIONS,
+  DISPLAY_TYPE_LABELS,
+  DISPLAY_TYPE_OVERRIDES,
+  DEFAULT_DISPLAY_TYPES,
+} from '@/lib/standard-widgets'
 
 // ---------------------------------------------------------------------------
-// Display type definitions (shared with backend via assets/standard-metrics.json)
+// Display type helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Map of display_type value -> definition object.
- * Each definition includes: `label`, `layoutMode` ("intrinsic" | "boxed"),
- * and for boxed presentations: `defaultFrameWidth`, `defaultFrameHeight`.
- */
-export const DISPLAY_TYPE_DEFINITIONS = Object.freeze(
-  Object.fromEntries(Object.entries(standardMetricsManifest.displayTypes.definitions).map(([key, def]) => [key, Object.freeze(def)])),
-)
-
-/** Map of display_type value -> human-readable label for dropdown menus. */
-export const DISPLAY_TYPE_LABELS = Object.fromEntries(Object.entries(DISPLAY_TYPE_DEFINITIONS).map(([key, def]) => [key, def.label]))
-
-/** The default set of display types available to all metric value widgets. */
-export const DEFAULT_DISPLAY_TYPES = Object.freeze([...standardMetricsManifest.displayTypes.defaults])
-
-/** Per-metric overrides that restrict which display types are permitted. */
-const DISPLAY_TYPE_OVERRIDES = Object.freeze({ ...standardMetricsManifest.displayTypes.overrides })
 
 /**
  * Look up the full definition object for a display_type value.
@@ -116,21 +84,9 @@ export function getDisplayTypeOptions(metricType) {
   }))
 }
 
-/**
- * Metric types marked as `current` — actively shipping widget types.
- * @type {string[]}
- */
-const CURRENT_STANDARD_METRIC_WIDGET_TYPES = standardMetricsManifest.definitions
-  .filter((definition) => definition.current)
-  .map((definition) => definition.type)
-
-export { CURRENT_STANDARD_METRIC_WIDGET_TYPES }
-
-/**
- * Every metric type defined in the manifest (both current and planned).
- * @type {string[]}
- */
-export const STANDARD_METRIC_WIDGET_TYPES = standardMetricsManifest.definitions.map((definition) => definition.type)
+// ---------------------------------------------------------------------------
+// Metric definition helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Check whether a widget type is a known standard metric type.
@@ -185,84 +141,6 @@ export function getStandardMetricUnitLabel(type, displayUnit) {
   const option = definition?.supportedDisplayUnits.find((candidate) => candidate.value === resolvedUnit)
   return option?.renderLabel ?? option?.label ?? ''
 }
-
-// ---------------------------------------------------------------------------
-// Widget defaults owned by display type definitions
-// ---------------------------------------------------------------------------
-
-const _textDef = standardMetricsManifest.displayTypes.definitions.text
-
-/**
- * Flat default values for the "text" display type (value widgets).
- * Spread directly into factory-created widget data.
- * Sourced from displayTypes.definitions.text.defaults in the manifest.
- * @type {object}
- */
-export const TEXT_DEFAULTS = Object.freeze(_textDef.defaults)
-
-/**
- * Default font sizes keyed by metric type for text display.
- * Sourced from displayTypes.definitions.text.fontSizeByType in the manifest.
- * @type {{ time: number, gradient: number, heading: number, default: number }}
- */
-export const TEXT_FONT_SIZES = Object.freeze(_textDef.fontSizeByType)
-
-/**
- * Default fields for label widgets (text display type).
- * Sourced from displayTypes.definitions.text.labelDefaults in the manifest.
- * @type {{ x: number, y: number, font_size: number, text: string }}
- */
-export const TEXT_LABEL_DEFAULTS = Object.freeze(_textDef.labelDefaults)
-
-/**
- * Default values for the "heading_tape" display variant.
- * Sourced from displayTypes.definitions.heading_tape.defaults in the manifest.
- * @type {object}
- */
-export const HEADING_TAPE_DEFAULTS = Object.freeze(standardMetricsManifest.displayTypes.definitions.heading_tape.defaults)
-
-/**
- * Base defaults computed from each standard metric definition.
- * Each entry provides `show_units` and `display_unit` derived from the
- * manifest's `showUnitsByDefault` and `defaultDisplayUnit`.
- * `unit_color` is not here — it is a shared text display default
- * (TEXT_DEFAULTS.unit_color).
- * @type {Record<string, {show_units: boolean, display_unit: string|null}>}
- */
-export const METRIC_TYPE_BASE_DEFAULTS = Object.freeze(
-  Object.fromEntries(
-    STANDARD_METRIC_WIDGET_TYPES.map((type) => {
-      const definition = getStandardMetricDefinition(type)
-      return [
-        type,
-        Object.freeze({
-          show_units: definition?.showUnitsByDefault ?? false,
-          display_unit: definition?.defaultDisplayUnit,
-        }),
-      ]
-    }),
-  ),
-)
-
-const _metricTypeOverrides = _textDef.metricTypeOverrides || {}
-
-/**
- * Combined metric type defaults: base defaults from each metric definition
- * overlaid with text display type overrides from the manifest and
- * gradient-specific defaults from standard-widgets.
- *
- * Each override entry is shallow-merged over its base — adding a new
- * metricTypeOverrides entry in the manifest automatically flows through.
- *
- * @type {Record<string, object>}
- */
-export const TYPE_DEFAULTS = Object.freeze({
-  ...METRIC_TYPE_BASE_DEFAULTS,
-  ...Object.fromEntries(
-    Object.entries(_metricTypeOverrides).map(([type, override]) => [type, Object.freeze({ ...METRIC_TYPE_BASE_DEFAULTS[type], ...override })]),
-  ),
-  gradient: GRADIENT_DEFAULTS,
-})
 
 /**
  * Look up display-specific non-geometry defaults for a given display type.

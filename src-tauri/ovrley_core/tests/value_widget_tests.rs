@@ -67,3 +67,35 @@ fn metric_icon_top_centers_on_value_glyph_box() {
 
     assert!((actual - 30.0).abs() < 0.001);
 }
+
+#[test]
+// Verifies stable numeric baseline measurement removes per-digit vertical drift.
+fn stable_numeric_vertical_metrics_keep_baseline_constant() {
+    use ovrley_core::render::text::{baseline_for_text_top_with_line_height, resolve_font};
+    use std::path::PathBuf;
+
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    let font_dirs = vec![workspace_root.join("fonts")];
+    let font = resolve_font(&font_dirs, Some("JetBrains Mono.ttf"), 90.0);
+    let top = 100.0;
+    let line_height = 90.0 * 0.92;
+
+    let live_one = baseline_for_text_top_with_line_height("1", top, &font, line_height);
+    let live_nine = baseline_for_text_top_with_line_height("9", top, &font, line_height);
+    let stable_one =
+        baseline_for_text_top_with_line_height(NUMERIC_VERTICAL_METRICS_TEXT, top, &font, line_height);
+    let stable_nine =
+        baseline_for_text_top_with_line_height(NUMERIC_VERTICAL_METRICS_TEXT, top, &font, line_height);
+
+    assert_ne!(
+        live_one, live_nine,
+        "JetBrains Mono should expose different live baselines for different digits in Skia"
+    );
+    assert_eq!(
+        stable_one, stable_nine,
+        "Stable numeric metrics should keep the baseline fixed across digit changes"
+    );
+}

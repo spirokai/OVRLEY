@@ -2,9 +2,8 @@
  * @file template-state – Orchestration layer for durable ↔ editor-effective
  * template materialization.
  *
- * This module composes the normalization layer (template-normalization.js) and
- * the constants layer (template-defaults.js) to produce the two public shapes
- * the rest of the app depends on:
+ * This module composes the normalization layer (template-normalization.js) to
+ * produce the two public shapes the rest of the app depends on:
  *
  * 1. **Durable template state** – for file save/load and dirty checks.
  *    createDurableTemplateState normalizes the config and settings into a
@@ -15,11 +14,6 @@
  *    opacity, scale) into the committed config so editors see fully resolved
  *    widget data without having to resolve globals themselves.
  *
- * The split exists because:
- * - template-defaults.js owns static constants (zero runtime logic)
- * - template-normalization.js owns the durable normalization steps (pure functions)
- * - This file composes them into the two materializations the app needs
- *
  * Callers should import from this module only — re-exports keep a single
  * import path.
  *
@@ -29,6 +23,7 @@
 import { createFontSelection, getFontFamilyName } from '@/lib/fonts'
 import { getThemeColor } from '@/lib/theme'
 import { resolveActiveMetricWidgetData } from '@/lib/metric-widget-resolver'
+import { DEFAULT_GLOBAL_DEFAULTS } from './template-constants'
 import {
   applyPreviewOverrides,
   mergeSceneGlobalDefaults,
@@ -36,33 +31,13 @@ import {
   normalizeTemplateConfig,
   pickDefined,
 } from './template-normalization'
-import { DEFAULT_GLOBAL_DEFAULTS, DEFAULT_SCENE_FONT_SIZE, SCENE_STYLE_DEFAULTS } from './template-defaults'
-
-// Re-export defaults so callers have a single import path
-export {
-  DEFAULT_GLOBAL_DEFAULTS,
-  DEFAULT_SCENE_FONT_SIZE,
-  GLOBAL_DEFAULT_KEYS,
-  SCENE_DERIVED_SETTING_KEYS,
-  SCENE_GLOBAL_DEFAULT_KEYS,
-  SCENE_STYLE_DEFAULTS,
-  SCENE_STYLE_KEYS,
-} from './template-defaults'
-
-export { normalizeGlobalDefaults, normalizeTemplateConfig } from './template-normalization'
 
 function buildEffectiveSceneData(sceneData, globals) {
   if (!sceneData) return sceneData
-  const globalSceneStyle = pickDefined(globals, ['border_color', 'border_thickness', 'shadow_color', 'shadow_strength', 'shadow_distance'])
   return {
-    ...SCENE_STYLE_DEFAULTS,
+    ...DEFAULT_GLOBAL_DEFAULTS,
     ...sceneData,
-    ...globalSceneStyle,
-    font: globals?.font_text || sceneData.font || DEFAULT_GLOBAL_DEFAULTS.font_text,
-    color: globals?.color_text || sceneData.color || getThemeColor('ice'),
-    font_size: sceneData.font_size ?? DEFAULT_SCENE_FONT_SIZE,
-    opacity: globals?.opacity,
-    scale: globals?.scale,
+    ...pickDefined(globals, Object.keys(DEFAULT_GLOBAL_DEFAULTS)),
   }
 }
 

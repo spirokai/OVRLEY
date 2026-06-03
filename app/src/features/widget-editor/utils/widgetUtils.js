@@ -1,12 +1,18 @@
 /**
  * Pure helper functions for widget creation, parsing, and geometry.
- * Domain constants used by these functions live in @/lib/standard-metrics
- * and @/lib/standard-widgets.
+ * Domain constants used by these functions live in @/lib/standard-widgets.
  */
 
 import { createFontSelection } from '@/lib/fonts'
-import { TEXT_DEFAULTS, TEXT_FONT_SIZES, TEXT_LABEL_DEFAULTS, TYPE_DEFAULTS, HEADING_TAPE_DEFAULTS } from '@/lib/standard-metrics'
-import { PLOT_BASE_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS, COURSE_DIMENSIONS_FALLBACK } from '@/lib/standard-widgets'
+import {
+  TEXT_DEFAULTS,
+  TEXT_FONT_SIZES,
+  TEXT_LABEL_DEFAULTS,
+  TYPE_DEFAULTS,
+  HEADING_TAPE_DEFAULTS,
+  COURSE_PLOT_DEFAULTS,
+  ELEVATION_PLOT_DEFAULTS,
+} from '@/lib/standard-widgets'
 
 /**
  * Parses integer.
@@ -20,14 +26,6 @@ export function parseInteger(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
-/**
- * Constrains a value to the provided minimum and maximum bounds.
- *
- * @param {*} value - Input value processed by the helper.
- * @param {*} min - Lower bound used by the calculation.
- * @param {*} max - Upper bound used by the calculation.
- * @returns {number} Result produced by the helper.
- */
 /**
  * Returns widget font.
  *
@@ -61,7 +59,7 @@ function getCourseWidgetDimensions(coursePoints) {
   const validPoints = (coursePoints || []).filter(([latitude, longitude]) => Number.isFinite(latitude) && Number.isFinite(longitude))
 
   if (validPoints.length < 2) {
-    return COURSE_DIMENSIONS_FALLBACK
+    return null
   }
 
   const meanLatitudeRadians = (validPoints.reduce((sum, [latitude]) => sum + latitude, 0) / validPoints.length) * (Math.PI / 180)
@@ -153,27 +151,21 @@ export function createMetricValueDefaults(type, globalDefaults) {
  * @returns {object} Derived data structure for downstream use.
  */
 export function createPlotDefaults(type, globalDefaults, options = {}) {
-  const courseDimensions = type === 'course' ? getCourseWidgetDimensions(options.coursePoints) : COURSE_DIMENSIONS_FALLBACK
-  const base = {
-    ...PLOT_BASE_DEFAULTS,
-    value: type,
-    width: courseDimensions.width,
-    height: courseDimensions.height,
-    opacity: globalDefaults?.opacity ?? 1,
-  }
-
   if (type === 'course') {
+    // Required because course widget aspect ratio determined by the course points, so we can't set them as static defaults like other plot types
+    const courseDimensions = getCourseWidgetDimensions(options.coursePoints)
     return {
-      ...base,
       ...COURSE_PLOT_DEFAULTS,
+      ...(courseDimensions ? { width: courseDimensions.width, height: courseDimensions.height } : {}),
+      opacity: globalDefaults?.opacity ?? 1,
       color: getGlobalColor(globalDefaults, 'color_values'),
     }
   }
 
   const labelFont = globalDefaults?.font_values || 'Arial.ttf'
   return {
-    ...base,
     ...ELEVATION_PLOT_DEFAULTS,
+    opacity: globalDefaults?.opacity ?? 1,
     color: getGlobalColor(globalDefaults, 'color_values'),
     point_label: {
       ...createFontSelection(labelFont),

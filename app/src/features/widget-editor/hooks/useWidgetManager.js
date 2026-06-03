@@ -76,7 +76,7 @@ export function useWidgetManager() {
       nextConfig.plots.push(
         createPlotDefaults(type, globalDefaults, {
           coursePoints: parsedActivity?.sample_course_points,
-          sceneFontSize: nextConfig.scene?.font_size,
+          sceneFontSize: globalDefaults?.font_size,
         }),
       )
     }

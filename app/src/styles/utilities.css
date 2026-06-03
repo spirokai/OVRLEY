@@ -58,3 +58,26 @@
 .sidebar-scrollbar::-webkit-scrollbar-thumb:active {
   background-color: var(--sidebar-accent);
 }
+
+/* Widget drawer scrollbar — extra thin variant */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--sidebar-foreground) 40%, transparent) transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 2px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--sidebar-foreground) 40%, transparent);
+  border-radius: 1px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--sidebar-accent);
+}

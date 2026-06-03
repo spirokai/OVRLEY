@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { resolveActiveMetricWidgetData, initDisplayVariant, resetCurrentDisplayConfig } from '@/lib/metric-widget-resolver'
-import { HEADING_TAPE_DEFAULTS } from '@/lib/standard-metrics'
+import { HEADING_TAPE_DEFAULTS } from '@/lib/standard-widgets'
 
 describe('resolveActiveMetricWidgetData', () => {
   test('returns flat data as-is for text display_type', () => {

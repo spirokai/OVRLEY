@@ -1,17 +1,15 @@
 {
   "plot": {
-    "base": {
+    "course": {
+      "value": "course",
       "x": 100,
       "y": 100,
       "rotation": 0,
+      "opacity": 1,
       "completed_line_width": 6,
-      "remaining_line_width": 6
-    },
-    "courseDimensionsFallback": {
+      "remaining_line_width": 6,
       "width": 400,
-      "height": 200
-    },
-    "course": {
+      "height": 200,
       "completed_line_opacity": 100,
       "remaining_line_opacity": 35,
       "simplify_tolerance_px": 1,
@@ -23,9 +21,19 @@
       "marker_opacity": 100,
       "completed_line_color": "#ffffff",
       "remaining_line_color": "#ffffff",
-      "marker_color": "#ffffff"
+      "marker_color": "#ffffff",
+      "color": "#ffffff"
     },
     "elevation": {
+      "value": "elevation",
+      "x": 100,
+      "y": 100,
+      "rotation": 0,
+      "opacity": 1,
+      "completed_line_width": 6,
+      "remaining_line_width": 6,
+      "width": 400,
+      "height": 200,
       "completed_line_opacity": 100,
       "remaining_line_opacity": 35,
       "area_completed_opacity": 24,
@@ -48,7 +56,13 @@
       "remaining_line_color": "#ffffff",
       "area_completed_color": "#ffffff",
       "area_remaining_color": "#ffffff",
-      "marker_color": "#ffffff"
+      "marker_color": "#ffffff",
+      "color": "#ffffff",
+      "point_label": {
+        "font": "Arial.ttf",
+        "font_size": 12.5,
+        "color": "#ffffff"
+      }
     }
   },
   "gradient": {
@@ -60,5 +74,14 @@
     "triangle_width": 72,
     "triangle_positive_color": "#40e0d0",
     "triangle_negative_color": "#c65102"
+  },
+  "label": {
+    "x": 100,
+    "y": 100,
+    "font": "Arial.ttf",
+    "font_size": 60,
+    "text": "New Text",
+    "color": "#ffffff",
+    "opacity": 1
   }
 }

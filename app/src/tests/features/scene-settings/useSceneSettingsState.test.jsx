@@ -70,7 +70,7 @@ describe('useSceneSettingsState', () => {
 
 describe('sceneStyleValue', () => {
   test('returns scene value when defined', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    useStore.setState({ aspectRatio: '16:9', updateRate: 1, globalDefaults: { font_size: 42 } })
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene, font_size: 42 } }
 
