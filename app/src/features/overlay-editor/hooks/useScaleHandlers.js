@@ -17,7 +17,7 @@ import { flushSync } from 'react-dom'
  * @param {object} ctx.selectedWidget
  * @param {object} ctx.selectedTarget
  * @param {number} ctx.globalScale
- * @param {Function} ctx.setLiveWidgetDraft
+ * @param {Function} ctx.setLiveWidgetPreview
  * @param {Function} ctx.commitWidgetUpdate
  * @param {Function} ctx.clearWidgetDraft
  * @returns {object} Scale handler methods.
@@ -29,7 +29,7 @@ export function useScaleHandlers({
   selectedWidget,
   selectedTarget,
   globalScale,
-  setLiveWidgetDraft,
+  setLiveWidgetPreview,
   commitWidgetUpdate,
   clearWidgetDraft,
 }) {
@@ -69,7 +69,7 @@ export function useScaleHandlers({
       }
       draftWidgetsRef.current[selectedWidget.id] = {}
     },
-    onScale: ({ scale, direction, drag, target }) => {
+    onScale: ({ scale, drag, target }) => {
       const origin = interactionStartRef.current
       if (!origin?.id) return
       const rawScale = Number.isFinite(scale?.[0]) ? scale[0] : Number.isFinite(scale?.[1]) ? scale[1] : 1
@@ -83,26 +83,26 @@ export function useScaleHandlers({
       const nextX = origin.x + tx + origin.renderedMinX * (1 - uniformScale) * globalScale
       const nextY = origin.y + ty + (origin.renderedMinY * globalScale + gradientYOffset) * (1 - uniformScale)
 
-      const positionedDraft = {
-        ...draftWidgetsRef.current[origin.id],
-        x: nextX,
-        y: nextY,
-        scale_factor: uniformScale,
-        scale_start_width: origin.renderedWidth,
-        scale_start_height: origin.renderedHeight,
-        scale_start_left: origin.renderedLeft,
-        scale_start_top: origin.renderedTop,
-        translate_x: tx,
-        translate_y: ty,
+      const preview = {
+        left: origin.renderedLeft,
+        top: origin.renderedTop,
+        width: origin.renderedWidth,
+        height: origin.renderedHeight,
+        scaleFactor: uniformScale,
+        translateX: tx,
+        translateY: ty,
       }
       const nextDraft = {
-        ...positionedDraft,
-        scale_direction: direction,
+        scaleFactor: uniformScale,
+        translateX: tx,
+        translateY: ty,
+        x: nextX,
+        y: nextY,
       }
 
       draftWidgetsRef.current[origin.id] = nextDraft
       flushSync(() => {
-        setLiveWidgetDraft(origin.id, positionedDraft)
+        setLiveWidgetPreview(origin.id, preview)
       })
 
       if (scalePreviewFrameRef.current) {
@@ -112,7 +112,7 @@ export function useScaleHandlers({
       scalePreviewFrameRef.current = requestAnimationFrame(() => {
         const targetNode = target ?? selectedTarget
         if (!targetNode) return
-        applyLiveScalePositionStyles(targetNode, selectedWidget, positionedDraft, globalScale)
+        applyLiveScalePositionStyles(targetNode, selectedWidget, preview, globalScale)
       })
     },
     onScaleEnd: () => {
@@ -126,11 +126,11 @@ export function useScaleHandlers({
 
       const draft = draftWidgetsRef.current[origin.id]
       if (draft) {
-        const finalScale = draft.scale_factor ?? 1
+        const finalScale = draft.scaleFactor ?? 1
         const scaledDraft = buildScaledWidgetDataDraft(origin, finalScale, selectedWidget, { round: true })
 
-        const tx = draft.translate_x ?? 0
-        const ty = draft.translate_y ?? 0
+        const tx = draft.translateX ?? 0
+        const ty = draft.translateY ?? 0
         const gradientYOffset = selectedWidget.type === 'gradient' ? Math.min(0, -origin.valueOffset) : 0
         const finalX = origin.x + tx + origin.renderedMinX * (1 - finalScale) * globalScale
         const finalY = origin.y + ty + (origin.renderedMinY * globalScale + gradientYOffset) * (1 - finalScale)

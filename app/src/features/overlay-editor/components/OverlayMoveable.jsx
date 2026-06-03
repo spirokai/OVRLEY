@@ -3,7 +3,7 @@
  */
 
 import Moveable from 'react-moveable'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { CORNER_RESIZE_DIRECTIONS, EDGE_RESIZE_DIRECTIONS, MOVEABLE_ZOOM } from '../data/overlayEditorConstants'
 
@@ -44,6 +44,7 @@ export default function OverlayMoveable({
   moveableRef,
   selectedTarget,
   selectedTargets,
+  geometryVersion,
   isGroupDragActive,
   sceneElement,
   displayScale,
@@ -62,6 +63,18 @@ export default function OverlayMoveable({
   const moveableZoom = MOVEABLE_ZOOM / Math.max(displayScale, Number.EPSILON) / 2
   const horizontalGuidelines = useMemo(() => getGridGuidelines(sceneSize.height, gridSize, snapToGrid), [gridSize, sceneSize.height, snapToGrid])
   const verticalGuidelines = useMemo(() => getGridGuidelines(sceneSize.width, gridSize, snapToGrid), [gridSize, sceneSize.width, snapToGrid])
+
+  useEffect(() => {
+    if (!moveableRef.current || (!selectedTarget && !selectedTargets.length) || geometryVersion === 'none') {
+      return undefined
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      moveableRef.current?.updateRect()
+    })
+
+    return () => cancelAnimationFrame(frameId)
+  }, [geometryVersion, moveableRef, selectedTarget, selectedTargets])
 
   if ((!selectedTarget && !selectedTargets.length) || !sceneElement) {
     return null

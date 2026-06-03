@@ -1,37 +1,20 @@
 /**
- * Live widget draft state — temporary edits during drag/resize/scale/rotate.
+ * Live widget draft state - temporary edits during drag/resize/scale/rotate.
  *
- * Maintains a mutable ref (draftWidgetsRef) for synchronous access during
- * interaction frame callbacks, and a React state (liveWidgetDrafts) for
- * triggering re-renders. Both are kept in sync.
- *
- * Drafts are committed to config only when the interaction ends
- * (onDragEnd, onResizeEnd, onScaleEnd, onRotateEnd).
+ * Maintains mutable refs for synchronous access during interaction callbacks,
+ * and React state mirrors for rendering. Drafts are committed to config only
+ * when the interaction ends.
  */
 
 import { useCallback, useRef, useState } from 'react'
 import { clearLiveWidgetDraft, clearLiveWidgetDrafts } from '../utils/widgetDomHelpers'
 
-/**
- * Provides live widget draft state — temporary unsaved property overrides
- * applied during moveable interactions (drag, resize, scale, rotate).
- *
- * @returns {{
- *   clearWidgetDraft: (widgetId: string) => void,
- *   clearWidgetDrafts: (widgetIds: string[]) => void,
- *   draftWidgetsRef: React.MutableRefObject<Object<string, Object>>,
- *   liveWidgetDrafts: Object<string, Object>,
- *   resetWidgetDrafts: () => void,
- *   setLiveWidgetDraft: (widgetId: string, nextDraft: Object) => void,
- *   setLiveWidgetDraftsBatch: (nextDraftsById: Object<string, Object>) => void,
- * }}
- */
 export default function useWidgetDraftState() {
-  // Mutable ref and react state — dual storage for sync + render-trigger
   const draftWidgetsRef = useRef({})
   const [liveWidgetDrafts, setLiveWidgetDrafts] = useState({})
+  const widgetPreviewRef = useRef({})
+  const [liveWidgetPreviews, setLiveWidgetPreviews] = useState({})
 
-  // Draft mutations — set single, set batch, clear single, clear batch, reset all
   const setLiveWidgetDraft = useCallback((widgetId, nextDraft) => {
     draftWidgetsRef.current[widgetId] = nextDraft
     setLiveWidgetDrafts((current) => ({
@@ -40,7 +23,6 @@ export default function useWidgetDraftState() {
     }))
   }, [])
 
-  // Batch set — updates multiple widget drafts in a single state commit
   const setLiveWidgetDraftsBatch = useCallback((nextDraftsById) => {
     Object.entries(nextDraftsById).forEach(([widgetId, nextDraft]) => {
       draftWidgetsRef.current[widgetId] = nextDraft
@@ -49,6 +31,14 @@ export default function useWidgetDraftState() {
     setLiveWidgetDrafts((current) => ({
       ...current,
       ...nextDraftsById,
+    }))
+  }, [])
+
+  const setLiveWidgetPreview = useCallback((widgetId, nextPreview) => {
+    widgetPreviewRef.current[widgetId] = nextPreview
+    setLiveWidgetPreviews((current) => ({
+      ...current,
+      [widgetId]: nextPreview,
     }))
   }, [])
 
@@ -87,16 +77,19 @@ export default function useWidgetDraftState() {
   const resetWidgetDrafts = useCallback(() => {
     draftWidgetsRef.current = {}
     setLiveWidgetDrafts({})
+    widgetPreviewRef.current = {}
+    setLiveWidgetPreviews({})
   }, [])
 
-  // Return — draft state and mutation actions for moveable interaction handlers
   return {
     clearWidgetDraft,
     clearWidgetDrafts,
     draftWidgetsRef,
     liveWidgetDrafts,
+    liveWidgetPreviews,
     resetWidgetDrafts,
     setLiveWidgetDraft,
     setLiveWidgetDraftsBatch,
+    setLiveWidgetPreview,
   }
 }

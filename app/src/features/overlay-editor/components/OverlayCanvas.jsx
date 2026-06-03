@@ -7,15 +7,13 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
-import { getWidgetSceneOrigin } from '../utils/overlayEditorHelpers'
 import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel, WidgetPreview } from '@/features/widget-preview'
 import { useFontMetricsVersion } from '@/features/widget-preview/hooks/useFontMetricsVersion'
 import { getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
-import { buildWidgetTransform } from '@/lib/geometryUtils'
-import { isBoxedMetricWidget } from '@/lib/display-type-behavior'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
 import useStore from '@/store/useStore'
+import { resolveWidgetRenderGeometry } from '../utils/widgetRenderGeometry'
 
 /**
  * Canvas overlay grid — draws a teal-colored grid on an HTML canvas element
@@ -82,6 +80,7 @@ const CanvasGrid = memo(function CanvasGrid({ displayScale, sceneSize }) {
 const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({
     widget,
+    preview,
     globalScale,
     globalOpacity,
     activity,
@@ -107,34 +106,8 @@ const OverlayCanvasWidget = memo(
     const metricVisualBounds = metricPreviewModel?.visualBounds ?? null
     const textPreviewModel = buildTextWidgetPreviewModel({ widget })
     const visualBounds = metricVisualBounds ?? textPreviewModel?.visualBounds ?? null
-    const isBoxed = isBoxedMetricWidget(widget)
-    const scaleFactor = widget.data.scale_factor
-    const isScaling = scaleFactor !== undefined
+    const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, preview)
 
-    const origin = isScaling
-      ? { x: widget.data.scale_start_left, y: widget.data.scale_start_top }
-      : getWidgetSceneOrigin(widget, null, visualBounds, {
-          boundsScale: isBoxed ? 1 : globalScale,
-        })
-    const scale = isScaling ? globalScale * scaleFactor : isBoxed ? 1 : globalScale
-    const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
-    const width = isScaling
-      ? widget.data.scale_start_width
-      : isBoxed
-        ? (widget.data.width ?? 0) * (globalScale || 1)
-        : (visualBounds?.width ?? widget.data.width)
-    const height = isScaling
-      ? widget.data.scale_start_height
-      : isBoxed
-        ? (widget.data.height ?? 0) * (globalScale || 1)
-        : (visualBounds?.height ?? widget.data.height)
-
-    let transformStr = buildWidgetTransform({ scale, rotation })
-    if (isScaling) {
-      const tx = widget.data.translate_x ?? 0
-      const ty = widget.data.translate_y ?? 0
-      transformStr = `translate(${tx}px, ${ty}px)${transformStr ? ' ' + transformStr : ''}`
-    }
     return (
       <div
         ref={registerNode}
@@ -145,11 +118,11 @@ const OverlayCanvasWidget = memo(
         data-widget-bounds-bottom={visualBounds?.maxY ?? 0}
         className="group absolute cursor-move select-none rounded-xl outline-1 outline-transparent transition-shadow hover:z-50"
         style={{
-          left: origin.x,
-          top: origin.y,
-          width,
-          height,
-          transform: transformStr,
+          left: renderGeometry.left,
+          top: renderGeometry.top,
+          width: renderGeometry.width,
+          height: renderGeometry.height,
+          transform: renderGeometry.transform,
           transformOrigin: 'top left',
         }}
         onMouseDown={(event) => {
@@ -181,6 +154,7 @@ const OverlayCanvasWidget = memo(
   },
   (previousProps, nextProps) =>
     previousProps.widget === nextProps.widget &&
+    previousProps.preview === nextProps.preview &&
     previousProps.globalScale === nextProps.globalScale &&
     previousProps.globalOpacity === nextProps.globalOpacity &&
     previousProps.activity === nextProps.activity &&
@@ -273,6 +247,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
             <OverlayCanvasWidget
               key={widget.id}
               widget={widget}
+              preview={dataProps.widgetPreviews?.[widget.id] ?? null}
               globalScale={globalScale}
               globalOpacity={globalOpacity}
               activity={activity}

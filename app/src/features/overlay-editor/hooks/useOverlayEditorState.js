@@ -14,13 +14,12 @@
  * @module useOverlayEditorState
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import useStore from '@/store/useStore'
 import { buildConfigWidgets } from '@/lib/widget-presentation'
 import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget-config'
 import { resolvePreviewSecond } from '@/lib/preview-timing'
 import { getEffectiveWidgetData } from '@/lib/template-state'
-import { deepEqual } from '@/store/store-utils'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
 import { getSceneSize } from '../utils/overlayEditorUtils'
 import useWidgetDraftState from './useWidgetDraftState'
@@ -52,13 +51,21 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
   const scalePreviewFrameRef = useRef(null)
-  const prevWidgetDataRef = useRef(null)
 
   const [sceneElement, setSceneElement] = useState(null)
   const [widgetNodes, setWidgetNodes] = useState({})
 
-  const { clearWidgetDraft, clearWidgetDrafts, draftWidgetsRef, liveWidgetDrafts, resetWidgetDrafts, setLiveWidgetDraft, setLiveWidgetDraftsBatch } =
-    useWidgetDraftState()
+  const {
+    clearWidgetDraft,
+    clearWidgetDrafts,
+    draftWidgetsRef,
+    liveWidgetDrafts,
+    liveWidgetPreviews,
+    resetWidgetDrafts,
+    setLiveWidgetDraft,
+    setLiveWidgetDraftsBatch,
+    setLiveWidgetPreview,
+  } = useWidgetDraftState()
 
   const sourceActivity = useStore.getState().parsedActivity
   const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
@@ -104,17 +111,6 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   const renderedWidgetMap = useMemo(() => Object.fromEntries(renderedWidgets.map((w) => [w.id, w])), [renderedWidgets])
   const orderedWidgetIds = useMemo(() => renderedWidgets.map((w) => w.id), [renderedWidgets])
 
-  const [widgetDataVersion, setWidgetDataVersion] = useState(0)
-  const selectedWidgetsSnapshot = useMemo(() => renderedWidgets, [renderedWidgets])
-
-  useLayoutEffect(() => {
-    const prev = prevWidgetDataRef.current
-    if (!prev || !deepEqual(selectedWidgetsSnapshot, prev)) {
-      setWidgetDataVersion((v) => v + 1)
-    }
-    prevWidgetDataRef.current = selectedWidgetsSnapshot
-  }, [selectedWidgetsSnapshot])
-
   const widgetRefCallbacks = useMemo(
     () =>
       Object.fromEntries(
@@ -156,6 +152,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     globalScale,
     interactionStartRef,
     liveWidgetDrafts,
+    liveWidgetPreviews,
     moveableRef,
     onConfigChange,
     onZoomLevelChange,
@@ -170,8 +167,8 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     scalePreviewFrameRef,
     setLiveWidgetDraft,
     setLiveWidgetDraftsBatch,
+    setLiveWidgetPreview,
     setSceneElement,
-    widgetDataVersion,
     widgetNodes,
     widgetRefCallbacks,
     widgets,

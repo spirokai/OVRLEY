@@ -8,8 +8,11 @@
 import { fireEvent, render } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import OverlayEditor from '@/features/overlay-editor/components/OverlayEditor'
+import { resolveWidgetRenderGeometry } from '@/features/overlay-editor/utils/widgetRenderGeometry'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
+
+const overlayMoveableSpy = vi.fn()
 
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path) => path,
@@ -27,14 +30,14 @@ vi.mock('@/features/video-preview', () => ({
 vi.mock('@/features/widget-preview', () => ({
   WidgetPreview: ({ widget }) => <div>{widget.name}</div>,
   buildMetricWidgetPreviewModel: () => null,
-  buildTextWidgetPreviewModel: () => ({
+  buildTextWidgetPreviewModel: ({ widget }) => ({
     visualBounds: {
       minX: 0,
       minY: 0,
-      maxX: 120,
-      maxY: 40,
-      width: 120,
-      height: 40,
+      maxX: (widget?.data?.font_size ?? 30) * 4,
+      maxY: Math.round((widget?.data?.font_size ?? 30) * 1.5),
+      width: (widget?.data?.font_size ?? 30) * 4,
+      height: Math.round((widget?.data?.font_size ?? 30) * 1.5),
     },
   }),
 }))
@@ -48,7 +51,10 @@ vi.mock('@/features/widget-preview/utils/textMeasurement', () => ({
 }))
 
 vi.mock('@/features/overlay-editor/components/OverlayMoveable', () => ({
-  default: () => null,
+  default: (props) => {
+    overlayMoveableSpy(props)
+    return null
+  },
 }))
 
 vi.mock('@/features/overlay-editor/hooks/useEditorViewport', () => ({
@@ -82,6 +88,7 @@ function makeConfig(labels) {
 describe('OverlayEditor selection flow', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
+    overlayMoveableSpy.mockClear()
   })
 
   test('supports pointer multi-select and delete through the shared selection store', () => {
@@ -303,5 +310,91 @@ describe('OverlayEditor selection flow', () => {
     expect(getByTestId('overlay-scene').contains(selectionRect)).toBe(false)
 
     fireEvent.mouseUp(window)
+  })
+
+  test('anchors the badge to the live scale preview geometry', () => {
+    const widget = {
+      id: 'widget-1',
+      type: 'text',
+      category: 'labels',
+      data: {
+        x: 10,
+        y: 20,
+        font_size: 30,
+      },
+    }
+    const renderGeometry = resolveWidgetRenderGeometry(
+      widget,
+      {
+        minX: 0,
+        minY: 0,
+        maxX: 120,
+        maxY: 40,
+        width: 120,
+        height: 40,
+      },
+      1,
+      {
+        left: 100,
+        top: 200,
+        width: 120,
+        height: 40,
+        scaleFactor: 1.5,
+        translateX: 30,
+        translateY: 15,
+      },
+    )
+
+    expect(renderGeometry.badgeLeft).toBe(130)
+    expect(renderGeometry.badgeTop).toBe(215)
+  })
+
+  test('refreshes moveable geometry token when selected widget geometry changes from config edits', () => {
+    const initialConfig = makeConfig([makeLabel('A', { id: 'widget-1', x: 10, y: 20, font_size: 30 })])
+    const updatedConfig = makeConfig([makeLabel('A', { id: 'widget-1', x: 10, y: 20, font_size: 48 })])
+
+    useStore.getState().setConfig(initialConfig)
+
+    const { container, rerender } = render(
+      <OverlayEditor
+        config={initialConfig}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={vi.fn()}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    fireEvent.mouseDown(container.querySelector('[data-widget-id="widget-1"]'), { button: 0 })
+
+    const initialGeometryVersion = overlayMoveableSpy.mock.lastCall?.[0]?.geometryVersion
+
+    useStore.getState().setConfig(updatedConfig)
+
+    rerender(
+      <OverlayEditor
+        config={updatedConfig}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={vi.fn()}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        showTemplateStatus={false}
+        templateStatus="Saved"
+      />,
+    )
+
+    const updatedGeometryVersion = overlayMoveableSpy.mock.lastCall?.[0]?.geometryVersion
+
+    expect(initialGeometryVersion).toBeTruthy()
+    expect(updatedGeometryVersion).toBeTruthy()
+    expect(updatedGeometryVersion).not.toBe(initialGeometryVersion)
   })
 })

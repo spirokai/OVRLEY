@@ -6,6 +6,7 @@
 import { buildWidgetTransform } from '@/lib/geometryUtils'
 import { isBoxedMetricWidget } from '@/lib/display-type-behavior'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
+import { resolveWidgetRenderGeometry } from './widgetRenderGeometry'
 
 /**
  * Removes a single widget's draft from the mutable ref.
@@ -134,38 +135,15 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
  * @param {object} draft - Live draft with position overrides.
  * @param {number} globalScale - Global scale factor.
  */
-export function applyLiveScalePositionStyles(target, widget, draft, globalScale, visualBoundsOverride = null) {
+export function applyLiveScalePositionStyles(target, widget, preview, globalScale, visualBoundsOverride = null) {
   if (!target || !widget) {
     return
   }
 
-  const nextRotation = draft.rotation ?? (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
-  const transforms = []
-
-  if (draft.scale_factor !== undefined) {
-    const tx = draft.translate_x ?? 0
-    const ty = draft.translate_y ?? 0
-    transforms.push(`translate(${tx}px, ${ty}px)`)
-    if (nextRotation) {
-      transforms.push(`rotate(${nextRotation}deg)`)
-    }
-    transforms.push(`scale(${globalScale * draft.scale_factor})`)
-    target.style.left = `${draft.scale_start_left}px`
-    target.style.top = `${draft.scale_start_top}px`
-    target.style.transform = transforms.join(' ')
-    return
-  }
-
   const visualBounds = visualBoundsOverride ?? getWidgetVisualBoundsFromTarget(target)
-  const draftOrigin = getWidgetSceneOrigin(widget, draft, visualBounds, {
-    boundsScale: isBoxedMetricWidget(widget) ? 1 : globalScale,
-  })
+  const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, preview)
 
-  if (globalScale !== 1) {
-    transforms.push(`scale(${globalScale})`)
-  }
-
-  target.style.left = `${draftOrigin.x}px`
-  target.style.top = `${draftOrigin.y}px`
-  target.style.transform = transforms.join(' ')
+  target.style.left = `${renderGeometry.left}px`
+  target.style.top = `${renderGeometry.top}px`
+  target.style.transform = renderGeometry.transform
 }

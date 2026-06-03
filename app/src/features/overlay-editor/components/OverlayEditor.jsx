@@ -14,7 +14,6 @@ import OverlayCanvas from './OverlayCanvas'
 import OverlayMoveable from './OverlayMoveable'
 import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel } from '@/features/widget-preview'
 import { WIDGET_ICONS } from '../data/overlayEditorConfig'
-import { getWidgetSceneOrigin } from '../utils/overlayEditorHelpers'
 import useOverlayEditorState from '../hooks/useOverlayEditorState'
 import useWidgetSelection from '../hooks/useWidgetSelection'
 import { useEditorViewport } from '../hooks/useEditorViewport'
@@ -25,8 +24,9 @@ import { useResizeHandlers } from '../hooks/useResizeHandlers'
 import { useScaleHandlers } from '../hooks/useScaleHandlers'
 import { useRotateHandlers } from '../hooks/useRotateHandlers'
 import { isBoxedMetricWidget } from '@/lib/display-type-behavior'
+import { buildRenderedGeometrySignature, resolveWidgetRenderGeometry } from '../utils/widgetRenderGeometry'
 
-function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId, previewSecond, selectedWidgetIds, widgets }) {
+function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId, previewSecond, selectedWidgetIds, widgetPreviews, widgets }) {
   const visibleWidgets = useMemo(() => {
     const visibleIds = new Set(selectedWidgetIds)
     if (hoveredWidgetId) visibleIds.add(hoveredWidgetId)
@@ -42,9 +42,9 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
         const metricPreviewModel = buildMetricWidgetPreviewModel({ widget, activity, previewSecond })
         const textPreviewModel = buildTextWidgetPreviewModel({ widget })
         const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
-        const origin = getWidgetSceneOrigin(widget, null, visualBounds, { boundsScale: isBoxedMetricWidget(widget) ? 1 : globalScale })
-        const left = origin.x * displayScale
-        const top = Math.max(origin.y * displayScale - 24, 0)
+        const renderGeometry = resolveWidgetRenderGeometry(widget, visualBounds, globalScale, widgetPreviews?.[widget.id] ?? null)
+        const left = renderGeometry.badgeLeft * displayScale
+        const top = Math.max(renderGeometry.badgeTop * displayScale - 24, 0)
 
         return (
           <div
@@ -208,16 +208,13 @@ function OverlayEditor({
     clearWidgetDraft: overlayState.clearWidgetDraft,
     commitWidgetUpdate: overlayState.commitWidgetUpdate,
     draftWidgetsRef: overlayState.draftWidgetsRef,
-    activity,
-    effectiveSelectedWidgetIds,
     globalScale: overlayState.globalScale,
     interactionStartRef: overlayState.interactionStartRef,
     renderedWidgetMap: overlayState.renderedWidgetMap,
-    previewSecond: overlayState.previewSecond,
     scalePreviewFrameRef: overlayState.scalePreviewFrameRef,
     selectedTarget: selection.selectedTarget,
     selectedWidget: selection.selectedWidget,
-    setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
+    setLiveWidgetPreview: overlayState.setLiveWidgetPreview,
   })
 
   const rotateHandlers = useRotateHandlers({
@@ -237,6 +234,34 @@ function OverlayEditor({
   })
 
   const handlers = { ...dragHandlers, ...resizeHandlers, ...scaleHandlers, ...rotateHandlers }
+  const selectedRenderedGeometryVersion = useMemo(() => {
+    if (!selection.effectiveSelectedWidgetIds.length) {
+      return 'none'
+    }
+
+    return selection.effectiveSelectedWidgetIds
+      .map((widgetId) => {
+        const widget = overlayState.renderedWidgetMap[widgetId]
+        if (!widget) {
+          return 'missing'
+        }
+
+        const preview = overlayState.liveWidgetPreviews[widgetId] ?? null
+        const metricPreviewModel = buildMetricWidgetPreviewModel({ widget, activity, previewSecond: overlayState.previewSecond })
+        const textPreviewModel = buildTextWidgetPreviewModel({ widget })
+        const visualBounds = (metricPreviewModel ?? textPreviewModel)?.visualBounds ?? null
+
+        return buildRenderedGeometrySignature(widget, visualBounds, overlayState.globalScale, preview)
+      })
+      .join('|')
+  }, [
+    activity,
+    overlayState.globalScale,
+    overlayState.liveWidgetPreviews,
+    overlayState.previewSecond,
+    overlayState.renderedWidgetMap,
+    selection.effectiveSelectedWidgetIds,
+  ])
 
   // Capability flags
   const canResizeSelected = !selection.isGroupSelection && isBoxedMetricWidget(selection.selectedWidget)
@@ -275,11 +300,12 @@ function OverlayEditor({
   const canvasDataProps = useMemo(
     () => ({
       widgets: overlayState.renderedWidgets,
+      widgetPreviews: overlayState.liveWidgetPreviews,
       activity,
       previewSecond: overlayState.previewSecond,
       exportRange: overlayState.previewExportRange,
     }),
-    [overlayState.renderedWidgets, activity, overlayState.previewSecond, overlayState.previewExportRange],
+    [overlayState.liveWidgetPreviews, overlayState.renderedWidgets, activity, overlayState.previewSecond, overlayState.previewExportRange],
   )
   const canvasCallbacks = useMemo(
     () => ({
@@ -325,6 +351,7 @@ function OverlayEditor({
               moveableRef={overlayState.moveableRef}
               selectedTarget={selection.selectedTarget}
               selectedTargets={selection.selectedTargets}
+              geometryVersion={selectedRenderedGeometryVersion}
               isGroupDragActive={isGroupDragActive}
               sceneElement={overlayState.sceneElement}
               displayScale={displayScale}
@@ -346,6 +373,7 @@ function OverlayEditor({
             hoveredWidgetId={hoveredWidgetId}
             previewSecond={overlayState.previewSecond}
             selectedWidgetIds={selection.selectedWidgetIds}
+            widgetPreviews={overlayState.liveWidgetPreviews}
             widgets={overlayState.renderedWidgets}
           />
         </div>
