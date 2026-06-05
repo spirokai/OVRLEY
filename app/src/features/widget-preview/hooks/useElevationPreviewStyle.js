@@ -22,7 +22,7 @@ import { useFontMetricsVersion } from './useFontMetricsVersion'
  */
 export function useElevationPreviewStyle(data, globalScale) {
   const style = useMemo(() => {
-    // Viewport and scale: keep the SVG valid and un-scale explicit widths.
+    // Viewport and scale: keep the SVG valid.
     const width = Math.max(Number(data.width), 1)
     const height = Math.max(Number(data.height), 1)
     const safeGlobalScale = Math.max(Number(globalScale) || 1, 0.1)
@@ -39,8 +39,8 @@ export function useElevationPreviewStyle(data, globalScale) {
       width,
       height,
       safeGlobalScale,
-      remainingLineWidth: Number(data.remaining_line_width) / safeGlobalScale,
-      completedLineWidth: Number(data.completed_line_width) / safeGlobalScale,
+      remainingLineWidth: Number(data.remaining_line_width),
+      completedLineWidth: Number(data.completed_line_width),
       remainingLineOpacity: normalizePreviewOpacity(data.remaining_line_opacity, 1),
       completedLineOpacity: normalizePreviewOpacity(data.completed_line_opacity, 1),
       markerSize,

@@ -5,9 +5,8 @@
 //! Does not own: template listing, template content retrieval, or rendering —
 //!       those live in `ovrley_core::commands` and the render pipeline.
 //!
-//! Allowed dependencies: `std`, `tauri`, `runtime_paths`.
-//! Forbidden dependencies: `ovrley_core` (these are thin filesystem wrappers
-//!       that don't need domain types).
+//! Allowed dependencies: `std`, `tauri`, `runtime_paths`, `ovrley_core`
+//!       (for template write validation through the normalization seam).
 
 use crate::runtime_paths;
 use std::path::PathBuf;
@@ -27,8 +26,14 @@ pub(crate) fn default_template_save_path(
 }
 
 /// Writes a user template file, creating parent directories as needed.
+///
+/// Validates the template content before writing — invalid JSON or config
+/// that fails the normalization seam is rejected with an error.
 #[tauri::command]
 pub(crate) fn write_template_file(path: String, contents: String) -> Result<String, String> {
+    ovrley_core::commands::validate_template_contents(&contents)
+        .map_err(|e| e.to_string())?;
+
     let path_buf = PathBuf::from(&path);
 
     if let Some(parent) = path_buf.parent() {

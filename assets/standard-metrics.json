@@ -531,7 +531,7 @@
     },
     {
       "type": "heading",
-      "current": true,
+      "current": false,
       "label": "Heading",
       "defaultDisplayUnit": "degrees",
       "supportedDisplayUnits": [

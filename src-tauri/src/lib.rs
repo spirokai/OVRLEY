@@ -27,6 +27,9 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub mod video_server; // test seam
 
+#[cfg(test)]
+mod video_server_tests;
+
 mod file_ops;
 mod preview_import;
 mod runtime_paths;

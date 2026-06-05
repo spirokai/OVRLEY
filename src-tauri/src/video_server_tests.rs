@@ -33,7 +33,7 @@ use std::time::Duration;
 
 use uuid::Uuid;
 
-use app_lib::video_server::{parse_range, ByteRange, ParsedRange, VideoServerHandle};
+use crate::video_server::{parse_range, ByteRange, ParsedRange, VideoServerHandle};
 
 /// Verifies all byte range forms required by the Phase A plan.
 #[test]

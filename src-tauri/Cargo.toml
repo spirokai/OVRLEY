@@ -35,4 +35,3 @@ base64 = "0.22"
 ovrley_core = { path = "ovrley_core" }
 tiny_http = "0.12"
 uuid = { version = "1", features = ["v4"] }
-anyhow = "1"

@@ -2,6 +2,29 @@
 
 ## Status: Draft / Proposed replacement for v1
 
+**Non-negotiable rules**
+
+- DO NOT jump into the common "centralize all defaults in Rust" trap. This plan is the exact opposite: the backend should have zero ownership of render-affecting defaults.
+- Define validating contract for the standard metric text/value slice, with zero backend-owned semantic defaults.
+- NEVER encode backend-side constants or defaults.
+- NEVER assume the intent or desired outcome of the user submitting the contract to Rust.
+- Do not inlcude missing values in the contract.
+- Reject missing output-affecting fields with explicit error messages.
+- Failing because the user omitted a field that can change output is the right outcome.
+
+For the validated path:
+
+- No `.unwrap_or`, `.or`, `.or_else`
+- No placeholder literals: `None`, `Some(...)` wrapping invented values, `0`, `0.0`, `false`, `""`, hardcoded strings, or default enum variants
+- No catch-all fallback match arms for config semantics
+- No clamping/coercion that changes invalid config into valid config
+- If an existing target type requires fields outside the slice, stop and introduce a narrower type instead of filling them
+- Before finishing, list every newly assigned concrete value and classify it as:
+  - explicit input
+  - mechanical derivation
+  - error path
+  - forbidden invented value
+
 ---
 
 ## 1. Goal
@@ -18,16 +41,6 @@ This v2 plan changes the target:
 
 > We do **not** remove every fallback.
 > We remove only the fallbacks that can silently change user-visible output or encoding behavior relative to the validated config contract.
-
-**Non-negotiable rules**
-
-- DO NOT jump into the common "centralize all defaults in Rust" trap. This plan is the exact opposite: the backend should have zero ownership of render-affecting defaults.
-- Define validating contract for the standard metric text/value slice, with zero backend-owned semantic defaults.
-- NEVER encode backend-side constants or defaults.
-- NEVER assume the intent or desired outcome of the user submitting the contract to Rust.
-- Do not inlcude missing values in the contract.
-- Reject missing output-affecting fields with explicit error messages.
-- Failing because the user omitted a field that can change output is the right outcome.
 
 That means:
 

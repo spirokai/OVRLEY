@@ -14,21 +14,17 @@ import { getPreviewMarkerLayers, normalizePreviewOpacity } from '../utils/svgPre
  * 3. Derive marker styling and inset radius for route normalization.
  *
  * @param {object} data - Effective route widget data.
- * @param {number} globalScale - Scene/global scale applied to the preview.
- * @returns {object} Style model consumed by the route preview renderer.
+  @returns {object} Style model consumed by the route preview renderer.
  */
-export function useRoutePreviewStyle(data, globalScale) {
+export function useRoutePreviewStyle(data) {
   return useMemo(() => {
-    // Viewport and scale: ensure valid raster bounds and un-scale explicit widths.
+    // Viewport and scale: ensure valid raster bounds.
     const width = Math.max(data.width, 80)
     const height = Math.max(data.height, 80)
-    const safeGlobalScale = Math.max(Number(globalScale) || 1, 0.1)
 
-    // Geometry widths: route normalization needs the true stroke footprint.
-    const geometryRemainingLineWidth = Number(data.remaining_line_width)
-    const geometryCompletedLineWidth = Number(data.completed_line_width)
-    const remainingLineWidth = geometryRemainingLineWidth / safeGlobalScale
-    const completedLineWidth = geometryCompletedLineWidth / safeGlobalScale
+    // Stroke widths: shared by geometry inset calculations and SVG rendering.
+    const remainingLineWidth = Number(data.remaining_line_width)
+    const completedLineWidth = Number(data.completed_line_width)
 
     // Marker sizing: reserve enough inset so the route stroke and marker do not clip.
     const markerSize = Number(data.marker_size)
@@ -40,8 +36,6 @@ export function useRoutePreviewStyle(data, globalScale) {
     return {
       width,
       height,
-      geometryRemainingLineWidth,
-      geometryCompletedLineWidth,
       remainingLineWidth,
       completedLineWidth,
       remainingLineColor: data.remaining_line_color,
@@ -51,5 +45,5 @@ export function useRoutePreviewStyle(data, globalScale) {
       routeMarkerInsetRadius,
       markerLayers: getPreviewMarkerLayers(data, markerSize, markerColor, markerOpacity),
     }
-  }, [data, globalScale])
+  }, [data])
 }

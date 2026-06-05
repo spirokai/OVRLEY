@@ -54,107 +54,120 @@ cyclemetry/
 │
 ├── src-tauri/                    # Tauri v2 desktop shell
 │   ├── build.rs                  # Windows msvcprt link + Tauri build
-│   ├── src/
-│   │   ├── main.rs               # Binary entry point
-│   │   ├── lib.rs                # Tauri app wiring, 18 IPC commands, BackendState
-│   │   ├── bin_common.rs          # Shared CLI argument parsing
-│   │   ├── benchmark_common.rs    # Shared benchmark metrics printing
-│   │   ├── tauri_commands.rs      # Tauri #[command] wrappers → ovrley_core
-│   │   ├── file_ops.rs            # Template file read/write commands
-│   │   ├── preview_import.rs      # Video preview import logic
-│   │   ├── runtime_paths.rs       # Platform resource path resolution
-│   │   ├── video_server.rs        # Local HTTP server for video preview
-│   │   └── bin/                   # CLI tools
-│   │       ├── render_video.rs    #   Video render
-│   │       ├── render_preview.rs  #   Preview PNG generation
-│   │       ├── validate_activity.rs # Activity validation
-│   │       ├── parallel_render.rs #   Diagnostic parallel benchmark
-│   │       ├── benchmark_widget_rate.rs | Benchmark: widget update rates
-│   │       ├── benchmark_transparent.rs| Benchmark: transparent codecs
-│   │       └── benchmark_composite.rs  | Benchmark: composite codecs
+│   ├── Cargo.toml                # Workspace root + app package
+│   ├── tauri.conf.json
 │   │
-│   ├── tests/
-│   │   └── video_server_tests.rs  # Video server integration tests
+│   ├── src/                       # Tauri shell layer (app_lib crate)
+│   │   ├── main.rs                #   Binary entry point
+│   │   ├── lib.rs                 #   Tauri app wiring, 18 IPC commands, BackendState
+│   │   ├── tauri_commands.rs      #   Tauri #[command] wrappers → ovrley_core
+│   │   ├── file_ops.rs            #   Template file read/write commands
+│   │   ├── preview_import.rs      #   Video preview import logic
+│   │   ├── runtime_paths.rs       #   Platform resource path resolution
+│   │   ├── video_server.rs        #   Local HTTP server for video preview
+│   │   └── video_server_tests.rs  #   Video server integration tests
 │   │
-│   ├── ovrley_core/               # Standalone Rust crate
-│   │   ├── src/
-│   │   │   ├── lib.rs             #   Crate root, module declarations, re-exports
-│   │   │   ├── types.rs           #   MetricKind enum (cross-cutting domain type)
-│   │   │   ├── error.rs           #   CoreError enum + CoreResult alias
-│   │   │   ├── interpolation.rs   #   Linear interpolation utilities
-│   │   │   ├── rdp.rs             #   Ramer-Douglas-Peucker simplification
-│   │   │   ├── paths.rs           #   AppPaths: font/template/output dirs
-│   │   │   ├── activity/          #   Activity ingestion & densification
-│   │   │   │   ├── schema.rs      #     ParsedActivity, DenseActivityReport
-│   │   │   │   ├── trim.rs        #     Scene-window trimming
-│   │   │   │   └── interpolate.rs #     Frame-rate densification
-│   │   │   ├── config/mod.rs      #   RenderConfig schema, validation, plots
-│   │   │   ├── commands/mod.rs    #   Backend command implementations
-│   │   │   ├── debug/mod.rs       #   RenderProgress, RenderProfiler
-│   │   │   ├── render/            #   Skia overlay rendering
-│   │   │   │   ├── mod.rs         #     prepare_preview_assets, render_frame_rgba
-│   │   │   │   ├── surface.rs     #     Skia surface create/wrap/encode
-│   │   │   │   ├── text.rs        #     Font resolution, text drawing
-│   │   │   │   ├── format.rs      #     Metric formatting, unit conversion
-│   │   │   │   ├── static_layer.rs#     Cached static label layer
-│   │   │   │   └── widgets/       #     Widget rendering (route, elevation, value)
-│   │   │   │       ├── common.rs  #       Polyline, area, marker, transform
-│   │   │   │       ├── types.rs   #       Cache types, geometry types
-│   │   │   │       ├── geometry.rs#       Interior segment geometry helpers
-│   │   │   │       ├── marker.rs  #       Marker circle drawing
-│   │   │   │       ├── polyline.rs#       Polyline drawing (painting)
-│   │   │   │       ├── transform.rs#      Coordinate transform utilities
-│   │   │   │       ├── route/     #       Route map widget
-│   │   │   │       ├── elevation/ #       Elevation profile widget
-│   │   │   │       ├── value/     #       Metric value widget
-│   │   │   │       └── tests/     #       Widget unit tests
-│   │   │   └── encode/            #   FFmpeg video encoding pipelines
-│   │   │       ├── mod.rs         #     Module organization
-│   │   │       ├── ffmpeg.rs      #     Binary discovery, ffmpeg arg builders
-│   │   │       ├── ffmpeg_settings.rs    # Unified encoding settings type
-│   │   │       ├── ffmpeg_composite.rs   # Composite MP4 ffmpeg args
-│   │   │       ├── ffmpeg_composite_profiles.rs  # Composite encoder profiles
-│   │   │       ├── ffmpeg_transparent_profiles.rs # Transparent encoder profiles
-│   │   │       ├── fps.rs         #     Rational FPS type
-│   │   │       ├── progress.rs    #     RenderProgress state machine
-│   │   │       ├── codec_detect.rs#     Encoder availability probing
-│   │   │       ├── codec_catalog.rs#     Known codec definitions
-│   │   │       ├── video_probe.rs #     ffprobe metadata extraction
-│   │   │       ├── video.rs       #     RenderController, dispatch, orchestration
-│   │   │       ├── video_pipeline.rs      # Single-pass render (transparent)
-│   │   │       ├── video_parallel.rs      # Parallel segment rendering
-│   │   │       ├── video_segmented.rs     # Segmented render + concat
-│   │   │       ├── video_windows.rs       # Windows-specific encode helpers
-│   │   │       ├── video_debug.rs         # Debug artifact generation
-│   │   │       ├── video_composite_pipeline.rs # Composite render loop
-│   │   │       ├── video_composite_support.rs  # Composite timing/plan helpers
-│   │   │       ├── video_composite_debug.rs    # Composite debug artifacts
-│   │   │       └── pipeline_shared.rs     # Shared encode pipeline types
-│   │   └── tests/                 # Integration tests
-│   │       ├── common/            #   Shared test fixtures & helpers
-│   │       ├── activity_tests.rs  #   Activity parse/trim/densify
-│   │       ├── commands_tests.rs  #   Backend command logic
-│   │       ├── config_tests.rs    #   RenderConfig validation
-│   │       ├── cancellation_tests.rs  # Render cancellation
-│   │       ├── codec_detect_tests.rs  # Encoder detection
-│   │       ├── composite_profile_tests.rs
-│   │       ├── error_display_tests.rs
-│   │       ├── ffmpeg_composite_tests.rs
-│   │       ├── ffmpeg_settings_tests.rs
-│   │       ├── format_tests.rs
-│   │       ├── fps_tests.rs
-│   │       ├── metric_kind_behavior_tests.rs
-│   │       ├── metric_kind_serde_tests.rs
-│   │       ├── progress_tests.rs
-│   │       ├── rdp_tests.rs
-│   │       ├── render_baseline_suite.rs  # PNG baseline render tests
-│   │       ├── value_widget_tests.rs
-│   │       ├── video_composite_pipeline_tests.rs
-│   │       ├── video_probe_tests.rs
-│   │       └── video_tests.rs
+│   ├── ovrley_core/               # Standalone domain library crate
+│   │   ├── Cargo.toml
+│   │   ├── BENCHMARKS.md
+│   │   ├── BASELINES.md
+│   │   └── src/
+│   │       ├── lib.rs             #   Crate root, module declarations, re-exports
+│   │       ├── types.rs           #   MetricKind enum (cross-cutting domain type)
+│   │       ├── error.rs           #   CoreError enum + CoreResult alias
+│   │       ├── interpolation.rs   #   Linear interpolation utilities
+│   │       ├── rdp.rs             #   Ramer-Douglas-Peucker simplification
+│   │       ├── paths.rs           #   AppPaths: font/template/output dirs
+│   │       ├── bin_common.rs       #   Shared CLI argument parsing
+│   │       ├── benchmark_common.rs #   Shared benchmark infrastructure
+│   │       ├── bin/               #   CLI diagnostic binaries
+│   │       │   ├── render_video.rs    #     Video render
+│   │       │   ├── render_preview.rs  #     Preview PNG generation
+│   │       │   ├── validate_activity.rs #  Activity validation
+│   │       │   ├── parallel_render.rs #     Diagnostic parallel benchmark
+│   │       │   ├── benchmark_widget_rate.rs |  Widget update rate benchmark
+│   │       │   ├── benchmark_transparent.rs|  Transparent codec benchmark
+│   │       │   └── benchmark_composite.rs  |  Composite codec benchmark
+│   │       ├── activity/          #   Activity ingestion & densification
+│   │       │   ├── schema.rs      #     ParsedActivity, DenseActivityReport
+│   │       │   ├── trim.rs        #     Scene-window trimming
+│   │       │   └── interpolate.rs #     Frame-rate densification
+│   │       ├── commands/mod.rs    #   Backend command implementations
+│   │       ├── normalize/         #   Config validation seam
+│   │       │   ├── mod.rs         #     validate_render_config, ValidatedRenderConfig
+│   │       │   ├── raw/           #     Raw types + parsing (private)
+│   │       │   ├── helpers.rs     #     Shared validation helpers
+│   │       │   ├── scene.rs       #     SceneConfig validation
+│   │       │   ├── value.rs       #     ValueConfig validation
+│   │       │   ├── gradient.rs    #     Gradient widget validation
+│   │       │   ├── heading.rs     #     Heading widget validation
+│   │       │   ├── label.rs       #     Label validation
+│   │       │   ├── route.rs       #     Route plot validation
+│   │       │   ├── elevation.rs   #     Elevation plot validation
+│   │       │   └── time.rs        #     Time value validation
+│   │       ├── debug/mod.rs       #   RenderProgress, RenderProfiler
+│   │       ├── render/            #   Skia overlay rendering
+│   │       │   ├── mod.rs         #     prepare_preview_assets, render_frame_rgba
+│   │       │   ├── surface.rs     #     Skia surface create/wrap/encode
+│   │       │   ├── text.rs        #     Font resolution, text drawing
+│   │       │   ├── format.rs      #     Metric formatting, unit conversion
+│   │       │   ├── static_layer.rs#     Cached static label layer
+│   │       │   └── widgets/       #     Widget rendering (route, elevation, value)
+│   │       │       ├── common.rs  #       Polyline, area, marker, transform
+│   │       │       ├── types.rs   #       Cache types, geometry types
+│   │       │       ├── geometry.rs#       Interior segment geometry helpers
+│   │       │       ├── marker.rs  #       Marker circle drawing
+│   │       │       ├── polyline.rs#       Polyline drawing (painting)
+│   │       │       ├── transform.rs#      Coordinate transform utilities
+│   │       │       ├── route/     #       Route map widget
+│   │       │       ├── elevation/ #       Elevation profile widget
+│   │       │       ├── value/     #       Metric value widget
+│   │       │       └── tests/     #       Widget unit tests
+│   │       └── encode/            #   FFmpeg video encoding pipelines
+│   │           ├── mod.rs         #     Module organization
+│   │           ├── ffmpeg.rs      #     Binary discovery, ffmpeg arg builders
+│   │           ├── ffmpeg_settings.rs    # Unified encoding settings type
+│   │           ├── ffmpeg_composite.rs   # Composite MP4 ffmpeg args
+│   │           ├── ffmpeg_composite_profiles.rs  # Composite encoder profiles
+│   │           ├── ffmpeg_transparent_profiles.rs # Transparent encoder profiles
+│   │           ├── fps.rs         #     Rational FPS type
+│   │           ├── progress.rs    #     RenderProgress state machine
+│   │           ├── codec_detect.rs#     Encoder availability probing
+│   │           ├── codec_catalog.rs#     Known codec definitions
+│   │           ├── video_probe.rs #     ffprobe metadata extraction
+│   │           ├── video.rs       #     RenderController, dispatch, orchestration
+│   │           ├── video_pipeline.rs      # Single-pass render (transparent)
+│   │           ├── video_parallel.rs      # Parallel segment rendering
+│   │           ├── video_segmented.rs     # Segmented render + concat
+│   │           ├── video_windows.rs       # Windows-specific encode helpers
+│   │           ├── video_debug.rs         # Debug artifact generation
+│   │           ├── video_composite_pipeline.rs # Composite render loop
+│   │           ├── video_composite_support.rs  # Composite timing/plan helpers
+│   │           ├── video_composite_debug.rs    # Composite debug artifacts
+│   │           └── pipeline_shared.rs     # Shared encode pipeline types
 │   │
-│   ├── Cargo.toml
-│   └── tauri.conf.json
+│   └── tests/                     # ovrley_core integration tests
+│       ├── common/                #   Shared test fixtures & helpers
+│       ├── activity_tests.rs      #   Activity parse/trim/densify
+│       ├── commands_tests.rs      #   Backend command logic
+│       ├── config_tests.rs        #   RenderConfig validation
+│       ├── cancellation_tests.rs  #   Render cancellation
+│       ├── codec_detect_tests.rs  #   Encoder detection
+│       ├── composite_profile_tests.rs
+│       ├── error_display_tests.rs
+│       ├── ffmpeg_composite_tests.rs
+│       ├── ffmpeg_settings_tests.rs
+│       ├── format_tests.rs
+│       ├── fps_tests.rs
+│       ├── metric_kind_behavior_tests.rs
+│       ├── metric_kind_serde_tests.rs
+│       ├── progress_tests.rs
+│       ├── rdp_tests.rs
+│       ├── render_baseline_suite.rs  # PNG baseline render tests
+│       ├── value_widget_tests.rs
+│       ├── video_composite_pipeline_tests.rs
+│       ├── video_probe_tests.rs
+│       └── video_tests.rs
 │
 ├── templates/                    # Bundled template JSON files
 ├── fonts/                        # Bundled fonts (Evogria, Furore)
@@ -239,7 +252,8 @@ OVRLEY follows a **two-process desktop architecture** via Tauri v2:
 │  │  │ paths    │  │ activity │       │   │
 │  │  └──────────┘  └─────┬────┘       │   │
 │  │  ┌──────────┐        │            │   │
-│  │  │ config   │────────┘            │   │
+│  │  │ normalize│────────┘            │   │
+│  │  │  (seam)  │                     │   │
 │  │  └────┬─────┘                     │   │
 │  │       │                           │   │
 │  │  ┌────▼─────────────────┐         │   │
@@ -281,6 +295,7 @@ OVRLEY follows a **two-process desktop architecture** via Tauri v2:
 3. **Widget rendering is duplicated:** The JSX SVG preview renderers (in `features/widget-preview/components/`) approximately match the Rust Skia renderers (`render/widgets/*.rs`). Minor discrepancies exist — the Rust output is authoritative.
 4. **Cached static layers:** Labels and static widget backgrounds are rendered once and cached as Skia images. Only dynamic metric values + marker positions are redrawn per frame.
 5. **Composite video timing is tricky:** Overlay FPS = source video FPS / update_rate. Timing mapping goes: overlay_frame -> video_local_time -> activity_time -> dense_frame_index.
+6. **Normalization seam — zero backend defaults:** All raw config types (`SceneConfig`, `ValueConfig`, etc.) and parsing functions live in `normalize::raw` (a **private** submodule). No code outside `normalize/` can access raw types. The only public entry point is `validate_render_config()`, which converts raw types into validated types. The backend owns **zero** render-affecting defaults — missing fields are rejected, not filled in. The frontend must materialise every value before sending.
 
 ---
 
@@ -439,7 +454,7 @@ useVideoPreview.js
 
 ## 6. Backend Architecture
 
-### 6.1 Tauri IPC Commands (18 total)
+### 6.1 Tauri IPC Commands (19 total)
 
 All defined in `lib.rs` and implemented in `ovrley_core/src/commands/mod.rs`:
 
@@ -449,6 +464,7 @@ All defined in `lib.rs` and implemented in `ovrley_core/src/commands/mod.rs`:
 | `backend_current_os`           | OS string ("windows", "macos")                |
 | `backend_list_system_fonts`    | Skia FontMgr font listing                     |
 | `backend_render`               | Start video render (transparent or composite) |
+| `backend_render_preview_frame` | Render one transparent preview PNG (debug)    |
 | `backend_progress`             | Poll render progress                          |
 | `backend_cancel`               | Cancel active render                          |
 | `backend_open_downloads`       | Open output folder                            |
@@ -461,7 +477,7 @@ All defined in `lib.rs` and implemented in `ovrley_core/src/commands/mod.rs`:
 | `backend_get_video_state`      | Diagnostic server state                       |
 | `backend_detect_codecs`        | Probe encoder availability                    |
 | `default_template_save_path`   | User template path                            |
-| `write_template_file`          | Write template JSON to disk                   |
+| `write_template_file`          | Write template JSON to disk (validated)       |
 | `write_parse_debug_file`       | Write debug file                              |
 
 ### 6.2 Render Pipeline (Skia → FFmpeg)
@@ -490,27 +506,30 @@ commands::backend_render
     │
     ▼
 Shared pipeline:
-    ├── 1. Parse config (config::parse_config_json)
-    ├── 2. Parse activity (activity::parse_activity_json)
-    ├── 3. Trim activity to scene window (activity::trim::trim_activity)
-    ├── 4. Densify activity to frame rate (activity::interpolate::densify_activity)
-    ├── 5. Prepare Skia assets (render::prepare_preview_assets)
+    ├── 1. Parse config JSON → raw types (normalize::raw::parse_config_json)
+    ├── 2. Validate through normalization seam (normalize::validate_render_config)
+    │      └── Validates every field; rejects missing/out-of-range values
+    │          Zero backend-owned defaults — frontend must send everything
+    ├── 3. Parse activity (activity::parse_activity_json)
+    ├── 4. Trim activity to scene window (activity::trim::trim_activity)
+    ├── 5. Densify activity to frame rate (activity::interpolate::densify_activity)
+    ├── 6. Prepare Skia assets (render::prepare_preview_assets)
     │      ├── Cached labels image (render::static_layer)
     │      ├── Route widget: GPS projection → LTTB downsample → RDP simplify
     │      │   (route/normalize.rs → route/prepare.rs → route/simplify.rs)
     │      └── Elevation widget: SG smooth → RDP with min/max preservation
     │          (elevation/normalize.rs → elevation/prepare.rs → elevation/reduction.rs)
-    ├── 6. Spawn FFmpeg subprocess (encode/ffmpeg.rs)
-    ├── 7. Render loop: for each frame →
+    ├── 7. Spawn FFmpeg subprocess (encode/ffmpeg.rs)
+    ├── 8. Render loop: for each frame →
     │      ├── render::render_frame_to_surface()
     │      │   ├── Blit static labels layer (render::static_layer)
     │      │   ├── Draw metric values (value/layout.rs: icon + value + unit)
     │      │   ├── Draw route widget (route/draw.rs: remaining + completed + marker)
     │      │   └── Draw elevation widget (elevation/draw.rs: remaining + completed + marker + labels)
     │      └── Write RGBA bytes to FFmpeg stdin
-    ├── 8. Monitor FFmpeg progress (parse stderr for frame=)
-    ├── 9. Wait for FFmpeg to finish
-    └── 10. Validate output, write timing/debug summaries
+    ├── 9. Monitor FFmpeg progress (parse stderr for frame=)
+    ├── 10. Wait for FFmpeg to finish
+    └── 11. Validate output, write timing/debug summaries
 ```
 
 ### 6.3 FFmpeg Integration
@@ -778,18 +797,18 @@ pnpm tauri build
 
 ## 9. Template System
 
-Templates are JSON files following the `ovrley-template` format (v1):
+Templates are JSON files following the `ovrley-template` format (v2):
 
 ```json
 {
   "format": "ovrley-template",
-  "version": 1,
+  "version": 2,
   "name": "Template Name",
   "savedAt": "ISO-8601",
   "config": {
     "scene": { "width": 1920, "height": 1080, "fps": 30, "start": 0, "end": 3600, ... },
-    "labels": [{ "key": "text", "text": "...", "x": 100, "y": 200, ... }],
-    "values": [{ "key": "speed", "x": 100, "y": 300, ... }],
+    "labels": [{ "text": "...", "x": 100, "y": 200, ... }],
+    "values": [{ "value": "speed", "x": 100, "y": 300, ... }],
     "plots": [{ "type": "route_map", ... }, { "type": "elevation", ... }]
   },
   "settings": {
@@ -798,6 +817,8 @@ Templates are JSON files following the `ovrley-template` format (v1):
   }
 }
 ```
+
+**Validation:** Template writes go through `write_template_file` which validates the full config through the normalization seam before writing to disk. The backend rejects any template with missing or invalid fields — the frontend must provide complete configs.
 
 **Resolution:** Built-in templates in `templates/`, user templates in `Documents/OVRLEY/`. Deduplication by filename (user wins over built-in).
 
@@ -821,7 +842,8 @@ Templates are JSON files following the `ovrley-template` format (v1):
 
 - **skia-safe 0.75** — `binary-cache` feature enabled
 - **Process-lifetime caches** — `OnceLock<Mutex<HashMap>>` for fonts, label images
-- **Module layering** — `tauri_commands.rs` (Tauri `#[command]` wrappers) → `ovrley_core::commands` (framework-agnostic logic) → domain modules (activity, config, render, encode)
+- **Module layering** — `tauri_commands.rs` (Tauri `#[command]` wrappers) → `ovrley_core::commands` (framework-agnostic logic) → domain modules (activity, render, encode)
+- **Normalization seam** — all raw config types and parsing live in `normalize::raw` (private submodule). The only public entry point is `normalize::validate_render_config()`. No code outside `normalize/` can access raw types. The backend owns zero render-affecting defaults — the frontend must materialise every value before sending.
 - **Shared utilities** — `types.rs` (MetricKind), `error.rs` (CoreError), `interpolation.rs`, `rdp.rs`, `paths.rs` (AppPaths) live at crate root as leaf dependencies
 - **Render loop** — acquires surface, renders RGBA, writes to FFmpeg stdin pipe
 - **Composite pipeline** — two-input FFmpeg: source video file + raw pipe overlay
@@ -843,6 +865,6 @@ Templates are JSON files following the `ovrley-template` format (v1):
 1. **Widget rendering is duplicated** — JSX SVG preview (in `features/widget-preview/components/`) vs. Rust Skia render. Expect minor visual discrepancies. Rust output is authoritative.
 2. **Composite timing is the most complex part** — involves mapping between 3 time domains: video time, activity time, and overlay frame index.
 3. **QTRLE parallel render** — only activates for >= 2 second integer-second durations, uses `logical_cores / 4` workers.
-4. **Frontend testing** — 50 Vitest test suites (320 tests) in `app/src/tests/`. Rust has unit tests in `render/widgets/tests/` and integration tests in `ovrley_core/tests/` and `src-tauri/tests/`.
+4. **Frontend testing** — 50 Vitest test suites (320 tests) in `app/src/tests/`. Rust has widget unit tests in `ovrley_core/src/render/widgets/tests/`, video server tests in `src-tauri/src/video_server_tests.rs`, and integration tests in `ovrley_core/tests/`. CLI benchmark binaries live in `ovrley_core/src/bin/` (`cargo run -p ovrley_core --bin <name>`).
 5. **Browser fallback** — the frontend has a fallback path for running outside Tauri (browser dev mode), using local file APIs instead of Tauri IPC.
 6. **CSS zoom** — the editor shell supports zoom via `--app-scale` CSS variable (0.35x–4x).

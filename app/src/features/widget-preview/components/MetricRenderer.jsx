@@ -23,6 +23,32 @@
 import { PreviewMetricIcon, PreviewSvgText } from './previewSvgComponents'
 import { useMetricPreviewPresentation } from '../hooks/useMetricPreviewPresentation'
 
+let gradientMeasureTextNode = null
+
+function measureGradientSvgTextWidth(text, fontFamily, fontSize) {
+  if (!text || typeof document === 'undefined' || typeof document.createElementNS !== 'function') {
+    return 0
+  }
+
+  if (!gradientMeasureTextNode) {
+    const namespace = 'http://www.w3.org/2000/svg'
+    const svg = document.createElementNS(namespace, 'svg')
+    gradientMeasureTextNode = document.createElementNS(namespace, 'text')
+    svg.style.position = 'absolute'
+    svg.style.visibility = 'hidden'
+    svg.style.pointerEvents = 'none'
+    svg.style.left = '-9999px'
+    svg.style.top = '-9999px'
+    svg.appendChild(gradientMeasureTextNode)
+    document.body?.appendChild(svg)
+  }
+
+  gradientMeasureTextNode.setAttribute('font-family', fontFamily)
+  gradientMeasureTextNode.setAttribute('font-size', `${fontSize}`)
+  gradientMeasureTextNode.textContent = text
+  return gradientMeasureTextNode.getComputedTextLength?.() ?? 0
+}
+
 export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpacity, globalScale, metricPreviewModel, sceneStyle }) {
   const presentation = useMetricPreviewPresentation({
     widget,
@@ -97,6 +123,14 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
   }
 
   if (presentation.mode === 'gradient' && presentation.gradientLayout) {
+    const renderedGradientText = `${presentation.gradientValuePrefix}${presentation.gradientUnitSuffix}`
+    const renderedGradientWidth = measureGradientSvgTextWidth(renderedGradientText, presentation.fontFamily, presentation.fontSize)
+    const renderedGradientPrefixWidth = measureGradientSvgTextWidth(presentation.gradientValuePrefix, presentation.fontFamily, presentation.fontSize)
+    const gradientValueLeft =
+      renderedGradientWidth > 0 ? (presentation.gradientLayout.width - renderedGradientWidth) / 2 : presentation.gradientLayout.value.left
+    const gradientUnitX =
+      renderedGradientPrefixWidth > 0 ? gradientValueLeft + renderedGradientPrefixWidth : presentation.gradientLayout.value.left + presentation.gradientPrefixWidth
+
     return (
       <svg
         width={presentation.gradientLayout.width}
@@ -107,7 +141,7 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
         {presentation.gradientValuePrefix ? (
           <PreviewSvgText
             text={presentation.gradientValuePrefix}
-            x={presentation.gradientLayout.value.left}
+            x={gradientValueLeft}
             baseline={presentation.gradientLayout.value.baseline}
             color={presentation.color}
             fontFamily={presentation.fontFamily}
@@ -122,7 +156,7 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
         {presentation.gradientUnitSuffix ? (
           <PreviewSvgText
             text={presentation.gradientUnitSuffix}
-            x={presentation.gradientLayout.value.left + presentation.gradientPrefixWidth}
+            x={gradientUnitX}
             baseline={presentation.gradientLayout.value.baseline}
             color={presentation.unitColor}
             fontFamily={presentation.fontFamily}

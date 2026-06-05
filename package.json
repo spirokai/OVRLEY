@@ -15,9 +15,9 @@
     "format:frontend": "cd app && pnpm format",
     "format": "pnpm format:frontend",
     "release": "semantic-release",
-    "benchmark:transparent": "cd src-tauri && cargo run --bin benchmark_transparent --",
-    "benchmark:composite": "cd src-tauri && cargo run --bin benchmark_composite --",
-    "benchmark:widget-rate": "cd src-tauri && cargo run --bin benchmark_widget_rate --"
+    "benchmark:transparent": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_transparent --",
+    "benchmark:composite": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_composite --",
+    "benchmark:widget-rate": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_widget_rate --"
   },
   "keywords": [],
   "author": "",
