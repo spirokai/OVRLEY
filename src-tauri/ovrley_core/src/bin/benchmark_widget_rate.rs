@@ -34,7 +34,7 @@ use ovrley_core::bin_common::{format_mmss, read_positional, repo_root, resolve_p
 /// GPU composite codec profiles exercised by this benchmark.
 const CODECS: &[(&str, &str)] = &[
     ("nnvgpu_h264", "nnvgpu_h264"),
-    //("qsv_full_h264", "qsv_full_h264"),
+    ("qsv_full_h264", "qsv_full_h264"),
 ];
 
 /// Widget update rates tested (activity-seconds between widget recomputes).

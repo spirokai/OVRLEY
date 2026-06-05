@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 
 import { Type } from 'lucide-react'
-import { STANDARD_METRIC_WIDGET_TYPES } from './standard-widgets'
+import { CURRENT_STANDARD_METRIC_WIDGET_TYPES, STANDARD_METRIC_WIDGET_TYPES } from './standard-widgets'
 import { getStandardMetricDefinition } from './standard-metrics'
 import { METRIC_ICON_SVGS } from './widget-icon-data'
 
@@ -89,28 +89,9 @@ export const TYPE_ICONS = {
 
 export const QUICKMENU_ITEMS = [
   'label',
-  'speed',
   'elevation',
-  'heartrate',
-  'power',
-  'cadence',
-  'time',
-  'temperature',
-  'gradient',
   'course',
-  'pace',
-  'g_force',
-  'air_pressure',
-  'ground_contact_time',
-  'left_right_balance',
-  'stride_length',
-  'stroke_rate',
-  'torque',
-  'vertical_speed',
-  'gear_position',
-  'vertical_oscillation',
-  'core_temperature',
-  'heading',
+  ...CURRENT_STANDARD_METRIC_WIDGET_TYPES,
 ].map((type) => ({
   type,
   icon: TYPE_ICONS[type],
