@@ -6,12 +6,12 @@
 //! lives behind the public facade in `encode::video`.
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::RenderConfig;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
 use crate::encode::video::render_video;
 use crate::encode::video_debug::{concat_video_segments, timestamp_nanos};
 use crate::encode::video_pipeline::rendered_frame_count;
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
 use std::collections::VecDeque;
 use std::sync::mpsc;
@@ -34,7 +34,7 @@ pub use crate::encode::progress::RenderController;
 /// 5. Stitch produced output files with ffmpeg concat demuxer (stream copy)
 pub fn run_parallel_renders(
     paths: &AppPaths,
-    configs: Vec<RenderConfig>,
+    configs: Vec<ValidatedRenderConfig>,
     activity: &ParsedActivity,
     reports: Vec<DenseActivityReport>,
 ) -> CoreResult<Duration> {

@@ -6,7 +6,7 @@
 //! video rendering can draw each frame with predictable cost.
 
 /// Shared geometry, style, and drawing helpers for all widgets.
-mod common;
+pub(crate) mod common;
 /// Elevation profile widget implementation.
 mod elevation;
 /// Point/rect/math and layout-fitting helpers.
@@ -29,11 +29,12 @@ pub mod types;
 pub mod value;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
+use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
-use crate::types::{DisplayType, MetricKind};
+use crate::render::widgets::types::PreparedValue;
+use std::collections::BTreeMap;
 
 pub(crate) use elevation::draw_elevation_widget;
 pub use metric_presentation::draw_metric_presentation;
@@ -42,7 +43,8 @@ pub use types::{
     MetricPresentationReport, PreparedRenderAssets, PresentationCache, WidgetRenderReport,
 };
 pub(crate) use value::{
-    draw_metric_value_widget_with_config, draw_static_metric_icon_for_value, has_static_metric_icon,
+    draw_metric_value_widget_with_config, draw_static_metric_icon_for_value_validated,
+    has_static_metric_icon_validated,
 };
 
 // Module-local tests for widget-specific RDP behavior that exercise internal
@@ -57,50 +59,62 @@ mod tests;
 
 /// Prepares all widget-specific caches needed by the active template.
 ///
-/// Plot configuration is parsed lazily; absent widgets produce no cache, while
-/// invalid present widgets return an error before rendering starts.
+/// All config validation has already happened at the seam. This function
+/// clones validated data into widget caches without re-validating.
 pub fn prepare_render_assets(
     paths: &AppPaths,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<PreparedRenderAssets> {
-    let mut assets = PreparedRenderAssets::default();
+    let scene = config.scene.clone();
+    let labels = config.labels.clone();
+    let values = config.values.clone();
 
-    if let Some(route_plot) = config.course_plot()? {
+    let mut assets = PreparedRenderAssets {
+        scene,
+        labels,
+        values,
+        route_cache: None,
+        elevation_cache: None,
+        presentation_caches: BTreeMap::new(),
+        base_rgba: None,
+    };
+
+    if let Some(validated) = &config.course_plot {
         assets.route_cache = Some(route::prepare_route_cache(
-            config,
             activity,
             dense_activity,
-            &route_plot,
+            validated,
+            &assets.scene,
             prepare_profiler,
         )?);
     }
 
-    if let Some(elevation_plot) = config.elevation_plot()? {
+    if let Some(validated) = &config.elevation_plot {
         assets.elevation_cache = Some(elevation::prepare_elevation_cache(
-            config,
             activity,
             dense_activity,
-            &elevation_plot,
+            validated,
+            &assets.scene,
             prepare_profiler,
         )?);
     }
 
-    for (idx, value) in config.values.iter().enumerate() {
-        if value.value == MetricKind::Heading && value.display_type == DisplayType::Tape {
-            let hw_config = value.to_heading_widget_config()?;
-            let cache = heading::prepare_heading_cache(
-                config,
-                &hw_config,
-                &paths.font_dirs,
-                prepare_profiler,
-            )?;
-            assets
-                .presentation_caches
-                .insert(idx, types::PresentationCache::HeadingTape(cache));
-        }
+    for (idx, value) in assets.values.iter().enumerate() {
+        let PreparedValue::HeadingTape(validated) = value else {
+            continue;
+        };
+        let cache = heading::prepare_heading_cache(
+            &assets.scene,
+            validated,
+            &paths.font_dirs,
+            prepare_profiler,
+        )?;
+        assets
+            .presentation_caches
+            .insert(idx, types::PresentationCache::HeadingTape(cache));
     }
 
     Ok(assets)

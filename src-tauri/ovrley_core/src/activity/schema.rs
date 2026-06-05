@@ -12,7 +12,7 @@
 //! Forbidden dependencies: `render`, `encode`, `commands`.
 //!
 //! Related modules: [`crate::activity::interpolate`] (consumes these types for
-//!       densification), [`crate::config`] (consumes `RenderDataRequirements` to
+//!       densification), [`crate::normalize`] (consumes `RenderDataRequirements` to
 //!       decide which series are needed).
 //!
 //! ## Serde Contract

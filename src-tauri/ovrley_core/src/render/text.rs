@@ -4,8 +4,11 @@
 //! and border values here. Font lookup is cached because labels and dynamic
 //! values reuse the same typefaces across many frames.
 
-use crate::config::{LabelConfig, SceneConfig, ValueConfig};
-use crate::MetricKind;
+use crate::error::{CoreError, CoreResult};
+use crate::normalize::{
+    ValidatedGradientWidget, ValidatedLabel, ValidatedSceneConfig, ValidatedTimeValue,
+    ValidatedValueWidget,
+};
 use skia_safe::{
     image_filters,
     paint::{Join, Style},
@@ -41,10 +44,7 @@ pub struct ResolvedTextStyle {
     pub shadow_distance: f32,
     /// Optional text stroke color.
     pub border_color: Option<Color>,
-    /// Text stroke thickness.
     pub border_thickness: f32,
-    /// Reserved border offset value.
-    pub border_distance: f32,
 }
 
 /// Text measurement details used for manual widget layout.
@@ -60,93 +60,142 @@ pub struct MeasuredText {
 }
 
 // Resolves the scene-level text shadow color with opacity applied.
-fn scene_shadow_color(scene: &SceneConfig, opacity: f32) -> Option<Color> {
-    scene
-        .shadow_color
-        .as_deref()
-        .map(|color| parse_color(color, opacity))
-}
-
-// Resolves the scene-level text border color with opacity applied.
-fn scene_border_color(scene: &SceneConfig, opacity: f32) -> Option<Color> {
-    scene
-        .border_color
-        .as_deref()
-        .map(|color| parse_color(color, opacity))
-}
-
-/// Resolves a static label style from scene defaults and label overrides.
-pub fn label_style(scene: &SceneConfig, label: &LabelConfig, scale: f32) -> ResolvedTextStyle {
-    let opacity = label.opacity.or(scene.opacity).unwrap_or(1.0);
-
-    ResolvedTextStyle {
-        x: label.x,
-        y: label.y,
-        font_name: label
-            .font
-            .clone()
-            .or(label.font_family.clone())
-            .or_else(|| scene.font.clone()),
-        font_size: label.font_size.or(scene.font_size).unwrap_or(32.0) * scale,
-        line_height: label.font_size.or(scene.font_size).unwrap_or(32.0) * scale * 0.92,
-        color: parse_color(
-            label
-                .color
-                .as_deref()
-                .or(scene.color.as_deref())
-                .unwrap_or("#ffffff"),
-            opacity,
-        ),
-        opacity,
-        shadow_color: scene_shadow_color(scene, opacity),
-        shadow_strength: scene.shadow_strength.unwrap_or(0.0) * scale,
-        shadow_distance: scene.shadow_distance.unwrap_or(0.0) * scale,
-        border_color: scene_border_color(scene, opacity),
-        border_thickness: scene.border_thickness.unwrap_or(0.0) * scale,
-        border_distance: scene.border_distance.unwrap_or(0.0) * scale,
+fn scene_shadow_color(scene: &ValidatedSceneConfig, opacity: f32) -> Option<Color> {
+    if scene.shadow_color.is_empty() {
+        None
+    } else {
+        Some(parse_color(&scene.shadow_color, opacity))
     }
 }
 
-/// Resolves a dynamic value style from scene defaults and value overrides.
-pub fn value_style(scene: &SceneConfig, value: &ValueConfig, scale: f32) -> ResolvedTextStyle {
-    let base_y = if value.value == MetricKind::Gradient {
-        value.y
+// Resolves the scene-level text border color with opacity applied.
+fn scene_border_color(scene: &ValidatedSceneConfig, opacity: f32) -> Option<Color> {
+    if scene.border_color.is_empty() {
+        None
     } else {
-        value.y + value.value_offset.unwrap_or(0.0)
-    };
-    let opacity = value.opacity.or(scene.opacity).unwrap_or(1.0);
+        Some(parse_color(&scene.border_color, opacity))
+    }
+}
+
+/// Resolves a text style from a validated label and scene config.
+///
+/// All output-affecting fields are already explicit in the validated type.
+/// Shadow and border come from scene config (not part of the label contract).
+pub fn validated_label_style(
+    validated: &ValidatedLabel,
+    scene: &ValidatedSceneConfig,
+    scale: f32,
+) -> ResolvedTextStyle {
+    let opacity = validated.opacity;
+    let color = Color::from_argb(
+        validated.color[3],
+        validated.color[0],
+        validated.color[1],
+        validated.color[2],
+    );
 
     ResolvedTextStyle {
-        x: value.x,
-        y: base_y,
-        font_name: value
-            .font
-            .clone()
-            .or(value.font_family.clone())
-            .or_else(|| scene.font.clone()),
-        font_size: value.font_size.or(scene.font_size).unwrap_or(32.0) * scale,
-        line_height: value.font_size.or(scene.font_size).unwrap_or(32.0) * scale * 0.92,
-        color: parse_color(
-            value
-                .color
-                .as_deref()
-                .or(scene.color.as_deref())
-                .unwrap_or("#ffffff"),
-            opacity,
-        ),
+        x: validated.x,
+        y: validated.y,
+        font_name: Some(validated.font_name.clone()),
+        font_size: validated.font_size * scale,
+        line_height: validated.font_size * scale * 0.92,
+        color,
         opacity,
         shadow_color: scene_shadow_color(scene, opacity),
-        shadow_strength: scene.shadow_strength.unwrap_or(0.0) * scale,
-        shadow_distance: scene.shadow_distance.unwrap_or(0.0) * scale,
+        shadow_strength: scene.shadow_strength * scale,
+        shadow_distance: scene.shadow_distance * scale,
         border_color: scene_border_color(scene, opacity),
-        border_thickness: scene.border_thickness.unwrap_or(0.0) * scale,
-        border_distance: scene.border_distance.unwrap_or(0.0) * scale,
+        border_thickness: scene.border_thickness * scale,
+    }
+}
+
+/// Resolves a text style from a validated value widget and scene config.
+///
+/// All output-affecting fields are already explicit in the validated type.
+/// Shadow and border come from scene config (not part of the value contract).
+pub fn validated_value_style(
+    validated: &ValidatedValueWidget,
+    scene: &ValidatedSceneConfig,
+    scale: f32,
+) -> ResolvedTextStyle {
+    let opacity = validated.opacity;
+    let color = Color::from_argb(
+        validated.color[3],
+        validated.color[0],
+        validated.color[1],
+        validated.color[2],
+    );
+
+    ResolvedTextStyle {
+        x: validated.x,
+        y: validated.y,
+        font_name: Some(validated.font_name.clone()),
+        font_size: validated.font_size * scale,
+        line_height: validated.font_size * scale * 0.92,
+        color,
+        opacity,
+        shadow_color: scene_shadow_color(scene, opacity),
+        shadow_strength: scene.shadow_strength * scale,
+        shadow_distance: scene.shadow_distance * scale,
+        border_color: scene_border_color(scene, opacity),
+        border_thickness: scene.border_thickness * scale,
+    }
+}
+
+/// Resolves a text style from a validated time widget and scene config.
+///
+/// All output-affecting fields are already explicit in the validated type.
+/// Shadow and border come from scene config (not part of the time contract).
+pub fn validated_time_style(
+    validated: &ValidatedTimeValue,
+    scene: &ValidatedSceneConfig,
+    scale: f32,
+) -> ResolvedTextStyle {
+    validated_value_style(&validated.base, scene, scale)
+}
+
+/// Resolves a text style from a validated gradient widget and scene config.
+///
+/// All output-affecting fields are already explicit in the validated type.
+/// Shadow and border come from scene config (not part of the gradient contract).
+pub fn validated_gradient_style(
+    validated: &ValidatedGradientWidget,
+    scene: &ValidatedSceneConfig,
+    scale: f32,
+) -> ResolvedTextStyle {
+    let opacity = validated.opacity;
+    let color = Color::from_argb(
+        validated.color[3],
+        validated.color[0],
+        validated.color[1],
+        validated.color[2],
+    );
+
+    ResolvedTextStyle {
+        x: validated.x,
+        y: validated.y,
+        font_name: Some(validated.font_name.clone()),
+        font_size: validated.font_size * scale,
+        line_height: validated.font_size * scale * 0.92,
+        color,
+        opacity,
+        shadow_color: scene_shadow_color(scene, opacity),
+        shadow_strength: scene.shadow_strength * scale,
+        shadow_distance: scene.shadow_distance * scale,
+        border_color: scene_border_color(scene, opacity),
+        border_thickness: scene.border_thickness * scale,
     }
 }
 
 /// Draws text with optional drop shadow and stroke.
-pub fn draw_text(canvas: &Canvas, text: &str, style: &ResolvedTextStyle, font_dirs: &[PathBuf]) {
-    draw_text_with_vertical_metrics_text(canvas, text, text, style, font_dirs);
+pub fn draw_text(
+    canvas: &Canvas,
+    text: &str,
+    style: &ResolvedTextStyle,
+    font_dirs: &[PathBuf],
+) -> CoreResult<()> {
+    draw_text_with_vertical_metrics_text(canvas, text, text, style, font_dirs)
 }
 
 /// Draws text while allowing baseline alignment to be measured from a stable
@@ -157,23 +206,19 @@ pub fn draw_text_with_vertical_metrics_text(
     vertical_metrics_text: &str,
     style: &ResolvedTextStyle,
     font_dirs: &[PathBuf],
-) {
+) -> CoreResult<()> {
     if text.is_empty() {
-        return;
+        return Ok(());
     }
 
-    let font = resolve_font(font_dirs, style.font_name.as_deref(), style.font_size);
+    let font = resolve_font(font_dirs, style.font_name.as_deref(), style.font_size)?;
     let metrics_text = if vertical_metrics_text.is_empty() {
         text
     } else {
         vertical_metrics_text
     };
-    let baseline = baseline_for_text_top_with_line_height(
-        metrics_text,
-        style.y,
-        &font,
-        style.line_height,
-    );
+    let baseline =
+        baseline_for_text_top_with_line_height(metrics_text, style.y, &font, style.line_height);
 
     if let Some(shadow_color) = style.shadow_color {
         if style.shadow_strength > 0.0 || style.shadow_distance != 0.0 {
@@ -203,22 +248,17 @@ pub fn draw_text_with_vertical_metrics_text(
 
     let paint = text_paint(style.color);
     canvas.draw_str(text, Point::new(style.x, baseline), &font, &paint);
+    Ok(())
 }
 
 /// Resolves a font from configured font directories or system fonts.
-pub fn resolve_font(font_dirs: &[PathBuf], name: Option<&str>, font_size: f32) -> Font {
-    let typeface = resolve_typeface(font_dirs, name);
-    Font::from_typeface(typeface, font_size)
-}
-
-/// Computes a baseline for text whose top edge should start at `top_y`.
-pub fn baseline_for_top(top_y: f32, font: &Font) -> f32 {
-    let (_, metrics) = font.metrics();
-    top_y - metrics.ascent
+pub fn resolve_font(font_dirs: &[PathBuf], name: Option<&str>, font_size: f32) -> CoreResult<Font> {
+    let typeface = resolve_typeface(font_dirs, name)?;
+    Ok(Font::from_typeface(typeface, font_size))
 }
 
 /// Computes a baseline for text inside a fixed line-height box.
-pub fn baseline_for_top_with_line_height(top_y: f32, font: &Font, line_height: f32) -> f32 {
+pub(crate) fn baseline_for_top_with_line_height(top_y: f32, font: &Font, line_height: f32) -> f32 {
     let (_, metrics) = font.metrics();
     let leading_offset = (line_height - font.size()) * 0.5;
     top_y + leading_offset - metrics.ascent
@@ -243,9 +283,13 @@ pub fn baseline_for_text_top_with_line_height(
 }
 
 /// Measures text using a resolved style.
-pub fn measure_text(text: &str, style: &ResolvedTextStyle, font_dirs: &[PathBuf]) -> MeasuredText {
-    let font = resolve_font(font_dirs, style.font_name.as_deref(), style.font_size);
-    measure_text_with_font(text, &font)
+pub fn measure_text(
+    text: &str,
+    style: &ResolvedTextStyle,
+    font_dirs: &[PathBuf],
+) -> CoreResult<MeasuredText> {
+    let font = resolve_font(font_dirs, style.font_name.as_deref(), style.font_size)?;
+    Ok(measure_text_with_font(text, &font))
 }
 
 /// Measures text using an already-resolved Skia font.
@@ -301,13 +345,13 @@ fn text_paint(color: Color) -> Paint {
 // immutable after load, so stale reads are harmless. This cache is accessed on
 // the hot path (every text-drawing call), but the `Mutex` is only locked on
 // first insertion; subsequent lookups hit the cached `Typeface` directly.
-fn resolve_typeface(font_dirs: &[PathBuf], name: Option<&str>) -> Typeface {
+fn resolve_typeface(font_dirs: &[PathBuf], name: Option<&str>) -> CoreResult<Typeface> {
     static CACHE: OnceLock<Mutex<HashMap<String, Typeface>>> = OnceLock::new();
     let key = name.unwrap_or("__default_font__").to_string();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     if let Ok(cache) = cache.lock() {
         if let Some(typeface) = cache.get(&key) {
-            return typeface.clone();
+            return Ok(typeface.clone());
         }
     }
 
@@ -315,12 +359,12 @@ fn resolve_typeface(font_dirs: &[PathBuf], name: Option<&str>) -> Typeface {
         .or_else(|| load_first_bundled_typeface(font_dirs))
         .or_else(|| FontMgr::default().legacy_make_typeface(Some("Arial"), FontStyle::normal()))
         .or_else(|| FontMgr::default().legacy_make_typeface(None, FontStyle::normal()))
-        .expect("failed to resolve a usable typeface");
+        .ok_or_else(|| CoreError::Render("failed to resolve a usable typeface".into()))?;
 
     if let Ok(mut cache) = cache.lock() {
         cache.insert(key, resolved.clone());
     }
-    resolved
+    Ok(resolved)
 }
 
 // Attempts to load a typeface from an explicit path, bundled dir, or system family.

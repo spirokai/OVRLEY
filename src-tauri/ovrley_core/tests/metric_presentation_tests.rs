@@ -19,8 +19,8 @@
 //! - Future display types crashing instead of returning None
 
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
-use ovrley_core::config::ValueConfig;
 use ovrley_core::debug::RenderProfiler;
+use ovrley_core::normalize::raw::ValueConfig;
 use ovrley_core::render::surface::create_surface;
 use ovrley_core::render::text::ResolvedTextStyle;
 use ovrley_core::render::widgets::metric_presentation::draw_metric_presentation;
@@ -167,7 +167,6 @@ fn default_style() -> ResolvedTextStyle {
         shadow_distance: 0.0,
         border_color: None,
         border_thickness: 0.0,
-        border_distance: 0.0,
     }
 }
 
@@ -184,7 +183,8 @@ fn text_display_type_returns_none_from_presentation_dispatch() {
 
     let result = draw_metric_presentation(
         surface.canvas(),
-        &value,
+        value.value,
+        value.display_type,
         &style,
         &dense,
         0,
@@ -212,7 +212,8 @@ fn tape_display_type_with_heading_cache_draws_successfully() {
 
     let result = draw_metric_presentation(
         surface.canvas(),
-        &value,
+        value.value,
+        value.display_type,
         &style,
         &dense,
         0,
@@ -243,7 +244,8 @@ fn tape_display_type_without_cache_returns_none() {
 
     let result = draw_metric_presentation(
         surface.canvas(),
-        &value,
+        value.value,
+        value.display_type,
         &style,
         &dense,
         0,
@@ -271,7 +273,8 @@ fn tape_display_type_with_text_cache_returns_none() {
 
     let result = draw_metric_presentation(
         surface.canvas(),
-        &value,
+        value.value,
+        value.display_type,
         &style,
         &dense,
         0,
@@ -300,7 +303,8 @@ fn tape_display_type_with_non_heading_metric_returns_none() {
 
     let result = draw_metric_presentation(
         surface.canvas(),
-        &value,
+        value.value,
+        value.display_type,
         &style,
         &dense,
         0,
@@ -334,7 +338,8 @@ fn future_boxed_display_types_return_none() {
         let value = default_value_config(display_type);
         let result = draw_metric_presentation(
             surface.canvas(),
-            &value,
+            value.value,
+            value.display_type,
             &style,
             &dense,
             0,
@@ -351,62 +356,119 @@ fn future_boxed_display_types_return_none() {
     }
 }
 
+fn full_heading_tape_config(x: i32, y: i32) -> serde_json::Value {
+    full_heading_tape_config_sized(x, y, 200, 60)
+}
+
+fn full_heading_tape_config_sized(x: i32, y: i32, width: u32, height: u32) -> serde_json::Value {
+    serde_json::json!({
+        "value": "heading",
+        "x": x,
+        "y": y,
+        "display_type": "heading_tape",
+        "width": width,
+        "height": height,
+        "pixels_per_degree": 5.0,
+        "major_tick_interval": 45,
+        "minor_ticks_per_major": 4,
+        "show_major_ticks": true,
+        "show_minor_ticks": true,
+        "major_tick_length_pct": 0.3,
+        "minor_tick_length_pct": 0.15,
+        "major_tick_thickness": 2.0,
+        "minor_tick_thickness": 1.0,
+        "tick_color": "#ffffff",
+        "cardinal_tick_color": "#ff0000",
+        "tick_alignment": "below",
+        "show_minor_labels": false,
+        "show_major_labels": true,
+        "label_color": "#ffffff",
+        "cardinal_label_color": "#ff0000",
+        "label_font_size": 12.0,
+        "label_offset": 4.0,
+        "show_indicator": true,
+        "indicator_style": "chevron",
+        "indicator_placement": "top",
+        "indicator_color": "#FF0000",
+        "indicator_size": 10.0,
+        "rotation": 0.0,
+        "opacity": 1.0
+    })
+}
+
+fn full_speed_text_config(x: i32, y: i32) -> serde_json::Value {
+    serde_json::json!({
+        "value": "speed",
+        "x": x,
+        "y": y,
+        "display_type": "text",
+        "font": "Arial.ttf",
+        "font_size": 32.0,
+        "color": "#ffffff",
+        "opacity": 1.0,
+        "show_icon": true,
+        "icon_color": "#ffffff",
+        "icon_size": 45.0,
+        "icon_offset_x": 0.0,
+        "icon_offset_y": 0.0,
+        "show_units": true,
+        "unit_color": "#ffffff",
+        "display_unit": "kmh",
+        "prefix": "",
+        "suffix": "",
+        "decimals": 0
+    })
+}
+
 // ── Asset preparation: per-index cache allocation ────────────────────────
 
 #[test]
 fn prepare_assets_distinct_caches_per_value_index() {
     use ovrley_core::activity::schema::ParsedActivity;
-    use ovrley_core::config::RenderConfig;
     use ovrley_core::debug::RenderProfiler;
+    use ovrley_core::normalize::raw::RenderConfig;
+    use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
     use ovrley_core::render::widgets::prepare_render_assets;
     use ovrley_core::render::widgets::types::PresentationCache;
     use std::path::PathBuf;
 
-    let heading_tape_at_pos_0 = serde_json::from_value(serde_json::json!({
-        "value": "heading",
-        "x": 10,
-        "y": 20,
-        "display_type": "heading_tape",
-        "width": 200,
-        "height": 60
-    }))
-    .unwrap();
+    let heading_tape_at_pos_0 = full_heading_tape_config(10, 20);
 
-    let speed_text_at_pos_1 = serde_json::from_value(serde_json::json!({
-        "value": "speed",
-        "x": 100,
-        "y": 200,
-        "display_type": "text"
-    }))
-    .unwrap();
+    let speed_text_at_pos_1 = serde_json::from_value(full_speed_text_config(100, 200)).unwrap();
 
-    let heading_tape_at_pos_2 = serde_json::from_value(serde_json::json!({
-        "value": "heading",
-        "x": 400,
-        "y": 20,
-        "display_type": "heading_tape",
-        "width": 200,
-        "height": 60
-    }))
-    .unwrap();
+    let heading_tape_at_pos_2 = full_heading_tape_config(400, 20);
 
     let config = RenderConfig {
         scene: serde_json::from_value(serde_json::json!({
             "fps": 30.0,
             "start": 0.0,
-            "end": 10.0
+            "end": 10.0,
+            "width": 1920,
+            "height": 1080,
+            "scale": 1.0,
+            "shadow_strength": 0.0,
+            "shadow_distance": 0.0,
+            "shadow_color": "#000000",
+            "border_thickness": 0.0,
+            "border_color": "#000000",
+            "update_rate": 1,
+            "custom_export_range_active": false,
+            "composite_sync_offset": 0.0,
+            "composite_video_trim_start": 0.0,
+            "composite_widget_update_rate": 1
         }))
         .unwrap(),
         labels: vec![],
         values: vec![
-            heading_tape_at_pos_0,
+            serde_json::from_value(heading_tape_at_pos_0).unwrap(),
             speed_text_at_pos_1,
-            heading_tape_at_pos_2,
+            serde_json::from_value(heading_tape_at_pos_2).unwrap(),
         ],
         plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
     };
+    let config = validate_render_config(config).unwrap();
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = ovrley_core::activity::schema::DenseActivityReport {
         frame_count: 1,
@@ -484,7 +546,8 @@ fn prepare_assets_distinct_caches_per_value_index() {
 #[test]
 fn render_preserves_multiple_boxed_reports() {
     use ovrley_core::activity::schema::ParsedActivity;
-    use ovrley_core::config::RenderConfig;
+    use ovrley_core::normalize::raw::RenderConfig;
+    use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
     use ovrley_core::render::render_preview_with_report;
     use std::path::PathBuf;
@@ -494,25 +557,9 @@ fn render_preserves_multiple_boxed_reports() {
         .unwrap()
         .to_path_buf();
 
-    let heading_tape = serde_json::from_value(serde_json::json!({
-        "value": "heading",
-        "x": 10,
-        "y": 20,
-        "display_type": "heading_tape",
-        "width": 200,
-        "height": 60
-    }))
-    .unwrap();
+    let heading_tape = serde_json::from_value(full_heading_tape_config(10, 20)).unwrap();
 
-    let linear_speed = serde_json::from_value(serde_json::json!({
-        "value": "speed",
-        "x": 400,
-        "y": 20,
-        "display_type": "linear",
-        "width": 200,
-        "height": 60
-    }))
-    .unwrap();
+    let speed_text = serde_json::from_value(full_speed_text_config(400, 20)).unwrap();
 
     let config = RenderConfig {
         scene: serde_json::from_value(serde_json::json!({
@@ -520,14 +567,26 @@ fn render_preserves_multiple_boxed_reports() {
             "start": 0.0,
             "end": 10.0,
             "width": 800,
-            "height": 200
+            "height": 200,
+            "scale": 1.0,
+            "shadow_strength": 0.0,
+            "shadow_distance": 0.0,
+            "shadow_color": "#000000",
+            "border_thickness": 0.0,
+            "border_color": "#000000",
+            "update_rate": 1,
+            "custom_export_range_active": false,
+            "composite_sync_offset": 0.0,
+            "composite_video_trim_start": 0.0,
+            "composite_widget_update_rate": 1
         }))
         .unwrap(),
         labels: vec![],
-        values: vec![heading_tape, linear_speed],
+        values: vec![heading_tape, speed_text],
         plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
     };
+    let config = validate_render_config(config).unwrap();
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = ovrley_core::activity::schema::DenseActivityReport {
         frame_count: 1,
@@ -579,11 +638,11 @@ fn render_preserves_multiple_boxed_reports() {
     let result = render_preview_with_report(&paths, &config, &activity, &dense, 0.0, &out_path);
 
     assert!(result.is_ok(), "Full-frame render should succeed");
-    let (_guard, report) = result.unwrap();
+    let report = result.unwrap();
 
     assert!(
         report.metric_presentations.len() == 1,
-        "Exactly one boxed presentation should report here: heading_tape renders as a boxed metric presentation while linear falls back to text; got {}",
+        "Exactly one boxed presentation should report here: heading_tape renders as a boxed metric presentation while speed text remains intrinsic; got {}",
         report.metric_presentations.len()
     );
     let presentation = &report.metric_presentations[0];
@@ -616,7 +675,8 @@ fn render_preserves_multiple_boxed_reports() {
 #[test]
 fn render_reports_multiple_heading_tapes_with_identity() {
     use ovrley_core::activity::schema::ParsedActivity;
-    use ovrley_core::config::RenderConfig;
+    use ovrley_core::normalize::raw::RenderConfig;
+    use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
     use ovrley_core::render::render_preview_with_report;
     use std::path::PathBuf;
@@ -626,25 +686,10 @@ fn render_reports_multiple_heading_tapes_with_identity() {
         .unwrap()
         .to_path_buf();
 
-    let heading_tape_left = serde_json::from_value(serde_json::json!({
-        "value": "heading",
-        "x": 10,
-        "y": 20,
-        "display_type": "heading_tape",
-        "width": 200,
-        "height": 60
-    }))
-    .unwrap();
+    let heading_tape_left = serde_json::from_value(full_heading_tape_config(10, 20)).unwrap();
 
-    let heading_tape_right = serde_json::from_value(serde_json::json!({
-        "value": "heading",
-        "x": 400,
-        "y": 20,
-        "display_type": "heading_tape",
-        "width": 180,
-        "height": 50
-    }))
-    .unwrap();
+    let heading_tape_right =
+        serde_json::from_value(full_heading_tape_config_sized(400, 20, 180, 50)).unwrap();
 
     let config = RenderConfig {
         scene: serde_json::from_value(serde_json::json!({
@@ -652,7 +697,18 @@ fn render_reports_multiple_heading_tapes_with_identity() {
             "start": 0.0,
             "end": 10.0,
             "width": 800,
-            "height": 200
+            "height": 200,
+            "scale": 1.0,
+            "shadow_strength": 0.0,
+            "shadow_distance": 0.0,
+            "shadow_color": "#000000",
+            "border_thickness": 0.0,
+            "border_color": "#000000",
+            "update_rate": 1,
+            "custom_export_range_active": false,
+            "composite_sync_offset": 0.0,
+            "composite_video_trim_start": 0.0,
+            "composite_widget_update_rate": 1
         }))
         .unwrap(),
         labels: vec![],
@@ -660,6 +716,7 @@ fn render_reports_multiple_heading_tapes_with_identity() {
         plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
     };
+    let config = validate_render_config(config).unwrap();
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
     let dense = ovrley_core::activity::schema::DenseActivityReport {
         frame_count: 1,
@@ -711,7 +768,7 @@ fn render_reports_multiple_heading_tapes_with_identity() {
     let result = render_preview_with_report(&paths, &config, &activity, &dense, 0.0, &out_path);
 
     assert!(result.is_ok(), "Full-frame render should succeed");
-    let (_guard, report) = result.unwrap();
+    let report = result.unwrap();
 
     assert_eq!(
         report.metric_presentations.len(),

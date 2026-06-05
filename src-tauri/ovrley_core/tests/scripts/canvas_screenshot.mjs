@@ -97,7 +97,7 @@ async function main() {
     `,
   })
 
-  await page.waitForFunction(() => typeof window.__STORE__ !== 'undefined', {
+  await page.waitForFunction(() => typeof window.__OVRLEY_STORE__ !== 'undefined', {
     timeout: 30000,
   })
 
@@ -110,17 +110,29 @@ async function main() {
 
     if (activity) {
       await page.evaluate((data) => {
-        window.setCurrentActivityCache(data)
+        const store = window.__OVRLEY_STORE__
+        const state = store.getState()
+        state.setParsedActivity(data)
+        state.setActivitySummary(data)
       }, activity)
     }
 
     if (storeState) {
       await page.evaluate((state) => {
-        const store = window.__STORE__
-        store.getState().setConfig(state.config)
+        const store = window.__OVRLEY_STORE__
+        const actions = store.getState()
+        actions.setConfig(state.config)
+        if (typeof state.startSecond === 'number') {
+          actions.setStartSecond?.(state.startSecond)
+        }
+        if (typeof state.endSecond === 'number') {
+          actions.setEndSecond?.(state.endSecond)
+        }
+        if (typeof state.selectedSecond === 'number') {
+          actions.setSelectedSecond?.(state.selectedSecond)
+        }
         store.setState({
           globalDefaults: state.globalDefaults,
-          selectedSecond: state.selectedSecond,
           activitySummary: state.activitySummary,
           selectedWidgetId: null,
           widgetDrawerOpen: false,
@@ -218,7 +230,7 @@ async function main() {
       const widget = document.querySelector('[data-testid="widget-layer"] [data-widget-id]')
       const widgetId = widget?.getAttribute('data-widget-id')
       if (widgetId) {
-        window.__STORE__?.getState?.().setSelectedWidgetId?.(widgetId)
+        window.__OVRLEY_STORE__?.getState?.().setSelectedWidgetId?.(widgetId)
       }
     })
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))

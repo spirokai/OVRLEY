@@ -10,10 +10,12 @@
 
 /// Activity JSON contracts plus trim and interpolation utilities.
 pub mod activity;
+/// Shared benchmark infrastructure for diagnostic benchmark binaries.
+pub mod benchmark_common;
+/// Shared CLI argument helpers for diagnostic binaries.
+pub mod bin_common;
 /// Backend-facing command helpers used by the Tauri application layer.
 pub mod commands;
-/// Template and scene configuration contracts.
-pub mod config;
 /// Progress and timing diagnostics shared by render and encode code.
 pub mod debug;
 /// Video encoding and ffmpeg integration.
@@ -22,6 +24,8 @@ pub mod encode;
 pub mod error;
 /// Shared interpolation utilities used by activity and render modules.
 pub mod interpolation;
+/// Render config validation seam — zero backend-owned defaults.
+pub mod normalize;
 /// Application path configuration and resolution.
 pub mod paths;
 /// Shared Ramer-Douglas-Peucker line simplification.

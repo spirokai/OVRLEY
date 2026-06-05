@@ -6,13 +6,16 @@
 //! the cached-image and base-RGBA paths use the same static drawing loop.
 
 use super::LabelCacheStatus;
-use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
+use crate::normalize::ValidatedSceneConfig;
 use crate::paths::AppPaths;
 use crate::render::surface::{create_surface, wrap_native_surface};
-use crate::render::text::{draw_text, label_style, value_style};
-use crate::render::widgets::{draw_static_metric_icon_for_value, has_static_metric_icon};
+use crate::render::text::{draw_text, validated_label_style, validated_value_style};
+use crate::render::widgets::types::PreparedValue;
+use crate::render::widgets::{
+    draw_static_metric_icon_for_value_validated, has_static_metric_icon_validated,
+};
 use skia_safe::Image;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -25,19 +28,21 @@ use std::time::Instant;
 /// different render configurations cannot reuse stale images across renders.
 pub(super) fn cached_labels_image(
     paths: &AppPaths,
-    config: &RenderConfig,
-    width: u32,
-    height: u32,
-    scale: f32,
+    labels: &[crate::normalize::ValidatedLabel],
+    values: &[PreparedValue],
+    scene: &ValidatedSceneConfig,
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<(Option<Image>, LabelCacheStatus)> {
-    if config.labels.is_empty() && !config_has_static_metric_icons(config) {
+    let width = scene.width;
+    let height = scene.height;
+    let scale = scene.scale;
+    if labels.is_empty() && !config_has_static_metric_icons(values) {
         return Ok((None, LabelCacheStatus::None));
     }
 
     static CACHE: OnceLock<Mutex<HashMap<u64, Image>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    let cache_key = labels_cache_key(config, width, height, scale)?;
+    let cache_key = labels_cache_key(labels, values, scene, width, height, scale);
 
     if let Ok(cache) = cache.lock() {
         if let Some(image) = cache.get(&cache_key) {
@@ -52,8 +57,8 @@ pub(super) fn cached_labels_image(
         surface.canvas().clear(skia_safe::Color::TRANSPARENT);
     });
     prepare_profiler.measure("text.static.cache", || {
-        draw_static_text_and_icons(surface.canvas(), paths, config, scale);
-    });
+        draw_static_text_and_icons(surface.canvas(), paths, labels, values, scene, scale)
+    })?;
     let image = surface.image_snapshot();
     prepare_profiler.record_ms(
         "prepare_render_assets.total",
@@ -73,15 +78,17 @@ pub(super) fn cached_labels_image(
 /// values so the hot path does not have to redraw static content repeatedly.
 pub fn prepare_base_rgba(
     paths: &AppPaths,
-    config: &RenderConfig,
-    width: u32,
-    height: u32,
-    scale: f32,
+    labels: &[crate::normalize::ValidatedLabel],
+    values: &[PreparedValue],
+    scene: &ValidatedSceneConfig,
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<Option<Vec<u8>>> {
+    let width = scene.width;
+    let height = scene.height;
+    let scale = scene.scale;
     let row_bytes = (width as usize) * 4;
     let mut pixels = vec![0u8; row_bytes * (height as usize)];
-    if config.labels.is_empty() && !config_has_static_metric_icons(config) {
+    if labels.is_empty() && !config_has_static_metric_icons(values) {
         return Ok(Some(pixels));
     }
 
@@ -89,15 +96,18 @@ pub fn prepare_base_rgba(
         wrap_native_surface(width, height, pixels.as_mut_slice())
     })?;
     prepare_profiler.measure("text.static.cache", || {
-        draw_static_text_and_icons(surface.canvas(), paths, config, scale);
-    });
+        draw_static_text_and_icons(surface.canvas(), paths, labels, values, scene, scale)
+    })?;
     drop(surface);
     Ok(Some(pixels))
 }
 
 /// Returns whether any configured metric widget contributes a static icon.
-pub(super) fn config_has_static_metric_icons(config: &RenderConfig) -> bool {
-    config.values.iter().any(has_static_metric_icon)
+pub(super) fn config_has_static_metric_icons(values: &[PreparedValue]) -> bool {
+    values
+        .iter()
+        .filter_map(text_value)
+        .any(has_static_metric_icon_validated)
 }
 
 /// Draws the full static text-and-icon layer shared by preview and video prep.
@@ -107,37 +117,69 @@ pub(super) fn config_has_static_metric_icons(config: &RenderConfig) -> bool {
 fn draw_static_text_and_icons(
     canvas: &skia_safe::Canvas,
     paths: &AppPaths,
-    config: &RenderConfig,
+    labels: &[crate::normalize::ValidatedLabel],
+    values: &[PreparedValue],
+    scene: &ValidatedSceneConfig,
     scale: f32,
-) {
-    for label in &config.labels {
-        let style = label_style(&config.scene, label, scale);
-        draw_text(canvas, &label.text, &style, &paths.font_dirs);
+) -> CoreResult<()> {
+    for validated in labels {
+        let style = validated_label_style(validated, scene, scale);
+        draw_text(canvas, &validated.text, &style, &paths.font_dirs)?;
     }
-    draw_static_metric_icons(canvas, paths, config, scale);
+    draw_static_metric_icons(canvas, paths, values, scene, scale)?;
+    Ok(())
 }
 
 /// Computes the cache key for the shared static label/icon layer.
-fn labels_cache_key(config: &RenderConfig, width: u32, height: u32, scale: f32) -> CoreResult<u64> {
+fn labels_cache_key(
+    labels: &[crate::normalize::ValidatedLabel],
+    values: &[PreparedValue],
+    scene: &ValidatedSceneConfig,
+    width: u32,
+    height: u32,
+    scale: f32,
+) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     width.hash(&mut hasher);
     height.hash(&mut hasher);
     scale.to_bits().hash(&mut hasher);
-    serde_json::to_string(&config.scene)?.hash(&mut hasher);
-    serde_json::to_string(&config.labels)?.hash(&mut hasher);
-    serde_json::to_string(&config.values)?.hash(&mut hasher);
-    Ok(hasher.finish())
+    format!("{scene:?}").hash(&mut hasher);
+    format!("{labels:?}").hash(&mut hasher);
+    format!("{values:?}").hash(&mut hasher);
+    hasher.finish()
 }
 
 /// Draws all metric icons whose pixels do not depend on the current frame.
+///
+/// Validates standard metric text widgets upfront so validated icons use
+/// zero backend-owned defaults.
 fn draw_static_metric_icons(
     canvas: &skia_safe::Canvas,
     paths: &AppPaths,
-    config: &RenderConfig,
+    values: &[PreparedValue],
+    scene: &ValidatedSceneConfig,
     scale: f32,
-) {
-    for value in &config.values {
-        let style = value_style(&config.scene, value, scale);
-        draw_static_metric_icon_for_value(canvas, value, &style, scale, &paths.font_dirs);
+) -> CoreResult<()> {
+    for validated in values.iter().filter_map(text_value) {
+        if !has_static_metric_icon_validated(validated) {
+            continue;
+        }
+        let style = validated_value_style(validated, scene, scale);
+        draw_static_metric_icon_for_value_validated(
+            canvas,
+            validated,
+            &style,
+            scale,
+            &paths.font_dirs,
+        )?;
+    }
+    Ok(())
+}
+
+fn text_value(value: &PreparedValue) -> Option<&crate::normalize::ValidatedValueWidget> {
+    match value {
+        PreparedValue::StandardText(validated) => Some(validated),
+        PreparedValue::TimeText(validated) => Some(&validated.base),
+        PreparedValue::Gradient(_) | PreparedValue::HeadingTape(_) => None,
     }
 }

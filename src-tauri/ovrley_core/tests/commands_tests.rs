@@ -32,16 +32,17 @@ use std::path::PathBuf;
 use serde_json::Value;
 
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
+use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::commands::{backend_render, is_composite_render};
-use ovrley_core::config::parse_config_json;
-use ovrley_core::config::RenderConfig;
 use ovrley_core::debug::RenderProgress;
 use ovrley_core::encode::fps::Fps;
 use ovrley_core::encode::video::RenderController;
 use ovrley_core::encode::video_composite_pipeline::{
     apply_composite_scene_timing, derive_composite_render_plan,
 };
+use ovrley_core::normalize::raw::parse_config_json;
+use ovrley_core::normalize::raw::RenderConfig;
+use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
 
 /// Verifies the transparent render branch does not alter dense activity
@@ -53,8 +54,9 @@ fn test_3_1_transparent_render_branch_keeps_original_dense_timing() {
     let config = transparent_config(5.0, 15.0, 30.0);
     let activity = synthetic_activity();
 
-    assert!(!is_composite_render(&config));
-    let dense = build_dense_activity_report(&activity, &config).unwrap();
+    let validated = validate_render_config(config.clone()).unwrap();
+    assert!(!is_composite_render(&validated));
+    let dense = build_dense_activity_report_validated(&activity, &validated).unwrap();
 
     assert_eq!(dense.frame_count, 300);
     assert_eq!(dense.series.speed.first().copied().flatten(), Some(5.0));
@@ -76,10 +78,13 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
             r#"
                 "composite_video_path": "input.mp4",
                 "composite_bitrate": "60M",
+                "composite_sync_offset": 0.0,
                 "composite_video_fps_num": 30000,
                 "composite_video_fps_den": 1001,
                 "composite_video_duration": 20.0,
-                "composite_render_duration": 10.0
+                "composite_render_duration": 10.0,
+                "composite_video_trim_start": 0.0,
+                "composite_widget_update_rate": 1
                 "#,
         ),
         &synthetic_activity_json(),
@@ -114,8 +119,6 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
         &controller,
         &composite_config_json(&format!(
             r#"
-                "width": 3840,
-                "height": 2160,
                 "composite_video_path": "{}",
                 "composite_bitrate": "60M",
                 "composite_sync_offset": 300.0,
@@ -123,7 +126,8 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
                 "composite_video_fps_den": 1001,
                 "composite_video_duration": 20.0,
                 "composite_render_duration": 0.2,
-                "composite_widget_update_rate": 2
+                "composite_widget_update_rate": 2,
+                "composite_video_trim_start": 0.0
                 "#,
             video_path.to_string_lossy().replace('\\', "\\\\")
         )),
@@ -146,16 +150,18 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
 /// Plan derivation must reject composite configs that omit `composite_bitrate`.
 #[test]
 fn test_3_3_missing_bitrate_validation() {
-    let config = composite_config(
+    let error = derive_composite_render_plan(&composite_validated_scene(
         r#"
             "composite_video_path": "input.mp4",
+            "composite_sync_offset": 0.0,
             "composite_video_fps_num": 30000,
             "composite_video_fps_den": 1001,
-            "composite_video_duration": 20.0
+            "composite_video_duration": 20.0,
+            "composite_video_trim_start": 0.0,
+            "composite_widget_update_rate": 1
             "#,
-    );
-
-    let error = derive_composite_render_plan(&config).unwrap_err();
+    ))
+    .unwrap_err();
 
     assert_eq!(
         error.to_string(),
@@ -167,20 +173,26 @@ fn test_3_3_missing_bitrate_validation() {
 /// (numerator or denominator), giving a field-specific error for each.
 #[test]
 fn test_3_4_missing_fps_validation() {
-    let missing_num = composite_config(
+    let missing_num = composite_validated_scene(
         r#"
             "composite_video_path": "input.mp4",
             "composite_bitrate": "60M",
+            "composite_sync_offset": 0.0,
             "composite_video_fps_den": 1001,
-            "composite_video_duration": 20.0
+            "composite_video_duration": 20.0,
+            "composite_video_trim_start": 0.0,
+            "composite_widget_update_rate": 1
             "#,
     );
-    let missing_den = composite_config(
+    let missing_den = composite_validated_scene(
         r#"
             "composite_video_path": "input.mp4",
             "composite_bitrate": "60M",
+            "composite_sync_offset": 0.0,
             "composite_video_fps_num": 30000,
-            "composite_video_duration": 20.0
+            "composite_video_duration": 20.0,
+            "composite_video_trim_start": 0.0,
+            "composite_widget_update_rate": 1
             "#,
     );
 
@@ -219,17 +231,24 @@ fn test_3_5_dense_report_timing_for_sync_offset() {
             "composite_video_fps_den": 1001,
             "composite_video_duration": 20.0,
             "composite_render_duration": 10.0,
+            "composite_video_trim_start": 0.0,
             "composite_widget_update_rate": 1
             "#,
     );
-    let plan = derive_composite_render_plan(&config).unwrap();
-    apply_composite_scene_timing(&mut config, &plan);
+    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
+    let plan = derive_composite_render_plan(&scene).unwrap();
+    apply_composite_scene_timing(&mut scene, &plan);
+    config.scene.start = scene.start;
+    config.scene.end = scene.end;
+    config.scene.fps = scene.fps;
+    config.scene.update_rate = Some(scene.update_rate);
 
-    let dense = build_dense_activity_report(&synthetic_activity(), &config).unwrap();
+    let validated = validate_render_config(config).unwrap();
+    let dense = build_dense_activity_report_validated(&synthetic_activity(), &validated).unwrap();
 
-    assert_eq!(config.scene.start, 300.0);
-    assert_eq!(config.scene.end, 310.0);
-    assert!((config.scene.fps - (30000.0 / 1001.0)).abs() < 1e-9);
+    assert_eq!(validated.scene.start, 300.0);
+    assert_eq!(validated.scene.end, 310.0);
+    assert!((validated.scene.fps - (30000.0 / 1001.0)).abs() < 1e-9);
     assert_eq!(dense.series.speed.first().copied().flatten(), Some(300.0));
 }
 
@@ -249,21 +268,29 @@ fn test_3_6_dense_report_timing_for_lower_overlay_update_rate() {
         r#"
             "composite_video_path": "input.mp4",
             "composite_bitrate": "60M",
+            "composite_sync_offset": 0.0,
             "composite_video_fps_num": 60000,
             "composite_video_fps_den": 1001,
             "composite_video_duration": 20.0,
             "composite_render_duration": 10.0,
+            "composite_video_trim_start": 0.0,
             "composite_widget_update_rate": 2
             "#,
     );
-    let plan = derive_composite_render_plan(&config).unwrap();
-    apply_composite_scene_timing(&mut config, &plan);
+    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
+    let plan = derive_composite_render_plan(&scene).unwrap();
+    apply_composite_scene_timing(&mut scene, &plan);
+    config.scene.start = scene.start;
+    config.scene.end = scene.end;
+    config.scene.fps = scene.fps;
+    config.scene.update_rate = Some(scene.update_rate);
 
-    let dense = build_dense_activity_report(&synthetic_activity(), &config).unwrap();
+    let validated = validate_render_config(config).unwrap();
+    let dense = build_dense_activity_report_validated(&synthetic_activity(), &validated).unwrap();
 
     assert_eq!(plan.overlay_pipe_fps, Fps::new(30000, 1001).unwrap());
-    assert!((config.scene.fps - (30000.0 / 1001.0)).abs() < 1e-9);
-    assert_eq!(config.widget_update_rate(), 1);
+    assert!((validated.scene.fps - (30000.0 / 1001.0)).abs() < 1e-9);
+    assert_eq!(validated.scene.update_rate, 1);
     assert_eq!(dense.frame_count, 300);
 }
 
@@ -275,14 +302,17 @@ fn test_3_7_render_duration_defaults_to_remaining_video_after_trim() {
         r#"
             "composite_video_path": "input.mp4",
             "composite_bitrate": "60M",
+            "composite_sync_offset": 0.0,
             "composite_video_fps_num": 30000,
             "composite_video_fps_den": 1001,
             "composite_video_duration": 60.0,
-            "composite_video_trim_start": 10.0
+            "composite_video_trim_start": 10.0,
+            "composite_widget_update_rate": 1
             "#,
     );
 
-    let plan = derive_composite_render_plan(&config).unwrap();
+    let scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
+    let plan = derive_composite_render_plan(&scene).unwrap();
 
     assert_eq!(plan.render_duration, 50.0);
 }
@@ -295,14 +325,17 @@ fn test_3_8_rejects_impossible_trim() {
         r#"
             "composite_video_path": "input.mp4",
             "composite_bitrate": "60M",
+            "composite_sync_offset": 0.0,
             "composite_video_fps_num": 30000,
             "composite_video_fps_den": 1001,
             "composite_video_duration": 60.0,
-            "composite_video_trim_start": 60.0
+            "composite_video_trim_start": 60.0,
+            "composite_widget_update_rate": 1
             "#,
     );
 
-    let error = derive_composite_render_plan(&config).unwrap_err();
+    let scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
+    let error = derive_composite_render_plan(&scene).unwrap_err();
 
     assert_eq!(
         error.to_string(),
@@ -310,16 +343,19 @@ fn test_3_8_rejects_impossible_trim() {
     );
 }
 
+/// Explicit speed value config required by the validation contract.
+const EXPLICIT_SPEED_VALUE: &str = r##"{"value":"speed","x":0,"y":0,"font":"Arial.ttf","font_size":32.0,"color":"#ffffff","opacity":1.0,"show_icon":true,"icon_color":"#40e0d0","icon_size":28.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"show_units":true,"unit_color":"#ffffff","display_unit":"kmh","decimals":0,"prefix":"","suffix":""}"##;
+
 /// Builds a minimal transparent-render config with one speed value and no
 /// composite fields — used to verify the transparent branch is selected.
 fn transparent_config(start: f64, end: f64, fps: f64) -> RenderConfig {
     parse_config_json(&format!(
-        r#"{{
-                "scene":{{"fps":{fps},"start":{start},"end":{end},"ffmpeg":{{}}}},
-                "values":[{{"value":"speed","x":0,"y":0}}],
+        r##"{{
+                "scene":{{"fps":{fps},"start":{start},"end":{end},"width":1920,"height":1080,"scale":1.0,"shadow_color":"#000000","shadow_strength":0.0,"shadow_distance":0.0,"border_color":"#000000","border_thickness":0.0,"update_rate":1,"ffmpeg":{{}}}},
+                "values":[{EXPLICIT_SPEED_VALUE}],
                 "labels":[],
                 "plots":[]
-            }}"#
+            }}"##
     ))
     .unwrap()
 }
@@ -327,25 +363,44 @@ fn transparent_config(start: f64, end: f64, fps: f64) -> RenderConfig {
 /// Builds a composite config from extra scene-level JSON fields injected
 /// into a boilerplate `scene` block — keeps individual tests concise.
 fn composite_config(extra_scene_fields: &str) -> RenderConfig {
-    parse_config_json(&composite_config_json(extra_scene_fields)).unwrap()
+    let json_str = composite_config_json(extra_scene_fields);
+    let value: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+    serde_json::from_value(value).unwrap()
+}
+
+fn composite_validated_scene(
+    extra_scene_fields: &str,
+) -> ovrley_core::normalize::ValidatedSceneConfig {
+    let config = composite_config(extra_scene_fields);
+    ovrley_core::normalize::validate_scene_config(config.scene).unwrap()
 }
 
 /// Returns the full JSON template string for a composite config, splicing
 /// `extra_scene_fields` into the `scene` block.
 fn composite_config_json(extra_scene_fields: &str) -> String {
     format!(
-        r#"{{
+        r##"{{
                 "scene":{{
                     "fps":30,
                     "start":0,
                     "end":10,
-                    "ffmpeg":{{}},
+                    "width":1920,
+                    "height":1080,
+                    "scale":1.0,
+                    "shadow_strength":0.0,
+                    "shadow_distance":0.0,
+                    "shadow_color":"#000000",
+                    "border_thickness":0.0,
+                    "border_color":"#000000",
+                    "update_rate":1,
+                    "custom_export_range_active":false,
+                    "ffmpeg":{{"codec":"libx264"}},
                     {extra_scene_fields}
                 }},
-                "values":[{{"value":"speed","x":0,"y":0}}],
+                "values":[{EXPLICIT_SPEED_VALUE}],
                 "labels":[],
                 "plots":[]
-            }}"#
+            }}"##
     )
 }
 

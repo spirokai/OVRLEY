@@ -5,10 +5,10 @@
 //! across phases without coupling the main render loop to reporting details.
 
 use crate::activity::schema::DenseActivityReport;
-use crate::config::RenderConfig;
 use crate::debug::TimingBucket;
 use crate::encode::ffmpeg::suppress_child_console;
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
 use crate::render::LabelCacheStatus;
 use chrono::Local;
@@ -152,7 +152,7 @@ pub(crate) fn write_prepare_summary(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn write_timing_summary_with_phase(
     debug_dir: &Path,
-    config: &RenderConfig,
+    scene: &crate::normalize::ValidatedSceneConfig,
     output_path: &Path,
     phase: &str,
     total_frames: u32,
@@ -162,15 +162,16 @@ pub(crate) fn write_timing_summary_with_phase(
     sample_frame_indices: Vec<usize>,
     timings: BTreeMap<String, TimingBucket>,
 ) -> CoreResult<()> {
+    let update_rate = scene.update_rate.max(1);
     let summary = TimingSummary {
         phase: phase.to_string(),
         timestamp: iso_timestamp_now(),
         overlay_filename: output_path.to_string_lossy().to_string(),
-        fps: config.container_fps(),
-        layout_fps: config.scene.fps,
-        update_rate: config.widget_update_rate(),
-        width: config.scene.width.unwrap_or(1920),
-        height: config.scene.height.unwrap_or(1080),
+        fps: scene.fps / f64::from(update_rate),
+        layout_fps: scene.fps,
+        update_rate,
+        width: scene.width,
+        height: scene.height,
         total_frames,
         layout_total_frames,
         rendered_frames,
@@ -184,10 +185,10 @@ pub(crate) fn write_timing_summary_with_phase(
 /// Writes timing and segment metadata for a stitched render.
 pub(crate) fn write_stitch_summary(
     paths: &AppPaths,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     public_filename: &str,
     concat_duration_ms: f64,
-    segment_configs: &[RenderConfig],
+    segment_configs: &[ValidatedRenderConfig],
     segment_reports: &[DenseActivityReport],
     filenames: &[String],
 ) -> CoreResult<()> {

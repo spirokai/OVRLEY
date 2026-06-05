@@ -15,33 +15,32 @@ use super::reduction::{
 };
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
-use crate::config::{ElevationPlotConfig, RenderConfig, RenderDataRequirements};
 use crate::debug::RenderProfiler;
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::RenderDataRequirements;
 use crate::render::surface::create_surface;
 use std::time::Instant;
 
 /// Prepares cached geometry, static layers, and frame states for an elevation
 /// plot.
 pub(crate) fn prepare_elevation_cache(
-    config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
-    plot: &ElevationPlotConfig,
+    validated: &crate::normalize::ValidatedElevationPlot,
+    scene: &crate::normalize::ValidatedSceneConfig,
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<ElevationWidgetCache> {
     let prepare_started = Instant::now();
-    let show_full_activity = plot.show_full_activity.unwrap_or(false);
-    let plot = super::normalize::normalize_elevation_plot(config, plot);
-    let raw_points = build_elevation_source_points(config, activity, show_full_activity)?;
+    let show_full_activity = validated.show_full_activity;
+    let plot = super::normalize::normalize_elevation_plot(validated, scene);
+    let raw_points = build_elevation_source_points(activity, show_full_activity, scene)?;
     let geometry = prepare_profiler.measure("build_elevation_cache.geometry", || {
         build_elevation_geometry(&plot, &raw_points)
     })?;
-    let marker_layers = super::super::marker::marker_layers_from_points(
-        &plot.marker_points,
+    let marker_layers = super::super::marker::marker_layers_from_plot(
         &plot.marker_variant,
         plot.marker_variant_diameter,
-        plot.marker_variant_stroke_width,
+        plot.marker_size,
         &plot.marker_color,
         plot.marker_opacity,
     );
@@ -50,7 +49,7 @@ pub(crate) fn prepare_elevation_cache(
     })?;
     let frame_states = prepare_profiler.measure("build_elevation_cache.frame_states", || {
         super::frame_state::build_elevation_frame_states(
-            config,
+            scene,
             activity,
             dense_activity,
             &geometry,
@@ -142,7 +141,7 @@ fn build_elevation_geometry(
         &downsampled,
         plot.width as f32,
         plot.height as f32,
-        plot.margin,
+        0.0,
         plot.y_scale,
     );
     let projected_samples = downsampled
@@ -215,11 +214,11 @@ fn raw_elevation_points_with_optional_progress(
 /// Custom export ranges trim the source samples so the profile itself can
 /// represent only the selected slice unless the template asks for full view.
 fn build_elevation_source_points(
-    config: &RenderConfig,
     activity: &ParsedActivity,
     show_full_activity: bool,
+    scene: &crate::normalize::ValidatedSceneConfig,
 ) -> CoreResult<Vec<(f32, f64)>> {
-    if show_full_activity || !custom_export_range_active(config) {
+    if show_full_activity || !custom_export_range_active(scene) {
         let source = if activity.sample_elevations.is_empty() {
             &activity.elevation
         } else {
@@ -233,8 +232,8 @@ fn build_elevation_source_points(
 
     let trimmed = trim_activity(
         activity,
-        config.scene.start,
-        config.scene.end,
+        scene.start,
+        scene.end,
         &RenderDataRequirements {
             distance_progress: true,
             elevation: true,

@@ -5,9 +5,8 @@
 //! cleanup of temporary segment outputs. The public facade in `encode::video`
 //! decides when to call into these helpers.
 
-use crate::activity::build_dense_activity_report;
+use crate::activity::build_dense_activity_report_validated;
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::RenderConfig;
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
 use crate::encode::fps::Fps;
@@ -23,6 +22,7 @@ use crate::encode::video_windows::{
     composite_output_frame_windows, integer_second_duration, integer_second_windows,
 };
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -32,7 +32,7 @@ use std::time::{Duration, Instant};
 
 /// Returns whether transparent rendering should be split into stitched segments.
 pub(crate) fn should_parallelize_segmented(
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     dense_activity: &DenseActivityReport,
 ) -> bool {
     // qtrle and prores_ks_vulkan encoding are comparatively slow and
@@ -45,7 +45,7 @@ pub(crate) fn should_parallelize_segmented(
         .and_then(serde_json::Value::as_str)
         .map(|codec| codec == "qtrle" || codec == "prores_ks_vulkan")
         .unwrap_or(false)
-        && integer_second_duration(config).unwrap_or(0) >= 2
+        && integer_second_duration(&config.scene).unwrap_or(0) >= 2
         && dense_activity.frame_count >= 2
 }
 
@@ -76,13 +76,13 @@ pub(crate) fn should_parallelize_composite(
 /// 7. Clean up temporary segment files
 pub(crate) fn render_video_segmented(
     paths: &AppPaths,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> CoreResult<String> {
     // ── PHASE 1: FALL BACK TO SINGLE PASS FOR SHORT RENDERS ──
-    let Some(total_seconds) = integer_second_duration(config) else {
+    let Some(total_seconds) = integer_second_duration(&config.scene) else {
         return render_video_single(paths, config, activity, dense_activity, controller);
     };
     let segment_count = estimate_parallel_render_worker_count(total_seconds as usize);
@@ -91,14 +91,15 @@ pub(crate) fn render_video_segmented(
     }
 
     // ── PHASE 2: BUILD PER-SEGMENT CONFIGS & DENSE REPORTS ──
-    let mut segment_configs = Vec::with_capacity(segment_count);
+    let mut segment_configs: Vec<ValidatedRenderConfig> = Vec::with_capacity(segment_count);
     let mut segment_reports = Vec::with_capacity(segment_count);
-    for (segment_start, segment_end) in integer_second_windows(config, total_seconds, segment_count)
+    for (segment_start, segment_end) in
+        integer_second_windows(&config.scene, total_seconds, segment_count)
     {
         let mut segment_config = config.clone();
         segment_config.scene.start = segment_start;
         segment_config.scene.end = segment_end;
-        let segment_dense = build_dense_activity_report(activity, &segment_config)?;
+        let segment_dense = build_dense_activity_report_validated(activity, &segment_config)?;
         if segment_dense.frame_count == 0 {
             continue;
         }
@@ -295,7 +296,9 @@ pub(crate) fn render_composite_video_segmented(
         .as_object()
         .and_then(|map| map.get("codec"))
         .and_then(serde_json::Value::as_str)
-        .unwrap_or("libx264");
+        .ok_or_else(|| {
+            CoreError::Encode("scene.ffmpeg.codec must be provided by the frontend".into())
+        })?;
     let source_fps = Fps::new(
         request.composite_video_fps_num,
         request.composite_video_fps_den,
@@ -374,9 +377,9 @@ pub(crate) fn render_composite_video_segmented(
                 composite_video_fps_num,
                 composite_video_fps_den,
                 composite_video_duration,
-                Some(segment_render_duration),
-                Some(segment_trim_start),
-                Some(update_rate),
+                segment_render_duration,
+                segment_trim_start,
+                update_rate,
             );
             let _ = tx.send(SegmentEvent::Completed(index, result));
         });
@@ -508,9 +511,9 @@ fn render_composite_single_pass(
         request.composite_video_fps_num,
         request.composite_video_fps_den,
         request.composite_video_duration,
-        Some(render_duration),
-        Some(trim_start),
-        Some(update_rate),
+        render_duration,
+        trim_start,
+        update_rate,
     )
 }
 

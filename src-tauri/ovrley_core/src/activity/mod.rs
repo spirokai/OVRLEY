@@ -16,8 +16,8 @@ pub mod trim;
 use crate::activity::interpolate::densify_activity;
 use crate::activity::schema::{DebugPayload, DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
-use crate::config::RenderConfig;
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::ValidatedRenderConfig;
 use serde_json::Value;
 
 /// Parses frontend activity JSON from either production or debug payload shapes.
@@ -41,13 +41,11 @@ pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
     }
 }
 
-/// Trims and densifies parsed activity data for the provided render config.
-pub fn build_dense_activity_report(
+/// Trims and densifies parsed activity data for a validated render config.
+pub fn build_dense_activity_report_validated(
     activity: &ParsedActivity,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
 ) -> CoreResult<DenseActivityReport> {
-    // Data requirements are derived from the template before trimming so unused
-    // high-cardinality series never get copied or densified.
     let requirements = config.render_data_requirements()?;
     let trimmed = trim_activity(
         activity,

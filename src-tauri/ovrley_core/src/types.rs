@@ -8,7 +8,7 @@
 //!       string literals scattered across 5+ files.
 //! Does not own: metric formatting (see [`crate::render::format`]), metric widget
 //!       rendering, or the `RenderDataRequirements` derivation (see
-//!       [`crate::config`]).
+//!       [`crate::normalize`]).
 //!
 //! Allowed dependencies: `serde` (for JSON compatibility).
 //! Forbidden dependencies: all other crate modules (this is a leaf dependency

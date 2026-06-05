@@ -6,11 +6,12 @@
 //! on layout.
 
 use crate::activity::schema::DenseActivityReport;
-use crate::config::{RenderConfig, ValueConfig};
+use crate::normalize::{
+    ValidatedGradientWidget, ValidatedTimeFormatting, ValidatedTimeValue, ValidatedValueFormatting,
+    ValidatedValueWidget,
+};
 use crate::standard_metrics::{
-    is_standard_metric, metric_icon_asset_key, standard_metric_default_display_unit,
-    standard_metric_formatter, standard_metric_show_units, standard_metric_unit_label,
-    StandardMetricFormatterKind,
+    standard_metric_formatter, standard_metric_unit_label, StandardMetricFormatterKind,
 };
 use crate::MetricKind;
 use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
@@ -55,7 +56,7 @@ pub struct MetricDisplayParts {
 
 /// Returns the dense frame index corresponding to an absolute preview second.
 pub fn frame_index_for_second(
-    config: &RenderConfig,
+    scene: &crate::normalize::ValidatedSceneConfig,
     dense_activity: &DenseActivityReport,
     second: f64,
 ) -> usize {
@@ -63,56 +64,17 @@ pub fn frame_index_for_second(
         return 0;
     }
 
-    let relative_second =
-        (second - config.scene.start).clamp(0.0, config.scene.end - config.scene.start);
-    let index = (relative_second * config.scene.fps).round() as isize;
+    let relative_second = (second - scene.start).clamp(0.0, scene.end - scene.start);
+    let index = (relative_second * scene.fps).round() as isize;
     index.clamp(0, dense_activity.frame_count.saturating_sub(1) as isize) as usize
 }
 
-/// Formats a metric value as a single text string.
-///
-/// This path is used for ordinary text values and for gradient value text.
-pub fn format_value(
-    config: &RenderConfig,
-    value_config: &ValueConfig,
-    dense_activity: &DenseActivityReport,
-    frame_index: usize,
-) -> String {
-    let raw = raw_value(value_config.value, dense_activity, frame_index);
-    let mut formatted = match value_config.value {
-        MetricKind::Time => format_time(
-            config,
-            value_config,
-            dense_activity
-                .series
-                .time
-                .get(frame_index)
-                .and_then(|value| value.as_deref()),
-        ),
-        MetricKind::Gradient => format_gradient(config, value_config, raw),
-        MetricKind::Elevation => format_elevation(config, value_config, raw),
-        kind if is_standard_metric(kind) => format_standard_metric_text(config, value_config, raw),
-        _ => format_generic_numeric(config, value_config, raw).unwrap_or_else(|| "--".to_string()),
-    };
-
-    if let Some(prefix) = &value_config.prefix {
-        formatted = format!("{prefix}{formatted}");
-    }
-    if let Some(suffix) = &value_config.suffix {
-        formatted.push_str(suffix);
-    }
-
-    formatted
-}
-
-// Looks up one raw numeric sample by metric key and frame index.
+/// Looks up one raw numeric sample by metric key and frame index.
 fn raw_value(
     key: MetricKind,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
 ) -> Option<f64> {
-    // Series vectors may be empty when the template did not request them.
-    // Treat out-of-range and absent values as missing.
     match key {
         MetricKind::Speed => dense_activity
             .series
@@ -244,99 +206,100 @@ fn raw_value(
     }
 }
 
-/// Builds separated value/unit/icon display parts for rich metric widgets.
+/// Builds metric display parts from a validated value widget.
 ///
-/// # Two-phase dispatch
-///
-/// 1. **Metric dispatch** — match the metric kind and produce raw `(value_text,
-///    unit_text, icon_kind)` tuples, applying unit conversion and number
-///    formatting per metric type. The `Time` and `Temperature` cases involve
-///    secondary branching for format and unit selections.
-/// 2. **Prefix/suffix application** — prepend and append user-configured affix
-///    text around the resolved value string before returning the final parts.
-pub fn format_metric_parts(
-    config: &RenderConfig,
-    value_config: &ValueConfig,
+/// All output-affecting fields are already explicit — no backend-owned defaults
+/// are applied. Raw telemetry is looked up by metric kind and formatted using
+/// the validated formatting contract.
+pub fn format_validated_metric_parts(
+    validated: &ValidatedValueWidget,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
 ) -> Option<MetricDisplayParts> {
-    // Metric widgets need the value and units separately so units can be drawn
-    // at a smaller size while sharing the same raw telemetry formatting rules.
-    //
-    // Phase 1: dispatch by metric kind — each arm normalizes raw telemetry into
-    // a (value_text, unit_text, icon_kind) tuple with unit conversion applied.
-    let raw = raw_value(value_config.value, dense_activity, frame_index);
-    let (mut value_text, unit_text, icon_kind) = match value_config.value {
-        MetricKind::Time => (
-            format_time(
-                config,
-                value_config,
-                dense_activity
-                    .series
-                    .time
-                    .get(frame_index)
-                    .and_then(|value| value.as_deref()),
-            ),
-            None,
-            Some(MetricIconKind::Clock3),
-        ),
-        kind if is_standard_metric(kind) => format_standard_metric_parts(config, value_config, raw),
-        _ => return None,
-    };
+    let raw = raw_value(validated.metric, dense_activity, frame_index);
 
-    // Phase 2: apply user-configured prefix and suffix around the resolved value.
-    if let Some(prefix) = &value_config.prefix {
-        value_text = format!("{prefix}{value_text}");
+    let (mut value_text, unit_text, icon_kind) =
+        format_validated_standard_metric_parts(validated, raw);
+
+    if !validated.prefix.is_empty() {
+        value_text = format!("{}{value_text}", validated.prefix);
     }
-    if let Some(suffix) = &value_config.suffix {
-        value_text.push_str(suffix);
+    if !validated.suffix.is_empty() {
+        value_text.push_str(&validated.suffix);
     }
 
     Some(MetricDisplayParts {
         value_text,
         unit_text,
-        show_icon: value_config
-            .show_icon
-            .unwrap_or(value_config.value != MetricKind::Gradient),
+        show_icon: validated.show_icon,
         icon_kind,
     })
 }
 
-fn format_standard_metric_text(
-    config: &RenderConfig,
-    value_config: &ValueConfig,
-    raw: Option<f64>,
-) -> String {
-    let (value_text, unit_text, _) = format_standard_metric_parts(config, value_config, raw);
-    if let Some(unit_text) = unit_text {
-        format!("{value_text} {unit_text}")
+/// Formats a gradient widget value using the validated contract.
+///
+/// All output-affecting fields are already explicit — no backend-owned defaults
+/// are applied. Raw telemetry is looked up by metric kind and formatted using
+/// the validated formatting contract.
+pub fn format_validated_gradient(validated: &ValidatedGradientWidget, raw: Option<f64>) -> String {
+    let Some(value) = raw else {
+        return "--%".to_string();
+    };
+    let decimals = validated.formatting.decimals();
+    let magnitude = format_number(value.abs(), decimals);
+    let sign = if value > 0.0 {
+        "+"
+    } else if value < 0.0 {
+        "-"
     } else {
-        value_text
+        ""
+    };
+    let prefix = if validated.show_sign { sign } else { "" };
+    let mut formatted = format!("{prefix}{magnitude}%");
+    if !validated.prefix.is_empty() {
+        formatted = format!("{}{formatted}", validated.prefix);
+    }
+    if !validated.suffix.is_empty() {
+        formatted.push_str(&validated.suffix);
+    }
+    formatted
+}
+
+/// Formats a time widget value using the validated contract.
+pub fn format_validated_time_parts(
+    validated: &ValidatedTimeValue,
+    raw: Option<&str>,
+) -> MetricDisplayParts {
+    let mut value_text = format_validated_time_text(validated, raw);
+    if !validated.base.prefix.is_empty() {
+        value_text = format!("{}{value_text}", validated.base.prefix);
+    }
+    if !validated.base.suffix.is_empty() {
+        value_text.push_str(&validated.base.suffix);
+    }
+
+    MetricDisplayParts {
+        value_text,
+        unit_text: None,
+        show_icon: validated.base.show_icon,
+        icon_kind: super::widgets::value::metric_icon_kind_for_value(MetricKind::Time),
     }
 }
 
-fn format_standard_metric_parts(
-    config: &RenderConfig,
-    value_config: &ValueConfig,
+fn format_validated_standard_metric_parts(
+    validated: &ValidatedValueWidget,
     raw: Option<f64>,
 ) -> (String, Option<String>, Option<MetricIconKind>) {
-    let kind = value_config.value;
-    let display_unit = resolved_standard_metric_display_unit(kind, value_config);
-    let decimals = match standard_metric_formatter(kind) {
-        Some(StandardMetricFormatterKind::Decimal) => {
-            effective_decimals(config, value_config, Some(1))
-        }
-        Some(StandardMetricFormatterKind::Balance) => {
-            effective_decimals(config, value_config, Some(0))
-        }
-        _ => effective_decimals(config, value_config, Some(0)),
-    };
-    let show_units = standard_metric_show_units(kind, value_config.show_units);
+    let kind = validated.metric;
+    let display_unit = Some(validated.display_unit.as_str());
+    let decimals = validated_decimals(&validated.formatting);
+    let show_units = validated.show_units;
     let unit_text = show_units.then(|| standard_metric_unit_label(kind, display_unit).to_string());
+
     let value_text = match standard_metric_formatter(kind) {
         Some(StandardMetricFormatterKind::Speed) => raw
             .map(|speed_mps| {
-                let factor = match display_unit.unwrap_or("kmh") {
+                let factor = match validated.display_unit.as_str() {
                     "mph" | "imperial" => 2.23694,
                     "kn" => 1.943844,
                     "mps" => 1.0,
@@ -347,7 +310,7 @@ fn format_standard_metric_parts(
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Temperature) => raw
             .map(|temp_c| {
-                let resolved = if display_unit == Some("fahrenheit") {
+                let resolved = if validated.display_unit == "fahrenheit" {
                     (temp_c * 9.0 / 5.0) + 32.0
                 } else {
                     temp_c
@@ -361,7 +324,7 @@ fn format_standard_metric_parts(
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Pace) => raw
             .map(|seconds_per_km| {
-                let total_seconds = if display_unit == Some("min_per_mi") {
+                let total_seconds = if validated.display_unit == "min_per_mi" {
                     seconds_per_km * 1.609_344
                 } else {
                     seconds_per_km
@@ -385,76 +348,46 @@ fn format_standard_metric_parts(
                 )
             })
             .unwrap_or_else(|| "--".to_string()),
-        Some(StandardMetricFormatterKind::Balance) => raw
-            .map(|left_value| {
-                format_balance_value(left_value, decimals, value_config.balance_format.as_deref())
-            })
-            .unwrap_or_else(|| "--".to_string()),
+        Some(StandardMetricFormatterKind::Balance) => {
+            let balance_format = validated.formatting.balance_format();
+            raw.map(|left_value| format_balance_value(left_value, decimals, balance_format))
+                .unwrap_or_else(|| "--".to_string())
+        }
         None => "--".to_string(),
     };
 
-    (value_text, unit_text, metric_icon_kind_for_metric(kind))
+    (
+        value_text,
+        unit_text,
+        super::widgets::value::metric_icon_kind_for_value(kind),
+    )
 }
 
-// Formats elevation, converting to feet for imperial templates.
-fn format_elevation(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f64>) -> String {
-    let Some(mut value) = raw else {
-        return "--".to_string();
-    };
-    if matches!(value_config.unit.as_deref(), Some("imperial")) {
-        value *= 3.28084;
+fn validated_decimals(formatting: &ValidatedValueFormatting) -> usize {
+    match formatting {
+        ValidatedValueFormatting::DecimalPlaces { decimals } => *decimals,
+        ValidatedValueFormatting::DecimalRounding { decimal_rounding } => {
+            (*decimal_rounding).max(0) as usize
+        }
+        ValidatedValueFormatting::Balance { decimals, .. } => *decimals,
+        ValidatedValueFormatting::BalanceRounded {
+            decimal_rounding, ..
+        } => (*decimal_rounding).max(0) as usize,
     }
-    format_generic_numeric(config, value_config, Some(value)).unwrap_or_else(|| "--".to_string())
 }
 
-// Formats gradient with sign and percent suffix.
-fn format_gradient(config: &RenderConfig, value_config: &ValueConfig, raw: Option<f64>) -> String {
-    let Some(value) = raw else {
-        return "--%".to_string();
-    };
-    let decimals = effective_decimals(config, value_config, Some(0));
-    let magnitude = format_number(value.abs(), decimals);
-    let sign = if value > 0.0 {
-        "+"
-    } else if value < 0.0 {
-        "-"
-    } else {
-        ""
-    };
-    let prefix = if value_config.show_sign.unwrap_or(true) {
-        sign
-    } else {
-        ""
-    };
-    format!("{prefix}{magnitude}%")
-}
-
-// Formats an RFC 3339 timestamp according to template time settings.
-fn format_time(config: &RenderConfig, value_config: &ValueConfig, raw: Option<&str>) -> String {
-    // Convert to local time for display after applying user-configured offsets.
-    // Invalid strings are returned unchanged so source parser issues remain
-    // visible in previews instead of silently disappearing.
+fn format_validated_time_text(validated: &ValidatedTimeValue, raw: Option<&str>) -> String {
     let Some(raw) = raw else {
         return "--:--".to_string();
     };
     let Ok(parsed) = DateTime::parse_from_rfc3339(raw) else {
         return raw.to_string();
     };
-    let adjusted = parsed.with_timezone(&Local)
-        + Duration::hours(value_config.hours_offset.unwrap_or(0) as i64);
-
-    if let Some(format_key) = value_config.format.as_deref() {
-        return format_time_key(format_key, adjusted);
+    let adjusted = parsed.with_timezone(&Local) + Duration::hours(validated.hours_offset);
+    match &validated.formatting {
+        ValidatedTimeFormatting::Preset(format_key) => format_time_key(format_key, adjusted),
+        ValidatedTimeFormatting::Strftime(strftime) => adjusted.format(strftime).to_string(),
     }
-    if let Some(strftime) = value_config
-        .time_format
-        .as_deref()
-        .or(config.scene.time_format.as_deref())
-    {
-        return adjusted.format(strftime).to_string();
-    }
-
-    format_time_key("time-24", adjusted)
 }
 
 /// Applies one of the built-in date/time format presets.
@@ -501,33 +434,6 @@ where
     }
 }
 
-// Formats a generic numeric metric with the configured decimal precision.
-fn format_generic_numeric(
-    config: &RenderConfig,
-    value_config: &ValueConfig,
-    raw: Option<f64>,
-) -> Option<String> {
-    raw.map(|value| format_number(value, effective_decimals(config, value_config, None)))
-}
-
-// Resolves the decimal precision for a value from value and scene defaults.
-fn effective_decimals(
-    config: &RenderConfig,
-    value_config: &ValueConfig,
-    default: Option<usize>,
-) -> usize {
-    if let Some(decimals) = value_config.decimals {
-        return decimals;
-    }
-    if let Some(rounding) = value_config
-        .decimal_rounding
-        .or(config.scene.decimal_rounding)
-    {
-        return rounding.max(0) as usize;
-    }
-    default.unwrap_or(0)
-}
-
 // Converts a number to display text, trimming unnecessary fractional zeros.
 //
 // Zero-decimal values intentionally round instead of truncating so backend
@@ -547,16 +453,6 @@ fn format_number(value: f64, decimals: usize) -> String {
         text.pop();
     }
     text
-}
-
-fn resolved_standard_metric_display_unit<'a>(
-    kind: MetricKind,
-    value_config: &'a ValueConfig,
-) -> Option<&'a str> {
-    value_config
-        .display_unit
-        .as_deref()
-        .or(standard_metric_default_display_unit(kind))
 }
 
 fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, value: f64) -> f64 {
@@ -623,45 +519,6 @@ fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option
         "l_prefix" => format!("L{left}/R{right}"),
         "l_suffix" => format!("{left}L/{right}R"),
         _ => format!("{left}/{right}"),
-    }
-}
-
-fn metric_icon_kind_for_metric(kind: MetricKind) -> Option<MetricIconKind> {
-    match metric_icon_asset_key(kind)? {
-        crate::standard_metrics::MetricIconAssetKey::Speed => Some(MetricIconKind::Gauge),
-        crate::standard_metrics::MetricIconAssetKey::Heartrate => Some(MetricIconKind::Heart),
-        crate::standard_metrics::MetricIconAssetKey::Cadence => Some(MetricIconKind::RefreshCw),
-        crate::standard_metrics::MetricIconAssetKey::Power => Some(MetricIconKind::Zap),
-        crate::standard_metrics::MetricIconAssetKey::Time => Some(MetricIconKind::Clock3),
-        crate::standard_metrics::MetricIconAssetKey::Temperature => {
-            Some(MetricIconKind::Thermometer)
-        }
-        crate::standard_metrics::MetricIconAssetKey::CoreTemperature => {
-            Some(MetricIconKind::CoreTemperature)
-        }
-        crate::standard_metrics::MetricIconAssetKey::Pace => Some(MetricIconKind::Footprints),
-        crate::standard_metrics::MetricIconAssetKey::AirPressure => Some(MetricIconKind::Wind),
-        crate::standard_metrics::MetricIconAssetKey::LeftRightBalance => {
-            Some(MetricIconKind::Scale)
-        }
-        crate::standard_metrics::MetricIconAssetKey::StrideLength => Some(MetricIconKind::Ruler),
-        crate::standard_metrics::MetricIconAssetKey::StrokeRate => Some(MetricIconKind::Waves),
-        crate::standard_metrics::MetricIconAssetKey::VerticalSpeed => {
-            Some(MetricIconKind::TrendingUp)
-        }
-        crate::standard_metrics::MetricIconAssetKey::VerticalRatio => Some(MetricIconKind::Percent),
-        crate::standard_metrics::MetricIconAssetKey::GForce => Some(MetricIconKind::GForce),
-        crate::standard_metrics::MetricIconAssetKey::GroundContactTime => {
-            Some(MetricIconKind::GroundContactTime)
-        }
-        crate::standard_metrics::MetricIconAssetKey::Torque => Some(MetricIconKind::Torque),
-        crate::standard_metrics::MetricIconAssetKey::GearPosition => {
-            Some(MetricIconKind::GearPosition)
-        }
-        crate::standard_metrics::MetricIconAssetKey::Heading => Some(MetricIconKind::Compass),
-        crate::standard_metrics::MetricIconAssetKey::VerticalOscillation => {
-            Some(MetricIconKind::ArrowUpDown)
-        }
     }
 }
 

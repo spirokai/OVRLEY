@@ -7,14 +7,14 @@
 //! `video_segmented`.
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::RenderConfig;
 use crate::encode::video_composite_pipeline::render_composite_video_single;
 use crate::encode::video_pipeline::render_video_single;
 use crate::encode::video_segmented::{
     render_composite_video_segmented, render_video_segmented, should_parallelize_composite,
     should_parallelize_segmented,
 };
-use crate::error::CoreResult;
+use crate::error::{CoreError, CoreResult};
+use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
 
 pub use crate::encode::progress::RenderController;
@@ -25,7 +25,7 @@ pub use crate::encode::video_windows::{composite_output_frame_windows, Composite
 /// Renders a video, using segmentation when the selected codec benefits from it.
 pub fn render_video(
     paths: &AppPaths,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
@@ -47,7 +47,7 @@ pub fn render_video(
 /// from `composite_video_duration`.
 pub struct CompositeRenderRequest<'a> {
     pub paths: &'a AppPaths,
-    pub config: &'a RenderConfig,
+    pub config: &'a ValidatedRenderConfig,
     pub activity: &'a ParsedActivity,
     pub dense_activity: &'a DenseActivityReport,
     pub controller: &'a RenderController,
@@ -57,9 +57,9 @@ pub struct CompositeRenderRequest<'a> {
     pub composite_video_fps_num: u32,
     pub composite_video_fps_den: u32,
     pub composite_video_duration: f64,
-    pub composite_render_duration: Option<f64>,
-    pub composite_video_trim_start: Option<f64>,
-    pub composite_widget_update_rate: Option<u32>,
+    pub composite_render_duration: f64,
+    pub composite_video_trim_start: f64,
+    pub composite_widget_update_rate: u32,
 }
 
 /// Renders an imported video with the Skia overlay composited into an MP4 output.
@@ -67,11 +67,9 @@ pub struct CompositeRenderRequest<'a> {
 /// Longer renders are automatically split into parallel segments for better CPU
 /// utilization and then stitched with FFmpeg stream copy.
 pub fn render_composite_video(request: &CompositeRenderRequest<'_>) -> CoreResult<String> {
-    let render_duration = request.composite_render_duration.unwrap_or(
-        request.composite_video_duration - request.composite_video_trim_start.unwrap_or(0.0),
-    );
-    let trim_start = request.composite_video_trim_start.unwrap_or(0.0);
-    let update_rate = request.composite_widget_update_rate.unwrap_or(1).max(1);
+    let render_duration = request.composite_render_duration;
+    let trim_start = request.composite_video_trim_start;
+    let update_rate = request.composite_widget_update_rate.max(1);
 
     let codec = request
         .config
@@ -80,7 +78,9 @@ pub fn render_composite_video(request: &CompositeRenderRequest<'_>) -> CoreResul
         .as_object()
         .and_then(|map| map.get("codec"))
         .and_then(serde_json::Value::as_str)
-        .unwrap_or("libx264");
+        .ok_or_else(|| {
+            CoreError::Encode("scene.ffmpeg.codec must be provided by the frontend".into())
+        })?;
     if should_parallelize_composite(
         render_duration,
         request.composite_video_fps_num,
@@ -102,8 +102,8 @@ pub fn render_composite_video(request: &CompositeRenderRequest<'_>) -> CoreResul
         request.composite_video_fps_num,
         request.composite_video_fps_den,
         request.composite_video_duration,
-        Some(render_duration),
-        Some(trim_start),
-        Some(update_rate),
+        render_duration,
+        trim_start,
+        update_rate,
     )
 }

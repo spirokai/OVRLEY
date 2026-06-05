@@ -18,21 +18,26 @@ pub mod text;
 pub mod widgets;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::{RenderConfig, ValueConfig};
 use crate::debug::{RenderProfiler, TimingBucket};
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::ValidatedRenderConfig;
+use crate::normalize::ValidatedSceneConfig;
 use crate::paths::AppPaths;
-use crate::render::format::{format_value, frame_index_for_second};
+use crate::render::format::frame_index_for_second;
 use crate::render::static_layer::{cached_labels_image, config_has_static_metric_icons};
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
-use crate::render::text::{draw_text, value_style};
+use crate::render::text::{
+    validated_gradient_style, validated_time_style, validated_value_style, ResolvedTextStyle,
+};
+use crate::render::widgets::types::PreparedValue;
 use crate::render::widgets::value::MetricWidgetRequest;
 use crate::render::widgets::{
     draw_elevation_widget, draw_metric_presentation, draw_metric_value_widget_with_config,
-    draw_route_widget, has_static_metric_icon, prepare_render_assets, MetricPresentationReport,
-    PreparedRenderAssets, WidgetRenderReport,
+    draw_route_widget, has_static_metric_icon_validated, prepare_render_assets,
+    MetricPresentationReport, PreparedRenderAssets, WidgetRenderReport,
 };
 use crate::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
+use skia_safe::Canvas;
 use skia_safe::Image;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -83,6 +88,12 @@ pub struct PreparedPreviewAssets {
     pub(crate) prepared_assets: PreparedRenderAssets,
 }
 
+impl PreparedPreviewAssets {
+    pub fn scene(&self) -> &ValidatedSceneConfig {
+        &self.prepared_assets.scene
+    }
+}
+
 /// Mutable raw-pixel render target used by the video encoder pipeline.
 pub struct RenderTarget<'a> {
     /// RGBA pixel buffer that Skia will draw into.
@@ -100,7 +111,7 @@ pub struct RenderTarget<'a> {
 /// avoid redrawing static content every frame.
 pub fn prepare_preview_assets(
     paths: &AppPaths,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
 ) -> CoreResult<(
@@ -109,13 +120,8 @@ pub fn prepare_preview_assets(
     BTreeMap<String, TimingBucket>,
     f64,
 )> {
-    let width = config.scene.width.unwrap_or(1920);
-    let height = config.scene.height.unwrap_or(1080);
-    let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
     let mut prepare_profiler = RenderProfiler::default();
     let prepare_started = Instant::now();
-    let (labels_image, label_cache_status) =
-        cached_labels_image(paths, config, width, height, scale, &mut prepare_profiler)?;
     let mut prepared_assets = prepare_render_assets(
         paths,
         config,
@@ -123,8 +129,20 @@ pub fn prepare_preview_assets(
         dense_activity,
         &mut prepare_profiler,
     )?;
-    prepared_assets.base_rgba =
-        prepare_base_rgba(paths, config, width, height, scale, &mut prepare_profiler)?;
+    let (labels_image, label_cache_status) = cached_labels_image(
+        paths,
+        &prepared_assets.labels,
+        &prepared_assets.values,
+        &prepared_assets.scene,
+        &mut prepare_profiler,
+    )?;
+    prepared_assets.base_rgba = prepare_base_rgba(
+        paths,
+        &prepared_assets.labels,
+        &prepared_assets.values,
+        &prepared_assets.scene,
+        &mut prepare_profiler,
+    )?;
     let prepare_timings = annotate_timing_aliases(
         prepare_profiler.summary(),
         &[("prepare.surface.clear", "surface.clear")],
@@ -144,30 +162,29 @@ pub fn prepare_preview_assets(
 /// Renders a preview PNG at `second`.
 pub fn render_preview_to_path(
     paths: &AppPaths,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     second: f64,
     out_path: &Path,
 ) -> CoreResult<()> {
     render_preview_with_report(paths, config, activity, dense_activity, second, out_path)
-        .map(|report| report.0)
+        .map(|_| ())
 }
 
 /// Renders a preview PNG and returns a performance report.
 pub fn render_preview_with_report(
     paths: &AppPaths,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     second: f64,
     out_path: &Path,
-) -> CoreResult<((), PreviewRenderReport)> {
+) -> CoreResult<PreviewRenderReport> {
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
         prepare_preview_assets(paths, config, activity, dense_activity)?;
     render_preview_with_prepared_assets(PreviewRenderRequest {
         paths,
-        config,
         dense_activity,
         prepared_preview_assets: &prepared_preview_assets,
         second,
@@ -181,7 +198,6 @@ pub fn render_preview_with_report(
 /// Bundled parameters for a preview frame render.
 pub struct PreviewRenderRequest<'a> {
     pub paths: &'a AppPaths,
-    pub config: &'a RenderConfig,
     pub dense_activity: &'a DenseActivityReport,
     pub prepared_preview_assets: &'a PreparedPreviewAssets,
     pub second: f64,
@@ -194,7 +210,6 @@ pub struct PreviewRenderRequest<'a> {
 /// Bundled parameters for rendering a single frame to RGBA.
 pub struct FrameRenderRequest<'a> {
     pub paths: &'a AppPaths,
-    pub config: &'a RenderConfig,
     pub dense_activity: &'a DenseActivityReport,
     pub prepared_assets: &'a PreparedRenderAssets,
     pub frame_index: usize,
@@ -217,13 +232,16 @@ pub struct FrameRenderRequest<'a> {
 /// geometry should be prepared once and reused.
 pub fn render_preview_with_prepared_assets(
     request: PreviewRenderRequest<'_>,
-) -> CoreResult<((), PreviewRenderReport)> {
+) -> CoreResult<PreviewRenderReport> {
     // Phase 1: resolve dimensions, frame index, and create profilers.
-    let width = request.config.scene.width.unwrap_or(1920);
-    let height = request.config.scene.height.unwrap_or(1080);
-    let scale = request.config.scene.scale.unwrap_or(1.0).max(0.1);
-    let frame_index =
-        frame_index_for_second(request.config, request.dense_activity, request.second);
+    let width = request.prepared_preview_assets.scene().width;
+    let height = request.prepared_preview_assets.scene().height;
+    let scale = request.prepared_preview_assets.scene().scale;
+    let frame_index = frame_index_for_second(
+        request.prepared_preview_assets.scene(),
+        request.dense_activity,
+        request.second,
+    );
     let mut frame_profiler = RenderProfiler::default();
     let mut preview_profiler = RenderProfiler::default();
     let total_started = Instant::now();
@@ -231,7 +249,6 @@ pub fn render_preview_with_prepared_assets(
     // Phase 2: draw all overlay layers into a Skia surface.
     let (mut surface, route_widget, elevation_widget, metric_presentations) = render_frame_surface(
         request.paths,
-        request.config,
         request.dense_activity,
         &request.prepared_preview_assets.prepared_assets,
         frame_index,
@@ -284,8 +301,8 @@ pub fn render_preview_with_prepared_assets(
         label_layer_ms,
         value_draw_ms,
         png_write_ms,
-        value_count: request.config.values.len(),
-        label_count: request.config.labels.len(),
+        value_count: request.prepared_preview_assets.prepared_assets.values.len(),
+        label_count: request.prepared_preview_assets.prepared_assets.labels.len(),
         label_cache_status: match request.label_cache_status {
             LabelCacheStatus::None => "none".to_string(),
             LabelCacheStatus::Hit => "hit".to_string(),
@@ -299,7 +316,7 @@ pub fn render_preview_with_prepared_assets(
         preview_only_timings,
     };
 
-    Ok(((), report))
+    Ok(report)
 }
 
 /// Renders one frame directly into an existing RGBA buffer.
@@ -338,7 +355,6 @@ pub fn render_frame_rgba(request: FrameRenderRequest<'_>) -> CoreResult<()> {
     let _ = render_frame_to_surface(
         surface.canvas(),
         request.paths,
-        request.config,
         request.dense_activity,
         request.prepared_assets,
         request.frame_index,
@@ -346,7 +362,7 @@ pub fn render_frame_rgba(request: FrameRenderRequest<'_>) -> CoreResult<()> {
         labels_image,
         base_layer_restored,
         request.frame_profiler,
-    );
+    )?;
     Ok(())
 }
 
@@ -354,7 +370,6 @@ pub fn render_frame_rgba(request: FrameRenderRequest<'_>) -> CoreResult<()> {
 #[allow(clippy::too_many_arguments)]
 fn render_frame_surface(
     paths: &AppPaths,
-    config: &RenderConfig,
     dense_activity: &DenseActivityReport,
     prepared_assets: &PreparedRenderAssets,
     frame_index: usize,
@@ -371,8 +386,8 @@ fn render_frame_surface(
     // Preview rendering owns its surface and writes a PNG, while video rendering
     // wraps caller-owned pixels. This helper is the preview-side equivalent of
     // `render_frame_rgba`.
-    let width = config.scene.width.unwrap_or(1920);
-    let height = config.scene.height.unwrap_or(1080);
+    let width = prepared_assets.scene.width;
+    let height = prepared_assets.scene.height;
     let mut surface = if preview_profiler.is_some() {
         create_surface(width, height)?
     } else {
@@ -391,7 +406,6 @@ fn render_frame_surface(
     let widgets = render_frame_to_surface(
         surface.canvas(),
         paths,
-        config,
         dense_activity,
         prepared_assets,
         frame_index,
@@ -399,16 +413,15 @@ fn render_frame_surface(
         labels_image,
         false,
         frame_profiler,
-    );
+    )?;
     Ok((surface, widgets.0, widgets.1, widgets.2))
 }
 
 // Draws all overlay layers for one frame onto an existing Skia canvas.
 #[allow(clippy::too_many_arguments)]
 fn render_frame_to_surface(
-    canvas: &skia_safe::Canvas,
+    canvas: &Canvas,
     paths: &AppPaths,
-    config: &RenderConfig,
     dense_activity: &DenseActivityReport,
     prepared_assets: &PreparedRenderAssets,
     frame_index: usize,
@@ -416,68 +429,126 @@ fn render_frame_to_surface(
     labels_image: Option<&Image>,
     base_layer_restored: bool,
     frame_profiler: &mut RenderProfiler,
-) -> (
+) -> CoreResult<(
     Option<WidgetRenderReport>,
     Option<WidgetRenderReport>,
     Vec<MetricPresentationReport>,
-) {
-    // Draw order is important: static labels/icons first, dynamic metric text
-    // (dispatched by DisplayType), then plot widgets. Static metric icons can
-    // be skipped here when they were already included in the restored base layer.
+)> {
     let frame_started = Instant::now();
     if let Some(labels_image) = labels_image {
         frame_profiler.measure("base.restore", || {
             canvas.draw_image(labels_image, (0, 0), None);
         });
     }
-    let static_metric_icons_rendered =
-        config_has_static_metric_icons(config) && (labels_image.is_some() || base_layer_restored);
+
+    let static_metric_icons_rendered = config_has_static_metric_icons(&prepared_assets.values)
+        && (labels_image.is_some() || base_layer_restored);
 
     // Phase 1: Intrinsic text rendering (gradient + text display types).
     // This phase is timed as "text.dynamic" for report compatibility.
-    let mut boxed_values: Vec<(&ValueConfig, usize)> = Vec::new();
-    frame_profiler.measure("text.dynamic", || {
-        for (idx, value) in config.values.iter().enumerate() {
-            let style = value_style(&config.scene, value, scale);
-            let static_icon_rendered_for_value =
-                static_metric_icons_rendered && has_static_metric_icon(value);
-            if draw_metric_value_widget_with_config(MetricWidgetRequest {
-                canvas,
-                config,
-                value,
-                base_style: &style,
-                dense_activity,
-                frame_index,
-                scale,
-                font_dirs: &paths.font_dirs,
-                static_icon_rendered: static_icon_rendered_for_value,
-            }) {
-                // Non-intrinsic display types (boxed metric presentations) are
-                // signaled as "handled" by draw_metric_value_widget_with_config
-                // but not actually drawn there. Collect them for presentation
-                // dispatch below, outside this profiler closure.
-                if display_type_layout_mode(value.display_type) == DisplayTypeLayoutMode::Boxed {
-                    boxed_values.push((value, idx));
-                }
+    let mut boxed_values: Vec<(usize, &PreparedValue)> = Vec::new();
+    frame_profiler.measure("text.dynamic", || -> CoreResult<()> {
+        for (idx, value) in prepared_assets.values.iter().enumerate() {
+            // Boxed display types (heading_tape, etc.) are handled in Phase 2
+            // via metric_presentation dispatch, not the text widget path.
+            if display_type_layout_mode(value.display_type()) == DisplayTypeLayoutMode::Boxed {
+                boxed_values.push((idx, value));
                 continue;
             }
-            let text = format_value(config, value, dense_activity, frame_index);
-            draw_text(canvas, &text, &style, &paths.font_dirs);
+
+            match value {
+                PreparedValue::StandardText(validated) => {
+                    let style = validated_value_style(validated, &prepared_assets.scene, scale);
+                    let static_icon_rendered_for_value =
+                        static_metric_icons_rendered && has_static_metric_icon_validated(validated);
+                    draw_metric_value_widget_with_config(MetricWidgetRequest {
+                        canvas,
+                        metric_kind: validated.metric,
+                        display_type: validated.display_type,
+                        base_style: &style,
+                        dense_activity,
+                        frame_index,
+                        scale,
+                        font_dirs: &paths.font_dirs,
+                        static_icon_rendered: static_icon_rendered_for_value,
+                        validated: Some(validated),
+                        validated_gradient: None,
+                        validated_time: None,
+                    })?;
+                }
+                PreparedValue::TimeText(validated) => {
+                    let style = validated_time_style(validated, &prepared_assets.scene, scale);
+                    let static_icon_rendered_for_value = static_metric_icons_rendered
+                        && has_static_metric_icon_validated(&validated.base);
+                    draw_metric_value_widget_with_config(MetricWidgetRequest {
+                        canvas,
+                        metric_kind: crate::MetricKind::Time,
+                        display_type: crate::DisplayType::Text,
+                        base_style: &style,
+                        dense_activity,
+                        frame_index,
+                        scale,
+                        font_dirs: &paths.font_dirs,
+                        static_icon_rendered: static_icon_rendered_for_value,
+                        validated: None,
+                        validated_gradient: None,
+                        validated_time: Some(validated),
+                    })?;
+                }
+                PreparedValue::Gradient(validated) => {
+                    let style = validated_gradient_style(validated, &prepared_assets.scene, scale);
+                    draw_metric_value_widget_with_config(MetricWidgetRequest {
+                        canvas,
+                        metric_kind: crate::MetricKind::Gradient,
+                        display_type: crate::DisplayType::Text,
+                        base_style: &style,
+                        dense_activity,
+                        frame_index,
+                        scale,
+                        font_dirs: &paths.font_dirs,
+                        static_icon_rendered: false,
+                        validated: None,
+                        validated_gradient: Some(validated),
+                        validated_time: None,
+                    })?;
+                }
+                PreparedValue::HeadingTape(_) => {}
+            }
         }
-    });
+        Ok(())
+    })?;
 
     // Phase 2: Boxed metric presentation rendering, dispatched by DisplayType.
-    // Each value looks up its own presentation cache by index. When the
-    // presentation dispatcher returns None (unimplemented boxed type or
-    // missing cache), the value falls back to the generic text path so it
-    // is never silently invisible.
+    // Each value looks up its own presentation cache by index. Types without
+    // a cache (unimplemented placeholders) are skipped — nothing to draw.
     let mut metric_presentations = Vec::new();
-    for (value, idx) in &boxed_values {
-        let style = value_style(&config.scene, value, scale);
+    for (idx, value) in &boxed_values {
+        let Some(_cache) = prepared_assets.presentation_caches.get(idx) else {
+            continue;
+        };
+        // Heading tape is the only boxed type with a cache. Its draw function
+        // ignores the style (heading data comes from dense_activity), so we
+        // construct a no-op default here rather than falling back to legacy
+        // scene/value resolution.
+        let default_style = ResolvedTextStyle {
+            x: value.x(),
+            y: value.y(),
+            font_name: None,
+            font_size: 1.0,
+            line_height: 1.0,
+            color: skia_safe::Color::TRANSPARENT,
+            opacity: 0.0,
+            shadow_color: None,
+            shadow_strength: 0.0,
+            shadow_distance: 0.0,
+            border_color: None,
+            border_thickness: 0.0,
+        };
         let report = draw_metric_presentation(
             canvas,
-            value,
-            &style,
+            value.metric_kind(),
+            value.display_type(),
+            &default_style,
             dense_activity,
             frame_index,
             scale,
@@ -489,13 +560,10 @@ fn render_frame_to_surface(
         if let Some(report) = report {
             metric_presentations.push(MetricPresentationReport {
                 value_idx: *idx,
-                metric_kind: value.value,
-                display_type: value.display_type,
+                metric_kind: value.metric_kind(),
+                display_type: value.display_type(),
                 widget: report,
             });
-        } else {
-            let text = format_value(config, value, dense_activity, frame_index);
-            draw_text(canvas, &text, &style, &paths.font_dirs);
         }
     }
 
@@ -503,11 +571,20 @@ fn render_frame_to_surface(
         .route_cache
         .as_ref()
         .and_then(|cache| draw_route_widget(canvas, cache, frame_index, frame_profiler));
-    let elevation_widget = prepared_assets.elevation_cache.as_ref().and_then(|cache| {
-        draw_elevation_widget(canvas, paths, config, cache, frame_index, frame_profiler)
-    });
+    let elevation_widget = if let Some(cache) = &prepared_assets.elevation_cache {
+        draw_elevation_widget(
+            canvas,
+            paths,
+            cache,
+            frame_index,
+            &prepared_assets.scene,
+            frame_profiler,
+        )?
+    } else {
+        None
+    };
     frame_profiler.record_ms("frame.draw", frame_started.elapsed().as_secs_f64() * 1000.0);
-    (route_widget, elevation_widget, metric_presentations)
+    Ok((route_widget, elevation_widget, metric_presentations))
 }
 
 // Adds legacy alternate names to timing buckets for compatibility with reports.

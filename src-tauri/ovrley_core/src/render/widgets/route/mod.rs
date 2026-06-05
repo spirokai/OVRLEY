@@ -20,5 +20,5 @@ mod simplify;
 
 pub(crate) use draw::draw_route_widget;
 pub(crate) use prepare::prepare_route_cache;
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use simplify::simplify_route_samples;

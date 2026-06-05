@@ -11,7 +11,7 @@
 //!       [`crate::encode::ffmpeg_settings`], [`crate::encode::ffmpeg_composite`]).
 //!
 //! Allowed dependencies: `crate::encode::ffmpeg`, `crate::error`.
-//! Forbidden dependencies: `crate::commands`, `crate::render`, `crate::config`.
+//! Forbidden dependencies: `crate::commands`, `crate::render`, `crate::normalize`.
 //!
 //! Related modules: [`crate::encode::ffmpeg_composite_profiles`] (consumes detected
 //!       codecs to select encoder profiles), [`crate::encode::video_probe`]

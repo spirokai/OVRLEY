@@ -27,7 +27,6 @@
 //!    returned. A frame-count mismatch after success is also treated as a failure.
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
 use crate::encode::ffmpeg_settings::{build_ffmpeg_settings, FfmpegSettings};
@@ -42,6 +41,7 @@ use crate::encode::video_debug::{
     write_sample_frame, write_timing_summary_with_phase,
 };
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
 use crate::render::{prepare_preview_assets, render_frame_rgba, FrameRenderRequest, RenderTarget};
 use std::fs;
@@ -106,25 +106,23 @@ const FRAME_QUEUE_SIZE: usize = 12;
 /// Avoid per-frame allocations inside the loop — buffers are reused.
 pub(crate) fn render_video_single(
     paths: &AppPaths,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
 ) -> CoreResult<String> {
     // ── PHASE 1: SETUP — derive dimensions, frame counts, paths, and ffmpeg args ──
-    // The render loop is the producer; ffmpeg stdin is the consumer. A bounded
-    // frame queue plus a free-buffer pool limit peak memory while allowing
-    // encoder IO to overlap with Skia rendering.
-    let ffmpeg_settings = finalize_ffmpeg_settings(build_ffmpeg_settings(&config.scene.ffmpeg)?);
-    let width = make_even(config.scene.width.unwrap_or(1920));
-    let height = make_even(config.scene.height.unwrap_or(1080));
+    let scene = &config.scene;
+    let ffmpeg_settings = finalize_ffmpeg_settings(build_ffmpeg_settings(&scene.ffmpeg)?);
+    let width = make_even(scene.width);
+    let height = make_even(scene.height);
     let layout_total_frames = dense_activity.frame_count as u32;
-    let update_rate = config.widget_update_rate() as usize;
+    let update_rate = scene.update_rate.max(1) as usize;
     // `rendered_frame_count` applies frame decimation: when update_rate > 1,
     // we render fewer frames than the dense report has, skipping layout frames
     // that would not change the visible overlay at the configured rate.
     let total_frames = rendered_frame_count(dense_activity.frame_count, update_rate) as u32;
-    let container_fps = config.container_fps();
+    let container_fps = scene.fps / f64::from(scene.update_rate.max(1));
     let debug_dir = create_debug_dir(paths, "phase_6")?;
     // ── PHASE 2: BUILD SKIA ASSETS — pre-render maps, fonts, and label cache ──
     let (prepared_preview_assets, label_cache_status, prepare_timings, prepare_total_ms) =
@@ -205,7 +203,7 @@ pub(crate) fn render_video_single(
     } else {
         Vec::new()
     };
-    let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
+    let scale = prepared_preview_assets.scene().scale;
     let mut estimator = ProgressEstimator::default();
     let mut rendered_frames = 0u32;
     // ── PHASE 5: HOT RENDER LOOP ──
@@ -236,7 +234,6 @@ pub(crate) fn render_video_single(
                 acquire_frame_buffer(&free_receiver, &cancel_flag, &mut aggregate_profiler)?;
             render_frame_rgba(FrameRenderRequest {
                 paths,
-                config,
                 dense_activity,
                 prepared_assets: &prepared_preview_assets.prepared_assets,
                 frame_index,
@@ -337,7 +334,7 @@ pub(crate) fn render_video_single(
     let merged_timings = merge_timing_maps(aggregate_profiler.summary(), writer_result.timings);
     write_timing_summary_with_phase(
         &debug_dir,
-        config,
+        prepared_preview_assets.scene(),
         &output_path,
         "phase_6",
         total_frames,

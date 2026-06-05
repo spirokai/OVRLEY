@@ -7,9 +7,7 @@
 //! plumbing, and small OS integration helpers.
 
 use crate::activity::schema::ParsedActivity;
-use crate::activity::{build_dense_activity_report, parse_activity_json};
-use crate::config::parse_config_json;
-use crate::config::RenderConfig;
+use crate::activity::{build_dense_activity_report_validated, parse_activity_json};
 use crate::debug::RenderProgress;
 use crate::encode::ffmpeg::resolve_ffmpeg_binary;
 use crate::encode::video::{
@@ -20,6 +18,7 @@ use crate::encode::video_composite_pipeline::{
 };
 use crate::encode::video_pipeline::rendered_frame_count;
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::{parse_config_json, parse_template_json};
 use serde::Serialize;
 use serde_json::{json, Value};
 use skia_safe::FontMgr;
@@ -120,14 +119,15 @@ pub fn backend_render(
 ) -> CoreResult<Value> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
-    if is_composite_render(&config) {
-        return start_composite_render(paths, controller, config, parsed_activity);
+    let validated = crate::normalize::validate_render_config(config)?;
+    if is_composite_render(&validated) {
+        return start_composite_render(paths, controller, validated, parsed_activity);
     }
 
-    let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
+    let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
     let output_frame_count = rendered_frame_count(
         dense_activity.frame_count,
-        config.widget_update_rate() as usize,
+        validated.widget_update_rate() as usize,
     );
     let render_id =
         controller.try_start(output_frame_count as u32, "Preparing render assets...")?;
@@ -137,7 +137,7 @@ pub fn backend_render(
     std::thread::spawn(move || {
         match render_video(
             &paths,
-            &config,
+            &validated,
             &parsed_activity,
             &dense_activity,
             &controller_clone,
@@ -168,7 +168,8 @@ pub fn backend_render_preview_frame(
 ) -> CoreResult<Value> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
-    let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
+    let validated = crate::normalize::validate_render_config(config)?;
+    let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|error| CoreError::Encode(format!("Failed to read system time: {error}")))?
@@ -178,7 +179,7 @@ pub fn backend_render_preview_frame(
     let output_path = paths.downloads_dir.join(&filename);
     render_preview_to_path(
         paths,
-        &config,
+        &validated,
         &parsed_activity,
         &dense_activity,
         second,
@@ -196,8 +197,7 @@ pub fn backend_render_preview_frame(
 ///
 /// Composite mode is intentionally gated only by `composite_video_path` so
 /// transparent exports continue through their existing path unchanged.
-pub fn is_composite_render(config: &RenderConfig) -> bool {
-    // test seam
+pub fn is_composite_render(config: &crate::normalize::ValidatedRenderConfig) -> bool {
     config.scene.composite_video_path.is_some()
 }
 
@@ -208,12 +208,12 @@ pub fn is_composite_render(config: &RenderConfig) -> bool {
 fn start_composite_render(
     paths: &AppPaths,
     controller: &RenderController,
-    mut config: RenderConfig,
+    mut validated: crate::normalize::ValidatedRenderConfig,
     parsed_activity: ParsedActivity,
 ) -> CoreResult<Value> {
-    let plan = derive_composite_render_plan(&config)?;
-    apply_composite_scene_timing(&mut config, &plan);
-    let dense_activity = build_dense_activity_report(&parsed_activity, &config)?;
+    let plan = derive_composite_render_plan(&validated.scene)?;
+    apply_composite_scene_timing(&mut validated.scene, &plan);
+    let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
 
     let output_frame_count = (plan.render_duration * plan.source_fps.as_f64())
         .ceil()
@@ -225,7 +225,7 @@ fn start_composite_render(
     std::thread::spawn(move || {
         match render_composite_video(&CompositeRenderRequest {
             paths: &paths,
-            config: &config,
+            config: &validated,
             activity: &parsed_activity,
             dense_activity: &dense_activity,
             controller: &controller_clone,
@@ -235,9 +235,9 @@ fn start_composite_render(
             composite_video_fps_num: plan.source_fps.num,
             composite_video_fps_den: plan.source_fps.den,
             composite_video_duration: plan.video_duration,
-            composite_render_duration: Some(plan.render_duration),
-            composite_video_trim_start: Some(plan.trim_start),
-            composite_widget_update_rate: Some(plan.update_rate),
+            composite_render_duration: plan.render_duration,
+            composite_video_trim_start: plan.trim_start,
+            composite_widget_update_rate: plan.update_rate,
         }) {
             Ok(filename) => controller_clone.finish_success(filename),
             Err(error) => {
@@ -503,4 +503,38 @@ pub fn backend_detect_codecs(paths: &AppPaths) -> CoreResult<Value> {
     use crate::encode::codec_detect::detect_codecs;
     let codecs = detect_codecs(&paths.repo_root)?;
     serde_json::to_value(&codecs).map_err(CoreError::Serialization)
+}
+
+/// Validates template contents without exposing raw config types.
+///
+/// Parses the template JSON, validates format/version, and runs the full
+/// normalization seam. Returns `Ok(())` if valid, or a descriptive error.
+/// This is the single entry point for write-time validation — callers never
+/// see `RenderConfig` or `ValidatedRenderConfig`.
+pub fn validate_template_contents(input: &str) -> CoreResult<()> {
+    let config = parse_template_json(input)?;
+    crate::normalize::validate_render_config(config)?;
+    Ok(())
+}
+
+/// Parses a config JSON string and runs the full normalization seam.
+///
+/// Returns the validated config ready for rendering. This is the primary
+/// entry point for CLI binaries that need to validate and render.
+pub fn parse_and_validate_config(
+    config_json: &str,
+) -> CoreResult<crate::normalize::ValidatedRenderConfig> {
+    let config = parse_config_json(config_json)?;
+    crate::normalize::validate_render_config(config)
+}
+
+/// Validates a pre-built config `Value` through the normalization seam.
+///
+/// Use this when the caller needs to mutate the config as a `Value` before
+/// validation (e.g., injecting ffmpeg CLI overrides).
+pub fn validate_config_value(
+    config_value: &serde_json::Value,
+) -> CoreResult<crate::normalize::ValidatedRenderConfig> {
+    let config = crate::normalize::parse_config_value(config_value)?;
+    crate::normalize::validate_render_config(config)
 }

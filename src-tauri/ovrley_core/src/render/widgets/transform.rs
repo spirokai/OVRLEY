@@ -7,7 +7,7 @@
 //!       point projection (see [`super::common`]).
 //!
 //! Allowed dependencies: `skia_safe`.
-//! Forbidden dependencies: `crate::config`, `crate::activity`,
+//! Forbidden dependencies: `crate::normalize`, `crate::activity`,
 //!       `crate::encode`, `crate::commands`.
 //!
 //! ## Performance

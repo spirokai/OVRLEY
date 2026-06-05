@@ -3,7 +3,7 @@
     {
       "name": "recent_template_preview_600s",
       "activity": "activity/gpx-parse-debug.json",
-      "config": "config/render-baseline-rich.json",
+      "config": "config/test-template-4k.json",
       "second": 600,
       "baseline": "baselines/frame/recent_template_preview_600s.png"
     }
@@ -12,7 +12,7 @@
     {
       "name": "recent_template_qtrle_short",
       "activity": "activity/gpx-parse-debug.json",
-      "config": "config/render-baseline-rich.json",
+      "config": "config/test-template-4k.json",
       "startSeconds": 600.0,
       "durationSeconds": 4.0,
       "codec": "qtrle",
@@ -26,8 +26,8 @@
     {
       "name": "recent_template_libx264_short",
       "activity": "activity/gpx-parse-debug.json",
-      "config": "config/render-baseline-rich.json",
-      "sourceVideo": "video/test-1080p.mp4",
+      "config": "config/test-template-4k.json",
+      "sourceVideo": "video/test-4k.mp4",
       "syncOffset": 600.0,
       "trimStartSeconds": 0.0,
       "durationSeconds": 4.0,
@@ -36,7 +36,7 @@
       "frameIndices": [0, 50, 100],
       "baselineDir": "baselines/composite/recent_template_libx264_short",
       "expectedCodecName": "h264",
-      "expectedPixFmt": "yuv420p",
+      "expectedPixFmt": "yuvj420p",
       "expectSourceAudioPassthrough": true
     }
   ]

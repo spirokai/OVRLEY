@@ -5,8 +5,11 @@
 //! per-frame marker positions. This module keeps those shared data shapes in one
 //! place.
 
-use crate::config::MarkerPointConfig;
-use crate::types::DisplayType;
+use crate::normalize::{
+    ValidatedGradientWidget, ValidatedHeading, ValidatedLabel, ValidatedSceneConfig,
+    ValidatedTimeValue, ValidatedValueWidget,
+};
+use crate::types::{DisplayType, MetricKind};
 use skia_safe::Image;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -56,9 +59,59 @@ pub enum PresentationCache {
     HeadingTape(HeadingWidgetCache),
 }
 
+/// One validated render value, keyed implicitly by its index in the config array.
+#[derive(Clone, Debug)]
+pub enum PreparedValue {
+    StandardText(ValidatedValueWidget),
+    TimeText(ValidatedTimeValue),
+    Gradient(ValidatedGradientWidget),
+    HeadingTape(ValidatedHeading),
+}
+
+impl PreparedValue {
+    pub fn metric_kind(&self) -> MetricKind {
+        match self {
+            Self::StandardText(value) => value.metric,
+            Self::TimeText(_) => MetricKind::Time,
+            Self::Gradient(_) => MetricKind::Gradient,
+            Self::HeadingTape(_) => MetricKind::Heading,
+        }
+    }
+
+    pub fn display_type(&self) -> DisplayType {
+        match self {
+            Self::StandardText(value) => value.display_type,
+            Self::TimeText(value) => value.base.display_type,
+            Self::Gradient(_) => DisplayType::Text,
+            Self::HeadingTape(_) => DisplayType::Tape,
+        }
+    }
+
+    pub fn x(&self) -> f32 {
+        match self {
+            Self::StandardText(value) => value.x,
+            Self::TimeText(value) => value.base.x,
+            Self::Gradient(value) => value.x,
+            Self::HeadingTape(value) => value.x,
+        }
+    }
+
+    pub fn y(&self) -> f32 {
+        match self {
+            Self::StandardText(value) => value.y,
+            Self::TimeText(value) => value.base.y,
+            Self::Gradient(value) => value.y,
+            Self::HeadingTape(value) => value.y,
+        }
+    }
+}
+
 /// Prepared assets shared across frame rendering.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct PreparedRenderAssets {
+    pub(crate) scene: ValidatedSceneConfig,
+    pub(crate) labels: Vec<ValidatedLabel>,
+    pub(crate) values: Vec<PreparedValue>,
     pub(crate) route_cache: Option<RouteWidgetCache>,
     pub(crate) elevation_cache: Option<ElevationWidgetCache>,
     pub presentation_caches: BTreeMap<usize, PresentationCache>,
@@ -201,11 +254,9 @@ pub(crate) struct NormalizedRoutePlot {
     pub(crate) completed_line_opacity: f32,
     pub(crate) marker_variant: String,
     pub(crate) marker_variant_diameter: f32,
-    pub(crate) marker_variant_stroke_width: f32,
     pub(crate) marker_size: f32,
     pub(crate) marker_color: String,
     pub(crate) marker_opacity: f32,
-    pub(crate) marker_points: Vec<MarkerPointConfig>,
 }
 
 /// Normalized elevation plot settings after defaults and scale are applied.
@@ -216,7 +267,6 @@ pub(crate) struct NormalizedElevationPlot {
     pub(crate) width: u32,
     pub(crate) height: u32,
     pub(crate) rotation: f32,
-    pub(crate) margin: f32,
     pub(crate) y_scale: f32,
     pub(crate) simplify_tolerance_px: f32,
     pub(crate) target_density: f32,
@@ -233,11 +283,9 @@ pub(crate) struct NormalizedElevationPlot {
     pub(crate) area_completed_opacity: f32,
     pub(crate) marker_variant: String,
     pub(crate) marker_variant_diameter: f32,
-    pub(crate) marker_variant_stroke_width: f32,
     pub(crate) marker_size: f32,
     pub(crate) marker_color: String,
     pub(crate) marker_opacity: f32,
-    pub(crate) marker_points: Vec<MarkerPointConfig>,
     pub(crate) show_elevation_metric: bool,
     pub(crate) show_elevation_imperial: bool,
     pub(crate) metric_label_offset_x: f32,
@@ -247,8 +295,6 @@ pub(crate) struct NormalizedElevationPlot {
     pub(crate) label_font: Option<String>,
     pub(crate) label_font_size: f32,
     pub(crate) label_color: String,
-    pub(crate) label_decimal_rounding: Option<i32>,
-    pub(crate) legacy_label_units: Vec<String>,
 }
 
 /// Projected route sample with distance progress.
@@ -256,9 +302,4 @@ pub(crate) struct NormalizedElevationPlot {
 pub(crate) struct RouteSample {
     pub(crate) point: (f32, f32),
     pub(crate) progress01: f32,
-}
-
-/// Returns an empty serde-compatible extra-field map.
-pub(crate) fn empty_extra() -> BTreeMap<String, serde_json::Value> {
-    BTreeMap::new()
 }

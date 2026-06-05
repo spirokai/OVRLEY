@@ -10,8 +10,8 @@ use super::interpolate::{
     interpolate_course_value, interpolate_numeric_series_value, interpolate_time_series_value,
 };
 use super::schema::{ParsedActivity, TrimmedActivity};
-use crate::config::RenderDataRequirements;
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
 
 // Validates that the requested scene window fits inside activity duration.

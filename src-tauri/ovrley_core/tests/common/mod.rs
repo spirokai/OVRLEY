@@ -10,4 +10,5 @@
 //! the crate-level integration test suite under `ovrley_core/tests/`.
 
 pub mod composite;
+pub mod seam;
 pub mod test_config;

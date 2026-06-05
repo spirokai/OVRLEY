@@ -20,7 +20,6 @@ use std::time::Duration;
 use std::time::Instant;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
 use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
 use crate::encode::ffmpeg_composite::{
@@ -43,6 +42,7 @@ use crate::encode::video_composite_support::{
 };
 use crate::encode::video_debug::timestamp_nanos;
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
 use crate::render::{prepare_preview_assets, render_frame_rgba, FrameRenderRequest, RenderTarget};
 
@@ -68,10 +68,11 @@ pub struct CompositeRenderPlan {
 ///
 /// Required fields fail before dense activity is built, while optional fields
 /// receive standard defaults.
-pub fn derive_composite_render_plan(config: &RenderConfig) -> CoreResult<CompositeRenderPlan> {
+pub fn derive_composite_render_plan(
+    scene: &crate::normalize::ValidatedSceneConfig,
+) -> CoreResult<CompositeRenderPlan> {
     // test seam
-    let video_path = config
-        .scene
+    let video_path = scene
         .composite_video_path
         .as_ref()
         .filter(|value| !value.trim().is_empty())
@@ -79,8 +80,7 @@ pub fn derive_composite_render_plan(config: &RenderConfig) -> CoreResult<Composi
         .ok_or_else(|| {
             CoreError::Config("scene.composite_video_path required for composite render".into())
         })?;
-    let bitrate = config
-        .scene
+    let bitrate = scene
         .composite_bitrate
         .as_ref()
         .filter(|value| !value.trim().is_empty())
@@ -88,14 +88,14 @@ pub fn derive_composite_render_plan(config: &RenderConfig) -> CoreResult<Composi
         .ok_or_else(|| {
             CoreError::Config("scene.composite_bitrate required for composite render".into())
         })?;
-    let fps_num = config.scene.composite_video_fps_num.ok_or_else(|| {
+    let fps_num = scene.composite_video_fps_num.ok_or_else(|| {
         CoreError::Config("scene.composite_video_fps_num required for composite render".into())
     })?;
-    let fps_den = config.scene.composite_video_fps_den.ok_or_else(|| {
+    let fps_den = scene.composite_video_fps_den.ok_or_else(|| {
         CoreError::Config("scene.composite_video_fps_den required for composite render".into())
     })?;
     let source_fps = Fps::new(fps_num, fps_den)?;
-    let video_duration = config.scene.composite_video_duration.ok_or_else(|| {
+    let video_duration = scene.composite_video_duration.ok_or_else(|| {
         CoreError::Config("scene.composite_video_duration required for composite render".into())
     })?;
     if !video_duration.is_finite() || video_duration <= 0.0 {
@@ -104,13 +104,17 @@ pub fn derive_composite_render_plan(config: &RenderConfig) -> CoreResult<Composi
         )));
     }
 
-    let sync_offset = config.scene.composite_sync_offset.unwrap_or(0.0);
+    let sync_offset = scene.composite_sync_offset.ok_or_else(|| {
+        CoreError::Config("scene.composite_sync_offset required for composite render".into())
+    })?;
     if !sync_offset.is_finite() || sync_offset < 0.0 {
         return Err(CoreError::Config(format!(
             "scene.composite_sync_offset must be zero or greater: {sync_offset}"
         )));
     }
-    let trim_start = config.scene.composite_video_trim_start.unwrap_or(0.0);
+    let trim_start = scene.composite_video_trim_start.ok_or_else(|| {
+        CoreError::Config("scene.composite_video_trim_start required for composite render".into())
+    })?;
     if !trim_start.is_finite() || trim_start < 0.0 {
         return Err(CoreError::Config(format!(
             "scene.composite_video_trim_start must be zero or greater: {trim_start}"
@@ -122,14 +126,16 @@ pub fn derive_composite_render_plan(config: &RenderConfig) -> CoreResult<Composi
         )));
     }
 
-    let update_rate = config
-        .scene
+    let update_rate = scene
         .composite_widget_update_rate
-        .unwrap_or(1)
+        .ok_or_else(|| {
+            CoreError::Config(
+                "scene.composite_widget_update_rate required for composite render".into(),
+            )
+        })?
         .max(1);
     let overlay_pipe_fps = source_fps.divided_by(update_rate)?;
-    let render_duration = config
-        .scene
+    let render_duration = scene
         .composite_render_duration
         .unwrap_or(video_duration - trim_start);
     if !render_duration.is_finite() || render_duration <= 0.0 {
@@ -155,12 +161,14 @@ pub fn derive_composite_render_plan(config: &RenderConfig) -> CoreResult<Composi
 ///
 /// This keeps persisted template timing untouched while aligning dense frames
 /// with the lower-FPS overlay stream used by compositing mode.
-pub fn apply_composite_scene_timing(config: &mut RenderConfig, plan: &CompositeRenderPlan) {
-    // test seam
-    config.scene.start = plan.sync_offset;
-    config.scene.end = plan.sync_offset + plan.render_duration;
-    config.scene.fps = plan.overlay_pipe_fps.as_f64();
-    config.scene.update_rate = Some(1);
+pub fn apply_composite_scene_timing(
+    scene: &mut crate::normalize::ValidatedSceneConfig,
+    plan: &CompositeRenderPlan,
+) {
+    scene.start = plan.sync_offset;
+    scene.end = plan.sync_offset + plan.render_duration;
+    scene.fps = plan.overlay_pipe_fps.as_f64();
+    scene.update_rate = 1;
 }
 
 /// Timing and command values derived by the composite pipeline shell.
@@ -204,7 +212,7 @@ pub struct CompositePipelinePlan {
 pub fn render_composite_video_single(
     // test seam
     paths: &AppPaths,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
@@ -214,18 +222,19 @@ pub fn render_composite_video_single(
     composite_video_fps_num: u32,
     composite_video_fps_den: u32,
     composite_video_duration: f64,
-    composite_render_duration: Option<f64>,
-    composite_video_trim_start: Option<f64>,
-    composite_widget_update_rate: Option<u32>,
+    composite_render_duration: f64,
+    composite_video_trim_start: f64,
+    composite_widget_update_rate: u32,
 ) -> CoreResult<String> {
     if controller.cancel_flag().load(Ordering::SeqCst) {
         return Err(CoreError::Cancelled);
     }
 
     // ── PHASE 1: DERIVE PIPELINE PLAN (timing, FPS, FFmpeg args, output path) ──
+    let scene = &config.scene;
     let plan = derive_composite_pipeline_plan(
         paths,
-        config,
+        &scene,
         composite_video_path,
         composite_bitrate,
         composite_video_fps_num,
@@ -266,10 +275,11 @@ pub fn render_composite_video_single(
     let monitor_lines = stderr_lines.clone();
     let monitor_thread = thread::spawn(move || monitor_composite_ffmpeg(stderr, monitor_lines));
 
-    let width = config.scene.width.unwrap_or(1920);
-    let height = config.scene.height.unwrap_or(1080);
+    let scene = prepared_preview_assets.scene();
+    let width = scene.width;
+    let height = scene.height;
     let frame_byte_len = (width as usize) * (height as usize) * 4;
-    let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
+    let scale = scene.scale;
     let total_progress = plan.output_frame_count.min(u64::from(u32::MAX)) as u32;
     let cancel_flag = controller.cancel_flag();
     let mut profiler = RenderProfiler::default();
@@ -334,14 +344,17 @@ pub fn render_composite_video_single(
             let frame_started = Instant::now();
             let activity_time = composite_sync_offset + video_local_time;
             let frame_result = (|| -> CoreResult<()> {
-                let dense_frame_index =
-                    dense_frame_index_for_overlay(config, dense_activity, &plan, activity_time)?;
+                let dense_frame_index = dense_frame_index_for_overlay(
+                    prepared_preview_assets.scene(),
+                    dense_activity,
+                    &plan,
+                    activity_time,
+                )?;
 
                 let mut frame_buffer =
                     acquire_frame_buffer(&free_receiver, cancel_flag.as_ref(), &mut profiler)?;
                 render_frame_rgba(FrameRenderRequest {
                     paths,
-                    config,
                     dense_activity,
                     prepared_assets: &prepared_preview_assets.prepared_assets,
                     frame_index: dense_frame_index,
@@ -541,27 +554,26 @@ fn terminate_composite_ffmpeg_after_cancel(
 pub fn derive_composite_pipeline_plan(
     // test seam
     paths: &AppPaths,
-    config: &RenderConfig,
+    scene: &crate::normalize::ValidatedSceneConfig,
     composite_video_path: &str,
     composite_bitrate: &str,
     composite_video_fps_num: u32,
     composite_video_fps_den: u32,
     composite_video_duration: f64,
-    composite_render_duration: Option<f64>,
-    composite_video_trim_start: Option<f64>,
-    composite_widget_update_rate: Option<u32>,
+    composite_render_duration: f64,
+    composite_video_trim_start: f64,
+    composite_widget_update_rate: u32,
 ) -> CoreResult<CompositePipelinePlan> {
     // ── PHASE 1: VALIDATE & DERIVE TIMING VALUES ──
     let source_fps = Fps::new(composite_video_fps_num, composite_video_fps_den)?;
     let output_fps = source_fps;
-    let update_rate = composite_widget_update_rate.unwrap_or(1).max(1);
+    let update_rate = composite_widget_update_rate.max(1);
     let overlay_pipe_fps = source_fps.divided_by(update_rate)?;
-    let trim_start = composite_video_trim_start.unwrap_or(0.0);
-    let render_duration =
-        composite_render_duration.unwrap_or(composite_video_duration - trim_start);
-    let width = config.scene.width.unwrap_or(1920);
-    let height = config.scene.height.unwrap_or(1080);
-    let codec_name = composite_codec_name(config);
+    let trim_start = composite_video_trim_start;
+    let render_duration = composite_render_duration;
+    let width = scene.width;
+    let height = scene.height;
+    let codec_name = composite_codec_name(scene)?;
 
     if !composite_video_duration.is_finite() || composite_video_duration <= 0.0 {
         return Err(CoreError::Encode(format!(
@@ -593,7 +605,7 @@ pub fn derive_composite_pipeline_plan(
         first_fractional_overrun_overlay_index(render_duration, overlay_pipe_fps);
     // ── PHASE 3: BUILD COMPOSITE FFMPEG SETTINGS ──
     let mut hwaccel_info = HwAccelInfo::trust_selected_profile();
-    hwaccel_info.available_codecs.qsv_full_init_args = composite_qsv_full_init_args(config);
+    hwaccel_info.available_codecs.qsv_full_init_args = composite_qsv_full_init_args(scene);
     let ffmpeg_settings = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
         codec_name: &codec_name,
         bitrate: composite_bitrate,
@@ -664,13 +676,13 @@ fn spawn_composite_ffmpeg_process(
 /// otherwise this falls back to scene-start-relative time mapping.
 pub fn dense_frame_index_for_overlay(
     // test seam
-    config: &RenderConfig,
+    scene: &crate::normalize::ValidatedSceneConfig,
     dense_activity: &DenseActivityReport,
     plan: &CompositePipelinePlan,
     activity_time: f64,
 ) -> CoreResult<usize> {
-    let direct_index = if dense_report_matches_composite_window(config, plan) {
-        let video_local_time = activity_time - config.scene.start;
+    let direct_index = if dense_report_matches_composite_window(scene, plan) {
+        let video_local_time = activity_time - scene.start;
         Some((video_local_time * plan.overlay_pipe_fps.as_f64()).round() as usize)
     } else {
         None
@@ -678,11 +690,11 @@ pub fn dense_frame_index_for_overlay(
     let dense_frame_index = match direct_index {
         Some(index) => index,
         None => {
-            let idx = ((activity_time - config.scene.start) * config.scene.fps).floor();
+            let idx = ((activity_time - scene.start) * scene.fps).floor();
             if idx < 0.0 {
                 return Err(CoreError::Encode(format!(
                     "Composite overlay frame is before dense activity range: activity_time={activity_time}, scene.start={}",
-                    config.scene.start
+                    scene.start
                 )));
             }
             idx as usize
@@ -704,20 +716,21 @@ pub fn dense_frame_index_for_overlay(
 /// tolerance so the hot render loop can use direct frame-index mapping
 /// when valid.
 fn dense_report_matches_composite_window(
-    config: &RenderConfig,
+    scene: &crate::normalize::ValidatedSceneConfig,
     plan: &CompositePipelinePlan,
 ) -> bool {
-    let expected_end = config.scene.start + plan.render_duration;
-    (config.scene.end - expected_end).abs() <= 1e-6
-        && (config.scene.fps - plan.overlay_pipe_fps.as_f64()).abs() <= 1e-9
-        && dense_report_frame_count_matches(config, plan)
+    let expected_end = scene.start + plan.render_duration;
+    (scene.end - expected_end).abs() <= 1e-6
+        && (scene.fps - plan.overlay_pipe_fps.as_f64()).abs() <= 1e-9
+        && dense_report_frame_count_matches(scene, plan)
 }
 
 /// Checks whether scene timing implies the same guarded overlay frame count.
-fn dense_report_frame_count_matches(config: &RenderConfig, plan: &CompositePipelinePlan) -> bool {
-    let scene_frames = ((config.scene.end - config.scene.start) * config.scene.fps)
-        .ceil()
-        .max(0.0) as u64;
+fn dense_report_frame_count_matches(
+    scene: &crate::normalize::ValidatedSceneConfig,
+    plan: &CompositePipelinePlan,
+) -> bool {
+    let scene_frames = ((scene.end - scene.start) * scene.fps).ceil().max(0.0) as u64;
     scene_frames == expected_guarded_overlay_frame_count(plan)
 }
 
@@ -749,24 +762,24 @@ fn stderr_snapshot(lines: &Arc<Mutex<Vec<String>>>) -> String {
 ///
 /// MP4 compositing defaults to software H.264 because the transparent-export
 /// defaults are alpha codecs that are not suitable for final MP4 output.
-fn composite_codec_name(config: &RenderConfig) -> String {
-    config
-        .scene
+fn composite_codec_name(scene: &crate::normalize::ValidatedSceneConfig) -> CoreResult<String> {
+    scene
         .ffmpeg
         .as_object()
         .and_then(|map| map.get("codec"))
         .and_then(serde_json::Value::as_str)
-        .unwrap_or("libx264")
-        .to_string()
+        .ok_or_else(|| {
+            CoreError::Encode("scene.ffmpeg.codec must be provided by the frontend".into())
+        })
+        .map(str::to_string)
 }
 
 /// Reads detected QSV full-overlay initialization args from `scene.ffmpeg`.
 ///
 /// The frontend injects these render-time args after codec detection so the
 /// backend can reuse the exact hardware-device candidate that passed probing.
-fn composite_qsv_full_init_args(config: &RenderConfig) -> Vec<String> {
-    config
-        .scene
+fn composite_qsv_full_init_args(scene: &crate::normalize::ValidatedSceneConfig) -> Vec<String> {
+    scene
         .ffmpeg
         .as_object()
         .and_then(|map| map.get("qsv_full_init_args"))

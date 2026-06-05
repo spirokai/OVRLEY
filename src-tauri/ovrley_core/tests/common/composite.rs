@@ -18,8 +18,7 @@ use std::sync::atomic::Ordering;
 use std::thread;
 
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::config::{parse_config_json, RenderConfig};
+use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::encode::ffmpeg_composite::{
     build_composite_ffmpeg_settings, CompositeFfmpegBuildRequest, HwAccelInfo,
@@ -32,6 +31,8 @@ use ovrley_core::encode::video_composite_debug::{
 use ovrley_core::encode::video_composite_pipeline::{
     derive_composite_pipeline_plan, render_composite_video_single, CompositePipelinePlan,
 };
+use ovrley_core::normalize::raw::{parse_config_json, RenderConfig};
+use ovrley_core::normalize::{parse_template_value, validate_render_config, ValidatedRenderConfig};
 use ovrley_core::paths::AppPaths;
 use serde_json::Value;
 
@@ -62,29 +63,41 @@ pub fn derive_fixture_composite_plan(
     fps_num: u32,
     fps_den: u32,
     video_duration: f64,
-    render_duration: Option<f64>,
-    trim_start: Option<f64>,
-    update_rate: Option<u32>,
+    render_duration: f64,
+    trim_start: f64,
+    update_rate: u32,
 ) -> CompositePipelinePlan {
     let config = parse_config_json(&format!(
-        r#"{{
+        r##"{{
             "scene":{{
                 "fps":30,
                 "start":0,
                 "end":10,
+                "scale":1.0,
+                "shadow_strength":0.0,
+                "shadow_distance":0.0,
+                "shadow_color":"#000000",
+                "border_thickness":0.0,
+                "border_color":"#000000",
+                "update_rate":1,
+                "custom_export_range_active":false,
+                "composite_sync_offset":0.0,
+                "composite_video_trim_start":0.0,
+                "composite_widget_update_rate":1,
                 {scene_prefix}
             }},
             "values":[],
             "labels":[],
             "plots":[]
-        }}"#
+        }}"##
     ))
     .unwrap();
     let paths = AppPaths::from_repo_root(PathBuf::from("."));
 
+    let scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
     derive_composite_pipeline_plan(
         &paths,
-        &config,
+        &scene,
         "input.mp4",
         "60M",
         fps_num,
@@ -193,7 +206,7 @@ pub fn render_fixture_composite_with_paths(
         .join("video")
         .join(video_path.trim_start_matches("tmp/"));
     let absolute_video_path = absolute_video_path.to_string_lossy().to_string();
-    let mut config = recent_template_config(width, height);
+    let mut config = mutable_recent_template_config(width, height);
     config.scene.ffmpeg = serde_json::json!({"codec": codec});
 
     // ── Phase 2: compute FPS hierarchy from source → overlay pipe ──
@@ -215,12 +228,13 @@ pub fn render_fixture_composite_with_paths(
     config.scene.composite_widget_update_rate = Some(update_rate);
 
     let activity = fixture_activity();
-    let dense_activity = build_dense_activity_report(&activity, &config).unwrap();
+    let validated = validate_render_config(config).unwrap();
+    let dense_activity = build_dense_activity_report_validated(&activity, &validated).unwrap();
 
     // ── Phase 4: execute single-segment composite render ─────────────
     let filename = render_composite_video_single(
         &paths,
-        &config,
+        &validated,
         &activity,
         &dense_activity,
         &controller,
@@ -230,9 +244,9 @@ pub fn render_fixture_composite_with_paths(
         fps_num,
         fps_den,
         render_duration.max(20.0),
-        Some(render_duration),
-        Some(0.0),
-        Some(update_rate),
+        render_duration,
+        0.0,
+        update_rate,
     )
     .map_err(|error| error.to_string())?;
 
@@ -345,13 +359,18 @@ pub fn write_fixture_composite_debug_summary(path_name: &str) -> AppPaths {
 }
 
 /// Loads the shipped recent-template fixture and overrides the output size.
-pub fn recent_template_config(width: u32, height: u32) -> RenderConfig {
+pub fn recent_template_config(width: u32, height: u32) -> ValidatedRenderConfig {
+    let config = mutable_recent_template_config(width, height);
+    validate_render_config(config).unwrap()
+}
+
+/// Loads the shipped recent-template fixture as a mutable raw config.
+pub fn mutable_recent_template_config(width: u32, height: u32) -> RenderConfig {
     let git_root = crate::common::test_config::repo_git_root();
     let template =
         fs::read_to_string(git_root.join("templates").join("recent-template.json")).unwrap();
     let value: Value = serde_json::from_str(&template).unwrap();
-    let mut config: RenderConfig =
-        serde_json::from_value(value.get("config").unwrap().clone()).unwrap();
+    let mut config = parse_template_value(&value).unwrap();
     config.scene.width = Some(width);
     config.scene.height = Some(height);
     config.scene.ffmpeg = serde_json::json!({"codec":"libx264"});
@@ -359,15 +378,32 @@ pub fn recent_template_config(width: u32, height: u32) -> RenderConfig {
 }
 
 /// Builds a minimal end-to-end composite render config for segmented tests.
-pub fn composite_test_config(render_duration: f64) -> RenderConfig {
+pub fn composite_test_config(render_duration: f64) -> ValidatedRenderConfig {
+    let config = mutable_composite_test_config(render_duration);
+    validate_render_config(config).unwrap()
+}
+
+/// Builds a minimal mutable raw config for tests that intentionally edit it.
+pub fn mutable_composite_test_config(render_duration: f64) -> RenderConfig {
     let json = format!(
-        r#"{{
+        r##"{{
         "scene": {{
             "width": 1920,
             "height": 1080,
             "fps": 30.0,
             "start": 0.0,
             "end": {duration},
+            "scale": 1.0,
+            "shadow_strength": 0.0,
+            "shadow_distance": 0.0,
+            "shadow_color": "#000000",
+            "border_thickness": 0.0,
+            "border_color": "#000000",
+            "update_rate": 1,
+            "custom_export_range_active": false,
+            "composite_sync_offset": 0.0,
+            "composite_video_trim_start": 0.0,
+            "composite_widget_update_rate": 1,
             "ffmpeg": {{
                 "codec": "libx264"
             }}
@@ -375,7 +411,7 @@ pub fn composite_test_config(render_duration: f64) -> RenderConfig {
         "widgets": [],
         "maps": [],
         "athlete": null
-    }}"#,
+    }}"##,
         duration = render_duration
     );
     parse_config_json(&json).unwrap()

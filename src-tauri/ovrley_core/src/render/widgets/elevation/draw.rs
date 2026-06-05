@@ -17,8 +17,8 @@ use super::super::polyline::{draw_area, draw_polyline};
 use super::super::transform::with_widget_transform;
 use super::super::types::{ElevationWidgetCache, WidgetRenderReport};
 use super::frame_state::build_elevation_completed_points;
-use crate::config::RenderConfig;
 use crate::debug::RenderProfiler;
+use crate::error::CoreResult;
 use crate::paths::AppPaths;
 use crate::render::text::{draw_text, parse_color, ResolvedTextStyle};
 use skia_safe::Canvas;
@@ -27,16 +27,19 @@ use skia_safe::Canvas;
 pub(crate) fn draw_elevation_widget(
     canvas: &Canvas,
     paths: &AppPaths,
-    config: &RenderConfig,
     elevation_cache: &ElevationWidgetCache,
     frame_index: usize,
+    scene: &crate::normalize::ValidatedSceneConfig,
     frame_profiler: &mut RenderProfiler,
-) -> Option<WidgetRenderReport> {
+) -> CoreResult<Option<WidgetRenderReport>> {
     // Phase 1: fetch precomputed frame state and build the completed-points prefix.
-    let scene_scale = config.scene.scale.unwrap_or(1.0).max(0.1);
-    let state = elevation_cache
+    let scene_scale = scene.scale.max(0.1);
+    let Some(state) = elevation_cache
         .frame_states
-        .get(frame_index.min(elevation_cache.frame_states.len().saturating_sub(1)))?;
+        .get(frame_index.min(elevation_cache.frame_states.len().saturating_sub(1)))
+    else {
+        return Ok(None);
+    };
     let completed_points = build_elevation_completed_points(
         &elevation_cache.geometry.points,
         &elevation_cache.geometry.progress_values,
@@ -96,11 +99,10 @@ pub(crate) fn draw_elevation_widget(
     // Phase 4: draw elevation labels outside the widget transform so text orientation
     // stays upright even when the widget itself is rotated.
     if elevation_cache.plot.show_elevation_metric {
-        frame_profiler.measure("text.elevation_label", || {
+        frame_profiler.measure("text.elevation_label", || -> CoreResult<()> {
             draw_elevation_label(
                 canvas,
                 paths,
-                config,
                 elevation_cache,
                 state.elevation_m,
                 "metric",
@@ -108,17 +110,17 @@ pub(crate) fn draw_elevation_widget(
                 marker_abs_y,
                 elevation_cache.plot.metric_label_offset_x,
                 elevation_cache.plot.metric_label_offset_y,
+                scene,
                 scene_scale,
-            );
-        });
+            )
+        })?;
     }
 
     if elevation_cache.plot.show_elevation_imperial {
-        frame_profiler.measure("text.elevation_label", || {
+        frame_profiler.measure("text.elevation_label", || -> CoreResult<()> {
             draw_elevation_label(
                 canvas,
                 paths,
-                config,
                 elevation_cache,
                 state.elevation_m,
                 "imperial",
@@ -126,42 +128,14 @@ pub(crate) fn draw_elevation_widget(
                 marker_abs_y,
                 elevation_cache.plot.imperial_label_offset_x,
                 elevation_cache.plot.imperial_label_offset_y,
+                scene,
                 scene_scale,
-            );
-        });
-    }
-
-    if !elevation_cache.plot.legacy_label_units.is_empty()
-        && !elevation_cache.plot.show_elevation_metric
-        && !elevation_cache.plot.show_elevation_imperial
-    {
-        frame_profiler.measure("text.elevation_label", || {
-            let text = elevation_cache
-                .plot
-                .legacy_label_units
-                .iter()
-                .map(|unit| {
-                    format_elevation_label(
-                        state.elevation_m,
-                        unit,
-                        elevation_cache.plot.label_decimal_rounding,
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            let style = elevation_label_style(
-                config,
-                elevation_cache,
-                marker_abs_x + elevation_cache.plot.metric_label_offset_x,
-                marker_abs_y + elevation_cache.plot.metric_label_offset_y,
-                scene_scale,
-            );
-            draw_text(canvas, &text, &style, &paths.font_dirs);
-        });
+            )
+        })?;
     }
 
     // Phase 5: build preview diagnostics from widget geometry and current frame state.
-    Some(widget_render_report(
+    Ok(Some(widget_render_report(
         elevation_cache.plot.x,
         elevation_cache.plot.y,
         elevation_cache.plot.width,
@@ -171,13 +145,12 @@ pub(crate) fn draw_elevation_widget(
         state.progress01,
         state.marker_x,
         state.marker_y,
-    ))
+    )))
 }
 
 fn draw_elevation_label(
     canvas: &Canvas,
     paths: &AppPaths,
-    config: &RenderConfig,
     elevation_cache: &ElevationWidgetCache,
     elevation_m: f64,
     unit: &str,
@@ -185,28 +158,26 @@ fn draw_elevation_label(
     base_y: f32,
     offset_x: f32,
     offset_y: f32,
+    scene: &crate::normalize::ValidatedSceneConfig,
     scene_scale: f32,
-) {
-    let text = format_elevation_label(
-        elevation_m,
-        unit,
-        elevation_cache.plot.label_decimal_rounding,
-    );
+) -> CoreResult<()> {
+    let text = format_elevation_label(elevation_m, unit, None);
     let style = elevation_label_style(
-        config,
         elevation_cache,
         base_x + offset_x,
         base_y + offset_y,
+        scene,
         scene_scale,
     );
-    draw_text(canvas, &text, &style, &paths.font_dirs);
+    draw_text(canvas, &text, &style, &paths.font_dirs)?;
+    Ok(())
 }
 
 fn elevation_label_style(
-    config: &RenderConfig,
     elevation_cache: &ElevationWidgetCache,
     x: f32,
     y: f32,
+    scene: &crate::normalize::ValidatedSceneConfig,
     scene_scale: f32,
 ) -> ResolvedTextStyle {
     ResolvedTextStyle {
@@ -216,24 +187,23 @@ fn elevation_label_style(
             .plot
             .label_font
             .clone()
-            .or_else(|| config.scene.font.clone()),
+            .or_else(|| scene.font.clone()),
         font_size: elevation_cache.plot.label_font_size,
         line_height: elevation_cache.plot.label_font_size * 0.92,
         color: parse_color(&elevation_cache.plot.label_color, 1.0),
         opacity: 1.0,
-        shadow_color: config
-            .scene
-            .shadow_color
-            .as_deref()
-            .map(|color| parse_color(color, 1.0)),
-        shadow_strength: config.scene.shadow_strength.unwrap_or(0.0) * scene_scale,
-        shadow_distance: config.scene.shadow_distance.unwrap_or(0.0) * scene_scale,
-        border_color: config
-            .scene
-            .border_color
-            .as_deref()
-            .map(|color| parse_color(color, 1.0)),
-        border_thickness: config.scene.border_thickness.unwrap_or(0.0) * scene_scale,
-        border_distance: config.scene.border_distance.unwrap_or(0.0) * scene_scale,
+        shadow_color: if scene.shadow_color.is_empty() {
+            None
+        } else {
+            Some(parse_color(&scene.shadow_color, 1.0))
+        },
+        shadow_strength: scene.shadow_strength * scene_scale,
+        shadow_distance: scene.shadow_distance * scene_scale,
+        border_color: if scene.border_color.is_empty() {
+            None
+        } else {
+            Some(parse_color(&scene.border_color, 1.0))
+        },
+        border_thickness: scene.border_thickness * scene_scale,
     }
 }

@@ -9,19 +9,9 @@ use super::types::{
     WidgetRenderReport,
 };
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::MarkerPointConfig;
-use crate::config::RenderConfig;
 use skia_safe::Canvas;
 
-pub(crate) const DEFAULT_COLOR: &str = "#ffffff";
-pub(crate) const DEFAULT_LINE_WIDTH: f32 = 1.75;
-pub(crate) const DEFAULT_POINT_WEIGHT: f32 = 80.0;
-pub(crate) const DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_PX: f32 = 1.0;
-pub(crate) const DEFAULT_ROUTE_SIMPLIFY_TOLERANCE_MULTIPLIER: f32 = 1.0;
 pub(crate) const DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER: f32 = 1.0;
-pub(crate) const DEFAULT_ELEVATION_LINE_WIDTH_MULTIPLIER: f32 = 2.5;
-pub(crate) const DEFAULT_ELEVATION_MARKER_SCALE: f32 = 2.5;
-pub(crate) const DEFAULT_ROUTE_LINE_WIDTH_MULTIPLIER: f32 = 2.5;
 
 // Interpolates one numeric value from sorted valid points.
 // Delegates to the shared `interpolation` leaf module.
@@ -51,9 +41,9 @@ fn interpolate_numeric_series_many(
 
 // Returns frame-by-frame progress values used to animate plot markers.
 pub(crate) fn frame_progress_values(
-    config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
+    scene: &crate::normalize::ValidatedSceneConfig,
 ) -> Vec<f32> {
     // Prefer dense distance progress when available because it maps widget
     // marker movement to real activity distance rather than elapsed time.
@@ -73,7 +63,7 @@ pub(crate) fn frame_progress_values(
         let target_elapsed_seconds = dense_activity
             .frame_elapsed_seconds
             .iter()
-            .map(|elapsed| config.scene.start + *elapsed)
+            .map(|elapsed| scene.start + *elapsed)
             .collect::<Vec<_>>();
         return interpolate_numeric_series_many(
             &activity.sample_elapsed_seconds,
@@ -98,8 +88,8 @@ pub(crate) fn frame_progress_values(
 /// Reads the typed `SceneConfig::custom_export_range_active` field.
 /// Templates that omit the field (including all older JSON) default to `false`,
 /// preserving backward-compatible behavior.
-pub(crate) fn custom_export_range_active(config: &RenderConfig) -> bool {
-    config.scene.custom_export_range_active.unwrap_or(false)
+pub(crate) fn custom_export_range_active(scene: &crate::normalize::ValidatedSceneConfig) -> bool {
+    scene.custom_export_range_active.unwrap_or(false)
 }
 
 // Interpolates absolute activity distance progress at an elapsed second.
@@ -123,20 +113,20 @@ pub(crate) fn interpolate_distance_progress_at_elapsed(
 
 // Converts absolute frame progress values into the current trim window.
 pub(crate) fn relative_distance_frame_progress_values(
-    config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
+    scene: &crate::normalize::ValidatedSceneConfig,
 ) -> Option<Vec<f32>> {
     // Convert absolute activity progress into trim-local progress for custom
     // export windows, preserving the visual start/end of the selected range.
-    let start_progress = interpolate_distance_progress_at_elapsed(activity, config.scene.start)?;
-    let end_progress = interpolate_distance_progress_at_elapsed(activity, config.scene.end)?;
+    let start_progress = interpolate_distance_progress_at_elapsed(activity, scene.start)?;
+    let end_progress = interpolate_distance_progress_at_elapsed(activity, scene.end)?;
     let span = end_progress - start_progress;
     if span <= 0.0 {
         return None;
     }
 
-    let frame_progress = frame_progress_values(config, activity, dense_activity);
+    let frame_progress = frame_progress_values(activity, dense_activity, scene);
     Some(
         frame_progress
             .into_iter()
@@ -176,16 +166,6 @@ pub(crate) fn normalize_optional_progress_window(
             })
             .collect::<Vec<_>>(),
     )
-}
-
-// Interpolates one optional numeric series at a target x-value.
-// Delegates to the shared `interpolation` leaf module.
-pub(crate) fn interpolate_optional_numeric_series(
-    x_values: &[f64],
-    y_values: &[Option<f64>],
-    target_x: f64,
-) -> Option<f64> {
-    crate::interpolation::interpolate_optional_numeric_series(x_values, y_values, target_x)
 }
 
 // Finds an interpolated point for target progress using a reusable search cursor.
@@ -252,92 +232,16 @@ pub(crate) fn point_at_progress_x(
     Some((index, point.0, point.1))
 }
 
-// Resolves the base plot color with a white default.
-pub(crate) fn plot_base_color(color: Option<&str>) -> String {
-    color.unwrap_or(DEFAULT_COLOR).to_string()
-}
-
-// Applies the historical line-width multiplier used by plot templates.
-pub(crate) fn legacy_line_width(line_width: Option<f32>, multiplier: f32) -> f32 {
-    line_width.unwrap_or(DEFAULT_LINE_WIDTH) * multiplier
-}
-
-// Derives a marker size from configured marker weights.
-pub(crate) fn marker_size_from_weights(
-    points: &[MarkerPointConfig],
-    default_size: f32,
-    weight_to_radius: impl Fn(f32) -> f32,
-) -> f32 {
-    points
-        .iter()
-        .filter_map(|point| point.weight)
-        .map(weight_to_radius)
-        .fold(default_size, f32::max)
-}
-
-// Supplies marker-point config when a legacy template only has flat marker fields.
-pub(crate) fn fallback_marker_points(
-    points: &[MarkerPointConfig],
-    marker_size: f32,
-    marker_color: &str,
-    marker_opacity: f32,
-) -> Vec<MarkerPointConfig> {
-    // Legacy templates often specify only marker_size/color fields. Convert
-    // those into the newer layered marker representation.
-    if points.is_empty() {
-        vec![MarkerPointConfig {
-            weight: Some(marker_size.powi(2)),
-            color: Some(marker_color.to_string()),
-            opacity: Some(marker_opacity),
-            extra: super::types::empty_extra(),
-        }]
-    } else {
-        points.to_vec()
-    }
-}
-
-// Scales marker weights so marker radii track scene scale.
-pub(crate) fn scale_marker_points(
-    points: &[MarkerPointConfig],
-    scale: f32,
-) -> Vec<MarkerPointConfig> {
-    if (scale - 1.0).abs() <= f32::EPSILON {
-        return points.to_vec();
-    }
-
-    let weight_scale = scale * scale;
-    points
-        .iter()
-        .cloned()
-        .map(|mut point| {
-            point.weight = point.weight.map(|weight| (weight * weight_scale).max(1.0));
-            point
-        })
-        .collect()
-}
-
-// Resolves explicit, inherited, and base style colors in precedence order.
-pub(crate) fn resolve_style_color(
-    explicit_color: Option<&String>,
-    inherited_color: Option<&String>,
-    base_color: &str,
-) -> String {
-    explicit_color
-        .cloned()
-        .or_else(|| inherited_color.cloned())
-        .unwrap_or_else(|| base_color.to_string())
-}
-
-// Converts scene shadow fields into a drawable shadow style.
-pub(crate) fn normalize_shadow_style(
-    color: Option<&String>,
-    strength: Option<f32>,
-    distance: Option<f32>,
+// Converts validated scene shadow fields into a drawable shadow style.
+pub(crate) fn normalize_shadow_style_validated(
+    color: &String,
+    strength: f32,
+    distance: f32,
     scale: f32,
 ) -> Option<ShadowStyle> {
-    let color = color?.clone();
-    let strength = strength.unwrap_or(0.0) * scale;
-    let distance = distance.unwrap_or(0.0) * scale;
+    let color = color.clone();
+    let strength = strength * scale;
+    let distance = distance * scale;
     if strength <= 0.0 && distance == 0.0 {
         return None;
     }

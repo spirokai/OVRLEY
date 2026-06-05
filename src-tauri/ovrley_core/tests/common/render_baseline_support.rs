@@ -14,8 +14,8 @@
 use crate::common::test_config;
 use anyhow::{anyhow, bail, Context, Result};
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::config::{parse_template_json, RenderConfig};
+use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
+use ovrley_core::commands::validate_config_value;
 use ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary;
 use ovrley_core::encode::video::{
     render_composite_video, render_video, rendered_frame_count, CompositeRenderRequest,
@@ -25,7 +25,7 @@ use ovrley_core::encode::video_probe::{probe_video, VideoMetadata};
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::render_preview_to_path;
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -187,8 +187,20 @@ pub fn run_composite_video_cases() -> Result<()> {
 fn run_frame_case(case: &FrameCase) -> Result<()> {
     let runtime = prepare_case_runtime("frame", &case.name)?;
     let activity = load_activity(&case.activity)?;
-    let config = load_config(&case.config)?;
-    let dense_activity = build_dense_activity_report(&activity, &config)
+    let mut config_value = load_mutable_config_value(&case.config)?;
+    let fps = config_value
+        .get("scene")
+        .and_then(|scene| scene.get("fps"))
+        .and_then(Value::as_f64)
+        .ok_or_else(|| anyhow!("config.scene.fps missing or invalid"))?;
+    set_scene_window(
+        &mut config_value,
+        f64::from(case.second),
+        f64::from(case.second) + (1.0 / fps.max(1.0)),
+    )?;
+    let validated = validate_config_value(&config_value)
+        .context("failed to validate frame config")?;
+    let dense_activity = build_dense_activity_report_validated(&activity, &validated)
         .context("failed to build dense activity for frame case")?;
     let actual_path = runtime
         .artifacts_dir
@@ -196,7 +208,7 @@ fn run_frame_case(case: &FrameCase) -> Result<()> {
 
     render_preview_to_path(
         &runtime.app_paths,
-        &config,
+        &validated,
         &activity,
         &dense_activity,
         f64::from(case.second),
@@ -221,16 +233,23 @@ fn run_frame_case(case: &FrameCase) -> Result<()> {
 fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
     let runtime = prepare_case_runtime("transparent", &case.name)?;
     let activity = load_activity(&case.activity)?;
-    let mut config = load_config(&case.config)?;
-    config.scene.start = case.start_seconds;
-    config.scene.end = case.start_seconds + case.duration_seconds;
-    config.scene.ffmpeg = json!({ "codec": case.codec });
+    let mut config_value = load_mutable_config_value(&case.config)?;
+    set_scene_window(
+        &mut config_value,
+        case.start_seconds,
+        case.start_seconds + case.duration_seconds,
+    )?;
+    let scene = mutable_scene_value(&mut config_value)?;
+    scene.insert("ffmpeg".to_string(), json!({ "codec": case.codec }));
 
-    let dense_activity = build_dense_activity_report(&activity, &config)
+    let validated = validate_config_value(&config_value)
+        .context("failed to validate transparent config")?;
+    let scene = validated.scene.clone();
+    let dense_activity = build_dense_activity_report_validated(&activity, &validated)
         .context("failed to build dense activity for transparent case")?;
     let total_frames = rendered_frame_count(
         dense_activity.frame_count,
-        config.widget_update_rate() as usize,
+        validated.widget_update_rate() as usize,
     ) as u32;
     let controller = RenderController::default();
     controller
@@ -239,7 +258,7 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
 
     let filename = render_video(
         &runtime.app_paths,
-        &config,
+        &validated,
         &activity,
         &dense_activity,
         &controller,
@@ -252,9 +271,9 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
         .context("failed to probe transparent output")?;
     assert_video_metadata(
         &metadata,
-        config.scene.width.unwrap_or(1920),
-        config.scene.height.unwrap_or(1080),
-        config.container_fps().round() as u32,
+        scene.width,
+        scene.height,
+        validated.container_fps().round() as u32,
         1,
         &case.expected_codec_name,
         case.expected_pix_fmt.as_deref(),
@@ -301,22 +320,38 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
 
     // ── Phase 3: load fixtures and apply case-specific scene timing ──
     let activity = load_activity(&case.activity)?;
-    let mut config = load_config(&case.config)?;
-    config.scene.start = case.sync_offset;
-    config.scene.end = case.sync_offset + case.duration_seconds;
-    config.scene.ffmpeg = json!({ "codec": case.codec });
-    config.scene.composite_video_path = Some(source_video.to_string_lossy().to_string());
-    config.scene.composite_bitrate = Some(case.bitrate.clone());
-    config.scene.composite_sync_offset = Some(case.sync_offset);
-    config.scene.composite_video_fps_num = Some(source_fps_num);
-    config.scene.composite_video_fps_den = Some(source_fps_den);
-    config.scene.composite_video_duration = Some(source_duration);
-    config.scene.composite_render_duration = Some(case.duration_seconds);
-    config.scene.composite_video_trim_start = Some(case.trim_start_seconds);
-    config.scene.composite_widget_update_rate = Some(1);
+    let mut config_value = load_mutable_config_value(&case.config)?;
+    set_scene_window(
+        &mut config_value,
+        case.sync_offset,
+        case.sync_offset + case.duration_seconds,
+    )?;
+    let scene = mutable_scene_value(&mut config_value)?;
+    scene.insert("ffmpeg".to_string(), json!({ "codec": case.codec }));
+    scene.insert(
+        "composite_video_path".to_string(),
+        json!(source_video.to_string_lossy().to_string()),
+    );
+    scene.insert("composite_bitrate".to_string(), json!(case.bitrate.clone()));
+    scene.insert("composite_sync_offset".to_string(), json!(case.sync_offset));
+    scene.insert("composite_video_fps_num".to_string(), json!(source_fps_num));
+    scene.insert("composite_video_fps_den".to_string(), json!(source_fps_den));
+    scene.insert("composite_video_duration".to_string(), json!(source_duration));
+    scene.insert(
+        "composite_render_duration".to_string(),
+        json!(case.duration_seconds),
+    );
+    scene.insert(
+        "composite_video_trim_start".to_string(),
+        json!(case.trim_start_seconds),
+    );
+    scene.insert("composite_widget_update_rate".to_string(), json!(1));
 
     // ── Phase 4: build dense activity and prepare render controller ──
-    let dense_activity = build_dense_activity_report(&activity, &config)
+    let validated = validate_config_value(&config_value)
+        .context("failed to validate composite config")?;
+    let scene = validated.scene.clone();
+    let dense_activity = build_dense_activity_report_validated(&activity, &validated)
         .context("failed to build dense activity for composite case")?;
     let total_frames = (case.duration_seconds * f64::from(source_fps_num)
         / f64::from(source_fps_den))
@@ -330,16 +365,16 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     // ── Phase 5: dispatch composite render through public entry point ──
     let filename = render_composite_video(&CompositeRenderRequest {
         paths: &runtime.app_paths,
-        config: &config,
+        config: &validated,
         activity: &activity,
         dense_activity: &dense_activity,
         controller: &controller,
-        composite_video_path: config
+        composite_video_path: validated
             .scene
             .composite_video_path
             .as_deref()
             .ok_or_else(|| anyhow!("missing composite video path"))?,
-        composite_bitrate: config
+        composite_bitrate: validated
             .scene
             .composite_bitrate
             .as_deref()
@@ -348,9 +383,9 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
         composite_video_fps_num: source_fps_num,
         composite_video_fps_den: source_fps_den,
         composite_video_duration: source_duration,
-        composite_render_duration: Some(case.duration_seconds),
-        composite_video_trim_start: Some(case.trim_start_seconds),
-        composite_widget_update_rate: Some(1),
+        composite_render_duration: case.duration_seconds,
+        composite_video_trim_start: case.trim_start_seconds,
+        composite_widget_update_rate: 1,
     })
     .context("composite render failed")?;
     let output_path = runtime.app_paths.downloads_dir.join(filename);
@@ -366,8 +401,8 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     };
     assert_video_metadata(
         &output_metadata,
-        config.scene.width.unwrap_or(1920),
-        config.scene.height.unwrap_or(1080),
+        scene.width,
+        scene.height,
         source_fps_num,
         source_fps_den,
         &case.expected_codec_name,
@@ -448,23 +483,15 @@ fn prepare_case_runtime(kind: &str, case_name: &str) -> Result<CaseRuntime> {
     })
 }
 
-/// Loads a `RenderConfig` from the fixture tree or a real template file.
-///
-/// Plain config fixtures (the `RenderConfig` shape directly) are parsed as-is.
-/// Real template files (wrapping `{ "format": "ovrley-template", "config": {...} }`)
-/// have their `config` sub-object extracted first.
-fn load_config(relative_path: &str) -> Result<RenderConfig> {
+/// Loads a mutable config fixture value after materializing durable template
+/// globals back into `config.scene`.
+fn load_mutable_config_value(relative_path: &str) -> Result<Value> {
     let path = fixtures_root().join(relative_path);
     let json = fs::read_to_string(&path)
         .with_context(|| format!("failed to read config fixture {}", path.display()))?;
     let value: serde_json::Value = serde_json::from_str(&json)
         .with_context(|| format!("failed to parse JSON from {}", path.display()))?;
-    let config_str = match value.get("config") {
-        Some(config_obj) => serde_json::to_string(config_obj)
-            .context("failed to serialize extracted template config")?,
-        None => json,
-    };
-    parse_template_json(&config_str).context("failed to parse config")
+    materialize_template_config_value(&value).context("failed to materialize template config")
 }
 
 /// Loads a `ParsedActivity` from the fixture tree.
@@ -472,6 +499,43 @@ fn load_activity(relative_path: &str) -> Result<ParsedActivity> {
     let json = fs::read_to_string(fixtures_root().join(relative_path))
         .with_context(|| format!("failed to read activity fixture {relative_path}"))?;
     parse_activity_json(&json).context("failed to parse activity fixture")
+}
+
+fn set_scene_window(config_value: &mut Value, start: f64, end: f64) -> Result<()> {
+    let scene = mutable_scene_value(config_value)?;
+    scene.insert("start".to_string(), json!(start));
+    scene.insert("end".to_string(), json!(end));
+    Ok(())
+}
+
+fn mutable_scene_value(config_value: &mut Value) -> Result<&mut serde_json::Map<String, Value>> {
+    config_value
+        .get_mut("scene")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| anyhow!("config.scene must be an object"))
+}
+
+fn materialize_template_config_value(value: &Value) -> Result<Value> {
+    let mut config_value = value.get("config").cloned().unwrap_or_else(|| value.clone());
+    apply_template_global_defaults_to_scene(&mut config_value, value);
+    Ok(config_value)
+}
+
+fn apply_template_global_defaults_to_scene(config_value: &mut Value, template: &Value) {
+    let Some(globals) = template
+        .get("settings")
+        .and_then(|settings| settings.get("globalDefaults"))
+    else {
+        return;
+    };
+
+    if let Some(scene) = config_value.get_mut("scene").and_then(Value::as_object_mut) {
+        if let Some(globals_object) = globals.as_object() {
+            for (key, value) in globals_object {
+                scene.insert(key.clone(), value.clone());
+            }
+        }
+    }
 }
 
 /// Compares or records all selected frames for a rendered video output.

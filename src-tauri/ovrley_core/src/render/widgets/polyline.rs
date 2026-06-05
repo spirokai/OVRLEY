@@ -7,7 +7,7 @@
 //!       parsing (see [`crate::render::text::parse_color`]).
 //!
 //! Allowed dependencies: `skia_safe`, `super::transform`, `super::types`.
-//! Forbidden dependencies: `crate::config`, `crate::activity`,
+//! Forbidden dependencies: `crate::normalize`, `crate::activity`,
 //!       `crate::encode`, `crate::commands`.
 //!
 //! ## Performance

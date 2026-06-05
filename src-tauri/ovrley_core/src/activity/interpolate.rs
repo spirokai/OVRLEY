@@ -10,7 +10,7 @@ use super::schema::{
     CourseSeries, DenseActivityReport, DenseSeriesReport, NumericSeries, TimeSeries,
     TrimmedActivity,
 };
-use crate::config::RenderDataRequirements;
+use crate::normalize::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
 
 pub use crate::interpolation::{

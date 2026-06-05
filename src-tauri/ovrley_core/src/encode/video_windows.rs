@@ -5,8 +5,8 @@
 //! state. Production code uses these helpers to derive stable transparent and
 //! composite segment windows before the segmented orchestration layer runs.
 
-use crate::config::RenderConfig;
 use crate::encode::fps::Fps;
+use crate::normalize::ValidatedSceneConfig;
 
 /// Output-frame window range for one parallel composite segment.
 ///
@@ -76,12 +76,12 @@ pub fn composite_output_frame_windows(
 }
 
 /// Returns the scene duration when start and end are exact integer seconds.
-pub(crate) fn integer_second_duration(config: &RenderConfig) -> Option<u32> {
+pub(crate) fn integer_second_duration(scene: &ValidatedSceneConfig) -> Option<u32> {
     // Stitching expects clean second boundaries so duplicated or missing frames
     // are not introduced at segment joins.
-    let start = config.scene.start.round();
-    let end = config.scene.end.round();
-    if (config.scene.start - start).abs() > 1e-9 || (config.scene.end - end).abs() > 1e-9 {
+    let start = scene.start.round();
+    let end = scene.end.round();
+    if (scene.start - start).abs() > 1e-9 || (scene.end - end).abs() > 1e-9 {
         return None;
     }
     if end <= start {
@@ -92,14 +92,14 @@ pub(crate) fn integer_second_duration(config: &RenderConfig) -> Option<u32> {
 
 /// Splits an integer-second scene into balanced contiguous render windows.
 pub(crate) fn integer_second_windows(
-    config: &RenderConfig,
+    scene: &ValidatedSceneConfig,
     total_seconds: u32,
     segment_count: usize,
 ) -> Vec<(f64, f64)> {
     let actual_segment_count = segment_count.min(total_seconds as usize).max(1);
     let base_seconds = total_seconds / actual_segment_count as u32;
     let extra_segments = total_seconds % actual_segment_count as u32;
-    let mut cursor = config.scene.start.round();
+    let mut cursor = scene.start.round();
     let mut windows = Vec::with_capacity(actual_segment_count);
 
     for index in 0..actual_segment_count {

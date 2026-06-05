@@ -18,10 +18,10 @@ mod common;
 
 use anyhow::{Context, Result};
 use canvas_parity::{
-    generate_diff_png, parse_fixtures_with_config, render_skia_preview, run_playwright_screenshot,
-    run_ssim, test_app_paths, write_mock_data, ViteServer,
+    generate_diff_png, parse_fixtures_with_config, preview_window_config, render_skia_preview,
+    run_playwright_screenshot, run_ssim, test_app_paths, write_mock_data, ViteServer,
 };
-use ovrley_core::activity::build_dense_activity_report;
+use ovrley_core::activity::build_dense_activity_report_validated;
 use std::fs;
 use std::path::PathBuf;
 
@@ -65,7 +65,9 @@ fn canvas_parity() -> Result<()> {
     // 1. Parse fixtures
     println!("[1/9] Parsing fixtures...");
     let (activity, config, activity_raw, config_raw) =
-        parse_fixtures_with_config(&fixture_root, "test-template-1080p.json")?;
+        parse_fixtures_with_config(&fixture_root, "test-template-4k.json")?;
+    let (config, config_raw) =
+        preview_window_config(&config, &config_raw, &activity, SELECTED_SECOND)?;
     println!(
         "  activity: {} samples, {}s duration",
         activity.sample_elapsed_seconds.len(),
@@ -74,7 +76,7 @@ fn canvas_parity() -> Result<()> {
 
     // 2. Build dense activity report
     println!("[2/9] Building dense activity report...");
-    let dense_activity = build_dense_activity_report(&activity, &config)
+    let dense_activity = build_dense_activity_report_validated(&activity, &config)
         .context("build_dense_activity_report failed")?;
     println!("  dense frames: {}", dense_activity.frame_count);
 
@@ -157,6 +159,27 @@ fn canvas_parity() -> Result<()> {
     } else {
         0.0
     };
+    let translucent_premultiplied_rgb_pct =
+        if diff_stats.translucent_premultiplied_rgb_compared_pixels > 0 {
+            (diff_stats.translucent_premultiplied_rgb_mismatch_pixels as f64
+                / diff_stats.translucent_premultiplied_rgb_compared_pixels as f64)
+                * 100.0
+        } else {
+            0.0
+        };
+    let alpha_mask_iou = if diff_stats.alpha_mask_union_pixels > 0 {
+        diff_stats.alpha_mask_intersection_pixels as f64 / diff_stats.alpha_mask_union_pixels as f64
+    } else {
+        1.0
+    };
+    let alpha_mask_dice = if diff_stats.canvas_mask_pixels + diff_stats.skia_mask_pixels > 0 {
+        (2.0 * diff_stats.alpha_mask_intersection_pixels as f64)
+            / (diff_stats.canvas_mask_pixels + diff_stats.skia_mask_pixels) as f64
+    } else {
+        1.0
+    };
+    let edge_chamfer_mean_px = diff_stats.edge_chamfer_mean_distance_px;
+    let edge_chamfer_p95_px = diff_stats.edge_chamfer_p95_distance_px;
     let canvas_only_pct = if diff_stats.overlay_pixels > 0 {
         (diff_stats.canvas_only_pixels as f64 / diff_stats.overlay_pixels as f64) * 100.0
     } else {
@@ -188,6 +211,31 @@ fn canvas_parity() -> Result<()> {
     println!(
         "  THRESHOLD APPLIED ({} / {}) - {alpha_tolerant_pct:.2}%",
         diff_stats.overlay_significant_mismatch_pixels, diff_stats.overlay_pixels
+    );
+    println!(
+        "  PREMUL RGB (BOTH TRANSLUCENT) ({} / {}) - {translucent_premultiplied_rgb_pct:.2}%",
+        diff_stats.translucent_premultiplied_rgb_mismatch_pixels,
+        diff_stats.translucent_premultiplied_rgb_compared_pixels
+    );
+    println!(
+        "  ALPHA MASK IoU {:.4} (intersection {} / union {})",
+        alpha_mask_iou,
+        diff_stats.alpha_mask_intersection_pixels,
+        diff_stats.alpha_mask_union_pixels
+    );
+    println!(
+        "  ALPHA MASK Dice {:.4} (2 * {} / ({} + {}))",
+        alpha_mask_dice,
+        diff_stats.alpha_mask_intersection_pixels,
+        diff_stats.canvas_mask_pixels,
+        diff_stats.skia_mask_pixels
+    );
+    println!(
+        "  EDGE CHAMFER mean {:.3}px  p95 {:.3}px  (canvas edges {} -> skia, skia edges {} -> canvas)",
+        edge_chamfer_mean_px,
+        edge_chamfer_p95_px,
+        diff_stats.canvas_edge_pixels,
+        diff_stats.skia_edge_pixels
     );
     println!(
         "  CLEAN (AA EXCLUDED) ({} / {}; ignored {}) - {edge_insensitive_pct:.2}%",
@@ -231,6 +279,27 @@ fn canvas_parity() -> Result<()> {
                 "count": diff_stats.overlay_significant_mismatch_pixels,
                 "total": diff_stats.overlay_pixels,
                 "percent": format!("{:.2}", alpha_tolerant_pct),
+            },
+            "premultiplied_rgb_both_translucent": {
+                "mismatch": diff_stats.translucent_premultiplied_rgb_mismatch_pixels,
+                "compared": diff_stats.translucent_premultiplied_rgb_compared_pixels,
+                "percent": format!("{:.2}", translucent_premultiplied_rgb_pct),
+            },
+            "alpha_mask_overlap": {
+                "canvas": diff_stats.canvas_mask_pixels,
+                "skia": diff_stats.skia_mask_pixels,
+                "intersection": diff_stats.alpha_mask_intersection_pixels,
+                "union": diff_stats.alpha_mask_union_pixels,
+                "iou": format!("{:.4}", alpha_mask_iou),
+                "dice": format!("{:.4}", alpha_mask_dice),
+            },
+            "edge_chamfer_distance": {
+                "canvas_edge_pixels": diff_stats.canvas_edge_pixels,
+                "skia_edge_pixels": diff_stats.skia_edge_pixels,
+                "canvas_to_skia_mean_px": format!("{:.4}", diff_stats.canvas_to_skia_edge_mean_distance_px),
+                "skia_to_canvas_mean_px": format!("{:.4}", diff_stats.skia_to_canvas_edge_mean_distance_px),
+                "symmetric_mean_px": format!("{:.4}", edge_chamfer_mean_px),
+                "symmetric_p95_px": format!("{:.4}", edge_chamfer_p95_px),
             },
             "clean_aa_excluded": {
                 "mismatch": diff_stats.edge_insensitive_mismatch_pixels,

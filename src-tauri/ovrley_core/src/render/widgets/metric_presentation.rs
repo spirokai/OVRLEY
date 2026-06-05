@@ -17,7 +17,6 @@
 //! metric presentation system.
 
 use crate::activity::schema::DenseActivityReport;
-use crate::config::ValueConfig;
 use crate::debug::RenderProfiler;
 use crate::render::text::ResolvedTextStyle;
 use crate::render::widgets::heading::draw_heading_widget;
@@ -38,7 +37,8 @@ use std::collections::BTreeMap;
 #[allow(clippy::too_many_arguments)]
 pub fn draw_metric_presentation(
     canvas: &Canvas,
-    value: &ValueConfig,
+    metric_kind: MetricKind,
+    display_type: DisplayType,
     base_style: &ResolvedTextStyle,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
@@ -48,11 +48,11 @@ pub fn draw_metric_presentation(
     value_idx: usize,
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
-    match value.display_type {
+    match display_type {
         DisplayType::Text => None,
         DisplayType::Tape => draw_tape_presentation(
             canvas,
-            value,
+            metric_kind,
             base_style,
             dense_activity,
             frame_index,
@@ -73,7 +73,7 @@ pub fn draw_metric_presentation(
 #[allow(clippy::too_many_arguments)]
 fn draw_tape_presentation(
     canvas: &Canvas,
-    value: &ValueConfig,
+    metric_kind: MetricKind,
     _base_style: &ResolvedTextStyle,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
@@ -82,7 +82,7 @@ fn draw_tape_presentation(
     cache: Option<&PresentationCache>,
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
-    if value.value != MetricKind::Heading {
+    if metric_kind != MetricKind::Heading {
         return None;
     }
 

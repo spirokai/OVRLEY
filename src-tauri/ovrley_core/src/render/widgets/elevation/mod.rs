@@ -20,7 +20,7 @@ mod reduction;
 
 pub(crate) use draw::draw_elevation_widget;
 pub(crate) use prepare::prepare_elevation_cache;
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use reduction::{
     simplify_elevation_samples, simplify_elevation_samples_segment, ElevationSample,
 };

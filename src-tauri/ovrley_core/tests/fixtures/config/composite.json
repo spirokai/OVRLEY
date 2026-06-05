@@ -2,7 +2,13 @@
   "scene": {
     "width": 1920,
     "height": 1080,
-    "fps": 30
+    "fps": 30,
+    "start": 0,
+    "end": 10,
+    "composite_video_path": "test.mp4",
+    "composite_bitrate": "60M",
+    "composite_sync_offset": 300.0,
+    "composite_widget_update_rate": 2
   },
   "labels": [],
   "values": [

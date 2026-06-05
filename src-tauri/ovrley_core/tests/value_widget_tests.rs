@@ -79,16 +79,24 @@ fn stable_numeric_vertical_metrics_keep_baseline_constant() {
         .unwrap()
         .to_path_buf();
     let font_dirs = vec![workspace_root.join("fonts")];
-    let font = resolve_font(&font_dirs, Some("JetBrains Mono.ttf"), 90.0);
+    let font = resolve_font(&font_dirs, Some("JetBrains Mono.ttf"), 90.0).unwrap();
     let top = 100.0;
     let line_height = 90.0 * 0.92;
 
     let live_one = baseline_for_text_top_with_line_height("1", top, &font, line_height);
     let live_nine = baseline_for_text_top_with_line_height("9", top, &font, line_height);
-    let stable_one =
-        baseline_for_text_top_with_line_height(NUMERIC_VERTICAL_METRICS_TEXT, top, &font, line_height);
-    let stable_nine =
-        baseline_for_text_top_with_line_height(NUMERIC_VERTICAL_METRICS_TEXT, top, &font, line_height);
+    let stable_one = baseline_for_text_top_with_line_height(
+        NUMERIC_VERTICAL_METRICS_TEXT,
+        top,
+        &font,
+        line_height,
+    );
+    let stable_nine = baseline_for_text_top_with_line_height(
+        NUMERIC_VERTICAL_METRICS_TEXT,
+        top,
+        &font,
+        line_height,
+    );
 
     assert_ne!(
         live_one, live_nine,

@@ -2,21 +2,24 @@
 //!
 //! These tests guard the last-mile display contract between the React canvas
 //! preview and the Rust preview-PNG renderer. The underlying interpolated value
-//! may already match, but the final displayed metric still needs to follow the
-//! same rounding rules to avoid visible one-unit mismatches.
+//! may already match, final displayed metric still needs to follow the same
+//! rounding rules to avoid visible one-unit mismatches.
+
+mod common;
 
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
-use ovrley_core::config::parse_config_json;
-use ovrley_core::render::format::format_metric_parts;
+use serde_json::json;
 
-fn config_json(values_json: &str) -> ovrley_core::config::RenderConfig {
-    let input = format!(
-        r#"{{
-        "scene": {{"fps": 30, "start": 0, "end": 10}},
-        "values": {values_json}
-    }}"#
-    );
-    parse_config_json(&input).unwrap()
+const SPEED_VALUE: &str = r##"{"value":"speed","x":0,"y":0,"display_unit":"kmh","decimals":0,"show_units":true,"font":"Arial.ttf","font_size":32.0,"color":"#ffffff","opacity":1.0,"show_icon":true,"icon_color":"#40e0d0","icon_size":28.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"unit_color":"#ffffff","prefix":"","suffix":""}"##;
+const TORQUE_VALUE: &str = r##"{"value":"torque","x":0,"y":0,"display_unit":"nm","decimals":0,"show_units":true,"font":"Arial.ttf","font_size":32.0,"color":"#ffffff","opacity":1.0,"show_icon":true,"icon_color":"#40e0d0","icon_size":28.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"unit_color":"#ffffff","prefix":"","suffix":""}"##;
+
+fn config_json(values_json: &str) -> ovrley_core::normalize::ValidatedRenderConfig {
+    common::seam::validated_config_from_value(json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": serde_json::from_str::<serde_json::Value>(values_json).unwrap(),
+        "plots": []
+    }))
 }
 
 fn dense_with_speed_and_torque(speed: f64, torque: f64) -> DenseActivityReport {
@@ -55,16 +58,19 @@ fn dense_with_speed_and_torque(speed: f64, torque: f64) -> DenseActivityReport {
 
 #[test]
 fn zero_decimal_standard_metrics_round_like_canvas_preview() {
-    let config = config_json(
-        r#"[
-          {"value":"speed","x":0,"y":0,"display_unit":"kmh","decimals":0,"show_units":true},
-          {"value":"torque","x":0,"y":0,"display_unit":"nm","decimals":0,"show_units":true}
-        ]"#,
-    );
+    let config = config_json(&format!("[{}, {}]", SPEED_VALUE, TORQUE_VALUE));
     let dense = dense_with_speed_and_torque(8.5, 18.6);
 
-    let speed_parts = format_metric_parts(&config, &config.values[0], &dense, 0).unwrap();
-    let torque_parts = format_metric_parts(&config, &config.values[1], &dense, 0).unwrap();
+    let mut values = config.values.into_iter();
+    let speed_validated = common::seam::expect_standard_value(values.next().unwrap(), 0);
+    let torque_validated = common::seam::expect_standard_value(values.next().unwrap(), 1);
+
+    let speed_parts =
+        ovrley_core::render::format::format_validated_metric_parts(&speed_validated, &dense, 0)
+            .unwrap();
+    let torque_parts =
+        ovrley_core::render::format::format_validated_metric_parts(&torque_validated, &dense, 0)
+            .unwrap();
 
     assert_eq!(speed_parts.value_text, "31");
     assert_eq!(torque_parts.value_text, "19");

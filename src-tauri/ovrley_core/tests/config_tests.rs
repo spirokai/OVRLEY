@@ -1,50 +1,24 @@
-//! Configuration parsing and serialization tests.
+//! Configuration seam tests.
 //!
-//! Verifies `parse_config_json` for transparent and composite configs,
-//! default handling, composite-field serialization suppression, input
-//! validation, and serde round-trip idempotency.
-//!
-//! ## Fixtures
-//!
-//! - `test_config::simple_config_path()` — minimal valid transparent config.
-//! - `test_config::composite_config_path()` — valid composite config with
-//!   all render-time fields.
-//! - `fixtures/config/invalid.json` — deliberately malformed config for
-//!   error-reporting tests.
-//!
-//! ## Type
-//! Integration test. Reads fixture files from disk; does not require
-//! ffmpeg or video assets.
-//!
-//! ## Regressions guarded
-//! - Old transparent templates silently failing due to new composite fields
-//! - Composite render-time fields leaking into serialized output
-//! - Zero widget update rate accepted (division by zero)
-//! - Serde round-trip losing fields
-
-use ovrley_core::config::{
-    parse_config_json, parse_template_json, TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION,
-};
+//! These tests exercise the public validation seam rather than the raw config
+//! DTOs. Old parser-only tests that asserted backend defaults or fallback
+//! behavior were superseded once validation took full responsibility for config
+//! health.
 
 mod common;
 
+use ovrley_core::commands::{parse_and_validate_config, validate_template_contents};
+use ovrley_core::normalize::TEMPLATE_FILE_VERSION;
+use serde_json::json;
+
 #[test]
-// Verifies old transparent-render configs parse without composite fields.
-fn parses_transparent_config_without_composite_fields() {
-    let config = parse_config_json(
-        r#"{
-            "scene": {
-                "fps": 30,
-                "start": 0,
-                "end": 10,
-                "ffmpeg": {}
-            },
-            "labels": [],
-            "values": [],
-            "plots": []
-        }"#,
-    )
-    .unwrap();
+fn validated_transparent_config_preserves_absent_composite_fields() {
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [explicit_speed_value()],
+        "plots": []
+    }));
 
     assert_eq!(config.scene.composite_video_path, None);
     assert_eq!(config.scene.composite_bitrate, None);
@@ -58,108 +32,66 @@ fn parses_transparent_config_without_composite_fields() {
 }
 
 #[test]
-// Verifies all composite render-time fields deserialize into scene config.
-fn parses_config_with_all_composite_fields() {
-    let config = parse_config_json(
-        r#"{
-            "scene": {
-                "fps": 30,
-                "start": 0,
-                "end": 10,
-                "ffmpeg": {},
-                "composite_video_path": "test.mp4",
-                "composite_bitrate": "60M",
-                "composite_sync_offset": 300.0,
-                "composite_video_fps_num": 30000,
-                "composite_video_fps_den": 1001,
-                "composite_video_duration": 20.0,
-                "composite_render_duration": 10.0,
-                "composite_video_trim_start": 0.0,
-                "composite_widget_update_rate": 2
-            },
-            "labels": [],
-            "values": [],
-            "plots": []
-        }"#,
-    )
-    .unwrap();
+fn validated_composite_config_preserves_fields() {
+    let mut config = json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [explicit_speed_value()],
+        "plots": []
+    });
+    config["scene"]["composite_video_path"] = json!("test.mp4");
+    config["scene"]["composite_bitrate"] = json!("60M");
+    config["scene"]["composite_sync_offset"] = json!(300.0);
+    config["scene"]["composite_video_fps_num"] = json!(30000);
+    config["scene"]["composite_video_fps_den"] = json!(1001);
+    config["scene"]["composite_video_duration"] = json!(20.0);
+    config["scene"]["composite_render_duration"] = json!(10.0);
+    config["scene"]["composite_video_trim_start"] = json!(0.0);
+    config["scene"]["composite_widget_update_rate"] = json!(2);
 
+    let validated = common::seam::validated_config_from_value(config);
     assert_eq!(
-        config.scene.composite_video_path.as_deref(),
+        validated.scene.composite_video_path.as_deref(),
         Some("test.mp4")
     );
-    assert_eq!(config.scene.composite_bitrate.as_deref(), Some("60M"));
-    assert_eq!(config.scene.composite_sync_offset, Some(300.0));
-    assert_eq!(config.scene.composite_video_fps_num, Some(30000));
-    assert_eq!(config.scene.composite_video_fps_den, Some(1001));
-    assert_eq!(config.scene.composite_video_duration, Some(20.0));
-    assert_eq!(config.scene.composite_render_duration, Some(10.0));
-    assert_eq!(config.scene.composite_video_trim_start, Some(0.0));
-    assert_eq!(config.scene.composite_widget_update_rate, Some(2));
+    assert_eq!(validated.scene.composite_bitrate.as_deref(), Some("60M"));
+    assert_eq!(validated.scene.composite_sync_offset, Some(300.0));
+    assert_eq!(validated.scene.composite_video_fps_num, Some(30000));
+    assert_eq!(validated.scene.composite_video_fps_den, Some(1001));
+    assert_eq!(validated.scene.composite_video_duration, Some(20.0));
+    assert_eq!(validated.scene.composite_render_duration, Some(10.0));
+    assert_eq!(validated.scene.composite_video_trim_start, Some(0.0));
+    assert_eq!(validated.scene.composite_widget_update_rate, Some(2));
 }
 
 #[test]
-// Verifies composite render-time fields are not emitted by Rust serialization.
-fn skips_composite_fields_when_serializing_scene() {
-    let config = parse_config_json(
-        r#"{
-            "scene": {
-                "fps": 30,
-                "start": 0,
-                "end": 10,
-                "ffmpeg": {},
-                "composite_video_path": "test.mp4",
-                "composite_bitrate": "60M",
-                "composite_sync_offset": 300.0,
-                "composite_video_fps_num": 30000,
-                "composite_video_fps_den": 1001,
-                "composite_video_duration": 20.0,
-                "composite_render_duration": 10.0,
-                "composite_video_trim_start": 0.0,
-                "composite_widget_update_rate": 2
-            },
-            "labels": [],
-            "values": [],
-            "plots": []
-        }"#,
-    )
-    .unwrap();
-
-    let serialized = serde_json::to_value(&config).unwrap();
-    let scene = serialized.get("scene").unwrap();
-    for key in [
-        "composite_video_path",
-        "composite_bitrate",
-        "composite_sync_offset",
-        "composite_video_fps_num",
-        "composite_video_fps_den",
-        "composite_video_duration",
-        "composite_render_duration",
-        "composite_video_trim_start",
-        "composite_widget_update_rate",
-    ] {
-        assert_eq!(scene.get(key), None, "{key} should not serialize");
-    }
-}
-
-#[test]
-// Verifies composite overlay update-rate validation prevents division by zero.
 fn rejects_zero_composite_widget_update_rate() {
-    let error = parse_config_json(
-        r#"{
+    let error = parse_and_validate_config(
+        r##"{
             "scene": {
                 "fps": 30,
                 "start": 0,
                 "end": 10,
+                "width": 1920,
+                "height": 1080,
+                "scale": 1.0,
+                "shadow_color": "#000000",
+                "shadow_strength": 0.0,
+                "shadow_distance": 0.0,
+                "border_color": "#000000",
+                "border_thickness": 0.0,
+                "update_rate": 1,
+                "custom_export_range_active": false,
                 "ffmpeg": {},
                 "composite_widget_update_rate": 0
             },
             "labels": [],
             "values": [],
             "plots": []
-        }"#,
+        }"##,
     )
-    .unwrap_err();
+    .err()
+    .unwrap();
 
     let error_msg = error.to_string();
     assert!(
@@ -168,32 +100,28 @@ fn rejects_zero_composite_widget_update_rate() {
     );
 }
 
-// --- Snapshot / golden tests (Step 11a) ---
-
 #[test]
-fn valid_minimal_config_fills_defaults() {
+fn legacy_simple_fixture_is_rejected_by_validation_seam() {
     let json = std::fs::read_to_string(common::test_config::simple_config_path()).unwrap();
-    let config = parse_config_json(&json).unwrap();
-
-    assert_eq!(config.scene.fps, 30.0);
-    assert_eq!(config.scene.width, Some(1920));
-    assert_eq!(config.scene.height, Some(1080));
-    assert_eq!(config.scene.composite_video_path, None);
-    assert_eq!(config.values.len(), 1);
+    let error = parse_and_validate_config(&json).err().unwrap();
+    assert!(
+        error.to_string().contains("scene.shadow_color")
+            || error.to_string().contains("scene.scale")
+            || error.to_string().contains("scene.update_rate"),
+        "got: '{error}'"
+    );
 }
 
 #[test]
-fn valid_composite_config_preserves_fields() {
+fn legacy_composite_fixture_is_rejected_by_validation_seam() {
     let json = std::fs::read_to_string(common::test_config::composite_config_path()).unwrap();
-    let config = parse_config_json(&json).unwrap();
-
-    assert_eq!(
-        config.scene.composite_video_path.as_deref(),
-        Some("test.mp4")
+    let error = parse_and_validate_config(&json).err().unwrap();
+    assert!(
+        error.to_string().contains("scene.shadow_color")
+            || error.to_string().contains("scene.scale")
+            || error.to_string().contains("scene.update_rate"),
+        "got: '{error}'"
     );
-    assert_eq!(config.scene.composite_bitrate.as_deref(), Some("60M"));
-    assert_eq!(config.scene.composite_sync_offset, Some(300.0));
-    assert_eq!(config.scene.composite_widget_update_rate, Some(2));
 }
 
 #[test]
@@ -204,60 +132,55 @@ fn invalid_json_reports_error() {
             .join("invalid.json"),
     )
     .unwrap();
-    let error = parse_config_json(&json).unwrap_err();
+    let error = parse_and_validate_config(&json).err().unwrap();
     assert!(!error.to_string().is_empty());
 }
 
 #[test]
-fn config_roundtrip_is_idempotent() {
-    let json = std::fs::read_to_string(common::test_config::simple_config_path()).unwrap();
-    let config1 = parse_config_json(&json).unwrap();
-    let serialized = serde_json::to_string(&config1).unwrap();
-    let config2 = parse_config_json(&serialized).unwrap();
-    assert_eq!(config1.scene.fps, config2.scene.fps);
-    assert_eq!(config1.scene.width, config2.scene.width);
-    assert_eq!(config1.scene.height, config2.scene.height);
-}
+fn validated_standard_metric_display_unit_survives_seam() {
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [{
+            "value": "speed",
+            "x": 0,
+            "y": 0,
+            "font": "Arial.ttf",
+            "font_size": 32.0,
+            "color": "#ffffff",
+            "opacity": 1.0,
+            "show_icon": true,
+            "icon_color": "#ffffff",
+            "icon_size": 45.0,
+            "icon_offset_x": 0.0,
+            "icon_offset_y": 0.0,
+            "show_units": true,
+            "unit_color": "#ffffff",
+            "display_unit": "mph",
+            "prefix": "",
+            "suffix": "",
+            "decimals": 0,
+            "triangle_width": 0.0,
+            "display_type": "text"
+        }],
+        "plots": []
+    }));
 
-#[test]
-fn parses_standard_metric_display_unit_from_config_json() {
-    let config = parse_config_json(
-        r#"{
-            "scene": {
-                "fps": 30,
-                "start": 0,
-                "end": 10,
-                "ffmpeg": {}
-            },
-            "labels": [],
-            "values": [
-                {
-                    "value": "speed",
-                    "x": 0,
-                    "y": 0,
-                    "display_unit": "mph"
-                }
-            ],
-            "plots": []
-        }"#,
-    )
-    .unwrap();
-
-    assert_eq!(config.values[0].display_unit.as_deref(), Some("mph"));
+    let value = common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
+    assert_eq!(value.display_unit, "mph");
 }
 
 #[test]
 fn rejects_older_template_versions_explicitly() {
-    let error = parse_template_json(&format!(
+    let error = validate_template_contents(&format!(
         r#"{{
-            "format": "{TEMPLATE_FILE_FORMAT}",
+            "format": "ovrley-template",
             "version": {},
             "config": {{
                 "scene": {{
                     "fps": 30,
                     "start": 0,
-                    "end": 10,
-                    "ffmpeg": {{}}
+                    "end": 10
                 }},
                 "labels": [],
                 "values": [],
@@ -276,4 +199,29 @@ fn rejects_older_template_versions_explicitly() {
         )),
         "got: '{error}'"
     );
+}
+
+fn explicit_speed_value() -> serde_json::Value {
+    json!({
+        "value": "speed",
+        "x": 0,
+        "y": 0,
+        "font": "Arial.ttf",
+        "font_size": 32.0,
+        "color": "#ffffff",
+        "opacity": 1.0,
+        "show_icon": true,
+        "icon_color": "#ffffff",
+        "icon_size": 45.0,
+        "icon_offset_x": 0.0,
+        "icon_offset_y": 0.0,
+        "show_units": true,
+        "unit_color": "#ffffff",
+        "display_unit": "kmh",
+        "prefix": "",
+        "suffix": "",
+        "decimals": 0,
+        "triangle_width": 0.0,
+        "display_type": "text"
+    })
 }

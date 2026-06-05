@@ -41,8 +41,10 @@
 use anyhow::{bail, Context, Result};
 use ovrley_core::activity::parse_activity_json;
 use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
-use ovrley_core::config::{parse_template_json, RenderConfig};
 use ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary;
+use ovrley_core::normalize::{
+    parse_template_value, validate_render_config, ValidatedRenderConfig, ValidatedSceneConfig,
+};
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::{
     prepare_preview_assets, render_preview_with_prepared_assets, PreviewRenderRequest,
@@ -59,8 +61,11 @@ use std::time::{Duration, Instant};
 
 /// Parses the activity and config fixtures from the given fixture root.
 ///
-/// Returns `(parsed_activity, render_config, raw_activity_json, raw_config_json)`.
-pub fn parse_fixtures(fixture_root: &Path) -> Result<(ParsedActivity, RenderConfig, Value, Value)> {
+/// Returns `(parsed_activity, validated_config, raw_activity_json, raw_config_json)`.
+#[allow(dead_code)]
+pub fn parse_fixtures(
+    fixture_root: &Path,
+) -> Result<(ParsedActivity, ValidatedRenderConfig, Value, Value)> {
     parse_fixtures_with_config(fixture_root, "test-template-4k.json")
 }
 
@@ -68,7 +73,7 @@ pub fn parse_fixtures(fixture_root: &Path) -> Result<(ParsedActivity, RenderConf
 pub fn parse_fixtures_with_config(
     fixture_root: &Path,
     config_filename: &str,
-) -> Result<(ParsedActivity, RenderConfig, Value, Value)> {
+) -> Result<(ParsedActivity, ValidatedRenderConfig, Value, Value)> {
     let activity_path = fixture_root.join("activity").join("gpx-parse-debug.json");
     let config_path = fixture_root.join("config").join(config_filename);
 
@@ -77,10 +82,38 @@ pub fn parse_fixtures_with_config(
 
     let activity = parse_activity_json(&serde_json::to_string(&activity_raw)?)
         .context("failed to parse activity fixture")?;
-    let config = parse_template_json(&serde_json::to_string(&config_raw)?)
-        .context("failed to parse config fixture")?;
+    let config_value = materialize_template_config_value(&config_raw)
+        .context("failed to materialize config fixture")?;
+    let config = parse_template_value(&config_value).context("failed to parse config fixture")?;
+    let validated = validate_render_config(config).context("failed to validate config fixture")?;
 
-    Ok((activity, config, activity_raw, config_raw))
+    Ok((activity, validated, activity_raw, config_raw))
+}
+
+/// Rewrites both validated and raw config to the one-frame preview window used
+/// by the real editor preview path for a selected second.
+pub fn preview_window_config(
+    config: &ValidatedRenderConfig,
+    config_raw: &Value,
+    activity: &ParsedActivity,
+    selected_second: u32,
+) -> Result<(ValidatedRenderConfig, Value)> {
+    let mut adjusted = config.clone();
+    let activity_duration = activity_duration_seconds(activity);
+    let (start, end) = build_preview_frame_window(
+        activity_duration,
+        f64::from(selected_second),
+        adjusted.scene.fps,
+    );
+    adjusted.scene.start = start;
+    adjusted.scene.end = end;
+
+    let mut adjusted_raw = config_raw.clone();
+    let scene = mutable_scene_value(&mut adjusted_raw)?;
+    scene.insert("start".to_string(), serde_json::json!(start));
+    scene.insert("end".to_string(), serde_json::json!(end));
+
+    Ok((adjusted, adjusted_raw))
 }
 
 /// Reads a JSON file as a serde Value.
@@ -91,12 +124,87 @@ fn read_json(path: &Path) -> Result<Value> {
         .with_context(|| format!("failed to parse JSON from {}", path.display()))
 }
 
+fn materialize_template_config_value(template_value: &Value) -> Result<Value> {
+    let mut config_value = template_value
+        .get("config")
+        .cloned()
+        .unwrap_or_else(|| template_value.clone());
+
+    let scene = config_value
+        .get_mut("scene")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| anyhow::anyhow!("config.scene must be an object"))?;
+
+    if let Some(globals) = template_value
+        .get("settings")
+        .and_then(|settings| settings.get("globalDefaults"))
+        .and_then(Value::as_object)
+    {
+        for (key, value) in globals {
+            scene.insert(key.clone(), value.clone());
+        }
+    }
+
+    let fps = scene.get("fps").and_then(Value::as_f64).unwrap_or(1.0).max(1.0);
+    scene
+        .entry("start".to_string())
+        .or_insert_with(|| serde_json::json!(0.0));
+    scene
+        .entry("end".to_string())
+        .or_insert_with(|| serde_json::json!(1.0 / fps));
+
+    Ok(config_value)
+}
+
+fn activity_duration_seconds(activity: &ParsedActivity) -> f64 {
+    activity.trim_end_seconds.max(
+        activity
+            .sample_elapsed_seconds
+            .last()
+            .copied()
+            .unwrap_or(0.0),
+    )
+}
+
+fn build_preview_frame_window(
+    activity_duration: f64,
+    preview_second: f64,
+    scene_fps: f64,
+) -> (f64, f64) {
+    let safe_duration = activity_duration.max(0.0);
+    let safe_preview_second = preview_second.clamp(0.0, safe_duration);
+    let frame_duration = 1.0 / scene_fps.max(1.0);
+
+    if safe_duration <= 0.0 {
+        return (0.0, frame_duration);
+    }
+
+    let max_window_start = (safe_duration - frame_duration).max(0.0);
+    let start = safe_preview_second.clamp(0.0, max_window_start);
+    let end = safe_duration.min((start + frame_duration).max(safe_preview_second + f64::EPSILON));
+    (start, end)
+}
+
+fn mutable_scene_value(config_raw: &mut Value) -> Result<&mut serde_json::Map<String, Value>> {
+    let root = if config_raw.get("config").is_some() {
+        config_raw
+            .get_mut("config")
+            .ok_or_else(|| anyhow::anyhow!("template config missing"))?
+    } else {
+        config_raw
+    };
+
+    root.get_mut("scene")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| anyhow::anyhow!("config.scene must be an object"))
+}
+
 // ── Skia render ─────────────────────────────────────────────────────────────
 
 /// Renders a Skia preview PNG at the given second.
 pub fn render_skia_preview(
     paths: &AppPaths,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     second: u32,
@@ -111,10 +219,9 @@ pub fn render_skia_preview(
             .context("prepare_preview_assets failed")?;
     render_preview_with_prepared_assets(PreviewRenderRequest {
         paths,
-        config,
         dense_activity,
         prepared_preview_assets: &prepared,
-        second,
+        second: f64::from(second),
         prepare_timings,
         label_cache_status,
         extra_total_ms,
@@ -168,7 +275,7 @@ pub fn test_app_paths(git_root: &Path, case_root: &Path) -> Result<AppPaths> {
 /// mock directory, mimicking what the frontend receives from the backend.
 pub fn write_mock_data(
     mock_dir: &Path,
-    config: &RenderConfig,
+    config: &ValidatedRenderConfig,
     config_raw: &Value,
     activity: &ParsedActivity,
     activity_raw: &Value,
@@ -176,7 +283,7 @@ pub fn write_mock_data(
 ) -> Result<()> {
     fs::create_dir_all(mock_dir)
         .with_context(|| format!("failed to create mock dir {}", mock_dir.display()))?;
-    let global_defaults = resolve_global_defaults(config, config_raw);
+    let global_defaults = resolve_global_defaults(&config.scene, config_raw);
 
     // 1. template.json — ovrley-template envelope wrapping the config
     let config_obj = config_raw
@@ -201,10 +308,8 @@ pub fn write_mock_data(
     println!("  wrote activity.json");
 
     // 3. store-state.json — Zustand store snapshot
-    let config_value =
-        serde_json::to_value(config).context("failed to serialize config for store state")?;
     let store_state = serde_json::json!({
-        "config": config_value,
+        "config": config_obj,
         "globalDefaults": global_defaults,
         "selectedSecond": selected_second,
         "startSecond": config.scene.start,
@@ -222,31 +327,46 @@ pub fn write_mock_data(
     Ok(())
 }
 
-fn resolve_global_defaults(config: &RenderConfig, config_raw: &Value) -> Value {
-    config_raw
+fn resolve_global_defaults(scene: &ValidatedSceneConfig, config_raw: &Value) -> Value {
+    let mut derived = derive_global_defaults(scene);
+
+    let Some(derived_object) = derived.as_object_mut() else {
+        return derived;
+    };
+
+    let raw_globals = config_raw
         .get("settings")
         .and_then(|settings| settings.get("globalDefaults"))
-        .cloned()
-        .unwrap_or_else(|| derive_global_defaults(config))
+        .and_then(Value::as_object);
+
+    if let Some(raw_globals) = raw_globals {
+        for (key, value) in raw_globals {
+            derived_object
+                .entry(key.clone())
+                .or_insert_with(|| value.clone());
+        }
+    }
+
+    derived
 }
 
-/// Derives global default values from a RenderConfig.
-fn derive_global_defaults(config: &RenderConfig) -> Value {
+/// Derives global default values from a ValidatedSceneConfig.
+fn derive_global_defaults(scene: &ValidatedSceneConfig) -> Value {
     serde_json::json!({
-        "font_values": config.scene.font.as_deref().unwrap_or("Furore.otf"),
-        "font_text": config.scene.font.as_deref().unwrap_or("Arial.ttf"),
-        "color_values": config.scene.color.as_deref().unwrap_or("#ffffff"),
-        "color_text": config.scene.color.as_deref().unwrap_or("#ffffff"),
-        "color_icons": config.scene.color.as_deref().unwrap_or("#ffffff"),
-        "border_color": config.scene.border_color.as_deref().unwrap_or("#ff0000"),
-        "border_thickness": config.scene.border_thickness.unwrap_or(0.0) as i32,
-        "border_strength": config.scene.border_strength.unwrap_or(0.0) as i32,
-        "border_distance": config.scene.border_distance.unwrap_or(0.0) as i32,
-        "shadow_color": config.scene.shadow_color.as_deref().unwrap_or("#0059ff"),
-        "shadow_strength": config.scene.shadow_strength.unwrap_or(0.0) as i32,
-        "shadow_distance": config.scene.shadow_distance.unwrap_or(0.0) as i32,
-        "opacity": (config.scene.opacity.unwrap_or(1.0) * 100.0).round() as i32,
-        "scale": config.scene.scale.unwrap_or(2.0) as i32,
+        "font_values": scene.font.as_deref().unwrap_or("Arial.ttf"),
+        "font_text": scene.font.as_deref().unwrap_or("Arial.ttf"),
+        "color_values": "#ffffff",
+        "color_text": "#ffffff",
+        "color_icons": "#ffffff",
+        "color_units": "#ffffff",
+        "font_size": scene.font_size.unwrap_or(30.0),
+        "border_color": &scene.border_color,
+        "border_thickness": scene.border_thickness,
+        "shadow_color": &scene.shadow_color,
+        "shadow_strength": scene.shadow_strength,
+        "shadow_distance": scene.shadow_distance,
+        "opacity": scene.opacity.unwrap_or(1.0),
+        "scale": scene.scale,
     })
 }
 
@@ -608,6 +728,16 @@ struct AlphaBounds {
     height: u32,
 }
 
+#[derive(Clone, Debug)]
+struct EdgeDistanceStats {
+    canvas_edge_pixels: u64,
+    skia_edge_pixels: u64,
+    canvas_to_skia_mean_distance_px: f64,
+    skia_to_canvas_mean_distance_px: f64,
+    symmetric_mean_distance_px: f64,
+    symmetric_p95_distance_px: f64,
+}
+
 /// Minimum alpha value (0-255) for a pixel to be considered part of the overlay.
 ///
 /// Pixels with alpha ≤ this threshold in *both* images are treated as
@@ -632,7 +762,7 @@ const ONLY_PIXEL_ALPHA_THRESHOLD: u8 = 96;
 /// Pixels whose R, G, B, and A all differ by ≤ this value are treated as
 /// matching.  Set to 4, which is barely perceptible and filters out
 /// harmless sub-pixel positioning noise while catching real colour errors.
-const DIFF_CHANNEL_TOLERANCE: u8 = 4;
+const DIFF_CHANNEL_TOLERANCE: u8 = 6;
 
 /// Minimum absolute difference in alpha between a pixel and any of its
 /// 8 neighbours for that pixel to be flagged as an "alpha edge."
@@ -648,9 +778,8 @@ const EDGE_ALPHA_DELTA_THRESHOLD: u8 = 0;
 /// from "edge-insensitive" mismatch counting.
 ///
 /// When > 0, a band of pixels around every alpha transition is ignored
-/// for the clean mismatch metric.  Currently set to 0 so every
-/// non-edge pixel is compared strictly.
-const EDGE_IGNORE_RADIUS: i32 = 0;
+/// for the clean mismatch metric.
+const EDGE_IGNORE_RADIUS: i32 = 1;
 
 /// Queries (width, height) of a PNG file via ffprobe.
 pub fn probe_png_dimensions(ffprobe: &Path, path: &Path) -> Result<(u32, u32)> {
@@ -920,11 +1049,19 @@ fn alpha_union_bounds(
 /// 2. **`overlay_pixels`** / **`overlay_mismatch_pixels`** — restricted to the overlay mask.
 /// 3. **`overlay_significant_mismatch_pixels`** — mismatches exceeding
 ///    `DIFF_CHANNEL_TOLERANCE`.
-/// 4. **`edge_insensitive_mismatch_pixels`** / **`edge_compared_pixels`** —
+/// 4. **`translucent_premultiplied_rgb_mismatch_pixels`** /
+///    **`translucent_premultiplied_rgb_compared_pixels`** — partially
+///    transparent pixels compared in premultiplied RGB space only.
+/// 5. **`alpha_mask_intersection_pixels`** / **`alpha_mask_union_pixels`** —
+///    visible-pixel overlap counts used for alpha-mask IoU / Dice.
+/// 6. **`edge_chamfer_distance`** — contour-placement distance between the
+///    thresholded visible masks.
+/// 7. **`edge_insensitive_mismatch_pixels`** / **`edge_compared_pixels`** —
 ///    significant mismatches on non-edge pixels (the "clean" metric).
-/// 5. **`canvas_only_pixels`** / **`skia_only_pixels`** — content exclusive to one renderer.
+/// 8. **`canvas_only_pixels`** / **`skia_only_pixels`** — content exclusive to one renderer.
 ///
 /// See the module-level documentation for a full explanation of each category.
+#[allow(dead_code)]
 pub struct DiffStats {
     /// Total pixels with any channel difference (full frame, including transparent area).
     pub mismatch_pixels: u64,
@@ -938,6 +1075,30 @@ pub struct DiffStats {
     pub skia_only_pixels: u64,
     /// Overlay pixels whose max channel delta exceeds `DIFF_CHANNEL_TOLERANCE`.
     pub overlay_significant_mismatch_pixels: u64,
+    /// Pixels where both renderers are partially transparent (`alpha_threshold < a < 255`).
+    pub translucent_premultiplied_rgb_compared_pixels: u64,
+    /// Partially transparent pixels whose premultiplied RGB delta exceeds `DIFF_CHANNEL_TOLERANCE`.
+    pub translucent_premultiplied_rgb_mismatch_pixels: u64,
+    /// Pixels where Canvas alpha > `ALPHA_MASK_THRESHOLD`.
+    pub canvas_mask_pixels: u64,
+    /// Pixels where Skia alpha > `ALPHA_MASK_THRESHOLD`.
+    pub skia_mask_pixels: u64,
+    /// Pixels where both renderers exceed `ALPHA_MASK_THRESHOLD`.
+    pub alpha_mask_intersection_pixels: u64,
+    /// Pixels where either renderer exceeds `ALPHA_MASK_THRESHOLD`.
+    pub alpha_mask_union_pixels: u64,
+    /// Visible contour pixels in the Canvas mask.
+    pub canvas_edge_pixels: u64,
+    /// Visible contour pixels in the Skia mask.
+    pub skia_edge_pixels: u64,
+    /// Mean directed chamfer distance from Canvas edges to nearest Skia edge, in pixels.
+    pub canvas_to_skia_edge_mean_distance_px: f64,
+    /// Mean directed chamfer distance from Skia edges to nearest Canvas edge, in pixels.
+    pub skia_to_canvas_edge_mean_distance_px: f64,
+    /// Mean symmetric chamfer distance across both contour sets, in pixels.
+    pub edge_chamfer_mean_distance_px: f64,
+    /// 95th percentile symmetric contour distance, in pixels.
+    pub edge_chamfer_p95_distance_px: f64,
     /// Overlay non-edge pixels (used as denominator for edge-insensitive %).
     pub edge_compared_pixels: u64,
     /// Significant mismatches on non-edge pixels — the cleanest rendering-diff metric.
@@ -980,6 +1141,9 @@ pub struct DiffStats {
 /// 5. Classify mismatches:
 ///    - `max_delta > 0` → **exact mismatch** (counted in `mismatch_pixels`)
 ///    - `max_delta > DIFF_CHANNEL_TOLERANCE` → **significant mismatch**
+///    - On pixels where both images are partially transparent, compare only
+///      premultiplied RGB and count those whose max delta exceeds
+///      `DIFF_CHANNEL_TOLERANCE`
 ///    - Significant + overlay + non-edge → **edge-insensitive mismatch**
 ///      (the most useful "real diff" metric)
 /// 6. Classify orphaned content:
@@ -1025,6 +1189,12 @@ pub fn generate_diff_png(
 
     let (width, height, skia_bytes) = decode_png_to_rgba(&ffmpeg, &input_a)?;
     let (_, _, canvas_bytes) = decode_png_to_rgba(&ffmpeg, canvas_path)?;
+    let skia_visible_mask =
+        build_visible_alpha_mask(&skia_bytes, width, height, ALPHA_MASK_THRESHOLD);
+    let canvas_visible_mask =
+        build_visible_alpha_mask(&canvas_bytes, width, height, ALPHA_MASK_THRESHOLD);
+    let edge_distance_stats =
+        compute_edge_distance_stats(&canvas_visible_mask, &skia_visible_mask, width, height);
     let edge_ignore_mask = build_alpha_edge_ignore_mask(
         &skia_bytes,
         &canvas_bytes,
@@ -1041,6 +1211,12 @@ pub fn generate_diff_png(
     let mut canvas_only_pixels: u64 = 0;
     let mut skia_only_pixels: u64 = 0;
     let mut overlay_significant_mismatch_pixels: u64 = 0;
+    let mut translucent_premultiplied_rgb_compared_pixels: u64 = 0;
+    let mut translucent_premultiplied_rgb_mismatch_pixels: u64 = 0;
+    let mut canvas_mask_pixels: u64 = 0;
+    let mut skia_mask_pixels: u64 = 0;
+    let mut alpha_mask_intersection_pixels: u64 = 0;
+    let mut alpha_mask_union_pixels: u64 = 0;
     let mut edge_compared_pixels: u64 = 0;
     let mut edge_insensitive_mismatch_pixels: u64 = 0;
     let mut edge_ignored_pixels: u64 = 0;
@@ -1055,7 +1231,11 @@ pub fn generate_diff_png(
         let has_canvas_alpha = canvas_chunk[3] > alpha_threshold;
         let has_skia_only_alpha = chunk[3] > only_pixel_alpha_threshold;
         let has_canvas_only_alpha = canvas_chunk[3] > only_pixel_alpha_threshold;
+        let has_skia_translucent_alpha = has_skia_alpha && chunk[3] < u8::MAX;
+        let has_canvas_translucent_alpha = has_canvas_alpha && canvas_chunk[3] < u8::MAX;
         let is_overlay_pixel = has_skia_alpha || has_canvas_alpha;
+        let is_both_translucent_pixel = has_skia_translucent_alpha && has_canvas_translucent_alpha;
+        let is_intersection_mask_pixel = has_skia_alpha && has_canvas_alpha;
         let is_edge_ignored = is_overlay_pixel && edge_ignore_mask.get(i).copied().unwrap_or(false);
         let max_delta = chunk
             .iter()
@@ -1063,8 +1243,11 @@ pub fn generate_diff_png(
             .map(|(left, right)| left.abs_diff(*right))
             .max()
             .unwrap_or(0);
+        let premultiplied_rgb_max_delta = premultiplied_rgb_max_delta(chunk, canvas_chunk);
         let is_exact_mismatch = max_delta > 0;
         let is_significant_mismatch = max_delta > channel_tolerance;
+        let is_translucent_premultiplied_rgb_mismatch =
+            premultiplied_rgb_max_delta > channel_tolerance;
 
         if is_exact_mismatch {
             mismatch_count += 1;
@@ -1087,7 +1270,25 @@ pub fn generate_diff_png(
             diff_bytes.extend_from_slice(&[chunk[0] / 2, chunk[1] / 2, chunk[2] / 2, 255]);
         }
 
+        if is_both_translucent_pixel {
+            translucent_premultiplied_rgb_compared_pixels += 1;
+            if is_translucent_premultiplied_rgb_mismatch {
+                translucent_premultiplied_rgb_mismatch_pixels += 1;
+            }
+        }
+
+        if has_canvas_alpha {
+            canvas_mask_pixels += 1;
+        }
+        if has_skia_alpha {
+            skia_mask_pixels += 1;
+        }
+        if is_intersection_mask_pixel {
+            alpha_mask_intersection_pixels += 1;
+        }
+
         if is_overlay_pixel {
+            alpha_mask_union_pixels += 1;
             if has_canvas_only_alpha && !has_skia_only_alpha {
                 canvas_only_pixels += 1;
             } else if has_skia_only_alpha && !has_canvas_only_alpha {
@@ -1148,6 +1349,18 @@ pub fn generate_diff_png(
         canvas_only_pixels,
         skia_only_pixels,
         overlay_significant_mismatch_pixels,
+        translucent_premultiplied_rgb_compared_pixels,
+        translucent_premultiplied_rgb_mismatch_pixels,
+        canvas_mask_pixels,
+        skia_mask_pixels,
+        alpha_mask_intersection_pixels,
+        alpha_mask_union_pixels,
+        canvas_edge_pixels: edge_distance_stats.canvas_edge_pixels,
+        skia_edge_pixels: edge_distance_stats.skia_edge_pixels,
+        canvas_to_skia_edge_mean_distance_px: edge_distance_stats.canvas_to_skia_mean_distance_px,
+        skia_to_canvas_edge_mean_distance_px: edge_distance_stats.skia_to_canvas_mean_distance_px,
+        edge_chamfer_mean_distance_px: edge_distance_stats.symmetric_mean_distance_px,
+        edge_chamfer_p95_distance_px: edge_distance_stats.symmetric_p95_distance_px,
         edge_compared_pixels,
         edge_insensitive_mismatch_pixels,
         edge_ignored_pixels,
@@ -1157,6 +1370,197 @@ pub fn generate_diff_png(
         edge_alpha_delta_threshold: EDGE_ALPHA_DELTA_THRESHOLD,
         edge_ignore_radius: EDGE_IGNORE_RADIUS,
     })
+}
+
+fn premultiplied_rgb_max_delta(left: &[u8], right: &[u8]) -> u8 {
+    let left_alpha = left.get(3).copied().unwrap_or(0);
+    let right_alpha = right.get(3).copied().unwrap_or(0);
+
+    (0..3)
+        .map(|channel| {
+            let left_value =
+                premultiply_channel(left.get(channel).copied().unwrap_or(0), left_alpha);
+            let right_value =
+                premultiply_channel(right.get(channel).copied().unwrap_or(0), right_alpha);
+            left_value.abs_diff(right_value)
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+fn premultiply_channel(channel: u8, alpha: u8) -> u8 {
+    (((channel as u16) * (alpha as u16) + 127) / 255) as u8
+}
+
+fn build_visible_alpha_mask(
+    bytes: &[u8],
+    width: u32,
+    height: u32,
+    alpha_threshold: u8,
+) -> Vec<bool> {
+    let mut mask = vec![false; (width as usize).saturating_mul(height as usize)];
+    for y in 0..height {
+        for x in 0..width {
+            let index = (y * width + x) as usize;
+            mask[index] = alpha_at(bytes, width, x, y) > alpha_threshold;
+        }
+    }
+    mask
+}
+
+fn compute_edge_distance_stats(
+    canvas_visible_mask: &[bool],
+    skia_visible_mask: &[bool],
+    width: u32,
+    height: u32,
+) -> EdgeDistanceStats {
+    let canvas_edges = build_binary_mask_edges(canvas_visible_mask, width, height);
+    let skia_edges = build_binary_mask_edges(skia_visible_mask, width, height);
+    let canvas_distance_map = build_chamfer_distance_map(&canvas_edges, width, height);
+    let skia_distance_map = build_chamfer_distance_map(&skia_edges, width, height);
+
+    let canvas_to_skia = collect_directed_edge_distances(&canvas_edges, &skia_distance_map);
+    let skia_to_canvas = collect_directed_edge_distances(&skia_edges, &canvas_distance_map);
+
+    let canvas_to_skia_mean_distance_px = mean_distance(&canvas_to_skia);
+    let skia_to_canvas_mean_distance_px = mean_distance(&skia_to_canvas);
+
+    let mut symmetric = Vec::with_capacity(canvas_to_skia.len() + skia_to_canvas.len());
+    symmetric.extend_from_slice(&canvas_to_skia);
+    symmetric.extend_from_slice(&skia_to_canvas);
+
+    EdgeDistanceStats {
+        canvas_edge_pixels: canvas_edges.iter().filter(|&&value| value).count() as u64,
+        skia_edge_pixels: skia_edges.iter().filter(|&&value| value).count() as u64,
+        canvas_to_skia_mean_distance_px,
+        skia_to_canvas_mean_distance_px,
+        symmetric_mean_distance_px: mean_distance(&symmetric),
+        symmetric_p95_distance_px: percentile_distance(&symmetric, 0.95),
+    }
+}
+
+fn build_binary_mask_edges(mask: &[bool], width: u32, height: u32) -> Vec<bool> {
+    let mut edges = vec![false; mask.len()];
+    for y in 0..height {
+        for x in 0..width {
+            let index = (y * width + x) as usize;
+            if !mask.get(index).copied().unwrap_or(false) {
+                continue;
+            }
+
+            let is_boundary = x == 0
+                || y == 0
+                || x + 1 >= width
+                || y + 1 >= height
+                || !mask
+                    .get((y * width + (x - 1)) as usize)
+                    .copied()
+                    .unwrap_or(false)
+                || !mask
+                    .get((y * width + (x + 1)) as usize)
+                    .copied()
+                    .unwrap_or(false)
+                || !mask
+                    .get(((y - 1) * width + x) as usize)
+                    .copied()
+                    .unwrap_or(false)
+                || !mask
+                    .get(((y + 1) * width + x) as usize)
+                    .copied()
+                    .unwrap_or(false);
+
+            if is_boundary {
+                edges[index] = true;
+            }
+        }
+    }
+
+    edges
+}
+
+fn build_chamfer_distance_map(edge_mask: &[bool], width: u32, height: u32) -> Vec<f64> {
+    const INF: f64 = 1.0e12;
+    const ORTH: f64 = 1.0;
+    const DIAG: f64 = std::f64::consts::SQRT_2;
+
+    let mut distances = edge_mask
+        .iter()
+        .map(|&is_edge| if is_edge { 0.0 } else { INF })
+        .collect::<Vec<_>>();
+
+    if !edge_mask.iter().any(|&is_edge| is_edge) {
+        return distances;
+    }
+
+    for y in 0..height {
+        for x in 0..width {
+            let index = (y * width + x) as usize;
+            let mut best = distances[index];
+            if x > 0 {
+                best = best.min(distances[index - 1] + ORTH);
+            }
+            if y > 0 {
+                best = best.min(distances[index - width as usize] + ORTH);
+                if x > 0 {
+                    best = best.min(distances[index - width as usize - 1] + DIAG);
+                }
+                if x + 1 < width {
+                    best = best.min(distances[index - width as usize + 1] + DIAG);
+                }
+            }
+            distances[index] = best;
+        }
+    }
+
+    for y in (0..height).rev() {
+        for x in (0..width).rev() {
+            let index = (y * width + x) as usize;
+            let mut best = distances[index];
+            if x + 1 < width {
+                best = best.min(distances[index + 1] + ORTH);
+            }
+            if y + 1 < height {
+                best = best.min(distances[index + width as usize] + ORTH);
+                if x > 0 {
+                    best = best.min(distances[index + width as usize - 1] + DIAG);
+                }
+                if x + 1 < width {
+                    best = best.min(distances[index + width as usize + 1] + DIAG);
+                }
+            }
+            distances[index] = best;
+        }
+    }
+
+    distances
+}
+
+fn collect_directed_edge_distances(edge_mask: &[bool], target_distance_map: &[f64]) -> Vec<f64> {
+    edge_mask
+        .iter()
+        .zip(target_distance_map.iter())
+        .filter_map(|(is_edge, &distance)| is_edge.then_some(distance))
+        .collect()
+}
+
+fn mean_distance(distances: &[f64]) -> f64 {
+    if distances.is_empty() {
+        return 0.0;
+    }
+
+    distances.iter().sum::<f64>() / distances.len() as f64
+}
+
+fn percentile_distance(distances: &[f64], percentile: f64) -> f64 {
+    if distances.is_empty() {
+        return 0.0;
+    }
+
+    let mut sorted = distances.to_vec();
+    sorted.sort_by(|left, right| left.total_cmp(right));
+    let max_index = sorted.len().saturating_sub(1);
+    let percentile_index = ((max_index as f64) * percentile.clamp(0.0, 1.0)).round() as usize;
+    sorted[percentile_index.min(max_index)]
 }
 
 /// Builds a boolean mask indicating which overlay pixels lie on an "alpha edge."

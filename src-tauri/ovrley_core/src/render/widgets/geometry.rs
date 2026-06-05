@@ -1,26 +1,17 @@
 //! Point/rect/math and layout-fitting helpers for overlay widgets.
 //!
-//! Owns: `distance` (Euclidean distance between 2D points), `normalize_opacity`
-//!       (opacity value normalization with percent-to-decimal conversion),
+//! Owns: `distance` (Euclidean distance between 2D points),
 //!       `fit_points_to_widget_with_inset` (bounding-box scaling with padding).
 //! Does not own: RDP simplification (see [`crate::rdp`]), polyline/area drawing
 //!       (see [`super::polyline`]), marker drawing (see [`super::marker`]).
 //!
 //! Allowed dependencies: `std`.
-//! Forbidden dependencies: `skia_safe`, `crate::config`, `crate::activity`.
+//! Forbidden dependencies: `skia_safe`, `crate::normalize`, `crate::activity`.
 //!
 //! ## Performance
 //! `fit_points_to_widget_with_inset` is O(n) in point count and called once per
 //! widget build (not per-frame). `distance` is called per-point during RDP
 //! simplification, also during widget build. Not on the render hot path.
-
-pub(crate) fn normalize_opacity(value: Option<f32>, default: f32) -> f32 {
-    match value {
-        Some(value) if value > 1.0 => (value / 100.0).clamp(0.0, 1.0),
-        Some(value) => value.clamp(0.0, 1.0),
-        None => default,
-    }
-}
 
 pub(crate) fn distance(left: (f32, f32), right: (f32, f32)) -> f32 {
     ((right.0 - left.0).powi(2) + (right.1 - left.1).powi(2)).sqrt()

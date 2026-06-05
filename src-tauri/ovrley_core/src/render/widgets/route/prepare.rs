@@ -7,7 +7,7 @@ use super::super::common::{
     custom_export_range_active, normalize_optional_progress_window, static_layer_padding,
 };
 use super::super::geometry::fit_points_to_widget_with_inset;
-use super::super::marker::marker_layers_from_points;
+use super::super::marker::marker_layers_from_plot;
 use super::super::polyline::draw_polyline_with_shadow;
 use super::super::types::{
     NormalizedRoutePlot, RouteSample, RouteWidgetCache, StaticLayer, WidgetGeometry,
@@ -15,32 +15,32 @@ use super::super::types::{
 use super::simplify::{downsample_route_samples, simplify_route_samples};
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
-use crate::config::{CoursePlotConfig, RenderConfig, RenderDataRequirements};
 use crate::debug::RenderProfiler;
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::RenderDataRequirements;
+use crate::normalize::ValidatedRoutePlot;
 use crate::render::surface::create_surface;
 use std::time::Instant;
 
 /// Prepares cached geometry, static layers, and frame states for a route plot.
 pub(crate) fn prepare_route_cache(
-    config: &RenderConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
-    plot: &CoursePlotConfig,
+    validated: &ValidatedRoutePlot,
+    scene: &crate::normalize::ValidatedSceneConfig,
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<RouteWidgetCache> {
     let prepare_started = Instant::now();
-    let show_full_activity = plot.show_full_activity.unwrap_or(false);
-    let plot = super::normalize::normalize_route_plot(config, plot);
-    let route_samples = build_route_samples(config, activity, show_full_activity)?;
+    let show_full_activity = validated.show_full_activity;
+    let plot = super::normalize::normalize_route_plot(validated, scene);
+    let route_samples = build_route_samples(activity, show_full_activity, scene)?;
     let geometry = prepare_profiler.measure("build_route_cache.geometry", || {
         build_route_geometry(&plot, &route_samples)
     })?;
-    let marker_layers = marker_layers_from_points(
-        &plot.marker_points,
+    let marker_layers = marker_layers_from_plot(
         &plot.marker_variant,
         plot.marker_variant_diameter,
-        plot.marker_variant_stroke_width,
+        plot.marker_size,
         &plot.marker_color,
         plot.marker_opacity,
     );
@@ -49,11 +49,11 @@ pub(crate) fn prepare_route_cache(
     })?;
     let frame_states = prepare_profiler.measure("build_route_cache.frame_states", || {
         super::frame_state::build_route_frame_states(
-            config,
             activity,
             &geometry,
             dense_activity,
             show_full_activity,
+            scene,
         )
     });
     prepare_profiler.record_ms(
@@ -168,11 +168,11 @@ fn route_geometry_inset_px(plot: &NormalizedRoutePlot) -> f32 {
 /// `show_full_activity` overrides custom export trimming so the full route
 /// remains visible while progress can still follow the selected scene.
 fn build_route_samples(
-    config: &RenderConfig,
     activity: &ParsedActivity,
     show_full_activity: bool,
+    scene: &crate::normalize::ValidatedSceneConfig,
 ) -> CoreResult<Vec<RouteSample>> {
-    if show_full_activity || !custom_export_range_active(config) {
+    if show_full_activity || !custom_export_range_active(scene) {
         return Ok(project_course_samples(
             &activity.sample_course_points,
             &activity.sample_distance_progress,
@@ -181,8 +181,8 @@ fn build_route_samples(
 
     let trimmed = trim_activity(
         activity,
-        config.scene.start,
-        config.scene.end,
+        scene.start,
+        scene.end,
         &RenderDataRequirements {
             distance_progress: true,
             course: true,

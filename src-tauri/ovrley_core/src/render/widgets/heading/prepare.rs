@@ -4,12 +4,12 @@
 //! rendered once into a cached Skia image surface. Per-frame, the tape is
 //! drawn offset by `heading × pixels_per_degree`.
 
-use super::super::common::normalize_shadow_style;
+use super::super::common::normalize_shadow_style_validated;
 use super::super::types::HeadingWidgetCache;
 use super::geometry::{visible_labels, visible_ticks};
-use crate::config::{HeadingWidgetConfig, RenderConfig};
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
+use crate::normalize::{ValidatedHeading, ValidatedSceneConfig};
 use crate::render::surface::create_surface;
 use crate::render::text::parse_color;
 use skia_safe::{image_filters, Paint, Point};
@@ -19,25 +19,25 @@ use std::time::Instant;
 /// Prepares the heading widget cache by rendering the full 360° tape to a
 /// cached Skia image.
 pub fn prepare_heading_cache(
-    config: &RenderConfig,
-    plot: &HeadingWidgetConfig,
+    scene: &ValidatedSceneConfig,
+    heading: &ValidatedHeading,
     font_dirs: &[PathBuf],
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<HeadingWidgetCache> {
     let prepare_started = Instant::now();
 
-    let scale = config.scene.scale.unwrap_or(1.0).max(0.1);
-    let scaled_ppd = plot.pixels_per_degree * scale;
+    let scale = scene.scale.max(0.1);
+    let scaled_ppd = heading.pixels_per_degree * scale;
     let tape_width = (360.0 * scaled_ppd).ceil() as u32;
-    let tape_height = ((plot.height as f32) * scale).ceil().max(1.0) as u32;
-    let scaled_width = ((plot.width as f32) * scale).round().max(1.0) as u32;
-    let scaled_height = ((plot.height as f32) * scale).round().max(1.0) as u32;
+    let tape_height = ((heading.height as f32) * scale).ceil().max(1.0) as u32;
+    let scaled_width = ((heading.width as f32) * scale).round().max(1.0) as u32;
+    let scaled_height = ((heading.height as f32) * scale).round().max(1.0) as u32;
 
-    // Resolve shadow style from scene defaults
-    let shadow = normalize_shadow_style(
-        config.scene.shadow_color.as_ref(),
-        config.scene.shadow_strength,
-        config.scene.shadow_distance,
+    // Resolve shadow style from scene defaults (shadow is not part of heading contract)
+    let shadow = normalize_shadow_style_validated(
+        &scene.shadow_color,
+        scene.shadow_strength,
+        scene.shadow_distance,
         scale,
     );
 
@@ -49,21 +49,21 @@ pub fn prepare_heading_cache(
     let canvas = surface.canvas();
     canvas.clear(skia_safe::Color::TRANSPARENT);
 
-    // Resolve colors
-    let tick_color = plot.tick_color.as_deref().unwrap_or("#ffffff");
-    let cardinal_tick_color = plot.cardinal_tick_color.as_deref().unwrap_or(tick_color);
-    let label_color = plot.label_color.as_deref().unwrap_or("#ffffff");
-    let cardinal_label_color = plot.cardinal_label_color.as_deref().unwrap_or(label_color);
+    // Colors are already resolved in the validated heading
+    let tick_color = heading.tick_color.as_str();
+    let cardinal_tick_color = heading.cardinal_tick_color.as_str();
+    let label_color = heading.label_color.as_str();
+    let cardinal_label_color = heading.cardinal_label_color.as_str();
 
     // Compute tick lengths in pixels (percentage of scaled height)
-    let major_tick_length = tape_height as f32 * plot.major_tick_length_pct / 100.0;
-    let minor_tick_length = tape_height as f32 * plot.minor_tick_length_pct / 100.0;
-    let major_tick_thickness = plot.major_tick_thickness * scale;
-    let minor_tick_thickness = plot.minor_tick_thickness * scale;
+    let major_tick_length = tape_height as f32 * heading.major_tick_length_pct / 100.0;
+    let minor_tick_length = tape_height as f32 * heading.minor_tick_length_pct / 100.0;
+    let major_tick_thickness = heading.major_tick_thickness * scale;
+    let minor_tick_thickness = heading.minor_tick_thickness * scale;
 
     // Compute tick y positions based on alignment
     let center_y = tape_height as f32 / 2.0;
-    let tick_bottom = if plot.tick_alignment == "centered" {
+    let tick_bottom = if heading.tick_alignment == "centered" {
         center_y + major_tick_length / 2.0
     } else {
         // "below" alignment: ticks extend downward from centerline
@@ -71,17 +71,12 @@ pub fn prepare_heading_cache(
     };
 
     // Font for labels
-    let font_size = plot.label_font_size.unwrap_or(12.0) * scale;
-    let label_font = plot
-        .label_font
-        .as_deref()
-        .or(plot.label_font_family.as_deref())
-        .or_else(|| first_value_font(config))
-        .or(config.scene.font.as_deref());
-    let font = crate::render::text::resolve_font(font_dirs, label_font, font_size);
+    let font_size = heading.label_font_size * scale;
+    let font =
+        crate::render::text::resolve_font(font_dirs, heading.label_font.as_deref(), font_size)?;
 
     // Label y-position: below the ticks
-    let label_offset = plot.label_offset.unwrap_or(4.0) * scale;
+    let label_offset = heading.label_offset * scale;
     let label_y = tick_bottom + label_offset + font_size;
 
     // Collect all ticks to draw
@@ -89,13 +84,13 @@ pub fn prepare_heading_cache(
         0.0, // heading=0 for the static tape image
         scaled_ppd,
         tape_width as f32,
-        plot.major_tick_interval,
-        plot.minor_ticks_per_major,
-        plot.show_major_ticks,
-        plot.show_minor_ticks,
+        heading.major_tick_interval,
+        heading.minor_ticks_per_major,
+        heading.show_major_ticks,
+        heading.show_minor_ticks,
     );
 
-    let labels = visible_labels(&ticks, plot.show_minor_labels, plot.show_major_labels);
+    let labels = visible_labels(&ticks, heading.show_minor_labels, heading.show_major_labels);
 
     // Draw shadow pass first so shadows sit behind the main content
     if let Some(ref shadow) = shadow {
@@ -126,7 +121,7 @@ pub fn prepare_heading_cache(
                     } else {
                         minor_tick_length
                     };
-                    let top = if plot.tick_alignment == "centered" {
+                    let top = if heading.tick_alignment == "centered" {
                         center_y - length / 2.0
                     } else {
                         tick_bottom - length
@@ -183,7 +178,7 @@ pub fn prepare_heading_cache(
         } else {
             minor_tick_length
         };
-        let top = if plot.tick_alignment == "centered" {
+        let top = if heading.tick_alignment == "centered" {
             center_y - length / 2.0
         } else {
             tick_bottom - length
@@ -228,27 +223,17 @@ pub fn prepare_heading_cache(
     Ok(HeadingWidgetCache {
         tape_image,
         tape_width: tape_width as f32,
-        x: plot.x,
-        y: plot.y,
+        x: heading.x,
+        y: heading.y,
         width: scaled_width,
         height: scaled_height,
         pixels_per_degree: scaled_ppd,
-        show_indicator: plot.show_indicator,
-        indicator_style: plot.indicator_style.clone(),
-        indicator_placement: plot.indicator_placement.clone(),
-        indicator_color: plot
-            .indicator_color
-            .clone()
-            .unwrap_or_else(|| "#ffffff".to_string()),
-        indicator_size: plot.indicator_size.unwrap_or(10.0) * scale,
+        show_indicator: heading.show_indicator,
+        indicator_style: heading.indicator_style.clone(),
+        indicator_placement: heading.indicator_placement.clone(),
+        indicator_color: heading.indicator_color.clone(),
+        indicator_size: heading.indicator_size * scale,
         indicator_shadow: shadow,
-        display_type: plot.display_type,
+        display_type: crate::types::DisplayType::Tape,
     })
-}
-
-fn first_value_font(config: &RenderConfig) -> Option<&str> {
-    config
-        .values
-        .iter()
-        .find_map(|value| value.font.as_deref().or(value.font_family.as_deref()))
 }

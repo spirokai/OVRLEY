@@ -9,7 +9,6 @@ use super::super::common::{
 use super::super::geometry::distance;
 use super::super::types::{RouteFrameState, WidgetGeometry};
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::RenderConfig;
 
 /// Precomputes route marker coordinates for each render frame.
 ///
@@ -17,20 +16,20 @@ use crate::config::RenderConfig;
 /// marker starts at the beginning of the exported slice rather than the
 /// full activity.
 pub(crate) fn build_route_frame_states(
-    config: &RenderConfig,
     activity: &ParsedActivity,
     geometry: &WidgetGeometry,
     dense_activity: &DenseActivityReport,
     show_full_activity: bool,
+    scene: &crate::normalize::ValidatedSceneConfig,
 ) -> Vec<RouteFrameState> {
-    let frame_progress = if custom_export_range_active(config)
+    let frame_progress = if custom_export_range_active(scene)
         && !show_full_activity
         && !geometry.progress_values.is_empty()
     {
-        relative_distance_frame_progress_values(config, activity, dense_activity)
-            .unwrap_or_else(|| frame_progress_values(config, activity, dense_activity))
+        relative_distance_frame_progress_values(activity, dense_activity, scene)
+            .unwrap_or_else(|| frame_progress_values(activity, dense_activity, scene))
     } else {
-        frame_progress_values(config, activity, dense_activity)
+        frame_progress_values(activity, dense_activity, scene)
     };
     let mut progress_cursor = 0usize;
     frame_progress

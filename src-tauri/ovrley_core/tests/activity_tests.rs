@@ -1,48 +1,39 @@
 //! Activity parsing, trimming, and densification integration tests.
-//!
-//! Covers `parse_activity_json`, `trim_activity`, and
-//! `build_dense_activity_report` against real GPX- and FIT-derived JSON
-//! fixtures. Verifies frame count correctness at common FPS values,
-//! non-integer trim windows, and that only explicitly requested telemetry
-//! series are densified.
-//!
-//! ## Fixtures
-//!
-//! - `test_config::parsed_activity_path()` — GPX-derived debug JSON with
-//!   full telemetry (speed, elevation, heartrate, course, timestamps).
-//! - `test_config::fit_activity_path()` — FIT-derived debug JSON used
-//!   for trim-window and selective-densification tests.
-//!
-//! ## Type
-//! Integration test. Does not require ffmpeg or video fixtures — pure data
-//! pipeline testing. No I/O beyond fixture reads.
-//!
-//! ## Regressions guarded
-//! - Frame count mismatch after non-integer trim windows
-//! - Unnecessary densification of unrequested telemetry series
-//! - Distance progress breaking on trimmed exports
-//! - JSON schema drift in activity fixtures
 
 mod common;
 
 use std::fs;
 
-use ovrley_core::activity::{build_dense_activity_report, parse_activity_json};
-use ovrley_core::config::parse_config_json;
+use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
+use ovrley_core::commands::parse_and_validate_config;
+
+fn full_scene(fps: f64, start: f64, end: f64) -> String {
+    format!(
+        r##"{{"fps":{fps},"start":{start},"end":{end},"width":1920,"height":1080,"scale":1.0,"shadow_color":"#000000","shadow_strength":0.0,"shadow_distance":0.0,"border_color":"#000000","border_thickness":0.0,"update_rate":1}}"##
+    )
+}
+
+fn speed_value() -> &'static str {
+    r##"{"value":"speed","x":0,"y":0,"font":"f","font_size":12.0,"color":"#ffffff","opacity":1.0,"show_icon":false,"icon_color":"#000000","icon_size":1.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"show_units":false,"unit_color":"#000000","display_unit":"","prefix":"","suffix":"","format":"{v}","decimals":0}"##
+}
+
+fn time_value() -> String {
+    format!(
+        r##"{{"value":"time","x":0,"y":0,"font":"f","font_size":12.0,"color":"#ffffff","opacity":1.0,"show_icon":false,"icon_color":"#000000","icon_size":1.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"show_units":false,"unit_color":"#000000","display_unit":"","prefix":"","suffix":"","format":"{{v}}","decimals":0}}"##
+    )
+}
 
 #[test]
-// Verifies that a complete GPX fixture densifies to the expected frame count.
 fn builds_dense_report_for_full_fixture() {
     let activity_json = fs::read_to_string(common::test_config::parsed_activity_path()).unwrap();
     let activity = parse_activity_json(&activity_json).unwrap();
-    let config = parse_config_json(
-        r#"{
-            "scene":{"fps":30,"start":0,"end":4912,"width":3840,"height":2160},
-            "values":[{"value":"speed","x":0,"y":0}]
-        }"#,
-    )
+    let config = parse_and_validate_config(&format!(
+        r##"{{"scene":{},"values":[{}]}}"##,
+        full_scene(30.0, 0.0, 4912.0),
+        speed_value()
+    ))
     .unwrap();
-    let report = build_dense_activity_report(&activity, &config).unwrap();
+    let report = build_dense_activity_report_validated(&activity, &config).unwrap();
 
     assert_eq!(report.frame_count, 147360);
     assert_eq!(report.frame_elapsed_seconds.first().copied(), Some(0.0));
@@ -59,20 +50,18 @@ fn builds_dense_report_for_full_fixture() {
 }
 
 #[test]
-// Verifies non-integer trim windows produce stable frame counts at common FPS values.
 fn trims_non_integer_window_across_multiple_fps() {
     let activity_json = fs::read_to_string(common::test_config::fit_activity_path()).unwrap();
     let activity = parse_activity_json(&activity_json).unwrap();
 
     for (fps, expected_frames) in [(24.0, 708usize), (30.0, 885usize), (60.0, 1770usize)] {
-        let config = parse_config_json(&format!(
-            r#"{{
-                "scene":{{"fps":{fps},"start":600.25,"end":629.75}},
-                "values":[{{"value":"time","x":0,"y":0}}]
-            }}"#
+        let config = parse_and_validate_config(&format!(
+            r##"{{"scene":{},"values":[{}]}}"##,
+            full_scene(fps, 600.25, 629.75),
+            time_value()
         ))
         .unwrap();
-        let report = build_dense_activity_report(&activity, &config).unwrap();
+        let report = build_dense_activity_report_validated(&activity, &config).unwrap();
         assert_eq!(report.frame_count, expected_frames);
         assert_eq!(report.frame_elapsed_seconds.first().copied(), Some(0.0));
         assert!(
@@ -88,20 +77,17 @@ fn trims_non_integer_window_across_multiple_fps() {
 }
 
 #[test]
-// Verifies only telemetry required by values/plots is densified.
 fn only_densifies_series_requested_by_template() {
     let activity_json = fs::read_to_string(common::test_config::fit_activity_path()).unwrap();
     let activity = parse_activity_json(&activity_json).unwrap();
-    let config = parse_config_json(
-        r#"{
-            "scene":{"fps":30,"start":600,"end":630},
-            "values":[{"value":"speed","x":0,"y":0}],
-            "plots":{"course":{"value":"course","x":0,"y":0,"width":200,"height":100}}
-        }"#,
-    )
+    let config = parse_and_validate_config(&format!(
+        r##"{{"scene":{},"values":[{}],"plots":{{"course":{{"value":"course","x":0,"y":0,"width":200,"height":100,"simplify_tolerance_px":1.0,"target_density":1.0,"completed_line_width":2.0,"completed_line_color":"#000000","completed_line_opacity":1.0,"remaining_line_width":2.0,"remaining_line_color":"#888888","remaining_line_opacity":1.0,"marker_variant":"single","marker_variant_diameter":12.0,"marker_size":8.0,"marker_color":"#ff0000","marker_opacity":1.0,"show_full_activity":false}}}}}}"##,
+        full_scene(30.0, 600.0, 630.0),
+        speed_value()
+    ))
     .unwrap();
 
-    let report = build_dense_activity_report(&activity, &config).unwrap();
+    let report = build_dense_activity_report_validated(&activity, &config).unwrap();
 
     assert_eq!(report.series.speed.len(), report.frame_count);
     assert!(report.series.elevation.is_empty());
@@ -113,19 +99,16 @@ fn only_densifies_series_requested_by_template() {
 }
 
 #[test]
-// Verifies trimmed plot progress remains absolute to the full activity.
 fn trimmed_exports_keep_absolute_distance_progress() {
     let activity_json = fs::read_to_string(common::test_config::fit_activity_path()).unwrap();
     let activity = parse_activity_json(&activity_json).unwrap();
-    let config = parse_config_json(
-        r#"{
-            "scene":{"fps":30,"start":600,"end":630},
-            "plots":{"course":{"value":"course","x":0,"y":0,"width":200,"height":100}}
-        }"#,
-    )
+    let config = parse_and_validate_config(&format!(
+        r##"{{"scene":{},"plots":{{"course":{{"value":"course","x":0,"y":0,"width":200,"height":100,"simplify_tolerance_px":1.0,"target_density":1.0,"completed_line_width":2.0,"completed_line_color":"#000000","completed_line_opacity":1.0,"remaining_line_width":2.0,"remaining_line_color":"#888888","remaining_line_opacity":1.0,"marker_variant":"single","marker_variant_diameter":12.0,"marker_size":8.0,"marker_color":"#ff0000","marker_opacity":1.0,"show_full_activity":false}}}}}}"##,
+        full_scene(30.0, 600.0, 630.0)
+    ))
     .unwrap();
 
-    let report = build_dense_activity_report(&activity, &config).unwrap();
+    let report = build_dense_activity_report_validated(&activity, &config).unwrap();
 
     let first_progress = report
         .frame_distance_progress

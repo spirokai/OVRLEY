@@ -4,33 +4,32 @@
 /// points for every render frame so per-frame drawing performs minimal
 /// arithmetic.
 use super::super::common::{
-    custom_export_range_active, frame_progress_values, interpolate_optional_numeric_series,
-    point_at_metric_progress_with_cursor, point_at_progress_x,
-    relative_distance_frame_progress_values,
+    custom_export_range_active, frame_progress_values, point_at_metric_progress_with_cursor,
+    point_at_progress_x, relative_distance_frame_progress_values,
 };
 use super::super::types::{ElevationFrameState, WidgetGeometry};
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::config::RenderConfig;
+use crate::normalize::ValidatedSceneConfig;
 
 /// Precomputes marker coordinates and elevation values for each render frame.
 ///
 /// Marker positions follow distance progress; displayed elevation values use
 /// dense frame data when available and fall back to progress interpolation.
 pub(crate) fn build_elevation_frame_states(
-    config: &RenderConfig,
+    scene: &ValidatedSceneConfig,
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     geometry: &WidgetGeometry,
     show_full_activity: bool,
 ) -> Vec<ElevationFrameState> {
-    let frame_progress = if custom_export_range_active(config)
+    let frame_progress = if custom_export_range_active(scene)
         && !show_full_activity
         && !geometry.progress_values.is_empty()
     {
-        relative_distance_frame_progress_values(config, activity, dense_activity)
-            .unwrap_or_else(|| frame_progress_values(config, activity, dense_activity))
+        relative_distance_frame_progress_values(activity, dense_activity, scene)
+            .unwrap_or_else(|| frame_progress_values(activity, dense_activity, scene))
     } else {
-        frame_progress_values(config, activity, dense_activity)
+        frame_progress_values(activity, dense_activity, scene)
     };
     let fallback_elevations = if dense_activity.series.elevation.len() == frame_progress.len() {
         None
@@ -123,8 +122,12 @@ fn interpolate_elevation_for_progresses(
     frame_progresses
         .iter()
         .map(|progress01| {
-            interpolate_optional_numeric_series(progress_values, elevations, *progress01 as f64)
-                .unwrap_or(0.0)
+            crate::interpolation::interpolate_optional_numeric_series(
+                progress_values,
+                elevations,
+                *progress01 as f64,
+            )
+            .unwrap_or(0.0)
         })
         .collect()
 }
