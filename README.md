@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="app/public/logo.svg" alt="OVRLEY Logo" height="90" />
+  <img src="app/public/logo.svg" alt="OVRLEY Logo" height="60" />
 </div>
 
 <br />
@@ -10,7 +10,12 @@
 
 <br />
 
-OVRLEY turns .fit and .gpx activity data into customizable overlays for action-cam videos. It features an intuitive, WYSIWYG editor backed by a robust, hardware-accelerated native rendering engine.
+<div align="center">
+  <h1><a href="www.ovrley.cc">OVRELY WEBSITE</a></h1>
+  <br/>
+  <br/>
+  <p>OVRLEY turns .fit and .gpx activity data into customizable overlays for action-cam videos. It features an intuitive, WYSIWYG editor backed by a robust, hardware-accelerated native rendering engine.</p>
+</div>
 
 ## Features
 
@@ -23,7 +28,7 @@ OVRLEY turns .fit and .gpx activity data into customizable overlays for action-c
 - **Hardware-Accelerated Export**: Export pipelines using GPU acceleration for maximum export speed.
 - **Preview & Sync**: Preview your footage directly inside the app in full quality. Automatically syncs activity to your video, with manual offset possible.
 - **100% Free & Offline**: No subscriptions. All data processing, rendering, and encoding happen locally on your machine. Your data never leaves your computer.
-- **Cross-Platform & Portable**: Runs on Windows, macOS, and Linux. No installation required; just download and run.
+- **Cross-Platform & Portable**: Runs on Windows, macOS, and Linux. Portable build - no installation required; just download and run.
 
 > ## Using OVRLEY: Download the exe/app file from latest release and just run it - no installation or setup required.
 
@@ -77,8 +82,18 @@ To launch the application locally with hot-module reloading enabled:
 
 ```bash
 # Starts the frontend server alongside the native Tauri window
-pnpm dev
+pnpm run dev
 ```
+
+## Available Test Suites
+
+The Rust backend includes several extra test suites covering rendering correctness, cross-pipeline parity, and encoding performance:
+
+| Suite                | Purpose                                                                                        | Docs                                                         |
+| -------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Render Baselines** | Pixel-level regression tests — rendered frames and videos compared against committed baselines | [`BASELINES.md`](src-tauri/ovrley_core/BASELINES.md)         |
+| **Canvas Parity**    | Rust Skia vs browser SVG pixel comparison with SSIM scoring and diff images                    | [`CANVAS_PARITY.md`](src-tauri/ovrley_core/CANVAS_PARITY.md) |
+| **Benchmarks**       | Real-render encoding benchmarks measuring job time and file size per codec/hardware profile    | [`BENCHMARKS.md`](src-tauri/ovrley_core/BENCHMARKS.md)       |
 
 ## Building & Compatibility
 
@@ -87,7 +102,7 @@ OVRLEY is optimized for desktop environments and is designed to be run as a stan
 To compile a production release:
 
 ```bash
-pnpm build
+pnpm run build
 ```
 
 **Portable Distribution:** The build process bypasses traditional system installers. Instead, it generates a standalone, portable application packaged neatly within a `.zip` file. This allows for immediate extraction and execution without elevated system privileges.
