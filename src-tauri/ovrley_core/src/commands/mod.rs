@@ -25,7 +25,6 @@ use skia_safe::FontMgr;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::paths::AppPaths;
@@ -459,42 +458,15 @@ fn template_descriptor(
     }))
 }
 
-// Opens a filesystem path with the operating system's default file launcher.
+// Opens a path with the operating system's default handler.
+//
+// Uses the `open` crate which delegates to ShellExecuteW on Windows,
+// NSWorkspace on macOS, and xdg-open/gnome-open/etc on Linux — all
+// without blocking the caller.
 fn open_path_in_system(path: &Path) -> CoreResult<()> {
-    // Use native platform launchers rather than shell invocation so paths with
-    // spaces are passed as arguments and not interpreted as command text.
-    if cfg!(windows) {
-        Command::new("explorer")
-            .arg(path)
-            .spawn()
-            .map_err(|error| {
-                CoreError::Encode(format!("Failed to open {}: {error}", path.display()))
-            })?;
-        return Ok(());
-    }
-
-    let mut command = if cfg!(target_os = "macos") {
-        let mut cmd = Command::new("open");
-        cmd.arg(path);
-        cmd
-    } else {
-        let mut cmd = Command::new("xdg-open");
-        cmd.arg(path);
-        cmd
-    };
-
-    let status = command.status().map_err(|error| {
+    open::that(path).map_err(|error| {
         CoreError::Encode(format!("Failed to open {}: {error}", path.display()))
-    })?;
-
-    if status.success() {
-        Ok(())
-    } else {
-        Err(CoreError::Encode(format!(
-            "Failed to open {}",
-            path.display()
-        )))
-    }
+    })
 }
 
 /// Probes a video file and returns its metadata.

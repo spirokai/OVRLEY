@@ -20,11 +20,6 @@ use std::path::PathBuf;
 /// 4:2:2/4:4:4 chroma formats.
 pub(crate) fn preview_warnings_for_metadata(metadata: &serde_json::Value) -> Vec<String> {
     let mut warnings = Vec::new();
-    let codec_name = metadata
-        .get("codecName")
-        .and_then(|value| value.as_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
     let pix_fmt = metadata
         .get("pixFmt")
         .and_then(|value| value.as_str())
