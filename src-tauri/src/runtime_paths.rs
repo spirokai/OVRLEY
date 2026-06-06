@@ -25,8 +25,9 @@ pub(crate) fn source_repo_root() -> PathBuf {
 /// Builds the backend path configuration for the current runtime mode.
 ///
 /// Development builds read resources from the source checkout. Packaged builds
-/// read resources from Tauri's resource directory. User templates always live
-/// under the user's documents directory in `OVRLEY`.
+/// read resources from Tauri's resource directory. User data lives under the
+/// user's documents directory in `OVRLEY`, with templates in `templates/`,
+/// render outputs at the root, and runtime scratch data in `.runtime/`.
 pub(crate) fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
     let repo_root = source_repo_root();
     // cfg!() is intentional here, not #[cfg(debug_assertions)]. Both branches
@@ -38,12 +39,12 @@ pub(crate) fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
     } else {
         app.path().resource_dir().map_err(|e| e.to_string())?
     };
-    let mut paths = AppPaths::from_resource_root(repo_root, resource_root);
-    paths.user_templates_dir = app
+    let user_data_root = app
         .path()
         .document_dir()
         .map_err(|e| e.to_string())?
         .join("OVRLEY");
+    let paths = AppPaths::from_runtime_roots(repo_root, resource_root, user_data_root);
     paths.ensure_dirs().map_err(|e| e.to_string())?;
     Ok(paths)
 }

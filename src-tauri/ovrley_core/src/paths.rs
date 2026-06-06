@@ -18,9 +18,10 @@ use std::path::PathBuf;
 /// Central path configuration for the application runtime.
 ///
 /// Resolves font directories, template directories, debug/render output paths,
-/// temporary storage, and the user downloads directory. Paths are computed once
-/// at startup from the repository root and (optionally) a Tauri resource root,
-/// then cloned into every request that needs filesystem access.
+/// temporary storage, and the public render-output directory. Paths are
+/// computed once at startup from the repository root, the active resource
+/// root, and a single OVRLEY user-data root, then cloned into every request
+/// that needs filesystem access.
 ///
 /// This type lives in a neutral module so both `commands` and `encode` can
 /// depend on it without creating a circular dependency.
@@ -37,32 +38,32 @@ pub struct AppPaths {
 
 impl AppPaths {
     pub fn from_repo_root(repo_root: PathBuf) -> Self {
-        Self::from_roots(repo_root.clone(), repo_root)
+        Self::from_runtime_roots(repo_root.clone(), repo_root, documents_ovrley_dir())
     }
 
     pub fn from_resource_root(repo_root: PathBuf, resource_root: PathBuf) -> Self {
-        Self::from_roots(repo_root, resource_root)
+        Self::from_runtime_roots(repo_root, resource_root, documents_ovrley_dir())
     }
 
-    fn from_roots(repo_root: PathBuf, resource_root: PathBuf) -> Self {
-        let downloads_dir = downloads_ovrley_dir();
-        let runtime_dir = downloads_dir.join(".runtime");
+    pub fn from_runtime_roots(
+        repo_root: PathBuf,
+        resource_root: PathBuf,
+        user_data_root: PathBuf,
+    ) -> Self {
+        let downloads_dir = user_data_root.clone();
+        let runtime_dir = user_data_root.join(".runtime");
         let font_dirs = vec![resource_root.join("fonts"), repo_root.join("fonts")]
             .into_iter()
             .filter(|path| path.is_dir())
             .collect();
-        let debug_render_dir = if resource_root == repo_root {
-            repo_root.join("debug").join("timings")
-        } else {
-            runtime_dir.join("debug").join("timings")
-        };
+        let debug_render_dir = runtime_dir.join("debug").join("timings");
         let temp_dir = runtime_dir.join("tmp");
         let bundled_templates_dirs =
             vec![resource_root.join("templates"), repo_root.join("templates")]
                 .into_iter()
                 .filter(|path| path.is_dir())
                 .collect();
-        let user_templates_dir = documents_ovrley_dir();
+        let user_templates_dir = user_data_root.join("templates");
 
         Self {
             repo_root: resource_root,
@@ -113,16 +114,4 @@ fn documents_ovrley_dir() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."));
     home.join("Documents").join("OVRLEY")
-}
-
-// Resolves the platform-specific OVRLEY downloads directory.
-//
-// On Windows this is `%USERPROFILE%\Downloads\OVRLEY`; on other platforms it
-// is `$HOME/Downloads/OVRLEY`. This directory doubles as the runtime scratch
-// space (`.runtime/` subdirectory) for temporary files and debug artifacts.
-fn downloads_ovrley_dir() -> PathBuf {
-    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    home.join("Downloads").join("OVRLEY")
 }

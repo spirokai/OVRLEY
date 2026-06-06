@@ -278,6 +278,14 @@ export async function openDownloads() {
 }
 
 /**
+ * Opens the user templates directory.
+ * @returns {Promise<*>} Promise resolving to the operation result.
+ */
+export async function openTemplates() {
+  return apiCall('backend_open_templates', {})
+}
+
+/**
  * Opens video.
  *
  * @param {*} filename - Target filename for the operation.

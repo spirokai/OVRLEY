@@ -212,6 +212,11 @@ export default function useTemplateManagement({ onTemplateCreated }) {
   // Import template handler — opens browser file picker and hydrates state from a JSON file
   const handleImportTemplate = useCallback(async () => {
     try {
+      if (hasTauriRuntime()) {
+        await backend.openTemplates()
+        return
+      }
+
       const file = await selectBrowserTemplateFile()
       if (!file) return
 

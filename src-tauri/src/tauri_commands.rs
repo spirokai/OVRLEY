@@ -118,6 +118,14 @@ pub(crate) async fn backend_open_downloads(app: AppHandle) -> Result<String, Str
     )?))
 }
 
+/// Opens the application's templates directory in the platform file manager.
+#[tauri::command]
+pub(crate) async fn backend_open_templates(app: AppHandle) -> Result<String, String> {
+    call_and_serialize(commands::backend_open_templates(&runtime_paths::app_paths(
+        &app,
+    )?))
+}
+
 /// Opens a rendered video file from the output directory.
 #[tauri::command]
 pub(crate) async fn backend_open_video(app: AppHandle, filename: String) -> Result<String, String> {

@@ -66,6 +66,7 @@ pub fn run() {
             tauri_commands::backend_list_templates,
             tauri_commands::backend_get_template,
             tauri_commands::backend_open_downloads,
+            tauri_commands::backend_open_templates,
             tauri_commands::backend_open_video,
             tauri_commands::backend_probe_video,
             tauri_commands::backend_import_preview_video,

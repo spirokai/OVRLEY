@@ -20,6 +20,7 @@ pub(crate) fn default_template_save_path(
 ) -> Result<String, String> {
     let mut path = app.path().document_dir().map_err(|e| e.to_string())?;
     path.push("OVRLEY");
+    path.push("templates");
     std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
     path.push(filename);
     Ok(path.to_string_lossy().to_string())

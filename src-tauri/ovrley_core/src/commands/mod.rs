@@ -352,6 +352,12 @@ pub fn backend_open_downloads(paths: &AppPaths) -> CoreResult<Value> {
     Ok(json!({ "message": "Folder opened" }))
 }
 
+/// Opens the user templates directory in the system file browser.
+pub fn backend_open_templates(paths: &AppPaths) -> CoreResult<Value> {
+    open_path_in_system(&paths.user_templates_dir)?;
+    Ok(json!({ "message": "Folder opened" }))
+}
+
 /// Opens a rendered video from the downloads directory.
 pub fn backend_open_video(paths: &AppPaths, filename: &str) -> CoreResult<Value> {
     let downloads_path = paths.downloads_dir.join(filename);
