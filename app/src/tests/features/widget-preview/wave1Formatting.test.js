@@ -164,6 +164,16 @@ describe('Wave 1 metric formatting', () => {
     expect(model?.unitText).toBe('FT/MIN')
   })
 
+  test('vertical_speed converts to ft/h', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('vertical_speed', { display_unit: 'ftph', decimals: 1 }),
+      activity: makeActivity('vertical_speed', 1),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('11811')
+    expect(model?.unitText).toBe('FT/H')
+  })
+
   test('pace formats with min/km display', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('pace', { display_unit: 'min_per_km' }),

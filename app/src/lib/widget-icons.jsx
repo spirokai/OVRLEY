@@ -89,8 +89,10 @@ export const TYPE_ICONS = {
 
 export const QUICKMENU_ITEMS = [
   'label',
+  'time',
   'elevation',
   'course',
+  'gradient',
   ...CURRENT_STANDARD_METRIC_WIDGET_TYPES,
 ].map((type) => ({
   type,

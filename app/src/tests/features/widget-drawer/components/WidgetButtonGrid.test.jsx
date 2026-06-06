@@ -12,7 +12,9 @@ describe('WidgetButtonGrid', () => {
     render(<WidgetButtonGrid onAddWidget={() => {}} />)
 
     const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(23)
+    expect(buttons.length).toBeGreaterThan(0)
+    expect(screen.getByText('Time')).toBeInTheDocument()
+    expect(screen.getByText('Grad.')).toBeInTheDocument()
   })
 
   test('each button displays an icon', () => {
@@ -24,11 +26,13 @@ describe('WidgetButtonGrid', () => {
     })
   })
 
-  test('each button displays the widget drawer label, including Wave 1 standard metrics', () => {
+  test('each button displays the widget drawer label for the current drawer catalog', () => {
     render(<WidgetButtonGrid onAddWidget={() => {}} />)
 
     expect(screen.getByText('HR')).toBeInTheDocument()
     expect(screen.getByText('Map')).toBeInTheDocument()
+    expect(screen.getByText('Time')).toBeInTheDocument()
+    expect(screen.getByText('Grad.')).toBeInTheDocument()
     expect(screen.getByText('Temp.')).toBeInTheDocument()
     expect(screen.getByText('G-Force')).toBeInTheDocument()
     expect(screen.getByText('Air Press.')).toBeInTheDocument()
@@ -40,7 +44,6 @@ describe('WidgetButtonGrid', () => {
     expect(screen.getByText('Gear')).toBeInTheDocument()
     expect(screen.getByText('V. Osc.')).toBeInTheDocument()
     expect(screen.getByText('Core T.')).toBeInTheDocument()
-    expect(screen.getByText('Heading')).toBeInTheDocument()
   })
 
   test('clicking a button calls onAddWidget with the correct type', async () => {

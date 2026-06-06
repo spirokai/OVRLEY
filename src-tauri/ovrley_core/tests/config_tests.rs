@@ -201,6 +201,46 @@ fn rejects_older_template_versions_explicitly() {
     );
 }
 
+#[test]
+fn durable_template_without_scene_timing_still_validates_for_save() {
+    validate_template_contents(
+        r##"{
+            "format": "ovrley-template",
+            "version": 2,
+            "config": {
+                "scene": {
+                    "width": 1920,
+                    "height": 1080,
+                    "fps": 30,
+                    "updateRate": 1
+                },
+                "labels": [],
+                "values": [],
+                "plots": []
+            },
+            "settings": {
+                "globalDefaults": {
+                    "border_color": "#000000",
+                    "border_thickness": 0,
+                    "shadow_color": "#000000",
+                    "shadow_strength": 0,
+                    "shadow_distance": 0,
+                    "font_values": "Arial.ttf",
+                    "font_text": "Arial.ttf",
+                    "color_values": "#ffffff",
+                    "color_text": "#ffffff",
+                    "color_icons": "#ffffff",
+                    "color_units": "#ffffff",
+                    "font_size": 30,
+                    "opacity": 1,
+                    "scale": 1
+                }
+            }
+        }"##,
+    )
+    .expect("durable template save validation should not require scene.start/end");
+}
+
 fn explicit_speed_value() -> serde_json::Value {
     json!({
         "value": "speed",

@@ -18,6 +18,22 @@ import {
 import { useTemplateSaveStatus } from './useTemplateSaveStatus'
 import { selectBrowserTemplateFile, getFilenameFromPath, getFilenameFromTemplateId } from '../utils/templateFileUtils'
 
+function getErrorMessage(error, fallbackMessage) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  if (typeof error === 'string' && error.trim()) {
+    return error
+  }
+
+  if (error && typeof error === 'object' && typeof error.message === 'string' && error.message.trim()) {
+    return error.message
+  }
+
+  return fallbackMessage
+}
+
 /**
  * Provides template management state and actions.
  *
@@ -104,7 +120,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         setLastSavedTemplateState(templateState)
       } catch (error) {
         console.error('Failed to load template:', error)
-        setErrorMessage(`Failed to load template: ${error.message}`)
+        setErrorMessage(`Failed to load template: ${getErrorMessage(error, 'Unknown error')}`)
       } finally {
         setProcessing(false)
       }
@@ -176,7 +192,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
       setLastSavedTemplateState(currentTemplateState)
     } catch (error) {
       console.error('Failed to save template:', error)
-      setErrorMessage(`Failed to save template: ${error.message}`)
+      setErrorMessage(`Failed to save template: ${getErrorMessage(error, 'Unknown error')}`)
     }
   }, [
     aspectRatio,
@@ -218,7 +234,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
       setLastSavedTemplateState(templateState)
     } catch (error) {
       console.error('Failed to import template:', error)
-      setErrorMessage(`Failed to import template: ${error.message}`)
+      setErrorMessage(`Failed to import template: ${getErrorMessage(error, 'Unknown error')}`)
     }
   }, [aspectRatio, exportCodec, exportRange, globalDefaults, hydrateTemplateState, setErrorMessage, setLastSavedTemplateState, updateRate])
 

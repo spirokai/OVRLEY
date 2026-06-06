@@ -36,6 +36,47 @@ async function requireInvoke() {
 }
 
 /**
+ * Normalizes values thrown by the Tauri bridge to standard Error instances.
+ *
+ * @param {*} error - Rejection value from the invoke bridge.
+ * @param {string} fallbackMessage - Message used when no better detail exists.
+ * @returns {Error} Normalized Error instance.
+ */
+function normalizeBackendError(error, fallbackMessage = 'Unknown backend error') {
+  if (error instanceof Error) {
+    return error
+  }
+
+  if (typeof error === 'string' && error.trim()) {
+    return new Error(error)
+  }
+
+  if (error && typeof error === 'object' && typeof error.message === 'string' && error.message.trim()) {
+    return new Error(error.message)
+  }
+
+  return new Error(fallbackMessage)
+}
+
+/**
+ * Invokes a Tauri command and normalizes bridge errors.
+ *
+ * @param {string} tauriCmd - Tauri command name to invoke.
+ * @param {object} tauriArgs - Argument payload passed to the Tauri command.
+ * @returns {Promise<*>} Promise resolving to the raw command result.
+ */
+async function invokeCommand(tauriCmd, tauriArgs = {}) {
+  const invoke = await requireInvoke()
+
+  try {
+    return await invoke(tauriCmd, tauriArgs)
+  } catch (error) {
+    console.error(`[Backend] Tauri bridge error for ${tauriCmd}:`, error)
+    throw normalizeBackendError(error)
+  }
+}
+
+/**
  * Serializes data to JSON while safely handling cyclic references.
  *
  * @param {*} obj - Value for obj.
@@ -67,23 +108,9 @@ function safeJsonStringify(obj) {
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 async function apiCall(tauriCmd, tauriArgs) {
-  const invoke = await requireInvoke()
-
   // In Tauri, call Rust directly. No sidecar/socket probing remains.
-  try {
-    const result = await invoke(tauriCmd, tauriArgs)
-    return JSON.parse(result)
-  } catch (e) {
-    console.error(`[Backend] Tauri bridge error for ${tauriCmd}:`, e)
-    // Normalize errors to standard Error objects
-    if (typeof e === 'string') {
-      throw new Error(e)
-    }
-    if (e instanceof Error) {
-      throw e
-    }
-    throw new Error(e?.message || e?.toString() || 'Unknown fetch error')
-  }
+  const result = await invokeCommand(tauriCmd, tauriArgs)
+  return JSON.parse(result)
 }
 
 /**
@@ -141,8 +168,7 @@ export async function renderPreviewFrame(config, parsedActivity, second) {
  * @returns {Promise<object>} Promise resolving to the operation result.
  */
 export async function getPlatformInfo() {
-  const invoke = await requireInvoke()
-  const payload = await invoke('backend_current_os')
+  const payload = await invokeCommand('backend_current_os')
   return typeof payload === 'string' ? JSON.parse(payload) : payload
 }
 
@@ -284,8 +310,7 @@ export async function getTemplate(filename) {
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function getDefaultTemplateSavePath(filename) {
-  const invoke = await requireInvoke()
-  return invoke('default_template_save_path', { filename })
+  return invokeCommand('default_template_save_path', { filename })
 }
 
 /**
@@ -296,8 +321,7 @@ export async function getDefaultTemplateSavePath(filename) {
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function writeTemplateFile(path, contents) {
-  const invoke = await requireInvoke()
-  return invoke('write_template_file', { path, contents })
+  return invokeCommand('write_template_file', { path, contents })
 }
 
 /**
@@ -308,8 +332,7 @@ export async function writeTemplateFile(path, contents) {
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function writeParseDebugFile(filename, contents) {
-  const invoke = await requireInvoke()
-  return invoke('write_parse_debug_file', { filename, contents })
+  return invokeCommand('write_parse_debug_file', { filename, contents })
 }
 
 /**
@@ -346,7 +369,6 @@ export async function getVideoState() {
  * @returns {Promise<object>} Promise resolving to available codec flags.
  */
 export async function detectCodecs() {
-  const invoke = await requireInvoke()
-  const result = await invoke('backend_detect_codecs', {})
+  const result = await invokeCommand('backend_detect_codecs', {})
   return typeof result === 'string' ? JSON.parse(result) : result
 }

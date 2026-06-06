@@ -249,6 +249,14 @@ mod tests {
     }
 
     #[test]
+    fn zero_simplify_tolerance_accepted() {
+        let mut p = full_plot();
+        p.simplify_tolerance_px = Some(0.0);
+        let validated = validate_elevation_plot(&p, 0, &validated_scene()).unwrap();
+        assert_eq!(validated.simplify_tolerance_px, 0.0);
+    }
+
+    #[test]
     fn missing_completed_line_width_rejected() {
         let mut p = full_plot();
         p.completed_line_width = None;

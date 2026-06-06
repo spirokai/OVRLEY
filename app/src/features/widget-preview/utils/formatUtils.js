@@ -133,6 +133,8 @@ function convertStandardMetricValue(type, value, displayUnit) {
       switch (displayUnit) {
         case 'ftmin':
           return numericValue * 196.850394
+        case 'ftph':
+          return numericValue * 11811.02364
         case 'mph_vertical':
           return numericValue * 3600
         default:

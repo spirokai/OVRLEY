@@ -5,7 +5,7 @@
 <br />
 
 <div align="center">
-  <img src="docs/hero.png" alt="OVRLEY Dashboard Interface" width="100%" />
+  <img src="docs/hero.avif" alt="OVRLEY Dashboard Interface" width="100%" />
 </div>
 
 <br />

@@ -11,13 +11,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as backend from '@/api/backend'
 import { useRenderStore } from '@/hooks/useAppStoreSelectors'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
-import { buildPreviewFrameWindow, resolveActivityDuration, resolvePreviewSecond } from '@/lib/preview-timing'
-import { createEditorEffectiveConfig } from '@/lib/template-state'
+import { resolvePreviewSecond } from '@/lib/preview-timing'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
 import { getDefaultBitrate } from '../data/bitrateDefaults'
 import { resolutionsMismatch } from '../utils/codecUtils'
+import { createRenderEffectiveConfig } from '../utils/renderConfig'
 import useRenderDialogState from './useRenderDialogState'
 
 export default function useRenderWorkflow({ backendStatus }) {
@@ -281,35 +281,40 @@ export default function useRenderWorkflow({ backendStatus }) {
       }
 
       setRenderingPreviewFrame(true)
-      const nextConfig = createEditorEffectiveConfig({ config, globalDefaults })
+      const nextConfig = createRenderEffectiveConfig({
+        availableCodecs: useStore.getState().availableCodecs,
+        config,
+        exportBitrate: renderSettingsDraft?.exportBitrate,
+        exportCodec,
+        exportRange,
+        globalDefaults,
+        importedVideoDuration: useStore.getState().importedVideoDuration,
+        importedVideoFps: useStore.getState().importedVideoFps,
+        importedVideoFpsDen: useStore.getState().importedVideoFpsDen,
+        importedVideoFpsNum: useStore.getState().importedVideoFpsNum,
+        importedVideoPath: useStore.getState().importedVideoPath,
+        timelineEnd: useStore.getState().endSecond,
+        timelineStart: useStore.getState().startSecond,
+        updateRate,
+        videoSyncOffsetSeconds: useStore.getState().videoSyncOffsetSeconds,
+      })
       const previewFps = sanitizeIntegerFps(nextConfig.scene.fps || 30)
 
-      // Mirror the editor canvas timing path exactly: first resolve the shared
-      // preview second from the current playhead, then synthesize the minimal
-      // one-frame scene window the backend still requires for dense activity
-      // generation and frame lookup.
       const dummyDurationSeconds = useStore.getState().dummyDurationSeconds
       const selectedSecond = useStore.getState().selectedSecond
-      const previewSecond = resolvePreviewSecond({
+      const resolvedPreviewSecond = resolvePreviewSecond({
         dummyDurationSeconds,
         selectedSecond,
         sourceActivity: parsedActivity,
       })
-      const activityDuration = resolveActivityDuration({
-        dummyDurationSeconds,
-        sourceActivity: parsedActivity,
-      })
-      const previewWindow = buildPreviewFrameWindow({
-        activityDuration,
-        previewSecond,
-        sceneFps: previewFps,
-      })
+      const previewSecond = Math.min(
+        Math.max(resolvedPreviewSecond, nextConfig.scene.start ?? 0),
+        nextConfig.scene.end ?? resolvedPreviewSecond,
+      )
 
       nextConfig.scene = {
         ...nextConfig.scene,
         fps: previewFps,
-        start: previewWindow.start,
-        end: previewWindow.end,
         update_rate: normalizeUpdateRateForFps(previewFps, updateRate),
       }
       delete nextConfig.scene.updateRate
@@ -328,7 +333,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     } finally {
       setRenderingPreviewFrame(false)
     }
-  }, [config, globalDefaults, renderPreviewFrameDisabled, setErrorMessage, updateRate])
+  }, [config, exportCodec, exportRange, globalDefaults, renderPreviewFrameDisabled, renderSettingsDraft?.exportBitrate, setErrorMessage, updateRate])
 
   return {
     closeRenderDialog,

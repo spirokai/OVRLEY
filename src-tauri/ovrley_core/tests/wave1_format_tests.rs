@@ -284,6 +284,22 @@ fn vertical_speed_converts_to_ftmin() {
 }
 
 #[test]
+fn vertical_speed_converts_to_ftph() {
+    let (value, unit) = format_parts(
+        "vertical_speed",
+        "vertical_speed",
+        Some(1.0),
+        &[
+            ("display_unit", r#""ftph""#),
+            ("decimals", "1"),
+            ("show_units", "true"),
+        ],
+    );
+    assert_eq!(value, "11811");
+    assert_eq!(unit, Some("FT/H".to_string()));
+}
+
+#[test]
 fn vertical_oscillation_formats_as_mm() {
     let (value, unit) = format_parts(
         "vertical_oscillation",

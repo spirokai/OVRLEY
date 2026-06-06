@@ -152,7 +152,7 @@
           "label": "BPM"
         }
       ],
-      "showUnitsByDefault": false,
+      "showUnitsByDefault": true,
       "formatter": "integer",
       "icon": {
         "source": "shared",
@@ -170,7 +170,7 @@
           "label": "RPM"
         }
       ],
-      "showUnitsByDefault": false,
+      "showUnitsByDefault": true,
       "formatter": "integer",
       "icon": {
         "source": "shared",
@@ -188,7 +188,7 @@
           "label": "W"
         }
       ],
-      "showUnitsByDefault": false,
+      "showUnitsByDefault": true,
       "formatter": "integer",
       "icon": {
         "source": "shared",
@@ -417,7 +417,7 @@
       "type": "vertical_speed",
       "current": true,
       "label": "Vertical Speed",
-      "defaultDisplayUnit": "mps",
+      "defaultDisplayUnit": "mph_vertical",
       "supportedDisplayUnits": [
         {
           "value": "mps",
@@ -428,6 +428,11 @@
           "value": "ftmin",
           "label": "ft/min",
           "renderLabel": "FT/MIN"
+        },
+        {
+          "value": "ftph",
+          "label": "ft/h",
+          "renderLabel": "FT/H"
         },
         {
           "value": "mph_vertical",
@@ -464,7 +469,7 @@
     },
     {
       "type": "vertical_ratio",
-      "current": false,
+      "current": true,
       "label": "Vertical Ratio",
       "defaultDisplayUnit": "percent",
       "supportedDisplayUnits": [
@@ -540,7 +545,7 @@
           "label": "°"
         }
       ],
-      "showUnitsByDefault": false,
+      "showUnitsByDefault": true,
       "formatter": "integer",
       "icon": {
         "source": "lucide",

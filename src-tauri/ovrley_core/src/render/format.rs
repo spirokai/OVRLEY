@@ -493,6 +493,7 @@ fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, v
         MetricKind::Torque => value,
         MetricKind::VerticalSpeed => match display_unit.unwrap_or("mps") {
             "ftmin" => value * 196.850_394,
+            "ftph" => value * 11_811.023_64,
             "mph_vertical" => value * 3600.0,
             _ => value,
         },

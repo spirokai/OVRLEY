@@ -6,7 +6,8 @@
 //! before sending the config.
 
 use super::helpers::{
-    normalize_marker_variant, require_f32, require_hex_color, require_opacity, require_positive_f32,
+    normalize_marker_variant, require_f32, require_hex_color, require_non_negative_f32,
+    require_opacity, require_positive_f32,
 };
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::raw::CoursePlotConfig;
@@ -40,8 +41,8 @@ pub fn validate_route_plot(
 ) -> CoreResult<ValidatedRoutePlot> {
     let p = |f: &str| format!("plots[{index}].{f}");
 
-    let simplify_tolerance_px =
-        require_positive_f32(plot.simplify_tolerance_px, &p("simplify_tolerance_px"))?;
+    let simplify_tolerance_px = require_f32(plot.simplify_tolerance_px, &p("simplify_tolerance_px"))?;
+    require_non_negative_f32(simplify_tolerance_px, &p("simplify_tolerance_px"))?;
     let target_density = require_f32(plot.target_density, &p("target_density"))?;
     if !(0.1..=2.0).contains(&target_density) {
         return Err(CoreError::Config(format!(
@@ -143,6 +144,22 @@ mod tests {
     fn missing_simplify_tolerance_rejected() {
         let mut p = full_plot();
         p.simplify_tolerance_px = None;
+        let e = validate_route_plot(&p, 0).unwrap_err().to_string();
+        assert!(e.contains("simplify_tolerance_px"), "{e}");
+    }
+
+    #[test]
+    fn zero_simplify_tolerance_accepted() {
+        let mut p = full_plot();
+        p.simplify_tolerance_px = Some(0.0);
+        let validated = validate_route_plot(&p, 0).unwrap();
+        assert_eq!(validated.simplify_tolerance_px, 0.0);
+    }
+
+    #[test]
+    fn negative_simplify_tolerance_rejected() {
+        let mut p = full_plot();
+        p.simplify_tolerance_px = Some(-1.0);
         let e = validate_route_plot(&p, 0).unwrap_err().to_string();
         assert!(e.contains("simplify_tolerance_px"), "{e}");
     }

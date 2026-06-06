@@ -593,13 +593,60 @@ pub fn parse_template_value(value: &Value) -> CoreResult<RenderConfig> {
         )));
     }
 
-    let config_value = value
+    let mut config_value = value
         .get("config")
         .cloned()
         .ok_or_else(|| CoreError::Config("template config missing".into()))?;
+    materialize_template_scene_defaults(&mut config_value, value);
     let mut config = parse_config_value(&config_value)?;
     apply_template_global_defaults(&mut config, &value);
     Ok(config)
+}
+
+fn materialize_template_scene_defaults(config: &mut Value, template: &Value) {
+    let Some(scene) = config.get_mut("scene").and_then(Value::as_object_mut) else {
+        return;
+    };
+
+    if !scene.contains_key("start") {
+        scene.insert("start".to_string(), Value::from(0.0));
+    }
+    if !scene.contains_key("end") {
+        scene.insert("end".to_string(), Value::from(1.0));
+    }
+
+    let Some(globals) = template
+        .get("settings")
+        .and_then(|settings| settings.get("globalDefaults"))
+        .and_then(Value::as_object)
+    else {
+        return;
+    };
+
+    copy_scene_default_if_missing(scene, globals, "scale", "scale");
+    copy_scene_default_if_missing(scene, globals, "font", "font_values");
+    copy_scene_default_if_missing(scene, globals, "font_size", "font_size");
+    copy_scene_default_if_missing(scene, globals, "opacity", "opacity");
+    copy_scene_default_if_missing(scene, globals, "shadow_color", "shadow_color");
+    copy_scene_default_if_missing(scene, globals, "shadow_strength", "shadow_strength");
+    copy_scene_default_if_missing(scene, globals, "shadow_distance", "shadow_distance");
+    copy_scene_default_if_missing(scene, globals, "border_color", "border_color");
+    copy_scene_default_if_missing(scene, globals, "border_thickness", "border_thickness");
+}
+
+fn copy_scene_default_if_missing(
+    scene: &mut serde_json::Map<String, Value>,
+    globals: &serde_json::Map<String, Value>,
+    scene_key: &str,
+    globals_key: &str,
+) {
+    if scene.contains_key(scene_key) {
+        return;
+    }
+
+    if let Some(value) = globals.get(globals_key) {
+        scene.insert(scene_key.to_string(), value.clone());
+    }
 }
 
 fn apply_template_global_defaults(config: &mut RenderConfig, template: &Value) {
