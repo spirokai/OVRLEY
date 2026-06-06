@@ -269,12 +269,16 @@ export async function cancelRender() {
   return apiCall('backend_cancel', {})
 }
 
+async function openFolder(command) {
+  return apiCall(command, {})
+}
+
 /**
  * Opens downloads.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function openDownloads() {
-  return apiCall('backend_open_downloads', {})
+  return openFolder('backend_open_downloads')
 }
 
 /**
@@ -282,7 +286,7 @@ export async function openDownloads() {
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 export async function openTemplates() {
-  return apiCall('backend_open_templates', {})
+  return openFolder('backend_open_templates')
 }
 
 /**

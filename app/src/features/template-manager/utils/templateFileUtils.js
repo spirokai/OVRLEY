@@ -1,23 +1,11 @@
 /**
  * File dialog helpers for template import/export operations.
- * Pure functions — no React dependencies.
+ * Pure functions - no React dependencies.
  */
 
-/**
- * Creates a hidden file input element and resolves with the selected file.
- * Falls back to browser file picker when Tauri dialog is unavailable.
- *
- * @returns {Promise<File|null>} The selected file, or null if cancelled.
- */
-export const selectBrowserTemplateFile = () =>
-  new Promise((resolve) => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.json,application/json'
-    input.onchange = () => resolve(input.files?.[0] ?? null)
-    input.oncancel = () => resolve(null)
-    input.click()
-  })
+import { selectBrowserFile } from '@/lib/file-dialog'
+
+export const selectBrowserTemplateFile = () => selectBrowserFile('.json,application/json')
 
 /**
  * Extracts the filename from a full filesystem path.

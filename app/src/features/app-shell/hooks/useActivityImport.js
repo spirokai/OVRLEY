@@ -1,47 +1,30 @@
 /**
- * Activity import — GPX/FIT file selection via browser file dialog.
- * Manages the file-open flow and delegates parsing to gpxUtils.
+ * Activity import - GPX/FIT file selection and import.
  */
 
 import { useCallback } from 'react'
-import useStore from '@/store/useStore'
+import { hasTauriRuntime } from '@/api/backend'
 import { useActivityStore } from '@/hooks/useAppStoreSelectors'
 import importActivityFile from '@/lib/activity/import-activity'
+import { fileFromSelectedPath, openSinglePath, selectBrowserFile } from '@/lib/file-dialog'
+import useStore from '@/store/useStore'
 
-/**
- * Opens a browser file-picker dialog for .gpx / .fit files.
- * Returns the selected File object, or null on cancel.
- *
- * @returns {Promise<File|null>} The selected file or null.
- */
-const selectBrowserGpxFile = () =>
-  new Promise((resolve) => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.gpx,.fit'
-    input.onchange = () => resolve(input.files?.[0] ?? null)
-    input.oncancel = () => resolve(null)
-    input.click()
-  })
-
-/**
- * Container hook for activity file import.
- * Provides the current GPX filename and an open-handler that
- * triggers the browser file dialog and saves the selected file.
- *
- * @returns {{
- *   activityFilename: string|null,
- *   handleGpxFileOpen: Function,
- * }}
- */
 export default function useActivityImport() {
-  // Store selectors — activity import state from the global store
   const { activityFilename, setErrorMessage, setProcessing } = useActivityStore()
 
-  // Activity file handler — opens file dialog, imports GPX/FIT, handles errors
   const handleGpxFileOpen = useCallback(async () => {
     try {
-      const selected = await selectBrowserGpxFile()
+      let selected = null
+
+      if (hasTauriRuntime()) {
+        const selectedPath = await openSinglePath([{ name: 'GPX or FIT', extensions: ['gpx', 'fit'] }])
+
+        if (typeof selectedPath === 'string') {
+          selected = await fileFromSelectedPath(selectedPath, 'activity')
+        }
+      } else {
+        selected = await selectBrowserFile('.gpx,.fit')
+      }
 
       if (!selected) return
 

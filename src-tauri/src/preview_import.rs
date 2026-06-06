@@ -35,13 +35,6 @@ pub(crate) fn preview_warnings_for_metadata(metadata: &serde_json::Value) -> Vec
         .and_then(|value| value.as_u64())
         .unwrap_or(0);
 
-    if codec_name == "hevc" || codec_name == "h265" {
-        warnings.push(
-            "HEVC/H.265 playback depends on the OS video decoder and may not work on every system."
-                .to_string(),
-        );
-    }
-
     if bits_per_raw_sample > 8 || pix_fmt.contains("10") || pix_fmt.contains("12") {
         warnings.push(
             "10-bit or higher-bit-depth footage may not play reliably in the native preview."

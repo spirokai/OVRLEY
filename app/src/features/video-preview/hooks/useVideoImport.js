@@ -1,9 +1,9 @@
 /**
- * Video import â€” Tauri dialog-based background media selection and preview management.
+ * Video import - background media selection and preview management.
  */
 
-import { open } from '@tauri-apps/plugin-dialog'
 import { clearPreviewVideo, importPreviewVideo } from '@/api/backend'
+import { openSinglePath } from '@/lib/file-dialog'
 import useStore from '@/store/useStore'
 
 const DEBUG_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
@@ -28,15 +28,12 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
 
   const handleImportVideo = async () => {
     try {
-      const selected = await open({
-        multiple: false,
-        filters: [
-          {
-            name: debugModeEnabled ? 'Video or Image' : 'Video',
-            extensions: debugModeEnabled ? ['mp4', 'mov', 'mkv', 'png', 'jpg', 'jpeg', 'webp'] : ['mp4', 'mov', 'mkv'],
-          },
-        ],
-      })
+      const selected = await openSinglePath([
+        {
+          name: debugModeEnabled ? 'Video or Image' : 'Video',
+          extensions: debugModeEnabled ? ['mp4', 'mov', 'mkv', 'png', 'jpg', 'jpeg', 'webp'] : ['mp4', 'mov', 'mkv'],
+        },
+      ])
       if (!selected) {
         return
       }

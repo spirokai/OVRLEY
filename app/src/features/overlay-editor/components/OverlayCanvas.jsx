@@ -219,7 +219,6 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           src={videoSrc}
           className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')}
           preload="metadata"
-          muted
           playsInline
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
         />
