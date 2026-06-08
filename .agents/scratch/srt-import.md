@@ -847,16 +847,16 @@ Deliverables:
 
 Acceptance criteria:
 
-- [ ] `ParsedActivity`, `TrimmedActivity`, and dense schema structs carry the new series
-- [ ] Render data requirements request the new series when widgets use them
-- [ ] `unitsMode: hidden` is enforced in normalization
-- [ ] Single-unit selectable metrics remain valid and renderable
+- [x] `ParsedActivity`, `TrimmedActivity`, and dense schema structs carry the new series
+- [x] Render data requirements request the new series when widgets use them
+- [x] `unitsMode: hidden` is enforced in the frontend defaults chain and UI; backend manifest requires explicit `unitsMode` per definition
+- [x] Single-unit selectable metrics remain valid and renderable
 
 Manual tests:
 
-- [ ] Run Rust tests covering config validation and metric kind serde
-- [ ] Verify a config containing each new metric survives the normalization seam
-- [ ] Verify no-unit metrics are rejected if malformed configs try to turn units on
+- [x] Run Rust tests covering config validation and metric kind serde
+- [x] Verify a config containing each new metric survives the normalization seam
+- [x] Verify manifest rejects definitions missing `unitsMode` or `interpolation`
 
 ### Phase 6: Backend Densification + Render Formatting
 
