@@ -145,4 +145,68 @@ describe('combineSeries and combineSeriesPreferDerived (via deriveActivityMetric
     expect(result.metricSeriesMap.gradient).toBeDefined()
     expect(result.metricSeriesMap.gradient.series.length).toBe(4)
   })
+
+  test('windowed rate derivation smooths speed across flat distance segments', () => {
+    // Simulate dense SRT-like data: 10 points over 1 second, distance jumps every few frames
+    // like GPS that only updates periodically
+    const elapsedSeries = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    const distanceSeries = [0, 0, 0, 0, 2, 2, 2, 2, 4, 4]
+    const elevationSeries = [100, 100.05, 100.1, 100.15, 100.2, 100.25, 100.3, 100.35, 100.4, 100.45]
+
+    const helpers = makeHelpers()
+    const samples = makeNormalizedSamples(distanceSeries.map(() => ({})))
+
+    const result = deriveActivityMetricSeries({
+      courseSeries: distanceSeries.map(() => [0, 0]),
+      distanceSeries,
+      elevationBaseSeries: elevationSeries,
+      elapsedSeries,
+      normalizedRawSamples: samples,
+      useLegacyGpxDerivations: false,
+      helpers,
+      useWindowedRate: true,
+      rateWindowSeconds: 0.5,
+    })
+
+    // Per-sample (non-windowed) would give: null, 0, 0, 0, 20, 0, 0, 0, 20, 0
+    // Windowed gives more stable values since it looks back ~0.5s
+    expect(result.metricSeriesMap.speed).toBeDefined()
+    const speed = result.metricSeriesMap.speed.series
+    // all non-null speed values should be reasonable (not spiking to 20, then 0)
+    const nonNullSpeeds = speed.filter((v) => v !== null)
+    nonNullSpeeds.forEach((v) => {
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThan(15) // not absurd spikes
+    })
+  })
+
+  test('windowed rate leaves standard data unchanged', () => {
+    // Legacy ~1 sample/sec data: windowed should produce same results as non-windowed
+    // because lookback naturally lands on the previous sample
+    const elapsedSeries = [0, 1, 2, 3, 4]
+    const distanceSeries = [0, 10, 20, 30, 40]
+    const elevationSeries = [100, 110, 120, 130, 140]
+
+    const helpers = makeHelpers()
+    const samples = makeNormalizedSamples(distanceSeries.map(() => ({})))
+
+    const result = deriveActivityMetricSeries({
+      courseSeries: distanceSeries.map(() => [0, 0]),
+      distanceSeries,
+      elevationBaseSeries: elevationSeries,
+      elapsedSeries,
+      normalizedRawSamples: samples,
+      useLegacyGpxDerivations: false,
+      helpers,
+      useWindowedRate: true,
+      rateWindowSeconds: 1,
+    })
+
+    // With 1-second sample spacing, windowed should give ~10 m/s consistently
+    const speed = result.metricSeriesMap.speed.series
+    const nonNullSpeeds = speed.filter((v) => v !== null)
+    nonNullSpeeds.forEach((v) => {
+      expect(v).toBeCloseTo(10, 0)
+    })
+  })
 })

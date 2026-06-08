@@ -33,11 +33,18 @@ export { WIDGET_ICONS }
  * @type {Object<string, number|string>}
  */
 export const DEFAULT_ACTIVITY_PREVIEW = {
+  altitude: 100,
+  aperture: 2.8,
   cadence: 92,
+  color_temperature: 5500,
+  ev: 0,
+  focal_length: 24,
   gradient: -7,
   heading: 90,
   heartrate: 154,
+  iso: 400,
   power: 286,
+  shutter_speed: 0.001,
   speed: 8.4,
   temperature: 21,
   time: '2026-04-20T09:41:00Z',

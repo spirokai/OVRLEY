@@ -349,6 +349,69 @@ export function buildMetricCoverage(metricSeriesMap) {
 }
 
 /**
+ * Derives numeric rate series using a fixed-duration lookback window.
+ *
+ * Instead of differencing consecutive samples (which amplifies quantization
+ * noise in dense telemetry), this function looks back a configurable number
+ * of seconds and computes the rate over that window.  This naturally handles
+ * data sources where the underlying sensor updates at a slower rate than the
+ * sample cadence (e.g. DJI SRT where GPS fixes arrive ~6-10 Hz but cue data
+ * is recorded at ~30 Hz).
+ *
+ * @param {number[]} numeratorSeries - Value series (distance, elevation, etc.).
+ * @param {number[]} elapsedSeries - Elapsed time series aligned with numeratorSeries.
+ * @param {object} helpers - Shared numeric helpers ({ isFiniteNumber, roundValue }).
+ * @param {number} [windowSec=1] - Lookback window in seconds.
+ * @returns {number[]} Derived rate series (null at index 0).
+ */
+function deriveWindowedRateSeries(numeratorSeries, elapsedSeries, helpers, windowSec = 1) {
+  const { isFiniteNumber, roundValue } = helpers
+  const derivedSeries = []
+  let lastValue = null
+
+  for (let index = 0; index < numeratorSeries.length; index += 1) {
+    const currentValue = numeratorSeries[index]
+    const currentElapsed = elapsedSeries[index]
+
+    if (!isFiniteNumber(currentValue) || !isFiniteNumber(currentElapsed)) {
+      derivedSeries.push(lastValue)
+      continue
+    }
+
+    // Walk backward from current index to find a sample at least windowSec ago
+    const lookbackTarget = currentElapsed - windowSec
+    let lookbackIndex = index - 1
+    while (lookbackIndex >= 0 && elapsedSeries[lookbackIndex] > lookbackTarget) {
+      lookbackIndex -= 1
+    }
+
+    if (lookbackIndex < 0) {
+      derivedSeries.push(lastValue)
+      continue
+    }
+
+    const lookbackValue = numeratorSeries[lookbackIndex]
+    const lookbackElapsed = elapsedSeries[lookbackIndex]
+
+    if (!isFiniteNumber(lookbackValue) || !isFiniteNumber(lookbackElapsed)) {
+      derivedSeries.push(lastValue)
+      continue
+    }
+
+    const elapsedDelta = currentElapsed - lookbackElapsed
+    if (elapsedDelta <= 0) {
+      derivedSeries.push(lastValue)
+      continue
+    }
+
+    lastValue = (currentValue - lookbackValue) / elapsedDelta
+    derivedSeries.push(roundValue(lastValue, 6))
+  }
+
+  return derivedSeries
+}
+
+/**
  * Derives activity metric series.
  *
  * @param {object} options - Structured options for the helper.
@@ -369,6 +432,8 @@ export function deriveActivityMetricSeries({
   normalizedRawSamples,
   useLegacyGpxDerivations,
   helpers,
+  useWindowedRate = false,
+  rateWindowSeconds = 1,
 }) {
   const { safeNumber } = helpers
   const directMetrics = {
@@ -403,12 +468,16 @@ export function deriveActivityMetricSeries({
   }
 
   const nullSeries = normalizedRawSamples.map(() => null)
-  const derivedSpeed = deriveNumericRateSeries(distanceSeries, elapsedSeries, helpers)
+  const derivedSpeed = useWindowedRate
+    ? deriveWindowedRateSeries(distanceSeries, elapsedSeries, helpers, rateWindowSeconds)
+    : deriveNumericRateSeries(distanceSeries, elapsedSeries, helpers)
   const derivedHeading = deriveHeadingSeries(courseSeries, helpers)
   const derivedGradient = useLegacyGpxDerivations
     ? deriveLegacyGradientSeries(directMetrics.elevation, distanceSeries, helpers)
     : deriveGradientSeries(directMetrics.elevation, distanceSeries, helpers)
-  const derivedVerticalSpeed = deriveNumericRateSeries(directMetrics.elevation, elapsedSeries, helpers)
+  const derivedVerticalSpeed = useWindowedRate
+    ? deriveWindowedRateSeries(directMetrics.elevation, elapsedSeries, helpers, rateWindowSeconds)
+    : deriveNumericRateSeries(directMetrics.elevation, elapsedSeries, helpers)
   const derivedPace = derivePaceSeries(
     directMetrics.speed.map((value, index) => value ?? derivedSpeed[index]),
     helpers,

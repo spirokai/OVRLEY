@@ -278,3 +278,155 @@ describe('left_right_balance format variants', () => {
     expect(model?.unitText).toBe('')
   })
 })
+
+describe('Phase 4 camera metric formatting', () => {
+  test('aperture formats as F/x.x', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('aperture', {}),
+      activity: makeActivity('aperture', 2.8),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('F/2.8')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('aperture formats single decimal place', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('aperture', {}),
+      activity: makeActivity('aperture', 1.7),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('F/1.7')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('aperture shows placeholder when missing', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('aperture', {}),
+      activity: { sample_elapsed_seconds: [0], aperture: [null] },
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('--')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('shutter_speed formats as reciprocal', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('shutter_speed', {}),
+      activity: makeActivity('shutter_speed', 0.0003125),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('1/3200')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('shutter_speed formats 0.5 as 1/2', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('shutter_speed', {}),
+      activity: makeActivity('shutter_speed', 0.5),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('1/2')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('shutter_speed formats 1/50 equivalent', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('shutter_speed', {}),
+      activity: makeActivity('shutter_speed', 0.02),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('1/50')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('shutter_speed shows placeholder when missing', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('shutter_speed', {}),
+      activity: { sample_elapsed_seconds: [0], shutter_speed: [null] },
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('--')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('ev formats positive values with plus sign', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('ev', { decimals: 1 }),
+      activity: makeActivity('ev', 0.5),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('+0.5')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('ev formats negative values with minus sign', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('ev', { decimals: 1 }),
+      activity: makeActivity('ev', -1.0),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('-1.0')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('ev formats zero without sign', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('ev', { decimals: 1 }),
+      activity: makeActivity('ev', 0),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('0.0')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('ev shows placeholder when missing', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('ev', {}),
+      activity: { sample_elapsed_seconds: [0], ev: [null] },
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('--')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('iso formats as integer', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('iso', {}),
+      activity: makeActivity('iso', 800),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('800')
+    expect(model?.unitText).toBe('')
+  })
+
+  test('altitude formats with unit', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('altitude', { show_units: true, display_unit: 'm', decimals: 1 }),
+      activity: makeActivity('altitude', 42.5),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('42.5')
+    expect(model?.unitText).toBe('M')
+  })
+
+  test('focal_length formats with optional mm unit', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('focal_length', { show_units: true, display_unit: 'mm', decimals: 2 }),
+      activity: makeActivity('focal_length', 24),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('24')
+    expect(model?.unitText).toBe('MM')
+  })
+
+  test('color_temperature formats with optional K unit', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('color_temperature', { show_units: true, display_unit: 'kelvin' }),
+      activity: makeActivity('color_temperature', 5491),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('5491')
+    expect(model?.unitText).toBe('K')
+  })
+})

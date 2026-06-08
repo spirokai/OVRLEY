@@ -10,6 +10,7 @@
 import { clamp } from '@/lib/utils'
 import { DEFAULT_ACTIVITY_PREVIEW } from '../data/overlayEditorConfig'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
+import { getStandardMetricInterpolation } from '@/lib/standard-metrics'
 
 /**
  * Returns the configured scene dimensions with defaults of 1920x1080.
@@ -134,6 +135,55 @@ export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
 }
 
 /**
+ * Returns the last known value at or before the target X using hold semantics.
+ * Finds the sample with the largest X <= targetX and returns its Y value.
+ * Null Y values are skipped by walking backward from the insertion point.
+ *
+ * @param {number[]} xValues - X-axis sample values (monotonic).
+ * @param {number[]} yValues - Y-axis sample values aligned with xValues.
+ * @param {number} targetX - Requested X value.
+ * @returns {number|null} Held Y value, or null if no valid sample exists before targetX.
+ */
+export function getHoldSeriesValue(xValues, yValues, targetX) {
+  if (!Array.isArray(xValues) || !Array.isArray(yValues) || !xValues.length) {
+    return null
+  }
+
+  const safeTargetX = Number(targetX)
+  if (!Number.isFinite(safeTargetX)) {
+    return null
+  }
+
+  // Find the rightmost index where xValues[index] <= safeTargetX
+  let bestIndex = -1
+  let low = 0
+  let high = xValues.length - 1
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2)
+    if (Number(xValues[mid]) <= safeTargetX) {
+      bestIndex = mid
+      low = mid + 1
+    } else {
+      high = mid - 1
+    }
+  }
+
+  if (bestIndex === -1) {
+    return null
+  }
+
+  // Walk backward from bestIndex to find the first non-null Y value
+  for (let i = bestIndex; i >= 0; i -= 1) {
+    if (Number.isFinite(yValues[i])) {
+      return Number(yValues[i])
+    }
+  }
+
+  return null
+}
+
+/**
  * Interpolates an activity metric series (speed, heartrate, etc.) at the
  * given elapsed second. Falls back to DEFAULT_ACTIVITY_PREVIEW values.
  *
@@ -148,6 +198,13 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
 
   if (!Array.isArray(series) || !elapsedSeries.length) {
     return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
+  }
+
+  const interpolationMode = getStandardMetricInterpolation(key)
+
+  if (interpolationMode === 'hold') {
+    const heldValue = getHoldSeriesValue(elapsedSeries, series, elapsedSecond)
+    return heldValue ?? null
   }
 
   const interpolatedValue = getInterpolatedSeriesValue(elapsedSeries, series, elapsedSecond)

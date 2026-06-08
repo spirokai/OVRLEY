@@ -130,6 +130,8 @@ export function finalizeParsedActivity({ fileName, fileFormat, metadata = {}, ra
   const helpers = { calculateBearingDegrees, haversineDistanceMeters, isFiniteNumber, roundValue, safeNumber, safeTimestamp }
   const useLegacyGpxDerivations = options.useLegacyGpxDerivations === true
   const skipIdleGapFill = options.skipIdleGapFill === true
+  const useWindowedRate = options.useWindowedRate === true
+  const rateWindowSeconds = typeof options.rateWindowSeconds === 'number' && options.rateWindowSeconds > 0 ? options.rateWindowSeconds : 1
   const { rawSamples: normalizedRawSamples, gapDebug } = skipIdleGapFill
     ? { rawSamples, gapDebug: { inserted_sample_count: 0 } }
     : insertIdleGapSamples(rawSamples)
@@ -147,6 +149,8 @@ export function finalizeParsedActivity({ fileName, fileFormat, metadata = {}, ra
     normalizedRawSamples,
     useLegacyGpxDerivations,
     helpers,
+    useWindowedRate,
+    rateWindowSeconds,
   })
 
   const validAttributes = buildValidAttributes(metricSeriesMap, courseSeries, timeSeries)

@@ -315,7 +315,6 @@ function parseFormatBShutter(raw) {
 function splitCues(text) {
   const cues = []
   const blocks = text.split(/\n\s*\n/)
-  let currentCue = null
 
   for (const block of blocks) {
     const lines = block.trim().split('\n')
@@ -360,6 +359,6 @@ export function parseSrtActivityFile(text, fileName) {
     fileFormat: 'srt',
     metadata: {},
     rawSamples,
-    options: { skipIdleGapFill: true },
+    options: { skipIdleGapFill: true, useWindowedRate: true, rateWindowSeconds: 0.5 },
   })
 }

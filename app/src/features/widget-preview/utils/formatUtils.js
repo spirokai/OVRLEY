@@ -9,7 +9,12 @@ import {
   MAX_GRADIENT_ABS_PERCENT,
   GRADIENT_ZERO_EPSILON,
 } from '@/features/overlay-editor'
-import { getStandardMetricDefinition, getStandardMetricDisplayUnit, getStandardMetricUnitLabel } from '@/lib/standard-metrics'
+import {
+  getStandardMetricDefinition,
+  getStandardMetricDisplayUnit,
+  getStandardMetricUnitLabel,
+  getStandardMetricUnitsMode,
+} from '@/lib/standard-metrics'
 import { measurePreviewText, getPreviewTextBaseline } from './textMeasurement'
 
 /**
@@ -187,6 +192,50 @@ function formatBalance(value, decimals = 0, balanceFormat = 'percent_label') {
   }
 }
 
+function formatAperture(value) {
+  if (value === null || value === undefined) {
+    return { value: '--', units: '' }
+  }
+
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return { value: '--', units: '' }
+  }
+
+  return { value: `F/${numericValue.toFixed(1)}`, units: '' }
+}
+
+function formatShutterSpeed(value) {
+  if (value === null || value === undefined) {
+    return { value: '--', units: '' }
+  }
+
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return { value: '--', units: '' }
+  }
+
+  const denominator = Math.round(1 / numericValue)
+  return { value: `1/${denominator}`, units: '' }
+}
+
+function formatEv(value, decimals = 1) {
+  if (value === null || value === undefined) {
+    return { value: '--', units: '' }
+  }
+
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return { value: '--', units: '' }
+  }
+
+  const abs = Math.abs(numericValue)
+  const formatted = abs.toFixed(decimals)
+  const prefix = numericValue > 0 ? '+' : numericValue < 0 ? '-' : ''
+
+  return { value: `${prefix}${formatted}`, units: '' }
+}
+
 export function formatStandardMetricDisplay(type, value, widgetData = {}) {
   const definition = getStandardMetricDefinition(type)
   if (!definition) {
@@ -198,6 +247,8 @@ export function formatStandardMetricDisplay(type, value, widgetData = {}) {
 
   const displayUnit = getStandardMetricDisplayUnit(type, widgetData)
   const unitLabel = getStandardMetricUnitLabel(type, displayUnit)
+  const unitsMode = getStandardMetricUnitsMode(type)
+  const effectiveUnitLabel = unitsMode === 'hidden' ? '' : unitLabel
 
   if (definition.formatter === 'speed') {
     return formatSpeed(value, displayUnit)
@@ -215,9 +266,21 @@ export function formatStandardMetricDisplay(type, value, widgetData = {}) {
     return formatBalance(value, widgetData.decimals ?? 0, widgetData.balance_format)
   }
 
+  if (definition.formatter === 'aperture') {
+    return formatAperture(value)
+  }
+
+  if (definition.formatter === 'shutter') {
+    return formatShutterSpeed(value)
+  }
+
+  if (definition.formatter === 'ev') {
+    return formatEv(value, widgetData.decimals ?? 1)
+  }
+
   return formatRoundedMetric(
     value === null || value === undefined ? value : convertStandardMetricValue(type, value, displayUnit),
-    unitLabel,
+    effectiveUnitLabel,
     widgetData.decimals ?? (definition.formatter === 'decimal' ? 1 : 0),
   )
 }

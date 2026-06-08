@@ -756,6 +756,8 @@ Manual tests:
 - [x] Verify `altitude`, `iso`, `aperture`, `shutter_speed`, `focal_length`, `ev`, and `color_temperature` arrays exist and align with `sample_elapsed_seconds`
 - [x] Verify `speed`, `heading`, and `vertical_speed` can still be derived from the imported SRT activity
 
+> **Post-implementation (windowed rate derivation):** SRT GPS data is sparse relative to cue cadence (GPS updates ~6-10 Hz vs cue data at ~30 Hz). `finalizeParsedActivity` now accepts `options.useWindowedRate` which routes speed and vertical_speed through `deriveWindowedRateSeries()` — a 1-second lookback window instead of per-sample differencing. Only the SRT parser passes this flag; FIT/GPX keep existing per-sample rate derivation unchanged.
+
 ### Phase 3: Frontend Widget Catalog + Units UI Plumbing
 
 Files:
@@ -812,20 +814,20 @@ Deliverables:
 
 Acceptance criteria:
 
-- [ ] Frontend preview uses manifest-driven `linear` vs `hold`
-- [ ] `shutter_speed` always renders as reciprocal style in preview
-- [ ] `aperture` renders as `F/x.x` in preview
-- [ ] `focal_length` renders with optional `mm`
-- [ ] `color_temperature` renders with optional `K`
-- [ ] Unitless metrics render no unit text
-- [ ] Preview fallback data exists for all new metrics when no activity is loaded
+- [x] Frontend preview uses manifest-driven `linear` vs `hold`
+- [x] `shutter_speed` always renders as reciprocal style in preview
+- [x] `aperture` renders as `F/x.x` in preview
+- [x] `focal_length` renders with optional `mm`
+- [x] `color_temperature` renders with optional `K`
+- [x] Unitless metrics render no unit text
+- [x] Preview fallback data exists for all new metrics when no activity is loaded
 
 Manual tests:
 
-- [ ] Scrub between two different ISO values and confirm the preview holds rather than interpolates
-- [ ] Scrub between two altitude values and confirm the preview interpolates smoothly
-- [ ] Verify shutter text stays reciprocal throughout playback/scrubbing
-- [ ] Verify turning units off for `focal_length` and `color_temperature` removes the suffix cleanly
+- [x] Scrub between two different ISO values and confirm the preview holds rather than interpolates
+- [x] Scrub between two altitude values and confirm the preview interpolates smoothly
+- [x] Verify shutter text stays reciprocal throughout playback/scrubbing
+- [x] Verify turning units off for `focal_length` and `color_temperature` removes the suffix cleanly
 
 ### Phase 5: Backend Schema + Normalization + Requirements
 
@@ -884,6 +886,8 @@ Acceptance criteria:
 - [ ] Rust renderer formats aperture as `F/x.x`
 - [ ] Rust renderer shows/hides `mm` and `K` based on `show_units`
 - [ ] Preview/render parity is maintained for the new metrics
+
+> **Note:** The frontend SRT parser applies windowed rate derivation (1-second lookback) before producing the `speed` and `vertical_speed` series. The backend receives these as pre-computed numeric arrays — do NOT re-derive rates from raw GPS coordinates in Rust. Densification should interpolate the received arrays as-is.
 
 Manual tests:
 

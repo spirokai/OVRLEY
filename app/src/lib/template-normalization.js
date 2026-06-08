@@ -39,7 +39,6 @@ import {
   TEXT_DEFAULTS,
   COURSE_PLOT_DEFAULTS,
   ELEVATION_PLOT_DEFAULTS,
-  METRIC_TYPE_OVERRIDES,
   GRADIENT_DEFAULTS,
 } from '@/lib/standard-widgets'
 
@@ -131,7 +130,8 @@ function normalizeDisplayVariants(variants) {
 
 function normalizeValue(value = {}) {
   const type = value.value
-  const extraKeys = type === 'gradient' ? Object.keys(GRADIENT_DEFAULTS) : Object.keys(METRIC_TYPE_OVERRIDES[type] || {})
+  const valueDefaults = type === 'gradient' ? GRADIENT_DEFAULTS : TYPE_DEFAULTS[type] || {}
+  const extraKeys = Object.keys(valueDefaults).filter((key) => !VALUE_SHARED_KEYS.includes(key))
   const keys = [...VALUE_SHARED_KEYS, ...extraKeys]
   const withDefaults = { ...TEXT_DEFAULTS, ...TYPE_DEFAULTS[type], ...value }
   const pickedValue = pickDefined(withDefaults, keys)
