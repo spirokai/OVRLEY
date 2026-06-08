@@ -85,3 +85,31 @@ export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradien
   icon: TYPE_ICONS[type],
   label: WIDGET_DRAWER_LABELS[type] ?? TYPE_LABELS[type],
 }))
+
+const NON_METRIC_CATEGORIES = {
+  label: 'general',
+  time: 'general',
+  elevation: 'general',
+  course: 'general',
+  gradient: 'general',
+}
+
+function getWidgetCategory(type) {
+  if (type in NON_METRIC_CATEGORIES) return NON_METRIC_CATEGORIES[type]
+  return getStandardMetricDefinition(type)?.category || 'other'
+}
+
+const CATEGORY_ORDER = ['general', 'cycling', 'running', 'camera', 'other']
+
+export const GROUPED_QUICKMENU_ITEMS = (() => {
+  const groups = {}
+  for (const item of QUICKMENU_ITEMS) {
+    const cat = getWidgetCategory(item.type)
+    if (!groups[cat]) groups[cat] = []
+    groups[cat].push(item)
+  }
+  return CATEGORY_ORDER.map((cat) => ({
+    category: cat,
+    items: groups[cat] || [],
+  })).filter((g) => g.items.length > 0)
+})()

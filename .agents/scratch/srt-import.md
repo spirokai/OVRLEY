@@ -787,10 +787,10 @@ Acceptance criteria:
 
 Manual tests:
 
-- [ ] Add each new metric widget from the drawer/quick menu
-- [ ] Open the widget editor for each and verify the expected unit controls appear or do not appear
-- [ ] Toggle units on/off for `focal_length` and `color_temperature`
-- [ ] Confirm there is no unit dropdown for a single-unit selectable metric
+- [x] Add each new metric widget from the drawer/quick menu
+- [x] Open the widget editor for each and verify the expected unit controls appear or do not appear
+- [x] Toggle units on/off for `focal_length` and `color_temperature`
+- [x] Confirm there is no unit dropdown for a single-unit selectable metric
 
 ### Phase 4: Frontend Preview Interpolation + Formatting
 

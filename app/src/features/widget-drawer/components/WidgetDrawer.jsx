@@ -43,7 +43,7 @@ export function WidgetDrawer() {
             transform: widgetDrawerOpen ? 'translateX(0)' : 'translateX(calc(-100% + 24px))',
           }}
         >
-          <div className="w-40 h-full bg-card rounded-r-lg flex flex-col overflow-hidden border border-border/60 shadow-lg shadow-black/80">
+          <div className="w-60 h-full bg-card rounded-r-lg flex flex-col overflow-hidden border border-border/60 shadow-lg shadow-black/80">
             <WidgetButtonGrid onAddWidget={handleAddWidget} />
           </div>
           <div className="flex flex-col h-full">
