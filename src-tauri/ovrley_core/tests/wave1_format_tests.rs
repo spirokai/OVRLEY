@@ -84,6 +84,13 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
         "vertical_speed" => s.vertical_speed = series,
         "gear_position" => s.gear_position = series,
         "vertical_oscillation" => s.vertical_oscillation = series,
+        "altitude" => s.altitude = series,
+        "iso" => s.iso = series,
+        "aperture" => s.aperture = series,
+        "shutter_speed" => s.shutter_speed = series,
+        "focal_length" => s.focal_length = series,
+        "ev" => s.ev = series,
+        "color_temperature" => s.color_temperature = series,
         _ => {}
     }
     DenseActivityReport {
@@ -466,4 +473,229 @@ fn balance_placeholder_shows_dashes() {
         &[("display_unit", r#""percent""#)],
     );
     assert_eq!(value, "--");
+}
+
+// ── New camera metric formatting ──────────────────────────────────────────
+
+#[test]
+fn iso_formats_as_integer() {
+    let (value, unit) = format_parts(
+        "iso",
+        "iso",
+        Some(400.0),
+        &[("decimals", "0"), ("display_unit", r#""iso""#)],
+    );
+    assert_eq!(value, "400");
+    assert_eq!(unit, None);
+}
+
+#[test]
+fn iso_shows_placeholder_when_missing() {
+    let (value, _) = format_parts(
+        "iso",
+        "iso",
+        None,
+        &[("decimals", "0"), ("display_unit", r#""iso""#)],
+    );
+    assert_eq!(value, "--");
+}
+
+#[test]
+fn aperture_formats_as_fnum() {
+    let (value, unit) = format_parts(
+        "aperture",
+        "aperture",
+        Some(1.7),
+        &[
+            ("decimals", "0"),
+            ("show_units", "false"),
+            ("display_unit", r#""fnum""#),
+        ],
+    );
+    assert_eq!(value, "F/1.7");
+    assert_eq!(unit, None);
+}
+
+#[test]
+fn aperture_formats_integer_fnum() {
+    let (value, _) = format_parts(
+        "aperture",
+        "aperture",
+        Some(2.0),
+        &[
+            ("decimals", "0"),
+            ("show_units", "false"),
+            ("display_unit", r#""fnum""#),
+        ],
+    );
+    assert_eq!(value, "F/2");
+}
+
+#[test]
+fn shutter_speed_formats_reciprocal() {
+    let (value, unit) = format_parts(
+        "shutter_speed",
+        "shutter_speed",
+        Some(0.0003125),
+        &[
+            ("show_units", "false"),
+            ("display_unit", r#""seconds""#),
+        ],
+    );
+    assert_eq!(value, "1/3200");
+    assert_eq!(unit, None);
+}
+
+#[test]
+fn shutter_speed_formats_whole_second() {
+    let (value, _) = format_parts(
+        "shutter_speed",
+        "shutter_speed",
+        Some(0.5),
+        &[
+            ("show_units", "false"),
+            ("display_unit", r#""seconds""#),
+        ],
+    );
+    assert_eq!(value, "1/2");
+}
+
+#[test]
+fn shutter_speed_shows_placeholder_when_missing() {
+    let (value, _) = format_parts(
+        "shutter_speed",
+        "shutter_speed",
+        None,
+        &[
+            ("show_units", "false"),
+            ("display_unit", r#""seconds""#),
+        ],
+    );
+    assert_eq!(value, "--");
+}
+
+#[test]
+fn focal_length_formats_with_mm_unit() {
+    let (value, unit) = format_parts(
+        "focal_length",
+        "focal_length",
+        Some(24.0),
+        &[
+            ("display_unit", r#""mm""#),
+            ("decimals", "0"),
+            ("show_units", "true"),
+        ],
+    );
+    assert_eq!(value, "24");
+    assert_eq!(unit, Some("MM".to_string()));
+}
+
+#[test]
+fn focal_length_formats_without_unit() {
+    let (value, unit) = format_parts(
+        "focal_length",
+        "focal_length",
+        Some(24.0),
+        &[
+            ("display_unit", r#""mm""#),
+            ("decimals", "0"),
+            ("show_units", "false"),
+        ],
+    );
+    assert_eq!(value, "24");
+    assert_eq!(unit, None);
+}
+
+#[test]
+fn ev_formats_negative_with_sign() {
+    let (value, unit) = format_parts(
+        "ev",
+        "ev",
+        Some(-1.0),
+        &[
+            ("decimals", "0"),
+            ("show_units", "false"),
+            ("display_unit", r#""ev""#),
+        ],
+    );
+    assert_eq!(value, "-1");
+    assert_eq!(unit, None);
+}
+
+#[test]
+fn ev_formats_negative_with_decimals() {
+    let (value, _) = format_parts(
+        "ev",
+        "ev",
+        Some(-1.5),
+        &[
+            ("decimals", "1"),
+            ("show_units", "false"),
+            ("display_unit", r#""ev""#),
+        ],
+    );
+    assert_eq!(value, "-1.5");
+}
+
+#[test]
+fn ev_formats_positive_value() {
+    let (value, _) = format_parts(
+        "ev",
+        "ev",
+        Some(1.5),
+        &[
+            ("decimals", "1"),
+            ("show_units", "false"),
+            ("display_unit", r#""ev""#),
+        ],
+    );
+    assert_eq!(value, "1.5");
+}
+
+#[test]
+fn color_temperature_formats_with_k_unit() {
+    let (value, unit) = format_parts(
+        "color_temperature",
+        "color_temperature",
+        Some(5491.0),
+        &[
+            ("display_unit", r#""kelvin""#),
+            ("decimals", "0"),
+            ("show_units", "true"),
+        ],
+    );
+    assert_eq!(value, "5491");
+    assert_eq!(unit, Some("K".to_string()));
+}
+
+#[test]
+fn color_temperature_formats_without_unit() {
+    let (value, unit) = format_parts(
+        "color_temperature",
+        "color_temperature",
+        Some(5491.0),
+        &[
+            ("display_unit", r#""kelvin""#),
+            ("decimals", "0"),
+            ("show_units", "false"),
+        ],
+    );
+    assert_eq!(value, "5491");
+    assert_eq!(unit, None);
+}
+
+#[test]
+fn altitude_formats_as_decimal() {
+    let (value, unit) = format_parts(
+        "altitude",
+        "altitude",
+        Some(864.3),
+        &[
+            ("display_unit", r#""m""#),
+            ("decimals", "1"),
+            ("show_units", "true"),
+        ],
+    );
+    assert_eq!(value, "864.3");
+    assert_eq!(unit, Some("M".to_string()));
 }

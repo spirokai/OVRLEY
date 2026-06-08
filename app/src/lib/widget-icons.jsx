@@ -13,6 +13,7 @@ export function WidgetIcon({ type, className, ...props }) {
   return (
     <svg
       viewBox="0 0 24 24"
+      color="currentColor"
       fill="none"
       stroke="currentColor"
       strokeWidth={data.strokeWidth}

@@ -11,6 +11,7 @@ use super::schema::{
     TrimmedActivity,
 };
 use crate::normalize::RenderDataRequirements;
+use crate::standard_metrics::{standard_metric_interpolation, StandardMetricInterpolationKind};
 use chrono::{DateTime, SecondsFormat, Utc};
 
 pub use crate::interpolation::{
@@ -107,17 +108,31 @@ fn interpolate_numeric_series(
         .collect()
 }
 
-// Interpolates a numeric series only when the template requested it.
-fn densify_optional_numeric_series(
+// Densifies a numeric series with hold (step) interpolation.
+// Each frame takes the value of the last sample at or before that frame time.
+fn densify_hold_series(
     x_values: &[f64],
     y_values: &NumericSeries,
     target_x_values: &[f64],
-    enabled: bool,
 ) -> Vec<Option<f64>> {
-    if !enabled || y_values.is_empty() {
+    if y_values.is_empty() {
         return Vec::new();
     }
-    interpolate_numeric_series(x_values, y_values, target_x_values)
+    // Build (x, y) pairs from valid samples
+    let points = collect_valid_numeric_points(x_values, y_values);
+    let mut last_value: Option<f64> = None;
+    let mut point_idx = 0;
+    target_x_values
+        .iter()
+        .map(|target| {
+            // Advance past all points before this target
+            while point_idx < points.len() && points[point_idx].0 <= *target + 1e-9 {
+                last_value = Some(points[point_idx].1);
+                point_idx += 1;
+            }
+            last_value
+        })
+        .collect()
 }
 
 // Densifies a numeric series with forward-fill of nulls.
@@ -259,172 +274,214 @@ pub fn densify_activity(
     // ── Phase 3: densify each requested numeric series ───────────────────
     // Empty vectors signal to render code that the series is not needed,
     // avoiding wasted per-frame lookups and allocations.
+    // Interpolation mode (linear vs hold) is read from the manifest per metric.
+    let densify = |x: &[f64],
+                   y: &NumericSeries,
+                   target: &[f64],
+                   enabled: bool,
+                   kind: crate::MetricKind| {
+        if !enabled || y.is_empty() {
+            return Vec::new();
+        }
+        match standard_metric_interpolation(kind) {
+            Some(StandardMetricInterpolationKind::Hold) => densify_hold_series(x, y, target),
+            _ => interpolate_numeric_series(x, y, target),
+        }
+    };
+
     DenseActivityReport {
         frame_count: frame_elapsed_seconds.len(),
         frame_elapsed_seconds: frame_elapsed_seconds.clone(),
         frame_distance_progress,
         series: DenseSeriesReport {
-            speed: densify_optional_numeric_series(
+            speed: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.speed,
                 &frame_elapsed_seconds,
                 requirements.speed,
+                crate::MetricKind::Speed,
             ),
-            elevation: densify_optional_numeric_series(
+            elevation: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.elevation,
                 &frame_elapsed_seconds,
                 requirements.elevation,
+                crate::MetricKind::Elevation,
             ),
-            gradient: densify_optional_numeric_series(
+            gradient: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.gradient,
                 &frame_elapsed_seconds,
                 requirements.gradient,
+                crate::MetricKind::Gradient,
             ),
-            heartrate: densify_optional_numeric_series(
+            heartrate: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.heartrate,
                 &frame_elapsed_seconds,
                 requirements.heartrate,
+                crate::MetricKind::Heartrate,
             ),
-            cadence: densify_optional_numeric_series(
+            cadence: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.cadence,
                 &frame_elapsed_seconds,
                 requirements.cadence,
+                crate::MetricKind::Cadence,
             ),
-            power: densify_optional_numeric_series(
+            power: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.power,
                 &frame_elapsed_seconds,
                 requirements.power,
+                crate::MetricKind::Power,
             ),
-            temperature: densify_optional_numeric_series(
+            temperature: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.temperature,
                 &frame_elapsed_seconds,
                 requirements.temperature,
+                crate::MetricKind::Temperature,
             ),
-            pace: densify_optional_numeric_series(
+            pace: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.pace,
                 &frame_elapsed_seconds,
                 requirements.pace,
+                crate::MetricKind::Pace,
             ),
-            g_force: densify_optional_numeric_series(
+            g_force: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.g_force,
                 &frame_elapsed_seconds,
                 requirements.g_force,
+                crate::MetricKind::GForce,
             ),
-            air_pressure: densify_optional_numeric_series(
+            air_pressure: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.air_pressure,
                 &frame_elapsed_seconds,
                 requirements.air_pressure,
+                crate::MetricKind::AirPressure,
             ),
-            ground_contact_time: densify_optional_numeric_series(
+            ground_contact_time: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.ground_contact_time,
                 &frame_elapsed_seconds,
                 requirements.ground_contact_time,
+                crate::MetricKind::GroundContactTime,
             ),
-            left_right_balance: densify_optional_numeric_series(
+            left_right_balance: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.left_right_balance,
                 &frame_elapsed_seconds,
                 requirements.left_right_balance,
+                crate::MetricKind::LeftRightBalance,
             ),
-            stride_length: densify_optional_numeric_series(
+            stride_length: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.stride_length,
                 &frame_elapsed_seconds,
                 requirements.stride_length,
+                crate::MetricKind::StrideLength,
             ),
-            stroke_rate: densify_optional_numeric_series(
+            stroke_rate: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.stroke_rate,
                 &frame_elapsed_seconds,
                 requirements.stroke_rate,
+                crate::MetricKind::StrokeRate,
             ),
-            torque: densify_optional_numeric_series(
+            torque: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.torque,
                 &frame_elapsed_seconds,
                 requirements.torque,
+                crate::MetricKind::Torque,
             ),
-            vertical_speed: densify_optional_numeric_series(
+            vertical_speed: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.vertical_speed,
                 &frame_elapsed_seconds,
                 requirements.vertical_speed,
+                crate::MetricKind::VerticalSpeed,
             ),
-            altitude: densify_optional_numeric_series(
+            altitude: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.altitude,
                 &frame_elapsed_seconds,
                 requirements.altitude,
+                crate::MetricKind::Altitude,
             ),
-            iso: densify_optional_numeric_series(
+            iso: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.iso,
                 &frame_elapsed_seconds,
                 requirements.iso,
+                crate::MetricKind::Iso,
             ),
-            aperture: densify_optional_numeric_series(
+            aperture: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.aperture,
                 &frame_elapsed_seconds,
                 requirements.aperture,
+                crate::MetricKind::Aperture,
             ),
-            shutter_speed: densify_optional_numeric_series(
+            shutter_speed: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.shutter_speed,
                 &frame_elapsed_seconds,
                 requirements.shutter_speed,
+                crate::MetricKind::ShutterSpeed,
             ),
-            focal_length: densify_optional_numeric_series(
+            focal_length: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.focal_length,
                 &frame_elapsed_seconds,
                 requirements.focal_length,
+                crate::MetricKind::FocalLength,
             ),
-            ev: densify_optional_numeric_series(
+            ev: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.ev,
                 &frame_elapsed_seconds,
                 requirements.ev,
+                crate::MetricKind::Ev,
             ),
-            color_temperature: densify_optional_numeric_series(
+            color_temperature: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.color_temperature,
                 &frame_elapsed_seconds,
                 requirements.color_temperature,
+                crate::MetricKind::ColorTemperature,
             ),
-            gear_position: densify_optional_numeric_series(
+            gear_position: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.gear_position,
                 &frame_elapsed_seconds,
                 requirements.gear_position,
+                crate::MetricKind::GearPosition,
             ),
-            vertical_ratio: densify_optional_numeric_series(
+            vertical_ratio: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.vertical_ratio,
                 &frame_elapsed_seconds,
                 requirements.vertical_ratio,
+                crate::MetricKind::VerticalRatio,
             ),
-            vertical_oscillation: densify_optional_numeric_series(
+            vertical_oscillation: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.vertical_oscillation,
                 &frame_elapsed_seconds,
                 requirements.vertical_oscillation,
+                crate::MetricKind::VerticalOscillation,
             ),
-            core_temperature: densify_optional_numeric_series(
+            core_temperature: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.core_temperature,
                 &frame_elapsed_seconds,
                 requirements.core_temperature,
+                crate::MetricKind::CoreTemperature,
             ),
             heading: if requirements.heading && !trimmed.heading.is_empty() {
                 densify_forward_fill_series(

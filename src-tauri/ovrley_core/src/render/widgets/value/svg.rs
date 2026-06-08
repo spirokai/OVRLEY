@@ -1,12 +1,12 @@
 /// Lightweight SVG parser for bundled metric widget icons.
 ///
-/// Parses a deliberately small SVG subset (paths, lines, circles, one shared
-/// stroke width) and converts path data into Skia paths. The bundled Lucide-
-/// style icons use only a handful of commands, so the parser does not attempt
-/// full SVG compliance.
+/// Parses a deliberately small SVG subset (paths, lines, circles, root/per-
+/// primitive stroke width, and fill-vs-stroke style) and converts path data
+/// into Skia paths. The bundled Lucide-style icons use only a handful of
+/// commands, so the parser does not attempt full SVG compliance.
 use skia_safe::{path::ArcSize, Path, PathDirection, Point};
 
-use super::icons::{ParsedSvgIcon, SvgPrimitive};
+use super::icons::{ParsedSvgIcon, SvgPrimitive, SvgPrimitiveStyle};
 
 /// Token emitted by the SVG path tokenizer.
 #[derive(Clone, Copy, Debug)]
@@ -18,11 +18,14 @@ pub(crate) enum PathToken {
 /// Parses supported SVG icon markup into local drawing primitives.
 ///
 /// The bundled metric icons use a deliberately small SVG subset: paths,
-/// lines, circles, and one shared stroke width.
+/// lines, circles, fills, and root/per-primitive stroke width.
 pub(crate) fn parse_svg_icon(svg_markup: &str) -> Option<ParsedSvgIcon> {
-    let stroke_width = parse_xml_attr(svg_markup, "stroke-width")
+    let root_tag = root_svg_tag(svg_markup)?;
+    let stroke_width = parse_xml_attr(root_tag, "stroke-width")
         .and_then(|value| value.parse::<f32>().ok())
         .unwrap_or(2.0);
+    let root_fill = parse_paint_enabled(root_tag, "fill").unwrap_or(false);
+    let root_stroke = parse_paint_enabled(root_tag, "stroke").unwrap_or(true);
     let mut primitives = Vec::new();
     let mut rest = svg_markup;
 
@@ -35,19 +38,26 @@ pub(crate) fn parse_svg_icon(svg_markup: &str) -> Option<ParsedSvgIcon> {
         rest = &rest[end + 1..];
 
         if tag.starts_with("path") {
-            primitives.push(SvgPrimitive::Path(parse_xml_attr(tag, "d")?.to_string()));
+            primitives.push(SvgPrimitive::Path {
+                data: parse_xml_attr(tag, "d")?.to_string(),
+                style: parse_primitive_style(tag, root_fill, root_stroke),
+            });
         } else if tag.starts_with("line") {
             primitives.push(SvgPrimitive::Line {
                 x1: parse_xml_attr(tag, "x1")?.parse().ok()?,
                 y1: parse_xml_attr(tag, "y1")?.parse().ok()?,
                 x2: parse_xml_attr(tag, "x2")?.parse().ok()?,
                 y2: parse_xml_attr(tag, "y2")?.parse().ok()?,
+                style: SvgPrimitiveStyle::stroke_only(
+                    parse_xml_attr(tag, "stroke-width").and_then(|value| value.parse::<f32>().ok()),
+                ),
             });
         } else if tag.starts_with("circle") {
             primitives.push(SvgPrimitive::Circle {
                 cx: parse_xml_attr(tag, "cx")?.parse().ok()?,
                 cy: parse_xml_attr(tag, "cy")?.parse().ok()?,
                 r: parse_xml_attr(tag, "r")?.parse().ok()?,
+                style: parse_primitive_style(tag, root_fill, root_stroke),
             });
         }
     }
@@ -65,6 +75,31 @@ fn parse_xml_attr<'a>(markup: &'a str, name: &str) -> Option<&'a str> {
     let rest = &markup[start..];
     let end = rest.find('"')?;
     Some(&rest[..end])
+}
+
+/// Returns the opening `<svg ...>` tag so root-level defaults can be inherited.
+fn root_svg_tag(markup: &str) -> Option<&str> {
+    let start = markup.find("<svg")? + 1;
+    let rest = &markup[start..];
+    let end = rest.find('>')?;
+    Some(&rest[..end])
+}
+
+/// Parses a minimal boolean paint flag from an SVG attribute.
+///
+/// Any present value other than `none` is treated as enabled. The shared icon
+/// set uses `currentColor`, so full color parsing would be unnecessary scope.
+fn parse_paint_enabled(markup: &str, name: &str) -> Option<bool> {
+    parse_xml_attr(markup, name).map(|value| !value.eq_ignore_ascii_case("none"))
+}
+
+/// Builds per-primitive fill/stroke state with optional stroke-width override.
+fn parse_primitive_style(tag: &str, root_fill: bool, root_stroke: bool) -> SvgPrimitiveStyle {
+    SvgPrimitiveStyle {
+        fill: parse_paint_enabled(tag, "fill").unwrap_or(root_fill),
+        stroke: parse_paint_enabled(tag, "stroke").unwrap_or(root_stroke),
+        stroke_width: parse_xml_attr(tag, "stroke-width").and_then(|value| value.parse::<f32>().ok()),
+    }
 }
 
 /// Converts supported SVG path data into a Skia path.

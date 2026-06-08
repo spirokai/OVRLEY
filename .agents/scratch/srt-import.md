@@ -880,12 +880,12 @@ Deliverables:
 
 Acceptance criteria:
 
-- [ ] Rust densification honors manifest `linear` vs `hold`
-- [ ] New metrics appear in dense activity where required
-- [ ] Rust renderer formats shutter reciprocally
-- [ ] Rust renderer formats aperture as `F/x.x`
-- [ ] Rust renderer shows/hides `mm` and `K` based on `show_units`
-- [ ] Preview/render parity is maintained for the new metrics
+- [x] Rust densification honors manifest `linear` vs `hold`
+- [x] New metrics appear in dense activity where required
+- [x] Rust renderer formats shutter reciprocally
+- [x] Rust renderer formats aperture as `F/x.x`
+- [x] Rust renderer shows/hides `mm` and `K` based on `show_units`
+- [x] Preview/render parity is maintained for the new metrics
 
 > **Note:** The frontend SRT parser applies windowed rate derivation (1-second lookback) before producing the `speed` and `vertical_speed` series. The backend receives these as pre-computed numeric arrays — do NOT re-derive rates from raw GPS coordinates in Rust. Densification should interpolate the received arrays as-is.
 

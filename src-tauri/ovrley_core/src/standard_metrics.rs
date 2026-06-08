@@ -61,6 +61,13 @@ pub enum MetricIconAssetKey {
     Torque,
     GearPosition,
     Heading,
+    Altitude,
+    Iso,
+    Aperture,
+    ShutterSpeed,
+    FocalLength,
+    Ev,
+    ColorTemperature,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -350,6 +357,13 @@ pub fn metric_icon_asset_key(kind: MetricKind) -> Option<MetricIconAssetKey> {
         "widget-torque.svg" => Some(MetricIconAssetKey::Torque),
         "widget-gear-position.svg" => Some(MetricIconAssetKey::GearPosition),
         "widget-heading.svg" => Some(MetricIconAssetKey::Heading),
+        "widget-altitude.svg" => Some(MetricIconAssetKey::Altitude),
+        "widget-iso.svg" => Some(MetricIconAssetKey::Iso),
+        "widget-aperture.svg" => Some(MetricIconAssetKey::Aperture),
+        "widget-shutter-speed.svg" => Some(MetricIconAssetKey::ShutterSpeed),
+        "widget-focal-length.svg" => Some(MetricIconAssetKey::FocalLength),
+        "widget-ev.svg" => Some(MetricIconAssetKey::Ev),
+        "widget-color-temperature.svg" => Some(MetricIconAssetKey::ColorTemperature),
         _ => None,
     }
 }

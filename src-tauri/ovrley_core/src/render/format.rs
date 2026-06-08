@@ -39,6 +39,13 @@ pub enum MetricIconKind {
     GearPosition,
     Compass,
     ArrowUpDown,
+    Altitude,
+    Iso,
+    Aperture,
+    ShutterSpeed,
+    FocalLength,
+    Ev,
+    ColorTemperature,
 }
 
 /// Split metric text used by icon+value+unit widgets.
@@ -202,7 +209,49 @@ fn raw_value(
             .get(frame_index)
             .copied()
             .flatten(),
-        _ => None,
+        MetricKind::Altitude => dense_activity
+            .series
+            .altitude
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::Iso => dense_activity
+            .series
+            .iso
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::Aperture => dense_activity
+            .series
+            .aperture
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::ShutterSpeed => dense_activity
+            .series
+            .shutter_speed
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::FocalLength => dense_activity
+            .series
+            .focal_length
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::Ev => dense_activity
+            .series
+            .ev
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::ColorTemperature => dense_activity
+            .series
+            .color_temperature
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::Time => None,
     }
 }
 
@@ -353,9 +402,22 @@ fn format_validated_standard_metric_parts(
             raw.map(|left_value| format_balance_value(left_value, decimals, balance_format))
                 .unwrap_or_else(|| "--".to_string())
         }
-        None | Some(StandardMetricFormatterKind::Shutter) | Some(StandardMetricFormatterKind::Aperture) | Some(StandardMetricFormatterKind::Ev) => {
-            "--".to_string()
-        }
+        Some(StandardMetricFormatterKind::Shutter) => raw
+            .map(|seconds| format_shutter_value(seconds))
+            .unwrap_or_else(|| "--".to_string()),
+        Some(StandardMetricFormatterKind::Aperture) => raw
+            .map(|fnum| format_aperture_value(fnum, decimals))
+            .unwrap_or_else(|| "--".to_string()),
+        Some(StandardMetricFormatterKind::Ev) => raw
+            .map(|ev| {
+                if decimals > 0 {
+                    format!("{ev:.decimals$}")
+                } else {
+                    (ev.round() as i64).to_string()
+                }
+            })
+            .unwrap_or_else(|| "--".to_string()),
+        None => "--".to_string(),
     };
 
     (
@@ -511,6 +573,34 @@ fn format_pace_value(total_seconds: f64) -> String {
     let minutes = rounded_seconds / 60;
     let seconds = rounded_seconds % 60;
     format!("{minutes}:{seconds:02}")
+}
+
+/// Formats shutter speed as reciprocal text (e.g., `1/3200`).
+fn format_shutter_value(seconds: f64) -> String {
+    if !seconds.is_finite() || seconds <= 0.0 {
+        return "--".to_string();
+    }
+    if seconds >= 1.0 {
+        // Whole seconds: 0.5 → 1/2, 1.0 → 1/1
+        let reciprocal = (1.0 / seconds).round();
+        if reciprocal >= 1.0 {
+            return format!("1/{}", reciprocal as i64);
+        }
+    }
+    // Fast shutter: 0.0003125 → 1/3200
+    let reciprocal = (1.0 / seconds).round();
+    format!("1/{}", reciprocal as i64)
+}
+
+/// Formats aperture as `F/x.x` (e.g., `F/1.7`).
+/// Always uses 1 decimal place regardless of widget `decimals` setting,
+/// because aperture values like f/1.7, f/2.8, f/4.0 require fractional display.
+fn format_aperture_value(fnum: f64, _decimals: usize) -> String {
+    if !fnum.is_finite() || fnum <= 0.0 {
+        return "--".to_string();
+    }
+    let formatted = format_number(fnum, 1);
+    format!("F/{formatted}")
 }
 
 fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option<&str>) -> String {

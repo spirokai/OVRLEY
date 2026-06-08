@@ -32,7 +32,7 @@ Shared metric SVG icons used by both the Rust backend (`include_str!`) and the R
 
 ## Usage Notes
 
-- These SVGs use a deliberately small subset (paths, lines, circles) compatible with the Rust icon parser in `ovrley_core/src/render/widgets/value/svg.rs`.
+- These SVGs use a deliberately small subset (paths, lines, circles, `fill="currentColor"`, `fill="none"`, and optional per-element `stroke-width`) compatible with the Rust icon parser in `ovrley_core/src/render/widgets/value/svg.rs`.
 - The Rust backend embeds shared metric icons at compile time via `include_str!`.
 - The frontend imports shared metric icons via the `?raw` query suffix for SVG markup access.
 - Do not add inline styles, complex transforms, or unsupported SVG elements without updating the Rust parser.

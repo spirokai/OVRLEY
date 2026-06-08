@@ -24,7 +24,7 @@ use super::super::types::RouteSample;
 
 fn sample(x: f32, y: f32, progress01: f32) -> RouteSample {
     RouteSample {
-        point: (x, y),
+        point: (x as f64, y as f64),
         progress01,
     }
 }

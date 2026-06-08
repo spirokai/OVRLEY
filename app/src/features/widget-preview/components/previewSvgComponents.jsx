@@ -73,6 +73,7 @@ function PreviewSvgIconShadow({ icon, left, top, iconScale, shadow, shadowFilter
   return (
     <g
       transform={`translate(${left + shadow.distance} ${top + shadow.distance}) scale(${iconScale})`}
+      color={shadowColor.color}
       fill="none"
       stroke={shadowColor.color}
       strokeWidth={icon.strokeWidth || 2}
@@ -204,6 +205,7 @@ export function PreviewMetricIcon({ icon, left, top, size, color, opacity, shado
       />
       <g
         transform={`translate(${left} ${top}) scale(${iconScale})`}
+        color={color}
         fill="none"
         stroke={color}
         strokeWidth={icon.strokeWidth || 2}

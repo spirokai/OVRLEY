@@ -7,6 +7,7 @@ use std::fs;
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::commands::parse_and_validate_config;
+use ovrley_core::normalize::RenderDataRequirements;
 
 fn full_scene(fps: f64, start: f64, end: f64) -> String {
     format!(
@@ -186,4 +187,123 @@ fn parsed_activity_handles_nulls_in_new_series() {
 
     assert_eq!(activity.iso, vec![Some(200.0), None, Some(800.0)]);
     assert_eq!(activity.ev, vec![None, Some(-1.0), None]);
+}
+
+#[test]
+fn hold_interpolation_densifies_iso_as_step_function() {
+    use ovrley_core::activity::interpolate::densify_activity;
+    use ovrley_core::activity::schema::TrimmedActivity;
+
+    // iso samples: 200 at t=0, 800 at t=1
+    // With hold interpolation, all frames before t=1 should hold 200
+    let trimmed = TrimmedActivity {
+        source_start_time: None,
+        sample_elapsed_seconds: vec![0.0, 1.0],
+        sample_distance_progress: vec![],
+        course: vec![],
+        elevation: vec![],
+        speed: vec![],
+        heartrate: vec![],
+        cadence: vec![],
+        power: vec![],
+        temperature: vec![],
+        pace: vec![],
+        g_force: vec![],
+        air_pressure: vec![],
+        ground_contact_time: vec![],
+        left_right_balance: vec![],
+        stride_length: vec![],
+        stroke_rate: vec![],
+        torque: vec![],
+        vertical_speed: vec![],
+        altitude: vec![],
+        iso: vec![Some(200.0), Some(800.0)],
+        aperture: vec![],
+        shutter_speed: vec![],
+        focal_length: vec![],
+        ev: vec![],
+        color_temperature: vec![],
+        gear_position: vec![],
+        vertical_ratio: vec![],
+        vertical_oscillation: vec![],
+        core_temperature: vec![],
+        gradient: vec![],
+        time: vec![],
+        heading: vec![],
+    };
+    let mut requirements = RenderDataRequirements::default();
+    requirements.iso = true;
+
+    // fps=4 → frames at t=0, 0.25, 0.5, 0.75 (all before t=1)
+    let report = densify_activity(&trimmed, 4.0, &requirements);
+
+    assert_eq!(report.series.iso.len(), 4);
+    // Hold: all frames before t=1 should be 200 (the last known value at or before each frame)
+    for (i, value) in report.series.iso.iter().enumerate() {
+        assert_eq!(
+            *value,
+            Some(200.0),
+            "frame {i} should hold 200.0, got {value:?}"
+        );
+    }
+}
+
+#[test]
+fn linear_interpolation_densifies_altitude_as_smooth_line() {
+    use ovrley_core::activity::interpolate::densify_activity;
+    use ovrley_core::activity::schema::TrimmedActivity;
+
+    // altitude samples: 100 at t=0, 200 at t=1
+    // With linear interpolation, values should be between 100 and 200
+    let trimmed = TrimmedActivity {
+        source_start_time: None,
+        sample_elapsed_seconds: vec![0.0, 1.0],
+        sample_distance_progress: vec![],
+        course: vec![],
+        elevation: vec![],
+        speed: vec![],
+        heartrate: vec![],
+        cadence: vec![],
+        power: vec![],
+        temperature: vec![],
+        pace: vec![],
+        g_force: vec![],
+        air_pressure: vec![],
+        ground_contact_time: vec![],
+        left_right_balance: vec![],
+        stride_length: vec![],
+        stroke_rate: vec![],
+        torque: vec![],
+        vertical_speed: vec![],
+        altitude: vec![Some(100.0), Some(200.0)],
+        iso: vec![],
+        aperture: vec![],
+        shutter_speed: vec![],
+        focal_length: vec![],
+        ev: vec![],
+        color_temperature: vec![],
+        gear_position: vec![],
+        vertical_ratio: vec![],
+        vertical_oscillation: vec![],
+        core_temperature: vec![],
+        gradient: vec![],
+        time: vec![],
+        heading: vec![],
+    };
+    let mut requirements = RenderDataRequirements::default();
+    requirements.altitude = true;
+
+    // fps=4 → frames at t=0, 0.25, 0.5, 0.75
+    let report = densify_activity(&trimmed, 4.0, &requirements);
+
+    assert_eq!(report.series.altitude.len(), 4);
+    // Linear: t=0→100, t=0.25→125, t=0.5→150, t=0.75→175
+    let expected = [100.0, 125.0, 150.0, 175.0];
+    for (i, (value, exp)) in report.series.altitude.iter().zip(expected.iter()).enumerate() {
+        let v = value.unwrap();
+        assert!(
+            (v - exp).abs() < 0.01,
+            "frame {i}: expected ~{exp}, got {v}"
+        );
+    }
 }

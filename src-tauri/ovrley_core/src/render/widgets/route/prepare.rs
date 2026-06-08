@@ -6,7 +6,6 @@
 use super::super::common::{
     custom_export_range_active, normalize_optional_progress_window, static_layer_padding,
 };
-use super::super::geometry::fit_points_to_widget_with_inset;
 use super::super::marker::marker_layers_from_plot;
 use super::super::polyline::draw_polyline_with_shadow;
 use super::super::types::{
@@ -35,7 +34,7 @@ pub(crate) fn prepare_route_cache(
     let plot = super::normalize::normalize_route_plot(validated, scene);
     let route_samples = build_route_samples(activity, show_full_activity, scene)?;
     let geometry = prepare_profiler.measure("build_route_cache.geometry", || {
-        build_route_geometry(&plot, &route_samples)
+        build_route_geometry(&plot, validated, &route_samples)
     })?;
     let marker_layers = marker_layers_from_plot(
         &plot.marker_variant,
@@ -76,6 +75,7 @@ pub(crate) fn prepare_route_cache(
 /// preserving visually important points.
 fn build_route_geometry(
     plot: &NormalizedRoutePlot,
+    validated: &ValidatedRoutePlot,
     route_samples: &[RouteSample],
 ) -> CoreResult<WidgetGeometry> {
     if route_samples.len() < 2 {
@@ -87,12 +87,14 @@ fn build_route_geometry(
         .iter()
         .map(|sample| sample.point)
         .collect::<Vec<_>>();
-    let stroke_inset = route_geometry_inset_px(plot);
+    // Match the editor preview: simplify in unscaled widget space, then map the
+    // surviving points into the scaled render box for Skia drawing.
+    let stroke_inset = route_geometry_inset_px_validated(validated);
     let fitted = fit_points_to_widget_with_inset(
         &projected,
-        plot.width as f32,
-        plot.height as f32,
-        stroke_inset,
+        validated.width as f64,
+        validated.height as f64,
+        stroke_inset as f64,
         true,
     );
     let fitted_samples = route_samples
@@ -103,15 +105,25 @@ fn build_route_geometry(
             progress01: sample.progress01,
         })
         .collect::<Vec<_>>();
-    let target_count = ((plot.width as f32) * plot.target_density).round().max(2.0) as usize;
+    let target_count =
+        ((validated.width as f32) * plot.target_density).round().max(2.0) as usize;
     let downsampled =
         downsample_route_samples(&fitted_samples, target_count.min(fitted_samples.len()));
     let simplified = simplify_route_samples(&downsampled, plot.simplify_tolerance_px.max(0.05));
+    let scaled_points = simplified
+        .iter()
+        .map(|sample| {
+            (
+                (sample.point.0 * (plot.width as f64 / validated.width.max(1) as f64)) as f32,
+                (sample.point.1 * (plot.height as f64 / validated.height.max(1) as f64)) as f32,
+            )
+        })
+        .collect::<Vec<_>>();
 
     Ok(WidgetGeometry {
         bbox: (0.0, 0.0, plot.width as f32, plot.height as f32),
         progress_values: simplified.iter().map(|sample| sample.progress01).collect(),
-        points: simplified.iter().map(|sample| sample.point).collect(),
+        points: scaled_points,
         source_point_count: route_samples.len(),
         simplification: format!(
             "lttb_density_{:.2}_rdp_px_{:.2}",
@@ -156,11 +168,54 @@ fn build_route_remaining_layer(
     }))
 }
 
-/// Computes inset needed to keep route strokes and marker inside widget bounds.
-fn route_geometry_inset_px(plot: &NormalizedRoutePlot) -> f32 {
+fn route_geometry_inset_px_validated(plot: &ValidatedRoutePlot) -> f32 {
     let line_inset = (plot.remaining_line_width.max(plot.completed_line_width) * 0.5).max(0.0);
     let marker_inset = plot.marker_size.max(plot.marker_variant_diameter * 0.5);
-    marker_inset.max(line_inset) + 1.0
+    let base_inset = marker_inset.max(line_inset) + 1.0;
+    base_inset.min(plot.width.min(plot.height) as f32 * 0.45)
+}
+
+fn fit_points_to_widget_with_inset(
+    points: &[(f64, f64)],
+    width: f64,
+    height: f64,
+    inset_px: f64,
+    invert_y: bool,
+) -> Vec<(f64, f64)> {
+    if points.is_empty() {
+        return Vec::new();
+    }
+
+    let min_x = points.iter().map(|(x, _)| *x).fold(f64::INFINITY, f64::min);
+    let max_x = points
+        .iter()
+        .map(|(x, _)| *x)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let min_y = points.iter().map(|(_, y)| *y).fold(f64::INFINITY, f64::min);
+    let max_y = points
+        .iter()
+        .map(|(_, y)| *y)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let safe_inset = inset_px.max(0.0).min(width.min(height) * 0.45);
+    let inner_width = (width - safe_inset * 2.0).max(1.0);
+    let inner_height = (height - safe_inset * 2.0).max(1.0);
+    let span_x = (max_x - min_x).max(1e-6);
+    let span_y = (max_y - min_y).max(1e-6);
+    let scale = (inner_width / span_x).min(inner_height / span_y);
+    let offset_x = (width - span_x * scale) / 2.0;
+    let offset_y = (height - span_y * scale) / 2.0;
+
+    points
+        .iter()
+        .map(|(x, y)| {
+            let fitted_x = (x - min_x) * scale + offset_x;
+            let mut fitted_y = (y - min_y) * scale + offset_y;
+            if invert_y {
+                fitted_y = height - fitted_y;
+            }
+            (fitted_x, fitted_y)
+        })
+        .collect()
 }
 
 /// Selects full-activity or trimmed course samples for route geometry.
@@ -221,7 +276,7 @@ fn project_course_samples(
     valid_points
         .into_iter()
         .map(|(index, lat, lon)| RouteSample {
-            point: ((lon * mean_latitude_radians.cos()) as f32, lat as f32),
+            point: (lon * mean_latitude_radians.cos(), lat),
             progress01: progress_values
                 .get(index)
                 .copied()

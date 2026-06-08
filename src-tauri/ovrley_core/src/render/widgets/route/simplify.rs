@@ -4,12 +4,12 @@
 /// decimation and Largest-Triangle-Three-Buckets for density reduction
 /// before simplification.
 use super::super::types::RouteSample;
-use crate::rdp::simplify_rdp_indices;
+use crate::rdp::simplify_rdp_indices_f64;
 
 /// Simplifies route samples using Ramer-Douglas-Peucker.
 pub(crate) fn simplify_route_samples(points: &[RouteSample], tolerance: f32) -> Vec<RouteSample> {
-    let tuples: Vec<(f32, f32)> = points.iter().map(|p| p.point).collect();
-    let indices = simplify_rdp_indices(&tuples, tolerance);
+    let tuples: Vec<(f64, f64)> = points.iter().map(|p| p.point).collect();
+    let indices = simplify_rdp_indices_f64(&tuples, tolerance as f64);
     indices.iter().map(|&i| points[i]).collect()
 }
 
@@ -38,14 +38,14 @@ pub(crate) fn downsample_route_samples(
 
         let average = if avg_range_start < avg_range_end {
             let range = &points[avg_range_start..avg_range_end];
-            let (sum_x, sum_y) = range.iter().fold((0.0f64, 0.0f64), |(sx, sy), sample| {
-                (sx + sample.point.0 as f64, sy + sample.point.1 as f64)
-            });
+            let (sum_x, sum_y) = range
+                .iter()
+                .fold((0.0f64, 0.0f64), |(sx, sy), sample| (sx + sample.point.0, sy + sample.point.1));
             let count = range.len() as f64;
             (sum_x / count, sum_y / count)
         } else {
             let fallback = points[points.len() - 1];
-            (fallback.point.0 as f64, fallback.point.1 as f64)
+            fallback.point
         };
 
         let range_start = (bucket_index as f64 * bucket_size).floor() as usize + 1;
@@ -77,9 +77,9 @@ pub(crate) fn downsample_route_samples(
 }
 
 /// Computes triangle area used by Largest-Triangle-Three-Buckets downsampling.
-fn triangle_area(point_a: (f32, f32), point_b: (f32, f32), point_c: (f64, f64)) -> f64 {
-    (((point_a.0 as f64 - point_c.0) * (point_b.1 as f64 - point_a.1 as f64))
-        - ((point_a.0 as f64 - point_b.0 as f64) * (point_c.1 - point_a.1 as f64)))
+fn triangle_area(point_a: (f64, f64), point_b: (f64, f64), point_c: (f64, f64)) -> f64 {
+    (((point_a.0 - point_c.0) * (point_b.1 - point_a.1))
+        - ((point_a.0 - point_b.0) * (point_c.1 - point_a.1)))
         .abs()
         * 0.5
 }

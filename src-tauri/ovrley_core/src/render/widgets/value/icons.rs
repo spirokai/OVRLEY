@@ -12,19 +12,51 @@ use std::sync::OnceLock;
 
 pub(crate) const ICON_VIEWBOX_SIZE: f32 = 24.0;
 
-/// Parsed SVG icon with enough data for Skia stroke rendering.
+/// Parsed SVG icon with enough data for Skia fill/stroke rendering.
 #[derive(Clone, Debug)]
 pub(crate) struct ParsedSvgIcon {
     pub stroke_width: f32,
     pub primitives: Vec<SvgPrimitive>,
 }
 
+/// Rendering style captured for one supported SVG primitive.
+#[derive(Clone, Debug)]
+pub(crate) struct SvgPrimitiveStyle {
+    pub fill: bool,
+    pub stroke: bool,
+    pub stroke_width: Option<f32>,
+}
+
+impl SvgPrimitiveStyle {
+    pub fn stroke_only(stroke_width: Option<f32>) -> Self {
+        Self {
+            fill: false,
+            stroke: true,
+            stroke_width,
+        }
+    }
+}
+
 /// Primitive SVG elements supported by the local icon parser.
 #[derive(Clone, Debug)]
 pub(crate) enum SvgPrimitive {
-    Path(String),
-    Line { x1: f32, y1: f32, x2: f32, y2: f32 },
-    Circle { cx: f32, cy: f32, r: f32 },
+    Path {
+        data: String,
+        style: SvgPrimitiveStyle,
+    },
+    Line {
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        style: SvgPrimitiveStyle,
+    },
+    Circle {
+        cx: f32,
+        cy: f32,
+        r: f32,
+        style: SvgPrimitiveStyle,
+    },
 }
 
 /// Maps a telemetry value key to its built-in icon kind.
@@ -63,6 +95,19 @@ pub(crate) fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconK
         crate::standard_metrics::MetricIconAssetKey::Heading => Some(MetricIconKind::Compass),
         crate::standard_metrics::MetricIconAssetKey::VerticalOscillation => {
             Some(MetricIconKind::ArrowUpDown)
+        }
+        crate::standard_metrics::MetricIconAssetKey::Altitude => Some(MetricIconKind::Altitude),
+        crate::standard_metrics::MetricIconAssetKey::Iso => Some(MetricIconKind::Iso),
+        crate::standard_metrics::MetricIconAssetKey::Aperture => Some(MetricIconKind::Aperture),
+        crate::standard_metrics::MetricIconAssetKey::ShutterSpeed => {
+            Some(MetricIconKind::ShutterSpeed)
+        }
+        crate::standard_metrics::MetricIconAssetKey::FocalLength => {
+            Some(MetricIconKind::FocalLength)
+        }
+        crate::standard_metrics::MetricIconAssetKey::Ev => Some(MetricIconKind::Ev),
+        crate::standard_metrics::MetricIconAssetKey::ColorTemperature => {
+            Some(MetricIconKind::ColorTemperature)
         }
     }
 }
@@ -105,6 +150,21 @@ fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIco
         MetricIconKind::ArrowUpDown => {
             parsed_metric_icon_cached(icon_kind, &ARROW_UP_DOWN_ICON_CACHE)
         }
+        MetricIconKind::Altitude => parsed_metric_icon_cached(icon_kind, &ALTITUDE_ICON_CACHE),
+        MetricIconKind::Iso => parsed_metric_icon_cached(icon_kind, &ISO_ICON_CACHE),
+        MetricIconKind::Aperture => {
+            parsed_metric_icon_cached(icon_kind, &APERTURE_ICON_CACHE)
+        }
+        MetricIconKind::ShutterSpeed => {
+            parsed_metric_icon_cached(icon_kind, &SHUTTER_SPEED_ICON_CACHE)
+        }
+        MetricIconKind::FocalLength => {
+            parsed_metric_icon_cached(icon_kind, &FOCAL_LENGTH_ICON_CACHE)
+        }
+        MetricIconKind::Ev => parsed_metric_icon_cached(icon_kind, &EV_ICON_CACHE),
+        MetricIconKind::ColorTemperature => {
+            parsed_metric_icon_cached(icon_kind, &COLOR_TEMPERATURE_ICON_CACHE)
+        }
     }
 }
 
@@ -128,6 +188,13 @@ static TORQUE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static GEAR_POSITION_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static COMPASS_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static ARROW_UP_DOWN_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static ALTITUDE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static ISO_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static APERTURE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static SHUTTER_SPEED_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static FOCAL_LENGTH_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static EV_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static COLOR_TEMPERATURE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 
 fn parsed_metric_icon_cached(
     icon_kind: MetricIconKind,
@@ -224,6 +291,34 @@ fn metric_icon_svg_markup(icon_kind: MetricIconKind) -> &'static str {
             env!("CARGO_MANIFEST_DIR"),
             "/../../assets/widget-icons/widget-vertical-oscillation.svg"
         )),
+        MetricIconKind::Altitude => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-altitude.svg"
+        )),
+        MetricIconKind::Iso => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-iso.svg"
+        )),
+        MetricIconKind::Aperture => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-aperture.svg"
+        )),
+        MetricIconKind::ShutterSpeed => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-shutter-speed.svg"
+        )),
+        MetricIconKind::FocalLength => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-focal-length.svg"
+        )),
+        MetricIconKind::Ev => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-ev.svg"
+        )),
+        MetricIconKind::ColorTemperature => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-color-temperature.svg"
+        )),
     }
 }
 
@@ -309,20 +404,60 @@ fn metric_icon_paint(icon: &ParsedSvgIcon, color: Color) -> Paint {
     paint
 }
 
+/// Clones an existing icon paint and reconfigures it for fills.
+fn metric_icon_fill_paint(paint: &Paint) -> Paint {
+    let mut fill_paint = paint.clone();
+    fill_paint.set_style(Style::Fill);
+    fill_paint.set_stroke_width(0.0);
+    fill_paint
+}
+
 /// Draws parsed SVG icon primitives onto the current canvas.
 pub(crate) fn draw_metric_icon_primitives(canvas: &Canvas, icon: &ParsedSvgIcon, paint: &Paint) {
     for primitive in &icon.primitives {
         match primitive {
-            SvgPrimitive::Path(data) => {
+            SvgPrimitive::Path { data, style } => {
                 if let Some(path) = super::svg::svg_path_to_skia_path(data) {
-                    canvas.draw_path(&path, paint);
+                    if style.fill {
+                        let fill_paint = metric_icon_fill_paint(paint);
+                        canvas.draw_path(&path, &fill_paint);
+                    }
+                    if style.stroke {
+                        let mut stroke_paint = paint.clone();
+                        let stroke_width = style.stroke_width.unwrap_or(icon.stroke_width);
+                        stroke_paint
+                            .set_stroke_width(if style.stroke_width.is_some() { stroke_width } else { stroke_width.max(1.0) });
+                        canvas.draw_path(&path, &stroke_paint);
+                    }
                 }
             }
-            SvgPrimitive::Line { x1, y1, x2, y2 } => {
-                canvas.draw_line(Point::new(*x1, *y1), Point::new(*x2, *y2), paint);
+            SvgPrimitive::Line {
+                x1,
+                y1,
+                x2,
+                y2,
+                style,
+            } => {
+                if style.stroke {
+                    let mut stroke_paint = paint.clone();
+                    let stroke_width = style.stroke_width.unwrap_or(icon.stroke_width);
+                    stroke_paint
+                        .set_stroke_width(if style.stroke_width.is_some() { stroke_width } else { stroke_width.max(1.0) });
+                    canvas.draw_line(Point::new(*x1, *y1), Point::new(*x2, *y2), &stroke_paint);
+                }
             }
-            SvgPrimitive::Circle { cx, cy, r } => {
-                canvas.draw_circle(Point::new(*cx, *cy), *r, paint);
+            SvgPrimitive::Circle { cx, cy, r, style } => {
+                if style.fill {
+                    let fill_paint = metric_icon_fill_paint(paint);
+                    canvas.draw_circle(Point::new(*cx, *cy), *r, &fill_paint);
+                }
+                if style.stroke {
+                    let mut stroke_paint = paint.clone();
+                    let stroke_width = style.stroke_width.unwrap_or(icon.stroke_width);
+                    stroke_paint
+                        .set_stroke_width(if style.stroke_width.is_some() { stroke_width } else { stroke_width.max(1.0) });
+                    canvas.draw_circle(Point::new(*cx, *cy), *r, &stroke_paint);
+                }
             }
         }
     }

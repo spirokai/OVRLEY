@@ -300,6 +300,6 @@ pub(crate) struct NormalizedElevationPlot {
 /// Projected route sample with distance progress.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct RouteSample {
-    pub(crate) point: (f32, f32),
+    pub(crate) point: (f64, f64),
     pub(crate) progress01: f32,
 }
