@@ -8,6 +8,8 @@ import {
 } from '@/lib/standard-widgets'
 import {
   getStandardMetricDefinition,
+  getStandardMetricInterpolation,
+  getStandardMetricUnitsMode,
   isStandardMetricWidgetType,
   getDisplayTypeDefinition,
   getDisplayTypeLabel,
@@ -37,9 +39,16 @@ describe('standard metric widget catalog', () => {
       'torque',
       'vertical_speed',
       'gear_position',
+      'vertical_ratio',
       'vertical_oscillation',
       'core_temperature',
-      'heading',
+      'altitude',
+      'iso',
+      'aperture',
+      'shutter_speed',
+      'focal_length',
+      'ev',
+      'color_temperature',
     ])
     expect(STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(CURRENT_STANDARD_METRIC_WIDGET_TYPES))
 
@@ -90,6 +99,53 @@ describe('standard metric widget catalog', () => {
     expect(TYPE_LABELS.speed).toBe(getStandardMetricDefinition('speed').label)
     expect(TYPE_LABELS.pace).toBe(getStandardMetricDefinition('pace').label)
     expect(TYPE_LABELS.core_temperature).toBe(getStandardMetricDefinition('core_temperature').label)
+  })
+
+  test('Phase 1 SRT camera metrics are in the standard metric catalog', () => {
+    const newTypes = ['altitude', 'iso', 'aperture', 'shutter_speed', 'focal_length', 'ev', 'color_temperature']
+    for (const type of newTypes) {
+      expect(isStandardMetricWidgetType(type)).toBe(true)
+      const def = getStandardMetricDefinition(type)
+      expect(def).toBeTruthy()
+      expect(def.interpolation).toBeDefined()
+      expect(def.unitsMode).toBeDefined()
+    }
+  })
+
+  test('Phase 1 new metric definitions carry correct interpolation policy', () => {
+    expect(getStandardMetricInterpolation('altitude')).toBe('linear')
+    expect(getStandardMetricInterpolation('iso')).toBe('hold')
+    expect(getStandardMetricInterpolation('aperture')).toBe('hold')
+    expect(getStandardMetricInterpolation('shutter_speed')).toBe('hold')
+    expect(getStandardMetricInterpolation('focal_length')).toBe('hold')
+    expect(getStandardMetricInterpolation('ev')).toBe('hold')
+    expect(getStandardMetricInterpolation('color_temperature')).toBe('hold')
+  })
+
+  test('Phase 1 new metric definitions carry correct unitsMode policy', () => {
+    expect(getStandardMetricUnitsMode('altitude')).toBe('selectable')
+    expect(getStandardMetricUnitsMode('iso')).toBe('hidden')
+    expect(getStandardMetricUnitsMode('aperture')).toBe('hidden')
+    expect(getStandardMetricUnitsMode('shutter_speed')).toBe('hidden')
+    expect(getStandardMetricUnitsMode('focal_length')).toBe('selectable')
+    expect(getStandardMetricUnitsMode('ev')).toBe('hidden')
+    expect(getStandardMetricUnitsMode('color_temperature')).toBe('selectable')
+  })
+
+  test('existing metrics carry interpolation and unitsMode defaults', () => {
+    const existingTypes = ['speed', 'heartrate', 'cadence', 'power', 'temperature', 'pace', 'heading']
+    for (const type of existingTypes) {
+      expect(getStandardMetricInterpolation(type)).toBe('linear')
+      expect(getStandardMetricUnitsMode(type)).toBe('selectable')
+    }
+  })
+
+  test('getStandardMetricInterpolation returns null for unknown types', () => {
+    expect(getStandardMetricInterpolation('nonexistent')).toBeNull()
+  })
+
+  test('getStandardMetricUnitsMode returns null for unknown types', () => {
+    expect(getStandardMetricUnitsMode('nonexistent')).toBeNull()
   })
 })
 

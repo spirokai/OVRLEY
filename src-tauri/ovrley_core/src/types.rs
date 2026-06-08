@@ -68,6 +68,20 @@ pub enum MetricKind {
     CoreTemperature,
     #[serde(rename = "heading")]
     Heading,
+    #[serde(rename = "altitude")]
+    Altitude,
+    #[serde(rename = "iso")]
+    Iso,
+    #[serde(rename = "aperture")]
+    Aperture,
+    #[serde(rename = "shutter_speed")]
+    ShutterSpeed,
+    #[serde(rename = "focal_length")]
+    FocalLength,
+    #[serde(rename = "ev")]
+    Ev,
+    #[serde(rename = "color_temperature")]
+    ColorTemperature,
 }
 
 /// Visual representation mode for a value widget.

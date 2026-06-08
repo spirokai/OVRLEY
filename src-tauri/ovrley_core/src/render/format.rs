@@ -353,7 +353,9 @@ fn format_validated_standard_metric_parts(
             raw.map(|left_value| format_balance_value(left_value, decimals, balance_format))
                 .unwrap_or_else(|| "--".to_string())
         }
-        None => "--".to_string(),
+        None | Some(StandardMetricFormatterKind::Shutter) | Some(StandardMetricFormatterKind::Aperture) | Some(StandardMetricFormatterKind::Ev) => {
+            "--".to_string()
+        }
     };
 
     (

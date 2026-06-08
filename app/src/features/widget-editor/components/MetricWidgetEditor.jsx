@@ -2,7 +2,12 @@
  * Supports widget editing flows related to metric widget editor.
  */
 
-import { getStandardMetricDefinition, getStandardMetricDisplayUnit, getStandardMetricUnitOptions } from '@/lib/standard-metrics'
+import {
+  getStandardMetricDefinition,
+  getStandardMetricDisplayUnit,
+  getStandardMetricUnitOptions,
+  getStandardMetricUnitsMode,
+} from '@/lib/standard-metrics'
 import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/utils/formatUtils'
 import { FontSection, IconSection, UnitsControlRow } from './widgetEditorSections'
 import { ToggleField, SelectField } from './widgetFormControls'
@@ -19,6 +24,7 @@ import { useCallback } from 'react'
  */
 export default function MetricWidgetEditor({ widget, updateWidgetData, setNumericField }) {
   const definition = getStandardMetricDefinition(widget.type)
+  const unitsMode = getStandardMetricUnitsMode(widget.type)
   const unitOptions = getStandardMetricUnitOptions(widget.type)
   const showUnits = widget.data.show_units
   const supportsUnitSelection = unitOptions.length > 1
@@ -54,21 +60,23 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
         widget={widget}
         updateWidgetData={updateWidgetData}
         setNumericField={setNumericField}
-        showUnitsToggle
+        showUnitsToggle={unitsMode !== 'hidden'}
         unitsField={
-          <UnitsControlRow
-            widget={widget}
-            updateWidgetData={updateWidgetData}
-            title={supportsUnitSelection ? 'Units' : 'Unit'}
-            checked={showUnits}
-            onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
-            colorValue={widget.data.unit_color}
-            onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
-            selectLabel="Unit"
-            value={getStandardMetricDisplayUnit(widget.type, widget.data)}
-            onValueChange={(value) => updateWidgetData(widget.id, { display_unit: value })}
-            options={supportsUnitSelection ? unitOptions : undefined}
-          />
+          unitsMode !== 'hidden' ? (
+            <UnitsControlRow
+              widget={widget}
+              updateWidgetData={updateWidgetData}
+              title={supportsUnitSelection ? 'Units' : 'Unit'}
+              checked={showUnits}
+              onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
+              colorValue={widget.data.unit_color}
+              onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
+              selectLabel="Unit"
+              value={getStandardMetricDisplayUnit(widget.type, widget.data)}
+              onValueChange={(value) => updateWidgetData(widget.id, { display_unit: value })}
+              options={supportsUnitSelection ? unitOptions : undefined}
+            />
+          ) : null
         }
       />
     </>

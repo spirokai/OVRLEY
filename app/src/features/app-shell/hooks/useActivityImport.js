@@ -17,13 +17,13 @@ export default function useActivityImport() {
       let selected = null
 
       if (hasTauriRuntime()) {
-        const selectedPath = await openSinglePath([{ name: 'GPX or FIT', extensions: ['gpx', 'fit'] }])
+        const selectedPath = await openSinglePath([{ name: 'GPX, FIT or SRT', extensions: ['gpx', 'fit', 'srt'] }])
 
         if (typeof selectedPath === 'string') {
           selected = await fileFromSelectedPath(selectedPath, 'activity')
         }
       } else {
-        selected = await selectBrowserFile('.gpx,.fit')
+        selected = await selectBrowserFile('.gpx,.fit,.srt')
       }
 
       if (!selected) return

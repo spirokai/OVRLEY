@@ -136,6 +136,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "speed",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "shared",
         "assetFile": "widget-speed.svg"
@@ -154,6 +156,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "shared",
         "assetFile": "widget-heartrate.svg"
@@ -172,6 +176,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "shared",
         "assetFile": "widget-cadence.svg"
@@ -190,6 +196,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "shared",
         "assetFile": "widget-power.svg"
@@ -212,6 +220,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "temperature",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "shared",
         "assetFile": "widget-temperature.svg"
@@ -236,6 +246,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "pace",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
         "name": "Footprints",
@@ -261,6 +273,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "custom",
         "assetFile": "widget-g-force.svg"
@@ -295,6 +309,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
         "name": "Wind",
@@ -315,6 +331,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "custom",
         "assetFile": "widget-ground-contact-time.svg"
@@ -334,6 +352,8 @@
       ],
       "showUnitsByDefault": false,
       "formatter": "balance",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
         "name": "Scale",
@@ -369,6 +389,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
         "name": "Ruler",
@@ -388,6 +410,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
         "name": "Waves",
@@ -408,6 +432,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "custom",
         "assetFile": "widget-torque.svg"
@@ -442,6 +468,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
         "name": "TrendingUp",
@@ -462,6 +490,8 @@
       ],
       "showUnitsByDefault": false,
       "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "custom",
         "assetFile": "widget-gear-position.svg"
@@ -480,6 +510,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
         "name": "Percent",
@@ -505,6 +537,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
         "name": "ArrowUpDown",
@@ -528,6 +562,8 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "temperature",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
         "name": "Thermometer",
@@ -547,10 +583,120 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
       "icon": {
         "source": "lucide",
         "name": "Compass",
         "assetFile": "widget-heading.svg"
+      }
+    },
+    {
+      "type": "altitude",
+      "current": true,
+      "label": "Altitude",
+      "defaultDisplayUnit": "m",
+      "supportedDisplayUnits": [
+        { "value": "m", "label": "m", "renderLabel": "M" },
+        { "value": "ft", "label": "ft", "renderLabel": "FT" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-altitude.svg"
+      }
+    },
+    {
+      "type": "iso",
+      "current": true,
+      "label": "ISO",
+      "defaultDisplayUnit": "iso",
+      "supportedDisplayUnits": [{ "value": "iso", "label": "ISO" }],
+      "showUnitsByDefault": false,
+      "formatter": "integer",
+      "interpolation": "hold",
+      "unitsMode": "hidden",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-iso.svg"
+      }
+    },
+    {
+      "type": "aperture",
+      "current": true,
+      "label": "Aperture",
+      "defaultDisplayUnit": "fnum",
+      "supportedDisplayUnits": [{ "value": "fnum", "label": "f/" }],
+      "showUnitsByDefault": false,
+      "formatter": "aperture",
+      "interpolation": "hold",
+      "unitsMode": "hidden",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-aperture.svg"
+      }
+    },
+    {
+      "type": "shutter_speed",
+      "current": true,
+      "label": "Shutter",
+      "defaultDisplayUnit": "seconds",
+      "supportedDisplayUnits": [{ "value": "seconds", "label": "s" }],
+      "showUnitsByDefault": false,
+      "formatter": "shutter",
+      "interpolation": "hold",
+      "unitsMode": "hidden",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-shutter-speed.svg"
+      }
+    },
+    {
+      "type": "focal_length",
+      "current": true,
+      "label": "Focal",
+      "defaultDisplayUnit": "mm",
+      "supportedDisplayUnits": [{ "value": "mm", "label": "mm", "renderLabel": "MM" }],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "interpolation": "hold",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-focal-length.svg"
+      }
+    },
+    {
+      "type": "ev",
+      "current": true,
+      "label": "EV",
+      "defaultDisplayUnit": "ev",
+      "supportedDisplayUnits": [{ "value": "ev", "label": "EV" }],
+      "showUnitsByDefault": false,
+      "formatter": "ev",
+      "interpolation": "hold",
+      "unitsMode": "hidden",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-ev.svg"
+      }
+    },
+    {
+      "type": "color_temperature",
+      "current": true,
+      "label": "WB",
+      "defaultDisplayUnit": "kelvin",
+      "supportedDisplayUnits": [{ "value": "kelvin", "label": "K", "renderLabel": "K" }],
+      "showUnitsByDefault": true,
+      "formatter": "integer",
+      "interpolation": "hold",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-color-temperature.svg"
       }
     }
   ]

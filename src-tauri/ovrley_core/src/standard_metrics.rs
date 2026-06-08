@@ -20,6 +20,23 @@ pub enum StandardMetricFormatterKind {
     Integer,
     Decimal,
     Balance,
+    Shutter,
+    Aperture,
+    Ev,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StandardMetricInterpolationKind {
+    Linear,
+    Hold,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StandardMetricUnitsMode {
+    Selectable,
+    Hidden,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,6 +92,8 @@ pub struct StandardMetricDefinition {
     pub show_units_by_default: bool,
     pub formatter: StandardMetricFormatterKind,
     pub icon: StandardMetricIconDefinition,
+    pub interpolation: StandardMetricInterpolationKind,
+    pub units_mode: StandardMetricUnitsMode,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -89,6 +108,18 @@ struct RawStandardMetricDefinition {
     show_units_by_default: bool,
     formatter: StandardMetricFormatterKind,
     icon: StandardMetricIconDefinition,
+    #[serde(default = "default_interpolation")]
+    interpolation: StandardMetricInterpolationKind,
+    #[serde(default = "default_units_mode")]
+    units_mode: StandardMetricUnitsMode,
+}
+
+fn default_interpolation() -> StandardMetricInterpolationKind {
+    StandardMetricInterpolationKind::Linear
+}
+
+fn default_units_mode() -> StandardMetricUnitsMode {
+    StandardMetricUnitsMode::Selectable
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -193,6 +224,8 @@ fn load_manifest() -> StandardMetricManifest {
                     show_units_by_default: definition.show_units_by_default,
                     formatter: definition.formatter,
                     icon: definition.icon,
+                    interpolation: definition.interpolation,
+                    units_mode: definition.units_mode,
                 },
             )
         })
@@ -225,6 +258,13 @@ fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
         "vertical_oscillation" => Some(MetricKind::VerticalOscillation),
         "core_temperature" => Some(MetricKind::CoreTemperature),
         "heading" => Some(MetricKind::Heading),
+        "altitude" => Some(MetricKind::Altitude),
+        "iso" => Some(MetricKind::Iso),
+        "aperture" => Some(MetricKind::Aperture),
+        "shutter_speed" => Some(MetricKind::ShutterSpeed),
+        "focal_length" => Some(MetricKind::FocalLength),
+        "ev" => Some(MetricKind::Ev),
+        "color_temperature" => Some(MetricKind::ColorTemperature),
         _ => None,
     }
 }
@@ -253,6 +293,13 @@ fn metric_kind_to_key(kind: MetricKind) -> &'static str {
         MetricKind::VerticalOscillation => "vertical_oscillation",
         MetricKind::CoreTemperature => "core_temperature",
         MetricKind::Heading => "heading",
+        MetricKind::Altitude => "altitude",
+        MetricKind::Iso => "iso",
+        MetricKind::Aperture => "aperture",
+        MetricKind::ShutterSpeed => "shutter_speed",
+        MetricKind::FocalLength => "focal_length",
+        MetricKind::Ev => "ev",
+        MetricKind::ColorTemperature => "color_temperature",
     }
 }
 
@@ -278,6 +325,14 @@ pub fn standard_metric_show_units(kind: MetricKind, configured: Option<bool>) ->
 
 pub fn standard_metric_formatter(kind: MetricKind) -> Option<StandardMetricFormatterKind> {
     standard_metric_definition(kind).map(|definition| definition.formatter)
+}
+
+pub fn standard_metric_interpolation(kind: MetricKind) -> Option<StandardMetricInterpolationKind> {
+    standard_metric_definition(kind).map(|definition| definition.interpolation)
+}
+
+pub fn standard_metric_units_mode(kind: MetricKind) -> Option<StandardMetricUnitsMode> {
+    standard_metric_definition(kind).map(|definition| definition.units_mode)
 }
 
 pub fn metric_icon_asset_key(kind: MetricKind) -> Option<MetricIconAssetKey> {

@@ -154,3 +154,27 @@ export function getDisplayVariantNonGeometryDefaults(displayType) {
   if (!definition?.defaults || definition.layoutMode === 'intrinsic') return null
   return definition.defaults
 }
+
+// ---------------------------------------------------------------------------
+// Interpolation + units policy
+// ---------------------------------------------------------------------------
+
+/**
+ * Look up the interpolation policy for a standard metric type.
+ * @param {string} type - metric type string
+ * @returns {'linear' | 'hold' | null} the interpolation mode, or `null` if not found
+ */
+export function getStandardMetricInterpolation(type) {
+  const definition = getStandardMetricDefinition(type)
+  return definition?.interpolation ?? null
+}
+
+/**
+ * Look up the units mode policy for a standard metric type.
+ * @param {string} type - metric type string
+ * @returns {'selectable' | 'hidden' | null} the units mode, or `null` if not found
+ */
+export function getStandardMetricUnitsMode(type) {
+  const definition = getStandardMetricDefinition(type)
+  return definition?.unitsMode ?? null
+}

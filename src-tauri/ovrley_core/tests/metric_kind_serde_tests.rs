@@ -41,6 +41,13 @@ fn metric_kind_round_trip_all_variants() {
         (MetricKind::VerticalOscillation, r#""vertical_oscillation""#),
         (MetricKind::CoreTemperature, r#""core_temperature""#),
         (MetricKind::Heading, r#""heading""#),
+        (MetricKind::Altitude, r#""altitude""#),
+        (MetricKind::Iso, r#""iso""#),
+        (MetricKind::Aperture, r#""aperture""#),
+        (MetricKind::ShutterSpeed, r#""shutter_speed""#),
+        (MetricKind::FocalLength, r#""focal_length""#),
+        (MetricKind::Ev, r#""ev""#),
+        (MetricKind::ColorTemperature, r#""color_temperature""#),
     ];
 
     for (kind, expected_json) in cases {

@@ -7,6 +7,7 @@ import * as backend from '@/api/backend'
 import { finalizeParsedActivity } from './parser.js'
 import { safeNumber } from './parse-helpers.js'
 import parseFitActivityFile from './fit-parser.js'
+import { parseSrtActivityFile } from './srt-parser.js'
 
 /**
  * Handles sanitize debug filename.
@@ -182,7 +183,11 @@ function parseGpxActivityFile(file, textContent) {
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 async function parseActivityFile(file) {
-  return file.name.toLowerCase().endsWith('.fit') ? parseFitActivityFile(file) : parseGpxActivityFile(file, await file.text())
+  const lowerName = file.name.toLowerCase()
+  if (lowerName.endsWith('.fit')) return parseFitActivityFile(file)
+  if (lowerName.endsWith('.srt')) return parseSrtActivityFile(await file.text(), file.name)
+  if (lowerName.endsWith('.gpx')) return parseGpxActivityFile(file, await file.text())
+  throw new Error(`Unsupported activity file format: ${file.name}`)
 }
 
 /**

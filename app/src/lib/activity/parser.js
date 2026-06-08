@@ -12,14 +12,20 @@ const CORE_ACTIVITY_ATTRIBUTES = ['cadence', 'course', 'elevation', 'gradient', 
 const EXTENDED_ACTIVITY_ATTRIBUTES = [
   'air_pressure',
   'altitude',
+  'aperture',
+  'color_temperature',
   'core_temperature',
   'distance',
+  'ev',
+  'focal_length',
   'g_force',
   'gear_position',
   'ground_contact_time',
   'heading',
+  'iso',
   'left_right_balance',
   'pace',
+  'shutter_speed',
   'stroke_rate',
   'stride_length',
   'torque',
@@ -30,19 +36,25 @@ const EXTENDED_ACTIVITY_ATTRIBUTES = [
 const METRIC_UNITS = {
   air_pressure: 'bar',
   altitude: 'm',
+  aperture: 'fnum',
   cadence: 'rpm',
+  color_temperature: 'kelvin',
   core_temperature: 'celsius',
   distance: 'm',
   elevation: 'm',
+  ev: 'ev',
+  focal_length: 'mm',
   g_force: 'g',
   gear_position: 'raw',
   gradient: 'percent',
   ground_contact_time: 'ms',
   heading: 'degrees',
   heartrate: 'bpm',
+  iso: 'iso',
   left_right_balance: 'raw',
   pace: 'seconds_per_km',
   power: 'watts',
+  shutter_speed: 'seconds',
   speed: 'mps',
   stride_length: 'raw',
   stroke_rate: 'strokes_per_minute',
@@ -117,7 +129,10 @@ function buildExtendedAttributes(metricSeriesMap) {
 export function finalizeParsedActivity({ fileName, fileFormat, metadata = {}, rawSamples = [], options = {} }) {
   const helpers = { calculateBearingDegrees, haversineDistanceMeters, isFiniteNumber, roundValue, safeNumber, safeTimestamp }
   const useLegacyGpxDerivations = options.useLegacyGpxDerivations === true
-  const { rawSamples: normalizedRawSamples, gapDebug } = insertIdleGapSamples(rawSamples)
+  const skipIdleGapFill = options.skipIdleGapFill === true
+  const { rawSamples: normalizedRawSamples, gapDebug } = skipIdleGapFill
+    ? { rawSamples, gapDebug: { inserted_sample_count: 0 } }
+    : insertIdleGapSamples(rawSamples)
   const timeSeries = buildTimeSeries(normalizedRawSamples)
   const courseSeries = buildCourseSeries(normalizedRawSamples)
   const directDistanceSeries = normalizedRawSamples.map((sample) => safeNumber(sample.distance))
@@ -194,6 +209,12 @@ export function finalizeParsedActivity({ fileName, fileFormat, metadata = {}, ra
     torque: metricSeriesMap.torque.series,
     vertical_oscillation: metricSeriesMap.vertical_oscillation.series,
     vertical_speed: metricSeriesMap.vertical_speed.series,
+    iso: metricSeriesMap.iso.series,
+    aperture: metricSeriesMap.aperture.series,
+    shutter_speed: metricSeriesMap.shutter_speed.series,
+    focal_length: metricSeriesMap.focal_length.series,
+    ev: metricSeriesMap.ev.series,
+    color_temperature: metricSeriesMap.color_temperature.series,
   }
 
   return {

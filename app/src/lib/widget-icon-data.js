@@ -22,6 +22,13 @@ import courseIconSvg from '@/components/widgets/icons/widget-course.svg?raw'
 import elevationIconSvg from '@/components/widgets/icons/widget-elevation.svg?raw'
 import labelIconSvg from '@/components/widgets/icons/widget-label.svg?raw'
 import headingIconSvg from '../../../assets/widget-icons/widget-heading.svg?raw'
+import altitudeIconSvg from '../../../assets/widget-icons/widget-altitude.svg?raw'
+import isoIconSvg from '../../../assets/widget-icons/widget-iso.svg?raw'
+import apertureIconSvg from '../../../assets/widget-icons/widget-aperture.svg?raw'
+import shutterSpeedIconSvg from '../../../assets/widget-icons/widget-shutter-speed.svg?raw'
+import focalLengthIconSvg from '../../../assets/widget-icons/widget-focal-length.svg?raw'
+import evIconSvg from '../../../assets/widget-icons/widget-ev.svg?raw'
+import colorTemperatureIconSvg from '../../../assets/widget-icons/widget-color-temperature.svg?raw'
 
 function parseMetricIconSvg(svgMarkup) {
   const strokeWidthMatch = svgMarkup.match(/stroke-width="([^"]+)"/)
@@ -56,5 +63,12 @@ export const METRIC_ICON_SVGS = {
   course: parseMetricIconSvg(courseIconSvg),
   elevation: parseMetricIconSvg(elevationIconSvg),
   heading: parseMetricIconSvg(headingIconSvg),
+  altitude: parseMetricIconSvg(altitudeIconSvg),
+  iso: parseMetricIconSvg(isoIconSvg),
+  aperture: parseMetricIconSvg(apertureIconSvg),
+  shutter_speed: parseMetricIconSvg(shutterSpeedIconSvg),
+  focal_length: parseMetricIconSvg(focalLengthIconSvg),
+  ev: parseMetricIconSvg(evIconSvg),
+  color_temperature: parseMetricIconSvg(colorTemperatureIconSvg),
   label: parseMetricIconSvg(labelIconSvg),
 }

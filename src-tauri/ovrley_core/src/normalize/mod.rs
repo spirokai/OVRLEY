@@ -183,6 +183,7 @@ impl ValidatedRenderConfig {
                 MetricKind::CoreTemperature => requirements.core_temperature = true,
                 MetricKind::Heading => requirements.heading = true,
                 MetricKind::Time => requirements.time = true,
+                _ => {}
             }
         }
 

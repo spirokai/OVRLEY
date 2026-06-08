@@ -75,7 +75,7 @@ function useAppShellComposition() {
   }
 
   const activityControls = {
-    activityLabel: activityFilename === 'demo.gpxinit' ? 'Load GPX/FIT' : activityFilename || 'Load GPX/FIT',
+    activityLabel: activityFilename === 'demo.gpxinit' ? 'Load GPX/FIT/SRT' : activityFilename || 'Load GPX/FIT/SRT',
     onOpenActivityFile: handleGpxFileOpen,
   }
 

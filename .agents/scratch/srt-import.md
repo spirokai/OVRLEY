@@ -430,6 +430,7 @@ Extend the canonical parsed activity object with:
 ### Extend metric metadata
 
 Classification note:
+
 - `altitude` is already present in the frontend parsed-activity metadata (`EXTENDED_ACTIVITY_ATTRIBUTES` and `METRIC_UNITS`).
 - For this slice, all newly added SRT/camera metrics belong in `EXTENDED_ACTIVITY_ATTRIBUTES`.
 - None of the new camera metrics should be added to `CORE_ACTIVITY_ATTRIBUTES`.
@@ -706,18 +707,18 @@ Deliverables:
 
 Acceptance criteria:
 
-- [ ] Shared manifest includes `altitude`, `iso`, `aperture`, `shutter_speed`, `focal_length`, `ev`, and `color_temperature`
-- [ ] Shared manifest uses only `unitsMode: selectable | hidden`
-- [ ] JS manifest adapters can read `interpolation` and `unitsMode`
-- [ ] Rust manifest adapters can read `interpolation` and `unitsMode`
-- [ ] Rust `MetricKind` supports all 7 new metric IDs
-- [ ] Existing standard metric consumers keep working after the manifest change
+- [x] Shared manifest includes `altitude`, `iso`, `aperture`, `shutter_speed`, `focal_length`, `ev`, and `color_temperature`
+- [x] Shared manifest uses only `unitsMode: selectable | hidden`
+- [x] JS manifest adapters can read `interpolation` and `unitsMode`
+- [x] Rust manifest adapters can read `interpolation` and `unitsMode`
+- [x] Rust `MetricKind` supports all 7 new metric IDs
+- [x] Existing standard metric consumers keep working after the manifest change
 
 Manual tests:
 
-- [ ] Open the app and verify the widget drawer still loads without runtime errors
-- [ ] Confirm no existing standard metric preview crashes because of the new manifest keys
-- [ ] Confirm the new metrics appear in the metric catalog once labels are wired
+- [x] Open the app and verify the widget drawer still loads without runtime errors
+- [x] Confirm no existing standard metric preview crashes because of the new manifest keys
+- [x] Confirm the new metrics appear in the metric catalog once labels are wired
 
 ### Phase 2: Frontend SRT Parser + Canonical Parsed Activity Output
 
@@ -739,21 +740,21 @@ Deliverables:
 
 Acceptance criteria:
 
-- [ ] `.srt` files import through the frontend activity pipeline
-- [ ] Cue start times populate `sample_elapsed_seconds` with millisecond precision preserved
-- [ ] `abs_alt` populates both `altitude` and `elevation`
-- [ ] `ct` populates `color_temperature`
-- [ ] `ev` populates `ev`
-- [ ] Shutter values are stored numerically in seconds
-- [ ] SRT parsing bypasses idle-gap insertion
-- [ ] The finalized parsed activity shape matches FIT/GPX conventions closely enough for the existing backend/import flow
+- [x] `.srt` files import through the frontend activity pipeline
+- [x] Cue start times populate `sample_elapsed_seconds` with millisecond precision preserved
+- [x] `abs_alt` populates both `altitude` and `elevation`
+- [x] `ct` populates `color_temperature`
+- [x] `ev` populates `ev`
+- [x] Shutter values are stored numerically in seconds
+- [x] SRT parsing bypasses idle-gap insertion
+- [x] The finalized parsed activity shape matches FIT/GPX conventions closely enough for the existing backend/import flow
 
 Manual tests:
 
-- [ ] Import the representative SRT sample and inspect the parse debug JSON
-- [ ] Verify `sample_elapsed_seconds` contains values like `2.001`, `3.002`
-- [ ] Verify `altitude`, `iso`, `aperture`, `shutter_speed`, `focal_length`, `ev`, and `color_temperature` arrays exist and align with `sample_elapsed_seconds`
-- [ ] Verify `speed`, `heading`, and `vertical_speed` can still be derived from the imported SRT activity
+- [x] Import the representative SRT sample and inspect the parse debug JSON
+- [x] Verify `sample_elapsed_seconds` contains values like `2.001`, `3.002`
+- [x] Verify `altitude`, `iso`, `aperture`, `shutter_speed`, `focal_length`, `ev`, and `color_temperature` arrays exist and align with `sample_elapsed_seconds`
+- [x] Verify `speed`, `heading`, and `vertical_speed` can still be derived from the imported SRT activity
 
 ### Phase 3: Frontend Widget Catalog + Units UI Plumbing
 
@@ -778,11 +779,11 @@ Deliverables:
 
 Acceptance criteria:
 
-- [ ] New metrics can be added as widgets from the frontend catalog
-- [ ] `altitude` behaves like a normal standard metric widget
-- [ ] `iso`, `aperture`, `shutter_speed`, and `ev` expose no units controls
-- [ ] `focal_length` and `color_temperature` can toggle units on/off
-- [ ] `focal_length` and `color_temperature` do not expose a unit dropdown when only one unit is supported
+- [x] New metrics can be added as widgets from the frontend catalog
+- [x] `altitude` behaves like a normal standard metric widget
+- [x] `iso`, `aperture`, `shutter_speed`, and `ev` expose no units controls
+- [x] `focal_length` and `color_temperature` can toggle units on/off
+- [x] `focal_length` and `color_temperature` do not expose a unit dropdown when only one unit is supported
 
 Manual tests:
 

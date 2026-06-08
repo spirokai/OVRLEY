@@ -167,14 +167,7 @@ export function FontSection({
  * @param {*} props.unitsField - Value for units field.
  * @returns {JSX.Element} Rendered component output.
  */
-export function IconSection({
-  widget,
-  updateWidgetData,
-  setNumericField,
-  title = 'Icon',
-  showUnitsToggle = false,
-  unitsField = null,
-}) {
+export function IconSection({ widget, updateWidgetData, setNumericField, title = 'Icon', showUnitsToggle = false, unitsField = null }) {
   const iconSize = widget.data.icon_size
 
   return (

@@ -394,6 +394,12 @@ export function deriveActivityMetricSeries({
     torque: normalizedRawSamples.map((sample) => safeNumber(sample.torque)),
     vertical_oscillation: normalizedRawSamples.map((sample) => safeNumber(sample.verticalOscillation)),
     vertical_speed: normalizedRawSamples.map((sample) => safeNumber(sample.verticalSpeed)),
+    iso: normalizedRawSamples.map((sample) => safeNumber(sample.iso)),
+    aperture: normalizedRawSamples.map((sample) => safeNumber(sample.aperture)),
+    shutter_speed: normalizedRawSamples.map((sample) => safeNumber(sample.shutterSpeed)),
+    focal_length: normalizedRawSamples.map((sample) => safeNumber(sample.focalLength)),
+    ev: normalizedRawSamples.map((sample) => safeNumber(sample.ev)),
+    color_temperature: normalizedRawSamples.map((sample) => safeNumber(sample.colorTemperature)),
   }
 
   const nullSeries = normalizedRawSamples.map(() => null)
@@ -434,6 +440,12 @@ export function deriveActivityMetricSeries({
       torque: combineSeries(directMetrics.torque, derivedTorque),
       vertical_oscillation: combineSeries(directMetrics.vertical_oscillation, nullSeries),
       vertical_speed: combineSeries(directMetrics.vertical_speed, derivedVerticalSpeed),
+      iso: combineSeries(directMetrics.iso, nullSeries),
+      aperture: combineSeries(directMetrics.aperture, nullSeries),
+      shutter_speed: combineSeries(directMetrics.shutter_speed, nullSeries),
+      focal_length: combineSeries(directMetrics.focal_length, nullSeries),
+      ev: combineSeries(directMetrics.ev, nullSeries),
+      color_temperature: combineSeries(directMetrics.color_temperature, nullSeries),
     },
   }
 }

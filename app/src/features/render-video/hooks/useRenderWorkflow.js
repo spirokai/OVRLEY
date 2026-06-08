@@ -307,10 +307,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         selectedSecond,
         sourceActivity: parsedActivity,
       })
-      const previewSecond = Math.min(
-        Math.max(resolvedPreviewSecond, nextConfig.scene.start ?? 0),
-        nextConfig.scene.end ?? resolvedPreviewSecond,
-      )
+      const previewSecond = Math.min(Math.max(resolvedPreviewSecond, nextConfig.scene.start ?? 0), nextConfig.scene.end ?? resolvedPreviewSecond)
 
       nextConfig.scene = {
         ...nextConfig.scene,

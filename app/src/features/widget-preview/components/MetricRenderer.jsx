@@ -129,7 +129,9 @@ export function OverlayMetricWidget({ widget, activity, previewSecond, globalOpa
     const gradientValueLeft =
       renderedGradientWidth > 0 ? (presentation.gradientLayout.width - renderedGradientWidth) / 2 : presentation.gradientLayout.value.left
     const gradientUnitX =
-      renderedGradientPrefixWidth > 0 ? gradientValueLeft + renderedGradientPrefixWidth : presentation.gradientLayout.value.left + presentation.gradientPrefixWidth
+      renderedGradientPrefixWidth > 0
+        ? gradientValueLeft + renderedGradientPrefixWidth
+        : presentation.gradientLayout.value.left + presentation.gradientPrefixWidth
 
     return (
       <svg
