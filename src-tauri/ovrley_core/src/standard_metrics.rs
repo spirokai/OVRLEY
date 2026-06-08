@@ -108,18 +108,8 @@ struct RawStandardMetricDefinition {
     show_units_by_default: bool,
     formatter: StandardMetricFormatterKind,
     icon: StandardMetricIconDefinition,
-    #[serde(default = "default_interpolation")]
     interpolation: StandardMetricInterpolationKind,
-    #[serde(default = "default_units_mode")]
     units_mode: StandardMetricUnitsMode,
-}
-
-fn default_interpolation() -> StandardMetricInterpolationKind {
-    StandardMetricInterpolationKind::Linear
-}
-
-fn default_units_mode() -> StandardMetricUnitsMode {
-    StandardMetricUnitsMode::Selectable
 }
 
 #[derive(Clone, Debug, Deserialize)]

@@ -170,6 +170,27 @@ pub struct ParsedActivity {
     /// Vertical speed in meters per second.
     #[serde(default)]
     pub vertical_speed: NumericSeries,
+    /// Altitude in meters (from SRT `abs_alt`).
+    #[serde(default)]
+    pub altitude: NumericSeries,
+    /// ISO sensitivity.
+    #[serde(default)]
+    pub iso: NumericSeries,
+    /// Aperture f-number.
+    #[serde(default)]
+    pub aperture: NumericSeries,
+    /// Shutter speed in seconds.
+    #[serde(default)]
+    pub shutter_speed: NumericSeries,
+    /// Focal length in millimeters.
+    #[serde(default)]
+    pub focal_length: NumericSeries,
+    /// Exposure value.
+    #[serde(default)]
+    pub ev: NumericSeries,
+    /// Color temperature in Kelvin.
+    #[serde(default)]
+    pub color_temperature: NumericSeries,
     /// Gear position as a discrete numeric value.
     #[serde(default)]
     pub gear_position: NumericSeries,
@@ -259,6 +280,20 @@ pub struct DenseSeriesReport {
     pub torque: Vec<Option<f64>>,
     /// Vertical speed in meters per second.
     pub vertical_speed: Vec<Option<f64>>,
+    /// Altitude in meters.
+    pub altitude: Vec<Option<f64>>,
+    /// ISO sensitivity.
+    pub iso: Vec<Option<f64>>,
+    /// Aperture f-number.
+    pub aperture: Vec<Option<f64>>,
+    /// Shutter speed in seconds.
+    pub shutter_speed: Vec<Option<f64>>,
+    /// Focal length in millimeters.
+    pub focal_length: Vec<Option<f64>>,
+    /// Exposure value.
+    pub ev: Vec<Option<f64>>,
+    /// Color temperature in Kelvin.
+    pub color_temperature: Vec<Option<f64>>,
     /// Gear position as a discrete numeric value.
     pub gear_position: Vec<Option<f64>>,
     /// Vertical ratio in percent.
@@ -322,6 +357,20 @@ pub struct TrimmedActivity {
     pub torque: NumericSeries,
     /// Trimmed vertical speed samples in meters per second.
     pub vertical_speed: NumericSeries,
+    /// Trimmed altitude samples in meters.
+    pub altitude: NumericSeries,
+    /// Trimmed ISO samples.
+    pub iso: NumericSeries,
+    /// Trimmed aperture samples.
+    pub aperture: NumericSeries,
+    /// Trimmed shutter speed samples in seconds.
+    pub shutter_speed: NumericSeries,
+    /// Trimmed focal length samples in millimeters.
+    pub focal_length: NumericSeries,
+    /// Trimmed exposure value samples.
+    pub ev: NumericSeries,
+    /// Trimmed color temperature samples in Kelvin.
+    pub color_temperature: NumericSeries,
     /// Trimmed gear position samples.
     pub gear_position: NumericSeries,
     /// Trimmed vertical ratio samples in percent.

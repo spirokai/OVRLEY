@@ -4,6 +4,7 @@ mod common;
 
 use std::fs;
 
+use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::commands::parse_and_validate_config;
 
@@ -29,13 +30,13 @@ fn builds_dense_report_for_full_fixture() {
     let activity = parse_activity_json(&activity_json).unwrap();
     let config = parse_and_validate_config(&format!(
         r##"{{"scene":{},"values":[{}]}}"##,
-        full_scene(30.0, 0.0, 4912.0),
+        full_scene(30.0, 0.0, 4672.0),
         speed_value()
     ))
     .unwrap();
     let report = build_dense_activity_report_validated(&activity, &config).unwrap();
 
-    assert_eq!(report.frame_count, 147360);
+    assert_eq!(report.frame_count, 140160);
     assert_eq!(report.frame_elapsed_seconds.first().copied(), Some(0.0));
     assert!(
         report
@@ -43,7 +44,7 @@ fn builds_dense_report_for_full_fixture() {
             .last()
             .copied()
             .unwrap_or_default()
-            < 4912.0
+            < 4672.0
     );
     assert_eq!(report.series.speed.len(), report.frame_count);
     assert!(report.series.course_lat.is_empty());
@@ -124,4 +125,65 @@ fn trimmed_exports_keep_absolute_distance_progress() {
     assert!(first_progress > 0.0);
     assert!(last_progress > first_progress);
     assert!(last_progress < 1.0);
+}
+
+#[test]
+fn parsed_activity_deserializes_new_srt_series() {
+    let json = serde_json::json!({
+        "sample_elapsed_seconds": [0.0, 1.0, 2.0],
+        "altitude": [100.0, 110.0, 120.0],
+        "iso": [200.0, 400.0, 800.0],
+        "aperture": [1.7, 2.8, 4.0],
+        "shutter_speed": [0.0003125, 0.001, 0.002],
+        "focal_length": [24.0, 35.0, 50.0],
+        "ev": [0.0, -1.0, 1.5],
+        "color_temperature": [5491.0, 5600.0, 3200.0]
+    });
+    let activity: ParsedActivity = serde_json::from_value(json).unwrap();
+
+    assert_eq!(activity.altitude, vec![Some(100.0), Some(110.0), Some(120.0)]);
+    assert_eq!(activity.iso, vec![Some(200.0), Some(400.0), Some(800.0)]);
+    assert_eq!(activity.aperture, vec![Some(1.7), Some(2.8), Some(4.0)]);
+    assert_eq!(
+        activity.shutter_speed,
+        vec![Some(0.0003125), Some(0.001), Some(0.002)]
+    );
+    assert_eq!(
+        activity.focal_length,
+        vec![Some(24.0), Some(35.0), Some(50.0)]
+    );
+    assert_eq!(activity.ev, vec![Some(0.0), Some(-1.0), Some(1.5)]);
+    assert_eq!(
+        activity.color_temperature,
+        vec![Some(5491.0), Some(5600.0), Some(3200.0)]
+    );
+}
+
+#[test]
+fn parsed_activity_new_series_default_to_empty() {
+    let json = serde_json::json!({
+        "sample_elapsed_seconds": [0.0, 1.0]
+    });
+    let activity: ParsedActivity = serde_json::from_value(json).unwrap();
+
+    assert!(activity.altitude.is_empty());
+    assert!(activity.iso.is_empty());
+    assert!(activity.aperture.is_empty());
+    assert!(activity.shutter_speed.is_empty());
+    assert!(activity.focal_length.is_empty());
+    assert!(activity.ev.is_empty());
+    assert!(activity.color_temperature.is_empty());
+}
+
+#[test]
+fn parsed_activity_handles_nulls_in_new_series() {
+    let json = serde_json::json!({
+        "sample_elapsed_seconds": [0.0, 1.0, 2.0],
+        "iso": [200.0, null, 800.0],
+        "ev": [null, -1.0, null]
+    });
+    let activity: ParsedActivity = serde_json::from_value(json).unwrap();
+
+    assert_eq!(activity.iso, vec![Some(200.0), None, Some(800.0)]);
+    assert_eq!(activity.ev, vec![None, Some(-1.0), None]);
 }

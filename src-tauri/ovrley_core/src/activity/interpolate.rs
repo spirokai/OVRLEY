@@ -360,6 +360,48 @@ pub fn densify_activity(
                 &frame_elapsed_seconds,
                 requirements.vertical_speed,
             ),
+            altitude: densify_optional_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.altitude,
+                &frame_elapsed_seconds,
+                requirements.altitude,
+            ),
+            iso: densify_optional_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.iso,
+                &frame_elapsed_seconds,
+                requirements.iso,
+            ),
+            aperture: densify_optional_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.aperture,
+                &frame_elapsed_seconds,
+                requirements.aperture,
+            ),
+            shutter_speed: densify_optional_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.shutter_speed,
+                &frame_elapsed_seconds,
+                requirements.shutter_speed,
+            ),
+            focal_length: densify_optional_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.focal_length,
+                &frame_elapsed_seconds,
+                requirements.focal_length,
+            ),
+            ev: densify_optional_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.ev,
+                &frame_elapsed_seconds,
+                requirements.ev,
+            ),
+            color_temperature: densify_optional_numeric_series(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.color_temperature,
+                &frame_elapsed_seconds,
+                requirements.color_temperature,
+            ),
             gear_position: densify_optional_numeric_series(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.gear_position,

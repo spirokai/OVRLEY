@@ -141,6 +141,7 @@ pub fn validate_value_widget(value: ValueConfig, index: usize) -> CoreResult<Val
 
     // -- units -- all explicit --------------------------------------------
     let show_units = require_bool(value.show_units, &p("show_units"))?;
+
     let unit_color = rgba_from_hex(
         require_str(value.unit_color.as_deref(), &p("unit_color"))?,
         &p("unit_color"),
@@ -416,5 +417,114 @@ mod tests {
         v.value = MetricKind::Gradient;
         let e = validate_value_widget(v, 0).unwrap_err().to_string();
         assert!(e.contains("validation slice"), "{e}");
+    }
+
+    // ── unitsMode: hidden enforcement ──────────────────────────────────────
+
+    fn explicit_hidden_metric(metric: MetricKind, unit: &str, decimals: usize) -> ValueConfig {
+        let json = serde_json::json!({
+            "value": metric,
+            "x": 100.0, "y": 200.0,
+            "font": "Arial.ttf", "font_family": "Arial", "font_size": 100.0,
+            "color": "#ffffff", "opacity": 1.0,
+            "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
+            "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_units": false, "unit_color": "#ffffff", "display_unit": unit,
+            "decimals": decimals,
+            "prefix": "", "suffix": ""
+        });
+        serde_json::from_value(json).unwrap()
+    }
+
+    #[test]
+    fn iso_hidden_units_passes() {
+        let v = explicit_hidden_metric(MetricKind::Iso, "iso", 0);
+        assert!(validate_value_widget(v, 0).is_ok());
+    }
+
+    #[test]
+    fn aperture_hidden_units_passes() {
+        let v = explicit_hidden_metric(MetricKind::Aperture, "fnum", 1);
+        assert!(validate_value_widget(v, 0).is_ok());
+    }
+
+    #[test]
+    fn shutter_speed_hidden_units_passes() {
+        let v = explicit_hidden_metric(MetricKind::ShutterSpeed, "seconds", 0);
+        assert!(validate_value_widget(v, 0).is_ok());
+    }
+
+    #[test]
+    fn ev_hidden_units_passes() {
+        let v = explicit_hidden_metric(MetricKind::Ev, "ev", 1);
+        assert!(validate_value_widget(v, 0).is_ok());
+    }
+
+    // ── Single-unit selectable metrics ─────────────────────────────────────
+
+    #[test]
+    fn focal_length_single_unit_selectable_show_units_true() {
+        let v = serde_json::from_value(serde_json::json!({
+            "value": "focal_length", "x": 100.0, "y": 200.0,
+            "font": "Arial.ttf", "font_family": "Arial", "font_size": 100.0,
+            "color": "#ffffff", "opacity": 1.0,
+            "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
+            "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_units": true, "unit_color": "#ffffff", "display_unit": "mm",
+            "decimals": 0,
+            "prefix": "", "suffix": ""
+        }))
+        .unwrap();
+        assert!(validate_value_widget(v, 0).is_ok());
+    }
+
+    #[test]
+    fn focal_length_single_unit_selectable_show_units_false() {
+        let mut v: ValueConfig = serde_json::from_value(serde_json::json!({
+            "value": "focal_length", "x": 100.0, "y": 200.0,
+            "font": "Arial.ttf", "font_family": "Arial", "font_size": 100.0,
+            "color": "#ffffff", "opacity": 1.0,
+            "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
+            "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_units": true, "unit_color": "#ffffff", "display_unit": "mm",
+            "decimals": 0,
+            "prefix": "", "suffix": ""
+        }))
+        .unwrap();
+        v.show_units = Some(false);
+        assert!(validate_value_widget(v, 0).is_ok());
+    }
+
+    #[test]
+    fn color_temperature_single_unit_selectable_show_units_true() {
+        let v = serde_json::from_value(serde_json::json!({
+            "value": "color_temperature", "x": 100.0, "y": 200.0,
+            "font": "Arial.ttf", "font_family": "Arial", "font_size": 100.0,
+            "color": "#ffffff", "opacity": 1.0,
+            "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
+            "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_units": true, "unit_color": "#ffffff", "display_unit": "kelvin",
+            "decimals": 0,
+            "prefix": "", "suffix": ""
+        }))
+        .unwrap();
+        assert!(validate_value_widget(v, 0).is_ok());
+    }
+
+    #[test]
+    fn color_temperature_single_unit_selectable_show_units_false() {
+        let mut v: ValueConfig = serde_json::from_value(serde_json::json!({
+            "value": "color_temperature", "x": 100.0, "y": 200.0,
+            "font": "Arial.ttf", "font_family": "Arial", "font_size": 100.0,
+            "color": "#ffffff", "opacity": 1.0,
+            "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
+            "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_units": true, "unit_color": "#ffffff", "display_unit": "kelvin",
+            "decimals": 0,
+            "prefix": "", "suffix": ""
+        }))
+        .unwrap();
+        v.show_units = Some(false);
+        assert!(validate_value_widget(v, 0).is_ok());
     }
 }

@@ -365,6 +365,90 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
+        altitude: if requirements.altitude {
+            trim_numeric_series(
+                elapsed,
+                &activity.altitude,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        iso: if requirements.iso {
+            trim_numeric_series(
+                elapsed,
+                &activity.iso,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        aperture: if requirements.aperture {
+            trim_numeric_series(
+                elapsed,
+                &activity.aperture,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        shutter_speed: if requirements.shutter_speed {
+            trim_numeric_series(
+                elapsed,
+                &activity.shutter_speed,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        focal_length: if requirements.focal_length {
+            trim_numeric_series(
+                elapsed,
+                &activity.focal_length,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        ev: if requirements.ev {
+            trim_numeric_series(
+                elapsed,
+                &activity.ev,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        color_temperature: if requirements.color_temperature {
+            trim_numeric_series(
+                elapsed,
+                &activity.color_temperature,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
         gear_position: if requirements.gear_position {
             trim_numeric_series(
                 elapsed,
