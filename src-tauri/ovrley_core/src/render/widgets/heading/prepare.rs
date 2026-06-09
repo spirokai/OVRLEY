@@ -11,7 +11,7 @@ use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedHeading, ValidatedSceneConfig};
 use crate::render::surface::create_surface;
-use crate::render::text::parse_color;
+use crate::render::text::{origin_x_for_centered_text, parse_color};
 use skia_safe::{image_filters, Paint, Point};
 use std::path::PathBuf;
 use std::time::Instant;
@@ -144,10 +144,11 @@ pub fn prepare_heading_cache(
                     } else {
                         label_color
                     };
+                    let label_x = origin_x_for_centered_text(&label.text, label.x, &font);
                     shadow_label_paint.set_color(parse_color(color_str, 1.0));
                     canvas.draw_str(
                         &label.text,
-                        Point::new(label.x, label_y),
+                        Point::new(label_x, label_y),
                         &font,
                         &shadow_label_paint,
                     );
@@ -202,11 +203,12 @@ pub fn prepare_heading_cache(
             } else {
                 label_color
             };
+            let label_x = origin_x_for_centered_text(&label.text, label.x, &font);
             label_paint.set_color(parse_color(color_str, 1.0));
 
             canvas.draw_str(
                 &label.text,
-                Point::new(label.x, label_y),
+                Point::new(label_x, label_y),
                 &font,
                 &label_paint,
             );

@@ -33,7 +33,7 @@ export function useHeadingPreviewModel({ widget, activity, previewSecond, global
 
   // Typography: heading labels need font metrics ready before the tape is drawn.
   const labelFontSize = data.label_font_size
-  const labelFontFamily = getPreviewFontFamily(data.label_font || data.label_font_family || valueFont || sceneFont)
+  const labelFontFamily = getPreviewFontFamily(data.label_font || valueFont || sceneFont)
   useFontMetricsVersion(labelFontFamily, labelFontSize)
 
   return useMemo(() => {

@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as backend from '@/api/backend'
 import { hasTauriRuntime } from '@/features/app-shell'
+import { fileFromSelectedPath, openSinglePath } from '@/lib/file-dialog'
 import { useTemplateStore } from '@/hooks/useAppStoreSelectors'
 import useTemplateFetching from './useTemplateFetching'
 import {
@@ -209,15 +210,19 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     updateRate,
   ])
 
-  // Import template handler — opens browser file picker and hydrates state from a JSON file
+  // Import template handler — opens file picker and hydrates state from a JSON file
   const handleImportTemplate = useCallback(async () => {
     try {
+      let file
+
       if (hasTauriRuntime()) {
-        await backend.openTemplates()
-        return
+        const selectedPath = await openSinglePath([{ name: 'OVRLEY Template', extensions: ['json'] }])
+        if (!selectedPath) return
+        file = await fileFromSelectedPath(selectedPath)
+      } else {
+        file = await selectBrowserTemplateFile()
       }
 
-      const file = await selectBrowserTemplateFile()
       if (!file) return
 
       const rawText = await file.text()

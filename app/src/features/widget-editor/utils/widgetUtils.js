@@ -4,6 +4,7 @@
  */
 
 import { createFontSelection } from '@/lib/fonts'
+import { getDefaultFrameDimensions } from '@/lib/standard-metrics'
 import {
   TEXT_DEFAULTS,
   TEXT_FONT_SIZES,
@@ -124,13 +125,17 @@ export function createMetricValueDefaults(type, globalDefaults) {
     }
   }
   if (type === 'heading') {
+    const frameDefaults = getDefaultFrameDimensions('heading_tape')
     return {
       ...sharedDefaults,
       icon_color: getGlobalColor(globalDefaults, 'color_icons'),
       unit_color: getGlobalColor(globalDefaults, 'color_units'),
       ...TYPE_DEFAULTS[type],
       display_variants: {
-        heading_tape: { ...HEADING_TAPE_DEFAULTS },
+        heading_tape: {
+          ...HEADING_TAPE_DEFAULTS,
+          ...(frameDefaults || {}),
+        },
       },
     }
   }

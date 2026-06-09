@@ -307,6 +307,12 @@ pub fn measure_text_with_font(text: &str, font: &Font) -> MeasuredText {
     }
 }
 
+/// Converts a visual text center into the Skia text origin used by `draw_str`.
+pub fn origin_x_for_centered_text(text: &str, center_x: f32, font: &Font) -> f32 {
+    let (_, bounds) = font.measure_str(text, None);
+    center_x - (bounds.left + bounds.right) * 0.5
+}
+
 /// Parses `#RRGGBB` or `#RRGGBBAA` text into a Skia ARGB color.
 pub fn parse_color(input: &str, opacity: f32) -> Color {
     let hex = input.trim().trim_start_matches('#');

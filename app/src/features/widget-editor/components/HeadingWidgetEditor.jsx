@@ -23,7 +23,6 @@
 import { Compass, Ruler, Type, Target } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
-import { getFontFamilyName } from '@/lib/fonts'
 import { ColorField, SliderField, ToggleField, SelectField } from './widgetFormControls'
 import { SectionHeading } from './widgetEditorSections'
 import { getDisplayTypeOptions } from '@/lib/standard-metrics'
@@ -180,8 +179,8 @@ export default function HeadingWidgetEditor({ widget, updateWidgetData, setNumer
             <SectionHeading icon={Type} title="Labels" />
             <FontSelectField
               label="Label Font"
-              value={tapeData.label_font || tapeData.label_font_family}
-              onValueChange={(value) => updateTapeData({ label_font: value, label_font_family: getFontFamilyName(value) })}
+              value={tapeData.label_font}
+              onValueChange={(value) => updateTapeData({ label_font: value })}
               recommendedFonts={availableFonts.recommendedFonts}
               systemFonts={availableFonts.systemFonts}
               triggerClassName="h-9 border-border/70 bg-surface text-xs"
