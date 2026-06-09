@@ -202,8 +202,41 @@ impl ValueConfig {
         let mut raw = serde_json::to_value(self)
             .map_err(|e| CoreError::Config(format!("heading value serialization: {e}")))?;
         strip_json_nulls(&mut raw);
+
+        // Promote all keys from display_variants.heading_tape to the top level
+        // so HeadingWidgetConfig can deserialize. The JS durable normalization
+        // stores heading-specific fields inside display_variants so they
+        // survive round-tripping alongside text defaults.
+        promote_variant_keys(&mut raw, "heading_tape");
+
         serde_json::from_value(raw)
             .map_err(|e| CoreError::Config(format!("heading value config: {e}")))
+    }
+}
+
+/// Promotes all keys from a nested display variant to the top level if they
+/// are not already present at the root. This ensures display-specific fields
+/// (e.g. width, height, pixels_per_degree, tick_color, etc.) are visible to
+/// validators that expect them at the top level.
+fn promote_variant_keys(raw: &mut serde_json::Value, variant_key: &str) {
+    let mut promotions: Vec<(String, serde_json::Value)> = Vec::new();
+
+    if let Some(variants) = raw.get("display_variants") {
+        if let Some(variant) = variants.get(variant_key) {
+            if let Some(obj) = variant.as_object() {
+                for (key, value) in obj {
+                    if raw.get(key).is_none() {
+                        promotions.push((key.clone(), value.clone()));
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(obj) = raw.as_object_mut() {
+        for (k, v) in promotions {
+            obj.insert(k, v);
+        }
     }
 }
 
@@ -453,7 +486,7 @@ pub struct HeadingWidgetConfig {
     pub label_color: Option<String>,
     #[serde(default, alias = "major_label_color")]
     pub cardinal_label_color: Option<String>,
-    #[serde(default, alias = "label_font_family")]
+    #[serde(default)]
     pub label_font: Option<String>,
     #[serde(default)]
     pub label_font_size: Option<f32>,

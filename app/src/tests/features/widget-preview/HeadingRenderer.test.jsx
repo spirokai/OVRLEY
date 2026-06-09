@@ -127,7 +127,7 @@ describe('OverlayHeadingWidget', () => {
   })
 
   test('heading labels inherit the value font when no label font is set', () => {
-    const widget = makeHeadingWidget({ label_font: undefined, label_font_family: undefined })
+    const widget = makeHeadingWidget({ label_font: undefined })
     const { container } = render(
       <OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} valueFont="Furore.otf" />,
     )

@@ -19,6 +19,7 @@ use ovrley_core::normalize::{
     validate_render_config, validate_scene_config, ValidatedHeading, ValidatedSceneConfig,
 };
 use ovrley_core::render::surface::create_surface;
+use ovrley_core::render::text::{origin_x_for_centered_text, resolve_font};
 use ovrley_core::render::widgets::heading::draw::draw_heading_widget;
 use ovrley_core::render::widgets::heading::geometry::{
     chevron_vertices, visible_labels, visible_ticks, TapeTick,
@@ -27,6 +28,7 @@ use ovrley_core::render::widgets::heading::prepare::prepare_heading_cache;
 use ovrley_core::render::widgets::types::HeadingWidgetCache;
 use ovrley_core::types::DisplayType;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 // ── Geometry helpers ──────────────────────────────────────────────────────
 
@@ -245,6 +247,34 @@ fn visible_labels_respects_show_flags() {
     assert_eq!(major_only.len(), 2);
     assert_eq!(major_only[0].text, "N");
     assert_eq!(major_only[1].text, "15");
+}
+
+#[test]
+fn centered_heading_labels_use_tick_center_as_visual_center() {
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    let font_dirs = vec![workspace_root.join("fonts")];
+    let font = resolve_font(&font_dirs, Some("JetBrains Mono.ttf"), 36.0).unwrap();
+    let center_x = 120.0;
+    let text = "NE";
+
+    let (_, naive_bounds) = font.measure_str(text, None);
+    let naive_center = center_x + (naive_bounds.left + naive_bounds.right) * 0.5;
+    assert!(
+        (naive_center - center_x).abs() > 0.1,
+        "naive draw_str x should not already center glyph bounds"
+    );
+
+    let draw_x = origin_x_for_centered_text(text, center_x, &font);
+    let (_, bounds) = font.measure_str(text, None);
+    let rendered_center = draw_x + (bounds.left + bounds.right) * 0.5;
+
+    assert!(
+        (rendered_center - center_x).abs() < 0.001,
+        "expected centered bounds at {center_x}, got {rendered_center}"
+    );
 }
 
 // ── Geometry: chevron vertices ────────────────────────────────────────────

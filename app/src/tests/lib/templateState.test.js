@@ -148,7 +148,6 @@ describe('normalizeTemplateConfig', () => {
               width: 400,
               height: 80,
               label_font: 'Teko.ttf',
-              label_font_family: 'Teko',
               major_tick_thickness: 4,
               minor_tick_thickness: 1,
             },
@@ -161,7 +160,6 @@ describe('normalizeTemplateConfig', () => {
 
     expect(result.values[0].display_type).toBe('heading_tape')
     expect(result.values[0].display_variants.heading_tape.label_font).toBe('Teko.ttf')
-    expect(result.values[0].display_variants.heading_tape.label_font_family).toBe('Teko')
     expect(result.values[0].display_variants.heading_tape.major_tick_thickness).toBe(4)
     expect(result.values[0].display_variants.heading_tape.minor_tick_thickness).toBe(1)
   })
