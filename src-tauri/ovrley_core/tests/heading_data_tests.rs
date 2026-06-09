@@ -8,7 +8,7 @@ mod common;
 
 use serde_json::json;
 
-use ovrley_core::activity::schema::{ParsedActivity, TrimmedActivity};
+use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::normalize::RenderDataRequirements;
 
 #[test]
@@ -66,41 +66,8 @@ fn render_data_requirements_heading_derived_from_metric_kind() {
 fn heading_trimmed_and_densified_with_forward_fill() {
     use ovrley_core::activity::interpolate::densify_activity;
 
-    let trimmed = TrimmedActivity {
-        source_start_time: None,
-        sample_elapsed_seconds: vec![0.0, 0.5, 1.0],
-        sample_distance_progress: vec![],
-        course: vec![],
-        elevation: vec![],
-        speed: vec![],
-        heartrate: vec![],
-        cadence: vec![],
-        power: vec![],
-        temperature: vec![],
-        pace: vec![],
-        g_force: vec![],
-        air_pressure: vec![],
-        ground_contact_time: vec![],
-        left_right_balance: vec![],
-        stride_length: vec![],
-        stroke_rate: vec![],
-        torque: vec![],
-        vertical_speed: vec![],
-        altitude: vec![],
-        iso: vec![],
-        aperture: vec![],
-        shutter_speed: vec![],
-        focal_length: vec![],
-        ev: vec![],
-        color_temperature: vec![],
-        gear_position: vec![],
-        vertical_ratio: vec![],
-        vertical_oscillation: vec![],
-        core_temperature: vec![],
-        gradient: vec![],
-        time: vec![],
-        heading: vec![Some(90.0), None, Some(180.0)],
-    };
+    let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 0.5, 1.0]);
+    trimmed.heading = vec![Some(90.0), None, Some(180.0)];
     let mut requirements = RenderDataRequirements::default();
     requirements.heading = true;
 
@@ -122,41 +89,8 @@ fn heading_trimmed_and_densified_with_forward_fill() {
 fn heading_not_densified_when_not_required() {
     use ovrley_core::activity::interpolate::densify_activity;
 
-    let trimmed = TrimmedActivity {
-        source_start_time: None,
-        sample_elapsed_seconds: vec![0.0, 1.0],
-        sample_distance_progress: vec![],
-        course: vec![],
-        elevation: vec![],
-        speed: vec![],
-        heartrate: vec![],
-        cadence: vec![],
-        power: vec![],
-        temperature: vec![],
-        pace: vec![],
-        g_force: vec![],
-        air_pressure: vec![],
-        ground_contact_time: vec![],
-        left_right_balance: vec![],
-        stride_length: vec![],
-        stroke_rate: vec![],
-        torque: vec![],
-        vertical_speed: vec![],
-        altitude: vec![],
-        iso: vec![],
-        aperture: vec![],
-        shutter_speed: vec![],
-        focal_length: vec![],
-        ev: vec![],
-        color_temperature: vec![],
-        gear_position: vec![],
-        vertical_ratio: vec![],
-        vertical_oscillation: vec![],
-        core_temperature: vec![],
-        gradient: vec![],
-        time: vec![],
-        heading: vec![Some(90.0), Some(180.0)],
-    };
+    let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 1.0]);
+    trimmed.heading = vec![Some(90.0), Some(180.0)];
     let requirements = RenderDataRequirements::default();
 
     let report = densify_activity(&trimmed, 30.0, &requirements);
@@ -168,40 +102,7 @@ fn heading_values_triggers_heading_data_requirement() {
     let config = common::seam::validated_config_from_value(json!({
         "scene": common::seam::explicit_scene_json(),
         "labels": [],
-        "values": [{
-            "value": "heading",
-            "x": 0.0,
-            "y": 0.0,
-            "display_type": "heading_tape",
-            "width": 400,
-            "height": 80,
-            "rotation": 0.0,
-            "opacity": 1.0,
-            "pixels_per_degree": 5.0,
-            "major_tick_interval": 15,
-            "minor_ticks_per_major": 3,
-            "show_major_ticks": true,
-            "show_minor_ticks": true,
-            "major_tick_length_pct": 40.0,
-            "minor_tick_length_pct": 20.0,
-            "major_tick_thickness": 2.0,
-            "minor_tick_thickness": 1.0,
-            "tick_color": "#FFFFFF",
-            "cardinal_tick_color": "#FF0000",
-            "tick_alignment": "below",
-            "show_minor_labels": true,
-            "show_major_labels": true,
-            "label_color": "#CCCCCC",
-            "cardinal_label_color": "#FF0000",
-            "label_font": "Teko.ttf",
-            "label_font_size": 12.0,
-            "label_offset": 5.0,
-            "indicator_style": "chevron",
-            "indicator_placement": "top",
-            "show_indicator": true,
-            "indicator_color": "#FF0000",
-            "indicator_size": 10.0
-        }],
+        "values": [common::builders::heading_tape_json()],
         "plots": []
     }));
 

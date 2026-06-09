@@ -10,7 +10,7 @@
 
 mod common;
 
-use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
+use ovrley_core::activity::schema::DenseActivityReport;
 use ovrley_core::render::format::format_validated_metric_parts;
 use serde_json::json;
 
@@ -38,39 +38,7 @@ fn value_config_json(value_type: &str, overrides: &[(&str, &str)]) -> String {
 }
 
 fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
-    let mut s = DenseSeriesReport {
-        speed: vec![],
-        elevation: vec![],
-        gradient: vec![],
-        heartrate: vec![],
-        cadence: vec![],
-        power: vec![],
-        temperature: vec![],
-        pace: vec![],
-        g_force: vec![],
-        air_pressure: vec![],
-        ground_contact_time: vec![],
-        left_right_balance: vec![],
-        stride_length: vec![],
-        stroke_rate: vec![],
-        torque: vec![],
-        vertical_speed: vec![],
-        altitude: vec![],
-        iso: vec![],
-        aperture: vec![],
-        shutter_speed: vec![],
-        focal_length: vec![],
-        ev: vec![],
-        color_temperature: vec![],
-        gear_position: vec![],
-        vertical_ratio: vec![],
-        vertical_oscillation: vec![],
-        core_temperature: vec![],
-        heading: vec![],
-        course_lat: vec![],
-        course_lon: vec![],
-        time: vec![],
-    };
+    let mut s = common::builders::empty_dense_series();
     let series = vec![raw];
     match series_key {
         "pace" => s.pace = series,

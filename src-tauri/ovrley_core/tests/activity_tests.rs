@@ -9,14 +9,16 @@ use ovrley_core::activity::{build_dense_activity_report_validated, parse_activit
 use ovrley_core::commands::parse_and_validate_config;
 use ovrley_core::normalize::RenderDataRequirements;
 
-fn full_scene(fps: f64, start: f64, end: f64) -> String {
-    format!(
-        r##"{{"fps":{fps},"start":{start},"end":{end},"width":1920,"height":1080,"scale":1.0,"shadow_color":"#000000","shadow_strength":0.0,"shadow_distance":0.0,"border_color":"#000000","border_thickness":0.0,"update_rate":1}}"##
-    )
+fn full_scene(fps: f64, start: f64, end: f64) -> serde_json::Value {
+    let mut scene = common::builders::scene_json();
+    scene["fps"] = serde_json::json!(fps);
+    scene["start"] = serde_json::json!(start);
+    scene["end"] = serde_json::json!(end);
+    scene
 }
 
-fn speed_value() -> &'static str {
-    r##"{"value":"speed","x":0,"y":0,"font":"f","font_size":12.0,"color":"#ffffff","opacity":1.0,"show_icon":false,"icon_color":"#000000","icon_size":1.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"show_units":false,"unit_color":"#000000","display_unit":"","prefix":"","suffix":"","format":"{v}","decimals":0}"##
+fn speed_value() -> serde_json::Value {
+    common::builders::speed_value_json()
 }
 
 fn time_value() -> String {
@@ -29,11 +31,13 @@ fn time_value() -> String {
 fn builds_dense_report_for_full_fixture() {
     let activity_json = fs::read_to_string(common::test_config::parsed_activity_path()).unwrap();
     let activity = parse_activity_json(&activity_json).unwrap();
-    let config = parse_and_validate_config(&format!(
-        r##"{{"scene":{},"values":[{}]}}"##,
-        full_scene(30.0, 0.0, 4672.0),
-        speed_value()
-    ))
+    let config = parse_and_validate_config(
+        &serde_json::json!({
+            "scene": full_scene(30.0, 0.0, 4672.0),
+            "values": [speed_value()]
+        })
+        .to_string(),
+    )
     .unwrap();
     let report = build_dense_activity_report_validated(&activity, &config).unwrap();
 
@@ -57,11 +61,13 @@ fn trims_non_integer_window_across_multiple_fps() {
     let activity = parse_activity_json(&activity_json).unwrap();
 
     for (fps, expected_frames) in [(24.0, 708usize), (30.0, 885usize), (60.0, 1770usize)] {
-        let config = parse_and_validate_config(&format!(
-            r##"{{"scene":{},"values":[{}]}}"##,
-            full_scene(fps, 600.25, 629.75),
-            time_value()
-        ))
+        let config = parse_and_validate_config(
+            &serde_json::json!({
+                "scene": full_scene(fps, 600.25, 629.75),
+                "values": [serde_json::from_str::<serde_json::Value>(&time_value()).unwrap()]
+            })
+            .to_string(),
+        )
         .unwrap();
         let report = build_dense_activity_report_validated(&activity, &config).unwrap();
         assert_eq!(report.frame_count, expected_frames);
@@ -82,11 +88,26 @@ fn trims_non_integer_window_across_multiple_fps() {
 fn only_densifies_series_requested_by_template() {
     let activity_json = fs::read_to_string(common::test_config::fit_activity_path()).unwrap();
     let activity = parse_activity_json(&activity_json).unwrap();
-    let config = parse_and_validate_config(&format!(
-        r##"{{"scene":{},"values":[{}],"plots":{{"course":{{"value":"course","x":0,"y":0,"width":200,"height":100,"simplify_tolerance_px":1.0,"target_density":1.0,"completed_line_width":2.0,"completed_line_color":"#000000","completed_line_opacity":1.0,"remaining_line_width":2.0,"remaining_line_color":"#888888","remaining_line_opacity":1.0,"marker_variant":"single","marker_variant_diameter":12.0,"marker_size":8.0,"marker_color":"#ff0000","marker_opacity":1.0,"show_full_activity":false}}}}}}"##,
-        full_scene(30.0, 600.0, 630.0),
-        speed_value()
-    ))
+    let config = parse_and_validate_config(
+        &serde_json::json!({
+            "scene": full_scene(30.0, 600.0, 630.0),
+            "values": [speed_value()],
+            "plots": {
+                "course": {
+                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100,
+                    "simplify_tolerance_px": 1.0, "target_density": 1.0,
+                    "completed_line_width": 2.0, "completed_line_color": "#000000",
+                    "completed_line_opacity": 1.0,
+                    "remaining_line_width": 2.0, "remaining_line_color": "#888888",
+                    "remaining_line_opacity": 1.0,
+                    "marker_variant": "single", "marker_variant_diameter": 12.0,
+                    "marker_size": 8.0, "marker_color": "#ff0000", "marker_opacity": 1.0,
+                    "show_full_activity": false
+                }
+            }
+        })
+        .to_string(),
+    )
     .unwrap();
 
     let report = build_dense_activity_report_validated(&activity, &config).unwrap();
@@ -104,10 +125,25 @@ fn only_densifies_series_requested_by_template() {
 fn trimmed_exports_keep_absolute_distance_progress() {
     let activity_json = fs::read_to_string(common::test_config::fit_activity_path()).unwrap();
     let activity = parse_activity_json(&activity_json).unwrap();
-    let config = parse_and_validate_config(&format!(
-        r##"{{"scene":{},"plots":{{"course":{{"value":"course","x":0,"y":0,"width":200,"height":100,"simplify_tolerance_px":1.0,"target_density":1.0,"completed_line_width":2.0,"completed_line_color":"#000000","completed_line_opacity":1.0,"remaining_line_width":2.0,"remaining_line_color":"#888888","remaining_line_opacity":1.0,"marker_variant":"single","marker_variant_diameter":12.0,"marker_size":8.0,"marker_color":"#ff0000","marker_opacity":1.0,"show_full_activity":false}}}}}}"##,
-        full_scene(30.0, 600.0, 630.0)
-    ))
+    let config = parse_and_validate_config(
+        &serde_json::json!({
+            "scene": full_scene(30.0, 600.0, 630.0),
+            "plots": {
+                "course": {
+                    "value": "course", "x": 0, "y": 0, "width": 200, "height": 100,
+                    "simplify_tolerance_px": 1.0, "target_density": 1.0,
+                    "completed_line_width": 2.0, "completed_line_color": "#000000",
+                    "completed_line_opacity": 1.0,
+                    "remaining_line_width": 2.0, "remaining_line_color": "#888888",
+                    "remaining_line_opacity": 1.0,
+                    "marker_variant": "single", "marker_variant_diameter": 12.0,
+                    "marker_size": 8.0, "marker_color": "#ff0000", "marker_opacity": 1.0,
+                    "show_full_activity": false
+                }
+            }
+        })
+        .to_string(),
+    )
     .unwrap();
 
     let report = build_dense_activity_report_validated(&activity, &config).unwrap();
@@ -192,45 +228,11 @@ fn parsed_activity_handles_nulls_in_new_series() {
 #[test]
 fn hold_interpolation_densifies_iso_as_step_function() {
     use ovrley_core::activity::interpolate::densify_activity;
-    use ovrley_core::activity::schema::TrimmedActivity;
 
     // iso samples: 200 at t=0, 800 at t=1
     // With hold interpolation, all frames before t=1 should hold 200
-    let trimmed = TrimmedActivity {
-        source_start_time: None,
-        sample_elapsed_seconds: vec![0.0, 1.0],
-        sample_distance_progress: vec![],
-        course: vec![],
-        elevation: vec![],
-        speed: vec![],
-        heartrate: vec![],
-        cadence: vec![],
-        power: vec![],
-        temperature: vec![],
-        pace: vec![],
-        g_force: vec![],
-        air_pressure: vec![],
-        ground_contact_time: vec![],
-        left_right_balance: vec![],
-        stride_length: vec![],
-        stroke_rate: vec![],
-        torque: vec![],
-        vertical_speed: vec![],
-        altitude: vec![],
-        iso: vec![Some(200.0), Some(800.0)],
-        aperture: vec![],
-        shutter_speed: vec![],
-        focal_length: vec![],
-        ev: vec![],
-        color_temperature: vec![],
-        gear_position: vec![],
-        vertical_ratio: vec![],
-        vertical_oscillation: vec![],
-        core_temperature: vec![],
-        gradient: vec![],
-        time: vec![],
-        heading: vec![],
-    };
+    let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 1.0]);
+    trimmed.iso = vec![Some(200.0), Some(800.0)];
     let mut requirements = RenderDataRequirements::default();
     requirements.iso = true;
 
@@ -251,45 +253,10 @@ fn hold_interpolation_densifies_iso_as_step_function() {
 #[test]
 fn linear_interpolation_densifies_altitude_as_smooth_line() {
     use ovrley_core::activity::interpolate::densify_activity;
-    use ovrley_core::activity::schema::TrimmedActivity;
 
     // altitude samples: 100 at t=0, 200 at t=1
-    // With linear interpolation, values should be between 100 and 200
-    let trimmed = TrimmedActivity {
-        source_start_time: None,
-        sample_elapsed_seconds: vec![0.0, 1.0],
-        sample_distance_progress: vec![],
-        course: vec![],
-        elevation: vec![],
-        speed: vec![],
-        heartrate: vec![],
-        cadence: vec![],
-        power: vec![],
-        temperature: vec![],
-        pace: vec![],
-        g_force: vec![],
-        air_pressure: vec![],
-        ground_contact_time: vec![],
-        left_right_balance: vec![],
-        stride_length: vec![],
-        stroke_rate: vec![],
-        torque: vec![],
-        vertical_speed: vec![],
-        altitude: vec![Some(100.0), Some(200.0)],
-        iso: vec![],
-        aperture: vec![],
-        shutter_speed: vec![],
-        focal_length: vec![],
-        ev: vec![],
-        color_temperature: vec![],
-        gear_position: vec![],
-        vertical_ratio: vec![],
-        vertical_oscillation: vec![],
-        core_temperature: vec![],
-        gradient: vec![],
-        time: vec![],
-        heading: vec![],
-    };
+    let mut trimmed = common::builders::minimal_trimmed_activity(vec![0.0, 1.0]);
+    trimmed.altitude = vec![Some(100.0), Some(200.0)];
     let mut requirements = RenderDataRequirements::default();
     requirements.altitude = true;
 

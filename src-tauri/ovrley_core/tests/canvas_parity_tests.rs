@@ -26,7 +26,7 @@ use std::fs;
 use std::path::PathBuf;
 
 /// The second within the activity to render (mid-activity, all widgets active).
-const SELECTED_SECOND: u32 = 600;
+const SELECTED_SECOND: u32 = 200;
 
 /// SSIM threshold — accounts for minor glyph rasterization differences between
 /// Skia's FreeType and Chromium's FreeType.

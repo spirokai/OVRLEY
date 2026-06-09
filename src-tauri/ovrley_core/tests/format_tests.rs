@@ -204,45 +204,5 @@ fn validated_standard_value(value: serde_json::Value) -> ValidatedValueWidget {
 }
 
 fn dense_report_with(fill: impl FnOnce(&mut DenseSeriesReport)) -> DenseActivityReport {
-    let mut series = DenseSeriesReport {
-        speed: vec![],
-        elevation: vec![],
-        gradient: vec![],
-        heartrate: vec![],
-        cadence: vec![],
-        power: vec![],
-        temperature: vec![],
-        pace: vec![],
-        g_force: vec![],
-        air_pressure: vec![],
-        ground_contact_time: vec![],
-        left_right_balance: vec![],
-        stride_length: vec![],
-        stroke_rate: vec![],
-        torque: vec![],
-        vertical_speed: vec![],
-        altitude: vec![],
-        iso: vec![],
-        aperture: vec![],
-        shutter_speed: vec![],
-        focal_length: vec![],
-        ev: vec![],
-        color_temperature: vec![],
-        gear_position: vec![],
-        vertical_ratio: vec![],
-        vertical_oscillation: vec![],
-        core_temperature: vec![],
-        heading: vec![],
-        course_lat: vec![],
-        course_lon: vec![],
-        time: vec![],
-    };
-    fill(&mut series);
-
-    DenseActivityReport {
-        frame_count: 1,
-        frame_elapsed_seconds: vec![0.0],
-        frame_distance_progress: vec![Some(0.0)],
-        series,
-    }
+    common::builders::dense_report_with(fill)
 }

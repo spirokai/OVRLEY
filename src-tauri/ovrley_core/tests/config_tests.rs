@@ -242,26 +242,5 @@ fn durable_template_without_scene_timing_still_validates_for_save() {
 }
 
 fn explicit_speed_value() -> serde_json::Value {
-    json!({
-        "value": "speed",
-        "x": 0,
-        "y": 0,
-        "font": "Arial.ttf",
-        "font_size": 32.0,
-        "color": "#ffffff",
-        "opacity": 1.0,
-        "show_icon": true,
-        "icon_color": "#ffffff",
-        "icon_size": 45.0,
-        "icon_offset_x": 0.0,
-        "icon_offset_y": 0.0,
-        "show_units": true,
-        "unit_color": "#ffffff",
-        "display_unit": "kmh",
-        "prefix": "",
-        "suffix": "",
-        "decimals": 0,
-        "triangle_width": 0.0,
-        "display_type": "text"
-    })
+    common::builders::speed_value_json()
 }

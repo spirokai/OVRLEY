@@ -19,6 +19,10 @@ use ovrley_core::encode::ffmpeg_settings::build_ffmpeg_settings;
 use ovrley_core::error::CoreResult;
 use serde_json::json;
 
+mod common;
+
+use common::composite::{assert_argument_pair, has_argument_pair};
+
 #[test]
 fn prores_ks_defaults() -> CoreResult<()> {
     let settings = build_ffmpeg_settings(&json!({
@@ -182,18 +186,6 @@ fn profile_specific_json_knobs_do_not_override_catalog_defaults() -> CoreResult<
     assert!(!settings.output_args.iter().any(|arg| arg == "ap10"));
     assert!(!settings.output_args.iter().any(|arg| arg == "8"));
     Ok(())
-}
-
-fn assert_argument_pair(args: &[String], key: &str, value: &str) {
-    assert!(
-        has_argument_pair(args, key, value),
-        "missing argument pair {key} {value} in {args:?}"
-    );
-}
-
-fn has_argument_pair(args: &[String], key: &str, value: &str) -> bool {
-    args.windows(2)
-        .any(|window| window[0] == key && window[1] == value)
 }
 
 fn count_flag(args: &[String], key: &str) -> usize {

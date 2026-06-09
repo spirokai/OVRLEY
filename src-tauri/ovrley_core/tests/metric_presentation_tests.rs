@@ -18,6 +18,8 @@
 //! - DisplayType dispatch returning wrong variant for Text
 //! - Future display types crashing instead of returning None
 
+mod common;
+
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::raw::ValueConfig;
@@ -116,39 +118,9 @@ fn empty_caches() -> BTreeMap<usize, PresentationCache> {
 }
 
 fn empty_dense_series() -> DenseSeriesReport {
-    DenseSeriesReport {
-        speed: vec![],
-        elevation: vec![],
-        gradient: vec![],
-        heartrate: vec![],
-        cadence: vec![],
-        power: vec![],
-        temperature: vec![],
-        pace: vec![],
-        g_force: vec![],
-        air_pressure: vec![],
-        ground_contact_time: vec![],
-        left_right_balance: vec![],
-        stride_length: vec![],
-        stroke_rate: vec![],
-        torque: vec![],
-        vertical_speed: vec![],
-        altitude: vec![],
-        iso: vec![],
-        aperture: vec![],
-        shutter_speed: vec![],
-        focal_length: vec![],
-        ev: vec![],
-        color_temperature: vec![],
-        gear_position: vec![],
-        vertical_ratio: vec![],
-        vertical_oscillation: vec![],
-        core_temperature: vec![],
-        heading: vec![Some(90.0)],
-        course_lat: vec![],
-        course_lon: vec![],
-        time: vec![],
-    }
+    let mut s = common::builders::empty_dense_series();
+    s.heading = vec![Some(90.0)];
+    s
 }
 
 fn default_dense_activity() -> DenseActivityReport {
@@ -447,25 +419,7 @@ fn prepare_assets_distinct_caches_per_value_index() {
     let heading_tape_at_pos_2 = full_heading_tape_config(400, 20);
 
     let config = RenderConfig {
-        scene: serde_json::from_value(serde_json::json!({
-            "fps": 30.0,
-            "start": 0.0,
-            "end": 10.0,
-            "width": 1920,
-            "height": 1080,
-            "scale": 1.0,
-            "shadow_strength": 0.0,
-            "shadow_distance": 0.0,
-            "shadow_color": "#000000",
-            "border_thickness": 0.0,
-            "border_color": "#000000",
-            "update_rate": 1,
-            "custom_export_range_active": false,
-            "composite_sync_offset": 0.0,
-            "composite_video_trim_start": 0.0,
-            "composite_widget_update_rate": 1
-        }))
-        .unwrap(),
+        scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         labels: vec![],
         values: vec![
             serde_json::from_value(heading_tape_at_pos_0).unwrap(),
@@ -481,39 +435,7 @@ fn prepare_assets_distinct_caches_per_value_index() {
         frame_count: 1,
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
-        series: ovrley_core::activity::schema::DenseSeriesReport {
-            speed: vec![],
-            elevation: vec![],
-            gradient: vec![],
-            heartrate: vec![],
-            cadence: vec![],
-            power: vec![],
-            temperature: vec![],
-            pace: vec![],
-            g_force: vec![],
-            air_pressure: vec![],
-            ground_contact_time: vec![],
-            left_right_balance: vec![],
-            stride_length: vec![],
-            stroke_rate: vec![],
-            torque: vec![],
-            vertical_speed: vec![],
-            altitude: vec![],
-            iso: vec![],
-            aperture: vec![],
-            shutter_speed: vec![],
-            focal_length: vec![],
-            ev: vec![],
-            color_temperature: vec![],
-            gear_position: vec![],
-            vertical_ratio: vec![],
-            vertical_oscillation: vec![],
-            core_temperature: vec![],
-            heading: vec![Some(90.0)],
-            course_lat: vec![],
-            course_lon: vec![],
-            time: vec![],
-        },
+        series: empty_dense_series(),
     };
     let paths = AppPaths {
         repo_root: PathBuf::from(env!("CARGO_MANIFEST_DIR")),
@@ -575,26 +497,11 @@ fn render_preserves_multiple_boxed_reports() {
 
     let speed_text = serde_json::from_value(full_speed_text_config(400, 20)).unwrap();
 
+    let mut scene = common::builders::scene_json();
+    scene["width"] = serde_json::json!(800);
+    scene["height"] = serde_json::json!(200);
     let config = RenderConfig {
-        scene: serde_json::from_value(serde_json::json!({
-            "fps": 30.0,
-            "start": 0.0,
-            "end": 10.0,
-            "width": 800,
-            "height": 200,
-            "scale": 1.0,
-            "shadow_strength": 0.0,
-            "shadow_distance": 0.0,
-            "shadow_color": "#000000",
-            "border_thickness": 0.0,
-            "border_color": "#000000",
-            "update_rate": 1,
-            "custom_export_range_active": false,
-            "composite_sync_offset": 0.0,
-            "composite_video_trim_start": 0.0,
-            "composite_widget_update_rate": 1
-        }))
-        .unwrap(),
+        scene: serde_json::from_value(scene).unwrap(),
         labels: vec![],
         values: vec![heading_tape, speed_text],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -602,43 +509,13 @@ fn render_preserves_multiple_boxed_reports() {
     };
     let config = validate_render_config(config).unwrap();
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({})).unwrap();
+    let mut series = empty_dense_series();
+    series.speed = vec![Some(10.0)];
     let dense = ovrley_core::activity::schema::DenseActivityReport {
         frame_count: 1,
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
-        series: ovrley_core::activity::schema::DenseSeriesReport {
-            speed: vec![Some(10.0)],
-            elevation: vec![],
-            gradient: vec![],
-            heartrate: vec![],
-            cadence: vec![],
-            power: vec![],
-            temperature: vec![],
-            pace: vec![],
-            g_force: vec![],
-            air_pressure: vec![],
-            ground_contact_time: vec![],
-            left_right_balance: vec![],
-            stride_length: vec![],
-            stroke_rate: vec![],
-            torque: vec![],
-            vertical_speed: vec![],
-            altitude: vec![],
-            iso: vec![],
-            aperture: vec![],
-            shutter_speed: vec![],
-            focal_length: vec![],
-            ev: vec![],
-            color_temperature: vec![],
-            gear_position: vec![],
-            vertical_ratio: vec![],
-            vertical_oscillation: vec![],
-            core_temperature: vec![],
-            heading: vec![Some(90.0)],
-            course_lat: vec![],
-            course_lon: vec![],
-            time: vec![],
-        },
+        series,
     };
     let fonts_dir = workspace_root.join("fonts");
     let paths = AppPaths {
@@ -712,26 +589,11 @@ fn render_reports_multiple_heading_tapes_with_identity() {
     let heading_tape_right =
         serde_json::from_value(full_heading_tape_config_sized(400, 20, 180, 50)).unwrap();
 
+    let mut scene = common::builders::scene_json();
+    scene["width"] = serde_json::json!(800);
+    scene["height"] = serde_json::json!(200);
     let config = RenderConfig {
-        scene: serde_json::from_value(serde_json::json!({
-            "fps": 30.0,
-            "start": 0.0,
-            "end": 10.0,
-            "width": 800,
-            "height": 200,
-            "scale": 1.0,
-            "shadow_strength": 0.0,
-            "shadow_distance": 0.0,
-            "shadow_color": "#000000",
-            "border_thickness": 0.0,
-            "border_color": "#000000",
-            "update_rate": 1,
-            "custom_export_range_active": false,
-            "composite_sync_offset": 0.0,
-            "composite_video_trim_start": 0.0,
-            "composite_widget_update_rate": 1
-        }))
-        .unwrap(),
+        scene: serde_json::from_value(scene).unwrap(),
         labels: vec![],
         values: vec![heading_tape_left, heading_tape_right],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -743,39 +605,7 @@ fn render_reports_multiple_heading_tapes_with_identity() {
         frame_count: 1,
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
-        series: ovrley_core::activity::schema::DenseSeriesReport {
-            speed: vec![],
-            elevation: vec![],
-            gradient: vec![],
-            heartrate: vec![],
-            cadence: vec![],
-            power: vec![],
-            temperature: vec![],
-            pace: vec![],
-            g_force: vec![],
-            air_pressure: vec![],
-            ground_contact_time: vec![],
-            left_right_balance: vec![],
-            stride_length: vec![],
-            stroke_rate: vec![],
-            torque: vec![],
-            vertical_speed: vec![],
-            altitude: vec![],
-            iso: vec![],
-            aperture: vec![],
-            shutter_speed: vec![],
-            focal_length: vec![],
-            ev: vec![],
-            color_temperature: vec![],
-            gear_position: vec![],
-            vertical_ratio: vec![],
-            vertical_oscillation: vec![],
-            core_temperature: vec![],
-            heading: vec![Some(90.0)],
-            course_lat: vec![],
-            course_lon: vec![],
-            time: vec![],
-        },
+        series: empty_dense_series(),
     };
     let fonts_dir = workspace_root.join("fonts");
     let paths = AppPaths {

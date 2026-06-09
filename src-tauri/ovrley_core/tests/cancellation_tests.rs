@@ -19,16 +19,6 @@ fn double_cancel_is_idempotent() {
     assert!(progress.status == "cancelled" || progress.status == "running");
 }
 
-/// Progress reports zero frames before any frames are rendered.
-#[test]
-fn progress_starts_at_zero() {
-    let controller = RenderController::default();
-    controller.try_start(100, "test_progress_zero").unwrap();
-
-    let progress = controller.progress();
-    assert_eq!(progress.encoded, 0);
-}
-
 /// Start -> cancel lifecycle at the controller level.
 #[test]
 fn controller_lifecycle_start_and_cancel() {

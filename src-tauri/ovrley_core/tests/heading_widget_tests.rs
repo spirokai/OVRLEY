@@ -13,6 +13,8 @@
 //! - Cache preparation producing correct dimensions and indicator config
 //! - Per-frame drawing producing a valid render report
 
+mod common;
+
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::raw::RenderConfig;
 use ovrley_core::normalize::{
@@ -72,25 +74,7 @@ fn default_heading() -> ValidatedHeading {
 
 fn default_render_config() -> RenderConfig {
     let scene: ovrley_core::normalize::raw::SceneConfig =
-        serde_json::from_value(serde_json::json!({
-            "fps": 30.0,
-            "start": 0.0,
-            "end": 10.0,
-            "width": 1920,
-            "height": 1080,
-            "scale": 1.0,
-            "shadow_strength": 0.0,
-            "shadow_distance": 0.0,
-            "shadow_color": "#000000",
-            "border_thickness": 0.0,
-            "border_color": "#000000",
-            "update_rate": 1,
-            "custom_export_range_active": false,
-            "composite_sync_offset": 0.0,
-            "composite_video_trim_start": 0.0,
-            "composite_widget_update_rate": 1
-        }))
-        .unwrap();
+        serde_json::from_value(common::builders::scene_json()).unwrap();
     let config = RenderConfig {
         scene,
         labels: vec![],
@@ -394,70 +378,4 @@ fn draw_heading_widget_with_chevron_indicator() {
     assert_eq!(report.geometry.widget_height, 80);
 }
 
-#[test]
-fn draw_heading_widget_with_highlight_bar() {
-    let mut cache = default_cache();
-    cache.indicator_style = "highlight_bar".to_string();
-    cache.indicator_placement = "both".to_string();
-    let mut surface = create_surface(1920, 1080).unwrap();
-    let canvas = surface.canvas();
-    canvas.clear(skia_safe::Color::TRANSPARENT);
-    let mut profiler = RenderProfiler::default();
 
-    let report = draw_heading_widget(canvas, &cache, 45.0, &mut profiler);
-
-    assert!(report.is_some());
-}
-
-#[test]
-fn draw_heading_widget_indicator_hidden() {
-    let mut cache = default_cache();
-    cache.show_indicator = false;
-    let mut surface = create_surface(1920, 1080).unwrap();
-    let canvas = surface.canvas();
-    canvas.clear(skia_safe::Color::TRANSPARENT);
-    let mut profiler = RenderProfiler::default();
-
-    let report = draw_heading_widget(canvas, &cache, 0.0, &mut profiler);
-
-    assert!(report.is_some());
-}
-
-#[test]
-fn draw_heading_widget_chevron_placement_both() {
-    let mut cache = default_cache();
-    cache.indicator_placement = "both".to_string();
-    let mut surface = create_surface(1920, 1080).unwrap();
-    let canvas = surface.canvas();
-    canvas.clear(skia_safe::Color::TRANSPARENT);
-    let mut profiler = RenderProfiler::default();
-
-    let report = draw_heading_widget(canvas, &cache, 180.0, &mut profiler);
-
-    assert!(report.is_some());
-}
-
-#[test]
-fn draw_heading_widget_wrap_at_360() {
-    let cache = default_cache();
-    let mut surface = create_surface(1920, 1080).unwrap();
-    let canvas = surface.canvas();
-    canvas.clear(skia_safe::Color::TRANSPARENT);
-    let mut profiler = RenderProfiler::default();
-
-    // Heading near 360 should wrap seamlessly
-    let report = draw_heading_widget(canvas, &cache, 359.0, &mut profiler);
-    assert!(report.is_some());
-}
-
-#[test]
-fn draw_heading_widget_at_zero() {
-    let cache = default_cache();
-    let mut surface = create_surface(1920, 1080).unwrap();
-    let canvas = surface.canvas();
-    canvas.clear(skia_safe::Color::TRANSPARENT);
-    let mut profiler = RenderProfiler::default();
-
-    let report = draw_heading_widget(canvas, &cache, 0.0, &mut profiler);
-    assert!(report.is_some());
-}

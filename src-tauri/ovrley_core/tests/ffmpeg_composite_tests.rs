@@ -21,6 +21,9 @@
 
 use std::path::Path;
 
+mod common;
+
+use common::composite::{assert_argument_pair, has_argument_pair};
 use ovrley_core::encode::codec_detect::AvailableCodecs;
 use ovrley_core::encode::ffmpeg_composite::{
     build_composite_ffmpeg_settings, CompositeFfmpegBuildRequest, CompositeFfmpegSettings,
@@ -738,14 +741,3 @@ fn test_9_7_safe_codec_names_do_not_select_experimental_profiles() {
     assert!(!qsv.filter_complex.contains("overlay_qsv"));
 }
 
-fn assert_argument_pair(args: &[String], key: &str, value: &str) {
-    assert!(
-        has_argument_pair(args, key, value),
-        "missing argument pair {key} {value} in {args:?}"
-    );
-}
-
-fn has_argument_pair(args: &[String], key: &str, value: &str) -> bool {
-    args.windows(2)
-        .any(|window| window[0] == key && window[1] == value)
-}

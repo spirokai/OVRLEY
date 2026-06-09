@@ -7,7 +7,7 @@
 
 mod common;
 
-use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
+use ovrley_core::activity::schema::DenseActivityReport;
 use serde_json::json;
 
 const SPEED_VALUE: &str = r##"{"value":"speed","x":0,"y":0,"display_unit":"kmh","decimals":0,"show_units":true,"font":"Arial.ttf","font_size":32.0,"color":"#ffffff","opacity":1.0,"show_icon":true,"icon_color":"#40e0d0","icon_size":28.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"unit_color":"#ffffff","prefix":"","suffix":""}"##;
@@ -23,44 +23,10 @@ fn config_json(values_json: &str) -> ovrley_core::normalize::ValidatedRenderConf
 }
 
 fn dense_with_speed_and_torque(speed: f64, torque: f64) -> DenseActivityReport {
-    DenseActivityReport {
-        frame_count: 1,
-        frame_elapsed_seconds: vec![0.0],
-        frame_distance_progress: vec![],
-        series: DenseSeriesReport {
-            speed: vec![Some(speed)],
-            elevation: vec![],
-            gradient: vec![],
-            heartrate: vec![],
-            cadence: vec![],
-            power: vec![],
-            temperature: vec![],
-            pace: vec![],
-            g_force: vec![],
-            air_pressure: vec![],
-            ground_contact_time: vec![],
-            left_right_balance: vec![],
-            stride_length: vec![],
-            stroke_rate: vec![],
-            torque: vec![Some(torque)],
-            vertical_speed: vec![],
-            altitude: vec![],
-            iso: vec![],
-            aperture: vec![],
-            shutter_speed: vec![],
-            focal_length: vec![],
-            ev: vec![],
-            color_temperature: vec![],
-            gear_position: vec![],
-            vertical_ratio: vec![],
-            vertical_oscillation: vec![],
-            core_temperature: vec![],
-            heading: vec![],
-            course_lat: vec![],
-            course_lon: vec![],
-            time: vec![],
-        },
-    }
+    common::builders::dense_report_with(|s| {
+        s.speed = vec![Some(speed)];
+        s.torque = vec![Some(torque)];
+    })
 }
 
 #[test]

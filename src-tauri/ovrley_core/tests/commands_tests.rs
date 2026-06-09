@@ -343,21 +343,25 @@ fn test_3_8_rejects_impossible_trim() {
     );
 }
 
-/// Explicit speed value config required by the validation contract.
-const EXPLICIT_SPEED_VALUE: &str = r##"{"value":"speed","x":0,"y":0,"font":"Arial.ttf","font_size":32.0,"color":"#ffffff","opacity":1.0,"show_icon":true,"icon_color":"#40e0d0","icon_size":28.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"show_units":true,"unit_color":"#ffffff","display_unit":"kmh","decimals":0,"prefix":"","suffix":""}"##;
+/// Canonical speed value from the shared test-common fixture.
+fn explicit_speed_value_json() -> serde_json::Value {
+    common::builders::speed_value_json()
+}
 
 /// Builds a minimal transparent-render config with one speed value and no
 /// composite fields — used to verify the transparent branch is selected.
 fn transparent_config(start: f64, end: f64, fps: f64) -> RenderConfig {
-    parse_config_json(&format!(
-        r##"{{
-                "scene":{{"fps":{fps},"start":{start},"end":{end},"width":1920,"height":1080,"scale":1.0,"shadow_color":"#000000","shadow_strength":0.0,"shadow_distance":0.0,"border_color":"#000000","border_thickness":0.0,"update_rate":1,"ffmpeg":{{}}}},
-                "values":[{EXPLICIT_SPEED_VALUE}],
-                "labels":[],
-                "plots":[]
-            }}"##
-    ))
-    .unwrap()
+    let mut scene = common::builders::scene_json();
+    scene["fps"] = serde_json::json!(fps);
+    scene["start"] = serde_json::json!(start);
+    scene["end"] = serde_json::json!(end);
+    let config = serde_json::json!({
+        "scene": scene,
+        "values": [explicit_speed_value_json()],
+        "labels": [],
+        "plots": []
+    });
+    parse_config_json(&config.to_string()).unwrap()
 }
 
 /// Builds a composite config from extra scene-level JSON fields injected
@@ -378,30 +382,22 @@ fn composite_validated_scene(
 /// Returns the full JSON template string for a composite config, splicing
 /// `extra_scene_fields` into the `scene` block.
 fn composite_config_json(extra_scene_fields: &str) -> String {
-    format!(
-        r##"{{
-                "scene":{{
-                    "fps":30,
-                    "start":0,
-                    "end":10,
-                    "width":1920,
-                    "height":1080,
-                    "scale":1.0,
-                    "shadow_strength":0.0,
-                    "shadow_distance":0.0,
-                    "shadow_color":"#000000",
-                    "border_thickness":0.0,
-                    "border_color":"#000000",
-                    "update_rate":1,
-                    "custom_export_range_active":false,
-                    "ffmpeg":{{"codec":"libx264"}},
-                    {extra_scene_fields}
-                }},
-                "values":[{EXPLICIT_SPEED_VALUE}],
-                "labels":[],
-                "plots":[]
-            }}"##
-    )
+    let mut scene = common::builders::scene_json();
+    scene["ffmpeg"] = serde_json::json!({"codec": "libx264"});
+    let extra: serde_json::Value =
+        serde_json::from_str(&format!("{{{}}}", extra_scene_fields)).unwrap();
+    if let serde_json::Value::Object(map) = &extra {
+        for (k, v) in map {
+            scene[k] = v.clone();
+        }
+    }
+    serde_json::json!({
+        "scene": scene,
+        "values": [explicit_speed_value_json()],
+        "labels": [],
+        "plots": []
+    })
+    .to_string()
 }
 
 /// Parses the shared synthetic activity fixture used by command tests.
