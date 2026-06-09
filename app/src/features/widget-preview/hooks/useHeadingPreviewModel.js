@@ -23,12 +23,13 @@ import { useFontMetricsVersion } from './useFontMetricsVersion'
  * @param {object|null} params.activity - Activity data with heading series.
  * @param {number} params.previewSecond - Current preview timestamp in seconds.
  * @param {number} params.globalOpacity - Global opacity multiplier.
+ * @param {number} params.globalScale - Global scale multiplier.
  * @param {string} params.sceneFont - Scene-level font family.
  * @param {string} params.valueFont - Value-font override.
  * @param {object} params.sceneStyle - Scene style object.
  * @returns {object} Preview model consumed by the heading preview renderer.
  */
-export function useHeadingPreviewModel({ widget, activity, previewSecond, globalOpacity, sceneFont, valueFont, sceneStyle }) {
+export function useHeadingPreviewModel({ widget, activity, previewSecond, globalOpacity, globalScale, sceneFont, valueFont, sceneStyle }) {
   const data = widget.data
 
   // Typography: heading labels need font metrics ready before the tape is drawn.
@@ -38,6 +39,7 @@ export function useHeadingPreviewModel({ widget, activity, previewSecond, global
 
   return useMemo(() => {
     // Viewport and opacity: boxed heading widgets guarantee geometry, but keep raster minimums.
+    const scale = globalScale ?? 1
     const width = Math.max(data.width, 80)
     const height = Math.max(data.height, 20)
     const ppd = data.pixels_per_degree
@@ -57,6 +59,8 @@ export function useHeadingPreviewModel({ widget, activity, previewSecond, global
       data,
       width,
       height,
+      displayWidth: width * scale,
+      displayHeight: height * scale,
       opacity,
       tapeWidth,
       labelFontFamily,
@@ -67,5 +71,5 @@ export function useHeadingPreviewModel({ widget, activity, previewSecond, global
       shadowFilterId: sanitizeSvgId(`${widget.id}-shadow`),
       clipPathId: sanitizeSvgId(`${widget.id}-clip`),
     }
-  }, [activity, data, globalOpacity, labelFontFamily, previewSecond, sceneStyle, widget.id])
+  }, [activity, data, globalOpacity, globalScale, labelFontFamily, previewSecond, sceneStyle, widget.id])
 }

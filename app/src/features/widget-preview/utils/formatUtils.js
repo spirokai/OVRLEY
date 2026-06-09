@@ -145,6 +145,8 @@ function convertStandardMetricValue(type, value, displayUnit) {
         default:
           return numericValue
       }
+    case 'altitude':
+      return displayUnit === 'ft' ? numericValue * 3.28084 : numericValue
     case 'vertical_oscillation':
       switch (displayUnit) {
         case 'cm':

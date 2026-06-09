@@ -548,6 +548,13 @@ fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, v
             "mbar" => value * 1000.0,
             _ => value * 1000.0,
         },
+        MetricKind::Altitude => {
+            if display_unit == Some("ft") {
+                value * 3.280_84
+            } else {
+                value
+            }
+        }
         MetricKind::StrideLength => match display_unit.unwrap_or("m") {
             "cm" => value * 100.0,
             "ft" => value * 3.280_84,

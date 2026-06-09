@@ -40,7 +40,7 @@
 - Burnt orange (#FF6A2B) + cream orange (#DCB9A6; just minor accents) - DONE; screen8
 - Neon acid lime (#D7FF3F) + titanium gray (#C6CDD5) - DONE; screen12
 - Blue navy (#95C4EC) + neon teal (#11E9C5)
-- Lavender (#CAB2FB) + slate brown (#8B5CF6) - DONE; screen10, screen1
+- Lavender (#CAB2FB) + slate brown (#8B5CF6) - DONE; screen10
 
 ## Non-negotiable settings and fonts
 

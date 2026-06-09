@@ -125,6 +125,7 @@ function WidgetPreview({
           activity={activity}
           previewSecond={previewSecond}
           globalOpacity={globalOpacity}
+          globalScale={globalScale}
           sceneFont={sceneFont}
           sceneStyle={sceneStyle}
           valueFont={valueFont}

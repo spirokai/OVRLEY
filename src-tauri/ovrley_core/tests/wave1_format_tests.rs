@@ -699,3 +699,19 @@ fn altitude_formats_as_decimal() {
     assert_eq!(value, "864.3");
     assert_eq!(unit, Some("M".to_string()));
 }
+
+#[test]
+fn altitude_converts_meters_to_feet() {
+    let (value, unit) = format_parts(
+        "altitude",
+        "altitude",
+        Some(100.0),
+        &[
+            ("display_unit", r#""ft""#),
+            ("decimals", "0"),
+            ("show_units", "true"),
+        ],
+    );
+    assert_eq!(value, "328");
+    assert_eq!(unit, Some("FT".to_string()));
+}

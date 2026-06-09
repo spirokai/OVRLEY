@@ -187,28 +187,107 @@ function deriveLegacyGradientSeries(elevationSeries, distanceSeries, helpers) {
 }
 
 /**
- * Derives heading series.
+ * Derives heading series using a minimum-distance lookback.
+ *
+ * Instead of using adjacent course samples, this derives bearing from a
+ * minimum-distance baseline around the current sample. When possible it uses
+ * one point before and one point after the current sample so a single noisy
+ * fix does not dominate the bearing.
  *
  * @param {*} courseSeries - Value for course series.
+ * @param {*} distanceSeries - Cumulative distance series aligned with courseSeries.
  * @param {*} helpers - Shared numeric and geospatial helper functions.
+ * @param {number} [minDistanceMeters=2] - Minimum travel distance before recomputing bearing.
  * @returns {*} Derived data structure for downstream use.
  */
-function deriveHeadingSeries(courseSeries, helpers) {
+function deriveHeadingSeries(courseSeries, distanceSeries, helpers, minDistanceMeters = 2) {
   const { calculateBearingDegrees, isFiniteNumber, roundValue } = helpers
+  const derivedSeries = []
   let lastHeading = null
+  const halfBaselineMeters = minDistanceMeters / 2
 
-  return courseSeries.map((point, index) => {
-    const previousPoint = index > 0 ? courseSeries[index - 1] : null
-    const nextPoint = index < courseSeries.length - 1 ? courseSeries[index + 1] : null
-    const heading = calculateBearingDegrees(previousPoint, point) ?? calculateBearingDegrees(point, nextPoint) ?? lastHeading
+  for (let index = 0; index < courseSeries.length; index += 1) {
+    const currentPoint = courseSeries[index]
+    const currentDistance = distanceSeries[index]
+    let heading = null
 
-    if (isFiniteNumber(heading)) {
-      lastHeading = heading
-      return roundValue(heading, 3)
+    if (isFiniteNumber(currentDistance)) {
+      let centeredLookbackIndex = index - 1
+      while (centeredLookbackIndex >= 0 && currentDistance - distanceSeries[centeredLookbackIndex] < halfBaselineMeters) {
+        centeredLookbackIndex -= 1
+      }
+
+      let lookaheadIndex = index + 1
+      while (lookaheadIndex < courseSeries.length && distanceSeries[lookaheadIndex] - currentDistance < halfBaselineMeters) {
+        lookaheadIndex += 1
+      }
+
+      let fallbackLookbackIndex = index - 1
+      while (fallbackLookbackIndex >= 0 && currentDistance - distanceSeries[fallbackLookbackIndex] < minDistanceMeters) {
+        fallbackLookbackIndex -= 1
+      }
+
+      const hasCenteredLookback = centeredLookbackIndex >= 0 && isFiniteNumber(distanceSeries[centeredLookbackIndex])
+      const hasLookahead = lookaheadIndex < courseSeries.length && isFiniteNumber(distanceSeries[lookaheadIndex])
+      const hasFallbackLookback = fallbackLookbackIndex >= 0 && isFiniteNumber(distanceSeries[fallbackLookbackIndex])
+
+      if (hasCenteredLookback && hasLookahead) {
+        heading = calculateBearingDegrees(courseSeries[centeredLookbackIndex], courseSeries[lookaheadIndex])
+      } else if (hasFallbackLookback) {
+        heading = calculateBearingDegrees(courseSeries[fallbackLookbackIndex], currentPoint)
+      }
     }
 
-    return null
-  })
+    if (isFiniteNumber(heading)) {
+      lastHeading = roundValue(heading, 3)
+    }
+
+    derivedSeries.push(lastHeading)
+  }
+
+  return derivedSeries
+}
+
+/**
+ * Smooths heading as a circular signal using exponential smoothing on unit vectors.
+ *
+ * Smoothing sin/cos components avoids 0°/360° wrap artifacts and preserves
+ * continuous turns better than smoothing raw degree values.
+ *
+ * @param {Array<number|null>} headingSeries - Derived heading values in degrees.
+ * @param {*} helpers - Shared numeric helper functions.
+ * @param {number} [alpha=0.2] - EMA smoothing factor.
+ * @returns {Array<number|null>} Smoothed heading series.
+ */
+function smoothHeadingSeriesCircularEma(headingSeries, helpers, alpha = 0.05) {
+  const { isFiniteNumber, roundValue } = helpers
+  const smoothedSeries = []
+  let smoothedX = null
+  let smoothedY = null
+
+  for (const heading of headingSeries) {
+    if (!isFiniteNumber(heading)) {
+      smoothedSeries.push(null)
+      continue
+    }
+
+    const radians = (heading * Math.PI) / 180
+    const nextX = Math.cos(radians)
+    const nextY = Math.sin(radians)
+
+    if (!isFiniteNumber(smoothedX) || !isFiniteNumber(smoothedY)) {
+      smoothedX = nextX
+      smoothedY = nextY
+    } else {
+      smoothedX = alpha * nextX + (1 - alpha) * smoothedX
+      smoothedY = alpha * nextY + (1 - alpha) * smoothedY
+    }
+
+    const smoothedHeading = (Math.atan2(smoothedY, smoothedX) * 180) / Math.PI
+    smoothedSeries.push(roundValue((smoothedHeading + 360) % 360, 3))
+  }
+
+  return smoothedSeries
 }
 
 /**
@@ -471,7 +550,7 @@ export function deriveActivityMetricSeries({
   const derivedSpeed = useWindowedRate
     ? deriveWindowedRateSeries(distanceSeries, elapsedSeries, helpers, rateWindowSeconds)
     : deriveNumericRateSeries(distanceSeries, elapsedSeries, helpers)
-  const derivedHeading = deriveHeadingSeries(courseSeries, helpers)
+  const derivedHeading = smoothHeadingSeriesCircularEma(deriveHeadingSeries(courseSeries, distanceSeries, helpers), helpers)
   const derivedGradient = useLegacyGpxDerivations
     ? deriveLegacyGradientSeries(directMetrics.elevation, distanceSeries, helpers)
     : deriveGradientSeries(directMetrics.elevation, distanceSeries, helpers)

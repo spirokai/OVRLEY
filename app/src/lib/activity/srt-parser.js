@@ -359,6 +359,6 @@ export function parseSrtActivityFile(text, fileName) {
     fileFormat: 'srt',
     metadata: {},
     rawSamples,
-    options: { skipIdleGapFill: true, useWindowedRate: true, rateWindowSeconds: 0.5 },
+    options: { skipIdleGapFill: true, useWindowedRate: true, rateWindowSeconds: 1 },
   })
 }

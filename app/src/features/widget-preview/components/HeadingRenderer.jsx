@@ -110,8 +110,8 @@ function buildShadowFilter(id, shadow) {
   )
 }
 
-export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOpacity, sceneFont, valueFont, sceneStyle }) {
-  const model = useHeadingPreviewModel({ widget, activity, previewSecond, globalOpacity, sceneFont, valueFont, sceneStyle })
+export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneFont, valueFont, sceneStyle }) {
+  const model = useHeadingPreviewModel({ widget, activity, previewSecond, globalOpacity, globalScale, sceneFont, valueFont, sceneStyle })
   const { data } = model
 
   const renderTapeCopies = (filterId = null) => (
@@ -129,8 +129,8 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
 
   return (
     <svg
-      width={model.width}
-      height={model.height}
+      width={model.displayWidth}
+      height={model.displayHeight}
       viewBox={`0 0 ${model.width} ${model.height}`}
       className="block h-full w-full"
       style={{ opacity: model.opacity < 1 ? model.opacity : undefined }}

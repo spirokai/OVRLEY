@@ -410,6 +410,16 @@ describe('Phase 4 camera metric formatting', () => {
     expect(model?.unitText).toBe('M')
   })
 
+  test('altitude converts meters to feet', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('altitude', { show_units: true, display_unit: 'ft', decimals: 0 }),
+      activity: makeActivity('altitude', 100),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('328')
+    expect(model?.unitText).toBe('FT')
+  })
+
   test('focal_length formats with optional mm unit', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('focal_length', { show_units: true, display_unit: 'mm', decimals: 2 }),
