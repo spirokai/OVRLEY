@@ -92,6 +92,11 @@ impl PreparedPreviewAssets {
     pub fn scene(&self) -> &ValidatedSceneConfig {
         &self.prepared_assets.scene
     }
+
+    /// Returns the elevation geometry as a JSON value for parity tests.
+    pub fn elevation_geometry_json(&self) -> Option<serde_json::Value> {
+        self.prepared_assets.elevation_geometry_json()
+    }
 }
 
 /// Mutable raw-pixel render target used by the video encoder pipeline.

@@ -86,7 +86,7 @@ fn canvas_parity() -> Result<()> {
 
     // 4. Render Skia PNG
     println!("[4/9] Rendering Skia preview...");
-    render_skia_preview(
+    let prepared = render_skia_preview(
         &app_paths,
         &config,
         &activity,
@@ -104,6 +104,7 @@ fn canvas_parity() -> Result<()> {
         &activity,
         &activity_raw,
         SELECTED_SECOND,
+        Some(&prepared),
     )?;
 
     // 6. Spawn Vite dev server

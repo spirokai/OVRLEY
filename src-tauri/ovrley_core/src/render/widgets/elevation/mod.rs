@@ -14,13 +14,10 @@
 
 mod draw;
 mod frame_state;
-mod normalize;
-mod prepare;
+pub(crate) mod normalize;
+pub(crate) mod prepare;
 mod reduction;
 
 pub(crate) use draw::draw_elevation_widget;
 pub(crate) use prepare::prepare_elevation_cache;
-#[cfg(test)]
-pub(crate) use reduction::{
-    simplify_elevation_samples, simplify_elevation_samples_segment, ElevationSample,
-};
+

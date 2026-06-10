@@ -66,13 +66,18 @@ async function main() {
 
   const page = await context.newPage()
 
-  await page.addInitScript(() => {
+  await page.addInitScript((geometryJson) => {
     window.__TAURI_INTERNALS__ = {
       metadata: {
         currentWindow: { label: 'main' },
       },
     }
-  })
+    // Inject pre-computed Rust elevation geometry so the preview uses the
+    // exact same geometry as the Skia render (parity test).
+    if (geometryJson) {
+      window.__OVRLEY_MOCK_ELEVATION_GEOMETRY = JSON.parse(geometryJson)
+    }
+  }, existsSync(resolve(mockDir || '.', 'elevation-geometry.json')) ? readFileSync(resolve(mockDir, 'elevation-geometry.json'), 'utf-8') : null)
 
   await page.goto(viteUrl, { waitUntil: 'load', timeout: 15000 })
 
