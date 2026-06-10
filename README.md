@@ -19,10 +19,10 @@
 
 ## Features
 
-- **Universal Import**: Supports `.fit` and `.gpx` files from any device or service (Strava, Garmin, etc.). Works for any activity: running, cycling, skiing, sailing, motorcycling, and more.
+- **Universal Import**: Supports `.fit`, `.gpx` and `.srt` files from any device or service (Strava, Garmin, etc.). Works for any activity: running, cycling, skiing, sailing, motorcycling, and more.
 - **Interactive Editor**: Drag-and-drop editor for live layout editing and template sharing.
 - **Full Customization**: Shape every widget with your own styling, color, font, and size.
-- **23+ Widgets**: Speed, heartrate, power, cadence, date, temperature, elevation profile, map route, and more.
+- **29+ Widgets**: Speed, heartrate, power, cadence, date, temperature, elevation profile, map route, and more.
 - **Transparent Overlays**: Export with alpha channel for maximum flexibility in post-production. Use in Premiere Pro, DaVinci Resolve, Final Cut Pro, or any editor that supports layered video.
 - **Direct Final Video Export**: Export your video footage with overlays baked in; no separate compositing step required. Choose from multiple codecs and hardware-accelerated pipelines, customize bitrate, and more.
 - **Hardware-Accelerated Export**: Export pipelines using GPU acceleration for maximum export speed.
@@ -52,7 +52,7 @@ Transparent Overlays:
 
 MP4 Exports (overlays baked in):
 
-- **H.264/H.265**: Industry-standard codecs for maximum compatibility. Custom bitrate settings allow you to balance quality and file size.
+- **H.264/H.265**: Industry-standard codecs for maximum compatibility. Custom bitrate setting to balance quality and file size.
 
 Hardware-Acceleration Options:
 **NVENC/AMF/QSV/VideoToolbox**: Hardware-accelerated encoding options to take full advantage of your system and GPU to speed up export times.
