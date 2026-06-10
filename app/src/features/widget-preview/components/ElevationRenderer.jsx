@@ -28,6 +28,10 @@ export function OverlayElevationWidget({ widget, activity, previewSecond, global
   const style = useElevationPreviewStyle(data, globalScale)
   const geometry = useElevationPreviewGeometry({ activity, data, exportRange, previewSecond, style })
 
+  if (!geometry) {
+    return null
+  }
+
   // Elevation labels — build metric ("M") and imperial ("FT") label text from the interpolated elevation value
   const metricLabel = geometry.elevationValue === null || geometry.elevationValue === undefined ? '-- M' : `${Math.round(geometry.elevationValue)} M`
   const imperialLabel =

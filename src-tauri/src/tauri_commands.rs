@@ -250,3 +250,18 @@ pub(crate) async fn backend_detect_codecs(app: AppHandle) -> Result<String, Stri
         &app,
     )?))
 }
+
+/// Builds elevation widget geometry from config and activity data.
+///
+/// Returns simplified, projected geometry points for the elevation preview
+/// without rendering a Skia surface.
+#[tauri::command]
+pub(crate) async fn backend_build_elevation_geometry(
+    config_json: String,
+    parsed_activity_json: String,
+) -> Result<String, String> {
+    call_and_serialize(commands::elevation_geometry::build_elevation_geometry_command(
+        &config_json,
+        &parsed_activity_json,
+    ))
+}

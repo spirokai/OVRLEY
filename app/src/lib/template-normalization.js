@@ -34,13 +34,7 @@ import {
   SCENE_RENDER_TIME_ONLY_KEYS,
   VALUE_SHARED_KEYS,
 } from './template-constants'
-import {
-  TYPE_DEFAULTS,
-  TEXT_DEFAULTS,
-  COURSE_PLOT_DEFAULTS,
-  ELEVATION_PLOT_DEFAULTS,
-  GRADIENT_DEFAULTS,
-} from '@/lib/standard-widgets'
+import { TYPE_DEFAULTS, TEXT_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS, GRADIENT_DEFAULTS } from '@/lib/standard-widgets'
 
 function cloneSerializable(value) {
   if (value === undefined) return undefined

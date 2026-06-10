@@ -35,15 +35,10 @@ export const GRADIENT_ZERO_LINE_WIDTH_PX = 1
 export const NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT = '0123456789-:.%'
 
 // ---- From geometryUtils.js ----
-export const GEOMETRY_EPSILON = 1e-9
 export const ROUTE_FALLBACK_INSET_MAX_RATIO = 0.45
-export const ELEVATION_FALLBACK_PADDING = 18
 export const SIMPLIFY_MIN_TOLERANCE = 0.05
 export const DENSITY_CLAMP_MIN = 0.1
 export const DENSITY_CLAMP_MAX = 2
-export const VERTICAL_SCALE_CLAMP_MIN = 0.2
-export const VERTICAL_SCALE_CLAMP_MAX = 4
-export const SIMPLIFY_TOLERANCE_CLAMP_MAX = 8
 
 // ---- From useOverlayEditorState.js ----
 export const VIEWPORT_PADDING = 72
