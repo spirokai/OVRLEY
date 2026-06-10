@@ -56,6 +56,7 @@ export default function HeadingWidgetEditor({ widget, updateWidgetData, setNumer
   const showMinorLabels = tapeData.show_minor_labels
   const showMajorLabels = tapeData.show_major_labels
   const isChevronIndicator = tapeData.indicator_style === 'chevron'
+  const displayOptions = getDisplayTypeOptions('heading')
 
   const handleDisplayTypeChange = (value) => {
     const nextData = initDisplayVariant(data, value)
@@ -80,7 +81,9 @@ export default function HeadingWidgetEditor({ widget, updateWidgetData, setNumer
       {/* Display Type */}
       <div className="space-y-4">
         <SectionHeading icon={Compass} title="Display" />
-        <SelectField label="Display Type" value={displayType} onValueChange={handleDisplayTypeChange} options={getDisplayTypeOptions('heading')} />
+        {displayOptions.length > 1 && (
+          <SelectField label="Display Type" value={displayType} onValueChange={handleDisplayTypeChange} options={displayOptions} />
+        )}
       </div>
 
       {isTextDisplayType(displayType) ? (
