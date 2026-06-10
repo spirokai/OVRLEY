@@ -35,7 +35,8 @@ fn main() -> Result<(), String> {
 
     let activity = parse_activity_json(&payload_json).map_err(|e| e.to_string())?;
     let config = parse_and_validate_config(&config_json).map_err(|e| e.to_string())?;
-    let report = build_dense_activity_report_validated(&activity, &config).map_err(|e| e.to_string())?;
+    let report =
+        build_dense_activity_report_validated(&activity, &config).map_err(|e| e.to_string())?;
     let output = serde_json::to_string_pretty(&report)
         .map_err(|error| format!("Failed to serialize report: {error}"))?;
 

@@ -25,17 +25,18 @@ use ovrley_core::bin_common::{read_arg, read_optional_arg, repo_root};
 /// Ensures `config.scene.ffmpeg` is a JSON object, defaulting to an empty
 /// one if it was null. Returns a mutable reference so callers can insert
 /// override keys without repeated null checks.
-fn ensure_ffmpeg_object(
-    config: &mut Value,
-) -> Result<&mut Map<String, Value>, String> {
+fn ensure_ffmpeg_object(config: &mut Value) -> Result<&mut Map<String, Value>, String> {
     let scene = config
         .get_mut("scene")
         .ok_or_else(|| "config missing 'scene'".to_string())?;
     if scene.get("ffmpeg").map_or(true, |v| v.is_null()) {
-        scene.as_object_mut().ok_or_else(|| "scene must be an object".to_string())?
+        scene
+            .as_object_mut()
+            .ok_or_else(|| "scene must be an object".to_string())?
             .insert("ffmpeg".to_string(), Value::Object(Map::new()));
     }
-    scene.get_mut("ffmpeg")
+    scene
+        .get_mut("ffmpeg")
         .and_then(|v| v.as_object_mut())
         .ok_or_else(|| "scene.ffmpeg must be a JSON object".to_string())
 }
@@ -44,11 +45,7 @@ fn ensure_ffmpeg_object(
 ///
 /// A no-op when `value` is `None`, so callers can pass optional CLI flags
 /// without branching on presence.
-fn set_ffmpeg_string(
-    config: &mut Value,
-    key: &str,
-    value: Option<String>,
-) -> Result<(), String> {
+fn set_ffmpeg_string(config: &mut Value, key: &str, value: Option<String>) -> Result<(), String> {
     if let Some(value) = value {
         ensure_ffmpeg_object(config)?.insert(key.to_string(), Value::String(value));
     }
@@ -78,9 +75,13 @@ fn main() -> Result<(), String> {
         .map_err(|error| format!("Failed to read {}: {error}", config_path.display()))?;
 
     let activity = parse_activity_json(&payload_json).map_err(|e| e.to_string())?;
-    let mut config_value: Value = serde_json::from_str(&config_json)
-        .map_err(|error| format!("config JSON: {error}"))?;
-    set_ffmpeg_string(&mut config_value, "codec", read_optional_arg("--codec", &args))?;
+    let mut config_value: Value =
+        serde_json::from_str(&config_json).map_err(|error| format!("config JSON: {error}"))?;
+    set_ffmpeg_string(
+        &mut config_value,
+        "codec",
+        read_optional_arg("--codec", &args),
+    )?;
     set_ffmpeg_string(
         &mut config_value,
         "container",

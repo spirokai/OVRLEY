@@ -11,9 +11,7 @@
 //! - Marker_y stuck at geometry y-coordinate during drone hover
 //! - Marker_y not tracking elevation changes at same GPS position
 
-use super::super::elevation::{
-    build_elevation_completed_points, build_elevation_frame_states,
-};
+use super::super::elevation::{build_elevation_completed_points, build_elevation_frame_states};
 use super::super::types::{NormalizedElevationPlot, WidgetGeometry};
 use crate::activity::schema::{DenseActivityReport, DenseSeriesReport, ParsedActivity};
 use crate::normalize::ValidatedSceneConfig;
@@ -212,7 +210,9 @@ fn marker_y_follows_elevation_during_hover() {
     // All marker_x values should be identical (vertical segment, same x)
     let marker_xs: Vec<f32> = states.iter().map(|s| s.marker_x).collect();
     assert!(
-        marker_xs.windows(2).all(|w| (w[0] - w[1]).abs() <= f32::EPSILON),
+        marker_xs
+            .windows(2)
+            .all(|w| (w[0] - w[1]).abs() <= f32::EPSILON),
         "marker_x should be constant during hover, got {:?}",
         marker_xs
     );
@@ -250,12 +250,8 @@ fn completed_points_fills_vertical_segment_chronologically() {
     let marker_point = (100.0, 400.0);
 
     // Mid-hover: elapsed_fraction = 0.5
-    let completed = build_elevation_completed_points(
-        &points,
-        &elapsed_fractions,
-        0.5,
-        marker_point,
-    );
+    let completed =
+        build_elevation_completed_points(&points, &elapsed_fractions, 0.5, marker_point);
 
     // Should include points with elapsed_fraction <= 0.5: indices 0, 1, 2
     assert!(
@@ -288,12 +284,8 @@ fn completed_points_includes_all_at_full_elapsed() {
     let elapsed_fractions = vec![0.0, 0.25, 0.5, 0.75, 1.0];
     let marker_point = (100.0, 300.0);
 
-    let completed = build_elevation_completed_points(
-        &points,
-        &elapsed_fractions,
-        1.0,
-        marker_point,
-    );
+    let completed =
+        build_elevation_completed_points(&points, &elapsed_fractions, 1.0, marker_point);
 
     // All 5 points should be included (plus marker if distant)
     assert!(

@@ -45,9 +45,9 @@ pub fn build_route_geometry_command(
     let validated = parse_and_validate_config(config_json)?;
     let activity = parse_activity_json(parsed_activity_json)?;
 
-    let course_plot = validated.course_plot.ok_or_else(|| {
-        CoreError::Config("Config has no course_plot widget".into())
-    })?;
+    let course_plot = validated
+        .course_plot
+        .ok_or_else(|| CoreError::Config("Config has no course_plot widget".into()))?;
 
     let show_full_activity = course_plot.show_full_activity;
 

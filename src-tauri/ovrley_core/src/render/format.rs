@@ -239,12 +239,7 @@ fn raw_value(
             .get(frame_index)
             .copied()
             .flatten(),
-        MetricKind::Ev => dense_activity
-            .series
-            .ev
-            .get(frame_index)
-            .copied()
-            .flatten(),
+        MetricKind::Ev => dense_activity.series.ev.get(frame_index).copied().flatten(),
         MetricKind::ColorTemperature => dense_activity
             .series
             .color_temperature

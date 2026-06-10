@@ -98,7 +98,8 @@ fn parse_primitive_style(tag: &str, root_fill: bool, root_stroke: bool) -> SvgPr
     SvgPrimitiveStyle {
         fill: parse_paint_enabled(tag, "fill").unwrap_or(root_fill),
         stroke: parse_paint_enabled(tag, "stroke").unwrap_or(root_stroke),
-        stroke_width: parse_xml_attr(tag, "stroke-width").and_then(|value| value.parse::<f32>().ok()),
+        stroke_width: parse_xml_attr(tag, "stroke-width")
+            .and_then(|value| value.parse::<f32>().ok()),
     }
 }
 

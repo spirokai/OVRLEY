@@ -198,8 +198,8 @@ fn run_frame_case(case: &FrameCase) -> Result<()> {
         f64::from(case.second),
         f64::from(case.second) + (1.0 / fps.max(1.0)),
     )?;
-    let validated = validate_config_value(&config_value)
-        .context("failed to validate frame config")?;
+    let validated =
+        validate_config_value(&config_value).context("failed to validate frame config")?;
     let dense_activity = build_dense_activity_report_validated(&activity, &validated)
         .context("failed to build dense activity for frame case")?;
     let actual_path = runtime
@@ -242,8 +242,8 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
     let scene = mutable_scene_value(&mut config_value)?;
     scene.insert("ffmpeg".to_string(), json!({ "codec": case.codec }));
 
-    let validated = validate_config_value(&config_value)
-        .context("failed to validate transparent config")?;
+    let validated =
+        validate_config_value(&config_value).context("failed to validate transparent config")?;
     let scene = validated.scene.clone();
     let dense_activity = build_dense_activity_report_validated(&activity, &validated)
         .context("failed to build dense activity for transparent case")?;
@@ -336,7 +336,10 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     scene.insert("composite_sync_offset".to_string(), json!(case.sync_offset));
     scene.insert("composite_video_fps_num".to_string(), json!(source_fps_num));
     scene.insert("composite_video_fps_den".to_string(), json!(source_fps_den));
-    scene.insert("composite_video_duration".to_string(), json!(source_duration));
+    scene.insert(
+        "composite_video_duration".to_string(),
+        json!(source_duration),
+    );
     scene.insert(
         "composite_render_duration".to_string(),
         json!(case.duration_seconds),
@@ -348,8 +351,8 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     scene.insert("composite_widget_update_rate".to_string(), json!(1));
 
     // ── Phase 4: build dense activity and prepare render controller ──
-    let validated = validate_config_value(&config_value)
-        .context("failed to validate composite config")?;
+    let validated =
+        validate_config_value(&config_value).context("failed to validate composite config")?;
     let scene = validated.scene.clone();
     let dense_activity = build_dense_activity_report_validated(&activity, &validated)
         .context("failed to build dense activity for composite case")?;
@@ -516,7 +519,10 @@ fn mutable_scene_value(config_value: &mut Value) -> Result<&mut serde_json::Map<
 }
 
 fn materialize_template_config_value(value: &Value) -> Result<Value> {
-    let mut config_value = value.get("config").cloned().unwrap_or_else(|| value.clone());
+    let mut config_value = value
+        .get("config")
+        .cloned()
+        .unwrap_or_else(|| value.clone());
     apply_template_global_defaults_to_scene(&mut config_value, value);
     Ok(config_value)
 }

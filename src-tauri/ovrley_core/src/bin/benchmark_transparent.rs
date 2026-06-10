@@ -201,8 +201,7 @@ fn main() -> Result<(), String> {
     let base_validated = parse_and_validate_config(&base_config_str).map_err(|e| e.to_string())?;
     let res_width = base_validated.scene.width;
     let res_height = base_validated.scene.height;
-    let base_update_rate = settings_update_rate
-        .unwrap_or(base_validated.scene.update_rate);
+    let base_update_rate = settings_update_rate.unwrap_or(base_validated.scene.update_rate);
 
     let mut results = BTreeMap::new();
 
@@ -240,8 +239,8 @@ fn main() -> Result<(), String> {
             run_config_value["scene"]["ffmpeg"] = serde_json::json!({"codec": codec_name});
 
             let config = validate_config_value(&run_config_value).map_err(|e| e.to_string())?;
-            let dense =
-                build_dense_activity_report_validated(&activity, &config).map_err(|e| e.to_string())?;
+            let dense = build_dense_activity_report_validated(&activity, &config)
+                .map_err(|e| e.to_string())?;
 
             let update_rate = config.widget_update_rate();
             let total_frames = rendered_frame_count(dense.frame_count, update_rate as usize) as u32;

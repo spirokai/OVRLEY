@@ -38,9 +38,9 @@ pub(crate) fn downsample_route_samples(
 
         let average = if avg_range_start < avg_range_end {
             let range = &points[avg_range_start..avg_range_end];
-            let (sum_x, sum_y) = range
-                .iter()
-                .fold((0.0f64, 0.0f64), |(sx, sy), sample| (sx + sample.point.0, sy + sample.point.1));
+            let (sum_x, sum_y) = range.iter().fold((0.0f64, 0.0f64), |(sx, sy), sample| {
+                (sx + sample.point.0, sy + sample.point.1)
+            });
             let count = range.len() as f64;
             (sum_x / count, sum_y / count)
         } else {

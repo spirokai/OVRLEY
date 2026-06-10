@@ -92,6 +92,24 @@ pub(crate) fn custom_export_range_active(scene: &crate::normalize::ValidatedScen
     scene.custom_export_range_active.unwrap_or(false)
 }
 
+// Returns the elapsed-time denominator used by trimmed/full-activity widgets.
+pub(crate) fn scoped_source_duration(
+    scene: &crate::normalize::ValidatedSceneConfig,
+    activity: &ParsedActivity,
+    show_full_activity: bool,
+) -> f64 {
+    if custom_export_range_active(scene) && !show_full_activity {
+        (scene.end - scene.start).max(1e-9)
+    } else {
+        activity
+            .sample_elapsed_seconds
+            .last()
+            .copied()
+            .unwrap_or(1.0)
+            .max(1e-9)
+    }
+}
+
 // Interpolates absolute activity distance progress at an elapsed second.
 pub(crate) fn interpolate_distance_progress_at_elapsed(
     activity: &ParsedActivity,

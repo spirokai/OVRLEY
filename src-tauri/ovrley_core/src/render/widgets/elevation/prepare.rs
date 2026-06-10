@@ -4,7 +4,8 @@
 /// Preparation owns smoothing, downsampling, simplification, static layers,
 /// and frame-state generation so the render loop stays predictable.
 use super::super::common::{
-    custom_export_range_active, normalize_optional_progress_window, static_layer_padding,
+    custom_export_range_active, normalize_optional_progress_window, scoped_source_duration,
+    static_layer_padding,
 };
 use super::super::polyline::{draw_area, draw_polyline_with_shadow};
 use super::super::types::{
@@ -138,25 +139,6 @@ pub(crate) fn build_elevation_geometry(
             .round()
             .max(2.0) as usize;
     let downsampled = downsample_elevation_points(raw_points, target_count.min(raw_points.len()));
-    let projected = project_elevation_points(
-        &downsampled,
-        plot.width as f32,
-        plot.height as f32,
-        0.0,
-        plot.y_scale,
-    );
-    let projected_samples = downsampled
-        .iter()
-        .zip(projected.iter())
-        .map(|(sample, point)| super::reduction::ElevationSample {
-            point: *point,
-            progress01: sample.progress01,
-            elapsed_fraction: sample.elapsed_fraction,
-            preserve: sample.preserve,
-        })
-        .collect::<Vec<_>>();
-    let simplified = simplify_elevation_samples(&projected_samples, plot.simplify_tolerance_px);
-
     let min_elevation = raw_points
         .iter()
         .map(|(_, elev, _)| *elev)
@@ -165,11 +147,24 @@ pub(crate) fn build_elevation_geometry(
         .iter()
         .map(|(_, elev, _)| *elev)
         .fold(f64::NEG_INFINITY, f64::max);
+    let projected = project_elevation_points(
+        &downsampled,
+        min_elevation,
+        max_elevation,
+        plot.width as f32,
+        plot.height as f32,
+        0.0,
+        plot.y_scale,
+    );
+    let simplified = simplify_elevation_samples(&projected, plot.simplify_tolerance_px);
 
     Ok(WidgetGeometry {
         bbox: (0.0, 0.0, plot.width as f32, plot.height as f32),
         progress_values: simplified.iter().map(|sample| sample.progress01).collect(),
-        elapsed_fractions: simplified.iter().map(|sample| sample.elapsed_fraction).collect(),
+        elapsed_fractions: simplified
+            .iter()
+            .map(|sample| sample.elapsed_fraction)
+            .collect(),
         elevation_data_range: Some((min_elevation, max_elevation)),
         points: simplified.iter().map(|sample| sample.point).collect(),
         source_point_count: raw_points.len(),
@@ -186,8 +181,8 @@ fn raw_elevation_points(
     source: &[Option<f64>],
     progress: &[f64],
     elapsed_seconds: &[f64],
+    source_duration: f64,
 ) -> Vec<(f32, f64, f32)> {
-    let source_duration = elapsed_seconds.last().copied().unwrap_or(1.0).max(1e-9);
     source
         .iter()
         .enumerate()
@@ -214,29 +209,6 @@ fn raw_elevation_points(
         .collect()
 }
 
-/// Extracts elevation samples after normalizing optional trimmed progress
-/// values.
-fn raw_elevation_points_with_optional_progress(
-    source: &[Option<f64>],
-    progress_values: &[Option<f64>],
-    elapsed_seconds: &[f64],
-) -> Vec<(f32, f64, f32)> {
-    let normalized_progress =
-        normalize_optional_progress_window(progress_values).unwrap_or_else(|| {
-            (0..source.len())
-                .map(|index| {
-                    if source.len() > 1 {
-                        index as f64 / (source.len() - 1) as f64
-                    } else {
-                        0.0
-                    }
-                })
-                .collect::<Vec<_>>()
-        });
-
-    raw_elevation_points(source, &normalized_progress, elapsed_seconds)
-}
-
 /// Selects full-activity or trimmed source elevation samples for geometry.
 ///
 /// Custom export ranges trim the source samples so the profile itself can
@@ -246,6 +218,8 @@ pub(crate) fn build_elevation_source_points(
     show_full_activity: bool,
     scene: &crate::normalize::ValidatedSceneConfig,
 ) -> CoreResult<Vec<(f32, f64, f32)>> {
+    let source_duration = scoped_source_duration(scene, activity, show_full_activity);
+
     if show_full_activity || !custom_export_range_active(scene) {
         let source = if activity.sample_elevations.is_empty() {
             &activity.elevation
@@ -256,6 +230,7 @@ pub(crate) fn build_elevation_source_points(
             source,
             &activity.sample_distance_progress,
             &activity.sample_elapsed_seconds,
+            source_duration,
         ));
     }
 
@@ -269,10 +244,23 @@ pub(crate) fn build_elevation_source_points(
             ..RenderDataRequirements::default()
         },
     )?;
+    let normalized_progress = normalize_optional_progress_window(&trimmed.sample_distance_progress)
+        .unwrap_or_else(|| {
+            (0..trimmed.elevation.len())
+                .map(|index| {
+                    if trimmed.elevation.len() > 1 {
+                        index as f64 / (trimmed.elevation.len() - 1) as f64
+                    } else {
+                        0.0
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
 
-    Ok(raw_elevation_points_with_optional_progress(
+    Ok(raw_elevation_points(
         &trimmed.elevation,
-        &trimmed.sample_distance_progress,
+        &normalized_progress,
         &trimmed.sample_elapsed_seconds,
+        source_duration,
     ))
 }

@@ -275,19 +275,16 @@ pub fn densify_activity(
     // Empty vectors signal to render code that the series is not needed,
     // avoiding wasted per-frame lookups and allocations.
     // Interpolation mode (linear vs hold) is read from the manifest per metric.
-    let densify = |x: &[f64],
-                   y: &NumericSeries,
-                   target: &[f64],
-                   enabled: bool,
-                   kind: crate::MetricKind| {
-        if !enabled || y.is_empty() {
-            return Vec::new();
-        }
-        match standard_metric_interpolation(kind) {
-            Some(StandardMetricInterpolationKind::Hold) => densify_hold_series(x, y, target),
-            _ => interpolate_numeric_series(x, y, target),
-        }
-    };
+    let densify =
+        |x: &[f64], y: &NumericSeries, target: &[f64], enabled: bool, kind: crate::MetricKind| {
+            if !enabled || y.is_empty() {
+                return Vec::new();
+            }
+            match standard_metric_interpolation(kind) {
+                Some(StandardMetricInterpolationKind::Hold) => densify_hold_series(x, y, target),
+                _ => interpolate_numeric_series(x, y, target),
+            }
+        };
 
     DenseActivityReport {
         frame_count: frame_elapsed_seconds.len(),

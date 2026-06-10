@@ -15,9 +15,7 @@
 
 mod common;
 
-use ovrley_core::commands::route_geometry::{
-    build_route_geometry_command, RouteGeometryResponse,
-};
+use ovrley_core::commands::route_geometry::{build_route_geometry_command, RouteGeometryResponse};
 
 /// Verifies the response struct serializes `points` as `[[x,y], ...]` JSON
 /// arrays, not as tuple objects `{"0": x, "1": y}`. This is critical because
@@ -72,16 +70,39 @@ fn test_response_uses_camel_case_field_names() {
     };
 
     let json = serde_json::to_value(&response).unwrap();
-    let keys: Vec<&str> = json.as_object().unwrap().keys().map(|k| k.as_str()).collect();
+    let keys: Vec<&str> = json
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(|k| k.as_str())
+        .collect();
 
     assert!(keys.contains(&"points"), "expected camelCase 'points'");
-    assert!(keys.contains(&"progressValues"), "expected camelCase 'progressValues'");
+    assert!(
+        keys.contains(&"progressValues"),
+        "expected camelCase 'progressValues'"
+    );
     assert!(keys.contains(&"bbox"), "expected camelCase 'bbox'");
-    assert!(keys.contains(&"sourcePointCount"), "expected camelCase 'sourcePointCount'");
-    assert!(keys.contains(&"simplification"), "expected camelCase 'simplification'");
-    assert!(keys.contains(&"widgetWidth"), "expected camelCase 'widgetWidth'");
-    assert!(keys.contains(&"widgetHeight"), "expected camelCase 'widgetHeight'");
-    assert!(!keys.contains(&"widget_width"), "should not have snake_case widget_width");
+    assert!(
+        keys.contains(&"sourcePointCount"),
+        "expected camelCase 'sourcePointCount'"
+    );
+    assert!(
+        keys.contains(&"simplification"),
+        "expected camelCase 'simplification'"
+    );
+    assert!(
+        keys.contains(&"widgetWidth"),
+        "expected camelCase 'widgetWidth'"
+    );
+    assert!(
+        keys.contains(&"widgetHeight"),
+        "expected camelCase 'widgetHeight'"
+    );
+    assert!(
+        !keys.contains(&"widget_width"),
+        "should not have snake_case widget_width"
+    );
 }
 
 /// Command must return a descriptive error when the config has no course_plot.
@@ -116,11 +137,8 @@ fn test_command_errors_when_no_course_plot() {
         "trim_end_seconds": 10.0
     });
 
-    let error = build_route_geometry_command(
-        &config.to_string(),
-        &activity.to_string(),
-    )
-    .unwrap_err();
+    let error =
+        build_route_geometry_command(&config.to_string(), &activity.to_string()).unwrap_err();
 
     let msg = error.to_string();
     assert!(
@@ -189,11 +207,8 @@ fn test_command_returns_geometry_for_valid_input() {
         "trim_end_seconds": 10.0
     });
 
-    let response = build_route_geometry_command(
-        &config.to_string(),
-        &activity.to_string(),
-    )
-    .unwrap();
+    let response =
+        build_route_geometry_command(&config.to_string(), &activity.to_string()).unwrap();
 
     // Geometry should have at least 2 points (endpoint preservation)
     assert!(

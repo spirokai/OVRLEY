@@ -505,10 +505,7 @@ fn shutter_speed_formats_reciprocal() {
         "shutter_speed",
         "shutter_speed",
         Some(0.0003125),
-        &[
-            ("show_units", "false"),
-            ("display_unit", r#""seconds""#),
-        ],
+        &[("show_units", "false"), ("display_unit", r#""seconds""#)],
     );
     assert_eq!(value, "1/3200");
     assert_eq!(unit, None);
@@ -520,10 +517,7 @@ fn shutter_speed_formats_whole_second() {
         "shutter_speed",
         "shutter_speed",
         Some(0.5),
-        &[
-            ("show_units", "false"),
-            ("display_unit", r#""seconds""#),
-        ],
+        &[("show_units", "false"), ("display_unit", r#""seconds""#)],
     );
     assert_eq!(value, "1/2");
 }
@@ -534,10 +528,7 @@ fn shutter_speed_shows_placeholder_when_missing() {
         "shutter_speed",
         "shutter_speed",
         None,
-        &[
-            ("show_units", "false"),
-            ("display_unit", r#""seconds""#),
-        ],
+        &[("show_units", "false"), ("display_unit", r#""seconds""#)],
     );
     assert_eq!(value, "--");
 }

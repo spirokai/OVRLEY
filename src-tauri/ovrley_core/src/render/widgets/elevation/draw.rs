@@ -98,40 +98,37 @@ pub(crate) fn draw_elevation_widget(
 
     // Phase 4: draw elevation labels outside the widget transform so text orientation
     // stays upright even when the widget itself is rotated.
-    if elevation_cache.plot.show_elevation_metric {
-        frame_profiler.measure("text.elevation_label", || -> CoreResult<()> {
-            draw_elevation_label(
-                canvas,
-                paths,
-                elevation_cache,
-                state.elevation_m,
-                "metric",
-                marker_abs_x,
-                marker_abs_y,
-                elevation_cache.plot.metric_label_offset_x,
-                elevation_cache.plot.metric_label_offset_y,
-                scene,
-                scene_scale,
-            )
-        })?;
-    }
-
-    if elevation_cache.plot.show_elevation_imperial {
-        frame_profiler.measure("text.elevation_label", || -> CoreResult<()> {
-            draw_elevation_label(
-                canvas,
-                paths,
-                elevation_cache,
-                state.elevation_m,
-                "imperial",
-                marker_abs_x,
-                marker_abs_y,
-                elevation_cache.plot.imperial_label_offset_x,
-                elevation_cache.plot.imperial_label_offset_y,
-                scene,
-                scene_scale,
-            )
-        })?;
+    for (enabled, unit, offset_x, offset_y) in [
+        (
+            elevation_cache.plot.show_elevation_metric,
+            "metric",
+            elevation_cache.plot.metric_label_offset_x,
+            elevation_cache.plot.metric_label_offset_y,
+        ),
+        (
+            elevation_cache.plot.show_elevation_imperial,
+            "imperial",
+            elevation_cache.plot.imperial_label_offset_x,
+            elevation_cache.plot.imperial_label_offset_y,
+        ),
+    ] {
+        if enabled {
+            frame_profiler.measure("text.elevation_label", || -> CoreResult<()> {
+                draw_elevation_label(
+                    canvas,
+                    paths,
+                    elevation_cache,
+                    state.elevation_m,
+                    unit,
+                    marker_abs_x,
+                    marker_abs_y,
+                    offset_x,
+                    offset_y,
+                    scene,
+                    scene_scale,
+                )
+            })?;
+        }
     }
 
     // Phase 5: build preview diagnostics from widget geometry and current frame state.

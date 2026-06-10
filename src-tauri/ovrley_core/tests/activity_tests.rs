@@ -178,7 +178,10 @@ fn parsed_activity_deserializes_new_srt_series() {
     });
     let activity: ParsedActivity = serde_json::from_value(json).unwrap();
 
-    assert_eq!(activity.altitude, vec![Some(100.0), Some(110.0), Some(120.0)]);
+    assert_eq!(
+        activity.altitude,
+        vec![Some(100.0), Some(110.0), Some(120.0)]
+    );
     assert_eq!(activity.iso, vec![Some(200.0), Some(400.0), Some(800.0)]);
     assert_eq!(activity.aperture, vec![Some(1.7), Some(2.8), Some(4.0)]);
     assert_eq!(
@@ -266,7 +269,13 @@ fn linear_interpolation_densifies_altitude_as_smooth_line() {
     assert_eq!(report.series.altitude.len(), 4);
     // Linear: t=0→100, t=0.25→125, t=0.5→150, t=0.75→175
     let expected = [100.0, 125.0, 150.0, 175.0];
-    for (i, (value, exp)) in report.series.altitude.iter().zip(expected.iter()).enumerate() {
+    for (i, (value, exp)) in report
+        .series
+        .altitude
+        .iter()
+        .zip(expected.iter())
+        .enumerate()
+    {
         let v = value.unwrap();
         assert!(
             (v - exp).abs() < 0.01,

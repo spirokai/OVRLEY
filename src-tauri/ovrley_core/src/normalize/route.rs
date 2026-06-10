@@ -41,7 +41,8 @@ pub fn validate_route_plot(
 ) -> CoreResult<ValidatedRoutePlot> {
     let p = |f: &str| format!("plots[{index}].{f}");
 
-    let simplify_tolerance_px = require_f32(plot.simplify_tolerance_px, &p("simplify_tolerance_px"))?;
+    let simplify_tolerance_px =
+        require_f32(plot.simplify_tolerance_px, &p("simplify_tolerance_px"))?;
     require_non_negative_f32(simplify_tolerance_px, &p("simplify_tolerance_px"))?;
     let target_density = require_f32(plot.target_density, &p("target_density"))?;
     if !(0.1..=2.0).contains(&target_density) {

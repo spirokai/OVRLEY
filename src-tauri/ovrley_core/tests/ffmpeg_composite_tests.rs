@@ -740,4 +740,3 @@ fn test_9_7_safe_codec_names_do_not_select_experimental_profiles() {
     assert!(!nvenc.filter_complex.contains("overlay_cuda"));
     assert!(!qsv.filter_complex.contains("overlay_qsv"));
 }
-

@@ -59,7 +59,8 @@ fn main() -> Result<(), String> {
         let config_json = std::fs::read_to_string(&config_path)
             .map_err(|error| format!("Failed to read config{}: {error}", i))?;
         let config = parse_and_validate_config(&config_json).map_err(|e| e.to_string())?;
-        let dense = build_dense_activity_report_validated(&activity, &config).map_err(|e| e.to_string())?;
+        let dense =
+            build_dense_activity_report_validated(&activity, &config).map_err(|e| e.to_string())?;
         configs.push(config);
         reports.push(dense);
     }

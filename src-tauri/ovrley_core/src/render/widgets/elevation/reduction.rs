@@ -24,14 +24,14 @@ pub(crate) fn downsample_elevation_points(
         return points
             .iter()
             .enumerate()
-            .map(|(index, (progress01, elevation, elapsed_fraction))| {
-                ReducedElevationPoint {
+            .map(
+                |(index, (progress01, elevation, elapsed_fraction))| ReducedElevationPoint {
                     progress01: *progress01,
                     elevation: *elevation,
                     elapsed_fraction: *elapsed_fraction,
                     preserve: index == 0 || index + 1 == points.len(),
-                }
-            })
+                },
+            )
             .collect();
     }
 
@@ -259,26 +259,19 @@ pub(crate) fn project_single_elevation_y(
 /// to exaggerate or compress the profile around its centerline.
 pub(crate) fn project_elevation_points(
     points: &[ReducedElevationPoint],
+    min_elevation: f64,
+    max_elevation: f64,
     width: f32,
     height: f32,
     margin: f32,
     y_scale: f32,
-) -> Vec<(f32, f32)> {
-    let min_elevation = points
-        .iter()
-        .map(|point| point.elevation)
-        .fold(f64::INFINITY, f64::min);
-    let max_elevation = points
-        .iter()
-        .map(|point| point.elevation)
-        .fold(f64::NEG_INFINITY, f64::max);
+) -> Vec<ElevationSample> {
     let inner_width = (width * (1.0 - 2.0 * margin)).max(1.0);
 
     points
         .iter()
         .map(|point| {
-            let point_x =
-                width * margin + inner_width * point.progress01.clamp(0.0, 1.0);
+            let point_x = width * margin + inner_width * point.progress01.clamp(0.0, 1.0);
             let point_y = project_single_elevation_y(
                 point.elevation,
                 min_elevation,
@@ -287,7 +280,12 @@ pub(crate) fn project_elevation_points(
                 margin,
                 y_scale,
             );
-            (point_x, point_y)
+            ElevationSample {
+                point: (point_x, point_y),
+                progress01: point.progress01,
+                elapsed_fraction: point.elapsed_fraction,
+                preserve: point.preserve,
+            }
         })
         .collect()
 }

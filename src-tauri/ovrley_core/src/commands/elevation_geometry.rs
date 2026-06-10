@@ -49,9 +49,9 @@ pub fn build_elevation_geometry_command(
     let validated = parse_and_validate_config(config_json)?;
     let activity = parse_activity_json(parsed_activity_json)?;
 
-    let elevation_plot = validated.elevation_plot.ok_or_else(|| {
-        CoreError::Config("Config has no elevation_plot widget".into())
-    })?;
+    let elevation_plot = validated
+        .elevation_plot
+        .ok_or_else(|| CoreError::Config("Config has no elevation_plot widget".into()))?;
 
     let show_full_activity = elevation_plot.show_full_activity;
 

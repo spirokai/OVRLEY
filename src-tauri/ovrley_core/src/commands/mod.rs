@@ -467,9 +467,8 @@ fn template_descriptor(
 // NSWorkspace on macOS, and xdg-open/gnome-open/etc on Linux — all
 // without blocking the caller.
 fn open_path_in_system(path: &Path) -> CoreResult<()> {
-    open::that(path).map_err(|error| {
-        CoreError::Encode(format!("Failed to open {}: {error}", path.display()))
-    })
+    open::that(path)
+        .map_err(|error| CoreError::Encode(format!("Failed to open {}: {error}", path.display())))
 }
 
 /// Probes a video file and returns its metadata.

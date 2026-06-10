@@ -152,9 +152,7 @@ fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIco
         }
         MetricIconKind::Altitude => parsed_metric_icon_cached(icon_kind, &ALTITUDE_ICON_CACHE),
         MetricIconKind::Iso => parsed_metric_icon_cached(icon_kind, &ISO_ICON_CACHE),
-        MetricIconKind::Aperture => {
-            parsed_metric_icon_cached(icon_kind, &APERTURE_ICON_CACHE)
-        }
+        MetricIconKind::Aperture => parsed_metric_icon_cached(icon_kind, &APERTURE_ICON_CACHE),
         MetricIconKind::ShutterSpeed => {
             parsed_metric_icon_cached(icon_kind, &SHUTTER_SPEED_ICON_CACHE)
         }
@@ -425,8 +423,11 @@ pub(crate) fn draw_metric_icon_primitives(canvas: &Canvas, icon: &ParsedSvgIcon,
                     if style.stroke {
                         let mut stroke_paint = paint.clone();
                         let stroke_width = style.stroke_width.unwrap_or(icon.stroke_width);
-                        stroke_paint
-                            .set_stroke_width(if style.stroke_width.is_some() { stroke_width } else { stroke_width.max(1.0) });
+                        stroke_paint.set_stroke_width(if style.stroke_width.is_some() {
+                            stroke_width
+                        } else {
+                            stroke_width.max(1.0)
+                        });
                         canvas.draw_path(&path, &stroke_paint);
                     }
                 }
@@ -441,8 +442,11 @@ pub(crate) fn draw_metric_icon_primitives(canvas: &Canvas, icon: &ParsedSvgIcon,
                 if style.stroke {
                     let mut stroke_paint = paint.clone();
                     let stroke_width = style.stroke_width.unwrap_or(icon.stroke_width);
-                    stroke_paint
-                        .set_stroke_width(if style.stroke_width.is_some() { stroke_width } else { stroke_width.max(1.0) });
+                    stroke_paint.set_stroke_width(if style.stroke_width.is_some() {
+                        stroke_width
+                    } else {
+                        stroke_width.max(1.0)
+                    });
                     canvas.draw_line(Point::new(*x1, *y1), Point::new(*x2, *y2), &stroke_paint);
                 }
             }
@@ -454,8 +458,11 @@ pub(crate) fn draw_metric_icon_primitives(canvas: &Canvas, icon: &ParsedSvgIcon,
                 if style.stroke {
                     let mut stroke_paint = paint.clone();
                     let stroke_width = style.stroke_width.unwrap_or(icon.stroke_width);
-                    stroke_paint
-                        .set_stroke_width(if style.stroke_width.is_some() { stroke_width } else { stroke_width.max(1.0) });
+                    stroke_paint.set_stroke_width(if style.stroke_width.is_some() {
+                        stroke_width
+                    } else {
+                        stroke_width.max(1.0)
+                    });
                     canvas.draw_circle(Point::new(*cx, *cy), *r, &stroke_paint);
                 }
             }

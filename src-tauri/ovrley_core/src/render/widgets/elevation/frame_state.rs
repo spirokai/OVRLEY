@@ -5,7 +5,7 @@
 /// arithmetic.
 use super::super::common::{
     custom_export_range_active, frame_progress_values, point_at_metric_progress_with_cursor,
-    point_at_progress_x, relative_distance_frame_progress_values,
+    point_at_progress_x, relative_distance_frame_progress_values, scoped_source_duration,
 };
 use super::super::types::{ElevationFrameState, NormalizedElevationPlot, WidgetGeometry};
 use super::reduction::project_single_elevation_y;
@@ -48,16 +48,7 @@ pub(crate) fn build_elevation_frame_states(
 
     // Source duration for elapsed fraction normalization — must match the
     // denominator used when building geometry.elapsed_fractions in Part A.
-    let source_duration = if custom_export_range_active(scene) && !show_full_activity {
-        (scene.end - scene.start).max(1e-9)
-    } else {
-        activity
-            .sample_elapsed_seconds
-            .last()
-            .copied()
-            .unwrap_or(1.0)
-            .max(1e-9)
-    };
+    let source_duration = scoped_source_duration(scene, activity, show_full_activity);
 
     let mut progress_cursor = 0usize;
 

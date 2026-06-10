@@ -105,8 +105,9 @@ pub(crate) fn build_route_geometry(
             progress01: sample.progress01,
         })
         .collect::<Vec<_>>();
-    let target_count =
-        ((validated.width as f32) * plot.target_density).round().max(2.0) as usize;
+    let target_count = ((validated.width as f32) * plot.target_density)
+        .round()
+        .max(2.0) as usize;
     let downsampled =
         downsample_route_samples(&fitted_samples, target_count.min(fitted_samples.len()));
     let simplified = simplify_route_samples(&downsampled, plot.simplify_tolerance_px.max(0.05));

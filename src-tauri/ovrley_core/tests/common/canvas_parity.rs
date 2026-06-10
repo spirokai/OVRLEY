@@ -146,7 +146,11 @@ fn materialize_template_config_value(template_value: &Value) -> Result<Value> {
         }
     }
 
-    let fps = scene.get("fps").and_then(Value::as_f64).unwrap_or(1.0).max(1.0);
+    let fps = scene
+        .get("fps")
+        .and_then(Value::as_f64)
+        .unwrap_or(1.0)
+        .max(1.0);
     scene
         .entry("start".to_string())
         .or_insert_with(|| serde_json::json!(0.0));

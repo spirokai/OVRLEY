@@ -21,13 +21,7 @@ fn downsample_preserves_meaningful_vertical_run() {
     let progress = 0.0f32;
     let elevation_base = 100.0f64;
     let points: Vec<(f32, f64, f32)> = (0..10)
-        .map(|i| {
-            (
-                progress,
-                elevation_base + i as f64 * 0.5,
-                i as f32 / 9.0,
-            )
-        })
+        .map(|i| (progress, elevation_base + i as f64 * 0.5, i as f32 / 9.0))
         .collect();
 
     let target_count = 5;
@@ -125,7 +119,10 @@ fn downsample_mixed_runs() {
     );
 
     // Vertical run at 0.5 should have multiple points (5m span > 0.5m)
-    let at_0_5: Vec<_> = result.iter().filter(|p| (p.progress01 - 0.5).abs() <= f32::EPSILON).collect();
+    let at_0_5: Vec<_> = result
+        .iter()
+        .filter(|p| (p.progress01 - 0.5).abs() <= f32::EPSILON)
+        .collect();
     assert!(
         at_0_5.len() >= 2,
         "vertical run at 0.5 should preserve >=2 points, got {}",

@@ -377,5 +377,3 @@ fn draw_heading_widget_with_chevron_indicator() {
     assert_eq!(report.geometry.widget_width, 400);
     assert_eq!(report.geometry.widget_height, 80);
 }
-
-

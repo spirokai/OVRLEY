@@ -30,7 +30,9 @@ use ovrley_core::benchmark_common::{
     sleep_between_benchmark_groups, sleep_between_benchmark_runs, summarize_run_outcome,
     CommonRunMetrics,
 };
-use ovrley_core::bin_common::{format_mmss, read_positional, repo_root, resolve_path, unix_timestamp};
+use ovrley_core::bin_common::{
+    format_mmss, read_positional, repo_root, resolve_path, unix_timestamp,
+};
 
 /// All composite codec profiles exercised by this benchmark.
 ///
@@ -184,8 +186,12 @@ fn main() -> Result<(), String> {
     let resolved_video = resolve_path(&video_path, &root);
     let metadata =
         probe_video(&root, &resolved_video.to_string_lossy()).map_err(|e| e.to_string())?;
-    let fps_num = metadata.fps_num.ok_or_else(|| "Video metadata missing fps_num".to_string())?;
-    let fps_den = metadata.fps_den.ok_or_else(|| "Video metadata missing fps_den".to_string())?;
+    let fps_num = metadata
+        .fps_num
+        .ok_or_else(|| "Video metadata missing fps_num".to_string())?;
+    let fps_den = metadata
+        .fps_den
+        .ok_or_else(|| "Video metadata missing fps_den".to_string())?;
     let video_duration = metadata
         .duration
         .ok_or_else(|| "Could not determine video duration".to_string())?;
@@ -251,8 +257,7 @@ fn main() -> Result<(), String> {
     let base_validated = parse_and_validate_config(&base_config_str).map_err(|e| e.to_string())?;
     let res_width = base_validated.scene.width;
     let res_height = base_validated.scene.height;
-    let base_update_rate = settings_update_rate
-        .unwrap_or(base_validated.scene.update_rate);
+    let base_update_rate = settings_update_rate.unwrap_or(base_validated.scene.update_rate);
 
     let mut results = BTreeMap::new();
 
@@ -301,8 +306,8 @@ fn main() -> Result<(), String> {
             run_config_value["scene"]["ffmpeg"] = ffmpeg_config;
 
             let config = validate_config_value(&run_config_value).map_err(|e| e.to_string())?;
-            let dense =
-                build_dense_activity_report_validated(&activity, &config).map_err(|e| e.to_string())?;
+            let dense = build_dense_activity_report_validated(&activity, &config)
+                .map_err(|e| e.to_string())?;
 
             let update_rate = config.widget_update_rate();
             let overlay_duration = config.scene.end - config.scene.start;
