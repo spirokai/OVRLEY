@@ -120,7 +120,7 @@ fn build_elevation_remaining_layer(
 ///
 /// Elevation traces are smoothed and reduced before projection, then RDP is
 /// applied in screen space to remove visually redundant points.
-fn build_elevation_geometry(
+pub(crate) fn build_elevation_geometry(
     plot: &NormalizedElevationPlot,
     raw_points: &[(f32, f64)],
 ) -> CoreResult<WidgetGeometry> {
@@ -213,7 +213,7 @@ fn raw_elevation_points_with_optional_progress(
 ///
 /// Custom export ranges trim the source samples so the profile itself can
 /// represent only the selected slice unless the template asks for full view.
-fn build_elevation_source_points(
+pub(crate) fn build_elevation_source_points(
     activity: &ParsedActivity,
     show_full_activity: bool,
     scene: &crate::normalize::ValidatedSceneConfig,

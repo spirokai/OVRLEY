@@ -219,10 +219,10 @@ describe('combineSeries and combineSeriesPreferDerived (via deriveActivityMetric
       [0.0000008, 0.0000008],
       [-0.0000008, 0.0000016],
       [0.0000008, 0.0000024],
-      [0, 0.0000120],
+      [0, 0.000012],
       [0.0000008, 0.0000128],
       [-0.0000008, 0.0000136],
-      [0, 0.0000240],
+      [0, 0.000024],
     ]
     const helpers = makeHelpers({ calculateBearingDegrees })
     const samples = makeNormalizedSamples(courseSeries.map(() => ({})))

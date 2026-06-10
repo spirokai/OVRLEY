@@ -73,7 +73,7 @@ pub(crate) fn prepare_route_cache(
 ///
 /// Downsample before RDP simplification to cap work for long activities while
 /// preserving visually important points.
-fn build_route_geometry(
+pub(crate) fn build_route_geometry(
     plot: &NormalizedRoutePlot,
     validated: &ValidatedRoutePlot,
     route_samples: &[RouteSample],
@@ -222,7 +222,7 @@ fn fit_points_to_widget_with_inset(
 ///
 /// `show_full_activity` overrides custom export trimming so the full route
 /// remains visible while progress can still follow the selected scene.
-fn build_route_samples(
+pub(crate) fn build_route_samples(
     activity: &ParsedActivity,
     show_full_activity: bool,
     scene: &crate::normalize::ValidatedSceneConfig,

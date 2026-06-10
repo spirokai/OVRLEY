@@ -1,7 +1,29 @@
-import { describe, expect, test } from 'vitest'
-import { render } from '@testing-library/react'
+import { describe, expect, test, vi, beforeEach } from 'vitest'
+import { render, waitFor } from '@testing-library/react'
+
+// Mock the backend IPC call
+const mockBuildElevationGeometry = vi.fn()
+vi.mock('@/api/backend', () => ({
+  buildElevationGeometry: (...args) => mockBuildElevationGeometry(...args),
+  hasTauriRuntime: () => true,
+}))
 
 import { OverlayElevationWidget } from '@/features/widget-preview'
+
+const GEOMETRY_RESPONSE = {
+  points: [
+    [0, 48],
+    [80, 24],
+    [160, 36],
+    [240, 0],
+  ],
+  progressValues: [0, 0.33, 0.66, 1],
+  bbox: [0, 0, 240, 48],
+  sourcePointCount: 4,
+  simplification: 'sg11_density_1.00_rdp_px_1.00',
+  widgetWidth: 240,
+  widgetHeight: 48,
+}
 
 function makeElevationWidget(overrides = {}) {
   return {
@@ -37,7 +59,12 @@ function makeActivity() {
 }
 
 describe('OverlayElevationWidget', () => {
-  test('uses the widget height as the SVG coordinate height below the old clamp threshold', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockBuildElevationGeometry.mockResolvedValue(GEOMETRY_RESPONSE)
+  })
+
+  test('uses the widget height as the SVG coordinate height below the old clamp threshold', async () => {
     const widget = makeElevationWidget({ height: 48 })
     const { container } = render(
       <OverlayElevationWidget
@@ -51,6 +78,11 @@ describe('OverlayElevationWidget', () => {
         sceneStyle={{}}
       />,
     )
+
+    await waitFor(() => {
+      const svg = container.querySelector('svg')
+      expect(svg).toBeTruthy()
+    })
 
     const svg = container.querySelector('svg')
     const marker = container.querySelector('circle')

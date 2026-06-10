@@ -8,7 +8,7 @@
 /// Shared geometry, style, and drawing helpers for all widgets.
 pub(crate) mod common;
 /// Elevation profile widget implementation.
-mod elevation;
+pub(crate) mod elevation;
 /// Point/rect/math and layout-fitting helpers.
 mod geometry;
 /// Heading compass tape widget implementation.
@@ -20,7 +20,7 @@ pub mod metric_presentation;
 /// Polyline and area drawing helpers.
 mod polyline;
 /// Route/course widget implementation.
-mod route;
+pub(crate) mod route;
 /// Skia path and coordinate transform helpers.
 mod transform;
 /// Shared widget cache and report types.

@@ -73,6 +73,8 @@ pub fn run() {
             tauri_commands::backend_clear_preview_video,
             tauri_commands::backend_get_video_state,
             tauri_commands::backend_detect_codecs,
+            tauri_commands::backend_build_elevation_geometry,
+            tauri_commands::backend_build_route_geometry,
             file_ops::default_template_save_path,
             file_ops::write_template_file,
             file_ops::write_parse_debug_file

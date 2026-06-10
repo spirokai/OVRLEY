@@ -384,3 +384,43 @@ export async function detectCodecs() {
   const result = await invokeCommand('backend_detect_codecs', {})
   return typeof result === 'string' ? JSON.parse(result) : result
 }
+
+/**
+ * Builds elevation widget geometry from config and activity data.
+ *
+ * Returns simplified, projected geometry points for the elevation preview
+ * without rendering a Skia surface. The JS frontend uses this to avoid
+ * duplicating the geometry pipeline.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} parsedActivity - Normalized activity payload used by the app.
+ * @returns {Promise<object>} Promise resolving to elevation geometry (points, progressValues, bbox, etc.).
+ */
+export async function buildElevationGeometry(config, parsedActivity) {
+  const safeConfig = safeJsonStringify(config)
+  const safeParsedActivity = safeJsonStringify(parsedActivity)
+  return apiCall('backend_build_elevation_geometry', {
+    configJson: safeConfig,
+    parsedActivityJson: safeParsedActivity,
+  })
+}
+
+/**
+ * Builds route widget geometry from config and activity data.
+ *
+ * Returns simplified, projected geometry points for the route preview
+ * without rendering a Skia surface. The JS frontend uses this to avoid
+ * duplicating the geometry pipeline.
+ *
+ * @param {*} config - Overlay template configuration data.
+ * @param {*} parsedActivity - Normalized activity payload used by the app.
+ * @returns {Promise<object>} Promise resolving to route geometry (points, progressValues, bbox, etc.).
+ */
+export async function buildRouteGeometry(config, parsedActivity) {
+  const safeConfig = safeJsonStringify(config)
+  const safeParsedActivity = safeJsonStringify(parsedActivity)
+  return apiCall('backend_build_route_geometry', {
+    configJson: safeConfig,
+    parsedActivityJson: safeParsedActivity,
+  })
+}

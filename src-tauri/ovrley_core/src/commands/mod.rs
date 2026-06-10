@@ -6,6 +6,9 @@
 //! runtime path resolution, template IO, video render startup, progress/cancel
 //! plumbing, and small OS integration helpers.
 
+pub mod elevation_geometry;
+pub mod route_geometry;
+
 use crate::activity::schema::ParsedActivity;
 use crate::activity::{build_dense_activity_report_validated, parse_activity_json};
 use crate::debug::RenderProgress;

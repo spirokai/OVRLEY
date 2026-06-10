@@ -99,7 +99,7 @@
     "variantFrameKeys": ["width", "height", "rotation"],
     "defaults": ["text", "linear", "bars", "arc", "corner"],
     "overrides": {
-      "heading": ["text", "heading_tape"],
+      "heading": ["text"],
       "core_temperature": ["text"],
       "left_right_balance": ["text"],
       "time": ["text"]
@@ -514,7 +514,7 @@
     {
       "type": "vertical_ratio",
       "current": true,
-      "label": "Vertical Ratio",
+      "label": "V. Ratio",
       "defaultDisplayUnit": "percent",
       "supportedDisplayUnits": [
         {

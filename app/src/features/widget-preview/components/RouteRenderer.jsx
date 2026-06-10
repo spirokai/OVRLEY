@@ -26,6 +26,11 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
   const data = widget.data
   const style = useRoutePreviewStyle(data, globalScale)
   const geometry = useRoutePreviewGeometry({ activity, data, exportRange, previewSecond, style })
+
+  if (!geometry) {
+    return null
+  }
+
   const shadow = getTextShadowParts(sceneStyle)
   const shadowFilterId = sanitizeSvgId(`${widget.id}-route-shadow-blur`)
 

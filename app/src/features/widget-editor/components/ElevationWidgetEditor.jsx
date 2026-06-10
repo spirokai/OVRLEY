@@ -26,7 +26,6 @@ const MARKER_VARIANT_OPTIONS = [
  */
 export default function ElevationWidgetEditor({ widget, updateWidgetData, setNumericField, sceneFontSize }) {
   const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
-  const completedLineOpacity = widget.data.completed_line_opacity
   const remainingLineOpacity = widget.data.remaining_line_opacity
   const completedAreaOpacity = widget.data.area_completed_opacity
   const remainingAreaOpacity = widget.data.area_remaining_opacity
@@ -94,11 +93,11 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
         <div className="grid grid-cols-2 gap-3">
           <SliderField
             label="Finished Opacity"
-            value={completedLineOpacity}
+            value={widget.data.completed_line_opacity}
             min={0}
             max={100}
             step={1}
-            valueDisplay={`${completedLineOpacity}%`}
+            valueDisplay={`${widget.data.completed_line_opacity}%`}
             onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
           />
           <SliderField

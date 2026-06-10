@@ -18,16 +18,13 @@ The elevation profile widget assumes `distance_progress → elevation` is a sing
 
 ### How the bug manifests
 
-Three independent failures combine to make the elevation widget show incorrect behavior during drone flights:
+With the current Rust-geometry architecture, the bug manifests in the Rust backend only:
 
 | Layer | File | Failure |
 |-------|------|---------|
 | **Rust geometry** | `reduction.rs:99-107` | Downsampler drops consecutive samples with identical `progress01`. A 17-sample hover-climb collapses to a single point. |
 | **Rust marker** | `frame_state.rs:48-54` | Marker `(x, y)` is resolved from `point_at_metric_progress_with_cursor()` — a progress→geometry lookup. Since the collapsed geometry has only one point at the hover position, the marker's y is stuck regardless of actual altitude. |
 | **Rust completed profile** | `frame_state.rs:90-94` | Completed profile is built by `progress ≤ currentProgress`. All vertical-segment points share the same progress, so they are either fully included or fully excluded — partial fill of a vertical segment is impossible. |
-| **JS geometry** | `elevationGeometry.js:129` | Mirror of the Rust downsampler dedupe — `if (selectedSamples[last].progress === nextSample.progress) continue`. |
-| **JS marker** | `useElevationPreviewGeometry.js:87` | Marker resolved from `getPointAtMetricProgress()` — same progress→geometry ambiguity. |
-| **JS completed profile** | `svgPreviewUtils.js:270` | Filtered by `progress ≤ currentProgress` — same partial-fill impossibility. |
 
 The `srt-parser.js` parser is **not** the problem — it correctly preserves raw flight samples with duplicate GPS positions and changing altitude. The breakage starts in widget geometry preparation.
 
@@ -35,6 +32,7 @@ The `srt-parser.js` parser is **not** the problem — it correctly preserves raw
 
 - **Route widget**: The route has no altitude axis. Hovering at the same GPS produces a stationary marker — this is correct and must not change.
 - **Elevation label value** (Rust only): `frame_state.rs:56-66` reads `dense_activity.series.elevation[frame_index]`, which IS per-frame and interpolated from elapsed time. The numeric label is already correct; only the visual marker position and drawn profile are wrong.
+- **JS frontend**: The hooks (`useElevationPreviewGeometry`, `useRoutePreviewGeometry`) now consume Rust geometry via IPC. No JS geometry code needs to change — Rust is the single source of truth.
 
 ## Solution Summary
 
@@ -49,7 +47,7 @@ The `srt-parser.js` parser is **not** the problem — it correctly preserves raw
 | Marker position x | From `distanceProgressAtTime` (unchanged) | Stays stable during hover |
 | Marker position y | From `elevationAtTime` projected into widget y-scale | Correctly tracks altitude change during hover |
 | Completed profile | Build by chronological sample order, not `progress ≤` | Allows partial fill of vertical segments as time advances |
-| Elevation label value (JS) | Switch from progress→elevation to elapsed→elevation | Fixes the JS-side label ambiguity |
+| Elevation label value | Already correct in Rust | No change needed |
 
 ### Why not time-based x-axis?
 
@@ -80,9 +78,9 @@ This guarantees that (a) meaningful vertical runs always contribute at least the
 
 ## Implementation Plan
 
-**Principle**: Rust backend is the master of truth — fix it first and completely, then mirror the corrected behavior in the JS frontend preview.
+**Principle**: Rust backend is the single source of truth for geometry generation. The JS frontend consumes Rust geometry via IPC — no duplicated geometry code in JS.
 
-The Rust changes touch 5 files but are tightly coupled — the geometry fix enables the marker fix, which enables the completed-profile fix. The JS side mirrors the same logic. Tests are included within each phase rather than split out.
+**Architecture context**: The elevation geometry pipeline lives entirely in Rust (`ovrley_core/src/render/widgets/elevation/`). The JS hook `useElevationPreviewGeometry` calls `buildElevationGeometry()` via Tauri IPC and receives pre-built geometry. Per-frame operations (marker interpolation, completed segment splitting, SVG path materialization) remain local in JS for 30fps performance.
 
 ---
 
@@ -140,36 +138,27 @@ Wire new modules in `tests/mod.rs`. Verify `cargo test` passes.
 
 ---
 
-### Phase 2 — JS frontend: Mirror the Rust fix
+### Phase 2 — JS frontend: Update hooks to consume new geometry shape
 
-**Same four changes mirrored in JS:**
+Since Rust is the single source of truth for geometry, the JS changes are minimal — only the hooks that consume the Rust response need updating to handle the new fields.
 
 **Files to modify:**
 
-`exportRange.js`:
-- `buildScopedElevationSeries()`: extend the return value to include `elapsedSeconds`, aligned 1:1 with `values` and `progressValues`.
-- For full activity, return `activity.sample_elapsed_seconds` as `elapsedSeconds`.
-- For custom export windows, build trim-relative `elapsedSeconds` using the same start/interior/end logic already used for `values` and `progressValues`, so all three arrays describe the same scoped series.
-
-`elevationGeometry.js`:
-- Pre-scan in `downsampleElevationSamples()` or added step: before even-spaced selection, scan the smoothed samples for consecutive duplicate-progress runs. For each run where `max(value) - min(value) ≥ 0.5`, set `preserve = true` on every sample in the run. The existing `simplifyProjectedPoints()` already protects `preserve`-flagged points.
-- `selectEvenlySpaced` logic: skip a candidate only if its progress equals the previous selection's progress AND the candidate is NOT `preserve`.
-- `normalizeElevationGeometry()`: return `elapsedFractions` (computed from the caller-provided scoped `elapsedSeconds[i] / scopedElapsedSeconds.last()`, not from sample index) and `dataRange: { min, max }`, alongside existing `points` and `progressValues`. The caller must provide the scoped elapsed-seconds array from `buildScopedElevationSeries()` so trimmed previews use the same time basis as trimmed geometry.
-
 `useElevationPreviewGeometry.js`:
-- Read `elapsedSeconds` from `buildScopedElevationSeries(activity, exportWindow)` alongside `values` and `progressValues`, and pass it into `normalizeElevationGeometry()`.
-- `markerPoint`: keep x from `getPointAtMetricProgress()` / `getPointAtProgress()`. Compute y by projecting `getInterpolatedActivityValue(activity, 'elevation', previewSecond)` into widget y-space using `data.y_scale` + geometry's `dataRange`.
-- `elevationValue`: switch from `getInterpolatedSeriesValue(profileDistanceProgress, profileElevations, progress01)` to `getInterpolatedActivityValue(activity, 'elevation', previewSecond)`.
-- `frameElapsedFraction`: compute against the same scoped duration used by `normalizeElevationGeometry()` to derive `elapsedFractions`. For custom export windows, use the scoped/trim-relative duration returned by `buildScopedElevationSeries()`; for full activity, use the full activity duration. Do not derive this from a different denominator than the geometry used.
-- `completedPoints`: call `buildElevationCompletedPoints()` with `elapsedFractions` and `frameElapsedFraction`.
+- The hook already calls `buildElevationGeometry()` via IPC and receives the Rust response.
+- After Phase 1, the Rust response will include `elapsedFractions` and `dataRange` fields.
+- Update the hook to use `elapsedFractions` instead of `progressValues` for completed profile construction.
+- Update `buildElevationCompletedPoints()` call to pass `elapsedFractions` and `frameElapsedFraction`.
+- The marker-y computation and elevation label already use elapsed-time interpolation in Rust — no change needed.
 
 `svgPreviewUtils.js` — `buildElevationCompletedPoints()`:
 - Change signature: accept `elapsedFractions` + `frameElapsedFraction` instead of `progressValues` + `progress01`.
 - Filter by `elapsedFractions[i] ≤ frameElapsedFraction`.
 
-**Unit tests (within Phase 2):**
-- `app/src/tests/lib/elevationGeometry.test.js`: `downsampleElevationSamples` vertical run preservation and collapse tests.
-- `app/src/tests/lib/svgPreviewUtils.test.js`: `buildElevationCompletedPoints` chronological fill test.
+**No changes needed to:**
+- `elevationGeometry.js` — this file should be deleted (geometry is now in Rust).
+- `exportRange.js` — `buildScopedElevationSeries()` is no longer used by the geometry hook.
+- Any geometry computation code — all in Rust now.
 
 **Acceptance criteria:**
 - [ ] DJI-sample2 preview: marker y changes during first 17s, marker x stays constant.
@@ -219,3 +208,4 @@ Manual verification with real sample data:
 - Changing the elevation x-axis to time-based — explicitly rejected.
 - Adding a drone-specific detection mode — the fix is general and applies to any activity with duplicate-distance runs.
 - Changing the parser (`srt-parser.js`) — it is correct as-is.
+- Duplicating geometry logic in JS — Rust is the single source of truth; JS hooks consume geometry via IPC.

@@ -47,7 +47,8 @@ use ovrley_core::normalize::{
 };
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::{
-    prepare_preview_assets, render_preview_with_prepared_assets, PreviewRenderRequest,
+    prepare_preview_assets, render_preview_with_prepared_assets, PreparedPreviewAssets,
+    PreviewRenderRequest,
 };
 use serde_json::Value;
 use std::fs;
@@ -209,7 +210,7 @@ pub fn render_skia_preview(
     dense_activity: &DenseActivityReport,
     second: u32,
     out_path: &Path,
-) -> Result<()> {
+) -> Result<PreparedPreviewAssets> {
     println!(
         "  rendering Skia frame at second {second} → {}",
         out_path.display()
@@ -229,7 +230,7 @@ pub fn render_skia_preview(
     })
     .context("render_preview_with_prepared_assets failed")?;
     println!("  Skia render complete: {} kB", file_size_kb(out_path));
-    Ok(())
+    Ok(prepared)
 }
 
 /// Returns file size in KB.
@@ -280,6 +281,7 @@ pub fn write_mock_data(
     activity: &ParsedActivity,
     activity_raw: &Value,
     selected_second: u32,
+    prepared: Option<&PreparedPreviewAssets>,
 ) -> Result<()> {
     fs::create_dir_all(mock_dir)
         .with_context(|| format!("failed to create mock dir {}", mock_dir.display()))?;
@@ -323,6 +325,22 @@ pub fn write_mock_data(
     });
     write_json(&mock_dir.join("store-state.json"), &store_state)?;
     println!("  wrote store-state.json");
+
+    // 4. elevation-geometry.json — pre-computed Rust geometry for parity test
+    if let Some(assets) = prepared {
+        if let Some(geom) = assets.elevation_geometry_json() {
+            write_json(&mock_dir.join("elevation-geometry.json"), &geom)?;
+            println!("  wrote elevation-geometry.json");
+        }
+    }
+
+    // 5. route-geometry.json — pre-computed Rust route geometry for parity test
+    if let Some(assets) = prepared {
+        if let Some(geom) = assets.route_geometry_json() {
+            write_json(&mock_dir.join("route-geometry.json"), &geom)?;
+            println!("  wrote route-geometry.json");
+        }
+    }
 
     Ok(())
 }
