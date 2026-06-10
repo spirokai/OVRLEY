@@ -130,6 +130,8 @@ impl PreparedRenderAssets {
         Some(serde_json::json!({
             "points": geom.points.iter().map(|(x, y)| [x, y]).collect::<Vec<_>>(),
             "progressValues": geom.progress_values,
+            "elapsedFractions": geom.elapsed_fractions,
+            "dataRange": geom.elevation_data_range.map(|(min, max)| [min, max]),
             "bbox": [geom.bbox.0, geom.bbox.1, geom.bbox.2, geom.bbox.3],
             "sourcePointCount": geom.source_point_count,
             "simplification": geom.simplification,
@@ -160,6 +162,8 @@ pub(crate) struct WidgetGeometry {
     pub(crate) points: Vec<(f32, f32)>,
     pub(crate) bbox: (f32, f32, f32, f32),
     pub(crate) progress_values: Vec<f32>,
+    pub(crate) elapsed_fractions: Vec<f32>,
+    pub(crate) elevation_data_range: Option<(f64, f64)>,
     pub(crate) source_point_count: usize,
     pub(crate) simplification: String,
 }
@@ -180,6 +184,7 @@ pub(crate) struct ElevationFrameState {
     pub(crate) marker_x: f32,
     pub(crate) marker_y: f32,
     pub(crate) elevation_m: f64,
+    pub(crate) frame_elapsed_fraction: f32,
 }
 
 /// One visual layer of a configurable marker.

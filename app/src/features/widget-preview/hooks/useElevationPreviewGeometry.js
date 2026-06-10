@@ -6,9 +6,36 @@ import {
   resolveExportRangeWindow,
 } from '@/features/overlay-editor'
 import { buildElevationGeometry, hasTauriRuntime } from '@/api/backend'
-import { areaToSvg, getPointAtMetricProgress, pointsToSvg } from '@/lib/geometryUtils'
+import { areaToSvg, findPointAtProgress, pointsToSvg } from '@/lib/geometryUtils'
 import { buildElevationCompletedPoints } from '../utils/svgPreviewUtils'
 import useStore from '@/store/useStore'
+
+function normalizeElevationGeometry(geometry) {
+  if (!geometry || !Array.isArray(geometry.points) || !Array.isArray(geometry.progressValues)) {
+    return null
+  }
+
+  if (!Array.isArray(geometry.elapsedFractions) || !Array.isArray(geometry.dataRange) || geometry.dataRange.length !== 2) {
+    return null
+  }
+
+  return geometry
+}
+
+function projectElevationValueToSvgY(elevationValue, dataRange, height, yScale) {
+  const [minElevation, maxElevation] = Array.isArray(dataRange) ? dataRange : [NaN, NaN]
+  if (!Number.isFinite(elevationValue) || !Number.isFinite(minElevation) || !Number.isFinite(maxElevation)) {
+    return null
+  }
+
+  const safeHeight = Math.max(Number(height) || 0, 1)
+  const safeYScale = Number(yScale) || 1
+  const span = Math.max(maxElevation - minElevation, 1e-9)
+  const normalized = (elevationValue - minElevation) / span
+  const centered = Math.min(Math.max((normalized - 0.5) * safeYScale + 0.5, 0), 1)
+
+  return safeHeight - safeHeight * centered
+}
 
 /**
  * Builds the geometry model for the elevation preview renderer.
@@ -35,14 +62,17 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
   const globalDefaults = useStore((state) => state.globalDefaults)
 
   const mockGeometry = typeof window !== 'undefined' ? window.__OVRLEY_MOCK_ELEVATION_GEOMETRY : null
+  const exportWindow = useMemo(
+    () => resolveExportRangeWindow(activity, exportRange, data.show_full_activity),
+    [activity, exportRange, data.show_full_activity],
+  )
 
   // Build the config Rust needs. The store scene lacks non-durable fields
-  // (scale, shadow, border) — globalDefaults fills them. start/end are
+  // (scale, shadow, border); globalDefaults fills them. start/end are
   // overridden when an export window is active so Rust trims source points.
   const geometryConfig = useMemo(() => {
     if (!config || !activity || !hasTauriRuntime() || mockGeometry) return null
     const duration = activity?.trim_end_seconds ?? 0
-    const exportWindow = resolveExportRangeWindow(activity, exportRange, false)
     const { updateRate, start, end, ...sceneRest } = config.scene
 
     return {
@@ -57,7 +87,7 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
         custom_export_range_active: exportWindow.active,
       },
     }
-  }, [config, globalDefaults, activity, exportRange, mockGeometry, style.safeGlobalScale])
+  }, [config, globalDefaults, activity, exportWindow, mockGeometry, style.safeGlobalScale])
 
   useEffect(() => {
     if (!geometryConfig) return
@@ -69,32 +99,40 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
     return () => {
       cancelled = true
     }
-  }, [geometryConfig, activity, data])
+  }, [geometryConfig, activity])
 
-  const effectiveGeometry = mockGeometry ?? rustGeometry
+  const effectiveGeometry = normalizeElevationGeometry(mockGeometry ?? rustGeometry)
   if (!effectiveGeometry || !activity) return null
 
-  // Rust computes at scaled resolution (scene.width × scale), but SVG
-  // needs unscaled widget-local coordinates.
+  // Rust computes at scaled resolution, but SVG needs widget-local coordinates.
   const points = effectiveGeometry.points.map(([x, y]) => [x / style.safeGlobalScale, y / style.safeGlobalScale])
-  const pointProgress = effectiveGeometry.progressValues
+  const lastPoint = points[points.length - 1] ?? null
 
-  // progress01 drives marker placement and completed polyline. Export
-  // window normalizes it to 0..1 within the trimmed range.
-  const exportWindow = resolveExportRangeWindow(activity, exportRange, data.show_full_activity)
+  // Keep marker x distance-based so it stays put during hover/stop segments.
   const progress01 = exportWindow.active
     ? (getWindowProgressAtTime(activity, exportWindow, previewSecond) ?? 0)
     : getDistanceProgressAtElapsed(activity, previewSecond)
 
-  const markerPoint = getPointAtMetricProgress(points, pointProgress, progress01) || points[points.length - 1]
-  const completedPoints = buildElevationCompletedPoints(points, pointProgress, progress01, markerPoint)
+  // Completed profile fill is chronological, normalized to the same scoped duration
+  // Rust used when building elapsedFractions.
+  const sourceDuration = exportWindow.active
+    ? exportWindow.end - exportWindow.start
+    : activity.sample_elapsed_seconds?.at(-1) || 1
+  const elapsedWindowStart = exportWindow.active ? exportWindow.start : 0
+  const frameElapsedFraction = Math.min(Math.max((previewSecond - elapsedWindowStart) / Math.max(sourceDuration, 1e-9), 0), 1)
 
-  // Numeric elevation for the label — interpolated from raw series at
-  // current distance progress. sample_elevations preferred over raw elevation.
-  const elevationValue = getInterpolatedSeriesValue(
-    activity.sample_distance_progress,
-    activity.sample_elevations.length ? activity.sample_elevations : activity.elevation,
+  const metricHit = findPointAtProgress(points, effectiveGeometry.progressValues, progress01)
+  const elevationSeries = activity.sample_elevations.length ? activity.sample_elevations : activity.elevation
+  const elevationValue = getInterpolatedSeriesValue(activity.sample_elapsed_seconds, elevationSeries, previewSecond)
+  const markerX = metricHit?.point?.[0] ?? lastPoint?.[0] ?? null
+  const markerY = projectElevationValueToSvgY(elevationValue, effectiveGeometry.dataRange, style.height, data.y_scale)
+  const markerPoint = Number.isFinite(markerX) && Number.isFinite(markerY) ? [markerX, markerY] : null
+  const completedPoints = buildElevationCompletedPoints(
+    points,
+    effectiveGeometry.progressValues,
+    effectiveGeometry.elapsedFractions,
     progress01,
+    frameElapsedFraction,
   )
 
   return {

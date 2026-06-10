@@ -1,14 +1,12 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 
-// Mock the backend IPC call before importing the hook
 const mockBuildElevationGeometry = vi.fn()
 vi.mock('@/api/backend', () => ({
   buildElevationGeometry: (...args) => mockBuildElevationGeometry(...args),
   hasTauriRuntime: () => true,
 }))
 
-// Mock the Zustand store — the hook reads config from here
 const mockConfig = {
   scene: {
     width: 240,
@@ -44,20 +42,22 @@ const mockConfig = {
 }
 
 vi.mock('@/store/useStore', () => ({
-  default: vi.fn((selector) => selector({ config: mockConfig })),
+  default: vi.fn((selector) => selector({ config: mockConfig, globalDefaults: {} })),
 }))
 
-// Mock geometryUtils — the hook still uses local marker interpolation
 vi.mock('@/lib/geometryUtils', () => ({
-  getPointAtMetricProgress: vi.fn((points, progress, target) => {
+  findPointAtProgress: vi.fn((points, progress, target) => {
     if (!points.length) return null
     for (let i = 0; i < points.length - 1; i++) {
       if (target >= progress[i] && target <= progress[i + 1]) {
         const t = (target - progress[i]) / (progress[i + 1] - progress[i] || 1)
-        return [points[i][0] + t * (points[i + 1][0] - points[i][0]), points[i][1] + t * (points[i + 1][1] - points[i][1])]
+        return {
+          point: [points[i][0] + t * (points[i + 1][0] - points[i][0]), points[i][1] + t * (points[i + 1][1] - points[i][1])],
+          index: i,
+        }
       }
     }
-    return points[points.length - 1]
+    return { point: points[points.length - 1], index: points.length - 1 }
   }),
   getPointAtProgress: vi.fn(() => null),
   pointsToSvg: vi.fn((points) => points.map((p) => p.join(',')).join(' ')),
@@ -69,16 +69,16 @@ vi.mock('@/lib/geometryUtils', () => ({
   }),
 }))
 
-// Mock svgPreviewUtils — completed points filtering
 vi.mock('@/features/widget-preview/utils/svgPreviewUtils', () => ({
-  buildElevationCompletedPoints: vi.fn((points, progress, progress01, _marker) => {
-    return points.filter((_, i) => (progress[i] ?? 0) <= progress01)
-  }),
+  buildElevationCompletedPoints: vi.fn((points, _progressValues, elapsedFractions, _progress01, frameElapsedFraction) =>
+    points.filter((_, index) => (elapsedFractions[index] ?? 0) <= frameElapsedFraction),
+  ),
   getPreviewMarkerLayers: vi.fn(() => []),
   sanitizeSvgId: vi.fn((id) => id),
 }))
 
 import { useElevationPreviewGeometry } from '@/features/widget-preview/hooks/useElevationPreviewGeometry'
+import { buildElevationCompletedPoints } from '@/features/widget-preview/utils/svgPreviewUtils'
 
 function makeActivity() {
   return {
@@ -116,6 +116,8 @@ const GEOMETRY_RESPONSE = {
     [240, 0],
   ],
   progressValues: [0, 0.33, 0.66, 1],
+  elapsedFractions: [0, 0.33, 0.66, 1],
+  dataRange: [100, 160],
   bbox: [0, 0, 240, 48],
   sourcePointCount: 4,
   simplification: 'sg11_density_1.00_rdp_px_1.00',
@@ -148,13 +150,10 @@ describe('useElevationPreviewGeometry', () => {
 
     const [config, passedActivity] = mockBuildElevationGeometry.mock.calls[0]
     expect(passedActivity).toBe(activity)
-    // Should have scene.start and scene.end filled from activity duration
     expect(config.scene.start).toBe(0)
     expect(config.scene.end).toBe(30)
-    // Should preserve the original scene dimensions
     expect(config.scene.width).toBe(240)
     expect(config.scene.height).toBe(48)
-    // Should contain the elevation plot
     expect(config.plots).toEqual(expect.arrayContaining([expect.objectContaining({ value: 'elevation' })]))
   })
 
@@ -180,11 +179,75 @@ describe('useElevationPreviewGeometry', () => {
     expect(geometry).toHaveProperty('completedSvgPoints')
     expect(geometry).toHaveProperty('areaSvgPoints')
     expect(geometry).toHaveProperty('completedAreaSvgPoints')
-
     expect(Array.isArray(geometry.markerPoint)).toBe(true)
     expect(geometry.markerPoint).toHaveLength(2)
     expect(typeof geometry.remainingSvgPoints).toBe('string')
     expect(geometry.remainingSvgPoints.length).toBeGreaterThan(0)
+  })
+
+  test('keeps marker x distance-based while marker y and label follow elapsed-time elevation', async () => {
+    mockBuildElevationGeometry.mockResolvedValue({
+      ...GEOMETRY_RESPONSE,
+      points: [
+        [0, 48],
+        [0, 24],
+        [160, 12],
+        [240, 0],
+      ],
+      progressValues: [0, 0, 0.66, 1],
+      elapsedFractions: [0, 0.33, 0.66, 1],
+      dataRange: [100, 160],
+    })
+
+    const activity = {
+      sample_elapsed_seconds: [0, 10, 20, 30],
+      sample_distance_progress: [0, 0, 0.66, 1],
+      sample_elevations: [100, 130, 145, 160],
+      elevation: [100, 130, 145, 160],
+    }
+
+    const { result } = renderHook(() =>
+      useElevationPreviewGeometry({
+        activity,
+        data: makeData(),
+        exportRange: null,
+        previewSecond: 5,
+        style: makeStyle(),
+      }),
+    )
+
+    await waitFor(() => {
+      expect(result.current).not.toBeNull()
+    })
+
+    expect(result.current.markerPoint[0]).toBe(0)
+    expect(result.current.elevationValue).toBe(115)
+    expect(result.current.markerPoint[1]).toBe(36)
+  })
+
+  test('normalizes completed-profile elapsed fraction within the active export window', async () => {
+    renderHook(() =>
+      useElevationPreviewGeometry({
+        activity: makeActivity(),
+        data: {
+          ...makeData(),
+          show_full_activity: false,
+        },
+        exportRange: {
+          type: 'custom',
+          fromTime: '00:10',
+          toTime: '00:20',
+        },
+        previewSecond: 15,
+        style: makeStyle(),
+      }),
+    )
+
+    await waitFor(() => {
+      expect(buildElevationCompletedPoints).toHaveBeenCalled()
+    })
+
+    expect(buildElevationCompletedPoints).toHaveBeenLastCalledWith(expect.any(Array), expect.any(Array), expect.any(Array), expect.any(Number), 0.5)
   })
 
   test('returns null while IPC call is in flight', () => {

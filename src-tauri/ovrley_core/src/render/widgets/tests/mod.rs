@@ -12,5 +12,8 @@
 //! - `rdp_elevation_tests.rs` — elevation-sample RDP simplification
 //! - `rdp_route_tests.rs` — route-sample RDP simplification
 
+mod elevation_frame_state_tests;
+mod elevation_geometry_tests;
+mod elevation_reduction_tests;
 mod rdp_elevation_tests;
 mod rdp_route_tests;

@@ -29,6 +29,7 @@ fn sample(x: f32, y: f32, progress01: f32) -> ElevationSample {
     ElevationSample {
         point: (x, y),
         progress01,
+        elapsed_fraction: progress01,
         preserve: false,
     }
 }

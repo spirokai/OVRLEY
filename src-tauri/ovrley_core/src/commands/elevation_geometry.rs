@@ -21,6 +21,10 @@ pub struct ElevationGeometryResponse {
     pub points: Vec<[f32; 2]>,
     /// Per-point progress values (0.0..=1.0) for marker interpolation.
     pub progress_values: Vec<f32>,
+    /// Per-point elapsed fractions (0.0..=1.0) for chronological fill.
+    pub elapsed_fractions: Vec<f32>,
+    /// Source elevation range [min, max] used for marker-y projection.
+    pub data_range: Option<[f64; 2]>,
     /// Bounding box [min_x, min_y, max_x, max_y].
     pub bbox: [f32; 4],
     /// Number of raw source elevation samples before simplification.
@@ -70,6 +74,8 @@ pub fn build_elevation_geometry_command(
     Ok(ElevationGeometryResponse {
         points: geometry.points.into_iter().map(|(x, y)| [x, y]).collect(),
         progress_values: geometry.progress_values,
+        elapsed_fractions: geometry.elapsed_fractions,
+        data_range: geometry.elevation_data_range.map(|(min, max)| [min, max]),
         bbox: [
             geometry.bbox.0,
             geometry.bbox.1,

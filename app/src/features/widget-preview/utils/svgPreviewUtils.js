@@ -151,6 +151,34 @@ function resolveMarkerVariantDiameter(widgetData, fallbackRadius) {
   return Math.max(fallbackRadius * 2 + 8, 8)
 }
 
+const METRIC_PROGRESS_EPSILON = 1e-6
+
+function metricProgressEqual(left, right) {
+  return Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) <= METRIC_PROGRESS_EPSILON
+}
+
+function findDuplicateProgressRun(progressValues, targetProgress, anchorIndex) {
+  const safeAnchorIndex = Math.max(Math.min(anchorIndex, progressValues.length - 1), 0)
+  const anchorProgress = Number(progressValues[safeAnchorIndex])
+
+  if (!metricProgressEqual(anchorProgress, targetProgress)) {
+    return null
+  }
+
+  let start = safeAnchorIndex
+  let end = safeAnchorIndex
+
+  while (start > 0 && metricProgressEqual(progressValues[start - 1], anchorProgress)) {
+    start -= 1
+  }
+
+  while (end + 1 < progressValues.length && metricProgressEqual(progressValues[end + 1], anchorProgress)) {
+    end += 1
+  }
+
+  return end > start ? { start, end } : null
+}
+
 /**
  * Builds the marker layer definitions for a widget's position indicator.
  *
@@ -250,31 +278,54 @@ export function buildRouteFramePreview(points, progressValues, progress01) {
 }
 
 /**
- * Builds the completed elevation polyline points up to a given progress value.
+ * Builds the completed elevation polyline points for the current frame.
  *
- * Filters the full elevation point array to include only points whose progress
- * is at or below the current progress, appending the marker point if it extends
- * beyond the last filtered point.
+ * Ordinary motion should behave like the route widget: the completed path ends
+ * at the distance-based marker position on the geometry. When the activity is in
+ * a duplicate-progress run (hover/stop with vertical motion), the path must fill
+ * chronologically within that run using elapsed fractions while still staying at
+ * the current x-position.
  *
  * @param {number[][]} points - Elevation SVG points.
- * @param {number[]} progressValues - Per-point progress values (0–1).
- * @param {number} progress01 - Current progress (0–1).
- * @param {number[]|null} markerPoint - Current marker position [x, y] to append.
+ * @param {number[]} progressValues - Per-point metric progress values (0–1).
+ * @param {number[]} elapsedFractions - Per-point elapsed fractions (0–1).
+ * @param {number} progress01 - Current distance progress (0–1).
+ * @param {number} frameElapsedFraction - Current frame elapsed fraction (0–1).
  * @returns {number[][]} Points for the completed (ridden) portion of the elevation profile.
  */
-export function buildElevationCompletedPoints(points, progressValues, progress01, markerPoint) {
+export function buildElevationCompletedPoints(points, progressValues, elapsedFractions, progress01, frameElapsedFraction) {
   if (!points.length) {
     return []
   }
 
-  const completedPoints = points.filter((_, index) => (progressValues[index] ?? 0) <= progress01)
+  const metricHit = findPointAtProgress(points, progressValues, progress01)
+  const metricIndex = metricHit?.index ?? points.length - 1
+  const duplicateRun = findDuplicateProgressRun(progressValues, progress01, metricIndex)
+  let completedPoints = []
+  let completedEndpoint = metricHit?.point || points[points.length - 1]
+
+  if (duplicateRun) {
+    completedPoints = points.slice(0, duplicateRun.start)
+
+    for (let index = duplicateRun.start; index <= duplicateRun.end; index += 1) {
+      if ((elapsedFractions[index] ?? 0) < frameElapsedFraction) {
+        completedPoints.push(points[index])
+      }
+    }
+
+    const runPoints = points.slice(duplicateRun.start, duplicateRun.end + 1)
+    const runElapsedFractions = elapsedFractions.slice(duplicateRun.start, duplicateRun.end + 1)
+    completedEndpoint = findPointAtProgress(runPoints, runElapsedFractions, frameElapsedFraction)?.point || runPoints[runPoints.length - 1]
+  } else {
+    completedPoints = points.slice(0, Math.min(metricIndex, points.length))
+  }
 
   if (!completedPoints.length) {
     completedPoints.push(points[0])
   }
 
-  if (markerPoint && !pointsEqual(completedPoints[completedPoints.length - 1], markerPoint)) {
-    completedPoints.push(markerPoint)
+  if (completedEndpoint && !pointsEqual(completedPoints[completedPoints.length - 1], completedEndpoint)) {
+    completedPoints.push(completedEndpoint)
   }
 
   return completedPoints

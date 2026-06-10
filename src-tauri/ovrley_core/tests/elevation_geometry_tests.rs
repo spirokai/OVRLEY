@@ -27,6 +27,8 @@ fn test_response_serializes_points_as_arrays() {
     let response = ElevationGeometryResponse {
         points: vec![[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
         progress_values: vec![0.0, 0.5, 1.0],
+        elapsed_fractions: vec![0.0, 0.5, 1.0],
+        data_range: Some([100.0, 300.0]),
         bbox: [0.0, 0.0, 100.0, 50.0],
         source_point_count: 42,
         simplification: "sg11_density_1.00_rdp_px_1.00".to_string(),
@@ -50,6 +52,14 @@ fn test_response_serializes_points_as_arrays() {
     assert_eq!(progress[1], 0.5);
     assert_eq!(progress[2], 1.0);
 
+    let elapsed = json.get("elapsedFractions").unwrap().as_array().unwrap();
+    assert_eq!(elapsed.len(), 3);
+    assert_eq!(elapsed[0], 0.0);
+    assert_eq!(elapsed[1], 0.5);
+    assert_eq!(elapsed[2], 1.0);
+
+    assert_eq!(json.get("dataRange").unwrap(), &serde_json::json!([100.0, 300.0]));
+
     // bbox must be [min_x, min_y, max_x, max_y]
     let bbox = json.get("bbox").unwrap().as_array().unwrap();
     assert_eq!(bbox[0], 0.0);
@@ -64,6 +74,8 @@ fn test_response_uses_camel_case_field_names() {
     let response = ElevationGeometryResponse {
         points: vec![],
         progress_values: vec![],
+        elapsed_fractions: vec![],
+        data_range: None,
         bbox: [0.0; 4],
         source_point_count: 0,
         simplification: String::new(),
@@ -76,6 +88,8 @@ fn test_response_uses_camel_case_field_names() {
 
     assert!(keys.contains(&"points"), "expected camelCase 'points'");
     assert!(keys.contains(&"progressValues"), "expected camelCase 'progressValues'");
+    assert!(keys.contains(&"elapsedFractions"), "expected camelCase 'elapsedFractions'");
+    assert!(keys.contains(&"dataRange"), "expected camelCase 'dataRange'");
     assert!(keys.contains(&"bbox"), "expected camelCase 'bbox'");
     assert!(keys.contains(&"sourcePointCount"), "expected camelCase 'sourcePointCount'");
     assert!(keys.contains(&"simplification"), "expected camelCase 'simplification'");
@@ -222,6 +236,9 @@ fn test_command_returns_geometry_for_valid_input() {
     for window in response.progress_values.windows(2) {
         assert!(window[0] <= window[1], "progress not monotonic");
     }
+
+    assert_eq!(response.elapsed_fractions.len(), response.points.len());
+    assert_eq!(response.data_range, Some([100.0, 130.0]));
 
     // Widget dimensions should match config
     assert_eq!(response.widget_width, 400);

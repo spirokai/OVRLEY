@@ -18,6 +18,8 @@ const GEOMETRY_RESPONSE = {
     [240, 0],
   ],
   progressValues: [0, 0.33, 0.66, 1],
+  elapsedFractions: [0, 0.33, 0.66, 1],
+  dataRange: [100, 160],
   bbox: [0, 0, 240, 48],
   sourcePointCount: 4,
   simplification: 'sg11_density_1.00_rdp_px_1.00',

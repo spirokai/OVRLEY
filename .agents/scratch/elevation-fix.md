@@ -9,10 +9,12 @@ The elevation profile widget assumes `distance_progress → elevation` is a sing
 ### Evidence from sample data
 
 **`DJI-sample2-parse-debug.json`** (300 samples, 299 s):
+
 - Samples 0–16: `distance_progress = 0` for all 17 samples, `elevation` rises from 14m → 36m, `course_points` stays at `[149.0251, -20.2532]`
 - The drone spends 17 seconds climbing vertically at the same ground position.
 
 **`DJI-sample1-parse-debug.json`** (9000 samples, 300 s):
+
 - A plateau from 11.866s to 14.866s: `distance_progress` near-constant while `elevation` rises 861.712m → 866.112m.
 - Across the full file: 873 duplicate-distance runs, 811 with altitude change.
 
@@ -20,11 +22,11 @@ The elevation profile widget assumes `distance_progress → elevation` is a sing
 
 With the current Rust-geometry architecture, the bug manifests in the Rust backend only:
 
-| Layer | File | Failure |
-|-------|------|---------|
-| **Rust geometry** | `reduction.rs:99-107` | Downsampler drops consecutive samples with identical `progress01`. A 17-sample hover-climb collapses to a single point. |
-| **Rust marker** | `frame_state.rs:48-54` | Marker `(x, y)` is resolved from `point_at_metric_progress_with_cursor()` — a progress→geometry lookup. Since the collapsed geometry has only one point at the hover position, the marker's y is stuck regardless of actual altitude. |
-| **Rust completed profile** | `frame_state.rs:90-94` | Completed profile is built by `progress ≤ currentProgress`. All vertical-segment points share the same progress, so they are either fully included or fully excluded — partial fill of a vertical segment is impossible. |
+| Layer                      | File                   | Failure                                                                                                                                                                                                                               |
+| -------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Rust geometry**          | `reduction.rs:99-107`  | Downsampler drops consecutive samples with identical `progress01`. A 17-sample hover-climb collapses to a single point.                                                                                                               |
+| **Rust marker**            | `frame_state.rs:48-54` | Marker `(x, y)` is resolved from `point_at_metric_progress_with_cursor()` — a progress→geometry lookup. Since the collapsed geometry has only one point at the hover position, the marker's y is stuck regardless of actual altitude. |
+| **Rust completed profile** | `frame_state.rs:90-94` | Completed profile is built by `progress ≤ currentProgress`. All vertical-segment points share the same progress, so they are either fully included or fully excluded — partial fill of a vertical segment is impossible.              |
 
 The `srt-parser.js` parser is **not** the problem — it correctly preserves raw flight samples with duplicate GPS positions and changing altitude. The breakage starts in widget geometry preparation.
 
@@ -38,16 +40,16 @@ The `srt-parser.js` parser is **not** the problem — it correctly preserves raw
 
 **The route plot stays fully distance-based. The elevation profile keeps distance on the x-axis but drives marker position, label value, and completed-profile construction from elapsed time instead of distance progress.**
 
-| Component | Decision | Rationale |
-|-----------|----------|-----------|
-| Route plot x-axis | Keep distance-based | Marker must not drift during stops; drone hover at same GPS is correct behavior |
-| Elevation x-axis | Keep distance-based | Same reason — cycling compatibility; marker_x stays put during hover |
-| Elevation y-axis | Altitude, as before | No change |
-| Duplicate x values | **Preserve** when elevation span is meaningful | These represent vertical flight segments |
-| Marker position x | From `distanceProgressAtTime` (unchanged) | Stays stable during hover |
-| Marker position y | From `elevationAtTime` projected into widget y-scale | Correctly tracks altitude change during hover |
-| Completed profile | Build by chronological sample order, not `progress ≤` | Allows partial fill of vertical segments as time advances |
-| Elevation label value | Already correct in Rust | No change needed |
+| Component             | Decision                                              | Rationale                                                                       |
+| --------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Route plot x-axis     | Keep distance-based                                   | Marker must not drift during stops; drone hover at same GPS is correct behavior |
+| Elevation x-axis      | Keep distance-based                                   | Same reason — cycling compatibility; marker_x stays put during hover            |
+| Elevation y-axis      | Altitude, as before                                   | No change                                                                       |
+| Duplicate x values    | **Preserve** when elevation span is meaningful        | These represent vertical flight segments                                        |
+| Marker position x     | From `distanceProgressAtTime` (unchanged)             | Stays stable during hover                                                       |
+| Marker position y     | From `elevationAtTime` projected into widget y-scale  | Correctly tracks altitude change during hover                                   |
+| Completed profile     | Build by chronological sample order, not `progress ≤` | Allows partial fill of vertical segments as time advances                       |
+| Elevation label value | Already correct in Rust                               | No change needed                                                                |
 
 ### Why not time-based x-axis?
 
@@ -59,16 +61,17 @@ Not all duplicate-progress runs should be preserved. Cycling barometric noise du
 
 **Threshold**: `0.5m` elevation span across a consecutive duplicate-progress run.
 
-| Scenario | Elevation span | Action | Rationale |
-|----------|---------------|--------|-----------|
-| Drone hover-climb (DJI-sample2) | 22m | **Keep all points** | Real vertical flight segment |
-| Drone hover-climb (DJI-sample1) | 4.4m | **Keep all points** | Real vertical flight segment |
-| Cycling red-light stop (barometric noise) | <0.3m | **Collapse to single median** | Just noise; single point suffices |
-| Mountain bike stopped on steep slope (GPS drift + pressure change) | >1m | **Keep all points** | Real altitude change, correctly shown |
+| Scenario                                                           | Elevation span | Action                        | Rationale                             |
+| ------------------------------------------------------------------ | -------------- | ----------------------------- | ------------------------------------- |
+| Drone hover-climb (DJI-sample2)                                    | 22m            | **Keep all points**           | Real vertical flight segment          |
+| Drone hover-climb (DJI-sample1)                                    | 4.4m           | **Keep all points**           | Real vertical flight segment          |
+| Cycling red-light stop (barometric noise)                          | <0.3m          | **Collapse to single median** | Just noise; single point suffices     |
+| Mountain bike stopped on steep slope (GPS drift + pressure change) | >1m            | **Keep all points**           | Real altitude change, correctly shown |
 
 **Implementation strategy**: The preserve decision must happen **before** candidate selection, not after. Even-spacing alone can produce 0–1 candidates from a short but meaningful hover-climb (e.g., a 3-second plateau in a 300-second activity at low target density), so a post-pass would never see the run.
 
 Two-step approach in `downsample_elevation_points()`:
+
 1. **Pre-scan** the smoothed points to identify consecutive runs sharing the same `progress01` (within `f32::EPSILON`). For each run where `max_elevation - min_elevation ≥ 0.5m`:
    - Mark **every point** in the run with `preserve = true` in the `ReducedElevationPoint` array.
    - Also mark the first and last points of the smoothed input as `preserve` (endpoints, existing behavior).
@@ -118,17 +121,20 @@ This guarantees that (a) meaningful vertical runs always contribute at least the
 **E) Unit tests**
 
 New file `src/render/widgets/tests/elevation_reduction_tests.rs`:
+
 - `downsample_preserves_meaningful_vertical_run` — 10 consecutive same-progress samples spanning 5m, multiple points survive.
 - `downsample_collapses_noise_vertical_run` — 10 consecutive same-progress samples spanning 0.1m, output is a single point.
 - `downsample_mixed_runs` — alternating forward progress + vertical runs, correct points in each.
 
 New file `src/render/widgets/tests/elevation_frame_state_tests.rs`:
+
 - `marker_y_follows_elevation_during_hover` — vertical segment geometry, frame states show changing marker_y.
 - `completed_points_fills_vertical_segment_chronologically` — mid-hover frame, completed points include partial vertical segment.
 
 Wire new modules in `tests/mod.rs`. Verify `cargo test` passes.
 
 **Acceptance criteria:**
+
 - [ ] DJI-sample2 geometry: multiple distinct y-values at x ≈ 0 after simplification.
 - [ ] DJI-sample2 frame states: `marker_y` changes during first 17s while `marker_x` stays constant.
 - [ ] DJI-sample2 completed profile: at mid-hover, area fills partially up the vertical segment.
@@ -145,22 +151,26 @@ Since Rust is the single source of truth for geometry, the JS changes are minima
 **Files to modify:**
 
 `useElevationPreviewGeometry.js`:
+
 - The hook already calls `buildElevationGeometry()` via IPC and receives the Rust response.
 - After Phase 1, the Rust response will include `elapsedFractions` and `dataRange` fields.
 - Update the hook to use `elapsedFractions` instead of `progressValues` for completed profile construction.
 - Update `buildElevationCompletedPoints()` call to pass `elapsedFractions` and `frameElapsedFraction`.
-- The marker-y computation and elevation label already use elapsed-time interpolation in Rust — no change needed.
+- The marker-y computation and elevation label already use elapsed-time interpolation in Rust — verify what needs to be changed on frontend.
 
 `svgPreviewUtils.js` — `buildElevationCompletedPoints()`:
+
 - Change signature: accept `elapsedFractions` + `frameElapsedFraction` instead of `progressValues` + `progress01`.
 - Filter by `elapsedFractions[i] ≤ frameElapsedFraction`.
 
 **No changes needed to:**
+
 - `elevationGeometry.js` — this file should be deleted (geometry is now in Rust).
 - `exportRange.js` — `buildScopedElevationSeries()` is no longer used by the geometry hook.
 - Any geometry computation code — all in Rust now.
 
 **Acceptance criteria:**
+
 - [ ] DJI-sample2 preview: marker y changes during first 17s, marker x stays constant.
 - [ ] DJI-sample2 preview: completed area fills upward chronologically during hover.
 - [ ] Elevation label shows changing altitude during hover.
@@ -194,13 +204,13 @@ Manual verification with real sample data:
 
 ## Regression Risks
 
-| Risk | Likelihood | Mitigation |
-|------|-----------|------------|
-| Barometric noise during cycling stops creates visible vertical scribbles | Low | 0.5m threshold collapses noise; only spans ≥0.5m produce vertical segments |
-| `elevation_data_range` mismatch between geometry projection and marker projection | Low | Use exact same projection formula (`project_single_elevation_y`) in both places; add test |
-| `elapsed_fraction` mismatch between geometry and frame state | Low | Both are normalized against the exact same scoped/source duration. Geometry stores or exposes that duration; frame state reuses it instead of `dense_activity.frame_elapsed_seconds.last()`. |
-| Route widget accidentally picks up elapsed-fraction logic | Very low | Route widget has its own `progress_values` and `frame_state.rs`; no shared code changes |
-| Custom export ranges break because trim operates on elapsed but geometry was built from full activity | Medium | `show_full_activity` and `custom_export_range_active()` already handle this split; the elapsed_fraction is computed on the trimmed source (not full activity) when trimming is active. Verify in Phase 3. |
+| Risk                                                                                                  | Likelihood | Mitigation                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Barometric noise during cycling stops creates visible vertical scribbles                              | Low        | 0.5m threshold collapses noise; only spans ≥0.5m produce vertical segments                                                                                                                                |
+| `elevation_data_range` mismatch between geometry projection and marker projection                     | Low        | Use exact same projection formula (`project_single_elevation_y`) in both places; add test                                                                                                                 |
+| `elapsed_fraction` mismatch between geometry and frame state                                          | Low        | Both are normalized against the exact same scoped/source duration. Geometry stores or exposes that duration; frame state reuses it instead of `dense_activity.frame_elapsed_seconds.last()`.              |
+| Route widget accidentally picks up elapsed-fraction logic                                             | Very low   | Route widget has its own `progress_values` and `frame_state.rs`; no shared code changes                                                                                                                   |
+| Custom export ranges break because trim operates on elapsed but geometry was built from full activity | Medium     | `show_full_activity` and `custom_export_range_active()` already handle this split; the elapsed_fraction is computed on the trimmed source (not full activity) when trimming is active. Verify in Phase 3. |
 
 ## Non-Goals
 

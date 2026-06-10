@@ -53,6 +53,7 @@ pub(crate) fn prepare_elevation_cache(
             activity,
             dense_activity,
             &geometry,
+            &plot,
             show_full_activity,
         )
     });
@@ -122,7 +123,7 @@ fn build_elevation_remaining_layer(
 /// applied in screen space to remove visually redundant points.
 pub(crate) fn build_elevation_geometry(
     plot: &NormalizedElevationPlot,
-    raw_points: &[(f32, f64)],
+    raw_points: &[(f32, f64, f32)],
 ) -> CoreResult<WidgetGeometry> {
     use super::super::common::DEFAULT_ELEVATION_DOWNSAMPLE_MULTIPLIER;
 
@@ -150,14 +151,26 @@ pub(crate) fn build_elevation_geometry(
         .map(|(sample, point)| super::reduction::ElevationSample {
             point: *point,
             progress01: sample.progress01,
+            elapsed_fraction: sample.elapsed_fraction,
             preserve: sample.preserve,
         })
         .collect::<Vec<_>>();
     let simplified = simplify_elevation_samples(&projected_samples, plot.simplify_tolerance_px);
 
+    let min_elevation = raw_points
+        .iter()
+        .map(|(_, elev, _)| *elev)
+        .fold(f64::INFINITY, f64::min);
+    let max_elevation = raw_points
+        .iter()
+        .map(|(_, elev, _)| *elev)
+        .fold(f64::NEG_INFINITY, f64::max);
+
     Ok(WidgetGeometry {
         bbox: (0.0, 0.0, plot.width as f32, plot.height as f32),
         progress_values: simplified.iter().map(|sample| sample.progress01).collect(),
+        elapsed_fractions: simplified.iter().map(|sample| sample.elapsed_fraction).collect(),
+        elevation_data_range: Some((min_elevation, max_elevation)),
         points: simplified.iter().map(|sample| sample.point).collect(),
         source_point_count: raw_points.len(),
         simplification: format!(
@@ -167,8 +180,14 @@ pub(crate) fn build_elevation_geometry(
     })
 }
 
-/// Extracts finite elevation samples paired with normalized distance progress.
-fn raw_elevation_points(source: &[Option<f64>], progress: &[f64]) -> Vec<(f32, f64)> {
+/// Extracts finite elevation samples paired with normalized distance progress
+/// and elapsed-time fraction (0..1).
+fn raw_elevation_points(
+    source: &[Option<f64>],
+    progress: &[f64],
+    elapsed_seconds: &[f64],
+) -> Vec<(f32, f64, f32)> {
+    let source_duration = elapsed_seconds.last().copied().unwrap_or(1.0).max(1e-9);
     source
         .iter()
         .enumerate()
@@ -178,8 +197,16 @@ fn raw_elevation_points(source: &[Option<f64>], progress: &[f64]) -> Vec<(f32, f
                 .get(index)
                 .copied()
                 .unwrap_or_else(|| index as f64 / source.len().saturating_sub(1).max(1) as f64);
+            let elapsed = elapsed_seconds
+                .get(index)
+                .copied()
+                .unwrap_or_else(|| index as f64);
             if value.is_finite() && progress_value.is_finite() {
-                Some((progress_value.clamp(0.0, 1.0) as f32, value))
+                Some((
+                    progress_value.clamp(0.0, 1.0) as f32,
+                    value,
+                    (elapsed / source_duration).clamp(0.0, 1.0) as f32,
+                ))
             } else {
                 None
             }
@@ -192,7 +219,8 @@ fn raw_elevation_points(source: &[Option<f64>], progress: &[f64]) -> Vec<(f32, f
 fn raw_elevation_points_with_optional_progress(
     source: &[Option<f64>],
     progress_values: &[Option<f64>],
-) -> Vec<(f32, f64)> {
+    elapsed_seconds: &[f64],
+) -> Vec<(f32, f64, f32)> {
     let normalized_progress =
         normalize_optional_progress_window(progress_values).unwrap_or_else(|| {
             (0..source.len())
@@ -206,7 +234,7 @@ fn raw_elevation_points_with_optional_progress(
                 .collect::<Vec<_>>()
         });
 
-    raw_elevation_points(source, &normalized_progress)
+    raw_elevation_points(source, &normalized_progress, elapsed_seconds)
 }
 
 /// Selects full-activity or trimmed source elevation samples for geometry.
@@ -217,7 +245,7 @@ pub(crate) fn build_elevation_source_points(
     activity: &ParsedActivity,
     show_full_activity: bool,
     scene: &crate::normalize::ValidatedSceneConfig,
-) -> CoreResult<Vec<(f32, f64)>> {
+) -> CoreResult<Vec<(f32, f64, f32)>> {
     if show_full_activity || !custom_export_range_active(scene) {
         let source = if activity.sample_elevations.is_empty() {
             &activity.elevation
@@ -227,6 +255,7 @@ pub(crate) fn build_elevation_source_points(
         return Ok(raw_elevation_points(
             source,
             &activity.sample_distance_progress,
+            &activity.sample_elapsed_seconds,
         ));
     }
 
@@ -244,5 +273,6 @@ pub(crate) fn build_elevation_source_points(
     Ok(raw_elevation_points_with_optional_progress(
         &trimmed.elevation,
         &trimmed.sample_distance_progress,
+        &trimmed.sample_elapsed_seconds,
     ))
 }

@@ -42,8 +42,8 @@ pub(crate) fn draw_elevation_widget(
     };
     let completed_points = build_elevation_completed_points(
         &elevation_cache.geometry.points,
-        &elevation_cache.geometry.progress_values,
-        state.progress01,
+        &elevation_cache.geometry.elapsed_fractions,
+        state.frame_elapsed_fraction,
         (state.marker_x, state.marker_y),
     );
     let baseline_y = elevation_cache.plot.height as f32;

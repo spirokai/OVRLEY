@@ -123,6 +123,8 @@ pub(crate) fn build_route_geometry(
     Ok(WidgetGeometry {
         bbox: (0.0, 0.0, plot.width as f32, plot.height as f32),
         progress_values: simplified.iter().map(|sample| sample.progress01).collect(),
+        elapsed_fractions: Vec::new(),
+        elevation_data_range: None,
         points: scaled_points,
         source_point_count: route_samples.len(),
         simplification: format!(

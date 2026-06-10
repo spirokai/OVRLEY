@@ -20,4 +20,11 @@ mod reduction;
 
 pub(crate) use draw::draw_elevation_widget;
 pub(crate) use prepare::prepare_elevation_cache;
+#[cfg(test)]
+pub(crate) use reduction::{
+    downsample_elevation_points, simplify_elevation_samples, simplify_elevation_samples_segment,
+    ElevationSample,
+};
+#[cfg(test)]
+pub(crate) use frame_state::{build_elevation_completed_points, build_elevation_frame_states};
 
