@@ -265,3 +265,18 @@ pub(crate) async fn backend_build_elevation_geometry(
         &parsed_activity_json,
     ))
 }
+
+/// Builds route widget geometry from config and activity data.
+///
+/// Returns simplified, projected geometry points for the route preview
+/// without rendering a Skia surface.
+#[tauri::command]
+pub(crate) async fn backend_build_route_geometry(
+    config_json: String,
+    parsed_activity_json: String,
+) -> Result<String, String> {
+    call_and_serialize(commands::route_geometry::build_route_geometry_command(
+        &config_json,
+        &parsed_activity_json,
+    ))
+}

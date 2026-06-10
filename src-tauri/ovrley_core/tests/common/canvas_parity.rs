@@ -334,6 +334,14 @@ pub fn write_mock_data(
         }
     }
 
+    // 5. route-geometry.json — pre-computed Rust route geometry for parity test
+    if let Some(assets) = prepared {
+        if let Some(geom) = assets.route_geometry_json() {
+            write_json(&mock_dir.join("route-geometry.json"), &geom)?;
+            println!("  wrote route-geometry.json");
+        }
+    }
+
     Ok(())
 }
 

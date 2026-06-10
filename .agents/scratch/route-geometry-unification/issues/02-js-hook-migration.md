@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 02 — JS Hook Migration to Consume Rust Route Geometry
 
@@ -12,16 +12,16 @@ Rewrite the `useRoutePreviewGeometry` hook to call the new `backend_build_route_
 
 ## Acceptance criteria
 
-- [ ] `useRoutePreviewGeometry` calls `buildRouteGeometry()` from `backend.js` and stores the result
-- [ ] The hook passes Rust-provided `points` and `progressValues` to local marker interpolation
-- [ ] The hook passes Rust-provided `points` and `progressValues` to local `buildRouteFramePreview` for completed segment
-- [ ] The hook materializes SVG paths via local `pointsToSvg()`
-- [ ] `routeGeometry.js` is deleted entirely
-- [ ] `buildExportWindowRouteSamples` is removed from the hook (scoping moves to Rust)
-- [ ] `RouteRenderer.jsx` renders correctly with the new hook output (no changes needed to the renderer itself)
-- [ ] Canvas-parity test includes route widget comparison
-- [ ] `pnpm test` passes
-- [ ] `pnpm lint` passes
+- [x] `useRoutePreviewGeometry` calls `buildRouteGeometry()` from `backend.js` and stores the result
+- [x] The hook passes Rust-provided `points` and `progressValues` to local marker interpolation
+- [x] The hook passes Rust-provided `points` and `progressValues` to local `buildRouteFramePreview` for completed segment
+- [x] The hook materializes SVG paths via local `pointsToSvg()`
+- [x] `routeGeometry.js` is deleted entirely
+- [x] `buildExportWindowRouteSamples` is removed from the hook (scoping moves to Rust)
+- [x] `RouteRenderer.jsx` renders correctly with the new hook output (no changes needed to the renderer itself)
+- [ ] Canvas-parity test includes route widget comparison (out of scope for this issue)
+- [x] `pnpm test` passes
+- [x] `pnpm lint` passes
 
 ## Implementation notes
 

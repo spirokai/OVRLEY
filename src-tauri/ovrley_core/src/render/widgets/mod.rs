@@ -20,7 +20,7 @@ pub mod metric_presentation;
 /// Polyline and area drawing helpers.
 mod polyline;
 /// Route/course widget implementation.
-mod route;
+pub(crate) mod route;
 /// Skia path and coordinate transform helpers.
 mod transform;
 /// Shared widget cache and report types.

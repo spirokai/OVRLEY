@@ -135,6 +135,23 @@ impl PreparedRenderAssets {
             "simplification": geom.simplification,
         }))
     }
+
+    /// Returns the route geometry as a JSON value for parity tests.
+    ///
+    /// The JSON shape matches `RouteGeometryResponse` — points as
+    /// `[[x,y], ...]` arrays and progressValues as a flat `f32` array.
+    /// Returns `None` when no route widget is configured.
+    pub fn route_geometry_json(&self) -> Option<serde_json::Value> {
+        let cache = self.route_cache.as_ref()?;
+        let geom = &cache.geometry;
+        Some(serde_json::json!({
+            "points": geom.points.iter().map(|(x, y)| [x, y]).collect::<Vec<_>>(),
+            "progressValues": geom.progress_values,
+            "bbox": [geom.bbox.0, geom.bbox.1, geom.bbox.2, geom.bbox.3],
+            "sourcePointCount": geom.source_point_count,
+            "simplification": geom.simplification,
+        }))
+    }
 }
 
 /// Widget-local polyline geometry and progress mapping.

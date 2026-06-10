@@ -14,13 +14,15 @@ import { getPreviewMarkerLayers, normalizePreviewOpacity } from '../utils/svgPre
  * 3. Derive marker styling and inset radius for route normalization.
  *
  * @param {object} data - Effective route widget data.
-  @returns {object} Style model consumed by the route preview renderer.
+ * @param {number} globalScale - Scene/global scale applied to the preview.
+ * @returns {object} Style model consumed by the route preview renderer.
  */
-export function useRoutePreviewStyle(data) {
+export function useRoutePreviewStyle(data, globalScale) {
   return useMemo(() => {
     // Viewport and scale: ensure valid raster bounds.
     const width = Math.max(data.width, 80)
     const height = Math.max(data.height, 80)
+    const safeGlobalScale = Math.max(Number(globalScale) || 1, 0.1)
 
     // Stroke widths: shared by geometry inset calculations and SVG rendering.
     const remainingLineWidth = Number(data.remaining_line_width)
@@ -36,6 +38,7 @@ export function useRoutePreviewStyle(data) {
     return {
       width,
       height,
+      safeGlobalScale,
       remainingLineWidth,
       completedLineWidth,
       remainingLineColor: data.remaining_line_color,
@@ -45,5 +48,5 @@ export function useRoutePreviewStyle(data) {
       routeMarkerInsetRadius,
       markerLayers: getPreviewMarkerLayers(data, markerSize, markerColor, markerOpacity),
     }
-  }, [data])
+  }, [data, globalScale])
 }

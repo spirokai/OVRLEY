@@ -14,8 +14,8 @@
 
 mod draw;
 mod frame_state;
-mod normalize;
-mod prepare;
+pub(crate) mod normalize;
+pub(crate) mod prepare;
 mod simplify;
 
 pub(crate) use draw::draw_route_widget;

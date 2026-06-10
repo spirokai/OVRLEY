@@ -92,7 +92,10 @@ cyclemetry/
 │   │       │   ├── schema.rs      #     ParsedActivity, DenseActivityReport
 │   │       │   ├── trim.rs        #     Scene-window trimming
 │   │       │   └── interpolate.rs #     Frame-rate densification
-│   │       ├── commands/mod.rs    #   Backend command implementations
+│   │       ├── commands/         #   Backend command implementations
+│   │       │   ├── mod.rs        #     Module organization + shared helpers
+│   │       │   ├── elevation_geometry.rs  # Elevation geometry IPC command
+│   │       │   └── route_geometry.rs      # Route geometry IPC command
 │   │       ├── normalize/         #   Config validation seam
 │   │       │   ├── mod.rs         #     validate_render_config, ValidatedRenderConfig
 │   │       │   ├── raw/           #     Raw types + parsing (private)
@@ -292,7 +295,7 @@ OVRLEY follows a **two-process desktop architecture** via Tauri v2:
 
 1. **Skia for rendering, not HTML Canvas:** Overlays are rendered in Rust using Skia, mirroring what will be in the final video. The frontend's `WidgetPreview` components render SVG approximations for preview only.
 2. **No TypeScript:** The frontend is plain JSX. Type documentation is via JSDoc.
-3. **Widget rendering is duplicated:** The JSX SVG preview renderers (in `features/widget-preview/components/`) approximately match the Rust Skia renderers (`render/widgets/*.rs`). Minor discrepancies exist — the Rust output is authoritative.
+3. **Geometry is computed in Rust:** Widget geometry (route Mercator projection + LTTB downsampling + RDP simplification, elevation smoothing + downsampling + simplification) is computed once in Rust via IPC commands (`backend_build_route_geometry`, `backend_build_elevation_geometry`). The JS hooks consume pre-built geometry for 30fps preview rendering with zero IPC latency. Per-frame operations (marker interpolation, completed segment splitting, SVG path materialization) remain local in JS.
 4. **Cached static layers:** Labels and static widget backgrounds are rendered once and cached as Skia images. Only dynamic metric values + marker positions are redrawn per frame.
 5. **Composite video timing is tricky:** Overlay FPS = source video FPS / update_rate. Timing mapping goes: overlay_frame -> video_local_time -> activity_time -> dense_frame_index.
 6. **Normalization seam — zero backend defaults:** All raw config types (`SceneConfig`, `ValueConfig`, etc.) and parsing functions live in `normalize::raw` (a **private** submodule). No code outside `normalize/` can access raw types. The only public entry point is `validate_render_config()`, which converts raw types into validated types. The backend owns **zero** render-affecting defaults — missing fields are rejected, not filled in. The frontend must materialise every value before sending.
@@ -382,16 +385,31 @@ Widgets are stored in the `config` object as arrays: `config.labels[]`, `config.
 
 **10 widget types** and their preview renderers (`features/widget-preview/components/`):
 
-| Widget Type                      | Renderer                | Editor                       |
-| -------------------------------- | ----------------------- | ---------------------------- |
-| text                             | `TextRenderer`          | `TextWidgetEditor`           |
-| speed, heartrate, power, cadence | `MetricRenderer`        | `MetricWidgetEditor`         |
-| time                             | `MetricRenderer`        | `TimeWidgetEditor`           |
-| temperature                      | `MetricRenderer`        | `TemperatureWidgetEditor`    |
-| gradient                         | `MetricRenderer` (triangle) | `GradientWidgetEditor`   |
-| heading                          | `HeadingRenderer`       | `HeadingWidgetEditor`        |
-| route_map                        | `RouteRenderer`         | `RouteMapWidgetEditor`       |
-| elevation                        | `ElevationRenderer`     | `ElevationWidgetEditor`      |
+| Widget Type                      | Renderer                | Editor                       | Geometry Source |
+| -------------------------------- | ----------------------- | ---------------------------- | --------------- |
+| text                             | `TextRenderer`          | `TextWidgetEditor`           | N/A             |
+| speed, heartrate, power, cadence | `MetricRenderer`        | `MetricWidgetEditor`         | N/A             |
+| time                             | `MetricRenderer`        | `TimeWidgetEditor`           | N/A             |
+| temperature                      | `MetricRenderer`        | `TemperatureWidgetEditor`    | N/A             |
+| gradient                         | `MetricRenderer` (triangle) | `GradientWidgetEditor`   | N/A             |
+| heading                          | `HeadingRenderer`       | `HeadingWidgetEditor`        | N/A             |
+| route_map                        | `RouteRenderer`         | `RouteMapWidgetEditor`       | Rust IPC        |
+| elevation                        | `ElevationRenderer`     | `ElevationWidgetEditor`      | Rust IPC        |
+
+**Geometry IPC pattern** (route and elevation widgets):
+
+The route and elevation widgets compute their geometry in Rust and expose it via IPC commands. The JS hooks consume this geometry for 30fps preview rendering:
+
+```
+User moves slider / preview second changes
+  → JS hook calls buildRouteGeometry() / buildElevationGeometry() via IPC
+  → Rust runs geometry pipeline (fast — hundreds of points)
+  → Rust returns { points, progressValues, bbox, sourcePointCount, simplification }
+  → JS hook stores geometry in state
+  → JS renders preview at 30fps using local interpolation (zero latency)
+```
+
+Per-frame operations (marker interpolation, completed segment splitting, SVG path materialization) remain local in JS for performance. The geometry is computed once when parameters change, not per-frame.
 
 ### 5.5 Activity Parsing Pipeline
 
@@ -454,7 +472,7 @@ useVideoPreview.js
 
 ## 6. Backend Architecture
 
-### 6.1 Tauri IPC Commands (19 total)
+### 6.1 Tauri IPC Commands (21 total)
 
 All defined in `lib.rs` and implemented in `ovrley_core/src/commands/mod.rs`:
 
@@ -476,6 +494,8 @@ All defined in `lib.rs` and implemented in `ovrley_core/src/commands/mod.rs`:
 | `backend_clear_preview_video`  | Clear preview registration                    |
 | `backend_get_video_state`      | Diagnostic server state                       |
 | `backend_detect_codecs`        | Probe encoder availability                    |
+| `backend_build_elevation_geometry` | Build elevation widget geometry via IPC   |
+| `backend_build_route_geometry` | Build route widget geometry via IPC           |
 | `default_template_save_path`   | User template path                            |
 | `write_template_file`          | Write template JSON to disk (validated)       |
 | `write_parse_debug_file`       | Write debug file                              |
@@ -530,6 +550,23 @@ Shared pipeline:
     ├── 9. Monitor FFmpeg progress (parse stderr for frame=)
     ├── 10. Wait for FFmpeg to finish
     └── 11. Validate output, write timing/debug summaries
+
+Geometry IPC Commands (used by frontend preview):
+    ├── backend_build_elevation_geometry
+    │   └── commands::elevation_geometry::build_elevation_geometry_command
+    │       ├── Parse config + activity JSON
+    │       ├── Build elevation source points (trim + project)
+    │       ├── Normalize elevation plot (scale dimensions)
+    │       ├── Build elevation geometry (smooth → downsample → simplify)
+    │       └── Return { points, progressValues, bbox, sourcePointCount, simplification }
+    │
+    └── backend_build_route_geometry
+        └── commands::route_geometry::build_route_geometry_command
+            ├── Parse config + activity JSON
+            ├── Build route samples (trim + Mercator projection)
+            ├── Normalize route plot (scale dimensions)
+            ├── Build route geometry (fit → downsample LTTB → simplify RDP)
+            └── Return { points, progressValues, bbox, sourcePointCount, simplification }
 ```
 
 ### 6.3 FFmpeg Integration
@@ -613,6 +650,7 @@ The Rust backend receives already-parsed activity JSON from the frontend (the JS
 4. `frame_state.rs`: Per-frame state: completion fraction, marker position
 5. `draw.rs`: Per frame: draw remaining route → completed route prefix → marker circle (`marker.rs`)
 6. `geometry.rs`: Interior segment geometry for completed path clipping
+7. `commands/route_geometry.rs`: IPC command `backend_build_route_geometry` exposes the geometry pipeline to the frontend
 
 **Elevation profile** (`render/widgets/elevation/`):
 
@@ -621,6 +659,7 @@ The Rust backend receives already-parsed activity JSON from the frontend (the JS
 3. `reduction.rs`: Simplify RDP with preserved min/max elevation points (visibility-critical)
 4. `frame_state.rs`: Per-frame state: completed/remaining cut point, marker position
 5. `draw.rs`: Per frame: draw remaining area+line → completed area fill → completed line → marker → metric/imperial labels
+6. `commands/elevation_geometry.rs`: IPC command `backend_build_elevation_geometry` exposes the geometry pipeline to the frontend
 
 **Metric values** (`render/widgets/value/`):
 
@@ -862,9 +901,10 @@ Templates are JSON files following the `ovrley-template` format (v2):
 
 ## 11. Known Architectural Notes
 
-1. **Widget rendering is duplicated** — JSX SVG preview (in `features/widget-preview/components/`) vs. Rust Skia render. Expect minor visual discrepancies. Rust output is authoritative.
-2. **Composite timing is the most complex part** — involves mapping between 3 time domains: video time, activity time, and overlay frame index.
-3. **QTRLE parallel render** — only activates for >= 2 second integer-second durations, uses `logical_cores / 4` workers.
-4. **Frontend testing** — 50 Vitest test suites (320 tests) in `app/src/tests/`. Rust has widget unit tests in `ovrley_core/src/render/widgets/tests/`, video server tests in `src-tauri/src/video_server_tests.rs`, and integration tests in `ovrley_core/tests/`. CLI benchmark binaries live in `ovrley_core/src/bin/` (`cargo run -p ovrley_core --bin <name>`).
-5. **Browser fallback** — the frontend has a fallback path for running outside Tauri (browser dev mode), using local file APIs instead of Tauri IPC.
-6. **CSS zoom** — the editor shell supports zoom via `--app-scale` CSS variable (0.35x–4x).
+1. **Geometry is computed in Rust** — Route and elevation widget geometry (Mercator projection, LTTB downsampling, RDP simplification, Savitzky-Golay smoothing) is computed once in Rust via IPC commands (`backend_build_route_geometry`, `backend_build_elevation_geometry`). The JS hooks consume pre-built geometry for 30fps preview rendering. Per-frame operations (marker interpolation, completed segment splitting, SVG path materialization) remain local in JS. This eliminates the duplicated JS geometry pipelines (`routeGeometry.js`, `elevationGeometry.js`) and ensures WYSIWYG parity between preview and final render.
+2. **Canvas-parity testing** — The Rust `PreparedPreviewAssets` exposes `elevation_geometry_json()` and `route_geometry_json()` methods that serialize geometry for Playwright tests. The test script injects `window.__OVRLEY_MOCK_ELEVATION_GEOMETRY` and `window.__OVRLEY_MOCK_ROUTE_GEOMETRY` so the frontend uses identical geometry to Skia rendering.
+3. **Composite timing is the most complex part** — involves mapping between 3 time domains: video time, activity time, and overlay frame index.
+4. **QTRLE parallel render** — only activates for >= 2 second integer-second durations, uses `logical_cores / 4` workers.
+5. **Frontend testing** — 50 Vitest test suites (320 tests) in `app/src/tests/`. Rust has widget unit tests in `ovrley_core/src/render/widgets/tests/`, video server tests in `src-tauri/src/video_server_tests.rs`, and integration tests in `ovrley_core/tests/`. CLI benchmark binaries live in `ovrley_core/src/bin/` (`cargo run -p ovrley_core --bin <name>`).
+6. **Browser fallback** — the frontend has a fallback path for running outside Tauri (browser dev mode), using local file APIs instead of Tauri IPC.
+7. **CSS zoom** — the editor shell supports zoom via `--app-scale` CSS variable (0.35x–4x).

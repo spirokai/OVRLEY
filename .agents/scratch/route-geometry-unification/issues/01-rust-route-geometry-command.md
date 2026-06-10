@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 01 — Rust Route Geometry Command + IPC Contract
 
@@ -14,20 +14,20 @@ No JS changes happen in this slice — the existing JS pipeline continues to wor
 
 ## Acceptance criteria
 
-- [ ] `RouteGeometryResponse` struct exists with `#[derive(Serialize)]` and all PRD-specified fields (`points`, `progressValues`, `bbox`, `sourcePointCount`, `simplification`, `widgetWidth`, `widgetHeight`)
-- [ ] `points` serializes as `[[x,y], ...]` JSON arrays (not tuple objects)
-- [ ] `build_route_samples` in `prepare.rs` is `pub(crate)`
-- [ ] `build_route_geometry` in `prepare.rs` is `pub(crate)`
-- [ ] `normalize_route_plot` in `normalize.rs` is `pub(crate)`
-- [ ] New command module `ovrley_core/src/commands/route_geometry.rs` exists with `build_route_geometry_command` function
-- [ ] Command accepts geometry-specific request (route plot config, scene timing, activity JSON)
-- [ ] Command errors when no route plot in config
-- [ ] Command calls existing pipeline: `build_route_samples` → `build_route_geometry`
-- [ ] Command returns `RouteGeometryResponse` with correct field mapping
-- [ ] Tauri wrapper `backend_build_route_geometry` exists in `tauri_commands.rs`
-- [ ] Command registered in `lib.rs` `generate_handler![]`
-- [ ] JS API helper `buildRouteGeometry(config, parsedActivity)` exists in `app/src/api/backend.js`
-- [ ] `cargo test` passes with new module
+- [x] `RouteGeometryResponse` struct exists with `#[derive(Serialize)]` and all PRD-specified fields (`points`, `progressValues`, `bbox`, `sourcePointCount`, `simplification`, `widgetWidth`, `widgetHeight`)
+- [x] `points` serializes as `[[x,y], ...]` JSON arrays (not tuple objects)
+- [x] `build_route_samples` in `prepare.rs` is `pub(crate)`
+- [x] `build_route_geometry` in `prepare.rs` is `pub(crate)`
+- [x] `normalize_route_plot` in `normalize.rs` is `pub(crate)`
+- [x] New command module `ovrley_core/src/commands/route_geometry.rs` exists with `build_route_geometry_command` function
+- [x] Command accepts geometry-specific request (route plot config, scene timing, activity JSON)
+- [x] Command errors when no route plot in config
+- [x] Command calls existing pipeline: `build_route_samples` → `build_route_geometry`
+- [x] Command returns `RouteGeometryResponse` with correct field mapping
+- [x] Tauri wrapper `backend_build_route_geometry` exists in `tauri_commands.rs`
+- [x] Command registered in `lib.rs` `generate_handler![]`
+- [x] JS API helper `buildRouteGeometry(config, parsedActivity)` exists in `app/src/api/backend.js`
+- [x] `cargo test` passes with new module
 - [ ] `pnpm test` passes (new hook test mocking the IPC call)
 
 ## Implementation notes
