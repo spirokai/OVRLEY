@@ -34,7 +34,7 @@
 
 ## Project Summary
 
-The codebase utilizes a modern, dual-stack architecture to maximize both the user experience and computational performance:
+The codebase utilizes a dual-stack architecture to maximize both the user experience and computational performance:
 
 - **Frontend Interface**: A React application built with Vite (`app`), providing a seamless editing environment for overlay positioning, aesthetic customization, and metric synchronization.
 - **Core Engine**: A standalone Rust backend (`ovrley_core`) utilizing Skia for frame-perfect 2D graphics rendering and FFmpeg for high-speed video compositing.
@@ -42,7 +42,7 @@ The codebase utilizes a modern, dual-stack architecture to maximize both the use
 
 ## Export & Codecs
 
-OVRLEY supports both exporting transparent overlays as well as final footage with overlays baked in. It offers multiple export pipelines tailored to your hardware and workflow needs:
+OVRLEY supports both exporting transparent overlays as well as final footage with overlays baked in. It offers multiple export pipelines for different hardware and workflow needs:
 
 **Transparent Overlays**
 
