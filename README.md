@@ -11,7 +11,7 @@
 <br />
 
 <div align="center">
-  <h1><a href="www.ovrley.cc">OVRELY WEBSITE</a></h1>
+  <h1><a href="https://www.ovrley.cc">OVRLEY WEBSITE</a></h1>
   <br/>
   <br/>
   <p>OVRLEY turns .fit and .gpx activity data into customizable overlays for action-cam videos. It features an intuitive, WYSIWYG editor backed by a robust, hardware-accelerated native rendering engine.</p>
