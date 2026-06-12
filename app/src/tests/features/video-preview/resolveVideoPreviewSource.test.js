@@ -39,6 +39,22 @@ describe('videoPreviewSource helpers', () => {
     expect(convertFileSrc).toHaveBeenCalledWith('C:\\clips\\ride.mp4')
   })
 
+  test('falls back to a file source when the app is https but the preview URL is http', () => {
+    const convertFileSrc = vi.fn((path) => `converted:${path}`)
+
+    expect(
+      resolveVideoPreviewSource({
+        convertFileSrc,
+        importedVideoPath: 'C:\\clips\\ride.mp4',
+        importedVideoPreviewUrl: 'http://127.0.0.1:3210/video/abc',
+        windowProtocol: 'https:',
+        useLocalHttpPreview: true,
+      }),
+    ).toBe('converted:C:\\clips\\ride.mp4')
+
+    expect(convertFileSrc).toHaveBeenCalledWith('C:\\clips\\ride.mp4')
+  })
+
   test('flags preview playback outside the imported video window', () => {
     expect(
       isVideoPreviewOutOfRange({
