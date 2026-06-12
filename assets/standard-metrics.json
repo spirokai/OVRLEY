@@ -97,7 +97,7 @@
       }
     },
     "variantFrameKeys": ["width", "height", "rotation"],
-    "defaults": ["text", "linear", "bars", "arc", "corner"],
+    "defaults": ["text"],
     "overrides": {
       "heading": ["text"],
       "core_temperature": ["text"],
@@ -702,7 +702,7 @@
     {
       "type": "focal_length",
       "current": true,
-      "label": "Focal",
+      "label": "Focal L.",
       "defaultDisplayUnit": "mm",
       "supportedDisplayUnits": [
         {
