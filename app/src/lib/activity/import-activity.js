@@ -33,9 +33,14 @@ function sanitizeDebugFilename(filename) {
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
 async function persistDebugPayload(filename, payload) {
-  const debugFilename = sanitizeDebugFilename(filename)
-  const contents = JSON.stringify(payload, null, 2)
-  return backend.writeParseDebugFile(debugFilename, contents)
+  try {
+    const debugFilename = sanitizeDebugFilename(filename)
+    const contents = JSON.stringify(payload, null, 2)
+    return await backend.writeParseDebugFile(debugFilename, contents)
+  } catch (error) {
+    console.warn('Failed to write parse debug file (non-fatal):', error)
+    return null
+  }
 }
 
 /**
