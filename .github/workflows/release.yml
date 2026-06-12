@@ -57,22 +57,15 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Tauri app
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: pnpm tauri build --bundles ${{ matrix.bundles }}
 
       - name: Create Windows portable archive
         if: runner.os == 'Windows'
-        run: node scripts/package-portable.mjs
+        run: node scripts/package-portable.mjs --version ${{ inputs.tag }}
 
       - name: Create macOS portable archive
         if: runner.os == 'macOS'
-        run: node scripts/package-portable.mjs
+        run: node scripts/package-portable.mjs --version ${{ inputs.tag }}
 
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v2
