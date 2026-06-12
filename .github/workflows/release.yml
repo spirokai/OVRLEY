@@ -64,7 +64,7 @@ jobs:
 
       - name: Disable Tauri bundling
         if: matrix.bundles == ''
-        run: node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.bundle.targets='';fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2))"
+        run: node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.bundle.targets=[];fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2))"
 
       - name: Build Tauri app
         run: pnpm tauri build${{ matrix.bundles && format(' --bundles {0}', matrix.bundles) || '' }}
