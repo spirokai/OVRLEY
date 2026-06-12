@@ -131,10 +131,13 @@ const PORTABLE_EXCLUDED_TOP_LEVEL = new Set([
   'deps',
   'examples',
   'incremental',
+  'nsis',
+  'wix',
 ])
 
 const PORTABLE_PRUNE_FILE_PATTERNS = [
   /^\.cargo-lock$/i,
+  /^\.cargo-artifact/i,
   /\.d$/i,
   /\.exp$/i,
   /\.lib$/i,
