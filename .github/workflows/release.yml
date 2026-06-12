@@ -2,11 +2,6 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag to build, for example v1.0.0"
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -37,7 +32,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve release tag
+        id: release_tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="$(git tag --merged HEAD --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' | head -n 1)"
+          if [ -z "$TAG" ]; then
+            echo "No semantic-release tag found on the selected branch history." >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          git checkout "refs/tags/$TAG"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -61,16 +70,16 @@ jobs:
 
       - name: Create Windows portable archive
         if: runner.os == 'Windows'
-        run: node scripts/package-portable.mjs --version ${{ inputs.tag }}
+        run: node scripts/package-portable.mjs --version ${{ steps.release_tag.outputs.tag }}
 
       - name: Create macOS portable archive
         if: runner.os == 'macOS'
-        run: node scripts/package-portable.mjs --version ${{ inputs.tag }}
+        run: node scripts/package-portable.mjs --version ${{ steps.release_tag.outputs.tag }}
 
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
+          tag_name: ${{ steps.release_tag.outputs.tag }}
           files: ${{ matrix.artifact_glob }}
           fail_on_unmatched_files: true
         env:
