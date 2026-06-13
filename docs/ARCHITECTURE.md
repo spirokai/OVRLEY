@@ -818,7 +818,7 @@ pnpm install
 pnpm tauri build
     ├── Vite builds app/ → app/dist/
     ├── Cargo builds src-tauri/ (Rust compilation)
-    └── Tauri bundles: NSIS/MSI (Windows), DMG (macOS)
+    └── Tauri bundles: portable ZIP (Windows), app bundle (macOS)
         └── scripts/package-portable.mjs: creates standalone ZIP
             ├── OVRLEY binary
             ├── vendor/ffmpeg/

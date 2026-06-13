@@ -99,7 +99,7 @@
     "variantFrameKeys": ["width", "height", "rotation"],
     "defaults": ["text"],
     "overrides": {
-      "heading": ["text"],
+      "heading": ["text", "heading_tape"],
       "core_temperature": ["text"],
       "left_right_balance": ["text"],
       "time": ["text"]

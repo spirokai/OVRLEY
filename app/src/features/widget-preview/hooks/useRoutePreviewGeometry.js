@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { getDistanceProgressAtElapsed, getWindowProgressAtTime, resolveExportRangeWindow } from '@/features/overlay-editor'
 import { buildRouteGeometry, hasTauriRuntime } from '@/api/backend'
 import { pointsToSvg } from '@/lib/geometryUtils'
+import { buildPlaceholderRoutePreviewGeometry } from '../utils/placeholderPlotGeometry'
 import { buildRouteFramePreview } from '../utils/svgPreviewUtils'
 import useStore from '@/store/useStore'
 
@@ -29,6 +30,7 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
   const [rustGeometry, setRustGeometry] = useState(null)
   const config = useStore((state) => state.config)
   const globalDefaults = useStore((state) => state.globalDefaults)
+  const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
 
   const mockGeometry = typeof window !== 'undefined' ? window.__OVRLEY_MOCK_ROUTE_GEOMETRY : null
 
@@ -66,6 +68,15 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
       cancelled = true
     }
   }, [geometryConfig, activity, data])
+
+  if (!activity) {
+    return buildPlaceholderRoutePreviewGeometry({
+      width: style.width,
+      height: style.height,
+      previewSecond,
+      dummyDurationSeconds,
+    })
+  }
 
   const effectiveGeometry = mockGeometry ?? rustGeometry
   if (!effectiveGeometry || !activity) return null

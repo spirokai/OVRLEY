@@ -7,6 +7,7 @@ import {
 } from '@/features/overlay-editor'
 import { buildElevationGeometry, hasTauriRuntime } from '@/api/backend'
 import { areaToSvg, findPointAtProgress, pointsToSvg } from '@/lib/geometryUtils'
+import { buildPlaceholderElevationPreviewGeometry } from '../utils/placeholderPlotGeometry'
 import { buildElevationCompletedPoints } from '../utils/svgPreviewUtils'
 import useStore from '@/store/useStore'
 
@@ -60,6 +61,7 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
   const [rustGeometry, setRustGeometry] = useState(null)
   const config = useStore((state) => state.config)
   const globalDefaults = useStore((state) => state.globalDefaults)
+  const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
 
   const mockGeometry = typeof window !== 'undefined' ? window.__OVRLEY_MOCK_ELEVATION_GEOMETRY : null
   const exportWindow = useMemo(
@@ -101,6 +103,15 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
     }
   }, [geometryConfig, activity])
 
+  if (!activity) {
+    return buildPlaceholderElevationPreviewGeometry({
+      width: style.width,
+      height: style.height,
+      previewSecond,
+      dummyDurationSeconds,
+    })
+  }
+
   const effectiveGeometry = normalizeElevationGeometry(mockGeometry ?? rustGeometry)
   if (!effectiveGeometry || !activity) return null
 
@@ -115,9 +126,7 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
 
   // Completed profile fill is chronological, normalized to the same scoped duration
   // Rust used when building elapsedFractions.
-  const sourceDuration = exportWindow.active
-    ? exportWindow.end - exportWindow.start
-    : activity.sample_elapsed_seconds?.at(-1) || 1
+  const sourceDuration = exportWindow.active ? exportWindow.end - exportWindow.start : activity.sample_elapsed_seconds?.at(-1) || 1
   const elapsedWindowStart = exportWindow.active ? exportWindow.start : 0
   const frameElapsedFraction = Math.min(Math.max((previewSecond - elapsedWindowStart) / Math.max(sourceDuration, 1e-9), 0), 1)
 
