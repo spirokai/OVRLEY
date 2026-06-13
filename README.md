@@ -96,8 +96,6 @@ The Rust backend includes several extra test suites covering rendering correctne
 
 ## Building & Compatibility
 
-OVRLEY is optimized for desktop environments and is designed to be run as a standalone application.
-
 To compile a production release:
 
 ```bash
