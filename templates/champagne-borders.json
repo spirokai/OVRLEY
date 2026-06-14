@@ -1,0 +1,139 @@
+{
+  "format": "ovrley-template",
+  "version": 2,
+  "name": "champagne-borders",
+  "savedAt": "2026-06-14T14:24:58.202Z",
+  "config": {
+    "scene": {
+      "width": 3840,
+      "height": 2160,
+      "fps": 30,
+      "updateRate": 1
+    },
+    "labels": [
+      {
+        "x": 123,
+        "y": 1964,
+        "font": "Bebas Neue",
+        "font_size": 102,
+        "text": "WINTERTHUR, SWITZERLAND",
+        "color": "#fff7e6",
+        "opacity": 1,
+        "id": "widget-3"
+      }
+    ],
+    "values": [
+      {
+        "x": 3306,
+        "y": 92,
+        "prefix": "",
+        "suffix": "",
+        "decimals": 0,
+        "display_type": "text",
+        "unit_color": "#fff7e6",
+        "show_icon": true,
+        "icon_size": 89,
+        "icon_offset_x": 0,
+        "icon_offset_y": 0,
+        "icon_color": "#fff7e6",
+        "font": "Bebas Neue",
+        "font_size": 180,
+        "color": "#fff7e6",
+        "opacity": 1,
+        "show_units": true,
+        "display_unit": "w",
+        "id": "widget-1",
+        "value": "power"
+      },
+      {
+        "x": 3306,
+        "y": 314,
+        "prefix": "",
+        "suffix": "",
+        "decimals": 0,
+        "display_type": "text",
+        "unit_color": "#fff7e6",
+        "show_icon": true,
+        "icon_size": 78,
+        "icon_offset_x": 0,
+        "icon_offset_y": 0,
+        "icon_color": "#fff7e6",
+        "font": "Bebas Neue",
+        "font_size": 180,
+        "color": "#fff7e6",
+        "opacity": 1,
+        "show_units": true,
+        "display_unit": "kmh",
+        "id": "widget-2",
+        "value": "speed"
+      },
+      {
+        "x": 3306,
+        "y": 554,
+        "prefix": "",
+        "suffix": "",
+        "decimals": 0,
+        "display_type": "text",
+        "unit_color": "#fff7e6",
+        "show_icon": true,
+        "icon_size": 67,
+        "icon_offset_x": 0,
+        "icon_offset_y": 0,
+        "icon_color": "#fff7e6",
+        "font": "Bebas Neue",
+        "font_size": 180,
+        "color": "#fff7e6",
+        "opacity": 1,
+        "show_units": true,
+        "display_unit": "bpm",
+        "id": "widget-7",
+        "value": "heartrate"
+      }
+    ],
+    "plots": [
+      {
+        "value": "course",
+        "x": 97,
+        "y": 1818,
+        "rotation": 267.4,
+        "opacity": 1,
+        "completed_line_width": 10,
+        "remaining_line_width": 10,
+        "width": 1048,
+        "height": 824,
+        "completed_line_opacity": 100,
+        "remaining_line_opacity": 66,
+        "simplify_tolerance_px": 1,
+        "target_density": 1,
+        "show_full_activity": false,
+        "marker_variant": "halo",
+        "marker_variant_diameter": 78,
+        "marker_size": 17,
+        "marker_opacity": 100,
+        "completed_line_color": "#fff1d4",
+        "remaining_line_color": "#fff7e6",
+        "marker_color": "#f4f731",
+        "color": "#fff1d4",
+        "id": "widget-6"
+      }
+    ]
+  },
+  "settings": {
+    "globalDefaults": {
+      "border_color": "#260c06",
+      "border_thickness": 5,
+      "shadow_color": "#6e2716",
+      "shadow_strength": 2,
+      "shadow_distance": 2,
+      "font_values": "Bebas Neue",
+      "font_text": "Bebas Neue",
+      "color_values": "#fff7e6",
+      "color_text": "#fff7e6",
+      "color_icons": "#fff7e6",
+      "color_units": "#fff7e6",
+      "font_size": 30,
+      "opacity": 1,
+      "scale": 1
+    }
+  }
+}
