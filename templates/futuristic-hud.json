@@ -5,8 +5,8 @@
   "savedAt": "2026-06-01T13:23:10.194Z",
   "config": {
     "scene": {
-      "width": 1920,
-      "height": 1080,
+      "width": 3840,
+      "height": 2160,
       "fps": 30,
       "updateRate": 1
     },
