@@ -9,6 +9,8 @@
 pub(crate) mod common;
 /// Elevation profile widget implementation.
 pub(crate) mod elevation;
+/// Linear gauge metric widget implementation.
+pub mod linear_gauge;
 /// Point/rect/math and layout-fitting helpers.
 mod geometry;
 /// Heading compass tape widget implementation.
@@ -37,6 +39,7 @@ use crate::render::widgets::types::PreparedValue;
 use std::collections::BTreeMap;
 
 pub(crate) use elevation::draw_elevation_widget;
+pub use linear_gauge::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
 pub use metric_presentation::draw_metric_presentation;
 pub(crate) use route::draw_route_widget;
 pub use types::{
@@ -103,18 +106,33 @@ pub fn prepare_render_assets(
     }
 
     for (idx, value) in assets.values.iter().enumerate() {
-        let PreparedValue::HeadingTape(validated) = value else {
-            continue;
-        };
-        let cache = heading::prepare_heading_cache(
-            &assets.scene,
-            validated,
-            &paths.font_dirs,
-            prepare_profiler,
-        )?;
-        assets
-            .presentation_caches
-            .insert(idx, types::PresentationCache::HeadingTape(cache));
+        match value {
+            PreparedValue::HeadingTape(validated) => {
+                let cache = heading::prepare_heading_cache(
+                    &assets.scene,
+                    validated,
+                    &paths.font_dirs,
+                    prepare_profiler,
+                )?;
+                assets
+                    .presentation_caches
+                    .insert(idx, types::PresentationCache::HeadingTape(cache));
+            }
+            PreparedValue::LinearGauge(validated) => {
+                let cache = linear_gauge::prepare_linear_gauge_cache(
+                    validated,
+                    dense_activity,
+                    &assets.scene,
+                    assets.scene.scale,
+                    &paths.font_dirs,
+                    prepare_profiler,
+                )?;
+                assets
+                    .presentation_caches
+                    .insert(idx, types::PresentationCache::LinearGauge(cache));
+            }
+            _ => {}
+        }
     }
 
     Ok(assets)

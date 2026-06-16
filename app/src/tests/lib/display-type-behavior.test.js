@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { isTextDisplayType, isBoxedMetricWidget } from '@/lib/display-type-behavior'
+import { isTextDisplayType, isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
 
 describe('display-type-behavior', () => {
   test('isTextDisplayType', () => {

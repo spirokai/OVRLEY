@@ -115,9 +115,7 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
 
   // Completed profile fill is chronological, normalized to the same scoped duration
   // Rust used when building elapsedFractions.
-  const sourceDuration = exportWindow.active
-    ? exportWindow.end - exportWindow.start
-    : activity.sample_elapsed_seconds?.at(-1) || 1
+  const sourceDuration = exportWindow.active ? exportWindow.end - exportWindow.start : activity.sample_elapsed_seconds?.at(-1) || 1
   const elapsedWindowStart = exportWindow.active ? exportWindow.start : 0
   const frameElapsedFraction = Math.min(Math.max((previewSecond - elapsedWindowStart) / Math.max(sourceDuration, 1e-9), 0), 1)
 

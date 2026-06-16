@@ -5,7 +5,7 @@ import {
   STANDARD_METRIC_WIDGET_TYPES,
   DISPLAY_TYPE_DEFINITIONS,
   DISPLAY_TYPE_LABELS,
-} from '@/lib/standard-widgets'
+} from '@/lib/widget/standard-widgets'
 import {
   getStandardMetricDefinition,
   getStandardMetricInterpolation,
@@ -17,9 +17,9 @@ import {
   getDefaultFrameDimensions,
   getSupportedDisplayTypes,
   getDisplayTypeOptions,
-} from '@/lib/standard-metrics'
-import { isTextDisplayType, isBoxedMetricWidget } from '@/lib/display-type-behavior'
-import { TYPE_LABELS } from '@/lib/widget-icons'
+} from '@/lib/widget/standard-metrics'
+import { isTextDisplayType, isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
+import { TYPE_LABELS } from '@/lib/widget/widget-icons'
 
 describe('standard metric widget catalog', () => {
   test('covers the existing and Wave 1 shared standard metric widgets', () => {

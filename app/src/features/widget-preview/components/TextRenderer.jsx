@@ -12,7 +12,7 @@
  * @returns {JSX.Element} SVG element for text widget preview.
  */
 
-import { buildTextWidgetPreviewModel } from '../utils/textWidgetPreviewModel'
+import { buildTextWidgetPreviewModel } from '../utils/textWidgetPreviewUtils'
 import { getPreviewFontFamily } from '../utils/textMeasurement'
 import { getWidgetOpacity } from '../utils/textMeasurement'
 import { getTextShadowParts } from '../utils/shadowUtils'

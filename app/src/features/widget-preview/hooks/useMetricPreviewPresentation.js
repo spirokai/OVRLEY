@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { getInterpolatedActivityValue, GRADIENT_ZERO_LINE_WIDTH_PX, METRIC_ICON_SVGS } from '@/features/overlay-editor'
 import { buildGradientTrianglePath, formatGradientValue, getGradientWidgetLayout } from '../utils/formatUtils'
-import { buildMetricWidgetPreviewModel } from '../utils/metricWidgetPreviewModel'
+import { buildMetricWidgetPreviewModel } from '../utils/metricWidgetPreviewUtils'
 import { getPreviewFontFamily, getWidgetOpacity, measurePreviewText } from '../utils/textMeasurement'
 import { getTextShadowParts } from '../utils/shadowUtils'
 import { sanitizeSvgId } from '../utils/svgPreviewUtils'

@@ -75,7 +75,22 @@
         "label": "Linear",
         "layoutMode": "boxed",
         "defaultFrameWidth": 200,
-        "defaultFrameHeight": 60
+        "defaultFrameHeight": 60,
+        "defaults": {
+          "orientation": "horizontal",
+          "track_corner_radius": 6,
+          "track_border_thickness": 2,
+          "track_border_color": "#ffffff",
+          "track_empty_color": "#222222",
+          "track_empty_opacity": 0.5,
+          "track_filled_color": "#40e0d0",
+          "track_filled_opacity": 1,
+          "track_fill_flat": false,
+          "show_min_max_labels": false,
+          "min_max_label_font": "Arial.ttf",
+          "min_max_label_font_size": 12,
+          "min_max_label_color": "#ffffff"
+        }
       },
       "bars": {
         "label": "Bars",
@@ -99,7 +114,7 @@
     "variantFrameKeys": ["width", "height", "rotation"],
     "defaults": ["text"],
     "overrides": {
-      "heading": ["text"],
+      "heading": ["text", "heading_tape"],
       "core_temperature": ["text"],
       "left_right_balance": ["text"],
       "time": ["text"]
@@ -589,7 +604,7 @@
     },
     {
       "type": "heading",
-      "current": true,
+      "current": false,
       "label": "Heading",
       "defaultDisplayUnit": "degrees",
       "supportedDisplayUnits": [

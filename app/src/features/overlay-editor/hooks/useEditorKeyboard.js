@@ -3,7 +3,7 @@
  */
 
 import { useEffect } from 'react'
-import { deleteWidgetsInConfig, duplicateWidgetsInConfig } from '@/lib/widget-config'
+import { deleteWidgetsInConfig, duplicateWidgetsInConfig } from '@/lib/widget/widget-config'
 import { isEditableElement } from '../utils/overlayEditorHelpers'
 
 /**

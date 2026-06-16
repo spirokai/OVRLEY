@@ -6,8 +6,8 @@
 //! place.
 
 use crate::normalize::{
-    ValidatedGradientWidget, ValidatedHeading, ValidatedLabel, ValidatedSceneConfig,
-    ValidatedTimeValue, ValidatedValueWidget,
+    ValidatedGradientWidget, ValidatedHeading, ValidatedLabel, ValidatedLinearGaugeOrientation,
+    ValidatedLinearGaugeWidget, ValidatedSceneConfig, ValidatedTimeValue, ValidatedValueWidget,
 };
 use crate::types::{DisplayType, MetricKind};
 use skia_safe::Image;
@@ -57,6 +57,7 @@ pub struct MetricPresentationReport {
 #[derive(Clone, Debug)]
 pub enum PresentationCache {
     HeadingTape(HeadingWidgetCache),
+    LinearGauge(LinearGaugeCache),
 }
 
 /// One validated render value, keyed implicitly by its index in the config array.
@@ -66,6 +67,7 @@ pub enum PreparedValue {
     TimeText(ValidatedTimeValue),
     Gradient(ValidatedGradientWidget),
     HeadingTape(ValidatedHeading),
+    LinearGauge(ValidatedLinearGaugeWidget),
 }
 
 impl PreparedValue {
@@ -75,6 +77,7 @@ impl PreparedValue {
             Self::TimeText(_) => MetricKind::Time,
             Self::Gradient(_) => MetricKind::Gradient,
             Self::HeadingTape(_) => MetricKind::Heading,
+            Self::LinearGauge(value) => value.metric,
         }
     }
 
@@ -84,6 +87,7 @@ impl PreparedValue {
             Self::TimeText(value) => value.base.display_type,
             Self::Gradient(_) => DisplayType::Text,
             Self::HeadingTape(_) => DisplayType::Tape,
+            Self::LinearGauge(_) => DisplayType::Linear,
         }
     }
 
@@ -93,6 +97,7 @@ impl PreparedValue {
             Self::TimeText(value) => value.base.x,
             Self::Gradient(value) => value.x,
             Self::HeadingTape(value) => value.x,
+            Self::LinearGauge(value) => value.x,
         }
     }
 
@@ -102,6 +107,7 @@ impl PreparedValue {
             Self::TimeText(value) => value.base.y,
             Self::Gradient(value) => value.y,
             Self::HeadingTape(value) => value.y,
+            Self::LinearGauge(value) => value.y,
         }
     }
 }
@@ -235,6 +241,36 @@ pub struct HeadingWidgetCache {
     pub indicator_shadow: Option<ShadowStyle>,
     /// Visual representation mode. When `Text`, the tape is not drawn.
     pub display_type: DisplayType,
+}
+
+/// Prepared linear gauge widget cache — holds the pre-rendered static track image
+/// and per-frame fill states for efficient frame-by-frame compositing.
+#[derive(Clone, Debug)]
+pub struct LinearGaugeCache {
+    pub static_image: Image,
+    pub x: f32,
+    pub y: f32,
+    pub width: u32,
+    pub height: u32,
+    pub rotation: f32,
+    pub display_type: DisplayType,
+    pub orientation: ValidatedLinearGaugeOrientation,
+    pub track_corner_radius: f32,
+    pub track_border_thickness: f32,
+    pub track_filled_color: String,
+    pub track_filled_opacity: f32,
+    pub track_fill_flat: bool,
+    pub min_value: f64,
+    pub max_value: f64,
+    pub frame_states: Vec<LinearGaugeFrameState>,
+}
+
+/// Precomputed linear gauge state for one frame: the interpolated metric value
+/// and its fill fraction (0-1) for rendering the filled portion of the bar.
+#[derive(Clone, Copy, Debug)]
+pub struct LinearGaugeFrameState {
+    pub value: f64,
+    pub fill01: f32,
 }
 
 /// Prepared elevation widget cache.

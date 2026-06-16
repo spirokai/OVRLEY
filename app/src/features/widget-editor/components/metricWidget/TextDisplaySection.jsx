@@ -1,28 +1,23 @@
-/**
- * Supports widget editing flows related to metric widget editor.
- */
-
 import {
   getStandardMetricDefinition,
   getStandardMetricDisplayUnit,
   getStandardMetricUnitOptions,
   getStandardMetricUnitsMode,
-} from '@/lib/standard-metrics'
+} from '@/lib/widget/standard-metrics'
 import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/utils/formatUtils'
-import { FontSection, IconSection, UnitsControlRow } from './widgetEditorSections'
-import { ToggleField, SelectField } from './widgetFormControls'
+import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
+import { ToggleField, SelectField } from '../widgetFormControls'
 import { useCallback } from 'react'
 
 /**
- * Renders the metric widget editor component.
+ * Renders text-specific display controls: font, decimals/balance, icon, units.
  *
- * @param {object} props - Component props.
- * @param {*} props.widget - Widget definition being rendered or edited.
- * @param {*} props.updateWidgetData - Value for update widget data.
- * @param {*} props.setNumericField - Value for set numeric field.
- * @returns {JSX.Element} Rendered component output.
+ * @param {object} props
+ * @param {object} props.widget - Widget config.
+ * @param {Function} props.updateWidgetData - Updates widget data.
+ * @param {Function} props.setNumericField - Sets a numeric field.
  */
-export default function MetricWidgetEditor({ widget, updateWidgetData, setNumericField }) {
+export default function TextDisplaySection({ widget, updateWidgetData, setNumericField }) {
   const definition = getStandardMetricDefinition(widget.type)
   const unitsMode = getStandardMetricUnitsMode(widget.type)
   const unitOptions = getStandardMetricUnitOptions(widget.type)

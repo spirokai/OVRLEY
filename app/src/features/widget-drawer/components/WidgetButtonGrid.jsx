@@ -2,7 +2,7 @@
  * WidgetButtonGrid — scrollable categorized grid of widget-type buttons inside the drawer.
  */
 
-import { GROUPED_QUICKMENU_ITEMS } from '@/lib/widget-icons'
+import { GROUPED_QUICKMENU_ITEMS } from '@/lib/widget/widget-icons'
 
 function WidgetButton({ item, onClick }) {
   const Icon = item.icon

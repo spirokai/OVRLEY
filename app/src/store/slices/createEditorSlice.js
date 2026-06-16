@@ -6,8 +6,8 @@
  */
 
 import { cloneSerializable, DEFAULT_CONFIG, hasSerializableChanged, syncSceneTimingFromConfig, syncSceneTimingToConfig } from '../store-utils'
-import { ensureWidgetIdsInConfig } from '../../lib/widget-config'
-import { buildConfigWidgets } from '../../lib/widget-presentation'
+import { ensureWidgetIdsInConfig } from '../../lib/widget/widget-config'
+import { buildConfigWidgets } from '../../lib/widget/widget-presentation'
 import { getPrimarySelectionId, normalizeSelectionIds } from '../../features/overlay-editor/utils/overlayEditorHelpers'
 
 /**

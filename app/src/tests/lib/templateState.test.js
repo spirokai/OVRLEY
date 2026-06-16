@@ -13,8 +13,8 @@ import {
   createEditorEffectiveConfig,
   getEffectiveWidgetData,
   syncGlobalDefaultsToConfig,
-} from '@/lib/template-state'
-import { normalizeGlobalDefaults, normalizeTemplateConfig } from '@/lib/template-normalization'
+} from '@/lib/template/template-state'
+import { normalizeGlobalDefaults, normalizeTemplateConfig } from '@/lib/template/template-normalization'
 
 /* -------------------------------------------------------------------------- */
 /* normalizeGlobalDefaults                                                    */

@@ -7,11 +7,11 @@
  */
 
 import { deepEqual } from '@/store/store-utils'
-import { createDurableTemplateState } from '@/lib/template-state'
-import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template-constants'
+import { createDurableTemplateState } from '@/lib/template/template-state'
+import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template/template-constants'
 
-export { normalizeTemplateConfig } from '@/lib/template-normalization'
-export { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template-constants'
+export { normalizeTemplateConfig } from '@/lib/template/template-normalization'
+export { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 
 /**
  * Handles sanitize template filename.

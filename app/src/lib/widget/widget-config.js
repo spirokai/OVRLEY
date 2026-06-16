@@ -17,7 +17,7 @@
  */
 
 import { cloneSerializable } from '@/store/store-utils'
-import { normalizeColorFields } from './color-utils'
+import { normalizeColorFields } from '../color-utils'
 
 const LEGACY_WIDGET_ID_PATTERN = /^(label|value|plot)-\d+$/
 const GENERATED_WIDGET_ID_PATTERN = /^widget-(\d+)$/

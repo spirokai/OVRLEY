@@ -22,8 +22,8 @@
  */
 
 import { normalizeColorFields } from '@/lib/color-utils'
-import { ensureWidgetIdsInConfig } from '@/lib/widget-config'
-import { initDisplayVariant } from '@/lib/metric-widget-resolver'
+import { ensureWidgetIdsInConfig } from '../widget/widget-config'
+import { initDisplayVariant } from '../widget/metric-widget-resolver'
 import {
   COURSE_PLOT_KEYS,
   DEFAULT_GLOBAL_DEFAULTS,
@@ -34,7 +34,7 @@ import {
   SCENE_RENDER_TIME_ONLY_KEYS,
   VALUE_SHARED_KEYS,
 } from './template-constants'
-import { TYPE_DEFAULTS, TEXT_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS, GRADIENT_DEFAULTS } from '@/lib/standard-widgets'
+import { TYPE_DEFAULTS, TEXT_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS, GRADIENT_DEFAULTS } from '../widget/standard-widgets'
 
 function cloneSerializable(value) {
   if (value === undefined) return undefined

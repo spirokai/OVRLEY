@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, test } from 'vitest'
-import { buildConfigWidgets, groupWidgetsForSidebar } from '@/lib/widget-presentation'
+import { buildConfigWidgets, groupWidgetsForSidebar } from '@/lib/widget/widget-presentation'
 import {
   deleteWidgetInConfig,
   deleteWidgetsInConfig,
@@ -17,7 +17,7 @@ import {
   replaceWidgetInConfig,
   updateWidgetInConfig,
   updateWidgetsInConfig,
-} from '@/lib/widget-config'
+} from '@/lib/widget/widget-config'
 
 function makeConfig({ labels = [], values = [], plots = [] } = {}) {
   return {

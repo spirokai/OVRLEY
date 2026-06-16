@@ -522,7 +522,7 @@ fn render_frame_to_surface(
                         validated_time: None,
                     })?;
                 }
-                PreparedValue::HeadingTape(_) => {}
+                PreparedValue::HeadingTape(_) | PreparedValue::LinearGauge(_) => {}
             }
         }
         Ok(())

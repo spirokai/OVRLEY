@@ -6,14 +6,13 @@
 import { RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { TYPE_ICONS } from '@/lib/widget-icons'
-import { isStandardMetricWidgetType } from '@/lib/standard-metrics'
+import { TYPE_ICONS } from '@/lib/widget/widget-icons'
+import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
 import { useWidgetManager } from '../hooks/useWidgetManager'
 import { PositionSection } from './widgetEditorSections'
 import ElevationWidgetEditor from './ElevationWidgetEditor'
 import GradientWidgetEditor from './GradientWidgetEditor'
-import HeadingWidgetEditor from './HeadingWidgetEditor'
-import MetricWidgetEditor from './MetricWidgetEditor'
+import MetricWidgetEditor from './metricWidget/MetricWidgetEditor'
 import RouteMapWidgetEditor from './RouteMapWidgetEditor'
 import TextWidgetEditor from './TextWidgetEditor'
 import TimeWidgetEditor from './TimeWidgetEditor'
@@ -32,7 +31,6 @@ const WIDGET_EDITOR_MAP = {
   gradient: GradientWidgetEditor,
   course: RouteMapWidgetEditor,
   elevation: ElevationWidgetEditor,
-  heading: HeadingWidgetEditor,
 }
 
 /**

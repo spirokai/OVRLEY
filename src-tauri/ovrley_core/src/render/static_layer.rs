@@ -180,6 +180,8 @@ fn text_value(value: &PreparedValue) -> Option<&crate::normalize::ValidatedValue
     match value {
         PreparedValue::StandardText(validated) => Some(validated),
         PreparedValue::TimeText(validated) => Some(&validated.base),
-        PreparedValue::Gradient(_) | PreparedValue::HeadingTape(_) => None,
+        PreparedValue::Gradient(_)
+        | PreparedValue::HeadingTape(_)
+        | PreparedValue::LinearGauge(_) => None,
     }
 }

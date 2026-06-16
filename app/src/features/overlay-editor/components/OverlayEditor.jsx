@@ -23,7 +23,7 @@ import { useDragHandlers } from '../hooks/useDragHandlers'
 import { useResizeHandlers } from '../hooks/useResizeHandlers'
 import { useScaleHandlers } from '../hooks/useScaleHandlers'
 import { useRotateHandlers } from '../hooks/useRotateHandlers'
-import { isBoxedMetricWidget } from '@/lib/display-type-behavior'
+import { isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
 import { buildRenderedGeometrySignature, resolveWidgetRenderGeometry } from '../utils/widgetRenderGeometry'
 
 function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId, previewSecond, selectedWidgetIds, widgetPreviews, widgets }) {
@@ -262,6 +262,13 @@ function OverlayEditor({
     overlayState.renderedWidgetMap,
     selection.effectiveSelectedWidgetIds,
   ])
+
+  useEffect(() => {
+    if (selectedRenderedGeometryVersion === 'none' || !overlayState.moveableRef.current) return undefined
+    // Keep Moveable's geometry rect in sync when widget bounds or display type change.
+    overlayState.moveableRef.current.updateRect?.()
+    return undefined
+  }, [overlayState.moveableRef, selectedRenderedGeometryVersion])
 
   // Capability flags
   const canResizeSelected = !selection.isGroupSelection && isBoxedMetricWidget(selection.selectedWidget)

@@ -14,7 +14,7 @@ import {
   getStandardMetricDisplayUnit,
   getStandardMetricUnitLabel,
   getStandardMetricUnitsMode,
-} from '@/lib/standard-metrics'
+} from '@/lib/widget/standard-metrics'
 import { measurePreviewText, getPreviewTextBaseline } from './textMeasurement'
 
 /**

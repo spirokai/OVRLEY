@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, test } from 'vitest'
-import { TEXT_DEFAULTS } from '@/lib/standard-widgets'
+import { TEXT_DEFAULTS } from '@/lib/widget/standard-widgets'
 
 describe('TEXT_DEFAULTS', () => {
   test('includes display_type: "text" so new value widgets default to text rendering', () => {
