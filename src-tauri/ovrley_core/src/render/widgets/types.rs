@@ -248,6 +248,8 @@ pub struct HeadingWidgetCache {
 #[derive(Clone, Debug)]
 pub struct LinearGaugeCache {
     pub static_image: Image,
+    pub static_image_x: f32,
+    pub static_image_y: f32,
     pub x: f32,
     pub y: f32,
     pub width: u32,

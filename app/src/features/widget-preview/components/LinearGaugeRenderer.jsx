@@ -10,9 +10,10 @@
 
 import { formatLinearGaugeLabel, getLinearGaugeLayout } from '../utils/linearGaugeGeometry'
 import { getTextShadowParts } from '../utils/shadowUtils'
+import { normalizeSvgShadowColor } from '../utils/svgPreviewUtils'
 import { getPreviewFontFamily } from '../utils/textMeasurement'
 import { getInterpolatedActivityValue } from '@/features/overlay-editor'
-import { PreviewSvgShadowOnlyFilter } from './previewSvgComponents'
+import { PreviewSvgShadowBlurFilter } from './previewSvgComponents'
 import { useId } from 'react'
 
 /**
@@ -54,8 +55,27 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
   const labelFontSize = data.min_max_label_font_size ?? 12
   const labelFontFamily = getPreviewFontFamily(data.min_max_label_font)
   const shadow = getTextShadowParts(sceneStyle)
-  const shadowFilterId = shadow ? `linear-gauge-${widget.id || maskId}-shadow` : null
+  const shadowEnabled = borderThickness > 0 && shadow
+  const shadowFilterId = shadowEnabled?.strength > 0 ? `linear-gauge-${widget.id || maskId}-shadow` : null
   const fillIsFlat = Boolean(data.track_fill_flat)
+  const shadowMaskId = `${maskId}-shadow-mask`
+  const shadowColor = shadowEnabled ? normalizeSvgShadowColor(shadowEnabled.color, opacity) : null
+  const outerShadow =
+    shadowColor != null ? (
+      <g transform={`translate(${shadowEnabled.distance} ${shadowEnabled.distance})`} filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}>
+        <rect
+          x={0}
+          y={0}
+          width={width}
+          height={height}
+          rx={cornerRadius}
+          ry={cornerRadius}
+          fill={shadowColor.color}
+          opacity={shadowColor.opacity}
+          mask={borderThickness > 0 ? `url(#${shadowMaskId})` : undefined}
+        />
+      </g>
+    ) : null
   const innerTrackRect = {
     x: borderThickness,
     y: borderThickness,
@@ -98,22 +118,36 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
       className="block overflow-visible"
       data-testid="linear-gauge-preview"
     >
-      {shadowFilterId ? <PreviewSvgShadowOnlyFilter id={shadowFilterId} shadow={shadow} opacity={opacity} /> : null}
+      {shadowFilterId ? <PreviewSvgShadowBlurFilter id={shadowFilterId} shadow={shadowEnabled} /> : null}
       {borderThickness > 0 || (fillIsFlat && fillCornerRadius > 0) ? (
         <defs>
           {borderThickness > 0 ? (
-            <mask id={maskId}>
-              <rect x={0} y={0} width={width} height={height} rx={cornerRadius} ry={cornerRadius} fill="white" />
-              <rect
-                x={innerTrackRect.x}
-                y={innerTrackRect.y}
-                width={innerTrackRect.width}
-                height={innerTrackRect.height}
-                rx={fillCornerRadius}
-                ry={fillCornerRadius}
-                fill="black"
-              />
-            </mask>
+            <>
+              <mask id={maskId}>
+                <rect x={0} y={0} width={width} height={height} rx={cornerRadius} ry={cornerRadius} fill="white" />
+                <rect
+                  x={innerTrackRect.x}
+                  y={innerTrackRect.y}
+                  width={innerTrackRect.width}
+                  height={innerTrackRect.height}
+                  rx={fillCornerRadius}
+                  ry={fillCornerRadius}
+                  fill="black"
+                />
+              </mask>
+              <mask id={shadowMaskId}>
+                <rect x={0} y={0} width={width} height={height} rx={cornerRadius} ry={cornerRadius} fill="white" />
+                <rect
+                  x={innerTrackRect.x}
+                  y={innerTrackRect.y}
+                  width={innerTrackRect.width}
+                  height={innerTrackRect.height}
+                  rx={fillCornerRadius}
+                  ry={fillCornerRadius}
+                  fill="black"
+                />
+              </mask>
+            </>
           ) : null}
           {fillIsFlat && fillCornerRadius > 0 ? (
             <clipPath id={flatFillClipId}>
@@ -122,6 +156,7 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
           ) : null}
         </defs>
       ) : null}
+      {outerShadow}
       {borderThickness > 0 ? (
         <rect
           x={0}
@@ -133,7 +168,6 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
           fill={data.track_border_color}
           mask={`url(#${maskId})`}
           opacity={opacity}
-          filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}
         />
       ) : (
         <rect
@@ -146,7 +180,6 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
           fill={data.track_empty_color}
           fillOpacity={data.track_empty_opacity}
           opacity={opacity}
-          filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}
         />
       )}
       {borderThickness > 0 ? (

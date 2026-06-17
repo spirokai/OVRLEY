@@ -48,12 +48,13 @@ describe('OverlayLinearGaugeWidget', () => {
   test('uses interpolated metric value at previewSecond', () => {
     render(<OverlayLinearGaugeWidget widget={makeWidget()} activity={activity} previewSecond={0.5} globalScale={1} />)
 
-    const rects = screen.getByTestId('linear-gauge-preview').querySelectorAll('rect')
-    // rects: [0]=mask-white, [1]=mask-black, [2]=border, [3]=empty-track, [4]=filled-track
-    expect(rects[4]).toHaveAttribute('x', '2')
-    expect(rects[4]).toHaveAttribute('y', '2')
-    expect(rects[4]).toHaveAttribute('width', '98')
-    expect(rects[4]).toHaveAttribute('height', '36')
+    const rects = [...screen.getByTestId('linear-gauge-preview').querySelectorAll('rect')]
+    const filledRect = rects.find((rect) => rect.getAttribute('fill') === '#40e0d0')
+
+    expect(filledRect).toHaveAttribute('x', '2')
+    expect(filledRect).toHaveAttribute('y', '2')
+    expect(filledRect).toHaveAttribute('width', '98')
+    expect(filledRect).toHaveAttribute('height', '36')
   })
 
   test('renders a flat advancing fill end when enabled', () => {
@@ -76,5 +77,46 @@ describe('OverlayLinearGaugeWidget', () => {
 
     const label = screen.getByText('0')
     expect(label).toHaveAttribute('font-family', '"Teko", "Arial Narrow", sans-serif')
+  })
+
+  test('renders the shadow as a separate layer behind the gauge body', () => {
+    render(
+      <OverlayLinearGaugeWidget
+        widget={makeWidget()}
+        activity={activity}
+        previewSecond={0}
+        globalScale={1}
+        sceneStyle={{ shadow_color: '#000000', shadow_strength: 4, shadow_distance: 3 }}
+      />,
+    )
+
+    const svg = screen.getByTestId('linear-gauge-preview')
+    const rects = [...svg.querySelectorAll('rect')]
+    const shadowGroup = svg.querySelector('g[filter]')
+    const shadowRect = shadowGroup?.querySelector('rect')
+    const borderRect = rects.find((rect) => rect.getAttribute('mask') && !rect.getAttribute('filter'))
+
+    expect(shadowGroup).toBeTruthy()
+    expect(shadowRect).toBeTruthy()
+    expect(borderRect).toBeTruthy()
+    expect(shadowRect).toHaveAttribute('mask')
+    expect(borderRect).not.toHaveAttribute('filter')
+    expect(shadowGroup.compareDocumentPosition(borderRect) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('does not render a shadow when the gauge has no border', () => {
+    render(
+      <OverlayLinearGaugeWidget
+        widget={makeWidget({ track_border_thickness: 0 })}
+        activity={activity}
+        previewSecond={0}
+        globalScale={1}
+        sceneStyle={{ shadow_color: '#000000', shadow_strength: 4, shadow_distance: 3 }}
+      />,
+    )
+
+    const svg = screen.getByTestId('linear-gauge-preview')
+    expect(svg.querySelector('g[filter]')).toBeNull()
+    expect(svg.querySelector('filter')).toBeNull()
   })
 })

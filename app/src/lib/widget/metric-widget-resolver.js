@@ -80,8 +80,7 @@ export function initDisplayVariant(widgetData, displayType) {
   if (!widgetData || displayType === 'text') return widgetData
 
   const variants = widgetData.display_variants || {}
-  if (variants[displayType]) return widgetData
-
+  const currentVariant = variants[displayType]
   const frameDefaults = getDefaultFrameDimensions(displayType)
   const nonGeometryDefaults = getDisplayVariantNonGeometryDefaults(displayType)
 
@@ -89,7 +88,8 @@ export function initDisplayVariant(widgetData, displayType) {
 
   const variantDefaults = {
     ...(nonGeometryDefaults || {}),
-    ...resolveFrameGeometry(null, widgetData, frameDefaults),
+    ...(currentVariant || {}),
+    ...resolveFrameGeometry(currentVariant, widgetData, frameDefaults),
   }
 
   return {

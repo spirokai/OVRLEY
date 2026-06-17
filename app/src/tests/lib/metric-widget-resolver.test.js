@@ -187,7 +187,30 @@ describe('initDisplayVariant', () => {
     expect(result.display_variants.linear.width).toBe(200)
     expect(result.display_variants.linear.height).toBe(60)
     expect(result.display_variants.linear.rotation).toBe(0)
-    expect(result.display_variants.linear.pixels_per_degree).toBeUndefined()
+    expect(result.display_variants.linear.orientation).toBe('horizontal')
+    expect(result.display_variants.linear.track_fill_flat).toBe(false)
+  })
+
+  test('backfills missing linear defaults into an existing variant', () => {
+    const data = {
+      value: 'speed',
+      display_type: 'linear',
+      display_variants: {
+        linear: {
+          width: 320,
+          height: 90,
+          track_corner_radius: 12,
+        },
+      },
+    }
+    const result = initDisplayVariant(data, 'linear')
+
+    expect(result.display_variants.linear.width).toBe(320)
+    expect(result.display_variants.linear.height).toBe(90)
+    expect(result.display_variants.linear.track_corner_radius).toBe(12)
+    expect(result.display_variants.linear.orientation).toBe('horizontal')
+    expect(result.display_variants.linear.track_fill_flat).toBe(false)
+    expect(result.display_variants.linear.show_min_max_labels).toBe(false)
   })
 
   test('returns data as-is when data is null', () => {

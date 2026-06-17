@@ -7,10 +7,8 @@
  */
 
 import { getDisplayTypeOptions } from '@/lib/widget/standard-metrics'
-import { SectionHeading } from '../widgetEditorSections'
 import { SelectField } from '../widgetFormControls'
 import { useCallback } from 'react'
-import { Gauge } from 'lucide-react'
 import { initDisplayVariant } from '@/lib/widget/metric-widget-resolver'
 import { isTextDisplayType } from '@/lib/widget/display-type-behavior'
 import TextDisplaySection from './TextDisplaySection'
@@ -54,7 +52,7 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
     <>
       {showTypeDropdown ? (
         <div className="space-y-4">
-          <SectionHeading icon={Gauge} title="Display" />
+          {/* <SectionHeading icon={Gauge} title="Display" /> */}
           <SelectField label="Display Type" value={displayType} onValueChange={handleDisplayTypeChange} options={displayOptions} />
         </div>
       ) : null}

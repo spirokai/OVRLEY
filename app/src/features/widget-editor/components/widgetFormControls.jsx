@@ -79,7 +79,7 @@ export function FieldBlock({ label, children, className, disabled = false }) {
  */
 export function SelectField({ label, value, onValueChange, options, disabled = false }) {
   return (
-    <FieldBlock label={label}>
+    <FieldBlock label={label} disabled={disabled}>
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger className={cn(CONTROL_CLASS, disabled && 'opacity-50 pointer-events-none')}>
           <SelectValue />

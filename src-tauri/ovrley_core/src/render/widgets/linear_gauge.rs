@@ -13,12 +13,15 @@ use crate::normalize::{
 };
 use crate::render::surface::create_surface;
 use crate::render::text::{origin_x_for_centered_text, parse_color, resolve_font};
+use crate::render::widgets::common::{
+    normalize_shadow_style_validated, static_layer_padding,
+};
 use crate::render::widgets::types::{
     LinearGaugeCache, LinearGaugeFrameState, WidgetFrameReport, WidgetGeometryReport,
     WidgetRenderReport,
 };
 use crate::types::{DisplayType, MetricKind};
-use skia_safe::{image_filters, BlendMode, Canvas, Paint, Point, RRect, Rect};
+use skia_safe::{image_filters, BlendMode, Canvas, Paint, Path, Point, RRect, Rect};
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -101,6 +104,19 @@ pub fn prepare_linear_gauge_cache(
     prepare_profiler.measure("gauge.linear.prepare", || {
         let scaled_width = ((gauge.width as f32) * scale).round().max(1.0) as u32;
         let scaled_height = ((gauge.height as f32) * scale).round().max(1.0) as u32;
+        let shadow = normalize_shadow_style_validated(
+            &scene.shadow_color,
+            scene.shadow_strength,
+            scene.shadow_distance,
+            scale,
+        );
+        let padding = static_layer_padding(gauge.track_border_thickness * scale, shadow.as_ref());
+        let layer_width = scaled_width
+            .saturating_add(padding.saturating_mul(2))
+            .max(1);
+        let layer_height = scaled_height
+            .saturating_add(padding.saturating_mul(2))
+            .max(1);
         let (min_value, max_value) = metric_range(&dense_activity.series, gauge.metric);
         let frame_states = metric_values(&dense_activity.series, gauge.metric)
             .iter()
@@ -113,9 +129,10 @@ pub fn prepare_linear_gauge_cache(
             })
             .collect::<Vec<_>>();
 
-        let mut surface = create_surface(scaled_width, scaled_height)?;
+        let mut surface = create_surface(layer_width, layer_height)?;
         let canvas = surface.canvas();
         canvas.clear(skia_safe::Color::TRANSPARENT);
+        canvas.translate((padding as f32, padding as f32));
         draw_static_linear_layer(
             canvas,
             gauge,
@@ -130,6 +147,8 @@ pub fn prepare_linear_gauge_cache(
 
         Ok(LinearGaugeCache {
             static_image: surface.image_snapshot(),
+            static_image_x: gauge.x - padding as f32,
+            static_image_y: gauge.y - padding as f32,
             x: gauge.x,
             y: gauge.y,
             width: scaled_width,
@@ -162,7 +181,11 @@ pub fn draw_linear_gauge_widget(
     }
 
     frame_profiler.measure("gauge.linear.draw", || {
-        canvas.draw_image(&cache.static_image, (cache.x, cache.y), None);
+        canvas.draw_image(
+            &cache.static_image,
+            (cache.static_image_x, cache.static_image_y),
+            None,
+        );
 
         let state = cache
             .frame_states
@@ -240,21 +263,50 @@ fn draw_static_linear_layer(
     let radius = gauge.track_corner_radius * scale;
     let border = gauge.track_border_thickness * scale;
 
-    let shadow_active = scene.shadow_strength > 0.0 || scene.shadow_distance > 0.0;
-    let shadow_color = if shadow_active && !scene.shadow_color.is_empty() {
-        Some(parse_color(&scene.shadow_color, 1.0))
+    let shadow_filter = if border > 0.0 {
+        normalize_shadow_style_validated(
+            &scene.shadow_color,
+            scene.shadow_strength,
+            scene.shadow_distance,
+            scale,
+        )
+        .and_then(|shadow| {
+            image_filters::drop_shadow_only(
+                (shadow.offset_x, shadow.offset_y),
+                (shadow.strength, shadow.strength),
+                parse_color(&shadow.color, 1.0),
+                None,
+                None,
+            )
+        })
     } else {
         None
     };
-    let shadow_filter = shadow_color.and_then(|color| {
-        image_filters::drop_shadow_only(
-            (scene.shadow_distance * scale, scene.shadow_distance * scale),
-            (scene.shadow_strength * scale, scene.shadow_strength * scale),
-            color,
-            None,
-            None,
-        )
-    });
+
+    if let Some(ref filter) = shadow_filter {
+        let outer_rrect = RRect::new_rect_xy(Rect::from_xywh(0.0, 0.0, w, h), radius, radius);
+        let mut shadow_paint = Paint::default();
+        shadow_paint.set_anti_alias(true);
+        shadow_paint.set_color(skia_safe::Color::BLACK);
+        shadow_paint.set_image_filter(filter.clone());
+        if border > 0.0 {
+            let inner_rect = Rect::from_xywh(
+                border,
+                border,
+                (w - border * 2.0).max(0.0),
+                (h - border * 2.0).max(0.0),
+            );
+            let inner_radius = (radius - border).max(0.0);
+            let inner_rrect = RRect::new_rect_xy(inner_rect, inner_radius, inner_radius);
+            let mut ring_path = Path::new();
+            ring_path.set_fill_type(skia_safe::path::FillType::EvenOdd);
+            ring_path.add_rrect(outer_rrect, None);
+            ring_path.add_rrect(inner_rrect, None);
+            canvas.draw_path(&ring_path, &shadow_paint);
+        } else {
+            canvas.draw_rrect(outer_rrect, &shadow_paint);
+        }
+    }
 
     if border > 0.0 {
         let outer_rect = Rect::from_xywh(0.0, 0.0, w, h);
@@ -262,9 +314,6 @@ fn draw_static_linear_layer(
         let mut border_paint = Paint::default();
         border_paint.set_anti_alias(true);
         border_paint.set_color(parse_color(&gauge.track_border_color, 1.0));
-        if let Some(ref filter) = shadow_filter {
-            border_paint.set_image_filter(filter.clone());
-        }
         canvas.draw_rrect(outer_rrect, &border_paint);
 
         let inner_rect = Rect::from_xywh(
@@ -295,11 +344,6 @@ fn draw_static_linear_layer(
         &gauge.track_empty_color,
         gauge.track_empty_opacity,
     ));
-    if border <= 0.0 {
-        if let Some(ref filter) = shadow_filter {
-            empty_paint.set_image_filter(filter.clone());
-        }
-    }
     canvas.draw_rrect(inner_rrect, &empty_paint);
 
     if gauge.show_min_max_labels {
