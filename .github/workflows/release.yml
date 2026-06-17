@@ -16,7 +16,7 @@ jobs:
         include:
           - name: windows
             os: windows-latest
-            bundles: ''
+            bundles: ""
             artifact_glob: |
               dist-portable/*.zip
           - name: macos
