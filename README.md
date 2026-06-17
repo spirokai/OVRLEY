@@ -61,7 +61,7 @@ OVRLEY supports both exporting transparent overlays as well as final footage wit
 Compiling and running OVRLEY requires the following system-level toolchains:
 
 - **[Node.js](https://nodejs.org/) & [pnpm](https://pnpm.io/)** (Package management and script execution)
-- **[Rust Toolchain](https://rust-lang.org/tools/install/)** (For compiling the Tauri shell and core engine)
+- **[Rust Toolchain 1.85+](https://rust-lang.org/tools/install/)** (For compiling the Tauri shell and core engine)
 - **[FFmpeg 8.1+ (Full Build)](https://ffmpeg.org/download.html/)** (For video manipulation; **installed automatically**)
 
 > **Important:** The rendering engine requires an FFmpeg 8.1+ **Full Build** located within the `vendor/ffmpeg` directory to ensure compatibility with advanced hardware encoders. This is automatically handled by the installation process, but you can manually place your own build there.

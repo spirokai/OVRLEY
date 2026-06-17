@@ -9,12 +9,12 @@
 pub(crate) mod common;
 /// Elevation profile widget implementation.
 pub(crate) mod elevation;
-/// Linear gauge metric widget implementation.
-pub mod linear_gauge;
 /// Point/rect/math and layout-fitting helpers.
 mod geometry;
 /// Heading compass tape widget implementation.
 pub mod heading;
+/// Linear gauge metric widget implementation.
+pub mod linear_gauge;
 /// Marker and dot drawing helpers.
 mod marker;
 /// DisplayType-driven metric presentation dispatch.

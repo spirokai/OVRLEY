@@ -376,6 +376,7 @@ pub(crate) fn draw_metric_icon(
                 shadow_color,
                 None,
                 None,
+                None,
             ) {
                 let mut shadow_paint = metric_icon_paint(
                     icon,

@@ -15,16 +15,16 @@
 //! per frame — these are lightweight Skia state stack operations. `path_from_points`
 //! is O(n) in point count and called during widget preparation (not per-frame).
 
-use skia_safe::Path as SkPath;
+use skia_safe::{Path as SkPath, PathBuilder};
 
 pub(crate) fn path_from_points(
     points: &[(f32, f32)],
     close_path: bool,
     baseline_y: Option<f32>,
 ) -> SkPath {
-    let mut path = SkPath::new();
+    let mut path = PathBuilder::new();
     if points.is_empty() {
-        return path;
+        return path.detach();
     }
     if let Some(baseline) = baseline_y {
         path.move_to((points[0].0, baseline));
@@ -40,7 +40,7 @@ pub(crate) fn path_from_points(
     if close_path {
         path.close();
     }
-    path
+    path.detach()
 }
 
 pub(crate) fn with_widget_transform(

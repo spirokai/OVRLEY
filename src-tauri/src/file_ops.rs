@@ -32,8 +32,7 @@ pub(crate) fn default_template_save_path(
 /// that fails the normalization seam is rejected with an error.
 #[tauri::command]
 pub(crate) fn write_template_file(path: String, contents: String) -> Result<String, String> {
-    ovrley_core::commands::validate_template_contents(&contents)
-        .map_err(|e| e.to_string())?;
+    ovrley_core::commands::validate_template_contents(&contents).map_err(|e| e.to_string())?;
 
     let path_buf = PathBuf::from(&path);
 

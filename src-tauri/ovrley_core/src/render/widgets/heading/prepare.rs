@@ -101,6 +101,7 @@ pub fn prepare_heading_cache(
                 parse_color(&shadow.color, 1.0),
                 None,
                 None,
+                None,
             );
 
             if let Some(filter) = shadow_filter {

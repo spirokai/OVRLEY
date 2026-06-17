@@ -13,15 +13,15 @@ use crate::normalize::{
 };
 use crate::render::surface::create_surface;
 use crate::render::text::{origin_x_for_centered_text, parse_color, resolve_font};
-use crate::render::widgets::common::{
-    normalize_shadow_style_validated, static_layer_padding,
-};
+use crate::render::widgets::common::{normalize_shadow_style_validated, static_layer_padding};
 use crate::render::widgets::types::{
     LinearGaugeCache, LinearGaugeFrameState, WidgetFrameReport, WidgetGeometryReport,
     WidgetRenderReport,
 };
 use crate::types::{DisplayType, MetricKind};
-use skia_safe::{image_filters, BlendMode, Canvas, Paint, Path, Point, RRect, Rect};
+use skia_safe::{
+    image_filters, BlendMode, Canvas, Paint, PathBuilder, PathFillType, Point, RRect, Rect,
+};
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -277,6 +277,7 @@ fn draw_static_linear_layer(
                 parse_color(&shadow.color, 1.0),
                 None,
                 None,
+                None,
             )
         })
     } else {
@@ -298,10 +299,10 @@ fn draw_static_linear_layer(
             );
             let inner_radius = (radius - border).max(0.0);
             let inner_rrect = RRect::new_rect_xy(inner_rect, inner_radius, inner_radius);
-            let mut ring_path = Path::new();
-            ring_path.set_fill_type(skia_safe::path::FillType::EvenOdd);
-            ring_path.add_rrect(outer_rrect, None);
-            ring_path.add_rrect(inner_rrect, None);
+            let mut ring_path = PathBuilder::new_with_fill_type(PathFillType::EvenOdd);
+            ring_path.add_rrect(outer_rrect, None, None);
+            ring_path.add_rrect(inner_rrect, None, None);
+            let ring_path = ring_path.detach();
             canvas.draw_path(&ring_path, &shadow_paint);
         } else {
             canvas.draw_rrect(outer_rrect, &shadow_paint);

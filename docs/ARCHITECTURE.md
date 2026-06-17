@@ -192,13 +192,13 @@ cyclemetry/
 | State management   | Zustand           | 5.x (with `immer`, `subscribeWithSelector`) |
 | UI primitives      | shadcn/ui + Radix | latest                                      |
 | Desktop shell      | Tauri             | 2.9.x                                       |
-| Rendering (Rust)   | skia-safe         | 0.75                                        |
+| Rendering (Rust)   | skia-safe         | 0.97.2                                      |
 | Video encoding     | FFmpeg            | 8.1+ (via subprocess)                       |
 | Activity parsing   | fit-file-parser   | browser                                     |
 | Drag/resize        | react-moveable    | latest                                      |
 | Icons              | lucide-react      | latest                                      |
 | Package manager    | pnpm              | 10.25.0                                     |
-| Rust edition       | 2021              | 1.84.0                                      |
+| Rust edition       | 2021              | 1.85.0 minimum toolchain                    |
 | Immutable updates  | immer             | via Zustand middleware                      |
 
 ---
@@ -879,7 +879,7 @@ Templates are JSON files following the `ovrley-template` format (v2):
 
 ### Rust
 
-- **skia-safe 0.75** — `binary-cache` feature enabled
+- **skia-safe 0.97.2** — `binary-cache` feature enabled; mutable path construction now uses Skia's `PathBuilder` APIs where older releases allowed editing `Path` directly
 - **Process-lifetime caches** — `OnceLock<Mutex<HashMap>>` for fonts, label images
 - **Module layering** — `tauri_commands.rs` (Tauri `#[command]` wrappers) → `ovrley_core::commands` (framework-agnostic logic) → domain modules (activity, render, encode)
 - **Normalization seam** — all raw config types and parsing live in `normalize::raw` (private submodule). The only public entry point is `normalize::validate_render_config()`. No code outside `normalize/` can access raw types. The backend owns zero render-affecting defaults — the frontend must materialise every value before sending.

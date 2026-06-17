@@ -5,11 +5,11 @@
 //! frontend must materialise all defaults before sending the config.
 
 mod elevation;
-mod linear_gauge;
 mod gradient;
 mod heading;
 mod helpers;
 mod label;
+mod linear_gauge;
 pub mod raw;
 mod route;
 mod scene;
@@ -28,10 +28,12 @@ pub use raw::{
 };
 
 pub use elevation::{validate_elevation_plot, ValidatedElevationPlot};
-pub use linear_gauge::{validate_linear_gauge, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};
 pub use label::{validate_label, ValidatedLabel};
+pub use linear_gauge::{
+    validate_linear_gauge, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
+};
 pub use route::{validate_route_plot, ValidatedRoutePlot};
 pub use scene::{validate_scene_config, ValidatedSceneConfig};
 pub use time::{validate_time_value, ValidatedTimeFormatting, ValidatedTimeValue};
