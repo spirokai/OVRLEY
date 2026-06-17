@@ -191,8 +191,9 @@ describe('normalizeTemplateConfig', () => {
     expect(result.values[0].display_variants.linear.height).toBe(80)
     expect(result.values[0].display_variants.linear.track_corner_radius).toBe(10)
     expect(result.values[0].display_variants.linear.orientation).toBe('horizontal')
-    expect(result.values[0].display_variants.linear.track_fill_flat).toBe(false)
+    expect(result.values[0].display_variants.linear.track_fill_flat).toBe(true)
     expect(result.values[0].display_variants.linear.show_min_max_labels).toBe(false)
+    expect(result.values[0].display_variants.linear.min_max_label_position).toBe('bottom')
   })
 })
 

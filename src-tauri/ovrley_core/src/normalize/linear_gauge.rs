@@ -17,6 +17,15 @@ pub enum ValidatedLinearGaugeOrientation {
     Vertical,
 }
 
+/// Validated min/max label position, constrained by gauge orientation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ValidatedLinearGaugeLabelPosition {
+    Left,
+    Right,
+    Bottom,
+    Top,
+}
+
 /// Fully validated linear gauge widget configuration.
 #[derive(Clone, Debug)]
 pub struct ValidatedLinearGaugeWidget {
@@ -39,6 +48,7 @@ pub struct ValidatedLinearGaugeWidget {
     pub show_min_max_labels: bool,
     pub min_max_label_font: String,
     pub min_max_label_font_size: f32,
+    pub min_max_label_position: ValidatedLinearGaugeLabelPosition,
     pub min_max_label_color: String,
 }
 
@@ -92,6 +102,36 @@ pub fn validate_linear_gauge(
         }
     };
 
+    let min_max_label_position = match (
+        orientation,
+        require_string(value.min_max_label_position, &p("min_max_label_position"))?.as_str(),
+    ) {
+        (ValidatedLinearGaugeOrientation::Horizontal, "bottom") => {
+            ValidatedLinearGaugeLabelPosition::Bottom
+        }
+        (ValidatedLinearGaugeOrientation::Horizontal, "top") => {
+            ValidatedLinearGaugeLabelPosition::Top
+        }
+        (ValidatedLinearGaugeOrientation::Vertical, "left") => {
+            ValidatedLinearGaugeLabelPosition::Left
+        }
+        (ValidatedLinearGaugeOrientation::Vertical, "right") => {
+            ValidatedLinearGaugeLabelPosition::Right
+        }
+        (ValidatedLinearGaugeOrientation::Horizontal, other) => {
+            return Err(CoreError::Config(format!(
+                "{}: expected bottom or top for horizontal gauge, got {other}",
+                p("min_max_label_position")
+            )));
+        }
+        (ValidatedLinearGaugeOrientation::Vertical, other) => {
+            return Err(CoreError::Config(format!(
+                "{}: expected left or right for vertical gauge, got {other}",
+                p("min_max_label_position")
+            )));
+        }
+    };
+
     let track_empty_opacity = require_f32(value.track_empty_opacity, &p("track_empty_opacity"))?;
     let track_filled_opacity = require_f32(value.track_filled_opacity, &p("track_filled_opacity"))?;
     for (field, opacity) in [
@@ -132,6 +172,7 @@ pub fn validate_linear_gauge(
             value.min_max_label_font_size,
             &p("min_max_label_font_size"),
         )?,
+        min_max_label_position,
         min_max_label_color: require_string(value.min_max_label_color, &p("min_max_label_color"))?,
     })
 }

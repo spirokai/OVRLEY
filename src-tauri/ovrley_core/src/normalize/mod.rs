@@ -32,7 +32,8 @@ pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};
 pub use label::{validate_label, ValidatedLabel};
 pub use linear_gauge::{
-    validate_linear_gauge, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
+    validate_linear_gauge, ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
+    ValidatedLinearGaugeWidget,
 };
 pub use route::{validate_route_plot, ValidatedRoutePlot};
 pub use scene::{validate_scene_config, ValidatedSceneConfig};

@@ -9,7 +9,8 @@ use crate::activity::schema::{DenseActivityReport, DenseSeriesReport};
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{
-    ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget, ValidatedSceneConfig,
+    ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
+    ValidatedLinearGaugeWidget, ValidatedSceneConfig,
 };
 use crate::render::surface::create_surface;
 use crate::render::text::{origin_x_for_centered_text, parse_color, resolve_font};
@@ -28,6 +29,20 @@ use std::path::PathBuf;
 pub enum LinearGaugeOrientation {
     Horizontal,
     Vertical,
+}
+
+const LINEAR_GAUGE_LABEL_GAP_PX: f32 = 10.0;
+
+#[derive(Clone, Debug)]
+struct LinearGaugeLabelLayout {
+    min_label: String,
+    max_label: String,
+    min_origin: Point,
+    max_origin: Point,
+}
+
+fn linear_gauge_label_gap(font_size: f32) -> f32 {
+    (font_size * 0.35).max(LINEAR_GAUGE_LABEL_GAP_PX)
 }
 
 impl From<ValidatedLinearGaugeOrientation> for LinearGaugeOrientation {
@@ -104,20 +119,28 @@ pub fn prepare_linear_gauge_cache(
     prepare_profiler.measure("gauge.linear.prepare", || {
         let scaled_width = ((gauge.width as f32) * scale).round().max(1.0) as u32;
         let scaled_height = ((gauge.height as f32) * scale).round().max(1.0) as u32;
+        let (min_value, max_value) = metric_range(&dense_activity.series, gauge.metric);
         let shadow = normalize_shadow_style_validated(
             &scene.shadow_color,
             scene.shadow_strength,
             scene.shadow_distance,
             scale,
         );
-        let padding = static_layer_padding(gauge.track_border_thickness * scale, shadow.as_ref());
+        let track_padding = static_layer_padding(gauge.track_border_thickness * scale, shadow.as_ref());
+        let (label_left, label_top, label_right, label_bottom) =
+            linear_gauge_label_padding(gauge, scaled_width, scaled_height, scale, font_dirs, min_value, max_value)?;
+        let left_padding = track_padding.max(label_left);
+        let top_padding = track_padding.max(label_top);
+        let right_padding = track_padding.max(label_right);
+        let bottom_padding = track_padding.max(label_bottom);
         let layer_width = scaled_width
-            .saturating_add(padding.saturating_mul(2))
+            .saturating_add(left_padding)
+            .saturating_add(right_padding)
             .max(1);
         let layer_height = scaled_height
-            .saturating_add(padding.saturating_mul(2))
+            .saturating_add(top_padding)
+            .saturating_add(bottom_padding)
             .max(1);
-        let (min_value, max_value) = metric_range(&dense_activity.series, gauge.metric);
         let frame_states = metric_values(&dense_activity.series, gauge.metric)
             .iter()
             .map(|value| {
@@ -132,7 +155,7 @@ pub fn prepare_linear_gauge_cache(
         let mut surface = create_surface(layer_width, layer_height)?;
         let canvas = surface.canvas();
         canvas.clear(skia_safe::Color::TRANSPARENT);
-        canvas.translate((padding as f32, padding as f32));
+        canvas.translate((left_padding as f32, top_padding as f32));
         draw_static_linear_layer(
             canvas,
             gauge,
@@ -147,8 +170,8 @@ pub fn prepare_linear_gauge_cache(
 
         Ok(LinearGaugeCache {
             static_image: surface.image_snapshot(),
-            static_image_x: gauge.x - padding as f32,
-            static_image_y: gauge.y - padding as f32,
+            static_image_x: gauge.x - left_padding as f32,
+            static_image_y: gauge.y - top_padding as f32,
             x: gauge.x,
             y: gauge.y,
             width: scaled_width,
@@ -350,23 +373,145 @@ fn draw_static_linear_layer(
     if gauge.show_min_max_labels {
         let font_size = gauge.min_max_label_font_size * scale;
         let font = resolve_font(font_dirs, Some(&gauge.min_max_label_font), font_size)?;
+        let layout = linear_gauge_label_layout(gauge, width, height, scale, &font, min_value, max_value);
         let mut text_paint = Paint::default();
         text_paint.set_anti_alias(true);
         text_paint.set_color(parse_color(&gauge.min_max_label_color, 1.0));
-        let baseline = (h + font_size) / 2.0 - font_size * 0.15;
-        let min_label = format_linear_gauge_label(min_value);
-        let max_label = format_linear_gauge_label(max_value);
-        canvas.draw_str(
-            &min_label,
-            Point::new(4.0 * scale, baseline),
-            &font,
-            &text_paint,
-        );
-        let max_x = origin_x_for_centered_text(&max_label, w - 12.0 * scale, &font);
-        canvas.draw_str(&max_label, Point::new(max_x, baseline), &font, &text_paint);
+        canvas.draw_str(&layout.min_label, layout.min_origin, &font, &text_paint);
+        canvas.draw_str(&layout.max_label, layout.max_origin, &font, &text_paint);
     }
 
     Ok(())
+}
+
+fn linear_gauge_label_padding(
+    gauge: &ValidatedLinearGaugeWidget,
+    width: u32,
+    height: u32,
+    scale: f32,
+    font_dirs: &[PathBuf],
+    min_value: f64,
+    max_value: f64,
+) -> CoreResult<(u32, u32, u32, u32)> {
+    if !gauge.show_min_max_labels {
+        return Ok((0, 0, 0, 0));
+    }
+
+    let font_size = gauge.min_max_label_font_size * scale;
+    let font = resolve_font(font_dirs, Some(&gauge.min_max_label_font), font_size)?;
+    let layout = linear_gauge_label_layout(gauge, width, height, scale, &font, min_value, max_value);
+    let (_, min_bounds) = font.measure_str(&layout.min_label, None);
+    let (_, max_bounds) = font.measure_str(&layout.max_label, None);
+
+    let min_left = layout.min_origin.x + min_bounds.left;
+    let min_top = layout.min_origin.y + min_bounds.top;
+    let min_right = layout.min_origin.x + min_bounds.right;
+    let min_bottom = layout.min_origin.y + min_bounds.bottom;
+    let max_left = layout.max_origin.x + max_bounds.left;
+    let max_top = layout.max_origin.y + max_bounds.top;
+    let max_right = layout.max_origin.x + max_bounds.right;
+    let max_bottom = layout.max_origin.y + max_bounds.bottom;
+
+    let left = min_left.min(max_left);
+    let top = min_top.min(max_top);
+    let right = min_right.max(max_right);
+    let bottom = min_bottom.max(max_bottom);
+
+    Ok((
+        (-left).max(0.0).ceil() as u32,
+        (-top).max(0.0).ceil() as u32,
+        (right - width as f32).max(0.0).ceil() as u32,
+        (bottom - height as f32).max(0.0).ceil() as u32,
+    ))
+}
+
+fn linear_gauge_label_layout(
+    gauge: &ValidatedLinearGaugeWidget,
+    width: u32,
+    height: u32,
+    scale: f32,
+    font: &skia_safe::Font,
+    min_value: f64,
+    max_value: f64,
+) -> LinearGaugeLabelLayout {
+    let w = width as f32;
+    let h = height as f32;
+    let gap = linear_gauge_label_gap(gauge.min_max_label_font_size * scale);
+    let min_label = format_linear_gauge_label(min_value);
+    let max_label = format_linear_gauge_label(max_value);
+    let (_, metrics) = font.metrics();
+    let (_, min_bounds) = font.measure_str(&min_label, None);
+    let (_, max_bounds) = font.measure_str(&max_label, None);
+
+    match (gauge.orientation, gauge.min_max_label_position) {
+        (
+            ValidatedLinearGaugeOrientation::Horizontal,
+            ValidatedLinearGaugeLabelPosition::Top,
+        ) => {
+            let baseline = -gap - metrics.descent;
+            LinearGaugeLabelLayout {
+                min_label: min_label.clone(),
+                max_label: max_label.clone(),
+                min_origin: Point::new(
+                    origin_x_for_centered_text(&min_label, 0.0, font),
+                    baseline,
+                ),
+                max_origin: Point::new(
+                    origin_x_for_centered_text(&max_label, w, font),
+                    baseline,
+                ),
+            }
+        }
+        (
+            ValidatedLinearGaugeOrientation::Horizontal,
+            ValidatedLinearGaugeLabelPosition::Bottom,
+        ) => {
+            let baseline = h + gap - metrics.ascent;
+            LinearGaugeLabelLayout {
+                min_label: min_label.clone(),
+                max_label: max_label.clone(),
+                min_origin: Point::new(
+                    origin_x_for_centered_text(&min_label, 0.0, font),
+                    baseline,
+                ),
+                max_origin: Point::new(
+                    origin_x_for_centered_text(&max_label, w, font),
+                    baseline,
+                ),
+            }
+        }
+        (
+            ValidatedLinearGaugeOrientation::Vertical,
+            ValidatedLinearGaugeLabelPosition::Left,
+        ) => LinearGaugeLabelLayout {
+            min_label: min_label.clone(),
+            max_label: max_label.clone(),
+            min_origin: Point::new(
+                -gap - min_bounds.right,
+                h - (min_bounds.top + min_bounds.bottom) * 0.5,
+            ),
+            max_origin: Point::new(
+                -gap - max_bounds.right,
+                -(max_bounds.top + max_bounds.bottom) * 0.5,
+            ),
+        },
+        (
+            ValidatedLinearGaugeOrientation::Vertical,
+            ValidatedLinearGaugeLabelPosition::Right,
+        ) => LinearGaugeLabelLayout {
+            min_label: min_label.clone(),
+            max_label: max_label.clone(),
+            min_origin: Point::new(
+                w + gap - min_bounds.left,
+                h - (min_bounds.top + min_bounds.bottom) * 0.5,
+            ),
+            max_origin: Point::new(
+                w + gap - max_bounds.left,
+                -(max_bounds.top + max_bounds.bottom) * 0.5,
+            ),
+        },
+        _ => unreachable!("linear gauge label position should match validated orientation"),
+    }
 }
 
 /// Formats a gauge boundary value for display. Integers show no decimal;

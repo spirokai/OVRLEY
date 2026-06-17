@@ -18,10 +18,11 @@ mod common;
 
 use anyhow::{Context, Result};
 use canvas_parity::{
-    generate_diff_png, parse_fixtures_with_config, preview_window_config, render_skia_preview,
-    run_playwright_screenshot, run_ssim, test_app_paths, write_mock_data, ViteServer,
+    generate_diff_png, parse_fixtures_with_config, render_skia_preview, run_playwright_screenshot,
+    run_ssim, test_app_paths, write_mock_data, ViteServer,
 };
 use ovrley_core::activity::build_dense_activity_report_validated;
+use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
 
@@ -64,14 +65,31 @@ fn canvas_parity() -> Result<()> {
 
     // 1. Parse fixtures
     println!("[1/9] Parsing fixtures...");
-    let (activity, config, activity_raw, config_raw) =
+    let (activity, mut config, activity_raw, mut config_raw) =
         parse_fixtures_with_config(&fixture_root, "test-template-4k.json")?;
-    let (config, config_raw) =
-        preview_window_config(&config, &config_raw, &activity, SELECTED_SECOND)?;
+    // Set the scene window to the full activity duration so the dense report
+    // contains all telemetry data. The gauge range is derived from the full
+    // dense series — narrowing the window would starve metrics like power and
+    // cause fallback to the 0–100 default range.
+    let activity_duration = activity
+        .sample_elapsed_seconds
+        .last()
+        .copied()
+        .unwrap_or(activity.trim_end_seconds);
+    config.scene.start = 0.0;
+    config.scene.end = activity_duration;
+    if let Some(scene) = config_raw
+        .get_mut("config")
+        .and_then(|c| c.get_mut("scene"))
+        .and_then(Value::as_object_mut)
+    {
+        scene.insert("start".into(), serde_json::json!(0.0));
+        scene.insert("end".into(), serde_json::json!(activity_duration));
+    }
     println!(
         "  activity: {} samples, {}s duration",
         activity.sample_elapsed_seconds.len(),
-        activity.trim_end_seconds
+        activity_duration
     );
 
     // 2. Build dense activity report

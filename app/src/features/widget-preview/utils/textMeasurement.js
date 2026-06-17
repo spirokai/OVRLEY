@@ -21,6 +21,8 @@ function createEmptyTextMeasure() {
     glyphHeight: 0,
     ascent: 0,
     descent: 0,
+    fontAscent: 0,
+    fontDescent: 0,
     boundsLeft: 0,
     boundsRight: 0,
   }
@@ -82,6 +84,8 @@ export function measurePreviewText(text, fontSize, fontFamily) {
   const metrics = context.measureText(text)
   const ascent = metrics.actualBoundingBoxAscent || 0
   const descent = metrics.actualBoundingBoxDescent || 0
+  const fontAscent = metrics.fontBoundingBoxAscent || ascent
+  const fontDescent = metrics.fontBoundingBoxDescent || descent
   const glyphHeight = ascent + descent
 
   return {
@@ -89,6 +93,8 @@ export function measurePreviewText(text, fontSize, fontFamily) {
     glyphHeight,
     ascent,
     descent,
+    fontAscent,
+    fontDescent,
     boundsLeft: metrics.actualBoundingBoxLeft || 0,
     boundsRight: metrics.actualBoundingBoxRight || metrics.width,
   }

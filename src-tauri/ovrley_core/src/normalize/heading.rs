@@ -306,6 +306,7 @@ mod tests {
             show_min_max_labels: None,
             min_max_label_font: None,
             min_max_label_font_size: None,
+            min_max_label_position: None,
             min_max_label_color: None,
             extra: {
                 let mut m = BTreeMap::new();

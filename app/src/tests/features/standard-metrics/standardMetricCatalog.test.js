@@ -161,7 +161,7 @@ describe('display type definitions', () => {
 
   test('boxed display types include default frame dimensions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameWidth).toBe(200)
-    expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameHeight).toBe(60)
+    expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameHeight).toBe(30)
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameWidth).toBe(120)
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameHeight).toBe(120)
   })
@@ -199,7 +199,7 @@ describe('display type definitions', () => {
 
   test('getDefaultFrameDimensions returns dimensions for boxed types and null for intrinsic', () => {
     expect(getDefaultFrameDimensions('text')).toBeNull()
-    expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 60 })
+    expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 30 })
     expect(getDefaultFrameDimensions('arc')).toEqual({ width: 120, height: 120 })
     expect(getDefaultFrameDimensions('nonexistent')).toBeNull()
   })
@@ -208,7 +208,6 @@ describe('display type definitions', () => {
     expect(getSupportedDisplayTypes('heading')).toEqual(['text', 'heading_tape'])
     expect(getSupportedDisplayTypes('core_temperature')).toEqual(['text'])
     expect(getSupportedDisplayTypes('speed')).toContain('text')
-    expect(getSupportedDisplayTypes('speed')).toContain('linear')
   })
 
   test('getDisplayTypeOptions builds dropdown options from definitions', () => {

@@ -224,6 +224,8 @@ pub struct ValueConfig {
     #[serde(default)]
     pub min_max_label_font_size: Option<f32>,
     #[serde(default)]
+    pub min_max_label_position: Option<String>,
+    #[serde(default)]
     pub min_max_label_color: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
