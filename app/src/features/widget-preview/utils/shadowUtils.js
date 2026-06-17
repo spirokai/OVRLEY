@@ -17,7 +17,7 @@ export function getTextShadowParts(data) {
   const shadowDistance = Number(data?.shadow_distance) || 0
   const shadowColor = data?.shadow_color
 
-  if (!shadowColor || (!shadowStrength && !shadowDistance)) return undefined
+  if (!shadowColor || shadowStrength <= 0) return undefined
 
   return {
     color: shadowColor,

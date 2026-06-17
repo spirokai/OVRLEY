@@ -221,7 +221,7 @@ pub fn draw_text_with_vertical_metrics_text(
         baseline_for_text_top_with_line_height(metrics_text, style.y, &font, style.line_height);
 
     if let Some(shadow_color) = style.shadow_color {
-        if style.shadow_strength > 0.0 || style.shadow_distance != 0.0 {
+        if style.shadow_strength > 0.0 {
             if let Some(shadow_filter) = image_filters::drop_shadow_only(
                 (style.shadow_distance, style.shadow_distance),
                 (style.shadow_strength, style.shadow_strength),

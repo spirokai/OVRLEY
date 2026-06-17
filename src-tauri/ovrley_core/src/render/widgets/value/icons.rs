@@ -358,7 +358,7 @@ pub(crate) fn draw_metric_icon(
     canvas.translate((x, y));
     canvas.scale((icon_scale, icon_scale));
     if let Some(shadow_color) = shadow_color {
-        if shadow_strength > 0.0 || shadow_distance != 0.0 {
+        if shadow_strength > 0.0 {
             let inverse_scale = if icon_scale.abs() <= f32::EPSILON {
                 1.0
             } else {

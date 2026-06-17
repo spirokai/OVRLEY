@@ -260,7 +260,7 @@ pub(crate) fn normalize_shadow_style_validated(
     let color = color.clone();
     let strength = strength * scale;
     let distance = distance * scale;
-    if strength <= 0.0 && distance == 0.0 {
+    if strength <= 0.0 {
         return None;
     }
     Some(ShadowStyle {

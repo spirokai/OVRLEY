@@ -95,7 +95,7 @@ function renderHighlightBar(centerX, topY, height, config) {
 }
 
 function buildShadowFilter(id, shadow) {
-  if (!shadow?.color || (!shadow.strength && !shadow.distance)) return null
+  if (!shadow?.color || shadow.strength <= 0) return null
 
   return (
     <filter id={id} x="-50%" y="-50%" width="200%" height="200%">
@@ -142,7 +142,7 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
         {model.shadow && buildShadowFilter(model.shadowFilterId, model.shadow)}
       </defs>
 
-      {model.shadow && renderTapeCopies(model.shadowFilterId)}
+      {model.shadow?.strength > 0 ? renderTapeCopies(model.shadowFilterId) : null}
 
       {renderTapeCopies()}
 
@@ -150,7 +150,7 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
         <>
           {data.indicator_style === 'highlight_bar'
             ? renderHighlightBar(model.width / 2, 0, model.height, data)
-            : renderChevron(model.width / 2, 0, model.height, data, model.shadow ? model.shadowFilterId : null)}
+            : renderChevron(model.width / 2, 0, model.height, data, model.shadow?.strength > 0 ? model.shadowFilterId : null)}
         </>
       )}
     </svg>

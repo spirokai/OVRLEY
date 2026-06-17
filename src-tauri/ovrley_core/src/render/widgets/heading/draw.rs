@@ -130,7 +130,7 @@ fn draw_chevron_indicator(
 
     // Apply shadow first so it sits behind the chevron
     if let Some(ref shadow) = cache.indicator_shadow {
-        if shadow.strength > 0.0 || shadow.distance != 0.0 {
+        if shadow.strength > 0.0 {
             if let Some(filter) = skia_safe::image_filters::drop_shadow_only(
                 (shadow.offset_x, shadow.offset_y),
                 (shadow.strength, shadow.strength),
