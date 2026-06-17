@@ -474,7 +474,7 @@ fn parse_ffmpeg_frame(line: &str) -> Option<u32> {
 fn make_even(value: u32) -> u32 {
     // Many ffmpeg encoders require even dimensions. The extra pixel is
     // transparent because the render target starts cleared/base-filled.
-    if value.is_multiple_of(2) {
+    if value % 2 == 0 {
         value
     } else {
         value + 1

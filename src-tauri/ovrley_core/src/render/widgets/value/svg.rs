@@ -4,7 +4,7 @@
 /// primitive stroke width, and fill-vs-stroke style) and converts path data
 /// into Skia paths. The bundled Lucide-style icons use only a handful of
 /// commands, so the parser does not attempt full SVG compliance.
-use skia_safe::{path::ArcSize, Path, PathDirection, Point};
+use skia_safe::{path_builder::ArcSize, Path, PathBuilder, PathDirection, Point};
 
 use super::icons::{ParsedSvgIcon, SvgPrimitive, SvgPrimitiveStyle};
 
@@ -123,7 +123,7 @@ pub(crate) fn svg_path_to_skia_path(data: &str) -> Option<Path> {
     }
 
     // Phase 2: walk the token stream, mapping SVG commands to Skia path calls.
-    let mut path = Path::new();
+    let mut path = PathBuilder::new();
     let mut index = 0usize;
     let mut current_command = None;
     let mut current = Point::new(0.0, 0.0);
@@ -200,7 +200,7 @@ pub(crate) fn svg_path_to_skia_path(data: &str) -> Option<Path> {
                     if rx.abs() <= f32::EPSILON || ry.abs() <= f32::EPSILON {
                         path.line_to(end);
                     } else {
-                        path.arc_to_rotated(
+                        path.arc_to_radius(
                             (rx, ry),
                             x_axis_rotation,
                             if large_arc {
@@ -243,7 +243,7 @@ pub(crate) fn svg_path_to_skia_path(data: &str) -> Option<Path> {
         }
     }
 
-    Some(path)
+    Some(path.detach())
 }
 
 /// Tokenizes SVG path data into commands and numeric operands.

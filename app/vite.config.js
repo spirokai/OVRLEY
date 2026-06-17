@@ -79,10 +79,139 @@ function parseDebugWritePlugin() {
   }
 }
 
+/**
+ * Serves generated Wasm preview POC artifacts during local debug sessions.
+ *
+ * @returns {object} Result produced by the helper.
+ */
+function wasmPreviewArtifactPlugin() {
+  const artifactDir = path.resolve(__dirname, '..', 'src-tauri', 'target', 'wasm32-unknown-emscripten', 'wasm-preview')
+  const contentTypes = {
+    '.js': 'text/javascript',
+    '.wasm': 'application/wasm',
+  }
+
+  return {
+    name: 'wasm-preview-artifact-plugin',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/debug/wasm-preview-artifacts', async (req, res) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          res.statusCode = 405
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ error: 'Method not allowed' }))
+          return
+        }
+
+        const requestPath = decodeURIComponent(new URL(req.url || '', 'http://localhost').pathname)
+        const requestedPath = requestPath.replace(/^\/debug\/wasm-preview-artifacts\/?/, '').replace(/^\/+/, '')
+        const outputPath = path.resolve(artifactDir, requestedPath)
+        const isInsideArtifactDir = outputPath === artifactDir || outputPath.startsWith(`${artifactDir}${path.sep}`)
+
+        if (!isInsideArtifactDir || !['wasm_preview_poc.js', 'wasm_preview_poc.wasm'].includes(path.basename(outputPath))) {
+          res.statusCode = 404
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ error: 'Unknown Wasm preview artifact' }))
+          return
+        }
+
+        try {
+          const contents = await fs.readFile(outputPath)
+          res.statusCode = 200
+          res.setHeader('Content-Type', contentTypes[path.extname(outputPath)] || 'application/octet-stream')
+          res.setHeader('Cache-Control', 'no-store')
+          if (req.method === 'HEAD') {
+            res.end()
+            return
+          }
+          res.end(contents)
+        } catch (error) {
+          res.statusCode = 404
+          res.setHeader('Content-Type', 'application/json')
+          res.end(
+            JSON.stringify({
+              error: `Wasm preview artifact is missing. Run "pnpm wasm:preview:build" from the repo root. ${error.message}`,
+            }),
+          )
+        }
+      })
+    },
+  }
+}
+
+/**
+ * Serves bundled fonts from the repo's fonts directory during local debug sessions.
+ *
+ * @returns {object} Result produced by the helper.
+ */
+function fontServingPlugin() {
+  const fontsDir = path.resolve(__dirname, '..', 'fonts')
+  const contentTypes = {
+    '.ttf': 'font/ttf',
+    '.otf': 'font/otf',
+    '.ttc': 'font/ttc',
+  }
+
+  return {
+    name: 'font-serving-plugin',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/fonts', async (req, res) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          res.statusCode = 405
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ error: 'Method not allowed' }))
+          return
+        }
+
+        const requestPath = decodeURIComponent(new URL(req.url || '', 'http://localhost').pathname)
+        const requestedPath = requestPath.replace(/^\/fonts\/?/, '').replace(/^\/+/, '')
+        const outputPath = path.resolve(fontsDir, requestedPath)
+        const isInsideFontsDir = outputPath === fontsDir || outputPath.startsWith(`${fontsDir}${path.sep}`)
+
+        if (!isInsideFontsDir) {
+          res.statusCode = 403
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ error: 'Access denied' }))
+          return
+        }
+
+        const ext = path.extname(outputPath).toLowerCase()
+        if (!contentTypes[ext]) {
+          res.statusCode = 404
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ error: 'Unsupported font format' }))
+          return
+        }
+
+        try {
+          const contents = await fs.readFile(outputPath)
+          res.statusCode = 200
+          res.setHeader('Content-Type', contentTypes[ext])
+          res.setHeader('Cache-Control', 'public, max-age=3600')
+          if (req.method === 'HEAD') {
+            res.end()
+            return
+          }
+          res.end(contents)
+        } catch (error) {
+          res.statusCode = 404
+          res.setHeader('Content-Type', 'application/json')
+          res.end(
+            JSON.stringify({
+              error: `Font not found: ${error.message}`,
+            }),
+          )
+        }
+      })
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss(), parseDebugWritePlugin()],
+  plugins: [react(), tailwindcss(), parseDebugWritePlugin(), wasmPreviewArtifactPlugin(), fontServingPlugin()],
   server: {
     port: 5173,
     strictPort: true,

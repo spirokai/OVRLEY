@@ -2,7 +2,12 @@
 members = [
     ".",
     "ovrley_core",
+    "wasm_preview_poc",
 ]
+
+[profile.wasm-preview]
+inherits = "release"
+panic = "abort"
 
 [package]
 name = "app"

@@ -581,7 +581,7 @@ pub fn parse_config_value(value: &Value) -> CoreResult<RenderConfig> {
             ));
         }
         let fps = config.scene.fps.round() as u32;
-        if !fps.is_multiple_of(update_rate) {
+        if fps % update_rate != 0 {
             return Err(CoreError::Config(format!(
                 "scene.update_rate ({update_rate}) must cleanly divide scene.fps ({fps})"
             )));

@@ -17,7 +17,8 @@
     "release": "semantic-release",
     "benchmark:transparent": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_transparent --",
     "benchmark:composite": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_composite --",
-    "benchmark:widget-rate": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_widget_rate --"
+    "benchmark:widget-rate": "cd src-tauri && cargo run -p ovrley_core --bin benchmark_widget_rate --",
+    "wasm:preview:build": "cd src-tauri && cargo +1.84.0 build -p wasm_preview_poc --target wasm32-unknown-emscripten --profile wasm-preview"
   },
   "keywords": [],
   "author": "",

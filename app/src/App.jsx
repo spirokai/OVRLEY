@@ -26,6 +26,7 @@ import {
   useEditorShellState,
 } from '@/features/app-shell'
 import { useVideoImport } from '@/features/video-preview'
+import { WasmPreviewDebug } from '@/features/wasm-preview-debug'
 import * as backend from './api/backend'
 
 /**
@@ -223,6 +224,10 @@ function AppShell() {
  * @returns {JSX.Element} Rendered component output.
  */
 function App() {
+  if (import.meta.env.DEV && window.location.hash === '#/debug/wasm-preview') {
+    return <WasmPreviewDebug />
+  }
+
   return <AppShell />
 }
 

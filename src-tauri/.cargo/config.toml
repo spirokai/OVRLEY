@@ -1,0 +1,8 @@
+[target.wasm32-unknown-emscripten]
+linker = "wasm_preview_poc/tools/emcc-linker.bat"
+rustflags = [
+    "-C",
+    "link-arg=-sSUPPORT_LONGJMP=emscripten",
+    "-C",
+    "link-arg=-sINITIAL_MEMORY=134217728",
+]

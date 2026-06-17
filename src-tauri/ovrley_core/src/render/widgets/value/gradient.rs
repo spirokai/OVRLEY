@@ -8,7 +8,7 @@ use crate::error::CoreResult;
 use crate::normalize::ValidatedGradientWidget;
 use crate::render::format::format_validated_gradient;
 use crate::render::text::{draw_text, measure_text, ResolvedTextStyle};
-use skia_safe::{paint::Style, Canvas, Color, Paint, PaintCap, Path, Point};
+use skia_safe::{paint::Style, Canvas, Color, Paint, PaintCap, Path, PathBuilder, Point};
 use std::path::PathBuf;
 
 const GRADIENT_TRIANGLE_GAP_PX: f32 = 8.0;
@@ -196,7 +196,7 @@ fn build_gradient_triangle_path(
         return None;
     }
 
-    let mut path = Path::new();
+    let mut path = PathBuilder::new();
     if raw_gradient.unwrap_or(0.0) > 0.0 {
         path.move_to(Point::new(left, baseline_y));
         path.line_to(Point::new(left + width, baseline_y));
@@ -209,5 +209,5 @@ fn build_gradient_triangle_path(
         return None;
     }
     path.close();
-    Some(path)
+    Some(path.detach())
 }

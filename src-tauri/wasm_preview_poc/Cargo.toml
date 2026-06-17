@@ -1,0 +1,8 @@
+[package]
+name = "wasm_preview_poc"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+skia-safe = { version = "=0.97.2", features = ["binary-cache"] }

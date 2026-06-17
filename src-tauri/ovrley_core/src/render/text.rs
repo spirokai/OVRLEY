@@ -228,6 +228,7 @@ pub fn draw_text_with_vertical_metrics_text(
                 shadow_color,
                 None,
                 None,
+                None,
             ) {
                 let mut paint = text_paint(style.color);
                 paint.set_image_filter(shadow_filter);
