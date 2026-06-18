@@ -17,7 +17,7 @@ import { useFontMetricsVersion } from '../hooks/useFontMetricsVersion'
 import { PreviewSvgShadowBlurFilter, PreviewSvgText } from './previewSvgComponents'
 import { useId } from 'react'
 
-const LINEAR_GAUGE_LABEL_GAP_PX = 10
+const LINEAR_GAUGE_LABEL_GAP_PX = 8
 
 /**
  * Extracts the activity series for the metric this widget displays.

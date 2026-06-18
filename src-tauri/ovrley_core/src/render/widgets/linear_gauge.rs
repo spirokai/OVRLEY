@@ -31,7 +31,7 @@ pub enum LinearGaugeOrientation {
     Vertical,
 }
 
-const LINEAR_GAUGE_LABEL_GAP_PX: f32 = 10.0;
+const LINEAR_GAUGE_LABEL_GAP_PX: f32 = 8.0;
 
 #[derive(Clone, Debug)]
 struct LinearGaugeLabelLayout {
