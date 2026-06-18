@@ -181,6 +181,49 @@
         "id": "widget-8",
         "value": "time",
         "format": "time-24"
+      },
+      {
+        "x": 1485,
+        "y": 765,
+        "prefix": "",
+        "suffix": "",
+        "decimals": 0,
+        "display_type": "linear",
+        "unit_color": "#ffffff",
+        "show_icon": true,
+        "icon_size": 45,
+        "icon_offset_x": 0,
+        "icon_offset_y": 0,
+        "icon_color": "#ffffff",
+        "font": "Furore.otf",
+        "font_size": 100,
+        "color": "#ffffff",
+        "opacity": 1,
+        "show_units": true,
+        "display_unit": "w",
+        "id": "widget-11",
+        "value": "power",
+        "display_variants": {
+          "linear": {
+            "width": 497,
+            "height": 60,
+            "rotation": 0,
+            "orientation": "horizontal",
+            "track_corner_radius": 20,
+            "track_border_thickness": 3,
+            "track_border_color": "#ffffff",
+            "track_empty_color": "#222222",
+            "track_empty_opacity": 0.5,
+            "track_fill_flat": true,
+            "track_filled_color": "#40e0d0",
+            "track_filled_opacity": 1,
+            "show_min_max_labels": true,
+            "min_max_label_font_size": 35,
+            "min_max_label_font": "Furore.otf",
+            "min_max_label_position": "bottom",
+            "min_max_label_color": "#c75102"
+          }
+        }
       }
     ],
     "plots": [
@@ -213,7 +256,7 @@
         "imperial_label_offset_x": 0,
         "imperial_label_offset_y": 0,
         "completed_line_color": "#afeeee",
-        "remaining_line_color": "#ff0000",
+        "remaining_line_color": "#1500FF",
         "area_completed_color": "#ffffff",
         "area_remaining_color": "#00565c",
         "marker_color": "#d1f8f3",
@@ -245,7 +288,7 @@
         "marker_size": 6,
         "marker_opacity": 100,
         "completed_line_color": "#afeeee",
-        "remaining_line_color": "#ff0000",
+        "remaining_line_color": "#1500FF",
         "marker_color": "#40e0d0",
         "color": "#b1f3e1",
         "id": "widget-10"
@@ -254,7 +297,7 @@
   },
   "settings": {
     "globalDefaults": {
-      "border_color": "#ff0000",
+      "border_color": "#04FF00",
       "border_thickness": 2,
       "shadow_color": "#0059ff",
       "shadow_strength": 0,

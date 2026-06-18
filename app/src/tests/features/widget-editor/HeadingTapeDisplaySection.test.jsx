@@ -1,8 +1,8 @@
 import { describe, test, expect, vi, beforeAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import HeadingWidgetEditor from '@/features/widget-editor/components/HeadingWidgetEditor'
-import { HEADING_TAPE_DEFAULTS } from '@/lib/standard-widgets'
+import HeadingTapeDisplaySection from '@/features/widget-editor/components/metricWidget/HeadingTapeDisplaySection'
+import { HEADING_TAPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 
 vi.mock('@/features/scene-settings/hooks/useAvailableFonts', () => ({
   default: () => ({
@@ -26,50 +26,34 @@ function makeHeadingWidget(overrides = {}) {
     category: 'values',
     data: {
       value: 'heading',
-      display_type: 'text',
+      display_type: 'heading_tape',
       display_variants: {
-        heading_tape: { ...HEADING_TAPE_DEFAULTS },
+        heading_tape: { ...HEADING_TAPE_DEFAULTS, ...overrides },
       },
-      ...overrides,
     },
   }
 }
 
 function makeHeadingTapeWidget(tapeOverrides = {}) {
-  return makeHeadingWidget({
-    display_type: 'heading_tape',
-    display_variants: {
-      heading_tape: { ...HEADING_TAPE_DEFAULTS, ...tapeOverrides },
-    },
-  })
+  return makeHeadingWidget(tapeOverrides)
 }
 
-describe('HeadingWidgetEditor', () => {
-  test('reuses metric editor controls in text mode', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingWidget({ display_type: 'text' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
-    expect(screen.getByText('Display')).toBeInTheDocument()
-    expect(screen.getByText('Display Type')).toBeInTheDocument()
-    expect(screen.getByText('Typography')).toBeInTheDocument()
-    expect(screen.getByText('Icon')).toBeInTheDocument()
-    expect(screen.getByText('Unit')).toBeInTheDocument()
-    expect(screen.queryByText('Tape Scale')).not.toBeInTheDocument()
-  })
-
+describe('HeadingTapeDisplaySection', () => {
   test('renders the Tape section with pixels_per_degree control', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} />)
     expect(screen.getByText('Tape Scale')).toBeInTheDocument()
     expect(screen.getByText('Pixels per Degree')).toBeInTheDocument()
   })
 
   test('renders the Ticks section with major/minor toggles', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} />)
     expect(screen.getByText('Ticks')).toBeInTheDocument()
     expect(screen.getByText('Major Ticks')).toBeInTheDocument()
     expect(screen.getByText('Minor Ticks')).toBeInTheDocument()
   })
 
   test('renders tick length and thickness controls', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} />)
     expect(screen.getByText('Major Length')).toBeInTheDocument()
     expect(screen.getByText('Minor Length')).toBeInTheDocument()
     expect(screen.getByText('Major Thickness')).toBeInTheDocument()
@@ -77,26 +61,26 @@ describe('HeadingWidgetEditor', () => {
   })
 
   test('renders tick color controls', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} />)
     expect(screen.getByText('Tick Color')).toBeInTheDocument()
     const cardinalColors = screen.getAllByText('Cardinal Color')
     expect(cardinalColors.length).toBeGreaterThanOrEqual(1)
   })
 
   test('renders tick alignment dropdown', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} />)
     expect(screen.getByText('Alignment')).toBeInTheDocument()
   })
 
   test('renders the Labels section with show/hide toggles', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} />)
     expect(screen.getByText('Labels')).toBeInTheDocument()
     expect(screen.getByText('Minor Labels')).toBeInTheDocument()
     expect(screen.getByText('Major Labels')).toBeInTheDocument()
   })
 
   test('renders label color and font size controls', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} />)
     expect(screen.getByText('Label Font')).toBeInTheDocument()
     expect(screen.getByText('Label Color')).toBeInTheDocument()
     expect(screen.getAllByText('Cardinal Color').length).toBeGreaterThanOrEqual(1)
@@ -104,7 +88,7 @@ describe('HeadingWidgetEditor', () => {
   })
 
   test('renders the Indicator section with style and placement controls', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} />)
     expect(screen.getByText('Indicator')).toBeInTheDocument()
     expect(screen.getByText('Show Indicator')).toBeInTheDocument()
     expect(screen.getByText('Style')).toBeInTheDocument()
@@ -112,7 +96,7 @@ describe('HeadingWidgetEditor', () => {
   })
 
   test('renders indicator color and size controls', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget()} updateWidgetData={vi.fn()} />)
     expect(screen.getByText('Indicator Color')).toBeInTheDocument()
     expect(screen.getByText('Indicator Size')).toBeInTheDocument()
   })
@@ -120,13 +104,7 @@ describe('HeadingWidgetEditor', () => {
   test('major tick toggle writes to display_variants.heading_tape', async () => {
     const updateWidgetData = vi.fn()
     const user = userEvent.setup()
-    render(
-      <HeadingWidgetEditor
-        widget={makeHeadingTapeWidget({ show_major_ticks: true })}
-        updateWidgetData={updateWidgetData}
-        setNumericField={vi.fn()}
-      />,
-    )
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget({ show_major_ticks: true })} updateWidgetData={updateWidgetData} />)
 
     const majorTicksLabel = screen.getByText('Major Ticks')
     const toggle = majorTicksLabel.closest('div').querySelector('button')
@@ -143,18 +121,12 @@ describe('HeadingWidgetEditor', () => {
   })
 
   test('indicator style select shows current value', () => {
-    render(
-      <HeadingWidgetEditor
-        widget={makeHeadingTapeWidget({ indicator_style: 'highlight_bar' })}
-        updateWidgetData={vi.fn()}
-        setNumericField={vi.fn()}
-      />,
-    )
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget({ indicator_style: 'highlight_bar' })} updateWidgetData={vi.fn()} />)
     expect(screen.getByText('Highlight Bar')).toBeInTheDocument()
   })
 
   test('disables major tick options when major ticks are hidden', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingTapeWidget({ show_major_ticks: false })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget({ show_major_ticks: false })} updateWidgetData={vi.fn()} />)
 
     const majorLengthSlider = screen.getByText('Major Length').closest('div').parentElement.querySelector('[data-slot="slider"]')
     const majorThicknessSlider = screen.getByText('Major Thickness').closest('div').parentElement.querySelector('[data-slot="slider"]')
@@ -164,7 +136,7 @@ describe('HeadingWidgetEditor', () => {
   })
 
   test('disables minor tick options when minor ticks are hidden', () => {
-    render(<HeadingWidgetEditor widget={makeHeadingTapeWidget({ show_minor_ticks: false })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget({ show_minor_ticks: false })} updateWidgetData={vi.fn()} />)
 
     const minorLengthSlider = screen.getByText('Minor Length').closest('div').parentElement.querySelector('[data-slot="slider"]')
     const minorThicknessSlider = screen.getByText('Minor Thickness').closest('div').parentElement.querySelector('[data-slot="slider"]')
@@ -174,13 +146,7 @@ describe('HeadingWidgetEditor', () => {
   })
 
   test('disables indicator placement when style is highlight bar', () => {
-    render(
-      <HeadingWidgetEditor
-        widget={makeHeadingTapeWidget({ indicator_style: 'highlight_bar' })}
-        updateWidgetData={vi.fn()}
-        setNumericField={vi.fn()}
-      />,
-    )
+    render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget({ indicator_style: 'highlight_bar' })} updateWidgetData={vi.fn()} />)
 
     const placementTrigger = screen.getByText('Placement').closest('div').querySelector('button')
 

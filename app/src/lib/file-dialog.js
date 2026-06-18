@@ -1,5 +1,5 @@
-import { convertFileSrc } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
+import { readSelectedFileBytes } from '@/api/backend'
 
 export const selectBrowserFile = (accept) =>
   new Promise((resolve) => {
@@ -12,14 +12,9 @@ export const selectBrowserFile = (accept) =>
   })
 
 export async function fileFromSelectedPath(selectedPath, fallbackName = 'file') {
-  const response = await fetch(convertFileSrc(selectedPath))
-  if (!response.ok) {
-    throw new Error(`Failed to read selected file: ${response.status}`)
-  }
-
-  const blob = await response.blob()
+  const bytes = await readSelectedFileBytes(selectedPath)
   const filename = String(selectedPath).split(/[/\\]/).pop() || fallbackName
-  return new File([blob], filename, { type: blob.type || 'application/octet-stream' })
+  return new File([bytes], filename, { type: 'application/octet-stream' })
 }
 
 export function openSinglePath(filters) {

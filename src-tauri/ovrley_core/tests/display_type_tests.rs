@@ -6,6 +6,7 @@
 
 mod common;
 
+use ovrley_core::render::widgets::types::PreparedValue;
 use ovrley_core::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
 use ovrley_core::types::DisplayType;
 use serde_json::json;
@@ -85,7 +86,7 @@ fn text_display_type_passes_standard_metric_validation() {
 }
 
 #[test]
-fn linear_display_type_is_rejected_for_standard_text_metrics() {
+fn incomplete_linear_display_type_requires_gauge_fields() {
     let error = ovrley_core::commands::validate_config_value(&json!({
         "scene": common::seam::explicit_scene_json(),
         "labels": [],
@@ -117,11 +118,44 @@ fn linear_display_type_is_rejected_for_standard_text_metrics() {
     .unwrap();
 
     assert!(
-        error
-            .to_string()
-            .contains("values[0].display_type: display_type 'linear' is outside the standard metric text/value validation slice"),
+        error.to_string().contains("values[0].width: required"),
         "got: '{error}'"
     );
+}
+
+#[test]
+fn complete_linear_display_type_validates_as_gauge() {
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [{
+            "value": "speed",
+            "x": 10,
+            "y": 20,
+            "display_type": "linear",
+            "width": 200,
+            "height": 60,
+            "rotation": 0,
+            "orientation": "horizontal",
+            "track_corner_radius": 6,
+            "track_border_thickness": 2,
+            "track_border_color": "#ffffff",
+            "track_empty_color": "#222222",
+            "track_empty_opacity": 0.5,
+            "track_filled_color": "#40e0d0",
+            "track_filled_opacity": 1,
+            "show_min_max_labels": false,
+            "min_max_label_font_size": 12,
+            "min_max_label_color": "#ffffff"
+        }],
+        "plots": []
+    }));
+
+    let PreparedValue::LinearGauge(value) = config.values.into_iter().next().unwrap() else {
+        panic!("linear display type should validate as a linear gauge prepared value");
+    };
+    assert_eq!(value.display_type, DisplayType::Linear);
+    assert_eq!(value.width, 200);
 }
 
 #[test]

@@ -20,6 +20,7 @@ use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::render::text::ResolvedTextStyle;
 use crate::render::widgets::heading::draw_heading_widget;
+use crate::render::widgets::linear_gauge::draw_linear_gauge_widget;
 use crate::render::widgets::types::{PresentationCache, WidgetRenderReport};
 use crate::types::{DisplayType, MetricKind};
 use skia_safe::Canvas;
@@ -61,8 +62,28 @@ pub fn draw_metric_presentation(
             presentation_caches.get(&value_idx),
             frame_profiler,
         ),
-        DisplayType::Linear | DisplayType::Bars | DisplayType::Arc | DisplayType::Corner => None,
+        DisplayType::Linear => draw_linear_presentation(
+            canvas,
+            presentation_caches.get(&value_idx),
+            frame_index,
+            frame_profiler,
+        ),
+        DisplayType::Bars | DisplayType::Arc | DisplayType::Corner => None,
     }
+}
+
+/// Draws the linear gauge presentation for a single frame. Delegates
+/// per-frame fill-composite rendering to the shared linear gauge module.
+fn draw_linear_presentation(
+    canvas: &Canvas,
+    cache: Option<&PresentationCache>,
+    frame_index: usize,
+    frame_profiler: &mut RenderProfiler,
+) -> Option<WidgetRenderReport> {
+    let PresentationCache::LinearGauge(gauge_cache) = cache? else {
+        return None;
+    };
+    draw_linear_gauge_widget(canvas, gauge_cache, frame_index, frame_profiler)
 }
 
 /// Draws the heading tape presentation for a heading metric value.
@@ -86,7 +107,9 @@ fn draw_tape_presentation(
         return None;
     }
 
-    let PresentationCache::HeadingTape(heading_cache) = cache?;
+    let PresentationCache::HeadingTape(heading_cache) = cache? else {
+        return None;
+    };
 
     if heading_cache.display_type == DisplayType::Text {
         return None;

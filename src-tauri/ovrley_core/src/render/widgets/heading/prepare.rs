@@ -94,11 +94,12 @@ pub fn prepare_heading_cache(
 
     // Draw shadow pass first so shadows sit behind the main content
     if let Some(ref shadow) = shadow {
-        if shadow.strength > 0.0 || shadow.distance != 0.0 {
+        if shadow.strength > 0.0 {
             let shadow_filter = image_filters::drop_shadow_only(
                 (shadow.offset_x, shadow.offset_y),
                 (shadow.strength, shadow.strength),
                 parse_color(&shadow.color, 1.0),
+                None,
                 None,
                 None,
             );

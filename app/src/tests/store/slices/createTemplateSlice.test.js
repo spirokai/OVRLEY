@@ -9,8 +9,8 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
-import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template-constants'
-import { createEditorEffectiveConfig } from '@/lib/template-state'
+import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
+import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
 /**

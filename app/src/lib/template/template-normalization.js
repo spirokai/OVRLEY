@@ -22,8 +22,8 @@
  */
 
 import { normalizeColorFields } from '@/lib/color-utils'
-import { ensureWidgetIdsInConfig } from '@/lib/widget-config'
-import { initDisplayVariant } from '@/lib/metric-widget-resolver'
+import { ensureWidgetIdsInConfig } from '../widget/widget-config'
+import { initDisplayVariant } from '../widget/metric-widget-resolver'
 import {
   COURSE_PLOT_KEYS,
   DEFAULT_GLOBAL_DEFAULTS,
@@ -34,7 +34,7 @@ import {
   SCENE_RENDER_TIME_ONLY_KEYS,
   VALUE_SHARED_KEYS,
 } from './template-constants'
-import { TYPE_DEFAULTS, TEXT_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS, GRADIENT_DEFAULTS } from '@/lib/standard-widgets'
+import { TYPE_DEFAULTS, TEXT_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS, GRADIENT_DEFAULTS } from '../widget/standard-widgets'
 
 function cloneSerializable(value) {
   if (value === undefined) return undefined
@@ -122,6 +122,21 @@ function normalizeDisplayVariants(variants) {
   return Object.keys(normalized).length > 0 ? normalized : undefined
 }
 
+function normalizeLinearGaugeLabelPosition(variant) {
+  if (!variant || typeof variant !== 'object') return variant
+
+  const orientation = variant.orientation === 'vertical' ? 'vertical' : 'horizontal'
+  const allowedPositions = orientation === 'vertical' ? ['left', 'right'] : ['bottom', 'top']
+  const fallbackPosition = orientation === 'vertical' ? 'left' : 'bottom'
+  const position = typeof variant.min_max_label_position === 'string' ? variant.min_max_label_position : fallbackPosition
+
+  return {
+    ...variant,
+    orientation,
+    min_max_label_position: allowedPositions.includes(position) ? position : fallbackPosition,
+  }
+}
+
 function normalizeValue(value = {}) {
   const type = value.value
   const valueDefaults = type === 'gradient' ? GRADIENT_DEFAULTS : TYPE_DEFAULTS[type] || {}
@@ -137,6 +152,9 @@ function normalizeValue(value = {}) {
   }
   if (pickedValue.display_variants) {
     pickedValue.display_variants = normalizeDisplayVariants(pickedValue.display_variants)
+    if (pickedValue.display_variants?.linear) {
+      pickedValue.display_variants.linear = normalizeLinearGaugeLabelPosition(pickedValue.display_variants.linear)
+    }
   }
   return normalizeColorFields(pickedValue)
 }

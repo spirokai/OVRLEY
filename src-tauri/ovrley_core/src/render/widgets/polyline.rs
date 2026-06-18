@@ -50,7 +50,7 @@ pub(crate) fn draw_polyline_with_shadow(
     paint.set_color(crate::render::text::parse_color(color, opacity));
 
     if let Some(shadow) = shadow {
-        if shadow.strength > 0.0 || shadow.distance != 0.0 {
+        if shadow.strength > 0.0 {
             let mut shadow_paint = Paint::default();
             shadow_paint.set_anti_alias(true);
             shadow_paint.set_style(skia_safe::paint::Style::Stroke);

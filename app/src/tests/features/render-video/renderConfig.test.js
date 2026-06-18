@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, test } from 'vitest'
-import { DEFAULT_EXPORT_RANGE } from '@/lib/template-constants'
+import { DEFAULT_EXPORT_RANGE } from '@/lib/template/template-constants'
 import { createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
 
 describe('render config preparation', () => {

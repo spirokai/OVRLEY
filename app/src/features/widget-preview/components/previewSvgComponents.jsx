@@ -20,7 +20,7 @@ import { normalizeSvgShadowColor } from '../utils/svgPreviewUtils'
  * @returns {JSX.Element|null} SVG defs element, or null if id or shadow is missing.
  */
 export function PreviewSvgShadowOnlyFilter({ id, shadow, opacity = 1 }) {
-  if (!id || !shadow) {
+  if (!id || !shadow || shadow.strength <= 0) {
     return null
   }
 
@@ -64,7 +64,7 @@ export function PreviewSvgShadowBlurFilter({ id, shadow }) {
 }
 
 function PreviewSvgIconShadow({ icon, left, top, iconScale, shadow, shadowFilterId, opacity }) {
-  if (!shadow || !shadowFilterId) {
+  if (!shadow || !shadowFilterId || shadow.strength <= 0) {
     return null
   }
 
@@ -120,7 +120,7 @@ export function PreviewSvgText({
   borderThickness,
   textTransform,
 }) {
-  const hasShadow = Boolean(shadow && shadowFilterId)
+  const hasShadow = Boolean(shadow && shadowFilterId && shadow.strength > 0)
   const textStyle = textTransform ? { textTransform } : undefined
 
   return (
@@ -234,7 +234,7 @@ export function PreviewMetricIcon({ icon, left, top, size, color, opacity, shado
  * @returns {JSX.Element|null} SVG polyline element, or null if no shadow or points.
  */
 export function PreviewPolylineShadow({ points, shadow, blurFilterId, strokeWidth, strokeOpacity, rotation = 0 }) {
-  if (!shadow || !points) {
+  if (!shadow || !points || shadow.strength <= 0) {
     return null
   }
 

@@ -28,7 +28,7 @@ Portable archives include a generated `THIRD_PARTY_NOTICES.txt` with the bundled
 
 ## macOS
 
-The workflow uploads the `.dmg` and a zipped `.app`. The `.app` is the portable form on macOS; FFmpeg is included inside the app resources, separate from the app executable. Distribution outside a local machine should still be signed and notarized to avoid Gatekeeper warnings.
+The workflow uploads a zipped `.app`. The `.app` is the portable form on macOS; FFmpeg is included inside the app resources, separate from the app executable. Distribution outside a local machine should still be signed and notarized to avoid Gatekeeper warnings.
 
 ## FFmpeg Updates
 

@@ -13,8 +13,8 @@ import {
   createEditorEffectiveConfig,
   getEffectiveWidgetData,
   syncGlobalDefaultsToConfig,
-} from '@/lib/template-state'
-import { normalizeGlobalDefaults, normalizeTemplateConfig } from '@/lib/template-normalization'
+} from '@/lib/template/template-state'
+import { normalizeGlobalDefaults, normalizeTemplateConfig } from '@/lib/template/template-normalization'
 
 /* -------------------------------------------------------------------------- */
 /* normalizeGlobalDefaults                                                    */
@@ -162,6 +162,38 @@ describe('normalizeTemplateConfig', () => {
     expect(result.values[0].display_variants.heading_tape.label_font).toBe('Teko.ttf')
     expect(result.values[0].display_variants.heading_tape.major_tick_thickness).toBe(4)
     expect(result.values[0].display_variants.heading_tape.minor_tick_thickness).toBe(1)
+  })
+
+  test('normalizes linear value widget with complete display defaults', () => {
+    const config = {
+      values: [
+        {
+          id: 'linear-1',
+          value: 'speed',
+          x: 30,
+          y: 40,
+          display_type: 'linear',
+          display_variants: {
+            linear: {
+              width: 320,
+              height: 80,
+              track_corner_radius: 10,
+            },
+          },
+        },
+      ],
+    }
+
+    const result = normalizeTemplateConfig(config)
+
+    expect(result.values[0].display_type).toBe('linear')
+    expect(result.values[0].display_variants.linear.width).toBe(320)
+    expect(result.values[0].display_variants.linear.height).toBe(80)
+    expect(result.values[0].display_variants.linear.track_corner_radius).toBe(10)
+    expect(result.values[0].display_variants.linear.orientation).toBe('horizontal')
+    expect(result.values[0].display_variants.linear.track_fill_flat).toBe(true)
+    expect(result.values[0].display_variants.linear.show_min_max_labels).toBe(false)
+    expect(result.values[0].display_variants.linear.min_max_label_position).toBe('bottom')
   })
 })
 

@@ -11,12 +11,11 @@ import { describe, expect, test, vi } from 'vitest'
 
 // Mock all editor components
 vi.mock('@/features/widget-editor/components/TextWidgetEditor', () => ({ default: () => <div data-testid="editor-text" /> }))
-vi.mock('@/features/widget-editor/components/MetricWidgetEditor', () => ({ default: () => <div data-testid="editor-metric" /> }))
+vi.mock('@/features/widget-editor/components/metricWidget/MetricWidgetEditor', () => ({ default: () => <div data-testid="editor-metric" /> }))
 vi.mock('@/features/widget-editor/components/TimeWidgetEditor', () => ({ default: () => <div data-testid="editor-time" /> }))
 vi.mock('@/features/widget-editor/components/GradientWidgetEditor', () => ({ default: () => <div data-testid="editor-gradient" /> }))
 vi.mock('@/features/widget-editor/components/RouteMapWidgetEditor', () => ({ default: () => <div data-testid="editor-course" /> }))
 vi.mock('@/features/widget-editor/components/ElevationWidgetEditor', () => ({ default: () => <div data-testid="editor-elevation" /> }))
-vi.mock('@/features/widget-editor/components/HeadingWidgetEditor', () => ({ default: () => <div data-testid="editor-heading" /> }))
 
 // Mock useWidgetManager with different widget types
 const mockUseWidgetManager = vi.fn()
@@ -93,11 +92,11 @@ describe('SidebarWidgetsTab widget type dispatch', () => {
     expect(getByTestId('editor-elevation')).toBeTruthy()
   })
 
-  test('heading widget renders HeadingWidgetEditor', () => {
+  test('heading widget renders MetricWidgetEditor', () => {
     mockUseWidgetManager.mockReturnValue(
       makeManagerState({ id: 'w1', type: 'heading', category: 'values', name: 'Heading', data: { value: 'heading', x: 0, y: 0 } }),
     )
     const { getByTestId } = render(<SidebarWidgetsTab />)
-    expect(getByTestId('editor-heading')).toBeTruthy()
+    expect(getByTestId('editor-metric')).toBeTruthy()
   })
 })

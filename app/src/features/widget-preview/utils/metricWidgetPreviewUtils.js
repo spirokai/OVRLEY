@@ -18,8 +18,8 @@
 import { formatStandardMetricDisplay, formatTimeValue } from './formatUtils'
 import { getMetricWidgetLayout, getMetricWidgetVisualBounds, getPreviewFontFamily } from './textMeasurement'
 import { getInterpolatedActivityValue, getInterpolatedTimeValue } from '@/features/overlay-editor'
-import { getStandardMetricDefinition, isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/standard-metrics'
-import { resolveActiveMetricWidgetData } from '@/lib/metric-widget-resolver'
+import { getStandardMetricDefinition, isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/standard-metrics'
+import { resolveActiveMetricWidgetData } from '@/lib/widget/metric-widget-resolver'
 
 export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond }) {
   // Guard — skip non-value widgets and gradient type (handled separately).

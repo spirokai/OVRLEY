@@ -221,11 +221,12 @@ pub fn draw_text_with_vertical_metrics_text(
         baseline_for_text_top_with_line_height(metrics_text, style.y, &font, style.line_height);
 
     if let Some(shadow_color) = style.shadow_color {
-        if style.shadow_strength > 0.0 || style.shadow_distance != 0.0 {
+        if style.shadow_strength > 0.0 {
             if let Some(shadow_filter) = image_filters::drop_shadow_only(
                 (style.shadow_distance, style.shadow_distance),
                 (style.shadow_strength, style.shadow_strength),
                 shadow_color,
+                None,
                 None,
                 None,
             ) {
@@ -254,7 +255,11 @@ pub fn draw_text_with_vertical_metrics_text(
 /// Resolves a font from configured font directories or system fonts.
 pub fn resolve_font(font_dirs: &[PathBuf], name: Option<&str>, font_size: f32) -> CoreResult<Font> {
     let typeface = resolve_typeface(font_dirs, name)?;
-    Ok(Font::from_typeface(typeface, font_size))
+    let mut font = Font::from_typeface(typeface, font_size);
+    font.set_edging(skia_safe::font::Edging::SubpixelAntiAlias);
+    font.set_subpixel(true);
+    font.set_hinting(skia_safe::FontHinting::Full);
+    Ok(font)
 }
 
 /// Computes a baseline for text inside a fixed line-height box.
@@ -393,11 +398,10 @@ fn load_typeface(font_dirs: &[PathBuf], name: Option<&str>) -> Option<Typeface> 
         }
     }
 
-    if Path::new(name).extension().is_none() {
-        return font_mgr.legacy_make_typeface(Some(name), FontStyle::normal());
-    }
-
-    None
+    let family_name = strip_supported_font_extension(name).unwrap_or(name);
+    font_mgr
+        .match_family_style(family_name, FontStyle::normal())
+        .or_else(|| font_mgr.legacy_make_typeface(Some(family_name), FontStyle::normal()))
 }
 
 fn load_first_bundled_typeface(font_dirs: &[PathBuf]) -> Option<Typeface> {
@@ -436,4 +440,20 @@ fn load_first_bundled_typeface(font_dirs: &[PathBuf]) -> Option<Typeface> {
     }
 
     None
+}
+
+fn strip_supported_font_extension(name: &str) -> Option<&str> {
+    let extension = Path::new(name)
+        .extension()
+        .and_then(|value| value.to_str())
+        .filter(|value| {
+            value.eq_ignore_ascii_case("ttf")
+                || value.eq_ignore_ascii_case("otf")
+                || value.eq_ignore_ascii_case("ttc")
+                || value.eq_ignore_ascii_case("woff")
+                || value.eq_ignore_ascii_case("woff2")
+                || value.eq_ignore_ascii_case("fon")
+        })?;
+    let end = name.len().saturating_sub(extension.len() + 1);
+    Some(name[..end].trim_end_matches('.'))
 }

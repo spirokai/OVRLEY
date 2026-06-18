@@ -24,6 +24,7 @@ export default function FontSelectField({
   label,
   value,
   onValueChange,
+  disabled = false,
   recommendedFonts = [],
   systemFonts = [],
   triggerClassName = 'h-8 text-xs',
@@ -66,9 +67,11 @@ export default function FontSelectField({
 
   return (
     <div className="space-y-2">
-      <Label className={labelClassName}>{label}</Label>
+      <Label className={labelClassName} disabled={disabled}>
+        {label}
+      </Label>
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger className={triggerClassName}>
+        <SelectTrigger className={triggerClassName} disabled={disabled}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

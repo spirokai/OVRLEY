@@ -11,7 +11,7 @@ use super::super::types::{
 use super::geometry::{chevron_vertices, heading_offset};
 use crate::debug::RenderProfiler;
 use crate::render::text::parse_color;
-use skia_safe::{Canvas, Paint, Path, Point, Rect};
+use skia_safe::{Canvas, Paint, PathBuilder, Point, Rect};
 
 /// Draws the heading widget for one frame.
 ///
@@ -130,11 +130,12 @@ fn draw_chevron_indicator(
 
     // Apply shadow first so it sits behind the chevron
     if let Some(ref shadow) = cache.indicator_shadow {
-        if shadow.strength > 0.0 || shadow.distance != 0.0 {
+        if shadow.strength > 0.0 {
             if let Some(filter) = skia_safe::image_filters::drop_shadow_only(
                 (shadow.offset_x, shadow.offset_y),
                 (shadow.strength, shadow.strength),
                 parse_color(&shadow.color, 1.0),
+                None,
                 None,
                 None,
             ) {
@@ -146,11 +147,12 @@ fn draw_chevron_indicator(
                 let draw_shadow = |edge_y: f32, pointing_down: bool| {
                     let verts =
                         chevron_vertices(center_x - cache.x, edge_y - cache.y, size, pointing_down);
-                    let mut path = Path::new();
+                    let mut path = PathBuilder::new();
                     path.move_to(Point::new(verts[0].x + cache.x, verts[0].y + cache.y));
                     path.line_to(Point::new(verts[1].x + cache.x, verts[1].y + cache.y));
                     path.line_to(Point::new(verts[2].x + cache.x, verts[2].y + cache.y));
                     path.close();
+                    let path = path.detach();
                     canvas.draw_path(&path, &shadow_paint);
                 };
 
@@ -169,11 +171,12 @@ fn draw_chevron_indicator(
 
     let draw_chevron = |edge_y: f32, pointing_down: bool| {
         let verts = chevron_vertices(center_x - cache.x, edge_y - cache.y, size, pointing_down);
-        let mut path = Path::new();
+        let mut path = PathBuilder::new();
         path.move_to(Point::new(verts[0].x + cache.x, verts[0].y + cache.y));
         path.line_to(Point::new(verts[1].x + cache.x, verts[1].y + cache.y));
         path.line_to(Point::new(verts[2].x + cache.x, verts[2].y + cache.y));
         path.close();
+        let path = path.detach();
         canvas.draw_path(&path, &paint);
     };
 

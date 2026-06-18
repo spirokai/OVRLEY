@@ -22,7 +22,7 @@
 
 import { createFontSelection, getFontFamilyName } from '@/lib/fonts'
 import { getThemeColor } from '@/lib/theme'
-import { resolveActiveMetricWidgetData } from '@/lib/metric-widget-resolver'
+import { resolveActiveMetricWidgetData } from '../widget/metric-widget-resolver'
 import { DEFAULT_GLOBAL_DEFAULTS } from './template-constants'
 import {
   applyPreviewOverrides,
@@ -138,6 +138,7 @@ export function syncGlobalDefaultsToConfig(config, globals, changedKeys = null) 
   if (nextConfig.values) {
     for (const value of nextConfig.values) {
       if (shouldApply('font_values')) Object.assign(value, createFontSelection(globals.font_values))
+      if (shouldApply('font_values') && value.display_variants?.linear) value.display_variants.linear.min_max_label_font = globals.font_values
       if (shouldApply('color_values')) value.color = globals.color_values
       if (shouldApply('color_icons') && Object.hasOwn(value, 'icon_color')) value.icon_color = globals.color_icons
       if (shouldApply('color_units') && value.value !== 'time') value.unit_color = globals.color_units

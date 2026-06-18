@@ -9,8 +9,8 @@
  * @module standard-widgets
  */
 
-import standardWidgetsManifest from '../../../assets/standard-widgets.json'
-import standardMetricsManifest from '../../../assets/standard-metrics.json'
+import standardWidgetsManifest from '../../../../assets/standard-widgets.json'
+import standardMetricsManifest from '../../../../assets/standard-metrics.json'
 
 // ---------------------------------------------------------------------------
 // Plot widget defaults (assets/standard-widgets.json)

@@ -76,6 +76,7 @@ pub fn run() {
             tauri_commands::backend_build_elevation_geometry,
             tauri_commands::backend_build_route_geometry,
             file_ops::default_template_save_path,
+            file_ops::read_selected_file_bytes,
             file_ops::write_template_file,
             file_ops::write_parse_debug_file
         ])

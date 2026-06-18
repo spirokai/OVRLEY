@@ -16,10 +16,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import useStore from '@/store/useStore'
-import { buildConfigWidgets } from '@/lib/widget-presentation'
-import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget-config'
+import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
+import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
 import { resolvePreviewSecond } from '@/lib/preview-timing'
-import { getEffectiveWidgetData } from '@/lib/template-state'
+import { getEffectiveWidgetData } from '@/lib/template/template-state'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
 import { getSceneSize } from '../utils/overlayEditorUtils'
 import useWidgetDraftState from './useWidgetDraftState'

@@ -4,7 +4,7 @@
  */
 
 import { buildWidgetTransform } from '@/lib/geometryUtils'
-import { isBoxedMetricWidget } from '@/lib/display-type-behavior'
+import { isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 import { resolveWidgetRenderGeometry } from './widgetRenderGeometry'
 

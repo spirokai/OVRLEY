@@ -348,6 +348,17 @@ export async function writeParseDebugFile(filename, contents) {
 }
 
 /**
+ * Reads raw bytes from one user-selected file path via the native Tauri shell.
+ *
+ * @param {string} path - Absolute path returned by the native file picker.
+ * @returns {Promise<Uint8Array>} Promise resolving to the file bytes.
+ */
+export async function readSelectedFileBytes(path) {
+  const payload = await invokeCommand('read_selected_file_bytes', { path })
+  return payload instanceof Uint8Array ? payload : new Uint8Array(payload)
+}
+
+/**
  * Imports a video into the local HTTP preview server.
  *
  * @param {string} path - Absolute path to the source video file.

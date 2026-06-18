@@ -9,6 +9,7 @@ mod gradient;
 mod heading;
 mod helpers;
 mod label;
+mod linear_gauge;
 pub mod raw;
 mod route;
 mod scene;
@@ -30,6 +31,10 @@ pub use elevation::{validate_elevation_plot, ValidatedElevationPlot};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};
 pub use label::{validate_label, ValidatedLabel};
+pub use linear_gauge::{
+    validate_linear_gauge, ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
+    ValidatedLinearGaugeWidget,
+};
 pub use route::{validate_route_plot, ValidatedRoutePlot};
 pub use scene::{validate_scene_config, ValidatedSceneConfig};
 pub use time::{validate_time_value, ValidatedTimeFormatting, ValidatedTimeValue};
@@ -102,6 +107,10 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
             }
             if value.value == MetricKind::Time && value.display_type == DisplayType::Text {
                 return validate_time_value(value, idx, &scene).map(PreparedValue::TimeText);
+            }
+            if value.display_type == DisplayType::Linear {
+                let value = value.with_promoted_display_variant("linear")?;
+                return validate_linear_gauge(value, idx).map(PreparedValue::LinearGauge);
             }
             validate_value_widget(value, idx).map(PreparedValue::StandardText)
         })

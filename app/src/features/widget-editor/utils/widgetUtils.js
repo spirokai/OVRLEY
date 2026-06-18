@@ -4,7 +4,7 @@
  */
 
 import { createFontSelection } from '@/lib/fonts'
-import { getDefaultFrameDimensions } from '@/lib/standard-metrics'
+import { getDefaultFrameDimensions } from '@/lib/widget/standard-metrics'
 import {
   TEXT_DEFAULTS,
   TEXT_FONT_SIZES,
@@ -13,7 +13,7 @@ import {
   HEADING_TAPE_DEFAULTS,
   COURSE_PLOT_DEFAULTS,
   ELEVATION_PLOT_DEFAULTS,
-} from '@/lib/standard-widgets'
+} from '@/lib/widget/standard-widgets'
 
 /**
  * Parses integer.

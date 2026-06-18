@@ -31,8 +31,9 @@ import { OverlayMetricWidget } from './MetricRenderer'
 import { OverlayRouteWidget } from './RouteRenderer'
 import { OverlayElevationWidget } from './ElevationRenderer'
 import { OverlayHeadingWidget } from './HeadingRenderer'
-import { isBoxedDisplayType, getDisplayTypeLabel, getDefaultFrameDimensions } from '@/lib/standard-metrics'
-import { resolveActiveMetricWidgetData } from '@/lib/metric-widget-resolver'
+import { OverlayLinearGaugeWidget } from './LinearGaugeRenderer'
+import { isBoxedDisplayType, getDisplayTypeLabel, getDefaultFrameDimensions } from '@/lib/widget/standard-metrics'
+import { resolveActiveMetricWidgetData } from '@/lib/widget/metric-widget-resolver'
 
 /**
  * Registry mapping boxed display_type values to their preview components.
@@ -41,6 +42,7 @@ import { resolveActiveMetricWidgetData } from '@/lib/metric-widget-resolver'
  */
 const BOXED_PREVIEW_COMPONENTS = {
   heading_tape: OverlayHeadingWidget,
+  linear: OverlayLinearGaugeWidget,
 }
 
 /**

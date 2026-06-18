@@ -193,11 +193,61 @@ pub struct ValueConfig {
     pub border_distance: Option<f32>,
     #[serde(default)]
     pub display_type: DisplayType,
+    #[serde(default)]
+    pub width: Option<u32>,
+    #[serde(default)]
+    pub height: Option<u32>,
+    #[serde(default)]
+    pub rotation: Option<f32>,
+    #[serde(default)]
+    pub orientation: Option<String>,
+    #[serde(default)]
+    pub track_corner_radius: Option<f32>,
+    #[serde(default)]
+    pub track_border_thickness: Option<f32>,
+    #[serde(default)]
+    pub track_border_color: Option<String>,
+    #[serde(default)]
+    pub track_empty_color: Option<String>,
+    #[serde(default)]
+    pub track_empty_opacity: Option<f32>,
+    #[serde(default)]
+    pub track_filled_color: Option<String>,
+    #[serde(default)]
+    pub track_filled_opacity: Option<f32>,
+    #[serde(default)]
+    pub track_fill_flat: Option<bool>,
+    #[serde(default)]
+    pub show_min_max_labels: Option<bool>,
+    #[serde(default)]
+    pub min_max_label_font: Option<String>,
+    #[serde(default)]
+    pub min_max_label_font_size: Option<f32>,
+    #[serde(default)]
+    pub min_max_label_position: Option<String>,
+    #[serde(default)]
+    pub min_max_label_color: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
 
 impl ValueConfig {
+    /// Promotes nested display variant fields to the top level so validators
+    /// can consume them as flat fields. Used when a JS-normalized config stores
+    /// variant-specific keys inside `display_variants.<key>` — Rust deserializes
+    /// the raw JSON, strips nulls, and promotes the nested object up.
+    pub(crate) fn with_promoted_display_variant(
+        &self,
+        variant_key: &str,
+    ) -> CoreResult<ValueConfig> {
+        let mut raw = serde_json::to_value(self)
+            .map_err(|e| CoreError::Config(format!("value config serialization: {e}")))?;
+        strip_json_nulls(&mut raw);
+        promote_variant_keys(&mut raw, variant_key);
+
+        serde_json::from_value(raw).map_err(|e| CoreError::Config(format!("value config: {e}")))
+    }
+
     pub(crate) fn to_heading_widget_config(&self) -> CoreResult<HeadingWidgetConfig> {
         let mut raw = serde_json::to_value(self)
             .map_err(|e| CoreError::Config(format!("heading value serialization: {e}")))?;

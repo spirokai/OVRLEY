@@ -7,7 +7,7 @@
  * component references used as icon lookup values.
  */
 
-import { WIDGET_ICONS } from '@/lib/widget-icons'
+import { WIDGET_ICONS } from '@/lib/widget/widget-icons'
 
 /**
  * Maps font file names and short names to CSS font-family strings.

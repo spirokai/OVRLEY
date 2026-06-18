@@ -10,7 +10,7 @@
 import { clamp } from '@/lib/utils'
 import { DEFAULT_ACTIVITY_PREVIEW } from '../data/overlayEditorConfig'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
-import { getStandardMetricInterpolation } from '@/lib/standard-metrics'
+import { getStandardMetricInterpolation } from '@/lib/widget/standard-metrics'
 
 /**
  * Returns the configured scene dimensions with defaults of 1920x1080.

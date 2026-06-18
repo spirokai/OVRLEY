@@ -1,5 +1,5 @@
 import { buildWidgetTransform } from '@/lib/geometryUtils'
-import { isBoxedMetricWidget } from '@/lib/display-type-behavior'
+import { isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 
 function buildScaleTranslate(tx, ty) {

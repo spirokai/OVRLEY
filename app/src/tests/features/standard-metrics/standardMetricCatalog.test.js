@@ -5,7 +5,7 @@ import {
   STANDARD_METRIC_WIDGET_TYPES,
   DISPLAY_TYPE_DEFINITIONS,
   DISPLAY_TYPE_LABELS,
-} from '@/lib/standard-widgets'
+} from '@/lib/widget/standard-widgets'
 import {
   getStandardMetricDefinition,
   getStandardMetricInterpolation,
@@ -17,9 +17,9 @@ import {
   getDefaultFrameDimensions,
   getSupportedDisplayTypes,
   getDisplayTypeOptions,
-} from '@/lib/standard-metrics'
-import { isTextDisplayType, isBoxedMetricWidget } from '@/lib/display-type-behavior'
-import { TYPE_LABELS } from '@/lib/widget-icons'
+} from '@/lib/widget/standard-metrics'
+import { isTextDisplayType, isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
+import { TYPE_LABELS } from '@/lib/widget/widget-icons'
 
 describe('standard metric widget catalog', () => {
   test('covers the existing and Wave 1 shared standard metric widgets', () => {
@@ -161,7 +161,7 @@ describe('display type definitions', () => {
 
   test('boxed display types include default frame dimensions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameWidth).toBe(200)
-    expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameHeight).toBe(60)
+    expect(DISPLAY_TYPE_DEFINITIONS.linear.defaultFrameHeight).toBe(30)
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameWidth).toBe(120)
     expect(DISPLAY_TYPE_DEFINITIONS.arc.defaultFrameHeight).toBe(120)
   })
@@ -199,7 +199,7 @@ describe('display type definitions', () => {
 
   test('getDefaultFrameDimensions returns dimensions for boxed types and null for intrinsic', () => {
     expect(getDefaultFrameDimensions('text')).toBeNull()
-    expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 60 })
+    expect(getDefaultFrameDimensions('linear')).toEqual({ width: 200, height: 30 })
     expect(getDefaultFrameDimensions('arc')).toEqual({ width: 120, height: 120 })
     expect(getDefaultFrameDimensions('nonexistent')).toBeNull()
   })
@@ -208,7 +208,6 @@ describe('display type definitions', () => {
     expect(getSupportedDisplayTypes('heading')).toEqual(['text', 'heading_tape'])
     expect(getSupportedDisplayTypes('core_temperature')).toEqual(['text'])
     expect(getSupportedDisplayTypes('speed')).toContain('text')
-    expect(getSupportedDisplayTypes('speed')).toContain('linear')
   })
 
   test('getDisplayTypeOptions builds dropdown options from definitions', () => {

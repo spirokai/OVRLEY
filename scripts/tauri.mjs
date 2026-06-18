@@ -17,7 +17,10 @@ const shouldBuildPortable =
 if (!shouldBuildPortable) {
   process.exitCode = await run(process.execPath, [tauriScript, ...args])
 } else {
-  const buildCode = await run(process.execPath, [tauriScript, ...args, '--no-bundle'])
+  const tauriBuildArgs = process.platform === 'darwin'
+    ? [...args, '--bundles', 'app']
+    : [...args, '--no-bundle']
+  const buildCode = await run(process.execPath, [tauriScript, ...tauriBuildArgs])
   if (buildCode !== 0) {
     process.exitCode = buildCode
   } else {

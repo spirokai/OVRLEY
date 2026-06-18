@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { createEditorEffectiveConfig } from '@/lib/template-state'
+import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import useStore from '@/store/useStore'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { getUpdateRateOptions, normalizeUpdateRateForFps } from '@/lib/update-rate'

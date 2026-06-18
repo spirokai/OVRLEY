@@ -291,6 +291,23 @@ mod tests {
             border_strength: None,
             border_distance: None,
             display_type: crate::types::DisplayType::Tape,
+            width: None,
+            height: None,
+            rotation: None,
+            orientation: None,
+            track_corner_radius: None,
+            track_border_thickness: None,
+            track_border_color: None,
+            track_empty_color: None,
+            track_empty_opacity: None,
+            track_filled_color: None,
+            track_filled_opacity: None,
+            track_fill_flat: None,
+            show_min_max_labels: None,
+            min_max_label_font: None,
+            min_max_label_font_size: None,
+            min_max_label_position: None,
+            min_max_label_color: None,
             extra: {
                 let mut m = BTreeMap::new();
                 m.insert("width".into(), serde_json::json!(400));

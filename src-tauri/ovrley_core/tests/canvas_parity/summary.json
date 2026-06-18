@@ -1,71 +1,71 @@
 {
   "artifacts": {
-    "canvas": "E:\\Github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas.png",
-    "diff": "E:\\Github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas-parity.png",
-    "skia": "E:\\Github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\skia.png"
+    "canvas": "D:\\github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas.png",
+    "diff": "D:\\github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\canvas-parity.png",
+    "skia": "D:\\github\\cyclemetry-reloaded\\src-tauri\\ovrley_core\\tests\\canvas_parity\\skia.png"
   },
   "orphaned_pixels": {
     "canvas_exclusive": {
-      "count": 21096,
-      "percent": "2.71",
-      "total": 779164
+      "count": 21916,
+      "percent": "2.42",
+      "total": 906657
     },
     "skia_exclusive": {
-      "count": 12456,
-      "percent": "1.60",
-      "total": 779164
+      "count": 14969,
+      "percent": "1.65",
+      "total": 906657
     }
   },
   "pixel_mismatch": {
     "alpha_mask_overlap": {
-      "canvas": 750975,
-      "dice": "0.9731",
-      "intersection": 738401,
-      "iou": "0.9477",
-      "skia": 766590,
-      "union": 779164
+      "canvas": 874351,
+      "dice": "0.9745",
+      "intersection": 861651,
+      "iou": "0.9504",
+      "skia": 893957,
+      "union": 906657
     },
     "clean_aa_excluded": {
-      "compared": 574756,
-      "ignored": 204408,
-      "mismatch": 7521,
-      "percent": "1.31"
+      "compared": 675613,
+      "ignored": 231044,
+      "mismatch": 7471,
+      "percent": "1.11"
     },
     "edge_chamfer_distance": {
-      "canvas_edge_pixels": 30992,
-      "canvas_to_skia_mean_px": "0.8472",
-      "skia_edge_pixels": 44433,
-      "skia_to_canvas_mean_px": "1.1489",
-      "symmetric_mean_px": "1.0249",
+      "canvas_edge_pixels": 34228,
+      "canvas_to_skia_mean_px": "0.8868",
+      "skia_edge_pixels": 47977,
+      "skia_to_canvas_mean_px": "1.1470",
+      "symmetric_mean_px": "1.0387",
       "symmetric_p95_px": "3.0000"
     },
     "full_frame": {
-      "count": 577552,
-      "percent": "7.11",
+      "count": 322707,
+      "percent": "3.97",
       "total": 8118463
     },
     "overlay": {
-      "count": 553832,
-      "percent": "71.08",
-      "total": 779164
+      "count": 295389,
+      "percent": "32.58",
+      "total": 906657
     },
     "premultiplied_rgb_both_translucent": {
-      "compared": 428177,
-      "mismatch": 30143,
-      "percent": "7.04"
+      "compared": 511711,
+      "mismatch": 35535,
+      "percent": "6.94"
     },
     "threshold_applied": {
-      "count": 124789,
-      "percent": "16.02",
-      "total": 779164
+      "count": 132112,
+      "percent": "14.57",
+      "total": 906657
     }
   },
   "ssim": {
-    "combined": 0.982838,
+    "combined": 0.980898,
     "pass": true,
     "threshold": 0.98,
-    "u": 0.984868,
-    "v": 0.986233,
-    "y": 0.977413
+    "u": 0.979048,
+    "v": 0.98092,
+    "y": 0.982725
   }
 }

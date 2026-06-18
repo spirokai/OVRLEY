@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { resolveActiveMetricWidgetData, initDisplayVariant, resetCurrentDisplayConfig } from '@/lib/metric-widget-resolver'
-import { HEADING_TAPE_DEFAULTS } from '@/lib/standard-widgets'
+import {
+  resolveActiveMetricWidgetData,
+  initDisplayVariant,
+  resetCurrentDisplayConfig,
+  buildFrameGeometryUpdate,
+} from '@/lib/widget/metric-widget-resolver'
+import { HEADING_TAPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 
 describe('resolveActiveMetricWidgetData', () => {
   test('returns flat data as-is for text display_type', () => {
@@ -180,9 +185,32 @@ describe('initDisplayVariant', () => {
 
     expect(result.display_variants.linear).toBeDefined()
     expect(result.display_variants.linear.width).toBe(200)
-    expect(result.display_variants.linear.height).toBe(60)
+    expect(result.display_variants.linear.height).toBe(30)
     expect(result.display_variants.linear.rotation).toBe(0)
-    expect(result.display_variants.linear.pixels_per_degree).toBeUndefined()
+    expect(result.display_variants.linear.orientation).toBe('horizontal')
+    expect(result.display_variants.linear.track_fill_flat).toBe(true)
+  })
+
+  test('backfills missing linear defaults into an existing variant', () => {
+    const data = {
+      value: 'speed',
+      display_type: 'linear',
+      display_variants: {
+        linear: {
+          width: 320,
+          height: 90,
+          track_corner_radius: 12,
+        },
+      },
+    }
+    const result = initDisplayVariant(data, 'linear')
+
+    expect(result.display_variants.linear.width).toBe(320)
+    expect(result.display_variants.linear.height).toBe(90)
+    expect(result.display_variants.linear.track_corner_radius).toBe(12)
+    expect(result.display_variants.linear.orientation).toBe('horizontal')
+    expect(result.display_variants.linear.track_fill_flat).toBe(true)
+    expect(result.display_variants.linear.show_min_max_labels).toBe(false)
   })
 
   test('returns data as-is when data is null', () => {
@@ -253,5 +281,30 @@ describe('resetCurrentDisplayConfig', () => {
 
   test('returns data as-is when data is null', () => {
     expect(resetCurrentDisplayConfig(null)).toBeNull()
+  })
+})
+
+describe('buildFrameGeometryUpdate', () => {
+  test('syncs live frame geometry into the active display variant for boxed previews', () => {
+    const data = {
+      value: 'speed',
+      display_type: 'linear',
+      display_variants: {
+        linear: {
+          width: 200,
+          height: 60,
+          orientation: 'horizontal',
+        },
+      },
+    }
+
+    const patch = buildFrameGeometryUpdate(data, { width: 320, height: 90 })
+    const resolved = resolveActiveMetricWidgetData({ ...data, ...patch })
+
+    expect(patch.display_variants.linear.width).toBe(320)
+    expect(patch.display_variants.linear.height).toBe(90)
+    expect(patch.display_variants.linear.orientation).toBe('horizontal')
+    expect(resolved.width).toBe(320)
+    expect(resolved.height).toBe(90)
   })
 })

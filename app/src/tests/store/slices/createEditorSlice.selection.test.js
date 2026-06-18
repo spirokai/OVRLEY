@@ -10,7 +10,7 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
-import { deleteWidgetInConfig } from '@/lib/widget-config'
+import { deleteWidgetInConfig } from '@/lib/widget/widget-config'
 
 function makeLabel(text, overrides = {}) {
   return {

@@ -8,7 +8,7 @@
  */
 
 import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
-import { createEditorEffectiveConfig } from '@/lib/template-state'
+import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { formatCompositeBitrate, isCompositeCodec, isQsvFullCodec, resolveCompositeFps } from './render-execution'
 
@@ -176,5 +176,6 @@ export function createRenderEffectiveConfig(options) {
   return {
     ...nextConfig,
     scene,
+    values: nextConfig.values?.map(({ display_variants: _displayVariants, ...value }) => value),
   }
 }

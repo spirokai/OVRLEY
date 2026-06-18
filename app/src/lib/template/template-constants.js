@@ -10,8 +10,14 @@
  * @module template-constants
  */
 
-import standardTemplateManifest from '../../../assets/standard-template.json'
-import { TEXT_LABEL_DEFAULTS, TEXT_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS, HEADING_TAPE_DEFAULTS } from '@/lib/standard-widgets'
+import standardTemplateManifest from '../../../../assets/standard-template.json'
+import {
+  TEXT_LABEL_DEFAULTS,
+  TEXT_DEFAULTS,
+  COURSE_PLOT_DEFAULTS,
+  ELEVATION_PLOT_DEFAULTS,
+  DISPLAY_TYPE_DEFINITIONS,
+} from '../widget/standard-widgets'
 
 // ---------------------------------------------------------------------------
 // Template metadata / defaults
@@ -54,6 +60,10 @@ export const ELEVATION_PLOT_KEYS = [...Object.keys(ELEVATION_PLOT_DEFAULTS), 'id
 /** Allowed keys for display variant configs during normalization. */
 const DISPLAY_VARIANT_FRAME_KEYS = ['width', 'height', 'rotation']
 
-export const DISPLAY_VARIANT_KEYS = {
-  heading_tape: [...DISPLAY_VARIANT_FRAME_KEYS, ...Object.keys(HEADING_TAPE_DEFAULTS)],
-}
+export const DISPLAY_VARIANT_KEYS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(DISPLAY_TYPE_DEFINITIONS)
+      .filter(([, definition]) => definition.layoutMode === 'boxed')
+      .map(([displayType, definition]) => [displayType, [...DISPLAY_VARIANT_FRAME_KEYS, ...Object.keys(definition.defaults || {})]]),
+  ),
+)

@@ -260,10 +260,12 @@ pub(crate) async fn backend_build_elevation_geometry(
     config_json: String,
     parsed_activity_json: String,
 ) -> Result<String, String> {
-    call_and_serialize(commands::elevation_geometry::build_elevation_geometry_command(
-        &config_json,
-        &parsed_activity_json,
-    ))
+    call_and_serialize(
+        commands::elevation_geometry::build_elevation_geometry_command(
+            &config_json,
+            &parsed_activity_json,
+        ),
+    )
 }
 
 /// Builds route widget geometry from config and activity data.

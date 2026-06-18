@@ -6,8 +6,8 @@
  * - Text reset defaults come from TEXT_DEFAULTS in standard-widgets
  */
 
-import { TEXT_DEFAULTS } from '@/lib/standard-widgets'
-import { getDefaultFrameDimensions, getDisplayVariantNonGeometryDefaults } from '@/lib/standard-metrics'
+import { TEXT_DEFAULTS } from './standard-widgets'
+import { getDefaultFrameDimensions, getDisplayVariantNonGeometryDefaults } from './standard-metrics'
 
 /**
  * Resolves frame geometry from the 3-tier fallback chain:
@@ -22,8 +22,8 @@ import { getDefaultFrameDimensions, getDisplayVariantNonGeometryDefaults } from 
  */
 function resolveFrameGeometry(variantConfig, widgetData, frameDefaults) {
   return {
-    width: variantConfig?.width ?? widgetData?.width ?? frameDefaults?.width,
-    height: variantConfig?.height ?? widgetData?.height ?? frameDefaults?.height,
+    width: widgetData?.width ?? variantConfig?.width ?? frameDefaults?.width,
+    height: widgetData?.height ?? variantConfig?.height ?? frameDefaults?.height,
     rotation: variantConfig?.rotation ?? widgetData?.rotation ?? 0,
   }
 }
@@ -80,8 +80,7 @@ export function initDisplayVariant(widgetData, displayType) {
   if (!widgetData || displayType === 'text') return widgetData
 
   const variants = widgetData.display_variants || {}
-  if (variants[displayType]) return widgetData
-
+  const currentVariant = variants[displayType]
   const frameDefaults = getDefaultFrameDimensions(displayType)
   const nonGeometryDefaults = getDisplayVariantNonGeometryDefaults(displayType)
 
@@ -89,7 +88,8 @@ export function initDisplayVariant(widgetData, displayType) {
 
   const variantDefaults = {
     ...(nonGeometryDefaults || {}),
-    ...resolveFrameGeometry(null, widgetData, frameDefaults),
+    ...(currentVariant || {}),
+    ...resolveFrameGeometry(currentVariant, widgetData, frameDefaults),
   }
 
   return {

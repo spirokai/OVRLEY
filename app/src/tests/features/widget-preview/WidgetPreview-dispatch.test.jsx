@@ -27,6 +27,11 @@ vi.mock('@/features/widget-preview/components/ElevationRenderer', () => ({
 vi.mock('@/features/widget-preview/components/HeadingRenderer', () => ({
   OverlayHeadingWidget: (props) => <div data-testid="heading-renderer" data-widget-type={props.widget.type} />,
 }))
+vi.mock('@/features/widget-preview/components/LinearGaugeRenderer', () => ({
+  OverlayLinearGaugeWidget: (props) => (
+    <div data-testid="linear-gauge-renderer" data-widget-type={props.widget.type} data-display-type={props.widget.data.display_type} />
+  ),
+}))
 
 import WidgetPreview from '@/features/widget-preview/components/WidgetPreview'
 
@@ -91,13 +96,13 @@ describe('WidgetPreview dispatch by display_type', () => {
     expect(getByTestId('metric-renderer')).toBeTruthy()
   })
 
-  test('unsupported boxed display type renders fallback placeholder', () => {
-    const { getByText } = render(
+  test('linear display_type uses the linear gauge renderer', () => {
+    const { getByTestId } = render(
       <WidgetPreview
         widget={{ type: 'speed', category: 'values', data: { display_type: 'linear', x: 0, y: 0, width: 200, height: 60 } }}
         activity={ACTIVITY}
       />,
     )
-    expect(getByText(/Linear.*preview not implemented/)).toBeTruthy()
+    expect(getByTestId('linear-gauge-renderer')).toBeTruthy()
   })
 })

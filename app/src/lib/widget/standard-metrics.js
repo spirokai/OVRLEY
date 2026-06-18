@@ -14,7 +14,7 @@ import {
   DISPLAY_TYPE_LABELS,
   DISPLAY_TYPE_OVERRIDES,
   DEFAULT_DISPLAY_TYPES,
-} from '@/lib/standard-widgets'
+} from './standard-widgets'
 
 // ---------------------------------------------------------------------------
 // Display type helpers

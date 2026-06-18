@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template-constants'
+import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template/template-constants'
 import {
   createTemplateFilePayload,
   createTemplateState,

@@ -2,7 +2,7 @@
   "format": "ovrley-template",
   "version": 2,
   "name": "acid-titanium",
-  "savedAt": "2026-06-06T08:47:21.151Z",
+  "savedAt": "2026-06-14T13:27:51.698Z",
   "config": {
     "scene": {
       "width": 3840,
@@ -24,8 +24,8 @@
     ],
     "values": [
       {
-        "x": 3326,
-        "y": 1552,
+        "x": 3265,
+        "y": 1557,
         "prefix": "",
         "suffix": "",
         "decimals": 0,
@@ -46,8 +46,8 @@
         "value": "heartrate"
       },
       {
-        "x": 3330,
-        "y": 1276,
+        "x": 3269,
+        "y": 1295,
         "prefix": "",
         "suffix": "",
         "decimals": 0,
@@ -68,8 +68,8 @@
         "value": "power"
       },
       {
-        "x": 3428,
-        "y": 1828,
+        "x": 3365,
+        "y": 1819,
         "prefix": "",
         "suffix": "",
         "decimals": 0,

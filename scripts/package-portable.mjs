@@ -1,6 +1,6 @@
-import { cp, mkdir, readFile, rm, stat } from 'node:fs/promises'
+import { cp, mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
 import { writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -9,8 +9,11 @@ const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
 const profile = readArg('--profile') ?? 'release'
 const targetDir = join(rootDir, 'src-tauri', 'target', profile)
+const bundleDir = join(targetDir, 'bundle')
 const distDir = join(rootDir, 'dist-portable')
-const appDir = join(distDir, 'OVRLEY')
+const appName = 'OVRLEY'
+const appDir = join(distDir, appName)
+const appBundleName = `${appName}.app`
 const binaryName = process.platform === 'win32' ? 'OVRLEY.exe' : 'OVRLEY'
 const builtBinaryName = process.platform === 'win32' ? 'app.exe' : 'app'
 const builtBinaryPath = join(targetDir, builtBinaryName)
@@ -22,23 +25,64 @@ main().catch((error) => {
 })
 
 async function main() {
-  await ensureFile(builtBinaryPath, 'Tauri binary')
   await ensureFile(ffmpegBinaryPath, 'FFmpeg binary')
-  const version = await readPackageVersion()
+  const version = await readArchiveVersion()
   const archivePath = join(distDir, `OVRLEY-${platformSlug()}-${version}.zip`)
 
   await rm(appDir, { recursive: true, force: true })
-  await mkdir(join(appDir, 'vendor'), { recursive: true })
+  await mkdir(distDir, { recursive: true })
 
-  await cp(builtBinaryPath, join(appDir, binaryName))
-  await cp(join(rootDir, 'vendor', 'ffmpeg'), join(appDir, 'vendor', 'ffmpeg'), { recursive: true })
-  await cp(join(rootDir, 'fonts'), join(appDir, 'fonts'), { recursive: true })
-  await cp(join(rootDir, 'templates'), join(appDir, 'templates'), { recursive: true })
+  if (process.platform === 'darwin') {
+    await packageMacosApp(appDir)
+  } else {
+    await packagePortableBinary(appDir)
+  }
+
+  if (process.platform === 'darwin') {
+    await writeFile(join(appDir, 'README-macOS.txt'), buildMacosReadme())
+  }
+
   await writeFile(join(appDir, 'THIRD_PARTY_NOTICES.txt'), buildThirdPartyNotice())
 
   await rm(archivePath, { force: true })
   await zipDirectory(appDir, archivePath)
   console.log(`[portable] Created ${archivePath}`)
+}
+
+async function packagePortableBinary(destinationDir) {
+  await ensureFile(builtBinaryPath, 'Tauri binary')
+  await mkdir(destinationDir, { recursive: true })
+
+  const topLevelEntries = await readdir(targetDir, { withFileTypes: true })
+  for (const entry of topLevelEntries) {
+    if (PORTABLE_EXCLUDED_TOP_LEVEL.has(entry.name)) {
+      continue
+    }
+
+    const sourcePath = join(targetDir, entry.name)
+    const destinationPath = join(destinationDir, entry.name)
+
+    if (entry.isDirectory()) {
+      await cp(sourcePath, destinationPath, { recursive: true })
+    } else {
+      await cp(sourcePath, destinationPath)
+    }
+  }
+
+  await prunePortableRuntime(destinationDir)
+
+  if (binaryName !== builtBinaryName) {
+    await rename(join(destinationDir, builtBinaryName), join(destinationDir, binaryName))
+  }
+}
+
+async function packageMacosApp(destinationDir) {
+  const appBundlePath = await resolveMacosAppBundle()
+  const bundledFfmpegPath = join(appBundlePath, 'Contents', 'Resources', 'vendor', 'ffmpeg', 'bin', 'ffmpeg')
+
+  await ensureFile(bundledFfmpegPath, 'Bundled FFmpeg binary inside macOS app bundle')
+  await mkdir(destinationDir, { recursive: true })
+  await cp(appBundlePath, join(destinationDir, appBundleName), { recursive: true })
 }
 
 function buildThirdPartyNotice() {
@@ -53,7 +97,7 @@ function buildThirdPartyNotice() {
     'FFmpeg',
     '-------',
     'This portable OVRLEY distribution includes an unmodified FFmpeg command-line binary',
-    'and its required runtime libraries as a separate component under vendor/ffmpeg.',
+    'and its required runtime libraries as a separate component in the packaged resources.',
     '',
     'OVRLEY invokes ffmpeg as a subprocess for video encoding. FFmpeg is not linked into',
     'the OVRLEY executable.',
@@ -63,8 +107,8 @@ function buildThirdPartyNotice() {
     'License information: https://ffmpeg.org/legal.html',
     'Upstream repository mirror: https://github.com/FFmpeg/FFmpeg',
     '',
-    'Windows builds are downloaded from Gyan Doshi FFmpeg builds:',
-    'https://www.gyan.dev/ffmpeg/builds/',
+    'Windows builds are downloaded from BtbN FFmpeg builds:',
+    'https://github.com/BtbN/FFmpeg-Builds',
     '',
     'macOS builds are downloaded from Evermeet/Tessus FFmpeg builds:',
     'https://evermeet.cx/ffmpeg/',
@@ -80,9 +124,88 @@ function buildThirdPartyNotice() {
   ].join('\n')
 }
 
+const PORTABLE_EXCLUDED_TOP_LEVEL = new Set([
+  '.fingerprint',
+  'build',
+  'bundle',
+  'deps',
+  'examples',
+  'incremental',
+  'nsis',
+  'wix',
+])
+
+const PORTABLE_PRUNE_FILE_PATTERNS = [
+  /^\.cargo-lock$/i,
+  /^\.cargo-artifact/i,
+  /\.d$/i,
+  /\.exp$/i,
+  /\.lib$/i,
+  /\.pdb$/i,
+  /\.rlib$/i,
+]
+
+async function prunePortableRuntime(destinationDir) {
+  const entries = await readdir(destinationDir, { withFileTypes: true })
+
+  for (const entry of entries) {
+    if (!entry.isFile()) {
+      continue
+    }
+
+    if (entry.name !== builtBinaryName && entry.name.toLowerCase().endsWith('.exe')) {
+      await rm(join(destinationDir, entry.name), { force: true })
+      continue
+    }
+
+    if (PORTABLE_PRUNE_FILE_PATTERNS.some((pattern) => pattern.test(entry.name))) {
+      await rm(join(destinationDir, entry.name), { force: true })
+    }
+  }
+}
+
+function buildMacosReadme() {
+  return [
+    'OVRLEY FOR macOS',
+    '',
+    'Install',
+    '-------',
+    '1. Extract the ZIP archive.',
+    '2. Move OVRLEY.app to your /Applications folder.',
+    '',
+    'Unsigned App Notice',
+    '-------------------',
+    'OVRLEY is not signed with an Apple Developer certificate, so macOS may block it from opening by default.',
+    'Run this command once in Terminal after moving the app to /Applications:',
+    '',
+    'xattr -cr /Applications/OVRLEY.app',
+    '',
+  ].join('\n')
+}
+
 function readArg(flag) {
   const index = args.indexOf(flag)
   return index >= 0 ? args[index + 1] : null
+}
+
+async function resolveMacosAppBundle() {
+  const preferredPaths = [
+    join(bundleDir, 'macos', appBundleName),
+    join(bundleDir, 'dmg', appBundleName),
+  ]
+
+  for (const candidate of preferredPaths) {
+    if (await pathIsDirectory(candidate)) {
+      return candidate
+    }
+  }
+
+  const discovered = await findDirectoryByName(bundleDir, appBundleName)
+  if (discovered) {
+    return discovered
+  }
+
+  throw new Error(`macOS app bundle not found under ${bundleDir}`)
 }
 
 async function ensureFile(path, label) {
@@ -97,6 +220,15 @@ async function ensureFile(path, label) {
   throw new Error(`${label} not found at ${path}`)
 }
 
+async function pathIsDirectory(path) {
+  try {
+    const entry = await stat(path)
+    return entry.isDirectory()
+  } catch {
+    return false
+  }
+}
+
 function zipDirectory(sourceDir, destinationPath) {
   if (process.platform === 'win32') {
     return run('powershell', [
@@ -106,7 +238,7 @@ function zipDirectory(sourceDir, destinationPath) {
     ])
   }
 
-  return run('zip', ['-qr', destinationPath, 'OVRLEY'], distDir)
+  return run('zip', ['-qr', destinationPath, basename(sourceDir)], distDir)
 }
 
 function run(command, commandArgs, cwd = rootDir) {
@@ -132,4 +264,88 @@ async function readPackageVersion() {
     throw new Error('Could not read version from package.json')
   }
   return packageJson.version
+}
+
+async function readArchiveVersion() {
+  const explicitVersion = normalizeVersion(readArg('--version') ?? process.env.PORTABLE_VERSION)
+  if (explicitVersion) {
+    return explicitVersion
+  }
+
+  const gitTagVersion = normalizeVersion(readExactGitTag())
+  if (gitTagVersion) {
+    return gitTagVersion
+  }
+
+  await fetchGitTags()
+
+  const fetchedGitTagVersion = normalizeVersion(readExactGitTag())
+  if (fetchedGitTagVersion) {
+    return fetchedGitTagVersion
+  }
+
+  return readPackageVersion()
+}
+
+function readExactGitTag() {
+  const result = spawnSync('git', ['describe', '--tags', '--exact-match'], {
+    cwd: rootDir,
+    encoding: 'utf8',
+  })
+
+  if (result.status !== 0) {
+    return null
+  }
+
+  return result.stdout.trim()
+}
+
+async function fetchGitTags() {
+  const result = spawnSync('git', ['fetch', '--tags'], {
+    cwd: rootDir,
+    encoding: 'utf8',
+  })
+
+  if (result.status === 0) {
+    return
+  }
+
+  const stderr = result.stderr?.trim()
+  if (stderr) {
+    console.warn(`[portable] Failed to fetch git tags; falling back without remote tags: ${stderr}`)
+  }
+}
+
+function normalizeVersion(version) {
+  if (typeof version !== 'string') {
+    return null
+  }
+
+  const trimmed = version.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  return trimmed.startsWith('v') ? trimmed.slice(1) : trimmed
+}
+
+async function findDirectoryByName(dir, targetName) {
+  if (!await pathIsDirectory(dir)) {
+    return null
+  }
+
+  const entries = await readdir(dir, { withFileTypes: true })
+  for (const entry of entries) {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory() && entry.name === targetName) {
+      return path
+    }
+    if (entry.isDirectory()) {
+      const found = await findDirectoryByName(path, targetName)
+      if (found) {
+        return found
+      }
+    }
+  }
+  return null
 }
