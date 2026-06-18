@@ -5,7 +5,7 @@
  * store remains the single owner of the selected-id list and primary widget.
  */
 
-import { fireEvent, render } from '@testing-library/react'
+import { act, fireEvent, render, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import OverlayEditor from '@/features/overlay-editor/components/OverlayEditor'
 import { resolveWidgetRenderGeometry } from '@/features/overlay-editor/utils/widgetRenderGeometry'
@@ -85,6 +85,19 @@ function makeConfig(labels) {
   }
 }
 
+const defaultEditorControls = {
+  backgroundMode: 'black',
+  gridVisible: false,
+  onResetZoom: vi.fn(),
+  onSetBackgroundMode: vi.fn(),
+  onSetGridVisible: vi.fn(),
+  onSetSnapToGrid: vi.fn(),
+  onZoomIn: vi.fn(),
+  onZoomOut: vi.fn(),
+  snapToGrid: false,
+  zoomLevel: 1,
+}
+
 describe('OverlayEditor selection flow', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
@@ -105,6 +118,7 @@ describe('OverlayEditor selection flow', () => {
     const { container } = render(
       <OverlayEditor
         config={config}
+        editorControls={defaultEditorControls}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
@@ -112,6 +126,8 @@ describe('OverlayEditor selection flow', () => {
         backgroundMode="black"
         gridVisible={false}
         snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
         showTemplateStatus={false}
         templateStatus="Saved"
       />,
@@ -155,6 +171,7 @@ describe('OverlayEditor selection flow', () => {
     const { container } = render(
       <OverlayEditor
         config={useStore.getState().config}
+        editorControls={defaultEditorControls}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
@@ -162,6 +179,8 @@ describe('OverlayEditor selection flow', () => {
         backgroundMode="black"
         gridVisible={false}
         snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
         showTemplateStatus={false}
         templateStatus="Saved"
       />,
@@ -204,6 +223,7 @@ describe('OverlayEditor selection flow', () => {
     const { container } = render(
       <OverlayEditor
         config={useStore.getState().config}
+        editorControls={defaultEditorControls}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
@@ -211,6 +231,8 @@ describe('OverlayEditor selection flow', () => {
         backgroundMode="black"
         gridVisible={false}
         snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
         showTemplateStatus={false}
         templateStatus="Saved"
       />,
@@ -250,6 +272,7 @@ describe('OverlayEditor selection flow', () => {
     const { container, getByTestId } = render(
       <OverlayEditor
         config={useStore.getState().config}
+        editorControls={defaultEditorControls}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
@@ -257,6 +280,8 @@ describe('OverlayEditor selection flow', () => {
         backgroundMode="black"
         gridVisible={false}
         snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
         showTemplateStatus={false}
         templateStatus="Saved"
       />,
@@ -291,6 +316,7 @@ describe('OverlayEditor selection flow', () => {
     const { getByTestId, queryByTestId } = render(
       <OverlayEditor
         config={useStore.getState().config}
+        editorControls={defaultEditorControls}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
@@ -298,6 +324,8 @@ describe('OverlayEditor selection flow', () => {
         backgroundMode="black"
         gridVisible={false}
         snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
         showTemplateStatus={false}
         templateStatus="Saved"
       />,
@@ -354,6 +382,39 @@ describe('OverlayEditor selection flow', () => {
     expect(renderGeometry.badgeTop).toBe(215)
   })
 
+  test('renders the canvas toolbar centered above the preview area', () => {
+    const config = makeConfig([makeLabel('A', { id: 'widget-1' })])
+
+    useStore.getState().setConfig(config)
+
+    const { getByTestId } = render(
+      <OverlayEditor
+        config={config}
+        editorControls={defaultEditorControls}
+        globalDefaults={{ opacity: 1, scale: 1 }}
+        onConfigChange={vi.fn()}
+        zoomLevel={1}
+        onZoomLevelChange={vi.fn()}
+        backgroundMode="black"
+        gridVisible={false}
+        snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
+        showTemplateStatus
+        templateStatus="Modified"
+      />,
+    )
+
+    const badgeRow = getByTestId('canvas-status-badges')
+    const toolbar = getByTestId('canvas-editor-toolbar')
+
+    expect(within(badgeRow).getByText(/1920 .* 1080/)).toBeTruthy()
+    expect(within(badgeRow).getByText('Modified')).toBeTruthy()
+    expect(within(toolbar).getByText('100%')).toBeTruthy()
+    expect(toolbar.className).toContain('left-1/2')
+    expect(toolbar.className).toContain('-translate-x-1/2')
+  })
+
   test('refreshes moveable bounds when the selected widget changes intrinsic size', () => {
     const config = makeConfig([makeLabel('A', { id: 'widget-1', font_size: 30 })])
     const nextConfig = makeConfig([makeLabel('A', { id: 'widget-1', font_size: 60 })])
@@ -363,6 +424,7 @@ describe('OverlayEditor selection flow', () => {
     const { container, rerender } = render(
       <OverlayEditor
         config={config}
+        editorControls={defaultEditorControls}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
@@ -370,6 +432,8 @@ describe('OverlayEditor selection flow', () => {
         backgroundMode="black"
         gridVisible={false}
         snapToGrid={false}
+        importedBackgroundImageFilename={null}
+        importedVideoFilename={null}
         showTemplateStatus={false}
         templateStatus="Saved"
       />,
@@ -381,21 +445,26 @@ describe('OverlayEditor selection flow', () => {
     fireEvent.mouseDown(widget, { button: 0 })
     moveableUpdateRectMock.mockClear()
 
-    useStore.getState().setConfig(nextConfig)
-    rerender(
-      <OverlayEditor
-        config={nextConfig}
-        globalDefaults={{ opacity: 1, scale: 1 }}
-        onConfigChange={vi.fn()}
-        zoomLevel={1}
-        onZoomLevelChange={vi.fn()}
-        backgroundMode="black"
-        gridVisible={false}
-        snapToGrid={false}
-        showTemplateStatus={false}
-        templateStatus="Saved"
-      />,
-    )
+    act(() => {
+      useStore.getState().setConfig(nextConfig)
+      rerender(
+        <OverlayEditor
+          config={nextConfig}
+          editorControls={defaultEditorControls}
+          globalDefaults={{ opacity: 1, scale: 1 }}
+          onConfigChange={vi.fn()}
+          zoomLevel={1}
+          onZoomLevelChange={vi.fn()}
+          backgroundMode="black"
+          gridVisible={false}
+          snapToGrid={false}
+          importedBackgroundImageFilename={null}
+          importedVideoFilename={null}
+          showTemplateStatus={false}
+          templateStatus="Saved"
+        />,
+      )
+    })
 
     expect(moveableUpdateRectMock).toHaveBeenCalled()
   })

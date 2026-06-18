@@ -12,8 +12,8 @@ vi.mock('@tauri-apps/api/core', () => ({ convertFileSrc: (path) => path }))
 vi.mock('@/features/app-shell/components/ActivitySection', () => ({
   default: (props) => <div data-testid="activity-section" data-props={JSON.stringify(Object.keys(props))} />,
 }))
-vi.mock('@/features/app-shell/components/EditorToolbar', () => ({
-  default: (props) => <div data-testid="editor-toolbar" data-props={JSON.stringify(Object.keys(props))} />,
+vi.mock('@/features/app-shell/components/TemplateSection', () => ({
+  default: (props) => <div data-testid="template-section" data-props={JSON.stringify(Object.keys(props))} />,
 }))
 vi.mock('@/features/app-shell/components/ActionButtons', () => ({
   default: (props) => <div data-testid="action-buttons" data-props={JSON.stringify(Object.keys(props))} />,
@@ -24,18 +24,6 @@ import AppHeader from '@/features/app-shell/components/AppHeader'
 const defaultProps = {
   activityControls: { activityLabel: 'Test Activity', onOpenActivityFile: vi.fn() },
   backendStatus: 'connected',
-  editorControls: {
-    backgroundMode: 'checker',
-    gridVisible: true,
-    onResetZoom: vi.fn(),
-    onSetBackgroundMode: vi.fn(),
-    onSetGridVisible: vi.fn(),
-    onSetSnapToGrid: vi.fn(),
-    onZoomIn: vi.fn(),
-    onZoomOut: vi.fn(),
-    snapToGrid: false,
-    zoomLevel: 1,
-  },
   onOpenDownloads: vi.fn(),
   renderControls: {
     onOpenRenderDialog: vi.fn(),
@@ -67,32 +55,32 @@ const defaultProps = {
 }
 
 describe('AppHeader grouped-props contract', () => {
-  test('renders all three child sections', () => {
+  test('renders activity, template, and action sections', () => {
     const { getByTestId } = render(<AppHeader {...defaultProps} />)
 
     expect(getByTestId('activity-section')).toBeTruthy()
-    expect(getByTestId('editor-toolbar')).toBeTruthy()
+    expect(getByTestId('template-section')).toBeTruthy()
     expect(getByTestId('action-buttons')).toBeTruthy()
   })
 
-  test('ActivitySection receives activityLabel and template CRUD props', () => {
+  test('ActivitySection receives activity and video import props', () => {
     const { getByTestId } = render(<AppHeader {...defaultProps} />)
     const props = JSON.parse(getByTestId('activity-section').dataset.props)
 
     expect(props).toContain('activityLabel')
     expect(props).toContain('onOpenActivityFile')
-    expect(props).toContain('config')
-    expect(props).toContain('handleSaveTemplate')
+    expect(props).toContain('handleImportVideo')
+    expect(props).toContain('clearImportedVideo')
   })
 
-  test('EditorToolbar receives background/zoom/grid props', () => {
+  test('TemplateSection receives template selector and CRUD props', () => {
     const { getByTestId } = render(<AppHeader {...defaultProps} />)
-    const props = JSON.parse(getByTestId('editor-toolbar').dataset.props)
+    const props = JSON.parse(getByTestId('template-section').dataset.props)
 
-    expect(props).toContain('backgroundMode')
-    expect(props).toContain('zoomLevel')
-    expect(props).toContain('gridVisible')
-    expect(props).toContain('snapToGrid')
+    expect(props).toContain('handleTemplateChange')
+    expect(props).toContain('handleCreateNewTemplate')
+    expect(props).toContain('handleSaveTemplate')
+    expect(props).toContain('handleImportTemplate')
   })
 
   test('ActionButtons receives render and backend props', () => {
