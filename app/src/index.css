@@ -27,7 +27,7 @@
     sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  font-size: clamp(12px, 0.5vw + 7px, 15.5px);
+  font-size: clamp(10px, 0.5vw + 7px, 13.5px);
   text-transform: uppercase;
   font-optical-sizing: auto;
   letter-spacing: 0.03em;

@@ -19,7 +19,6 @@ import {
   ControlPanel,
   ErrorAlert,
   LoadingOverlay,
-  TitleBar,
   useActivityImport,
   useAppBootstrap,
   useBackendStatus,
@@ -177,11 +176,9 @@ function AppShell() {
           onCancel={() => templateManagement.setShowNewTemplateConfirm(false)}
           onConfirm={templateManagement.confirmCreateNewTemplate}
         />
-        <TitleBar />
         <AppHeader
           activityControls={activityControls}
           backendStatus={backendStatus}
-          editorControls={editorControls}
           onOpenDownloads={handleOpenDownloads}
           renderControls={renderControls}
           templateControls={templateControls}
@@ -202,6 +199,9 @@ function AppShell() {
                 backgroundMode={editorShell.editorBackgroundMode}
                 gridVisible={editorShell.editorGridVisible}
                 snapToGrid={editorShell.editorSnapToGrid}
+                importedBackgroundImageFilename={videoControls.importedBackgroundImageFilename}
+                importedVideoFilename={videoControls.importedVideoFilename}
+                editorControls={editorControls}
                 showTemplateStatus={templateManagement.showTemplateStatus}
                 templateStatus={templateManagement.status}
               />

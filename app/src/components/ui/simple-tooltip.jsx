@@ -28,7 +28,7 @@ export function SimpleTooltip({ content, children, side = 'top', className = '' 
       {children}
       {show && (
         <div
-          className={`absolute ${sideClasses} z-[1000] whitespace-nowrap rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-xs text-foreground shadow-2xl pointer-events-none animate-in fade-in zoom-in-95 duration-200`}
+          className={`absolute ${sideClasses} z-1000 whitespace-nowrap rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-xs text-foreground shadow-2xl pointer-events-none animate-in fade-in zoom-in-95 duration-200`}
         >
           {content}
           {/* Arrow */}

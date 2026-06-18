@@ -9,15 +9,15 @@ vi.mock('@tauri-apps/api/window', () => ({
   }),
 }))
 
-let TitleBar
+let WindowControls
 beforeAll(async () => {
-  const mod = await import('@/features/app-shell/components/TitleBar')
-  TitleBar = mod.default
+  const mod = await import('@/features/app-shell/components/WindowControls')
+  WindowControls = mod.default
 })
 
-describe('TitleBar', () => {
+describe('WindowControls', () => {
   test('renders minimize, maximize, and close buttons', () => {
-    render(<TitleBar />)
+    render(<WindowControls />)
 
     expect(screen.getByLabelText('Minimize')).toBeDefined()
     expect(screen.getByLabelText('Maximize')).toBeDefined()

@@ -6,6 +6,7 @@
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { FolderOpen, ImageDown, Play } from 'lucide-react'
+import WindowControls from './WindowControls'
 
 /**
  * Renders the render and overlays action buttons.
@@ -68,6 +69,9 @@ export default function ActionButtons({
           {renderingVideo ? 'Rendering...' : 'Render'}
         </Button>
       </SimpleTooltip>
+      <div className="ml-6 flex items-center">
+        <WindowControls />
+      </div>
     </div>
   )
 }

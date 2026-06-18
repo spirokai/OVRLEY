@@ -9,6 +9,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutGrid, Tag } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import EditorToolbar from '@/features/app-shell/components/EditorToolbar'
 import useStore from '@/store/useStore'
 import OverlayCanvas from './OverlayCanvas'
 import OverlayMoveable from './OverlayMoveable'
@@ -63,10 +64,7 @@ function WidgetBadgeLayer({ activity, displayScale, globalScale, hoveredWidgetId
 
 function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
   return (
-    <div data-testid="canvas-status-badges" className="pointer-events-none absolute left-4 top-4 z-50 flex items-center gap-2">
-      <div className="rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
-        {width} &times; {height}
-      </div>
+    <div data-testid="canvas-status-badges" className="pointer-events-none absolute right-8 top-4 z-50 flex items-center gap-2">
       {showTemplateStatus ? (
         <Badge
           variant={status === 'Modified' ? 'secondary' : 'outline'}
@@ -75,6 +73,30 @@ function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
           {status}
         </Badge>
       ) : null}
+      <div className="rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
+        {width} &times; {height}
+      </div>
+    </div>
+  )
+}
+
+function CanvasToolbar({ editorControls, importedBackgroundImageFilename, importedVideoFilename }) {
+  return (
+    <div data-testid="canvas-editor-toolbar" className="pointer-events-auto absolute left-1/2 top-4 z-50 -translate-x-1/2">
+      <EditorToolbar
+        backgroundMode={editorControls.backgroundMode}
+        onSetBackgroundMode={editorControls.onSetBackgroundMode}
+        importedBackgroundImageFilename={importedBackgroundImageFilename}
+        importedVideoFilename={importedVideoFilename}
+        zoomLevel={editorControls.zoomLevel}
+        onZoomIn={editorControls.onZoomIn}
+        onZoomOut={editorControls.onZoomOut}
+        onResetZoom={editorControls.onResetZoom}
+        gridVisible={editorControls.gridVisible}
+        onSetGridVisible={editorControls.onSetGridVisible}
+        snapToGrid={editorControls.snapToGrid}
+        onSetSnapToGrid={editorControls.onSetSnapToGrid}
+      />
     </div>
   )
 }
@@ -94,6 +116,7 @@ function EmptyOverlayState() {
 }
 
 function OverlayEditor({
+  editorControls,
   config,
   globalDefaults,
   onConfigChange,
@@ -102,6 +125,8 @@ function OverlayEditor({
   backgroundMode,
   gridVisible,
   snapToGrid,
+  importedBackgroundImageFilename,
+  importedVideoFilename,
   showTemplateStatus,
   templateStatus,
 }) {
@@ -332,6 +357,11 @@ function OverlayEditor({
           showTemplateStatus={showTemplateStatus}
           status={templateStatus}
           width={overlayState.sceneSize.width}
+        />
+        <CanvasToolbar
+          editorControls={editorControls}
+          importedBackgroundImageFilename={importedBackgroundImageFilename}
+          importedVideoFilename={importedVideoFilename}
         />
         <div
           className="relative shrink-0"

@@ -9,10 +9,11 @@
 
 /* control box points */
 .moveable-control {
-  height: calc(12px / var(--app-scale, 1)) !important;
-  width: calc(12px / var(--app-scale, 1)) !important;
-  margin-top: calc(-6.5px / var(--app-scale, 1)) !important;
-  margin-left: calc(-6.5px / var(--app-scale, 1)) !important;
+  height: calc(10px / var(--app-scale, 1)) !important;
+  width: calc(10px / var(--app-scale, 1)) !important;
+  margin-top: calc(-5px / var(--app-scale, 1)) !important;
+  margin-left: calc(-5px / var(--app-scale, 1)) !important;
+  border-radius: 0 !important;
 }
 
 .moveable-direction,

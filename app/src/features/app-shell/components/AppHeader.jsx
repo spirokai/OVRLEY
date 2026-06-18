@@ -4,8 +4,8 @@
  */
 
 import ActivitySection from './ActivitySection'
-import EditorToolbar from './EditorToolbar'
 import ActionButtons from './ActionButtons'
+import TemplateSection from './TemplateSection'
 
 /**
  * Renders the app header component.
@@ -13,35 +13,14 @@ import ActionButtons from './ActionButtons'
  * @param {object} props - Component props.
  * @param {*} props.activityControls - Activity control state and handlers.
  * @param {*} props.backendStatus - Current backend status.
- * @param {*} props.editorControls - Editor control state and handlers.
  * @param {function} props.onOpenDownloads - Callback invoked to open downloads.
  * @param {*} props.renderControls - Render control state and handlers.
  * @param {*} props.templateControls - Template control state and handlers.
  * @param {*} props.videoControls - Video import control state and handlers.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function AppHeader({
-  activityControls,
-  backendStatus,
-  editorControls,
-  onOpenDownloads,
-  renderControls,
-  templateControls,
-  videoControls,
-}) {
+export default function AppHeader({ activityControls, backendStatus, onOpenDownloads, renderControls, templateControls, videoControls }) {
   const { activityLabel, onOpenActivityFile } = activityControls
-  const {
-    backgroundMode,
-    gridVisible,
-    onResetZoom,
-    onSetBackgroundMode,
-    onSetGridVisible,
-    onSetSnapToGrid,
-    onZoomIn,
-    onZoomOut,
-    snapToGrid,
-    zoomLevel,
-  } = editorControls
   const { onOpenRenderDialog, onRenderPreviewFrame, renderDisabled, renderPreviewFrameDisabled, renderTooltipContent, renderingVideo } =
     renderControls
   const {
@@ -55,12 +34,11 @@ export default function AppHeader({
     showTemplateStatus,
     templates,
   } = templateControls
-  const { debugModeEnabled, importedBackgroundImageFilename, importedMediaFilename, importedVideoFilename, handleImportVideo, clearImportedVideo } =
-    videoControls
+  const { debugModeEnabled, importedMediaFilename, handleImportVideo, clearImportedVideo } = videoControls
 
   return (
     <header className="relative z-50 shrink-0 border-b border-border/70 bg-card backdrop-blur-sm">
-      <div className="grid grid-cols-[55%_auto_minmax(12rem,1fr)] items-center gap-6 px-6 pb-3 pt-2">
+      <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-x-6 pb-3 pl-6 pr-1 pt-3">
         <ActivitySection
           activityLabel={activityLabel}
           onOpenActivityFile={onOpenActivityFile}
@@ -68,6 +46,9 @@ export default function AppHeader({
           importedMediaFilename={importedMediaFilename}
           handleImportVideo={handleImportVideo}
           clearImportedVideo={clearImportedVideo}
+        />
+
+        <TemplateSection
           loadedTemplateSource={loadedTemplateSource}
           loadedTemplateFilename={loadedTemplateFilename}
           handleTemplateChange={handleTemplateChange}
@@ -77,23 +58,8 @@ export default function AppHeader({
           handleCreateNewTemplate={handleCreateNewTemplate}
           handleSaveTemplate={handleSaveTemplate}
           handleImportTemplate={handleImportTemplate}
+          className="ml-24"
         />
-
-        <EditorToolbar
-          backgroundMode={backgroundMode}
-          onSetBackgroundMode={onSetBackgroundMode}
-          importedBackgroundImageFilename={importedBackgroundImageFilename}
-          importedVideoFilename={importedVideoFilename}
-          zoomLevel={zoomLevel}
-          onZoomIn={onZoomIn}
-          onZoomOut={onZoomOut}
-          onResetZoom={onResetZoom}
-          gridVisible={gridVisible}
-          onSetGridVisible={onSetGridVisible}
-          snapToGrid={snapToGrid}
-          onSetSnapToGrid={onSetSnapToGrid}
-        />
-
         <ActionButtons
           onOpenRenderDialog={onOpenRenderDialog}
           onRenderPreviewFrame={onRenderPreviewFrame}
