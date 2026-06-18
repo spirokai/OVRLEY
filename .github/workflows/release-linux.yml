@@ -29,6 +29,7 @@ jobs:
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Install Linux build dependencies
         run: |
@@ -74,6 +75,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Set package version
+        run: |
+          node -e "const fs=require('fs');const version=process.env.RELEASE_VERSION;for (const file of ['package.json','src-tauri/tauri.conf.json']) { const json=JSON.parse(fs.readFileSync(file,'utf8')); json.version=version; fs.writeFileSync(file, JSON.stringify(json, null, 2) + '\n'); }"
+        env:
+          RELEASE_VERSION: ${{ steps.release_tag.outputs.version }}
+
       - name: Verify bundled FFmpeg resource tree
         shell: bash
         run: |
@@ -101,12 +108,24 @@ jobs:
           dpkg-deb -c "$DEB" | grep -E '/vendor/ffmpeg/bin/ffmpeg$'
           dpkg-deb -c "$DEB" | grep -E '/vendor/ffmpeg/bin/ffprobe$'
 
+      - name: Normalize release artifact name
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist-release
+          DEB="$(find src-tauri/target/release/bundle/deb -name '*.deb' -print -quit)"
+          if [ -z "$DEB" ]; then
+            echo "No .deb package was produced." >&2
+            exit 1
+          fi
+          cp "$DEB" "dist-release/OVRLEY-linux-${{ steps.release_tag.outputs.version }}.deb"
+
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.release_tag.outputs.tag }}
           files: |
-            src-tauri/target/release/bundle/deb/*.deb
+            dist-release/*.deb
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
