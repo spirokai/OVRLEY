@@ -9,7 +9,7 @@
 //! Forbidden dependencies: none (this is a utility module for the shell layer).
 
 use ovrley_core::paths::AppPaths;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
 /// Returns the repository root when running from the Tauri crate.
@@ -37,7 +37,7 @@ pub(crate) fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
     let resource_root = if cfg!(debug_assertions) {
         repo_root.clone()
     } else {
-        app.path().resource_dir().map_err(|e| e.to_string())?
+        portable_resource_root().unwrap_or(app.path().resource_dir().map_err(|e| e.to_string())?)
     };
     let user_data_root = app
         .path()
@@ -47,4 +47,22 @@ pub(crate) fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
     let paths = AppPaths::from_runtime_roots(repo_root, resource_root, user_data_root);
     paths.ensure_dirs().map_err(|e| e.to_string())?;
     Ok(paths)
+}
+
+fn portable_resource_root() -> Option<PathBuf> {
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    has_bundled_ffmpeg(&exe_dir).then_some(exe_dir)
+}
+
+fn has_bundled_ffmpeg(root: &Path) -> bool {
+    let binary_name = if cfg!(windows) {
+        "ffmpeg.exe"
+    } else {
+        "ffmpeg"
+    };
+    root.join("vendor")
+        .join("ffmpeg")
+        .join("bin")
+        .join(binary_name)
+        .is_file()
 }

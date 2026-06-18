@@ -57,6 +57,17 @@ pub fn resolve_ffmpeg_binary(repo_root: &Path) -> CoreResult<PathBuf> {
     ))
 }
 
+/// Applies platform-specific process configuration for bundled FFmpeg tools.
+///
+/// Windows release builds hide the child console window. Linux portable builds
+/// ship FFmpeg as a shared build, so subprocesses need the sibling `lib`
+/// directory on `LD_LIBRARY_PATH` even when the app was not started through the
+/// portable launcher.
+pub fn configure_ffmpeg_command(command: &mut Command, binary_path: &Path) {
+    suppress_child_console(command);
+    apply_bundled_ffmpeg_library_path(command, binary_path);
+}
+
 #[cfg(windows)]
 /// Prevents spawned ffmpeg/explorer processes from opening console windows.
 pub fn suppress_child_console(command: &mut Command) {
@@ -69,6 +80,60 @@ pub fn suppress_child_console(command: &mut Command) {
 #[cfg(not(windows))]
 /// No-op console suppression on platforms without Windows creation flags.
 pub fn suppress_child_console(_command: &mut Command) {}
+
+#[cfg(target_os = "linux")]
+fn apply_bundled_ffmpeg_library_path(command: &mut Command, binary_path: &Path) {
+    if !is_bundled_ffmpeg_tool(binary_path) {
+        return;
+    }
+
+    let Some(bin_dir) = binary_path.parent() else {
+        return;
+    };
+    let Some(ffmpeg_dir) = bin_dir.parent() else {
+        return;
+    };
+    let lib_dir = ffmpeg_dir.join("lib");
+    if !lib_dir.is_dir() {
+        return;
+    }
+
+    let mut value = lib_dir.to_string_lossy().to_string();
+    if let Some(existing) = env::var_os("LD_LIBRARY_PATH") {
+        let existing = existing.to_string_lossy();
+        if !existing.is_empty() {
+            value.push(':');
+            value.push_str(&existing);
+        }
+    }
+    command.env("LD_LIBRARY_PATH", value);
+}
+
+#[cfg(not(target_os = "linux"))]
+fn apply_bundled_ffmpeg_library_path(_command: &mut Command, _binary_path: &Path) {}
+
+#[cfg(target_os = "linux")]
+fn is_bundled_ffmpeg_tool(binary_path: &Path) -> bool {
+    let Some(bin_dir) = binary_path.parent() else {
+        return false;
+    };
+    if bin_dir.file_name().and_then(|name| name.to_str()) != Some("bin") {
+        return false;
+    }
+
+    let Some(ffmpeg_dir) = bin_dir.parent() else {
+        return false;
+    };
+    if ffmpeg_dir.file_name().and_then(|name| name.to_str()) != Some("ffmpeg") {
+        return false;
+    }
+
+    ffmpeg_dir
+        .parent()
+        .and_then(|name| name.file_name())
+        .and_then(|name| name.to_str())
+        == Some("vendor")
+}
 
 // Searches the process PATH for a binary with the requested platform filename.
 fn find_in_path(binary_name: &str) -> Option<PathBuf> {

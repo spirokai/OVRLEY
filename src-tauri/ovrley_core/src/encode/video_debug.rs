@@ -6,7 +6,7 @@
 
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::TimingBucket;
-use crate::encode::ffmpeg::suppress_child_console;
+use crate::encode::ffmpeg::configure_ffmpeg_command;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
@@ -100,7 +100,7 @@ pub(crate) fn concat_video_segments(
     })?;
 
     let mut command = Command::new(ffmpeg_bin);
-    suppress_child_console(&mut command);
+    configure_ffmpeg_command(&mut command, ffmpeg_bin);
     let status = command
         .arg("-f")
         .arg("concat")
@@ -292,7 +292,7 @@ pub(crate) fn write_sample_frame(
     // same input pixel format as the real encoder path.
     let png_path = debug_dir.join(format!("sample_{frame_index:04}.png"));
     let mut command = Command::new(ffmpeg_bin);
-    suppress_child_console(&mut command);
+    configure_ffmpeg_command(&mut command, ffmpeg_bin);
     command
         .arg("-loglevel")
         .arg("error")

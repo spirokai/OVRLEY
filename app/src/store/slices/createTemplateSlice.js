@@ -18,6 +18,20 @@ const initialExportRange = { ...DEFAULT_EXPORT_RANGE }
 const initialExportCodec = 'prores_ks'
 const initialGlobalDefaults = { ...DEFAULT_GLOBAL_DEFAULTS }
 const initialAspectRatio = '16:9'
+const MACOS_ONLY_CODECS = new Set(['prores_videotoolbox', 'h264_videotoolbox', 'hevc_videotoolbox'])
+const LINUX_ONLY_CODECS = new Set(['h264_vaapi', 'hevc_vaapi'])
+const WINDOWS_LINUX_CODECS = new Set([
+  'h264_nvenc',
+  'hevc_nvenc',
+  'nnvgpu_h264',
+  'nnvgpu_hevc',
+  'h264_qsv',
+  'hevc_qsv',
+  'qsv_full_h264',
+  'qsv_full_hevc',
+  'h264_amf',
+  'hevc_amf',
+])
 
 /**
  * Creates template slice.
@@ -27,13 +41,35 @@ const initialAspectRatio = '16:9'
  * @returns {object} Derived data structure for downstream use.
  */
 export function createTemplateSlice(set, get) {
+  const fallbackCodecForPlatformCodec = (codec) => {
+    if (codec?.includes('264')) {
+      return 'libx264'
+    }
+    if (codec?.includes('265') || codec?.includes('hevc')) {
+      return 'libx265'
+    }
+    if (codec === 'prores_videotoolbox') {
+      return 'prores_ks'
+    }
+
+    return 'prores_ks'
+  }
+
   const normalizePlatformCodec = (codec, platformOs) => {
     if (codec === 'libvpx-vp9' || codec === 'hevc_alpha') {
       return 'prores_ks'
     }
 
-    if (codec === 'prores_videotoolbox' && platformOs !== 'macos') {
-      return 'prores_ks'
+    if (MACOS_ONLY_CODECS.has(codec) && platformOs !== 'macos') {
+      return fallbackCodecForPlatformCodec(codec)
+    }
+
+    if (LINUX_ONLY_CODECS.has(codec) && platformOs !== 'linux') {
+      return fallbackCodecForPlatformCodec(codec)
+    }
+
+    if (WINDOWS_LINUX_CODECS.has(codec) && platformOs !== 'windows' && platformOs !== 'linux') {
+      return fallbackCodecForPlatformCodec(codec)
     }
 
     return codec || 'prores_ks'

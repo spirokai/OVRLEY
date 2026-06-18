@@ -21,7 +21,7 @@ use std::time::Instant;
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::debug::RenderProfiler;
-use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
+use crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::encode::ffmpeg_composite::{
     build_composite_ffmpeg_settings, CompositeFfmpegBuildRequest, CompositeFfmpegSettings,
     HwAccelInfo,
@@ -650,7 +650,7 @@ fn spawn_composite_ffmpeg_process(
     plan: &CompositePipelinePlan,
 ) -> CoreResult<std::process::Child> {
     let mut command = Command::new(ffmpeg_bin);
-    suppress_child_console(&mut command);
+    configure_ffmpeg_command(&mut command, ffmpeg_bin);
     command.arg("-loglevel").arg("info");
     command.args(&plan.ffmpeg_settings.hw_init_args);
     command.args(&plan.ffmpeg_settings.input_0_args);

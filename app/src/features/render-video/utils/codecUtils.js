@@ -59,6 +59,8 @@ export function codecFlag(availableCodecs, codec) {
     hevc_amf: 'hevcAmf',
     h264_videotoolbox: 'h264Videotoolbox',
     hevc_videotoolbox: 'hevcVideotoolbox',
+    h264_vaapi: 'h264Vaapi',
+    hevc_vaapi: 'hevcVaapi',
   }
   const key = flagByCodec[codec]
   return Boolean(availableCodecs?.[key])
