@@ -42,6 +42,17 @@
       "../templates": "templates",
       "../vendor/ffmpeg": "vendor/ffmpeg"
     },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libayatana-appindicator3-1",
+          "libgtk-3-0",
+          "librsvg2-2",
+          "libssl3",
+          "libwebkit2gtk-4.1-0"
+        ]
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/64x64.png",
