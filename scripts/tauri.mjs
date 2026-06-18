@@ -17,11 +17,9 @@ const shouldBuildPortable =
 if (!shouldBuildPortable) {
   process.exitCode = await run(process.execPath, [tauriScript, ...args])
 } else {
-  const tauriBuildArgs = process.platform === 'darwin'
-    ? [...args, '--bundles', 'app']
-    : [...args, '--no-bundle']
+  const tauriBuildArgs = defaultTauriBuildArgs(args)
   const buildCode = await run(process.execPath, [tauriScript, ...tauriBuildArgs])
-  if (buildCode !== 0) {
+  if (buildCode !== 0 || process.platform === 'linux') {
     process.exitCode = buildCode
   } else {
     const profile = args.includes('--debug') || args.includes('-d') ? 'debug' : 'release'
@@ -31,6 +29,16 @@ if (!shouldBuildPortable) {
       profile,
     ])
   }
+}
+
+function defaultTauriBuildArgs(args) {
+  if (process.platform === 'darwin') {
+    return [...args, '--bundles', 'app']
+  }
+  if (process.platform === 'linux') {
+    return [...args, '--bundles', 'deb']
+  }
+  return [...args, '--no-bundle']
 }
 
 function run(command, commandArgs) {

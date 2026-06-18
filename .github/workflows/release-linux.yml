@@ -37,6 +37,8 @@ jobs:
           sudo apt-get install -y \
             build-essential \
             curl \
+            dpkg-dev \
+            fakeroot \
             file \
             libayatana-appindicator3-dev \
             librsvg2-dev \
@@ -63,21 +65,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Disable Tauri bundling
-        run: node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.bundle.targets=[];fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2))"
+      - name: Build Tauri Debian package
+        run: pnpm tauri build --bundles deb
 
-      - name: Build Tauri app
-        run: pnpm tauri build
-
-      - name: Create portable archive
-        run: node scripts/package-portable.mjs --version ${{ steps.release_tag.outputs.tag }}
+      - name: Verify Debian package contains bundled FFmpeg
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEB="$(find src-tauri/target/release/bundle/deb -name '*.deb' -print -quit)"
+          if [ -z "$DEB" ]; then
+            echo "No .deb package was produced." >&2
+            exit 1
+          fi
+          dpkg-deb -c "$DEB" | grep -E '/vendor/ffmpeg/bin/ffmpeg$'
+          dpkg-deb -c "$DEB" | grep -E '/vendor/ffmpeg/bin/ffprobe$'
 
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.release_tag.outputs.tag }}
           files: |
-            dist-portable/*.zip
+            src-tauri/target/release/bundle/deb/*.deb
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
