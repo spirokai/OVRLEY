@@ -11,7 +11,9 @@ const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const installDir = join(rootDir, 'vendor', 'ffmpeg')
 const binDir = join(installDir, 'bin')
 const binaryName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+const probeBinaryName = process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe'
 const binaryPath = join(binDir, binaryName)
+const probeBinaryPath = join(binDir, probeBinaryName)
 const requiredEncoders = process.platform === 'darwin'
   ? ['prores_ks', 'qtrle', 'prores_videotoolbox']
   : process.platform === 'win32' || process.platform === 'linux'
@@ -21,10 +23,14 @@ const requiredFilters = process.platform === 'win32' || process.platform === 'li
   ? ['format', 'hwupload', 'overlay_qsv', 'hwdownload']
   : ['format', 'hwupload']
 
-const defaultArchives = {
+const defaultFfmpegArchives = {
   win32: 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip',
   linux: 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl-shared.tar.xz',
   darwin: 'https://evermeet.cx/ffmpeg/ffmpeg-8.1.1.zip',
+}
+
+const defaultFfprobeArchives = {
+  darwin: 'https://evermeet.cx/ffmpeg/ffprobe-8.1.1.zip',
 }
 
 main().catch((error) => {
@@ -45,11 +51,12 @@ async function main() {
     }
     console.log(`[ffmpeg] ${existingStatus.message}`)
     console.log(`[ffmpeg] Using ${binaryPath}`)
+    verifyInstalledTools(binaryPath, probeBinaryPath)
     return
   }
   console.log(`[ffmpeg] ${existingStatus.message}`)
 
-  const archiveUrl = process.env.OVRLEY_FFMPEG_ARCHIVE_URL ?? defaultArchives[process.platform]
+  const archiveUrl = process.env.OVRLEY_FFMPEG_ARCHIVE_URL ?? defaultFfmpegArchives[process.platform]
   if (!archiveUrl) {
     console.log(`[ffmpeg] No bundled installer for ${process.platform}; install ffmpeg >= ${MIN_VERSION} on PATH or set OVRLEY_FFMPEG.`)
     return
@@ -67,15 +74,34 @@ async function main() {
   await download(archiveUrl, archivePath)
   await extractArchive(archivePath, extractDir)
 
+  const ffprobeArchiveUrl = process.env.OVRLEY_FFPROBE_ARCHIVE_URL ?? defaultFfprobeArchives[process.platform]
+  if (ffprobeArchiveUrl) {
+    const ffprobeArchivePath = join(workDir, basename(new URL(ffprobeArchiveUrl).pathname))
+    const ffprobeExtractDir = join(workDir, 'extract-ffprobe')
+    await mkdir(ffprobeExtractDir, { recursive: true })
+    console.log(`[ffmpeg] Downloading ${ffprobeArchiveUrl}`)
+    await download(ffprobeArchiveUrl, ffprobeArchivePath)
+    await extractArchive(ffprobeArchivePath, ffprobeExtractDir)
+  }
+
   const discoveredBinary = await findFile(extractDir, binaryName)
   if (!discoveredBinary) {
     throw new Error(`Downloaded archive did not contain ${binaryName}`)
+  }
+
+  const discoveredProbeBinary = await findFile(workDir, probeBinaryName)
+  if (!discoveredProbeBinary) {
+    throw new Error(`Downloaded archive did not contain ${probeBinaryName}`)
   }
 
   await rm(installDir, { recursive: true, force: true })
   await mkdir(binDir, { recursive: true })
   const discoveredBinDir = dirname(discoveredBinary)
   await copyExtractedFfmpegDir(discoveredBinDir, binDir)
+
+  if (dirname(discoveredProbeBinary) !== discoveredBinDir) {
+    await cp(discoveredProbeBinary, probeBinaryPath)
+  }
 
   const discoveredLibDir = resolve(discoveredBinDir, '..', 'lib')
   let copiedLibDir = false
@@ -90,6 +116,7 @@ async function main() {
 
   if (process.platform !== 'win32') {
     await chmod(binaryPath, 0o755)
+    await chmod(probeBinaryPath, 0o755)
   }
   if (process.platform === 'linux') {
     await replaceSymlinksWithFiles(installDir)
@@ -100,9 +127,11 @@ async function main() {
     throw new Error(`Installed ffmpeg is not usable: ${installedStatus.message}`)
   }
   console.log(`[ffmpeg] ${installedStatus.message}`)
+  verifyInstalledTools(binaryPath, probeBinaryPath)
 
   await rm(workDir, { recursive: true, force: true })
   console.log(`[ffmpeg] Installed ${binaryPath}`)
+  console.log(`[ffmpeg] Installed ${probeBinaryPath}`)
 }
 
 function execFfmpeg(path, args, options) {
@@ -176,10 +205,56 @@ async function checkFfmpeg(path) {
     }
   }
 
+  const probeStatus = checkFfprobe(join(dirname(path), probeBinaryName))
+  if (!probeStatus.usable) {
+    return probeStatus
+  }
+
   return {
     usable: true,
-    message: `Bundled ffmpeg ${version} is current and has required features.`,
+    message: `Bundled ffmpeg ${version} is current and has required features; ffprobe is available.`,
   }
+}
+
+function checkFfprobe(path) {
+  const result = execFfmpeg(path, ['-version'], { encoding: 'utf8' })
+  if (result.status !== 0) {
+    return {
+      usable: false,
+      message: `Bundled ffprobe is missing or failed to run at ${path}; downloading full build.`,
+    }
+  }
+
+  return {
+    usable: true,
+    message: `Bundled ffprobe is available at ${path}.`,
+  }
+}
+
+function verifyInstalledTools(ffmpegPath, ffprobePath) {
+  const ffmpegVersion = runVersionCheck('ffmpeg', ffmpegPath)
+  const ffprobeVersion = runVersionCheck('ffprobe', ffprobePath)
+  console.log(`[ffmpeg] Verified ffmpeg: ${ffmpegVersion}`)
+  console.log(`[ffmpeg] Verified ffmpeg path: ${ffmpegPath}`)
+  console.log(`[ffmpeg] Verified ffprobe: ${ffprobeVersion}`)
+  console.log(`[ffmpeg] Verified ffprobe path: ${ffprobePath}`)
+}
+
+function runVersionCheck(label, path) {
+  const result = execFfmpeg(path, ['-version'], { encoding: 'utf8' })
+  if (result.status !== 0) {
+    const stderr = result.stderr?.trim()
+    throw new Error(`${label} verification failed at ${path}${stderr ? `: ${stderr}` : ''}`)
+  }
+
+  return firstNonEmptyLine(result.stdout) ?? `${label} -version completed successfully`
+}
+
+function firstNonEmptyLine(output) {
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean)
 }
 
 function parseVersion(output) {
