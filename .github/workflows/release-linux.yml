@@ -29,7 +29,6 @@ jobs:
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          git checkout "refs/tags/$TAG"
 
       - name: Install Linux build dependencies
         run: |
@@ -74,6 +73,18 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify bundled FFmpeg resource tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x vendor/ffmpeg/bin/ffmpeg
+          test -x vendor/ffmpeg/bin/ffprobe
+          if find vendor/ffmpeg -type l -print -quit | grep -q .; then
+            echo "Bundled FFmpeg still contains symlinks:" >&2
+            find vendor/ffmpeg -type l -print >&2
+            exit 1
+          fi
 
       - name: Build Tauri Debian package
         run: pnpm tauri build --bundles deb
