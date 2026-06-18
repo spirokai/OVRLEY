@@ -33,8 +33,13 @@ jobs:
 
       - name: Install Linux build dependencies
         run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list || true
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources || true
           sudo apt-get update
           sudo apt-get install -y \
+            -o Acquire::Retries=5 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
             build-essential \
             curl \
             dpkg-dev \
@@ -44,9 +49,7 @@ jobs:
             librsvg2-dev \
             libssl-dev \
             libwebkit2gtk-4.1-dev \
-            patchelf \
-            wget \
-            zip
+            patchelf
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
