@@ -1,5 +1,5 @@
 import { createWriteStream } from 'node:fs'
-import { chmod, cp, mkdir, rm, stat } from 'node:fs/promises'
+import { chmod, copyFile, cp, lstat, mkdir, readdir, realpath, rm, stat, unlink } from 'node:fs/promises'
 import { get } from 'node:https'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -40,6 +40,9 @@ async function main() {
 
   const existingStatus = await checkFfmpeg(binaryPath)
   if (existingStatus.usable) {
+    if (process.platform === 'linux') {
+      await replaceSymlinksWithFiles(installDir)
+    }
     console.log(`[ffmpeg] ${existingStatus.message}`)
     console.log(`[ffmpeg] Using ${binaryPath}`)
     return
@@ -72,13 +75,13 @@ async function main() {
   await rm(installDir, { recursive: true, force: true })
   await mkdir(binDir, { recursive: true })
   const discoveredBinDir = dirname(discoveredBinary)
-  await cp(discoveredBinDir, binDir, { recursive: true })
+  await copyExtractedFfmpegDir(discoveredBinDir, binDir)
 
   const discoveredLibDir = resolve(discoveredBinDir, '..', 'lib')
   let copiedLibDir = false
   try {
     await stat(discoveredLibDir)
-    await cp(discoveredLibDir, join(installDir, 'lib'), { recursive: true })
+    await copyExtractedFfmpegDir(discoveredLibDir, join(installDir, 'lib'))
     copiedLibDir = true
   } catch { /* no lib/ directory, that's fine */ }
   if (process.platform === 'linux' && !copiedLibDir) {
@@ -87,6 +90,9 @@ async function main() {
 
   if (process.platform !== 'win32') {
     await chmod(binaryPath, 0o755)
+  }
+  if (process.platform === 'linux') {
+    await replaceSymlinksWithFiles(installDir)
   }
 
   const installedStatus = await checkFfmpeg(binaryPath)
@@ -105,6 +111,35 @@ function execFfmpeg(path, args, options) {
     env.LD_LIBRARY_PATH = `${join(dirname(path), '..', 'lib')}:${env.LD_LIBRARY_PATH ?? ''}`
   }
   return spawnSync(path, args, { ...options, env })
+}
+
+async function copyExtractedFfmpegDir(sourceDir, destinationDir) {
+  await cp(sourceDir, destinationDir, {
+    recursive: true,
+    dereference: process.platform === 'linux',
+  })
+}
+
+async function replaceSymlinksWithFiles(dir) {
+  const entries = await readdir(dir, { withFileTypes: true })
+  for (const entry of entries) {
+    const path = join(dir, entry.name)
+    const stats = await lstat(path)
+    if (stats.isSymbolicLink()) {
+      const target = await realpath(path)
+      await unlink(path)
+      const targetStats = await stat(target)
+      if (targetStats.isDirectory()) {
+        await cp(target, path, { recursive: true, dereference: true })
+      } else {
+        await copyFile(target, path)
+      }
+      continue
+    }
+    if (entry.isDirectory()) {
+      await replaceSymlinksWithFiles(path)
+    }
+  }
 }
 
 async function checkFfmpeg(path) {
