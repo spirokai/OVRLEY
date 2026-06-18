@@ -11,6 +11,10 @@ import tailwindcss from '@tailwindcss/vite'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const allowedHosts = (process.env.OVRLEY_VITE_ALLOWED_HOSTS || '')
+  .split(',')
+  .map((host) => host.trim())
+  .filter(Boolean)
 
 /**
  * Parses debug write plugin.
@@ -84,8 +88,10 @@ export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss(), parseDebugWritePlugin()],
   server: {
+    host: true,
     port: 5173,
     strictPort: true,
+    allowedHosts,
     fs: {
       allow: [path.resolve(__dirname, '..')],
     },
