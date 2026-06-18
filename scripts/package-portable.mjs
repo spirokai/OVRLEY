@@ -18,6 +18,7 @@ const binaryName = process.platform === 'win32' ? 'OVRLEY.exe' : 'OVRLEY'
 const builtBinaryName = process.platform === 'win32' ? 'app.exe' : 'app'
 const builtBinaryPath = join(targetDir, builtBinaryName)
 const ffmpegBinaryPath = join(rootDir, 'vendor', 'ffmpeg', 'bin', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')
+const ffprobeBinaryPath = join(rootDir, 'vendor', 'ffmpeg', 'bin', process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe')
 
 main().catch((error) => {
   console.error(`[portable] ${error.message}`)
@@ -26,6 +27,7 @@ main().catch((error) => {
 
 async function main() {
   await ensureFile(ffmpegBinaryPath, 'FFmpeg binary')
+  await ensureFile(ffprobeBinaryPath, 'FFprobe binary')
   const version = await readArchiveVersion()
   const archivePath = join(distDir, `OVRLEY-${platformSlug()}-${version}.zip`)
 
@@ -79,8 +81,10 @@ async function packagePortableBinary(destinationDir) {
 async function packageMacosApp(destinationDir) {
   const appBundlePath = await resolveMacosAppBundle()
   const bundledFfmpegPath = join(appBundlePath, 'Contents', 'Resources', 'vendor', 'ffmpeg', 'bin', 'ffmpeg')
+  const bundledFfprobePath = join(appBundlePath, 'Contents', 'Resources', 'vendor', 'ffmpeg', 'bin', 'ffprobe')
 
   await ensureFile(bundledFfmpegPath, 'Bundled FFmpeg binary inside macOS app bundle')
+  await ensureFile(bundledFfprobePath, 'Bundled FFprobe binary inside macOS app bundle')
   await mkdir(destinationDir, { recursive: true })
   await cp(appBundlePath, join(destinationDir, appBundleName), { recursive: true })
 }
@@ -96,11 +100,11 @@ function buildThirdPartyNotice() {
     '',
     'FFmpeg',
     '-------',
-    'This portable OVRLEY distribution includes an unmodified FFmpeg command-line binary',
-    'and its required runtime libraries as a separate component in the packaged resources.',
+    'This portable OVRLEY distribution includes unmodified FFmpeg and FFprobe command-line binaries',
+    'and their required runtime libraries as separate components in the packaged resources.',
     '',
-    'OVRLEY invokes ffmpeg as a subprocess for video encoding. FFmpeg is not linked into',
-    'the OVRLEY executable.',
+    'OVRLEY invokes ffmpeg as a subprocess for video encoding and ffprobe as a subprocess',
+    'for video metadata extraction. FFmpeg and FFprobe are not linked into the OVRLEY executable.',
     '',
     'Project: https://ffmpeg.org/',
     'Source code: https://ffmpeg.org/download.html',
