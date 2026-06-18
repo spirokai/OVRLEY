@@ -20,7 +20,7 @@
 //! Not a hot path — called once per imported video. Subprocess overhead
 //! dominates; ffprobe typically completes in < 1 second for 1080p files.
 
-use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
+use crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::error::{CoreError, CoreResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -94,7 +94,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
     };
     let ffprobe_path = ffmpeg_path.with_file_name(ffprobe_name);
 
-    let mut command = Command::new(ffprobe_path);
+    let mut command = Command::new(&ffprobe_path);
     command.args([
         "-v",
         "quiet",
@@ -104,7 +104,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
         "-show_streams",
         file_path,
     ]);
-    suppress_child_console(&mut command);
+    configure_ffmpeg_command(&mut command, &ffprobe_path);
 
     let output = command
         .output()

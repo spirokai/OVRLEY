@@ -101,10 +101,15 @@ async function main() {
   }
 
   const discoveredLibDir = resolve(discoveredBinDir, '..', 'lib')
+  let copiedLibDir = false
   try {
     await stat(discoveredLibDir)
     await cp(discoveredLibDir, join(installDir, 'lib'), { recursive: true })
+    copiedLibDir = true
   } catch { /* no lib/ directory, that's fine */ }
+  if (process.platform === 'linux' && !copiedLibDir) {
+    throw new Error(`Downloaded Linux archive did not contain required shared libraries at ${discoveredLibDir}`)
+  }
 
   if (process.platform !== 'win32') {
     await chmod(binaryPath, 0o755)

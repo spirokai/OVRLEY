@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
+import { chmod, cp, mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
 import { writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -17,6 +17,8 @@ const appBundleName = `${appName}.app`
 const binaryName = process.platform === 'win32' ? 'OVRLEY.exe' : 'OVRLEY'
 const builtBinaryName = process.platform === 'win32' ? 'app.exe' : 'app'
 const builtBinaryPath = join(targetDir, builtBinaryName)
+const vendorFfmpegDir = join(rootDir, 'vendor', 'ffmpeg')
+const portableResourceDirs = ['fonts', 'templates']
 const ffmpegBinaryPath = join(rootDir, 'vendor', 'ffmpeg', 'bin', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')
 const ffprobeBinaryPath = join(rootDir, 'vendor', 'ffmpeg', 'bin', process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe')
 
@@ -42,6 +44,9 @@ async function main() {
 
   if (process.platform === 'darwin') {
     await writeFile(join(appDir, 'README-macOS.txt'), buildMacosReadme())
+  }
+  if (process.platform === 'linux') {
+    await writeFile(join(appDir, 'README-Linux.txt'), buildLinuxReadme())
   }
 
   await writeFile(join(appDir, 'THIRD_PARTY_NOTICES.txt'), buildThirdPartyNotice())
@@ -72,9 +77,42 @@ async function packagePortableBinary(destinationDir) {
   }
 
   await prunePortableRuntime(destinationDir)
+  await copyPortableResourceDirs(destinationDir)
+  await copyPortableFfmpeg(destinationDir)
 
-  if (binaryName !== builtBinaryName) {
+  if (process.platform === 'linux') {
+    const runtimeBinaryName = `${binaryName}-bin`
+    const runtimeBinaryPath = join(destinationDir, runtimeBinaryName)
+    await rename(join(destinationDir, builtBinaryName), runtimeBinaryPath)
+    await writeFile(join(destinationDir, binaryName), buildLinuxLauncher(runtimeBinaryName))
+    await chmod(join(destinationDir, binaryName), 0o755)
+    await chmod(runtimeBinaryPath, 0o755)
+  } else if (binaryName !== builtBinaryName) {
     await rename(join(destinationDir, builtBinaryName), join(destinationDir, binaryName))
+  }
+}
+
+async function copyPortableResourceDirs(destinationDir) {
+  for (const name of portableResourceDirs) {
+    const sourceDir = join(rootDir, name)
+    const destinationResourceDir = join(destinationDir, name)
+    await ensureDirectory(sourceDir, `Portable ${name} source directory`)
+    await rm(destinationResourceDir, { recursive: true, force: true })
+    await cp(sourceDir, destinationResourceDir, { recursive: true })
+    await ensureDirectory(destinationResourceDir, `Packaged ${name} directory`)
+  }
+}
+
+async function copyPortableFfmpeg(destinationDir) {
+  const destinationFfmpegDir = join(destinationDir, 'vendor', 'ffmpeg')
+  await rm(destinationFfmpegDir, { recursive: true, force: true })
+  await mkdir(dirname(destinationFfmpegDir), { recursive: true })
+  await cp(vendorFfmpegDir, destinationFfmpegDir, { recursive: true })
+
+  await ensureFile(join(destinationFfmpegDir, 'bin', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'), 'Packaged FFmpeg binary')
+  await ensureFile(join(destinationFfmpegDir, 'bin', process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe'), 'Packaged FFprobe binary')
+  if (process.platform === 'linux') {
+    await ensureDirectory(join(destinationFfmpegDir, 'lib'), 'Packaged FFmpeg shared libraries')
   }
 }
 
@@ -90,8 +128,14 @@ async function packageMacosApp(destinationDir) {
 }
 
 function buildThirdPartyNotice() {
-  const ffmpegVersion = spawnSync(ffmpegBinaryPath, ['-version'], { encoding: 'utf8' })
-  const ffmpegLicense = spawnSync(ffmpegBinaryPath, ['-L'], { encoding: 'utf8' })
+  const ffmpegVersion = spawnSync(ffmpegBinaryPath, ['-version'], {
+    encoding: 'utf8',
+    env: bundledFfmpegEnv(ffmpegBinaryPath),
+  })
+  const ffmpegLicense = spawnSync(ffmpegBinaryPath, ['-L'], {
+    encoding: 'utf8',
+    env: bundledFfmpegEnv(ffmpegBinaryPath),
+  })
   const versionText = ffmpegVersion.status === 0 ? ffmpegVersion.stdout.trim() : 'Unable to read ffmpeg -version output.'
   const licenseText = ffmpegLicense.status === 0 ? ffmpegLicense.stdout.trim() : 'Unable to read ffmpeg -L output.'
 
@@ -114,6 +158,9 @@ function buildThirdPartyNotice() {
     'Windows builds are downloaded from BtbN FFmpeg builds:',
     'https://github.com/BtbN/FFmpeg-Builds',
     '',
+    'Linux builds are downloaded from BtbN FFmpeg builds:',
+    'https://github.com/BtbN/FFmpeg-Builds',
+    '',
     'macOS builds are downloaded from Evermeet/Tessus FFmpeg builds:',
     'https://evermeet.cx/ffmpeg/',
     '',
@@ -126,6 +173,14 @@ function buildThirdPartyNotice() {
     licenseText,
     '',
   ].join('\n')
+}
+
+function bundledFfmpegEnv(path) {
+  const env = { ...process.env }
+  if (process.platform === 'linux') {
+    env.LD_LIBRARY_PATH = `${join(dirname(path), '..', 'lib')}:${env.LD_LIBRARY_PATH ?? ''}`
+  }
+  return env
 }
 
 const PORTABLE_EXCLUDED_TOP_LEVEL = new Set([
@@ -187,6 +242,42 @@ function buildMacosReadme() {
   ].join('\n')
 }
 
+function buildLinuxReadme() {
+  return [
+    'OVRLEY FOR LINUX',
+    '',
+    'Install',
+    '-------',
+    '1. Extract the ZIP archive.',
+    '2. Run ./OVRLEY from the extracted directory.',
+    '',
+    'Notes',
+    '-----',
+    'OVRLEY is packaged as a portable experimental Linux build.',
+    'The OVRLEY launcher sets LD_LIBRARY_PATH so bundled FFmpeg libraries are available.',
+    'Run OVRLEY-bin directly only if you provide an equivalent LD_LIBRARY_PATH yourself.',
+    '',
+  ].join('\n')
+}
+
+function buildLinuxLauncher(runtimeBinaryName) {
+  return [
+    '#!/usr/bin/env sh',
+    'set -eu',
+    'APP_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)',
+    'FFMPEG_BIN="$APP_DIR/vendor/ffmpeg/bin/ffmpeg"',
+    'FFMPEG_LIB_DIR="$APP_DIR/vendor/ffmpeg/lib"',
+    'if [ -x "$FFMPEG_BIN" ]; then',
+    '  export OVRLEY_FFMPEG="$FFMPEG_BIN"',
+    'fi',
+    'if [ -d "$FFMPEG_LIB_DIR" ]; then',
+    '  export LD_LIBRARY_PATH="$FFMPEG_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
+    'fi',
+    `exec "$APP_DIR/${runtimeBinaryName}" "$@"`,
+    '',
+  ].join('\n')
+}
+
 function readArg(flag) {
   const index = args.indexOf(flag)
   return index >= 0 ? args[index + 1] : null
@@ -216,6 +307,18 @@ async function ensureFile(path, label) {
   try {
     const entry = await stat(path)
     if (entry.isFile()) {
+      return
+    }
+  } catch {
+    // Fall through to the shared error below.
+  }
+  throw new Error(`${label} not found at ${path}`)
+}
+
+async function ensureDirectory(path, label) {
+  try {
+    const entry = await stat(path)
+    if (entry.isDirectory()) {
       return
     }
   } catch {

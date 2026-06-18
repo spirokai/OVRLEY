@@ -79,6 +79,19 @@ describe('createTemplateSlice — pure state actions', () => {
     expect(useStore.getState().exportCodec).toBe('prores_videotoolbox')
   })
 
+  test('setExportCodec normalizes platform-specific video codecs', () => {
+    useStore.getState().setPlatformOs('linux')
+    useStore.getState().setExportCodec('h264_vaapi')
+    expect(useStore.getState().exportCodec).toBe('h264_vaapi')
+
+    useStore.getState().setPlatformOs('windows')
+    expect(useStore.getState().exportCodec).toBe('libx264')
+
+    useStore.getState().setPlatformOs('linux')
+    useStore.getState().setExportCodec('h264_videotoolbox')
+    expect(useStore.getState().exportCodec).toBe('libx264')
+  })
+
   test('setPlatformOs is pure — updates platformOs and normalizes codec', () => {
     useStore.getState().setPlatformOs('macos')
 

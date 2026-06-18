@@ -30,7 +30,7 @@
 use crate::encode::codec_catalog::{
     CompositeAvailabilityRule, CompositeCodecId, TransparentAvailabilityRule, TransparentCodecId,
 };
-use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
+use crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::error::CoreResult;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -623,9 +623,9 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
 /// A failed probe returns an empty set so hardware-only filter profiles are
 /// conservatively disabled instead of being shown optimistically.
 fn detect_ffmpeg_filters(ffmpeg_path: &Path) -> std::collections::BTreeSet<String> {
-    let output = Command::new(ffmpeg_path)
-        .args(["-hide_banner", "-filters"])
-        .output();
+    let mut command = Command::new(ffmpeg_path);
+    configure_ffmpeg_command(&mut command, ffmpeg_path);
+    let output = command.args(["-hide_banner", "-filters"]).output();
     let Ok(output) = output else {
         return std::collections::BTreeSet::new();
     };
@@ -798,7 +798,7 @@ fn probe_codec_owned(name: &str, ffmpeg_path: &Path, args: &[String]) -> bool {
     let mut command = Command::new(ffmpeg_path);
     command.arg("-nostdin");
     command.args(args);
-    suppress_child_console(&mut command);
+    configure_ffmpeg_command(&mut command, ffmpeg_path);
     command.stdout(Stdio::null());
     command.stderr(Stdio::null());
 

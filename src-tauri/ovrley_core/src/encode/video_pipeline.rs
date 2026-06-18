@@ -28,7 +28,7 @@
 
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::debug::RenderProfiler;
-use crate::encode::ffmpeg::{resolve_ffmpeg_binary, suppress_child_console};
+use crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::encode::ffmpeg_settings::{build_ffmpeg_settings, FfmpegSettings};
 use crate::encode::pipeline_shared::{
     acquire_frame_buffer, merge_timing_maps, queue_frame, writer_worker, FrameBuffer,
@@ -409,7 +409,7 @@ fn spawn_ffmpeg_process(
     // Feed rawvideo via stdin to avoid writing intermediary frame files. All
     // arguments are separate argv entries, so user paths are not shell-expanded.
     let mut command = Command::new(ffmpeg_bin);
-    suppress_child_console(&mut command);
+    configure_ffmpeg_command(&mut command, ffmpeg_bin);
     command.arg("-loglevel").arg(&ffmpeg_settings.loglevel);
 
     if !ffmpeg_settings.input_args.is_empty() {
