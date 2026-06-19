@@ -30,7 +30,6 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Install Linux build dependencies
         run: |
@@ -57,7 +56,6 @@ jobs:
             libssl-dev \
             libwebkit2gtk-4.1-dev \
             patchelf \
-            pkg-config
             pkg-config
 
       - name: Setup pnpm
