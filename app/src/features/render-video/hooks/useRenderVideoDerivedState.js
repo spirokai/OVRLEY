@@ -28,6 +28,7 @@ export default function useRenderVideoDerivedState({ settings }) {
   const availableCodecs = useStore((state) => state.availableCodecs)
   const config = useStore((state) => state.config)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
+  const importedVideoDuration = useStore((state) => state.importedVideoDuration)
   const importedVideoFps = useStore((state) => state.importedVideoFps)
   const importedVideoResolution = useStore((state) => state.importedVideoResolution)
   const renderProgress = useStore((state) => state.renderProgress)
@@ -74,6 +75,7 @@ export default function useRenderVideoDerivedState({ settings }) {
     containerFps,
     defaultBitrateForCodec,
     hasImportedVideo,
+    importedVideoDuration,
     importedVideoFps,
     importedVideoResolution,
     platformOs,

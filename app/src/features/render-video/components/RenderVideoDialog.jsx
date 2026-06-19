@@ -10,6 +10,7 @@ import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
 import ExportRangeSettings from './ExportRangeSettings'
 import RenderProgressPanel from './RenderProgressPanel'
 import useRenderVideoDialogState from '../hooks/useRenderVideoDialogState'
@@ -32,6 +33,25 @@ export default function RenderVideoDialog(props) {
     return null
   }
 
+  const fps = ctx.importedVideoFps ? Math.round(ctx.importedVideoFps) : Number(ctx.settings.fps)
+  const outputFormatLabel = ctx.OUTPUT_FORMATS.find((option) => option.value === ctx.selectedOutputFormatValue)?.label
+  const accelerationLabel = ctx.selectedAccelerationOptions.find(
+    (option) => option.value === ctx.selectedAccelerationValue && option.available && option.value !== 'cpu',
+  )?.label
+  const durationSeconds = ctx.hasImportedVideo
+    ? Number(ctx.importedVideoDuration)
+    : ctx.settings.exportRange?.type === 'custom'
+      ? timeToSeconds(ctx.settings.exportRange.toTime) - timeToSeconds(ctx.settings.exportRange.fromTime)
+      : Number(ctx.config?.scene?.end) - Number(ctx.config?.scene?.start)
+  const renderSummaryItems = [
+    ctx.config?.scene?.width && ctx.config?.scene?.height ? `${ctx.config.scene.width}x${ctx.config.scene.height}` : null,
+    Number.isFinite(fps) ? `${fps} fps` : null,
+    Number.isFinite(Number(ctx.settings.updateRate)) ? `Update 1/${Number(ctx.settings.updateRate)}` : null,
+    outputFormatLabel || ctx.settings.exportCodec || null,
+    accelerationLabel || null,
+    Number.isFinite(durationSeconds) && durationSeconds >= 0 ? formatDurationSummary(durationSeconds) : null,
+  ].filter(Boolean)
+
   return (
     <div
       className="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md"
@@ -42,7 +62,7 @@ export default function RenderVideoDialog(props) {
         onMouseDown={(event) => event.stopPropagation()}
       >
         {ctx.isProgress ? (
-          <RenderProgressPanel renderProgress={ctx.renderProgress} onCancel={ctx.handleCancel} />
+          <RenderProgressPanel renderProgress={ctx.renderProgress} renderSummaryItems={renderSummaryItems} onCancel={ctx.handleCancel} />
         ) : (
           <div className="space-y-6">
             <div className="space-y-2">
@@ -250,4 +270,16 @@ export default function RenderVideoDialog(props) {
       </div>
     </div>
   )
+}
+
+function formatDurationSummary(durationSeconds) {
+  const roundedSeconds = Math.round(durationSeconds)
+  const minutes = Math.floor(roundedSeconds / 60)
+  const seconds = roundedSeconds % 60
+
+  if (minutes > 0) {
+    return `${minutes} min ${seconds} sec`
+  }
+
+  return `${seconds} sec`
 }

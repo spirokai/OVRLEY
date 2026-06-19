@@ -164,6 +164,7 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     handleFpsModeChange,
     handleOutputFormatChange,
     hasImportedVideo: derived.hasImportedVideo,
+    importedVideoDuration: derived.importedVideoDuration,
     importedVideoFps: derived.importedVideoFps,
     importedVideoResolution: derived.importedVideoResolution,
     isProgress,
