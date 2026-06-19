@@ -8,7 +8,6 @@
   "permissions": [
     "core:path:default",
     "dialog:default",
-    "core:webview:allow-internal-toggle-devtools",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
