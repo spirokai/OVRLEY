@@ -81,15 +81,18 @@ pub fn run() {
             file_ops::write_parse_debug_file
         ])
         .setup(|app| {
-            #[cfg(debug_assertions)]
-            {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .build(),
+            )?;
             app.state::<video_server::VideoServerHandle>().start()?;
+            if let Some(window) = app.get_webview_window("main") {
+                window.open_devtools();
+                log::info!("Opened devtools for main webview window");
+            } else {
+                log::warn!("Could not find main webview window to open devtools");
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
