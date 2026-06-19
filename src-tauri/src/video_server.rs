@@ -182,6 +182,13 @@ impl VideoServerHandle {
 
         let import_id = Uuid::new_v4().to_string();
         let file_size = metadata.len();
+        log::info!(
+            "Registered preview video path={} content_type={} file_size={} import_id={}",
+            path.display(),
+            content_type,
+            file_size,
+            import_id
+        );
         let current = CurrentVideo {
             import_id: import_id.clone(),
             path,
@@ -193,14 +200,6 @@ impl VideoServerHandle {
             let mut guard = self.inner.lock().map_err(|error| error.to_string())?;
             guard.current = Some(current);
         }
-
-        log::info!(
-            "Registered preview video path={} content_type={} file_size={} import_id={}",
-            path.display(),
-            content_type,
-            file_size,
-            import_id
-        );
 
         self.url_for_import(&import_id)
     }
