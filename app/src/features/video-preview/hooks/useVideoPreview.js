@@ -8,7 +8,7 @@ import useStore from '@/store/useStore'
 import { useVideoPlaybackClock } from './useVideoPlaybackClock'
 import { useVideoPreviewWarnings } from './useVideoPreviewWarnings'
 import { DRIFT_CORRECTION_SECONDS, SCRUB_SEEK_EPSILON_SECONDS, SCRUB_SEEK_INTERVAL_MS } from '../data/videoPreviewConstants'
-import { clampVideoTime, syncVideoCurrentTime } from '../utils/videoPreviewPlayback'
+import { clampVideoTime, primeVideoFirstFrame, syncVideoCurrentTime } from '../utils/videoPreviewPlayback'
 import { createVideoPreviewScrubScheduler } from '../utils/videoPreviewScrubScheduler'
 import { isVideoPreviewOutOfRange, resolveVideoPreviewSource } from '../utils/videoPreviewSource'
 
@@ -112,6 +112,7 @@ export function useVideoPreview(videoRef, isActive = true) {
 
     const handleLoadedMetadata = () => {
       syncPlaybackState()
+      primeVideoFirstFrame(video)
     }
 
     syncPlaybackState()
