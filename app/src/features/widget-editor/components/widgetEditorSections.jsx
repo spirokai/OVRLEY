@@ -4,6 +4,7 @@
  */
 
 import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
+import { Separator } from '@/components/ui/separator'
 import { ColorField, NumberField, SelectField, SliderField, TextField, TIME_FORMATS, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
@@ -19,11 +20,15 @@ import { getThemeColor } from '@/lib/theme'
  * @param {*} props.title - Value for title.
  * @returns {JSX.Element} Rendered component output.
  */
-export function SectionHeading({ icon: Icon, title }) {
+export function SectionHeading({ icon: Icon, title, trailing = null }) {
   return (
-    <div className="flex items-center gap-2">
-      <Icon className="h-3.5 w-3.5 text-primary" />
-      <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</h5>
+    <div className="flex w-full items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2 pt-3 pb-3">
+        <Icon className="h-3.5 w-3.5 text-primary" />
+        <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</h5>
+        <Separator className="flex-1" />
+      </div>
+      {trailing ? <div className="shrink-0">{trailing}</div> : null}
     </div>
   )
 }
@@ -37,13 +42,13 @@ export function SectionHeading({ icon: Icon, title }) {
  * @param {*} props.updateWidgetData - Value for update widget data.
  * @returns {JSX.Element} Rendered component output.
  */
-export function PositionSection({ widget, setNumericField, updateWidgetData }) {
+export function PositionSection({ widget, setNumericField, updateWidgetData, headerAction = null }) {
   const opacity = Math.round(widget.data.opacity * 100)
 
   return (
-    <div className="space-y-3">
-      <SectionHeading icon={Move} title="General" />
-      <div className="grid grid-cols-2 gap-3">
+    <div className="space-y-4">
+      <SectionHeading icon={Move} title="General" trailing={headerAction} />
+      <div className="grid grid-cols-2 gap-4 pt-2">
         <NumberField label="Horizontal Position" value={widget.data.x} onChange={(rawValue) => setNumericField(widget.id, 'x', rawValue)} />
         <NumberField label="Vertical Position" value={widget.data.y} onChange={(rawValue) => setNumericField(widget.id, 'y', rawValue)} />
       </div>
@@ -72,7 +77,7 @@ export function DimensionsSection({ widget, setNumericField }) {
   return (
     <div className="space-y-3">
       <SectionHeading icon={TrendingUp} title="Dimensions" />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <NumberField label="Width" value={widget.data.width} onChange={(rawValue) => setNumericField(widget.id, 'width', rawValue, { min: 0 })} />
         <NumberField label="Height" value={widget.data.height} onChange={(rawValue) => setNumericField(widget.id, 'height', rawValue, { min: 0 })} />
       </div>
@@ -135,7 +140,7 @@ export function FontSection({
         valueDisplay={`${fontSize}px`}
         onSliderChange={(value) => updateWidgetData(widget.id, { font_size: value })}
       />
-      <div className="grid grid-cols-2 gap-3 items-end">
+      <div className="grid grid-cols-2 gap-4 items-end">
         <FontSelectField
           label="Font Family"
           value={getWidgetFont(widget)}
@@ -172,11 +177,13 @@ export function IconSection({ widget, updateWidgetData, setNumericField, title =
 
   return (
     <div className="space-y-4">
-      <div className="flex w-full justify-between items-center">
+      <div className="flex w-full items-center gap-3">
         <SectionHeading icon={Palette} title={title} />
-        <ToggleField checked={widget.data.show_icon} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_icon: checked })} />
+        <div className="shrink-0 pt-1">
+          <ToggleField checked={widget.data.show_icon} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_icon: checked })} />
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <ColorField
           label="Color"
           disabled={!widget.data.show_icon}
@@ -194,7 +201,7 @@ export function IconSection({ widget, updateWidgetData, setNumericField, title =
           onSliderChange={(value) => updateWidgetData(widget.id, { icon_size: value })}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <NumberField
           disabled={!widget.data.show_icon}
           label="Horizontal Offset"
@@ -260,13 +267,17 @@ export function UnitsControlRow({
   const controlsDisabled = showToggle && !checked
 
   return (
-    <div className="space-y-2 pt-4">
-      <div className="flex w-full justify-between items-center">
+    <div className="space-y-2 pt-2">
+      <div className="flex w-full items-center gap-3">
         <SectionHeading icon={Ruler} title={title} />
-        {showToggle ? <ToggleField checked={checked} onCheckedChange={onCheckedChange} /> : null}
+        {showToggle ? (
+          <div className="shrink-0 pt-1">
+            <ToggleField checked={checked} onCheckedChange={onCheckedChange} />
+          </div>
+        ) : null}
       </div>
       {showSelect || showColor ? (
-        <div className="grid grid-cols-2 gap-3 items-start">
+        <div className="grid grid-cols-2 gap-4 items-start">
           {showColor ? <ColorField label={colorLabel} value={colorValue} onChange={onColorChange} disabled={controlsDisabled} /> : null}
           {showSelect ? (
             <SelectField label={selectLabel} value={value} onValueChange={onValueChange} options={options} disabled={controlsDisabled} />

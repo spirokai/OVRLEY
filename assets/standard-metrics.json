@@ -114,7 +114,7 @@
       }
     },
     "variantFrameKeys": ["width", "height", "rotation"],
-    "defaults": ["text"],
+    "defaults": ["text", "linear"],
     "overrides": {
       "heading": ["text", "heading_tape"],
       "core_temperature": ["text"],

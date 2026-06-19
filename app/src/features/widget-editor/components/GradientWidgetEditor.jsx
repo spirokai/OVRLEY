@@ -24,15 +24,6 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
   return (
     <>
       <FontSection widget={widget} updateWidgetData={updateWidgetData} title="Typography" fontSizeLabel="Font Size" colorLabel="Value Color" />
-      <UnitsControlRow
-        widget={widget}
-        updateWidgetData={updateWidgetData}
-        title="Unit"
-        showToggle={false}
-        colorLabel="Percent Color"
-        colorValue={widget.data.unit_color}
-        onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
-      />
 
       <SliderField
         label="Value Offset"
@@ -43,7 +34,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
         valueDisplay={`${valueOffset}px`}
         onSliderChange={(value) => updateWidgetData(widget.id, { value_offset: value })}
       />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <SliderField
           label="Decimals"
           value={decimals}
@@ -59,11 +50,13 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
         </div>
       </div>
       <div className="space-y-4">
-        <div className="flex w-full justify-between items-center">
+        <div className="flex w-full items-center gap-3">
           <SectionHeading icon={TrendingUp} title="Indicator" />
-          <ToggleField checked={widget.data.show_triangle} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_triangle: checked })} />
+          <div className="shrink-0 pt-1">
+            <ToggleField checked={widget.data.show_triangle} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_triangle: checked })} />
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <ColorField
             label="Color Positive"
             disabled={!widget.data.show_triangle}
@@ -87,6 +80,15 @@ export default function GradientWidgetEditor({ widget, updateWidgetData }) {
           step={1}
           valueDisplay={`${triangleWidth}px`}
           onSliderChange={(value) => updateWidgetData(widget.id, { triangle_width: value })}
+        />
+        <UnitsControlRow
+          widget={widget}
+          updateWidgetData={updateWidgetData}
+          title="Unit"
+          showToggle={false}
+          colorLabel="Percent Color"
+          colorValue={widget.data.unit_color}
+          onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
         />
       </div>
     </>

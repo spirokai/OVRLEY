@@ -58,13 +58,6 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
 
       <div className="space-y-4">
         <SectionHeading icon={Palette} title="Line Styling" />
-        <div className="flex items-center justify-between gap-2 px-1">
-          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Render Full Activity</Label>
-          <ToggleField
-            checked={widget.data.show_full_activity}
-            onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_activity: checked })}
-          />
-        </div>
         <SliderField
           label="Thickness"
           value={lineWidth}
@@ -79,44 +72,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
             })
           }
         />
-        <div className="grid grid-cols-2 gap-3">
-          <ColorField
-            label="Finished Color"
-            value={widget.data.completed_line_color || getThemeColor('ice')}
-            onChange={(value) =>
-              updateWidgetData(widget.id, {
-                completed_line_color: value,
-                color: value,
-              })
-            }
-          />
-          <ColorField
-            label="Remaining Color"
-            value={widget.data.remaining_line_color || getThemeColor('teal')}
-            onChange={(value) => updateWidgetData(widget.id, { remaining_line_color: value })}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <SliderField
-            label="Finished Opacity"
-            value={completedLineOpacity}
-            min={0}
-            max={100}
-            step={1}
-            valueDisplay={`${completedLineOpacity}%`}
-            onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
-          />
-          <SliderField
-            label="Remaining Opacity"
-            value={remainingLineOpacity}
-            min={0}
-            max={100}
-            step={1}
-            valueDisplay={`${remainingLineOpacity}%`}
-            onSliderChange={(value) => updateWidgetData(widget.id, { remaining_line_opacity: value })}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <SliderField
             label="Smoothing"
             value={simplifyTolerance}
@@ -144,6 +100,52 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
             }
           />
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <ColorField
+            label="Finished Color"
+            value={widget.data.completed_line_color || getThemeColor('ice')}
+            onChange={(value) =>
+              updateWidgetData(widget.id, {
+                completed_line_color: value,
+                color: value,
+              })
+            }
+          />
+          <ColorField
+            label="Remaining Color"
+            value={widget.data.remaining_line_color || getThemeColor('teal')}
+            onChange={(value) => updateWidgetData(widget.id, { remaining_line_color: value })}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            label="Finished Opacity"
+            value={completedLineOpacity}
+            min={0}
+            max={100}
+            step={1}
+            valueDisplay={`${completedLineOpacity}%`}
+            onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
+          />
+          <SliderField
+            label="Remaining Opacity"
+            value={remainingLineOpacity}
+            min={0}
+            max={100}
+            step={1}
+            valueDisplay={`${remainingLineOpacity}%`}
+            onSliderChange={(value) => updateWidgetData(widget.id, { remaining_line_opacity: value })}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between gap-2 px-1 pt-2">
+            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Show Full Activity</Label>
+            <ToggleField
+              checked={widget.data.show_full_activity}
+              onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_activity: checked })}
+            />
+          </div>
+        </div>
       </div>
       <div className="space-y-4">
         <SectionHeading icon={Map} title="Marker" />
@@ -153,27 +155,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
           options={MARKER_VARIANT_OPTIONS}
           onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
         />
-        <SliderField
-          label=" Size"
-          value={markerSize}
-          min={0}
-          max={50}
-          step={1}
-          valueDisplay={`${markerSize}px`}
-          onSliderChange={(value) => updateWidgetData(widget.id, { marker_size: value })}
-        />
-        {showVariantDiameter ? (
-          <SliderField
-            label={variantDiameterLabel}
-            value={markerVariantDiameter}
-            min={Math.max(Math.round(markerSize * 2), 4)}
-            max={120}
-            step={1}
-            valueDisplay={`${markerVariantDiameter}px`}
-            onSliderChange={(value) => updateWidgetData(widget.id, { marker_variant_diameter: value })}
-          />
-        ) : null}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <ColorField
             label="Color"
             value={widget.data.marker_color || getThemeColor('aqua')}
@@ -188,6 +170,28 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, setNume
             valueDisplay={`${markerOpacity}%`}
             onSliderChange={(value) => updateWidgetData(widget.id, { marker_opacity: value })}
           />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            label=" Size"
+            value={markerSize}
+            min={0}
+            max={50}
+            step={1}
+            valueDisplay={`${markerSize}px`}
+            onSliderChange={(value) => updateWidgetData(widget.id, { marker_size: value })}
+          />
+          {showVariantDiameter ? (
+            <SliderField
+              label={variantDiameterLabel}
+              value={markerVariantDiameter}
+              min={Math.max(Math.round(markerSize * 2), 4)}
+              max={120}
+              step={1}
+              valueDisplay={`${markerVariantDiameter}px`}
+              onSliderChange={(value) => updateWidgetData(widget.id, { marker_variant_diameter: value })}
+            />
+          ) : null}
         </div>
       </div>
     </>

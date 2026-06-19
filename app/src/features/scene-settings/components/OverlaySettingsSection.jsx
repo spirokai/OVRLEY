@@ -54,7 +54,7 @@ export default function OverlaySettingsSection({
 }) {
   return (
     <>
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-3 mb-2">
         <Video className="h-4 w-4 text-primary" />
         <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Overlay</h4>
         <Separator className="flex-1" />
