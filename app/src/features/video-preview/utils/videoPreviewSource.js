@@ -13,6 +13,19 @@ function currentWindowProtocol() {
   return window.location.protocol
 }
 
+function isLoopbackHttpUrl(url) {
+  if (typeof url !== 'string' || !url.startsWith('http://')) {
+    return false
+  }
+
+  try {
+    const { hostname } = new URL(url)
+    return hostname === '127.0.0.1' || hostname === 'localhost'
+  } catch {
+    return false
+  }
+}
+
 /**
  * Resolves the active source URL for the preview video element.
  *
@@ -31,7 +44,8 @@ export function resolveVideoPreviewSource({
   windowProtocol = currentWindowProtocol(),
   useLocalHttpPreview = USE_LOCAL_HTTP_VIDEO_PREVIEW,
 }) {
-  const blocksMixedContent = windowProtocol === 'https:' && importedVideoPreviewUrl?.startsWith('http://')
+  const blocksMixedContent =
+    windowProtocol === 'https:' && importedVideoPreviewUrl?.startsWith('http://') && !isLoopbackHttpUrl(importedVideoPreviewUrl)
 
   if (useLocalHttpPreview && importedVideoPreviewUrl && !blocksMixedContent) {
     return importedVideoPreviewUrl

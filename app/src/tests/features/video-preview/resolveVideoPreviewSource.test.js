@@ -39,7 +39,7 @@ describe('videoPreviewSource helpers', () => {
     expect(convertFileSrc).toHaveBeenCalledWith('C:\\clips\\ride.mp4')
   })
 
-  test('falls back to a file source when the app is https but the preview URL is http', () => {
+  test('keeps the local preview server source when the app is https', () => {
     const convertFileSrc = vi.fn((path) => `converted:${path}`)
 
     expect(
@@ -47,6 +47,22 @@ describe('videoPreviewSource helpers', () => {
         convertFileSrc,
         importedVideoPath: 'C:\\clips\\ride.mp4',
         importedVideoPreviewUrl: 'http://127.0.0.1:3210/video/abc',
+        windowProtocol: 'https:',
+        useLocalHttpPreview: true,
+      }),
+    ).toBe('http://127.0.0.1:3210/video/abc')
+
+    expect(convertFileSrc).not.toHaveBeenCalled()
+  })
+
+  test('falls back to a file source for non-loopback http preview URLs when the app is https', () => {
+    const convertFileSrc = vi.fn((path) => `converted:${path}`)
+
+    expect(
+      resolveVideoPreviewSource({
+        convertFileSrc,
+        importedVideoPath: 'C:\\clips\\ride.mp4',
+        importedVideoPreviewUrl: 'http://192.168.1.20:3210/video/abc',
         windowProtocol: 'https:',
         useLocalHttpPreview: true,
       }),

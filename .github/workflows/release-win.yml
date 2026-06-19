@@ -1,4 +1,4 @@
-name: Release
+name: Release Windows
 
 on:
   workflow_dispatch:
@@ -8,22 +8,8 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: windows
-            os: windows-latest
-            bundles: ''
-            artifact_glob: |
-              dist-portable/*.zip
-          - name: macos
-            os: macos-latest
-            bundles: app
-            artifact_glob: |
-              dist-portable/*.zip
+    name: Build windows
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -63,11 +49,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Disable Tauri bundling
-        if: matrix.bundles == ''
         run: node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.bundle.targets=[];fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2))"
 
       - name: Build Tauri app
-        run: pnpm tauri build${{ matrix.bundles && format(' --bundles {0}', matrix.bundles) || '' }}
+        run: pnpm tauri build
 
       - name: Create portable archive
         run: node scripts/package-portable.mjs --version ${{ steps.release_tag.outputs.tag }}
@@ -76,7 +61,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.release_tag.outputs.tag }}
-          files: ${{ matrix.artifact_glob }}
+          files: |
+            dist-portable/*.zip
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
