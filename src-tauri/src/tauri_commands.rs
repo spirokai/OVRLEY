@@ -210,12 +210,6 @@ pub(crate) async fn backend_import_preview_video(
         .next()
         .ok_or_else(|| "Failed to read import ID from preview URL".to_string())?
         .to_string();
-    log::info!(
-        "Imported preview video path={} import_id={} preview_url={}",
-        path,
-        import_id,
-        preview_url
-    );
     let response = ImportPreviewVideoResponse {
         import_id,
         preview_url,
@@ -235,7 +229,6 @@ pub(crate) async fn backend_clear_preview_video(
     state: tauri::State<'_, VideoServerHandle>,
 ) -> Result<String, String> {
     state.clear_video()?;
-    log::info!("Cleared current preview video registration");
     Ok("null".to_string())
 }
 

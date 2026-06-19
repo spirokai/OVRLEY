@@ -44,6 +44,8 @@
     "linux": {
       "deb": {
         "depends": [
+          "gstreamer1.0-libav",
+          "gstreamer1.0-plugins-good",
           "libayatana-appindicator3-1",
           "libgtk-3-0",
           "librsvg2-2",
