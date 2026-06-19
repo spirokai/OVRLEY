@@ -70,4 +70,18 @@ describe('useVideoPreview', () => {
 
     expect(video.play).not.toHaveBeenCalled()
   })
+
+  test('requests a frozen final frame after the playhead reaches the video end', () => {
+    useStore.setState({
+      importedVideoDuration: 30,
+      selectedSecond: 35,
+      videoSyncOffsetSeconds: 5,
+    })
+
+    const video = createVideoStub()
+    const videoRef = { current: video }
+    const { result } = renderHook(() => useVideoPreview(videoRef, true))
+
+    expect(result.current.frozenFrameSecond).toBe(30)
+  })
 })

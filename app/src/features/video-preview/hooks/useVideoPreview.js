@@ -17,7 +17,7 @@ import { isVideoPreviewOutOfRange, resolveVideoPreviewSource } from '../utils/vi
  *
  * @param {React.RefObject<HTMLVideoElement>} videoRef - Ref to the video element.
  * @param {boolean} isActive - Whether the imported video preview is currently visible.
- * @returns {{ videoSrc: string, importId: string|null, isOutOfRange: boolean, videoPreviewMessages: string[] }}
+ * @returns {{ videoSrc: string, importId: string|null, frozenFrameSecond: number|null, isOutOfRange: boolean, videoPreviewMessages: string[] }}
  */
 export function useVideoPreview(videoRef, isActive = true) {
   // Store selectors - subscribes to video import state, playhead position, playback mode, and sync offset.
@@ -130,11 +130,14 @@ export function useVideoPreview(videoRef, isActive = true) {
     videoDuration,
     videoSyncOffsetSeconds,
   })
+  const videoEndSecond = videoSyncOffsetSeconds + videoDuration
+  const frozenFrameSecond = videoSrc && videoDuration > 0 && selectedSecond >= videoEndSecond ? videoDuration : null
   const videoPreviewMessages = [...importedVideoPreviewWarnings, metadataStatusMessage, seekWarning, nativeVideoError].filter(Boolean)
 
   return {
     videoSrc,
     importId: importedVideoImportId,
+    frozenFrameSecond,
     isOutOfRange,
     videoPreviewMessages,
   }

@@ -12,6 +12,7 @@ import { useFontMetricsVersion } from '@/features/widget-preview/hooks/useFontMe
 import { getPreviewFontFamily } from '@/features/widget-preview/utils/textMeasurement'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
+import { syncVideoCurrentTime } from '@/features/video-preview/utils/videoPreviewPlayback'
 import useStore from '@/store/useStore'
 import { resolveWidgetRenderGeometry } from '../utils/widgetRenderGeometry'
 
@@ -76,6 +77,52 @@ const CanvasGrid = memo(function CanvasGrid({ displayScale, sceneSize }) {
     />
   )
 })
+
+function FrozenVideoFrame({ className, importId, second, src }) {
+  const videoRef = useRef(null)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !src || second === null) {
+      return undefined
+    }
+
+    const syncFrozenFrame = () => {
+      const duration = Number(video.duration)
+      if (!Number.isFinite(duration) || duration <= 0) {
+        return
+      }
+
+      if (!video.paused) {
+        video.pause()
+      }
+
+      syncVideoCurrentTime(video, second)
+    }
+
+    syncFrozenFrame()
+    video.addEventListener('loadedmetadata', syncFrozenFrame)
+    video.addEventListener('canplay', syncFrozenFrame)
+
+    return () => {
+      video.removeEventListener('loadedmetadata', syncFrozenFrame)
+      video.removeEventListener('canplay', syncFrozenFrame)
+    }
+  }, [second, src])
+
+  return (
+    <video
+      key={`${importId ?? 'no-video'}-frozen`}
+      ref={videoRef}
+      src={src}
+      className={className}
+      preload="auto"
+      playsInline
+      muted
+      aria-hidden="true"
+    />
+  )
+}
 
 const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({
@@ -190,9 +237,10 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
   const videoRef = useRef(null)
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
-  const { videoSrc, importId, isOutOfRange, videoPreviewMessages } = useVideoPreview(videoRef, backgroundMode === 'video')
+  const { videoSrc, importId, frozenFrameSecond, isOutOfRange, videoPreviewMessages } = useVideoPreview(videoRef, backgroundMode === 'video')
   const hasTransparentBackground = backgroundMode === 'transparent'
   const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
+  const videoBackgroundClassName = cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')
 
   return (
     <div
@@ -220,12 +268,15 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           key={importId ?? 'no-video'}
           ref={videoRef}
           src={videoSrc}
-          className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')}
+          className={videoBackgroundClassName}
           preload="metadata"
           playsInline
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
         />
       )}
+      {backgroundMode === 'video' && videoSrc && frozenFrameSecond !== null ? (
+        <FrozenVideoFrame className={videoBackgroundClassName} importId={importId} second={frozenFrameSecond} src={videoSrc} />
+      ) : null}
       {backgroundMode === 'image' && backgroundImageSrc ? (
         <img src={backgroundImageSrc} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" draggable="false" />
       ) : null}

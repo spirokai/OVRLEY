@@ -22,7 +22,6 @@
         "maximized": true,
         "fullscreen": false,
         "decorations": false,
-        "devtools": true,
         "useHttpsScheme": true
       }
     ],
