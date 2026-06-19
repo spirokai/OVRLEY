@@ -33,6 +33,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::paths::AppPaths;
 use crate::render::render_preview_to_path;
 
+const COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS: f64 = 0.25;
+
 /// Health-check response sent to the frontend.
 #[derive(Debug, Serialize)]
 pub struct HealthResponse {
@@ -213,7 +215,27 @@ fn start_composite_render(
     mut validated: crate::normalize::ValidatedRenderConfig,
     parsed_activity: ParsedActivity,
 ) -> CoreResult<Value> {
-    let plan = derive_composite_render_plan(&validated.scene)?;
+    let mut plan = derive_composite_render_plan(&validated.scene)?;
+
+    // Composite timing is derived from video metadata, while overlay telemetry
+    // is bounded by the activity. Accept tiny container/parser duration drift
+    // by trimming the composite tail; larger mismatches still fail below.
+    let activity_end = parsed_activity.trim_end_seconds.max(
+        parsed_activity
+            .sample_elapsed_seconds
+            .last()
+            .copied()
+            .unwrap_or_default(),
+    );
+    let max_render_duration = activity_end - plan.sync_offset;
+    let overrun = plan.render_duration - max_render_duration;
+    if max_render_duration > 0.0
+        && overrun > 0.0
+        && overrun <= COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS
+    {
+        plan.render_duration = max_render_duration;
+    }
+
     apply_composite_scene_timing(&mut validated.scene, &plan);
     let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
 

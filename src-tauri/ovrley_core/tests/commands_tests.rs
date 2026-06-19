@@ -96,6 +96,34 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
 }
 
 #[test]
+fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
+    let paths = AppPaths::from_repo_root(PathBuf::from("."));
+    let controller = RenderController::default();
+    let result = backend_render(
+        &paths,
+        &controller,
+        &composite_config_json(
+            r#"
+                "composite_video_path": "input.mp4",
+                "composite_bitrate": "60M",
+                "composite_sync_offset": 0.0,
+                "composite_video_fps_num": 30,
+                "composite_video_fps_den": 1,
+                "composite_video_duration": 384.384,
+                "composite_render_duration": 384.384,
+                "composite_video_trim_start": 0.0,
+                "composite_widget_update_rate": 1
+                "#,
+        ),
+        &short_fractional_activity_json(),
+    )
+    .unwrap();
+
+    assert_eq!(result.get("started").and_then(Value::as_bool), Some(true));
+    assert_eq!(controller.progress().total, 11530);
+}
+
+#[test]
 /// Verifies the composite render branch is activated and reaches the pipeline
 /// shell for a short composite render using a real video fixture.
 ///
@@ -414,6 +442,17 @@ fn synthetic_activity_json() -> String {
             "trim_start_seconds":0.0,
             "trim_end_seconds":600.0,
             "speed":[0.0,600.0]
+        }"#
+    .to_string()
+}
+
+fn short_fractional_activity_json() -> String {
+    r#"{
+            "sample_elapsed_seconds":[0.0,384.324],
+            "sample_distance_progress":[0.0,1.0],
+            "trim_start_seconds":0.0,
+            "trim_end_seconds":384.324,
+            "speed":[0.0,384.324]
         }"#
     .to_string()
 }
