@@ -58,7 +58,7 @@ export default function AppHeader({ activityControls, backendStatus, onOpenDownl
           handleCreateNewTemplate={handleCreateNewTemplate}
           handleSaveTemplate={handleSaveTemplate}
           handleImportTemplate={handleImportTemplate}
-          className="ml-24"
+          className="ml-4"
         />
         <ActionButtons
           onOpenRenderDialog={onOpenRenderDialog}

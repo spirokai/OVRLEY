@@ -66,11 +66,9 @@ export default function SidebarWidgetsTab() {
   return (
     <div className="space-y-6 pt-4">
       <div className="space-y-3">
-        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Active Widgets</h4>
-
         {widgets.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/70 py-8 text-center">
-            <p className="text-xs text-muted-foreground">No widgets added yet.</p>
+            <p className="text-xs text-muted-foreground">No active widgets</p>
           </div>
         ) : (
           <Accordion

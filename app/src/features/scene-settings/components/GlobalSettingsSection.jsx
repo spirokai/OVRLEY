@@ -24,22 +24,22 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 flex-1">
           <Palette className="h-4 w-4 text-primary" />
           <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Global Settings</h4>
+          <Separator className="flex-1" />
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+          className="ml-2 h-6 w-6 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
           onClick={onResetDefaults}
         >
           <RotateCcw className="h-3 w-3" />
         </Button>
       </div>
-      <Separator className="flex-1 mb-4" />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 pt-4">
         <FontSelectField
           label="Font - Values"
           value={globalDefaults.font_values}

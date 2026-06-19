@@ -22,7 +22,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
   const { overlaySettings, videoSyncSettings, globalSettings, handlers } = state
 
   return (
-    <div className="mt-4 space-y-8 outline-none pb-10">
+    <div className="mt-8 space-y-8 outline-none pb-10">
       <div className="space-y-4">
         <OverlaySettingsSection
           aspectRatio={overlaySettings.aspectRatio}
