@@ -7,7 +7,6 @@
  * the JSX body.
  */
 
-import { useEffect } from 'react'
 import { OverlayEditor } from '@/features/overlay-editor'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
@@ -28,28 +27,6 @@ import {
 } from '@/features/app-shell'
 import { useVideoImport } from '@/features/video-preview'
 import * as backend from './api/backend'
-
-function useRightClickDevtools() {
-  useEffect(() => {
-    if (!backend.hasTauriRuntime()) {
-      return undefined
-    }
-
-    const handleContextMenu = (event) => {
-      event.preventDefault()
-      import('@tauri-apps/api/core')
-        .then(({ invoke }) => invoke('plugin:webview|internal_toggle_devtools'))
-        .catch((error) => {
-          console.error('Failed to toggle DevTools:', error)
-        })
-    }
-
-    window.addEventListener('contextmenu', handleContextMenu)
-    return () => {
-      window.removeEventListener('contextmenu', handleContextMenu)
-    }
-  }, [])
-}
 
 /**
  * Orchestrates all shell-level hooks and returns domain-grouped objects.
@@ -161,8 +138,6 @@ function useAppShellComposition() {
  * @returns {JSX.Element} Rendered component output.
  */
 function AppShell() {
-  useRightClickDevtools()
-
   const {
     activityControls,
     backendStatus,
