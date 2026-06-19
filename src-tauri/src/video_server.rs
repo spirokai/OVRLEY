@@ -146,6 +146,7 @@ impl VideoServerHandle {
             guard.shutdown = false;
             guard.started = true;
         }
+        log::info!("Video preview server listening on 127.0.0.1:{port}");
 
         let inner = Arc::clone(&self.inner);
         thread::spawn(move || loop {
@@ -193,6 +194,14 @@ impl VideoServerHandle {
             guard.current = Some(current);
         }
 
+        log::info!(
+            "Registered preview video path={} content_type={} file_size={} import_id={}",
+            path.display(),
+            content_type,
+            file_size,
+            import_id
+        );
+
         self.url_for_import(&import_id)
     }
 
@@ -203,6 +212,7 @@ impl VideoServerHandle {
     pub fn clear_video(&self) -> Result<(), String> {
         let mut guard = self.inner.lock().map_err(|error| error.to_string())?;
         guard.current = None;
+        log::info!("Cleared preview video from HTTP server state");
         Ok(())
     }
 
@@ -259,6 +269,7 @@ fn respond_to_request(
 ) -> Result<(), String> {
     let method = request.method().clone();
     let url = request.url().to_string();
+    log::info!("Video preview request method={method:?} url={url}");
 
     if url == "/health" {
         return respond_text(request, StatusCode(200), "ok");
@@ -269,6 +280,7 @@ fn respond_to_request(
     }
 
     let Some(import_id) = url.strip_prefix("/video/").filter(|id| !id.is_empty()) else {
+        log::warn!("Rejecting preview request with unknown route url={url}");
         return respond_empty(request, StatusCode(404), common_headers(None, None));
     };
 
@@ -278,10 +290,18 @@ fn respond_to_request(
     };
 
     let Some(current) = current else {
+        log::warn!("Rejecting preview request url={url} because no video is registered");
         return respond_empty(request, StatusCode(404), common_headers(None, None));
     };
 
     if current.import_id != import_id || !current.path.is_file() {
+        log::warn!(
+            "Rejecting preview request url={} expected_import_id={} request_import_id={} path_exists={}",
+            url,
+            current.import_id,
+            import_id,
+            current.path.is_file()
+        );
         return respond_empty(request, StatusCode(404), common_headers(None, None));
     }
 
@@ -295,6 +315,12 @@ fn respond_to_request(
     match parse_range(range_header.as_deref(), current.file_size) {
         ParsedRange::Valid(range) => respond_video_range(request, current, range, is_head),
         ParsedRange::Unsatisfiable => {
+            log::warn!(
+                "Responding 416 for preview request url={} file_size={} range_header={:?}",
+                url,
+                current.file_size,
+                range_header
+            );
             let headers = common_headers(None, Some(format!("bytes */{}", current.file_size)));
             respond_empty(request, StatusCode(416), headers)
         }
@@ -311,6 +337,13 @@ fn respond_video_full(
     current: CurrentVideo,
     is_head: bool,
 ) -> Result<(), String> {
+    log::info!(
+        "Responding preview full import_id={} status=200 head={} path={} file_size={}",
+        current.import_id,
+        is_head,
+        current.path.display(),
+        current.file_size
+    );
     let mut headers = common_headers(Some(current.content_type), None);
     headers.push(header("Content-Length", current.file_size.to_string())?);
 
@@ -347,6 +380,15 @@ fn respond_video_range(
     is_head: bool,
 ) -> Result<(), String> {
     let range_len = range.end - range.start + 1;
+    log::info!(
+        "Responding preview range import_id={} status=206 head={} path={} start={} end={} len={}",
+        current.import_id,
+        is_head,
+        current.path.display(),
+        range.start,
+        range.end,
+        range_len
+    );
     let mut headers = common_headers(
         Some(current.content_type),
         Some(format!(
