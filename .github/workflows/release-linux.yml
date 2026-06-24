@@ -23,11 +23,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="$(git tag --merged HEAD --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' | head -n 1)"
+          TAG="$(git tag --points-at HEAD --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' | head -n 1 || true)"
           if [ -z "$TAG" ]; then
-            echo "No semantic-release tag found on the selected branch history." >&2
+            echo "No semantic-release tag points at the selected commit." >&2
             exit 1
           fi
+          echo "commit=$(git rev-parse HEAD)"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
