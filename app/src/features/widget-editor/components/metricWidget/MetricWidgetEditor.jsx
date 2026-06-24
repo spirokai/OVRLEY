@@ -51,7 +51,7 @@ export default function MetricWidgetEditor({ widget, updateWidgetData, setNumeri
   return (
     <>
       {showTypeDropdown ? (
-        <div className="space-y-4">
+        <div className="space-y-2">
           {/* <SectionHeading icon={Gauge} title="Display" /> */}
           <SelectField label="Display Type" value={displayType} onValueChange={handleDisplayTypeChange} options={displayOptions} />
         </div>

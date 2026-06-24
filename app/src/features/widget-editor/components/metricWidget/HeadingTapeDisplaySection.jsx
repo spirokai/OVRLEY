@@ -56,7 +56,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
 
       <div className="space-y-4">
         <SectionHeading icon={Ruler} title="Ticks" />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 px-1">
               <span className="text-[9px] text-muted-foreground uppercase font-bold">Major Ticks</span>
@@ -110,7 +110,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <ColorField label="Tick Color" value={tapeData.tick_color} onChange={(value) => updateTape({ tick_color: value })} />
           <ColorField label="Cardinal Color" value={tapeData.cardinal_tick_color} onChange={(value) => updateTape({ cardinal_tick_color: value })} />
         </div>
@@ -141,7 +141,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
           <span className="text-[9px] text-muted-foreground uppercase font-bold">Major Labels</span>
           <ToggleField checked={showMajorLabels} onCheckedChange={(checked) => updateTape({ show_major_labels: checked })} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <ColorField label="Label Color" value={tapeData.label_color} onChange={(value) => updateTape({ label_color: value })} />
           <ColorField
             label="Cardinal Color"
@@ -149,7 +149,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
             onChange={(value) => updateTape({ cardinal_label_color: value })}
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <SliderField
             label="Font Size"
             value={tapeData.label_font_size}
@@ -177,7 +177,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
           <span className="text-[9px] text-muted-foreground uppercase font-bold">Show Indicator</span>
           <ToggleField checked={tapeData.show_indicator} onCheckedChange={(checked) => updateTape({ show_indicator: checked })} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <SelectField
             label="Style"
             value={tapeData.indicator_style}
@@ -192,7 +192,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
             disabled={!isChevronIndicator}
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <ColorField label="Indicator Color" value={tapeData.indicator_color} onChange={(value) => updateTape({ indicator_color: value })} />
           <SliderField
             label="Indicator Size"

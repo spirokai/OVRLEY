@@ -37,6 +37,7 @@ describe('renderVideo', () => {
         scene: {
           ...DEFAULT_CONFIG.scene,
           fps: 60,
+          updateRate: 3,
         },
         values: [{ id: 'value-1', value: 'speed', x: 10, y: 20 }],
       },
@@ -83,6 +84,7 @@ describe('renderVideo', () => {
         sample_elapsed_seconds: [0, 10, 20],
       }),
     )
+    expect(vi.mocked(backend.renderVideo).mock.calls.at(-1)?.[0]?.scene).not.toHaveProperty('updateRate')
   })
 
   test('uses editor timeline bounds when hydrated template config omitted scene timing', async () => {
@@ -117,31 +119,5 @@ describe('renderVideo', () => {
       }),
       expect.any(Object),
     )
-  })
-
-  test('strips durable scene.updateRate before sending backend update_rate', async () => {
-    useStore.setState({
-      config: {
-        ...DEFAULT_CONFIG,
-        scene: {
-          ...DEFAULT_CONFIG.scene,
-          updateRate: 3,
-        },
-      },
-      updateRate: 3,
-    })
-
-    await renderVideo(useStore.getState())
-
-    expect(backend.renderVideo).toHaveBeenCalledWith(
-      expect.objectContaining({
-        scene: expect.not.objectContaining({
-          updateRate: expect.anything(),
-        }),
-      }),
-      expect.any(Object),
-    )
-
-    expect(vi.mocked(backend.renderVideo).mock.calls.at(-1)?.[0]?.scene?.update_rate).toBe(3)
   })
 })

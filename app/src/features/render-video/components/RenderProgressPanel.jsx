@@ -11,6 +11,7 @@
  * @param {number|null} props.renderProgress.estimatedSecondsRemaining - Estimated remaining time.
  * @param {number|null} props.renderProgress.renderingFps - Estimated output-frame-equivalent production FPS.
  * @param {number} props.renderProgress.encoded - Number of encoded frames.
+ * @param {string[]} [props.renderSummaryItems] - Compact render settings summary fragments.
  * @param {function} props.onCancel - Async callback invoked when user clicks cancel.
  */
 
@@ -20,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { formatFps, formatTime } from '../utils/codecUtils'
 
-function RenderProgressPanel({ renderProgress, onCancel }) {
+function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel }) {
   const [isCancelling, setIsCancelling] = useState(false)
 
   const { percent, current, total, message, estimatedSecondsRemaining, renderingFps, encoded } = renderProgress
@@ -57,11 +58,21 @@ function RenderProgressPanel({ renderProgress, onCancel }) {
         </div>
         <div>
           <h2 className="text-xl font-bold text-foreground">{isFinalizing ? 'Finalizing Video' : 'Exporting Overlay'}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{subMessage}</p>
+          <p className="text-sm text-muted-foreground">{subMessage}</p>
+          {renderSummaryItems.length > 0 && (
+            <p className="pt-8 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 text-[0.65rem] text-muted-foreground/55">
+              {renderSummaryItems.map((item, index) => (
+                <span key={`${item}-${index}`} className="inline-flex items-center">
+                  {index > 0 && <span className="mr-1 text-muted-foreground/25">/</span>}
+                  <span>{item}</span>
+                </span>
+              ))}
+            </p>
+          )}
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3 pt-6">
         <div className="flex justify-between text-xs font-medium">
           <span className="text-primary">{percent}% Complete</span>
           <span className="text-muted-foreground">

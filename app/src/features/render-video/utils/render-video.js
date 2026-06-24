@@ -8,6 +8,10 @@ import { createRenderEffectiveConfig } from './renderConfig'
 
 /**
  * Prepares and sends a video render request to the backend.
+ *
+ * `overrides.exportMode` decides whether imported-video metadata becomes a
+ * composite render input or is ignored for transparent export.
+ *
  * @param {object} [overrides={}] - Render settings overrides merged into effective config.
  * @returns {Promise<object>} Backend render response.
  */
@@ -37,6 +41,7 @@ export default async function renderVideo(overrides = {}) {
     const activeConfig = overrides.config || baseConfig
     const activeUpdateRate = overrides.updateRate ?? updateRate
     const activeExportRange = overrides.exportRange ?? exportRange
+    const activeExportMode = overrides.exportMode
     const activeExportCodec = overrides.exportCodec ?? exportCodec
     const activeExportBitrate = overrides.exportBitrate
 
@@ -45,6 +50,7 @@ export default async function renderVideo(overrides = {}) {
       config: activeConfig,
       exportBitrate: activeExportBitrate,
       exportCodec: activeExportCodec,
+      exportMode: activeExportMode,
       exportRange: activeExportRange,
       globalDefaults,
       importedVideoDuration,

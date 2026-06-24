@@ -36,9 +36,11 @@ export default function TextDisplaySection({ widget, updateWidgetData, setNumeri
       <FontSection widget={widget} updateWidgetData={updateWidgetData} />
 
       {hasDecimalControl ? (
-        <div className="flex items-center justify-between py-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Decimals</span>
-          <ToggleField checked={Boolean(widget.data.decimals)} onCheckedChange={toggleDecimals} />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between py-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Decimals</span>
+            <ToggleField checked={Boolean(widget.data.decimals)} onCheckedChange={toggleDecimals} />
+          </div>
         </div>
       ) : null}
 

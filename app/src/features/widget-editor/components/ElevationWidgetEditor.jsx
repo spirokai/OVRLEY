@@ -2,7 +2,7 @@
  * Supports widget editing flows related to elevation widget editor.
  */
 
-import { Mountain, Palette } from 'lucide-react'
+import { Map, Mountain, Palette } from 'lucide-react'
 import { ColorField, SelectField, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection, SectionHeading } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
@@ -52,13 +52,6 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
       <DimensionsSection widget={widget} setNumericField={setNumericField} />
       <div className="space-y-4">
         <SectionHeading icon={Palette} title="Line Styling" />
-        <div className="flex items-center justify-between gap-2 px-1">
-          <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Render Full Activity</Label>
-          <ToggleField
-            checked={widget.data.show_full_activity}
-            onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_activity: checked })}
-          />
-        </div>
         <SliderField
           label="Thickness"
           value={lineWidth}
@@ -73,57 +66,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
             })
           }
         />
-        <div className="grid grid-cols-2 gap-3">
-          <ColorField
-            label="Finished Color"
-            value={widget.data.completed_line_color || getThemeColor('ice')}
-            onChange={(value) =>
-              updateWidgetData(widget.id, {
-                completed_line_color: value,
-                color: value,
-              })
-            }
-          />
-          <ColorField
-            label="Remaining Color"
-            value={widget.data.remaining_line_color || getThemeColor('teal')}
-            onChange={(value) => updateWidgetData(widget.id, { remaining_line_color: value })}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <SliderField
-            label="Finished Opacity"
-            value={widget.data.completed_line_opacity}
-            min={0}
-            max={100}
-            step={1}
-            valueDisplay={`${widget.data.completed_line_opacity}%`}
-            onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
-          />
-          <SliderField
-            label="Remaining Opacity"
-            value={remainingLineOpacity}
-            min={0}
-            max={100}
-            step={1}
-            valueDisplay={`${remainingLineOpacity}%`}
-            onSliderChange={(value) => updateWidgetData(widget.id, { remaining_line_opacity: value })}
-          />
-        </div>
-        <SliderField
-          label="Vertical Scale"
-          value={yScale}
-          min={0.1}
-          max={3}
-          step={0.05}
-          valueDisplay={`${yScale.toFixed(2)}x`}
-          onSliderChange={(value) =>
-            updateWidgetData(widget.id, {
-              y_scale: Number(value.toFixed(2)),
-            })
-          }
-        />
-        <div className="grid grid-cols-2 gap-3">
+
+        <div className="grid grid-cols-2 gap-4">
           <SliderField
             label="Smoothing"
             value={simplifyTolerance}
@@ -151,9 +95,69 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
             }
           />
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <ColorField
+            label="Finished Color"
+            value={widget.data.completed_line_color || getThemeColor('ice')}
+            onChange={(value) =>
+              updateWidgetData(widget.id, {
+                completed_line_color: value,
+                color: value,
+              })
+            }
+          />
+          <ColorField
+            label="Remaining Color"
+            value={widget.data.remaining_line_color || getThemeColor('teal')}
+            onChange={(value) => updateWidgetData(widget.id, { remaining_line_color: value })}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            label="Finished Opacity"
+            value={widget.data.completed_line_opacity}
+            min={0}
+            max={100}
+            step={1}
+            valueDisplay={`${widget.data.completed_line_opacity}%`}
+            onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
+          />
+          <SliderField
+            label="Remaining Opacity"
+            value={remainingLineOpacity}
+            min={0}
+            max={100}
+            step={1}
+            valueDisplay={`${remainingLineOpacity}%`}
+            onSliderChange={(value) => updateWidgetData(widget.id, { remaining_line_opacity: value })}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            label="Vertical Scale"
+            value={yScale}
+            min={0.1}
+            max={3}
+            step={0.05}
+            valueDisplay={`${yScale.toFixed(2)}x`}
+            onSliderChange={(value) =>
+              updateWidgetData(widget.id, {
+                y_scale: Number(value.toFixed(2)),
+              })
+            }
+          />
+
+          <div className="flex items-center justify-between gap-2 px-1 pt-6">
+            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Show Full Activity</Label>
+            <ToggleField
+              checked={widget.data.show_full_activity}
+              onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_activity: checked })}
+            />
+          </div>
+        </div>
         <div className="space-y-4">
           <SectionHeading icon={Palette} title="Area Styling" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <ColorField
               label="Finished Color"
               value={widget.data.area_completed_color || getThemeColor('ice')}
@@ -165,7 +169,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
               onChange={(value) => updateWidgetData(widget.id, { area_remaining_color: value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <SliderField
               label="Finished Opacity"
               value={completedAreaOpacity}
@@ -188,22 +192,18 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
         </div>
       </div>
       <div className="space-y-4">
-        <SectionHeading icon={Mountain} title="Marker & Labels" />
+        <SectionHeading icon={Map} title="Marker" />
         <SelectField
           label="Marker Type"
           value={markerVariant}
           options={MARKER_VARIANT_OPTIONS}
           onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
         />
-        <div className="grid grid-cols-2 gap-3">
-          <SliderField
-            label="Size"
-            value={markerSize}
-            min={0}
-            max={50}
-            step={1}
-            valueDisplay={`${markerSize}px`}
-            onSliderChange={(value) => updateWidgetData(widget.id, { marker_size: value })}
+        <div className="grid grid-cols-2 gap-4">
+          <ColorField
+            label="Color"
+            value={widget.data.marker_color || getThemeColor('aqua')}
+            onChange={(value) => updateWidgetData(widget.id, { marker_color: value })}
           />
           <SliderField
             label="Opacity"
@@ -214,23 +214,33 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
             valueDisplay={`${markerOpacity}%`}
             onSliderChange={(value) => updateWidgetData(widget.id, { marker_opacity: value })}
           />
-          <ColorField
-            label="Color"
-            value={widget.data.marker_color || getThemeColor('aqua')}
-            onChange={(value) => updateWidgetData(widget.id, { marker_color: value })}
-          />
         </div>
-        {showVariantDiameter ? (
+        <div className="grid grid-cols-2 gap-4">
           <SliderField
-            label={variantDiameterLabel}
-            value={markerVariantDiameter}
-            min={Math.max(Math.round(markerSize * 2), 4)}
-            max={120}
+            label="Size"
+            value={markerSize}
+            min={0}
+            max={50}
             step={1}
-            valueDisplay={`${markerVariantDiameter}px`}
-            onSliderChange={(value) => updateWidgetData(widget.id, { marker_variant_diameter: value })}
+            valueDisplay={`${markerSize}px`}
+            onSliderChange={(value) => updateWidgetData(widget.id, { marker_size: value })}
           />
-        ) : null}
+          {showVariantDiameter ? (
+            <SliderField
+              label={variantDiameterLabel}
+              value={markerVariantDiameter}
+              min={Math.max(Math.round(markerSize * 2), 4)}
+              max={120}
+              step={1}
+              valueDisplay={`${markerVariantDiameter}px`}
+              onSliderChange={(value) => updateWidgetData(widget.id, { marker_variant_diameter: value })}
+            />
+          ) : null}
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <SectionHeading icon={Mountain} title="Labels" />
         <SliderField
           label="Label Size"
           value={labelFontSize}
@@ -243,11 +253,10 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
 
         <div className="grid grid-cols-2 gap-4 pt-2">
           <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center gap-2 px-1">
+            <div className="flex justify-between items-center gap-2 pl-1 pb-3">
               <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Metric Label</Label>
               <ToggleField
                 label="Label Metric"
-                checked={widget.data.show_elevation_metric}
                 onCheckedChange={(checked) =>
                   updateWidgetData(widget.id, {
                     show_elevation_metric: checked,
@@ -277,7 +286,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
             />
           </div>
           <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center gap-2 px-1">
+            <div className="flex justify-between items-center gap-2 pl-1 pb-3">
               <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Imperial Label</Label>
               <ToggleField
                 label="Label Imperial"

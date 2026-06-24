@@ -7,6 +7,7 @@
  */
 
 import { act, renderHook, waitFor } from '@testing-library/react'
+import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useRenderVideoDialogState from '@/features/render-video/hooks/useRenderVideoDialogState'
 import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
@@ -60,6 +61,8 @@ describe('useRenderVideoDialogState', () => {
       },
     )
 
+    expect(result.current.exportMode).toBe('transparent')
+
     act(() => {
       result.current.handleFpsModeChange('custom')
     })
@@ -79,45 +82,100 @@ describe('useRenderVideoDialogState', () => {
     expect(result.current.fpsMode).toBe('custom')
   })
 
-  test('switches imported-video renders to the first available MP4 codec', async () => {
+  test('switches imported-video dialogs between composite and transparent defaults while preserving later range edits', async () => {
     useStore.setState({
       importedVideoPath: 'C:\\video.mp4',
       importedVideoFps: 30,
+      importedVideoDuration: 12,
       importedVideoResolution: { width: 1920, height: 1080 },
+      videoSyncOffsetSeconds: 5,
       availableCodecs: {
         proresKs: true,
         libx264: true,
       },
     })
 
-    const onSettingsChange = vi.fn()
-    const settings = {
-      fps: 30,
-      updateRate: 1,
-      exportCodec: 'prores_ks',
-      exportAcceleration: 'cpu',
-      exportRange: { ...DEFAULT_EXPORT_RANGE },
-    }
+    const { result } = renderHook(() => {
+      const [settings, setSettings] = useState({
+        fps: 30,
+        updateRate: 1,
+        exportCodec: 'prores_ks',
+        exportAcceleration: 'cpu',
+        exportRange: { ...DEFAULT_EXPORT_RANGE },
+      })
 
-    renderHook(() =>
-      useRenderVideoDialogState({
+      return useRenderVideoDialogState({
         phase: 'confirm',
         settings,
-        onSettingsChange,
+        onSettingsChange: (updates) => setSettings((current) => ({ ...current, ...updates })),
         onClose: vi.fn(),
         onConfirm: vi.fn(),
-      }),
-    )
-
-    await waitFor(() => {
-      expect(onSettingsChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          exportCodec: 'libx264',
-          exportAcceleration: 'cpu',
-        }),
-      )
+      })
     })
 
-    expect(onSettingsChange.mock.calls.at(-1)?.[0]?.exportBitrate).toBeGreaterThan(0)
+    await waitFor(() => {
+      expect(result.current.settings.exportCodec).toBe('libx264')
+    })
+    expect(result.current.exportMode).toBe('composite')
+    expect(result.current.settings.exportBitrate).toBeGreaterThan(0)
+
+    act(() => {
+      result.current.handleExportModeChange(true)
+    })
+
+    await waitFor(() => {
+      expect(result.current.settings.exportCodec).toBe('prores_ks')
+    })
+    expect(result.current.exportMode).toBe('transparent')
+    expect(result.current.settings.exportRange).toEqual({
+      ...DEFAULT_EXPORT_RANGE,
+      type: 'custom',
+      fromTime: '00:00:05',
+      toTime: '00:00:17',
+    })
+
+    act(() => {
+      result.current.onSettingsChange({
+        exportRange: {
+          ...result.current.settings.exportRange,
+          fromTime: '00:00:06',
+          toTime: '00:00:15',
+        },
+      })
+    })
+
+    act(() => {
+      result.current.handleExportModeChange(false)
+    })
+
+    await waitFor(() => {
+      expect(result.current.settings.exportCodec).toBe('libx264')
+    })
+    expect(result.current.exportMode).toBe('composite')
+
+    act(() => {
+      result.current.handleExportModeChange(true)
+    })
+
+    await waitFor(() => {
+      expect(result.current.settings.exportCodec).toBe('prores_ks')
+    })
+    expect(result.current.settings.exportRange).toEqual({
+      ...DEFAULT_EXPORT_RANGE,
+      type: 'custom',
+      fromTime: '00:00:06',
+      toTime: '00:00:15',
+    })
+
+    act(() => {
+      result.current.handleApplyImportedVideoRange()
+    })
+
+    expect(result.current.settings.exportRange).toEqual({
+      ...DEFAULT_EXPORT_RANGE,
+      type: 'custom',
+      fromTime: '00:00:05',
+      toTime: '00:00:17',
+    })
   })
 })

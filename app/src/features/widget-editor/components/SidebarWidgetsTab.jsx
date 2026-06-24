@@ -64,34 +64,31 @@ export default function SidebarWidgetsTab() {
   if (!config) return null
 
   return (
-    <div className="space-y-6 pt-4">
+    <div className="space-y-6">
       <div className="space-y-3">
-        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Active Widgets</h4>
-
         {widgets.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/70 py-8 text-center">
-            <p className="text-xs text-muted-foreground">No widgets added yet.</p>
+            <p className="text-xs text-muted-foreground">No active widgets</p>
           </div>
         ) : (
           <Accordion
             type="single"
             value={selectedWidgetId || undefined}
             onValueChange={(value) => setSelectedWidgetId(value || widgets[0]?.id || null)}
-            className="space-y-1"
           >
             {widgets.map((widget) => {
               const Icon = TYPE_ICONS[widget.type] || TYPE_ICONS.label
 
               return (
-                <div key={widget.id} className="space-y-1">
+                <div key={widget.id}>
                   <AccordionItem
                     value={widget.id}
-                    className="overflow-hidden rounded-lg border border-border/60 bg-surface/80 transition-all data-[state=open]:border-accent-border  hover:border-primary "
+                    className="overflow-hidden border border-border/60 transition-all data-[state=open]:border-accent-border  hover:border-primary "
                   >
                     <div className="relative group">
-                      <AccordionTrigger className="group w-full px-3 py-2 pr-10 hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
+                      <AccordionTrigger className="group w-full px-3 py-3 pr-10 hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
                         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-surface-strong group-hover:bg-surface-accent-strong group-data-[state=open]:bg-surface-accent-strong">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded group-hover:bg-surface-accent-strong ">
                             <Icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-data-[state=open]:text-primary" />
                           </div>
                           <div className="flex flex-col items-start gap-0.5 min-w-0 flex-1">
@@ -116,21 +113,24 @@ export default function SidebarWidgetsTab() {
                       </div>
                     </div>
 
-                    <AccordionContent className="px-4 pb-3 pt-1.5 ">
-                      <div className="relative">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-1 -right-1 h-6 w-6 text-muted-foreground hover:text-foreground"
-                          onClick={() => resetWidget(widget.id)}
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                        </Button>
-
-                        <div className="space-y-6 pt-4">
-                          <PositionSection widget={widget} setNumericField={setNumericField} updateWidgetData={updateWidgetData} />
-                          {renderWidgetEditor(widget, updateWidgetData, setNumericField, config?.scene?.font_size)}
-                        </div>
+                    <AccordionContent className="px-4 pb-6 pt-1.5 bg-surface/60 ">
+                      <div className="space-y-6">
+                        <PositionSection
+                          widget={widget}
+                          setNumericField={setNumericField}
+                          updateWidgetData={updateWidgetData}
+                          headerAction={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-foreground/20"
+                              onClick={() => resetWidget(widget.id)}
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                          }
+                        />
+                        {renderWidgetEditor(widget, updateWidgetData, setNumericField, config?.scene?.font_size)}
                       </div>
                     </AccordionContent>
                   </AccordionItem>

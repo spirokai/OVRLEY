@@ -80,4 +80,46 @@ describe('render config preparation', () => {
     expect(renderConfig.scene.end).toBe(21)
     expect(renderConfig.scene.custom_export_range_active).toBe(true)
   })
+
+  test('skips composite scene fields for transparent override even when video is imported', () => {
+    const config = {
+      scene: {
+        width: 1920,
+        height: 1080,
+        fps: 60,
+      },
+      labels: [],
+      values: [],
+      plots: [],
+    }
+
+    const renderConfig = createRenderEffectiveConfig({
+      config,
+      globalDefaults: {},
+      updateRate: 1,
+      exportRange: {
+        ...DEFAULT_EXPORT_RANGE,
+        type: 'custom',
+        fromTime: '00:00:05',
+        toTime: '00:00:15',
+      },
+      exportMode: 'transparent',
+      exportCodec: 'prores_ks',
+      importedVideoPath: 'C:\\clip.mp4',
+      importedVideoDuration: 24,
+      importedVideoFps: 30,
+      importedVideoFpsNum: 30,
+      importedVideoFpsDen: 1,
+      timelineStart: 3,
+      timelineEnd: 21,
+      availableCodecs: null,
+    })
+
+    expect(renderConfig.scene.ffmpeg.codec).toBe('prores_ks')
+    expect(renderConfig.scene.start).toBe(5)
+    expect(renderConfig.scene.end).toBe(15)
+    expect(renderConfig.scene.custom_export_range_active).toBe(true)
+    expect(renderConfig.scene).not.toHaveProperty('composite_video_path')
+    expect(renderConfig.scene).not.toHaveProperty('composite_render_duration')
+  })
 })
