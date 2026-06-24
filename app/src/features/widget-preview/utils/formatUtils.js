@@ -318,6 +318,7 @@ export function formatTimeValue(format, timestamp) {
   const hour12Raw = date.getHours() % 12 || 12
   const hour12 = padNumber(hour12Raw)
   const minutes = padNumber(date.getMinutes())
+  const seconds = padNumber(date.getSeconds())
   const suffix = date.getHours() >= 12 ? 'PM' : 'AM'
 
   // Format map — selects the rendered string based on the format key; falls back to 24-hour time
@@ -330,9 +331,13 @@ export function formatTimeValue(format, timestamp) {
     'date-dd-mmmm-yyyy': `${day} ${longMonth} ${year}`,
     'date-mmmm-dd-yyyy': `${longMonth} ${day} ${year}`,
     'time-24': `${hour24}:${minutes}`,
+    'time-24s': `${hour24}:${minutes}:${seconds}`,
     'time-12': `${hour12}:${minutes} ${suffix}`,
+    'time-12s': `${hour12}:${minutes}:${seconds} ${suffix}`,
     'date-time-24': `${day}-${month}-${year} ${hour24}:${minutes}`,
+    'date-time-24s': `${day}-${month}-${year} ${hour24}:${minutes}:${seconds}`,
     'date-time-12': `${day}-${month}-${year} ${hour12}:${minutes} ${suffix}`,
+    'date-time-12s': `${day}-${month}-${year} ${hour12}:${minutes}:${seconds} ${suffix}`,
     'date-mmm-time-24': `${day} ${shortMonth} ${hour24}:${minutes}`,
     'date-mmm-time-12': `${day} ${shortMonth} ${hour12}:${minutes} ${suffix}`,
     'date-mmmm-time-24': `${day} ${longMonth} ${hour24}:${minutes}`,

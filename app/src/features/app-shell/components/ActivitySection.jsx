@@ -36,13 +36,13 @@ export default function ActivitySection({
 
       <div className="min-w-0 flex-1 overflow-hidden">
         <div className="flex min-w-0 items-center gap-2">
-          <Button className="mr-2 h-9 shrink-0 gap-2 border-border/70 px-5" onClick={onOpenActivityFile}>
+          <Button className="mr-2 h-9 w-48 shrink-0 gap-2 border-border/70 px-5" onClick={onOpenActivityFile}>
             <Activity className="h-3.5 w-3.5" />
             <span className="max-w-28 truncate">{activityLabel}</span>
           </Button>
 
           {importedMediaFilename ? (
-            <div className="max-w-[min(14rem,22vw)] mr-2 flex h-9 items-center rounded-md border border-border/70 bg-surface-elevated pl-3 pr-2 text-xs text-foreground justify-between">
+            <div className="w-48 mr-2 flex h-9 shrink-0 items-center rounded-md border border-border/70 bg-surface-elevated pl-3 pr-2 text-xs text-foreground justify-between">
               <div className="flex items-center gap-2 truncate">
                 <Film className="mr-2 h-4 w-4 text-primary" />
                 <span className="truncate">{importedMediaFilename}</span>
@@ -59,7 +59,7 @@ export default function ActivitySection({
           ) : (
             <Button
               variant="outline"
-              className="w-50 mr-2 h-9 shrink-0 gap-2 border-border/70 px-5 text-muted-foreground hover:text-foreground text-sm"
+              className="w-48 mr-2 h-9 shrink-0 gap-2 border-border/70 px-5 text-muted-foreground hover:text-foreground text-sm"
               onClick={handleImportVideo}
             >
               <Film className="h-3.5 w-3.5" />

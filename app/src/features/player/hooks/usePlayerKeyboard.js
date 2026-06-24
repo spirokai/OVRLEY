@@ -30,19 +30,12 @@ export default function usePlayerKeyboard({
   // Global shortcuts - maps Space and Arrow keys to playback controls while focus is outside form controls
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (
-        event.repeat ||
-        event.defaultPrevented ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.altKey ||
-        !hasActivity ||
-        isInteractiveElement(event.target)
-      ) {
+      if (event.repeat || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !hasActivity) {
         return
       }
 
       if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
+        if (isInteractiveElement(event.target)) return
         event.preventDefault()
         const direction = event.code === 'ArrowRight' ? 1 : -1
         handleStepByDirection(direction)
@@ -50,6 +43,10 @@ export default function usePlayerKeyboard({
       }
 
       if (event.code !== 'Space' || !hasActivity) {
+        return
+      }
+
+      if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, button, a, [contenteditable="true"]')) {
         return
       }
 

@@ -19,7 +19,11 @@ fn formats_time_key_variants() {
         .unwrap()
         .to_utc();
     assert_eq!(format_time_key("time-24", timestamp), "13:05");
+    assert_eq!(format_time_key("time-24s", timestamp), "13:05:00");
     assert_eq!(format_time_key("time-12", timestamp), "01:05 PM");
+    assert_eq!(format_time_key("time-12s", timestamp), "01:05:00 PM");
+    assert_eq!(format_time_key("date-time-24s", timestamp), "21-04-2025 13:05:00");
+    assert_eq!(format_time_key("date-time-12s", timestamp), "21-04-2025 01:05:00 PM");
     assert_eq!(
         format_time_key("date-dd-mmm-yyyy", timestamp),
         "21 APR 2025"

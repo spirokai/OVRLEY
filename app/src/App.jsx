@@ -87,6 +87,12 @@ function useAppShellComposition() {
 
   useAppBootstrap()
 
+  const { restoreLastLoadedTemplate } = templateManagement
+
+  useEffect(() => {
+    restoreLastLoadedTemplate()
+  }, [restoreLastLoadedTemplate])
+
   const handleOpenDownloads = async () => {
     try {
       await backend.openDownloads()

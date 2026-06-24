@@ -3,10 +3,11 @@
  * Container hook — composes sub-hooks and exposes template actions.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import { hasTauriRuntime } from '@/features/app-shell'
 import { fileFromSelectedPath, openSinglePath } from '@/lib/file-dialog'
+import { deletePreference, getPreference, setPreference } from '@/lib/preferences-store'
 import { useTemplateStore } from '@/hooks/useAppStoreSelectors'
 import useTemplateFetching from './useTemplateFetching'
 import {
@@ -119,6 +120,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
           source: 'backend',
         })
         setLastSavedTemplateState(templateState)
+        await setPreference('last-template', { source: 'backend', filename })
       } catch (error) {
         console.error('Failed to load template:', error)
         setErrorMessage(`Failed to load template: ${getErrorMessage(error, 'Unknown error')}`)
@@ -185,6 +187,9 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         await fetchTemplates()
         setLoadedTemplate(savedInDefaultTemplateDir ? `user:${savedFilename}` : savedFilename, savedInDefaultTemplateDir ? 'backend' : 'file')
         setLastSavedTemplateState(currentTemplateState)
+        if (savedInDefaultTemplateDir) {
+          await setPreference('last-template', { source: 'backend', filename: `user:${savedFilename}` })
+        }
         return
       }
 
@@ -251,6 +256,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
   // Confirm create new — executes the new template action and closes confirmation
   const confirmCreateNewTemplate = useCallback(() => {
     createNewTemplate()
+    deletePreference('last-template')
     onTemplateCreated()
     setShowNewTemplateConfirm(false)
   }, [createNewTemplate, onTemplateCreated])
@@ -266,6 +272,18 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     confirmCreateNewTemplate()
   }, [confirmCreateNewTemplate, status])
 
+  // Always point to the latest handleTemplateChange so restoreLastLoadedTemplate
+  // can be a stable (empty-deps) callback while still invoking the current handler.
+  const handleTemplateChangeRef = useRef(handleTemplateChange)
+  handleTemplateChangeRef.current = handleTemplateChange
+
+  const restoreLastLoadedTemplate = useCallback(async () => {
+    const saved = await getPreference('last-template')
+    if (saved?.source === 'backend' && saved.filename) {
+      handleTemplateChangeRef.current(saved.filename)
+    }
+  }, [])
+
   return {
     confirmCreateNewTemplate,
     handleCreateNewTemplate,
@@ -274,6 +292,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     handleTemplateChange,
     loadedTemplateFilename,
     loadedTemplateSource,
+    restoreLastLoadedTemplate,
     setShowNewTemplateConfirm,
     showNewTemplateConfirm,
     showTemplateStatus,

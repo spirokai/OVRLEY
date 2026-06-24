@@ -22,7 +22,7 @@
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Separator } from '@/components/ui/separator'
-import { Video, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react'
+import { Video, Bell, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export default function VideoSyncSection({
@@ -69,15 +69,15 @@ export default function VideoSyncSection({
       </div>
 
       {videoSyncWarning && (
-        <div className="flex gap-2 items-center rounded-md bg-destructive/25 p-2 pl-4 text-destructive">
-          <AlertTriangle className="h-3 w-3 shrink-0" />
+        <div className="flex gap-2 items-center rounded-md bg-amber-500/15 p-2 pl-4 text-amber-400">
+          <Bell className="h-3 w-3 shrink-0" />
           <p className="text-[0.65rem] font-semibold leading-tight">{videoSyncWarning}</p>
         </div>
       )}
 
       {videoResolutionMismatch && (
-        <div className="flex gap-2 items-center rounded-md bg-destructive/25 p-2 pl-4 text-destructive">
-          <AlertTriangle className="h-3 w-3 shrink-0" />
+        <div className="flex gap-2 items-center rounded-md bg-amber-500/15 p-2 pl-4 text-amber-400">
+          <Bell className="h-3 w-3 shrink-0" />
           <p className="text-[0.65rem] font-semibold leading-tight">Overlay and video resolutions do not match</p>
         </div>
       )}

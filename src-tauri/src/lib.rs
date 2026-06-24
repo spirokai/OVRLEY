@@ -55,6 +55,7 @@ pub fn run() {
         })
         .manage(video_server)
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             tauri_commands::backend_health,
             tauri_commands::backend_current_os,

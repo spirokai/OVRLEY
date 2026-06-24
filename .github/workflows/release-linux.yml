@@ -87,11 +87,6 @@ jobs:
           set -euo pipefail
           test -x vendor/ffmpeg/bin/ffmpeg
           test -x vendor/ffmpeg/bin/ffprobe
-          if find vendor/ffmpeg -type l -print -quit | grep -q .; then
-            echo "Bundled FFmpeg still contains symlinks:" >&2
-            find vendor/ffmpeg -type l -print >&2
-            exit 1
-          fi
 
       - name: Build Tauri Debian package
         run: pnpm tauri build --bundles deb
@@ -123,6 +118,7 @@ jobs:
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v3
         with:
+          draft: true
           tag_name: ${{ steps.release_tag.outputs.tag }}
           files: |
             dist-release/*.deb

@@ -28,12 +28,15 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
 
   const handleImportVideo = async () => {
     try {
-      const selected = await openSinglePath([
-        {
-          name: debugModeEnabled ? 'Video or Image' : 'Video',
-          extensions: debugModeEnabled ? ['mp4', 'mov', 'mkv', 'png', 'jpg', 'jpeg', 'webp'] : ['mp4', 'mov', 'mkv'],
-        },
-      ])
+      const selected = await openSinglePath(
+        [
+          {
+            name: debugModeEnabled ? 'Video or Image' : 'Video',
+            extensions: debugModeEnabled ? ['mp4', 'mov', 'mkv', 'png', 'jpg', 'jpeg', 'webp'] : ['mp4', 'mov', 'mkv'],
+          },
+        ],
+        { lastDirectoryKey: 'last-video-import-dir' },
+      )
       if (!selected) {
         return
       }

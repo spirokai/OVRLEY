@@ -17,7 +17,9 @@ export default function useActivityImport() {
       let selected = null
 
       if (hasTauriRuntime()) {
-        const selectedPath = await openSinglePath([{ name: 'GPX, FIT or SRT', extensions: ['gpx', 'fit', 'srt'] }])
+        const selectedPath = await openSinglePath([{ name: 'GPX, FIT or SRT', extensions: ['gpx', 'fit', 'srt'] }], {
+          lastDirectoryKey: 'last-activity-import-dir',
+        })
 
         if (typeof selectedPath === 'string') {
           selected = await fileFromSelectedPath(selectedPath, 'activity')

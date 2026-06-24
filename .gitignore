@@ -54,3 +54,6 @@ tmp/
 *.mov
 *.prof
 *.local
+
+# Agent scratch files
+.agents/release-notes.md

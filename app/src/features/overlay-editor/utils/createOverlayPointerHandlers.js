@@ -6,6 +6,16 @@ import { ZOOM_MIN, ZOOM_MAX } from '../data/overlayEditorConstants'
 import { clamp } from '@/lib/utils'
 import { buildSelectionRect, getPrimarySelectionId, hasSelectionModifier, normalizeSelectionIds, rectanglesIntersect } from './overlayEditorHelpers'
 
+function getLocalPointScale(element, elementBounds) {
+  const layoutWidth = element?.offsetWidth || element?.clientWidth || 0
+  const layoutHeight = element?.offsetHeight || element?.clientHeight || 0
+
+  return {
+    x: layoutWidth > 0 ? elementBounds.width / layoutWidth : 1,
+    y: layoutHeight > 0 ? elementBounds.height / layoutHeight : 1,
+  }
+}
+
 /**
  * Converts a client-space mouse position to local element coordinates.
  *
@@ -20,9 +30,10 @@ function getElementPoint(element, clientX, clientY) {
   }
 
   const elementBounds = element.getBoundingClientRect()
+  const scale = getLocalPointScale(element, elementBounds)
   return {
-    x: clientX - elementBounds.left,
-    y: clientY - elementBounds.top,
+    x: (clientX - elementBounds.left) / scale.x,
+    y: (clientY - elementBounds.top) / scale.y,
   }
 }
 
@@ -43,9 +54,10 @@ function getScenePoint(sceneElement, displayScale, sceneSize, clientX, clientY) 
   }
 
   const sceneBounds = sceneElement.getBoundingClientRect()
+  const scale = getLocalPointScale(sceneElement, sceneBounds)
   return {
-    x: clamp((clientX - sceneBounds.left) / displayScale, 0, sceneSize.width),
-    y: clamp((clientY - sceneBounds.top) / displayScale, 0, sceneSize.height),
+    x: clamp((clientX - sceneBounds.left) / scale.x, 0, sceneSize.width),
+    y: clamp((clientY - sceneBounds.top) / scale.y, 0, sceneSize.height),
   }
 }
 
@@ -67,6 +79,7 @@ function getIntersectedWidgetIds({ displayScale, nextSelectionRect, orderedWidge
   }
 
   const sceneBounds = sceneElement.getBoundingClientRect()
+  const sceneScale = getLocalPointScale(sceneElement, sceneBounds)
 
   return orderedWidgetIds.filter((widgetId) => {
     const node = widgetNodes[widgetId]
@@ -76,10 +89,10 @@ function getIntersectedWidgetIds({ displayScale, nextSelectionRect, orderedWidge
 
     const nodeBounds = node.getBoundingClientRect()
     const nodeRect = {
-      x: (nodeBounds.left - sceneBounds.left) / displayScale,
-      y: (nodeBounds.top - sceneBounds.top) / displayScale,
-      width: nodeBounds.width / displayScale,
-      height: nodeBounds.height / displayScale,
+      x: (nodeBounds.left - sceneBounds.left) / sceneScale.x,
+      y: (nodeBounds.top - sceneBounds.top) / sceneScale.y,
+      width: nodeBounds.width / sceneScale.x,
+      height: nodeBounds.height / sceneScale.y,
     }
 
     return rectanglesIntersect(nextSelectionRect, nodeRect)

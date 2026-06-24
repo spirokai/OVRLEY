@@ -451,9 +451,12 @@ fn format_validated_time_text(validated: &ValidatedTimeValue, raw: Option<&str>)
 
 /// Applies one of the built-in date/time format presets.
 ///
-/// Supported keys: `"time-24"`, `"time-12"`, `"date-dmy"`, `"date-mdy"`,
-/// `"date-ymd"`, `"datetime"`, `"datetime-short-month"`. Unrecognized keys
-/// fall back to the ISO 8601 datetime format.
+/// Supported keys: `"time-24"`, `"time-24s"`, `"time-12"`, `"date-dd-mm-yyyy"`,
+/// `"date-mm-dd-yyyy"`, `"date-yyyy-mm-dd"`, `"date-dd-mmm-yyyy"`,
+/// `"date-mmm-dd-yyyy"`, `"date-dd-mmmm-yyyy"`, `"date-mmmm-dd-yyyy"`,
+/// `"date-time-24"`, `"date-time-12"`, `"date-mmm-time-24"`, `"date-mmm-time-12"`,
+/// `"date-mmmm-time-24"`, `"date-mmmm-time-12"`. Unrecognized keys
+/// fall back to `HH:MM` (24-hour time without seconds).
 pub fn format_time_key<Tz>(format_key: &str, value: DateTime<Tz>) -> String
 // test seam
 where
@@ -472,6 +475,7 @@ where
     };
     let hour12 = format!("{hour12_raw:02}");
     let minutes = format!("{:02}", value.minute());
+    let seconds = format!("{:02}", value.second());
     let suffix = if value.hour() >= 12 { "PM" } else { "AM" };
 
     match format_key {
@@ -482,9 +486,13 @@ where
         "date-mmm-dd-yyyy" => format!("{short_month} {day} {year}"),
         "date-dd-mmmm-yyyy" => format!("{day} {long_month} {year}"),
         "date-mmmm-dd-yyyy" => format!("{long_month} {day} {year}"),
+        "time-24s" => format!("{hour24}:{minutes}:{seconds}"),
         "time-12" => format!("{hour12}:{minutes} {suffix}"),
+        "time-12s" => format!("{hour12}:{minutes}:{seconds} {suffix}"),
         "date-time-24" => format!("{day}-{month}-{year} {hour24}:{minutes}"),
+        "date-time-24s" => format!("{day}-{month}-{year} {hour24}:{minutes}:{seconds}"),
         "date-time-12" => format!("{day}-{month}-{year} {hour12}:{minutes} {suffix}"),
+        "date-time-12s" => format!("{day}-{month}-{year} {hour12}:{minutes}:{seconds} {suffix}"),
         "date-mmm-time-24" => format!("{day} {short_month} {hour24}:{minutes}"),
         "date-mmm-time-12" => format!("{day} {short_month} {hour12}:{minutes} {suffix}"),
         "date-mmmm-time-24" => format!("{day} {long_month} {hour24}:{minutes}"),
