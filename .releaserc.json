@@ -1,8 +1,7 @@
 {
   "branches": [
-    {"name": "frontend-refactor"},
     {"name": "main"},
-    {"name": "video-compositing"}
+    {"name": "rust-rewrite"}
   ],
   "tagFormat": "${version}",
   "plugins": ["@semantic-release/commit-analyzer"]

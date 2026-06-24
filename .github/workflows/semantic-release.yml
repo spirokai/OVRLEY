@@ -3,9 +3,8 @@ name: Semantic Release
 on:
   push:
     branches:
-      - frontend-refactor
       - main
-      - video-compositing
+      - rust-rewrite
   workflow_dispatch:
 
 permissions:
@@ -20,6 +19,17 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          fetch-tags: true
+          ref: ${{ github.ref }}
+
+      - name: Show selected release ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "github.ref=${GITHUB_REF}"
+          echo "github.ref_name=${GITHUB_REF_NAME}"
+          echo "commit=$(git rev-parse HEAD)"
+          git branch --show-current || true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
