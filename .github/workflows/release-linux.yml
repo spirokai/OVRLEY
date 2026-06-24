@@ -97,9 +97,14 @@ jobs:
             target="$(readlink -f "$link")"
             echo "$link -> $target"
             rm "$link"
-            cp -L --preserve=mode,timestamps "$target" "$link"
+            mv "$target" "$link"
           done
-          ! find vendor/ffmpeg -type l -print -quit | grep -q .
+          remaining="$(find vendor/ffmpeg -type l -print)"
+          if [ -n "$remaining" ]; then
+            echo "$remaining"
+            exit 1
+          fi
+          LD_LIBRARY_PATH="$PWD/vendor/ffmpeg/lib" vendor/ffmpeg/bin/ffmpeg -version
 
       - name: Build Tauri Debian package
         run: pnpm tauri build --bundles deb
