@@ -93,8 +93,8 @@ jobs:
         run: |
           set -euo pipefail
           find vendor/ffmpeg/lib -maxdepth 1 -type l -name '*.so' -print -delete
-          find vendor/ffmpeg -type l -print -exec sh -c 'target="$(readlink -f "$1")" && rm "$1" && cp -a "$target" "$1"' _ {} \;
-          test -z "$(find vendor/ffmpeg -type l -print -quit)"
+          find vendor/ffmpeg -type l -print -exec sh -c 'target="$(readlink -f "$1")" && rm "$1" && cp -L --preserve=mode,timestamps "$target" "$1"' _ {} \;
+          ! find vendor/ffmpeg -type l -print -quit | grep -q .
 
       - name: Build Tauri Debian package
         run: pnpm tauri build --bundles deb
