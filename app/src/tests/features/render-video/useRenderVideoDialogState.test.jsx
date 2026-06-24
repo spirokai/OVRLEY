@@ -120,7 +120,7 @@ describe('useRenderVideoDialogState', () => {
     expect(result.current.settings.exportBitrate).toBeGreaterThan(0)
 
     act(() => {
-      result.current.handleExportModeChange(true)
+      result.current.handleExportModeChange('transparent')
     })
 
     await waitFor(() => {
@@ -145,7 +145,7 @@ describe('useRenderVideoDialogState', () => {
     })
 
     act(() => {
-      result.current.handleExportModeChange(false)
+      result.current.handleExportModeChange('composite')
     })
 
     await waitFor(() => {
@@ -154,7 +154,7 @@ describe('useRenderVideoDialogState', () => {
     expect(result.current.exportMode).toBe('composite')
 
     act(() => {
-      result.current.handleExportModeChange(true)
+      result.current.handleExportModeChange('transparent')
     })
 
     await waitFor(() => {

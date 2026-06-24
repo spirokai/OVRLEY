@@ -162,12 +162,10 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
   }, [hasImportedVideo, importedVideoDuration, onSettingsChange, settings?.exportRange, videoSyncOffsetSeconds])
 
   const handleExportModeChange = useCallback(
-    (transparentEnabled) => {
-      const exportMode = transparentEnabled ? 'transparent' : 'composite'
-
+    (exportMode) => {
       // Only the first switch into transparent mode auto-prefills the imported
       // video span; after that, manual edits stay intact until the dialog closes.
-      if (transparentEnabled && hasImportedVideo && !importedVideoRangePrefilledRef.current) {
+      if (exportMode === 'transparent' && hasImportedVideo && !importedVideoRangePrefilledRef.current) {
         importedVideoRangePrefilledRef.current = true
         onSettingsChange({
           exportMode,
@@ -222,11 +220,13 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     })
   }
 
+  const dialogTitle = 'Export Settings'
+
   return {
     availableCodecs,
     config,
     containerFps,
-    dialogTitle: exportMode === 'composite' ? 'Composite Video Export Settings' : 'Transparent Export Settings',
+    dialogTitle,
     exportMode,
     fpsMode,
     handleAccelerationChange,

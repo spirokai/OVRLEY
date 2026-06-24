@@ -50,7 +50,7 @@ export default function ActivitySection({
               <Button
                 variant="ghost"
                 size="icon"
-                className="ml-1 h-6 w-6 text-muted-foreground hover:bg-surface-accent-soft hover:text-foreground"
+                className="ml-1 h-6 w-6 text-muted-foreground hover:bg-accent/15 hover:text-foreground"
                 onClick={clearImportedVideo}
               >
                 <X className="h-3.5 w-3.5" />

@@ -116,7 +116,7 @@
         "remaining_line_opacity": 100,
         "simplify_tolerance_px": 0,
         "target_density": 1,
-        "show_full_activity": false,
+        "show_full_activity": true,
         "marker_variant": "single",
         "marker_variant_diameter": 44,
         "marker_size": 26,

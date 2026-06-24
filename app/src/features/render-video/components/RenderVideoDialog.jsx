@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
-import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
@@ -66,28 +65,30 @@ export default function RenderVideoDialog(props) {
         {ctx.isProgress ? (
           <RenderProgressPanel renderProgress={ctx.renderProgress} renderSummaryItems={renderSummaryItems} onCancel={ctx.handleCancel} />
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <div className="space-y-2">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <Video className="h-4 w-4 text-primary" />
                   <h2 className="text-sm font-semibold text-foreground">{ctx.dialogTitle}</h2>
                 </div>
 
                 {ctx.showExportModeOverride ? (
-                  <div className="flex items-center gap-2 pt-0.5">
-                    <Switch
-                      id="transparent-export-switch"
-                      aria-label="Transparent Export"
-                      checked={ctx.exportMode === 'transparent'}
-                      onCheckedChange={ctx.handleExportModeChange}
-                    />
-                  </div>
+                  <Tabs value={ctx.exportMode} onValueChange={ctx.handleExportModeChange}>
+                    <TabsList className="h-7 bg-surface p-0.5">
+                      <TabsTrigger value="transparent" className="px-3 text-[10px]">
+                        Transparent
+                      </TabsTrigger>
+                      <TabsTrigger value="composite" className="px-3 text-[10px]">
+                        Full Video
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 ) : null}
               </div>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-1">
+            <div className="grid gap-8 lg:grid-cols-1">
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Framerate</Label>
                 {isCompositeExport && ctx.importedVideoFps ? (

@@ -91,6 +91,14 @@ pub fn run() {
                 )?;
             }
             app.state::<video_server::VideoServerHandle>().start()?;
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_decorations(false)?;
+                }
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())

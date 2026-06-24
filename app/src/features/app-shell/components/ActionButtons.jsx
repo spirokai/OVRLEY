@@ -69,9 +69,7 @@ export default function ActionButtons({
           {renderingVideo ? 'Rendering...' : 'Render'}
         </Button>
       </SimpleTooltip>
-      <div className="ml-6 flex items-center">
-        <WindowControls />
-      </div>
+      <WindowControls />
     </div>
   )
 }

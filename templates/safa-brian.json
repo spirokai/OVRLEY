@@ -190,7 +190,7 @@
         "marker_opacity": 100,
         "show_elevation_metric": true,
         "show_elevation_imperial": true,
-        "show_full_activity": false,
+        "show_full_activity": true,
         "y_scale": 1,
         "simplify_tolerance_px": 0.4,
         "target_density": 0.75,

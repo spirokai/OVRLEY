@@ -122,7 +122,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (!state.importedVideoCreationTime) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Could not determine video creation time  — placed at start',
+          videoSyncWarning: 'Could not determine video creation time',
         }
       }
 
@@ -143,7 +143,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (videoStart < activityStart || videoStart > activityEnd) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Video creation time is outside activity range',
+          videoSyncWarning: 'Video could not be synced with activity',
         }
       }
 

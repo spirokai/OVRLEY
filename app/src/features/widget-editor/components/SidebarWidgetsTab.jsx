@@ -73,8 +73,10 @@ export default function SidebarWidgetsTab() {
         ) : (
           <Accordion
             type="single"
+            collapsible
+            className="border-b border-border/70"
             value={selectedWidgetId || undefined}
-            onValueChange={(value) => setSelectedWidgetId(value || widgets[0]?.id || null)}
+            onValueChange={(value) => setSelectedWidgetId(value || null)}
           >
             {widgets.map((widget) => {
               const Icon = TYPE_ICONS[widget.type] || TYPE_ICONS.label
@@ -83,10 +85,10 @@ export default function SidebarWidgetsTab() {
                 <div key={widget.id}>
                   <AccordionItem
                     value={widget.id}
-                    className="overflow-hidden border border-border/60 transition-all data-[state=open]:border-accent-border  hover:border-primary "
+                    className="overflow-hidden border border-transparent border-b-none transition-all data-[state=open]:border-accent-border hover:border-primary"
                   >
                     <div className="relative group">
-                      <AccordionTrigger className="group w-full px-3 py-3 pr-10 hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
+                      <AccordionTrigger className="group w-full px-3 py-3 pr-10 border-t border-border/70 data-[state=open]:border-r-transparent hover:no-underline data-[state=open]:text-primary data-[state=open]:bg-surface-accent-soft hover:text-primary ">
                         <div className="flex items-center gap-2.5 flex-1 min-w-0">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded group-hover:bg-surface-accent-strong ">
                             <Icon className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-data-[state=open]:text-primary" />

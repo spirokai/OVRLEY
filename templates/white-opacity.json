@@ -117,7 +117,7 @@
         "remaining_line_opacity": 35,
         "simplify_tolerance_px": 1,
         "target_density": 0.95,
-        "show_full_activity": false,
+        "show_full_activity": true,
         "marker_variant": "ring",
         "marker_variant_diameter": 55,
         "marker_size": 18,

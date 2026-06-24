@@ -18,6 +18,13 @@ const POSITION_OPTIONS = [
   { value: 'right', label: 'Right' },
 ]
 
+const LABEL_POSITION_SWAP = {
+  bottom: 'left',
+  top: 'right',
+  left: 'bottom',
+  right: 'top',
+}
+
 /**
  * Renders linear gauge display controls: orientation, track styling,
  * min/max labels.
@@ -36,6 +43,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
       orientation,
       width: linearData.height,
       height: linearData.width,
+      min_max_label_position: LABEL_POSITION_SWAP[linearData.min_max_label_position] ?? linearData.min_max_label_position,
     })
   }
   const availablePositions = useMemo(() => {
@@ -46,6 +54,20 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
     }
   }, [linearData.orientation])
 
+  const widthSliderBounds = useMemo(() => {
+    if (linearData.orientation === 'vertical') {
+      return { min: 8, max: 100 }
+    }
+    return { min: 20, max: 600 }
+  }, [linearData.orientation])
+
+  const heightSliderBounds = useMemo(() => {
+    if (linearData.orientation === 'vertical') {
+      return { min: 20, max: 600 }
+    }
+    return { min: 8, max: 100 }
+  }, [linearData.orientation])
+
   return (
     <>
       <div className="space-y-4">
@@ -54,8 +76,8 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
           <SliderField
             label="Width"
             value={linearData.width}
-            min={20}
-            max={800}
+            min={widthSliderBounds.min}
+            max={widthSliderBounds.max}
             step={1}
             valueDisplay={`${linearData.width}px`}
             onSliderChange={(value) => updateLinear({ width: value })}
@@ -63,8 +85,8 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
           <SliderField
             label="Height"
             value={linearData.height}
-            min={8}
-            max={150}
+            min={heightSliderBounds.min}
+            max={heightSliderBounds.max}
             step={1}
             valueDisplay={`${linearData.height}px`}
             onSliderChange={(value) => updateLinear({ height: value })}
