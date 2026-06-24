@@ -133,6 +133,7 @@ async function main() {
   await rm(workDir, { recursive: true, force: true });
   console.log(`[ffmpeg] Installed ${binaryPath}`);
   console.log(`[ffmpeg] Installed ${probeBinaryPath}`);
+  console.log("[ffmpeg] postinstall script finished");
 }
 
 function execFfmpeg(path, args, options) {
@@ -299,6 +300,7 @@ function download(url, destination) {
     const request = get(url, (response) => {
       if ([301, 302, 303, 307, 308].includes(response.statusCode ?? 0)) {
         const location = response.headers.location;
+        response.resume();
         if (!location) {
           reject(new Error(`Redirect from ${url} did not include a location`));
           return;
@@ -373,7 +375,7 @@ function run(command, args) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(command, args, { stdio: "inherit" });
     child.on("error", reject);
-    child.on("exit", (code) => {
+    child.on("close", (code) => {
       if (code === 0) resolvePromise();
       else reject(new Error(`${command} exited with ${code}`));
     });
