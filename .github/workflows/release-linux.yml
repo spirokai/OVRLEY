@@ -88,22 +88,27 @@ jobs:
           test -x vendor/ffmpeg/bin/ffmpeg
           test -x vendor/ffmpeg/bin/ffprobe
 
-      - name: Resolve FFmpeg symlinks for Tauri bundler
+      - name: Normalize FFmpeg libs for Tauri bundler
         shell: bash
         run: |
           set -euo pipefail
-          find vendor/ffmpeg/lib -maxdepth 1 -type l -name '*.so' -print -delete
-          find vendor/ffmpeg -type l -print0 | while IFS= read -r -d '' link; do
-            target="$(readlink -f "$link")"
-            echo "$link -> $target"
-            rm "$link"
-            mv "$target" "$link"
+
+          cd vendor/ffmpeg/lib
+          for full in *.so.*.*.*; do
+            [ -e "$full" ] || continue
+            soname="${full%.*.*}"
+            unversioned="${soname%.*}"
+            rm -f "$soname" "$unversioned"
+            ln "$full" "$soname"
           done
-          remaining="$(find vendor/ffmpeg -type l -print)"
+          cd -
+
+          remaining="$(find vendor/ffmpeg/lib -maxdepth 1 -type l -print)"
           if [ -n "$remaining" ]; then
             echo "$remaining"
             exit 1
           fi
+          ls -li vendor/ffmpeg/lib/*.so*
           LD_LIBRARY_PATH="$PWD/vendor/ffmpeg/lib" vendor/ffmpeg/bin/ffmpeg -version
 
       - name: Build Tauri Debian package
