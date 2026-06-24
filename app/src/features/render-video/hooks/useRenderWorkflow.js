@@ -78,6 +78,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     return {
       fps,
       updateRate: normalizeUpdateRateForFps(fps, updateRate),
+      exportMode: importedVideoPath ? 'composite' : 'transparent',
       exportCodec: defaultCodec,
       exportBitrate: importedVideoPath
         ? getDefaultBitrate(
@@ -186,14 +187,18 @@ export default function useRenderWorkflow({ backendStatus }) {
     return unsubscribe
   }, [renderingVideo, setErrorMessage, setActiveRenderId, setRenderingVideo, setVideoFilename])
 
-  // Confirm handler — persists render settings, kicks off the render IPC call, and manages error/recovery flow
+  // Confirm handler — persists dialog-local render choices, resolves the active export
+  // pipeline, kicks off the render IPC call, and manages error/recovery flow.
   const handleRenderVideoConfirm = useCallback(async () => {
     if (!config?.scene || !renderSettingsDraft) {
       return
     }
 
-    const hasImportedVideo = Boolean(useStore.getState().importedVideoPath)
-    const nextExportRange = hasImportedVideo
+    // The dialog draft is the source of truth once opened; imported video only
+    // provides the default when a draft does not yet carry an explicit mode.
+    const exportMode = renderSettingsDraft.exportMode || (useStore.getState().importedVideoPath ? 'composite' : 'transparent')
+    const shouldComposite = exportMode === 'composite'
+    const nextExportRange = shouldComposite
       ? DEFAULT_EXPORT_RANGE
       : {
           ...DEFAULT_EXPORT_RANGE,
@@ -211,7 +216,7 @@ export default function useRenderWorkflow({ backendStatus }) {
 
     setConfig(nextConfig)
     setUpdateRate(nextUpdateRate)
-    if (!hasImportedVideo) {
+    if (!shouldComposite) {
       setExportCodec(renderSettingsDraft.exportCodec)
       setExportRange(nextExportRange)
     }
@@ -228,6 +233,7 @@ export default function useRenderWorkflow({ backendStatus }) {
       const { default: renderVideo } = await import('@/features/render-video/utils/render-video')
       const result = await renderVideo({
         config: nextConfig,
+        exportMode,
         updateRate: nextUpdateRate,
         exportRange: nextExportRange,
         exportCodec: renderSettingsDraft.exportCodec,
@@ -238,7 +244,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         importedVideoFps: useStore.getState().importedVideoFps,
         importedVideoFpsDen: useStore.getState().importedVideoFpsDen,
         importedVideoFpsNum: useStore.getState().importedVideoFpsNum,
-        importedVideoPath: useStore.getState().importedVideoPath,
+        importedVideoPath: shouldComposite ? useStore.getState().importedVideoPath : null,
         parsedActivity: useStore.getState().parsedActivity,
         startSecond: useStore.getState().startSecond,
         endSecond: useStore.getState().endSecond,

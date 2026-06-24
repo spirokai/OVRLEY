@@ -253,11 +253,10 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
 
         <div className="grid grid-cols-2 gap-4 pt-2">
           <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center gap-2 px-1">
+            <div className="flex justify-between items-center gap-2 pl-1 pb-3">
               <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Metric Label</Label>
               <ToggleField
                 label="Label Metric"
-                checked={widget.data.show_elevation_metric}
                 onCheckedChange={(checked) =>
                   updateWidgetData(widget.id, {
                     show_elevation_metric: checked,
@@ -287,7 +286,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, setNum
             />
           </div>
           <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center gap-2 px-1">
+            <div className="flex justify-between items-center gap-2 pl-1 pb-3">
               <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Imperial Label</Label>
               <ToggleField
                 label="Label Imperial"

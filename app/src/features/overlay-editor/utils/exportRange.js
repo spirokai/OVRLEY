@@ -40,6 +40,21 @@ export function timeToSeconds(timeStr) {
 }
 
 /**
+ * Converts a numeric second value to HH:MM:SS.
+ *
+ * @param {number} seconds - Whole or fractional second value.
+ * @returns {string} Zero-padded HH:MM:SS string.
+ */
+export function formatExportRangeTime(seconds) {
+  const safeSeconds = Math.max(0, Math.trunc(Number(seconds) || 0))
+  const hours = Math.floor(safeSeconds / 3600)
+  const minutes = Math.floor((safeSeconds % 3600) / 60)
+  const remainingSeconds = safeSeconds % 60
+
+  return [hours, minutes, remainingSeconds].map((part) => String(part).padStart(2, '0')).join(':')
+}
+
+/**
  * Returns the activity duration in seconds used by export-window helpers.
  *
  * @param {object|null} activity - Parsed activity data.

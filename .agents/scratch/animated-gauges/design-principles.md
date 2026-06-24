@@ -33,6 +33,7 @@ Update `as_str()` to return the same string. The custom `Deserialize` impl alrea
 Add gauge-specific fields to `ValueConfig`. **Every field must be `Option<T>` with `#[serde(default)]`.** Do not add required fields here — validation makes them required downstream.
 
 Example (bars):
+
 ```rust
 #[serde(default)]
 pub bar_count: Option<u32>,
@@ -150,6 +151,7 @@ pub fn prepare_bars_gauge_cache(
 ```
 
 **Steps:**
+
 1. Compute scaled dimensions: `(gauge.width * scale).round() as u32`
 2. Derive metric range from activity data (fallback 0–100 if no valid data)
 3. Precompute `frame_states`: for each frame, get interpolated value + `fill01`
@@ -161,6 +163,7 @@ pub fn prepare_bars_gauge_cache(
 **Static layer drawing rules:**
 
 ### Border (when `border_thickness > 0`):
+
 ```
 1. Draw outer RRect (full widget rect) filled with border_color
    - Apply shadow filter to this paint if shadows are active
@@ -170,15 +173,19 @@ pub fn prepare_bars_gauge_cache(
 ```
 
 ### No border:
+
 ```
 1. Draw outer RRect filled with track_empty_color (with track_empty_opacity)
    - Apply shadow filter if shadows are active
 ```
 
 ### Min/max labels (when `show_min_max_labels`):
+
 - Resolve font via `resolve_font(font_dirs, font_name, font_size * scale)`
 - Draw min label at left/bottom edge, max label at right/top edge
 - Y baseline: `(h + font_size) / 2.0 - font_size * 0.15`
+- Always use PreviewSvgText for label rendering in frontend, and the text measurement utility to compute label widths for proper alignment and truncation
+- Ensure there is a gap between labels and the track that somewhat scales with font size. Consult the linear gauge implementation for a good default. Ensure the gap is calculate the same in Rust and JS - same calculation, same constants, from same inputs and boundaries between JS and Rust.
 
 **GOTCHA:** Shadow filter goes on the **outermost** rect only. If there's a border, shadow on border; if no border, shadow on empty track. Never apply shadow to inner/cleared rects.
 
@@ -196,6 +203,7 @@ pub fn draw_bars_gauge_widget(
 ```
 
 **Steps:**
+
 1. Guard: return `None` if `cache.display_type` doesn't match
 2. `canvas.draw_image(&cache.static_image, (cache.x, cache.y), None)` — blit the pre-rendered static layer
 3. Look up the frame's `fill01` from `cache.frame_states[frame_index]`
@@ -206,11 +214,13 @@ pub fn draw_bars_gauge_widget(
 ### Fill drawing: rounded corners
 
 **Non-flat fill** (`track_fill_flat = false`):
+
 - Compute fill rect (inset by border_thickness)
 - Radius = `track_corner_radius - border_thickness` (max 0)
 - Draw `RRect::new_rect_xy(fill_rect, radius, radius)`
 
 **Flat fill** (`track_fill_flat = true`):
+
 - Compute inner rect (full track inset by border)
 - Compute fill rect (the advancing portion)
 - `canvas.save()` → `canvas.clip_rect(fill_rect, Intersect, true)` → draw full inner `RRect` → `canvas.restore()`
@@ -219,6 +229,7 @@ pub fn draw_bars_gauge_widget(
 ### Fill draw: arc gauges (different from linear)
 
 For arc gauges, **do NOT** use rounded corners on the fill. Use `stroke-linecap: round` semantics instead. Draw the filled arc as a stroked partial arc:
+
 - Use Skia `Cap::Round` on the stroke paint
 - The `track_corner_radius` field controls stroke cap behavior conceptually, but the actual rendering uses round caps
 
@@ -254,6 +265,7 @@ DisplayType::Bars => draw_bars_presentation(
 ```
 
 And a forwarding function:
+
 ```rust
 fn draw_bars_presentation(
     canvas: &Canvas,
@@ -299,6 +311,7 @@ Add entry in `displayTypes.definitions`:
 ```
 
 Key rules:
+
 - `layoutMode: "boxed"` enables the boxed rendering path in `WidgetPreview.jsx`
 - `defaultFrameWidth`/`defaultFrameHeight` are used for the unsupported fallback placeholder
 - `defaults` provides all widget-default values — the editor reads these via `getDisplayVariantNonGeometryDefaults()`
@@ -310,12 +323,14 @@ Key rules:
 **MUST mirror the Rust geometry functions exactly.** Same inputs, same formulas, same outputs.
 
 Export pure functions only (no React, no DOM, no side effects):
+
 - `getFillPercentage(value, min, max)` → number 0–1
 - `get<Gauge>Range(values)` → `{ min, max }` with fallback 0–100
 - `get<Gauge>Layout({ value, values, width, height, ...params })` → `{ min, max, fill, trackRect, fillRects[], ... }`
 - `format<Gauge>Label(value)` → string
 
 **Rules:**
+
 - No default parameters that diverge from Rust behavior
 - Empty/null values → fallback to placeholder (0.5 fill, 0–100 range)
 - Clamp fill to [0,1]; guard against `max <= min`
@@ -325,14 +340,22 @@ Export pure functions only (no React, no DOM, no side effects):
 ## 11. Frontend: Renderer component — `app/src/features/widget-preview/components/<Gauge>Renderer.jsx`
 
 ```jsx
-export function OverlayBarsGaugeWidget({ widget, activity, previewSecond, globalOpacity = 1, globalScale = 1, sceneStyle }) {
-  const data = widget.data
-  if (data.display_type !== 'bars') return null   // GUARD FIRST
+export function OverlayBarsGaugeWidget({
+  widget,
+  activity,
+  previewSecond,
+  globalOpacity = 1,
+  globalScale = 1,
+  sceneStyle,
+}) {
+  const data = widget.data;
+  if (data.display_type !== "bars") return null; // GUARD FIRST
   // ...
 }
 ```
 
 **Component rules:**
+
 1. **Guard on display_type** — return `null` if the widget isn't your type. This is the safety net for dispatch mismatches.
 2. **Compute layout** from geometry utils, passing `data.orientation`, `data.<specific_fields>`, and border thickness.
 3. **Render an `<svg>`** with `viewBox="0 0 {width} {height}"` and scaled `width`/`height` attributes: `width={width * scale}`, `height={height * scale}`.
@@ -356,29 +379,54 @@ export function OverlayBarsGaugeWidget({ widget, activity, previewSecond, global
       <rect x={fillRect.x} y={fillRect.y} width={fillRect.width} height={fillRect.height} />
     </clipPath>
   )}
-</defs>
+</defs>;
 
-{/* Border (with mask) OR empty track (no mask) */}
-{borderThickness > 0 ? (
-  <rect fullTrack rx={cornerRadius} mask={`url(#${maskId})`} fill={borderColor} filter={shadowFilter} />
-) : (
-  <rect fullTrack rx={cornerRadius} fill={emptyColor} fillOpacity={emptyOpacity} filter={shadowFilter} />
-)}
+{
+  /* Border (with mask) OR empty track (no mask) */
+}
+{
+  borderThickness > 0 ? (
+    <rect fullTrack rx={cornerRadius} mask={`url(#${maskId})`} fill={borderColor} filter={shadowFilter} />
+  ) : (
+    <rect fullTrack rx={cornerRadius} fill={emptyColor} fillOpacity={emptyOpacity} filter={shadowFilter} />
+  );
+}
 
-{/* Empty track when border exists */}
-{borderThickness > 0 && (
-  <rect innerTrack rx={fillCornerRadius} fill={emptyColor} fillOpacity={emptyOpacity} />
-)}
+{
+  /* Empty track when border exists */
+}
+{
+  borderThickness > 0 && <rect innerTrack rx={fillCornerRadius} fill={emptyColor} fillOpacity={emptyOpacity} />;
+}
 
-{/* Filled portion */}
-{flatFill && fillCornerRadius > 0 ? (
-  <rect innerTrack rx={fillCornerRadius} clipPath={`url(#${clipId})`} fill={filledColor} fillOpacity={filledOpacity} />
-) : (
-  <rect x={fillRect.x} y={fillRect.y} width={fillRect.width} height={fillRect.height} rx={fillCornerRadius} fill={filledColor} fillOpacity={filledOpacity} />
-)}
+{
+  /* Filled portion */
+}
+{
+  flatFill && fillCornerRadius > 0 ? (
+    <rect
+      innerTrack
+      rx={fillCornerRadius}
+      clipPath={`url(#${clipId})`}
+      fill={filledColor}
+      fillOpacity={filledOpacity}
+    />
+  ) : (
+    <rect
+      x={fillRect.x}
+      y={fillRect.y}
+      width={fillRect.width}
+      height={fillRect.height}
+      rx={fillCornerRadius}
+      fill={filledColor}
+      fillOpacity={filledOpacity}
+    />
+  );
+}
 ```
 
 **GOTCHAs:**
+
 - When `borderThickness > 0`, draw the empty track as a **separate inner rect** (not relying on the border mask for empty fill). This avoids antialiasing artifacts where the mask edge creates a faint gap between border and empty fill.
 - When `borderThickness === 0`, the empty track doubles as the outer rect and carries the shadow.
 - The `fillCornerRadius` = `Math.max(0, cornerRadius - borderThickness)`.
@@ -394,8 +442,8 @@ Register the renderer in `BOXED_PREVIEW_COMPONENTS`:
 const BOXED_PREVIEW_COMPONENTS = {
   heading_tape: OverlayHeadingWidget,
   linear: OverlayLinearGaugeWidget,
-  bars: OverlayBarsGaugeWidget,     // ADD HERE
-}
+  bars: OverlayBarsGaugeWidget, // ADD HERE
+};
 ```
 
 The dispatch is automatic: `isBoxedDisplayType(displayType)` checks `layoutMode === 'boxed'` in the manifest, then `BOXED_PREVIEW_COMPONENTS[displayType]` picks the renderer. If the display type is in the manifest but has no renderer yet, the fallback `UnsupportedBoxedPreview` shows a placeholder.
@@ -413,6 +461,7 @@ All boxed gauge widgets reuse the existing editor interaction system. **No gauge
 - **Rotate:** Reads/writes `rotation` from `widget.data`. Normalized to 0–360 with 1 decimal on commit.
 
 The draft pattern:
+
 1. `on*Start`: capture origin state in `interactionStartRef`, init empty draft
 2. `on*`: compute delta, store in both `draftWidgetsRef` (sync) and React state (render), apply live CSS transform to DOM
 3. `on*End`: read draft, round values, commit via `commitWidgetUpdate`, clear draft

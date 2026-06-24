@@ -112,13 +112,7 @@ describe('MetricWidgetEditor balance format', () => {
 
 describe('MetricWidgetEditor linear gauge controls', () => {
   test('shows display type selector for metrics with multiple display types', () => {
-    render(
-      <MetricWidgetEditor
-        widget={makeWidget('heading', { display_type: 'text' })}
-        updateWidgetData={vi.fn()}
-        setNumericField={vi.fn()}
-      />,
-    )
+    render(<MetricWidgetEditor widget={makeWidget('heading', { display_type: 'text' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
     expect(screen.getByText('Display Type')).toBeInTheDocument()
   })
 
@@ -170,5 +164,4 @@ describe('MetricWidgetEditor linear gauge controls', () => {
       }),
     )
   })
-
 })

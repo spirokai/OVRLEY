@@ -115,22 +115,22 @@ export default function SidebarWidgetsTab() {
 
                     <AccordionContent className="px-4 pb-6 pt-1.5 bg-surface/60 ">
                       <div className="space-y-6">
-                          <PositionSection
-                            widget={widget}
-                            setNumericField={setNumericField}
-                            updateWidgetData={updateWidgetData}
-                            headerAction={
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-foreground/20"
-                                onClick={() => resetWidget(widget.id)}
-                              >
-                                <RotateCcw className="h-3 w-3" />
-                              </Button>
-                            }
-                          />
-                          {renderWidgetEditor(widget, updateWidgetData, setNumericField, config?.scene?.font_size)}
+                        <PositionSection
+                          widget={widget}
+                          setNumericField={setNumericField}
+                          updateWidgetData={updateWidgetData}
+                          headerAction={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-foreground/20"
+                              onClick={() => resetWidget(widget.id)}
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                          }
+                        />
+                        {renderWidgetEditor(widget, updateWidgetData, setNumericField, config?.scene?.font_size)}
                       </div>
                     </AccordionContent>
                   </AccordionItem>

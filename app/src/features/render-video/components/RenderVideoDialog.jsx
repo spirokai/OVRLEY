@@ -1,6 +1,6 @@
 /**
  * Renders the render video dialog portion of the application interface.
- * Pure presentational — all logic is in useRenderVideoDialogState.
+ * Pure presentational - all logic is in useRenderVideoDialogState.
  */
 
 import { AlertTriangle, Play, Video } from 'lucide-react'
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
@@ -33,12 +34,13 @@ export default function RenderVideoDialog(props) {
     return null
   }
 
-  const fps = ctx.importedVideoFps ? Math.round(ctx.importedVideoFps) : Number(ctx.settings.fps)
+  const isCompositeExport = ctx.exportMode === 'composite'
+  const fps = isCompositeExport && ctx.importedVideoFps ? Math.round(ctx.importedVideoFps) : Number(ctx.settings.fps)
   const outputFormatLabel = ctx.OUTPUT_FORMATS.find((option) => option.value === ctx.selectedOutputFormatValue)?.label
   const accelerationLabel = ctx.selectedAccelerationOptions.find(
     (option) => option.value === ctx.selectedAccelerationValue && option.available && option.value !== 'cpu',
   )?.label
-  const durationSeconds = ctx.hasImportedVideo
+  const durationSeconds = isCompositeExport
     ? Number(ctx.importedVideoDuration)
     : ctx.settings.exportRange?.type === 'custom'
       ? timeToSeconds(ctx.settings.exportRange.toTime) - timeToSeconds(ctx.settings.exportRange.fromTime)
@@ -66,16 +68,29 @@ export default function RenderVideoDialog(props) {
         ) : (
           <div className="space-y-6">
             <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <Video className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-semibold text-foreground">Select Render Settings</h2>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <Video className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-semibold text-foreground">{ctx.dialogTitle}</h2>
+                </div>
+
+                {ctx.showExportModeOverride ? (
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <Switch
+                      id="transparent-export-switch"
+                      aria-label="Transparent Export"
+                      checked={ctx.exportMode === 'transparent'}
+                      onCheckedChange={ctx.handleExportModeChange}
+                    />
+                  </div>
+                ) : null}
               </div>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-1">
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Framerate</Label>
-                {ctx.importedVideoFps ? (
+                {isCompositeExport && ctx.importedVideoFps ? (
                   <div className="flex h-9 items-center rounded-md border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground">
                     Locked to video FPS ({Math.round(ctx.importedVideoFps)} fps)
                   </div>
@@ -94,7 +109,7 @@ export default function RenderVideoDialog(props) {
                 )}
               </div>
 
-              {!ctx.importedVideoFps && ctx.fpsMode === 'custom' && (
+              {(!isCompositeExport || !ctx.importedVideoFps) && ctx.fpsMode === 'custom' && (
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Custom FPS</Label>
                   <BlurInput
@@ -156,7 +171,7 @@ export default function RenderVideoDialog(props) {
                         </SelectLabel>
                         <SelectSeparator className="my-0" />
                         {ctx.OUTPUT_FORMATS.filter((option) => option.group === 'transparent').map((option) => (
-                          <SelectItem key={option.value} value={option.value} disabled={ctx.hasImportedVideo}>
+                          <SelectItem key={option.value} value={option.value} disabled={isCompositeExport}>
                             {option.label}
                           </SelectItem>
                         ))}
@@ -174,7 +189,7 @@ export default function RenderVideoDialog(props) {
                         <SelectSeparator className="my-0" />
                         {ctx.OUTPUT_FORMATS.filter((option) => option.group === 'mp4').map((option) => {
                           const available = ctx.isOutputFormatAvailable(option, ctx.platformOs, ctx.availableCodecs)
-                          const disabled = !ctx.hasImportedVideo || !available
+                          const disabled = !isCompositeExport || !available
                           return (
                             <SelectItem key={option.value} value={option.value} disabled={disabled}>
                               <span className="flex w-full items-center justify-between gap-3">
@@ -237,10 +252,12 @@ export default function RenderVideoDialog(props) {
                 </div>
               )}
 
-              {!ctx.hasImportedVideo && (
+              {ctx.showExportRangeSettings && (
                 <ExportRangeSettings
                   exportRange={ctx.settings.exportRange}
                   onExportRangeChange={(exportRange) => ctx.onSettingsChange({ exportRange })}
+                  showUseVideoRangeAction={ctx.hasImportedVideo}
+                  onUseVideoRange={ctx.handleApplyImportedVideoRange}
                 />
               )}
             </div>
@@ -249,7 +266,7 @@ export default function RenderVideoDialog(props) {
               <Button
                 type="button"
                 variant="outline"
-                className="border-border/70 bg-surface text-foreground hover:bg-surface-elevated"
+                className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
                 onClick={ctx.onClose}
                 disabled={ctx.renderingVideo}
               >

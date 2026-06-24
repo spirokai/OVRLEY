@@ -86,6 +86,13 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 
 Local markdown files under `.agents/scratch/`. See `.agents/agents/issue-tracker.md`.
 
+### Review-friendly edits
+
+- Prefer small, surgical `apply_patch` hunks over full-file rewrites.
+- Re-read a file immediately before any follow-up patch to the same file.
+- Avoid delete-and-readd file edits unless a full rewrite is truly necessary.
+- When possible, preserve surrounding code structure so human review can stay diff-based.
+
 ### Triage labels
 
 Five canonical roles: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Recorded as `Status:` in issue frontmatter. See `.agents/agents/triage-labels.md`.

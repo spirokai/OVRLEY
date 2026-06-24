@@ -21,16 +21,9 @@ import { updateWidgetInConfig, updateWidgetsInConfig } from '@/lib/widget/widget
 import { resolvePreviewSecond } from '@/lib/preview-timing'
 import { getEffectiveWidgetData } from '@/lib/template/template-state'
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
+import { formatExportRangeTime } from '../utils/exportRange'
 import { getSceneSize } from '../utils/overlayEditorUtils'
 import useWidgetDraftState from './useWidgetDraftState'
-
-function formatExportRangeTime(seconds) {
-  const safeSeconds = Math.max(0, Math.trunc(Number(seconds) || 0))
-  const hours = Math.floor(safeSeconds / 3600)
-  const minutes = Math.floor((safeSeconds % 3600) / 60)
-  const remainingSeconds = safeSeconds % 60
-  return [hours, minutes, remainingSeconds].map((part) => String(part).padStart(2, '0')).join(':')
-}
 
 function mergeDraftsIntoWidgets(widgets, liveWidgetDrafts) {
   return widgets.map((widget) => {

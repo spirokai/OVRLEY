@@ -22,7 +22,6 @@ import { getContainerFps, getUpdateRateOptions, sanitizeIntegerFps } from '@/lib
 import { getDefaultBitrate } from '../data/bitrateDefaults'
 
 export default function useRenderVideoDerivedState({ settings }) {
-  // Store selectors
   const renderingVideo = useStore((state) => state.renderingVideo)
   const platformOs = useStore((state) => state.platformOs)
   const availableCodecs = useStore((state) => state.availableCodecs)
@@ -31,13 +30,14 @@ export default function useRenderVideoDerivedState({ settings }) {
   const importedVideoDuration = useStore((state) => state.importedVideoDuration)
   const importedVideoFps = useStore((state) => state.importedVideoFps)
   const importedVideoResolution = useStore((state) => state.importedVideoResolution)
+  const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
   const renderProgress = useStore((state) => state.renderProgress)
 
-  // Derived values — computed FPS options, codec availability flags, and render readiness state
   const hasImportedVideo = Boolean(importedVideoPath)
+  const exportMode = settings?.exportMode || (hasImportedVideo ? 'composite' : 'transparent')
   const updateRateFps = useMemo(
-    () => (hasImportedVideo && importedVideoFps ? sanitizeIntegerFps(Math.round(importedVideoFps)) : settings?.fps),
-    [hasImportedVideo, importedVideoFps, settings?.fps],
+    () => (exportMode === 'composite' && importedVideoFps ? sanitizeIntegerFps(Math.round(importedVideoFps)) : settings?.fps),
+    [exportMode, importedVideoFps, settings?.fps],
   )
   const updateRateOptions = useMemo(() => getUpdateRateOptions(updateRateFps), [updateRateFps])
   const containerFps = useMemo(() => getContainerFps(updateRateFps, settings?.updateRate), [updateRateFps, settings?.updateRate])
@@ -55,8 +55,8 @@ export default function useRenderVideoDerivedState({ settings }) {
   const renderStartDisabled =
     renderingVideo ||
     resolutionMismatch ||
-    (hasImportedVideo && (!selectedCodecIsMp4 || !selectedExportCodecAvailable)) ||
-    (!hasImportedVideo && selectedCodecIsMp4)
+    (exportMode === 'composite' && (!selectedCodecIsMp4 || !selectedExportCodecAvailable)) ||
+    (exportMode !== 'composite' && selectedCodecIsMp4)
 
   const defaultBitrateForCodec = useCallback(
     (codec) =>
@@ -74,6 +74,7 @@ export default function useRenderVideoDerivedState({ settings }) {
     config,
     containerFps,
     defaultBitrateForCodec,
+    exportMode,
     hasImportedVideo,
     importedVideoDuration,
     importedVideoFps,
@@ -90,5 +91,6 @@ export default function useRenderVideoDerivedState({ settings }) {
     selectedOutputFormatValue,
     updateRateFps,
     updateRateOptions,
+    videoSyncOffsetSeconds,
   }
 }

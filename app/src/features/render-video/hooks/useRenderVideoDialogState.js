@@ -11,8 +11,9 @@
  * @returns {object} State and handlers for RenderVideoDialog.
  */
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { cancelRender } from '@/api/backend'
+import { formatExportRangeTime } from '@/features/overlay-editor/utils/exportRange'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { useFpsMode } from '@/hooks/useFpsMode'
 import { EXPORT_CODEC_LOOKUP, OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
@@ -25,8 +26,44 @@ import {
 } from '../utils/codecUtils'
 import useRenderVideoDerivedState from './useRenderVideoDerivedState'
 
+function getImportedVideoExportRange(durationSeconds, offsetSeconds) {
+  const start = Math.max(0, Number(offsetSeconds) || 0)
+  const duration = Math.max(0, Number(durationSeconds) || 0)
+
+  return {
+    type: 'custom',
+    fromTime: formatExportRangeTime(start),
+    toTime: formatExportRangeTime(start + duration),
+  }
+}
+
 export default function useRenderVideoDialogState({ phase, settings, onSettingsChange, onClose, onConfirm }) {
   const derived = useRenderVideoDerivedState({ settings })
+  const importedVideoRangePrefilledRef = useRef(false)
+  const {
+    availableCodecs,
+    config,
+    containerFps,
+    defaultBitrateForCodec,
+    exportMode,
+    hasImportedVideo,
+    importedVideoDuration,
+    importedVideoFps,
+    importedVideoResolution,
+    platformOs,
+    renderProgress,
+    renderStartDisabled,
+    renderingVideo,
+    resolutionMismatch,
+    selectedAccelerationOptions,
+    selectedAccelerationValue,
+    selectedCodecIsMp4,
+    selectedExportCodecAvailable,
+    selectedOutputFormatValue,
+    updateRateFps,
+    updateRateOptions,
+    videoSyncOffsetSeconds,
+  } = derived
 
   const { fpsMode, handleFpsModeChange, handleCustomFpsChange } = useFpsMode({
     fps: settings?.fps,
@@ -39,13 +76,20 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     updateRate: settings?.updateRate,
   })
 
-  // Auto-select MP4 codec when video is imported or codec availability changes
+  useEffect(() => {
+    if (phase !== 'confirm') {
+      importedVideoRangePrefilledRef.current = false
+    }
+  }, [phase])
+
   useEffect(() => {
     if (!settings) {
       return
     }
 
-    if (!derived.hasImportedVideo && derived.selectedCodecIsMp4) {
+    // Codec selection follows the active export pipeline: transparent exports
+    // cannot keep MP4 codecs, while composite exports must land on one.
+    if (exportMode !== 'composite' && selectedCodecIsMp4) {
       onSettingsChange({
         exportCodec: 'prores_ks',
         exportAcceleration: 'cpu',
@@ -54,18 +98,18 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
       return
     }
 
-    if (!derived.hasImportedVideo) {
+    if (exportMode !== 'composite') {
       return
     }
 
-    const firstAvailableMp4Codec = getFirstAvailableMp4ExportCodec(derived.platformOs, derived.availableCodecs)
+    const firstAvailableMp4Codec = getFirstAvailableMp4ExportCodec(platformOs, availableCodecs)
 
-    if (!derived.selectedCodecIsMp4 || !derived.selectedExportCodecAvailable) {
+    if (!selectedCodecIsMp4 || !selectedExportCodecAvailable) {
       if (firstAvailableMp4Codec) {
         onSettingsChange({
           exportCodec: firstAvailableMp4Codec,
           exportAcceleration: EXPORT_CODEC_LOOKUP[firstAvailableMp4Codec]?.acceleration || 'cpu',
-          exportBitrate: derived.defaultBitrateForCodec(firstAvailableMp4Codec),
+          exportBitrate: defaultBitrateForCodec(firstAvailableMp4Codec),
         })
       }
       return
@@ -73,32 +117,21 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
 
     if (!Number.isFinite(settings.exportBitrate)) {
       onSettingsChange({
-        exportBitrate: derived.defaultBitrateForCodec(settings.exportCodec),
+        exportBitrate: defaultBitrateForCodec(settings.exportCodec),
       })
     }
-  }, [
-    derived.hasImportedVideo,
-    derived.defaultBitrateForCodec,
-    derived,
-    onSettingsChange,
-    derived.platformOs,
-    derived.selectedCodecIsMp4,
-    derived.selectedExportCodecAvailable,
-    settings,
-    derived.availableCodecs,
-  ])
+  }, [availableCodecs, defaultBitrateForCodec, exportMode, onSettingsChange, platformOs, selectedCodecIsMp4, selectedExportCodecAvailable, settings])
 
-  // Normalize update rate when FPS changes
   useEffect(() => {
     if (!settings) {
       return
     }
 
-    const normalizedUpdateRate = normalizeUpdateRateForFps(derived.updateRateFps, settings.updateRate)
+    const normalizedUpdateRate = normalizeUpdateRateForFps(updateRateFps, settings.updateRate)
     if (normalizedUpdateRate !== settings.updateRate) {
       onSettingsChange({ updateRate: normalizedUpdateRate })
     }
-  }, [settings, derived.updateRateFps, onSettingsChange])
+  }, [settings, updateRateFps, onSettingsChange])
 
   const handleCancel = useCallback(async () => {
     await cancelRender()
@@ -114,6 +147,43 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     onClose()
   }
 
+  const handleApplyImportedVideoRange = useCallback(() => {
+    if (!hasImportedVideo) {
+      return
+    }
+
+    importedVideoRangePrefilledRef.current = true
+    onSettingsChange({
+      exportRange: {
+        ...(settings?.exportRange || {}),
+        ...getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
+      },
+    })
+  }, [hasImportedVideo, importedVideoDuration, onSettingsChange, settings?.exportRange, videoSyncOffsetSeconds])
+
+  const handleExportModeChange = useCallback(
+    (transparentEnabled) => {
+      const exportMode = transparentEnabled ? 'transparent' : 'composite'
+
+      // Only the first switch into transparent mode auto-prefills the imported
+      // video span; after that, manual edits stay intact until the dialog closes.
+      if (transparentEnabled && hasImportedVideo && !importedVideoRangePrefilledRef.current) {
+        importedVideoRangePrefilledRef.current = true
+        onSettingsChange({
+          exportMode,
+          exportRange: {
+            ...(settings?.exportRange || {}),
+            ...getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
+          },
+        })
+        return
+      }
+
+      onSettingsChange({ exportMode })
+    },
+    [hasImportedVideo, importedVideoDuration, onSettingsChange, settings?.exportRange, videoSyncOffsetSeconds],
+  )
+
   const handleOutputFormatChange = (value) => {
     const format = OUTPUT_FORMATS_BY_VALUE[value]
     if (!format) {
@@ -121,9 +191,9 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     }
 
     const acceleration =
-      getVisibleAccelerationOptions(format, derived.platformOs, derived.availableCodecs).find(
-        (option) => option.value === derived.selectedAccelerationValue && option.available,
-      ) || getFirstAvailableAcceleration(format, derived.platformOs, derived.availableCodecs)
+      getVisibleAccelerationOptions(format, platformOs, availableCodecs).find(
+        (option) => option.value === selectedAccelerationValue && option.available,
+      ) || getFirstAvailableAcceleration(format, platformOs, availableCodecs)
 
     if (!acceleration) {
       return
@@ -135,12 +205,12 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     onSettingsChange({
       exportCodec: nextExportCodec,
       exportAcceleration: acceleration.value,
-      exportBitrate: nextIsMp4Codec ? derived.defaultBitrateForCodec(nextExportCodec) : undefined,
+      exportBitrate: nextIsMp4Codec ? defaultBitrateForCodec(nextExportCodec) : undefined,
     })
   }
 
   const handleAccelerationChange = (value) => {
-    const nextExportCodec = getExportCodecForSelection(derived.selectedOutputFormatValue, value)
+    const nextExportCodec = getExportCodecForSelection(selectedOutputFormatValue, value)
     if (!nextExportCodec) {
       return
     }
@@ -148,25 +218,29 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     onSettingsChange({
       exportCodec: nextExportCodec,
       exportAcceleration: value,
-      exportBitrate: derived.selectedCodecIsMp4 ? derived.defaultBitrateForCodec(nextExportCodec) : undefined,
+      exportBitrate: selectedCodecIsMp4 ? defaultBitrateForCodec(nextExportCodec) : undefined,
     })
   }
 
   return {
-    availableCodecs: derived.availableCodecs,
-    config: derived.config,
-    containerFps: derived.containerFps,
+    availableCodecs,
+    config,
+    containerFps,
+    dialogTitle: exportMode === 'composite' ? 'Composite Video Export Settings' : 'Transparent Export Settings',
+    exportMode,
     fpsMode,
     handleAccelerationChange,
+    handleApplyImportedVideoRange,
     handleBackdropPointerDown,
     handleCancel,
     handleCustomFpsChange,
+    handleExportModeChange,
     handleFpsModeChange,
     handleOutputFormatChange,
-    hasImportedVideo: derived.hasImportedVideo,
-    importedVideoDuration: derived.importedVideoDuration,
-    importedVideoFps: derived.importedVideoFps,
-    importedVideoResolution: derived.importedVideoResolution,
+    hasImportedVideo,
+    importedVideoDuration,
+    importedVideoFps,
+    importedVideoResolution,
     isProgress,
     isOutputFormatAvailable,
     onClose,
@@ -174,16 +248,18 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     onSettingsChange,
     OUTPUT_FORMATS,
     phase,
-    platformOs: derived.platformOs,
-    renderProgress: derived.renderProgress,
-    renderStartDisabled: derived.renderStartDisabled,
-    renderingVideo: derived.renderingVideo,
-    resolutionMismatch: derived.resolutionMismatch,
-    selectedAccelerationOptions: derived.selectedAccelerationOptions,
-    selectedAccelerationValue: derived.selectedAccelerationValue,
-    selectedCodecIsMp4: derived.selectedCodecIsMp4,
-    selectedOutputFormatValue: derived.selectedOutputFormatValue,
+    platformOs,
+    renderProgress,
+    renderStartDisabled,
+    renderingVideo,
+    resolutionMismatch,
+    selectedAccelerationOptions,
+    selectedAccelerationValue,
+    selectedCodecIsMp4,
+    selectedOutputFormatValue,
     settings,
-    updateRateOptions: derived.updateRateOptions,
+    showExportModeOverride: hasImportedVideo,
+    showExportRangeSettings: exportMode !== 'composite',
+    updateRateOptions,
   }
 }

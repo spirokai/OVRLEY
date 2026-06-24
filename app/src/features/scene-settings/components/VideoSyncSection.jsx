@@ -115,7 +115,13 @@ export default function VideoSyncSection({
                 </button>
               </div>
             </div>
-            <Button variant="outline" size="sm" className="h-9 px-3 text-xs" disabled={!activitySummary} onClick={onComputeVideoSync}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 border-border/80 bg-surface-elevated px-3 text-xs font-semibold text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
+              disabled={!activitySummary}
+              onClick={onComputeVideoSync}
+            >
               Auto-sync
             </Button>
           </div>

@@ -3,8 +3,8 @@
  *
  * This module starts from committed template state, materializes the
  * editor-effective template config, and then layers on render-only scene
- * fields such as codec defaults, export-range scoping, and imported-video
- * composite metadata.
+ * fields such as codec defaults, export-range scoping, and optional
+ * imported-video composite metadata.
  */
 
 import { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
@@ -76,9 +76,12 @@ function applyCompositeSceneFields(scene, options) {
 /**
  * Applies the custom export-range window to the render-effective scene config.
  *
+ * Composite exports always render the imported video's span, while transparent
+ * exports may narrow the restored timeline window with a custom range.
+ *
  * @param {object} scene - Render-effective scene config.
  * @param {object|null|undefined} exportRange - Requested export-range settings.
- * @param {string|null|undefined} importedVideoPath - Imported-video path, if any.
+ * @param {string|null|undefined} importedVideoPath - Active composite-video path, if any.
  */
 function applyCustomExportRange(scene, exportRange, importedVideoPath) {
   scene.custom_export_range_active = Boolean(importedVideoPath)
@@ -130,6 +133,7 @@ function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
  * @param {object|null|undefined} options.availableCodecs - Detected codec metadata from the backend.
  * @param {object} options.config - Committed template config.
  * @param {*} options.exportCodec - Requested export codec.
+ * @param {'transparent'|'composite'|null|undefined} options.exportMode - Active export pipeline selection.
  * @param {object|null|undefined} options.exportRange - Export range settings.
  * @param {object|null|undefined} options.globalDefaults - Template global defaults.
  * @param {string|null|undefined} options.importedVideoPath - Imported-video path, if any.
@@ -139,7 +143,8 @@ function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
  * @returns {object} Render-effective config.
  */
 export function createRenderEffectiveConfig(options) {
-  const { availableCodecs, config, exportCodec, exportRange, globalDefaults, importedVideoPath, timelineStart, timelineEnd, updateRate } = options
+  const { availableCodecs, config, exportCodec, exportMode, exportRange, globalDefaults, importedVideoPath, timelineStart, timelineEnd, updateRate } =
+    options
 
   if (!config?.scene) {
     throw new Error('No valid config available')
@@ -149,7 +154,11 @@ export function createRenderEffectiveConfig(options) {
   const scene = {
     ...nextConfig.scene,
   }
-  const resolvedExportCodec = importedVideoPath && !isCompositeCodec(exportCodec) ? 'libx264' : exportCodec || 'prores_ks'
+  // Callers that do not pass an explicit export mode still follow the existing
+  // imported-video default of compositing; dialog callers can now opt out with
+  // transparent mode.
+  const shouldComposite = exportMode ? exportMode === 'composite' && Boolean(importedVideoPath) : Boolean(importedVideoPath)
+  const resolvedExportCodec = shouldComposite && !isCompositeCodec(exportCodec) ? 'libx264' : exportCodec || 'prores_ks'
 
   scene.fps = sanitizeIntegerFps(scene.fps)
   delete scene.updateRate
@@ -165,13 +174,13 @@ export function createRenderEffectiveConfig(options) {
     delete scene.ffmpeg.qsv_full_init_args
   }
 
-  if (importedVideoPath) {
+  if (shouldComposite) {
     applyCompositeSceneFields(scene, options)
   }
 
   applyTimelineSceneFields(scene, timelineStart, timelineEnd)
   applyCodecDefaults(scene, resolvedExportCodec)
-  applyCustomExportRange(scene, exportRange, importedVideoPath)
+  applyCustomExportRange(scene, exportRange, shouldComposite ? importedVideoPath : null)
 
   return {
     ...nextConfig,
