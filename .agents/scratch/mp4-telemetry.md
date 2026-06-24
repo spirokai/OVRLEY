@@ -1,4 +1,4 @@
-# MP4 Telemetry Integration Plan
+# MP4 Telemetry Integration Plan v2
 
 ## Goal
 
@@ -13,19 +13,19 @@ Two purposes:
 
 ## Decisions
 
-| # | Decision | Rationale |
-|---|----------|-----------|
-| D1 | Pin dependency to commit `fd9a73e` (Jun 11 2026, latest) | Reproducible builds; avoids silent breakage from upstream HEAD |
-| D2 | Video framerate as target sample rate | Overlay renders at video FPS; one telemetry value per frame simplifies densification |
-| D3 | Forward-backward moving average (FBMA) for smoothing | Simple (~20 lines), zero-phase, no coefficient computation; upgrade path to Butterworth if insufficient |
-| D4 | Camera settings (ISO, aperture, shutter, focal length, EV, color temp) excluded from smoothing | These are discrete values; smoothing would blur intentional jumps |
-| D5 | GPS `unix_timestamp` inference as primary creation-time source | Survives simple cuts (metadata track preserved); most accurate for GPS cameras |
-| D6 | ffprobe fallback for creation time | Handles non-GPS cameras and re-encoded videos where metadata track is stripped |
-| D7 | Rust outputs complete `ParsedActivity` JSON directly (flat arrays), not raw samples | Flat arrays are ~2.5x more compact than raw sample objects; avoids redundant JS re-processing; GPS speed/heading already available — no need to re-derive; frontend does NOT call `finalizeParsedActivity()` — Rust already computed all derived metrics |
-| D8 | FIT/GPX always supersedes extracted telemetry | FIT/GPX is user-intent data; telemetry supplements only missing fields |
-| D9 | Telemetry extraction runs automatically on video import | User confirmed; no separate "extract" button needed |
-| D10 | GPS speed/track/altitude used as recorded (not derived from coordinates) | These are GPS chip Doppler/heading/altimeter readings, already firmware-smoothed |
-| D11 | Check `GpsData.is_acquired` before using GPS values | Skip samples where GPS signal is lost; emit `null` in those positions |
+| #   | Decision                                                                                       | Rationale                                                                                                                                                                                                                                                |
+| --- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Pin dependency to commit `fd9a73e` (Jun 11 2026, latest)                                       | Reproducible builds; avoids silent breakage from upstream HEAD                                                                                                                                                                                           |
+| D2  | Video framerate as target sample rate                                                          | Overlay renders at video FPS; one telemetry value per frame simplifies densification                                                                                                                                                                     |
+| D3  | Forward-backward moving average (FBMA) for smoothing                                           | Simple (~20 lines), zero-phase, no coefficient computation; upgrade path to Butterworth if insufficient                                                                                                                                                  |
+| D4  | Camera settings (ISO, aperture, shutter, focal length, EV, color temp) excluded from smoothing | These are discrete values; smoothing would blur intentional jumps                                                                                                                                                                                        |
+| D5  | GPS `unix_timestamp` inference as primary creation-time source                                 | Survives simple cuts (metadata track preserved); most accurate for GPS cameras                                                                                                                                                                           |
+| D6  | ffprobe fallback for creation time                                                             | Handles non-GPS cameras and re-encoded videos where metadata track is stripped                                                                                                                                                                           |
+| D7  | Rust outputs complete `ParsedActivity` JSON directly (flat arrays), not raw samples            | Flat arrays are ~2.5x more compact than raw sample objects; avoids redundant JS re-processing; GPS speed/heading already available — no need to re-derive; frontend does NOT call `finalizeParsedActivity()` — Rust already computed all derived metrics |
+| D8  | FIT/GPX always supersedes extracted telemetry                                                  | FIT/GPX is user-intent data; telemetry supplements only missing fields                                                                                                                                                                                   |
+| D9  | Telemetry extraction runs automatically on video import                                        | User confirmed; no separate "extract" button needed                                                                                                                                                                                                      |
+| D10 | GPS speed/track/altitude used as recorded (not derived from coordinates)                       | These are GPS chip Doppler/heading/altimeter readings, already firmware-smoothed                                                                                                                                                                         |
+| D11 | Check `GpsData.is_acquired` before using GPS values                                            | Skip samples where GPS signal is lost; emit `null` in those positions                                                                                                                                                                                    |
 
 ## Telemetry-Parser Schema (Verified)
 
@@ -41,7 +41,7 @@ lives in `src/tags_impl.rs`:
 - `GroupedTagMap = BTreeMap<GroupId, TagMap>`
 - `GpsData`: `{ is_acquired, unix_timestamp, lat, lon, speed, track, altitude }`
 - `SampleInfo`: `{ sample_index, track_index, timestamp_ms, duration_ms,
-  video_rotation, tag_map }`
+video_rotation, tag_map }`
 
 ## Architecture
 
@@ -85,21 +85,21 @@ Frontend: store as videoTelemetry (same ParsedActivity shape as FIT/GPX)
 
 ## Telemetry → ParsedActivity Mapping
 
-| telemetry-parser source | ParsedActivity field | Unit conversion | Smoothing |
-|------------------------|---------------------|-----------------|-----------|
-| `GPS.lat/lon` | `course: [(lat, lon), ...]` | direct | no |
-| `GPS.altitude` | `altitude`, `elevation` | meters | FBMA |
-| `GPS.speed` | `speed` | km/h → m/s (÷3.6) | FBMA |
-| `GPS.track` | `heading` | degrees | FBMA |
-| `GPS.unix_timestamp` | `time`, `source_start_time` | unix → ISO 8601 | no |
-| Derived from course points | `sample_distance_progress` | haversine → normalized 0..1 | no |
-| Derived from elevation/distance | `gradient` | (Δelevation / Δdistance) × 100 | FBMA |
-| Derived from speed | `pace` | 1000 / speed (s/km) | no |
-| `Exposure.ISOValue` | `iso` | direct | **no** |
-| `Exposure.IrisFStop` | `aperture` | direct | **no** |
-| `Exposure.ShutterSpeed` | `shutter_speed` | direct | **no** |
-| `Lens.FocalLength` | `focal_length` | mm | **no** |
-| Accelerometer magnitude | `g_force` | √(x²+y²+z²), subtract 1g | FBMA |
+| telemetry-parser source         | ParsedActivity field        | Unit conversion                | Smoothing |
+| ------------------------------- | --------------------------- | ------------------------------ | --------- |
+| `GPS.lat/lon`                   | `course: [(lat, lon), ...]` | direct                         | no        |
+| `GPS.altitude`                  | `altitude`, `elevation`     | meters                         | FBMA      |
+| `GPS.speed`                     | `speed`                     | km/h → m/s (÷3.6)              | FBMA      |
+| `GPS.track`                     | `heading`                   | degrees                        | FBMA      |
+| `GPS.unix_timestamp`            | `time`, `source_start_time` | unix → ISO 8601                | no        |
+| Derived from course points      | `sample_distance_progress`  | haversine → normalized 0..1    | no        |
+| Derived from elevation/distance | `gradient`                  | (Δelevation / Δdistance) × 100 | FBMA      |
+| Derived from speed              | `pace`                      | 1000 / speed (s/km)            | no        |
+| `Exposure.ISOValue`             | `iso`                       | direct                         | **no**    |
+| `Exposure.IrisFStop`            | `aperture`                  | direct                         | **no**    |
+| `Exposure.ShutterSpeed`         | `shutter_speed`             | direct                         | **no**    |
+| `Lens.FocalLength`              | `focal_length`              | mm                             | **no**    |
+| Accelerometer magnitude         | `g_force`                   | √(x²+y²+z²), subtract 1g       | FBMA      |
 
 ### ParsedActivity JSON Shape (Rust Output)
 
@@ -189,12 +189,12 @@ fn extract_creation_time(samples: &[SampleInfo]) -> Option<String> {
 
 ### Survivability
 
-| Scenario | GPS method | ffprobe method |
-|----------|-----------|----------------|
-| Original camera file | Accurate | Accurate |
-| Simple cut (`ffmpeg -c copy`) | Accurate (timestamps preserved in metadata track) | Usually preserved |
-| Re-encode (Premiere, DaVinci) | **Lost** (metadata track stripped) | Overwritten to re-export time |
-| Trim start removed | Reflects cut point (correct for remaining video) | May reflect cut or original |
+| Scenario                      | GPS method                                        | ffprobe method                |
+| ----------------------------- | ------------------------------------------------- | ----------------------------- |
+| Original camera file          | Accurate                                          | Accurate                      |
+| Simple cut (`ffmpeg -c copy`) | Accurate (timestamps preserved in metadata track) | Usually preserved             |
+| Re-encode (Premiere, DaVinci) | **Lost** (metadata track stripped)                | Overwritten to re-export time |
+| Trim start removed            | Reflects cut point (correct for remaining video)  | May reflect cut or original   |
 
 ## Smoothing: Forward-Backward Moving Average
 
@@ -213,12 +213,12 @@ fn zero_phase_smooth(data: &[Option<f64>], window: usize) -> Vec<Option<f64>> {
 
 ### Window Sizes
 
-| Metric | Window | Rationale |
-|--------|--------|-----------|
-| GPS speed | fps/2 (0.5s) | Already firmware-smoothed; light pass |
-| GPS altitude | fps (1s) | GPS altitude is noisier than speed |
-| GPS heading | fps/2 (0.5s) | Preserve sharp turns |
-| gForce | fps (1s) | Accelerometer is high-frequency noise |
+| Metric       | Window       | Rationale                             |
+| ------------ | ------------ | ------------------------------------- |
+| GPS speed    | fps/2 (0.5s) | Already firmware-smoothed; light pass |
+| GPS altitude | fps (1s)     | GPS altitude is noisier than speed    |
+| GPS heading  | fps/2 (0.5s) | Preserve sharp turns                  |
+| gForce       | fps (1s)     | Accelerometer is high-frequency noise |
 
 ### Upgrade Path to Butterworth
 
@@ -954,8 +954,8 @@ tauri_commands::backend_extract_video_telemetry,
  * @returns {Promise<object|null>} Promise resolving to ParsedActivity or null.
  */
 export async function extractVideoTelemetry(path) {
-  const result = await invokeCommand('backend_extract_video_telemetry', { filePath: path })
-  return typeof result === 'string' ? JSON.parse(result) : result
+  const result = await invokeCommand("backend_extract_video_telemetry", { filePath: path });
+  return typeof result === "string" ? JSON.parse(result) : result;
 }
 ```
 
@@ -991,29 +991,30 @@ videoTelemetryCreationTime: null,
 After `importPreviewVideo()` succeeds, fire-and-forget telemetry extraction:
 
 ```javascript
-import { extractVideoTelemetry, clearPreviewVideo, importPreviewVideo } from '@/api/backend'
+import { extractVideoTelemetry, clearPreviewVideo, importPreviewVideo } from "@/api/backend";
 
 // Inside handleImportVideo, after setImportedVideo(metadata):
 extractVideoTelemetry(selected)
   .then((result) => {
     if (result) {
-      setVideoTelemetry(result)
+      setVideoTelemetry(result);
       // If GPS-inferred creation time available and ffprobe didn't provide one,
       // update creation time for sync
       if (result.source_start_time && !metadata.creationTime) {
         // Update store with GPS-inferred creation time
-        const updatedMetadata = { ...metadata, creationTime: result.source_start_time }
-        setImportedVideo(updatedMetadata)
+        const updatedMetadata = { ...metadata, creationTime: result.source_start_time };
+        setImportedVideo(updatedMetadata);
       }
     }
   })
-  .catch((err) => console.warn('Telemetry extraction failed:', err))
+  .catch((err) => console.warn("Telemetry extraction failed:", err));
 ```
 
 ### Step F4: Merge strategy (when FIT/GPX also imported)
 
 When the user imports FIT/GPX after video telemetry, the merge happens in the
 render payload builder. For each metric series:
+
 - If FIT/GPX has non-null values → use FIT/GPX
 - Otherwise → use video telemetry values
 
@@ -1052,6 +1053,7 @@ and merged before rendering.
 ### Step G3: Manual testing
 
 Test with sample videos:
+
 - GoPro HERO 5+ (GPS + camera settings)
 - Sony a7 series (GPS + camera settings)
 - DJI drone (GPS + camera settings)
