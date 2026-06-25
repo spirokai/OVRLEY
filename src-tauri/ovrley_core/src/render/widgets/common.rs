@@ -219,7 +219,7 @@ pub(crate) fn point_at_metric_progress_with_cursor(
         *cursor += 1;
     }
 
-    while *cursor > 0 && progress_values[*cursor] > safe_target {
+    while *cursor > 0 && progress_values[*cursor] >= safe_target {
         *cursor -= 1;
     }
 
@@ -231,11 +231,38 @@ pub(crate) fn point_at_metric_progress_with_cursor(
     let mix = (safe_target - left_progress) / span;
     let left_point = points[left_index];
     let right_point = points[right_index];
+    if right_progress <= left_progress {
+        return Some((right_index, left_point.0, left_point.1));
+    }
     Some((
         right_index,
         left_point.0 + (right_point.0 - left_point.0) * mix,
         left_point.1 + (right_point.1 - left_point.1) * mix,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::point_at_metric_progress_with_cursor;
+
+    #[test]
+    fn metric_progress_cursor_rewinds_to_front_of_duplicate_run() {
+        let points = vec![(0.0, 0.0), (10.0, 10.0), (10.0, 30.0), (20.0, 40.0)];
+        let progress_values = vec![0.0, 0.5, 0.5, 1.0];
+        let mut cursor = 0usize;
+
+        let first = point_at_metric_progress_with_cursor(&points, &progress_values, 0.75, &mut cursor)
+            .expect("first lookup should resolve");
+        assert_eq!(first.0, 3);
+
+        let plateau =
+            point_at_metric_progress_with_cursor(&points, &progress_values, 0.5, &mut cursor)
+                .expect("plateau lookup should resolve");
+
+        assert_eq!(plateau.0, 1, "should use first point in duplicate-progress run");
+        assert!((plateau.1 - 10.0).abs() <= 1e-3);
+        assert!((plateau.2 - 10.0).abs() <= 1e-3);
+    }
 }
 
 // Selects a point by evenly mapping progress to the point index domain.

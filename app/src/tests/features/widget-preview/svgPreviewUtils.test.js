@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import { getPreviewMarkerLayers, buildElevationCompletedPoints } from '@/features/widget-preview/utils/svgPreviewUtils'
+import { findPointAtProgress } from '@/lib/geometryUtils'
 
 describe('getPreviewMarkerLayers', () => {
   test('builds a single solid marker by default', () => {
@@ -63,6 +64,23 @@ describe('getPreviewMarkerLayers', () => {
 })
 
 describe('buildElevationCompletedPoints', () => {
+  test('resolves duplicate-progress plateaus to the first matching point', () => {
+    const points = [
+      [0, 0],
+      [10, 10],
+      [10, 30],
+      [20, 40],
+    ]
+    const progressValues = [0, 0.5, 0.5, 1]
+
+    const plateau = findPointAtProgress(points, progressValues, 0.5)
+
+    expect(plateau).toEqual({
+      index: 1,
+      point: [10, 10],
+    })
+  })
+
   test('filters the geometry by elapsed fraction and ends on the profile geometry', () => {
     const points = [
       [0, 50],
