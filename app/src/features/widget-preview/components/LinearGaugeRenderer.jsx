@@ -43,6 +43,10 @@ function getLinearGaugeLabelGap(labelFontSize) {
   return Math.max(labelFontSize * 0.35, LINEAR_GAUGE_LABEL_GAP_PX)
 }
 
+function getRectCornerRadii(radius, width, height) {
+  return { rx: Math.min(radius, width * 0.5), ry: Math.min(radius, height * 0.5) }
+}
+
 function getLinearGaugeLabelLayout({ data, width, height, labelFontFamily, labelFontSize, minLabel, maxLabel }) {
   const gap = getLinearGaugeLabelGap(labelFontSize)
   const minMeasure = measurePreviewText(minLabel, labelFontSize, labelFontFamily)
@@ -95,6 +99,7 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
   const data = widget.data
   const maskId = useId()
   const flatFillClipId = `${maskId}-flat-fill`
+  const innerTrackClipId = `${maskId}-inner-track`
   const labelFontSize = data.min_max_label_font_size ?? 12
   const labelFontFamily = getPreviewFontFamily(data.min_max_label_font)
   useFontMetricsVersion(labelFontFamily, labelFontSize)
@@ -126,6 +131,15 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
   const shadowFilterId = shadowEnabled?.strength > 0 ? `linear-gauge-${widget.id || maskId}-shadow` : null
   const fillIsFlat = Boolean(data.track_fill_flat)
   const shadowMaskId = `${maskId}-shadow-mask`
+  const trackCornerRadii = getRectCornerRadii(cornerRadius, width, height)
+  const innerTrackRect = {
+    x: borderThickness,
+    y: borderThickness,
+    width: Math.max(0, width - borderThickness * 2),
+    height: Math.max(0, height - borderThickness * 2),
+  }
+  const innerTrackCornerRadii = getRectCornerRadii(fillCornerRadius, innerTrackRect.width, innerTrackRect.height)
+  const fillCornerRadii = getRectCornerRadii(fillCornerRadius, layout.fillRect.width, layout.fillRect.height)
   const shadowColor = shadowEnabled ? normalizeSvgShadowColor(shadowEnabled.color, opacity) : null
   const outerShadow =
     shadowColor != null ? (
@@ -135,30 +149,38 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
           y={0}
           width={width}
           height={height}
-          rx={cornerRadius}
-          ry={cornerRadius}
+          rx={trackCornerRadii.rx}
+          ry={trackCornerRadii.ry}
           fill={shadowColor.color}
           opacity={shadowColor.opacity}
           mask={borderThickness > 0 ? `url(#${shadowMaskId})` : undefined}
         />
       </g>
     ) : null
-  const innerTrackRect = {
-    x: borderThickness,
-    y: borderThickness,
-    width: Math.max(0, width - borderThickness * 2),
-    height: Math.max(0, height - borderThickness * 2),
-  }
+  const useRoundedFill = fillCornerRadius > 0
   const filledTrack =
-    fillIsFlat && fillCornerRadius > 0 ? (
+    useRoundedFill && fillIsFlat ? (
       <rect
         x={innerTrackRect.x}
         y={innerTrackRect.y}
         width={innerTrackRect.width}
         height={innerTrackRect.height}
-        rx={fillCornerRadius}
-        ry={fillCornerRadius}
+        rx={innerTrackCornerRadii.rx}
+        ry={innerTrackCornerRadii.ry}
         clipPath={`url(#${flatFillClipId})`}
+        fill={data.track_filled_color}
+        fillOpacity={data.track_filled_opacity}
+        opacity={opacity}
+      />
+    ) : useRoundedFill ? (
+      <rect
+        x={layout.fillRect.x}
+        y={layout.fillRect.y}
+        width={layout.fillRect.width}
+        height={layout.fillRect.height}
+        rx={fillCornerRadii.rx}
+        ry={fillCornerRadii.ry}
+        clipPath={`url(#${innerTrackClipId})`}
         fill={data.track_filled_color}
         fillOpacity={data.track_filled_opacity}
         opacity={opacity}
@@ -169,8 +191,8 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
         y={layout.fillRect.y}
         width={layout.fillRect.width}
         height={layout.fillRect.height}
-        rx={fillCornerRadius}
-        ry={fillCornerRadius}
+        rx={fillCornerRadii.rx}
+        ry={fillCornerRadii.ry}
         fill={data.track_filled_color}
         fillOpacity={data.track_filled_opacity}
         opacity={opacity}
@@ -186,40 +208,52 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
       data-testid="linear-gauge-preview"
     >
       {shadowFilterId ? <PreviewSvgShadowBlurFilter id={shadowFilterId} shadow={shadowEnabled} /> : null}
-      {borderThickness > 0 || (fillIsFlat && fillCornerRadius > 0) ? (
+      {borderThickness > 0 || useRoundedFill ? (
         <defs>
           {borderThickness > 0 ? (
             <>
               <mask id={maskId}>
-                <rect x={0} y={0} width={width} height={height} rx={cornerRadius} ry={cornerRadius} fill="white" />
+                <rect x={0} y={0} width={width} height={height} rx={trackCornerRadii.rx} ry={trackCornerRadii.ry} fill="white" />
                 <rect
                   x={innerTrackRect.x}
                   y={innerTrackRect.y}
                   width={innerTrackRect.width}
                   height={innerTrackRect.height}
-                  rx={fillCornerRadius}
-                  ry={fillCornerRadius}
+                  rx={innerTrackCornerRadii.rx}
+                  ry={innerTrackCornerRadii.ry}
                   fill="black"
                 />
               </mask>
               <mask id={shadowMaskId}>
-                <rect x={0} y={0} width={width} height={height} rx={cornerRadius} ry={cornerRadius} fill="white" />
+                <rect x={0} y={0} width={width} height={height} rx={trackCornerRadii.rx} ry={trackCornerRadii.ry} fill="white" />
                 <rect
                   x={innerTrackRect.x}
                   y={innerTrackRect.y}
                   width={innerTrackRect.width}
                   height={innerTrackRect.height}
-                  rx={fillCornerRadius}
-                  ry={fillCornerRadius}
+                  rx={innerTrackCornerRadii.rx}
+                  ry={innerTrackCornerRadii.ry}
                   fill="black"
                 />
               </mask>
             </>
           ) : null}
-          {fillIsFlat && fillCornerRadius > 0 ? (
-            <clipPath id={flatFillClipId}>
-              <rect x={layout.fillRect.x} y={layout.fillRect.y} width={layout.fillRect.width} height={layout.fillRect.height} />
-            </clipPath>
+          {useRoundedFill ? (
+            <>
+              <clipPath id={flatFillClipId}>
+                <rect x={layout.fillRect.x} y={layout.fillRect.y} width={layout.fillRect.width} height={layout.fillRect.height} />
+              </clipPath>
+              <clipPath id={innerTrackClipId}>
+                <rect
+                  x={innerTrackRect.x}
+                  y={innerTrackRect.y}
+                  width={innerTrackRect.width}
+                  height={innerTrackRect.height}
+                  rx={innerTrackCornerRadii.rx}
+                  ry={innerTrackCornerRadii.ry}
+                />
+              </clipPath>
+            </>
           ) : null}
         </defs>
       ) : null}
@@ -230,8 +264,8 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
           y={0}
           width={width}
           height={height}
-          rx={cornerRadius}
-          ry={cornerRadius}
+          rx={trackCornerRadii.rx}
+          ry={trackCornerRadii.ry}
           fill={data.track_border_color}
           mask={`url(#${maskId})`}
           opacity={opacity}
@@ -242,8 +276,8 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
           y={0}
           width={width}
           height={height}
-          rx={cornerRadius}
-          ry={cornerRadius}
+          rx={trackCornerRadii.rx}
+          ry={trackCornerRadii.ry}
           fill={data.track_empty_color}
           fillOpacity={data.track_empty_opacity}
           opacity={opacity}
@@ -255,8 +289,8 @@ export function OverlayLinearGaugeWidget({ widget, activity, previewSecond, glob
           y={innerTrackRect.y}
           width={innerTrackRect.width}
           height={innerTrackRect.height}
-          rx={fillCornerRadius}
-          ry={fillCornerRadius}
+          rx={innerTrackCornerRadii.rx}
+          ry={innerTrackCornerRadii.ry}
           fill={data.track_empty_color}
           fillOpacity={data.track_empty_opacity}
           opacity={opacity}

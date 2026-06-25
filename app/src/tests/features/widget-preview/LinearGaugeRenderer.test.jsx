@@ -57,6 +57,16 @@ describe('OverlayLinearGaugeWidget', () => {
     expect(filledRect).toHaveAttribute('height', '36')
   })
 
+  test('clips a non-flat fill to the inner track at normal progress', () => {
+    render(<OverlayLinearGaugeWidget widget={makeWidget()} activity={activity} previewSecond={0.5} globalScale={1} />)
+
+    const rects = [...screen.getByTestId('linear-gauge-preview').querySelectorAll('rect')]
+    const filledRect = rects.find((rect) => rect.getAttribute('fill') === '#40e0d0')
+
+    expect(filledRect).toHaveAttribute('width', '98')
+    expect(filledRect).toHaveAttribute('clip-path')
+  })
+
   test('renders a flat advancing fill end when enabled', () => {
     render(<OverlayLinearGaugeWidget widget={makeWidget({ track_fill_flat: true })} activity={activity} previewSecond={0.5} globalScale={1} />)
 

@@ -37,12 +37,19 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
   const linearData = useMemo(() => widget.data.display_variants?.linear ?? {}, [widget.data.display_variants?.linear])
   const updateLinear = useDisplayVariantUpdater(widget, 'linear', linearData, updateWidgetData)
   const availableFonts = useAvailableFonts()
+  const cornerRadiusMax = useMemo(
+    () => Math.max(0, Math.min(linearData.width ?? 0, linearData.height ?? 0) * 0.5),
+    [linearData.width, linearData.height],
+  )
   const updateOrientation = (orientation) => {
     if (orientation === linearData.orientation) return
+    const nextWidth = linearData.height
+    const nextHeight = linearData.width
     updateLinear({
       orientation,
-      width: linearData.height,
-      height: linearData.width,
+      width: nextWidth,
+      height: nextHeight,
+      track_corner_radius: Math.min(Math.max(0, linearData.track_corner_radius), Math.max(0, Math.min(nextWidth ?? 0, nextHeight ?? 0) * 0.5)),
       min_max_label_position: LABEL_POSITION_SWAP[linearData.min_max_label_position] ?? linearData.min_max_label_position,
     })
   }
@@ -80,7 +87,15 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
             max={widthSliderBounds.max}
             step={1}
             valueDisplay={`${linearData.width}px`}
-            onSliderChange={(value) => updateLinear({ width: value })}
+            onSliderChange={(value) =>
+              updateLinear({
+                width: value,
+                track_corner_radius: Math.min(
+                  Math.max(0, linearData.track_corner_radius),
+                  Math.max(0, Math.min(value, linearData.height ?? 0) * 0.5),
+                ),
+              })
+            }
           />
           <SliderField
             label="Height"
@@ -89,7 +104,12 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
             max={heightSliderBounds.max}
             step={1}
             valueDisplay={`${linearData.height}px`}
-            onSliderChange={(value) => updateLinear({ height: value })}
+            onSliderChange={(value) =>
+              updateLinear({
+                height: value,
+                track_corner_radius: Math.min(Math.max(0, linearData.track_corner_radius), Math.max(0, Math.min(linearData.width ?? 0, value) * 0.5)),
+              })
+            }
           />
         </div>
         <div className="grid grid-cols-2 gap-4 pt-2">
@@ -98,10 +118,10 @@ export default function LinearDisplaySection({ widget, updateWidgetData }) {
             label="Corner Radius"
             value={linearData.track_corner_radius}
             min={0}
-            max={40}
+            max={cornerRadiusMax}
             step={1}
             valueDisplay={`${linearData.track_corner_radius}px`}
-            onSliderChange={(value) => updateLinear({ track_corner_radius: value })}
+            onSliderChange={(value) => updateLinear({ track_corner_radius: Math.min(Math.max(0, value), cornerRadiusMax) })}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">

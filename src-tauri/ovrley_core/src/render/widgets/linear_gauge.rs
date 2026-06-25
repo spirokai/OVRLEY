@@ -9,8 +9,8 @@ use crate::activity::schema::{DenseActivityReport, DenseSeriesReport};
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{
-    ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
-    ValidatedLinearGaugeWidget, ValidatedSceneConfig,
+    ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
+    ValidatedSceneConfig,
 };
 use crate::render::surface::create_surface;
 use crate::render::text::{origin_x_for_centered_text, parse_color, resolve_font};
@@ -126,9 +126,17 @@ pub fn prepare_linear_gauge_cache(
             scene.shadow_distance,
             scale,
         );
-        let track_padding = static_layer_padding(gauge.track_border_thickness * scale, shadow.as_ref());
-        let (label_left, label_top, label_right, label_bottom) =
-            linear_gauge_label_padding(gauge, scaled_width, scaled_height, scale, font_dirs, min_value, max_value)?;
+        let track_padding =
+            static_layer_padding(gauge.track_border_thickness * scale, shadow.as_ref());
+        let (label_left, label_top, label_right, label_bottom) = linear_gauge_label_padding(
+            gauge,
+            scaled_width,
+            scaled_height,
+            scale,
+            font_dirs,
+            min_value,
+            max_value,
+        )?;
         let left_padding = track_padding.max(label_left);
         let top_padding = track_padding.max(label_top);
         let right_padding = track_padding.max(label_right);
@@ -232,7 +240,7 @@ pub fn draw_linear_gauge_widget(
             ));
             let fill_rect = Rect::from_xywh(x, y, width, height);
             let radius = (cache.track_corner_radius - cache.track_border_thickness).max(0.0);
-            if cache.track_fill_flat && radius > 0.0 {
+            if radius > 0.0 {
                 let inset = cache.track_border_thickness.max(0.0);
                 let inner_rect = Rect::from_xywh(
                     cache.x + inset,
@@ -240,9 +248,23 @@ pub fn draw_linear_gauge_widget(
                     (cache.width as f32 - inset * 2.0).max(0.0),
                     (cache.height as f32 - inset * 2.0).max(0.0),
                 );
+                let inner_rrect = RRect::new_rect_xy(inner_rect, radius, radius);
+
                 canvas.save();
-                canvas.clip_rect(fill_rect, skia_safe::ClipOp::Intersect, true);
-                canvas.draw_rrect(RRect::new_rect_xy(inner_rect, radius, radius), &fill_paint);
+                if cache.track_fill_flat {
+                    canvas.clip_rect(fill_rect, skia_safe::ClipOp::Intersect, true);
+                    canvas.draw_rrect(inner_rrect, &fill_paint);
+                } else {
+                    canvas.clip_rrect(inner_rrect, skia_safe::ClipOp::Intersect, true);
+                    canvas.draw_rrect(
+                        RRect::new_rect_xy(
+                            fill_rect,
+                            radius.min(width * 0.5).max(0.0),
+                            radius.min(height * 0.5).max(0.0),
+                        ),
+                        &fill_paint,
+                    );
+                }
                 canvas.restore();
             } else {
                 canvas.draw_rrect(RRect::new_rect_xy(fill_rect, radius, radius), &fill_paint);
@@ -373,7 +395,8 @@ fn draw_static_linear_layer(
     if gauge.show_min_max_labels {
         let font_size = gauge.min_max_label_font_size * scale;
         let font = resolve_font(font_dirs, Some(&gauge.min_max_label_font), font_size)?;
-        let layout = linear_gauge_label_layout(gauge, width, height, scale, &font, min_value, max_value);
+        let layout =
+            linear_gauge_label_layout(gauge, width, height, scale, &font, min_value, max_value);
         let mut text_paint = Paint::default();
         text_paint.set_anti_alias(true);
         text_paint.set_color(parse_color(&gauge.min_max_label_color, 1.0));
@@ -399,7 +422,8 @@ fn linear_gauge_label_padding(
 
     let font_size = gauge.min_max_label_font_size * scale;
     let font = resolve_font(font_dirs, Some(&gauge.min_max_label_font), font_size)?;
-    let layout = linear_gauge_label_layout(gauge, width, height, scale, &font, min_value, max_value);
+    let layout =
+        linear_gauge_label_layout(gauge, width, height, scale, &font, min_value, max_value);
     let (_, min_bounds) = font.measure_str(&layout.min_label, None);
     let (_, max_bounds) = font.measure_str(&layout.max_label, None);
 
@@ -444,22 +468,13 @@ fn linear_gauge_label_layout(
     let (_, max_bounds) = font.measure_str(&max_label, None);
 
     match (gauge.orientation, gauge.min_max_label_position) {
-        (
-            ValidatedLinearGaugeOrientation::Horizontal,
-            ValidatedLinearGaugeLabelPosition::Top,
-        ) => {
+        (ValidatedLinearGaugeOrientation::Horizontal, ValidatedLinearGaugeLabelPosition::Top) => {
             let baseline = -gap - metrics.descent;
             LinearGaugeLabelLayout {
                 min_label: min_label.clone(),
                 max_label: max_label.clone(),
-                min_origin: Point::new(
-                    origin_x_for_centered_text(&min_label, 0.0, font),
-                    baseline,
-                ),
-                max_origin: Point::new(
-                    origin_x_for_centered_text(&max_label, w, font),
-                    baseline,
-                ),
+                min_origin: Point::new(origin_x_for_centered_text(&min_label, 0.0, font), baseline),
+                max_origin: Point::new(origin_x_for_centered_text(&max_label, w, font), baseline),
             }
         }
         (
@@ -470,46 +485,38 @@ fn linear_gauge_label_layout(
             LinearGaugeLabelLayout {
                 min_label: min_label.clone(),
                 max_label: max_label.clone(),
+                min_origin: Point::new(origin_x_for_centered_text(&min_label, 0.0, font), baseline),
+                max_origin: Point::new(origin_x_for_centered_text(&max_label, w, font), baseline),
+            }
+        }
+        (ValidatedLinearGaugeOrientation::Vertical, ValidatedLinearGaugeLabelPosition::Left) => {
+            LinearGaugeLabelLayout {
+                min_label: min_label.clone(),
+                max_label: max_label.clone(),
                 min_origin: Point::new(
-                    origin_x_for_centered_text(&min_label, 0.0, font),
-                    baseline,
+                    -gap - min_bounds.right,
+                    h - (min_bounds.top + min_bounds.bottom) * 0.5,
                 ),
                 max_origin: Point::new(
-                    origin_x_for_centered_text(&max_label, w, font),
-                    baseline,
+                    -gap - max_bounds.right,
+                    -(max_bounds.top + max_bounds.bottom) * 0.5,
                 ),
             }
         }
-        (
-            ValidatedLinearGaugeOrientation::Vertical,
-            ValidatedLinearGaugeLabelPosition::Left,
-        ) => LinearGaugeLabelLayout {
-            min_label: min_label.clone(),
-            max_label: max_label.clone(),
-            min_origin: Point::new(
-                -gap - min_bounds.right,
-                h - (min_bounds.top + min_bounds.bottom) * 0.5,
-            ),
-            max_origin: Point::new(
-                -gap - max_bounds.right,
-                -(max_bounds.top + max_bounds.bottom) * 0.5,
-            ),
-        },
-        (
-            ValidatedLinearGaugeOrientation::Vertical,
-            ValidatedLinearGaugeLabelPosition::Right,
-        ) => LinearGaugeLabelLayout {
-            min_label: min_label.clone(),
-            max_label: max_label.clone(),
-            min_origin: Point::new(
-                w + gap - min_bounds.left,
-                h - (min_bounds.top + min_bounds.bottom) * 0.5,
-            ),
-            max_origin: Point::new(
-                w + gap - max_bounds.left,
-                -(max_bounds.top + max_bounds.bottom) * 0.5,
-            ),
-        },
+        (ValidatedLinearGaugeOrientation::Vertical, ValidatedLinearGaugeLabelPosition::Right) => {
+            LinearGaugeLabelLayout {
+                min_label: min_label.clone(),
+                max_label: max_label.clone(),
+                min_origin: Point::new(
+                    w + gap - min_bounds.left,
+                    h - (min_bounds.top + min_bounds.bottom) * 0.5,
+                ),
+                max_origin: Point::new(
+                    w + gap - max_bounds.left,
+                    -(max_bounds.top + max_bounds.bottom) * 0.5,
+                ),
+            }
+        }
         _ => unreachable!("linear gauge label position should match validated orientation"),
     }
 }

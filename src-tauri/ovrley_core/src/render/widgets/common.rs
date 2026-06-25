@@ -251,15 +251,19 @@ mod tests {
         let progress_values = vec![0.0, 0.5, 0.5, 1.0];
         let mut cursor = 0usize;
 
-        let first = point_at_metric_progress_with_cursor(&points, &progress_values, 0.75, &mut cursor)
-            .expect("first lookup should resolve");
+        let first =
+            point_at_metric_progress_with_cursor(&points, &progress_values, 0.75, &mut cursor)
+                .expect("first lookup should resolve");
         assert_eq!(first.0, 3);
 
         let plateau =
             point_at_metric_progress_with_cursor(&points, &progress_values, 0.5, &mut cursor)
                 .expect("plateau lookup should resolve");
 
-        assert_eq!(plateau.0, 1, "should use first point in duplicate-progress run");
+        assert_eq!(
+            plateau.0, 1,
+            "should use first point in duplicate-progress run"
+        );
         assert!((plateau.1 - 10.0).abs() <= 1e-3);
         assert!((plateau.2 - 10.0).abs() <= 1e-3);
     }

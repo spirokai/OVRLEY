@@ -250,13 +250,8 @@ fn completed_points_fills_vertical_segment_chronologically() {
     let elapsed_fractions = vec![0.0, 0.25, 0.5, 0.75, 1.0];
 
     // Mid-hover: elapsed_fraction = 0.5
-    let completed = build_elevation_completed_points(
-        &points,
-        &progress_values,
-        &elapsed_fractions,
-        0.5,
-        0.5,
-    );
+    let completed =
+        build_elevation_completed_points(&points, &progress_values, &elapsed_fractions, 0.5, 0.5);
 
     // Should include points with elapsed_fraction <= 0.5: indices 0, 1, 2
     assert!(
@@ -289,13 +284,8 @@ fn completed_points_includes_all_at_full_elapsed() {
     let progress_values = vec![0.5, 0.5, 0.5, 0.5, 0.5];
     let elapsed_fractions = vec![0.0, 0.25, 0.5, 0.75, 1.0];
 
-    let completed = build_elevation_completed_points(
-        &points,
-        &progress_values,
-        &elapsed_fractions,
-        0.5,
-        1.0,
-    );
+    let completed =
+        build_elevation_completed_points(&points, &progress_values, &elapsed_fractions, 0.5, 1.0);
 
     // All 5 points should be included (plus marker if distant)
     assert!(
@@ -313,15 +303,14 @@ fn completed_points_follow_geometry_prefix_outside_duplicate_run() {
     let progress_values = vec![0.0, 0.3, 0.7, 1.0];
     let elapsed_fractions = vec![0.0, 0.3, 0.7, 1.0];
 
-    let completed = build_elevation_completed_points(
-        &points,
-        &progress_values,
-        &elapsed_fractions,
-        0.5,
-        0.5,
-    );
+    let completed =
+        build_elevation_completed_points(&points, &progress_values, &elapsed_fractions, 0.5, 0.5);
 
-    assert_eq!(completed.len(), 3, "should contain prefix plus interpolated endpoint");
+    assert_eq!(
+        completed.len(),
+        3,
+        "should contain prefix plus interpolated endpoint"
+    );
     assert_eq!(completed[0], points[0]);
     assert_eq!(completed[1], points[1]);
     assert!(
@@ -345,13 +334,8 @@ fn completed_points_use_geometry_endpoint_not_marker_y() {
     let progress_values = vec![0.5, 0.5, 0.5, 0.5, 0.5];
     let elapsed_fractions = vec![0.0, 0.25, 0.5, 0.75, 1.0];
 
-    let completed = build_elevation_completed_points(
-        &points,
-        &progress_values,
-        &elapsed_fractions,
-        0.5,
-        0.6,
-    );
+    let completed =
+        build_elevation_completed_points(&points, &progress_values, &elapsed_fractions, 0.5, 0.6);
 
     assert_eq!(
         *completed.last().unwrap(),

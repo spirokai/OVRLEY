@@ -134,6 +134,8 @@ pub fn validate_linear_gauge(
 
     let track_empty_opacity = require_f32(value.track_empty_opacity, &p("track_empty_opacity"))?;
     let track_filled_opacity = require_f32(value.track_filled_opacity, &p("track_filled_opacity"))?;
+    let track_corner_radius = require_f32(value.track_corner_radius, &p("track_corner_radius"))?
+        .clamp(0.0, (width.min(height)) as f32 * 0.5);
     for (field, opacity) in [
         ("track_empty_opacity", track_empty_opacity),
         ("track_filled_opacity", track_filled_opacity),
@@ -155,7 +157,7 @@ pub fn validate_linear_gauge(
         rotation: value.rotation.unwrap_or(0.0),
         display_type: value.display_type,
         orientation,
-        track_corner_radius: require_f32(value.track_corner_radius, &p("track_corner_radius"))?,
+        track_corner_radius,
         track_border_thickness: require_f32(
             value.track_border_thickness,
             &p("track_border_thickness"),
