@@ -246,12 +246,17 @@ fn completed_points_fills_vertical_segment_chronologically() {
         (100.0, 350.0),
         (100.0, 300.0),
     ];
+    let progress_values = vec![0.5, 0.5, 0.5, 0.5, 0.5];
     let elapsed_fractions = vec![0.0, 0.25, 0.5, 0.75, 1.0];
-    let marker_point = (100.0, 400.0);
 
     // Mid-hover: elapsed_fraction = 0.5
-    let completed =
-        build_elevation_completed_points(&points, &elapsed_fractions, 0.5, marker_point);
+    let completed = build_elevation_completed_points(
+        &points,
+        &progress_values,
+        &elapsed_fractions,
+        0.5,
+        0.5,
+    );
 
     // Should include points with elapsed_fraction <= 0.5: indices 0, 1, 2
     assert!(
@@ -281,16 +286,76 @@ fn completed_points_includes_all_at_full_elapsed() {
         (100.0, 350.0),
         (100.0, 300.0),
     ];
+    let progress_values = vec![0.5, 0.5, 0.5, 0.5, 0.5];
     let elapsed_fractions = vec![0.0, 0.25, 0.5, 0.75, 1.0];
-    let marker_point = (100.0, 300.0);
 
-    let completed =
-        build_elevation_completed_points(&points, &elapsed_fractions, 1.0, marker_point);
+    let completed = build_elevation_completed_points(
+        &points,
+        &progress_values,
+        &elapsed_fractions,
+        0.5,
+        1.0,
+    );
 
     // All 5 points should be included (plus marker if distant)
     assert!(
         completed.len() >= 5,
         "full elapsed should include all points, got {}",
         completed.len()
+    );
+}
+
+/// Ordinary forward motion must preserve the underlying polyline prefix
+/// instead of collapsing to a straight segment from the start point.
+#[test]
+fn completed_points_follow_geometry_prefix_outside_duplicate_run() {
+    let points = vec![(0.0, 100.0), (30.0, 60.0), (70.0, 90.0), (100.0, 20.0)];
+    let progress_values = vec![0.0, 0.3, 0.7, 1.0];
+    let elapsed_fractions = vec![0.0, 0.3, 0.7, 1.0];
+
+    let completed = build_elevation_completed_points(
+        &points,
+        &progress_values,
+        &elapsed_fractions,
+        0.5,
+        0.5,
+    );
+
+    assert_eq!(completed.len(), 3, "should contain prefix plus interpolated endpoint");
+    assert_eq!(completed[0], points[0]);
+    assert_eq!(completed[1], points[1]);
+    assert!(
+        (completed[2].0 - 50.0).abs() <= 1e-3 && (completed[2].1 - 75.0).abs() <= 1e-3,
+        "expected interpolated geometry endpoint, got {:?}",
+        completed[2]
+    );
+}
+
+/// Duplicate-progress runs must keep the completed endpoint on the geometry,
+/// not on the marker's independently projected y-coordinate.
+#[test]
+fn completed_points_use_geometry_endpoint_not_marker_y() {
+    let points = vec![
+        (100.0, 500.0),
+        (100.0, 450.0),
+        (100.0, 400.0),
+        (100.0, 350.0),
+        (100.0, 300.0),
+    ];
+    let progress_values = vec![0.5, 0.5, 0.5, 0.5, 0.5];
+    let elapsed_fractions = vec![0.0, 0.25, 0.5, 0.75, 1.0];
+
+    let completed = build_elevation_completed_points(
+        &points,
+        &progress_values,
+        &elapsed_fractions,
+        0.5,
+        0.6,
+    );
+
+    assert_eq!(
+        *completed.last().unwrap(),
+        (100.0, 380.0),
+        "endpoint should interpolate within the geometry run"
     );
 }

@@ -58,7 +58,7 @@ export default function ActionButtons({
           <span>PNG</span>
         </Button>
       ) : null}
-      <SimpleTooltip side="bottom" content={renderTooltipContent}>
+      <SimpleTooltip side="bottom" content={renderTooltipContent} className="pr-4">
         <Button
           size="sm"
           className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"

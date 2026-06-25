@@ -32,7 +32,7 @@ export default function WindowControls() {
   }
 
   return (
-    <div className="ml-6 flex items-center">
+    <div className="ml-2 flex items-center">
       <div className="flex h-9 items-center">
         <button
           className="flex h-full w-10 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground"

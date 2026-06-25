@@ -109,25 +109,102 @@ pub(crate) fn build_elevation_frame_states(
 /// segments fill progressively as time advances, not all-at-once by progress.
 pub(crate) fn build_elevation_completed_points(
     points: &[(f32, f32)],
+    progress_values: &[f32],
     elapsed_fractions: &[f32],
+    progress01: f32,
     frame_elapsed_fraction: f32,
-    marker_point: (f32, f32),
 ) -> Vec<(f32, f32)> {
-    if points.is_empty() {
+    if points.is_empty() || progress_values.len() != points.len() {
         return Vec::new();
     }
-    let mut result = points
-        .iter()
-        .zip(elapsed_fractions.iter())
-        .filter_map(|(point, elapsed)| (*elapsed <= frame_elapsed_fraction).then_some(*point))
-        .collect::<Vec<_>>();
-    if result.is_empty() {
-        result.push(points[0]);
+
+    let mut progress_cursor = 0usize;
+    let metric_hit = point_at_metric_progress_with_cursor(
+        points,
+        progress_values,
+        progress01,
+        &mut progress_cursor,
+    )
+    .map(|(index, x, y)| (index, (x, y)))
+    .unwrap_or((points.len().saturating_sub(1), points[points.len() - 1]));
+    let metric_index = metric_hit.0;
+    let duplicate_run = find_duplicate_progress_run(progress_values, progress01, metric_index);
+    let mut completed_points = Vec::new();
+    let completed_endpoint = if let Some((run_start, run_end)) = duplicate_run {
+        completed_points.extend_from_slice(&points[..run_start]);
+
+        for index in run_start..=run_end {
+            if elapsed_fractions.get(index).copied().unwrap_or(0.0) < frame_elapsed_fraction {
+                completed_points.push(points[index]);
+            }
+        }
+
+        let run_points = &points[run_start..=run_end];
+        let run_elapsed_fractions = &elapsed_fractions[run_start..=run_end];
+        let mut run_cursor = 0usize;
+        point_at_metric_progress_with_cursor(
+            run_points,
+            run_elapsed_fractions,
+            frame_elapsed_fraction,
+            &mut run_cursor,
+        )
+        .map(|(_, x, y)| (x, y))
+        .unwrap_or(*run_points.last().unwrap_or(&metric_hit.1))
+    } else {
+        completed_points.extend_from_slice(&points[..metric_index.min(points.len())]);
+        metric_hit.1
+    };
+
+    if completed_points.is_empty() {
+        completed_points.push(points[0]);
     }
-    if super::super::geometry::distance(*result.last().unwrap_or(&points[0]), marker_point) > 1e-3 {
-        result.push(marker_point);
+
+    if super::super::geometry::distance(
+        *completed_points.last().unwrap_or(&points[0]),
+        completed_endpoint,
+    ) > 1e-3
+    {
+        completed_points.push(completed_endpoint);
     }
-    result
+
+    completed_points
+}
+
+const METRIC_PROGRESS_EPSILON: f32 = 1e-6;
+
+fn metric_progress_equal(left: f32, right: f32) -> bool {
+    left.is_finite() && right.is_finite() && (left - right).abs() <= METRIC_PROGRESS_EPSILON
+}
+
+fn find_duplicate_progress_run(
+    progress_values: &[f32],
+    target_progress: f32,
+    anchor_index: usize,
+) -> Option<(usize, usize)> {
+    if progress_values.is_empty() {
+        return None;
+    }
+
+    let safe_anchor_index = anchor_index.min(progress_values.len() - 1);
+    let anchor_progress = progress_values[safe_anchor_index];
+    if !metric_progress_equal(anchor_progress, target_progress) {
+        return None;
+    }
+
+    let mut start = safe_anchor_index;
+    let mut end = safe_anchor_index;
+
+    while start > 0 && metric_progress_equal(progress_values[start - 1], anchor_progress) {
+        start -= 1;
+    }
+
+    while end + 1 < progress_values.len()
+        && metric_progress_equal(progress_values[end + 1], anchor_progress)
+    {
+        end += 1;
+    }
+
+    (end > start).then_some((start, end))
 }
 
 /// Resolves elevation values for marker labels from frame elapsed times.
