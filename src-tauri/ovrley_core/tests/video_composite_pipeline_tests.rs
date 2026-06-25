@@ -349,7 +349,7 @@ fn test_6_1_cancel_mid_render_stops_and_cleans_partial_output() {
     let error = render_job.join().unwrap().unwrap_err();
     let after = composited_outputs(&paths);
 
-    assert!(error.to_lowercase().contains("cancelled"));
+    assert_eq!(error, "Render cancelled");
     assert_eq!(before, after);
 }
 

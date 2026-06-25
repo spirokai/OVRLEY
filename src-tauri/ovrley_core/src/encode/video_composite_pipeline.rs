@@ -419,6 +419,13 @@ pub fn render_composite_video_single(
         .join()
         .map_err(|_| CoreError::Encode("Composite ffmpeg monitor thread panicked".to_string()))?;
 
+    // Once the user has cancelled, teardown noise from ffmpeg finalization
+    // should not be surfaced as a render failure in the UI.
+    if was_cancelled {
+        let _ = std::fs::remove_file(&plan.output_path);
+        return Err(CoreError::Cancelled);
+    }
+
     let writer = match writer_result {
         Ok(w) => w,
         Err(error) => {
@@ -456,10 +463,6 @@ pub fn render_composite_video_single(
             "{error}. FFmpeg stderr:\n{}",
             stderr_tail(&stderr)
         )));
-    }
-    if was_cancelled {
-        let _ = std::fs::remove_file(&plan.output_path);
-        return Err(CoreError::Cancelled);
     }
     if !status.success() {
         let _ = std::fs::remove_file(&plan.output_path);
