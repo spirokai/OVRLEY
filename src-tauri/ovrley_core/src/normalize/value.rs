@@ -67,6 +67,7 @@ pub struct ValidatedValueWidget {
     pub icon_offset_x: f32,
     pub icon_offset_y: f32,
     pub show_units: bool,
+    pub show_full_distance: Option<bool>,
     pub unit_color: [u8; 4],
     pub display_unit: String,
     pub prefix: String,
@@ -141,6 +142,14 @@ pub fn validate_value_widget(value: ValueConfig, index: usize) -> CoreResult<Val
 
     // -- units -- all explicit --------------------------------------------
     let show_units = require_bool(value.show_units, &p("show_units"))?;
+    let show_full_distance = if value.value == MetricKind::Distance {
+        Some(require_bool(
+            value.show_full_distance,
+            &p("show_full_distance"),
+        )?)
+    } else {
+        value.show_full_distance
+    };
 
     let unit_color = rgba_from_hex(
         require_str(value.unit_color.as_deref(), &p("unit_color"))?,
@@ -202,6 +211,23 @@ pub fn validate_value_widget(value: ValueConfig, index: usize) -> CoreResult<Val
         }
     };
 
+    if value.value == MetricKind::Distance {
+        let decimals = match &formatting {
+            ValidatedValueFormatting::DecimalPlaces { decimals } => *decimals,
+            ValidatedValueFormatting::DecimalRounding { decimal_rounding } => {
+                (*decimal_rounding).max(0) as usize
+            }
+            ValidatedValueFormatting::Balance { .. }
+            | ValidatedValueFormatting::BalanceRounded { .. } => 0,
+        };
+        if decimals > 2 {
+            return Err(CoreError::Config(format!(
+                "{}: distance supports only 0, 1, or 2 decimals, got {decimals}",
+                p("decimals")
+            )));
+        }
+    }
+
     Ok(ValidatedValueWidget {
         metric: value.value,
         x: value.x,
@@ -217,6 +243,7 @@ pub fn validate_value_widget(value: ValueConfig, index: usize) -> CoreResult<Val
         icon_offset_x,
         icon_offset_y,
         show_units,
+        show_full_distance,
         unit_color,
         display_unit,
         prefix,
@@ -242,6 +269,7 @@ mod tests {
             "color": "#ffffff", "opacity": 1.0,
             "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
             "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_full_distance": false,
             "show_units": true, "unit_color": "#ffffff", "display_unit": "kmh",
             "decimals": 0,
             "prefix": "", "suffix": ""
@@ -429,6 +457,7 @@ mod tests {
             "color": "#ffffff", "opacity": 1.0,
             "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
             "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_full_distance": false,
             "show_units": false, "unit_color": "#ffffff", "display_unit": unit,
             "decimals": decimals,
             "prefix": "", "suffix": ""
@@ -470,6 +499,7 @@ mod tests {
             "color": "#ffffff", "opacity": 1.0,
             "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
             "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_full_distance": false,
             "show_units": true, "unit_color": "#ffffff", "display_unit": "mm",
             "decimals": 0,
             "prefix": "", "suffix": ""
@@ -486,6 +516,7 @@ mod tests {
             "color": "#ffffff", "opacity": 1.0,
             "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
             "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_full_distance": false,
             "show_units": true, "unit_color": "#ffffff", "display_unit": "mm",
             "decimals": 0,
             "prefix": "", "suffix": ""
@@ -503,6 +534,7 @@ mod tests {
             "color": "#ffffff", "opacity": 1.0,
             "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
             "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_full_distance": false,
             "show_units": true, "unit_color": "#ffffff", "display_unit": "kelvin",
             "decimals": 0,
             "prefix": "", "suffix": ""
@@ -519,6 +551,7 @@ mod tests {
             "color": "#ffffff", "opacity": 1.0,
             "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
             "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_full_distance": false,
             "show_units": true, "unit_color": "#ffffff", "display_unit": "kelvin",
             "decimals": 0,
             "prefix": "", "suffix": ""
@@ -526,5 +559,43 @@ mod tests {
         .unwrap();
         v.show_units = Some(false);
         assert!(validate_value_widget(v, 0).is_ok());
+    }
+
+    #[test]
+    fn distance_requires_show_full_distance() {
+        let v: ValueConfig = serde_json::from_value(serde_json::json!({
+            "value": "distance", "x": 100.0, "y": 200.0,
+            "font": "Arial.ttf", "font_family": "Arial", "font_size": 100.0,
+            "color": "#ffffff", "opacity": 1.0,
+            "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
+            "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_units": true, "unit_color": "#ffffff", "display_unit": "km",
+            "decimals": 1,
+            "prefix": "", "suffix": ""
+        }))
+        .unwrap();
+        let e = validate_value_widget(v, 0).unwrap_err().to_string();
+        assert!(
+            e.contains("show_full_distance") && e.contains("required"),
+            "{e}"
+        );
+    }
+
+    #[test]
+    fn distance_rejects_more_than_two_decimals() {
+        let v: ValueConfig = serde_json::from_value(serde_json::json!({
+            "value": "distance", "x": 100.0, "y": 200.0,
+            "font": "Arial.ttf", "font_family": "Arial", "font_size": 100.0,
+            "color": "#ffffff", "opacity": 1.0,
+            "show_icon": true, "icon_color": "#ffffff", "icon_size": 45.0,
+            "icon_offset_x": 0.0, "icon_offset_y": 0.0,
+            "show_units": true, "show_full_distance": true,
+            "unit_color": "#ffffff", "display_unit": "km",
+            "decimals": 3,
+            "prefix": "", "suffix": ""
+        }))
+        .unwrap();
+        let e = validate_value_widget(v, 0).unwrap_err().to_string();
+        assert!(e.contains("supports only 0, 1, or 2 decimals"), "{e}");
     }
 }

@@ -21,6 +21,46 @@ import { getInterpolatedActivityValue, getInterpolatedTimeValue } from '@/featur
 import { getStandardMetricDefinition, isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 import { resolveActiveMetricWidgetData } from '@/lib/widget/metric-widget-resolver'
 
+function getLastFiniteValue(series) {
+  if (!Array.isArray(series)) {
+    return null
+  }
+
+  for (let index = series.length - 1; index >= 0; index -= 1) {
+    const candidate = Number(series[index])
+    if (Number.isFinite(candidate)) {
+      return candidate
+    }
+  }
+
+  return null
+}
+
+function formatDistancePreviewDisplay(activity, previewSecond, widgetData) {
+  const currentDistance = getInterpolatedActivityValue(activity, 'distance', previewSecond)
+  const current = formatStandardMetricDisplay('distance', currentDistance, widgetData)
+  const showFullDistance = widgetData.show_full_distance ?? true
+
+  if (!showFullDistance) {
+    return current
+  }
+
+  const totalDistance = getLastFiniteValue(activity?.distance)
+  if (totalDistance === null) {
+    return current
+  }
+
+  const total = formatStandardMetricDisplay('distance', totalDistance, {
+    ...widgetData,
+    show_units: false,
+  })
+
+  return {
+    value: `${current.value}/${total.value}`,
+    units: current.units,
+  }
+}
+
 export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond }) {
   // Guard — skip non-value widgets and gradient type (handled separately).
   if (!widget || widget.type === 'gradient') {
@@ -45,7 +85,10 @@ export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond 
 
   if (isStandardMetricWidgetType(widget.type)) {
     const definition = getStandardMetricDefinition(widget.type)
-    const formatted = formatStandardMetricDisplay(widget.type, getInterpolatedActivityValue(activity, widget.type, previewSecond), resolvedData)
+    const formatted =
+      widget.type === 'distance'
+        ? formatDistancePreviewDisplay(activity, previewSecond, resolvedData)
+        : formatStandardMetricDisplay(widget.type, getInterpolatedActivityValue(activity, widget.type, previewSecond), resolvedData)
     valueText = formatted.value
     unitText = formatted.units
 

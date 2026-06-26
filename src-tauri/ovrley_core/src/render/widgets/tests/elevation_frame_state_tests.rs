@@ -69,6 +69,7 @@ fn minimal_activity() -> ParsedActivity {
         course: Vec::new(),
         elevation: vec![Some(100.0), Some(150.0), Some(200.0), Some(250.0)],
         speed: Vec::new(),
+        distance: Vec::new(),
         heartrate: Vec::new(),
         cadence: Vec::new(),
         power: Vec::new(),
@@ -105,8 +106,10 @@ fn minimal_dense_activity() -> DenseActivityReport {
         frame_count: 3,
         frame_elapsed_seconds: vec![0.0, 1.0, 2.0],
         frame_distance_progress: vec![Some(0.0), Some(0.5), Some(1.0)],
+        full_activity_distance: None,
         series: DenseSeriesReport {
             speed: vec![None; 3],
+            distance: vec![None; 3],
             elevation: vec![Some(100.0), Some(200.0), Some(300.0)],
             gradient: vec![None; 3],
             heartrate: vec![None; 3],

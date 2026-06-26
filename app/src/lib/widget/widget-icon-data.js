@@ -1,6 +1,7 @@
 import airPressureIconSvg from '../../../../assets/widget-icons/widget-air-pressure.svg?raw'
 import cadenceIconSvg from '../../../../assets/widget-icons/widget-cadence.svg?raw'
 import coreTemperatureIconSvg from '../../../../assets/widget-icons/widget-core-temperature.svg?raw'
+import distanceIconSvg from '../../../../assets/widget-icons/widget-distance.svg?raw'
 import gearPositionIconSvg from '../../../../assets/widget-icons/widget-gear-position.svg?raw'
 import gForceIconSvg from '../../../../assets/widget-icons/widget-g-force.svg?raw'
 import groundContactTimeIconSvg from '../../../../assets/widget-icons/widget-ground-contact-time.svg?raw'
@@ -43,6 +44,7 @@ export const METRIC_ICON_SVGS = {
   air_pressure: parseMetricIconSvg(airPressureIconSvg),
   cadence: parseMetricIconSvg(cadenceIconSvg),
   core_temperature: parseMetricIconSvg(coreTemperatureIconSvg),
+  distance: parseMetricIconSvg(distanceIconSvg),
   gear_position: parseMetricIconSvg(gearPositionIconSvg),
   g_force: parseMetricIconSvg(gForceIconSvg),
   ground_contact_time: parseMetricIconSvg(groundContactTimeIconSvg),

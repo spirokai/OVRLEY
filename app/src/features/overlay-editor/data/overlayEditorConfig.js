@@ -37,6 +37,7 @@ export const DEFAULT_ACTIVITY_PREVIEW = {
   aperture: 2.8,
   cadence: 92,
   color_temperature: 5500,
+  distance: 22100,
   ev: 0,
   focal_length: 24,
   gradient: -7,

@@ -42,6 +42,7 @@ pub enum StandardMetricUnitsMode {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MetricIconAssetKey {
     Speed,
+    Distance,
     Heartrate,
     Cadence,
     Power,
@@ -237,6 +238,7 @@ fn load_manifest() -> StandardMetricManifest {
 fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
     match key {
         "speed" => Some(MetricKind::Speed),
+        "distance" => Some(MetricKind::Distance),
         "heartrate" => Some(MetricKind::Heartrate),
         "cadence" => Some(MetricKind::Cadence),
         "power" => Some(MetricKind::Power),
@@ -269,6 +271,7 @@ fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
 fn metric_kind_to_key(kind: MetricKind) -> &'static str {
     match kind {
         MetricKind::Speed => "speed",
+        MetricKind::Distance => "distance",
         MetricKind::Heartrate => "heartrate",
         MetricKind::Elevation => "elevation",
         MetricKind::Time => "time",
@@ -339,6 +342,7 @@ pub fn metric_icon_asset_key(kind: MetricKind) -> Option<MetricIconAssetKey> {
 
     match standard_metric_definition(kind)?.icon.asset_file.as_str() {
         "widget-speed.svg" => Some(MetricIconAssetKey::Speed),
+        "widget-distance.svg" => Some(MetricIconAssetKey::Distance),
         "widget-heartrate.svg" => Some(MetricIconAssetKey::Heartrate),
         "widget-cadence.svg" => Some(MetricIconAssetKey::Cadence),
         "widget-power.svg" => Some(MetricIconAssetKey::Power),

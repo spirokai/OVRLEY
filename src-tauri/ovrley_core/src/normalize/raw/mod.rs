@@ -160,6 +160,8 @@ pub struct ValueConfig {
     #[serde(default)]
     pub show_units: Option<bool>,
     #[serde(default)]
+    pub show_full_distance: Option<bool>,
+    #[serde(default)]
     pub unit_color: Option<String>,
     #[serde(default)]
     pub display_unit: Option<String>,

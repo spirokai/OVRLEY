@@ -63,6 +63,9 @@ pub(crate) enum SvgPrimitive {
 pub(crate) fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconKind> {
     match metric_icon_asset_key(kind)? {
         crate::standard_metrics::MetricIconAssetKey::Speed => Some(MetricIconKind::Gauge),
+        crate::standard_metrics::MetricIconAssetKey::Distance => {
+            Some(MetricIconKind::Distance)
+        }
         crate::standard_metrics::MetricIconAssetKey::Heartrate => Some(MetricIconKind::Heart),
         crate::standard_metrics::MetricIconAssetKey::Cadence => Some(MetricIconKind::RefreshCw),
         crate::standard_metrics::MetricIconAssetKey::Power => Some(MetricIconKind::Zap),
@@ -121,6 +124,7 @@ pub(crate) fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconK
 fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIcon> {
     match icon_kind {
         MetricIconKind::Gauge => parsed_metric_icon_cached(icon_kind, &GAUGE_ICON_CACHE),
+        MetricIconKind::Distance => parsed_metric_icon_cached(icon_kind, &DISTANCE_ICON_CACHE),
         MetricIconKind::Heart => parsed_metric_icon_cached(icon_kind, &HEART_ICON_CACHE),
         MetricIconKind::RefreshCw => parsed_metric_icon_cached(icon_kind, &REFRESH_CW_ICON_CACHE),
         MetricIconKind::Zap => parsed_metric_icon_cached(icon_kind, &ZAP_ICON_CACHE),
@@ -167,6 +171,7 @@ fn parsed_metric_icon(icon_kind: MetricIconKind) -> Option<&'static ParsedSvgIco
 }
 
 static GAUGE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
+static DISTANCE_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static HEART_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static REFRESH_CW_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
 static ZAP_ICON_CACHE: OnceLock<Option<ParsedSvgIcon>> = OnceLock::new();
@@ -212,6 +217,10 @@ fn metric_icon_svg_markup(icon_kind: MetricIconKind) -> &'static str {
         MetricIconKind::Gauge => include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../assets/widget-icons/widget-speed.svg"
+        )),
+        MetricIconKind::Distance => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/widget-icons/widget-distance.svg"
         )),
         MetricIconKind::Heart => include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),

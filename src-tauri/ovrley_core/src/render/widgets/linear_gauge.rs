@@ -548,6 +548,7 @@ fn metric_range(series: &DenseSeriesReport, metric: MetricKind) -> (f64, f64) {
 fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &[Option<f64>] {
     match metric {
         MetricKind::Speed => &series.speed,
+        MetricKind::Distance => &series.distance,
         MetricKind::Elevation => &series.elevation,
         MetricKind::Heartrate => &series.heartrate,
         MetricKind::Cadence => &series.cadence,

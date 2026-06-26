@@ -6,8 +6,7 @@ import {
 } from '@/lib/widget/standard-metrics'
 import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/utils/formatUtils'
 import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
-import { ToggleField, SelectField } from '../widgetFormControls'
-import { useCallback } from 'react'
+import { ToggleField, SelectField, SliderField } from '../widgetFormControls'
 
 /**
  * Renders text-specific display controls: font, decimals/balance, icon, units.
@@ -25,23 +24,25 @@ export default function TextDisplaySection({ widget, updateWidgetData, setNumeri
   const supportsUnitSelection = unitOptions.length > 1
   const hasDecimalControl = definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
   const hasBalanceFormat = definition?.formatter === 'balance'
-
-  const toggleDecimals = useCallback(() => {
-    const current = widget.data.decimals
-    updateWidgetData(widget.id, { decimals: current === 0 ? 1 : 0 })
-  }, [widget.id, widget.data.decimals, updateWidgetData])
+  const isDistanceWidget = widget.type === 'distance'
+  const maxDecimals = isDistanceWidget ? 2 : 1
+  const defaultDecimals = isDistanceWidget ? 1 : 0
+  const decimals = Number.isFinite(widget.data.decimals) ? Math.min(Math.max(widget.data.decimals, 0), maxDecimals) : defaultDecimals
 
   return (
     <>
       <FontSection widget={widget} updateWidgetData={updateWidgetData} />
 
       {hasDecimalControl ? (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center justify-between py-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Decimals</span>
-            <ToggleField checked={Boolean(widget.data.decimals)} onCheckedChange={toggleDecimals} />
-          </div>
-        </div>
+        <SliderField
+          label="Decimals"
+          value={decimals}
+          min={0}
+          max={maxDecimals}
+          step={1}
+          valueDisplay={String(decimals)}
+          onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
+        />
       ) : null}
 
       {hasBalanceFormat ? (
@@ -51,6 +52,18 @@ export default function TextDisplaySection({ widget, updateWidgetData, setNumeri
           onValueChange={(value) => updateWidgetData(widget.id, { balance_format: value })}
           options={BALANCE_FORMAT_OPTIONS}
         />
+      ) : null}
+
+      {isDistanceWidget ? (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between py-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Show Full Distance</span>
+            <ToggleField
+              checked={widget.data.show_full_distance ?? true}
+              onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_distance: checked })}
+            />
+          </div>
+        </div>
       ) : null}
 
       <IconSection

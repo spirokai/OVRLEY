@@ -22,6 +22,24 @@ describe('gear_position extraction pipeline', () => {
   })
 })
 
+describe('distance extraction pipeline', () => {
+  test('keeps the derived distance series in metricSeriesMap', () => {
+    const { metricSeriesMap } = deriveActivityMetricSeries({
+      courseSeries: [],
+      distanceSeries: [0, 100, 250],
+      elevationBaseSeries: [0, 0, 0],
+      elapsedSeries: [0, 5, 10],
+      normalizedRawSamples: [{}, {}, {}],
+      useLegacyGpxDerivations: false,
+      helpers: { isFiniteNumber, roundValue, safeNumber },
+    })
+
+    expect(metricSeriesMap.distance).toBeDefined()
+    expect(metricSeriesMap.distance.source).toBe('direct')
+    expect(metricSeriesMap.distance.series).toEqual([0, 100, 250])
+  })
+})
+
 describe('vertical_oscillation extraction pipeline', () => {
   test('extracts verticalOscillation from normalizedRawSamples into metricSeriesMap', () => {
     const { metricSeriesMap } = deriveActivityMetricSeries({
@@ -145,6 +163,78 @@ describe('metric widget preview model standard metric units', () => {
 
     expect(model?.valueText).toBe('22')
     expect(model?.unitText).toBe('MPH')
+  })
+
+  test('formats distance widgets using the series total when show_full_distance is enabled', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'distance',
+        data: {
+          display_unit: 'km',
+          decimals: 1,
+          show_units: true,
+          show_icon: false,
+          show_full_distance: true,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0, 10, 20],
+        distance: [0, 22100, 35700],
+      },
+      previewSecond: 10,
+    })
+
+    expect(model?.valueText).toBe('22.1/35.7')
+    expect(model?.unitText).toBe('km')
+  })
+
+  test('formats distance widgets as current-only when show_full_distance is disabled', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'distance',
+        data: {
+          display_unit: 'mi',
+          decimals: 2,
+          show_units: true,
+          show_icon: false,
+          show_full_distance: false,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0, 10, 20],
+        distance: [0, 1609.344, 3218.688],
+      },
+      previewSecond: 10,
+    })
+
+    expect(model?.valueText).toBe('1.00')
+    expect(model?.unitText).toBe('mi')
+  })
+
+  test('preserves requested trailing zeros for full distance formatting', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'distance',
+        data: {
+          display_unit: 'km',
+          decimals: 2,
+          show_units: true,
+          show_icon: false,
+          show_full_distance: true,
+        },
+      },
+      activity: {
+        sample_elapsed_seconds: [0, 10, 20],
+        distance: [0, 2300, 5000],
+      },
+      previewSecond: 10,
+    })
+
+    expect(model?.valueText).toBe('2.30/5.00')
+    expect(model?.unitText).toBe('km')
   })
 
   test('formats temperature widgets from display_unit', () => {

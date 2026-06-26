@@ -25,6 +25,18 @@ describe('MetricWidgetEditor decimal control', () => {
     expect(screen.getByText('Decimals')).toBeInTheDocument()
   })
 
+  test('shows decimal selector for distance', () => {
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('distance', { display_unit: 'km', decimals: 1 })}
+        updateWidgetData={vi.fn()}
+        setNumericField={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Decimals')).toBeInTheDocument()
+    expect(screen.getByText('Show Full Distance')).toBeInTheDocument()
+  })
+
   test('shows decimal toggle for stride_length', () => {
     render(<MetricWidgetEditor widget={makeWidget('stride_length', { display_unit: 'm' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
     expect(screen.getByText('Decimals')).toBeInTheDocument()
@@ -78,6 +90,28 @@ describe('MetricWidgetEditor decimal control', () => {
       />,
     )
     expect(screen.queryByText('Decimals')).not.toBeInTheDocument()
+  })
+})
+
+describe('MetricWidgetEditor distance formatting controls', () => {
+  test('toggles show_full_distance for distance widgets', async () => {
+    const user = userEvent.setup()
+    const updateWidgetData = vi.fn()
+
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('distance', { display_unit: 'km', decimals: 1, show_full_distance: true })}
+        updateWidgetData={updateWidgetData}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    const showFullDistanceRow = screen.getByText('Show Full Distance').closest('div')
+    const showFullDistanceSwitch = showFullDistanceRow?.parentElement?.querySelector('[role="switch"]')
+
+    expect(showFullDistanceSwitch).not.toBeNull()
+    await user.click(showFullDistanceSwitch)
+    expect(updateWidgetData).toHaveBeenCalledWith('value-0', { show_full_distance: false })
   })
 })
 

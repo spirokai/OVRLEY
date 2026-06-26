@@ -203,6 +203,41 @@ fn formats_metric_parts_for_heading() {
     assert!(parts.show_icon);
 }
 
+#[test]
+fn formats_metric_parts_for_distance_with_fixed_decimals() {
+    let validated = validated_standard_value(json!({
+        "value": "distance",
+        "x": 0.0,
+        "y": 0.0,
+        "font": "Arial.ttf",
+        "font_size": 32.0,
+        "color": "#ffffff",
+        "opacity": 1.0,
+        "prefix": "",
+        "suffix": "",
+        "decimals": 2,
+        "show_icon": true,
+        "icon_color": "#40e0d0",
+        "icon_size": 28.0,
+        "icon_offset_x": 0.0,
+        "icon_offset_y": 0.0,
+        "show_units": true,
+        "show_full_distance": true,
+        "unit_color": "#ffffff",
+        "display_unit": "km",
+        "triangle_width": 0.0,
+        "display_type": "text"
+    }));
+    let mut dense = dense_report_with(|series| series.distance = vec![Some(2300.0)]);
+    dense.full_activity_distance = Some(5000.0);
+
+    let parts = format_validated_metric_parts(&validated, &dense, 0).unwrap();
+    assert_eq!(parts.value_text, "2.30/5.00");
+    assert_eq!(parts.unit_text.as_deref(), Some("km"));
+    assert_eq!(parts.icon_kind, Some(MetricIconKind::Distance));
+    assert!(parts.show_icon);
+}
+
 fn validated_standard_value(value: serde_json::Value) -> ValidatedValueWidget {
     let config = common::seam::validated_config_from_value(json!({
         "scene": common::seam::explicit_scene_json(),

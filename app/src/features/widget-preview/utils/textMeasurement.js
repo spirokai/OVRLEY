@@ -105,7 +105,7 @@ function resolvePreviewVerticalMetricsText(text) {
     return ''
   }
 
-  return /^[0-9:.%+-]+$/.test(text) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : text
+  return /^[0-9/:.%+-]+$/.test(text) ? NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT : text
 }
 
 function getPreviewVerticalMetrics(text, fontSize, fontFamily) {

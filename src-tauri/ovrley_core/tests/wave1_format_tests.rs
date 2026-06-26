@@ -66,6 +66,7 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
         frame_count: 1,
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![],
+        full_activity_distance: None,
     }
 }
 

@@ -60,6 +60,10 @@ fn trim_numeric_series(
     trimmed
 }
 
+fn last_finite(series: &[Option<f64>]) -> Option<f64> {
+    series.iter().rev().copied().flatten().find(|value| value.is_finite())
+}
+
 /// Trims a parsed activity to a scene range.
 ///
 /// The returned timeline starts at `0.0` seconds and ends at `end - start`.
@@ -201,6 +205,18 @@ pub fn trim_activity(
             trim_numeric_series(
                 elapsed,
                 &activity.speed,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+            )
+        } else {
+            Vec::new()
+        },
+        distance: if requirements.distance {
+            trim_numeric_series(
+                elapsed,
+                &activity.distance,
                 start,
                 end,
                 start_inner_index,
@@ -533,5 +549,6 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
+        full_activity_distance: last_finite(&activity.distance),
     })
 }

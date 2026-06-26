@@ -47,6 +47,7 @@ pub use value::{validate_value_widget, ValidatedValueFormatting, ValidatedValueW
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RenderDataRequirements {
     pub speed: bool,
+    pub distance: bool,
     pub elevation: bool,
     pub gradient: bool,
     pub heartrate: bool,
@@ -178,6 +179,7 @@ impl ValidatedRenderConfig {
         for value in &self.values {
             match value.metric_kind() {
                 MetricKind::Speed => requirements.speed = true,
+                MetricKind::Distance => requirements.distance = true,
                 MetricKind::Elevation => requirements.elevation = true,
                 MetricKind::Gradient => requirements.gradient = true,
                 MetricKind::Heartrate => requirements.heartrate = true,

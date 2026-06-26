@@ -1,31 +1,34 @@
-# MP4 Telemetry Integration Plan v2
+# MP4 Telemetry Integration Plan v3
 
 ## Goal
 
-Supersede the current ffprobe-based video metadata extraction with
-[telemetry-parser](https://github.com/AdrianEddy/telemetry-parser) (Rust crate).
+Integrate [telemetry-parser](https://github.com/AdrianEddy/telemetry-parser)
+(Rust crate) for MP4 telemetry extraction while preserving the existing app
+seams around preview import, activity finalization, and render preparation.
 Two purposes:
 
-1. Primary metadata source for video import (resolution, fps, creation time,
-   codec, rotation) — fall back to ffprobe only when telemetry-parser fails.
-2. Extract embedded telemetry (GPS, camera settings, IMU) from video files and
-   remap to the internal `ParsedActivity` schema.
+1. Primary source for MP4 sync-relevant timestamps and embedded telemetry
+   (GPS, camera settings, IMU).
+2. Supplement the existing video probe path with telemetry-parser data, using
+   ffprobe only as a salvage fallback when telemetry-parser fails or returns
+   incomplete metadata needed by the app.
 
 ## Decisions
 
 | #   | Decision                                                                                       | Rationale                                                                                                                                                                                                                                                |
 | --- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Pin dependency to commit `fd9a73e` (Jun 11 2026, latest)                                       | Reproducible builds; avoids silent breakage from upstream HEAD                                                                                                                                                                                           |
-| D2  | Video framerate as target sample rate                                                          | Overlay renders at video FPS; one telemetry value per frame simplifies densification                                                                                                                                                                     |
+| D1  | Pin dependency to a reviewed telemetry-parser commit SHA                                       | Reproducible builds; avoids silent breakage from upstream HEAD. The exact SHA must be verified at implementation time instead of described as "latest" in the plan.                                                                                   |
+| D2  | Preserve native telemetry cadence through extraction                                           | Avoids baking one scene FPS into the imported activity too early; the existing Rust trim+dense pipeline remains the canonical frame-alignment seam.                                                                                                   |
 | D3  | Forward-backward moving average (FBMA) for smoothing                                           | Simple (~20 lines), zero-phase, no coefficient computation; upgrade path to Butterworth if insufficient                                                                                                                                                  |
 | D4  | Camera settings (ISO, aperture, shutter, focal length, EV, color temp) excluded from smoothing | These are discrete values; smoothing would blur intentional jumps                                                                                                                                                                                        |
-| D5  | GPS `unix_timestamp` inference as primary creation-time source                                 | Survives simple cuts (metadata track preserved); most accurate for GPS cameras                                                                                                                                                                           |
-| D6  | ffprobe fallback for creation time                                                             | Handles non-GPS cameras and re-encoded videos where metadata track is stripped                                                                                                                                                                           |
-| D7  | Rust outputs complete `ParsedActivity` JSON directly (flat arrays), not raw samples            | Flat arrays are ~2.5x more compact than raw sample objects; avoids redundant JS re-processing; GPS speed/heading already available — no need to re-derive; frontend does NOT call `finalizeParsedActivity()` — Rust already computed all derived metrics |
+| D5  | GPS `unix_timestamp` inference is treated as primary sync-time source                          | The timestamp is only used to synchronize telemetry/video with activity data; do not model it as authoritative file creation metadata.                                                                                                                |
+| D6  | ffprobe is a salvage fallback for missing sync/preview metadata                                | Handles non-GPS cameras, re-encoded videos, and preview-only fields that telemetry-parser may not expose (codec profile, pixel format, audio presence, bit depth, container format).                                                                |
+| D7  | Rust returns normalized MP4 raw samples plus sync metadata, not fully finalized `ParsedActivity` | Keeps one canonical finalization path across FIT/GPX/SRT/MP4, avoids duplicating derivation rules, and still lets Rust own dense-telemetry extraction and smoothing where it is cheapest.                                                           |
 | D8  | FIT/GPX always supersedes extracted telemetry                                                  | FIT/GPX is user-intent data; telemetry supplements only missing fields                                                                                                                                                                                   |
 | D9  | Telemetry extraction runs automatically on video import                                        | User confirmed; no separate "extract" button needed                                                                                                                                                                                                      |
 | D10 | GPS speed/track/altitude used as recorded (not derived from coordinates)                       | These are GPS chip Doppler/heading/altimeter readings, already firmware-smoothed                                                                                                                                                                         |
 | D11 | Check `GpsData.is_acquired` before using GPS values                                            | Skip samples where GPS signal is lost; emit `null` in those positions                                                                                                                                                                                    |
+| D12 | Frontend `finalizeParsedActivity()` remains canonical for now                                  | MP4 joins the existing import/finalization seam instead of creating a second source-specific activity assembly pipeline.                                                                                                                                |
 
 ## Telemetry-Parser Schema (Verified)
 
@@ -50,122 +53,117 @@ video_rotation, tag_map }`
     │
     ▼
 backend_import_preview_video()
-    │ 1. telemetry-parser → VideoMetadata (fps, resolution, etc.)
-    │ 2. Register in HTTP video server
-    │ 3. Return metadata + preview_url
+    │ 1. Probe with telemetry-parser first
+    │ 2. Salvage missing preview/sync metadata from ffprobe if needed
+    │ 3. Register in HTTP video server
+    │ 4. Return metadata + preview_url
     │
     ▼
 backend_extract_video_telemetry()  ← NEW command, called automatically
     │ 1. Parse file with telemetry-parser
-    │ 2. Get video FPS
-    │ 3. Extract GPS/camera/IMU at native rate
-    │ 4. Interpolate to video frame rate
-    │ 5. Apply FBMA smoothing (GPS only, not camera settings)
-    │ 6. Compute derived metrics (distance, gradient, pace)
-    │ 7. Infer creation_time from GPS
-    │ 8. Return ParsedActivity-compatible JSON (flat arrays)
+    │ 2. Extract GPS/camera/IMU at native rate
+    │ 3. Apply FBMA smoothing to dense continuous series only
+    │ 4. Infer primary sync time from GPS when available
+    │ 5. Return normalized MP4 raw samples + sync metadata
     │
     ▼
-Frontend: store as videoTelemetry (same ParsedActivity shape as FIT/GPX)
-    │ NO finalizeParsedActivity() call — Rust output is already complete
-    │ NO useWindowedRate — smoothing already done in Rust
-    │ Only add: metricUnits, coverage, validAttributes (cheap O(n) passes)
+Frontend: finalize MP4 telemetry through the existing activity pipeline
+    │ Reuse `finalizeParsedActivity()` (or a close sibling) as the canonical
+    │ assembler for:
+    │ - distance / progress
+    │ - gradient / pace / heading fallback rules
+    │ - metric units / coverage / valid attributes / extended attributes
+    │ - canonical `ParsedActivity` shape
     │
     ▼
 [User imports FIT/GPX] (optional, takes precedence)
-    │ → Merge: FIT/GPX values override telemetry values
+    │ → Merge at the canonical ParsedActivity layer, not as a parallel
+    │   late-render-only telemetry object
     │
     ▼
 [Rust: trim + densify → DenseActivityReport]
-    │ Densification is near-pass-through (already at frame rate)
+    │ Existing frame-alignment seam remains authoritative
     │
     ▼
 [Render: per-frame overlay]
 ```
 
-## Telemetry → ParsedActivity Mapping
+## Canonical Boundary
 
-| telemetry-parser source         | ParsedActivity field        | Unit conversion                | Smoothing |
-| ------------------------------- | --------------------------- | ------------------------------ | --------- |
-| `GPS.lat/lon`                   | `course: [(lat, lon), ...]` | direct                         | no        |
-| `GPS.altitude`                  | `altitude`, `elevation`     | meters                         | FBMA      |
-| `GPS.speed`                     | `speed`                     | km/h → m/s (÷3.6)              | FBMA      |
-| `GPS.track`                     | `heading`                   | degrees                        | FBMA      |
-| `GPS.unix_timestamp`            | `time`, `source_start_time` | unix → ISO 8601                | no        |
-| Derived from course points      | `sample_distance_progress`  | haversine → normalized 0..1    | no        |
-| Derived from elevation/distance | `gradient`                  | (Δelevation / Δdistance) × 100 | FBMA      |
-| Derived from speed              | `pace`                      | 1000 / speed (s/km)            | no        |
-| `Exposure.ISOValue`             | `iso`                       | direct                         | **no**    |
-| `Exposure.IrisFStop`            | `aperture`                  | direct                         | **no**    |
-| `Exposure.ShutterSpeed`         | `shutter_speed`             | direct                         | **no**    |
-| `Lens.FocalLength`              | `focal_length`              | mm                             | **no**    |
-| Accelerometer magnitude         | `g_force`                   | √(x²+y²+z²), subtract 1g       | FBMA      |
+The sustainable split is:
 
-### ParsedActivity JSON Shape (Rust Output)
+- Rust owns MP4-specific extraction, dense-series smoothing, and sync-time
+  inference.
+- JavaScript continues to own canonical activity finalization for all source
+  formats in this phase.
+- The existing Rust render-prep path continues to own scene trim and
+  frame-rate densification.
 
-Flat arrays — compact, fast to parse, matches existing schema exactly:
+This intentionally avoids introducing a second finalized-activity pipeline
+that only MP4 uses.
+
+## Telemetry → Raw Sample Mapping
+
+The extraction step produces normalized raw samples for the frontend
+finalization seam, not a fully assembled `ParsedActivity` object.
+
+| telemetry-parser source         | Raw sample field             | Unit conversion                | Smoothing |
+| ------------------------------- | ---------------------------- | ------------------------------ | --------- |
+| `GPS.lat/lon`                   | `latitude`, `longitude`      | direct                         | no        |
+| `GPS.altitude`                  | `altitude`, `elevation`      | meters                         | FBMA      |
+| `GPS.speed`                     | `speed`                      | km/h → m/s (÷3.6)              | FBMA      |
+| `GPS.track`                     | `heading`                    | degrees                        | FBMA      |
+| `GPS.unix_timestamp`            | `timestamp`, `sync_start`    | unix → ISO 8601                | no        |
+| `Exposure.ISOValue`             | `iso`                        | direct                         | **no**    |
+| `Exposure.IrisFStop`            | `aperture`                   | direct                         | **no**    |
+| `Exposure.ShutterSpeed`         | `shutterSpeed`               | direct                         | **no**    |
+| `Lens.FocalLength`              | `focalLength`                | mm                             | **no**    |
+| Accelerometer magnitude         | `gForce`                     | √(x²+y²+z²), subtract 1g       | FBMA      |
+
+### MP4 Raw Sample JSON Shape (Rust Output)
+
+Rust returns a normalized payload tailored for the existing frontend activity
+finalizer:
 
 ```json
 {
-  "file_name": "GOPR0123.MP4",
-  "file_format": "mp4_telemetry",
+  "fileName": "GOPR0123.MP4",
+  "fileFormat": "mp4_telemetry",
+  "syncTime": "2025-07-23T10:21:41Z",
   "metadata": {
-    "duration_seconds": 600.0,
-    "start_time": "2025-07-23T10:21:41Z",
-    "end_time": "2025-07-23T10:31:41Z",
-    "total_distance_m": 1500.0,
-    "sample_count": 18000,
     "camera_type": "GoPro",
-    "camera_model": "HERO 12"
+    "camera_model": "HERO 12",
+    "telemetry_sample_count": 18000
   },
-  "source_start_time": "2025-07-23T10:21:41Z",
-  "sample_elapsed_seconds": [0.0, 0.033, 0.067, ...],
-  "sample_distance_progress": [0.0, 0.0001, 0.0003, ...],
-  "sample_course_points": [[48.123, 11.456], [48.124, 11.457], ...],
-  "sample_elevations": [520.0, 520.1, 520.2, ...],
-  "trim_start_seconds": 0,
-  "trim_end_seconds": 600.0,
-  "course": [[48.123, 11.456], [48.124, 11.457], ...],
-  "elevation": [520.0, 520.1, 520.2, ...],
-  "speed": [5.2, 5.3, 5.1, ...],
-  "heading": [180.0, 180.1, 180.2, ...],
-  "gradient": [0.5, 0.3, -0.2, ...],
-  "pace": [192.3, 188.7, 196.1, ...],
-  "time": ["2025-07-23T10:21:41Z", "2025-07-23T10:21:41.033Z", ...],
-  "iso": [100, 100, 200, ...],
-  "aperture": [2.8, 2.8, 2.8, ...],
-  "shutter_speed": [0.0025, 0.0025, 0.005, ...],
-  "focal_length": [24.0, 24.0, 24.0, ...],
-  "altitude": [520.0, 520.1, 520.2, ...],
-  "g_force": [0.1, 0.2, 0.05, ...],
-  "heartrate": [],
-  "cadence": [],
-  "power": [],
-  "temperature": [],
-  "ev": [],
-  "color_temperature": [],
-  "air_pressure": [],
-  "ground_contact_time": [],
-  "left_right_balance": [],
-  "stride_length": [],
-  "stroke_rate": [],
-  "torque": [],
-  "vertical_speed": [],
-  "gear_position": [],
-  "vertical_ratio": [],
-  "vertical_oscillation": [],
-  "core_temperature": []
+  "rawSamples": [
+    {
+      "timestamp": "2025-07-23T10:21:41Z",
+      "latitude": 48.123,
+      "longitude": 11.456,
+      "altitude": 520.0,
+      "elevation": 520.0,
+      "speed": 5.2,
+      "heading": 180.0,
+      "iso": 100,
+      "aperture": 2.8,
+      "shutterSpeed": 0.0025,
+      "focalLength": 24.0,
+      "gForce": 0.1
+    }
+  ]
 }
 ```
 
-Note: Empty arrays `[]` for metrics not available from the camera (heartrate,
-cadence, power, etc.) — the frontend `combineSeries()` pattern fills these from
-FIT/GPX if available.
+The frontend then calls `finalizeParsedActivity()` with MP4-specific options
+such as skipping idle gap fill and preferring source-provided dense metrics.
 
-## Creation Time Extraction
+## Sync Time Extraction
+
+The inferred GPS timestamp is the preferred sync reference, not file
+provenance metadata:
 
 ```rust
-fn extract_creation_time(samples: &[SampleInfo]) -> Option<String> {
+fn extract_sync_time(samples: &[SampleInfo]) -> Option<String> {
     for sample in samples {
         if let Some(ref tag_map) = sample.tag_map {
             if let Some(gps_map) = tag_map.get(&GroupId::GPS) {
@@ -183,18 +181,18 @@ fn extract_creation_time(samples: &[SampleInfo]) -> Option<String> {
             }
         }
     }
-    None  // Caller falls back to ffprobe
+    None  // Caller may salvage a sync fallback from ffprobe if needed
 }
 ```
 
 ### Survivability
 
-| Scenario                      | GPS method                                        | ffprobe method                |
-| ----------------------------- | ------------------------------------------------- | ----------------------------- |
-| Original camera file          | Accurate                                          | Accurate                      |
-| Simple cut (`ffmpeg -c copy`) | Accurate (timestamps preserved in metadata track) | Usually preserved             |
-| Re-encode (Premiere, DaVinci) | **Lost** (metadata track stripped)                | Overwritten to re-export time |
-| Trim start removed            | Reflects cut point (correct for remaining video)  | May reflect cut or original   |
+| Scenario                      | GPS sync-time method                                | ffprobe salvage method         |
+| ----------------------------- | --------------------------------------------------- | ------------------------------ |
+| Original camera file          | Accurate                                            | Often acceptable               |
+| Simple cut (`ffmpeg -c copy`) | Accurate (timestamps preserved in metadata track)   | Usually preserved              |
+| Re-encode (Premiere, DaVinci) | **Lost** (metadata track stripped)                  | Often overwritten to export time |
+| Trim start removed            | Reflects cut point (correct for remaining clip sync) | May reflect cut or original    |
 
 ## Smoothing: Forward-Backward Moving Average
 
@@ -213,12 +211,12 @@ fn zero_phase_smooth(data: &[Option<f64>], window: usize) -> Vec<Option<f64>> {
 
 ### Window Sizes
 
-| Metric       | Window       | Rationale                             |
-| ------------ | ------------ | ------------------------------------- |
-| GPS speed    | fps/2 (0.5s) | Already firmware-smoothed; light pass |
-| GPS altitude | fps (1s)     | GPS altitude is noisier than speed    |
-| GPS heading  | fps/2 (0.5s) | Preserve sharp turns                  |
-| gForce       | fps (1s)     | Accelerometer is high-frequency noise |
+| Metric       | Window                    | Rationale                             |
+| ------------ | ------------------------- | ------------------------------------- |
+| GPS speed    | ~0.5s worth of samples    | Already firmware-smoothed; light pass |
+| GPS altitude | ~1.0s worth of samples    | GPS altitude is noisier than speed    |
+| GPS heading  | ~0.5s worth of samples    | Preserve sharp turns                  |
+| gForce       | ~1.0s worth of samples    | Accelerometer is high-frequency noise |
 
 ### Upgrade Path to Butterworth
 
@@ -257,7 +255,7 @@ resolve with `[patch]` if needed.
 
 ---
 
-## Phase B: Metadata Probe (Telemetry-Parser Primary, FFprobe Fallback)
+## Phase B: Metadata Probe (Telemetry-Parser First, FFprobe Salvage Fallback)
 
 ### Step B1: Create `src-tauri/ovrley_core/src/encode/telemetry.rs`
 
@@ -266,9 +264,9 @@ Module doc comment:
 ```rust
 //! Video metadata and telemetry extraction via telemetry-parser.
 //!
-//! Owns: `probe_video_metadata()` (supersedes ffprobe for basic metadata),
-//!       `extract_telemetry()` (extracts GPS/camera/IMU as ParsedActivity),
-//!       and zero-phase smoothing helpers.
+//! Owns: `probe_video_metadata()` (telemetry-first metadata probe with salvage
+//!       fallback), `extract_telemetry()` (extracts GPS/camera/IMU as normalized
+//!       MP4 raw samples), and zero-phase smoothing helpers.
 //! Does not own: ffprobe binary discovery (see [`crate::encode::ffmpeg`]),
 //!       activity parsing pipeline (frontend `finalizeParsedActivity()`).
 //!
@@ -304,7 +302,7 @@ pub struct TelemetryVideoMetadata {
     pub fps_num: Option<u32>,
     pub fps_den: Option<u32>,
     pub resolution: Option<Resolution>,
-    pub creation_time: Option<String>,
+    pub sync_time: Option<String>,
     pub codec_name: Option<String>,
     pub codec_long_name: Option<String>,
     pub codec_profile: Option<String>,
@@ -354,7 +352,7 @@ pub fn probe_video_metadata(file_path: &str) -> CoreResult<TelemetryVideoMetadat
             width: vm.width as u64,
             height: vm.height as u64,
         }),
-        creation_time: None, // Filled by caller via ffprobe fallback or GPS inference
+        sync_time: None, // Filled by caller via GPS inference or ffprobe salvage fallback
         codec_name: None,
         codec_long_name: None,
         codec_profile: None,
@@ -406,17 +404,25 @@ Replace the current implementation (lines 497-501):
 pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
     match crate::encode::telemetry::probe_video_metadata(file_path) {
         Ok(metadata) => {
-            let metadata = if metadata.creation_time.is_none() {
+            let metadata = if metadata.sync_time.is_none()
+                || metadata.codec_name.is_none()
+                || metadata.codec_long_name.is_none()
+                || metadata.codec_profile.is_none()
+                || metadata.pix_fmt.is_none()
+                || metadata.bits_per_raw_sample.is_none()
+                || metadata.container_format.is_none()
+                || !metadata.has_audio
+            {
                 match crate::encode::video_probe::probe_video(&paths.repo_root, file_path) {
                     Ok(ffprobe_md) => {
                         let mut md = metadata;
-                        md.creation_time = ffprobe_md.creation_time;
+                        if md.sync_time.is_none() { md.sync_time = ffprobe_md.creation_time; }
                         if md.codec_name.is_none() { md.codec_name = ffprobe_md.codec_name; }
                         if md.codec_long_name.is_none() { md.codec_long_name = ffprobe_md.codec_long_name; }
                         if md.codec_profile.is_none() { md.codec_profile = ffprobe_md.codec_profile; }
                         if md.pix_fmt.is_none() { md.pix_fmt = ffprobe_md.pix_fmt; }
                         if md.bits_per_raw_sample.is_none() { md.bits_per_raw_sample = ffprobe_md.bits_per_raw_sample; }
-                        md.has_audio = ffprobe_md.has_audio;
+                        md.has_audio = md.has_audio || ffprobe_md.has_audio;
                         if md.container_format.is_none() { md.container_format = ffprobe_md.container_format; }
                         md
                     }
@@ -439,14 +445,14 @@ pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Valu
 
 ---
 
-## Phase C: Telemetry Extraction → ParsedActivity
+## Phase C: Telemetry Extraction → Normalized MP4 Raw Samples
 
 ### Step C1: Define extraction internals
 
 In `telemetry.rs`:
 
 ```rust
-/// Intermediate sample at native telemetry rate, before interpolation.
+/// Intermediate sample at native telemetry rate, before final frontend assembly.
 struct NativeSample {
     timestamp_ms: f64,
     timestamp: Option<String>,
@@ -467,11 +473,10 @@ struct NativeSample {
 
 ### Step C2: Implement `extract_telemetry()`
 
-Returns `Option<serde_json::Value>` — the `ParsedActivity`-compatible JSON
-ready for the frontend store. Returns `None` if no telemetry found.
+Returns `Option<serde_json::Value>` containing normalized MP4 raw samples and
+sync metadata. Returns `None` if no telemetry found.
 
 ```rust
-use crate::activity::schema::ParsedActivity;
 use chrono::{TimeZone, Utc};
 
 pub fn extract_telemetry(file_path: &str) -> CoreResult<Option<serde_json::Value>> {
@@ -492,13 +497,6 @@ pub fn extract_telemetry(file_path: &str) -> CoreResult<Option<serde_json::Value
         _ => return Ok(None),
     };
 
-    let mut stream2 = File::open(path)
-        .map_err(|e| CoreError::Io { path: path.to_path_buf(), source: e })?;
-    let vm = telemetry_parser::util::get_video_metadata(&mut stream2, file_size)
-        .map_err(|e| CoreError::Encode(format!("telemetry-parser metadata error: {e}")))?;
-    let target_fps = vm.fps;
-    if target_fps <= 0.0 || !target_fps.is_finite() { return Ok(None); }
-
     let camera_type = input.camera_type().to_string();
     let camera_model = input.camera_model().cloned();
 
@@ -506,108 +504,46 @@ pub fn extract_telemetry(file_path: &str) -> CoreResult<Option<serde_json::Value
     let native = extract_native_samples(&samples);
     if native.is_empty() { return Ok(None); }
 
-    // ── 2. Infer creation time ──
-    let creation_time = extract_creation_time_from_samples(&samples);
+    // ── 2. Smooth dense continuous telemetry series in place ──
+    let mut normalized = native;
+    smooth_series(&mut normalized);
 
-    // ── 3. Resample to video frame rate ──
-    let target_interval_ms = 1000.0 / target_fps;
-    let total_duration_ms = samples.last().map(|s| s.timestamp_ms + s.duration_ms).unwrap_or(0.0);
-    let frame_count = (total_duration_ms / target_interval_ms).ceil() as usize;
+    // ── 3. Infer sync time ──
+    let sync_time = extract_sync_time_from_samples(&samples);
 
-    let mut resampled = Vec::with_capacity(frame_count);
-    for i in 0..frame_count {
-        let target_ms = i as f64 * target_interval_ms;
-        resampled.push(interpolate_at_timestamp(target_ms, &native));
-    }
-
-    // ── 4. Smooth GPS/IMU series ──
-    let fps_usize = target_fps.round() as usize;
-    smooth_series(&mut resampled, fps_usize);
-
-    // ── 5. Build flat arrays ──
-    let elapsed: Vec<f64> = (0..frame_count).map(|i| i as f64 / target_fps).collect();
-    let course: Vec<(Option<f64>, Option<f64>)> = resampled.iter().map(|s| (s.latitude, s.longitude)).collect();
-    let elevation: Vec<Option<f64>> = resampled.iter().map(|s| s.altitude).collect();
-    let speed: Vec<Option<f64>> = resampled.iter().map(|s| s.speed).collect();
-    let heading: Vec<Option<f64>> = resampled.iter().map(|s| s.heading).collect();
-    let time: Vec<Option<String>> = resampled.iter().map(|s| s.timestamp.clone()).collect();
-    let iso: Vec<Option<f64>> = resampled.iter().map(|s| s.iso).collect();
-    let aperture: Vec<Option<f64>> = resampled.iter().map(|s| s.aperture).collect();
-    let shutter_speed: Vec<Option<f64>> = resampled.iter().map(|s| s.shutter_speed).collect();
-    let focal_length: Vec<Option<f64>> = resampled.iter().map(|s| s.focal_length).collect();
-    let g_force: Vec<Option<f64>> = resampled.iter().map(|s| s.g_force).collect();
-
-    // ── 6. Compute derived metrics ──
-    let distance_series = compute_distance_series(&course);
-    let total_distance = distance_series.last().copied().unwrap_or(0.0);
-    let distance_progress: Vec<f64> = if total_distance > 0.0 {
-        distance_series.iter().map(|d| d / total_distance).collect()
-    } else {
-        vec![0.0; frame_count]
-    };
-    let gradient = compute_gradient_series(&elevation, &distance_series);
-    let pace: Vec<Option<f64>> = speed.iter().map(|s| {
-        s.and_then(|v| if v > 0.0 { Some(1000.0 / v) } else { None })
+    // ── 4. Convert to raw sample payload for frontend finalization ──
+    let raw_samples: Vec<_> = normalized.iter().map(|sample| {
+        serde_json::json!({
+            "timestamp": sample.timestamp,
+            "latitude": sample.latitude,
+            "longitude": sample.longitude,
+            "altitude": sample.altitude,
+            "elevation": sample.altitude,
+            "speed": sample.speed,
+            "heading": sample.heading,
+            "iso": sample.iso,
+            "aperture": sample.aperture,
+            "shutterSpeed": sample.shutter_speed,
+            "focalLength": sample.focal_length,
+            "ev": sample.ev,
+            "colorTemperature": sample.color_temperature,
+            "gForce": sample.g_force,
+        })
     }).collect();
 
-    // ── 7. Build ParsedActivity JSON ──
-    let start_time = time.iter().find(|t| t.is_some()).and_then(|t| t.clone());
-    let end_time = time.iter().rfind(|t| t.is_some()).and_then(|t| t.clone());
-    let duration_seconds = elapsed.last().copied().unwrap_or(0.0);
-
-    let mut activity = serde_json::json!({
-        "file_name": Path::new(file_path).file_name().map(|n| n.to_string_lossy().to_string()),
-        "file_format": "mp4_telemetry",
+    let payload = serde_json::json!({
+        "fileName": Path::new(file_path).file_name().map(|n| n.to_string_lossy().to_string()),
+        "fileFormat": "mp4_telemetry",
+        "syncTime": sync_time,
         "metadata": {
-            "duration_seconds": duration_seconds,
-            "start_time": start_time,
-            "end_time": end_time,
-            "total_distance_m": total_distance,
-            "sample_count": frame_count,
             "camera_type": camera_type,
             "camera_model": camera_model,
+            "telemetry_sample_count": raw_samples.len(),
         },
-        "source_start_time": start_time,
-        "sample_elapsed_seconds": elapsed,
-        "sample_distance_progress": distance_progress,
-        "sample_course_points": course,
-        "sample_elevations": elevation,
-        "trim_start_seconds": 0.0,
-        "trim_end_seconds": duration_seconds,
-        "course": course,
-        "elevation": elevation,
-        "speed": speed,
-        "heading": heading,
-        "gradient": gradient,
-        "pace": pace,
-        "time": time,
-        "iso": iso,
-        "aperture": aperture,
-        "shutter_speed": shutter_speed,
-        "focal_length": focal_length,
-        "altitude": elevation,
-        "g_force": g_force,
-        // Empty arrays for metrics not available from video telemetry
-        "heartrate": [],
-        "cadence": [],
-        "power": [],
-        "temperature": [],
-        "ev": [],
-        "color_temperature": [],
-        "air_pressure": [],
-        "ground_contact_time": [],
-        "left_right_balance": [],
-        "stride_length": [],
-        "stroke_rate": [],
-        "torque": [],
-        "vertical_speed": [],
-        "gear_position": [],
-        "vertical_ratio": [],
-        "vertical_oscillation": [],
-        "core_temperature": [],
+        "rawSamples": raw_samples,
     });
 
-    Ok(Some(activity))
+    Ok(Some(payload))
 }
 ```
 
@@ -719,7 +655,7 @@ fn unix_to_rfc3339(unix_ts: f64) -> String {
     Utc.timestamp_opt(secs, nanos).single().map(|dt| dt.to_rfc3339()).unwrap_or_default()
 }
 
-fn extract_creation_time_from_samples(samples: &[telemetry_parser::SampleInfo]) -> Option<String> {
+fn extract_sync_time_from_samples(samples: &[telemetry_parser::SampleInfo]) -> Option<String> {
     for sample in samples {
         if let Some(ref tag_map) = sample.tag_map {
             if let Some(gps_map) = tag_map.get(&GroupId::GPS) {
@@ -743,60 +679,15 @@ fn extract_creation_time_from_samples(samples: &[telemetry_parser::SampleInfo]) 
 
 ## Phase D: Interpolation, Smoothing, Derived Metrics
 
-### Step D1: Implement `interpolate_at_timestamp()`
+### Step D1: Keep smoothing only; do not pre-densify to video FPS
 
-```rust
-fn interpolate_at_timestamp(target_ms: f64, samples: &[NativeSample]) -> NativeSample {
-    if samples.is_empty() { return NativeSample::default_at(target_ms); }
-    let idx = samples.partition_point(|s| s.timestamp_ms <= target_ms);
-    if idx == 0 { return samples[0].clone(); }
-    if idx >= samples.len() { return samples.last().unwrap().clone(); }
-    let before = &samples[idx - 1];
-    let after = &samples[idx];
-    let dt = after.timestamp_ms - before.timestamp_ms;
-    if dt <= 0.0 { return before.clone(); }
-    let t = (target_ms - before.timestamp_ms) / dt;
-    NativeSample {
-        timestamp_ms: target_ms,
-        timestamp: if t < 0.5 { before.timestamp.clone() } else { after.timestamp.clone() },
-        latitude: lerp(before.latitude, after.latitude, t),
-        longitude: lerp(before.longitude, after.longitude, t),
-        altitude: lerp(before.altitude, after.altitude, t),
-        speed: lerp(before.speed, after.speed, t),
-        heading: lerp_heading(before.heading, after.heading, t),
-        iso: if t < 0.5 { before.iso } else { after.iso },
-        aperture: if t < 0.5 { before.aperture } else { after.aperture },
-        shutter_speed: if t < 0.5 { before.shutter_speed } else { after.shutter_speed },
-        focal_length: if t < 0.5 { before.focal_length } else { after.focal_length },
-        ev: lerp(before.ev, after.ev, t),
-        color_temperature: if t < 0.5 { before.color_temperature } else { after.color_temperature },
-        g_force: lerp(before.g_force, after.g_force, t),
-    }
-}
+The earlier version proposed resampling MP4 telemetry to video frame rate
+inside the extractor. That is intentionally removed.
 
-fn lerp(a: Option<f64>, b: Option<f64>, t: f64) -> Option<f64> {
-    match (a, b) {
-        (Some(a), Some(b)) => Some(a + (b - a) * t),
-        (Some(a), None) => Some(a),
-        (None, Some(b)) => Some(b),
-        (None, None) => None,
-    }
-}
-
-fn lerp_heading(a: Option<f64>, b: Option<f64>, t: f64) -> Option<f64> {
-    match (a, b) {
-        (Some(a), Some(b)) => {
-            let mut diff = b - a;
-            if diff > 180.0 { diff -= 360.0; }
-            if diff < -180.0 { diff += 360.0; }
-            Some((a + diff * t + 360.0) % 360.0)
-        }
-        (Some(a), None) => Some(a),
-        (None, Some(b)) => Some(b),
-        (None, None) => None,
-    }
-}
-```
+- Extraction keeps native telemetry cadence.
+- The existing frontend finalizer computes canonical distance/progress/derived
+  metrics.
+- The existing Rust render-prep path remains the only frame-densification seam.
 
 ### Step D2: Implement FBMA smoothing
 
@@ -825,16 +716,27 @@ fn zero_phase_smooth(data: &[Option<f64>], window: usize) -> Vec<Option<f64>> {
     backward.into_iter().rev().collect()
 }
 
-fn smooth_series(samples: &mut [NativeSample], fps: usize) {
+fn smoothing_window_for_seconds(sample_timestamps_ms: &[f64], seconds: f64) -> usize {
+    // Estimate a representative samples-per-second rate from timestamps and
+    // convert the desired smoothing horizon into a window length.
+}
+
+fn smooth_series(samples: &mut [NativeSample]) {
+    let timestamps: Vec<_> = samples.iter().map(|s| s.timestamp_ms).collect();
     let altitude: Vec<_> = samples.iter().map(|s| s.altitude).collect();
     let speed: Vec<_> = samples.iter().map(|s| s.speed).collect();
     let heading: Vec<_> = samples.iter().map(|s| s.heading).collect();
     let g_force: Vec<_> = samples.iter().map(|s| s.g_force).collect();
 
-    let sa = zero_phase_smooth(&altitude, fps.max(1));
-    let ss = zero_phase_smooth(&speed, (fps / 2).max(1));
-    let sh = zero_phase_smooth(&heading, (fps / 2).max(1));
-    let sg = zero_phase_smooth(&g_force, fps.max(1));
+    let altitude_window = smoothing_window_for_seconds(&timestamps, 1.0);
+    let speed_window = smoothing_window_for_seconds(&timestamps, 0.5);
+    let heading_window = smoothing_window_for_seconds(&timestamps, 0.5);
+    let g_force_window = smoothing_window_for_seconds(&timestamps, 1.0);
+
+    let sa = zero_phase_smooth(&altitude, altitude_window.max(1));
+    let ss = zero_phase_smooth(&speed, speed_window.max(1));
+    let sh = zero_phase_smooth(&heading, heading_window.max(1));
+    let sg = zero_phase_smooth(&g_force, g_force_window.max(1));
 
     for i in 0..samples.len() {
         samples[i].altitude = sa[i];
@@ -845,64 +747,11 @@ fn smooth_series(samples: &mut [NativeSample], fps: usize) {
 }
 ```
 
-### Step D3: Implement `compute_distance_series()`
+### Step D3: Reuse existing frontend derivations
 
-Haversine distance accumulation from lat/lon course points:
-
-```rust
-fn haversine_meters(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
-    const R: f64 = 6_371_000.0; // Earth radius in meters
-    let dlat = (lat2 - lat1).to_radians();
-    let dlon = (lon2 - lon1).to_radians();
-    let a = (dlat / 2.0).sin().powi(2) + lat1.to_radians().cos() * lat2.to_radians().cos() * (dlon / 2.0).sin().powi(2);
-    R * 2.0 * a.sqrt().atan2((1.0 - a).sqrt())
-}
-
-fn compute_distance_series(course: &[(Option<f64>, Option<f64>)]) -> Vec<f64> {
-    let mut distances = Vec::with_capacity(course.len());
-    let mut cumulative = 0.0;
-    distances.push(0.0);
-    for i in 1..course.len() {
-        match (course[i - 1], course[i]) {
-            ((Some(lat1), Some(lon1)), (Some(lat2), Some(lon2))) => {
-                cumulative += haversine_meters(lat1, lon1, lat2, lon2);
-            }
-            _ => {}
-        }
-        distances.push(cumulative);
-    }
-    distances
-}
-```
-
-### Step D4: Implement `compute_gradient_series()`
-
-```rust
-fn compute_gradient_series(elevation: &[Option<f64>], distance: &[f64]) -> Vec<Option<f64>> {
-    let len = elevation.len();
-    let mut gradient = Vec::with_capacity(len);
-    for i in 0..len {
-        // Look back ~5m and forward ~5m for gradient
-        let mut left = i;
-        while left > 0 && distance[i] - distance[left] < 5.0 { left -= 1; }
-        let mut right = i;
-        while right < len - 1 && distance[right] - distance[i] < 5.0 { right += 1; }
-        match (elevation[left], elevation[right]) {
-            (Some(el), Some(er)) => {
-                let horiz = distance[right] - distance[left];
-                if horiz >= 1.0 {
-                    let g = ((er - el) / horiz * 100.0).clamp(-30.0, 30.0);
-                    gradient.push(Some((g * 1000.0).round() / 1000.0));
-                } else {
-                    gradient.push(gradient.last().and_then(|v| *v));
-                }
-            }
-            _ => gradient.push(gradient.last().and_then(|v| *v)),
-        }
-    }
-    gradient
-}
-```
+Do not add Rust-only distance/gradient/pace derivation helpers for MP4 in this
+phase. Those remain in the canonical frontend finalization seam so all source
+formats share the same rules.
 
 ---
 
@@ -948,10 +797,10 @@ tauri_commands::backend_extract_video_telemetry,
 
 ```javascript
 /**
- * Extracts embedded telemetry from a video file as a ParsedActivity.
+ * Extracts embedded telemetry from a video file as normalized MP4 raw samples.
  *
  * @param {string} path - Absolute path to the source video file.
- * @returns {Promise<object|null>} Promise resolving to ParsedActivity or null.
+ * @returns {Promise<object|null>} Promise resolving to normalized payload or null.
  */
 export async function extractVideoTelemetry(path) {
   const result = await invokeCommand("backend_extract_video_telemetry", { filePath: path });
@@ -961,50 +810,71 @@ export async function extractVideoTelemetry(path) {
 
 ### Step F2: Add state to `createVideoImportSlice.js`
 
-Add new fields. Note: `videoTelemetry` is a complete `ParsedActivity` from Rust —
-all derived metrics (speed, heading, gradient, pace, distance) are already computed.
-No `finalizeParsedActivity()` call needed. No `useWindowedRate` smoothing needed.
+Add new fields for the raw MP4 telemetry payload and the finalized telemetry
+activity derived from it.
+
+Also rename the existing video timestamp field from `importedVideoCreationTime`
+to `importedVideoSyncTime` and update `computeVideoSync()` plus any callers to
+read `metadata.syncTime` instead of `metadata.creationTime`:
 
 ```javascript
-videoTelemetry: null,              // ParsedActivity from telemetry extraction (complete, no JS processing needed)
-videoTelemetryCreationTime: null,  // ISO-8601 from GPS inference
+videoTelemetryRaw: null,             // normalized Rust payload: { fileName, fileFormat, syncTime, metadata, rawSamples }
+videoTelemetryParsedActivity: null,  // ParsedActivity produced via finalizeParsedActivity()
+videoTelemetrySyncTime: null,        // ISO-8601 sync-time inferred from GPS or salvaged metadata
 ```
 
 Add setter:
 
 ```javascript
-setVideoTelemetry: (result) => set({
-  videoTelemetry: result,
-  videoTelemetryCreationTime: result?.source_start_time ?? null,
+setVideoTelemetry: ({ raw, parsedActivity }) => set({
+  videoTelemetryRaw: raw,
+  videoTelemetryParsedActivity: parsedActivity,
+  videoTelemetrySyncTime: raw?.syncTime ?? null,
 }),
 ```
 
 Update `clearImportedVideo` to also clear:
 
 ```javascript
-videoTelemetry: null,
-videoTelemetryCreationTime: null,
+videoTelemetryRaw: null,
+videoTelemetryParsedActivity: null,
+videoTelemetrySyncTime: null,
 ```
 
 ### Step F3: Update `useVideoImport.js` to call extraction
 
-After `importPreviewVideo()` succeeds, fire-and-forget telemetry extraction:
+After `importPreviewVideo()` succeeds, kick off telemetry extraction guarded by
+the current import path or import ID to avoid stale async writes:
 
 ```javascript
 import { extractVideoTelemetry, clearPreviewVideo, importPreviewVideo } from "@/api/backend";
+import { finalizeParsedActivity } from "@/lib/activity/parser";
 
 // Inside handleImportVideo, after setImportedVideo(metadata):
+const currentImportPath = selected;
 extractVideoTelemetry(selected)
   .then((result) => {
-    if (result) {
-      setVideoTelemetry(result);
-      // If GPS-inferred creation time available and ffprobe didn't provide one,
-      // update creation time for sync
-      if (result.source_start_time && !metadata.creationTime) {
-        // Update store with GPS-inferred creation time
-        const updatedMetadata = { ...metadata, creationTime: result.source_start_time };
-        setImportedVideo(updatedMetadata);
-      }
+    if (!result) return;
+    if (useStore.getState().importedVideoPath !== currentImportPath) return;
+
+    const { parsedActivity } = finalizeParsedActivity({
+      fileName: result.fileName,
+      fileFormat: result.fileFormat,
+      metadata: result.metadata,
+      rawSamples: result.rawSamples,
+      options: {
+        skipIdleGapFill: true,
+        useWindowedRate: true,
+        rateWindowSeconds: 1,
+      },
+    });
+
+    setVideoTelemetry({ raw: result, parsedActivity });
+
+    // Sync-time is a sync hint, not provenance metadata.
+    if (result.syncTime && !metadata.syncTime) {
+      const updatedMetadata = { ...metadata, syncTime: result.syncTime };
+      setImportedVideo(updatedMetadata);
     }
   })
   .catch((err) => console.warn("Telemetry extraction failed:", err));
@@ -1012,15 +882,21 @@ extractVideoTelemetry(selected)
 
 ### Step F4: Merge strategy (when FIT/GPX also imported)
 
-When the user imports FIT/GPX after video telemetry, the merge happens in the
-render payload builder. For each metric series:
+When the user imports FIT/GPX after video telemetry, merge at the canonical
+`ParsedActivity` layer rather than keeping a second render-only object.
 
-- If FIT/GPX has non-null values → use FIT/GPX
-- Otherwise → use video telemetry values
+Recommended flow:
 
-This is the existing `combineSeries()` pattern in `metric-series.js`. The
-`videoTelemetry` object from the store is passed alongside `importedActivity`
-and merged before rendering.
+- Keep `videoTelemetryParsedActivity` cached as supplemental camera telemetry.
+- Build one merged `parsedActivity` in store when telemetry or FIT/GPX changes.
+- For each metric series: if FIT/GPX has a non-null value, keep it; otherwise
+  fill from telemetry.
+- Keep one `activitySummary` / `parsedActivity` pair so the rest of the app
+  continues to operate on a single canonical activity object.
+
+This should reuse the existing `combineSeries()` pattern in
+`metric-series.js`, but the merge happens before render, not only inside the
+render payload builder.
 
 ---
 
@@ -1033,22 +909,20 @@ and merged before rendering.
 - `test_compute_rational_fps()` — 23.976, 24, 25, 29.97, 30, 59.94, 60
 - `test_moving_average()` — null handling, window sizes
 - `test_zero_phase_smooth()` — zero delay, smoothing behavior
-- `test_lerp()` — basic interpolation
-- `test_lerp_heading()` — 0°/360° wraparound
-- `test_interpolate_at_timestamp()` — mock NativeSample data
-- `test_extract_creation_time_from_samples()` — GPS timestamp inference
+- `test_smoothing_window_for_seconds()` — cadence-aware window sizing
+- `test_extract_sync_time_from_samples()` — GPS timestamp inference
 - `test_unix_to_rfc3339()` — timestamp conversion
-- `test_haversine_meters()` — known coordinate pairs
-- `test_compute_distance_series()` — cumulative distance
-- `test_compute_gradient_series()` — elevation/distance gradient
+- `test_extract_native_samples()` — expected field mapping from telemetry-parser tags
 
 ### Step G2: Integration tests
 
 `src-tauri/ovrley_core/tests/telemetry_tests.rs`:
 
 - `test_probe_video_metadata_with_gopro()` — if fixture available
-- `test_extract_telemetry_with_gopro()` — verify ParsedActivity shape
+- `test_extract_telemetry_with_gopro()` — verify normalized raw payload shape
 - `test_extract_telemetry_no_telemetry()` — verify returns None
+- frontend test: finalize MP4 telemetry payload into canonical `ParsedActivity`
+- frontend test: merge FIT/GPX over telemetry with expected precedence
 
 ### Step G3: Manual testing
 
@@ -1064,37 +938,29 @@ Test with sample videos:
 
 ## Unanswered Questions
 
-1. **Merge strategy on frontend**: When both telemetry and FIT/GPX are present,
-   should we merge at the store level (single combined ParsedActivity) or keep
-   them separate and merge at render time? The current store has a single
-   `importedActivity` — likely need to add a `videoTelemetry` slice and merge
-   when building the render payload.
-
-2. **gForce baseline subtraction**: Accelerometer reads ~1g at rest (gravity).
+1. **gForce baseline subtraction**: Accelerometer reads ~1g at rest (gravity).
    Should we subtract 1g to get net g-force, or expose the raw magnitude? The
    existing `g_force` field in `ParsedActivity` is described as "multiples of
    Earth gravity" which suggests net force (subtract 1g).
 
-3. **Edge-case: no telemetry at all**: Some videos (screen recordings, webcams)
+2. **Edge-case: no telemetry at all**: Some videos (screen recordings, webcams)
    have no embedded telemetry. `extract_telemetry()` returns `None`. The frontend
    should handle this gracefully — no activity imported, user can still import
    FIT/GPX separately. Confirm this is expected behavior?
 
-4. **Window size for FBMA**: The proposed window sizes (fps/2 for speed/heading,
-   fps for altitude/gForce) are starting points. Should these be configurable
+3. **Window size for FBMA**: The proposed windows (~0.5s for speed/heading,
+   ~1.0s for altitude/gForce) are starting points. Should these be configurable
    or hard-coded initially?
 
 ### Resolved Questions
 
-- **Interpolation method (was Q3)**: Linear interpolation for continuous values
-  (speed, altitude, heading, gForce), hold-last-value for discrete values (ISO,
-  aperture, shutter speed, focal length, color temperature). ~2ms overhead for
-  60-min footage — negligible vs ~1-3s telemetry-parser parsing.
+- **Canonical finalization boundary**: MP4 telemetry joins the existing
+  finalization seam. Rust does extraction + smoothing; JavaScript still builds
+  canonical `ParsedActivity` for all source formats in this phase.
 
-- **Partial telemetry (was Q5)**: Rust returns null for missing fields, empty
-  arrays `[]` for metrics not available from the camera (heartrate, cadence,
-  power, etc.). Frontend merge logic handles gracefully.
+- **Merge strategy**: Merge at the store/canonical-activity layer, not only at
+  render time. The rest of the app continues to consume one `parsedActivity`.
 
-- **Multiple GPS samples per frame (was Q7)**: Linear interpolation handles
-  this naturally — interpolates between surrounding GPS samples at each frame
-  timestamp. No special handling needed.
+- **Partial telemetry**: Rust returns sparse normalized raw samples with nulls
+  for missing values. Frontend finalization and merge logic handle gaps
+  gracefully.

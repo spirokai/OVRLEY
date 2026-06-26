@@ -89,7 +89,7 @@ export function formatPace(value, unit) {
   }
 }
 
-function formatRoundedMetric(value, units, decimals = 0) {
+function formatRoundedMetric(value, units, decimals = 0, preserveTrailingZeros = false) {
   if (value === null || value === undefined) {
     return {
       value: '--',
@@ -98,10 +98,31 @@ function formatRoundedMetric(value, units, decimals = 0) {
   }
 
   const numericValue = Number(value)
-  const roundedValue = decimals > 0 ? numericValue.toFixed(decimals).replace(/\.?0+$/, '') : Math.round(numericValue).toString()
+  const roundedValue =
+    decimals > 0
+      ? preserveTrailingZeros
+        ? numericValue.toFixed(decimals)
+        : numericValue.toFixed(decimals).replace(/\.?0+$/, '')
+      : Math.round(numericValue).toString()
 
   return {
     value: roundedValue,
+    units,
+  }
+}
+
+function formatDistanceValue(value, unit, decimals = 1, showUnits = true) {
+  const units = showUnits ? unit : ''
+  if (value === null || value === undefined) {
+    return {
+      value: '--',
+      units,
+    }
+  }
+
+  const currentValue = Number(value)
+  return {
+    value: formatRoundedMetric(currentValue, '', decimals, true).value,
     units,
   }
 }
@@ -110,6 +131,15 @@ function convertStandardMetricValue(type, value, displayUnit) {
   const numericValue = Number(value)
 
   switch (type) {
+    case 'distance':
+      switch (displayUnit) {
+        case 'km':
+          return numericValue / 1000
+        case 'mi':
+          return numericValue / 1609.344
+        default:
+          return numericValue
+      }
     case 'g_force':
       return displayUnit === 'mps2' ? numericValue * 9.80665 : numericValue
     case 'air_pressure':
@@ -251,6 +281,7 @@ export function formatStandardMetricDisplay(type, value, widgetData = {}) {
   const unitLabel = getStandardMetricUnitLabel(type, displayUnit)
   const unitsMode = getStandardMetricUnitsMode(type)
   const effectiveUnitLabel = unitsMode === 'hidden' ? '' : unitLabel
+  const showUnits = widgetData.show_units ?? definition.showUnitsByDefault ?? false
 
   if (definition.formatter === 'speed') {
     return formatSpeed(value, displayUnit)
@@ -278,6 +309,15 @@ export function formatStandardMetricDisplay(type, value, widgetData = {}) {
 
   if (definition.formatter === 'ev') {
     return formatEv(value, widgetData.decimals ?? 1)
+  }
+
+  if (type === 'distance') {
+    return formatDistanceValue(
+      value === null || value === undefined ? value : convertStandardMetricValue(type, value, displayUnit),
+      effectiveUnitLabel,
+      widgetData.decimals ?? 1,
+      showUnits,
+    )
   }
 
   return formatRoundedMetric(

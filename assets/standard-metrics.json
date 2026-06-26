@@ -34,6 +34,10 @@
           "time": {
             "format": "time-24"
           },
+          "distance": {
+            "decimals": 1,
+            "show_full_distance": true
+          },
           "left_right_balance": {
             "balance_format": "percent_label"
           }
@@ -157,6 +161,38 @@
       "icon": {
         "source": "shared",
         "assetFile": "widget-speed.svg"
+      },
+      "category": "general"
+    },
+    {
+      "type": "distance",
+      "current": true,
+      "label": "Distance",
+      "defaultDisplayUnit": "km",
+      "supportedDisplayUnits": [
+        {
+          "value": "m",
+          "label": "m",
+          "renderLabel": "m"
+        },
+        {
+          "value": "km",
+          "label": "km",
+          "renderLabel": "km"
+        },
+        {
+          "value": "mi",
+          "label": "mi",
+          "renderLabel": "mi"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-distance.svg"
       },
       "category": "general"
     },

@@ -290,6 +290,7 @@ pub fn densify_activity(
         frame_count: frame_elapsed_seconds.len(),
         frame_elapsed_seconds: frame_elapsed_seconds.clone(),
         frame_distance_progress,
+        full_activity_distance: trimmed.full_activity_distance,
         series: DenseSeriesReport {
             speed: densify(
                 &trimmed.sample_elapsed_seconds,
@@ -297,6 +298,13 @@ pub fn densify_activity(
                 &frame_elapsed_seconds,
                 requirements.speed,
                 crate::MetricKind::Speed,
+            ),
+            distance: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.distance,
+                &frame_elapsed_seconds,
+                requirements.distance,
+                crate::MetricKind::Distance,
             ),
             elevation: densify(
                 &trimmed.sample_elapsed_seconds,

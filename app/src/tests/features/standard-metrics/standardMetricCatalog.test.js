@@ -25,6 +25,7 @@ describe('standard metric widget catalog', () => {
   test('covers the existing and Wave 1 shared standard metric widgets', () => {
     expect(CURRENT_STANDARD_METRIC_WIDGET_TYPES).toEqual([
       'speed',
+      'distance',
       'heartrate',
       'cadence',
       'power',
@@ -53,6 +54,7 @@ describe('standard metric widget catalog', () => {
     expect(STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(CURRENT_STANDARD_METRIC_WIDGET_TYPES))
 
     const speed = getStandardMetricDefinition('speed')
+    const distance = getStandardMetricDefinition('distance')
 
     expect(speed).toMatchObject({
       label: 'Speed',
@@ -63,6 +65,15 @@ describe('standard metric widget catalog', () => {
       },
     })
     expect(speed.supportedDisplayUnits.map((option) => option.value)).toEqual(['kmh', 'mph', 'kn', 'mps'])
+    expect(distance).toMatchObject({
+      label: 'Distance',
+      defaultDisplayUnit: 'km',
+      showUnitsByDefault: true,
+      icon: {
+        assetFile: 'widget-distance.svg',
+      },
+    })
+    expect(distance.supportedDisplayUnits.map((option) => option.value)).toEqual(['m', 'km', 'mi'])
   })
 
   test('records the planned icon catalog for future standard metric widgets', () => {
@@ -84,6 +95,10 @@ describe('standard metric widget catalog', () => {
       source: 'custom',
       assetFile: 'widget-gear-position.svg',
     })
+    expect(getStandardMetricDefinition('distance').icon).toEqual({
+      source: 'custom',
+      assetFile: 'widget-distance.svg',
+    })
   })
 
   test('identifies standard metric widgets without folding in specialized widgets', () => {
@@ -97,6 +112,7 @@ describe('standard metric widget catalog', () => {
 
   test('feeds standard metric labels into shared widget label lookups', () => {
     expect(TYPE_LABELS.speed).toBe(getStandardMetricDefinition('speed').label)
+    expect(TYPE_LABELS.distance).toBe(getStandardMetricDefinition('distance').label)
     expect(TYPE_LABELS.pace).toBe(getStandardMetricDefinition('pace').label)
     expect(TYPE_LABELS.core_temperature).toBe(getStandardMetricDefinition('core_temperature').label)
   })
@@ -133,7 +149,7 @@ describe('standard metric widget catalog', () => {
   })
 
   test('existing metrics carry interpolation and unitsMode defaults', () => {
-    const existingTypes = ['speed', 'heartrate', 'cadence', 'power', 'temperature', 'pace', 'heading']
+    const existingTypes = ['speed', 'distance', 'heartrate', 'cadence', 'power', 'temperature', 'pace', 'heading']
     for (const type of existingTypes) {
       expect(getStandardMetricInterpolation(type)).toBe('linear')
       expect(getStandardMetricUnitsMode(type)).toBe('selectable')

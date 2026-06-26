@@ -274,6 +274,7 @@ mod tests {
             icon_offset_x: None,
             icon_offset_y: None,
             show_units: None,
+            show_full_distance: None,
             unit_color: None,
             display_unit: None,
             balance_format: None,

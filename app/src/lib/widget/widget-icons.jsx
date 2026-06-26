@@ -52,6 +52,7 @@ export const WIDGET_DRAWER_LABELS = {
   gradient: 'Grad.',
   course: 'Map',
   air_pressure: 'Air Press.',
+  distance: 'Dist.',
   ground_contact_time: 'GCT',
   left_right_balance: 'L/R Bal.',
   stride_length: 'Stride',

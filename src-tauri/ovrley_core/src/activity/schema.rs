@@ -128,6 +128,9 @@ pub struct ParsedActivity {
     /// Speed in meters per second.
     #[serde(default)]
     pub speed: NumericSeries,
+    /// Cumulative distance in meters.
+    #[serde(default)]
+    pub distance: NumericSeries,
     /// Heart rate in beats per minute.
     #[serde(default)]
     pub heartrate: NumericSeries,
@@ -241,6 +244,8 @@ pub struct DenseActivityReport {
     pub frame_elapsed_seconds: Vec<f64>,
     /// Per-frame absolute activity distance progress, if a plot requested it.
     pub frame_distance_progress: Vec<Option<f64>>,
+    /// Final source-activity distance from the parsed distance series.
+    pub full_activity_distance: Option<f64>,
     /// Densified telemetry vectors used by text values and widgets.
     pub series: DenseSeriesReport,
 }
@@ -250,6 +255,8 @@ pub struct DenseActivityReport {
 pub struct DenseSeriesReport {
     /// Speed in meters per second.
     pub speed: Vec<Option<f64>>,
+    /// Cumulative distance in meters.
+    pub distance: Vec<Option<f64>>,
     /// Elevation in meters.
     pub elevation: Vec<Option<f64>>,
     /// Gradient in percent.
@@ -331,6 +338,8 @@ pub struct TrimmedActivity {
     pub elevation: NumericSeries,
     /// Trimmed speed samples in meters per second.
     pub speed: NumericSeries,
+    /// Trimmed cumulative distance samples in meters.
+    pub distance: NumericSeries,
     /// Trimmed heart rate samples.
     pub heartrate: NumericSeries,
     /// Trimmed cadence samples.
@@ -385,4 +394,6 @@ pub struct TrimmedActivity {
     pub heading: NumericSeries,
     /// Trimmed timestamp samples.
     pub time: TimeSeries,
+    /// Final source-activity distance from the parsed distance series.
+    pub full_activity_distance: Option<f64>,
 }

@@ -33,6 +33,7 @@ pub fn heading_tape_json() -> Value {
 pub fn empty_dense_series() -> DenseSeriesReport {
     DenseSeriesReport {
         speed: vec![],
+        distance: vec![],
         elevation: vec![],
         gradient: vec![],
         heartrate: vec![],
@@ -71,6 +72,7 @@ pub fn minimal_dense_activity() -> DenseActivityReport {
         frame_count: 1,
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
+        full_activity_distance: None,
         series: empty_dense_series(),
     }
 }
@@ -82,6 +84,7 @@ pub fn dense_report_with(fill: impl FnOnce(&mut DenseSeriesReport)) -> DenseActi
         frame_count: 1,
         frame_elapsed_seconds: vec![0.0],
         frame_distance_progress: vec![Some(0.0)],
+        full_activity_distance: None,
         series,
     }
 }
@@ -96,6 +99,8 @@ pub fn minimal_trimmed_activity(times: Vec<f64>) -> TrimmedActivity {
         course: vec![],
         elevation: vec![],
         speed: vec![],
+        distance: vec![],
+        full_activity_distance: None,
         heartrate: vec![],
         cadence: vec![],
         power: vec![],

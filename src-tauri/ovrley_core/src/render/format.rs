@@ -20,6 +20,7 @@ use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MetricIconKind {
     Gauge,
+    Distance,
     Heart,
     RefreshCw,
     Zap,
@@ -86,6 +87,12 @@ fn raw_value(
         MetricKind::Speed => dense_activity
             .series
             .speed
+            .get(frame_index)
+            .copied()
+            .flatten(),
+        MetricKind::Distance => dense_activity
+            .series
+            .distance
             .get(frame_index)
             .copied()
             .flatten(),
@@ -263,7 +270,7 @@ pub fn format_validated_metric_parts(
     let raw = raw_value(validated.metric, dense_activity, frame_index);
 
     let (mut value_text, unit_text, icon_kind) =
-        format_validated_standard_metric_parts(validated, raw);
+        format_validated_standard_metric_parts(validated, dense_activity, raw);
 
     if !validated.prefix.is_empty() {
         value_text = format!("{}{value_text}", validated.prefix);
@@ -332,6 +339,7 @@ pub fn format_validated_time_parts(
 
 fn format_validated_standard_metric_parts(
     validated: &ValidatedValueWidget,
+    dense_activity: &DenseActivityReport,
     raw: Option<f64>,
 ) -> (String, Option<String>, Option<MetricIconKind>) {
     let kind = validated.metric;
@@ -386,10 +394,30 @@ fn format_validated_standard_metric_parts(
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Decimal) => raw
             .map(|value| {
-                format_number(
-                    convert_standard_metric_value(kind, display_unit, value),
-                    decimals,
-                )
+                if kind == MetricKind::Distance {
+                    let current = format_number_fixed(
+                        convert_standard_metric_value(kind, display_unit, value),
+                        decimals,
+                    );
+                    if validated.show_full_distance == Some(true) {
+                        if let Some(total) = dense_activity.full_activity_distance {
+                            let total = format_number_fixed(
+                                convert_standard_metric_value(kind, display_unit, total),
+                                decimals,
+                            );
+                            format!("{current}/{total}")
+                        } else {
+                            current
+                        }
+                    } else {
+                        current
+                    }
+                } else {
+                    format_number(
+                        convert_standard_metric_value(kind, display_unit, value),
+                        decimals,
+                    )
+                }
             })
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Balance) => {
@@ -522,6 +550,16 @@ fn format_number(value: f64, decimals: usize) -> String {
     text
 }
 
+fn format_number_fixed(value: f64, decimals: usize) -> String {
+    if decimals == 0 {
+        return value.round().to_string();
+    }
+
+    let factor = 10_f64.powi(decimals as i32);
+    let rounded = (value * factor).round() / factor;
+    format!("{rounded:.decimals$}")
+}
+
 fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, value: f64) -> f64 {
     match kind {
         MetricKind::Heartrate
@@ -538,6 +576,11 @@ fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, v
                 value
             }
         }
+        MetricKind::Distance => match display_unit.unwrap_or("km") {
+            "m" => value,
+            "mi" => value / 1609.344,
+            _ => value / 1000.0,
+        },
         MetricKind::GForce => {
             if display_unit == Some("mps2") {
                 value * 9.806_65
@@ -627,7 +670,7 @@ fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option
 
 #[cfg(test)]
 mod tests {
-    use super::format_balance_value;
+    use super::{format_balance_value, format_number_fixed};
 
     #[test]
     fn balance_percent_label_omits_spaces_around_slash() {
@@ -642,5 +685,11 @@ mod tests {
         assert_eq!(format_balance_value(60.0, 0, Some("plain")), "60/40");
         assert_eq!(format_balance_value(48.0, 0, Some("l_prefix")), "L48/R52");
         assert_eq!(format_balance_value(70.0, 0, Some("l_suffix")), "70L/30R");
+    }
+
+    #[test]
+    fn fixed_number_preserves_trailing_zeroes() {
+        assert_eq!(format_number_fixed(2.0, 1), "2.0");
+        assert_eq!(format_number_fixed(2.3, 2), "2.30");
     }
 }

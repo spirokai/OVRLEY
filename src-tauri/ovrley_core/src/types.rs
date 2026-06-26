@@ -26,6 +26,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 pub enum MetricKind {
     #[serde(rename = "speed")]
     Speed,
+    #[serde(rename = "distance")]
+    Distance,
     #[serde(rename = "heartrate")]
     Heartrate,
     #[serde(rename = "elevation")]
