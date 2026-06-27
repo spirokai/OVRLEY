@@ -5,7 +5,19 @@
 import { applyLiveWidgetStyles } from '../utils/widgetDomHelpers'
 import { clamp } from '@/lib/utils'
 import { isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
-import { buildFrameGeometryUpdate } from '@/lib/widget/metric-widget-resolver'
+import { buildFrameGeometryUpdate, resolveActiveMetricWidgetData } from '@/lib/widget/metric-widget-resolver'
+import { headingTickScaleHeightForRenderedBody, headingTapeLayout } from '@/features/widget-preview/utils/headingGeometry'
+
+function resolveResizedWidgetHeight(widget, renderedHeight) {
+  const resolvedData = resolveActiveMetricWidgetData(widget?.data)
+  if (resolvedData?.display_type !== 'heading_tape') {
+    return Math.max(renderedHeight, 8)
+  }
+
+  const layout = headingTapeLayout(resolvedData)
+  const fixedHeight = layout.totalHeight - layout.bodyHeight
+  return Math.max(headingTickScaleHeightForRenderedBody(renderedHeight - fixedHeight, resolvedData), 8)
+}
 
 /**
  * Creates resize-related moveable handlers.
@@ -57,7 +69,7 @@ export function useResizeHandlers({
       const nextY = origin.y + drag.beforeTranslate[1]
       const dimensionScale = isBoxedMetricWidget(selectedWidget) ? Math.max(Number(globalScale) || 1, 0.1) : 1
       const nextWidth = Math.max(width / dimensionScale, 8)
-      const nextHeight = Math.max(height / dimensionScale, 8)
+      const nextHeight = resolveResizedWidgetHeight(selectedWidget, height / dimensionScale)
       const widthScale = origin.width ? nextWidth / origin.width : 1
       const heightScale = origin.height ? nextHeight / origin.height : 1
       const markerScale = (widthScale + heightScale) / 2

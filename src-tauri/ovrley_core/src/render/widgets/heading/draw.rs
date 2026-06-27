@@ -50,14 +50,17 @@ pub fn draw_heading_widget(
         // Draw twice to handle the 360° wrap: once at offset, once at offset + tape_width.
         canvas.draw_image(
             &heading_cache.tape_image,
-            (heading_cache.x - wrapped_offset, heading_cache.y),
+            (
+                heading_cache.x - wrapped_offset,
+                heading_cache.y + heading_cache.tape_body_y,
+            ),
             None,
         );
         canvas.draw_image(
             &heading_cache.tape_image,
             (
                 heading_cache.x - wrapped_offset + heading_cache.tape_width,
-                heading_cache.y,
+                heading_cache.y + heading_cache.tape_body_y,
             ),
             None,
         );
@@ -86,9 +89,11 @@ pub fn draw_heading_widget(
             frame: WidgetFrameReport {
                 progress01: heading / 360.0,
                 marker_x: heading_cache.width as f32 / 2.0,
-                marker_y: heading_cache.height as f32 / 2.0,
+                marker_y: heading_cache.tape_body_y + heading_cache.tape_body_height / 2.0,
                 marker_abs_x: heading_cache.x + heading_cache.width as f32 / 2.0,
-                marker_abs_y: heading_cache.y + heading_cache.height as f32 / 2.0,
+                marker_abs_y: heading_cache.y
+                    + heading_cache.tape_body_y
+                    + heading_cache.tape_body_height / 2.0,
             },
         })
     })
@@ -107,9 +112,14 @@ fn draw_indicator(canvas: &Canvas, cache: &HeadingWidgetCache) {
 
     match cache.indicator_style.as_str() {
         "chevron" => draw_chevron_indicator(canvas, cache, center_x, top_y, bottom_y, color),
-        "highlight_bar" => {
-            draw_highlight_bar_indicator(canvas, cache, center_x, top_y, bottom_y, color)
-        }
+        "highlight_bar" => draw_highlight_bar_indicator(
+            canvas,
+            cache,
+            center_x,
+            cache.y + cache.tape_body_y,
+            cache.y + cache.tape_body_y + cache.tape_body_height,
+            color,
+        ),
         _ => {}
     }
 }

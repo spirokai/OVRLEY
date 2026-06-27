@@ -16,33 +16,27 @@
  * @returns {JSX.Element} SVG element for heading widget preview.
  */
 
-import { chevronVertices } from '../utils/headingGeometry'
+import { chevronVertices, headingLabelBaseline, headingTickPosition } from '../utils/headingGeometry'
 import { useHeadingPreviewModel } from '../hooks/useHeadingPreviewModel'
 
-function renderTicks(ticks, height, config) {
-  const majorLength = (height * config.major_tick_length_pct) / 100
-  const minorLength = (height * config.minor_tick_length_pct) / 100
+function renderTicks(ticks, topY, height, config) {
   const majorThickness = config.major_tick_thickness
   const minorThickness = config.minor_tick_thickness
   const tickColor = config.tick_color
   const cardinalColor = config.cardinal_tick_color
-  const centerY = height / 2
 
   return ticks.map((tick, i) => {
-    const length = tick.isMajor ? majorLength : minorLength
-    const top = config.tick_alignment === 'centered' ? centerY - length / 2 : centerY
+    const { length, top } = headingTickPosition(height, config, tick.isMajor)
+    const y1 = topY + top
     const color = tick.isCardinal ? cardinalColor : tickColor
     const thickness = tick.isMajor ? majorThickness : minorThickness
 
-    return <line key={`tick-${i}`} x1={tick.x} y1={top} x2={tick.x} y2={top + length} stroke={color} strokeWidth={thickness} />
+    return <line key={`tick-${i}`} x1={tick.x} y1={y1} x2={tick.x} y2={y1 + length} stroke={color} strokeWidth={thickness} />
   })
 }
 
-function renderLabels(labels, height, config, fontFamily) {
-  const majorLength = (height * config.major_tick_length_pct) / 100
-  const centerY = height / 2
-  const tickBottom = config.tick_alignment === 'centered' ? centerY + majorLength / 2 : centerY + majorLength
-  const labelY = tickBottom + config.label_offset + config.label_font_size
+function renderLabels(labels, topY, height, config, fontFamily) {
+  const labelY = topY + headingLabelBaseline(height, config)
   const fontSize = config.label_font_size
   const labelColor = config.label_color
   const cardinalColor = config.cardinal_label_color
@@ -117,12 +111,12 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
   const renderTapeCopies = (filterId = null) => (
     <g clipPath={`url(#${model.clipPathId})`} filter={filterId ? `url(#${filterId})` : undefined}>
       <g transform={`translate(${-model.wrappedOffset}, 0)`}>
-        {renderTicks(model.ticks, model.height, data)}
-        {renderLabels(model.labels, model.height, data, model.labelFontFamily)}
+        {renderTicks(model.ticks, model.bodyY, model.tickScaleHeight, data)}
+        {renderLabels(model.labels, model.bodyY, model.tickScaleHeight, data, model.labelFontFamily)}
       </g>
       <g transform={`translate(${-model.wrappedOffset + model.tapeWidth}, 0)`}>
-        {renderTicks(model.ticks, model.height, data)}
-        {renderLabels(model.labels, model.height, data, model.labelFontFamily)}
+        {renderTicks(model.ticks, model.bodyY, model.tickScaleHeight, data)}
+        {renderLabels(model.labels, model.bodyY, model.tickScaleHeight, data, model.labelFontFamily)}
       </g>
     </g>
   )
@@ -131,13 +125,13 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
     <svg
       width={model.displayWidth}
       height={model.displayHeight}
-      viewBox={`0 0 ${model.width} ${model.height}`}
+      viewBox={`0 0 ${model.width} ${model.totalHeight}`}
       className="block h-full w-full"
       style={{ opacity: model.opacity < 1 ? model.opacity : undefined }}
     >
       <defs>
         <clipPath id={model.clipPathId}>
-          <rect width={model.width} height={model.height} />
+          <rect y={model.bodyY} width={model.width} height={model.bodyHeight} />
         </clipPath>
         {model.shadow && buildShadowFilter(model.shadowFilterId, model.shadow)}
       </defs>
@@ -149,8 +143,8 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
       {data.show_indicator && (
         <>
           {data.indicator_style === 'highlight_bar'
-            ? renderHighlightBar(model.width / 2, 0, model.height, data)
-            : renderChevron(model.width / 2, 0, model.height, data, model.shadow?.strength > 0 ? model.shadowFilterId : null)}
+            ? renderHighlightBar(model.width / 2, model.bodyY, model.bodyHeight, data)
+            : renderChevron(model.width / 2, 0, model.totalHeight, data, model.shadow?.strength > 0 ? model.shadowFilterId : null)}
         </>
       )}
     </svg>

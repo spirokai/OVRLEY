@@ -46,10 +46,10 @@
       "heading_tape": {
         "label": "Heading Tape",
         "layoutMode": "boxed",
-        "defaultFrameWidth": 200,
-        "defaultFrameHeight": 60,
+        "defaultFrameWidth": 600,
+        "defaultFrameHeight": 100,
         "defaults": {
-          "pixels_per_degree": 5,
+          "pixels_per_degree": 9,
           "major_tick_interval": 15,
           "minor_ticks_per_major": 3,
           "show_major_ticks": true,
@@ -642,7 +642,7 @@
     },
     {
       "type": "heading",
-      "current": false,
+      "current": true,
       "label": "Heading",
       "defaultDisplayUnit": "degrees",
       "supportedDisplayUnits": [

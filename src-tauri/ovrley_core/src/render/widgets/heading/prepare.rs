@@ -6,7 +6,10 @@
 
 use super::super::common::normalize_shadow_style_validated;
 use super::super::types::HeadingWidgetCache;
-use super::geometry::{visible_labels, visible_ticks};
+use super::geometry::{
+    heading_label_baseline, heading_tape_layout, heading_tick_position, visible_labels,
+    visible_ticks, CHEVRON_GAP_PX,
+};
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedHeading, ValidatedSceneConfig};
@@ -29,9 +32,25 @@ pub fn prepare_heading_cache(
     let scale = scene.scale.max(0.1);
     let scaled_ppd = heading.pixels_per_degree * scale;
     let tape_width = (360.0 * scaled_ppd).ceil() as u32;
-    let tape_height = ((heading.height as f32) * scale).ceil().max(1.0) as u32;
+    let scaled_tick_scale_height = (heading.height as f32) * scale;
     let scaled_width = ((heading.width as f32) * scale).round().max(1.0) as u32;
-    let scaled_height = ((heading.height as f32) * scale).round().max(1.0) as u32;
+    let scaled_indicator_size = heading.indicator_size * scale;
+    let scaled_chevron_gap = CHEVRON_GAP_PX * scale;
+    let label_offset = heading.label_offset * scale;
+    let font_size = heading.label_font_size * scale;
+    let layout = heading_tape_layout(
+        scaled_tick_scale_height,
+        heading.show_indicator,
+        &heading.indicator_style,
+        &heading.indicator_placement,
+        scaled_indicator_size,
+        scaled_chevron_gap,
+        heading.major_tick_length_pct,
+        label_offset,
+        font_size,
+    );
+    let tape_height = layout.body_height.ceil().max(1.0) as u32;
+    let scaled_height = layout.total_height.ceil().max(1.0) as u32;
 
     // Resolve shadow style from scene defaults (shadow is not part of heading contract)
     let shadow = normalize_shadow_style_validated(
@@ -55,29 +74,20 @@ pub fn prepare_heading_cache(
     let label_color = heading.label_color.as_str();
     let cardinal_label_color = heading.cardinal_label_color.as_str();
 
-    // Compute tick lengths in pixels (percentage of scaled height)
-    let major_tick_length = tape_height as f32 * heading.major_tick_length_pct / 100.0;
-    let minor_tick_length = tape_height as f32 * heading.minor_tick_length_pct / 100.0;
     let major_tick_thickness = heading.major_tick_thickness * scale;
     let minor_tick_thickness = heading.minor_tick_thickness * scale;
 
-    // Compute tick y positions based on alignment
-    let center_y = tape_height as f32 / 2.0;
-    let tick_bottom = if heading.tick_alignment == "centered" {
-        center_y + major_tick_length / 2.0
-    } else {
-        // "below" alignment: ticks extend downward from centerline
-        center_y + major_tick_length
-    };
-
     // Font for labels
-    let font_size = heading.label_font_size * scale;
     let font =
         crate::render::text::resolve_font(font_dirs, heading.label_font.as_deref(), font_size)?;
 
     // Label y-position: below the ticks
-    let label_offset = heading.label_offset * scale;
-    let label_y = tick_bottom + label_offset + font_size;
+    let label_y = heading_label_baseline(
+        layout.tick_scale_height,
+        heading.major_tick_length_pct,
+        label_offset,
+        font_size,
+    );
 
     // Collect all ticks to draw
     let ticks = visible_ticks(
@@ -117,16 +127,13 @@ pub fn prepare_heading_cache(
                     } else {
                         minor_tick_thickness
                     });
-                    let length = if tick.is_major {
-                        major_tick_length
-                    } else {
-                        minor_tick_length
-                    };
-                    let top = if heading.tick_alignment == "centered" {
-                        center_y - length / 2.0
-                    } else {
-                        tick_bottom - length
-                    };
+                    let (top, length) = heading_tick_position(
+                        layout.tick_scale_height,
+                        heading.major_tick_length_pct,
+                        heading.minor_tick_length_pct,
+                        &heading.tick_alignment,
+                        tick.is_major,
+                    );
                     canvas.draw_line(
                         Point::new(tick.x, top),
                         Point::new(tick.x, top + length),
@@ -175,16 +182,13 @@ pub fn prepare_heading_cache(
             minor_tick_thickness
         });
 
-        let length = if tick.is_major {
-            major_tick_length
-        } else {
-            minor_tick_length
-        };
-        let top = if heading.tick_alignment == "centered" {
-            center_y - length / 2.0
-        } else {
-            tick_bottom - length
-        };
+        let (top, length) = heading_tick_position(
+            layout.tick_scale_height,
+            heading.major_tick_length_pct,
+            heading.minor_tick_length_pct,
+            &heading.tick_alignment,
+            tick.is_major,
+        );
 
         canvas.draw_line(
             Point::new(tick.x, top),
@@ -226,6 +230,8 @@ pub fn prepare_heading_cache(
     Ok(HeadingWidgetCache {
         tape_image,
         tape_width: tape_width as f32,
+        tape_body_y: layout.body_y,
+        tape_body_height: layout.body_height,
         x: heading.x,
         y: heading.y,
         width: scaled_width,
@@ -235,7 +241,7 @@ pub fn prepare_heading_cache(
         indicator_style: heading.indicator_style.clone(),
         indicator_placement: heading.indicator_placement.clone(),
         indicator_color: heading.indicator_color.clone(),
-        indicator_size: heading.indicator_size * scale,
+        indicator_size: scaled_indicator_size,
         indicator_shadow: shadow,
         display_type: crate::types::DisplayType::Tape,
     })

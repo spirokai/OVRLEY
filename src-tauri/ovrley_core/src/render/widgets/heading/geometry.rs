@@ -4,6 +4,125 @@
 //! heading value, widget dimensions, and scale. These are shared conceptually
 //! between the Skia backend (cached tape image) and the frontend SVG preview.
 
+pub const CHEVRON_GAP_PX: f32 = 4.0;
+pub const LABEL_DESCENT_PCT: f32 = 0.25;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HeadingTapeLayout {
+    pub body_y: f32,
+    pub body_height: f32,
+    pub tick_scale_height: f32,
+    pub total_height: f32,
+    pub has_top_chevron: bool,
+    pub has_bottom_chevron: bool,
+}
+
+pub fn heading_tape_has_chevron(
+    show_indicator: bool,
+    indicator_style: &str,
+    indicator_placement: &str,
+    placement: &str,
+) -> bool {
+    show_indicator
+        && indicator_style == "chevron"
+        && (indicator_placement == placement || indicator_placement == "both")
+}
+
+pub fn heading_tape_layout(
+    tick_scale_height: f32,
+    show_indicator: bool,
+    indicator_style: &str,
+    indicator_placement: &str,
+    indicator_size: f32,
+    chevron_gap: f32,
+    major_tick_length_pct: f32,
+    label_offset: f32,
+    font_size: f32,
+) -> HeadingTapeLayout {
+    let tick_scale_height = tick_scale_height.max(1.0);
+    let body_height = heading_tape_body_height(
+        tick_scale_height,
+        major_tick_length_pct,
+        label_offset,
+        font_size,
+    );
+    let indicator_size = indicator_size.max(0.0);
+    let has_top_chevron =
+        heading_tape_has_chevron(show_indicator, indicator_style, indicator_placement, "top");
+    let has_bottom_chevron = heading_tape_has_chevron(
+        show_indicator,
+        indicator_style,
+        indicator_placement,
+        "bottom",
+    );
+    let top_slot = if has_top_chevron {
+        indicator_size + chevron_gap
+    } else {
+        0.0
+    };
+    let bottom_slot = if has_bottom_chevron {
+        indicator_size + chevron_gap
+    } else {
+        0.0
+    };
+
+    HeadingTapeLayout {
+        body_y: top_slot,
+        body_height,
+        tick_scale_height,
+        total_height: top_slot + body_height + bottom_slot,
+        has_top_chevron,
+        has_bottom_chevron,
+    }
+}
+
+pub fn heading_tick_position(
+    body_height: f32,
+    major_tick_length_pct: f32,
+    minor_tick_length_pct: f32,
+    tick_alignment: &str,
+    is_major: bool,
+) -> (f32, f32) {
+    let major_length = body_height * major_tick_length_pct / 100.0;
+    let minor_length = body_height * minor_tick_length_pct / 100.0;
+    let length = if is_major { major_length } else { minor_length };
+    let top = if !is_major && tick_alignment == "centered" {
+        (major_length - minor_length) / 2.0
+    } else {
+        0.0
+    };
+
+    (top, length)
+}
+
+pub fn heading_label_baseline(
+    body_height: f32,
+    major_tick_length_pct: f32,
+    label_offset: f32,
+    font_size: f32,
+) -> f32 {
+    body_height * major_tick_length_pct / 100.0 + label_offset + font_size
+}
+
+pub fn heading_label_bottom(
+    body_height: f32,
+    major_tick_length_pct: f32,
+    label_offset: f32,
+    font_size: f32,
+) -> f32 {
+    heading_label_baseline(body_height, major_tick_length_pct, label_offset, font_size)
+        + font_size * LABEL_DESCENT_PCT
+}
+
+pub fn heading_tape_body_height(
+    body_height: f32,
+    major_tick_length_pct: f32,
+    label_offset: f32,
+    font_size: f32,
+) -> f32 {
+    heading_label_bottom(body_height, major_tick_length_pct, label_offset, font_size)
+}
+
 /// A single visible tick on the tape.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TapeTick {

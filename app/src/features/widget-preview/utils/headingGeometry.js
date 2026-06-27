@@ -16,6 +16,69 @@ const CARDINAL_LABELS = [
   [315, 'NW'],
 ]
 
+export const HEADING_TAPE_CHEVRON_GAP = 4
+export const HEADING_TAPE_LABEL_DESCENT_PCT = 0.25
+
+export function headingTapeHasChevron(config, placement) {
+  return Boolean(
+    config?.show_indicator &&
+    config?.indicator_style === 'chevron' &&
+    (config?.indicator_placement === placement || config?.indicator_placement === 'both'),
+  )
+}
+
+export function headingTapeLayout(config) {
+  const tickScaleHeight = Math.max(Number(config?.height) || 0, 1)
+  const bodyHeight = headingTapeBodyHeight(tickScaleHeight, config)
+  const indicatorSize = Math.max(Number(config?.indicator_size) || 0, 0)
+  const hasTopChevron = headingTapeHasChevron(config, 'top')
+  const hasBottomChevron = headingTapeHasChevron(config, 'bottom')
+  const topSlot = hasTopChevron ? indicatorSize + HEADING_TAPE_CHEVRON_GAP : 0
+  const bottomSlot = hasBottomChevron ? indicatorSize + HEADING_TAPE_CHEVRON_GAP : 0
+
+  return {
+    bodyHeight,
+    bodyY: topSlot,
+    hasBottomChevron,
+    hasTopChevron,
+    tickScaleHeight,
+    totalHeight: topSlot + bodyHeight + bottomSlot,
+  }
+}
+
+export function headingTapeRenderedHeight(config) {
+  return headingTapeLayout(config).totalHeight
+}
+
+export function headingTickPosition(bodyHeight, config, isMajor) {
+  const majorLength = (bodyHeight * (Number(config?.major_tick_length_pct) || 0)) / 100
+  const minorLength = (bodyHeight * (Number(config?.minor_tick_length_pct) || 0)) / 100
+  const length = isMajor ? majorLength : minorLength
+  const top = !isMajor && config?.tick_alignment === 'centered' ? (majorLength - minorLength) / 2 : 0
+
+  return { length, top }
+}
+
+export function headingLabelBaseline(bodyHeight, config) {
+  const majorLength = (bodyHeight * (Number(config?.major_tick_length_pct) || 0)) / 100
+  return majorLength + (Number(config?.label_offset) || 0) + (Number(config?.label_font_size) || 0)
+}
+
+export function headingLabelBottom(bodyHeight, config) {
+  return headingLabelBaseline(bodyHeight, config) + (Number(config?.label_font_size) || 0) * HEADING_TAPE_LABEL_DESCENT_PCT
+}
+
+export function headingTapeBodyHeight(bodyHeight, config) {
+  return headingLabelBottom(bodyHeight, config)
+}
+
+export function headingTickScaleHeightForRenderedBody(renderedBodyHeight, config) {
+  const majorTickRatio = Math.max(Number(config?.major_tick_length_pct) || 0, 0.001) / 100
+  const fixedLabelStack = (Number(config?.label_offset) || 0) + (Number(config?.label_font_size) || 0) * (1 + HEADING_TAPE_LABEL_DESCENT_PCT)
+
+  return Math.max((renderedBodyHeight - fixedLabelStack) / majorTickRatio, 1)
+}
+
 /**
  * Computes the scroll offset in pixels for a given heading.
  * @param {number} heading - Current heading in degrees (0–360)

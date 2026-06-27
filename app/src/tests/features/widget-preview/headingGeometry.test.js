@@ -7,6 +7,9 @@ import {
   visibleTicks,
   visibleLabels,
   chevronVertices,
+  headingLabelBaseline,
+  headingTapeLayout,
+  headingTickPosition,
 } from '@/features/widget-preview/utils/headingGeometry'
 
 describe('headingOffset', () => {
@@ -181,5 +184,72 @@ describe('chevronVertices', () => {
   test('bottom chevron points up', () => {
     const verts = chevronVertices(200, 80, 10, false)
     expect(verts[2].y).toBeCloseTo(70, 1)
+  })
+})
+
+describe('headingTapeLayout', () => {
+  const baseConfig = {
+    height: 80,
+    show_indicator: true,
+    indicator_style: 'chevron',
+    indicator_size: 10,
+    label_font_size: 12,
+    label_offset: 4,
+    major_tick_length_pct: 40,
+  }
+
+  test('adds fixed slots only for visible chevrons', () => {
+    expect(headingTapeLayout({ ...baseConfig, indicator_placement: 'top' })).toMatchObject({
+      bodyHeight: 51,
+      bodyY: 14,
+      hasBottomChevron: false,
+      hasTopChevron: true,
+      tickScaleHeight: 80,
+      totalHeight: 65,
+    })
+
+    expect(headingTapeLayout({ ...baseConfig, indicator_placement: 'bottom' })).toMatchObject({
+      bodyHeight: 51,
+      bodyY: 0,
+      hasBottomChevron: true,
+      hasTopChevron: false,
+      tickScaleHeight: 80,
+      totalHeight: 65,
+    })
+
+    expect(headingTapeLayout({ ...baseConfig, indicator_placement: 'both' })).toMatchObject({
+      bodyHeight: 51,
+      bodyY: 14,
+      hasBottomChevron: true,
+      hasTopChevron: true,
+      tickScaleHeight: 80,
+      totalHeight: 79,
+    })
+  })
+
+  test('does not reserve chevron slots for highlight bars', () => {
+    expect(headingTapeLayout({ ...baseConfig, indicator_style: 'highlight_bar', indicator_placement: 'both' })).toMatchObject({
+      bodyHeight: 51,
+      bodyY: 0,
+      tickScaleHeight: 80,
+      totalHeight: 51,
+    })
+  })
+})
+
+describe('headingTickPosition', () => {
+  const config = {
+    major_tick_length_pct: 40,
+    minor_tick_length_pct: 20,
+  }
+
+  test('alignment affects minor ticks only', () => {
+    expect(headingTickPosition(80, { ...config, tick_alignment: 'centered' }, true)).toEqual({ length: 32, top: 0 })
+    expect(headingTickPosition(80, { ...config, tick_alignment: 'centered' }, false)).toEqual({ length: 16, top: 8 })
+    expect(headingTickPosition(80, { ...config, tick_alignment: 'below' }, false)).toEqual({ length: 16, top: 0 })
+  })
+
+  test('label baseline stays at a fixed offset from the major tick bottom', () => {
+    expect(headingLabelBaseline(80, { ...config, label_offset: 4, label_font_size: 12 })).toBe(48)
   })
 })

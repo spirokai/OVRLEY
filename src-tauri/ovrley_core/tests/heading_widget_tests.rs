@@ -24,7 +24,8 @@ use ovrley_core::render::surface::create_surface;
 use ovrley_core::render::text::{origin_x_for_centered_text, resolve_font};
 use ovrley_core::render::widgets::heading::draw::draw_heading_widget;
 use ovrley_core::render::widgets::heading::geometry::{
-    chevron_vertices, visible_labels, visible_ticks, TapeTick,
+    chevron_vertices, heading_label_baseline, heading_tape_layout, heading_tick_position,
+    visible_labels, visible_ticks, TapeTick, CHEVRON_GAP_PX,
 };
 use ovrley_core::render::widgets::heading::prepare::prepare_heading_cache;
 use ovrley_core::render::widgets::types::HeadingWidgetCache;
@@ -99,10 +100,12 @@ fn default_cache() -> HeadingWidgetCache {
             surface.image_snapshot()
         },
         tape_width: 1800.0,
+        tape_body_y: 14.0,
+        tape_body_height: 51.0,
         x: 100.0,
         y: 200.0,
         width: 400,
-        height: 80,
+        height: 65,
         pixels_per_degree: 5.0,
         show_indicator: true,
         indicator_style: "chevron".to_string(),
@@ -296,6 +299,77 @@ fn chevron_vertices_pointing_up() {
 // ── Prepare: cache construction ───────────────────────────────────────────
 
 #[test]
+fn heading_tape_layout_adds_only_visible_chevron_slots() {
+    let top = heading_tape_layout(
+        80.0,
+        true,
+        "chevron",
+        "top",
+        10.0,
+        CHEVRON_GAP_PX,
+        40.0,
+        4.0,
+        12.0,
+    );
+    assert!((top.body_y - 14.0).abs() < f32::EPSILON);
+    assert!((top.body_height - 51.0).abs() < f32::EPSILON);
+    assert!((top.tick_scale_height - 80.0).abs() < f32::EPSILON);
+    assert!((top.total_height - 65.0).abs() < f32::EPSILON);
+    assert!(top.has_top_chevron);
+    assert!(!top.has_bottom_chevron);
+
+    let bottom = heading_tape_layout(
+        80.0,
+        true,
+        "chevron",
+        "bottom",
+        10.0,
+        CHEVRON_GAP_PX,
+        40.0,
+        4.0,
+        12.0,
+    );
+    assert!((bottom.body_y - 0.0).abs() < f32::EPSILON);
+    assert!((bottom.total_height - 65.0).abs() < f32::EPSILON);
+    assert!(!bottom.has_top_chevron);
+    assert!(bottom.has_bottom_chevron);
+
+    let both = heading_tape_layout(
+        80.0,
+        true,
+        "chevron",
+        "both",
+        10.0,
+        CHEVRON_GAP_PX,
+        40.0,
+        4.0,
+        12.0,
+    );
+    assert!((both.body_y - 14.0).abs() < f32::EPSILON);
+    assert!((both.total_height - 79.0).abs() < f32::EPSILON);
+}
+
+#[test]
+fn heading_tick_alignment_affects_minor_ticks_only() {
+    let major = heading_tick_position(80.0, 40.0, 20.0, "centered", true);
+    let minor_centered = heading_tick_position(80.0, 40.0, 20.0, "centered", false);
+    let minor_below = heading_tick_position(80.0, 40.0, 20.0, "below", false);
+
+    assert!((major.0 - 0.0).abs() < f32::EPSILON);
+    assert!((major.1 - 32.0).abs() < f32::EPSILON);
+    assert!((minor_centered.0 - 8.0).abs() < f32::EPSILON);
+    assert!((minor_centered.1 - 16.0).abs() < f32::EPSILON);
+    assert!((minor_below.0 - 0.0).abs() < f32::EPSILON);
+    assert!((minor_below.1 - 16.0).abs() < f32::EPSILON);
+}
+
+#[test]
+fn heading_label_baseline_uses_fixed_offset_from_major_tick_bottom() {
+    let baseline = heading_label_baseline(80.0, 40.0, 4.0, 12.0);
+    assert!((baseline - 48.0).abs() < f32::EPSILON);
+}
+
+#[test]
 fn prepare_heading_cache_produces_non_empty_tape() {
     let heading = default_heading();
     let mut profiler = RenderProfiler::default();
@@ -305,7 +379,9 @@ fn prepare_heading_cache_produces_non_empty_tape() {
 
     assert!((cache.tape_width - 1800.0).abs() < 1.0);
     assert_eq!(cache.width, 400);
-    assert_eq!(cache.height, 80);
+    assert_eq!(cache.height, 65);
+    assert!((cache.tape_body_y - 14.0).abs() < f32::EPSILON);
+    assert!((cache.tape_body_height - 51.0).abs() < f32::EPSILON);
     assert!((cache.pixels_per_degree - 5.0).abs() < f32::EPSILON);
     assert!((cache.x - 100.0).abs() < f32::EPSILON);
     assert!((cache.y - 200.0).abs() < f32::EPSILON);
@@ -324,7 +400,7 @@ fn prepare_heading_cache_with_no_labels() {
         prepare_heading_cache(&default_validated_scene(), &heading, &[], &mut profiler).unwrap();
 
     assert_eq!(cache.width, 400);
-    assert_eq!(cache.height, 80);
+    assert_eq!(cache.height, 65);
 }
 
 #[test]
@@ -375,5 +451,5 @@ fn draw_heading_widget_with_chevron_indicator() {
     assert!(report.is_some());
     let report = report.unwrap();
     assert_eq!(report.geometry.widget_width, 400);
-    assert_eq!(report.geometry.widget_height, 80);
+    assert_eq!(report.geometry.widget_height, 65);
 }

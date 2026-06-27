@@ -220,6 +220,10 @@ pub struct HeadingWidgetCache {
     pub tape_image: Image,
     /// Tape image width in pixels (360 × pixels_per_degree).
     pub tape_width: f32,
+    /// Y offset from widget top to the tape body.
+    pub tape_body_y: f32,
+    /// Tape body height in pixels, excluding chevrons and chevron gaps.
+    pub tape_body_height: f32,
     /// Widget position and dimensions.
     pub x: f32,
     pub y: f32,

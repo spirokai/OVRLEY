@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { getInterpolatedActivityValue } from '@/features/overlay-editor'
 import { getPreviewFontFamily, getWidgetOpacity } from '../utils/textMeasurement'
-import { headingOffset, visibleLabels, visibleTicks } from '../utils/headingGeometry'
+import { headingOffset, headingTapeLayout, visibleLabels, visibleTicks } from '../utils/headingGeometry'
 import { getTextShadowParts } from '../utils/shadowUtils'
 import { sanitizeSvgId } from '../utils/svgPreviewUtils'
 import { useFontMetricsVersion } from './useFontMetricsVersion'
@@ -38,10 +38,13 @@ export function useHeadingPreviewModel({ widget, activity, previewSecond, global
   useFontMetricsVersion(labelFontFamily, labelFontSize)
 
   return useMemo(() => {
-    // Viewport and opacity: boxed heading widgets guarantee geometry, but keep raster minimums.
+    // Viewport and opacity: boxed heading widgets guarantee geometry; clamp only invalid transient values.
     const scale = globalScale ?? 1
-    const width = Math.max(data.width, 80)
-    const height = Math.max(data.height, 20)
+    const width = Math.max(data.width, 1)
+    const layout = headingTapeLayout(data)
+    const bodyHeight = layout.bodyHeight
+    const tickScaleHeight = layout.tickScaleHeight
+    const totalHeight = layout.totalHeight
     const ppd = data.pixels_per_degree
     const opacity = getWidgetOpacity(data, globalOpacity)
     const tapeWidth = 360 * ppd
@@ -58,9 +61,12 @@ export function useHeadingPreviewModel({ widget, activity, previewSecond, global
     return {
       data,
       width,
-      height,
+      bodyHeight,
+      bodyY: layout.bodyY,
+      tickScaleHeight,
+      totalHeight,
       displayWidth: width * scale,
-      displayHeight: height * scale,
+      displayHeight: totalHeight * scale,
       opacity,
       tapeWidth,
       labelFontFamily,

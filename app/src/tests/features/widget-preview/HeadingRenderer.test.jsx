@@ -30,6 +30,7 @@ function makeHeadingWidget(overrides = {}) {
       label_color: '#cccccc',
       cardinal_label_color: '#ff0000',
       label_font_size: 12,
+      label_offset: 4,
       show_indicator: true,
       indicator_style: 'chevron',
       indicator_placement: 'top',
@@ -60,7 +61,66 @@ describe('OverlayHeadingWidget', () => {
     const { container } = render(<OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} />)
     const svg = container.querySelector('svg')
     expect(svg).toHaveAttribute('width', '500')
-    expect(svg).toHaveAttribute('height', '100')
+    expect(svg).toHaveAttribute('height', '73')
+  })
+
+  test('uses configured height as the tape body and adds visible chevron slots', () => {
+    const top = render(
+      <OverlayHeadingWidget
+        widget={makeHeadingWidget({ height: 80, indicator_placement: 'top' })}
+        activity={makeActivity()}
+        previewSecond={0}
+        globalOpacity={1}
+      />,
+    )
+    expect(top.container.querySelector('svg')).toHaveAttribute('height', '65')
+
+    const bottom = render(
+      <OverlayHeadingWidget
+        widget={makeHeadingWidget({ height: 80, indicator_placement: 'bottom' })}
+        activity={makeActivity()}
+        previewSecond={0}
+        globalOpacity={1}
+      />,
+    )
+    expect(bottom.container.querySelector('svg')).toHaveAttribute('height', '65')
+
+    const both = render(
+      <OverlayHeadingWidget
+        widget={makeHeadingWidget({ height: 80, indicator_placement: 'both' })}
+        activity={makeActivity()}
+        previewSecond={0}
+        globalOpacity={1}
+      />,
+    )
+    expect(both.container.querySelector('svg')).toHaveAttribute('height', '79')
+  })
+
+  test('places ticks at the body top after the top chevron gap', () => {
+    const widget = makeHeadingWidget({ height: 80, indicator_placement: 'top' })
+    const { container } = render(<OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} />)
+    const majorTick = Array.from(container.querySelectorAll('line')).find((line) => line.getAttribute('stroke-width') === '2')
+
+    expect(majorTick).toHaveAttribute('y1', '14')
+  })
+
+  test('moves ticks to the widget top when the top chevron is removed', () => {
+    const widget = makeHeadingWidget({ height: 80, indicator_placement: 'bottom' })
+    const { container } = render(<OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} />)
+    const majorTick = Array.from(container.querySelectorAll('line')).find((line) => line.getAttribute('stroke-width') === '2')
+
+    expect(majorTick).toHaveAttribute('y1', '0')
+  })
+
+  test('centered alignment changes minor ticks without moving major ticks', () => {
+    const widget = makeHeadingWidget({ height: 80, indicator_placement: 'top', tick_alignment: 'centered' })
+    const { container } = render(<OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} />)
+    const lines = Array.from(container.querySelectorAll('line'))
+    const majorTick = lines.find((line) => line.getAttribute('stroke-width') === '2')
+    const minorTick = lines.find((line) => line.getAttribute('stroke-width') === '1')
+
+    expect(majorTick).toHaveAttribute('y1', '14')
+    expect(minorTick).toHaveAttribute('y1', '22')
   })
 
   test('renders a clip path for the wrapped tape copies', () => {
