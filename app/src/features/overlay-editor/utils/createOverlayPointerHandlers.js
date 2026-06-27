@@ -73,7 +73,7 @@ function getScenePoint(sceneElement, displayScale, sceneSize, clientX, clientY) 
  * @param {Object<string, HTMLElement>} options.widgetNodes - Widget DOM node map.
  * @returns {string[]} Intersecting widget IDs.
  */
-function getIntersectedWidgetIds({ displayScale, nextSelectionRect, orderedWidgetIds, sceneElement, widgetNodes }) {
+function getIntersectedWidgetIds({ nextSelectionRect, orderedWidgetIds, sceneElement, widgetNodes }) {
   if (!sceneElement) {
     return []
   }

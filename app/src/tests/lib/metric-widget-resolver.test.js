@@ -105,9 +105,9 @@ describe('resolveActiveMetricWidgetData', () => {
     }
 
     const resolved = resolveActiveMetricWidgetData(data)
-    // Falls back to manifest defaults (200x60 for heading_tape)
-    expect(resolved.width).toBe(200)
-    expect(resolved.height).toBe(60)
+    // Falls back to manifest defaults (600x100 for heading_tape)
+    expect(resolved.width).toBe(600)
+    expect(resolved.height).toBe(100)
     expect(resolved.rotation).toBe(0)
   })
 
@@ -134,8 +134,8 @@ describe('initDisplayVariant', () => {
 
     expect(result.display_variants.heading_tape).toBeDefined()
     expect(result.display_variants.heading_tape.pixels_per_degree).toBe(HEADING_TAPE_DEFAULTS.pixels_per_degree)
-    expect(result.display_variants.heading_tape.width).toBe(200)
-    expect(result.display_variants.heading_tape.height).toBe(60)
+    expect(result.display_variants.heading_tape.width).toBe(600)
+    expect(result.display_variants.heading_tape.height).toBe(100)
   })
 
   test('seeds variant with current top-level frame geometry', () => {

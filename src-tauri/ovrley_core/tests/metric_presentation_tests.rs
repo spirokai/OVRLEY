@@ -586,7 +586,7 @@ fn render_preserves_multiple_boxed_reports() {
         "Reported widget geometry should match configured heading-tape width"
     );
     assert_eq!(
-        presentation.widget.geometry.widget_height, 34,
+        presentation.widget.geometry.widget_height, 35,
         "Reported widget geometry should include the configured heading-tape body and visible chevron slot"
     );
 

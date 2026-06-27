@@ -206,6 +206,7 @@ fn full_linear_gauge_config(x: i32, y: i32) -> serde_json::Value {
         "show_min_max_labels": false,
         "min_max_label_font": "Arial.ttf",
         "min_max_label_font_size": 12,
+        "min_max_label_position": "bottom",
         "min_max_label_color": "#ffffff"
     })
 }

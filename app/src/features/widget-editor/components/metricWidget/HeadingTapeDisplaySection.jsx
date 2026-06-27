@@ -58,7 +58,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
         <SectionHeading icon={Ruler} title="Ticks" />
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-2 px-1">
+            <div className="flex items-center justify-between gap-2 px-1 pb-2">
               <span className="text-[9px] text-muted-foreground uppercase font-bold">Major Ticks</span>
               <ToggleField checked={showMajorTicks} onCheckedChange={(checked) => updateTape({ show_major_ticks: checked })} />
             </div>
@@ -84,7 +84,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
             />
           </div>
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-2 px-1">
+            <div className="flex items-center justify-between gap-2 px-1 pb-2">
               <span className="text-[9px] text-muted-foreground uppercase font-bold">Minor Ticks</span>
               <ToggleField checked={showMinorTicks} onCheckedChange={(checked) => updateTape({ show_minor_ticks: checked })} />
             </div>
@@ -133,13 +133,15 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData }) 
           triggerClassName="h-9 border-border/70 bg-surface text-xs"
           labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
         />
-        <div className="flex items-center justify-between gap-2 px-1">
-          <span className="text-[9px] text-muted-foreground uppercase font-bold">Minor Labels</span>
-          <ToggleField checked={showMinorLabels} onCheckedChange={(checked) => updateTape({ show_minor_labels: checked })} />
-        </div>
-        <div className="flex items-center justify-between gap-2 px-1">
-          <span className="text-[9px] text-muted-foreground uppercase font-bold">Major Labels</span>
-          <ToggleField checked={showMajorLabels} onCheckedChange={(checked) => updateTape({ show_major_labels: checked })} />
+        <div className="grid grid-cols-2 gap-4 py-2">
+          <div className="flex items-center justify-between gap-2 px-1">
+            <span className="text-[9px] text-muted-foreground uppercase font-bold">Minor Labels</span>
+            <ToggleField checked={showMinorLabels} onCheckedChange={(checked) => updateTape({ show_minor_labels: checked })} />
+          </div>
+          <div className="flex items-center justify-between gap-2 px-1">
+            <span className="text-[9px] text-muted-foreground uppercase font-bold">Major Labels</span>
+            <ToggleField checked={showMajorLabels} onCheckedChange={(checked) => updateTape({ show_major_labels: checked })} />
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <ColorField label="Label Color" value={tapeData.label_color} onChange={(value) => updateTape({ label_color: value })} />

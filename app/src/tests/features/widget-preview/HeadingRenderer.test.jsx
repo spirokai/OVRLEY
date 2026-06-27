@@ -61,7 +61,7 @@ describe('OverlayHeadingWidget', () => {
     const { container } = render(<OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} />)
     const svg = container.querySelector('svg')
     expect(svg).toHaveAttribute('width', '500')
-    expect(svg).toHaveAttribute('height', '73')
+    expect(svg).toHaveAttribute('height', '74')
   })
 
   test('uses configured height as the tape body and adds visible chevron slots', () => {
@@ -73,7 +73,7 @@ describe('OverlayHeadingWidget', () => {
         globalOpacity={1}
       />,
     )
-    expect(top.container.querySelector('svg')).toHaveAttribute('height', '65')
+    expect(top.container.querySelector('svg')).toHaveAttribute('height', '66')
 
     const bottom = render(
       <OverlayHeadingWidget
@@ -83,7 +83,7 @@ describe('OverlayHeadingWidget', () => {
         globalOpacity={1}
       />,
     )
-    expect(bottom.container.querySelector('svg')).toHaveAttribute('height', '65')
+    expect(bottom.container.querySelector('svg')).toHaveAttribute('height', '66')
 
     const both = render(
       <OverlayHeadingWidget
@@ -93,7 +93,7 @@ describe('OverlayHeadingWidget', () => {
         globalOpacity={1}
       />,
     )
-    expect(both.container.querySelector('svg')).toHaveAttribute('height', '79')
+    expect(both.container.querySelector('svg')).toHaveAttribute('height', '81')
   })
 
   test('places ticks at the body top after the top chevron gap', () => {
@@ -101,7 +101,7 @@ describe('OverlayHeadingWidget', () => {
     const { container } = render(<OverlayHeadingWidget widget={widget} activity={makeActivity()} previewSecond={0} globalOpacity={1} />)
     const majorTick = Array.from(container.querySelectorAll('line')).find((line) => line.getAttribute('stroke-width') === '2')
 
-    expect(majorTick).toHaveAttribute('y1', '14')
+    expect(majorTick).toHaveAttribute('y1', '15')
   })
 
   test('moves ticks to the widget top when the top chevron is removed', () => {
@@ -119,8 +119,8 @@ describe('OverlayHeadingWidget', () => {
     const majorTick = lines.find((line) => line.getAttribute('stroke-width') === '2')
     const minorTick = lines.find((line) => line.getAttribute('stroke-width') === '1')
 
-    expect(majorTick).toHaveAttribute('y1', '14')
-    expect(minorTick).toHaveAttribute('y1', '22')
+    expect(majorTick).toHaveAttribute('y1', '15')
+    expect(minorTick).toHaveAttribute('y1', '23')
   })
 
   test('renders a clip path for the wrapped tape copies', () => {

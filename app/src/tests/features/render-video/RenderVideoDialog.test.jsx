@@ -71,11 +71,11 @@ describe('RenderVideoDialog', () => {
       />,
     )
 
-    expect(screen.getByText('Composite Video Export Settings')).toBeInTheDocument()
+    expect(screen.getByText('Export Settings')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('switch', { name: /transparent export/i }))
+    await user.click(screen.getByRole('tab', { name: 'Transparent' }))
 
-    expect(screen.getByText('Transparent Export Settings')).toBeInTheDocument()
+    expect(screen.getByText('Export Settings')).toBeInTheDocument()
     expect(screen.getByText('Custom Export Range')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /use video range/i })).toBeInTheDocument()
     expect(screen.getByDisplayValue('00:00:05')).toBeInTheDocument()

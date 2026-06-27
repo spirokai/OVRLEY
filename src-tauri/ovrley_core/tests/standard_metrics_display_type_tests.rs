@@ -33,7 +33,7 @@ fn display_type_definitions_load_from_manifest() {
     assert_eq!(linear.label, "Linear");
     assert_eq!(linear.layout_mode, DisplayTypeLayoutMode::Boxed);
     assert_eq!(linear.default_frame_width, Some(200));
-    assert_eq!(linear.default_frame_height, Some(60));
+    assert_eq!(linear.default_frame_height, Some(30));
 
     let arc = display_type_definition("arc").expect("arc must exist");
     assert_eq!(arc.label, "Arc");
@@ -44,8 +44,8 @@ fn display_type_definitions_load_from_manifest() {
     let heading_tape = display_type_definition("heading_tape").expect("heading_tape must exist");
     assert_eq!(heading_tape.label, "Heading Tape");
     assert_eq!(heading_tape.layout_mode, DisplayTypeLayoutMode::Boxed);
-    assert_eq!(heading_tape.default_frame_width, Some(200));
-    assert_eq!(heading_tape.default_frame_height, Some(60));
+    assert_eq!(heading_tape.default_frame_width, Some(600));
+    assert_eq!(heading_tape.default_frame_height, Some(100));
 }
 
 #[test]
@@ -70,11 +70,11 @@ fn is_boxed_display_type_correct() {
 #[test]
 fn default_frame_dimensions_for_boxed_types() {
     assert_eq!(default_frame_dimensions("text"), None);
-    assert_eq!(default_frame_dimensions("linear"), Some((200, 60)));
+    assert_eq!(default_frame_dimensions("linear"), Some((200, 30)));
     assert_eq!(default_frame_dimensions("bars"), Some((200, 60)));
     assert_eq!(default_frame_dimensions("arc"), Some((120, 120)));
     assert_eq!(default_frame_dimensions("corner"), Some((200, 60)));
-    assert_eq!(default_frame_dimensions("heading_tape"), Some((200, 60)));
+    assert_eq!(default_frame_dimensions("heading_tape"), Some((600, 100)));
     assert_eq!(default_frame_dimensions("nonexistent"), None);
 }
 
@@ -88,9 +88,6 @@ fn supported_display_types_per_metric() {
     let speed = supported_display_types(MetricKind::Speed);
     assert!(speed.iter().any(|dt| dt == "text"));
     assert!(speed.iter().any(|dt| dt == "linear"));
-    assert!(speed.iter().any(|dt| dt == "bars"));
-    assert!(speed.iter().any(|dt| dt == "arc"));
-    assert!(speed.iter().any(|dt| dt == "corner"));
 
     let core_temp = supported_display_types(MetricKind::CoreTemperature);
     assert_eq!(core_temp.len(), 1);

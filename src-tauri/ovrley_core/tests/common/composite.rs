@@ -366,9 +366,8 @@ pub fn recent_template_config(width: u32, height: u32) -> ValidatedRenderConfig 
 
 /// Loads the shipped recent-template fixture as a mutable raw config.
 pub fn mutable_recent_template_config(width: u32, height: u32) -> RenderConfig {
-    let git_root = crate::common::test_config::repo_git_root();
-    let template =
-        fs::read_to_string(git_root.join("templates").join("recent-template.json")).unwrap();
+    let template_path = crate::common::test_config::test_template_4k_path();
+    let template = fs::read_to_string(template_path).unwrap();
     let value: Value = serde_json::from_str(&template).unwrap();
     let mut config = parse_template_value(&value).unwrap();
     config.scene.width = Some(width);

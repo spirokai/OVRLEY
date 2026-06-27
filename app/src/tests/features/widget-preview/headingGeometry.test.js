@@ -198,14 +198,14 @@ describe('headingTapeLayout', () => {
     major_tick_length_pct: 40,
   }
 
-  test('adds fixed slots only for visible chevrons', () => {
+  test('adds slots proportional to indicator size for visible chevrons', () => {
     expect(headingTapeLayout({ ...baseConfig, indicator_placement: 'top' })).toMatchObject({
       bodyHeight: 51,
-      bodyY: 14,
+      bodyY: 15,
       hasBottomChevron: false,
       hasTopChevron: true,
       tickScaleHeight: 80,
-      totalHeight: 65,
+      totalHeight: 66,
     })
 
     expect(headingTapeLayout({ ...baseConfig, indicator_placement: 'bottom' })).toMatchObject({
@@ -214,16 +214,16 @@ describe('headingTapeLayout', () => {
       hasBottomChevron: true,
       hasTopChevron: false,
       tickScaleHeight: 80,
-      totalHeight: 65,
+      totalHeight: 66,
     })
 
     expect(headingTapeLayout({ ...baseConfig, indicator_placement: 'both' })).toMatchObject({
       bodyHeight: 51,
-      bodyY: 14,
+      bodyY: 15,
       hasBottomChevron: true,
       hasTopChevron: true,
       tickScaleHeight: 80,
-      totalHeight: 79,
+      totalHeight: 81,
     })
   })
 

@@ -145,8 +145,11 @@ fn complete_linear_display_type_validates_as_gauge() {
             "track_filled_color": "#40e0d0",
             "track_filled_opacity": 1,
             "show_min_max_labels": false,
+            "min_max_label_font": "Arial.ttf",
             "min_max_label_font_size": 12,
-            "min_max_label_color": "#ffffff"
+            "min_max_label_position": "bottom",
+            "min_max_label_color": "#ffffff",
+            "track_fill_flat": false
         }],
         "plots": []
     }));

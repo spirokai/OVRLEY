@@ -63,6 +63,11 @@ pub fn sample_video_path() -> PathBuf {
 }
 
 #[allow(dead_code)]
+pub fn test_template_4k_path() -> PathBuf {
+    fixtures().join("config").join("test-template-4k.json")
+}
+
+#[allow(dead_code)]
 pub fn workspace_root() -> PathBuf {
     repo_root().parent().unwrap().to_path_buf()
 }

@@ -43,6 +43,7 @@ describe('standard metric widget catalog', () => {
       'vertical_ratio',
       'vertical_oscillation',
       'core_temperature',
+      'heading',
       'altitude',
       'iso',
       'aperture',

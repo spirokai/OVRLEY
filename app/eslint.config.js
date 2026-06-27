@@ -65,4 +65,10 @@ export default defineConfig([
       globals: globals.vitest,
     },
   },
+  {
+    files: ['vite.config.js', 'eslint.config.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])
