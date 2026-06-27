@@ -160,6 +160,13 @@ pub fn prepare_heading_cache(
                         &font,
                         &shadow_label_paint,
                     );
+                    // Wrapped copy so labels at tape edges tile seamlessly
+                    canvas.draw_str(
+                        &label.text,
+                        Point::new(label_x + tape_width as f32, label_y),
+                        &font,
+                        &shadow_label_paint,
+                    );
                 }
             }
         }
@@ -214,6 +221,13 @@ pub fn prepare_heading_cache(
             canvas.draw_str(
                 &label.text,
                 Point::new(label_x, label_y),
+                &font,
+                &label_paint,
+            );
+            // Wrapped copy so labels at tape edges tile seamlessly
+            canvas.draw_str(
+                &label.text,
+                Point::new(label_x + tape_width as f32, label_y),
                 &font,
                 &label_paint,
             );
