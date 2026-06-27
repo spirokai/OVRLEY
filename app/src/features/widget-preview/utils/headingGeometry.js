@@ -16,7 +16,6 @@ const CARDINAL_LABELS = [
   [315, 'NW'],
 ]
 
-export const HEADING_TAPE_CHEVRON_GAP = 4
 export const HEADING_TAPE_LABEL_DESCENT_PCT = 0.25
 
 export function headingTapeHasChevron(config, placement) {
@@ -31,10 +30,11 @@ export function headingTapeLayout(config) {
   const tickScaleHeight = Math.max(Number(config?.height) || 0, 1)
   const bodyHeight = headingTapeBodyHeight(tickScaleHeight, config)
   const indicatorSize = Math.max(Number(config?.indicator_size) || 0, 0)
+  const gap = indicatorSize * 0.5
   const hasTopChevron = headingTapeHasChevron(config, 'top')
   const hasBottomChevron = headingTapeHasChevron(config, 'bottom')
-  const topSlot = hasTopChevron ? indicatorSize + HEADING_TAPE_CHEVRON_GAP : 0
-  const bottomSlot = hasBottomChevron ? indicatorSize + HEADING_TAPE_CHEVRON_GAP : 0
+  const topSlot = hasTopChevron ? indicatorSize + gap : 0
+  const bottomSlot = hasBottomChevron ? indicatorSize + gap : 0
 
   return {
     bodyHeight,

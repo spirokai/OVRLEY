@@ -8,7 +8,7 @@ use super::super::common::normalize_shadow_style_validated;
 use super::super::types::HeadingWidgetCache;
 use super::geometry::{
     heading_label_baseline, heading_tape_layout, heading_tick_position, visible_labels,
-    visible_ticks, CHEVRON_GAP_PX,
+    visible_ticks,
 };
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
@@ -35,7 +35,6 @@ pub fn prepare_heading_cache(
     let scaled_tick_scale_height = (heading.height as f32) * scale;
     let scaled_width = ((heading.width as f32) * scale).round().max(1.0) as u32;
     let scaled_indicator_size = heading.indicator_size * scale;
-    let scaled_chevron_gap = CHEVRON_GAP_PX * scale;
     let label_offset = heading.label_offset * scale;
     let font_size = heading.label_font_size * scale;
     let layout = heading_tape_layout(
@@ -44,7 +43,6 @@ pub fn prepare_heading_cache(
         &heading.indicator_style,
         &heading.indicator_placement,
         scaled_indicator_size,
-        scaled_chevron_gap,
         heading.major_tick_length_pct,
         label_offset,
         font_size,

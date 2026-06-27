@@ -4,7 +4,6 @@
 //! heading value, widget dimensions, and scale. These are shared conceptually
 //! between the Skia backend (cached tape image) and the frontend SVG preview.
 
-pub const CHEVRON_GAP_PX: f32 = 4.0;
 pub const LABEL_DESCENT_PCT: f32 = 0.25;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -34,7 +33,6 @@ pub fn heading_tape_layout(
     indicator_style: &str,
     indicator_placement: &str,
     indicator_size: f32,
-    chevron_gap: f32,
     major_tick_length_pct: f32,
     label_offset: f32,
     font_size: f32,
@@ -47,6 +45,7 @@ pub fn heading_tape_layout(
         font_size,
     );
     let indicator_size = indicator_size.max(0.0);
+    let gap = indicator_size * 0.5;
     let has_top_chevron =
         heading_tape_has_chevron(show_indicator, indicator_style, indicator_placement, "top");
     let has_bottom_chevron = heading_tape_has_chevron(
@@ -56,12 +55,12 @@ pub fn heading_tape_layout(
         "bottom",
     );
     let top_slot = if has_top_chevron {
-        indicator_size + chevron_gap
+        indicator_size + gap
     } else {
         0.0
     };
     let bottom_slot = if has_bottom_chevron {
-        indicator_size + chevron_gap
+        indicator_size + gap
     } else {
         0.0
     };

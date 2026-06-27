@@ -25,7 +25,7 @@ use ovrley_core::render::text::{origin_x_for_centered_text, resolve_font};
 use ovrley_core::render::widgets::heading::draw::draw_heading_widget;
 use ovrley_core::render::widgets::heading::geometry::{
     chevron_vertices, heading_label_baseline, heading_tape_layout, heading_tick_position,
-    visible_labels, visible_ticks, TapeTick, CHEVRON_GAP_PX,
+    visible_labels, visible_ticks, TapeTick,
 };
 use ovrley_core::render::widgets::heading::prepare::prepare_heading_cache;
 use ovrley_core::render::widgets::types::HeadingWidgetCache;
@@ -306,15 +306,14 @@ fn heading_tape_layout_adds_only_visible_chevron_slots() {
         "chevron",
         "top",
         10.0,
-        CHEVRON_GAP_PX,
         40.0,
         4.0,
         12.0,
     );
-    assert!((top.body_y - 14.0).abs() < f32::EPSILON);
+    assert!((top.body_y - 15.0).abs() < f32::EPSILON);
     assert!((top.body_height - 51.0).abs() < f32::EPSILON);
     assert!((top.tick_scale_height - 80.0).abs() < f32::EPSILON);
-    assert!((top.total_height - 65.0).abs() < f32::EPSILON);
+    assert!((top.total_height - 66.0).abs() < f32::EPSILON);
     assert!(top.has_top_chevron);
     assert!(!top.has_bottom_chevron);
 
@@ -324,13 +323,12 @@ fn heading_tape_layout_adds_only_visible_chevron_slots() {
         "chevron",
         "bottom",
         10.0,
-        CHEVRON_GAP_PX,
         40.0,
         4.0,
         12.0,
     );
     assert!((bottom.body_y - 0.0).abs() < f32::EPSILON);
-    assert!((bottom.total_height - 65.0).abs() < f32::EPSILON);
+    assert!((bottom.total_height - 66.0).abs() < f32::EPSILON);
     assert!(!bottom.has_top_chevron);
     assert!(bottom.has_bottom_chevron);
 
@@ -340,13 +338,12 @@ fn heading_tape_layout_adds_only_visible_chevron_slots() {
         "chevron",
         "both",
         10.0,
-        CHEVRON_GAP_PX,
         40.0,
         4.0,
         12.0,
     );
-    assert!((both.body_y - 14.0).abs() < f32::EPSILON);
-    assert!((both.total_height - 79.0).abs() < f32::EPSILON);
+    assert!((both.body_y - 15.0).abs() < f32::EPSILON);
+    assert!((both.total_height - 81.0).abs() < f32::EPSILON);
 }
 
 #[test]
@@ -379,8 +376,8 @@ fn prepare_heading_cache_produces_non_empty_tape() {
 
     assert!((cache.tape_width - 1800.0).abs() < 1.0);
     assert_eq!(cache.width, 400);
-    assert_eq!(cache.height, 65);
-    assert!((cache.tape_body_y - 14.0).abs() < f32::EPSILON);
+    assert_eq!(cache.height, 66);
+    assert!((cache.tape_body_y - 15.0).abs() < f32::EPSILON);
     assert!((cache.tape_body_height - 51.0).abs() < f32::EPSILON);
     assert!((cache.pixels_per_degree - 5.0).abs() < f32::EPSILON);
     assert!((cache.x - 100.0).abs() < f32::EPSILON);
@@ -400,7 +397,7 @@ fn prepare_heading_cache_with_no_labels() {
         prepare_heading_cache(&default_validated_scene(), &heading, &[], &mut profiler).unwrap();
 
     assert_eq!(cache.width, 400);
-    assert_eq!(cache.height, 65);
+    assert_eq!(cache.height, 66);
 }
 
 #[test]
