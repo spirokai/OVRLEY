@@ -15,7 +15,7 @@ use ovrley_core::encode::codec_detect::detect_codecs;
 use ovrley_core::encode::video::{
     render_composite_video, CompositeRenderRequest, RenderController,
 };
-use ovrley_core::encode::video_probe::probe_video;
+use ovrley_core::media::video_probe::probe_video;
 use ovrley_core::paths::AppPaths;
 use serde::Serialize;
 use serde_json::Value;

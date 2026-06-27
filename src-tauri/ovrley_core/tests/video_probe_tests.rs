@@ -22,7 +22,8 @@
 
 use serde_json::json;
 
-use ovrley_core::encode::video_probe::read_video_stream_duration;
+use ovrley_core::media::video_probe::read_video_stream_duration;
+use ovrley_core::media::{Resolution, SourceVideoMetadata};
 
 mod common;
 
@@ -48,6 +49,38 @@ fn falls_back_to_frame_count_when_stream_duration_is_missing() {
     let duration = read_video_stream_duration(&stream, Some(30.0)).unwrap();
 
     assert!((duration - 30.033333333333335).abs() < 1e-9);
+}
+
+#[test]
+fn source_video_metadata_serializes_sync_and_legacy_creation_fields() {
+    let metadata = SourceVideoMetadata {
+        path: "clip.mp4".to_string(),
+        duration: Some(12.5),
+        fps: Some(29.97002997002997),
+        fps_num: Some(30000),
+        fps_den: Some(1001),
+        resolution: Some(Resolution {
+            width: 1920,
+            height: 1080,
+        }),
+        creation_time: Some("2026-05-20T21:49:10.000000Z".to_string()),
+        sync_time: Some("2026-05-20T21:49:10.000000Z".to_string()),
+        codec_name: Some("h264".to_string()),
+        codec_long_name: None,
+        codec_profile: None,
+        pix_fmt: Some("yuv420p".to_string()),
+        bits_per_raw_sample: Some(8),
+        has_audio: true,
+        container_format: Some("mov,mp4,m4a,3gp,3g2,mj2".to_string()),
+        rotation_degrees: Some(0),
+    };
+
+    let value = serde_json::to_value(metadata).unwrap();
+
+    assert_eq!(value["creationTime"], "2026-05-20T21:49:10.000000Z");
+    assert_eq!(value["syncTime"], "2026-05-20T21:49:10.000000Z");
+    assert_eq!(value["fpsNum"], 30000);
+    assert_eq!(value["fpsDen"], 1001);
 }
 
 // --- Snapshot / golden tests (Step 11g) ---

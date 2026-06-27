@@ -24,6 +24,8 @@ pub mod encode;
 pub mod error;
 /// Shared interpolation utilities used by activity and render modules.
 pub mod interpolation;
+/// Source media probing and embedded telemetry extraction.
+pub mod media;
 /// Render config validation seam — zero backend-owned defaults.
 pub mod normalize;
 /// Application path configuration and resolution.

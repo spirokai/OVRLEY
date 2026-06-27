@@ -14,7 +14,7 @@
 //! Forbidden dependencies: `crate::commands`, `crate::render`, `crate::normalize`.
 //!
 //! Related modules: [`crate::encode::ffmpeg_composite_profiles`] (consumes detected
-//!       codecs to select encoder profiles), [`crate::encode::video_probe`]
+//!       codecs to select encoder profiles), [`crate::media::video_probe`]
 //!       (video metadata extraction, separate concern).
 //!
 //! ## Thread Safety

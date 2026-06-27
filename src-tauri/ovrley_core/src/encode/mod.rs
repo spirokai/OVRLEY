@@ -52,8 +52,6 @@ mod video_debug;
 pub(crate) mod video_parallel;
 /// Single-render video pipeline used by normal and segmented renders.
 pub(crate) mod video_pipeline;
-/// Video metadata extraction via ffprobe.
-pub mod video_probe;
 /// Internal segmented render orchestration for transparent and composite paths.
 pub(crate) mod video_segmented;
 /// Internal time-window helpers for segmented video orchestration.

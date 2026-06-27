@@ -21,7 +21,7 @@ use ovrley_core::encode::video::{
     render_composite_video, render_video, rendered_frame_count, CompositeRenderRequest,
     RenderController,
 };
-use ovrley_core::encode::video_probe::{probe_video, VideoMetadata};
+use ovrley_core::media::{video_probe::probe_video, SourceVideoMetadata};
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::render_preview_to_path;
 use serde::Deserialize;
@@ -856,7 +856,7 @@ fn write_rgba_png(
 
 /// Validates the key video metadata fields we use as baseline invariants.
 fn assert_video_metadata(
-    metadata: &VideoMetadata,
+    metadata: &SourceVideoMetadata,
     expected_width: u32,
     expected_height: u32,
     expected_fps_num: u32,

@@ -1,7 +1,8 @@
-//! Rational frame-rate helpers for video encoding paths.
+//! Rational frame-rate helpers for video source and output paths.
 //!
-//! Composite rendering keeps source-video frame rates as exact rationals so
-//! NTSC rates such as `30000/1001` are not rounded during command construction.
+//! Source probing and composite rendering keep video frame rates as exact
+//! rationals so NTSC rates such as `30000/1001` are not rounded during command
+//! construction or metadata handoff.
 
 use crate::error::{CoreError, CoreResult};
 
@@ -67,10 +68,12 @@ impl Fps {
         }
     }
 
-    /// Converts common floating point FPS metadata to exact rational rates.
+    /// Converts floating point FPS metadata to rational rates.
     ///
     /// This is a fallback for callers that do not yet have numerator and
-    /// denominator metadata; exact rational fields should be preferred.
+    /// denominator metadata; exact rational fields should be preferred. Common
+    /// broadcast/video rates are mapped to their canonical rationals. Other
+    /// positive finite values are rounded to integer FPS.
     pub fn from_f64_fallback(value: f64) -> CoreResult<Fps> {
         if !value.is_finite() || value <= 0.0 {
             return Err(CoreError::Encode(format!(
@@ -78,22 +81,25 @@ impl Fps {
             )));
         }
 
-        for (approx, num, den) in [
-            (23.976, 24000, 1001),
-            (29.97, 30000, 1001),
-            (59.94, 60000, 1001),
-            (25.0, 25, 1),
-            (30.0, 30, 1),
-            (60.0, 60, 1),
+        for (num, den) in [
+            (24000, 1001),
+            (24, 1),
+            (25, 1),
+            (30000, 1001),
+            (30, 1),
+            (48, 1),
+            (50, 1),
+            (60000, 1001),
+            (60, 1),
+            (120, 1),
         ] {
-            if (value - approx).abs() <= 0.001 {
+            let candidate = num as f64 / den as f64;
+            if (value - candidate).abs() <= 0.01 {
                 return Fps::new(num, den);
             }
         }
 
-        Err(CoreError::Encode(format!(
-            "Unsupported non-rational FPS fallback value: {value}"
-        )))
+        Fps::new(value.round() as u32, 1)
     }
 }
 

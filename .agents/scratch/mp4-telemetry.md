@@ -29,6 +29,8 @@ Two purposes:
 | D10 | GPS speed/track/altitude used as recorded (not derived from coordinates)                       | These are GPS chip Doppler/heading/altimeter readings, already firmware-smoothed                                                                                                                                                                         |
 | D11 | Check `GpsData.is_acquired` before using GPS values                                            | Skip samples where GPS signal is lost; emit `null` in those positions                                                                                                                                                                                    |
 | D12 | Frontend `finalizeParsedActivity()` remains canonical for now                                  | MP4 joins the existing import/finalization seam instead of creating a second source-specific activity assembly pipeline.                                                                                                                                |
+| D13 | Source video parsing lives in `media/`, not `encode/`                                         | Probing and embedded telemetry extraction inspect imported source media; `encode/` remains focused on producing rendered output via FFmpeg.                                                                                                             |
+| D14 | Smoothing horizons are top-of-file constants                                                  | Keeps telemetry tuning visible and avoids hidden magic numbers inside smoothing code.                                                                                                                                                                    |
 
 ## Telemetry-Parser Schema (Verified)
 
@@ -92,8 +94,12 @@ Frontend: finalize MP4 telemetry through the existing activity pipeline
 
 The sustainable split is:
 
+- Rust `media/` owns source video metadata and embedded telemetry parsing.
 - Rust owns MP4-specific extraction, dense-series smoothing, and sync-time
   inference.
+- Rust `encode/` remains the output-video encoding subsystem: render
+  orchestration, FFmpeg command construction, segmented output, progress, and
+  codec detection.
 - JavaScript continues to own canonical activity finalization for all source
   formats in this phase.
 - The existing Rust render-prep path continues to own scene trim and
@@ -197,6 +203,11 @@ fn extract_sync_time(samples: &[SampleInfo]) -> Option<String> {
 ## Smoothing: Forward-Backward Moving Average
 
 ```rust
+const GPS_SPEED_SMOOTHING_SECONDS: f64 = 0.5;
+const GPS_ALTITUDE_SMOOTHING_SECONDS: f64 = 1.0;
+const GPS_HEADING_SMOOTHING_SECONDS: f64 = 0.5;
+const G_FORCE_SMOOTHING_SECONDS: f64 = 1.0;
+
 fn moving_average(data: &[Option<f64>], window: usize) -> Vec<Option<f64>> {
     // Standard centered moving average, null-aware
 }
@@ -210,6 +221,9 @@ fn zero_phase_smooth(data: &[Option<f64>], window: usize) -> Vec<Option<f64>> {
 ```
 
 ### Window Sizes
+
+Declare these as top-of-file constants in `media/mp4_telemetry.rs`, not inline
+literals inside `smooth_series()`.
 
 | Metric       | Window                    | Rationale                             |
 | ------------ | ------------------------- | ------------------------------------- |
@@ -257,52 +271,69 @@ resolve with `[patch]` if needed.
 
 ## Phase B: Metadata Probe (Telemetry-Parser First, FFprobe Salvage Fallback)
 
-### Step B1: Create `src-tauri/ovrley_core/src/encode/telemetry.rs`
+### Step B1: Create `src-tauri/ovrley_core/src/media/`
 
-Module doc comment:
+Create a new source-media module:
+
+- `src-tauri/ovrley_core/src/media/mod.rs`
+- `src-tauri/ovrley_core/src/media/source_video_metadata.rs`
+- `src-tauri/ovrley_core/src/media/video_probe.rs` (move existing
+  `encode/video_probe.rs` here)
+- `src-tauri/ovrley_core/src/media/mp4_telemetry.rs`
+
+Initial `media/mod.rs`:
 
 ```rust
-//! Video metadata and telemetry extraction via telemetry-parser.
+//! Source media probing and embedded telemetry extraction.
 //!
-//! Owns: `probe_video_metadata()` (telemetry-first metadata probe with salvage
-//!       fallback), `extract_telemetry()` (extracts GPS/camera/IMU as normalized
-//!       MP4 raw samples), and zero-phase smoothing helpers.
-//! Does not own: ffprobe binary discovery (see [`crate::encode::ffmpeg`]),
-//!       activity parsing pipeline (frontend `finalizeParsedActivity()`).
-//!
-//! Allowed dependencies: `crate::error`, `crate::activity::schema`, `serde`,
-//!       `serde_json`, `chrono`, `telemetry_parser`, `std`.
-//! Forbidden dependencies: `crate::commands`, `crate::render`.
-//!
-//! ## Thread Safety
-//! Single-threaded. Reads file synchronously via telemetry-parser. No shared
-//! mutable state.
-//!
-//! ## Performance
-//! Called once per imported video. telemetry-parser reads only header/footer
-//! bytes (5-500 MB depending on file size), not the full file. Typical wall
-//! time < 2 seconds for 1080p files with telemetry.
+//! This module reads imported source media. It does not own rendering,
+//! output encoding, or FFmpeg encode pipelines.
+
+/// MP4/MOV metadata extraction via ffprobe.
+pub mod video_probe;
+/// Shared source video metadata contract.
+pub mod source_video_metadata;
+/// MP4 embedded telemetry extraction via telemetry-parser.
+pub mod mp4_telemetry;
+
+pub use source_video_metadata::{Resolution, SourceVideoMetadata};
 ```
 
-### Step B2: Define `TelemetryVideoMetadata` struct
+Register the module in `src-tauri/ovrley_core/src/lib.rs`:
 
-This struct must serialize to the same JSON shape as the existing
-`VideoMetadata` in `video_probe.rs` (camelCase), so the frontend receives
-identical fields regardless of which backend produced them.
+```rust
+/// Source media probing and embedded telemetry extraction.
+pub mod media;
+```
+
+After moving `video_probe.rs`, update references from
+`crate::encode::video_probe` to `crate::media::video_probe`.
+
+The moved `video_probe.rs` may keep using
+`crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary}` for
+now. A later cleanup can move FFmpeg binary discovery out of `encode/` if both
+probing and encoding continue to share it.
+
+### Step B2: Define shared source video metadata
+
+Create `src-tauri/ovrley_core/src/media/source_video_metadata.rs`.
+Both ffprobe and telemetry-parser populate this type directly; do not keep
+probe-specific metadata structs plus converters.
 
 ```rust
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TelemetryVideoMetadata {
+pub struct SourceVideoMetadata {
     pub path: String,
     pub duration: Option<f64>,
     pub fps: Option<f64>,
     pub fps_num: Option<u32>,
     pub fps_den: Option<u32>,
     pub resolution: Option<Resolution>,
-    pub sync_time: Option<String>,
+    pub creation_time: Option<String>, // legacy frontend compatibility
+    pub sync_time: Option<String>,     // canonical sync hint
     pub codec_name: Option<String>,
     pub codec_long_name: Option<String>,
     pub codec_profile: Option<String>,
@@ -313,46 +344,93 @@ pub struct TelemetryVideoMetadata {
     pub rotation_degrees: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resolution {
     pub width: u64,
     pub height: u64,
 }
 ```
 
-### Step B3: Implement `probe_video_metadata()`
+Update `media/mod.rs`:
 
 ```rust
+/// MP4 embedded telemetry and telemetry-first metadata extraction.
+pub mod mp4_telemetry;
+/// Shared source video metadata contract.
+pub mod source_video_metadata;
+/// MP4/MOV metadata extraction via ffprobe.
+pub mod video_probe;
+
+pub use source_video_metadata::{Resolution, SourceVideoMetadata};
+```
+
+### Step B3: Move `video_probe.rs` to return `SourceVideoMetadata`
+
+Move `src-tauri/ovrley_core/src/encode/video_probe.rs` to
+`src-tauri/ovrley_core/src/media/video_probe.rs` and change
+`probe_video()` to return `CoreResult<SourceVideoMetadata>` directly.
+
+The ffprobe path should set:
+
+- `creation_time` from the existing ffprobe priority chain.
+- `sync_time` to the same value as a salvage sync fallback.
+
+Keep `creation_time` only for current frontend compatibility. The canonical
+field for sync is `sync_time`.
+
+### Step B4: Create `src-tauri/ovrley_core/src/media/mp4_telemetry.rs`
+
+Module doc comment:
+
+```rust
+//! Source video metadata and telemetry extraction via telemetry-parser.
+//!
+//! Owns: `probe_video_metadata()` for telemetry-parser-first source-video
+//! metadata reads. Later phases add dense GPS/camera/IMU extraction from the
+//! same MP4 telemetry source.
+//! Does not own: ffprobe binary discovery (see [`crate::encode::ffmpeg`]),
+//! activity parsing/finalization, rendering, or output encoding.
+//!
+//! Allowed dependencies: `crate::error`, `crate::encode::fps`, `crate::media`,
+//! `telemetry_parser`, and `std`.
+//! Forbidden dependencies: `crate::commands`, `crate::render`.
+```
+
+Implement `probe_video_metadata()` so it returns `CoreResult<SourceVideoMetadata>`.
+
+```rust
+use crate::encode::fps::Fps;
 use crate::error::{CoreError, CoreResult};
+use crate::media::{Resolution, SourceVideoMetadata};
 use std::fs::File;
 use std::path::Path;
-use telemetry_parser::Input;
 
-pub fn probe_video_metadata(file_path: &str) -> CoreResult<TelemetryVideoMetadata> {
+pub fn probe_video_metadata(file_path: &str) -> CoreResult<SourceVideoMetadata> {
     let path = Path::new(file_path);
     let file_size = std::fs::metadata(path)
-        .map_err(|e| CoreError::Io { path: path.to_path_buf(), source: e })?
+        .map_err(|source| CoreError::Io { path: path.to_path_buf(), source })?
         .len() as usize;
 
     let mut stream = File::open(path)
-        .map_err(|e| CoreError::Io { path: path.to_path_buf(), source: e })?;
+        .map_err(|source| CoreError::Io { path: path.to_path_buf(), source })?;
 
     let vm = telemetry_parser::util::get_video_metadata(&mut stream, file_size)
-        .map_err(|e| CoreError::Encode(format!("telemetry-parser metadata error: {e}")))?;
+        .map_err(|error| CoreError::Encode(format!("telemetry-parser metadata error: {error}")))?;
 
-    let (fps_num, fps_den) = compute_rational_fps(vm.fps);
+    let (fps_num, fps_den) = rational_fps_parts(vm.fps);
 
-    Ok(TelemetryVideoMetadata {
+    Ok(SourceVideoMetadata {
         path: file_path.to_string(),
-        duration: Some(vm.duration_s),
-        fps: Some(vm.fps),
+        duration: positive_f64(vm.duration_s),
+        fps: positive_f64(vm.fps),
         fps_num,
         fps_den,
         resolution: Some(Resolution {
             width: vm.width as u64,
             height: vm.height as u64,
         }),
-        sync_time: None, // Filled by caller via GPS inference or ffprobe salvage fallback
+        creation_time: None,
+        sync_time: None,
         codec_name: None,
         codec_long_name: None,
         codec_profile: None,
@@ -365,36 +443,24 @@ pub fn probe_video_metadata(file_path: &str) -> CoreResult<TelemetryVideoMetadat
 }
 ```
 
-### Step B4: Implement `compute_rational_fps()`
+### Step B5: Reuse existing FPS rationalization
+
+Do not add a separate `compute_rational_fps()` helper. Use the shared
+`crate::encode::fps::Fps::from_f64_fallback()` table and expose only a thin
+local adapter if needed:
 
 ```rust
-fn compute_rational_fps(fps: f64) -> (Option<u32>, Option<u32>) {
-    if fps <= 0.0 || !fps.is_finite() {
-        return (None, None);
+pub fn rational_fps_parts(fps: f64) -> (Option<u32>, Option<u32>) {
+    match Fps::from_f64_fallback(fps) {
+        Ok(fps) => (Some(fps.num), Some(fps.den)),
+        Err(_) => (None, None),
     }
-    let candidates = [
-        (24000, 1001), (24, 1), (25, 1), (30000, 1001), (30, 1),
-        (48, 1), (50, 1), (60000, 1001), (60, 1), (120, 1),
-    ];
-    for (num, den) in candidates {
-        let candidate = num as f64 / den as f64;
-        if (fps - candidate).abs() < 0.01 {
-            return (Some(num), Some(den));
-        }
-    }
-    let rounded = fps.round() as u32;
-    if rounded > 0 { (Some(rounded), Some(1)) } else { (None, None) }
 }
 ```
 
-### Step B5: Register module in `src-tauri/ovrley_core/src/encode/mod.rs`
-
-Add after `pub mod video_probe;`:
-
-```rust
-/// Video metadata and telemetry extraction via telemetry-parser.
-pub mod telemetry;
-```
+Extend `Fps::from_f64_fallback()` to cover the Phase B metadata-probe rates:
+23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60, and 120, with an integer
+rounding fallback for other positive finite values.
 
 ### Step B6: Update `backend_probe_video()` in `src-tauri/ovrley_core/src/commands/mod.rs`
 
@@ -402,30 +468,11 @@ Replace the current implementation (lines 497-501):
 
 ```rust
 pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
-    match crate::encode::telemetry::probe_video_metadata(file_path) {
+    match crate::media::mp4_telemetry::probe_video_metadata(file_path) {
         Ok(metadata) => {
-            let metadata = if metadata.sync_time.is_none()
-                || metadata.codec_name.is_none()
-                || metadata.codec_long_name.is_none()
-                || metadata.codec_profile.is_none()
-                || metadata.pix_fmt.is_none()
-                || metadata.bits_per_raw_sample.is_none()
-                || metadata.container_format.is_none()
-                || !metadata.has_audio
-            {
-                match crate::encode::video_probe::probe_video(&paths.repo_root, file_path) {
-                    Ok(ffprobe_md) => {
-                        let mut md = metadata;
-                        if md.sync_time.is_none() { md.sync_time = ffprobe_md.creation_time; }
-                        if md.codec_name.is_none() { md.codec_name = ffprobe_md.codec_name; }
-                        if md.codec_long_name.is_none() { md.codec_long_name = ffprobe_md.codec_long_name; }
-                        if md.codec_profile.is_none() { md.codec_profile = ffprobe_md.codec_profile; }
-                        if md.pix_fmt.is_none() { md.pix_fmt = ffprobe_md.pix_fmt; }
-                        if md.bits_per_raw_sample.is_none() { md.bits_per_raw_sample = ffprobe_md.bits_per_raw_sample; }
-                        md.has_audio = md.has_audio || ffprobe_md.has_audio;
-                        if md.container_format.is_none() { md.container_format = ffprobe_md.container_format; }
-                        md
-                    }
+            let metadata = if needs_ffprobe_salvage(&metadata) {
+                match crate::media::video_probe::probe_video(&paths.repo_root, file_path) {
+                    Ok(ffprobe_metadata) => merge_ffprobe_metadata(metadata, ffprobe_metadata),
                     Err(e) => {
                         log::warn!("ffprobe fallback failed: {e}");
                         metadata
@@ -436,12 +483,16 @@ pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Valu
         }
         Err(e) => {
             log::warn!("telemetry-parser probe failed for {file_path}: {e}, falling back to ffprobe");
-            let metadata = crate::encode::video_probe::probe_video(&paths.repo_root, file_path)?;
+            let metadata = crate::media::video_probe::probe_video(&paths.repo_root, file_path)?;
             serde_json::to_value(&metadata).map_err(CoreError::Serialization)
         }
     }
 }
 ```
+
+`needs_ffprobe_salvage()` and `merge_ffprobe_metadata()` should both operate on
+`SourceVideoMetadata`. Do not introduce converter functions between ffprobe and
+telemetry metadata shapes.
 
 ---
 
@@ -449,7 +500,7 @@ pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Valu
 
 ### Step C1: Define extraction internals
 
-In `telemetry.rs`:
+In `media/mp4_telemetry.rs`:
 
 ```rust
 /// Intermediate sample at native telemetry rate, before final frontend assembly.
@@ -692,6 +743,11 @@ inside the extractor. That is intentionally removed.
 ### Step D2: Implement FBMA smoothing
 
 ```rust
+const GPS_SPEED_SMOOTHING_SECONDS: f64 = 0.5;
+const GPS_ALTITUDE_SMOOTHING_SECONDS: f64 = 1.0;
+const GPS_HEADING_SMOOTHING_SECONDS: f64 = 0.5;
+const G_FORCE_SMOOTHING_SECONDS: f64 = 1.0;
+
 fn moving_average(data: &[Option<f64>], window: usize) -> Vec<Option<f64>> {
     if window == 0 || data.is_empty() { return data.to_vec(); }
     let half = window / 2;
@@ -728,10 +784,10 @@ fn smooth_series(samples: &mut [NativeSample]) {
     let heading: Vec<_> = samples.iter().map(|s| s.heading).collect();
     let g_force: Vec<_> = samples.iter().map(|s| s.g_force).collect();
 
-    let altitude_window = smoothing_window_for_seconds(&timestamps, 1.0);
-    let speed_window = smoothing_window_for_seconds(&timestamps, 0.5);
-    let heading_window = smoothing_window_for_seconds(&timestamps, 0.5);
-    let g_force_window = smoothing_window_for_seconds(&timestamps, 1.0);
+    let altitude_window = smoothing_window_for_seconds(&timestamps, GPS_ALTITUDE_SMOOTHING_SECONDS);
+    let speed_window = smoothing_window_for_seconds(&timestamps, GPS_SPEED_SMOOTHING_SECONDS);
+    let heading_window = smoothing_window_for_seconds(&timestamps, GPS_HEADING_SMOOTHING_SECONDS);
+    let g_force_window = smoothing_window_for_seconds(&timestamps, G_FORCE_SMOOTHING_SECONDS);
 
     let sa = zero_phase_smooth(&altitude, altitude_window.max(1));
     let ss = zero_phase_smooth(&speed, speed_window.max(1));
@@ -761,7 +817,7 @@ formats share the same rules.
 
 ```rust
 pub fn backend_extract_video_telemetry(file_path: &str) -> CoreResult<Value> {
-    match crate::encode::telemetry::extract_telemetry(file_path)? {
+    match crate::media::mp4_telemetry::extract_telemetry(file_path)? {
         Some(activity_json) => Ok(activity_json),
         None => Ok(serde_json::Value::Null),
     }
@@ -902,11 +958,12 @@ render payload builder.
 
 ## Phase G: Testing
 
-### Step G1: Unit tests in `telemetry.rs`
+### Step G1: Unit tests in `media/mp4_telemetry.rs`
 
 `#[cfg(test)] mod tests` block:
 
-- `test_compute_rational_fps()` — 23.976, 24, 25, 29.97, 30, 59.94, 60
+- `test_rational_fps_parts()` / shared `Fps::from_f64_fallback()` coverage —
+  23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60, 120, and integer fallback
 - `test_moving_average()` — null handling, window sizes
 - `test_zero_phase_smooth()` — zero delay, smoothing behavior
 - `test_smoothing_window_for_seconds()` — cadence-aware window sizing
@@ -938,19 +995,7 @@ Test with sample videos:
 
 ## Unanswered Questions
 
-1. **gForce baseline subtraction**: Accelerometer reads ~1g at rest (gravity).
-   Should we subtract 1g to get net g-force, or expose the raw magnitude? The
-   existing `g_force` field in `ParsedActivity` is described as "multiples of
-   Earth gravity" which suggests net force (subtract 1g).
-
-2. **Edge-case: no telemetry at all**: Some videos (screen recordings, webcams)
-   have no embedded telemetry. `extract_telemetry()` returns `None`. The frontend
-   should handle this gracefully — no activity imported, user can still import
-   FIT/GPX separately. Confirm this is expected behavior?
-
-3. **Window size for FBMA**: The proposed windows (~0.5s for speed/heading,
-   ~1.0s for altitude/gForce) are starting points. Should these be configurable
-   or hard-coded initially?
+None.
 
 ### Resolved Questions
 
@@ -964,3 +1009,16 @@ Test with sample videos:
 - **Partial telemetry**: Rust returns sparse normalized raw samples with nulls
   for missing values. Frontend finalization and merge logic handle gaps
   gracefully.
+
+- **gForce baseline subtraction**: Subtract 1g from accelerometer magnitude.
+  The exported `gForce` value should represent net force above/below gravity,
+  matching the existing `ParsedActivity.g_force` semantics.
+
+- **No embedded telemetry**: `extract_telemetry()` returns `None`. The frontend
+  handles this gracefully: no activity is imported from the video, and the user
+  can still import FIT/GPX separately.
+
+- **FBMA window declarations**: Keep the initial smoothing horizons hard-coded
+  as named top-of-file constants in `media/mp4_telemetry.rs`:
+  `GPS_SPEED_SMOOTHING_SECONDS`, `GPS_ALTITUDE_SMOOTHING_SECONDS`,
+  `GPS_HEADING_SMOOTHING_SECONDS`, and `G_FORCE_SMOOTHING_SECONDS`.

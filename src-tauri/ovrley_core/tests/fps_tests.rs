@@ -1,7 +1,7 @@
 //! Rational FPS type tests.
 //!
 //! Verifies `Fps` arithmetic: construction, float fallback for common
-//! NTSC rates (23.976, 29.97, 59.94), division for overlay pipe FPS
+//! NTSC rates (23.976, 29.97, 59.94), common integer rates, division for overlay pipe FPS
 //! derivation, ffmpeg argument formatting, equality/comparison, and
 //! rejection of invalid values (zero denominator, zero division factor).
 //!
@@ -72,6 +72,15 @@ fn converts_common_float_fallback_rates() {
     assert_eq!(Fps::from_f64_fallback(25.0).unwrap().ffmpeg_arg(), "25/1");
     assert_eq!(Fps::from_f64_fallback(30.0).unwrap().ffmpeg_arg(), "30/1");
     assert_eq!(Fps::from_f64_fallback(60.0).unwrap().ffmpeg_arg(), "60/1");
+    assert_eq!(Fps::from_f64_fallback(24.0).unwrap().ffmpeg_arg(), "24/1");
+    assert_eq!(Fps::from_f64_fallback(48.0).unwrap().ffmpeg_arg(), "48/1");
+    assert_eq!(Fps::from_f64_fallback(50.0).unwrap().ffmpeg_arg(), "50/1");
+    assert_eq!(Fps::from_f64_fallback(120.0).unwrap().ffmpeg_arg(), "120/1");
+    assert_eq!(
+        Fps::from_f64_fallback(119.880).unwrap().ffmpeg_arg(),
+        "120/1"
+    );
+    assert_eq!(Fps::from_f64_fallback(47.5).unwrap().ffmpeg_arg(), "48/1");
 }
 
 // --- Snapshot / golden tests (Step 11d) ---

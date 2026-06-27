@@ -1,16 +1,15 @@
-//! Video metadata extraction via ffprobe.
+//! Source video metadata extraction via ffprobe.
 //!
-//! Owns: video probe types (`VideoMetadata`, `Resolution`) and the `probe_video`
-//!       function that extracts duration, FPS, resolution, codec, and creation-time
-//!       metadata from an MP4/MOV file using ffprobe.
+//! Owns: the `probe_video` function that extracts duration, FPS, resolution,
+//!       codec, audio, container, rotation, and timestamp fallback metadata
+//!       from an imported source video using ffprobe.
 //! Does not own: ffmpeg binary discovery (see [`crate::encode::ffmpeg`]), codec
 //!       availability detection (see [`crate::encode::codec_detect`]).
 //!
 //! Allowed dependencies: `crate::encode::ffmpeg`, `crate::error`.
 //! Forbidden dependencies: `crate::commands`, `crate::render`.
 //!
-//! Related modules: [`crate::encode::ffmpeg`] (binary resolution),
-//!       [`crate::encode::codec_detect`] (encoder capability probing).
+//! Related modules: [`crate::encode::ffmpeg`] (binary resolution).
 //!
 //! ## Thread Safety
 //! Single-threaded. Spawns an ffprobe subprocess and waits synchronously for
@@ -22,49 +21,17 @@
 
 use crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::error::{CoreError, CoreResult};
-use serde::{Deserialize, Serialize};
+use crate::media::{Resolution, SourceVideoMetadata};
 use serde_json::Value;
 use std::path::Path;
 use std::process::Command;
 
-/// Extracted video metadata returned to the frontend after import.
-///
-/// All fields except `path` and `has_audio` may be `None` if ffprobe did not
-/// report them. `creation_time` uses a priority chain: stream-level
-/// `creation_time` tag first, then container-level `creation_time`, then
-/// the file-system modification time as a final fallback.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct VideoMetadata {
-    pub path: String,
-    pub duration: Option<f64>,
-    pub fps: Option<f64>,
-    pub fps_num: Option<u32>,
-    pub fps_den: Option<u32>,
-    pub resolution: Option<Resolution>,
-    pub creation_time: Option<String>,
-    pub codec_name: Option<String>,
-    pub codec_long_name: Option<String>,
-    pub codec_profile: Option<String>,
-    pub pix_fmt: Option<String>,
-    pub bits_per_raw_sample: Option<u32>,
-    pub has_audio: bool,
-    pub container_format: Option<String>,
-    pub rotation_degrees: Option<i32>,
-}
-
-/// Width and height in pixels as reported by ffprobe.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Resolution {
-    pub width: u64,
-    pub height: u64,
-}
-
 /// Probes a video file with ffprobe and returns structured metadata.
 ///
 /// Spawns `ffprobe -v quiet -print_format json -show_format -show_streams` for
-/// the given file. Parses the JSON output into a [`VideoMetadata`] struct.
-/// Creation time is resolved with this priority:
+/// the given file. Parses the JSON output into a [`SourceVideoMetadata`] struct.
+/// `creation_time` and the ffprobe fallback `sync_time` are resolved with this
+/// priority:
 /// 1. Stream-level `creation_time` tag from the first video stream
 /// 2. Container-level `creation_time` from the format tags
 /// 3. QuickTime-specific `com.apple.quicktime.creationdate` tag
@@ -74,7 +41,7 @@ pub struct Resolution {
 /// 1. Resolve ffprobe binary and spawn the subprocess
 /// 2. Parse JSON output into structured metadata fields
 /// 3. Extract video stream properties (codec, resolution, FPS, rotation)
-/// 4. Build creation_time via priority chain
+/// 4. Build timestamp fallback fields via the creation-time priority chain
 ///
 /// # Errors
 /// Returns [`CoreError::FfmpegNotFound`] if ffmpeg/ffprobe cannot be located.
@@ -84,7 +51,7 @@ pub struct Resolution {
 /// Called once per imported video (not on any render hot path). Typical wall
 /// time < 1 second for 1080p files.
 #[must_use = "probe result contains video metadata required for rendering"]
-pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadata> {
+pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoMetadata> {
     // ── PHASE 1: RESOLVE FFPROBE BINARY & SPAWN SUBPROCESS ──
     let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
     let ffprobe_name = if cfg!(windows) {
@@ -120,7 +87,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
     // ── PHASE 2: PARSE JSON INTO STRUCTURED METADATA ──
     let json: Value = serde_json::from_slice(&output.stdout)?;
 
-    let mut metadata = VideoMetadata {
+    let mut metadata = SourceVideoMetadata {
         path: file_path.to_string(),
         duration: None,
         fps: None,
@@ -128,6 +95,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
         fps_den: None,
         resolution: None,
         creation_time: None,
+        sync_time: None,
         codec_name: None,
         codec_long_name: None,
         codec_profile: None,
@@ -259,6 +227,10 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<VideoMetadat
             }
         }
     }
+
+    // ffprobe timestamps are a salvage sync fallback, not authoritative
+    // provenance. Keep both fields until the frontend fully moves to syncTime.
+    metadata.sync_time = metadata.creation_time.clone();
 
     log::debug!("Final selected creation time: {:?}", metadata.creation_time);
 

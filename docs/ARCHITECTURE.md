@@ -137,7 +137,6 @@ cyclemetry/
 │   │           ├── progress.rs    #     RenderProgress state machine
 │   │           ├── codec_detect.rs#     Encoder availability probing
 │   │           ├── codec_catalog.rs#     Known codec definitions
-│   │           ├── video_probe.rs #     ffprobe metadata extraction
 │   │           ├── video.rs       #     RenderController, dispatch, orchestration
 │   │           ├── video_pipeline.rs      # Single-pass render (transparent)
 │   │           ├── video_parallel.rs      # Parallel segment rendering
@@ -148,6 +147,11 @@ cyclemetry/
 │   │           ├── video_composite_support.rs  # Composite timing/plan helpers
 │   │           ├── video_composite_debug.rs    # Composite debug artifacts
 │   │           └── pipeline_shared.rs     # Shared encode pipeline types
+│   │       ├── media/             #   Imported source media parsing
+│   │       │   ├── mod.rs         #     Source media module organization
+│   │       │   ├── source_video_metadata.rs # Shared video metadata contract
+│   │       │   ├── video_probe.rs #     ffprobe metadata extraction
+│   │       │   └── mp4_telemetry.rs #   telemetry-parser metadata/telemetry
 │   │
 │   └── tests/                     # ovrley_core integration tests
 │       ├── common/                #   Shared test fixtures & helpers
@@ -608,10 +612,21 @@ Geometry IPC Commands (used by frontend preview):
 - Codec definitions in `encode/codec_catalog.rs`
 - Reports booleans back to frontend for UI filtering
 
-**Video probing** (`encode/video_probe.rs`):
+### 6.4 Source Media Probing
+
+**Video probing** (`media/video_probe.rs`):
 
 - ffprobe metadata: dimensions, duration, FPS, codec, bitrate, pixel format
-- Creates activity timestamps from video for composite sync
+- Returns the shared `SourceVideoMetadata` shape
+- Uses creation-time metadata only as a sync fallback
+
+**MP4 telemetry metadata** (`media/mp4_telemetry.rs`):
+
+- telemetry-parser metadata: dimensions, duration, FPS, rotation
+- Returns the shared `SourceVideoMetadata` shape
+- Runs before ffprobe for video import metadata
+- ffprobe salvages codec/audio/container/sync fields that telemetry-parser does
+  not expose
 
 **Progress tracking** (`encode/progress.rs`, `debug/mod.rs`):
 
@@ -619,7 +634,7 @@ Geometry IPC Commands (used by frontend preview):
 - `RenderProfiler`: fine-grained timing buckets per pipeline phase
 - `RenderController`: shared state machine (Idle → Running → Done/Cancelled)
 
-### 6.4 Activity Processing (Rust Side)
+### 6.5 Activity Processing (Rust Side)
 
 The Rust backend receives already-parsed activity JSON from the frontend (the JS-side parser extracts raw samples). The Rust side does:
 
@@ -628,7 +643,7 @@ The Rust backend receives already-parsed activity JSON from the frontend (the JS
 3. **Densify** (`activity/interpolate.rs`): Convert uneven samples into frame-aligned dense series using linear interpolation with edge clamping via shared `interpolation.rs` utilities.
 4. **Report**: `DenseActivityReport` with per-frame telemetry for every scene frame.
 
-### 6.5 Widget Rendering (Skia)
+### 6.6 Widget Rendering (Skia)
 
 **Text** (`render/text.rs`):
 
@@ -782,7 +797,7 @@ VideoServerHandle.set_video(path)
     ▼
 useVideoPreview sets <video src>
 ├── useVideoPlaybackClock drives timeline
-└── Video sync: compares video creation_time vs activity timestamps
+└── Video sync: compares video sync_time vs activity timestamps
     ├── computeVideoSync() → auto-sets videoSyncOffsetSeconds
     └── During render: composite_video_path + sync_offset applied
 ```
@@ -881,7 +896,7 @@ Templates are JSON files following the `ovrley-template` format (v2):
 
 - **skia-safe 0.97.2** — `binary-cache` feature enabled; mutable path construction now uses Skia's `PathBuilder` APIs where older releases allowed editing `Path` directly
 - **Process-lifetime caches** — `OnceLock<Mutex<HashMap>>` for fonts, label images
-- **Module layering** — `tauri_commands.rs` (Tauri `#[command]` wrappers) → `ovrley_core::commands` (framework-agnostic logic) → domain modules (activity, render, encode)
+- **Module layering** — `tauri_commands.rs` (Tauri `#[command]` wrappers) → `ovrley_core::commands` (framework-agnostic logic) → domain modules (activity, media, render, encode)
 - **Normalization seam** — all raw config types and parsing live in `normalize::raw` (private submodule). The only public entry point is `normalize::validate_render_config()`. No code outside `normalize/` can access raw types. The backend owns zero render-affecting defaults — the frontend must materialise every value before sending.
 - **Shared utilities** — `types.rs` (MetricKind), `error.rs` (CoreError), `interpolation.rs`, `rdp.rs`, `paths.rs` (AppPaths) live at crate root as leaf dependencies
 - **Render loop** — acquires surface, renders RGBA, writes to FFmpeg stdin pipe

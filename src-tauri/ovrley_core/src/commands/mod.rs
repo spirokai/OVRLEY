@@ -495,9 +495,76 @@ fn open_path_in_system(path: &Path) -> CoreResult<()> {
 
 /// Probes a video file and returns its metadata.
 pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
-    use crate::encode::video_probe::probe_video;
-    let metadata = probe_video(&paths.repo_root, file_path)?;
-    serde_json::to_value(&metadata).map_err(CoreError::Serialization)
+    match crate::media::mp4_telemetry::probe_video_metadata(file_path) {
+        Ok(metadata) => {
+            let metadata = if needs_ffprobe_salvage(&metadata) {
+                match crate::media::video_probe::probe_video(&paths.repo_root, file_path) {
+                    Ok(ffprobe_metadata) => merge_ffprobe_metadata(metadata, ffprobe_metadata),
+                    Err(error) => {
+                        log::warn!("ffprobe fallback failed for {file_path}: {error}");
+                        metadata
+                    }
+                }
+            } else {
+                metadata
+            };
+            serde_json::to_value(&metadata).map_err(CoreError::Serialization)
+        }
+        Err(error) => {
+            log::warn!(
+                "telemetry-parser probe failed for {file_path}: {error}; falling back to ffprobe"
+            );
+            let metadata = crate::media::video_probe::probe_video(&paths.repo_root, file_path)?;
+            serde_json::to_value(&metadata).map_err(CoreError::Serialization)
+        }
+    }
+}
+
+fn needs_ffprobe_salvage(metadata: &crate::media::SourceVideoMetadata) -> bool {
+    metadata.sync_time.is_none()
+        || metadata.creation_time.is_none()
+        || metadata.codec_name.is_none()
+        || metadata.codec_long_name.is_none()
+        || metadata.codec_profile.is_none()
+        || metadata.pix_fmt.is_none()
+        || metadata.bits_per_raw_sample.is_none()
+        || metadata.container_format.is_none()
+        || !metadata.has_audio
+}
+
+fn merge_ffprobe_metadata(
+    mut metadata: crate::media::SourceVideoMetadata,
+    ffprobe_metadata: crate::media::SourceVideoMetadata,
+) -> crate::media::SourceVideoMetadata {
+    if metadata.sync_time.is_none() {
+        metadata.sync_time = ffprobe_metadata
+            .sync_time
+            .clone()
+            .or_else(|| ffprobe_metadata.creation_time.clone());
+    }
+    if metadata.creation_time.is_none() {
+        metadata.creation_time = ffprobe_metadata.creation_time;
+    }
+    if metadata.codec_name.is_none() {
+        metadata.codec_name = ffprobe_metadata.codec_name;
+    }
+    if metadata.codec_long_name.is_none() {
+        metadata.codec_long_name = ffprobe_metadata.codec_long_name;
+    }
+    if metadata.codec_profile.is_none() {
+        metadata.codec_profile = ffprobe_metadata.codec_profile;
+    }
+    if metadata.pix_fmt.is_none() {
+        metadata.pix_fmt = ffprobe_metadata.pix_fmt;
+    }
+    if metadata.bits_per_raw_sample.is_none() {
+        metadata.bits_per_raw_sample = ffprobe_metadata.bits_per_raw_sample;
+    }
+    metadata.has_audio = metadata.has_audio || ffprobe_metadata.has_audio;
+    if metadata.container_format.is_none() {
+        metadata.container_format = ffprobe_metadata.container_format;
+    }
+    metadata
 }
 
 /// Detects ffmpeg encoders and hardware acceleration methods available locally.

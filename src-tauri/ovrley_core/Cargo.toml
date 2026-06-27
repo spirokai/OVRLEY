@@ -14,6 +14,7 @@ thiserror = "2"
 log = "0.4"
 open = "5"
 skia-safe = { version = "0.97.2", features = ["binary-cache"] }
+telemetry-parser = { git = "https://github.com/AdrianEddy/telemetry-parser.git", rev = "fd9a73e" }
 
 [features]
 canvas-parity = []
