@@ -4,9 +4,8 @@
  */
 
 import * as backend from '@/api/backend'
-import { finalizeParsedActivity } from './parser.js'
-import { safeNumber } from './parse-helpers.js'
 import parseFitActivityFile from './fit-parser.js'
+import { parseGpxActivityFile } from './gpx-parser.js'
 import { parseSrtActivityFile } from './srt-parser.js'
 
 /**
@@ -44,144 +43,6 @@ async function persistDebugPayload(filename, payload) {
 }
 
 /**
- * Normalizes extension key.
- *
- * @param {*} value - Input value processed by the helper.
- * @returns {*} Derived data structure for downstream use.
- */
-function normalizeExtensionKey(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '')
-}
-
-/**
- * Handles collect leaf extension values.
- *
- * @param {*} element - Value for element.
- * @param {*} target - Target object, element, or value being updated.
- * @returns {*} Result produced by the helper.
- */
-function collectLeafExtensionValues(element, target) {
-  const childElements = Array.from(element.children || [])
-  if (!childElements.length) {
-    const key = normalizeExtensionKey(element.localName)
-    const value = element.textContent?.trim()
-    if (key && value) {
-      target[key] = value
-    }
-    return
-  }
-
-  childElements.forEach((child) => collectLeafExtensionValues(child, target))
-}
-
-/**
- * Reads track point metric.
- *
- * @param {*} extensionValues - Value for extension values.
- * @param {*} aliases - Alternate metric keys to inspect.
- * @returns {*} Requested value or structure.
- */
-function readTrackPointMetric(extensionValues, aliases) {
-  for (const alias of aliases) {
-    const normalizedAlias = normalizeExtensionKey(alias)
-    if (!(normalizedAlias in extensionValues)) continue
-
-    const numericValue = safeNumber(extensionValues[normalizedAlias])
-    if (numericValue !== null) {
-      return numericValue
-    }
-  }
-
-  return null
-}
-
-/**
- * Parses gpx activity file.
- *
- * @param {*} file - File object being loaded or saved.
- * @param {*} textContent - Value for text content.
- * @returns {object} Result produced by the helper.
- */
-function parseGpxActivityFile(file, textContent) {
-  const parser = new DOMParser()
-  const documentNode = parser.parseFromString(textContent, 'application/xml')
-  const parseError = documentNode.querySelector('parsererror')
-  if (parseError) {
-    throw new Error('The GPX file could not be parsed.')
-  }
-
-  const trackPoints = Array.from(documentNode.getElementsByTagNameNS('*', 'trkpt'))
-  if (!trackPoints.length) {
-    throw new Error('The GPX file does not contain any track points.')
-  }
-
-  const metadataNode = documentNode.getElementsByTagNameNS('*', 'metadata')[0] || null
-  const trackNode = documentNode.getElementsByTagNameNS('*', 'trk')[0] || null
-  const metadataName =
-    metadataNode?.getElementsByTagNameNS('*', 'name')[0]?.textContent?.trim() ||
-    trackNode?.getElementsByTagNameNS('*', 'name')[0]?.textContent?.trim() ||
-    null
-
-  const rawSamples = trackPoints.map((trackPoint) => {
-    const latitude = safeNumber(trackPoint.getAttribute('lat'))
-    const longitude = safeNumber(trackPoint.getAttribute('lon'))
-    const elevation = safeNumber(trackPoint.getElementsByTagNameNS('*', 'ele')[0]?.textContent)
-    const timestamp = trackPoint.getElementsByTagNameNS('*', 'time')[0]?.textContent?.trim() || null
-    const extensionValues = {}
-    const extensionsNode = trackPoint.getElementsByTagNameNS('*', 'extensions')[0]
-    if (extensionsNode) {
-      Array.from(extensionsNode.children || []).forEach((child) => {
-        collectLeafExtensionValues(child, extensionValues)
-      })
-    }
-
-    return {
-      airPressure: readTrackPointMetric(extensionValues, ['air_pressure', 'absolute_pressure', 'pressure']),
-      altitude: elevation,
-      cadence: readTrackPointMetric(extensionValues, ['cad', 'cadence']),
-      coreTemperature: readTrackPointMetric(extensionValues, ['core_temperature', 'coretemp', 'core_temp']),
-      distance: readTrackPointMetric(extensionValues, ['distance', 'distance_m', 'distancemeters']),
-      elevation,
-      gForce: readTrackPointMetric(extensionValues, ['g_force', 'gforce']),
-      gearPosition: readTrackPointMetric(extensionValues, ['gear_position', 'gear', 'gear_ratio']),
-      gradient: readTrackPointMetric(extensionValues, ['gradient', 'grade', 'slope']),
-      groundContactTime: readTrackPointMetric(extensionValues, ['ground_contact_time', 'groundcontacttime', 'stance_time']),
-      heading: readTrackPointMetric(extensionValues, ['heading', 'course', 'bearing', 'gps_heading']),
-      heartrate: readTrackPointMetric(extensionValues, ['hr', 'heartrate', 'heart_rate']),
-      latitude,
-      leftRightBalance: readTrackPointMetric(extensionValues, ['left_right_balance', 'leftrightbalance', 'balance']),
-      longitude,
-      pace: readTrackPointMetric(extensionValues, ['pace']),
-      power: readTrackPointMetric(extensionValues, ['power', 'powerinwatts', 'watts']),
-      speed: readTrackPointMetric(extensionValues, ['speed', 'enhanced_speed']),
-      strideLength: readTrackPointMetric(extensionValues, ['stride_length', 'stridelength', 'step_length']),
-      strokeRate: readTrackPointMetric(extensionValues, ['stroke_rate', 'strokerate']),
-      temperature: readTrackPointMetric(extensionValues, ['atemp', 'temperature', 'temp']),
-      timestamp,
-      torque: readTrackPointMetric(extensionValues, ['torque']),
-      verticalOscillation: readTrackPointMetric(extensionValues, ['vertical_oscillation', 'verticaloscillation']),
-      verticalSpeed: readTrackPointMetric(extensionValues, ['vertical_speed', 'verticalspeed', 'vam']),
-    }
-  })
-
-  return finalizeParsedActivity({
-    fileName: file.name,
-    fileFormat: 'gpx',
-    metadata: {
-      activity_name: metadataName,
-      creator: documentNode.documentElement?.getAttribute('creator') || null,
-    },
-    rawSamples,
-    options: {
-      useLegacyGpxDerivations: true,
-    },
-  })
-}
-
-/**
  * Parses activity file.
  *
  * @param {*} file - File object being loaded or saved.
@@ -189,10 +50,17 @@ function parseGpxActivityFile(file, textContent) {
  */
 async function parseActivityFile(file) {
   const lowerName = file.name.toLowerCase()
-  if (lowerName.endsWith('.fit')) return parseFitActivityFile(file)
-  if (lowerName.endsWith('.srt')) return parseSrtActivityFile(await file.text(), file.name)
-  if (lowerName.endsWith('.gpx')) return parseGpxActivityFile(file, await file.text())
-  throw new Error(`Unsupported activity file format: ${file.name}`)
+  let rawActivity
+  if (lowerName.endsWith('.fit')) rawActivity = await parseFitActivityFile(file)
+  else if (lowerName.endsWith('.srt')) rawActivity = parseSrtActivityFile(await file.text(), file.name)
+  else if (lowerName.endsWith('.gpx')) rawActivity = parseGpxActivityFile(file, await file.text())
+  else throw new Error(`Unsupported activity file format: ${file.name}`)
+
+  const finalized = await backend.finalizeActivity(rawActivity)
+  return {
+    parsedActivity: finalized.parsed_activity,
+    debugPayload: finalized.debug_payload,
+  }
 }
 
 /**
@@ -245,8 +113,10 @@ async function loadActivityIntoStore({ filename, parsedActivity, debugPayload, s
   setActivityFilename(filename)
   setParsedActivity(parsedActivity)
   setActivitySummary(parsedActivity)
-  const debugPath = await persistDebugPayload(filename, debugPayload)
-  console.log('Parse debug JSON written:', debugPath)
+  if (debugPayload) {
+    const debugPath = await persistDebugPayload(filename, debugPayload)
+    console.log('Parse debug JSON written:', debugPath)
+  }
   console.log('Activity filename set in store:', filename)
 
   syncSceneDurationWithActivity(parsedActivity?.metadata?.duration_seconds || 0, storeState)

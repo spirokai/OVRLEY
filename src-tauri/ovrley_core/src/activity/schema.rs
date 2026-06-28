@@ -73,6 +73,165 @@ pub type TimeSeries = Vec<Option<String>>;
 /// provide partial or sparse course data.
 pub type CourseSeries = Vec<(Option<f64>, Option<f64>)>;
 
+/// Intermediate activity payload produced by format-specific extraction.
+///
+/// This is the seam between browser/native parsers and shared Rust
+/// finalization: extractors normalize units and field names, then the backend
+/// applies the common post-processing rules exactly once.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RawActivity {
+    /// Source filename used for diagnostics and frontend display.
+    pub file_name: String,
+    /// Parser format label used to preserve source provenance.
+    pub file_format: String,
+    /// Format-specific context carried through without backend interpretation.
+    #[serde(default)]
+    pub metadata: Value,
+    /// Normalized samples in source order, before shared finalization.
+    #[serde(default)]
+    pub raw_samples: Vec<RawSample>,
+    /// Parser-selected processing controls for the shared backend path.
+    #[serde(default)]
+    pub options: RawActivityOptions,
+}
+
+/// Shared post-processing options supplied by extraction.
+///
+/// Options belong to extraction because source quality differs by format; the
+/// finalizer stays a deterministic executor of these explicit requests.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct RawActivityOptions {
+    /// Lets dense subtitle/video-like sources bypass synthetic idle insertion.
+    #[serde(default)]
+    pub skip_idle_gap_fill: bool,
+    /// Phase 1 smoothing requests keyed by final metric id.
+    #[serde(default)]
+    pub smoothing: BTreeMap<String, SmoothingOption>,
+}
+
+/// Per-metric smoothing request. Phase 0 only carries this through the schema.
+///
+/// The shape is introduced with RawActivity so frontend parsers can adopt the
+/// contract before the smoothing executor is wired in the next migration phase.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SmoothingOption {
+    /// Disabled entries remain serializable so parser defaults can be explicit.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Algorithm identifier chosen by the parser for this metric.
+    pub method: String,
+    /// Time horizon used by windowed algorithms; circular EMA ignores it.
+    pub window_seconds: f64,
+}
+
+/// Normalized extraction sample consumed by backend finalization.
+///
+/// Every field is optional because not all formats expose every sensor. Missing
+/// values remain `None` so derivation can distinguish absent data from real
+/// zeroes.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct RawSample {
+    /// Absolute source timestamp, normalized later for final output.
+    #[serde(default)]
+    pub timestamp: Option<String>,
+    /// Source-relative elapsed seconds when the format provides it.
+    #[serde(default)]
+    pub elapsed_seconds: Option<f64>,
+    /// GPS latitude in decimal degrees.
+    #[serde(default)]
+    pub latitude: Option<f64>,
+    /// GPS longitude in decimal degrees.
+    #[serde(default)]
+    pub longitude: Option<f64>,
+    /// Elevation used by route/elevation/gradient widgets.
+    #[serde(default)]
+    pub elevation: Option<f64>,
+    /// Alternate altitude channel preserved as its own metric.
+    #[serde(default)]
+    pub altitude: Option<f64>,
+    /// Direct source speed in meters per second.
+    #[serde(default)]
+    pub speed: Option<f64>,
+    /// Direct source heading in degrees.
+    #[serde(default)]
+    pub heading: Option<f64>,
+    /// Heart rate in beats per minute.
+    #[serde(default)]
+    pub heartrate: Option<f64>,
+    /// Cadence in source-normalized revolutions/steps per minute.
+    #[serde(default)]
+    pub cadence: Option<f64>,
+    /// Power in watts.
+    #[serde(default)]
+    pub power: Option<f64>,
+    /// Ambient/device temperature in Celsius.
+    #[serde(default)]
+    pub temperature: Option<f64>,
+    /// Direct source gradient when available; standard derivation may override.
+    #[serde(default)]
+    pub gradient: Option<f64>,
+    /// Direct source pace in seconds per kilometer.
+    #[serde(default)]
+    pub pace: Option<f64>,
+    /// Cumulative distance in meters.
+    #[serde(default)]
+    pub distance: Option<f64>,
+    /// Dynamic acceleration in multiples of Earth gravity.
+    #[serde(default)]
+    pub g_force: Option<f64>,
+    /// Direct source vertical speed in meters per second.
+    #[serde(default)]
+    pub vertical_speed: Option<f64>,
+    /// Direct source torque in newton-meters.
+    #[serde(default)]
+    pub torque: Option<f64>,
+    /// Stroke rate in strokes per minute.
+    #[serde(default)]
+    pub stroke_rate: Option<f64>,
+    /// Stride length in meters.
+    #[serde(default)]
+    pub stride_length: Option<f64>,
+    /// Vertical oscillation in the source-normalized display unit.
+    #[serde(default)]
+    pub vertical_oscillation: Option<f64>,
+    /// Ground contact time in milliseconds.
+    #[serde(default)]
+    pub ground_contact_time: Option<f64>,
+    /// Left/right balance as a numeric percent-left value.
+    #[serde(default)]
+    pub left_right_balance: Option<f64>,
+    /// Core/body temperature in Celsius.
+    #[serde(default)]
+    pub core_temperature: Option<f64>,
+    /// Air pressure in bar.
+    #[serde(default)]
+    pub air_pressure: Option<f64>,
+    /// Discrete gear position encoded as a numeric value.
+    #[serde(default)]
+    pub gear_position: Option<f64>,
+    /// Camera ISO setting.
+    #[serde(default)]
+    pub iso: Option<f64>,
+    /// Camera aperture f-number.
+    #[serde(default)]
+    pub aperture: Option<f64>,
+    /// Camera shutter speed in seconds.
+    #[serde(default)]
+    pub shutter_speed: Option<f64>,
+    /// Camera focal length in millimeters.
+    #[serde(default)]
+    pub focal_length: Option<f64>,
+    /// Camera exposure value.
+    #[serde(default)]
+    pub ev: Option<f64>,
+    /// Camera white-balance color temperature in Kelvin.
+    #[serde(default)]
+    pub color_temperature: Option<f64>,
+    /// Marks backend-inserted idle samples for diagnostics.
+    #[serde(default)]
+    pub synthetic_idle: bool,
+}
+
 /// Parsed source activity as passed from the JavaScript parser to Rust.
 ///
 /// The struct is intentionally forward-compatible: unknown fields are retained

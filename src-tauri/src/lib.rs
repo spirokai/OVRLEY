@@ -61,6 +61,7 @@ pub fn run() {
             tauri_commands::backend_current_os,
             tauri_commands::backend_list_system_fonts,
             tauri_commands::backend_render,
+            tauri_commands::backend_finalize_activity,
             tauri_commands::backend_render_preview_frame,
             tauri_commands::backend_progress,
             tauri_commands::backend_cancel,

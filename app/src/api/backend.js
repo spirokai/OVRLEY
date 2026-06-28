@@ -146,6 +146,18 @@ export async function renderVideo(config, parsedActivity) {
 }
 
 /**
+ * Finalizes extracted raw activity samples through the Rust backend pipeline.
+ *
+ * @param {object} rawActivity - RawActivity contract produced by format parsers.
+ * @returns {Promise<object>} Promise resolving to parsed activity and debug payload.
+ */
+export async function finalizeActivity(rawActivity) {
+  return apiCall('backend_finalize_activity', {
+    rawActivityJson: safeJsonStringify(rawActivity),
+  })
+}
+
+/**
  * Renders a transparent PNG for a single preview second.
  *
  * @param {*} config - Overlay template configuration data.

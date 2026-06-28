@@ -6,6 +6,8 @@
 //! dense per-frame report containing only the telemetry series required by the
 //! selected template.
 
+/// Backend-owned post-processing from raw extraction samples to ParsedActivity.
+pub mod finalize;
 /// Interpolation helpers used for numeric, coordinate, and timestamp series.
 pub mod interpolate;
 /// Serializable activity payloads and internal dense/trimmed report types.

@@ -67,6 +67,18 @@ pub fn backend_current_os() -> Value {
     })
 }
 
+/// Finalizes frontend-extracted raw activity samples into the canonical payload.
+///
+/// The core command owns JSON serialization at the framework-agnostic boundary
+/// so the Tauri layer can stay a thin string-in/string-out adapter while tests
+/// exercise the same backend finalization path.
+pub fn backend_finalize_activity(raw_activity_json: &str) -> CoreResult<Value> {
+    serde_json::to_value(crate::activity::finalize::finalize_raw_activity_json(
+        raw_activity_json,
+    )?)
+    .map_err(CoreError::Serialization)
+}
+
 /// Lists bundled font filenames plus system font family names visible to Skia.
 pub fn backend_list_system_fonts(paths: &AppPaths) -> Value {
     let mut fonts: Vec<String> = FontMgr::default()

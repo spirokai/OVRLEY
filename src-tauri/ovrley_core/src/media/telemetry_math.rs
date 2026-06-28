@@ -31,6 +31,38 @@ pub fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     R * c
 }
 
+/// Computes initial GPS bearing in degrees using the great-circle formula.
+///
+/// Heading derivation needs wrap-safe course direction from two coordinates;
+/// invalid inputs return `None` so sparse GPS samples can be skipped without
+/// failing the entire activity import.
+pub fn bearing_degrees(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> Option<f64> {
+    if !lat1.is_finite() || !lon1.is_finite() || !lat2.is_finite() || !lon2.is_finite() {
+        return None;
+    }
+
+    let from_lat = lat1.to_radians();
+    let to_lat = lat2.to_radians();
+    let delta_lon = (lon2 - lon1).to_radians();
+    let y = delta_lon.sin() * to_lat.cos();
+    let x = from_lat.cos() * to_lat.sin() - from_lat.sin() * to_lat.cos() * delta_lon.cos();
+    let bearing = y.atan2(x).to_degrees();
+    Some((bearing + 360.0) % 360.0)
+}
+
+/// Rounds finite telemetry values to a fixed decimal precision.
+///
+/// The migrated backend mirrors frontend JSON stability by rounding at the same
+/// assembly points, while returning `None` for NaN/inf so invalid math never
+/// reaches serialization.
+pub fn round_f64(value: f64, digits: i32) -> Option<f64> {
+    if !value.is_finite() {
+        return None;
+    }
+    let scale = 10_f64.powi(digits);
+    Some((value * scale).round() / scale)
+}
+
 /// Dynamic g-force magnitude from three-axis accelerometer components.
 ///
 /// Returns `magnitude - 1g` so a resting sensor reports 0.0 and positive values
