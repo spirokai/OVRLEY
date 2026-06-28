@@ -16,7 +16,6 @@ import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
 import { getDefaultBitrate } from '../data/bitrateDefaults'
-import { resolutionsMismatch } from '../utils/codecUtils'
 import { createRenderEffectiveConfig } from '../utils/renderConfig'
 import useRenderDialogState from './useRenderDialogState'
 
@@ -47,8 +46,7 @@ export default function useRenderWorkflow({ backendStatus }) {
 
   const hasParsedActivity = Boolean(activitySummary)
   const canRender = Boolean(config && hasParsedActivity)
-  const hasResolutionMismatch = resolutionsMismatch(config?.scene, importedVideoResolution)
-  const renderDisabled = !canRender || renderingVideo || backendStatus !== 'connected' || hasResolutionMismatch
+  const renderDisabled = !canRender || renderingVideo || backendStatus !== 'connected'
   const renderTooltipContent = useMemo(() => {
     if (!config) {
       return hasParsedActivity ? 'Load a template first' : 'Load a template and GPX/FIT activity first'
@@ -59,14 +57,12 @@ export default function useRenderWorkflow({ backendStatus }) {
     if (backendStatus !== 'connected') {
       return 'Backend offline'
     }
-    if (hasResolutionMismatch) {
-      return 'Overlay and imported video resolutions must match'
-    }
+
     if (renderingVideo) {
       return 'Rendering already in progress'
     }
     return null
-  }, [backendStatus, config, hasParsedActivity, hasResolutionMismatch, renderingVideo])
+  }, [backendStatus, config, hasParsedActivity, renderingVideo])
   const renderPreviewFrameDisabled = !canRender || renderingVideo || renderingPreviewFrame || backendStatus !== 'connected'
 
   const buildRenderSettingsDraft = useCallback(() => {

@@ -52,6 +52,7 @@ export default function RenderVideoDialog(props) {
     accelerationLabel || null,
     Number.isFinite(durationSeconds) && durationSeconds >= 0 ? formatDurationSummary(durationSeconds) : null,
   ].filter(Boolean)
+  const hasBlockingResolutionMismatch = ctx.hasImportedVideo && ctx.resolutionMismatch
 
   return (
     <div
@@ -59,11 +60,37 @@ export default function RenderVideoDialog(props) {
       onMouseDown={ctx.handleBackdropPointerDown}
     >
       <div
-        className="w-full max-w-md rounded-xl border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
+        className="w-full max-w-lg rounded-xl border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
         onMouseDown={(event) => event.stopPropagation()}
       >
         {ctx.isProgress ? (
           <RenderProgressPanel renderProgress={ctx.renderProgress} renderSummaryItems={renderSummaryItems} onCancel={ctx.handleCancel} />
+        ) : hasBlockingResolutionMismatch ? (
+          <div className="space-y-12 p-3">
+            <div className="space-y-8">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-10 w-10 shrink-0 text-red-500" />
+                <p className="pl-2 font-bold text-sm leading-relaxed text-red-500">
+                  Overlay resolution ({ctx.config?.scene?.width}x{ctx.config?.scene?.height}) must match imported video (
+                  {ctx.importedVideoResolution?.width}x{ctx.importedVideoResolution?.height}).
+                </p>
+              </div>
+              <p className="text-sm leading-6 text-muted-foreground text-justify">
+                This is necessary to properly render the overlay. Please change the overlay resolution in the sidebar settings or pick a different
+                template.
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
+                onClick={ctx.onClose}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="space-y-8">
             <div className="space-y-2">
@@ -240,16 +267,6 @@ export default function RenderVideoDialog(props) {
                     value={[ctx.settings.exportBitrate ?? 20]}
                     onValueChange={([value]) => ctx.onSettingsChange({ exportBitrate: value })}
                   />
-                </div>
-              )}
-
-              {ctx.hasImportedVideo && ctx.resolutionMismatch && (
-                <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-2 text-destructive">
-                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                  <p className="text-[10px] leading-tight">
-                    Overlay resolution {ctx.config?.scene?.width}x{ctx.config?.scene?.height} must match imported video{' '}
-                    {ctx.importedVideoResolution?.width}x{ctx.importedVideoResolution?.height}.
-                  </p>
                 </div>
               )}
 

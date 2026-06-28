@@ -21,8 +21,14 @@ import TemplateSection from './TemplateSection'
  */
 export default function AppHeader({ activityControls, backendStatus, onOpenDownloads, renderControls, templateControls, videoControls }) {
   const { activityLabel, onOpenActivityFile } = activityControls
-  const { onOpenRenderDialog, onRenderPreviewFrame, renderDisabled, renderPreviewFrameDisabled, renderTooltipContent, renderingVideo } =
-    renderControls
+  const {
+    onOpenRenderDialog,
+    onRenderPreviewFrame,
+    renderDisabled,
+    renderPreviewFrameDisabled,
+    renderTooltipContent,
+    renderingVideo,
+  } = renderControls
   const {
     config,
     handleCreateNewTemplate,
