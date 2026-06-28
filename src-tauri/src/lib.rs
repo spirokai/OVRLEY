@@ -71,6 +71,7 @@ pub fn run() {
             tauri_commands::backend_open_video,
             tauri_commands::backend_probe_video,
             tauri_commands::backend_import_preview_video,
+            tauri_commands::backend_extract_video_telemetry,
             tauri_commands::backend_clear_preview_video,
             tauri_commands::backend_get_video_state,
             tauri_commands::backend_detect_codecs,

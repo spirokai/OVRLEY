@@ -1,0 +1,75 @@
+diff --git a/src/dji/mod.rs b/src/dji/mod.rs
+index 4e8f336..2baea2b 100644
+--- a/src/dji/mod.rs
++++ b/src/dji/mod.rs
+@@ -147,6 +147,26 @@ impl Dji {
+                             exposure_time = e.exposure_time.as_ref().and_then(|v| Some(*v.exposure_time.get(0)? as f64 / *v.exposure_time.get(1)? as f64)).unwrap_or_default() * 1000.0;
+ 
+                             // log::debug!("Exposure time: {:?}", &exposure_time);
++
++                            // ISO sensitivity
++                            if let Some(ref iso) = e.iso {
++                                insert_tag(&mut tag_map, tag!(parsed GroupId::Exposure, TagId::ISOValue, "ISO", f32, |v| format!("{:.0}", v), iso.iso, vec![]), &options);
++                            }
++
++                            // Shutter speed as rational (num, den) ÔåÆ u32x2
++                            if let Some(ref et) = e.exposure_time {
++                                if et.exposure_time.len() >= 2 {
++                                    let num = et.exposure_time[0] as u32;
++                                    let den = et.exposure_time[1] as u32;
++                                    insert_tag(&mut tag_map, tag!(parsed GroupId::Exposure, TagId::ShutterSpeed, "Shutter speed", u32x2, |v| format!("{}/{}s", v.0, v.1), (num, den), vec![]), &options);
++                                }
++                            }
++
++                            // White balance colour temperature
++                            if let Some(ref wb) = e.white_balance_cct {
++                                insert_tag(&mut tag_map, tag!(parsed GroupId::Colors, TagId::WhiteBalance, "White balance", u32, |v| format!("{}K", v), wb.white_balance_cct, vec![]), &options);
++                            }
++
+                         }
+ 
+                         if let Some(ref imu) = frame.imu_frame_meta {
+@@ -258,7 +278,42 @@ impl Dji {
+                     Err(e) => { log::warn!("Failed to parse protobuf: {:?}", e); }
+                 },
+                 DeviceProtobuf::Wa530 => match dvtm_eagle4_wa530::ProductMeta::decode(data) {
+-                    Ok(parsed) => { handle_parsed!(parsed, imu_single_attitude_after_fusion); },
++                    Ok(parsed) => {
++                        // Capture WA530-specific camera fields before parsed is consumed
++                        let wa530_extra = parsed.frame_meta.as_ref()
++                            .and_then(|f| f.camera_frame_meta.as_ref())
++                            .map(|e| (
++                                e.f_number.clone(),
++                                e.focal_length.clone(),
++                                e.exposure_value.map(|v| v.exposure_value),
++                            ));
++                        handle_parsed!(parsed, imu_single_attitude_after_fusion);
++                        if let Some((f_number, focal_length, exposure_value)) = wa530_extra {
++                            if let Some(sample) = samples.last_mut() {
++                                if let Some(ref mut tag_map) = sample.tag_map {
++                                    if let Some(ref fn_) = f_number {
++                                        if fn_.f_number.len() >= 2 {
++                                            let num = fn_.f_number[0];
++                                            let den = fn_.f_number[1];
++                                            insert_tag(tag_map, tag!(parsed GroupId::Lens, TagId::IrisFStop, "F-number", u32x2, |v| format!("F{:.1}", v.0 as f64 / v.1 as f64), (num, den), vec![]), &options);
++                                        }
++                                    }
++                                    if let Some(ref fl) = focal_length {
++                                        if fl.focal_length.len() >= 2 {
++                                            let num = fl.focal_length[0] as f64;
++                                            let den = fl.focal_length[1] as f64;
++                                            if den > 0.0 {
++                                                insert_tag(tag_map, tag!(parsed GroupId::Lens, TagId::FocalLength, "Focal length", f32, |v| format!("{:.1}mm", v), (num / den) as f32, vec![]), &options);
++                                            }
++                                        }
++                                    }
++                                    if let Some(ev) = exposure_value {
++                                        insert_tag(tag_map, tag!(parsed GroupId::Exposure, TagId::Custom("EV".into()), "Exposure value", f32, |v| format!("{:.1}", v), ev, vec![]), &options);
++                                    }
++                                }
++                            }
++                        }
++                    },
+                     Err(e) => { log::warn!("Failed to parse protobuf: {:?}", e); }
+                 },
+                 DeviceProtobuf::Oq101 => match dvtm_oq101::ProductMeta::decode(data) {

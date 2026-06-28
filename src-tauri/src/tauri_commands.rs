@@ -220,6 +220,22 @@ pub(crate) async fn backend_import_preview_video(
     serialize_command_result(&response)
 }
 
+/// Extracts embedded telemetry from an imported video source.
+///
+/// This is intentionally separate from preview import so a failed telemetry
+/// parse does not prevent video playback; the frontend can call it
+/// opportunistically after the preview video is registered.
+#[tauri::command]
+pub(crate) async fn backend_extract_video_telemetry(
+    app: AppHandle,
+    file_path: String,
+) -> Result<String, String> {
+    call_and_serialize(commands::backend_extract_video_telemetry(
+        &runtime_paths::app_paths(&app)?,
+        &file_path,
+    ))
+}
+
 /// Clears the currently registered local HTTP preview video.
 ///
 /// Any previously issued `/video/<import_id>` URL becomes invalid after this

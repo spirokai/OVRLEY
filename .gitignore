@@ -46,6 +46,7 @@ ffmpeg/
 .ffmpeg/
 vendor/ffmpeg/*
 !vendor/ffmpeg/.gitkeep
+vendor/telemetry-parser/
 
 # Test fixtures (large video files)
 src-tauri/ovrley_core/tests/fixtures/video/

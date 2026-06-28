@@ -938,21 +938,88 @@ extractVideoTelemetry(selected)
 
 ### Step F4: Merge strategy (when FIT/GPX also imported)
 
-When the user imports FIT/GPX after video telemetry, merge at the canonical
-`ParsedActivity` layer rather than keeping a second render-only object.
+When the user imports FIT/GPX after video telemetry, merge from known source
+objects into a disposable canonical `ParsedActivity`. Do not treat the merged
+object itself as provenance-aware. Once metrics have been copied into one
+`ParsedActivity`, the app cannot reliably tell whether a value originally came
+from FIT/GPX or MP4 telemetry unless the source objects are still kept
+separately.
 
 Recommended flow:
 
-- Keep `videoTelemetryParsedActivity` cached as supplemental camera telemetry.
-- Build one merged `parsedActivity` in store when telemetry or FIT/GPX changes.
-- For each metric series: if FIT/GPX has a non-null value, keep it; otherwise
-  fill from telemetry.
-- Keep one `activitySummary` / `parsedActivity` pair so the rest of the app
-  continues to operate on a single canonical activity object.
+- Keep source-level activities separate in state:
+  - `importedActivityParsedActivity` (or the existing non-video parsed activity
+    store field) owns FIT/GPX/SRT user activity imports.
+  - `videoTelemetryParsedActivity` owns MP4 embedded telemetry finalized from
+    `videoTelemetryRaw`.
+  - `parsedActivity` / `activitySummary` is derived output only.
+- Rebuild the merged `parsedActivity` whenever either source changes. Do not
+  mutate an existing merged object in place, because that loses source
+  provenance and can leave stale MP4-filled values after a later activity
+  import.
+- If the user imports a new FIT/GPX/SRT activity, replace the non-video source
+  activity and recompute the merged activity against the current video
+  telemetry source, if any.
+- If the user clears or replaces the preview video, clear
+  `videoTelemetryRaw` / `videoTelemetryParsedActivity` and recompute from the
+  non-video source alone.
+- If only MP4 telemetry exists, `parsedActivity` may be derived directly from
+  `videoTelemetryParsedActivity`. If both exist, FIT/GPX/SRT remains the primary
+  activity source.
+- For each metric series during recompute: if FIT/GPX/SRT has a non-null value,
+  keep it; otherwise fill from MP4 telemetry. Camera-only metrics such as ISO,
+  aperture, shutter, focal length, EV, color temperature, and g-force naturally
+  come from MP4 when absent from the activity source.
+- Keep one derived `activitySummary` / `parsedActivity` pair so the rest of the
+  app continues to operate on a single canonical activity object, but never use
+  that pair as the source of truth for future merges.
 
 This should reuse the existing `combineSeries()` pattern in
 `metric-series.js`, but the merge happens before render, not only inside the
 render payload builder.
+
+### Step F5: Expand video metadata display
+
+Update `app/src/features/scene-settings/components/VideoSyncSection.jsx` so the
+video section shows richer source metadata when available. This is display-only
+metadata; it must not become sync/provenance logic.
+
+Recommended display fields:
+
+- Existing summary row: duration, fps, resolution.
+- Source timestamp row: use `importedVideoSyncTime` / `metadata.syncTime` once
+  F2 renames the old creation-time field; label it as sync/source time rather
+  than authoritative file creation time.
+- Camera row, if available:
+  - manufacturer/source family from MP4 telemetry `metadata.camera_type` or
+    source probe metadata if a manufacturer field is added later.
+  - model from MP4 telemetry `metadata.camera_model` and any later camera
+    model field.
+- Codec row, if available:
+  - `codecName` only from `SourceVideoMetadata`.
+  - keep the display compact and do not surface the longer codec detail bundle
+    in this phase.
+- Bitrate row, if available:
+  - show video/container bitrate only when the backend exposes it.
+  - Do not infer bitrate from file size and duration in the UI unless that is
+    explicitly added as an approximate field; exact stream bitrate should come
+    from ffprobe/source metadata.
+
+Data-shape note:
+
+- `SourceVideoMetadata` already carries codec/profile/pixel-format/bit-depth
+  fields, but F5 should only render `codecName` from that set. The UI must
+  render manufacturer, camera model, and bitrate too when the backend exposes
+  them, but those values come from the source metadata contract rather than the
+  codec detail bundle.
+- `extract_telemetry()` currently exposes MP4 telemetry metadata as
+  `camera_type` and `camera_model`.
+- If Phase F requires bitrate/manufacturer/model in the UI, add those fields to
+  the backend metadata contract first instead of deriving them ad hoc inside
+  `VideoSyncSection.jsx`.
+- `VideoSyncSection.jsx` should accept one metadata object or explicit optional
+  props for these display values; avoid reaching directly into unrelated store
+  state from the presentational component.
 
 ---
 

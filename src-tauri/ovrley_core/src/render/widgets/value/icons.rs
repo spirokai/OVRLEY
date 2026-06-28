@@ -63,9 +63,7 @@ pub(crate) enum SvgPrimitive {
 pub(crate) fn metric_icon_kind_for_value(kind: MetricKind) -> Option<MetricIconKind> {
     match metric_icon_asset_key(kind)? {
         crate::standard_metrics::MetricIconAssetKey::Speed => Some(MetricIconKind::Gauge),
-        crate::standard_metrics::MetricIconAssetKey::Distance => {
-            Some(MetricIconKind::Distance)
-        }
+        crate::standard_metrics::MetricIconAssetKey::Distance => Some(MetricIconKind::Distance),
         crate::standard_metrics::MetricIconAssetKey::Heartrate => Some(MetricIconKind::Heart),
         crate::standard_metrics::MetricIconAssetKey::Cadence => Some(MetricIconKind::RefreshCw),
         crate::standard_metrics::MetricIconAssetKey::Power => Some(MetricIconKind::Zap),

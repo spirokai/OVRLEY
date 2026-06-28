@@ -61,7 +61,12 @@ fn trim_numeric_series(
 }
 
 fn last_finite(series: &[Option<f64>]) -> Option<f64> {
-    series.iter().rev().copied().flatten().find(|value| value.is_finite())
+    series
+        .iter()
+        .rev()
+        .copied()
+        .flatten()
+        .find(|value| value.is_finite())
 }
 
 /// Trims a parsed activity to a scene range.

@@ -300,16 +300,7 @@ fn chevron_vertices_pointing_up() {
 
 #[test]
 fn heading_tape_layout_adds_only_visible_chevron_slots() {
-    let top = heading_tape_layout(
-        80.0,
-        true,
-        "chevron",
-        "top",
-        10.0,
-        40.0,
-        4.0,
-        12.0,
-    );
+    let top = heading_tape_layout(80.0, true, "chevron", "top", 10.0, 40.0, 4.0, 12.0);
     assert!((top.body_y - 15.0).abs() < f32::EPSILON);
     assert!((top.body_height - 51.0).abs() < f32::EPSILON);
     assert!((top.tick_scale_height - 80.0).abs() < f32::EPSILON);
@@ -317,31 +308,13 @@ fn heading_tape_layout_adds_only_visible_chevron_slots() {
     assert!(top.has_top_chevron);
     assert!(!top.has_bottom_chevron);
 
-    let bottom = heading_tape_layout(
-        80.0,
-        true,
-        "chevron",
-        "bottom",
-        10.0,
-        40.0,
-        4.0,
-        12.0,
-    );
+    let bottom = heading_tape_layout(80.0, true, "chevron", "bottom", 10.0, 40.0, 4.0, 12.0);
     assert!((bottom.body_y - 0.0).abs() < f32::EPSILON);
     assert!((bottom.total_height - 66.0).abs() < f32::EPSILON);
     assert!(!bottom.has_top_chevron);
     assert!(bottom.has_bottom_chevron);
 
-    let both = heading_tape_layout(
-        80.0,
-        true,
-        "chevron",
-        "both",
-        10.0,
-        40.0,
-        4.0,
-        12.0,
-    );
+    let both = heading_tape_layout(80.0, true, "chevron", "both", 10.0, 40.0, 4.0, 12.0);
     assert!((both.body_y - 15.0).abs() < f32::EPSILON);
     assert!((both.total_height - 81.0).abs() < f32::EPSILON);
 }

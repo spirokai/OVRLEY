@@ -520,6 +520,19 @@ pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Valu
     }
 }
 
+/// Extracts embedded MP4 telemetry as a normalized raw activity payload.
+///
+/// The extractor returns `null` when the video has no usable embedded telemetry
+/// so the frontend can distinguish "no MP4 telemetry source" from command
+/// failure. Final activity assembly and FIT/GPX merge precedence remain in the
+/// frontend import pipeline.
+pub fn backend_extract_video_telemetry(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
+    match crate::media::mp4_telemetry::extract_telemetry(&paths.repo_root, file_path)? {
+        Some(activity_json) => Ok(activity_json),
+        None => Ok(Value::Null),
+    }
+}
+
 fn needs_ffprobe_salvage(metadata: &crate::media::SourceVideoMetadata) -> bool {
     metadata.sync_time.is_none()
         || metadata.creation_time.is_none()
