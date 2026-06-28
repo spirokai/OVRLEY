@@ -3,18 +3,25 @@
 //! Telemetry-parser reads the camera-native metadata track (GoPro GPMF, DJI
 //! protobuf, Insta360 time-scalars, etc.) and exposes it as vendor-agnostic
 //! tag maps in [`GroupId`]/[`TagId`] buckets. This module converts those maps
-//! into a normalised columnar JSON payload that shares the same frontend
-//! interpolation path as FIT/GPX/SRT imports. The full pipeline:
+//! into a [`ParsedActivity`] with a single unified timeline. The pipeline:
 //!
-//! 1. `extract_telemetry()` opens the file and runs telemetry-parser.
-//! 2. `extract_native_samples()` converts tag maps into a [`NativeSample`] vec.
-//! 3. `smooth_series()` applies zero-phase smoothing to GPS/IMU fields.
-//! 4. `native_samples_to_series_json()` splits the flat vec into columnar
-//!    GPS / IMU / camera series for frontend interpolation.
+//! 1. `extract_native_samples()` converts tag maps into a [`NativeSample`] vec.
+//! 2. `smooth_series()` applies zero-phase smoothing to GPS/IMU fields.
+//! 3. `build_parsed_activity()` aligns all metrics to GPS‑cadence timestamps
+//!    (or video FPS as fallback) via closest-in-time matching, then assembles
+//!    the final [`ParsedActivity`].
 //!
-//! Owns: `probe_video_metadata()`, `extract_telemetry()`.
+//! The [`ParsedActivity`] carries raw GPS course points and elevation —
+//! **not** the simplified widget geometries. Route polylines and elevation
+//! plots are computed separately by [`crate::commands::route_geometry`] and
+//! [`crate::commands::elevation_geometry`] (LTTB downsampling, RDP
+//! simplification, equirectangular projection).
+//!
+//! Owns: `probe_video_metadata()`, [`extract_activity`].
 //! Does not own: ffprobe binary discovery (see [`crate::encode::ffmpeg`]),
-//!       activity parsing/finalization, rendering, or output encoding.
+//!       activity interpolation/densification (see [`crate::activity`]),
+//!       route/elevation geometry (see [`crate::commands`]),
+//!       rendering or output encoding.
 //!
 //! # Sub-modules
 //!
@@ -24,32 +31,33 @@
 //! | [`tags`] | Typed accessors for telemetry-parser `TagValue` variants |
 //! | [`vendor`] | Vendor-specific camera metadata (GoPro, Insta360, DJI JSON) |
 //! | [`smoothing`] | Zero-phase moving-average smoothing for continuous series |
+//! | [`activity`] | [`ParsedActivity`] assembly with closest-in-time alignment |
 
+mod activity;
 mod extraction;
+mod smoothing;
 mod tags;
 mod vendor;
-mod smoothing;
 
 use std::fs::File;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use chrono::{TimeZone, Utc};
-use serde_json::{json, Value};
 use telemetry_parser::tags_impl::{GroupId, TagId};
 use telemetry_parser::util::SampleInfo;
 use telemetry_parser::Input;
 
+use crate::activity::schema::ParsedActivity;
 use crate::encode::fps::Fps;
 use crate::error::{CoreError, CoreResult};
-use crate::media::{dji_ac004, Resolution, SourceVideoMetadata};
 use crate::media::native_sample::{NativeSample, TelemetrySeriesCounts};
+use crate::media::time::{
+    gps_unix_seconds_to_video_start_rfc3339, gpsu_millis_to_video_start_rfc3339,
+};
+use crate::media::{dji_ac004, Resolution, SourceVideoMetadata};
 
-use tags::extract_tag_u64;
-
-/// GoPro GPMF stores the absolute GPS UTC timestamp under the fourcc `GPSU`.
-const GOPRO_GPSU_TAG: u32 = 0x4750_5355;
+use tags::{extract_tag_u64, gps5_fix_is_usable, GOPRO_GPSU_TAG};
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -98,8 +106,69 @@ pub fn probe_video_metadata(file_path: &str) -> CoreResult<SourceVideoMetadata> 
     })
 }
 
-/// Extracts MP4 embedded telemetry into the normalized raw-sample payload.
-pub fn extract_telemetry(repo_root: &Path, file_path: &str) -> CoreResult<Option<Value>> {
+// ---------------------------------------------------------------------------
+// Shared extraction pipeline
+// ---------------------------------------------------------------------------
+
+/// Source that produced the normalized native samples.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TelemetrySource {
+    TelemetryParser,
+    DjiAc004Fallback,
+}
+
+impl TelemetrySource {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::TelemetryParser => "telemetry_parser",
+            Self::DjiAc004Fallback => "dji_ac004_fallback",
+        }
+    }
+}
+
+/// Timeline selected by the activity adapter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TimelineKind {
+    GpsAnchored,
+    VideoDerived,
+}
+
+impl TimelineKind {
+    fn from_counts(counts: TelemetrySeriesCounts) -> Self {
+        if counts.gps > 0 {
+            Self::GpsAnchored
+        } else {
+            Self::VideoDerived
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::GpsAnchored => "gps_anchored",
+            Self::VideoDerived => "video_derived",
+        }
+    }
+}
+
+/// Internal extraction result consumed by output adapters.
+struct Mp4TelemetryExtraction {
+    samples: Vec<NativeSample>,
+    counts: TelemetrySeriesCounts,
+    source: TelemetrySource,
+    timeline: TimelineKind,
+    camera_type: String,
+    camera_model: Option<String>,
+    sync_time: Option<String>,
+    file_name: Option<String>,
+}
+
+/// Shared core: opens the file, runs telemetry-parser, handles the DJI AC004
+/// fallback, extracts native samples, smooths GPS/IMU series, and records the
+/// provenance consumed by the activity adapter.
+fn extract_telemetry_data(
+    repo_root: &Path,
+    file_path: &str,
+) -> CoreResult<Option<Mp4TelemetryExtraction>> {
     let path = Path::new(file_path);
     let file_size = std::fs::metadata(path)
         .map_err(|source| CoreError::Io {
@@ -118,48 +187,103 @@ pub fn extract_telemetry(repo_root: &Path, file_path: &str) -> CoreResult<Option
         .map_err(|error| CoreError::Encode(format!("telemetry-parser parse error: {error}")))?;
     dump_raw_telemetry_parser_output(file_path, &input.samples);
 
-    let camera_type = input.camera_type();
+    let camera_type = input.camera_type().to_string();
     let camera_model = input.camera_model().cloned();
-    let samples = match input.samples {
-        Some(samples) if !samples.is_empty() => samples,
-        _ => return extract_dji_ac004_fallback(repo_root, path),
+    let file_name = path.file_name().map(|n| n.to_string_lossy().to_string());
+
+    // Try telemetry-parser first, fall back to DJI AC004 when needed
+    let (mut samples, sync_time, camera_model, source) = match input.samples {
+        Some(ref parser_samples) if !parser_samples.is_empty() => {
+            let has_gps_group = parser_samples.iter().any(|s| {
+                s.tag_map
+                    .as_ref()
+                    .is_some_and(|m| m.contains_key(&GroupId::GPS))
+            });
+
+            let extracted = extraction::extract_native_samples(parser_samples);
+
+            if extracted.is_empty() || (camera_type == "DJI" && !has_gps_group) {
+                let Some(dji) = dji_normalized_samples(repo_root, path)? else {
+                    return Ok(None);
+                };
+                (
+                    dji.samples,
+                    dji.sync_time,
+                    dji.device_name,
+                    TelemetrySource::DjiAc004Fallback,
+                )
+            } else {
+                let sync = extract_sync_time_from_samples(parser_samples);
+                (
+                    extracted,
+                    sync,
+                    camera_model,
+                    TelemetrySource::TelemetryParser,
+                )
+            }
+        }
+        _ => {
+            let Some(dji) = dji_normalized_samples(repo_root, path)? else {
+                return Ok(None);
+            };
+            (
+                dji.samples,
+                dji.sync_time,
+                dji.device_name,
+                TelemetrySource::DjiAc004Fallback,
+            )
+        }
     };
 
-    let has_gps_group = samples.iter().any(|s| {
-        s.tag_map.as_ref().is_some_and(|m| m.contains_key(&GroupId::GPS))
-    });
-
-    let mut normalized = extraction::extract_native_samples(&samples);
-    if normalized.is_empty() || (camera_type == "DJI" && !has_gps_group) {
-        return extract_dji_ac004_fallback(repo_root, path);
+    if samples.is_empty() {
+        return Ok(None);
     }
-    smoothing::smooth_series(&mut normalized);
+    smoothing::smooth_series(&mut samples);
+    let counts = count_series(&samples);
 
-    let (series, series_counts) = native_samples_to_series_json(&normalized);
-
-    Ok(Some(json!({
-        "fileName": path.file_name().map(|name| name.to_string_lossy().to_string()),
-        "fileFormat": "mp4_telemetry",
-        "syncTime": extract_sync_time_from_samples(&samples),
-        "metadata": {
-            "camera_type": camera_type,
-            "camera_model": camera_model,
-            "telemetry_sample_count": series_counts.total(),
-            "gps_sample_count": series_counts.gps,
-            "imu_sample_count": series_counts.imu,
-            "camera_sample_count": series_counts.camera,
-        },
-        "series": series,
-    })))
+    Ok(Some(Mp4TelemetryExtraction {
+        samples,
+        counts,
+        source,
+        timeline: TimelineKind::from_counts(counts),
+        camera_type,
+        camera_model,
+        sync_time,
+        file_name,
+    }))
 }
 
-/// Falls back to the repo-owned DJI AC004 decoder.
-fn extract_dji_ac004_fallback(repo_root: &Path, path: &Path) -> CoreResult<Option<Value>> {
+fn count_series(samples: &[NativeSample]) -> TelemetrySeriesCounts {
+    TelemetrySeriesCounts {
+        gps: samples
+            .iter()
+            .filter(|sample| sample.has_gps_payload())
+            .count(),
+        imu: samples
+            .iter()
+            .filter(|sample| sample.g_force.is_some())
+            .count(),
+        camera: samples
+            .iter()
+            .filter(|sample| sample.has_camera_payload())
+            .count(),
+    }
+}
+
+/// Result from the DJI AC004 fallback decoder.
+struct DjiFallbackResult {
+    samples: Vec<NativeSample>,
+    sync_time: Option<String>,
+    device_name: Option<String>,
+}
+
+/// Runs the DJI AC004 fallback decoder and returns normalized samples + metadata.
+fn dji_normalized_samples(repo_root: &Path, path: &Path) -> CoreResult<Option<DjiFallbackResult>> {
     let Some(telemetry) = dji_ac004::extract_from_video(repo_root, path)? else {
         return Ok(None);
     };
 
-    let mut normalized: Vec<_> = telemetry
+    let samples: Vec<_> = telemetry
         .samples
         .iter()
         .map(|sample| NativeSample {
@@ -175,27 +299,57 @@ fn extract_dji_ac004_fallback(repo_root: &Path, path: &Path) -> CoreResult<Optio
         })
         .collect();
 
-    if normalized.is_empty() {
+    if samples.is_empty() {
         return Ok(None);
     }
-    smoothing::smooth_series(&mut normalized);
-    let (series, series_counts) = native_samples_to_series_json(&normalized);
 
-    Ok(Some(json!({
-        "fileName": path.file_name().map(|name| name.to_string_lossy().to_string()),
-        "fileFormat": "mp4_telemetry",
-        "syncTime": telemetry.sync_time,
-        "metadata": {
-            "camera_type": "DJI",
-            "camera_model": telemetry.device_name,
-            "telemetry_sample_count": series_counts.total(),
-            "gps_sample_count": series_counts.gps,
-            "imu_sample_count": series_counts.imu,
-            "camera_sample_count": series_counts.camera,
-            "dji_ac004_sample_rate_hz": telemetry.sample_rate_hz,
-        },
-        "series": series,
-    })))
+    Ok(Some(DjiFallbackResult {
+        samples,
+        sync_time: telemetry.sync_time,
+        device_name: telemetry.device_name,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Public entry points
+// ---------------------------------------------------------------------------
+
+/// Extracts MP4 telemetry into a [`ParsedActivity`] with a single timeline.
+///
+/// The returned activity aligns all metrics (GPS, IMU, camera) to a single
+/// `sample_elapsed_seconds` timeline keyed to GPS timestamps (or video FPS
+/// when GPS is absent). Closest-in-time matching picks the IMU and camera
+/// value for each anchor point — see [`activity::build_parsed_activity`].
+///
+/// `fps` and `duration_s` come from [`probe_video_metadata`] and are only
+/// used as a fallback when the file has no GPS data.
+///
+/// The returned [`ParsedActivity`] carries raw course points and elevation.
+/// Route and elevation widget geometries are computed separately by
+/// [`crate::commands::route_geometry`] and
+/// [`crate::commands::elevation_geometry`].
+pub fn extract_activity(
+    repo_root: &Path,
+    file_path: &str,
+    fps: f64,
+    duration_s: f64,
+) -> CoreResult<Option<ParsedActivity>> {
+    let Some(result) = extract_telemetry_data(repo_root, file_path)? else {
+        return Ok(None);
+    };
+
+    Ok(Some(activity::build_parsed_activity(
+        &result.samples,
+        fps,
+        duration_s,
+        result.file_name,
+        &result.camera_type,
+        result.camera_model,
+        result.sync_time,
+        result.source.as_str(),
+        result.timeline.as_str(),
+        result.counts,
+    )))
 }
 
 /// Converts floating FPS metadata into the shared rational representation.
@@ -206,97 +360,6 @@ pub fn rational_fps_parts(fps: f64) -> (Option<u32>, Option<u32>) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Columnar JSON serialization
-// ---------------------------------------------------------------------------
-
-/// Serializes normalized native samples into columnar cadence-domain series.
-fn native_samples_to_series_json(samples: &[NativeSample]) -> (Value, TelemetrySeriesCounts) {
-    let mut gps_time_ms = Vec::new();
-    let mut gps_timestamp = Vec::new();
-    let mut latitude = Vec::new();
-    let mut longitude = Vec::new();
-    let mut altitude = Vec::new();
-    let mut elevation = Vec::new();
-    let mut speed = Vec::new();
-    let mut heading = Vec::new();
-
-    let mut imu_time_ms = Vec::new();
-    let mut g_force = Vec::new();
-
-    let mut camera_time_ms = Vec::new();
-    let mut iso = Vec::new();
-    let mut aperture = Vec::new();
-    let mut shutter_speed = Vec::new();
-    let mut focal_length = Vec::new();
-    let mut ev = Vec::new();
-    let mut color_temperature = Vec::new();
-
-    for sample in samples {
-        if sample.has_gps_payload() {
-            gps_time_ms.push(sample.timestamp_ms);
-            gps_timestamp.push(sample.timestamp.clone());
-            latitude.push(sample.latitude);
-            longitude.push(sample.longitude);
-            altitude.push(sample.altitude);
-            elevation.push(sample.altitude);
-            speed.push(sample.speed);
-            heading.push(sample.heading);
-        }
-
-        if sample.g_force.is_some() {
-            imu_time_ms.push(sample.timestamp_ms);
-            g_force.push(sample.g_force);
-        }
-
-        if sample.has_camera_payload() {
-            camera_time_ms.push(sample.timestamp_ms);
-            iso.push(sample.iso);
-            aperture.push(sample.aperture);
-            shutter_speed.push(sample.shutter_speed);
-            focal_length.push(sample.focal_length);
-            ev.push(sample.ev);
-            color_temperature.push(sample.color_temperature);
-        }
-    }
-
-    let counts = TelemetrySeriesCounts {
-        gps: gps_time_ms.len(),
-        imu: imu_time_ms.len(),
-        camera: camera_time_ms.len(),
-    };
-
-    (
-        json!({
-            "gps": {
-                "timeMs": gps_time_ms,
-                "timestamp": gps_timestamp,
-                "latitude": latitude,
-                "longitude": longitude,
-                "altitude": altitude,
-                "elevation": elevation,
-                "speed": speed,
-                "heading": heading,
-            },
-            "imu": {
-                "timeMs": imu_time_ms,
-                "gForce": g_force,
-            },
-            "camera": {
-                "timeMs": camera_time_ms,
-                "iso": iso,
-                "aperture": aperture,
-                "shutterSpeed": shutter_speed,
-                "focalLength": focal_length,
-                "ev": ev,
-                "colorTemperature": color_temperature,
-            },
-        }),
-        counts,
-    )
-}
-
-// ---------------------------------------------------------------------------
 // Sync time
 // ---------------------------------------------------------------------------
 
@@ -318,18 +381,20 @@ fn extract_sync_time_from_samples(samples: &[SampleInfo]) -> Option<String> {
                 let Some(gps) = gps_values.get().first().filter(|gps| gps.is_acquired) else {
                     continue;
                 };
-                return Some(unix_to_rfc3339(
-                    gps.unix_timestamp - sample.timestamp_ms / 1000.0,
+                return Some(gps_unix_seconds_to_video_start_rfc3339(
+                    gps.unix_timestamp,
+                    sample.timestamp_ms,
                 ));
             }
             telemetry_parser::tags_impl::TagValue::Vec_Vec_i32(rows) if !rows.get().is_empty() => {
-                if let Some(unix_ms) = extract_tag_u64(gps_map, &TagId::Unknown(GOPRO_GPSU_TAG)) {
-                    if sample.timestamp_ms == 0.0 {
-                        return Some(unix_millis_to_rfc3339(unix_ms));
+                if gps5_fix_is_usable(gps_map) {
+                    if let Some(unix_ms) = extract_tag_u64(gps_map, &TagId::Unknown(GOPRO_GPSU_TAG))
+                    {
+                        let first_row_ms = extract_tag_u64(gps_map, &TagId::TimestampUs)
+                            .map(|stmp| stmp as f64 / 1000.0)
+                            .unwrap_or(sample.timestamp_ms);
+                        return Some(gpsu_millis_to_video_start_rfc3339(unix_ms, first_row_ms));
                     }
-                    return Some(unix_to_rfc3339(
-                        unix_ms as f64 / 1000.0 - sample.timestamp_ms / 1000.0,
-                    ));
                 }
             }
             _ => {}
@@ -339,38 +404,14 @@ fn extract_sync_time_from_samples(samples: &[SampleInfo]) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------
-// Timestamp formatting
-// ---------------------------------------------------------------------------
-
-/// Converts GPS epoch timestamps into RFC 3339 format.
-pub(crate) fn unix_to_rfc3339(unix_ts: f64) -> String {
-    if !unix_ts.is_finite() {
-        return String::new();
-    }
-
-    let secs = unix_ts.floor() as i64;
-    let nanos = ((unix_ts - secs as f64) * 1_000_000_000.0)
-        .round()
-        .clamp(0.0, 999_999_999.0) as u32;
-
-    Utc.timestamp_opt(secs, nanos)
-        .single()
-        .map(|datetime| datetime.to_rfc3339())
-        .unwrap_or_default()
-}
-
-/// Converts millisecond epoch timestamps without floating-point.
-fn unix_millis_to_rfc3339(unix_ms: u64) -> String {
-    Utc.timestamp_millis_opt(unix_ms as i64)
-        .single()
-        .map(|datetime| datetime.to_rfc3339())
-        .unwrap_or_default()
-}
-
-// ---------------------------------------------------------------------------
 // Debug output
 // ---------------------------------------------------------------------------
 
+/// Writes a debug dump of the raw telemetry-parser output.
+///
+/// Only active in debug builds. The file is written to
+/// `debug/mp4telemetry/{stem}-telemetry-parser-raw.txt` for offline
+/// inspection when diagnosing extraction issues.
 #[cfg(debug_assertions)]
 fn dump_raw_telemetry_parser_output(file_path: &str, samples: &Option<Vec<SampleInfo>>) {
     let debug_dir = Path::new(env!("CARGO_MANIFEST_DIR"))

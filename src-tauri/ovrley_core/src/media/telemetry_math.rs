@@ -18,6 +18,19 @@ pub fn finite_f64(value: f64) -> Option<f64> {
     value.is_finite().then_some(value)
 }
 
+/// Great-circle distance between two GPS coordinates in meters.
+///
+/// Uses the Haversine formula with Earth radius 6,371,000 m.
+pub fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    const R: f64 = 6_371_000.0;
+    let dlat = (lat2 - lat1).to_radians();
+    let dlon = (lon2 - lon1).to_radians();
+    let a = (dlat / 2.0).sin().powi(2)
+        + lat1.to_radians().cos() * lat2.to_radians().cos() * (dlon / 2.0).sin().powi(2);
+    let c = 2.0 * a.sqrt().asin();
+    R * c
+}
+
 /// Dynamic g-force magnitude from three-axis accelerometer components.
 ///
 /// Returns `magnitude - 1g` so a resting sensor reports 0.0 and positive values

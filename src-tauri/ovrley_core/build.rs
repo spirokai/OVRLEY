@@ -23,20 +23,26 @@ fn main() {
     }
 
     // Locate cargo's git checkout of telemetry-parser inside CARGO_HOME.
-    let cargo_home = std::env::var("CARGO_HOME")
-        .unwrap_or_else(|_| format!("{}/.cargo", std::env::var("HOME")
+    let cargo_home =
+        std::env::var("CARGO_HOME").unwrap_or_else(|_| {
+            format!("{}/.cargo", std::env::var("HOME")
             .unwrap_or_else(|_| std::env::var("USERPROFILE")
-            .unwrap_or_else(|_| ".".into()))));
+            .unwrap_or_else(|_| ".".into())))
+        });
 
     let checkouts_dir = Path::new(&cargo_home).join("git/checkouts");
-    let Ok(entries) = std::fs::read_dir(&checkouts_dir) else { return };
+    let Ok(entries) = std::fs::read_dir(&checkouts_dir) else {
+        return;
+    };
 
     for entry in entries.flatten() {
         let dir_name = entry.file_name();
         if !dir_name.to_string_lossy().contains("telemetry-parser") {
             continue;
         }
-        let Ok(versions) = std::fs::read_dir(entry.path()) else { break };
+        let Ok(versions) = std::fs::read_dir(entry.path()) else {
+            break;
+        };
 
         for version in versions.flatten() {
             if !version.path().join("src/dji/mod.rs").exists() {

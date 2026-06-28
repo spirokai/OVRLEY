@@ -1,199 +1,135 @@
-use ovrley_core::media::mp4_telemetry;
-use serde_json::Value;
 use std::fs;
 use std::path::Path;
 
+use ovrley_core::media::mp4_telemetry;
+
 #[test]
-fn extracts_supported_mp4_telemetry_fixtures_through_one_pipeline() {
-    let cases = [
-        FixtureCase {
-            name: "DJI AC004",
-            filename: "DJI-telemetry.MP4",
-            expected_sync_time: "2026-03-15T23:58:14+00:00",
-            min_samples: 100,
-            min_gps_samples: 100,
-        },
-        FixtureCase {
-            name: "GoPro GPS5",
-            filename: "GoPro-telemetry.MP4",
-            expected_sync_time: "2024-08-05T12:28:30.174+00:00",
-            min_samples: 20,
-            min_gps_samples: 20,
-        },
-        FixtureCase {
-            name: "Hero8 GPS5",
-            filename: "Hero8-telemetry.mp4",
-            expected_sync_time: "2019-11-18T23:42:08.645+00:00",
-            min_samples: 100,
-            min_gps_samples: 100,
-        },
-    ];
+fn extracts_supported_mp4_telemetry_fixtures_with_provenance() {
+    let fixtures = discover_telemetry_fixtures();
+    assert!(!fixtures.is_empty(), "no telemetry fixtures found");
 
     let repo_root = repo_root();
-    for case in cases {
-        let fixture = video_fixture(case.filename);
-        let activity = mp4_telemetry::extract_telemetry(repo_root, fixture.to_str().unwrap())
-            .unwrap_or_else(|error| panic!("{}: extraction failed: {error}", case.name))
-            .unwrap_or_else(|| panic!("{}: expected telemetry activity", case.name));
-        write_normalized_debug_output(repo_root, case.filename, &activity);
+    for filename in &fixtures {
+        let fixture = video_fixture(filename);
+        let stem = Path::new(filename)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("video");
+
+        let metadata = mp4_telemetry::probe_video_metadata(fixture.to_str().unwrap())
+            .unwrap_or_else(|err| panic!("{stem}: probe failed: {err}"));
+        let activity = mp4_telemetry::extract_activity(
+            repo_root,
+            fixture.to_str().unwrap(),
+            metadata.fps.unwrap_or(30.0),
+            metadata.duration.unwrap_or(0.0),
+        )
+        .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
+        .unwrap_or_else(|| panic!("{stem}: expected telemetry activity"));
 
         assert_eq!(
-            activity["fileFormat"].as_str(),
+            activity.file_format.as_deref(),
             Some("mp4_telemetry"),
-            "{}: unexpected file format",
-            case.name
+            "{stem}: file_format"
         );
+
+        let expected_source = if filename == "DJI-telemetry.MP4" {
+            "dji_ac004_fallback"
+        } else {
+            "telemetry_parser"
+        };
         assert_eq!(
-            activity["syncTime"].as_str(),
-            Some(case.expected_sync_time),
-            "{}: unexpected syncTime",
-            case.name
+            activity
+                .metadata
+                .get("telemetry_source")
+                .and_then(|value| value.as_str()),
+            Some(expected_source),
+            "{stem}: telemetry_source"
         );
 
-        assert!(
-            activity.get("rawSamples").is_none(),
-            "{}: normalized payload should be columnar and must not include rawSamples",
-            case.name
-        );
-
-        let series = activity
-            .get("series")
-            .unwrap_or_else(|| panic!("{}: normalized payload must include series", case.name));
-        let gps = series
-            .get("gps")
-            .unwrap_or_else(|| panic!("{}: normalized payload must include GPS series", case.name));
-        let gps_time_ms = series_array(gps, "timeMs", case.name);
-        assert!(
-            activity["metadata"]["telemetry_sample_count"]
-                .as_u64()
-                .unwrap_or_default()
-                >= case.min_samples as u64,
-            "{}: expected at least {} telemetry samples, got {}",
-            case.name,
-            case.min_samples,
-            activity["metadata"]["telemetry_sample_count"]
-        );
-        assert!(
-            gps_time_ms.len() >= case.min_gps_samples,
-            "{}: expected at least {} GPS samples, got {}",
-            case.name,
-            case.min_gps_samples,
-            gps_time_ms.len()
-        );
-
-        assert_equal_series_lengths(
-            gps,
-            &[
-                "timestamp",
-                "latitude",
-                "longitude",
-                "altitude",
-                "elevation",
-                "speed",
-                "heading",
-            ],
-            case.name,
-        );
-        assert_equal_series_lengths(
-            series.get("imu").expect("IMU series"),
-            &["gForce"],
-            case.name,
-        );
-        assert_equal_series_lengths(
-            series.get("camera").expect("camera series"),
-            &[
-                "iso",
-                "aperture",
-                "shutterSpeed",
-                "focalLength",
-                "ev",
-                "colorTemperature",
-            ],
-            case.name,
-        );
-
-        assert!(
-            gps.get("gForce").is_none(),
-            "{}: GPS series must not carry g-force from another cadence",
-            case.name
-        );
-        assert!(
-            !gps_has_camera_scalar(gps),
-            "{}: GPS series must not carry camera scalars from another cadence",
-            case.name
-        );
-
+        let has_usable_gps = fixture_has_usable_gps(filename);
+        let expected_timeline = if has_usable_gps {
+            "gps_anchored"
+        } else {
+            "video_derived"
+        };
         assert_eq!(
-            activity["metadata"]["gps_sample_count"].as_u64(),
-            Some(gps_time_ms.len() as u64),
-            "{}: gps_sample_count must match GPS timeMs length",
-            case.name,
+            activity
+                .metadata
+                .get("timeline_kind")
+                .and_then(|value| value.as_str()),
+            Some(expected_timeline),
+            "{stem}: timeline_kind"
         );
+
+        let gps_count = metadata_count(&activity.metadata, "gps_sample_count", stem);
+        let imu_count = metadata_count(&activity.metadata, "imu_sample_count", stem);
+        let camera_count = metadata_count(&activity.metadata, "camera_sample_count", stem);
+        let total_count = metadata_count(&activity.metadata, "telemetry_sample_count", stem);
+        assert_eq!(
+            total_count,
+            gps_count + imu_count + camera_count,
+            "{stem}: telemetry_sample_count"
+        );
+
+        if has_usable_gps {
+            assert!(gps_count > 0, "{stem}: expected GPS samples");
+        } else {
+            assert_eq!(gps_count, 0, "{stem}: invalid GPS must be filtered");
+            assert!(
+                activity
+                    .sample_course_points
+                    .iter()
+                    .all(|(lat, lon)| lat.is_none() && lon.is_none()),
+                "{stem}: invalid GPS must not produce course points"
+            );
+        }
+
+        if filename == "GoPro-telemetry.MP4" {
+            assert!(
+                (activity.sample_elapsed_seconds[0] - 0.110_097).abs() < 1e-9,
+                "{stem}: GPS timeline must remain video-relative"
+            );
+            assert!(camera_count > 0, "{stem}: expected camera telemetry");
+        }
+
+        if filename == "DJI-telemetry.MP4" {
+            assert_eq!(
+                activity.source_start_time.as_deref(),
+                Some("2026-03-15T23:58:14+00:00"),
+                "{stem}: source_start_time"
+            );
+            assert!(imu_count > 0, "{stem}: expected IMU telemetry");
+        }
     }
 }
 
-struct FixtureCase {
-    name: &'static str,
-    filename: &'static str,
-    expected_sync_time: &'static str,
-    min_samples: usize,
-    min_gps_samples: usize,
+fn discover_telemetry_fixtures() -> Vec<String> {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("video");
+    let mut fixtures: Vec<String> = fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("cannot read fixture dir {dir:?}: {e}"))
+        .filter_map(|entry| {
+            let name = entry.ok()?.file_name().to_string_lossy().to_string();
+            let lower = name.to_lowercase();
+            lower.contains("telemetry").then_some(name)
+        })
+        .collect();
+    fixtures.sort();
+    fixtures
 }
 
-fn series_array<'a>(series: &'a Value, field: &str, case_name: &str) -> &'a Vec<Value> {
-    series
+fn metadata_count(metadata: &serde_json::Value, field: &str, stem: &str) -> u64 {
+    metadata
         .get(field)
-        .and_then(Value::as_array)
-        .unwrap_or_else(|| panic!("{case_name}: series field {field} must be an array"))
+        .and_then(|value| value.as_u64())
+        .unwrap_or_else(|| panic!("{stem}: metadata.{field} must be a count"))
 }
 
-fn assert_equal_series_lengths(series: &Value, fields: &[&str], case_name: &str) {
-    let time_ms_len = series_array(series, "timeMs", case_name).len();
-    for field in fields {
-        let field_len = series_array(series, field, case_name).len();
-        assert_eq!(
-            field_len, time_ms_len,
-            "{case_name}: series field {field} length must match timeMs length"
-        );
-    }
-}
-
-fn gps_has_camera_scalar(gps: &Value) -> bool {
-    [
-        "iso",
-        "aperture",
-        "shutterSpeed",
-        "focalLength",
-        "ev",
-        "colorTemperature",
-    ]
-    .iter()
-    .any(|field| gps.get(*field).is_some())
-}
-
-fn write_normalized_debug_output(repo_root: &Path, fixture_filename: &str, activity: &Value) {
-    let debug_dir = repo_root.join("debug").join("mp4telemetry");
-    fs::create_dir_all(&debug_dir).unwrap_or_else(|error| {
-        panic!(
-            "failed to create MP4 telemetry debug directory {}: {error}",
-            debug_dir.display()
-        )
-    });
-
-    let stem = Path::new(fixture_filename)
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .unwrap_or("video");
-    let output_path = debug_dir.join(format!("{stem}-normalized.json"));
-    let json = serde_json::to_string_pretty(activity)
-        .unwrap_or_else(|error| panic!("failed to serialize normalized telemetry JSON: {error}"));
-
-    fs::write(&output_path, json).unwrap_or_else(|error| {
-        panic!(
-            "failed to write normalized telemetry debug output {}: {error}",
-            output_path.display()
-        )
-    });
+fn fixture_has_usable_gps(filename: &str) -> bool {
+    filename != "Hero8-telemetry.mp4"
 }
 
 fn repo_root() -> &'static Path {

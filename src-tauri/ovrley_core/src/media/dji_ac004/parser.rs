@@ -13,11 +13,10 @@
 //! Does not own: wire-format decoding (see [`super::protobuf`]), inspection
 //!       (see [`super::inspect`]), or FFmpeg integration (see [`super`]).
 
-use chrono::{DateTime, NaiveDateTime, Utc};
-
 use super::protobuf::{get_f32, get_f64, get_string, get_submessage, get_varint};
 use super::{DjiAc004Sample, DjiAc004Telemetry, DEFAULT_SAMPLE_RATE_HZ};
 use crate::media::telemetry_math::g_force_from_components;
+use crate::media::time::dji_timestamp_to_rfc3339;
 
 /// Parses raw concatenated DJI metadata samples into structured telemetry.
 ///
@@ -38,7 +37,8 @@ pub fn parse_raw_metadata(raw_data: &[u8]) -> Option<DjiAc004Telemetry> {
     let mut frame_index = 0usize;
 
     while pos < raw_data.len() {
-        let Some((field_num, value, next_pos)) = super::protobuf::decode_field(raw_data, pos) else {
+        let Some((field_num, value, next_pos)) = super::protobuf::decode_field(raw_data, pos)
+        else {
             break;
         };
         pos = next_pos;
@@ -87,9 +87,7 @@ fn parse_point_from_sample(sample_data: &[u8], frame_index: usize) -> Option<Dji
     let timestamp_msg = get_submessage(fix_msg, 6)?;
     let timestamp = {
         let timestamp_text = get_string(timestamp_msg, 1)?;
-        let naive = NaiveDateTime::parse_from_str(&timestamp_text, crate::media::dji_ac004::DJI_TIMESTAMP_FORMAT).ok()?;
-        let datetime: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive, Utc);
-        datetime.to_rfc3339()
+        dji_timestamp_to_rfc3339(&timestamp_text)?
     };
 
     let (vx, vy) = get_submessage(gps_msg, 3).map_or((0.0, 0.0), |velocity_msg| {
@@ -141,7 +139,8 @@ struct DeviceInfo {
 fn first_device_info(raw_data: &[u8]) -> Option<DeviceInfo> {
     let mut pos = 0;
     while pos < raw_data.len() {
-        let Some((field_num, value, next_pos)) = super::protobuf::decode_field(raw_data, pos) else {
+        let Some((field_num, value, next_pos)) = super::protobuf::decode_field(raw_data, pos)
+        else {
             break;
         };
         pos = next_pos;

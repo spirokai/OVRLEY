@@ -3,14 +3,11 @@
 //! Telemetry-parser emits tag-map structures that vary by camera vendor
 //! (GoPro GPS5, DJI AC004 protobuf, Insta360 time scalars). [`NativeSample`]
 //! normalises those vendor-specific shapes into a single representation so
-//! the smoothing and serialisation stages do not need to know which camera
-//! produced the data. The columnar JSON payload produced from this shape is
-//! consumed by the frontend's unified (FIT/GPX/SRT/MP4) activity finaliser.
+//! smoothing and activity assembly do not need to know which camera produced
+//! the data.
 //!
-//! Owns: [`NativeSample`], [`TelemetrySeriesCounts`], [`sub_sample_timestamp_ms`].
-//! Does not own: extraction, smoothing, or JSON serialization.
-
-use telemetry_parser::util::SampleInfo;
+//! Owns: [`NativeSample`], [`TelemetrySeriesCounts`].
+//! Does not own: extraction, smoothing, time handling, or JSON serialization.
 
 /// Intermediate sample at native telemetry cadence before frontend
 /// finalization.
@@ -64,22 +61,7 @@ impl NativeSample {
     }
 }
 
-/// Distributes a sub-frame telemetry row within its enclosing parser sample.
-///
-/// GoPro GPS5 stores multiple GPS rows (e.g., 18 per frame) inside a single
-/// [`SampleInfo`] envelope with no per-row timestamps. This function assumes
-/// rows are uniformly spaced within the frame duration and returns the
-/// interpolated timestamp for the row at `index` out of `row_count`.
-pub fn sub_sample_timestamp_ms(sample: &SampleInfo, index: usize, row_count: usize) -> f64 {
-    if index == 0 || row_count <= 1 || !sample.duration_ms.is_finite() || sample.duration_ms <= 0.0
-    {
-        return sample.timestamp_ms;
-    }
-
-    sample.timestamp_ms + sample.duration_ms * index as f64 / row_count as f64
-}
-
-/// Counts of non-null samples per telemetry domain after columnar separation.
+/// Counts of non-null samples per telemetry domain after native extraction.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TelemetrySeriesCounts {
     pub gps: usize,

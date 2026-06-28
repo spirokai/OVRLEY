@@ -16,6 +16,13 @@ use telemetry_parser::tags_impl::{TagId, TagMap, TagValue};
 
 use crate::media::telemetry_math::finite_f64;
 
+/// GoPro GPMF stores the absolute GPS UTC timestamp under the fourcc `GPSU`.
+pub(crate) const GOPRO_GPSU_TAG: u32 = 0x4750_5355;
+/// GoPro GPMF stores GPS fix quality under the fourcc `GPSF`.
+pub(crate) const GOPRO_GPSF_TAG: u32 = 0x4750_5346;
+/// GoPro GPMF stores GPS precision under the fourcc `GPSP`.
+pub(crate) const GOPRO_GPSP_TAG: u32 = 0x4750_5350;
+
 /// Reads numeric telemetry tags through one conversion path.
 pub(crate) fn extract_tag_f64(map: &TagMap, id: &TagId) -> Option<f64> {
     let tag = map.get(id)?;
@@ -77,6 +84,20 @@ pub(crate) fn extract_tag_u64(map: &TagMap, id: &TagId) -> Option<u64> {
         TagValue::u64(value) => Some(*value.get()),
         _ => None,
     }
+}
+
+/// Rejects GPS5 packets that explicitly report no fix or unusable precision.
+pub(crate) fn gps5_fix_is_usable(gps_map: &TagMap) -> bool {
+    // Conservative choice for now: if GoPro marks GPS5 as no-fix or sentinel
+    // precision, do not turn those rows into a route or GPS-derived timeline.
+    // This needs proper field testing across real cameras/conditions. It may
+    // be better UX to import these coordinates with a warning and let the user
+    // decide whether the track is usable.
+    let fix = extract_tag_f64(gps_map, &TagId::Unknown(GOPRO_GPSF_TAG));
+    let precision = extract_tag_f64(gps_map, &TagId::Unknown(GOPRO_GPSP_TAG));
+
+    fix.is_none_or(|fix| fix >= 2.0)
+        && precision.is_none_or(|precision| precision.is_finite() && precision < 9999.0)
 }
 
 /// Reads string tags only when the parser exposed them as structured strings.

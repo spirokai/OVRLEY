@@ -8,8 +8,8 @@
 //! [`extraction::append_camera_samples`] focused on fallback priority and
 //! vector expansion rather than tag-map archaeology.
 //!
-//! Owns: GoPro GPMF rate parsing, Insta360 time-scalar unpacking, DJI /
-//!       Blackmagic / RED JSON metadata path extraction.
+//! Owns: Insta360 time-scalar unpacking, DJI / Blackmagic / RED JSON metadata
+//!       path extraction.
 //! Does not own: generic tag accessors (see [`super::tags`]), sample extraction,
 //!       or serialization.
 
@@ -17,37 +17,6 @@ use std::collections::BTreeMap;
 
 use serde_json::Value;
 use telemetry_parser::tags_impl::{GroupId, TagId, TagMap, TagValue};
-use telemetry_parser::util::SampleInfo;
-
-// ---------------------------------------------------------------------------
-// GoPro
-// ---------------------------------------------------------------------------
-
-/// Scans all samples for the GoPro `RATE` tag (e.g. "2_1SEC" → 2 Hz).
-pub(crate) fn extract_gopro_rate_hz(samples: &[SampleInfo]) -> Option<f64> {
-    for sample in samples {
-        let Some(tag_map) = &sample.tag_map else {
-            continue;
-        };
-        if let Some(default_map) = tag_map.get(&GroupId::Default) {
-            if let Some(tag) = default_map.get(&TagId::Unknown(0x5241_5445)) {
-                if let TagValue::String(s) = &tag.value {
-                    if let Some(rate) = parse_gopro_rate(s.get()) {
-                        return Some(rate);
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-fn parse_gopro_rate(s: &str) -> Option<f64> {
-    s.split('_')
-        .next()
-        .and_then(|n| n.parse::<f64>().ok())
-        .filter(|h| *h > 0.0)
-}
 
 // ---------------------------------------------------------------------------
 // Insta360
@@ -59,8 +28,17 @@ pub(crate) fn extract_insta360_shutter(tag_map: &BTreeMap<GroupId, TagMap>) -> O
     let tag = exposure_map.get(&TagId::Data)?;
     match &tag.value {
         TagValue::Vec_TimeScalar_f64(values) => {
-            let v: Vec<f64> = values.get().iter().map(|ts| ts.v).filter(|x| *x > 0.0).collect();
-            if v.is_empty() { None } else { Some(v) }
+            let v: Vec<f64> = values
+                .get()
+                .iter()
+                .map(|ts| ts.v)
+                .filter(|x| *x > 0.0)
+                .collect();
+            if v.is_empty() {
+                None
+            } else {
+                Some(v)
+            }
         }
         _ => None,
     }
@@ -72,10 +50,20 @@ pub(crate) fn extract_insta360_iso(tag_map: &BTreeMap<GroupId, TagMap>) -> Optio
     let tag = default_map.get(&TagId::Custom("AAAData".into()))?;
     match &tag.value {
         TagValue::Vec_TimeScalar_Json(values) => {
-            let v: Vec<f64> = values.get().iter()
-                .filter_map(|ts| ts.v.get("iso_value").and_then(|v| v.as_u64()).map(|iso| iso as f64))
+            let v: Vec<f64> = values
+                .get()
+                .iter()
+                .filter_map(|ts| {
+                    ts.v.get("iso_value")
+                        .and_then(|v| v.as_u64())
+                        .map(|iso| iso as f64)
+                })
                 .collect();
-            if v.is_empty() { None } else { Some(v) }
+            if v.is_empty() {
+                None
+            } else {
+                Some(v)
+            }
         }
         _ => None,
     }
@@ -107,14 +95,31 @@ pub(crate) fn extract_camera_from_json_metadata(
 
     // DJI WM169 / WA530 / OQ101 paths (nested protobuf flattened as JSON)
     try_extract_json_path(meta, "/iso/iso", iso, |v| v.as_f64());
-    try_extract_json_path(meta, "/exposureTime/exposureTime", shutter_speed, json_rational_to_f64);
-    try_extract_json_path(meta, "/whiteBalanceCct/whiteBalanceCct", color_temperature, |v| v.as_f64());
+    try_extract_json_path(
+        meta,
+        "/exposureTime/exposureTime",
+        shutter_speed,
+        json_rational_to_f64,
+    );
+    try_extract_json_path(
+        meta,
+        "/whiteBalanceCct/whiteBalanceCct",
+        color_temperature,
+        |v| v.as_f64(),
+    );
     try_extract_json_path(meta, "/fNumber/fNumber", aperture, json_rational_to_f64);
-    try_extract_json_path(meta, "/focalLength/focalLength", focal_length, json_rational_to_f64);
+    try_extract_json_path(
+        meta,
+        "/focalLength/focalLength",
+        focal_length,
+        json_rational_to_f64,
+    );
 
     // Blackmagic paths (flat per-frame metadata)
     try_extract_json_path(meta, "/iso", iso, |v| v.as_f64());
-    try_extract_json_path(meta, "/white_balance_kelvin", color_temperature, |v| v.as_f64());
+    try_extract_json_path(meta, "/white_balance_kelvin", color_temperature, |v| {
+        v.as_f64()
+    });
     try_extract_json_path(meta, "/exposure", shutter_speed, |v| v.as_f64());
     try_extract_json_string_parsed(meta, "/shutter_value", shutter_speed, parse_rational_string);
     try_extract_json_string_parsed(meta, "/aperture", aperture, parse_fstop_string);
@@ -122,18 +127,16 @@ pub(crate) fn extract_camera_from_json_metadata(
 
     // RED paths (flat per-frame metadata from R3D + RMD sidecar)
     try_extract_json_path(meta, "/iso", iso, |v| v.as_f64());
-    try_extract_json_path(meta, "/white_balance_kelvin", color_temperature, |v| v.as_f64());
+    try_extract_json_path(meta, "/white_balance_kelvin", color_temperature, |v| {
+        v.as_f64()
+    });
     try_extract_json_path(meta, "/exposure_time", shutter_speed, |v| v.as_f64());
     try_extract_json_path(meta, "/focal_length", focal_length, |v| v.as_f64());
     try_extract_json_string_parsed(meta, "/aperture", aperture, |s| s.parse::<f64>().ok());
 }
 
-fn try_extract_json_path<F>(
-    json: &Value,
-    pointer: &str,
-    target: &mut Option<Vec<f64>>,
-    extract: F,
-) where
+fn try_extract_json_path<F>(json: &Value, pointer: &str, target: &mut Option<Vec<f64>>, extract: F)
+where
     F: Fn(&Value) -> Option<f64>,
 {
     if target.is_some() {
@@ -155,7 +158,11 @@ fn try_extract_json_string_parsed<F>(
     if target.is_some() {
         return;
     }
-    if let Some(value) = json.pointer(pointer).and_then(|v| v.as_str()).and_then(&parse) {
+    if let Some(value) = json
+        .pointer(pointer)
+        .and_then(|v| v.as_str())
+        .and_then(&parse)
+    {
         *target = Some(vec![value]);
     }
 }

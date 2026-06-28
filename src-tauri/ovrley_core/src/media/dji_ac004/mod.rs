@@ -11,11 +11,9 @@
 //! |---|---|
 //! | [`protobuf`] | Wire-format decoding, field iteration, typed accessors |
 //! | [`parser`] | GPS fix parsing, device-info extraction |
-//! | [`inspect`] | Debug inspection with full field-tree output |
 
-mod protobuf;
 mod parser;
-mod inspect;
+mod protobuf;
 
 use std::path::Path;
 use std::process::Command;
@@ -27,7 +25,6 @@ use crate::error::{CoreError, CoreResult};
 
 pub use parser::parse_raw_metadata;
 
-pub(crate) const DJI_TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 pub(crate) const DEFAULT_SAMPLE_RATE_HZ: f64 = 25.0;
 
 /// Parsed telemetry from one DJI AC004 metadata stream.
@@ -84,25 +81,6 @@ pub fn extract_from_video(
 
     let raw_data = extract_dji_meta_raw(&ffmpeg_path, file_path, stream_index)?;
     Ok(parser::parse_raw_metadata(&raw_data))
-}
-
-/// Extracts the DJI metadata stream and returns a bounded debug view.
-pub fn inspect_from_video(
-    repo_root: &Path,
-    file_path: &Path,
-    max_samples: usize,
-) -> CoreResult<Option<Value>> {
-    let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
-    let Some(stream_index) = detect_dji_meta_stream(&ffmpeg_path, file_path)? else {
-        return Ok(None);
-    };
-
-    let raw_data = extract_dji_meta_raw(&ffmpeg_path, file_path, stream_index)?;
-    Ok(Some(inspect::inspect_raw_metadata(
-        &raw_data,
-        stream_index,
-        max_samples,
-    )))
 }
 
 /// Locates the metadata track that FFmpeg should extract for AC004 parsing.

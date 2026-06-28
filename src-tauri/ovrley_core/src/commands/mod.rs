@@ -520,15 +520,23 @@ pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Valu
     }
 }
 
-/// Extracts embedded MP4 telemetry as a normalized raw activity payload.
+/// Extracts embedded MP4 telemetry as a parsed activity payload.
 ///
-/// The extractor returns `null` when the video has no usable embedded telemetry
-/// so the frontend can distinguish "no MP4 telemetry source" from command
-/// failure. Final activity assembly and FIT/GPX merge precedence remain in the
-/// frontend import pipeline.
+/// This command is kept as frontend wiring for video imports. It deliberately
+/// returns the same [`ParsedActivity`] shape used by the rest of the import
+/// pipeline, not the old debug-only columnar telemetry JSON.
 pub fn backend_extract_video_telemetry(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
-    match crate::media::mp4_telemetry::extract_telemetry(&paths.repo_root, file_path)? {
-        Some(activity_json) => Ok(activity_json),
+    let metadata = crate::media::mp4_telemetry::probe_video_metadata(file_path)?;
+    let fps = metadata.fps.unwrap_or(30.0);
+    let duration_s = metadata.duration.unwrap_or(0.0);
+
+    match crate::media::mp4_telemetry::extract_activity(
+        &paths.repo_root,
+        file_path,
+        fps,
+        duration_s,
+    )? {
+        Some(activity) => serde_json::to_value(activity).map_err(CoreError::Serialization),
         None => Ok(Value::Null),
     }
 }

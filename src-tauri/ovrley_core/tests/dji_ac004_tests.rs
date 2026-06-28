@@ -1,7 +1,5 @@
-use ovrley_core::media::dji_ac004::{extract_from_video, inspect_from_video, parse_raw_metadata};
+use ovrley_core::media::dji_ac004::{extract_from_video, parse_raw_metadata};
 use ovrley_core::media::mp4_telemetry;
-use serde_json::Value;
-use std::fs;
 use std::path::Path;
 
 #[test]
@@ -28,55 +26,53 @@ fn extract_from_video_reads_dji_fixture() {
 fn mp4_telemetry_uses_ac004_fallback_for_dji_fixture() {
     let (repo_root, fixture) = dji_fixture();
 
-    let activity = mp4_telemetry::extract_telemetry(repo_root, fixture.to_str().unwrap())
-        .expect("expected extraction to succeed")
-        .expect("expected MP4 telemetry activity");
+    let metadata = mp4_telemetry::probe_video_metadata(fixture.to_str().unwrap())
+        .expect("expected video metadata probe to succeed");
+    let activity = mp4_telemetry::extract_activity(
+        repo_root,
+        fixture.to_str().unwrap(),
+        metadata.fps.unwrap_or(30.0),
+        metadata.duration.unwrap_or(0.0),
+    )
+    .expect("expected extraction to succeed")
+    .expect("expected MP4 telemetry activity");
 
-    assert_eq!(activity["fileFormat"].as_str(), Some("mp4_telemetry"));
+    assert_eq!(activity.file_format.as_deref(), Some("mp4_telemetry"));
     assert_eq!(
-        activity["syncTime"].as_str(),
+        activity.source_start_time.as_deref(),
         Some("2026-03-15T23:58:14+00:00")
     );
     assert_eq!(
-        activity["metadata"]["camera_model"].as_str(),
+        activity
+            .metadata
+            .get("camera_model")
+            .and_then(|value| value.as_str()),
         Some("DJI AC004")
     );
     assert!(
-        activity["series"]["gps"]["timeMs"]
-            .as_array()
-            .expect("GPS timeMs series")
-            .len()
-            > 100
+        activity.sample_elapsed_seconds.len() > 100,
+        "expected GPS-cadence samples"
     );
-    assert!(activity["series"]["gps"]["heading"]
-        .as_array()
-        .expect("GPS heading series")
-        .iter()
-        .any(|value| value.as_f64().is_some()));
     assert!(
-        activity["series"]["imu"]["gForce"]
-            .as_array()
-            .expect("IMU gForce series")
-            .len()
-            > 100
+        activity.heading.iter().any(|value| value.is_some()),
+        "expected heading values"
     );
-    assert!(activity.get("rawSamples").is_none());
-}
-
-#[test]
-fn writes_dji_ac004_parser_inspection_debug_output() {
-    let (repo_root, fixture) = dji_fixture();
-
-    let inspection = inspect_from_video(repo_root, &fixture, 125)
-        .expect("expected inspection to succeed")
-        .expect("expected DJI AC004 inspection output");
-
-    assert_eq!(inspection["sampleEnvelopeCount"].as_u64(), Some(125));
+    assert!(
+        activity
+            .g_force
+            .iter()
+            .filter(|value| value.is_some())
+            .count()
+            > 100,
+        "expected IMU g-force values"
+    );
     assert_eq!(
-        inspection["parsedTelemetry"]["validGpsSampleCount"].as_u64(),
-        Some(125)
+        activity
+            .metadata
+            .get("telemetry_source")
+            .and_then(|value| value.as_str()),
+        Some("dji_ac004_fallback")
     );
-    write_debug_json(repo_root, "DJI-telemetry-ac004-inspect.json", &inspection);
 }
 
 #[test]
@@ -285,24 +281,4 @@ fn dji_fixture() -> (&'static Path, std::path::PathBuf) {
     );
 
     (repo_root, fixture)
-}
-
-fn write_debug_json(repo_root: &Path, filename: &str, value: &Value) {
-    let debug_dir = repo_root.join("debug").join("mp4telemetry");
-    fs::create_dir_all(&debug_dir).unwrap_or_else(|error| {
-        panic!(
-            "failed to create MP4 telemetry debug directory {}: {error}",
-            debug_dir.display()
-        )
-    });
-
-    let output_path = debug_dir.join(filename);
-    let json = serde_json::to_string_pretty(value)
-        .unwrap_or_else(|error| panic!("failed to serialize DJI debug JSON: {error}"));
-    fs::write(&output_path, json).unwrap_or_else(|error| {
-        panic!(
-            "failed to write DJI debug output {}: {error}",
-            output_path.display()
-        )
-    });
 }
