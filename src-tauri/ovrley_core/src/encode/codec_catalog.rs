@@ -111,8 +111,8 @@ pub enum CompositeAvailabilityRule {
     HevcAmf,
     H264Videotoolbox,
     HevcVideotoolbox,
-    H264Vaapi,
-    HevcVaapi,
+    H264VaapiWithFullFilters,
+    HevcVaapiWithFullFilters,
     H264NvencWithCudaFilters,
     HevcNvencWithCudaFilters,
     H264QsvWithFullFilters,
@@ -277,7 +277,7 @@ const COMPOSITE_CODECS: &[CompositeCodecMetadata] = &[
         ffmpeg_codec_name: "h264_vaapi",
         accepted_aliases: VAAPI_H264_ALIASES,
         filter_stack_kind: CompositeFilterStackKind::VaapiOverlay,
-        availability_rule: CompositeAvailabilityRule::H264Vaapi,
+        availability_rule: CompositeAvailabilityRule::H264VaapiWithFullFilters,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::VaapiHevc,
@@ -285,7 +285,7 @@ const COMPOSITE_CODECS: &[CompositeCodecMetadata] = &[
         ffmpeg_codec_name: "hevc_vaapi",
         accepted_aliases: VAAPI_HEVC_ALIASES,
         filter_stack_kind: CompositeFilterStackKind::VaapiOverlay,
-        availability_rule: CompositeAvailabilityRule::HevcVaapi,
+        availability_rule: CompositeAvailabilityRule::HevcVaapiWithFullFilters,
     },
     CompositeCodecMetadata {
         id: CompositeCodecId::AmfH264,

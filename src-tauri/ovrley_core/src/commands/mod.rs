@@ -571,6 +571,11 @@ fn needs_ffprobe_salvage(metadata: &crate::media::SourceVideoMetadata) -> bool {
         || metadata.codec_profile.is_none()
         || metadata.pix_fmt.is_none()
         || metadata.bits_per_raw_sample.is_none()
+        || metadata.resolution.is_none()
+        || metadata
+            .rotation_degrees
+            .map(|degrees| degrees.rem_euclid(360) == 0)
+            .unwrap_or(true)
         || metadata.container_format.is_none()
         || !metadata.has_audio
 }
@@ -614,6 +619,17 @@ fn merge_ffprobe_metadata(
     }
     if metadata.bits_per_raw_sample.is_none() {
         metadata.bits_per_raw_sample = ffprobe_metadata.bits_per_raw_sample;
+    }
+    if metadata.resolution.is_none() {
+        metadata.resolution = ffprobe_metadata.resolution.clone();
+    }
+    if metadata
+        .rotation_degrees
+        .map(|degrees| degrees.rem_euclid(360) == 0)
+        .unwrap_or(true)
+        && ffprobe_metadata.rotation_degrees.is_some()
+    {
+        metadata.rotation_degrees = ffprobe_metadata.rotation_degrees;
     }
     metadata.has_audio = metadata.has_audio || ffprobe_metadata.has_audio;
     if metadata.container_format.is_none() {

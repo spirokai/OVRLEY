@@ -22,7 +22,9 @@ fn parses_ffmpeg_filter_names_from_filter_listing() {
          ... scale_qsv       V->V       Quick Sync Video scaling and format conversion\n\
          ... hwupload        V->V       Upload a normal frame to a hardware frame\n\
          ... overlay_qsv     VV->V      Quick Sync overlay\n\
-         ... hwdownload      V->V       Download a hardware frame\n",
+         ... hwdownload      V->V       Download a hardware frame\n\
+         ... transpose_cuda  V->V       Transpose input video using CUDA\n\
+         ... vpp_qsv         V->V       Quick Sync Video VPP\n",
     );
 
     assert!(filters.contains("overlay_cuda"));
@@ -31,4 +33,6 @@ fn parses_ffmpeg_filter_names_from_filter_listing() {
     assert!(filters.contains("hwupload"));
     assert!(filters.contains("overlay_qsv"));
     assert!(filters.contains("hwdownload"));
+    assert!(filters.contains("transpose_cuda"));
+    assert!(filters.contains("vpp_qsv"));
 }

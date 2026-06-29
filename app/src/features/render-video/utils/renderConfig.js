@@ -49,11 +49,14 @@ function applyCompositeSceneFields(scene, options) {
     importedVideoFpsNum,
     importedVideoFpsDen,
     importedVideoPath,
+    importedVideoResolution,
     exportBitrate,
     videoSyncOffsetSeconds,
   } = options
   const sourceFps = resolveCompositeFps(importedVideoFpsNum, importedVideoFpsDen, importedVideoFps)
   const renderDuration = Number(importedVideoDuration)
+  const displayWidth = Number(importedVideoResolution?.width)
+  const displayHeight = Number(importedVideoResolution?.height)
 
   if (!sourceFps) {
     throw new Error('Imported video FPS is required for MP4 compositing.')
@@ -61,7 +64,12 @@ function applyCompositeSceneFields(scene, options) {
   if (!Number.isFinite(renderDuration) || renderDuration <= 0) {
     throw new Error('Imported video duration is required for MP4 compositing.')
   }
+  if (!Number.isFinite(displayWidth) || displayWidth <= 0 || !Number.isFinite(displayHeight) || displayHeight <= 0) {
+    throw new Error('Imported video resolution is required for MP4 compositing.')
+  }
 
+  scene.width = displayWidth
+  scene.height = displayHeight
   scene.composite_video_path = importedVideoPath
   scene.composite_bitrate = formatCompositeBitrate(exportBitrate)
   scene.composite_sync_offset = Number.isFinite(Number(videoSyncOffsetSeconds)) ? Number(videoSyncOffsetSeconds) : 0

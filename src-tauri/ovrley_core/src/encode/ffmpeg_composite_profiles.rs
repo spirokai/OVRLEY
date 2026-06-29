@@ -29,9 +29,9 @@ const SOFTWARE_HEVC_FILTER: &str = "[0:v]{base_video_filters}null[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1[out]";
 
-const VAAPI_FILTER: &str = "[0:v]{base_video_filters}null[base];\
-[1:v]setpts=PTS-STARTPTS[ovr];\
-[base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=nv12,hwupload[out]";
+const VAAPI_FILTER: &str = "[0:v]{base_video_filters}scale_vaapi=w={width}:h={height}:format=nv12[main_hw];\
+[1:v]setpts=PTS-STARTPTS,format=yuva420p,hwupload[overlay_hw];\
+[main_hw][overlay_hw]overlay_vaapi=x=0:y=0:eof_action=repeat:shortest=1[out]";
 
 const AMF_D3D11_INPUT_ARGS: &[&str] = &["-init_hw_device", "d3d11va=dx", "-filter_hw_device", "dx"];
 
@@ -209,14 +209,14 @@ const BUILTIN_PROFILES: &[CompositeProfileTemplate] = &[
     CompositeProfileTemplate {
         name: "vaapi_h264",
         codec: "h264_vaapi",
-        input_args: &[],
+        input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
         filter_complex: Some(VAAPI_FILTER),
         output_args: &["-c:v", "h264_vaapi"],
     },
     CompositeProfileTemplate {
         name: "vaapi_hevc",
         codec: "hevc_vaapi",
-        input_args: &[],
+        input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
         filter_complex: Some(VAAPI_FILTER),
         output_args: &["-c:v", "hevc_vaapi"],
     },

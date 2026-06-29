@@ -84,6 +84,11 @@ pub struct AvailableCodecs {
     pub hwupload_filter: bool,
     pub overlay_qsv: bool,
     pub hwdownload_filter: bool,
+    pub transpose_cuda: bool,
+    pub vpp_qsv: bool,
+    pub scale_vaapi: bool,
+    pub overlay_vaapi: bool,
+    pub vaapi_full: bool,
     pub qsv_full: bool,
     pub qsv_full_init_args: Vec<String>,
 }
@@ -127,8 +132,8 @@ impl AvailableCodecs {
             CompositeAvailabilityRule::HevcAmf => self.hevc_amf,
             CompositeAvailabilityRule::H264Videotoolbox => self.h264_videotoolbox,
             CompositeAvailabilityRule::HevcVideotoolbox => self.hevc_videotoolbox,
-            CompositeAvailabilityRule::H264Vaapi => self.h264_vaapi,
-            CompositeAvailabilityRule::HevcVaapi => self.hevc_vaapi,
+            CompositeAvailabilityRule::H264VaapiWithFullFilters => self.h264_vaapi && self.vaapi_full,
+            CompositeAvailabilityRule::HevcVaapiWithFullFilters => self.hevc_vaapi && self.vaapi_full,
             CompositeAvailabilityRule::H264NvencWithCudaFilters => self.h264_nvenc && self.nnvgpu,
             CompositeAvailabilityRule::HevcNvencWithCudaFilters => self.hevc_nvenc && self.nnvgpu,
             CompositeAvailabilityRule::H264QsvWithFullFilters => self.h264_qsv && self.qsv_full,
@@ -571,8 +576,13 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
     let hwupload_filter = filters.contains("hwupload");
     let overlay_qsv = filters.contains("overlay_qsv");
     let hwdownload_filter = filters.contains("hwdownload");
+    let transpose_cuda = filters.contains("transpose_cuda");
+    let vpp_qsv = filters.contains("vpp_qsv");
+    let scale_vaapi = filters.contains("scale_vaapi");
+    let overlay_vaapi = filters.contains("overlay_vaapi");
     let cuda_filter_stack = cuda && overlay_cuda && scale_cuda && hwupload_filter;
     let qsv_filter_stack = overlay_qsv && scale_qsv && hwupload_filter;
+    let vaapi_filter_stack = scale_vaapi && overlay_vaapi && hwupload_filter;
 
     // ── PHASE 5: PROBE EXPERIMENTAL QSV FULL-OVERLAY PATH ──
     let qsv_full_init_args = if (h264_qsv || hevc_qsv) && qsv_filter_stack {
@@ -581,6 +591,7 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
         Vec::new()
     };
     let qsv_full = !qsv_full_init_args.is_empty();
+    let vaapi_full = (h264_vaapi || hevc_vaapi) && vaapi_filter_stack;
 
     // ── PHASE 6: ASSEMBLE RESULT ──
     Ok(AvailableCodecs {
@@ -613,6 +624,11 @@ pub fn detect_codecs(repo_root: &Path) -> CoreResult<AvailableCodecs> {
         hwupload_filter,
         overlay_qsv,
         hwdownload_filter,
+        transpose_cuda,
+        vpp_qsv,
+        scale_vaapi,
+        overlay_vaapi,
+        vaapi_full,
         qsv_full,
         qsv_full_init_args,
     })

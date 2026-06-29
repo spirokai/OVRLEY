@@ -114,6 +114,11 @@ impl HwAccelInfo {
                 hwupload_filter: true,
                 overlay_qsv: true,
                 hwdownload_filter: true,
+                transpose_cuda: true,
+                vpp_qsv: true,
+                scale_vaapi: true,
+                overlay_vaapi: true,
+                vaapi_full: true,
                 qsv_full: true,
                 qsv_full_init_args: Vec::new(),
             },
@@ -177,6 +182,13 @@ pub struct CompositeFfmpegBuildRequest<'a> {
 pub fn build_composite_ffmpeg_settings(
     request: &CompositeFfmpegBuildRequest<'_>,
 ) -> CoreResult<CompositeFfmpegSettings> {
+    build_composite_ffmpeg_settings_with_source_rotation(request, None)
+}
+
+pub(crate) fn build_composite_ffmpeg_settings_with_source_rotation(
+    request: &CompositeFfmpegBuildRequest<'_>,
+    source_rotation_degrees: Option<i32>,
+) -> CoreResult<CompositeFfmpegSettings> {
     // ── PHASE 1: VALIDATE INPUTS & REDUCE FPS ──
     validate_composite_inputs(request)?;
 
@@ -187,6 +199,22 @@ pub fn build_composite_ffmpeg_settings(
     // ── PHASE 2: SELECT & CONFIGURE PROFILE ──
     let mut selected_profile =
         select_composite_profile(request.codec_name, request.hwaccel_available)?;
+    let source_rotation_filter =
+        source_rotation_filter(source_rotation_degrees, &selected_profile.name);
+    if source_rotation_filter.is_some() {
+        let has_gpu_rotation = selected_profile.name.starts_with("nnvgpu")
+            || selected_profile.name.starts_with("qsv_full_")
+            || selected_profile.name.starts_with("vaapi_");
+        if !has_gpu_rotation {
+            if let Some(fallback_profile) = fallback_profile_name(&selected_profile) {
+                log::info!(
+                    "Composite source rotation requires CPU orientation filters; using {fallback_profile} instead of {}",
+                    selected_profile.name
+                );
+                selected_profile = composite_profile_template(&fallback_profile)?;
+            }
+        }
+    }
     if selected_profile.name.starts_with("qsv_full_") {
         if request.hwaccel_available.qsv_full_init_args().is_empty() {
             return Err(CoreError::Encode(format!(
@@ -199,7 +227,16 @@ pub fn build_composite_ffmpeg_settings(
 
     // ── PHASE 3: BUILD INPUT 0 ARGS (unseeked source video for filter-side trim) ──
     let mut input_0_args = selected_profile.input_args.clone();
-    input_0_args.extend(["-i".to_string(), video_path.clone()]);
+    let source_autorotate_arg = if source_rotation_filter.is_some() {
+        "-noautorotate"
+    } else {
+        "-autorotate"
+    };
+    input_0_args.extend([
+        source_autorotate_arg.to_string(),
+        "-i".to_string(),
+        video_path.clone(),
+    ]);
 
     // ── PHASE 4: BUILD INPUT 1 ARGS (raw RGBA overlay via stdin pipe) ──
     let overlay_thread_queue_size =
@@ -230,6 +267,7 @@ pub fn build_composite_ffmpeg_settings(
         input_2_args.push(format_seconds_arg(request.video_trim_start));
     }
     input_2_args.extend([
+        source_autorotate_arg.to_string(),
         "-t".to_string(),
         format_seconds_arg(request.render_duration),
         "-i".to_string(),
@@ -243,6 +281,7 @@ pub fn build_composite_ffmpeg_settings(
         request.video_trim_start,
         request.render_duration,
         &selected_profile,
+        source_rotation_filter,
     )?;
 
     // ── PHASE 7: BUILD OUTPUT ARGS (map, codec, bitrate, audio copy, mux flags) ──
@@ -263,6 +302,8 @@ pub fn build_composite_ffmpeg_settings(
         "-shortest".to_string(),
         "-movflags".to_string(),
         "faststart".to_string(),
+        "-metadata:s:v:0".to_string(),
+        "rotate=0".to_string(),
         "-y".to_string(),
     ]);
 
@@ -388,16 +429,12 @@ fn validate_catalog_profile_availability(
             metadata.id,
             metadata.ffmpeg_codec_name,
         ),
-        CompositeAvailabilityRule::H264Vaapi => validate_simple_catalog_profile(
-            hwaccel_available,
-            metadata.id,
-            metadata.ffmpeg_codec_name,
-        ),
-        CompositeAvailabilityRule::HevcVaapi => validate_simple_catalog_profile(
-            hwaccel_available,
-            metadata.id,
-            metadata.ffmpeg_codec_name,
-        ),
+        CompositeAvailabilityRule::H264VaapiWithFullFilters => {
+            validate_vaapi_full(hwaccel_available, metadata)
+        }
+        CompositeAvailabilityRule::HevcVaapiWithFullFilters => {
+            validate_vaapi_full(hwaccel_available, metadata)
+        }
         CompositeAvailabilityRule::H264NvencWithCudaFilters => validate_stacked_catalog_profile(
             hwaccel_available,
             super::codec_catalog::CompositeCodecId::NvgpuH264,
@@ -486,6 +523,26 @@ fn unavailable_qsv_overlay_profile(profile_name: &str) -> CoreResult<()> {
     )))
 }
 
+/// Validates the VAAPI full-overlay profile, checking encoder first then filter stack.
+fn validate_vaapi_full(
+    hwaccel_available: &HwAccelInfo,
+    metadata: &CompositeCodecMetadata,
+) -> CoreResult<()> {
+    if !hwaccel_available.available_codecs.vaapi {
+        return Err(CoreError::Encode(format!(
+            "Requested encoder {} is unavailable.",
+            metadata.ffmpeg_codec_name
+        )));
+    }
+    if !hwaccel_available.available_codecs.vaapi_full {
+        return Err(CoreError::Encode(format!(
+            "VAAPI full-overlay profile '{}' is unavailable; FFmpeg must support scale_vaapi, overlay_vaapi, and hwupload.",
+            metadata.profile_name
+        )));
+    }
+    Ok(())
+}
+
 /// Returns the safe CPU-overlay profile that corresponds to an experimental path.
 ///
 /// This is diagnostic only for explicit full-GPU renders, which fail loudly
@@ -513,21 +570,70 @@ fn composite_filter_complex(
     video_trim_start: f64,
     render_duration: f64,
     profile: &CompositeProfile,
+    source_rotation_filter: Option<&'static str>,
 ) -> CoreResult<String> {
     let template = profile.filter_complex.as_deref().unwrap_or(
         "[0:v]{base_video_filters}scale={width}:{height}[base];\
 [1:v]setpts=PTS-STARTPTS[ovr];\
 [base][ovr]overlay=0:0:eof_action=repeat:shortest=1,format=yuv420p[out]",
     );
-    let base_video_filters = format!(
+    let mut base_video_filters = format!(
         "trim=start={}:end={},setpts=PTS-STARTPTS,",
         format_seconds_arg(video_trim_start),
         format_seconds_arg(video_trim_start + render_duration),
     );
+    if let Some(rotation_filter) = source_rotation_filter {
+        base_video_filters.push_str(rotation_filter);
+    }
     Ok(template
         .replace("{base_video_filters}", &base_video_filters)
         .replace("{width}", &width.to_string())
         .replace("{height}", &height.to_string()))
+}
+
+fn source_rotation_filter(
+    rotation_degrees: Option<i32>,
+    profile_name: &str,
+) -> Option<&'static str> {
+    let is_cuda = profile_name.starts_with("nnvgpu");
+    let is_qsv = profile_name.starts_with("qsv_full_");
+    let is_vaapi = profile_name.starts_with("vaapi_");
+    match rotation_degrees.map(|degrees| degrees.rem_euclid(360)) {
+        Some(90) => {
+            if is_cuda {
+                Some("transpose_cuda=2,")
+            } else if is_qsv {
+                Some("vpp_qsv=transpose=2,")
+            } else if is_vaapi {
+                Some("transpose_vaapi=2,")
+            } else {
+                Some("transpose=2,")
+            }
+        }
+        Some(180) => {
+            if is_cuda {
+                Some("transpose_cuda=4,")
+            } else if is_qsv {
+                Some("vpp_qsv=transpose=4,")
+            } else if is_vaapi {
+                Some("transpose_vaapi=4,")
+            } else {
+                Some("hflip,vflip,")
+            }
+        }
+        Some(270) => {
+            if is_cuda {
+                Some("transpose_cuda=1,")
+            } else if is_qsv {
+                Some("vpp_qsv=transpose=1,")
+            } else if is_vaapi {
+                Some("transpose_vaapi=1,")
+            } else {
+                Some("transpose=1,")
+            }
+        }
+        _ => None,
+    }
 }
 
 /// Validates composite FFmpeg builder inputs before any command is produced.

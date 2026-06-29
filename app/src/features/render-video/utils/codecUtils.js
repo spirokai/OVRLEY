@@ -122,6 +122,10 @@ export function isAccelerationAvailable(format, accelerationValue, availableCode
     return codecFlag(availableCodecs, codec) && Boolean(availableCodecs.videotoolbox)
   }
 
+  if (accelerationValue === 'vaapi') {
+    return codecFlag(availableCodecs, codec) && Boolean(availableCodecs.vaapiFull)
+  }
+
   return codecFlag(availableCodecs, codec)
 }
 

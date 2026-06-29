@@ -23,8 +23,8 @@ use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::debug::RenderProfiler;
 use crate::encode::ffmpeg::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::encode::ffmpeg_composite::{
-    build_composite_ffmpeg_settings, CompositeFfmpegBuildRequest, CompositeFfmpegSettings,
-    HwAccelInfo,
+    build_composite_ffmpeg_settings_with_source_rotation, CompositeFfmpegBuildRequest,
+    CompositeFfmpegSettings, HwAccelInfo,
 };
 use crate::encode::fps::Fps;
 use crate::encode::pipeline_shared::{
@@ -598,6 +598,8 @@ pub fn derive_composite_pipeline_plan(
             "Composite render duration must be greater than zero: {render_duration}"
         )));
     }
+    let source_orientation =
+        verify_composite_source_resolution(paths, composite_video_path, width, height)?;
 
     // ── PHASE 2: COMPUTE FRAME COUNTS & OVERRUN GUARD ──
     let overlay_frame_count = (render_duration * overlay_pipe_fps.as_f64())
@@ -609,18 +611,21 @@ pub fn derive_composite_pipeline_plan(
     // ── PHASE 3: BUILD COMPOSITE FFMPEG SETTINGS ──
     let mut hwaccel_info = HwAccelInfo::trust_selected_profile();
     hwaccel_info.available_codecs.qsv_full_init_args = composite_qsv_full_init_args(scene);
-    let ffmpeg_settings = build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
-        codec_name: &codec_name,
-        bitrate: composite_bitrate,
-        video_path: Path::new(composite_video_path),
-        video_trim_start: trim_start,
-        render_duration,
-        width,
-        height,
-        source_fps,
-        overlay_pipe_fps,
-        hwaccel_available: &hwaccel_info,
-    })?;
+    let ffmpeg_settings = build_composite_ffmpeg_settings_with_source_rotation(
+        &CompositeFfmpegBuildRequest {
+            codec_name: &codec_name,
+            bitrate: composite_bitrate,
+            video_path: Path::new(composite_video_path),
+            video_trim_start: trim_start,
+            render_duration,
+            width,
+            height,
+            source_fps,
+            overlay_pipe_fps,
+            hwaccel_available: &hwaccel_info,
+        },
+        source_orientation.rotation_degrees,
+    )?;
     // ── PHASE 4: GENERATE OUTPUT FILENAME ──
     let output_filename = format!("video_composited_{}.mp4", timestamp_nanos()?);
     let output_path = paths.downloads_dir.join(&output_filename);
@@ -640,6 +645,62 @@ pub fn derive_composite_pipeline_plan(
         ffmpeg_settings,
         output_filename,
         output_path,
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CompositeSourceOrientation {
+    rotation_degrees: Option<i32>,
+}
+
+fn verify_composite_source_resolution(
+    paths: &AppPaths,
+    composite_video_path: &str,
+    scene_width: u32,
+    scene_height: u32,
+) -> CoreResult<CompositeSourceOrientation> {
+    let source_path = Path::new(composite_video_path);
+    if !source_path.is_file() {
+        // Unit-level plan tests use synthetic paths; real render submissions
+        // come from the file picker and are checked here before FFmpeg starts.
+        log::debug!(
+            "Skipping composite source resolution check for missing path: {composite_video_path}"
+        );
+        return Ok(CompositeSourceOrientation {
+            rotation_degrees: None,
+        });
+    }
+
+    let metadata = crate::media::video_probe::probe_video(&paths.repo_root, composite_video_path)?;
+    let resolution = metadata.resolution.ok_or_else(|| {
+        CoreError::Config(format!(
+            "Could not read composite video resolution for {composite_video_path}"
+        ))
+    })?;
+
+    let rotation = metadata
+        .rotation_degrees
+        .map(|degrees| degrees.rem_euclid(360));
+    let (display_width, display_height) = if matches!(rotation, Some(90 | 270)) {
+        (resolution.height, resolution.width)
+    } else {
+        (resolution.width, resolution.height)
+    };
+
+    if u64::from(scene_width) != display_width || u64::from(scene_height) != display_height {
+        return Err(CoreError::Config(format!(
+            "scene resolution {scene_width}x{scene_height} must match display-oriented composite video resolution {display_width}x{display_height} (coded {}x{}, rotation {})",
+            resolution.width,
+            resolution.height,
+            metadata
+                .rotation_degrees
+                .map(|degrees| degrees.to_string())
+                .unwrap_or_else(|| "none".to_string())
+        )));
+    }
+
+    Ok(CompositeSourceOrientation {
+        rotation_degrees: metadata.rotation_degrees,
     })
 }
 
