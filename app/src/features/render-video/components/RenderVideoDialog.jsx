@@ -76,7 +76,7 @@ export default function RenderVideoDialog(props) {
                 </p>
               </div>
               <p className="text-sm leading-6 text-muted-foreground text-justify">
-                This is necessary to properly render the overlay. Please change the overlay resolution in the sidebar settings or pick a different
+                This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different
                 template.
               </p>
             </div>
