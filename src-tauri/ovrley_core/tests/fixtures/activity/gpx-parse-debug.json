@@ -9,7 +9,6 @@
       "activity_name": "Evening Ride",
       "creator": "StravaGPX",
       "duration_seconds": 4672,
-      "start_time": "2026-04-16T16:18:38.000Z",
       "end_time": "2026-04-16T17:36:30.000Z",
       "total_distance_m": 37848.933,
       "sample_count": 4577
@@ -157,7 +156,7 @@
       "torque",
       "vertical_speed"
     ],
-    "source_start_time": "2026-04-16T16:18:38.000Z",
+    "sync_time": "2026-04-16T16:18:38.000Z",
     "sample_elapsed_seconds": [
       0,
       1,

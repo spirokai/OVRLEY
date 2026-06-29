@@ -404,11 +404,11 @@ fn derive_activity_summary(activity: &ParsedActivity) -> Value {
     let total_distance = estimate_total_distance(activity);
     serde_json::json!({
         "durationSeconds": duration_seconds as u64,
-        "endTime": activity.source_start_time.as_deref().unwrap_or(""),
+        "endTime": activity.sync_time.as_deref().unwrap_or(""),
         "fileFormat": activity.file_format.as_deref().unwrap_or("gpx"),
         "fileName": activity.file_name.as_deref().unwrap_or("activity"),
         "sampleCount": sample_count,
-        "startTime": activity.source_start_time.as_deref().unwrap_or(""),
+        "startTime": activity.sync_time.as_deref().unwrap_or(""),
         "totalDistanceMeters": total_distance,
     })
 }

@@ -74,6 +74,16 @@ pub(crate) async fn backend_render(
     ))
 }
 
+/// Finalizes frontend-extracted raw samples into a parsed activity payload.
+///
+/// This wrapper intentionally does no activity work; it preserves the existing
+/// command convention by delegating to `ovrley_core` and serializing the result
+/// as a JSON string for JavaScript.
+#[tauri::command]
+pub(crate) async fn backend_finalize_activity(raw_activity_json: String) -> Result<String, String> {
+    call_and_serialize(commands::backend_finalize_activity(&raw_activity_json))
+}
+
 /// Renders one transparent preview PNG for the requested second.
 #[tauri::command]
 pub(crate) async fn backend_render_preview_frame(

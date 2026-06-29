@@ -3,15 +3,15 @@
 //! Telemetry-parser reads the camera-native metadata track (GoPro GPMF, DJI
 //! protobuf, Insta360 time-scalars, etc.) and exposes it as vendor-agnostic
 //! tag maps in [`GroupId`]/[`TagId`] buckets. This module converts those maps
-//! into a [`ParsedActivity`] with a single unified timeline. The pipeline:
+//! into columnar telemetry for shared activity finalization. The pipeline:
 //!
 //! 1. `extract_native_samples()` converts tag maps into a [`NativeSample`] vec.
 //! 2. `smooth_series()` applies zero-phase smoothing to GPS/IMU fields.
-//! 3. `build_parsed_activity()` aligns all metrics to GPS‑cadence timestamps
-//!    (or video FPS as fallback) via closest-in-time matching, then assembles
-//!    the final [`ParsedActivity`].
+//! 3. `build_activity_columns()` aligns all metrics to GPS-cadence timestamps
+//!    (or video FPS as fallback) via closest-in-time matching, then the shared
+//!    activity finalizer derives gaps, metrics, and the final [`ParsedActivity`].
 //!
-//! The [`ParsedActivity`] carries raw GPS course points and elevation —
+//! The [`ParsedActivity`] carries raw GPS course points and elevation -
 //! **not** the simplified widget geometries. Route polylines and elevation
 //! plots are computed separately by [`crate::commands::route_geometry`] and
 //! [`crate::commands::elevation_geometry`] (LTTB downsampling, RDP
@@ -31,7 +31,7 @@
 //! | [`tags`] | Typed accessors for telemetry-parser `TagValue` variants |
 //! | [`vendor`] | Vendor-specific camera metadata (GoPro, Insta360, DJI JSON) |
 //! | [`smoothing`] | Zero-phase moving-average smoothing for continuous series |
-//! | [`activity`] | [`ParsedActivity`] assembly with closest-in-time alignment |
+//! | [`activity`] | Columnar telemetry assembly with closest-in-time alignment |
 
 mod activity;
 mod extraction;
@@ -319,7 +319,7 @@ fn dji_normalized_samples(repo_root: &Path, path: &Path) -> CoreResult<Option<Dj
 /// The returned activity aligns all metrics (GPS, IMU, camera) to a single
 /// `sample_elapsed_seconds` timeline keyed to GPS timestamps (or video FPS
 /// when GPS is absent). Closest-in-time matching picks the IMU and camera
-/// value for each anchor point — see [`activity::build_parsed_activity`].
+/// value for each anchor point - see shared activity finalization.
 ///
 /// `fps` and `duration_s` come from [`probe_video_metadata`] and are only
 /// used as a fallback when the file has no GPS data.
@@ -338,7 +338,7 @@ pub fn extract_activity(
         return Ok(None);
     };
 
-    Ok(Some(activity::build_parsed_activity(
+    let columns = activity::build_activity_columns(
         &result.samples,
         fps,
         duration_s,
@@ -349,7 +349,9 @@ pub fn extract_activity(
         result.source.as_str(),
         result.timeline.as_str(),
         result.counts,
-    )))
+    );
+
+    crate::activity::finalize::finalize_activity_columns(&columns).map(Some)
 }
 
 /// Converts floating FPS metadata into the shared rational representation.

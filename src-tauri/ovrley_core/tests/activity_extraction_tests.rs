@@ -133,44 +133,23 @@ fn extract_activity_from_telemetry_fixtures() {
             );
         }
 
-        // Non-MP4 fields must all be empty
-        assert!(
-            activity.heartrate.is_empty(),
-            "{stem}: heartrate must be empty"
-        );
-        assert!(activity.cadence.is_empty(), "{stem}: cadence must be empty");
-        assert!(activity.power.is_empty(), "{stem}: power must be empty");
-        assert!(
-            activity.temperature.is_empty(),
-            "{stem}: temperature must be empty"
-        );
-        assert!(activity.pace.is_empty(), "{stem}: pace must be empty");
-        assert!(
-            activity.air_pressure.is_empty(),
-            "{stem}: air_pressure must be empty"
-        );
-        assert!(
-            activity.ground_contact_time.is_empty(),
-            "{stem}: ground_contact_time must be empty"
-        );
-        assert!(
-            activity.stride_length.is_empty(),
-            "{stem}: stride_length must be empty"
-        );
-        assert!(
-            activity.stroke_rate.is_empty(),
-            "{stem}: stroke_rate must be empty"
-        );
-        assert!(activity.torque.is_empty(), "{stem}: torque must be empty");
-        assert!(
-            activity.gear_position.is_empty(),
-            "{stem}: gear_position must be empty"
-        );
+        // Non-MP4 fields are aligned by the shared finalizer but must contain
+        // no actual values.
+        assert_absent_metric(&activity.heartrate, stem, "heartrate");
+        assert_absent_metric(&activity.cadence, stem, "cadence");
+        assert_absent_metric(&activity.power, stem, "power");
+        assert_absent_metric(&activity.temperature, stem, "temperature");
+        assert_absent_metric(&activity.air_pressure, stem, "air_pressure");
+        assert_absent_metric(&activity.ground_contact_time, stem, "ground_contact_time");
+        assert_absent_metric(&activity.stride_length, stem, "stride_length");
+        assert_absent_metric(&activity.stroke_rate, stem, "stroke_rate");
+        assert_absent_metric(&activity.torque, stem, "torque");
+        assert_absent_metric(&activity.gear_position, stem, "gear_position");
 
         // Sync time: assert only for known fixtures
         if let Some(expected) = known_sync_times.get(filename.as_str()) {
             assert_eq!(
-                activity.source_start_time.as_deref(),
+                activity.sync_time.as_deref(),
                 Some(*expected),
                 "{stem}: sync time mismatch"
             );
@@ -234,6 +213,13 @@ fn extract_activity_from_telemetry_fixtures() {
             te = activity.trim_end_seconds
         );
     }
+}
+
+fn assert_absent_metric(series: &[Option<f64>], stem: &str, metric: &str) {
+    assert!(
+        series.iter().all(Option::is_none),
+        "{stem}: {metric} must contain no values"
+    );
 }
 
 fn discover_telemetry_fixtures() -> Vec<String> {

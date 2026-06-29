@@ -16,48 +16,49 @@ const FORMAT_A_SRT = [
   '',
 ].join('\n')
 
-describe('parseSrtActivityFile (Format A — bracketed telemetry)', () => {
-  test('produces parsedActivity and debugPayload shapes matching FIT/GPX', () => {
+describe('parseSrtActivityFile (Format A bracketed telemetry)', () => {
+  test('produces RawActivity shape', () => {
     const result = parseSrtActivityFile(FORMAT_A_SRT, 'test-format-a.SRT')
-    expect(result).toHaveProperty('parsedActivity')
-    expect(result).toHaveProperty('debugPayload')
-    expect(result.parsedActivity.file_format).toBe('srt')
-    expect(result.parsedActivity.file_name).toBe('test-format-a.SRT')
+    expect(result.file_format).toBe('srt')
+    expect(result.file_name).toBe('test-format-a.SRT')
+    expect(result.raw_samples).toHaveLength(2)
+    expect(result.options.skip_idle_gap_fill).toBe(true)
+    expect(result.options.smoothing.speed.method).toBe('zero_phase_ma')
   })
 
-  test('populates sample_elapsed_seconds with millisecond precision', () => {
+  test('populates elapsed seconds with millisecond precision', () => {
     const result = parseSrtActivityFile(FORMAT_A_SRT, 'test-format-a.SRT')
-    const elapsed = result.parsedActivity.sample_elapsed_seconds
+    const elapsed = result.raw_samples.map((sample) => sample.elapsed_seconds)
     expect(elapsed[0]).toBeCloseTo(2.001, 3)
     expect(elapsed[1]).toBeCloseTo(3.002, 3)
   })
 
   test('populates abs_alt into both altitude and elevation', () => {
     const result = parseSrtActivityFile(FORMAT_A_SRT, 'test-format-a.SRT')
-    expect(result.parsedActivity.altitude[0]).toBe(864.309)
-    expect(result.parsedActivity.elevation[0]).toBe(864.309)
+    expect(result.raw_samples[0].altitude).toBe(864.309)
+    expect(result.raw_samples[0].elevation).toBe(864.309)
   })
 
   test('populates camera telemetry fields from bracketed keys', () => {
     const result = parseSrtActivityFile(FORMAT_A_SRT, 'test-format-a.SRT')
-    expect(result.parsedActivity.iso[0]).toBe(200)
-    expect(result.parsedActivity.iso[1]).toBe(400)
-    expect(result.parsedActivity.aperture[0]).toBe(1.7)
-    expect(result.parsedActivity.aperture[1]).toBe(2.8)
-    expect(result.parsedActivity.shutter_speed[0]).toBeCloseTo(1 / 3200.0, 10)
-    expect(result.parsedActivity.shutter_speed[1]).toBeCloseTo(1 / 1600.0, 10)
-    expect(result.parsedActivity.focal_length[0]).toBe(24)
-    expect(result.parsedActivity.focal_length[1]).toBe(50)
-    expect(result.parsedActivity.ev[0]).toBe(0)
-    expect(result.parsedActivity.ev[1]).toBe(-1)
-    expect(result.parsedActivity.color_temperature[0]).toBe(5491)
-    expect(result.parsedActivity.color_temperature[1]).toBe(5500)
+    expect(result.raw_samples[0].iso).toBe(200)
+    expect(result.raw_samples[1].iso).toBe(400)
+    expect(result.raw_samples[0].aperture).toBe(1.7)
+    expect(result.raw_samples[1].aperture).toBe(2.8)
+    expect(result.raw_samples[0].shutter_speed).toBeCloseTo(1 / 3200.0, 10)
+    expect(result.raw_samples[1].shutter_speed).toBeCloseTo(1 / 1600.0, 10)
+    expect(result.raw_samples[0].focal_length).toBe(24)
+    expect(result.raw_samples[1].focal_length).toBe(50)
+    expect(result.raw_samples[0].ev).toBe(0)
+    expect(result.raw_samples[1].ev).toBe(-1)
+    expect(result.raw_samples[0].color_temperature).toBe(5491)
+    expect(result.raw_samples[1].color_temperature).toBe(5500)
   })
 
   test('bypasses idle-gap insertion for SRT telemetry', () => {
     const result = parseSrtActivityFile(FORMAT_A_SRT, 'test-format-a.SRT')
-    expect(result.parsedActivity.metadata.inserted_idle_sample_count).toBe(0)
-    expect(result.parsedActivity.metadata.sample_count).toBe(2)
+    expect(result.options.skip_idle_gap_fill).toBe(true)
+    expect(result.raw_samples).toHaveLength(2)
   })
 
   test('tolerates missing bracket fields in some cues', () => {
@@ -74,10 +75,10 @@ describe('parseSrtActivityFile (Format A — bracketed telemetry)', () => {
       '',
     ].join('\n')
     const result = parseSrtActivityFile(partialSrt, 'partial.SRT')
-    expect(result.parsedActivity.iso[0]).toBe(100)
-    expect(result.parsedActivity.iso[1]).toBe(200)
-    expect(result.parsedActivity.shutter_speed[0]).toBeCloseTo(1 / 2500.0, 10)
-    expect(result.parsedActivity.shutter_speed[1]).toBeNull()
+    expect(result.raw_samples[0].iso).toBe(100)
+    expect(result.raw_samples[1].iso).toBe(200)
+    expect(result.raw_samples[0].shutter_speed).toBeCloseTo(1 / 2500.0, 10)
+    expect(result.raw_samples[1].shutter_speed).toBeNull()
   })
 })
 
@@ -96,20 +97,20 @@ describe('parseSrtActivityFile (shutter parsing)', () => {
       '',
     ].join('\n')
     const result = parseSrtActivityFile(srt, 'shutter.SRT')
-    expect(result.parsedActivity.shutter_speed[0]).toBeCloseTo(0.0003125, 10)
-    expect(result.parsedActivity.shutter_speed[1]).toBeCloseTo(0.02, 10)
+    expect(result.raw_samples[0].shutter_speed).toBeCloseTo(0.0003125, 10)
+    expect(result.raw_samples[1].shutter_speed).toBeCloseTo(0.02, 10)
   })
 
   test('parses decimal-second shutter forms', () => {
     const srt = ['1', '00:00:01,000 --> 00:00:01,033', '2025-07-23 10:21:40.000', '[shutter: 0.5]', ''].join('\n')
     const result = parseSrtActivityFile(srt, 'shutter-decimal.SRT')
-    expect(result.parsedActivity.shutter_speed[0]).toBeCloseTo(0.5, 10)
+    expect(result.raw_samples[0].shutter_speed).toBeCloseTo(0.5, 10)
   })
 
   test('returns null for unsupported shutter forms', () => {
     const srt = ['1', '00:00:01,000 --> 00:00:01,033', '2025-07-23 10:21:40.000', '[shutter: 2"]', ''].join('\n')
     const result = parseSrtActivityFile(srt, 'shutter-bad.SRT')
-    expect(result.parsedActivity.shutter_speed[0]).toBeNull()
+    expect(result.raw_samples[0].shutter_speed).toBeNull()
   })
 
   test('Format B parses shutter as denominator of reciprocal fraction', () => {
@@ -128,15 +129,15 @@ describe('parseSrtActivityFile (shutter parsing)', () => {
       '',
     ].join('\n')
     const result = parseSrtActivityFile(srt, 'format-b.SRT')
-    expect(result.parsedActivity.shutter_speed[0]).toBeCloseTo(1 / 60, 6)
-    expect(result.parsedActivity.shutter_speed[1]).toBeCloseTo(1 / 3200, 10)
-    expect(result.parsedActivity.iso[0]).toBe(100)
-    expect(result.parsedActivity.iso[1]).toBe(200)
-    expect(result.parsedActivity.aperture[0]).toBe(2.2)
-    expect(result.parsedActivity.aperture[1]).toBe(2.8)
-    expect(result.parsedActivity.ev[0]).toBe(0)
-    expect(result.parsedActivity.ev[1]).toBeNull()
-    expect(result.parsedActivity.altitude[0]).toBe(14)
-    expect(result.parsedActivity.altitude[1]).toBe(16)
+    expect(result.raw_samples[0].shutter_speed).toBeCloseTo(1 / 60, 6)
+    expect(result.raw_samples[1].shutter_speed).toBeCloseTo(1 / 3200, 10)
+    expect(result.raw_samples[0].iso).toBe(100)
+    expect(result.raw_samples[1].iso).toBe(200)
+    expect(result.raw_samples[0].aperture).toBe(2.2)
+    expect(result.raw_samples[1].aperture).toBe(2.8)
+    expect(result.raw_samples[0].ev).toBe(0)
+    expect(result.raw_samples[1].ev).toBeNull()
+    expect(result.raw_samples[0].altitude).toBe(14)
+    expect(result.raw_samples[1].altitude).toBe(16)
   })
 })

@@ -2,13 +2,13 @@
 
 ## 1. Project Overview
 
-**OVRLEY** (`0.1.0`, GPL-3.0) is a cross-platform desktop application that turns `.fit` / `.gpx` GPS activity data (cycling, running, etc.) into **customizable video overlays**. Users load an activity file, arrange widgets (speed, heart rate, elevation, route map, time, gradient, etc.) on a scene canvas, optionally import a source video for compositing, and render the result as ProRes, QTRLE, or H.264/H.265 MP4.
+**OVRLEY** (`0.1.0`, GPL-3.0) is a cross-platform desktop application that turns `.fit` / `.gpx` GPS activity data and `.srt` telemetry subtitles into **customizable video overlays**. Users load an activity file, arrange widgets (speed, heart rate, elevation, route map, time, gradient, etc.) on a scene canvas, optionally import a source video for compositing, and render the result as ProRes, QTRLE, or H.264/H.265 MP4.
 
 **Key capabilities:**
 
 - 10+ widget types: metric values (speed, HR, power, cadence, temperature, time, gradient), text labels, route map, elevation profile
 - Widget editing: drag, resize, rotate, grid snap via `react-moveable`
-- Activity parsing: FIT (via `fit-file-parser` JS library) and GPX (via DOMParser)
+- Activity extraction: FIT (via `fit-file-parser` JS library), GPX (via DOMParser), and SRT (text parser), with shared Rust finalization
 - Transparent overlay export (ProRes/QTRLE) for external compositing
 - Direct MP4 compositing: overlay rendered over imported source video
 - 100% offline, no cloud dependencies
@@ -28,7 +28,7 @@ cyclemetry/
 │   │   ├── store/                # Zustand state (5 slices)
 │   │   ├── hooks/                # Shared hooks (selectors, useFpsMode)
 │   │   ├── lib/                  # Utility library
-│   │   │   ├── activity/         #   Activity parsing pipeline (FIT/GPX)
+│   │   │   ├── activity/         #   Activity extraction + backend finalization bridge
 │   │   │   ├── utils.js          #   isInteractiveElement, clamp, cn
 │   │   │   ├── update-rate.js    #   FPS normalization, rate options
 │   │   │   ├── widget-config.js  #   Widget CRUD operations
@@ -151,7 +151,7 @@ cyclemetry/
 │   │       │   ├── mod.rs         #     Source media module organization
 │   │       │   ├── source_video_metadata.rs # Shared video metadata contract
 │   │       │   ├── video_probe.rs #     ffprobe metadata extraction
-│   │       │   └── mp4_telemetry.rs #   telemetry-parser metadata/telemetry
+│   │       │   └── mp4_telemetry/ #   telemetry-parser extraction + column assembly
 │   │
 │   └── tests/                     # ovrley_core integration tests
 │       ├── common/                #   Shared test fixtures & helpers
@@ -335,7 +335,7 @@ Components follow a **container/presentational pattern** via hooks:
 ```
 App.jsx
 ├── useAppBootstrap                 # On mount: fetch platform, templates, codecs    (app-shell)
-├── useActivityImport               # File input for .gpx/.fit parsing               (app-shell)
+├── useActivityImport               # File input for .fit/.gpx/.srt activity import  (app-shell)
 ├── useTemplateManagement           # CRUD lifecycle for templates                   (template-manager)
 ├── useRenderWorkflow               # Render dialog orchestration                    (render-video)
 ├── useEditorShellState             # Zoom, grid, background mode                    (app-shell)
@@ -415,38 +415,39 @@ User moves slider / preview second changes
 
 Per-frame operations (marker interpolation, completed segment splitting, SVG path materialization) remain local in JS for performance. The geometry is computed once when parameters change, not per-frame.
 
-### 5.5 Activity Parsing Pipeline
+### 5.5 Activity Import Pipeline
 
 ```
-.gpx/.fit file
+.fit/.gpx/.srt file
     │
     ▼
 import-activity.js                        # File type detection + parser dispatch
     │
     ├── .fit → fit-parser.js              # fit-file-parser library
-    └── .gpx → DOMParser                  # Native XML parsing
+    ├── .gpx → gpx-parser.js              # DOMParser + extensions
+    └── .srt → srt-parser.js              # DJI subtitle telemetry
     │
     ▼
-parser.js                                 # finalizeParsedActivity()
-    ├── Build elapsed/distance/course series
-    ├── Insert idle gap samples (stationary detection)
-    ├── Compute metric series (speed from distance, gradient from elevation, etc.)
-    └── Returns { parsedActivity, debugPayload }
+RawActivity                               # file_name, file_format, metadata, raw_samples, options
+    ├── Snake-case raw samples in canonical units
+    ├── Parser-selected idle-gap behavior
+    └── Per-metric smoothing requests
     │
     ▼
-metric-series.js                          # deriveActivityMetricSeries()
-    ├── Speed from distance
-    ├── Gradient from elevation (Savitzky-Golay smoothing)
-    ├── Heading from course
-    ├── Pace from speed, vertical speed
-    └── Torque from power/cadence
+backend.finalizeActivity()                # Tauri IPC: backend_finalize_activity
+    └── Sends RawActivity JSON to Rust
     │
     ▼
-parse-helpers.js                          # safeNumber, numeric sanitization
+Rust activity::finalize                   # shared post-processing
+    ├── Idle gap fill
+    ├── Elapsed/distance/course/time/progress series
+    ├── Metric derivation
+    ├── Optional per-metric smoothing
+    └── Returns { parsed_activity, debug_payload }
 Zustand (activitySummary, parsedActivity)
 ```
 
-All activity parsing utilities live under `lib/activity/`. The `importActivityFile()` function accepts `storeActions` as a required parameter (no implicit `useStore.getState()` fallback).
+The frontend owns browser-visible FIT/GPX/SRT extraction into `RawActivity`. MP4 telemetry is extracted in Rust by `media/mp4_telemetry/`, smoothed at native cadence where required, aligned into `ActivityColumns`, and sent directly into the same shared finalizer core. Rust owns canonical finalization from optional idle-gap fill through derived metrics, opt-in smoothing, `sync_time` metadata, debug payload generation, and final `ParsedActivity` assembly. The `importActivityFile()` function accepts `storeActions` as a required parameter (no implicit `useStore.getState()` fallback).
 
 ### 5.6 Video Preview System
 
@@ -485,6 +486,7 @@ All defined in `lib.rs` and implemented in `ovrley_core/src/commands/mod.rs`:
 | `backend_health`               | Health check + FFmpeg path                    |
 | `backend_current_os`           | OS string ("windows", "macos")                |
 | `backend_list_system_fonts`    | Skia FontMgr font listing                     |
+| `backend_finalize_activity`    | Finalize RawActivity into ParsedActivity      |
 | `backend_render`               | Start video render (transparent or composite) |
 | `backend_render_preview_frame` | Render one transparent preview PNG (debug)    |
 | `backend_progress`             | Poll render progress                          |
@@ -620,13 +622,22 @@ Geometry IPC Commands (used by frontend preview):
 - Returns the shared `SourceVideoMetadata` shape
 - Uses creation-time metadata only as a sync fallback
 
-**MP4 telemetry metadata** (`media/mp4_telemetry.rs`):
+**MP4 telemetry metadata and activity extraction** (`media/mp4_telemetry/`):
 
 - telemetry-parser metadata: dimensions, duration, FPS, rotation
 - Returns the shared `SourceVideoMetadata` shape
 - Runs before ffprobe for video import metadata
 - ffprobe salvages codec/audio/container/sync fields that telemetry-parser does
   not expose
+- Activity extraction uses `telemetry-parser` tag maps first, with a DJI AC004
+  fallback for files whose parser output is incomplete for that camera path
+- MP4 extraction normalizes vendor telemetry into `NativeSample`, smooths
+  continuous MP4-native streams before culling, aligns GPS/IMU/camera streams
+  into `ActivityColumns`, then calls the shared activity finalizer
+- GPS/course anchoring requires usable latitude/longitude. Speed, heading,
+  altitude, or timestamps alone do not create a route or GPS-derived timeline
+- MP4 does not assemble `ParsedActivity` directly; `activity/finalize.rs` owns
+  gap handling, metric derivation, metadata enrichment, and final assembly
 
 **Progress tracking** (`encode/progress.rs`, `debug/mod.rs`):
 
@@ -636,12 +647,17 @@ Geometry IPC Commands (used by frontend preview):
 
 ### 6.5 Activity Processing (Rust Side)
 
-The Rust backend receives already-parsed activity JSON from the frontend (the JS-side parser extracts raw samples). The Rust side does:
+All activity sources converge on the shared Rust finalizer before preview or render. Frontend FIT/GPX/SRT parsers send `RawActivity` to `backend_finalize_activity`; MP4 telemetry is extracted in Rust, converted to `ActivityColumns`, and finalized through the same core path.
 
-1. **Parse** (`activity/mod.rs`): Accepts production or debug payload JSON, deserializes into `ParsedActivity` via `activity/schema.rs`.
-2. **Trim** (`activity/trim.rs`): Validate scene window against activity duration, interpolate boundary samples, produce `TrimmedActivity` with scene-local timeline and only the required telemetry series.
-3. **Densify** (`activity/interpolate.rs`): Convert uneven samples into frame-aligned dense series using linear interpolation with edge clamping via shared `interpolation.rs` utilities.
-4. **Report**: `DenseActivityReport` with per-frame telemetry for every scene frame.
+1. **Frontend raw activity input** (`activity/schema.rs`): `RawActivity` carries `file_name`, `file_format`, `metadata`, `raw_samples`, and parser-selected options. FIT/GPX/SRT parsers emit canonical units and can request per-metric smoothing.
+2. **Backend MP4 column input** (`media/mp4_telemetry/`): MP4 extraction produces `NativeSample` rows, preserves MP4-specific pre-cull smoothing for continuous streams, aligns GPS/IMU/camera cadences into `ActivityColumns`, and sets `skip_idle_gap_fill: true` because MP4 uses a video-derived or GPS-derived cadence.
+3. **Finalize** (`activity/finalize.rs`): `RawActivity` is gap-filled first when requested, then converted to `ActivityColumns`. `ActivityColumns` input goes directly into the same finalizer core. The finalizer builds elapsed/time/course/distance/progress series, derives missing metrics, applies opt-in per-metric smoothing after derivation, enriches metadata, and assembles `ParsedActivity`.
+4. **Sync naming** (`activity/schema.rs`): `sync_time` is the canonical activity start/sync field. `source_start_time` is retired, and `metadata.start_time` is stripped during finalization.
+5. **Debug payload** (`activity/finalize.rs`): Dev builds return `{ parsed_activity, debug_payload }`; release builds return `debug_payload: null`. The frontend persists the payload through `write_parse_debug_file` when present.
+6. **Parse existing activity JSON** (`activity/mod.rs`): Render and geometry commands accept production or debug payload JSON and deserialize `ParsedActivity` via `activity/schema.rs`.
+7. **Trim** (`activity/trim.rs`): Validate scene window against activity duration, interpolate boundary samples, produce `TrimmedActivity` with scene-local timeline and only the required telemetry series.
+8. **Densify** (`activity/interpolate.rs`): Convert uneven samples into frame-aligned dense series using linear interpolation with edge clamping via shared `interpolation.rs` utilities.
+9. **Report**: `DenseActivityReport` with per-frame telemetry for every scene frame.
 
 ### 6.6 Widget Rendering (Skia)
 
@@ -694,10 +710,12 @@ The Rust backend receives already-parsed activity JSON from the frontend (the JS
 [User clicks "Open Activity"]
     │
     ▼
-File picker (.gpx/.fit)
+File picker (.fit/.gpx/.srt)
     │
     ▼
-lib/activity/import-activity.js → parser.js → metric-series.js
+lib/activity/import-activity.js
+    ├── Frontend parser extracts RawActivity
+    └── backend_finalize_activity returns ParsedActivity
     │
     ▼
 Zustand: activitySummary, parsedActivity set
@@ -908,7 +926,7 @@ Templates are JSON files following the `ovrley-template` format (v2):
 ### Data Formats
 
 - **Templates** — JSON `ovrley-template` v1 format
-- **Activity** — JSON serialized from JS parser, Rust-side trim + densify
+- **Activity** — FIT/GPX/SRT frontend parsers emit `RawActivity`; MP4 Rust extraction emits `ActivityColumns`; Rust finalizes both to `ParsedActivity`, then trims + densifies
 - **Frames** — raw RGBA (u8, 4 bytes/pixel) between Rust and FFmpeg
 - **Preview** — PNG via Skia encode, returned as base64 over IPC
 

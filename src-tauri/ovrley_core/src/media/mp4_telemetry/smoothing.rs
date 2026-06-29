@@ -10,18 +10,18 @@
 //! temperature) are excluded because they change discretely; smoothing those
 //! would invent intermediate camera states that never occurred.
 //!
-//! Owns: [`smooth_series`], [`moving_average`], [`zero_phase_smooth`].
+//! Owns: [`smooth_series`].
 //! Does not own: sample extraction or JSON serialization.
 
+use crate::activity::finalize::smoothing::{smoothing_window_for_seconds, zero_phase_smooth};
 use crate::media::native_sample::NativeSample;
-use crate::media::telemetry_math::finite_f64;
 
 const GPS_SPEED_SMOOTHING_SECONDS: f64 = 0.5;
 const GPS_ALTITUDE_SMOOTHING_SECONDS: f64 = 1.0;
 const GPS_HEADING_SMOOTHING_SECONDS: f64 = 0.5;
 const G_FORCE_SMOOTHING_SECONDS: f64 = 1.0;
 
-/// Smooths only continuous telemetry fields before JSON serialization.
+/// Smooths only continuous telemetry fields before column assembly.
 ///
 /// GPS altitude/speed/heading and g-force benefit from noise reduction. Camera
 /// settings are intentionally excluded because ISO, aperture, shutter, focal
@@ -57,71 +57,4 @@ pub(crate) fn smooth_series(samples: &mut [NativeSample]) {
         samples[index].heading = smoothed_heading[index];
         samples[index].g_force = smoothed_g_force[index];
     }
-}
-
-/// A null-aware centered moving average for sparse telemetry series.
-fn moving_average(data: &[Option<f64>], window: usize) -> Vec<Option<f64>> {
-    if window <= 1 || data.is_empty() {
-        return data.to_vec();
-    }
-
-    let half = window / 2;
-    let mut result = Vec::with_capacity(data.len());
-    for index in 0..data.len() {
-        if data[index].is_none() {
-            result.push(None);
-            continue;
-        }
-
-        let start = index.saturating_sub(half);
-        let end = (index + half + 1).min(data.len());
-        let mut sum = 0.0;
-        let mut count = 0;
-
-        for value in &data[start..end] {
-            if let Some(value) = value {
-                sum += value;
-                count += 1;
-            }
-        }
-
-        result.push((count > 0).then_some(sum / count as f64));
-    }
-    result
-}
-
-/// Forward/backward (zero-phase) smoothing to avoid shifting events.
-fn zero_phase_smooth(data: &[Option<f64>], window: usize) -> Vec<Option<f64>> {
-    if window <= 1 || data.len() < 2 {
-        return data.to_vec();
-    }
-
-    let forward = moving_average(data, window);
-    let reversed: Vec<_> = forward.into_iter().rev().collect();
-    let backward = moving_average(&reversed, window);
-    backward.into_iter().rev().collect()
-}
-
-/// Converts a time horizon into a sample window using observed cadence.
-fn smoothing_window_for_seconds(sample_timestamps_ms: &[f64], seconds: f64) -> usize {
-    if sample_timestamps_ms.len() < 2 || !seconds.is_finite() || seconds <= 0.0 {
-        return 1;
-    }
-
-    let mut deltas_ms: Vec<_> = sample_timestamps_ms
-        .windows(2)
-        .filter_map(|pair| finite_f64(pair[1] - pair[0]))
-        .filter(|delta| *delta > 0.0)
-        .collect();
-    if deltas_ms.is_empty() {
-        return 1;
-    }
-
-    deltas_ms.sort_by(f64::total_cmp);
-    let median_delta_ms = deltas_ms[deltas_ms.len() / 2];
-    if median_delta_ms <= 0.0 {
-        return 1;
-    }
-
-    ((seconds * 1000.0) / median_delta_ms).round().max(1.0) as usize
 }

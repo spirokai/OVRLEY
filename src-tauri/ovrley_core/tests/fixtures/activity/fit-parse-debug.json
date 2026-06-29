@@ -73,7 +73,6 @@
       "total_elapsed_time": 4678,
       "total_timer_time": 4579,
       "duration_seconds": 4672,
-      "start_time": "2026-04-16T16:18:38.000Z",
       "end_time": "2026-04-16T17:36:30.000Z",
       "total_distance_m": 37858.43,
       "sample_count": 4673,
@@ -226,7 +225,7 @@
       "torque",
       "vertical_speed"
     ],
-    "source_start_time": "2026-04-16T16:18:38.000Z",
+    "sync_time": "2026-04-16T16:18:38.000Z",
     "sample_elapsed_seconds": [
       0,
       1,

@@ -95,9 +95,9 @@ fn extracts_supported_mp4_telemetry_fixtures_with_provenance() {
 
         if filename == "DJI-telemetry.MP4" {
             assert_eq!(
-                activity.source_start_time.as_deref(),
+                activity.sync_time.as_deref(),
                 Some("2026-03-15T23:58:14+00:00"),
-                "{stem}: source_start_time"
+                "{stem}: sync_time"
             );
             assert!(imu_count > 0, "{stem}: expected IMU telemetry");
         }

@@ -3,8 +3,7 @@
  */
 
 import FitParser from 'fit-file-parser'
-import { finalizeParsedActivity } from './parser.js'
-import { safeNumber } from './parse-helpers.js'
+import { safeNumber } from './raw-sample-utils.js'
 
 /**
  * Returns optional record value.
@@ -50,22 +49,22 @@ export default async function parseFitActivityFile(file) {
   const firstSession = Array.isArray(parsedFit?.sessions) ? parsedFit.sessions[0] || null : null
   const fileId = parsedFit?.file_id || null
 
-  const rawSamples = records.map((record) => ({
-    airPressure: safeNumber(record.absolute_pressure),
+  const raw_samples = records.map((record) => ({
+    air_pressure: safeNumber(record.absolute_pressure),
     altitude: safeNumber(record.enhanced_altitude ?? record.altitude),
     cadence: safeNumber(record.cadence),
-    coreTemperature: safeNumber(record.core_temperature),
+    core_temperature: safeNumber(record.core_temperature),
     distance: safeNumber(record.distance),
-    elapsedSeconds: safeNumber(getOptionalRecordValue(record, ['elapsed_time'])),
+    elapsed_seconds: safeNumber(getOptionalRecordValue(record, ['elapsed_time'])),
     elevation: safeNumber(record.enhanced_altitude ?? record.altitude),
-    gForce: safeNumber(getOptionalRecordValue(record, ['g_force', 'gforce'])),
-    gearPosition: safeNumber(getOptionalRecordValue(record, ['gear_ratio', 'gear', 'front_gear'])),
+    g_force: safeNumber(getOptionalRecordValue(record, ['g_force', 'gforce'])),
+    gear_position: safeNumber(getOptionalRecordValue(record, ['gear_ratio', 'gear', 'front_gear'])),
     gradient: safeNumber(record.grade),
-    groundContactTime: safeNumber(getOptionalRecordValue(record, ['ground_contact_time', 'stance_time'])),
+    ground_contact_time: safeNumber(getOptionalRecordValue(record, ['ground_contact_time', 'stance_time'])),
     heading: safeNumber(getOptionalRecordValue(record, ['gps_heading', 'compass_heading', 'heading', 'course_heading', 'navigation_heading'])),
     heartrate: safeNumber(record.heart_rate),
     latitude: safeNumber(record.position_lat),
-    leftRightBalance: (() => {
+    left_right_balance: (() => {
       const raw = getOptionalRecordValue(record, ['left_right_balance'])
       return raw !== null && typeof raw === 'object' ? safeNumber(raw.value) : safeNumber(raw)
     })(),
@@ -73,18 +72,18 @@ export default async function parseFitActivityFile(file) {
     pace: safeNumber(record.pace),
     power: safeNumber(record.power),
     speed: safeNumber(record.enhanced_speed ?? record.speed),
-    strideLength: safeNumber(getOptionalRecordValue(record, ['stride_length', 'step_length'])),
-    strokeRate: safeNumber(getOptionalRecordValue(record, ['stroke_rate', 'running_cadence'])),
+    stride_length: safeNumber(getOptionalRecordValue(record, ['stride_length', 'step_length'])),
+    stroke_rate: safeNumber(getOptionalRecordValue(record, ['stroke_rate', 'running_cadence'])),
     temperature: safeNumber(record.temperature),
     timestamp: record.timestamp,
     torque: safeNumber(getOptionalRecordValue(record, ['torque'])),
-    verticalOscillation: safeNumber(record.vertical_oscillation),
-    verticalSpeed: safeNumber(record.vertical_speed),
+    vertical_oscillation: safeNumber(record.vertical_oscillation),
+    vertical_speed: safeNumber(record.vertical_speed),
   }))
 
-  return finalizeParsedActivity({
-    fileName: file.name,
-    fileFormat: 'fit',
+  return {
+    file_name: file.name,
+    file_format: 'fit',
     metadata: {
       creator: fileId?.product_name || null,
       file_created_at: fileId?.time_created || null,
@@ -95,6 +94,12 @@ export default async function parseFitActivityFile(file) {
       total_elapsed_time: safeNumber(firstSession?.total_elapsed_time),
       total_timer_time: safeNumber(firstSession?.total_timer_time),
     },
-    rawSamples,
-  })
+    raw_samples,
+    options: {
+      skip_idle_gap_fill: false,
+      smoothing: {
+        heading: { enabled: true, method: 'circular_ema', window_seconds: 0.5 },
+      },
+    },
+  }
 }

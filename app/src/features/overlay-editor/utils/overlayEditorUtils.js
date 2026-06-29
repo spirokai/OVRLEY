@@ -214,7 +214,7 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
 
 /**
  * Interpolates the time-of-day value at the given elapsed second.
- * Uses the source_start_time offset when available, otherwise
+ * Uses the sync_time offset when available, otherwise
  * interpolates the ISO time series.
  *
  * @param {object|null} activity - Parsed activity data.
@@ -222,9 +222,9 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
  * @returns {string} ISO timestamp string.
  */
 export function getInterpolatedTimeValue(activity, elapsedSecond) {
-  const sourceStartTimeMs = Date.parse(activity?.source_start_time || '')
-  if (Number.isFinite(sourceStartTimeMs)) {
-    return new Date(sourceStartTimeMs + Math.max(elapsedSecond, 0) * 1000).toISOString()
+  const syncTimeMs = Date.parse(activity?.sync_time || '')
+  if (Number.isFinite(syncTimeMs)) {
+    return new Date(syncTimeMs + Math.max(elapsedSecond, 0) * 1000).toISOString()
   }
 
   const elapsedSeries = Array.isArray(activity?.sample_elapsed_seconds) ? activity.sample_elapsed_seconds : []

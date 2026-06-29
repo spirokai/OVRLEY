@@ -91,7 +91,7 @@ export function createMediaSlice(set, get) {
           fileFormat: activity.file_format || null,
           fileName: activity.file_name || null,
           sampleCount: activity.metadata?.sample_count ?? 0,
-          startTime: activity.metadata?.start_time ?? null,
+          syncTime: activity.sync_time ?? null,
           totalDistanceMeters: activity.metadata?.total_distance_m ?? 0,
           validAttributes: activity.valid_attributes || [],
         }

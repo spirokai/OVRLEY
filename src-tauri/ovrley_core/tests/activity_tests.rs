@@ -4,6 +4,7 @@ mod common;
 
 use std::fs;
 
+use ovrley_core::activity::finalize::finalize_raw_activity_json;
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
 use ovrley_core::commands::parse_and_validate_config;
@@ -25,6 +26,228 @@ fn time_value() -> String {
     format!(
         r##"{{"value":"time","x":0,"y":0,"font":"f","font_size":12.0,"color":"#ffffff","opacity":1.0,"show_icon":false,"icon_color":"#000000","icon_size":1.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"show_units":false,"unit_color":"#000000","display_unit":"","prefix":"","suffix":"","format":"{{v}}","decimals":0}}"##
     )
+}
+
+#[test]
+fn finalizes_raw_activity_with_idle_gap_debug_payload() {
+    let raw_activity = serde_json::json!({
+        "file_name": "raw-regression.fit",
+        "file_format": "fit",
+        "metadata": {
+            "sport": "cycling"
+        },
+        "raw_samples": [
+            {
+                "timestamp": "2026-01-01T00:00:00.000Z",
+                "elapsed_seconds": 0.0,
+                "latitude": 50.0,
+                "longitude": 14.0,
+                "elevation": 100.0,
+                "distance": 0.0
+            },
+            {
+                "timestamp": "2026-01-01T00:00:01.000Z",
+                "elapsed_seconds": 1.0,
+                "latitude": 50.0,
+                "longitude": 14.0001,
+                "elevation": 101.0,
+                "distance": 10.0
+            },
+            {
+                "timestamp": "2026-01-01T00:00:05.000Z",
+                "elapsed_seconds": 5.0,
+                "latitude": 50.0,
+                "longitude": 14.0001,
+                "elevation": 101.0,
+                "distance": 10.0
+            }
+        ],
+        "options": {
+            "skip_idle_gap_fill": false,
+            "smoothing": {}
+        }
+    });
+
+    let response = finalize_raw_activity_json(&raw_activity.to_string()).unwrap();
+    let activity = response.parsed_activity;
+
+    assert_eq!(activity.file_name.as_deref(), Some("raw-regression.fit"));
+    assert_eq!(activity.file_format.as_deref(), Some("fit"));
+    assert_eq!(
+        activity.sample_elapsed_seconds,
+        vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+    );
+    assert_eq!(
+        activity.distance,
+        vec![
+            Some(0.0),
+            Some(10.0),
+            Some(10.0),
+            Some(10.0),
+            Some(10.0),
+            Some(10.0)
+        ]
+    );
+    assert_eq!(
+        activity.speed,
+        vec![None, Some(10.0), Some(0.0), Some(0.0), Some(0.0), Some(0.0)]
+    );
+    assert_eq!(
+        activity.sample_distance_progress,
+        vec![0.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    );
+
+    let metadata = activity.metadata.as_object().unwrap();
+    assert_eq!(metadata["sport"], "cycling");
+    assert_eq!(metadata["sample_count"], 6);
+    assert_eq!(metadata["original_sample_count"], 3);
+    assert_eq!(metadata["inserted_idle_sample_count"], 3);
+    assert_eq!(metadata["duration_seconds"], 5.0);
+    assert_eq!(metadata["total_distance_m"], 10.0);
+
+    let coverage = activity.extra["coverage"].as_object().unwrap();
+    assert_eq!(coverage["speed"]["source"], "mixed");
+    assert_eq!(coverage["speed"]["availableCount"], 5);
+    assert_eq!(coverage["distance"]["availableCount"], 6);
+
+    let debug_payload = response
+        .debug_payload
+        .expect("debug builds must return parser diagnostics");
+    assert_eq!(debug_payload["file_name"], "raw-regression.fit");
+    assert_eq!(debug_payload["file_format"], "fit");
+    assert_eq!(debug_payload["idle_gap_fill"]["inserted_sample_count"], 3);
+    assert_eq!(
+        debug_payload["idle_gap_fill"]["detected_gaps"][0]["gap_seconds"],
+        4.0
+    );
+    assert_eq!(
+        debug_payload["idle_gap_fill"]["detected_gaps"][0]["inserted_samples"],
+        3
+    );
+    assert_eq!(
+        debug_payload["parsed_activity"]["metadata"]["inserted_idle_sample_count"],
+        3
+    );
+}
+
+#[test]
+fn finalizes_raw_activity_without_smoothing_when_map_is_empty() {
+    let raw_activity = serde_json::json!({
+        "file_name": "raw-no-smoothing.srt",
+        "file_format": "srt",
+        "raw_samples": [
+            { "elapsed_seconds": 0.0, "distance": 0.0, "elevation": 100.0 },
+            { "elapsed_seconds": 0.25, "distance": 0.0, "elevation": 100.0 },
+            { "elapsed_seconds": 0.5, "distance": 10.0, "elevation": 104.0 },
+            { "elapsed_seconds": 0.75, "distance": 10.0, "elevation": 104.0 },
+            { "elapsed_seconds": 1.0, "distance": 20.0, "elevation": 108.0 }
+        ],
+        "options": {
+            "skip_idle_gap_fill": true,
+            "smoothing": {}
+        }
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string())
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(
+        activity.speed,
+        vec![None, Some(0.0), Some(40.0), Some(0.0), Some(40.0)]
+    );
+    assert_eq!(
+        activity.vertical_speed,
+        vec![None, Some(0.0), Some(16.0), Some(0.0), Some(16.0)]
+    );
+}
+
+#[test]
+fn finalizes_raw_activity_with_srt_style_zero_phase_smoothing() {
+    let raw_activity = serde_json::json!({
+        "file_name": "raw-smoothed.srt",
+        "file_format": "srt",
+        "raw_samples": [
+            { "elapsed_seconds": 0.0, "distance": 0.0, "elevation": 100.0, "iso": 100.0 },
+            { "elapsed_seconds": 0.25, "distance": 0.0, "elevation": 100.0, "iso": 200.0 },
+            { "elapsed_seconds": 0.5, "distance": 10.0, "elevation": 104.0, "iso": 400.0 },
+            { "elapsed_seconds": 0.75, "distance": 10.0, "elevation": 104.0, "iso": 800.0 },
+            { "elapsed_seconds": 1.0, "distance": 20.0, "elevation": 108.0, "iso": 1600.0 }
+        ],
+        "options": {
+            "skip_idle_gap_fill": true,
+            "smoothing": {
+                "speed": { "enabled": true, "method": "zero_phase_ma", "window_seconds": 0.5 },
+                "vertical_speed": { "enabled": true, "method": "zero_phase_ma", "window_seconds": 1.0 },
+                "elevation": { "enabled": true, "method": "zero_phase_ma", "window_seconds": 1.0 },
+                "iso": { "enabled": true, "method": "zero_phase_ma", "window_seconds": 1.0 }
+            }
+        }
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string())
+        .unwrap()
+        .parsed_activity;
+
+    assert_ne!(
+        activity.speed,
+        vec![None, Some(0.0), Some(40.0), Some(0.0), Some(40.0)]
+    );
+    assert!(activity.speed[2].unwrap() > 0.0);
+    assert!(activity.speed[2].unwrap() < 40.0);
+    assert_ne!(
+        activity.elevation,
+        vec![
+            Some(100.0),
+            Some(100.0),
+            Some(104.0),
+            Some(104.0),
+            Some(108.0)
+        ]
+    );
+    assert_eq!(
+        activity.iso,
+        vec![
+            Some(100.0),
+            Some(200.0),
+            Some(400.0),
+            Some(800.0),
+            Some(1600.0)
+        ]
+    );
+}
+
+#[test]
+fn finalizes_raw_activity_with_circular_ema_without_heading_wrap_glitch() {
+    let raw_activity = serde_json::json!({
+        "file_name": "raw-heading.srt",
+        "file_format": "srt",
+        "raw_samples": [
+            { "elapsed_seconds": 0.0, "heading": 350.0 },
+            { "elapsed_seconds": 1.0, "heading": 355.0 },
+            { "elapsed_seconds": 2.0, "heading": 5.0 },
+            { "elapsed_seconds": 3.0, "heading": 10.0 }
+        ],
+        "options": {
+            "skip_idle_gap_fill": true,
+            "smoothing": {
+                "heading": { "enabled": true, "method": "circular_ema", "window_seconds": 0.5 }
+            }
+        }
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string())
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.heading[0], Some(350.0));
+    for heading in activity.heading.iter().flatten() {
+        assert!(
+            *heading >= 340.0 || *heading <= 20.0,
+            "heading should stay near north across wrap, got {heading}"
+        );
+    }
+    assert!(activity.heading[2].unwrap() > 350.0);
 }
 
 #[test]

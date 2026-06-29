@@ -67,6 +67,18 @@ pub fn backend_current_os() -> Value {
     })
 }
 
+/// Finalizes frontend-extracted raw activity samples into the canonical payload.
+///
+/// The core command owns JSON serialization at the framework-agnostic boundary
+/// so the Tauri layer can stay a thin string-in/string-out adapter while tests
+/// exercise the same backend finalization path.
+pub fn backend_finalize_activity(raw_activity_json: &str) -> CoreResult<Value> {
+    serde_json::to_value(crate::activity::finalize::finalize_raw_activity_json(
+        raw_activity_json,
+    )?)
+    .map_err(CoreError::Serialization)
+}
+
 /// Lists bundled font filenames plus system font family names visible to Skia.
 pub fn backend_list_system_fonts(paths: &AppPaths) -> Value {
     let mut fonts: Vec<String> = FontMgr::default()
@@ -495,27 +507,33 @@ fn open_path_in_system(path: &Path) -> CoreResult<()> {
 
 /// Probes a video file and returns its metadata.
 pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
+    let metadata = probe_video_metadata(paths, file_path)?;
+    serde_json::to_value(&metadata).map_err(CoreError::Serialization)
+}
+
+fn probe_video_metadata(
+    paths: &AppPaths,
+    file_path: &str,
+) -> CoreResult<crate::media::SourceVideoMetadata> {
     match crate::media::mp4_telemetry::probe_video_metadata(file_path) {
         Ok(metadata) => {
-            let metadata = if needs_ffprobe_salvage(&metadata) {
+            if needs_ffprobe_salvage(&metadata) {
                 match crate::media::video_probe::probe_video(&paths.repo_root, file_path) {
-                    Ok(ffprobe_metadata) => merge_ffprobe_metadata(metadata, ffprobe_metadata),
+                    Ok(ffprobe_metadata) => Ok(merge_ffprobe_metadata(metadata, ffprobe_metadata)),
                     Err(error) => {
                         log::warn!("ffprobe fallback failed for {file_path}: {error}");
-                        metadata
+                        Ok(metadata)
                     }
                 }
             } else {
-                metadata
-            };
-            serde_json::to_value(&metadata).map_err(CoreError::Serialization)
+                Ok(metadata)
+            }
         }
         Err(error) => {
             log::warn!(
                 "telemetry-parser probe failed for {file_path}: {error}; falling back to ffprobe"
             );
-            let metadata = crate::media::video_probe::probe_video(&paths.repo_root, file_path)?;
-            serde_json::to_value(&metadata).map_err(CoreError::Serialization)
+            crate::media::video_probe::probe_video(&paths.repo_root, file_path)
         }
     }
 }
@@ -526,7 +544,7 @@ pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Valu
 /// returns the same [`ParsedActivity`] shape used by the rest of the import
 /// pipeline, not the old debug-only columnar telemetry JSON.
 pub fn backend_extract_video_telemetry(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
-    let metadata = crate::media::mp4_telemetry::probe_video_metadata(file_path)?;
+    let metadata = probe_video_metadata(paths, file_path)?;
     let fps = metadata.fps.unwrap_or(30.0);
     let duration_s = metadata.duration.unwrap_or(0.0);
 
@@ -542,7 +560,11 @@ pub fn backend_extract_video_telemetry(paths: &AppPaths, file_path: &str) -> Cor
 }
 
 fn needs_ffprobe_salvage(metadata: &crate::media::SourceVideoMetadata) -> bool {
-    metadata.sync_time.is_none()
+    metadata.duration.is_none()
+        || metadata.fps.is_none()
+        || metadata.fps_num.is_none()
+        || metadata.fps_den.is_none()
+        || metadata.sync_time.is_none()
         || metadata.creation_time.is_none()
         || metadata.codec_name.is_none()
         || metadata.codec_long_name.is_none()
@@ -557,6 +579,18 @@ fn merge_ffprobe_metadata(
     mut metadata: crate::media::SourceVideoMetadata,
     ffprobe_metadata: crate::media::SourceVideoMetadata,
 ) -> crate::media::SourceVideoMetadata {
+    if metadata.duration.is_none() {
+        metadata.duration = ffprobe_metadata.duration;
+    }
+    if metadata.fps.is_none() {
+        metadata.fps = ffprobe_metadata.fps;
+    }
+    if metadata.fps_num.is_none() {
+        metadata.fps_num = ffprobe_metadata.fps_num;
+    }
+    if metadata.fps_den.is_none() {
+        metadata.fps_den = ffprobe_metadata.fps_den;
+    }
     if metadata.sync_time.is_none() {
         metadata.sync_time = ffprobe_metadata
             .sync_time

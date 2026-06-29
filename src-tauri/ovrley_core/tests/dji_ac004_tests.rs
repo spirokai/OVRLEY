@@ -39,7 +39,7 @@ fn mp4_telemetry_uses_ac004_fallback_for_dji_fixture() {
 
     assert_eq!(activity.file_format.as_deref(), Some("mp4_telemetry"));
     assert_eq!(
-        activity.source_start_time.as_deref(),
+        activity.sync_time.as_deref(),
         Some("2026-03-15T23:58:14+00:00")
     );
     assert_eq!(

@@ -1,12 +1,10 @@
 /**
  * SRT activity parser — converts DJI-style SRT subtitle cues into the
- * canonical raw-sample format consumed by `finalizeParsedActivity()`.
+ * RawActivity format consumed by backend finalization.
  *
  * Supports both Format A (bracketed `[key: value]` telemetry) and
  * Format B (legacy line-oriented `KEY:VALUE` telemetry).
  */
-
-import { finalizeParsedActivity } from './parser.js'
 
 /**
  * Parse a cue timing line like `00:00:02,001 --> 00:00:02,035` into elapsed seconds.
@@ -123,7 +121,7 @@ function parseFormatACue(bodyLines, elapsedSeconds) {
   const timestampLine = extractFormatATimestamp(bodyLines)
 
   return {
-    elapsedSeconds,
+    elapsed_seconds: elapsedSeconds,
     timestamp: toIsoTimestamp(timestampLine),
     latitude: parseFloat(fields.latitude) || null,
     longitude: parseFloat(fields.longitude) || null,
@@ -131,10 +129,10 @@ function parseFormatACue(bodyLines, elapsedSeconds) {
     elevation: parseFloat(fields.abs_alt) || null,
     iso: parseFloat(fields.iso) || null,
     aperture: parseFloat(fields.fnum) || null,
-    shutterSpeed: parseShutter(fields.shutter),
-    focalLength: parseFloat(fields.focal_len) || null,
+    shutter_speed: parseShutter(fields.shutter),
+    focal_length: parseFloat(fields.focal_len) || null,
     ev: fields.ev !== undefined ? parseFloat(fields.ev) || 0 : null,
-    colorTemperature: parseFloat(fields.ct) || null,
+    color_temperature: parseFloat(fields.ct) || null,
   }
 }
 
@@ -275,7 +273,7 @@ function parseFormatBCue(bodyLines, elapsedSeconds) {
   }
 
   return {
-    elapsedSeconds,
+    elapsed_seconds: elapsedSeconds,
     timestamp,
     latitude,
     longitude,
@@ -283,10 +281,10 @@ function parseFormatBCue(bodyLines, elapsedSeconds) {
     elevation: altitude,
     iso,
     aperture,
-    shutterSpeed: parseFormatBShutter(shutterRaw),
-    focalLength: null,
+    shutter_speed: parseFormatBShutter(shutterRaw),
+    focal_length: null,
     ev: ev !== null ? ev : null,
-    colorTemperature: null,
+    color_temperature: null,
   }
 }
 
@@ -337,16 +335,16 @@ function splitCues(text) {
 // ── Public API ───────────────────────────────────────────────────────────
 
 /**
- * Parse an SRT activity file into the canonical `{ parsedActivity, debugPayload }` shape.
+ * Parse an SRT activity file into the backend RawActivity contract.
  * @param {string} text — raw SRT file content
  * @param {string} fileName — source file name
- * @returns {{ parsedActivity: object, debugPayload: object }}
+ * @returns {object}
  */
 export function parseSrtActivityFile(text, fileName) {
   const isFormatA = detectFormatA(text)
   const cues = splitCues(text)
 
-  const rawSamples = cues
+  const raw_samples = cues
     .map((cue) => {
       const elapsedSeconds = parseCueStartSeconds(cue.timingLine)
       if (elapsedSeconds === null) return null
@@ -354,11 +352,19 @@ export function parseSrtActivityFile(text, fileName) {
     })
     .filter(Boolean)
 
-  return finalizeParsedActivity({
-    fileName,
-    fileFormat: 'srt',
+  return {
+    file_name: fileName,
+    file_format: 'srt',
     metadata: {},
-    rawSamples,
-    options: { skipIdleGapFill: true, useWindowedRate: true, rateWindowSeconds: 1 },
-  })
+    raw_samples,
+    options: {
+      skip_idle_gap_fill: true,
+      smoothing: {
+        speed: { enabled: true, method: 'zero_phase_ma', window_seconds: 0.5 },
+        vertical_speed: { enabled: true, method: 'zero_phase_ma', window_seconds: 1.0 },
+        elevation: { enabled: true, method: 'zero_phase_ma', window_seconds: 1.0 },
+        heading: { enabled: true, method: 'circular_ema', window_seconds: 0.5 },
+      },
+    },
+  }
 }
