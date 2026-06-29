@@ -69,6 +69,23 @@ fn settings_for_codec(
     .unwrap()
 }
 
+/// Builds composite settings for tests that vary resolution-specific input args.
+fn settings_for_dimensions(width: u32, height: u32) -> CompositeFfmpegSettings {
+    build_composite_ffmpeg_settings(&CompositeFfmpegBuildRequest {
+        codec_name: "libx264",
+        bitrate: "60M",
+        video_path: Path::new("test.mp4"),
+        video_trim_start: 0.0,
+        render_duration: 10.0,
+        width,
+        height,
+        source_fps: Fps::new(30000, 1001).unwrap(),
+        overlay_pipe_fps: Fps::new(30000, 1001).unwrap(),
+        hwaccel_available: &HwAccelInfo::default(),
+    })
+    .unwrap()
+}
+
 /// Wraps a canonical codec snapshot in the composite hardware-info shell so
 /// that tests can selectively mark individual codecs as available while
 /// keeping all other fields at their defaults.
@@ -145,7 +162,7 @@ fn test_2_5_rawvideo_pipe_input_has_expected_shape() {
         built.input_1_args,
         vec![
             "-thread_queue_size",
-            "512",
+            "16",
             "-f",
             "rawvideo",
             "-pix_fmt",
@@ -158,6 +175,25 @@ fn test_2_5_rawvideo_pipe_input_has_expected_shape() {
             "pipe:0"
         ]
     );
+}
+
+#[test]
+fn test_2_5a_rawvideo_pipe_queue_size_scales_with_resolution() {
+    for (width, height, expected_queue_size) in [
+        (1280, 720, "64"),
+        (1920, 1080, "64"),
+        (2560, 1440, "16"),
+        (3840, 2160, "16"),
+        (5120, 2880, "4"),
+        (7680, 4320, "4"),
+    ] {
+        let built = settings_for_dimensions(width, height);
+        assert_argument_pair(
+            &built.input_1_args,
+            "-thread_queue_size",
+            expected_queue_size,
+        );
+    }
 }
 
 #[test]

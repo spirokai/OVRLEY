@@ -202,9 +202,11 @@ pub fn build_composite_ffmpeg_settings(
     input_0_args.extend(["-i".to_string(), video_path.clone()]);
 
     // ── PHASE 4: BUILD INPUT 1 ARGS (raw RGBA overlay via stdin pipe) ──
+    let overlay_thread_queue_size =
+        composite_overlay_thread_queue_size(request.width, request.height).to_string();
     let input_1_args = vec![
         "-thread_queue_size".to_string(),
-        "512".to_string(),
+        overlay_thread_queue_size,
         "-f".to_string(),
         "rawvideo".to_string(),
         "-pix_fmt".to_string(),
@@ -274,6 +276,24 @@ pub fn build_composite_ffmpeg_settings(
         filter_complex,
         output_args,
     })
+}
+
+/// Chooses FFmpeg's raw-overlay input queue size from frame dimensions.
+///
+/// The queued units are raw RGBA frames, so memory cost scales with pixel area:
+/// 8K frames are large enough that FFmpeg should expose backpressure quickly.
+fn composite_overlay_thread_queue_size(width: u32, height: u32) -> usize {
+    const FULL_HD_PIXELS: u64 = 1920 * 1080;
+    const UHD_4K_PIXELS: u64 = 3840 * 2160;
+
+    let pixels = u64::from(width) * u64::from(height);
+    if pixels <= FULL_HD_PIXELS {
+        64
+    } else if pixels <= UHD_4K_PIXELS {
+        16
+    } else {
+        4
+    }
 }
 
 /// Builds global FFmpeg hardware initialization args for the selected profile.
