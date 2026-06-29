@@ -56,7 +56,7 @@ fn minimal_activity() -> ParsedActivity {
         file_name: None,
         file_format: None,
         metadata: serde_json::Value::Null,
-        source_start_time: None,
+        sync_time: None,
         sample_elapsed_seconds: vec![0.0, 1.0, 2.0, 3.0],
         sample_distance_progress: vec![0.0, 0.25, 0.5, 1.0],
         frame_elapsed_seconds: Vec::new(),

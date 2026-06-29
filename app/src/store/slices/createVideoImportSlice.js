@@ -127,7 +127,7 @@ export const createVideoImportSlice = (set, get) => ({
       }
 
       const videoStart = new Date(state.importedVideoCreationTime).getTime()
-      const activityStart = new Date(activitySummary?.startTime).getTime()
+      const activityStart = new Date(activitySummary?.syncTime).getTime()
       const activityEnd = new Date(activitySummary?.endTime).getTime()
 
       if (isNaN(videoStart) || (activitySummary && (isNaN(activityStart) || isNaN(activityEnd)))) {

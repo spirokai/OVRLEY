@@ -22,7 +22,7 @@
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Separator } from '@/components/ui/separator'
-import { Video, Bell, ChevronUp, ChevronDown } from 'lucide-react'
+import { Video, Bell, ChevronUp, ChevronDown, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export default function VideoSyncSection({
@@ -82,7 +82,7 @@ export default function VideoSyncSection({
         </div>
       )}
 
-      {activitySummary?.startTime && (
+      {activitySummary?.syncTime && (
         <div className="space-y-1">
           <Label className="text-[10px] text-muted-foreground uppercase font-bold pb-2!">Sync Offset</Label>
           <div className="grid grid-cols-2 gap-4">
@@ -126,6 +126,16 @@ export default function VideoSyncSection({
             </Button>
           </div>
         </div>
+      )}
+      {activitySummary && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-4 w-full h-9 gap-2 border-border/80 bg-surface-elevated px-3 text-xs font-semibold text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
+        >
+          <Settings className="h-3.5 w-3.5" />
+          Set Data Sources
+        </Button>
       )}
     </div>
   )

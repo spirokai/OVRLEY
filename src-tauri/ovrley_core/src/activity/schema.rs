@@ -109,6 +109,53 @@ pub struct RawActivityOptions {
     pub smoothing: BTreeMap<String, SmoothingOption>,
 }
 
+/// Columnar activity input used by the shared finalizer core.
+///
+/// Browser parsers can still send row-oriented [`RawActivity`] JSON; the
+/// finalizer converts that payload to columns at the boundary. MP4 telemetry
+/// alignment naturally produces columns and can feed this shape directly
+/// without constructing large sparse row objects.
+#[derive(Clone, Debug, Default)]
+pub struct ActivityColumns {
+    pub file_name: String,
+    pub file_format: String,
+    pub metadata: Value,
+    pub options: RawActivityOptions,
+    pub timestamp: TimeSeries,
+    pub elapsed_seconds: NumericSeries,
+    pub latitude: NumericSeries,
+    pub longitude: NumericSeries,
+    pub elevation: NumericSeries,
+    pub altitude: NumericSeries,
+    pub speed: NumericSeries,
+    pub heading: NumericSeries,
+    pub heartrate: NumericSeries,
+    pub cadence: NumericSeries,
+    pub power: NumericSeries,
+    pub temperature: NumericSeries,
+    pub gradient: NumericSeries,
+    pub pace: NumericSeries,
+    pub distance: NumericSeries,
+    pub g_force: NumericSeries,
+    pub vertical_speed: NumericSeries,
+    pub torque: NumericSeries,
+    pub stroke_rate: NumericSeries,
+    pub stride_length: NumericSeries,
+    pub vertical_oscillation: NumericSeries,
+    pub ground_contact_time: NumericSeries,
+    pub left_right_balance: NumericSeries,
+    pub core_temperature: NumericSeries,
+    pub air_pressure: NumericSeries,
+    pub gear_position: NumericSeries,
+    pub iso: NumericSeries,
+    pub aperture: NumericSeries,
+    pub shutter_speed: NumericSeries,
+    pub focal_length: NumericSeries,
+    pub ev: NumericSeries,
+    pub color_temperature: NumericSeries,
+    pub original_sample_count: usize,
+}
+
 /// Per-metric smoothing request. Phase 0 only carries this through the schema.
 ///
 /// The shape is introduced with RawActivity so frontend parsers can adopt the
@@ -248,9 +295,9 @@ pub struct ParsedActivity {
     /// Parser-provided metadata preserved for diagnostics and future widgets.
     #[serde(default)]
     pub metadata: Value,
-    /// Absolute activity start time in RFC 3339 format when known.
+    /// Canonical absolute timestamp for activity/video time zero.
     #[serde(default)]
-    pub source_start_time: Option<String>,
+    pub sync_time: Option<String>,
     /// Monotonic sample timestamps in seconds from the source activity start.
     #[serde(default)]
     pub sample_elapsed_seconds: Vec<f64>,
@@ -485,8 +532,8 @@ pub struct DenseSeriesReport {
 /// endpoints even when the trim window cuts through source samples.
 #[derive(Clone, Debug)]
 pub struct TrimmedActivity {
-    /// Trim-adjusted absolute start time, if the source start was known.
-    pub source_start_time: Option<String>,
+    /// Trim-adjusted sync time for the trimmed window.
+    pub sync_time: Option<String>,
     /// Sample times relative to the trim start.
     pub sample_elapsed_seconds: Vec<f64>,
     /// Absolute activity distance progress for each trimmed sample.

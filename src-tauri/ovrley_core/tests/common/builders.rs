@@ -93,7 +93,7 @@ pub fn dense_report_with(fill: impl FnOnce(&mut DenseSeriesReport)) -> DenseActi
 
 pub fn minimal_trimmed_activity(times: Vec<f64>) -> TrimmedActivity {
     TrimmedActivity {
-        source_start_time: None,
+        sync_time: None,
         sample_elapsed_seconds: times,
         sample_distance_progress: vec![],
         course: vec![],

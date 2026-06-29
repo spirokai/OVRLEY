@@ -10,13 +10,10 @@
 //! temperature) are excluded because they change discretely; smoothing those
 //! would invent intermediate camera states that never occurred.
 //!
-//! Owns: [`smooth_series`], [`moving_average`], [`zero_phase_smooth`].
+//! Owns: [`smooth_series`].
 //! Does not own: sample extraction or JSON serialization.
 
-#[allow(unused_imports)]
-pub(crate) use crate::activity::finalize::smoothing::{
-    moving_average, smoothing_window_for_seconds, zero_phase_smooth,
-};
+use crate::activity::finalize::smoothing::{smoothing_window_for_seconds, zero_phase_smooth};
 use crate::media::native_sample::NativeSample;
 
 const GPS_SPEED_SMOOTHING_SECONDS: f64 = 0.5;
@@ -24,7 +21,7 @@ const GPS_ALTITUDE_SMOOTHING_SECONDS: f64 = 1.0;
 const GPS_HEADING_SMOOTHING_SECONDS: f64 = 0.5;
 const G_FORCE_SMOOTHING_SECONDS: f64 = 1.0;
 
-/// Smooths only continuous telemetry fields before JSON serialization.
+/// Smooths only continuous telemetry fields before column assembly.
 ///
 /// GPS altitude/speed/heading and g-force benefit from noise reduction. Camera
 /// settings are intentionally excluded because ISO, aperture, shutter, focal

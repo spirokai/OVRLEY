@@ -178,14 +178,14 @@ fn interpolate_course_series(
 
 // Generates or interpolates timestamps over all target frame times.
 fn interpolate_time_series(
-    source_start_time: Option<&str>,
+    sync_time: Option<&str>,
     x_values: &[f64],
     y_values: &TimeSeries,
     target_x_values: &[f64],
 ) -> Vec<Option<String>> {
-    // If the source start is known, generating timestamps from elapsed seconds
+    // If the sync time is known, generating timestamps from elapsed seconds
     // avoids drift caused by sparse or missing source timestamp samples.
-    if let Some(start_time) = source_start_time
+    if let Some(start_time) = sync_time
         .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
         .map(|value| value.with_timezone(&Utc))
     {
@@ -258,11 +258,11 @@ pub fn densify_activity(
         (Vec::new(), Vec::new())
     };
 
-    // Timestamps use the source_start_time to generate synthetic values when
+    // Timestamps use sync_time to generate synthetic values when
     // available, falling back to interpolation from sparse source samples.
     let time = if requirements.time && !trimmed.time.is_empty() {
         interpolate_time_series(
-            trimmed.source_start_time.as_deref(),
+            trimmed.sync_time.as_deref(),
             &trimmed.sample_elapsed_seconds,
             &trimmed.time,
             &frame_elapsed_seconds,

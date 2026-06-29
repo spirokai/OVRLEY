@@ -172,11 +172,11 @@ pub fn trim_activity(
         Vec::new()
     };
 
-    // The trim-adjusted start time is the source start offset forward by
+    // The trim-adjusted sync time is the activity sync time offset forward by
     // the scene start, so per-frame timestamps in the dense report always
     // correspond to the correct wall-clock moment.
     let start_time = activity
-        .source_start_time
+        .sync_time
         .as_deref()
         .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
         .map(|value| {
@@ -190,7 +190,7 @@ pub fn trim_activity(
     // positions so downstream interpolation has precise endpoints even when
     // the trim window cuts through a source sampling interval.
     Ok(TrimmedActivity {
-        source_start_time: start_time,
+        sync_time: start_time,
         sample_elapsed_seconds: trimmed_elapsed,
         sample_distance_progress: trimmed_distance_progress,
         course,

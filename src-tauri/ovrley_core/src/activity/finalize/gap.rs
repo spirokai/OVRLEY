@@ -345,6 +345,14 @@ pub fn build_distance_series(
     course_points: &[(Option<f64>, Option<f64>)],
     direct_distance_series: &[Option<f64>],
 ) -> Vec<Option<f64>> {
+    let has_direct_distance = direct_distance_series.iter().any(|value| value.is_some());
+    let has_course = course_points
+        .iter()
+        .any(|(latitude, longitude)| latitude.is_some() && longitude.is_some());
+    if !has_direct_distance && !has_course {
+        return course_points.iter().map(|_| None).collect();
+    }
+
     let mut distance_series = Vec::with_capacity(course_points.len());
     let mut total_distance_meters: f64 = 0.0;
 

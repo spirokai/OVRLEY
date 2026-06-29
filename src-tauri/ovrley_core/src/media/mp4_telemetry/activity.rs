@@ -1,37 +1,28 @@
-//! Telemetry-to-activity assembly.
+//! MP4 telemetry to activity-column alignment.
 //!
-//! Takes the smoothed [`NativeSample`] vec and video metadata, then produces a
-//! [`ParsedActivity`] with a single unified timeline. GPS timestamps anchor the
-//! timeline when available; video FPS is the fallback. IMU and camera values
-//! are picked from the closest-in-time sample to each anchor point via a
-//! two-pointer walk over the sorted domain vectors.
-//!
-//! The haversine formula computes cumulative track distance, and from that
-//! `sample_distance_progress` (0.0–1.0) is derived — both are required by the
-//! elevation and route geometry backends.
-//!
-//! Fields not available from MP4 telemetry (heartrate, cadence, power, …) are
-//! left as empty vectors so downstream interpolation treats them as absent.
-//!
-//! Owns: [`build_parsed_activity`].
-//! Does not own: extraction, smoothing, or the raw telemetry-parser API.
+//! This module keeps MP4-specific pre-finalizer behavior close to extraction:
+//! GPS/IMU/camera streams have different cadences, continuous streams are
+//! smoothed before culling, and discrete camera settings are step functions.
+//! The output is [`ActivityColumns`], which the shared activity finalizer turns
+//! into the canonical [`ParsedActivity`](crate::activity::schema::ParsedActivity).
 
 use std::collections::BTreeMap;
 use std::iter;
 
-use serde_json::{json, Value};
+use serde_json::json;
 
-use crate::activity::schema::{CourseSeries, ParsedActivity, TimeSeries};
+use crate::activity::schema::{ActivityColumns, RawActivityOptions};
 use crate::media::native_sample::{NativeSample, TelemetrySeriesCounts};
-use crate::media::telemetry_math::haversine_distance;
+use crate::media::telemetry_math::finite_f64;
 
-/// Builds a [`ParsedActivity`] from smoothed MP4 telemetry samples.
+/// Builds aligned activity columns from pre-smoothed MP4 telemetry samples.
 ///
-/// The unified timeline is the GPS sample timestamp when GPS data exists,
-/// otherwise evenly spaced timestamps derived from `fps` and `duration_s`.
-/// IMU and camera values at each anchor point come from the closest-in-time
-/// sample in their respective domain.
-pub fn build_parsed_activity(
+/// GPS timestamps anchor the output timeline when GPS data exists; otherwise
+/// video FPS/duration provides a fallback timeline. IMU and camera values are
+/// selected by closest timestamp. Discrete camera fields hold their last known
+/// value independently because they represent step changes, not continuous
+/// signals.
+pub fn build_activity_columns(
     samples: &[NativeSample],
     fps: f64,
     duration_s: f64,
@@ -42,35 +33,44 @@ pub fn build_parsed_activity(
     telemetry_source: &str,
     timeline_kind: &str,
     series_counts: TelemetrySeriesCounts,
-) -> ParsedActivity {
-    // ── Separate by domain ──────────────────────────────────────────
-    let gps: Vec<&NativeSample> = samples.iter().filter(|s| s.has_gps_payload()).collect();
+) -> ActivityColumns {
+    let gps: Vec<&NativeSample> = samples
+        .iter()
+        .filter(|sample| {
+            matches!(
+                (
+                    sample.latitude.and_then(finite_f64),
+                    sample.longitude.and_then(finite_f64),
+                ),
+                (Some(latitude), Some(longitude)) if latitude != 0.0 || longitude != 0.0
+            )
+        })
+        .collect();
     let imu: Vec<&NativeSample> = samples.iter().filter(|s| s.g_force.is_some()).collect();
     let cam: Vec<&NativeSample> = samples.iter().filter(|s| s.has_camera_payload()).collect();
     let has_gps = !gps.is_empty();
 
-    // ── Anchor timeline ─────────────────────────────────────────────
     let (anchor_ms, anchor_gps_idx): (Vec<f64>, Vec<Option<usize>>) = if has_gps {
         gps.iter()
             .enumerate()
-            .map(|(i, s)| (s.timestamp_ms, Some(i)))
+            .map(|(index, sample)| (sample.timestamp_ms, Some(index)))
             .unzip()
     } else {
         let interval_ms = 1000.0 / fps.max(1.0);
         let max_t = duration_s * 1000.0;
         let count = (max_t / interval_ms).ceil() as usize;
-        let timestamps: Vec<f64> = (0..count).map(|i| i as f64 * interval_ms).collect();
+        let timestamps: Vec<f64> = (0..count).map(|index| index as f64 * interval_ms).collect();
         (timestamps, iter::repeat(None).take(count).collect())
     };
     let n = anchor_ms.len();
 
-    // ── Allocate series buffers ─────────────────────────────────────
+    let mut timestamp = vec![None; n];
     let mut latitude = vec![None; n];
     let mut longitude = vec![None; n];
     let mut altitude = vec![None; n];
+    let mut elevation = vec![None; n];
     let mut speed = vec![None; n];
     let mut heading = vec![None; n];
-    let mut time: TimeSeries = vec![None; n];
     let mut g_force = vec![None; n];
     let mut iso = vec![None; n];
     let mut aperture = vec![None; n];
@@ -79,35 +79,28 @@ pub fn build_parsed_activity(
     let mut ev = vec![None; n];
     let mut color_temperature = vec![None; n];
 
-    // ── Fill GPS fields ─────────────────────────────────────────────
-    // When GPS anchors are available the anchor index matches the GPS index
-    // one-to-one; when the fallback is active every anchor gets the last GPS
-    // value (or None if no GPS at all).
     let mut last_gps: Option<usize> = None;
-    for (i, &gps_opt) in anchor_gps_idx.iter().enumerate() {
-        if let Some(gi) = gps_opt {
-            last_gps = Some(gi);
+    for (index, &gps_opt) in anchor_gps_idx.iter().enumerate() {
+        if let Some(gps_index) = gps_opt {
+            last_gps = Some(gps_index);
         }
-        if let Some(gp) = last_gps.and_then(|gi| gps.get(gi)) {
-            latitude[i] = gp.latitude;
-            longitude[i] = gp.longitude;
-            altitude[i] = gp.altitude;
-            speed[i] = gp.speed;
-            heading[i] = gp.heading;
-            time[i] = gp.timestamp.clone();
+        if let Some(gps_sample) = last_gps.and_then(|gps_index| gps.get(gps_index)) {
+            latitude[index] = gps_sample.latitude;
+            longitude[index] = gps_sample.longitude;
+            altitude[index] = gps_sample.altitude;
+            elevation[index] = gps_sample.altitude;
+            speed[index] = gps_sample.speed;
+            heading[index] = gps_sample.heading;
+            timestamp[index] = gps_sample.timestamp.clone();
         }
     }
 
-    // ── Fill IMU fields (closest-in-time, two‑pointer walk) ────────
     let mut imu_idx = 0usize;
-    for (i, &a_ms) in anchor_ms.iter().enumerate() {
-        advance_to_closest(&imu, &mut imu_idx, a_ms);
-        g_force[i] = imu.get(imu_idx).and_then(|s| s.g_force);
+    for (index, &anchor) in anchor_ms.iter().enumerate() {
+        advance_to_closest(&imu, &mut imu_idx, anchor);
+        g_force[index] = imu.get(imu_idx).and_then(|sample| sample.g_force);
     }
 
-    // ── Fill camera fields (closest-in-time, two‑pointer walk) ──────
-    // Each camera metric holds its last known value forward independently:
-    // a camera sample may have ISO but lack colour temperature.
     let mut last_iso: Option<f64> = None;
     let mut last_aperture: Option<f64> = None;
     let mut last_shutter: Option<f64> = None;
@@ -115,38 +108,30 @@ pub fn build_parsed_activity(
     let mut last_ev: Option<f64> = None;
     let mut last_color_temp: Option<f64> = None;
     let mut cam_idx = 0usize;
-    for (i, &a_ms) in anchor_ms.iter().enumerate() {
-        advance_to_closest(&cam, &mut cam_idx, a_ms);
-        if let Some(c) = cam.get(cam_idx) {
-            last_iso = c.iso.or(last_iso);
-            last_aperture = c.aperture.or(last_aperture);
-            last_shutter = c.shutter_speed.or(last_shutter);
-            last_focal = c.focal_length.or(last_focal);
-            last_ev = c.ev.or(last_ev);
-            last_color_temp = c.color_temperature.or(last_color_temp);
+    for (index, &anchor) in anchor_ms.iter().enumerate() {
+        advance_to_closest(&cam, &mut cam_idx, anchor);
+        if let Some(camera_sample) = cam.get(cam_idx) {
+            last_iso = camera_sample.iso.or(last_iso);
+            last_aperture = camera_sample.aperture.or(last_aperture);
+            last_shutter = camera_sample.shutter_speed.or(last_shutter);
+            last_focal = camera_sample.focal_length.or(last_focal);
+            last_ev = camera_sample.ev.or(last_ev);
+            last_color_temp = camera_sample.color_temperature.or(last_color_temp);
         }
-        iso[i] = last_iso;
-        aperture[i] = last_aperture;
-        shutter_speed[i] = last_shutter;
-        focal_length[i] = last_focal;
-        ev[i] = last_ev;
-        color_temperature[i] = last_color_temp;
+        iso[index] = last_iso;
+        aperture[index] = last_aperture;
+        shutter_speed[index] = last_shutter;
+        focal_length[index] = last_focal;
+        ev[index] = last_ev;
+        color_temperature[index] = last_color_temp;
     }
 
-    // ── Compute derived fields ──────────────────────────────────────
-    let sample_elapsed_seconds: Vec<f64> = anchor_ms.iter().map(|&t| t / 1000.0).collect();
-
-    let (distance, distance_progress) = compute_distance_progress(&latitude, &longitude);
-    let course_points: CourseSeries = latitude
+    let elapsed_seconds = anchor_ms
         .iter()
-        .zip(longitude.iter())
-        .map(|(&lat, &lon)| (lat, lon))
+        .map(|timestamp_ms| Some(timestamp_ms / 1000.0))
         .collect();
-
-    let source_start_time = sync_time.or_else(|| time.iter().find_map(|t| t.clone()));
-    let end_s = sample_elapsed_seconds.last().copied().unwrap_or(duration_s);
-
-    let metadata: Value = json!({
+    let none = || vec![None; n];
+    let mut metadata = json!({
         "camera_type": camera_type,
         "camera_model": camera_model,
         "telemetry_source": telemetry_source,
@@ -155,66 +140,55 @@ pub fn build_parsed_activity(
         "gps_sample_count": series_counts.gps,
         "imu_sample_count": series_counts.imu,
         "camera_sample_count": series_counts.camera,
-        "sample_count": n,
-        "duration_seconds": end_s,
     });
+    if let Some(sync_time) = sync_time {
+        metadata["sync_time"] = json!(sync_time);
+    }
 
-    // ── Assemble ParsedActivity ─────────────────────────────────────
-    ParsedActivity {
-        file_name,
-        file_format: Some("mp4_telemetry".into()),
+    ActivityColumns {
+        file_name: file_name.unwrap_or_default(),
+        file_format: "mp4_telemetry".to_string(),
         metadata,
-        source_start_time,
-        sample_elapsed_seconds,
-        sample_distance_progress: distance_progress,
-        frame_elapsed_seconds: vec![],   // always []
-        frame_timestamps: vec![],        // always []
-        frame_distance_progress: vec![], // always []
-        trim_start_seconds: 0.0,
-        trim_end_seconds: end_s,
-        sample_course_points: course_points.clone(),
-        sample_elevations: vec![], // geometry backend falls back to elevation
-        course: course_points,
-        elevation: altitude.clone(),
-        speed: speed,
-        distance: distance,
-        heartrate: vec![],
-        cadence: vec![],
-        power: vec![],
-        temperature: vec![],
-        pace: vec![],
+        options: RawActivityOptions {
+            skip_idle_gap_fill: true,
+            smoothing: BTreeMap::new(),
+        },
+        timestamp,
+        elapsed_seconds,
+        latitude,
+        longitude,
+        elevation,
+        altitude,
+        speed,
+        heading,
+        heartrate: none(),
+        cadence: none(),
+        power: none(),
+        temperature: none(),
+        gradient: none(),
+        pace: none(),
+        distance: none(),
         g_force,
-        air_pressure: vec![],
-        ground_contact_time: vec![],
-        left_right_balance: vec![],
-        stride_length: vec![],
-        stroke_rate: vec![],
-        torque: vec![],
-        vertical_speed: vec![],
-        altitude: altitude,
+        vertical_speed: none(),
+        torque: none(),
+        stroke_rate: none(),
+        stride_length: none(),
+        vertical_oscillation: none(),
+        ground_contact_time: none(),
+        left_right_balance: none(),
+        core_temperature: none(),
+        air_pressure: none(),
+        gear_position: none(),
         iso,
         aperture,
         shutter_speed,
         focal_length,
         ev,
         color_temperature,
-        gear_position: vec![],
-        vertical_ratio: vec![],
-        vertical_oscillation: vec![],
-        core_temperature: vec![],
-        gradient: vec![],
-        time,
-        heading,
-        extra: BTreeMap::new(),
+        original_sample_count: samples.len(),
     }
 }
 
-/// Advances `idx` through `candidates` so it points to the sample whose
-/// `timestamp_ms` is closest to `target_ms`.
-///
-/// `candidates` must be sorted by `timestamp_ms` ascending. The two‑pointer
-/// walk ensures O(n) total time across all anchor points instead of O(n²)
-/// binary-search per anchor.
 fn advance_to_closest(candidates: &[&NativeSample], idx: &mut usize, target_ms: f64) {
     while *idx + 1 < candidates.len()
         && (candidates[*idx + 1].timestamp_ms - target_ms).abs()
@@ -222,33 +196,4 @@ fn advance_to_closest(candidates: &[&NativeSample], idx: &mut usize, target_ms: 
     {
         *idx += 1;
     }
-}
-
-/// Computes cumulative Haversine distance and 0.0–1.0 progress.
-fn compute_distance_progress(
-    lat: &[Option<f64>],
-    lon: &[Option<f64>],
-) -> (Vec<Option<f64>>, Vec<f64>) {
-    let mut cum = 0.0f64;
-    let distance: Vec<Option<f64>> = iter::once(Some(0.0))
-        .chain((1..lat.len()).map(|i| {
-            if let (Some(lat1), Some(lon1), Some(lat2), Some(lon2)) =
-                (lat[i - 1], lon[i - 1], lat[i], lon[i])
-            {
-                cum += haversine_distance(lat1, lon1, lat2, lon2);
-                Some(cum)
-            } else {
-                Some(cum) // carry forward when coords are missing
-            }
-        }))
-        .collect();
-
-    let total = distance.last().copied().flatten().unwrap_or(0.0);
-    let progress: Vec<f64> = if total > 0.0 {
-        distance.iter().map(|d| d.unwrap_or(0.0) / total).collect()
-    } else {
-        (0..lat.len()).map(|_| 0.0).collect()
-    };
-
-    (distance, progress)
 }

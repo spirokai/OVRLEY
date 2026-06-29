@@ -151,7 +151,7 @@ cyclemetry/
 │   │       │   ├── mod.rs         #     Source media module organization
 │   │       │   ├── source_video_metadata.rs # Shared video metadata contract
 │   │       │   ├── video_probe.rs #     ffprobe metadata extraction
-│   │       │   └── mp4_telemetry.rs #   telemetry-parser metadata/telemetry
+│   │       │   └── mp4_telemetry/ #   telemetry-parser extraction + column assembly
 │   │
 │   └── tests/                     # ovrley_core integration tests
 │       ├── common/                #   Shared test fixtures & helpers
@@ -447,7 +447,7 @@ Rust activity::finalize                   # shared post-processing
 Zustand (activitySummary, parsedActivity)
 ```
 
-The frontend owns format-specific extraction only. It normalizes browser-visible file formats into `RawActivity` and sends that contract to the backend. Rust owns the canonical finalization path from idle-gap fill through final `ParsedActivity` assembly. The backend generates the debug payload in dev builds; the frontend persists that payload through `write_parse_debug_file` when present. The `importActivityFile()` function accepts `storeActions` as a required parameter (no implicit `useStore.getState()` fallback).
+The frontend owns browser-visible FIT/GPX/SRT extraction into `RawActivity`. MP4 telemetry is extracted in Rust by `media/mp4_telemetry/`, smoothed at native cadence where required, aligned into `ActivityColumns`, and sent directly into the same shared finalizer core. Rust owns canonical finalization from optional idle-gap fill through derived metrics, opt-in smoothing, `sync_time` metadata, debug payload generation, and final `ParsedActivity` assembly. The `importActivityFile()` function accepts `storeActions` as a required parameter (no implicit `useStore.getState()` fallback).
 
 ### 5.6 Video Preview System
 
@@ -622,13 +622,22 @@ Geometry IPC Commands (used by frontend preview):
 - Returns the shared `SourceVideoMetadata` shape
 - Uses creation-time metadata only as a sync fallback
 
-**MP4 telemetry metadata** (`media/mp4_telemetry.rs`):
+**MP4 telemetry metadata and activity extraction** (`media/mp4_telemetry/`):
 
 - telemetry-parser metadata: dimensions, duration, FPS, rotation
 - Returns the shared `SourceVideoMetadata` shape
 - Runs before ffprobe for video import metadata
 - ffprobe salvages codec/audio/container/sync fields that telemetry-parser does
   not expose
+- Activity extraction uses `telemetry-parser` tag maps first, with a DJI AC004
+  fallback for files whose parser output is incomplete for that camera path
+- MP4 extraction normalizes vendor telemetry into `NativeSample`, smooths
+  continuous MP4-native streams before culling, aligns GPS/IMU/camera streams
+  into `ActivityColumns`, then calls the shared activity finalizer
+- GPS/course anchoring requires usable latitude/longitude. Speed, heading,
+  altitude, or timestamps alone do not create a route or GPS-derived timeline
+- MP4 does not assemble `ParsedActivity` directly; `activity/finalize.rs` owns
+  gap handling, metric derivation, metadata enrichment, and final assembly
 
 **Progress tracking** (`encode/progress.rs`, `debug/mod.rs`):
 
@@ -638,15 +647,17 @@ Geometry IPC Commands (used by frontend preview):
 
 ### 6.5 Activity Processing (Rust Side)
 
-The frontend extracts format-specific raw samples and sends a `RawActivity` contract to `backend_finalize_activity`. The Rust side owns the shared finalization path and then reuses the same `ParsedActivity` trim/densify pipeline for preview and render:
+All activity sources converge on the shared Rust finalizer before preview or render. Frontend FIT/GPX/SRT parsers send `RawActivity` to `backend_finalize_activity`; MP4 telemetry is extracted in Rust, converted to `ActivityColumns`, and finalized through the same core path.
 
-1. **Deserialize raw input** (`activity/schema.rs`): `RawActivity` carries `file_name`, `file_format`, `metadata`, `raw_samples`, and parser-selected options.
-2. **Finalize** (`activity/finalize.rs`): Optional idle-gap fill, elapsed/distance/course/time/progress construction, metric derivation, per-metric smoothing, metadata enrichment, and final `ParsedActivity` assembly.
-3. **Debug payload** (`activity/finalize.rs`): Dev builds return `{ parsed_activity, debug_payload }`; release builds return `debug_payload: null`. The frontend persists the payload through `write_parse_debug_file` when present.
-4. **Parse existing activity JSON** (`activity/mod.rs`): Render and geometry commands still accept production or debug payload JSON and deserialize `ParsedActivity` via `activity/schema.rs`.
-5. **Trim** (`activity/trim.rs`): Validate scene window against activity duration, interpolate boundary samples, produce `TrimmedActivity` with scene-local timeline and only the required telemetry series.
-6. **Densify** (`activity/interpolate.rs`): Convert uneven samples into frame-aligned dense series using linear interpolation with edge clamping via shared `interpolation.rs` utilities.
-7. **Report**: `DenseActivityReport` with per-frame telemetry for every scene frame.
+1. **Frontend raw activity input** (`activity/schema.rs`): `RawActivity` carries `file_name`, `file_format`, `metadata`, `raw_samples`, and parser-selected options. FIT/GPX/SRT parsers emit canonical units and can request per-metric smoothing.
+2. **Backend MP4 column input** (`media/mp4_telemetry/`): MP4 extraction produces `NativeSample` rows, preserves MP4-specific pre-cull smoothing for continuous streams, aligns GPS/IMU/camera cadences into `ActivityColumns`, and sets `skip_idle_gap_fill: true` because MP4 uses a video-derived or GPS-derived cadence.
+3. **Finalize** (`activity/finalize.rs`): `RawActivity` is gap-filled first when requested, then converted to `ActivityColumns`. `ActivityColumns` input goes directly into the same finalizer core. The finalizer builds elapsed/time/course/distance/progress series, derives missing metrics, applies opt-in per-metric smoothing after derivation, enriches metadata, and assembles `ParsedActivity`.
+4. **Sync naming** (`activity/schema.rs`): `sync_time` is the canonical activity start/sync field. `source_start_time` is retired, and `metadata.start_time` is stripped during finalization.
+5. **Debug payload** (`activity/finalize.rs`): Dev builds return `{ parsed_activity, debug_payload }`; release builds return `debug_payload: null`. The frontend persists the payload through `write_parse_debug_file` when present.
+6. **Parse existing activity JSON** (`activity/mod.rs`): Render and geometry commands accept production or debug payload JSON and deserialize `ParsedActivity` via `activity/schema.rs`.
+7. **Trim** (`activity/trim.rs`): Validate scene window against activity duration, interpolate boundary samples, produce `TrimmedActivity` with scene-local timeline and only the required telemetry series.
+8. **Densify** (`activity/interpolate.rs`): Convert uneven samples into frame-aligned dense series using linear interpolation with edge clamping via shared `interpolation.rs` utilities.
+9. **Report**: `DenseActivityReport` with per-frame telemetry for every scene frame.
 
 ### 6.6 Widget Rendering (Skia)
 
@@ -915,7 +926,7 @@ Templates are JSON files following the `ovrley-template` format (v2):
 ### Data Formats
 
 - **Templates** — JSON `ovrley-template` v1 format
-- **Activity** — frontend extracts `RawActivity`; Rust finalizes to `ParsedActivity`, then trims + densifies
+- **Activity** — FIT/GPX/SRT frontend parsers emit `RawActivity`; MP4 Rust extraction emits `ActivityColumns`; Rust finalizes both to `ParsedActivity`, then trims + densifies
 - **Frames** — raw RGBA (u8, 4 bytes/pixel) between Rust and FFmpeg
 - **Preview** — PNG via Skia encode, returned as base64 over IPC
 

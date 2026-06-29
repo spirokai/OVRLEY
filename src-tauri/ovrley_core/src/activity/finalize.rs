@@ -15,8 +15,7 @@ pub mod metrics;
 pub mod smoothing;
 
 use crate::activity::finalize::gap::{
-    build_distance_series, build_elapsed_series, build_progress_series, insert_idle_gap_samples,
-    skipped_gap_debug,
+    build_distance_series, build_progress_series, insert_idle_gap_samples, skipped_gap_debug,
 };
 use crate::activity::finalize::metrics::{
     build_metric_coverage, derive_activity_metric_series, MetricDescriptor,
@@ -24,7 +23,7 @@ use crate::activity::finalize::metrics::{
 use crate::activity::finalize::smoothing::{
     circular_ema, smoothing_window_for_seconds, zero_phase_smooth,
 };
-use crate::activity::schema::{ParsedActivity, RawActivity, RawSample};
+use crate::activity::schema::{ActivityColumns, ParsedActivity, RawActivity, RawSample};
 use crate::error::{CoreError, CoreResult};
 use crate::media::telemetry_math::{finite_f64, round_f64};
 use chrono::{DateTime, Utc};
@@ -98,7 +97,7 @@ pub fn parse_raw_activity_json(input: &str) -> CoreResult<RawActivity> {
 /// internals.
 pub fn finalize_raw_activity_json(input: &str) -> CoreResult<FinalizeActivityResponse> {
     let raw_activity = parse_raw_activity_json(input)?;
-    let finalized = finalize_with_debug(&raw_activity);
+    let finalized = finalize_raw_activity_with_debug(&raw_activity)?;
     let debug_payload = cfg!(debug_assertions).then(|| {
         json!({
             "generated_at": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
@@ -123,7 +122,18 @@ pub fn finalize_raw_activity_json(input: &str) -> CoreResult<FinalizeActivityRes
 /// time/course/distance series, derived metrics, metadata enrichment, and legacy
 /// compatibility fields stored through `ParsedActivity::extra`.
 pub fn finalize_parsed_activity(raw_activity: &RawActivity) -> ParsedActivity {
-    finalize_with_debug(raw_activity).parsed_activity
+    finalize_raw_activity_with_debug(raw_activity)
+        .expect("RawActivity rows should convert to valid activity columns")
+        .parsed_activity
+}
+
+/// Finalizes pre-aligned columnar activity input.
+///
+/// MP4 telemetry uses this after camera-specific smoothing and domain
+/// alignment. Row-oriented frontend formats still enter through
+/// [`finalize_raw_activity_json`] and are converted to this shape internally.
+pub fn finalize_activity_columns(columns: &ActivityColumns) -> CoreResult<ParsedActivity> {
+    Ok(finalize_columns_with_debug(columns, skipped_gap_debug())?.parsed_activity)
 }
 
 /// Runs finalization while retaining intermediate diagnostics.
@@ -132,69 +142,89 @@ pub fn finalize_parsed_activity(raw_activity: &RawActivity) -> ParsedActivity {
 /// must preserve gap-fill details from the normalization phase without
 /// recomputing the activity or threading debug state through render-facing
 /// schemas.
-fn finalize_with_debug(raw_activity: &RawActivity) -> FinalizedActivity {
+fn finalize_raw_activity_with_debug(raw_activity: &RawActivity) -> CoreResult<FinalizedActivity> {
     let (normalized_raw_samples, gap_debug) = if raw_activity.options.skip_idle_gap_fill {
         (raw_activity.raw_samples.clone(), skipped_gap_debug())
     } else {
         insert_idle_gap_samples(&raw_activity.raw_samples)
     };
+    let columns = activity_columns_from_samples(
+        raw_activity,
+        normalized_raw_samples,
+        raw_activity.raw_samples.len(),
+    );
+    finalize_columns_with_debug(&columns, gap_debug)
+}
 
-    let time_series = build_time_series(&normalized_raw_samples);
-    let course_series = build_course_series(&normalized_raw_samples);
-    let direct_distance_series: Vec<Option<f64>> = normalized_raw_samples
+fn finalize_columns_with_debug(
+    columns: &ActivityColumns,
+    gap_debug: gap::GapDebug,
+) -> CoreResult<FinalizedActivity> {
+    validate_column_lengths(columns)?;
+
+    let time_series = build_time_series(columns);
+    let course_series = build_course_series(columns);
+    let direct_distance_series: Vec<Option<f64>> = columns
+        .distance
         .iter()
-        .map(|sample| sample.distance.and_then(finite_f64))
+        .map(|value| value.and_then(finite_f64))
         .collect();
     let distance_series = build_distance_series(&course_series, &direct_distance_series);
-    let elapsed_series = build_elapsed_series(&normalized_raw_samples, &time_series);
-    let elevation_base_series: Vec<Option<f64>> = normalized_raw_samples
+    let elapsed_series = build_elapsed_series(columns, &time_series);
+    let elevation_base_series: Vec<Option<f64>> = columns
+        .elevation
         .iter()
-        .map(|sample| sample.elevation.and_then(finite_f64))
+        .map(|value| value.and_then(finite_f64))
         .collect();
     let mut metric_series_map = derive_activity_metric_series(
         &course_series,
         &distance_series,
         &elevation_base_series,
         &elapsed_series,
-        &normalized_raw_samples,
+        columns,
     );
     apply_metric_smoothing(
         &mut metric_series_map,
         &elapsed_series,
-        &raw_activity.options.smoothing,
+        &columns.options.smoothing,
     );
 
     let valid_attributes = build_valid_attributes(&metric_series_map, &course_series, &time_series);
     let extended_attributes = build_extended_attributes(&metric_series_map);
     let duration_seconds = elapsed_series.last().copied().unwrap_or(0.0);
     let total_distance_meters = distance_series.last().copied().flatten().unwrap_or(0.0);
-    let start_time = time_series.iter().find_map(Clone::clone);
+    let first_sample_time = time_series.iter().find_map(Clone::clone);
+    let sync_time = columns
+        .metadata
+        .get("sync_time")
+        .and_then(|value| value.as_str())
+        .filter(|value| DateTime::parse_from_rfc3339(value).is_ok())
+        .map(ToOwned::to_owned)
+        .or(first_sample_time);
     let end_time = time_series.iter().rev().find_map(Clone::clone);
     let coverage = build_metric_coverage(&metric_series_map);
     let distance_progress_series = build_progress_series(&distance_series);
 
-    let mut metadata = raw_activity.metadata.clone();
+    let mut metadata = columns.metadata.clone();
     if !metadata.is_object() {
         metadata = json!({});
     }
     if let Some(object) = metadata.as_object_mut() {
+        object.remove("start_time");
+        object.insert("sync_time".to_string(), json!(sync_time));
         object.insert(
             "duration_seconds".to_string(),
             json!(round_f64(duration_seconds, 3).unwrap_or(0.0)),
         );
-        object.insert("start_time".to_string(), json!(start_time));
         object.insert("end_time".to_string(), json!(end_time));
         object.insert(
             "total_distance_m".to_string(),
             json!(round_f64(total_distance_meters, 3).unwrap_or(0.0)),
         );
-        object.insert(
-            "sample_count".to_string(),
-            json!(normalized_raw_samples.len()),
-        );
+        object.insert("sample_count".to_string(), json!(columns.len()));
         object.insert(
             "original_sample_count".to_string(),
-            json!(raw_activity.raw_samples.len()),
+            json!(columns.original_sample_count),
         );
         object.insert(
             "inserted_idle_sample_count".to_string(),
@@ -212,10 +242,10 @@ fn finalize_with_debug(raw_activity: &RawActivity) -> FinalizedActivity {
     );
 
     let parsed_activity = ParsedActivity {
-        file_name: Some(raw_activity.file_name.clone()),
-        file_format: Some(raw_activity.file_format.clone()),
+        file_name: Some(columns.file_name.clone()),
+        file_format: Some(columns.file_format.clone()),
         metadata,
-        source_start_time: start_time,
+        sync_time,
         sample_elapsed_seconds: elapsed_series,
         sample_distance_progress: distance_progress_series,
         frame_elapsed_seconds: Vec::new(),
@@ -259,10 +289,120 @@ fn finalize_with_debug(raw_activity: &RawActivity) -> FinalizedActivity {
         extra,
     };
 
-    FinalizedActivity {
+    Ok(FinalizedActivity {
         parsed_activity,
         gap_debug,
+    })
+}
+
+fn activity_columns_from_samples(
+    raw_activity: &RawActivity,
+    raw_samples: Vec<RawSample>,
+    original_sample_count: usize,
+) -> ActivityColumns {
+    macro_rules! collect {
+        ($field:ident) => {
+            raw_samples
+                .iter()
+                .map(|sample| sample.$field.and_then(finite_f64))
+                .collect()
+        };
     }
+
+    ActivityColumns {
+        file_name: raw_activity.file_name.clone(),
+        file_format: raw_activity.file_format.clone(),
+        metadata: raw_activity.metadata.clone(),
+        options: raw_activity.options.clone(),
+        timestamp: raw_samples
+            .iter()
+            .map(|sample| sample.timestamp.clone())
+            .collect(),
+        elapsed_seconds: collect!(elapsed_seconds),
+        latitude: collect!(latitude),
+        longitude: collect!(longitude),
+        elevation: collect!(elevation),
+        altitude: collect!(altitude),
+        speed: collect!(speed),
+        heading: collect!(heading),
+        heartrate: collect!(heartrate),
+        cadence: collect!(cadence),
+        power: collect!(power),
+        temperature: collect!(temperature),
+        gradient: collect!(gradient),
+        pace: collect!(pace),
+        distance: collect!(distance),
+        g_force: collect!(g_force),
+        vertical_speed: collect!(vertical_speed),
+        torque: collect!(torque),
+        stroke_rate: collect!(stroke_rate),
+        stride_length: collect!(stride_length),
+        vertical_oscillation: collect!(vertical_oscillation),
+        ground_contact_time: collect!(ground_contact_time),
+        left_right_balance: collect!(left_right_balance),
+        core_temperature: collect!(core_temperature),
+        air_pressure: collect!(air_pressure),
+        gear_position: collect!(gear_position),
+        iso: collect!(iso),
+        aperture: collect!(aperture),
+        shutter_speed: collect!(shutter_speed),
+        focal_length: collect!(focal_length),
+        ev: collect!(ev),
+        color_temperature: collect!(color_temperature),
+        original_sample_count,
+    }
+}
+
+impl ActivityColumns {
+    pub fn len(&self) -> usize {
+        self.timestamp.len()
+    }
+}
+
+fn validate_column_lengths(columns: &ActivityColumns) -> CoreResult<()> {
+    let expected = columns.timestamp.len();
+    let lengths = [
+        ("elapsed_seconds", columns.elapsed_seconds.len()),
+        ("latitude", columns.latitude.len()),
+        ("longitude", columns.longitude.len()),
+        ("elevation", columns.elevation.len()),
+        ("altitude", columns.altitude.len()),
+        ("speed", columns.speed.len()),
+        ("heading", columns.heading.len()),
+        ("heartrate", columns.heartrate.len()),
+        ("cadence", columns.cadence.len()),
+        ("power", columns.power.len()),
+        ("temperature", columns.temperature.len()),
+        ("gradient", columns.gradient.len()),
+        ("pace", columns.pace.len()),
+        ("distance", columns.distance.len()),
+        ("g_force", columns.g_force.len()),
+        ("vertical_speed", columns.vertical_speed.len()),
+        ("torque", columns.torque.len()),
+        ("stroke_rate", columns.stroke_rate.len()),
+        ("stride_length", columns.stride_length.len()),
+        ("vertical_oscillation", columns.vertical_oscillation.len()),
+        ("ground_contact_time", columns.ground_contact_time.len()),
+        ("left_right_balance", columns.left_right_balance.len()),
+        ("core_temperature", columns.core_temperature.len()),
+        ("air_pressure", columns.air_pressure.len()),
+        ("gear_position", columns.gear_position.len()),
+        ("iso", columns.iso.len()),
+        ("aperture", columns.aperture.len()),
+        ("shutter_speed", columns.shutter_speed.len()),
+        ("focal_length", columns.focal_length.len()),
+        ("ev", columns.ev.len()),
+        ("color_temperature", columns.color_temperature.len()),
+    ];
+
+    for (name, len) in lengths {
+        if len != expected {
+            return Err(CoreError::Activity(format!(
+                "Invalid ActivityColumns payload: {name} length {len} does not match timestamp length {expected}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Builds lat/lon tuples while preserving partial GPS samples.
@@ -270,13 +410,15 @@ fn finalize_with_debug(raw_activity: &RawActivity) -> FinalizedActivity {
 /// Each coordinate is guarded independently so one bad component does not
 /// poison the whole vector shape; downstream interpolation can still decide
 /// whether enough course data exists to render.
-fn build_course_series(raw_samples: &[RawSample]) -> Vec<(Option<f64>, Option<f64>)> {
-    raw_samples
+fn build_course_series(columns: &ActivityColumns) -> Vec<(Option<f64>, Option<f64>)> {
+    columns
+        .latitude
         .iter()
-        .map(|sample| {
+        .zip(&columns.longitude)
+        .map(|(latitude, longitude)| {
             (
-                sample.latitude.and_then(finite_f64),
-                sample.longitude.and_then(finite_f64),
+                latitude.and_then(finite_f64),
+                longitude.and_then(finite_f64),
             )
         })
         .collect()
@@ -287,12 +429,12 @@ fn build_course_series(raw_samples: &[RawSample]) -> Vec<(Option<f64>, Option<f6
 /// The frontend historically emitted `Date#toISOString()` values. Normalizing
 /// here keeps backend-created payloads byte-stable enough for diagnostics and
 /// avoids leaking local time-zone formatting into render data.
-fn build_time_series(raw_samples: &[RawSample]) -> Vec<Option<String>> {
-    raw_samples
+fn build_time_series(columns: &ActivityColumns) -> Vec<Option<String>> {
+    columns
+        .timestamp
         .iter()
-        .map(|sample| {
-            sample
-                .timestamp
+        .map(|timestamp| {
+            timestamp
                 .as_deref()
                 .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
                 .map(|value| {
@@ -300,6 +442,83 @@ fn build_time_series(raw_samples: &[RawSample]) -> Vec<Option<String>> {
                         .with_timezone(&Utc)
                         .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
                 })
+        })
+        .collect()
+}
+
+fn build_elapsed_series(columns: &ActivityColumns, time_series: &[Option<String>]) -> Vec<f64> {
+    let explicit_elapsed: Vec<Option<f64>> = columns
+        .elapsed_seconds
+        .iter()
+        .map(|value| value.and_then(finite_f64))
+        .collect();
+    let has_explicit_elapsed = explicit_elapsed.iter().any(Option::is_some);
+    let valid_timestamps: Vec<Option<DateTime<Utc>>> = time_series
+        .iter()
+        .map(|value| {
+            value
+                .as_deref()
+                .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+                .map(|value| value.with_timezone(&Utc))
+        })
+        .collect();
+    let origin = valid_timestamps.iter().flatten().next().copied();
+
+    if has_explicit_elapsed {
+        let mut elapsed_series = Vec::with_capacity(columns.len());
+        let mut last_value: f64 = 0.0;
+        let preserve_precision = columns.file_format == "mp4_telemetry";
+        for index in 0..explicit_elapsed.len() {
+            if let Some(current) = explicit_elapsed[index] {
+                last_value = last_value.max(current);
+                elapsed_series.push(if preserve_precision {
+                    last_value
+                } else {
+                    round_f64(last_value, 3).unwrap_or(0.0)
+                });
+                continue;
+            }
+            if let (Some(origin), Some(timestamp)) = (origin, valid_timestamps[index]) {
+                let computed = ((timestamp - origin).num_milliseconds() as f64 / 1000.0).max(0.0);
+                last_value = last_value.max(computed);
+                elapsed_series.push(if preserve_precision {
+                    last_value
+                } else {
+                    round_f64(last_value, 3).unwrap_or(0.0)
+                });
+                continue;
+            }
+            if index == 0 {
+                elapsed_series.push(0.0);
+            } else {
+                last_value = elapsed_series[index - 1];
+                elapsed_series.push(round_f64(last_value, 3).unwrap_or(0.0));
+            }
+        }
+        return elapsed_series;
+    }
+
+    let Some(origin) = origin else {
+        return (0..columns.len())
+            .map(|index| round_f64(index as f64, 3).unwrap_or(index as f64))
+            .collect();
+    };
+
+    let mut last_value: f64 = 0.0;
+    valid_timestamps
+        .iter()
+        .enumerate()
+        .map(|(index, timestamp)| {
+            let Some(timestamp) = timestamp else {
+                return round_f64(last_value, 3).unwrap_or(last_value);
+            };
+            let next_value = ((*timestamp - origin).num_milliseconds() as f64 / 1000.0).max(0.0);
+            if next_value <= last_value && index > 0 {
+                last_value += 0.001;
+                return round_f64(last_value, 3).unwrap_or(last_value);
+            }
+            last_value = next_value;
+            round_f64(next_value, 3).unwrap_or(next_value)
         })
         .collect()
 }

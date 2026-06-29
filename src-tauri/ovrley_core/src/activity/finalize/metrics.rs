@@ -9,7 +9,7 @@
 //! Phase 0 intentionally uses the standard gradient derivation for every format;
 //! the legacy GPX path is not ported.
 
-use crate::activity::schema::{NumericSeries, RawSample};
+use crate::activity::schema::{ActivityColumns, NumericSeries};
 use crate::media::telemetry_math::{bearing_degrees, finite_f64, round_f64};
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -383,10 +383,10 @@ pub fn derive_activity_metric_series(
     distance_series: &NumericSeries,
     elevation_base_series: &NumericSeries,
     elapsed_series: &[f64],
-    raw_samples: &[RawSample],
+    columns: &ActivityColumns,
 ) -> BTreeMap<String, MetricDescriptor> {
-    let direct = direct_metrics(raw_samples, distance_series, elevation_base_series);
-    let null_series: NumericSeries = raw_samples.iter().map(|_| None).collect();
+    let direct = direct_metrics(columns, distance_series, elevation_base_series);
+    let null_series: NumericSeries = columns.timestamp.iter().map(|_| None).collect();
     let derived_speed = derive_numeric_rate_series(distance_series, elapsed_series);
     let derived_heading = derive_heading_series(course_series, distance_series, 2.0);
     let derived_gradient = derive_gradient_series(&direct["elevation"], distance_series);
@@ -468,7 +468,7 @@ pub fn derive_activity_metric_series(
 /// field naming surface and isolates the RawSample-to-metric mapping in one
 /// place.
 fn direct_metrics(
-    raw_samples: &[RawSample],
+    columns: &ActivityColumns,
     distance_series: &NumericSeries,
     elevation_base_series: &NumericSeries,
 ) -> BTreeMap<&'static str, NumericSeries> {
@@ -477,9 +477,10 @@ fn direct_metrics(
         ($name:literal, $field:ident) => {
             direct.insert(
                 $name,
-                raw_samples
+                columns
+                    .$field
                     .iter()
-                    .map(|sample| sample.$field.and_then(finite_f64))
+                    .map(|value| value.and_then(finite_f64))
                     .collect(),
             );
         };
