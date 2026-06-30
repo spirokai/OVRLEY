@@ -1,0 +1,107 @@
+name: Publish to Microsoft Store
+
+on:
+  workflow_dispatch:
+jobs:
+  store-pipeline:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # --- NEW STEP: Automatically fetch the latest release tag via GitHub API ---
+      - name: Fetch Latest Release Tag
+        id: get_tag
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $headers = @{
+            "Authorization" = "Bearer $env:GH_TOKEN"
+            "Accept" = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28" # Good practice to pin the API version
+          }
+
+          $response = Invoke-RestMethod `
+            -Uri "https://api.github.com/repos/${{ github.repository }}/releases/latest" `
+            -Headers $headers
+
+          $latestTag = $response.tag_name
+          Write-Host "Discovered latest release tag: $latestTag"
+
+          # Safe, PowerShell-native way to save to GITHUB_OUTPUT
+          "tag=$latestTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      # --- STEP A: Download & Extract ---
+      - name: Download & Extract Release Asset
+        uses: robinraju/release-downloader@v1.11
+        with:
+          # Pulls the dynamic tag discovered in the step above
+          tag: ${{ steps.get_tag.outputs.tag }}
+          fileName: "OVRLEY-win-${{ steps.get_tag.outputs.tag }}.zip"
+
+      - name: Extract Binaries
+        shell: powershell
+        run: Expand-Archive -Path "OVRLEY-win-${{ steps.get_tag.outputs.tag }}.zip" -DestinationPath ".\app-source" -Force
+
+      # --- STEP B: Initialize winapp CLI ---
+      - name: Setup WinApp CLI
+        uses: microsoft/setup-WinAppCli@v1
+
+      # --- STEP C: Generate Manifest dynamically with your explicit Store info ---
+      - name: Auto-Generate Manifest with Identity
+        shell: powershell
+        run: |
+          # 1. Clean up your version string using the dynamic tag output
+          $tag = "${{ steps.get_tag.outputs.tag }}"
+          $version = $tag.TrimStart('v')
+          $parts = $version.Split('.')
+          while ($parts.Count -lt 4) { $parts += "0" }
+          $version = ($parts[0..3] -join ".")
+
+          # 2. Call winapp to generate a pristine manifest with your exact store identities
+          winapp manifest generate `
+            --executable ".\app-source\OVRLEY.exe" `
+            --name "OVRLEY.OVRLEY" `
+            --publisher "CN=34DCDC1F-5913-4057-998F-50A45C98AD23" `
+            --version "$version" `
+            --output-directory ".\app-source"
+
+          # 3. Inject the C++ dependency using the CLI's native command
+          winapp manifest add-dependency `
+            --manifest ".\app-source\Package.appxmanifest" `
+            --name "Microsoft.VCLibs.140.00.UWPDesktop" `
+            --min-version "14.0.30704.0" `
+            --publisher "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+            
+          # 4. Rename the manifest to match the expected name for MSIX packaging
+          Rename-Item ".\app-source\Package.appxmanifest" "AppxManifest.xml" -Force
+
+      # --- STEP D: Package into MSIX and rename ---
+      - name: Pack MSIX
+        shell: powershell
+        run: |
+          winapp pack ".\app-source" --output-appx-directory ".\dist"
+
+          $package = Get-ChildItem ".\dist" -Filter *.msix | Select-Object -First 1
+          $newName = "OVRLEY-${{ steps.get_tag.outputs.tag }}.msix"
+          $newPath = Join-Path ".\dist" $newName
+
+          Rename-Item $package.FullName $newPath -Force
+
+      # --- STEP E: Authenticate & Deploy to Microsoft Store ---
+      - name: Setup MSStore CLI
+        uses: microsoft/microsoft-store-apppublisher@v1.2
+
+      - name: Authenticate and Publish to Store
+        shell: powershell
+        run: |
+          msstore reconfigure `
+            --tenantId "${{ secrets.AZURE_AD_TENANT_ID }}" `
+            --sellerId "${{ secrets.SELLER_ID }}" `
+            --clientId "${{ secrets.AZURE_AD_CLIENT_ID }}" `
+            --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
+
+          $package = Get-ChildItem ".\dist" -Filter *.msix | Select-Object -First 1
+          msstore publish --packagePath $package.FullName
