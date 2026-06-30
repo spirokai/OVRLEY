@@ -1,46 +1,12 @@
 /**
  * Activity file import pipeline — orchestrates GPX/FIT parsing,
- * cache update, store synchronization, and debug payload persistence.
+ * cache update, and store synchronization.
  */
 
 import * as backend from '@/api/backend'
 import parseFitActivityFile from './fit-parser.js'
 import { parseGpxActivityFile } from './gpx-parser.js'
 import { parseSrtActivityFile } from './srt-parser.js'
-
-/**
- * Handles sanitize debug filename.
- *
- * @param {*} filename - Target filename for the operation.
- * @returns {*} Result produced by the helper.
- */
-function sanitizeDebugFilename(filename) {
-  const normalizedBase = String(filename || 'activity')
-    .replace(/\.[^/.]+$/, '')
-    .replace(/[^a-zA-Z0-9._-]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-
-  return `${normalizedBase || 'activity'}-parse-debug.json`
-}
-
-/**
- * Handles persist debug payload.
- *
- * @param {*} filename - Target filename for the operation.
- * @param {*} payload - Structured payload produced by the helper.
- * @returns {Promise<*>} Promise resolving to the operation result.
- */
-async function persistDebugPayload(filename, payload) {
-  try {
-    const debugFilename = sanitizeDebugFilename(filename)
-    const contents = JSON.stringify(payload, null, 2)
-    return await backend.writeParseDebugFile(debugFilename, contents)
-  } catch (error) {
-    console.warn('Failed to write parse debug file (non-fatal):', error)
-    return null
-  }
-}
 
 /**
  * Parses activity file.
@@ -57,10 +23,7 @@ async function parseActivityFile(file) {
   else throw new Error(`Unsupported activity file format: ${file.name}`)
 
   const finalized = await backend.finalizeActivity(rawActivity)
-  return {
-    parsedActivity: finalized.parsed_activity,
-    debugPayload: finalized.debug_payload,
-  }
+  return finalized.parsed_activity
 }
 
 /**
@@ -103,20 +66,14 @@ function syncSceneDurationWithActivity(durationSeconds, storeState) {
  * @param {object} options - Structured options for the helper.
  * @param {*} options.filename - Target filename for the operation.
  * @param {*} options.parsedActivity - Normalized activity payload used by the app.
- * @param {*} options.debugPayload - Value for debug payload.
  * @param {*} options.storeState - Current store snapshot used for synchronization.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
-async function loadActivityIntoStore({ filename, parsedActivity, debugPayload, storeState }) {
-  const { setActivitySummary, setActivityFilename, setParsedActivity } = storeState
+async function loadActivityIntoStore({ filename, parsedActivity, storeState }) {
+  const { setActivityFilename, activateActivityFile } = storeState
 
   setActivityFilename(filename)
-  setParsedActivity(parsedActivity)
-  setActivitySummary(parsedActivity)
-  if (debugPayload) {
-    const debugPath = await persistDebugPayload(filename, debugPayload)
-    console.log('Parse debug JSON written:', debugPath)
-  }
+  activateActivityFile(parsedActivity)
   console.log('Activity filename set in store:', filename)
 
   syncSceneDurationWithActivity(parsedActivity?.metadata?.duration_seconds || 0, storeState)
@@ -154,7 +111,7 @@ export default async function importActivityFile(fileOrPath, storeActions) {
   try {
     store.clearActivitySummary()
 
-    const { parsedActivity, debugPayload } = await parseActivityFile(file)
+    const parsedActivity = await parseActivityFile(file)
 
     console.log('Frontend activity parse successful:', {
       durationSeconds: parsedActivity?.metadata?.duration_seconds,
@@ -166,7 +123,6 @@ export default async function importActivityFile(fileOrPath, storeActions) {
     await loadActivityIntoStore({
       filename,
       parsedActivity,
-      debugPayload,
       storeState: store,
     })
 

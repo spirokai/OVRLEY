@@ -262,7 +262,8 @@ function formatEv(value, decimals = 1) {
   }
 
   const abs = Math.abs(numericValue)
-  const formatted = abs.toFixed(decimals)
+  const effectiveDecimals = abs === 0 ? Math.max(decimals, 1) : decimals
+  const formatted = abs.toFixed(effectiveDecimals)
   const prefix = numericValue > 0 ? '+' : numericValue < 0 ? '-' : ''
 
   return { value: `${prefix}${formatted}`, units: '' }

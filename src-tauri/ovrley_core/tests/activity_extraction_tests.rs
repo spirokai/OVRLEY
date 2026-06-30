@@ -36,7 +36,7 @@ fn extract_activity_from_telemetry_fixtures() {
         let fps = metadata.fps.unwrap_or(30.0);
         let duration_s = metadata.duration.unwrap_or(0.0);
 
-        let activity =
+        let response =
             mp4_telemetry::extract_activity(repo_root, fixture.to_str().unwrap(), fps, duration_s)
                 .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
                 .unwrap_or_else(|| panic!("{stem}: expected activity, got None"));
@@ -44,9 +44,11 @@ fn extract_activity_from_telemetry_fixtures() {
         // Write artifact
         fs::write(
             output_dir.join(format!("{stem}-activity.json")),
-            serde_json::to_string_pretty(&activity).unwrap(),
+            serde_json::to_string_pretty(&response).unwrap(),
         )
         .unwrap();
+
+        let activity = &response.parsed_activity;
 
         // ── Quality assertions ──────────────────────────────────
 

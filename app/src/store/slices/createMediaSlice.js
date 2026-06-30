@@ -19,6 +19,8 @@ export function createMediaSlice(set, get) {
     activityFilename: null,
     activitySummary: null,
     parsedActivity: null,
+    parsedActivitySource: null, // 'activity-file' | 'video-telemetry' | null
+    hiddenVideoParsedActivity: null,
     activeRenderId: null,
     renderProgress: { ...DEFAULT_RENDER_PROGRESS },
 
@@ -81,7 +83,7 @@ export function createMediaSlice(set, get) {
       })
     },
 
-    setActivitySummary: (activity) => {
+    setActivitySummary: (activity, { computeVideoSync = true } = {}) => {
       let summary = null
       if (activity) {
         summary = {
@@ -101,15 +103,15 @@ export function createMediaSlice(set, get) {
         state.activitySummary = summary
       })
 
-      if (get().computeVideoSync) {
+      if (computeVideoSync && get().computeVideoSync) {
         get().computeVideoSync(summary)
       }
     },
 
     clearActivitySummary: () => {
-      set((state) => {
-        state.activitySummary = null
-        state.parsedActivity = null
+      get().clearActivityFile({
+        restoreVideoTelemetry: false,
+        clearFilename: false,
       })
     },
 
@@ -118,6 +120,96 @@ export function createMediaSlice(set, get) {
       set((state) => {
         state.parsedActivity = activity
       }),
+
+    activateActivityFile: (activity) => {
+      set((state) => {
+        if (state.parsedActivitySource === 'video-telemetry') {
+          state.hiddenVideoParsedActivity = state.parsedActivity
+        }
+        state.parsedActivity = activity
+        state.parsedActivitySource = 'activity-file'
+      })
+      get().setActivitySummary(activity)
+    },
+
+    loadVideoTelemetry: (activity) => {
+      const source = get().parsedActivitySource
+      if (source === 'activity-file') {
+        set((state) => {
+          state.hiddenVideoParsedActivity = activity
+        })
+      } else {
+        set((state) => {
+          state.parsedActivity = activity
+          state.parsedActivitySource = 'video-telemetry'
+          state.hiddenVideoParsedActivity = null
+          state.activityFilename = null
+          state.videoSyncOffsetSeconds = 0
+          state.videoSyncWarning = null
+        })
+        get().setActivitySummary(activity, { computeVideoSync: false })
+      }
+    },
+
+    clearActivityFile: ({ restoreVideoTelemetry = true, clearFilename = true } = {}) => {
+      const { parsedActivitySource, hiddenVideoParsedActivity } = get()
+
+      if (parsedActivitySource !== 'activity-file') return
+
+      set((state) => {
+        if (clearFilename) {
+          state.activityFilename = null
+        }
+      })
+
+      if (restoreVideoTelemetry && hiddenVideoParsedActivity) {
+        set((state) => {
+          state.parsedActivity = hiddenVideoParsedActivity
+          state.parsedActivitySource = 'video-telemetry'
+          state.hiddenVideoParsedActivity = null
+          state.videoSyncOffsetSeconds = 0
+          state.videoSyncWarning = null
+        })
+        get().setActivitySummary(get().parsedActivity, { computeVideoSync: false })
+      } else {
+        set((state) => {
+          state.parsedActivity = null
+          state.parsedActivitySource = null
+          state.activitySummary = null
+        })
+      }
+    },
+
+    clearVideoTelemetry: () => {
+      const { parsedActivitySource } = get()
+
+      set((state) => {
+        state.hiddenVideoParsedActivity = null
+      })
+
+      if (parsedActivitySource === 'video-telemetry') {
+        set((state) => {
+          state.parsedActivity = null
+          state.parsedActivitySource = null
+          state.activitySummary = null
+        })
+      }
+    },
+
+    syncVideoMetadataWithActiveActivity: () => {
+      const { parsedActivitySource, activitySummary, computeVideoSync } = get()
+
+      if (parsedActivitySource === 'activity-file') {
+        if (computeVideoSync) {
+          computeVideoSync(activitySummary)
+        }
+      } else {
+        set((state) => {
+          state.videoSyncOffsetSeconds = 0
+          state.videoSyncWarning = null
+        })
+      }
+    },
 
     setDemoActivity: () =>
       set((state) => {

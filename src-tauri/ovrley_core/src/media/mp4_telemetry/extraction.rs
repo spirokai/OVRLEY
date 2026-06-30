@@ -39,7 +39,8 @@ use super::tags::{
     GOPRO_GPSU_TAG,
 };
 use super::vendor::{
-    extract_camera_from_json_metadata, extract_insta360_iso, extract_insta360_shutter,
+    extract_camera_from_json_metadata, extract_insta360_ev, extract_insta360_iso,
+    extract_insta360_shutter,
 };
 
 /// Converts telemetry-parser's grouped tag maps into the narrow raw-sample
@@ -246,7 +247,8 @@ pub(crate) fn append_camera_samples(
             .map(|v| vec![v])
     } else {
         None
-    };
+    }
+    .or_else(|| extract_insta360_ev(tag_map));
 
     let mut aperture = tag_map
         .get(&GroupId::Lens)

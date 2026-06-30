@@ -2,7 +2,7 @@
  * Video import - background media selection and preview management.
  */
 
-import { clearPreviewVideo, importPreviewVideo } from '@/api/backend'
+import { clearPreviewVideo, extractVideoTelemetry, importPreviewVideo } from '@/api/backend'
 import { openSinglePath } from '@/lib/file-dialog'
 import useStore from '@/store/useStore'
 
@@ -10,6 +10,17 @@ const DEBUG_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
 
 function pathExtension(path) {
   return typeof path === 'string' ? path.split('.').pop()?.toLowerCase() || '' : ''
+}
+
+async function extractAndStoreVideoTelemetry(filePath) {
+  try {
+    const response = await extractVideoTelemetry(filePath)
+    if (response?.parsed_activity) {
+      useStore.getState().loadVideoTelemetry(response.parsed_activity)
+    }
+  } catch (error) {
+    console.warn('MP4 telemetry extraction failed (non-fatal):', error)
+  }
 }
 
 export default function useVideoImport({ debugModeEnabled = false, onSetBackgroundMode }) {
@@ -21,6 +32,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   const setImportingVideo = useStore((state) => state.setImportingVideo)
   const config = useStore((state) => state.config)
   const setConfig = useStore((state) => state.setConfig)
+  const clearVideoTelemetry = useStore((state) => state.clearVideoTelemetry)
 
   const importedVideoFilename = importedVideoPath ? importedVideoPath.split(/[/\\]/).pop() : null
   const importedBackgroundImageFilename = importedBackgroundImagePath ? importedBackgroundImagePath.split(/[/\\]/).pop() : null
@@ -52,6 +64,8 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         return
       }
 
+      clearVideoTelemetry()
+
       const response = await importPreviewVideo(selected)
       const metadata = {
         ...response.metadata,
@@ -68,6 +82,8 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         })
       }
       onSetBackgroundMode?.('video')
+
+      void extractAndStoreVideoTelemetry(selected)
     } catch (err) {
       console.error('Failed to import background media:', err)
     } finally {

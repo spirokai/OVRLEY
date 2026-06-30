@@ -68,7 +68,7 @@ fn finalizes_raw_activity_with_idle_gap_debug_payload() {
         }
     });
 
-    let response = finalize_raw_activity_json(&raw_activity.to_string()).unwrap();
+    let response = finalize_raw_activity_json(&raw_activity.to_string(), None).unwrap();
     let activity = response.parsed_activity;
 
     assert_eq!(activity.file_name.as_deref(), Some("raw-regression.fit"));
@@ -148,7 +148,7 @@ fn finalizes_raw_activity_without_smoothing_when_map_is_empty() {
         }
     });
 
-    let activity = finalize_raw_activity_json(&raw_activity.to_string())
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
         .unwrap()
         .parsed_activity;
 
@@ -185,7 +185,7 @@ fn finalizes_raw_activity_with_srt_style_zero_phase_smoothing() {
         }
     });
 
-    let activity = finalize_raw_activity_json(&raw_activity.to_string())
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
         .unwrap()
         .parsed_activity;
 
@@ -236,7 +236,7 @@ fn finalizes_raw_activity_with_circular_ema_without_heading_wrap_glitch() {
         }
     });
 
-    let activity = finalize_raw_activity_json(&raw_activity.to_string())
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
         .unwrap()
         .parsed_activity;
 

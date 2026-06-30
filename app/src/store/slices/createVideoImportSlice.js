@@ -67,8 +67,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoCameraModel: metadata.cameraModel ?? null,
     })
 
-    const activitySummary = get().activitySummary
-    get().computeVideoSync(activitySummary)
+    get().syncVideoMetadataWithActiveActivity()
   },
 
   setImportedBackgroundImage: (path) =>
@@ -94,7 +93,8 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoCameraModel: null,
     }),
 
-  clearImportedVideo: () =>
+  clearImportedVideo: () => {
+    get().clearVideoTelemetry()
     set({
       importedVideoPath: null,
       importedVideoDuration: null,
@@ -115,7 +115,8 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoBitRate: null,
       importedVideoCameraType: null,
       importedVideoCameraModel: null,
-    }),
+    })
+  },
 
   setVideoSyncOffset: (seconds) =>
     set({

@@ -48,7 +48,7 @@ use telemetry_parser::tags_impl::{GroupId, TagId};
 use telemetry_parser::util::SampleInfo;
 use telemetry_parser::Input;
 
-use crate::activity::schema::ParsedActivity;
+use crate::activity::finalize::write_activity_debug_file;
 use crate::encode::fps::Fps;
 use crate::error::{CoreError, CoreResult};
 use crate::media::native_sample::{NativeSample, TelemetrySeriesCounts};
@@ -200,8 +200,13 @@ fn extract_telemetry_data(
     })?;
 
     let cancel_flag = Arc::new(AtomicBool::new(false));
-    let input = Input::from_stream(&mut stream, file_size, path, |_| {}, cancel_flag)
-        .map_err(|error| CoreError::Encode(format!("telemetry-parser parse error: {error}")))?;
+    let input = match Input::from_stream(&mut stream, file_size, path, |_| {}, cancel_flag) {
+        Ok(input) => input,
+        Err(error) => {
+            log::info!("telemetry-parser cannot parse {file_path}: {error}");
+            return Ok(None);
+        }
+    };
     dump_raw_telemetry_parser_output(file_path, &input.samples);
 
     let camera_type = input.camera_type().to_string();
@@ -350,8 +355,26 @@ pub fn extract_activity(
     file_path: &str,
     fps: f64,
     duration_s: f64,
-) -> CoreResult<Option<ParsedActivity>> {
+) -> CoreResult<Option<crate::activity::finalize::FinalizeActivityResponse>> {
     let Some(result) = extract_telemetry_data(repo_root, file_path)? else {
+        if cfg!(debug_assertions) {
+            let stem = Path::new(file_path)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("video");
+            let debug_payload = serde_json::json!({
+                "generated_at": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                "file_name": Path::new(file_path).file_name().map(|n| n.to_string_lossy().to_string()),
+                "file_format": "mp4",
+                "telemetry": null,
+                "reason": "no embedded telemetry found by telemetry-parser or DJI fallback",
+            });
+            write_activity_debug_file(
+                repo_root,
+                Some(&format!("{stem}-telemetry-extraction")),
+                &debug_payload,
+            );
+        }
         return Ok(None);
     };
 
@@ -368,7 +391,7 @@ pub fn extract_activity(
         result.counts,
     );
 
-    crate::activity::finalize::finalize_activity_columns(&columns).map(Some)
+    crate::activity::finalize::finalize_activity_columns(&columns, Some(repo_root)).map(Some)
 }
 
 /// Converts floating FPS metadata into the shared rational representation.

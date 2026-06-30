@@ -28,7 +28,7 @@ fn mp4_telemetry_uses_ac004_fallback_for_dji_fixture() {
 
     let metadata = mp4_telemetry::probe_video_metadata(fixture.to_str().unwrap())
         .expect("expected video metadata probe to succeed");
-    let activity = mp4_telemetry::extract_activity(
+    let response = mp4_telemetry::extract_activity(
         repo_root,
         fixture.to_str().unwrap(),
         metadata.fps.unwrap_or(30.0),
@@ -36,6 +36,7 @@ fn mp4_telemetry_uses_ac004_fallback_for_dji_fixture() {
     )
     .expect("expected extraction to succeed")
     .expect("expected MP4 telemetry activity");
+    let activity = &response.parsed_activity;
 
     assert_eq!(activity.file_format.as_deref(), Some("mp4_telemetry"));
     assert_eq!(

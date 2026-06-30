@@ -81,6 +81,29 @@ struct FinalizedActivity {
     gap_debug: gap::GapDebug,
 }
 
+impl FinalizedActivity {
+    fn into_response(
+        self,
+        file_name: Option<&str>,
+        file_format: Option<&str>,
+        repo_root: Option<&std::path::Path>,
+    ) -> FinalizeActivityResponse {
+        let debug_payload = build_debug_payload(
+            file_name,
+            file_format,
+            &self.gap_debug,
+            &self.parsed_activity,
+        );
+        if let (Some(root), Some(payload)) = (repo_root, &debug_payload) {
+            write_activity_debug_file(root, Some(file_name.unwrap_or("activity")), payload);
+        }
+        FinalizeActivityResponse {
+            parsed_activity: self.parsed_activity,
+            debug_payload,
+        }
+    }
+}
+
 /// Parses the backend raw contract before finalization.
 ///
 /// This keeps Tauri command handlers thin: serde validation and activity-domain
@@ -90,50 +113,56 @@ pub fn parse_raw_activity_json(input: &str) -> CoreResult<RawActivity> {
         .map_err(|error| CoreError::Activity(format!("Invalid RawActivity payload: {error}")))
 }
 
+fn build_debug_payload(
+    file_name: Option<&str>,
+    file_format: Option<&str>,
+    gap_debug: &gap::GapDebug,
+    parsed_activity: &ParsedActivity,
+) -> Option<Value> {
+    cfg!(debug_assertions).then(|| {
+        json!({
+            "generated_at": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            "file_name": file_name,
+            "file_format": file_format,
+            "idle_gap_fill": gap_debug,
+            "parsed_activity": parsed_activity,
+        })
+    })
+}
+
 /// Runs the command-facing finalization path from raw JSON to response JSON.
 ///
 /// The parsed activity is always returned, but debug details are gated by
 /// `debug_assertions` so production builds do not pay for or expose parser
-/// internals.
-pub fn finalize_raw_activity_json(input: &str) -> CoreResult<FinalizeActivityResponse> {
+/// internals. When `repo_root` is provided, writes the debug file to disk.
+pub fn finalize_raw_activity_json(
+    input: &str,
+    repo_root: Option<&std::path::Path>,
+) -> CoreResult<FinalizeActivityResponse> {
     let raw_activity = parse_raw_activity_json(input)?;
     let finalized = finalize_raw_activity_with_debug(&raw_activity)?;
-    let debug_payload = cfg!(debug_assertions).then(|| {
-        json!({
-            "generated_at": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-            "file_name": raw_activity.file_name,
-            "file_format": raw_activity.file_format,
-            "idle_gap_fill": finalized.gap_debug,
-            "parsed_activity": finalized.parsed_activity,
-        })
-    });
-
-    Ok(FinalizeActivityResponse {
-        parsed_activity: finalized.parsed_activity,
-        debug_payload,
-    })
+    Ok(finalized.into_response(
+        Some(&raw_activity.file_name),
+        Some(&raw_activity.file_format),
+        repo_root,
+    ))
 }
 
-/// Converts normalized extraction samples into the existing ParsedActivity shape.
+/// Finalizes columnar activity input and returns full response with debug payload.
 ///
-/// The frontend and renderer already agree on `ParsedActivity`, so this function
-/// preserves that schema while moving the construction rules into Rust. It
-/// applies the shared phases in order: optional idle-gap insertion, aligned
-/// time/course/distance series, derived metrics, metadata enrichment, and legacy
-/// compatibility fields stored through `ParsedActivity::extra`.
-pub fn finalize_parsed_activity(raw_activity: &RawActivity) -> ParsedActivity {
-    finalize_raw_activity_with_debug(raw_activity)
-        .expect("RawActivity rows should convert to valid activity columns")
-        .parsed_activity
-}
-
-/// Finalizes pre-aligned columnar activity input.
-///
-/// MP4 telemetry uses this after camera-specific smoothing and domain
-/// alignment. Row-oriented frontend formats still enter through
-/// [`finalize_raw_activity_json`] and are converted to this shape internally.
-pub fn finalize_activity_columns(columns: &ActivityColumns) -> CoreResult<ParsedActivity> {
-    Ok(finalize_columns_with_debug(columns, skipped_gap_debug())?.parsed_activity)
+/// Both FIT/GPX/SRT and MP4 telemetry paths go through this to produce
+/// consistent debug output in dev builds. When `repo_root` is provided,
+/// writes the debug file to disk.
+pub fn finalize_activity_columns(
+    columns: &ActivityColumns,
+    repo_root: Option<&std::path::Path>,
+) -> CoreResult<FinalizeActivityResponse> {
+    let finalized = finalize_columns_with_debug(columns, skipped_gap_debug())?;
+    Ok(finalized.into_response(
+        Some(&columns.file_name),
+        Some(&columns.file_format),
+        repo_root,
+    ))
 }
 
 /// Runs finalization while retaining intermediate diagnostics.
@@ -142,7 +171,9 @@ pub fn finalize_activity_columns(columns: &ActivityColumns) -> CoreResult<Parsed
 /// must preserve gap-fill details from the normalization phase without
 /// recomputing the activity or threading debug state through render-facing
 /// schemas.
-fn finalize_raw_activity_with_debug(raw_activity: &RawActivity) -> CoreResult<FinalizedActivity> {
+fn finalize_raw_activity_with_debug(
+    raw_activity: &RawActivity,
+) -> CoreResult<FinalizedActivity> {
     let (normalized_raw_samples, gap_debug) = if raw_activity.options.skip_idle_gap_fill {
         (raw_activity.raw_samples.clone(), skipped_gap_debug())
     } else {
@@ -576,10 +607,11 @@ fn build_extended_attributes(
 /// over a map for uniform combination/coverage logic; this helper keeps that
 /// impedance match local to final assembly.
 fn metric(metric_series_map: &BTreeMap<String, MetricDescriptor>, name: &str) -> Vec<Option<f64>> {
-    metric_series_map
+    let series = metric_series_map
         .get(name)
         .map(|descriptor| descriptor.series.clone())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    strip_all_none(series)
 }
 
 /// Applies parser-requested smoothing after all direct/derived metrics exist.
@@ -676,4 +708,33 @@ fn metric_units() -> Value {
         "vertical_oscillation": "raw",
         "vertical_speed": "mps",
     })
+}
+
+/// Writes debug payload to `debug/activities/` in dev mode.
+pub fn write_activity_debug_file(
+    repo_root: &std::path::Path,
+    activity_filename: Option<&str>,
+    debug_payload: &Value,
+) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    let name = activity_filename.unwrap_or("activity");
+    let stem = name.rsplit_once('.').map(|(s, _)| s).unwrap_or(name);
+    let path = repo_root
+        .join("debug")
+        .join("activities")
+        .join(format!("{stem}-parse-debug.json"));
+    let _ = std::fs::create_dir_all(path.parent().unwrap());
+    let _ = std::fs::write(&path, serde_json::to_string_pretty(debug_payload).unwrap());
+}
+
+/// Replaces an all-`None` series with an empty `Vec` to avoid shipping
+/// useless null-filled arrays to the frontend.
+fn strip_all_none(series: Vec<Option<f64>>) -> Vec<Option<f64>> {
+    if series.iter().all(Option::is_none) {
+        Vec::new()
+    } else {
+        series
+    }
 }

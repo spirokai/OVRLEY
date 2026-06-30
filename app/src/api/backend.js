@@ -349,17 +349,6 @@ export async function writeTemplateFile(path, contents) {
 }
 
 /**
- * Writes parse debug file.
- *
- * @param {*} filename - Target filename for the operation.
- * @param {*} contents - Serialized file contents to write.
- * @returns {Promise<*>} Promise resolving to the operation result.
- */
-export async function writeParseDebugFile(filename, contents) {
-  return invokeCommand('write_parse_debug_file', { filename, contents })
-}
-
-/**
  * Reads raw bytes from one user-selected file path via the native Tauri shell.
  *
  * @param {string} path - Absolute path returned by the native file picker.
@@ -446,4 +435,14 @@ export async function buildRouteGeometry(config, parsedActivity) {
     configJson: safeConfig,
     parsedActivityJson: safeParsedActivity,
   })
+}
+
+/**
+ * Extracts MP4 telemetry from a video file.
+ *
+ * @param {string} filePath - Absolute path to the video file.
+ * @returns {Promise<object|null>} Promise resolving to ParsedActivity or null if no telemetry found.
+ */
+export async function extractVideoTelemetry(filePath) {
+  return apiCall('backend_extract_video_telemetry', { filePath })
 }

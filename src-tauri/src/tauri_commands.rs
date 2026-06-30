@@ -80,8 +80,14 @@ pub(crate) async fn backend_render(
 /// command convention by delegating to `ovrley_core` and serializing the result
 /// as a JSON string for JavaScript.
 #[tauri::command]
-pub(crate) async fn backend_finalize_activity(raw_activity_json: String) -> Result<String, String> {
-    call_and_serialize(commands::backend_finalize_activity(&raw_activity_json))
+pub(crate) async fn backend_finalize_activity(
+    app: AppHandle,
+    raw_activity_json: String,
+) -> Result<String, String> {
+    call_and_serialize(commands::backend_finalize_activity(
+        &runtime_paths::app_paths(&app)?,
+        &raw_activity_json,
+    ))
 }
 
 /// Renders one transparent preview PNG for the requested second.

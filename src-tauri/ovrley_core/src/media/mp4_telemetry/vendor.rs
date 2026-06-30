@@ -69,6 +69,31 @@ pub(crate) fn extract_insta360_iso(tag_map: &BTreeMap<GroupId, TagMap>) -> Optio
     }
 }
 
+/// Insta360 EV from `Default` / `Custom("AAAData")` as `Vec_TimeScalar_Json`.
+pub(crate) fn extract_insta360_ev(tag_map: &BTreeMap<GroupId, TagMap>) -> Option<Vec<f64>> {
+    let default_map = tag_map.get(&GroupId::Default)?;
+    let tag = default_map.get(&TagId::Custom("AAAData".into()))?;
+    match &tag.value {
+        TagValue::Vec_TimeScalar_Json(values) => {
+            let v: Vec<f64> = values
+                .get()
+                .iter()
+                .filter_map(|ts| {
+                    ts.v.get("ev_target")
+                        .and_then(|v| v.as_f64())
+                        .filter(|x| x.is_finite())
+                })
+                .collect();
+            if v.is_empty() {
+                None
+            } else {
+                Some(v)
+            }
+        }
+        _ => None,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // JSON metadata (DJI WM169 / WA530 / OQ101, Blackmagic, RED)
 // ---------------------------------------------------------------------------

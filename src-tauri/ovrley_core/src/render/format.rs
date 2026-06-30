@@ -433,8 +433,9 @@ fn format_validated_standard_metric_parts(
             .unwrap_or_else(|| "--".to_string()),
         Some(StandardMetricFormatterKind::Ev) => raw
             .map(|ev| {
-                if decimals > 0 {
-                    format!("{ev:.decimals$}")
+                let d = if ev == 0.0 { 1 } else { decimals };
+                if d > 0 {
+                    format!("{ev:.d$}")
                 } else {
                     (ev.round() as i64).to_string()
                 }

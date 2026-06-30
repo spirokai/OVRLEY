@@ -25,7 +25,8 @@ fn extracts_supported_mp4_telemetry_fixtures_with_provenance() {
             metadata.duration.unwrap_or(0.0),
         )
         .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
-        .unwrap_or_else(|| panic!("{stem}: expected telemetry activity"));
+        .unwrap_or_else(|| panic!("{stem}: expected telemetry activity"))
+        .parsed_activity;
 
         assert_eq!(
             activity.file_format.as_deref(),
