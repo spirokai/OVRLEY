@@ -101,9 +101,12 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
         codec_profile: None,
         pix_fmt: None,
         bits_per_raw_sample: None,
+        bit_rate: None,
         has_audio: false,
         container_format: None,
         rotation_degrees: None,
+        camera_type: None,
+        camera_model: None,
     };
 
     let format = json.get("format");
@@ -115,6 +118,10 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
             .and_then(|v| v.as_str())
             .and_then(parse_positive_f64);
         metadata.duration = format_duration;
+        metadata.bit_rate = format_obj
+            .get("bit_rate")
+            .and_then(|v| v.as_str())
+            .map(|value| value.to_string());
         metadata.container_format = format_obj
             .get("format_name")
             .and_then(|v| v.as_str())

@@ -28,9 +28,12 @@ pub struct SourceVideoMetadata {
     pub codec_profile: Option<String>,
     pub pix_fmt: Option<String>,
     pub bits_per_raw_sample: Option<u32>,
+    pub bit_rate: Option<String>,
     pub has_audio: bool,
     pub container_format: Option<String>,
     pub rotation_degrees: Option<i32>,
+    pub camera_type: Option<String>,
+    pub camera_model: Option<String>,
 }
 
 /// Width and height in pixels as reported by source video probes.

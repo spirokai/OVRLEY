@@ -49,6 +49,11 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             importedVideoDuration={videoSyncSettings.importedVideoDuration}
             importedVideoFps={videoSyncSettings.importedVideoFps}
             importedVideoResolution={videoSyncSettings.importedVideoResolution}
+            importedVideoCodecName={videoSyncSettings.importedVideoCodecName}
+            importedVideoCodecLongName={videoSyncSettings.importedVideoCodecLongName}
+            importedVideoBitRate={videoSyncSettings.importedVideoBitRate}
+            importedVideoCameraType={videoSyncSettings.importedVideoCameraType}
+            importedVideoCameraModel={videoSyncSettings.importedVideoCameraModel}
             importedVideoCreationTime={videoSyncSettings.importedVideoCreationTime}
             videoSyncWarning={videoSyncSettings.videoSyncWarning}
             videoResolutionMismatch={videoSyncSettings.videoResolutionMismatch}

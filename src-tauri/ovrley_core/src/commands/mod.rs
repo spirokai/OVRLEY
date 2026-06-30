@@ -577,6 +577,7 @@ fn needs_ffprobe_salvage(metadata: &crate::media::SourceVideoMetadata) -> bool {
             .map(|degrees| degrees.rem_euclid(360) == 0)
             .unwrap_or(true)
         || metadata.container_format.is_none()
+        || metadata.bit_rate.is_none()
         || !metadata.has_audio
 }
 
@@ -634,6 +635,9 @@ fn merge_ffprobe_metadata(
     metadata.has_audio = metadata.has_audio || ffprobe_metadata.has_audio;
     if metadata.container_format.is_none() {
         metadata.container_format = ffprobe_metadata.container_format;
+    }
+    if metadata.bit_rate.is_none() {
+        metadata.bit_rate = ffprobe_metadata.bit_rate;
     }
     metadata
 }

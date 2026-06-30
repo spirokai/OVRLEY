@@ -40,6 +40,11 @@ export const createVideoImportSlice = (set, get) => ({
   videoSyncOffsetSeconds: 0, // user-adjustable sync offset
   videoSyncWarning: null, // string warning or null
   availableCodecs: null,
+  importedVideoCodecName: null,
+  importedVideoCodecLongName: null,
+  importedVideoBitRate: null,
+  importedVideoCameraType: null,
+  importedVideoCameraModel: null,
 
   setImportedVideo: (metadata) => {
     set({
@@ -55,6 +60,11 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
       importedVideoPreviewError: metadata.previewError ?? null,
       importedBackgroundImagePath: null,
+      importedVideoCodecName: metadata.codecName ?? null,
+      importedVideoCodecLongName: metadata.codecLongName ?? null,
+      importedVideoBitRate: metadata.bitRate ?? null,
+      importedVideoCameraType: metadata.cameraType ?? null,
+      importedVideoCameraModel: metadata.cameraModel ?? null,
     })
 
     const activitySummary = get().activitySummary
@@ -77,6 +87,11 @@ export const createVideoImportSlice = (set, get) => ({
       importedBackgroundImagePath: path || null,
       videoSyncOffsetSeconds: 0,
       videoSyncWarning: null,
+      importedVideoCodecName: null,
+      importedVideoCodecLongName: null,
+      importedVideoBitRate: null,
+      importedVideoCameraType: null,
+      importedVideoCameraModel: null,
     }),
 
   clearImportedVideo: () =>
@@ -95,6 +110,11 @@ export const createVideoImportSlice = (set, get) => ({
       importedBackgroundImagePath: null,
       videoSyncOffsetSeconds: 0,
       videoSyncWarning: null,
+      importedVideoCodecName: null,
+      importedVideoCodecLongName: null,
+      importedVideoBitRate: null,
+      importedVideoCameraType: null,
+      importedVideoCameraModel: null,
     }),
 
   setVideoSyncOffset: (seconds) =>

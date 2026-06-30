@@ -29,6 +29,9 @@ export default function VideoSyncSection({
   importedVideoDuration,
   importedVideoFps,
   importedVideoResolution,
+  importedVideoCodecName,
+  importedVideoBitRate,
+  importedVideoCameraModel,
   importedVideoCreationTime,
   videoSyncWarning,
   videoResolutionMismatch,
@@ -49,7 +52,7 @@ export default function VideoSyncSection({
 
       <div className="space-y-2 text-xs text-muted-foreground px-1 pt-2">
         <div className="flex justify-between">
-          <b>Data:</b>
+          <b>INFO:</b>
           <span className="text-xs font-normal text-foreground/70">
             {importedVideoDuration
               ? `${Math.floor(importedVideoDuration / 60)}:${Math.floor(importedVideoDuration % 60)
@@ -65,6 +68,19 @@ export default function VideoSyncSection({
           <span className="text-xs font-normal text-foreground/70">
             {importedVideoCreationTime ? new Date(importedVideoCreationTime).toLocaleString() : 'Unknown'}
           </span>
+        </div>
+        <div className="flex justify-between">
+          <b>Codec:</b>
+          <span className="text-xs font-normal text-foreground/70">
+            {' '}
+            {importedVideoCodecName || 'Unknown'} |{' '}
+            {importedVideoBitRate ? `${(Number(importedVideoBitRate) / 1_000_000).toFixed(0)} Mbps` : 'Unknown'}
+          </span>
+        </div>
+
+        <div className="flex justify-between">
+          <b>Camera:</b>
+          <span className="text-xs font-normal text-foreground/70">{importedVideoCameraModel || 'Unknown'}</span>
         </div>
       </div>
 

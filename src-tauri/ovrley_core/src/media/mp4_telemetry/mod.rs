@@ -83,6 +83,20 @@ pub fn probe_video_metadata(file_path: &str) -> CoreResult<SourceVideoMetadata> 
 
     let (fps_num, fps_den) = rational_fps_parts(vm.fps);
 
+    let (camera_type, camera_model) = match File::open(path) {
+        Ok(mut stream) => {
+            let cancel_flag = Arc::new(AtomicBool::new(false));
+            match Input::from_stream(&mut stream, file_size, path, |_| {}, cancel_flag) {
+                Ok(input) => (
+                    Some(input.camera_type().to_string()),
+                    input.camera_model().cloned(),
+                ),
+                Err(_) => (None, None),
+            }
+        }
+        Err(_) => (None, None),
+    };
+
     Ok(SourceVideoMetadata {
         path: file_path.to_string(),
         duration: positive_f64(vm.duration_s),
@@ -100,9 +114,12 @@ pub fn probe_video_metadata(file_path: &str) -> CoreResult<SourceVideoMetadata> 
         codec_profile: None,
         pix_fmt: None,
         bits_per_raw_sample: None,
+        bit_rate: None,
         has_audio: false,
         container_format: None,
         rotation_degrees: Some(vm.rotation),
+        camera_type,
+        camera_model,
     })
 }
 
