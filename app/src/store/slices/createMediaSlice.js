@@ -3,6 +3,7 @@
  */
 
 import { DEFAULT_RENDER_PROGRESS, syncSceneTimingToConfig } from '../store-utils'
+import { getCourseWidgetDimensions } from '@/features/widget-editor/utils/widgetUtils'
 
 function getActivityDurationSeconds(activity) {
   const duration = Number(activity?.trim_end_seconds ?? activity?.metadata?.duration_seconds ?? 0)
@@ -21,6 +22,19 @@ function syncSceneDurationWithActiveActivity(state, activity) {
   state.endSecond = wholeSeconds
   state.selectedSecond = 0
   syncSceneTimingToConfig(state, { startSecond: 0, endSecond: wholeSeconds })
+
+  if (state.config?.plots) {
+    const coursePoints = activity?.sample_course_points
+    for (const plot of state.config.plots) {
+      if (plot.value === 'course' && coursePoints) {
+        const dims = getCourseWidgetDimensions(coursePoints)
+        if (dims) {
+          plot.width = dims.width
+          plot.height = dims.height
+        }
+      }
+    }
+  }
 }
 
 /**

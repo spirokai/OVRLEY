@@ -4,6 +4,9 @@
  */
 
 import * as backend from '@/api/backend'
+import { getCourseWidgetDimensions } from '@/features/widget-editor/utils/widgetUtils'
+import useStore from '@/store/useStore'
+import { syncSceneTimingToConfig } from '@/store/store-utils'
 import parseFitActivityFile from './fit-parser.js'
 import { parseGpxActivityFile } from './gpx-parser.js'
 import { parseSrtActivityFile } from './srt-parser.js'
@@ -26,49 +29,6 @@ async function parseActivityFile(file) {
   return finalized.parsed_activity
 }
 
-/**
- * Synchronizes scene duration with activity.
- *
- * @param {*} durationSeconds - Numeric duration seconds value.
- * @param {*} storeState - Current store snapshot used for synchronization.
- * @returns {*} Result produced by the helper.
- */
-function syncSceneDurationWithActivity(durationSeconds, storeState) {
-  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
-    console.warn('Parsed activity did not produce a duration value')
-    return
-  }
-
-  const wholeSeconds = Math.floor(durationSeconds)
-  const { config, setConfig, setDummyDurationSeconds, setEndSecond, setSelectedSecond, setStartSecond } = storeState
-
-  console.log('Setting activity duration:', durationSeconds, 'seconds')
-  setDummyDurationSeconds(wholeSeconds)
-  setStartSecond(0)
-  setEndSecond(wholeSeconds)
-  setSelectedSecond(0)
-
-  if (config) {
-    setConfig({
-      ...config,
-      scene: {
-        ...config.scene,
-        start: 0,
-        end: wholeSeconds,
-      },
-    })
-  }
-}
-
-/**
- * Loads a parsed activity into store state.
- *
- * @param {object} options - Structured options for the helper.
- * @param {*} options.filename - Target filename for the operation.
- * @param {*} options.parsedActivity - Normalized activity payload used by the app.
- * @param {*} options.storeState - Current store snapshot used for synchronization.
- * @returns {Promise<*>} Promise resolving to the operation result.
- */
 async function loadActivityIntoStore({ filename, parsedActivity, storeState }) {
   const { setActivityFilename, activateActivityFile } = storeState
 
@@ -76,7 +36,31 @@ async function loadActivityIntoStore({ filename, parsedActivity, storeState }) {
   activateActivityFile(parsedActivity)
   console.log('Activity filename set in store:', filename)
 
-  syncSceneDurationWithActivity(parsedActivity?.metadata?.duration_seconds || 0, storeState)
+  const durationSeconds = Number(parsedActivity?.metadata?.duration_seconds || 0)
+  if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+    const wholeSeconds = Math.floor(durationSeconds)
+    storeState.setDummyDurationSeconds(wholeSeconds)
+    storeState.setStartSecond(0)
+    storeState.setEndSecond(wholeSeconds)
+    storeState.setSelectedSecond(0)
+
+    useStore.setState((state) => {
+      syncSceneTimingToConfig(state, { startSecond: 0, endSecond: wholeSeconds })
+
+      const coursePoints = parsedActivity?.sample_course_points
+      if (coursePoints && state.config?.plots) {
+        const dims = getCourseWidgetDimensions(coursePoints)
+        if (dims) {
+          for (const plot of state.config.plots) {
+            if (plot.value === 'course') {
+              plot.width = dims.width
+              plot.height = dims.height
+            }
+          }
+        }
+      }
+    })
+  }
 }
 
 /**

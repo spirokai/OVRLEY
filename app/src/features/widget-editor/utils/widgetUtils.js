@@ -56,7 +56,7 @@ export function getGlobalColor(globalDefaults, key, fallback = '#ffffff') {
  * @param {*} coursePoints - Value for course points.
  * @returns {object} Requested value or structure.
  */
-function getCourseWidgetDimensions(coursePoints) {
+export function getCourseWidgetDimensions(coursePoints) {
   const validPoints = (coursePoints || []).filter(([latitude, longitude]) => Number.isFinite(latitude) && Number.isFinite(longitude))
 
   if (validPoints.length < 2) {
