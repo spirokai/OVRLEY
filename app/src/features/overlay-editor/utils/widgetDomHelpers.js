@@ -5,8 +5,6 @@
 
 import { buildWidgetTransform } from '@/lib/geometryUtils'
 import { isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
-import { resolveActiveMetricWidgetData } from '@/lib/widget/metric-widget-resolver'
-import { headingTapeRenderedHeight } from '@/features/widget-preview/utils/headingGeometry'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 import { resolveWidgetRenderGeometry } from './widgetRenderGeometry'
 
@@ -108,9 +106,6 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
   const nextRotation = draft.rotation ?? (widget.type === 'course' ? (widget.data.rotation ?? 0) : 0)
   const isBoxed = isBoxedMetricWidget(widget)
   const renderScale = isBoxed ? globalScale || 1 : 1
-  const resolvedData = isBoxed ? resolveActiveMetricWidgetData({ ...widget.data, ...draft }) : { ...widget.data, ...draft }
-  const renderedHeight =
-    resolvedData.display_type === 'heading_tape' ? headingTapeRenderedHeight(resolvedData) : (nextHeight ?? resolvedData.height ?? 0)
   const nextScale = (draft.scale ?? 1) * (isBoxed ? 1 : globalScale)
 
   target.style.left = `${origin.x}px`
@@ -120,8 +115,8 @@ export function applyLiveWidgetStyles(target, widget, draft, globalScale) {
     target.style.width = `${nextWidth * renderScale}px`
   }
 
-  if (typeof renderedHeight === 'number') {
-    target.style.height = `${renderedHeight * renderScale}px`
+  if (typeof nextHeight === 'number') {
+    target.style.height = `${nextHeight * renderScale}px`
   }
 
   target.style.transform =
