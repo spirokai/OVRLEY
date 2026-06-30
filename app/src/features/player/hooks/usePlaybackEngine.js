@@ -14,7 +14,7 @@ import { clamp, createPlaybackAnchor, getTimelinePlaybackSecond, getTotalPlaybac
  * @param {string} options.backgroundMode - Selected canvas background style.
  * @param {function} options.beginPreviewScrub - Store action to enter scrub mode.
  * @param {function} options.commitPreviewScrub - Store action to commit a scrub.
- * @param {number} options.dummyDurationSeconds - Fallback duration used without activity metadata.
+ * @param {number} options.fallbackDurationSeconds - Fallback duration used without activity metadata.
  * @param {number} options.importedVideoDuration - Imported video duration in seconds.
  * @param {string|null} options.importedVideoPath - Imported video path when a video exists.
  * @param {function} options.pausePreviewPlayback - Store action to pause playback.
@@ -34,7 +34,7 @@ export default function usePlaybackEngine({
   backgroundMode,
   beginPreviewScrub,
   commitPreviewScrub,
-  dummyDurationSeconds,
+  fallbackDurationSeconds,
   importedVideoDuration,
   importedVideoPath,
   pausePreviewPlayback,
@@ -66,12 +66,12 @@ export default function usePlaybackEngine({
     () =>
       getTotalPlaybackDuration({
         activityDurationSeconds: activitySummary?.durationSeconds,
-        dummyDurationSeconds,
+        fallbackDurationSeconds,
         importedVideoDuration,
         importedVideoPath,
         videoSyncOffsetSeconds,
       }),
-    [activitySummary?.durationSeconds, dummyDurationSeconds, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds],
+    [activitySummary?.durationSeconds, fallbackDurationSeconds, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds],
   )
 
   // Derived playback state - describes the active clock and the playhead shown by the UI.

@@ -304,10 +304,10 @@ export default function useRenderWorkflow({ backendStatus }) {
       })
       const previewFps = sanitizeIntegerFps(nextConfig.scene.fps || 30)
 
-      const dummyDurationSeconds = useStore.getState().dummyDurationSeconds
+      const fallbackDurationSeconds = useStore.getState().fallbackDurationSeconds
       const selectedSecond = useStore.getState().selectedSecond
       const resolvedPreviewSecond = resolvePreviewSecond({
-        dummyDurationSeconds,
+        fallbackDurationSeconds,
         selectedSecond,
         sourceActivity: parsedActivity,
       })

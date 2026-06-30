@@ -23,7 +23,7 @@ function createOptions(overrides = {}) {
     backgroundMode: 'black',
     beginPreviewScrub: vi.fn(),
     commitPreviewScrub: vi.fn(),
-    dummyDurationSeconds: 0,
+    fallbackDurationSeconds: 0,
     importedVideoDuration: 4,
     importedVideoPath: 'C:\\clips\\ride.mp4',
     pausePreviewPlayback: vi.fn(),

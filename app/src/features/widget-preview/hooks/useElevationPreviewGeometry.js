@@ -61,7 +61,7 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
   const [rustGeometry, setRustGeometry] = useState(null)
   const config = useStore((state) => state.config)
   const globalDefaults = useStore((state) => state.globalDefaults)
-  const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
+  const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
 
   const mockGeometry = typeof window !== 'undefined' ? window.__OVRLEY_MOCK_ELEVATION_GEOMETRY : null
   const exportWindow = useMemo(
@@ -108,7 +108,7 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
       width: style.width,
       height: style.height,
       previewSecond,
-      dummyDurationSeconds,
+      fallbackDurationSeconds,
     })
   }
 

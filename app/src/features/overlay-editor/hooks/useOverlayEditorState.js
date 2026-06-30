@@ -35,7 +35,7 @@ function mergeDraftsIntoWidgets(widgets, liveWidgetDrafts) {
 
 export default function useOverlayEditorState({ config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange }) {
   const selectedSecond = useStore((state) => state.selectedSecond)
-  const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
+  const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
   const exportRange = useStore((state) => state.exportRange)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoDuration = useStore((state) => state.importedVideoDuration)
@@ -80,8 +80,8 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     [globalDefaults, config?.scene],
   )
   const previewSecond = useMemo(
-    () => resolvePreviewSecond({ dummyDurationSeconds, selectedSecond, sourceActivity }),
-    [dummyDurationSeconds, selectedSecond, sourceActivity],
+    () => resolvePreviewSecond({ fallbackDurationSeconds, selectedSecond, sourceActivity }),
+    [fallbackDurationSeconds, selectedSecond, sourceActivity],
   )
   const previewExportRange = useMemo(() => {
     if (!importedVideoPath) return exportRange

@@ -30,7 +30,7 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
   const [rustGeometry, setRustGeometry] = useState(null)
   const config = useStore((state) => state.config)
   const globalDefaults = useStore((state) => state.globalDefaults)
-  const dummyDurationSeconds = useStore((state) => state.dummyDurationSeconds)
+  const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
 
   const mockGeometry = typeof window !== 'undefined' ? window.__OVRLEY_MOCK_ROUTE_GEOMETRY : null
 
@@ -74,7 +74,7 @@ export function useRoutePreviewGeometry({ activity, data, exportRange, previewSe
       width: style.width,
       height: style.height,
       previewSecond,
-      dummyDurationSeconds,
+      fallbackDurationSeconds,
     })
   }
 

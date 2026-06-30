@@ -36,7 +36,7 @@ describe('video import — telemetry lifecycle', () => {
     const state = useStore.getState()
     expect(state.parsedActivity).toEqual(activityFile)
     expect(state.parsedActivitySource).toBe('activity-file')
-    expect(state.hiddenVideoParsedActivity).toEqual(mp4Telemetry)
+    expect(state.stashedVideoTelemetry).toEqual(mp4Telemetry)
   })
 
   test('video telemetry activation does not run external activity sync', () => {
@@ -72,7 +72,7 @@ describe('activity import — overwrites MP4 telemetry', () => {
     const state = useStore.getState()
     expect(state.parsedActivity).toEqual(activityFile)
     expect(state.parsedActivitySource).toBe('activity-file')
-    expect(state.hiddenVideoParsedActivity).toEqual(mp4Telemetry)
+    expect(state.stashedVideoTelemetry).toEqual(mp4Telemetry)
   })
 
   test('clearing activity before parsing does not briefly restore video telemetry', () => {
@@ -83,7 +83,7 @@ describe('activity import — overwrites MP4 telemetry', () => {
 
     const state = useStore.getState()
     expect(state.parsedActivity).toBeNull()
-    expect(state.hiddenVideoParsedActivity).toEqual(mp4Telemetry)
+    expect(state.stashedVideoTelemetry).toEqual(mp4Telemetry)
   })
 })
 
@@ -99,7 +99,7 @@ describe('activity clear — restores video telemetry', () => {
     const state = useStore.getState()
     expect(state.parsedActivity).toEqual(mp4Telemetry)
     expect(state.parsedActivitySource).toBe('video-telemetry')
-    expect(state.hiddenVideoParsedActivity).toBeNull()
+    expect(state.stashedVideoTelemetry).toBeNull()
     expect(state.videoSyncOffsetSeconds).toBe(0)
     expect(state.videoSyncWarning).toBeNull()
   })
@@ -112,7 +112,7 @@ describe('activity clear — restores video telemetry', () => {
     const state = useStore.getState()
     expect(state.parsedActivity).toBeNull()
     expect(state.parsedActivitySource).toBeNull()
-    expect(state.hiddenVideoParsedActivity).toBeNull()
+    expect(state.stashedVideoTelemetry).toBeNull()
   })
 
   test('clearing video does not disturb active external activity', () => {

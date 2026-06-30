@@ -5,19 +5,19 @@
 import { DEFAULT_RENDER_PROGRESS, syncSceneTimingToConfig } from '../store-utils'
 import { getCourseWidgetDimensions } from '@/features/widget-editor/utils/widgetUtils'
 
-function getActivityDurationSeconds(activity) {
+function getDurationSeconds(activity) {
   const duration = Number(activity?.trim_end_seconds ?? activity?.metadata?.duration_seconds ?? 0)
   return Number.isFinite(duration) ? duration : 0
 }
 
-function syncSceneDurationWithActiveActivity(state, activity) {
-  const durationSeconds = getActivityDurationSeconds(activity)
+function applyParsedDataToScene(state, activity) {
+  const durationSeconds = getDurationSeconds(activity)
   if (durationSeconds <= 0) {
     return
   }
 
   const wholeSeconds = Math.floor(durationSeconds)
-  state.dummyDurationSeconds = wholeSeconds
+  state.fallbackDurationSeconds = wholeSeconds
   state.startSecond = 0
   state.endSecond = wholeSeconds
   state.selectedSecond = 0
@@ -53,7 +53,7 @@ export function createMediaSlice(set, get) {
     activitySummary: null,
     parsedActivity: null,
     parsedActivitySource: null, // 'activity-file' | 'video-telemetry' | null
-    hiddenVideoParsedActivity: null,
+    stashedVideoTelemetry: null,
     activeRenderId: null,
     renderProgress: { ...DEFAULT_RENDER_PROGRESS },
 
@@ -157,7 +157,7 @@ export function createMediaSlice(set, get) {
     activateActivityFile: (activity) => {
       set((state) => {
         if (state.parsedActivitySource === 'video-telemetry') {
-          state.hiddenVideoParsedActivity = state.parsedActivity
+          state.stashedVideoTelemetry = state.parsedActivity
         }
         state.parsedActivity = activity
         state.parsedActivitySource = 'activity-file'
@@ -169,24 +169,24 @@ export function createMediaSlice(set, get) {
       const source = get().parsedActivitySource
       if (source === 'activity-file') {
         set((state) => {
-          state.hiddenVideoParsedActivity = activity
+          state.stashedVideoTelemetry = activity
         })
       } else {
         set((state) => {
           state.parsedActivity = activity
           state.parsedActivitySource = 'video-telemetry'
-          state.hiddenVideoParsedActivity = null
+          state.stashedVideoTelemetry = null
           state.activityFilename = null
           state.videoSyncOffsetSeconds = 0
           state.videoSyncWarning = null
-          syncSceneDurationWithActiveActivity(state, activity)
+          applyParsedDataToScene(state, activity)
         })
         get().setActivitySummary(activity, { computeVideoSync: false })
       }
     },
 
     clearActivityFile: ({ restoreVideoTelemetry = true, clearFilename = true } = {}) => {
-      const { parsedActivitySource, hiddenVideoParsedActivity } = get()
+      const { parsedActivitySource, stashedVideoTelemetry } = get()
 
       if (parsedActivitySource !== 'activity-file') return
 
@@ -196,14 +196,14 @@ export function createMediaSlice(set, get) {
         }
       })
 
-      if (restoreVideoTelemetry && hiddenVideoParsedActivity) {
+      if (restoreVideoTelemetry && stashedVideoTelemetry) {
         set((state) => {
-          state.parsedActivity = hiddenVideoParsedActivity
+          state.parsedActivity = stashedVideoTelemetry
           state.parsedActivitySource = 'video-telemetry'
-          state.hiddenVideoParsedActivity = null
+          state.stashedVideoTelemetry = null
           state.videoSyncOffsetSeconds = 0
           state.videoSyncWarning = null
-          syncSceneDurationWithActiveActivity(state, hiddenVideoParsedActivity)
+          applyParsedDataToScene(state, stashedVideoTelemetry)
         })
         get().setActivitySummary(get().parsedActivity, { computeVideoSync: false })
       } else {
@@ -219,7 +219,7 @@ export function createMediaSlice(set, get) {
       const { parsedActivitySource } = get()
 
       set((state) => {
-        state.hiddenVideoParsedActivity = null
+        state.stashedVideoTelemetry = null
       })
 
       if (parsedActivitySource === 'video-telemetry') {
@@ -231,7 +231,7 @@ export function createMediaSlice(set, get) {
       }
     },
 
-    syncVideoMetadataWithActiveActivity: () => {
+    syncVideoMetadata: () => {
       const { parsedActivitySource, activitySummary, computeVideoSync } = get()
 
       if (parsedActivitySource === 'activity-file') {
@@ -250,7 +250,7 @@ export function createMediaSlice(set, get) {
       set((state) => {
         const demoDuration = 7946
         state.activityFilename = 'demo.gpxinit'
-        state.dummyDurationSeconds = demoDuration
+        state.fallbackDurationSeconds = demoDuration
         state.startSecond = 0
         state.endSecond = demoDuration
         state.selectedSecond = 0

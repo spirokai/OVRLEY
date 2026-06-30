@@ -25,7 +25,7 @@ export default function OverlayPlayer({ backgroundMode }) {
       activitySummary: state.activitySummary,
       beginPreviewScrub: state.beginPreviewScrub,
       commitPreviewScrub: state.commitPreviewScrub,
-      dummyDurationSeconds: state.dummyDurationSeconds,
+      fallbackDurationSeconds: state.fallbackDurationSeconds,
       importedVideoDuration: state.importedVideoDuration,
       importedVideoPath: state.importedVideoPath,
       pausePreviewPlayback: state.pausePreviewPlayback,

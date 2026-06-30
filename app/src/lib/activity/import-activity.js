@@ -39,7 +39,7 @@ async function loadActivityIntoStore({ filename, parsedActivity, storeState }) {
   const durationSeconds = Number(parsedActivity?.metadata?.duration_seconds || 0)
   if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
     const wholeSeconds = Math.floor(durationSeconds)
-    storeState.setDummyDurationSeconds(wholeSeconds)
+    storeState.setFallbackDurationSeconds(wholeSeconds)
     storeState.setStartSecond(0)
     storeState.setEndSecond(wholeSeconds)
     storeState.setSelectedSecond(0)

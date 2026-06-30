@@ -36,8 +36,8 @@ function buildPlaceholderProgress(points) {
   return buildLinearProgressValues(points)
 }
 
-function resolvePlaceholderProgress(previewSecond, dummyDurationSeconds) {
-  const safeDuration = Number(dummyDurationSeconds)
+function resolvePlaceholderProgress(previewSecond, fallbackDurationSeconds) {
+  const safeDuration = Number(fallbackDurationSeconds)
   if (!Number.isFinite(safeDuration) || safeDuration <= 0) {
     return 0
   }
@@ -50,10 +50,10 @@ function resolvePlaceholderProgress(previewSecond, dummyDurationSeconds) {
   return Math.min(Math.max(safeSecond / safeDuration, 0), 1)
 }
 
-export function buildPlaceholderRoutePreviewGeometry({ width, height, previewSecond, dummyDurationSeconds }) {
+export function buildPlaceholderRoutePreviewGeometry({ width, height, previewSecond, fallbackDurationSeconds }) {
   const points = buildPlaceholderRoutePoints(width, height)
   const progressValues = buildPlaceholderProgress(points)
-  const progress01 = resolvePlaceholderProgress(previewSecond, dummyDurationSeconds)
+  const progress01 = resolvePlaceholderProgress(previewSecond, fallbackDurationSeconds)
   const { markerPoint, completedPoints } = buildRouteFramePreview(points, progressValues, progress01)
 
   return {
@@ -63,10 +63,10 @@ export function buildPlaceholderRoutePreviewGeometry({ width, height, previewSec
   }
 }
 
-export function buildPlaceholderElevationPreviewGeometry({ width, height, previewSecond, dummyDurationSeconds }) {
+export function buildPlaceholderElevationPreviewGeometry({ width, height, previewSecond, fallbackDurationSeconds }) {
   const points = buildPlaceholderElevationPoints(width, height)
   const progressValues = buildPlaceholderProgress(points)
-  const progress01 = resolvePlaceholderProgress(previewSecond, dummyDurationSeconds)
+  const progress01 = resolvePlaceholderProgress(previewSecond, fallbackDurationSeconds)
   const markerHit = findPointAtProgress(points, progressValues, progress01)
   const completedPoints = buildElevationCompletedPoints(points, progressValues, progressValues, progress01, progress01)
 

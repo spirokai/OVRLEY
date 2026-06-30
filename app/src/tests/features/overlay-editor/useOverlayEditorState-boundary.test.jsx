@@ -31,7 +31,7 @@ describe('useOverlayEditorState module contract', () => {
 
   test('reacts when parsedActivity is replaced after async telemetry load', () => {
     useStore.setState({
-      dummyDurationSeconds: 10,
+      fallbackDurationSeconds: 10,
       parsedActivity: null,
       selectedSecond: 9,
     })

@@ -42,7 +42,7 @@ const mockConfig = {
 }
 
 vi.mock('@/store/useStore', () => ({
-  default: vi.fn((selector) => selector({ config: mockConfig, globalDefaults: {}, dummyDurationSeconds: 73 })),
+  default: vi.fn((selector) => selector({ config: mockConfig, globalDefaults: {}, fallbackDurationSeconds: 73 })),
 }))
 
 vi.mock('@/lib/geometryUtils', () => ({

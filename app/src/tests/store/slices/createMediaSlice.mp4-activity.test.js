@@ -34,17 +34,17 @@ describe('MP4 activity — store actions', () => {
       const state = useStore.getState()
       expect(state.parsedActivity).toEqual(mp4Telemetry)
       expect(state.parsedActivitySource).toBe('video-telemetry')
-      expect(state.hiddenVideoParsedActivity).toBeNull()
+      expect(state.stashedVideoTelemetry).toBeNull()
     })
 
-    test('stores MP4 telemetry in hiddenVideoParsedActivity when activity file is active', () => {
+    test('stores MP4 telemetry in stashedVideoTelemetry when activity file is active', () => {
       useStore.getState().activateActivityFile(activityFile)
       useStore.getState().loadVideoTelemetry(mp4Telemetry)
 
       const state = useStore.getState()
       expect(state.parsedActivity).toEqual(activityFile)
       expect(state.parsedActivitySource).toBe('activity-file')
-      expect(state.hiddenVideoParsedActivity).toEqual(mp4Telemetry)
+      expect(state.stashedVideoTelemetry).toEqual(mp4Telemetry)
     })
 
     test('sets videoSyncOffsetSeconds to 0 and clears videoSyncWarning when telemetry activates', () => {
@@ -77,7 +77,7 @@ describe('MP4 activity — store actions', () => {
       useStore.getState().loadVideoTelemetry(shortMp4Telemetry)
 
       const state = useStore.getState()
-      expect(state.dummyDurationSeconds).toBe(2)
+      expect(state.fallbackDurationSeconds).toBe(2)
       expect(state.startSecond).toBe(0)
       expect(state.endSecond).toBe(2)
       expect(state.selectedSecond).toBe(0)
@@ -95,14 +95,14 @@ describe('MP4 activity — store actions', () => {
       expect(state.parsedActivitySource).toBe('activity-file')
     })
 
-    test('moves active video telemetry into hiddenVideoParsedActivity', () => {
+    test('moves active video telemetry into stashedVideoTelemetry', () => {
       useStore.getState().loadVideoTelemetry(mp4Telemetry)
       useStore.getState().activateActivityFile(activityFile)
 
       const state = useStore.getState()
       expect(state.parsedActivity).toEqual(activityFile)
       expect(state.parsedActivitySource).toBe('activity-file')
-      expect(state.hiddenVideoParsedActivity).toEqual(mp4Telemetry)
+      expect(state.stashedVideoTelemetry).toEqual(mp4Telemetry)
     })
 
     test('updates activitySummary', () => {
@@ -126,7 +126,7 @@ describe('MP4 activity — store actions', () => {
       const state = useStore.getState()
       expect(state.parsedActivity).toEqual(mp4Telemetry)
       expect(state.parsedActivitySource).toBe('video-telemetry')
-      expect(state.hiddenVideoParsedActivity).toBeNull()
+      expect(state.stashedVideoTelemetry).toBeNull()
     })
 
     test('syncs the timeline range when hidden video telemetry is restored', () => {
@@ -141,7 +141,7 @@ describe('MP4 activity — store actions', () => {
             end: 3600,
           },
         },
-        dummyDurationSeconds: 3600,
+        fallbackDurationSeconds: 3600,
         endSecond: 3600,
         selectedSecond: 120,
         startSecond: 0,
@@ -152,7 +152,7 @@ describe('MP4 activity — store actions', () => {
       const state = useStore.getState()
       expect(state.parsedActivity).toEqual(shortMp4Telemetry)
       expect(state.parsedActivitySource).toBe('video-telemetry')
-      expect(state.dummyDurationSeconds).toBe(2)
+      expect(state.fallbackDurationSeconds).toBe(2)
       expect(state.endSecond).toBe(2)
       expect(state.selectedSecond).toBe(0)
       expect(state.config.scene.end).toBe(2)
@@ -178,7 +178,7 @@ describe('MP4 activity — store actions', () => {
       const state = useStore.getState()
       expect(state.parsedActivity).toBeNull()
       expect(state.parsedActivitySource).toBeNull()
-      expect(state.hiddenVideoParsedActivity).toEqual(mp4Telemetry)
+      expect(state.stashedVideoTelemetry).toEqual(mp4Telemetry)
     })
 
     test('clears activityFilename by default', () => {
@@ -232,7 +232,7 @@ describe('MP4 activity — store actions', () => {
       expect(state.parsedActivity).toBeNull()
       expect(state.parsedActivitySource).toBeNull()
       expect(state.activitySummary).toBeNull()
-      expect(state.hiddenVideoParsedActivity).toBeNull()
+      expect(state.stashedVideoTelemetry).toBeNull()
     })
 
     test('leaves parsedActivity alone when activity file is active', () => {
@@ -244,18 +244,18 @@ describe('MP4 activity — store actions', () => {
       const state = useStore.getState()
       expect(state.parsedActivity).toEqual(activityFile)
       expect(state.parsedActivitySource).toBe('activity-file')
-      expect(state.hiddenVideoParsedActivity).toBeNull()
+      expect(state.stashedVideoTelemetry).toBeNull()
     })
 
-    test('always clears hiddenVideoParsedActivity', () => {
+    test('always clears stashedVideoTelemetry', () => {
       useStore.getState().loadVideoTelemetry(mp4Telemetry)
       useStore.getState().activateActivityFile(activityFile)
 
-      expect(useStore.getState().hiddenVideoParsedActivity).toEqual(mp4Telemetry)
+      expect(useStore.getState().stashedVideoTelemetry).toEqual(mp4Telemetry)
 
       useStore.getState().clearVideoTelemetry()
 
-      expect(useStore.getState().hiddenVideoParsedActivity).toBeNull()
+      expect(useStore.getState().stashedVideoTelemetry).toBeNull()
     })
   })
 
@@ -268,11 +268,11 @@ describe('MP4 activity — store actions', () => {
 
       const state = useStore.getState()
       expect(state.parsedActivity).toBeNull()
-      expect(state.hiddenVideoParsedActivity).toEqual(mp4Telemetry)
+      expect(state.stashedVideoTelemetry).toEqual(mp4Telemetry)
     })
   })
 
-  describe('syncVideoMetadataWithActiveActivity', () => {
+  describe('syncVideoMetadata', () => {
     test('computes video sync when activity file is active', () => {
       const computeVideoSync = vi.fn()
       useStore.setState({
@@ -281,7 +281,7 @@ describe('MP4 activity — store actions', () => {
         activitySummary: { syncTime: '2024-01-01T00:00:00Z' },
       })
 
-      useStore.getState().syncVideoMetadataWithActiveActivity()
+      useStore.getState().syncVideoMetadata()
 
       expect(computeVideoSync).toHaveBeenCalledWith({ syncTime: '2024-01-01T00:00:00Z' })
     })
@@ -294,7 +294,7 @@ describe('MP4 activity — store actions', () => {
         videoSyncOffsetSeconds: 5,
       })
 
-      useStore.getState().syncVideoMetadataWithActiveActivity()
+      useStore.getState().syncVideoMetadata()
 
       expect(computeVideoSync).not.toHaveBeenCalled()
       expect(useStore.getState().videoSyncOffsetSeconds).toBe(0)
@@ -305,7 +305,7 @@ describe('MP4 activity — store actions', () => {
       const computeVideoSync = vi.fn()
       useStore.setState({ computeVideoSync, parsedActivitySource: null })
 
-      useStore.getState().syncVideoMetadataWithActiveActivity()
+      useStore.getState().syncVideoMetadata()
 
       expect(computeVideoSync).not.toHaveBeenCalled()
     })

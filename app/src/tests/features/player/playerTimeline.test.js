@@ -13,7 +13,7 @@ describe('playerTimeline helpers', () => {
     expect(
       getTotalPlaybackDuration({
         activityDurationSeconds: 12,
-        dummyDurationSeconds: 9,
+        fallbackDurationSeconds: 9,
         importedVideoDuration: 6,
         importedVideoPath: 'C:\\clips\\ride.mp4',
         videoSyncOffsetSeconds: 10,
@@ -25,7 +25,7 @@ describe('playerTimeline helpers', () => {
     expect(
       getTotalPlaybackDuration({
         activityDurationSeconds: 2.509,
-        dummyDurationSeconds: 73,
+        fallbackDurationSeconds: 73,
         importedVideoDuration: 2.509,
         importedVideoPath: 'C:\\clips\\GoPro-telemetry.MP4',
         videoSyncOffsetSeconds: 0,

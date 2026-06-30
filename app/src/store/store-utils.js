@@ -137,7 +137,7 @@ export function syncSceneTimingFromConfig(state, nextConfig, options = {}) {
   const previousStartSecond = state.startSecond
   const previousEndSecond = state.endSecond
   const previousSelectedSecond = state.selectedSecond
-  const timelineIsUntouched = previousStartSecond === 0 && previousEndSecond === state.dummyDurationSeconds && previousSelectedSecond === 0
+  const timelineIsUntouched = previousStartSecond === 0 && previousEndSecond === state.fallbackDurationSeconds && previousSelectedSecond === 0
 
   const sceneStartChangedInConfig = scene.start !== previousScene?.start
   const sceneEndChangedInConfig = scene.end !== previousScene?.end

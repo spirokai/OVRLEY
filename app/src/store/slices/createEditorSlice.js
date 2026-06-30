@@ -102,7 +102,7 @@ export function createEditorSlice(set, get) {
     previewInterpolationEnabled: true,
     hasUnrenderedChanges: false,
     lastRenderedConfig: null,
-    dummyDurationSeconds: 73,
+    fallbackDurationSeconds: 73,
     startSecond: 0,
     endSecond: 73,
     selectedSecond: 0,
@@ -145,9 +145,9 @@ export function createEditorSlice(set, get) {
         state.autoRender = val
       }),
 
-    setDummyDurationSeconds: (duration) =>
+    setFallbackDurationSeconds: (duration) =>
       set((state) => {
-        state.dummyDurationSeconds = duration
+        state.fallbackDurationSeconds = duration
       }),
 
     setStartSecond: (second) => {

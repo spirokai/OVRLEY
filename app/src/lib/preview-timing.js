@@ -18,12 +18,12 @@ import { clamp } from '@/lib/utils'
  * dummy duration. The result is always clamped to a non-negative finite value.
  *
  * @param {object} options
- * @param {number} [options.dummyDurationSeconds] - Fallback duration without activity data.
+ * @param {number} [options.fallbackDurationSeconds] - Fallback duration without activity data.
  * @param {object|null} [options.sourceActivity] - Parsed activity payload.
  * @returns {number} Effective preview/activity duration in seconds.
  */
-export function resolveActivityDuration({ dummyDurationSeconds, sourceActivity }) {
-  const activityDuration = Number(sourceActivity?.trim_end_seconds ?? sourceActivity?.metadata?.duration_seconds ?? dummyDurationSeconds ?? 0)
+export function resolveActivityDuration({ fallbackDurationSeconds, sourceActivity }) {
+  const activityDuration = Number(sourceActivity?.trim_end_seconds ?? sourceActivity?.metadata?.duration_seconds ?? fallbackDurationSeconds ?? 0)
   return Math.max(Number.isFinite(activityDuration) ? activityDuration : 0, 0)
 }
 
@@ -31,14 +31,14 @@ export function resolveActivityDuration({ dummyDurationSeconds, sourceActivity }
  * Clamps the current editor playhead into the effective previewable duration.
  *
  * @param {object} options
- * @param {number} [options.dummyDurationSeconds] - Fallback duration without activity data.
+ * @param {number} [options.fallbackDurationSeconds] - Fallback duration without activity data.
  * @param {number} [options.selectedSecond] - Current editor playhead second.
  * @param {object|null} [options.sourceActivity] - Parsed activity payload.
  * @returns {number} Preview second used consistently by canvas and preview rendering.
  */
-export function resolvePreviewSecond({ dummyDurationSeconds, selectedSecond, sourceActivity }) {
+export function resolvePreviewSecond({ fallbackDurationSeconds, selectedSecond, sourceActivity }) {
   const rawSecond = Number(selectedSecond) || 0
-  const maxSecond = resolveActivityDuration({ dummyDurationSeconds, sourceActivity })
+  const maxSecond = resolveActivityDuration({ fallbackDurationSeconds, sourceActivity })
   return clamp(rawSecond, 0, maxSecond)
 }
 

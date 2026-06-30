@@ -67,7 +67,7 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoCameraModel: metadata.cameraModel ?? null,
     })
 
-    get().syncVideoMetadataWithActiveActivity()
+    get().syncVideoMetadata()
   },
 
   setImportedBackgroundImage: (path) =>

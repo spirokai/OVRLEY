@@ -6,12 +6,12 @@ describe('preview timing helpers', () => {
   test('resolveActivityDuration prefers trim_end_seconds and falls back to dummy duration', () => {
     expect(resolveActivityDuration({ sourceActivity: { trim_end_seconds: 42 } })).toBe(42)
     expect(resolveActivityDuration({ sourceActivity: { metadata: { duration_seconds: 18 } } })).toBe(18)
-    expect(resolveActivityDuration({ dummyDurationSeconds: 9, sourceActivity: null })).toBe(9)
+    expect(resolveActivityDuration({ fallbackDurationSeconds: 9, sourceActivity: null })).toBe(9)
   })
 
   test('resolvePreviewSecond clamps the selected second to the activity duration', () => {
-    expect(resolvePreviewSecond({ dummyDurationSeconds: 10, selectedSecond: 12, sourceActivity: null })).toBe(10)
-    expect(resolvePreviewSecond({ dummyDurationSeconds: 10, selectedSecond: -2, sourceActivity: null })).toBe(0)
+    expect(resolvePreviewSecond({ fallbackDurationSeconds: 10, selectedSecond: 12, sourceActivity: null })).toBe(10)
+    expect(resolvePreviewSecond({ fallbackDurationSeconds: 10, selectedSecond: -2, sourceActivity: null })).toBe(0)
     expect(resolvePreviewSecond({ selectedSecond: 4.25, sourceActivity: { trim_end_seconds: 12 } })).toBe(4.25)
   })
 

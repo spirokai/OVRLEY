@@ -57,7 +57,7 @@ export function resolvePlaybackSource({ shouldUseVideoPlayback, playheadSecond, 
  *
  * @param {object} options - Duration inputs.
  * @param {number} options.activityDurationSeconds - Activity-backed duration.
- * @param {number} options.dummyDurationSeconds - Fallback template duration.
+ * @param {number} options.fallbackDurationSeconds - Fallback template duration.
  * @param {number} options.importedVideoDuration - Imported video duration.
  * @param {string|null} options.importedVideoPath - Imported video path when available.
  * @param {number} options.videoSyncOffsetSeconds - Timeline second where the video starts.
@@ -65,14 +65,14 @@ export function resolvePlaybackSource({ shouldUseVideoPlayback, playheadSecond, 
  */
 export function getTotalPlaybackDuration({
   activityDurationSeconds,
-  dummyDurationSeconds,
+  fallbackDurationSeconds,
   importedVideoDuration,
   importedVideoPath,
   videoSyncOffsetSeconds,
 }) {
   const metadataDuration = Number(activityDurationSeconds)
   const hasMetadataDuration = Number.isFinite(metadataDuration) && metadataDuration > 0
-  const fallbackDuration = Number(dummyDurationSeconds) || 0
+  const fallbackDuration = Number(fallbackDurationSeconds) || 0
   const videoEnd = importedVideoPath ? (Number(videoSyncOffsetSeconds) || 0) + (Number(importedVideoDuration) || 0) : 0
 
   return Math.max(hasMetadataDuration ? metadataDuration : fallbackDuration, videoEnd, 0)
