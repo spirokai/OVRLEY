@@ -21,6 +21,18 @@ describe('playerTimeline helpers', () => {
     ).toBe(16)
   })
 
+  test('does not let fallback duration extend a real activity timeline', () => {
+    expect(
+      getTotalPlaybackDuration({
+        activityDurationSeconds: 2.509,
+        dummyDurationSeconds: 73,
+        importedVideoDuration: 2.509,
+        importedVideoPath: 'C:\\clips\\GoPro-telemetry.MP4',
+        videoSyncOffsetSeconds: 0,
+      }),
+    ).toBe(2.509)
+  })
+
   test('keeps video-clock playback scoped to the imported video window', () => {
     const baseOptions = {
       shouldUseVideoPlayback: true,

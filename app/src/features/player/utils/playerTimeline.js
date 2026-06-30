@@ -70,11 +70,12 @@ export function getTotalPlaybackDuration({
   importedVideoPath,
   videoSyncOffsetSeconds,
 }) {
-  const metadataDuration = Number(activityDurationSeconds) || 0
+  const metadataDuration = Number(activityDurationSeconds)
+  const hasMetadataDuration = Number.isFinite(metadataDuration) && metadataDuration > 0
   const fallbackDuration = Number(dummyDurationSeconds) || 0
   const videoEnd = importedVideoPath ? (Number(videoSyncOffsetSeconds) || 0) + (Number(importedVideoDuration) || 0) : 0
 
-  return Math.max(metadataDuration, fallbackDuration, videoEnd, 0)
+  return Math.max(hasMetadataDuration ? metadataDuration : fallbackDuration, videoEnd, 0)
 }
 
 /**

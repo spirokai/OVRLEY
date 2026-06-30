@@ -2,7 +2,26 @@
  * Creates the create media slice Zustand slice used by the application store.
  */
 
-import { DEFAULT_RENDER_PROGRESS } from '../store-utils'
+import { DEFAULT_RENDER_PROGRESS, syncSceneTimingToConfig } from '../store-utils'
+
+function getActivityDurationSeconds(activity) {
+  const duration = Number(activity?.trim_end_seconds ?? activity?.metadata?.duration_seconds ?? 0)
+  return Number.isFinite(duration) ? duration : 0
+}
+
+function syncSceneDurationWithActiveActivity(state, activity) {
+  const durationSeconds = getActivityDurationSeconds(activity)
+  if (durationSeconds <= 0) {
+    return
+  }
+
+  const wholeSeconds = Math.floor(durationSeconds)
+  state.dummyDurationSeconds = wholeSeconds
+  state.startSecond = 0
+  state.endSecond = wholeSeconds
+  state.selectedSecond = 0
+  syncSceneTimingToConfig(state, { startSecond: 0, endSecond: wholeSeconds })
+}
 
 /**
  * Media slice — activity summary, render progress, error state, video/gpx filenames.
@@ -146,6 +165,7 @@ export function createMediaSlice(set, get) {
           state.activityFilename = null
           state.videoSyncOffsetSeconds = 0
           state.videoSyncWarning = null
+          syncSceneDurationWithActiveActivity(state, activity)
         })
         get().setActivitySummary(activity, { computeVideoSync: false })
       }
@@ -169,6 +189,7 @@ export function createMediaSlice(set, get) {
           state.hiddenVideoParsedActivity = null
           state.videoSyncOffsetSeconds = 0
           state.videoSyncWarning = null
+          syncSceneDurationWithActiveActivity(state, hiddenVideoParsedActivity)
         })
         get().setActivitySummary(get().parsedActivity, { computeVideoSync: false })
       } else {

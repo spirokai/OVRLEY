@@ -13,6 +13,13 @@ const activityFile = {
   valid_attributes: ['speed', 'heart_rate'],
 }
 
+const shortMp4Telemetry = {
+  metadata: { duration_seconds: 2.509, sample_count: 45 },
+  trim_end_seconds: 2.509,
+  file_format: 'mp4-telemetry',
+  valid_attributes: ['speed'],
+}
+
 function resetStore() {
   useStore.setState(useStore.getInitialState(), true)
 }
@@ -65,6 +72,18 @@ describe('MP4 activity — store actions', () => {
       expect(summary).not.toBeNull()
       expect(summary.durationSeconds).toBe(120)
     })
+
+    test('syncs the active timeline range to the telemetry duration', () => {
+      useStore.getState().loadVideoTelemetry(shortMp4Telemetry)
+
+      const state = useStore.getState()
+      expect(state.dummyDurationSeconds).toBe(2)
+      expect(state.startSecond).toBe(0)
+      expect(state.endSecond).toBe(2)
+      expect(state.selectedSecond).toBe(0)
+      expect(state.config.scene.start).toBe(0)
+      expect(state.config.scene.end).toBe(2)
+    })
   })
 
   describe('activateActivityFile', () => {
@@ -108,6 +127,35 @@ describe('MP4 activity — store actions', () => {
       expect(state.parsedActivity).toEqual(mp4Telemetry)
       expect(state.parsedActivitySource).toBe('video-telemetry')
       expect(state.hiddenVideoParsedActivity).toBeNull()
+    })
+
+    test('syncs the timeline range when hidden video telemetry is restored', () => {
+      useStore.getState().loadVideoTelemetry(shortMp4Telemetry)
+      useStore.getState().activateActivityFile(activityFile)
+      useStore.setState((state) => ({
+        config: {
+          ...state.config,
+          scene: {
+            ...state.config.scene,
+            start: 0,
+            end: 3600,
+          },
+        },
+        dummyDurationSeconds: 3600,
+        endSecond: 3600,
+        selectedSecond: 120,
+        startSecond: 0,
+      }))
+
+      useStore.getState().clearActivityFile()
+
+      const state = useStore.getState()
+      expect(state.parsedActivity).toEqual(shortMp4Telemetry)
+      expect(state.parsedActivitySource).toBe('video-telemetry')
+      expect(state.dummyDurationSeconds).toBe(2)
+      expect(state.endSecond).toBe(2)
+      expect(state.selectedSecond).toBe(0)
+      expect(state.config.scene.end).toBe(2)
     })
 
     test('clears everything when no hidden video telemetry exists', () => {
