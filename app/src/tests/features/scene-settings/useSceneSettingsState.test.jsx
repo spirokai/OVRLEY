@@ -19,13 +19,19 @@ vi.mock('@/api/backend', () => ({
   }),
 }))
 
+vi.mock('@/features/scene-settings/hooks/useAvailableFonts', () => ({
+  default: () => ({ recommendedFonts: [], systemFonts: [] }),
+}))
+
 describe('useSceneSettingsState', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
   })
 
   test('keeps temporary custom resolution and fps modes across unrelated scene updates', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    act(() => {
+      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    })
     const onConfigChange = vi.fn()
     const initialConfig = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
@@ -48,7 +54,9 @@ describe('useSceneSettingsState', () => {
   })
 
   test('returns to committed preset modes when resolution or FPS actually changes', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    act(() => {
+      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    })
     const onConfigChange = vi.fn()
     const initialConfig = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
@@ -70,7 +78,9 @@ describe('useSceneSettingsState', () => {
 
 describe('sceneStyleValue', () => {
   test('returns scene value when defined', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1, globalDefaults: { font_size: 42 } })
+    act(() => {
+      useStore.setState({ aspectRatio: '16:9', updateRate: 1, globalDefaults: { font_size: 42 } })
+    })
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene, font_size: 42 } }
 
@@ -80,7 +90,9 @@ describe('sceneStyleValue', () => {
   })
 
   test('returns fallback when scene value is undefined', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    act(() => {
+      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    })
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
@@ -92,7 +104,9 @@ describe('sceneStyleValue', () => {
 
 describe('handleAspectRatioChange', () => {
   test('selects a resolution preset when aspect ratio has presets', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    act(() => {
+      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    })
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
@@ -109,7 +123,9 @@ describe('handleAspectRatioChange', () => {
   })
 
   test('does not change resolution when aspect ratio is custom', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    act(() => {
+      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    })
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
@@ -125,7 +141,9 @@ describe('handleAspectRatioChange', () => {
 
 describe('handleFpsModeChange', () => {
   test('applies FPS preset value when selecting a standard FPS mode', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    act(() => {
+      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    })
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
@@ -141,7 +159,9 @@ describe('handleFpsModeChange', () => {
   })
 
   test('enters custom FPS mode without changing scene fps', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    act(() => {
+      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    })
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene, fps: 30 } }
 
@@ -158,7 +178,9 @@ describe('handleFpsModeChange', () => {
 
 describe('handleOffsetBlur', () => {
   test('parses and rounds a simple time string', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    act(() => {
+      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    })
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
@@ -173,7 +195,9 @@ describe('handleOffsetBlur', () => {
   })
 
   test('parses colon-delimited time (H:MM:SS)', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    act(() => {
+      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    })
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 
@@ -187,7 +211,9 @@ describe('handleOffsetBlur', () => {
   })
 
   test('parses decimal seconds and rounds to 1 decimal', () => {
-    useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    act(() => {
+      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
+    })
     const onConfigChange = vi.fn()
     const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
 

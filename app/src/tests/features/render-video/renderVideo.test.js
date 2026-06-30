@@ -28,6 +28,7 @@ describe('renderVideo', () => {
       started: true,
       render_id: 'render-1',
     })
+    vi.spyOn(console, 'log').mockImplementation(() => {})
   })
 
   test('prepares a render-effective payload from committed template state', async () => {

@@ -4,6 +4,7 @@ describe('backend Tauri error normalization', () => {
   beforeEach(() => {
     vi.resetModules()
     window.__TAURI_INTERNALS__ = {}
+    vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
   afterEach(() => {

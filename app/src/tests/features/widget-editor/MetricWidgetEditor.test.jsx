@@ -3,6 +3,10 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MetricWidgetEditor from '@/features/widget-editor/components/metricWidget/MetricWidgetEditor'
 
+vi.mock('@/features/scene-settings/hooks/useAvailableFonts', () => ({
+  default: () => ({ recommendedFonts: [], systemFonts: [] }),
+}))
+
 beforeAll(() => {
   globalThis.ResizeObserver = class ResizeObserver {
     observe() {}

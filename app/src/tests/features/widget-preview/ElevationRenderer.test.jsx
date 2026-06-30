@@ -43,6 +43,10 @@ function makeElevationWidget(overrides = {}) {
       marker_size: 16,
       show_elevation_metric: true,
       show_elevation_imperial: false,
+      metric_label_offset_x: 0,
+      metric_label_offset_y: 0,
+      imperial_label_offset_x: 0,
+      imperial_label_offset_y: 0,
       point_label: {
         font_size: 12,
       },

@@ -251,7 +251,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         setRenderProgress,
       })
       if (result && result.cancelled) {
-        console.log('Render video cancelled (UI handled)')
+        // cancelled
       }
     } catch (error) {
       setRenderDialogPhase('closed')

@@ -40,7 +40,6 @@ const useStore = create(
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   window.__OVRLEY_STORE__ = useStore
-  console.info('[OVRLEY] Store exposed as window.__OVRLEY_STORE__')
 }
 
 export default useStore

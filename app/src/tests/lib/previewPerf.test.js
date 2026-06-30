@@ -28,6 +28,7 @@ describe('previewPerf', () => {
     localStorage.clear()
     delete window.__OVRLEY_PREVIEW_PERF__
     delete window.__OVRLEY_PREVIEW_PERF_ENABLED__
+    vi.spyOn(console, 'info').mockImplementation(() => {})
   })
 
   afterEach(() => {

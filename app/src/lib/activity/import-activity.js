@@ -34,7 +34,6 @@ async function loadActivityIntoStore({ filename, parsedActivity, storeState }) {
 
   setActivityFilename(filename)
   activateActivityFile(parsedActivity)
-  console.log('Activity filename set in store:', filename)
 
   const durationSeconds = Number(parsedActivity?.metadata?.duration_seconds || 0)
   if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
@@ -87,22 +86,10 @@ export default async function importActivityFile(fileOrPath, storeActions) {
   const filename = file.name
   const store = storeActions
 
-  console.log('Starting activity processing:', {
-    source: 'file',
-    filename,
-  })
-
   try {
     store.clearActivitySummary()
 
     const parsedActivity = await parseActivityFile(file)
-
-    console.log('Frontend activity parse successful:', {
-      durationSeconds: parsedActivity?.metadata?.duration_seconds,
-      format: parsedActivity?.file_format,
-      samples: parsedActivity?.metadata?.sample_count,
-      validAttributes: parsedActivity?.valid_attributes,
-    })
 
     await loadActivityIntoStore({
       filename,
