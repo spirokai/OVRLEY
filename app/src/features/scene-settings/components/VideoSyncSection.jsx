@@ -22,7 +22,7 @@
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Separator } from '@/components/ui/separator'
-import { Video, Bell, ChevronUp, ChevronDown, Settings } from 'lucide-react'
+import { Video, Bell, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export default function VideoSyncSection({
@@ -49,7 +49,6 @@ export default function VideoSyncSection({
         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Video</h4>
         <Separator className="flex-1" />
       </div>
-
       <div className="space-y-2 text-xs text-muted-foreground px-1 pt-2">
         <div className="flex justify-between">
           <b>INFO:</b>
@@ -83,21 +82,18 @@ export default function VideoSyncSection({
           <span className="text-xs font-normal text-foreground/70">{importedVideoCameraModel || 'Unknown'}</span>
         </div>
       </div>
-
       {videoSyncWarning && (
         <div className="flex gap-2 items-center rounded-md bg-amber-500/15 p-2 pl-4 text-amber-400">
           <Bell className="h-3 w-3 shrink-0" />
           <p className="text-[0.65rem] font-semibold leading-tight">{videoSyncWarning}</p>
         </div>
       )}
-
       {videoResolutionMismatch && (
         <div className="flex gap-2 items-center rounded-md bg-amber-500/15 p-2 pl-4 text-amber-400">
           <Bell className="h-3 w-3 shrink-0" />
           <p className="text-[0.65rem] font-semibold leading-tight">Overlay and video resolutions do not match</p>
         </div>
       )}
-
       {activitySummary?.syncTime && (
         <div className="space-y-1">
           <Label className="text-[10px] text-muted-foreground uppercase font-bold pb-2!">Sync Offset</Label>
@@ -143,6 +139,8 @@ export default function VideoSyncSection({
           </div>
         </div>
       )}
+
+      {/* Yeah this will take an entire rewrite to plug in , so not now...
       {activitySummary && (
         <Button
           variant="outline"
@@ -152,7 +150,7 @@ export default function VideoSyncSection({
           <Settings className="h-3.5 w-3.5" />
           Set Data Sources
         </Button>
-      )}
+      )} */}
     </div>
   )
 }

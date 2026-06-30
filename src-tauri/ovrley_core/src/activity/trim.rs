@@ -49,6 +49,9 @@ fn trim_numeric_series(
     start_inner_index: usize,
     end_inner_index: usize,
 ) -> Vec<Option<f64>> {
+    if data.is_empty() {
+        return Vec::new();
+    }
     // Boundary interpolation preserves continuity when the trim cuts through
     // the middle of a source sampling interval.
     let start_value = interpolate_numeric_series_value(elapsed, data, start);
@@ -160,7 +163,7 @@ pub fn trim_activity(
         trimmed
     };
 
-    let course = if requirements.course {
+    let course = if requirements.course && !activity.course.is_empty() {
         let start_course = interpolate_course_value(elapsed, &activity.course, start);
         let end_course = interpolate_course_value(elapsed, &activity.course, end);
         let mut course = Vec::with_capacity(end_inner_index.saturating_sub(start_inner_index) + 2);
@@ -542,7 +545,7 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
-        time: if requirements.time {
+        time: if requirements.time && !activity.time.is_empty() {
             let start_value = interpolate_time_series_value(elapsed, &activity.time, start);
             let end_value = interpolate_time_series_value(elapsed, &activity.time, end);
             let mut trimmed =
