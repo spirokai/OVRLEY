@@ -40,6 +40,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoDuration = useStore((state) => state.importedVideoDuration)
   const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)
+  const sourceActivity = useStore((state) => state.parsedActivity)
 
   const moveableRef = useRef(null)
   const interactionStartRef = useRef(null)
@@ -60,7 +61,6 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     setLiveWidgetPreview,
   } = useWidgetDraftState()
 
-  const sourceActivity = useStore.getState().parsedActivity
   const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
   const widgets = useMemo(
     () => rawWidgets.map((widget) => ({ ...widget, data: getEffectiveWidgetData(widget, globalDefaults) })),
@@ -143,6 +143,7 @@ export default function useOverlayEditorState({ config, globalDefaults, onConfig
     globalDefaults,
     globalOpacity,
     globalScale,
+    activity: sourceActivity,
     interactionStartRef,
     liveWidgetDrafts,
     liveWidgetPreviews,

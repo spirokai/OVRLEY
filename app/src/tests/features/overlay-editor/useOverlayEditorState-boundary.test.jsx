@@ -7,17 +7,57 @@
  * function signature.
  */
 
-import { describe, expect, test } from 'vitest'
+import { act, renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useOverlayEditorState from '@/features/overlay-editor/hooks/useOverlayEditorState'
 import { getPrimarySelectionId, normalizeSelectionIds } from '@/features/overlay-editor/utils/overlayEditorHelpers'
+import useStore from '@/store/useStore'
+import { DEFAULT_CONFIG } from '@/store/store-utils'
+
+function resetStore() {
+  useStore.setState(useStore.getInitialState(), true)
+}
 
 describe('useOverlayEditorState module contract', () => {
+  beforeEach(resetStore)
+
   test('exports a function as default', () => {
     expect(typeof useOverlayEditorState).toBe('function')
   })
 
   test('accepts config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange', () => {
     expect(useOverlayEditorState.length).toBe(1)
+  })
+
+  test('reacts when parsedActivity is replaced after async telemetry load', () => {
+    useStore.setState({
+      dummyDurationSeconds: 10,
+      parsedActivity: null,
+      selectedSecond: 9,
+    })
+
+    const { result } = renderHook(() =>
+      useOverlayEditorState({
+        config: DEFAULT_CONFIG,
+        globalDefaults: {},
+        onConfigChange: vi.fn(),
+        zoomLevel: 1,
+        onZoomLevelChange: vi.fn(),
+      }),
+    )
+
+    expect(result.current.previewSecond).toBe(9)
+
+    act(() => {
+      useStore.setState({
+        parsedActivity: {
+          trim_end_seconds: 3,
+          metadata: { duration_seconds: 3 },
+        },
+      })
+    })
+
+    expect(result.current.previewSecond).toBe(3)
   })
 })
 

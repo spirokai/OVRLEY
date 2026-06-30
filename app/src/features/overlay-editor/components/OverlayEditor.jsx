@@ -10,7 +10,6 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutGrid, Tag } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import EditorToolbar from '@/features/app-shell/components/EditorToolbar'
-import useStore from '@/store/useStore'
 import OverlayCanvas from './OverlayCanvas'
 import OverlayMoveable from './OverlayMoveable'
 import { buildMetricWidgetPreviewModel, buildTextWidgetPreviewModel } from '@/features/widget-preview'
@@ -141,6 +140,7 @@ function OverlayEditor({
 
   // Derived state hook — widgets, scene, preview, drafts
   const overlayState = useOverlayEditorState({ config, globalDefaults, onConfigChange, zoomLevel, onZoomLevelChange })
+  const activity = overlayState.activity
 
   // Selection management — composed after overlayState so it can consume orderedWidgetIds, renderedWidgetMap, widgetNodes
   const selection = useWidgetSelection({
@@ -187,7 +187,6 @@ function OverlayEditor({
   })
 
   // Moveable interaction hooks
-  const activity = useStore.getState().parsedActivity
   const effectiveSelectedWidgetIds = selection.effectiveSelectedWidgetIds
 
   const dragHandlers = useDragHandlers({

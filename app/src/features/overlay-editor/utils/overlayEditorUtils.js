@@ -135,9 +135,10 @@ export function getInterpolatedSeriesValue(xValues, yValues, targetX) {
 }
 
 /**
- * Returns the last known value at or before the target X using hold semantics.
+ * Returns the held value at the target X.
  * Finds the sample with the largest X <= targetX and returns its Y value.
- * Null Y values are skipped by walking backward from the insertion point.
+ * If the target is before the first valid sample, clamps to that first sample
+ * so preview behavior matches render boundary interpolation.
  *
  * @param {number[]} xValues - X-axis sample values (monotonic).
  * @param {number[]} yValues - Y-axis sample values aligned with xValues.
@@ -170,6 +171,12 @@ export function getHoldSeriesValue(xValues, yValues, targetX) {
   }
 
   if (bestIndex === -1) {
+    for (let i = 0; i < xValues.length && i < yValues.length; i += 1) {
+      if (isValidInterpolatedSample(xValues, yValues, i)) {
+        return Number(yValues[i])
+      }
+    }
+
     return null
   }
 

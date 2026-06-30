@@ -57,8 +57,18 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
     expect(getInterpolatedActivityValue(baseActivity, 'altitude', 1.2)).toBe(22)
   })
 
-  test('hold metric returns null for elapsedSecond before first sample', () => {
-    expect(getInterpolatedActivityValue(baseActivity, 'iso', -1)).toBe(null)
+  test('hold metric clamps to the first sample before the first sample time', () => {
+    expect(getInterpolatedActivityValue(baseActivity, 'iso', -1)).toBe(100)
+    expect(
+      getInterpolatedActivityValue(
+        {
+          sample_elapsed_seconds: [0.110097, 0.5],
+          iso: [100, 200],
+        },
+        'iso',
+        0,
+      ),
+    ).toBe(100)
   })
 
   test('hold metric returns last sample for elapsedSecond beyond last sample', () => {
