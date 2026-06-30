@@ -104,12 +104,12 @@ fn default_heading_cache(display_type: DisplayType) -> HeadingWidgetCache {
             surface.image_snapshot()
         },
         tape_width: 1800.0,
-        tape_body_y: 14.0,
-        tape_body_height: 51.0,
+        tape_body_y: 15.0,
+        tape_body_height: 65.0,
         x: 100.0,
         y: 200.0,
         width: 400,
-        height: 65,
+        height: 80,
         pixels_per_degree: 5.0,
         show_indicator: true,
         indicator_style: "chevron".to_string(),
@@ -230,7 +230,7 @@ fn tape_display_type_with_heading_cache_draws_successfully() {
     );
     let report = result.unwrap();
     assert_eq!(report.geometry.widget_width, 400);
-    assert_eq!(report.geometry.widget_height, 65);
+    assert_eq!(report.geometry.widget_height, 80);
 }
 
 #[test]
@@ -586,8 +586,8 @@ fn render_preserves_multiple_boxed_reports() {
         "Reported widget geometry should match configured heading-tape width"
     );
     assert_eq!(
-        presentation.widget.geometry.widget_height, 35,
-        "Reported widget geometry should include the configured heading-tape body and visible chevron slot"
+        presentation.widget.geometry.widget_height, 60,
+        "Reported widget geometry should match configured heading-tape frame height"
     );
 
     let _ = std::fs::remove_file(&out_path);

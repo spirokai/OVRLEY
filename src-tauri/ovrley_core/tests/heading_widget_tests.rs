@@ -100,12 +100,12 @@ fn default_cache() -> HeadingWidgetCache {
             surface.image_snapshot()
         },
         tape_width: 1800.0,
-        tape_body_y: 14.0,
-        tape_body_height: 51.0,
+        tape_body_y: 15.0,
+        tape_body_height: 65.0,
         x: 100.0,
         y: 200.0,
         width: 400,
-        height: 65,
+        height: 80,
         pixels_per_degree: 5.0,
         show_indicator: true,
         indicator_style: "chevron".to_string(),
@@ -302,21 +302,46 @@ fn chevron_vertices_pointing_up() {
 fn heading_tape_layout_adds_only_visible_chevron_slots() {
     let top = heading_tape_layout(80.0, true, "chevron", "top", 10.0, 40.0, 4.0, 12.0);
     assert!((top.body_y - 15.0).abs() < f32::EPSILON);
-    assert!((top.body_height - 51.0).abs() < f32::EPSILON);
-    assert!((top.tick_scale_height - 80.0).abs() < f32::EPSILON);
-    assert!((top.total_height - 66.0).abs() < f32::EPSILON);
+    assert!((top.body_height - 65.0).abs() < f32::EPSILON);
+    assert!((top.tick_scale_height - 115.0).abs() < 0.001);
+    assert!((top.total_height - 80.0).abs() < f32::EPSILON);
     assert!(top.has_top_chevron);
     assert!(!top.has_bottom_chevron);
 
     let bottom = heading_tape_layout(80.0, true, "chevron", "bottom", 10.0, 40.0, 4.0, 12.0);
     assert!((bottom.body_y - 0.0).abs() < f32::EPSILON);
-    assert!((bottom.total_height - 66.0).abs() < f32::EPSILON);
+    assert!((bottom.body_height - 65.0).abs() < f32::EPSILON);
+    assert!((bottom.tick_scale_height - 115.0).abs() < 0.001);
+    assert!((bottom.total_height - 80.0).abs() < f32::EPSILON);
     assert!(!bottom.has_top_chevron);
     assert!(bottom.has_bottom_chevron);
 
     let both = heading_tape_layout(80.0, true, "chevron", "both", 10.0, 40.0, 4.0, 12.0);
     assert!((both.body_y - 15.0).abs() < f32::EPSILON);
-    assert!((both.total_height - 81.0).abs() < f32::EPSILON);
+    assert!((both.body_height - 50.0).abs() < f32::EPSILON);
+    assert!((both.tick_scale_height - 77.5).abs() < 0.001);
+    assert!((both.total_height - 80.0).abs() < f32::EPSILON);
+}
+
+#[test]
+fn heading_tape_layout_adds_body_margin_for_highlight_bars() {
+    let layout = heading_tape_layout(
+        80.0,
+        true,
+        "highlight_bar",
+        "both",
+        10.0,
+        40.0,
+        4.0,
+        12.0,
+    );
+
+    assert!((layout.body_y - 8.0).abs() < f32::EPSILON);
+    assert!((layout.body_height - 64.0).abs() < f32::EPSILON);
+    assert!((layout.tick_scale_height - 112.5).abs() < 0.001);
+    assert!((layout.total_height - 80.0).abs() < f32::EPSILON);
+    assert!(!layout.has_top_chevron);
+    assert!(!layout.has_bottom_chevron);
 }
 
 #[test]
@@ -349,9 +374,9 @@ fn prepare_heading_cache_produces_non_empty_tape() {
 
     assert!((cache.tape_width - 1800.0).abs() < 1.0);
     assert_eq!(cache.width, 400);
-    assert_eq!(cache.height, 66);
+    assert_eq!(cache.height, 80);
     assert!((cache.tape_body_y - 15.0).abs() < f32::EPSILON);
-    assert!((cache.tape_body_height - 51.0).abs() < f32::EPSILON);
+    assert!((cache.tape_body_height - 65.0).abs() < f32::EPSILON);
     assert!((cache.pixels_per_degree - 5.0).abs() < f32::EPSILON);
     assert!((cache.x - 100.0).abs() < f32::EPSILON);
     assert!((cache.y - 200.0).abs() < f32::EPSILON);
@@ -370,7 +395,7 @@ fn prepare_heading_cache_with_no_labels() {
         prepare_heading_cache(&default_validated_scene(), &heading, &[], &mut profiler).unwrap();
 
     assert_eq!(cache.width, 400);
-    assert_eq!(cache.height, 66);
+    assert_eq!(cache.height, 80);
 }
 
 #[test]
@@ -391,6 +416,8 @@ fn prepare_heading_cache_stores_indicator_config() {
     assert_eq!(cache.indicator_placement, "both");
     assert_eq!(cache.indicator_color, "#00FF00");
     assert!((cache.indicator_size - 20.0).abs() < f32::EPSILON);
+    assert!((cache.tape_body_y - 8.0).abs() < f32::EPSILON);
+    assert!((cache.tape_body_height - 64.0).abs() < f32::EPSILON);
 }
 
 #[test]
@@ -421,5 +448,5 @@ fn draw_heading_widget_with_chevron_indicator() {
     assert!(report.is_some());
     let report = report.unwrap();
     assert_eq!(report.geometry.widget_width, 400);
-    assert_eq!(report.geometry.widget_height, 65);
+    assert_eq!(report.geometry.widget_height, 80);
 }

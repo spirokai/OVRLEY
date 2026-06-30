@@ -17,6 +17,7 @@ const CARDINAL_LABELS = [
 ]
 
 export const HEADING_TAPE_LABEL_DESCENT_PCT = 0.25
+export const HEADING_TAPE_HIGHLIGHT_BAR_BODY_MARGIN_FRAME_PCT = 0.1
 
 export function headingTapeHasChevron(config, placement) {
   return Boolean(
@@ -26,15 +27,26 @@ export function headingTapeHasChevron(config, placement) {
   )
 }
 
+export function headingTapeHasHighlightBar(config) {
+  return Boolean(config?.show_indicator && config?.indicator_style === 'highlight_bar')
+}
+
 export function headingTapeLayout(config) {
-  const tickScaleHeight = Math.max(Number(config?.height) || 0, 1)
-  const bodyHeight = headingTapeBodyHeight(tickScaleHeight, config)
+  const frameHeight = Math.max(Number(config?.height) || 0, 1)
   const indicatorSize = Math.max(Number(config?.indicator_size) || 0, 0)
   const gap = indicatorSize * 0.5
   const hasTopChevron = headingTapeHasChevron(config, 'top')
   const hasBottomChevron = headingTapeHasChevron(config, 'bottom')
-  const topSlot = hasTopChevron ? indicatorSize + gap : 0
-  const bottomSlot = hasBottomChevron ? indicatorSize + gap : 0
+  const highlightBarMargin = headingTapeHasHighlightBar(config) ? frameHeight * HEADING_TAPE_HIGHLIGHT_BAR_BODY_MARGIN_FRAME_PCT : 0
+  const idealTopSlot = hasTopChevron ? indicatorSize + gap : highlightBarMargin
+  const idealBottomSlot = hasBottomChevron ? indicatorSize + gap : highlightBarMargin
+  const availableSlotHeight = Math.max(frameHeight - 1, 0)
+  const idealSlotHeight = idealTopSlot + idealBottomSlot
+  const slotScale = idealSlotHeight > availableSlotHeight && idealSlotHeight > 0 ? availableSlotHeight / idealSlotHeight : 1
+  const topSlot = idealTopSlot * slotScale
+  const bottomSlot = idealBottomSlot * slotScale
+  const bodyHeight = Math.max(frameHeight - topSlot - bottomSlot, 1)
+  const tickScaleHeight = headingTickScaleHeightForRenderedBody(bodyHeight, config)
 
   return {
     bodyHeight,
@@ -42,12 +54,8 @@ export function headingTapeLayout(config) {
     hasBottomChevron,
     hasTopChevron,
     tickScaleHeight,
-    totalHeight: topSlot + bodyHeight + bottomSlot,
+    totalHeight: frameHeight,
   }
-}
-
-export function headingTapeRenderedHeight(config) {
-  return headingTapeLayout(config).totalHeight
 }
 
 export function headingTickPosition(bodyHeight, config, isMajor) {

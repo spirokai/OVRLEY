@@ -116,8 +116,8 @@ fn draw_indicator(canvas: &Canvas, cache: &HeadingWidgetCache) {
             canvas,
             cache,
             center_x,
-            cache.y + cache.tape_body_y,
-            cache.y + cache.tape_body_y + cache.tape_body_height,
+            top_y,
+            bottom_y,
             color,
         ),
         _ => {}

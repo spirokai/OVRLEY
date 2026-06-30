@@ -382,6 +382,34 @@ describe('OverlayEditor selection flow', () => {
     expect(renderGeometry.badgeTop).toBe(215)
   })
 
+  test('uses heading tape frame height for render geometry', () => {
+    const renderGeometry = resolveWidgetRenderGeometry(
+      {
+        id: 'heading-1',
+        type: 'heading',
+        category: 'values',
+        data: {
+          x: 10,
+          y: 20,
+          display_type: 'heading_tape',
+          width: 400,
+          height: 80,
+          display_variants: {
+            heading_tape: {
+              width: 400,
+              height: 80,
+            },
+          },
+        },
+      },
+      null,
+      1,
+    )
+
+    expect(renderGeometry.width).toBe(400)
+    expect(renderGeometry.height).toBe(80)
+  })
+
   test('renders the canvas toolbar centered above the preview area', () => {
     const config = makeConfig([makeLabel('A', { id: 'widget-1' })])
 

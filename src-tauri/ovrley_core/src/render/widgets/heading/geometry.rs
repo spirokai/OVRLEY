@@ -5,6 +5,7 @@
 //! between the Skia backend (cached tape image) and the frontend SVG preview.
 
 pub const LABEL_DESCENT_PCT: f32 = 0.25;
+pub const HIGHLIGHT_BAR_BODY_MARGIN_FRAME_PCT: f32 = 0.1;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct HeadingTapeLayout {
@@ -27,8 +28,12 @@ pub fn heading_tape_has_chevron(
         && (indicator_placement == placement || indicator_placement == "both")
 }
 
+pub fn heading_tape_has_highlight_bar(show_indicator: bool, indicator_style: &str) -> bool {
+    show_indicator && indicator_style == "highlight_bar"
+}
+
 pub fn heading_tape_layout(
-    tick_scale_height: f32,
+    frame_height: f32,
     show_indicator: bool,
     indicator_style: &str,
     indicator_placement: &str,
@@ -37,13 +42,7 @@ pub fn heading_tape_layout(
     label_offset: f32,
     font_size: f32,
 ) -> HeadingTapeLayout {
-    let tick_scale_height = tick_scale_height.max(1.0);
-    let body_height = heading_tape_body_height(
-        tick_scale_height,
-        major_tick_length_pct,
-        label_offset,
-        font_size,
-    );
+    let frame_height = frame_height.max(1.0);
     let indicator_size = indicator_size.max(0.0);
     let gap = indicator_size * 0.5;
     let has_top_chevron =
@@ -54,25 +53,59 @@ pub fn heading_tape_layout(
         indicator_placement,
         "bottom",
     );
-    let top_slot = if has_top_chevron {
+    let highlight_bar_margin =
+        if heading_tape_has_highlight_bar(show_indicator, indicator_style) {
+            frame_height * HIGHLIGHT_BAR_BODY_MARGIN_FRAME_PCT
+        } else {
+            0.0
+        };
+    let ideal_top_slot = if has_top_chevron {
         indicator_size + gap
     } else {
-        0.0
+        highlight_bar_margin
     };
-    let bottom_slot = if has_bottom_chevron {
+    let ideal_bottom_slot = if has_bottom_chevron {
         indicator_size + gap
     } else {
-        0.0
+        highlight_bar_margin
     };
+    let available_slot_height = (frame_height - 1.0).max(0.0);
+    let ideal_slot_height = ideal_top_slot + ideal_bottom_slot;
+    let slot_scale = if ideal_slot_height > available_slot_height && ideal_slot_height > 0.0 {
+        available_slot_height / ideal_slot_height
+    } else {
+        1.0
+    };
+    let top_slot = ideal_top_slot * slot_scale;
+    let bottom_slot = ideal_bottom_slot * slot_scale;
+    let body_height = (frame_height - top_slot - bottom_slot).max(1.0);
+    let tick_scale_height = heading_tick_scale_height_for_rendered_body(
+        body_height,
+        major_tick_length_pct,
+        label_offset,
+        font_size,
+    );
 
     HeadingTapeLayout {
         body_y: top_slot,
         body_height,
         tick_scale_height,
-        total_height: top_slot + body_height + bottom_slot,
+        total_height: frame_height,
         has_top_chevron,
         has_bottom_chevron,
     }
+}
+
+pub fn heading_tick_scale_height_for_rendered_body(
+    rendered_body_height: f32,
+    major_tick_length_pct: f32,
+    label_offset: f32,
+    font_size: f32,
+) -> f32 {
+    let major_tick_ratio = (major_tick_length_pct.max(0.001)) / 100.0;
+    let fixed_label_stack = label_offset + font_size * (1.0 + LABEL_DESCENT_PCT);
+
+    ((rendered_body_height - fixed_label_stack) / major_tick_ratio).max(1.0)
 }
 
 pub fn heading_tick_position(

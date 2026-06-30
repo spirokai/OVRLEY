@@ -143,7 +143,7 @@ export function OverlayHeadingWidget({ widget, activity, previewSecond, globalOp
       {data.show_indicator && (
         <>
           {data.indicator_style === 'highlight_bar'
-            ? renderHighlightBar(model.width / 2, model.bodyY, model.bodyHeight, data)
+            ? renderHighlightBar(model.width / 2, 0, model.totalHeight, data)
             : renderChevron(model.width / 2, 0, model.totalHeight, data, model.shadow?.strength > 0 ? model.shadowFilterId : null)}
         </>
       )}

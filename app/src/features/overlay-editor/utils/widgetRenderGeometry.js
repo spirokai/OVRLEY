@@ -1,7 +1,6 @@
 import { buildWidgetTransform } from '@/lib/geometryUtils'
 import { isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
 import { resolveActiveMetricWidgetData } from '@/lib/widget/metric-widget-resolver'
-import { headingTapeRenderedHeight } from '@/features/widget-preview/utils/headingGeometry'
 import { getWidgetSceneOrigin } from './overlayEditorHelpers'
 
 function buildScaleTranslate(tx, ty) {
@@ -19,10 +18,7 @@ export function resolveWidgetRenderGeometry(widget, visualBounds, globalScale, p
   const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
   const resolvedData = isBoxed ? resolveActiveMetricWidgetData(widget.data) : widget.data
   const boxedWidth = (resolvedData.width ?? 0) * (globalScale || 1)
-  const boxedHeight =
-    resolvedData.display_type === 'heading_tape'
-      ? headingTapeRenderedHeight(resolvedData) * (globalScale || 1)
-      : (resolvedData.height ?? 0) * (globalScale || 1)
+  const boxedHeight = (resolvedData.height ?? 0) * (globalScale || 1)
   const staticOrigin = getWidgetSceneOrigin(widget, null, visualBounds, {
     boundsScale: isBoxed ? 1 : globalScale,
   })

@@ -32,13 +32,13 @@ pub fn prepare_heading_cache(
     let scale = scene.scale.max(0.1);
     let scaled_ppd = heading.pixels_per_degree * scale;
     let tape_width = (360.0 * scaled_ppd).ceil() as u32;
-    let scaled_tick_scale_height = (heading.height as f32) * scale;
     let scaled_width = ((heading.width as f32) * scale).round().max(1.0) as u32;
+    let scaled_frame_height = ((heading.height as f32) * scale).round().max(1.0);
     let scaled_indicator_size = heading.indicator_size * scale;
     let label_offset = heading.label_offset * scale;
     let font_size = heading.label_font_size * scale;
     let layout = heading_tape_layout(
-        scaled_tick_scale_height,
+        scaled_frame_height,
         heading.show_indicator,
         &heading.indicator_style,
         &heading.indicator_placement,
@@ -48,7 +48,7 @@ pub fn prepare_heading_cache(
         font_size,
     );
     let tape_height = layout.body_height.ceil().max(1.0) as u32;
-    let scaled_height = layout.total_height.ceil().max(1.0) as u32;
+    let scaled_height = layout.total_height.round().max(1.0) as u32;
 
     // Resolve shadow style from scene defaults (shadow is not part of heading contract)
     let shadow = normalize_shadow_style_validated(
