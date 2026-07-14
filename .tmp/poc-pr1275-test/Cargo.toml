@@ -1,0 +1,19 @@
+[package]
+name = "wasm_preview_poc"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "wasm_preview_poc"
+path = "src/main.rs"
+
+[dependencies]
+skia-safe = { path = "../rust-skia-pr1275/skia-safe", default-features = false }
+
+[profile.wasm-preview]
+inherits = "release"
+panic = "abort"

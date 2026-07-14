@@ -1,0 +1,14 @@
+diff --git a/gn/toolchain/BUILD.gn b/gn/toolchain/BUILD.gn
+index 4ea6d8c4..d68817a2 100644
+--- a/gn/toolchain/BUILD.gn
++++ b/gn/toolchain/BUILD.gn
+@@ -482,5 +482,5 @@
+-    # rust-skia: skip activation when an explicit emsdk path is configured.
+-    if (!is_canvaskit && skia_emsdk_dir == "") {
+-      deps = [ "//gn/toolchain/emsdk:activate(//gn/toolchain:$host_toolchain)" ]
+-    }
++    # rust-skia: Emscripten builds provide skia_emsdk_dir and select their
++    # Emscripten tools above. The wasm32-unknown-unknown path uses the WASI
++    # SDK tools supplied by the Rust-Skia build script and must not activate
++    # Skia's Emscripten toolchain action.
+   }
