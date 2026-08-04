@@ -12,7 +12,16 @@ use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
 const MAX_PARALLEL_FRAME_BUFFERS: usize = 5;
 pub const MAX_FRAME_WORKERS: usize = MAX_PARALLEL_FRAME_BUFFERS - 1;
-const PARALLEL_FRAME_MEMORY_CEILING_BYTES: usize = 192 * 1024 * 1024;
+
+/// Upper limit for RGBA frame pool memory.
+///
+/// Increased from 192 MiB to 512 MiB to support high-resolution sources,
+/// including DJI Action 4 portrait footage (2880×3840), while maintaining
+/// a conservative upper memory bound.
+///
+/// This allows the default 4-worker pipeline to allocate enough RGBA
+/// frame buffers without exhausting the frame pool.
+const PARALLEL_FRAME_MEMORY_CEILING_BYTES: usize = 512 * 1024 * 1024;
 
 /// Diagnoses the canonical frame-worker count for one codec profile and render.
 pub fn diagnose_frame_worker_count(
