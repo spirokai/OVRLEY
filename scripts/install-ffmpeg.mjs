@@ -6,11 +6,17 @@ import { basename, dirname, join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const PINNED_BTBN_FFMPEG_BUILD = "N-125608-g150f7d15df";
+// Pin to the last monthly BtbN autobuild.
+// Daily autobuilds are periodically removed and may return HTTP 404.
+const PINNED_BTBN_AUTOBUILD = "autobuild-2026-07-31-14-10";
+const PINNED_BTBN_FFMPEG_BUILD = "N-125875-g5d4d3bdc61";
+const BTBN_BASE =
+  `https://github.com/BtbN/FFmpeg-Builds/releases/download/${PINNED_BTBN_AUTOBUILD}`;
 const PINNED_WINDOWS_FFMPEG_ARCHIVE =
-  "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-14-13-19/ffmpeg-N-125608-g150f7d15df-win64-gpl-shared.zip";
+  `${BTBN_BASE}/ffmpeg-${PINNED_BTBN_FFMPEG_BUILD}-win64-gpl-shared.zip`;
 const PINNED_LINUX_FFMPEG_ARCHIVE =
-  "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-14-13-19/ffmpeg-N-125608-g150f7d15df-linux64-gpl-shared.tar.xz";
+  `${BTBN_BASE}/ffmpeg-${PINNED_BTBN_FFMPEG_BUILD}-linux64-gpl-shared.tar.xz`;
+
 const PINNED_DARWIN_FFMPEG_VERSION = "8.1.2";
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const installDir = join(rootDir, "vendor", "ffmpeg");
