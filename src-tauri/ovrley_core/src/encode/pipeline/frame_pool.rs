@@ -12,7 +12,7 @@ use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
 const MAX_PARALLEL_FRAME_BUFFERS: usize = 5;
 pub const MAX_FRAME_WORKERS: usize = MAX_PARALLEL_FRAME_BUFFERS - 1;
-const PARALLEL_FRAME_MEMORY_CEILING_BYTES: usize = 192 * 1024 * 1024;
+const PARALLEL_FRAME_MEMORY_CEILING_BYTES: usize = 768 * 1024 * 1024;
 
 /// Diagnoses the canonical frame-worker count for one codec profile and render.
 pub fn diagnose_frame_worker_count(
