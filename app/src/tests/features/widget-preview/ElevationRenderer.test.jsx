@@ -74,6 +74,7 @@ function makeElevationWidget(overrides = {}) {
 
 function makeActivity() {
   return {
+    trim_end_seconds: 30,
     sample_elapsed_seconds: [0, 10, 20, 30],
     sample_distance_progress: [0, 0.33, 0.66, 1],
     sample_elevations: [100, 130, 115, 160],
@@ -115,5 +116,34 @@ describe('OverlayElevationWidget', () => {
     expect(svg).toHaveAttribute('viewBox', '0 0 240 48')
     expect(marker).toHaveAttribute('r', '16')
     expect(line).toHaveAttribute('stroke-width', '2')
+  })
+
+  test('maps scaled Rust geometry into logical SVG coordinates and lets the outer frame scale the stroke', async () => {
+    mockBuildElevationGeometry.mockResolvedValue({
+      ...GEOMETRY_RESPONSE,
+      points: GEOMETRY_RESPONSE.points.map(([x, y]) => [x * 2, y * 2]),
+      widgetWidth: 480,
+      widgetHeight: 96,
+    })
+
+    const { container } = render(
+      <OverlayElevationWidget
+        widget={makeElevationWidget()}
+        activity={makeActivity()}
+        previewSecond={15}
+        globalOpacity={1}
+        globalScale={2}
+        sceneStyle={{}}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('polyline')).toBeTruthy()
+    })
+
+    const line = container.querySelector('polyline')
+    expect(line).toHaveAttribute('points', '0,48 80,24 160,36 240,0')
+    expect(line).toHaveAttribute('stroke-width', '2')
+    expect(line).not.toHaveAttribute('vector-effect')
   })
 })
