@@ -135,14 +135,6 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
 
   const isProgress = phase === 'progress'
 
-  const handleBackdropPointerDown = (event) => {
-    if (isProgress || event.target !== event.currentTarget) {
-      return
-    }
-
-    onClose()
-  }
-
   const handleApplyImportedVideoRange = useCallback(() => {
     if (!hasImportedVideo) {
       return
@@ -227,7 +219,6 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     fpsMode,
     handleAccelerationChange,
     handleApplyImportedVideoRange,
-    handleBackdropPointerDown,
     handleCancel,
     handleCustomFpsChange,
     handleExportModeChange,

@@ -1,0 +1,27 @@
+{
+  "categories": [
+    {
+      "name": "Playback",
+      "shortcuts": [
+        { "keys": ["Space"], "description": "Play / Pause" },
+        { "keys": ["←"], "description": "Step back 1 second" },
+        { "keys": ["→"], "description": "Step forward 1 second" }
+      ]
+    },
+    {
+      "name": "Editor",
+      "shortcuts": [
+        { "keys": ["Ctrl/CMD", "C"], "description": "Copy selected widget(s)" },
+        { "keys": ["Ctrl/CMD", "V"], "description": "Paste widget(s)" },
+        { "keys": ["Del"], "description": "Delete selected widget(s)" }
+      ]
+    },
+    {
+      "name": "History",
+      "shortcuts": [
+        { "keys": ["Ctrl/CMD", "Z"], "description": "Undo" },
+        { "keys": ["Ctrl/CMD", "Shift", "Z"], "description": "Redo" }
+      ]
+    }
+  ]
+}

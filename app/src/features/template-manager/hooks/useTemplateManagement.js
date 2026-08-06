@@ -3,7 +3,7 @@
  * Container hook — composes sub-hooks and exposes template actions.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import { hasTauriRuntime } from '@/features/app-shell'
 import { fileFromSelectedPath, openSinglePath } from '@/lib/file-dialog'
@@ -81,24 +81,6 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     aspectRatio,
     lastSavedTemplateState,
   })
-
-  // Side effects — closes the new-template confirmation dialog on Escape key press
-  useEffect(() => {
-    if (!showNewTemplateConfirm || typeof window === 'undefined') {
-      return undefined
-    }
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        setShowNewTemplateConfirm(false)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [showNewTemplateConfirm])
 
   // Template change handler — loads a template from the backend by filename
   const handleTemplateChange = useCallback(

@@ -24,6 +24,7 @@ import AppHeader from '@/features/app-shell/components/AppHeader'
 const defaultProps = {
   activityControls: { activityLabel: 'Test Activity', onOpenActivityFile: vi.fn() },
   backendStatus: 'connected',
+  keyboardShortcutsControls: { openKeyboardShortcuts: vi.fn() },
   onOpenDownloads: vi.fn(),
   renderControls: {
     onOpenRenderDialog: vi.fn(),

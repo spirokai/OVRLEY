@@ -20,6 +20,7 @@ import {
   AppHeader,
   ControlPanel,
   ErrorAlert,
+  KeyboardShortcutsDialog,
   LoadingOverlay,
   useActivityImport,
   useAppBootstrap,
@@ -149,6 +150,12 @@ function useAppShellComposition() {
     templates: templateManagement.templates,
   }
 
+  const keyboardShortcutsControls = {
+    openKeyboardShortcuts: editorShell.openKeyboardShortcuts,
+    closeKeyboardShortcuts: editorShell.closeKeyboardShortcuts,
+    keyboardShortcutsOpen: editorShell.keyboardShortcutsOpen,
+  }
+
   return {
     activityControls,
     backendStatus,
@@ -159,6 +166,7 @@ function useAppShellComposition() {
     handleOpenDownloads,
     importingVideo,
     isProcessing,
+    keyboardShortcutsControls,
     renderControls,
     renderWorkflow,
     setConfig,
@@ -186,6 +194,7 @@ function AppShell() {
     handleOpenDownloads,
     importingVideo,
     isProcessing,
+    keyboardShortcutsControls,
     renderControls,
     renderWorkflow,
     setConfig,
@@ -216,10 +225,12 @@ function AppShell() {
           onCancel={() => templateManagement.setShowNewTemplateConfirm(false)}
           onConfirm={templateManagement.confirmCreateNewTemplate}
         />
+        <KeyboardShortcutsDialog open={keyboardShortcutsControls.keyboardShortcutsOpen} onClose={keyboardShortcutsControls.closeKeyboardShortcuts} />
         <AppHeader
           activityControls={activityControls}
           backendStatus={backendStatus}
           onOpenDownloads={handleOpenDownloads}
+          keyboardShortcutsControls={keyboardShortcutsControls}
           renderControls={renderControls}
           templateControls={templateControls}
           videoControls={videoControls}
