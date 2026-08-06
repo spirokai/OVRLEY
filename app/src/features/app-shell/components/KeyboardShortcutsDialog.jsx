@@ -31,7 +31,7 @@ export default function KeyboardShortcutsDialog({ open, onClose }) {
     >
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md"
-        className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-sm border border-accent-border/80 bg-card/95 py-6 shadow-2xl shadow-background/50"
+        className="flex max-h-[70vh] w-full max-w-2xl flex-col rounded-sm border border-accent-border/80 bg-card/95 py-6 shadow-2xl shadow-background/50"
         aria-describedby={undefined}
       >
         <div className="flex items-center gap-3 px-6">
@@ -77,7 +77,7 @@ export default function KeyboardShortcutsDialog({ open, onClose }) {
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3 px-6">
           <Button
             type="button"
             variant="outline"
