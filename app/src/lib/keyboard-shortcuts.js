@@ -1,6 +1,9 @@
 import shortcutManifest from '@/data/keyboardShortcuts.json'
 
+const shortcutCommands = shortcutManifest.categories.flatMap((category) => category.commands)
+
 function getEventKey(event) {
+  if (event.type === 'wheel') return 'wheel'
   if (event.key === ' ') return 'space'
   if (event.key) return String(event.key).toLowerCase()
 
@@ -32,17 +35,19 @@ function matchesModifiers(event, modifiers) {
 }
 
 /**
- * Finds the command declared for a keyboard event in one owning scope.
+ * Finds the command declared for a keyboard or wheel event in one owning scope.
  *
- * @param {KeyboardEvent} event - Keyboard event to translate.
+ * @param {KeyboardEvent|WheelEvent} event - Event to translate.
  * @param {string} scope - Shortcut owner.
  * @returns {{ commandId: string, binding: object }|null} Matching command metadata.
  */
 export function matchKeyboardShortcut(event, scope) {
   const key = getEventKey(event)
-  for (const command of shortcutManifest.commands) {
+  for (const command of shortcutCommands) {
     if (command.scope !== scope) continue
-    const binding = command.bindings.find((candidate) => candidate.key === key && matchesModifiers(event, candidate.modifiers))
+    const binding = command.bindings.find(
+      (candidate) => !candidate.displayOnly && candidate.key === key && matchesModifiers(event, candidate.modifiers),
+    )
     if (binding) {
       return {
         commandId: command.id,

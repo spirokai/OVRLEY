@@ -27,9 +27,9 @@ function hasOpenKeyboardOverlay() {
  * @param {Array} options.selectedWidgets - Currently selected widgets.
  * @param {Function} options.setWidgetSelection - Store-backed selection intent action.
  * @param {React.MutableRefObject} options.clipboardRef - Editor-local clipboard ref.
- * @param {object} options.editorControls - Canvas presentation commands and state.
+ * @param {object} options.editorShell - Canonical editor shell state and actions.
  */
-export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, selectedWidgets, setWidgetSelection, clipboardRef, editorControls }) {
+export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, selectedWidgets, setWidgetSelection, clipboardRef, editorShell }) {
   const onKeyDown = useEffectEvent((event) => {
     if (event.defaultPrevented || isInteractiveElement(event.target)) return
 
@@ -91,23 +91,23 @@ export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, s
       }
       case 'editor.toggleSnap':
         event.preventDefault()
-        editorControls.onSetSnapToGrid(!editorControls.snapToGrid)
+        editorShell.setEditorSnapToGrid(!editorShell.editorSnapToGrid)
         return
       case 'editor.toggleGrid':
         event.preventDefault()
-        editorControls.onSetGridVisible(!editorControls.gridVisible)
+        editorShell.setEditorGridVisible(!editorShell.editorGridVisible)
         return
       case 'editor.zoomIn':
         event.preventDefault()
-        editorControls.onZoomIn()
+        editorShell.increaseZoom()
         return
       case 'editor.zoomOut':
         event.preventDefault()
-        editorControls.onZoomOut()
+        editorShell.decreaseZoom()
         return
       case 'editor.resetZoom':
         event.preventDefault()
-        editorControls.onResetZoom()
+        editorShell.resetZoom()
         return
       default:
         return

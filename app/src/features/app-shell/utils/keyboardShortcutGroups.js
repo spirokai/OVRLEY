@@ -11,6 +11,7 @@ const KEY_LABELS = {
   escape: 'Esc',
   home: 'Home',
   space: 'Space',
+  wheel: 'Scroll',
 }
 
 const MODIFIER_LABELS = {
@@ -44,44 +45,43 @@ function getBindingParts(binding) {
  * @returns {Array<{ name: string, shortcuts: Array<object> }>} Help groups.
  */
 export function getKeyboardShortcutGroups() {
-  const groups = []
+  return keyboardShortcutManifest.categories
+    .map((category) => {
+      const shortcuts = []
 
-  keyboardShortcutManifest.commands.forEach((command) => {
-    if (!command.display) return
-    const visibleBindings = command.bindings.filter((binding) => binding.display !== false)
-    if (!visibleBindings.length) return
+      category.commands.forEach((command) => {
+        if (!command.display) return
+        const visibleBindings = command.bindings.filter((binding) => binding.display !== false)
+        if (!visibleBindings.length) return
 
-    let group = groups.find((candidate) => candidate.name === command.category)
-    if (!group) {
-      group = { name: command.category, shortcuts: [] }
-      groups.push(group)
-    }
+        visibleBindings.forEach((binding) => {
+          const description = binding.description || command.description
+          let shortcut = shortcuts.find((candidate) => candidate.description === description)
+          if (!shortcut) {
+            shortcut = {
+              description,
+              options: [],
+            }
+            shortcuts.push(shortcut)
+          }
 
-    let shortcut = group.shortcuts.find((candidate) => candidate.description === command.description)
-    if (!shortcut) {
-      shortcut = {
-        description: command.description,
-        options: [],
-      }
-      group.shortcuts.push(shortcut)
-    }
+          getBindingParts(binding).forEach((bindingParts) => {
+            const option = shortcut.options.find((candidate) => candidate.groupKey === bindingParts.groupKey)
+            if (option) {
+              if (!option.keys.includes(bindingParts.keys[0])) option.keys.push(bindingParts.keys[0])
+              return
+            }
 
-    visibleBindings.forEach((binding) => {
-      getBindingParts(binding).forEach((bindingParts) => {
-        const option = shortcut.options.find((candidate) => candidate.groupKey === bindingParts.groupKey)
-        if (option) {
-          if (!option.keys.includes(bindingParts.keys[0])) option.keys.push(bindingParts.keys[0])
-          return
-        }
-
-        shortcut.options.push({
-          groupKey: bindingParts.groupKey,
-          keys: bindingParts.keys,
-          modifiers: bindingParts.modifiers,
+            shortcut.options.push({
+              groupKey: bindingParts.groupKey,
+              keys: bindingParts.keys,
+              modifiers: bindingParts.modifiers,
+            })
+          })
         })
       })
-    })
-  })
 
-  return groups
+      return { name: category.name, shortcuts }
+    })
+    .filter((category) => category.shortcuts.length)
 }

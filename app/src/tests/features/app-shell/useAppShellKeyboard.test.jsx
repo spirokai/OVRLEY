@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 import useAppShellKeyboard from '@/features/app-shell/hooks/useAppShellKeyboard'
 
-function renderShellKeyboard(overrides = {}) {
+function renderShellKeyboard(configure = () => {}) {
   const actions = {
     computeVideoSync: vi.fn(),
     handleActivityFileOpen: vi.fn(),
@@ -15,22 +15,43 @@ function renderShellKeyboard(overrides = {}) {
     openTemplateSelector: vi.fn(),
     toggleWidgetDrawer: vi.fn(),
   }
-
-  const hook = renderHook(() =>
-    useAppShellKeyboard({
+  const options = {
+    activityImport: {
+      handleActivityFileOpen: actions.handleActivityFileOpen,
+    },
+    appShell: {
       activitySummary: { durationSeconds: 20 },
-      backendStatus: 'connected',
+      computeVideoSync: actions.computeVideoSync,
       config: { scene: {} },
-      importedMediaFilename: null,
       importedVideoPath: 'ride.mp4',
+      toggleWidgetDrawer: actions.toggleWidgetDrawer,
+      widgetDrawerOpen: false,
+    },
+    backendState: {
+      backendStatus: 'connected',
+    },
+    handleOpenDownloads: actions.handleOpenDownloads,
+    renderWorkflow: {
+      openRenderDialog: actions.openRenderDialog,
       renderDisabled: false,
+    },
+    templateManagement: {
+      handleCreateNewTemplate: actions.handleCreateNewTemplate,
+      handleImportTemplate: actions.handleImportTemplate,
+      handleSaveTemplate: actions.handleSaveTemplate,
+      openTemplateSelector: actions.openTemplateSelector,
       showTemplateStatus: true,
       templateSelectorOpen: false,
-      widgetDrawerOpen: false,
-      ...actions,
-      ...overrides,
-    }),
-  )
+    },
+    videoControls: {
+      handleImportVideo: actions.handleImportVideo,
+      importedMediaFilename: null,
+    },
+  }
+
+  configure(options)
+
+  const hook = renderHook(() => useAppShellKeyboard(options))
 
   return { ...hook, actions }
 }
@@ -82,7 +103,11 @@ describe('useAppShellKeyboard', () => {
   })
 
   test('keeps disabled actions as no-ops', () => {
-    const { actions } = renderShellKeyboard({ backendStatus: 'offline', renderDisabled: true, showTemplateStatus: false })
+    const { actions } = renderShellKeyboard((options) => {
+      options.backendState.backendStatus = 'offline'
+      options.renderWorkflow.renderDisabled = true
+      options.templateManagement.showTemplateStatus = false
+    })
 
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 's' }))

@@ -38,13 +38,13 @@ export default function ActionButtons({
     <div className="flex min-w-fit items-center justify-end gap-3">
       <div className="flex items-center gap-4">
         <Button
-          variant="outline"
+          variant="ghost"
           size="toolbar-icon"
-          className="h-9 w-9 border-border/80 bg-background text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+          className="h-9 w-9 bg-background text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
           onClick={onOpenKeyboardShortcuts}
           aria-label="Keyboard shortcuts"
         >
-          <CircleHelp className="size-5" />
+          <CircleHelp className="size-4.5" />
         </Button>
 
         <SimpleTooltip side="bottom" content={backendStatus !== 'connected' ? 'Backend offline' : null}>

@@ -19,26 +19,22 @@ function hasOpenKeyboardOverlay() {
  * @returns {void}
  */
 export default function useAppShellKeyboard({
-  activitySummary,
-  backendStatus,
-  computeVideoSync,
-  config,
-  handleActivityFileOpen,
-  handleCreateNewTemplate,
-  handleImportTemplate,
-  handleImportVideo,
+  activityImport,
+  appShell,
+  backendState,
   handleOpenDownloads,
-  handleSaveTemplate,
-  importedMediaFilename,
-  importedVideoPath,
-  openRenderDialog,
-  openTemplateSelector,
-  renderDisabled,
-  showTemplateStatus,
-  templateSelectorOpen,
-  toggleWidgetDrawer,
-  widgetDrawerOpen,
+  renderWorkflow,
+  templateManagement,
+  videoControls,
 }) {
+  const { handleActivityFileOpen } = activityImport
+  const { activitySummary, computeVideoSync, config, importedVideoPath, toggleWidgetDrawer, widgetDrawerOpen } = appShell
+  const { backendStatus } = backendState
+  const { openRenderDialog, renderDisabled } = renderWorkflow
+  const { handleCreateNewTemplate, handleImportTemplate, handleSaveTemplate, openTemplateSelector, showTemplateStatus, templateSelectorOpen } =
+    templateManagement
+  const { handleImportVideo, importedMediaFilename } = videoControls
+
   const onKeyDown = useEffectEvent((event) => {
     if (event.repeat || event.defaultPrevented || isInteractiveElement(event.target)) return
 

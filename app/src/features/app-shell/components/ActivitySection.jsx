@@ -10,7 +10,7 @@ import { Activity, Film, X } from 'lucide-react'
  * Renders the activity and video controls in the app header.
  *
  * @param {object} props
- * @param {string} props.activityLabel - Label for the activity file button.
+ * @param {string|null} props.activityFilename - Imported activity filename.
  * @param {function} props.onOpenActivityFile - Opens the activity file picker.
  * @param {boolean} props.debugModeEnabled - Whether debug-only media features are enabled.
  * @param {string|null} props.appVersion - Build-time app version display label.
@@ -20,7 +20,7 @@ import { Activity, Film, X } from 'lucide-react'
  * @returns {JSX.Element} Rendered component.
  */
 export default function ActivitySection({
-  activityLabel,
+  activityFilename,
   onOpenActivityFile,
   debugModeEnabled,
   appVersion,
@@ -28,9 +28,11 @@ export default function ActivitySection({
   handleImportVideo,
   clearImportedVideo,
 }) {
+  const activityLabel = activityFilename && activityFilename !== 'demo.gpxinit' ? activityFilename : 'Load GPX/FIT/SRT/IGC/CSV/VBO'
+
   return (
     <div className="flex min-w-0 items-center gap-6 overflow-hidden">
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2">
         <img src="/logo.svg" alt="OVRLEY" className="h-5 pr-3" />
         <div className="h-8 w-px shrink-0 bg-border/60" />
         {appVersion ? (

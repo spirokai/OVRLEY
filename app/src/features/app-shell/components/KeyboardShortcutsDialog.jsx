@@ -31,7 +31,7 @@ export default function KeyboardShortcutsDialog({ open, onClose }) {
     >
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md"
-        className="flex max-h-[70vh] w-full max-w-2xl flex-col rounded-sm border border-accent-border/80 bg-card/95 py-6 shadow-2xl shadow-background/50"
+        className="flex h-[80vh] max-h-200 w-full max-w-3xl flex-col rounded-sm border border-accent-border/80 bg-card/95 py-6 shadow-2xl shadow-background/50"
         aria-describedby={undefined}
       >
         <div className="flex items-center gap-3 px-6">
@@ -49,15 +49,18 @@ export default function KeyboardShortcutsDialog({ open, onClose }) {
                 <h3 className="text-[1rem] font-extrabold uppercase text-primary">{category.name}</h3>
                 <div className="space-y-2">
                   {category.shortcuts.map((shortcut) => (
-                    <div key={`${category.name}-${shortcut.description}`} className="grid grid-cols-[12rem_1fr] items-center gap-8">
+                    <div key={`${category.name}-${shortcut.description}`} className="grid grid-cols-[16rem_1fr] items-center gap-8">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         {shortcut.options.map((option) => (
                           <span
                             key={`${shortcut.description}-${option.modifiers.join('|')}-${option.keys.join('|')}`}
                             className="inline-flex items-center gap-1"
                           >
-                            {option.modifiers.map((modifier) => (
-                              <Kbd key={modifier}>{modifier}</Kbd>
+                            {option.modifiers.map((modifier, modifierIndex) => (
+                              <span key={modifier} className="inline-flex items-center gap-1">
+                                <Kbd>{modifier}</Kbd>
+                                {modifierIndex < option.modifiers.length - 1 ? <span className="text-[0.9rem] text-muted-foreground">+</span> : null}
+                              </span>
                             ))}
                             {option.modifiers.length && option.keys.length ? <span className="text-[0.9rem] text-muted-foreground">+</span> : null}
                             {option.keys.map((key, keyIndex) => (
