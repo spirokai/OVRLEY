@@ -2,12 +2,23 @@
  * Keyboard shortcut handler for the overlay editor.
  */
 
-import { useEffect } from 'react'
-import { deleteWidgetsInConfig, duplicateWidgetsInConfig } from '@/lib/widget/widget-config'
+import { useEffect, useEffectEvent } from 'react'
+import { deleteWidgetsInConfig, duplicateWidgetsInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
 import { isInteractiveElement } from '@/lib/utils'
+import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
+
+function hasOpenKeyboardOverlay() {
+  if (typeof document === 'undefined') return false
+
+  return Boolean(
+    document.querySelector(
+      '[data-slot="dialog-content"], [data-slot="select-content"], [data-slot="popover-content"], [data-testid="widget-drawer-backdrop"]',
+    ),
+  )
+}
 
 /**
- * Registers keyboard listeners for delete/copy/paste editor actions.
+ * Registers keyboard listeners for editor actions.
  *
  * @param {object} options
  * @param {*} options.config - Current overlay template config.
@@ -16,41 +27,29 @@ import { isInteractiveElement } from '@/lib/utils'
  * @param {Array} options.selectedWidgets - Currently selected widgets.
  * @param {Function} options.setWidgetSelection - Store-backed selection intent action.
  * @param {React.MutableRefObject} options.clipboardRef - Editor-local clipboard ref.
+ * @param {object} options.editorControls - Canvas presentation commands and state.
  */
-export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, selectedWidgets, setWidgetSelection, clipboardRef }) {
-  useEffect(() => {
-    if (!config) {
-      return undefined
-    }
+export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, selectedWidgets, setWidgetSelection, clipboardRef, editorControls }) {
+  const onKeyDown = useEffectEvent((event) => {
+    if (event.defaultPrevented || isInteractiveElement(event.target)) return
 
-    const handleKeyDown = (event) => {
-      if (event.defaultPrevented || event.altKey || isInteractiveElement(event.target)) {
+    const match = matchKeyboardShortcut(event, 'editor')
+    if (!match) return
+
+    switch (match.commandId) {
+      case 'editor.clearSelection':
+        if (hasOpenKeyboardOverlay()) return
+        event.preventDefault()
+        setWidgetSelection([])
         return
-      }
-
-      const modifierKey = event.metaKey || event.ctrlKey
-      const normalizedKey = String(event.key || '').toLowerCase()
-
-      if (!modifierKey && event.key === 'Delete') {
-        if (!selectedWidgetIds.length) {
-          return
-        }
-
+      case 'editor.delete':
+        if (!selectedWidgetIds.length) return
         event.preventDefault()
         onConfigChange(deleteWidgetsInConfig(config, selectedWidgetIds))
         setWidgetSelection([])
         return
-      }
-
-      if (!modifierKey) {
-        return
-      }
-
-      if (normalizedKey === 'c') {
-        if (!selectedWidgets.length) {
-          return
-        }
-
+      case 'editor.copy':
+        if (!selectedWidgets.length) return
         event.preventDefault()
         clipboardRef.current = {
           widgets: selectedWidgets.map((widget) => ({
@@ -61,24 +60,65 @@ export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, s
           })),
         }
         return
-      }
-
-      if (normalizedKey !== 'v') {
+      case 'editor.paste': {
+        const clipboardWidgets = clipboardRef.current?.widgets
+        if (!Array.isArray(clipboardWidgets) || !clipboardWidgets.length) return
+        event.preventDefault()
+        const { config: nextConfig, insertedWidgetIds } = duplicateWidgetsInConfig(config, clipboardWidgets)
+        onConfigChange(nextConfig)
+        setWidgetSelection(insertedWidgetIds, insertedWidgetIds.at(-1) ?? null)
         return
       }
-
-      const clipboardWidgets = clipboardRef.current?.widgets
-      if (!Array.isArray(clipboardWidgets) || !clipboardWidgets.length) {
+      case 'editor.nudge': {
+        if (!selectedWidgets.length) return
+        const step = match.binding.step
+        const delta = {
+          x: match.binding.key === 'arrowleft' ? -step : match.binding.key === 'arrowright' ? step : 0,
+          y: match.binding.key === 'arrowup' ? -step : match.binding.key === 'arrowdown' ? step : 0,
+        }
+        const updatesById = Object.fromEntries(
+          selectedWidgets.map((widget) => [
+            widget.id,
+            {
+              x: widget.data.x + delta.x,
+              y: widget.data.y + delta.y,
+            },
+          ]),
+        )
+        event.preventDefault()
+        onConfigChange(updateWidgetsInConfig(config, updatesById))
         return
       }
-
-      event.preventDefault()
-      const { config: nextConfig, insertedWidgetIds } = duplicateWidgetsInConfig(config, clipboardWidgets)
-      onConfigChange(nextConfig)
-      setWidgetSelection(insertedWidgetIds, insertedWidgetIds.at(-1) ?? null)
+      case 'editor.toggleSnap':
+        event.preventDefault()
+        editorControls.onSetSnapToGrid(!editorControls.snapToGrid)
+        return
+      case 'editor.toggleGrid':
+        event.preventDefault()
+        editorControls.onSetGridVisible(!editorControls.gridVisible)
+        return
+      case 'editor.zoomIn':
+        event.preventDefault()
+        editorControls.onZoomIn()
+        return
+      case 'editor.zoomOut':
+        event.preventDefault()
+        editorControls.onZoomOut()
+        return
+      case 'editor.resetZoom':
+        event.preventDefault()
+        editorControls.onResetZoom()
+        return
+      default:
+        return
     }
+  })
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const handleKeyDown = (event) => onKeyDown(event)
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [clipboardRef, config, onConfigChange, selectedWidgetIds, selectedWidgets, setWidgetSelection])
+  }, [])
 }

@@ -5,7 +5,7 @@
 
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
-import { FolderOpen, ImageDown, Play } from 'lucide-react'
+import { CircleHelp, FolderOpen, ImageDown, Play } from 'lucide-react'
 import WindowControls from './WindowControls'
 
 /**
@@ -20,6 +20,7 @@ import WindowControls from './WindowControls'
  * @param {boolean} props.renderingVideo - Whether a render is in progress.
  * @param {string} props.backendStatus - Current backend connection status.
  * @param {function} props.onOpenDownloads - Opens the downloads/output folder.
+ * @param {function} props.onOpenKeyboardShortcuts - Opens the keyboard shortcuts dialog.
  * @returns {JSX.Element} Rendered component.
  */
 export default function ActionButtons({
@@ -31,21 +32,35 @@ export default function ActionButtons({
   renderingVideo,
   backendStatus,
   onOpenDownloads,
+  onOpenKeyboardShortcuts,
 }) {
   return (
     <div className="flex min-w-fit items-center justify-end gap-3">
-      <SimpleTooltip side="bottom" content={backendStatus !== 'connected' ? 'Backend offline' : null}>
+      <div className="flex items-center gap-4">
         <Button
           variant="outline"
-          size="sm"
-          className="h-9 gap-2 border-accent-border/70 px-4 text-muted-foreground hover:border-accent-border hover:bg-surface-accent-soft hover:text-foreground"
-          disabled={backendStatus !== 'connected'}
-          onClick={onOpenDownloads}
+          size="toolbar-icon"
+          className="h-9 w-9 border-border/80 bg-background text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+          onClick={onOpenKeyboardShortcuts}
+          aria-label="Keyboard shortcuts"
         >
-          <FolderOpen className="h-3.5 w-3.5" />
-          <span>Overlays</span>
+          <CircleHelp className="size-5" />
         </Button>
-      </SimpleTooltip>
+
+        <SimpleTooltip side="bottom" content={backendStatus !== 'connected' ? 'Backend offline' : null}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-2 border-accent-border/70 px-4 text-muted-foreground hover:border-accent-border hover:bg-surface-accent-soft hover:text-foreground"
+            disabled={backendStatus !== 'connected'}
+            onClick={onOpenDownloads}
+            aria-keyshortcuts="Mod+Shift+E"
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
+            <span>Overlays</span>
+          </Button>
+        </SimpleTooltip>
+      </div>
       {onRenderPreviewFrame ? (
         <Button
           variant="outline"
@@ -64,6 +79,7 @@ export default function ActionButtons({
           className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
           disabled={renderDisabled}
           onClick={onOpenRenderDialog}
+          aria-keyshortcuts="Mod+E"
         >
           <Play className="mr-2 h-4 w-4" />
           {renderingVideo ? 'Rendering...' : 'Render'}

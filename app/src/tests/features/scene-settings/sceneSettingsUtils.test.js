@@ -3,9 +3,7 @@ import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSe
 
 describe('formatVideoCreationTime', () => {
   test('converts GPS time into the recording timezone', () => {
-    expect(
-      formatVideoCreationTime('2026-07-28T01:46:15+00:00', 'gps', 'Europe/Prague'),
-    ).toBe('2026-07-28 03:46:15')
+    expect(formatVideoCreationTime('2026-07-28T01:46:15+00:00', 'gps', 'Europe/Prague')).toBe('2026-07-28 03:46:15')
   })
 
   test('keeps ffprobe clock text without a UTC suffix', () => {

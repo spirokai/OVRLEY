@@ -1,0 +1,94 @@
+{
+  "categories": [
+    {
+      "name": "Template and media",
+      "shortcuts": [
+        { "keys": ["Ctrl/Cmd", "N"], "description": "New template" },
+        { "keys": ["Ctrl/Cmd", "O"], "description": "Import/open template" },
+        { "keys": ["Ctrl/Cmd", "S"], "description": "Save template" },
+        { "keys": ["Alt", "A"], "description": "Import activity" },
+        { "keys": ["Ctrl/Cmd", "I"], "description": "Import video" },
+        { "keys": ["Ctrl/Cmd", "T"], "description": "Open template selector" },
+        { "keys": ["Ctrl/Cmd", "Shift", "E"], "description": "Open output folder" }
+      ]
+    },
+    {
+      "name": "Editor",
+      "shortcuts": [
+        { "keys": ["Ctrl/Cmd", "C"], "description": "Copy selected widgets" },
+        { "keys": ["Ctrl/Cmd", "V"], "description": "Paste copied widgets" },
+        { "keys": ["Delete"], "description": "Delete selected widgets" },
+        { "keys": ["Backspace"], "description": "Delete selected widgets" },
+        { "keys": ["Arrow keys"], "description": "Nudge selected widgets by 1 canvas pixel" },
+        { "keys": ["Shift", "Arrow keys"], "description": "Nudge selected widgets by 10 canvas pixels" },
+        { "keys": ["N"], "description": "Toggle snapping" },
+        { "keys": ["G"], "description": "Toggle grid" },
+        { "keys": ["Ctrl/Cmd", "+"], "description": "Canvas zoom in" },
+        { "keys": ["Ctrl/Cmd", "-"], "description": "Canvas zoom out" },
+        { "keys": ["Ctrl/Cmd", "0"], "description": "Reset canvas to 100%" },
+        { "keys": ["Esc"], "description": "Clear widget selection" }
+      ]
+    },
+    {
+      "name": "Playback",
+      "shortcuts": [
+        { "keys": ["Space"], "description": "Play/pause" },
+        { "keys": ["Left Arrow"], "description": "Step backward 1 second" },
+        { "keys": ["Right Arrow"], "description": "Step forward 1 second" },
+        { "keys": ["Home / Fn+Left Arrow"], "description": "Go to timeline start" },
+        { "keys": ["End / Fn+Right Arrow"], "description": "Go to timeline end" },
+        { "keys": ["M"], "description": "Mute/unmute video" }
+      ]
+    },
+    {
+      "name": "Export range",
+      "shortcuts": [
+        { "keys": ["I"], "description": "Set export In point at playhead" },
+        { "keys": ["O"], "description": "Set export Out point at playhead" },
+        { "keys": ["Ctrl/Cmd", "X"], "description": "Clear In and Out points" },
+        { "keys": ["Alt", "I"], "description": "Playhead to In point" },
+        { "keys": ["Alt", "O"], "description": "Playhead to Out point" }
+      ]
+    },
+    {
+      "name": "Timeline",
+      "shortcuts": [
+        { "keys": ["Shift", "Z"], "description": "Fit complete timeline" },
+        { "keys": ["Alt", "1"], "description": "Fit all media" },
+        { "keys": ["Alt", "2"], "description": "Fit activity" },
+        { "keys": ["Alt", "3"], "description": "Fit video" }
+      ]
+    },
+    {
+      "name": "Synchronization",
+      "shortcuts": [
+        { "keys": ["Left Arrow"], "description": "Selected clip: nudge backward 0.1 seconds" },
+        { "keys": ["Right Arrow"], "description": "Selected clip: nudge forward 0.1 seconds" },
+        { "keys": ["Shift", "Left Arrow"], "description": "Selected clip: nudge backward 1 second" },
+        { "keys": ["Shift", "Right Arrow"], "description": "Selected clip: nudge forward 1 second" },
+        { "keys": ["["], "description": "Nudge synchronization globally backward 1 second" },
+        { "keys": ["]"], "description": "Nudge synchronization globally forward 1 second" },
+        { "keys": ["Ctrl/Cmd", "Shift", "A"], "description": "Auto-sync activity and video" }
+      ]
+    },
+    {
+      "name": "History",
+      "shortcuts": [
+        { "keys": ["Ctrl/Cmd", "Z"], "description": "Undo" },
+        { "keys": ["Ctrl/Cmd", "Shift", "Z"], "description": "Redo" },
+        { "keys": ["Ctrl", "Y"], "description": "Redo on Windows" }
+      ]
+    },
+    {
+      "name": "Export",
+      "shortcuts": [{ "keys": ["Ctrl/Cmd", "E"], "description": "Open Render settings" }]
+    },
+    {
+      "name": "Panels and workspace",
+      "shortcuts": [
+        { "keys": ["Alt", "W"], "description": "Toggle widget drawer" },
+        { "keys": ["Esc"], "description": "Close widget drawer" }
+      ]
+    }
+  ]
+}

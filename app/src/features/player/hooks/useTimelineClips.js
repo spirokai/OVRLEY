@@ -4,6 +4,7 @@
 
 import { useCallback, useId, useMemo, useState } from 'react'
 import { Video } from 'lucide-react'
+import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatTimelineTime } from '../utils/playerTiming'
 import { getClipGeometry, getExportRangeHighlightGeometry } from '../utils/timelineGeometry'
 import { TYPE_LABELS } from '@/lib/widget/widget-icons'
@@ -146,7 +147,7 @@ export default function useTimelineClips({
         clipContentClassName: CLIP_CONTENT_OFFSET_CLASS,
         clipProps: {
           ...dragProps,
-          'aria-keyshortcuts': 'ArrowLeft ArrowRight',
+          'aria-keyshortcuts': 'ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight',
           'aria-pressed': selectedClipId === lane.id,
           tabIndex: canSelect ? 0 : -1,
           onClick: (e) => {
@@ -158,14 +159,17 @@ export default function useTimelineClips({
           onDoubleClick: stopClipEvent,
           onBlur: commitClipNudge,
           onKeyDown: (event) => {
-            if (selectedClipId !== lane.id || (event.code !== 'ArrowLeft' && event.code !== 'ArrowRight')) return
-            if (event.metaKey || event.ctrlKey || event.altKey) return
+            if (selectedClipId !== lane.id || event.defaultPrevented) return
+            const match = matchKeyboardShortcut(event, 'timeline-clip')
+            if (match?.commandId !== 'timelineClip.nudge') return
             event.preventDefault()
             event.stopPropagation()
-            nudgeClip(lane.id, event.code === 'ArrowRight' ? CLIP_SYNC_STEP_SECONDS : -CLIP_SYNC_STEP_SECONDS)
+            nudgeClip(lane.id, match.binding.seconds ?? CLIP_SYNC_STEP_SECONDS)
           },
           onKeyUp: (event) => {
-            if (event.code !== 'ArrowLeft' && event.code !== 'ArrowRight') return
+            if (event.defaultPrevented) return
+            const match = matchKeyboardShortcut(event, 'timeline-clip')
+            if (match?.commandId !== 'timelineClip.nudge') return
             event.preventDefault()
             event.stopPropagation()
             commitClipNudge()

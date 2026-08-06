@@ -24,6 +24,7 @@ import AppHeader from '@/features/app-shell/components/AppHeader'
 const defaultProps = {
   activityControls: { activityLabel: 'Test Activity', onOpenActivityFile: vi.fn() },
   backendStatus: 'connected',
+  keyboardShortcutsControls: { openKeyboardShortcuts: vi.fn() },
   onOpenDownloads: vi.fn(),
   renderControls: {
     onOpenRenderDialog: vi.fn(),
@@ -91,5 +92,6 @@ describe('AppHeader grouped-props contract', () => {
     expect(props).toContain('renderDisabled')
     expect(props).toContain('renderingVideo')
     expect(props).toContain('backendStatus')
+    expect(props).toContain('onOpenKeyboardShortcuts')
   })
 })

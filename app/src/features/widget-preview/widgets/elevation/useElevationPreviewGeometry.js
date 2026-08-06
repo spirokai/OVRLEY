@@ -38,16 +38,17 @@ function projectElevationValueToSvgY(elevationValue, dataRange, height, yScale) 
  * @returns {object|null} Geometry model for the renderer, or null while loading.
  */
 export function useElevationPreviewGeometry({ activity, data, exportRange, previewSecond, style }) {
-  const { areaSvgPoints, contentScale, exportWindow, fallbackDurationSeconds, geometryHeight, points, remainingSvgPoints, rustGeometry } = usePlotPreviewGeometry({
-    activity,
-    data,
-    exportRange,
-    style,
-    plotType: 'elevation',
-    buildGeometry: buildElevationGeometry,
-    mockGeometryKey: '__OVRLEY_MOCK_ELEVATION_GEOMETRY',
-    includeArea: true,
-  })
+  const { areaSvgPoints, contentScale, exportWindow, fallbackDurationSeconds, geometryHeight, points, remainingSvgPoints, rustGeometry } =
+    usePlotPreviewGeometry({
+      activity,
+      data,
+      exportRange,
+      style,
+      plotType: 'elevation',
+      buildGeometry: buildElevationGeometry,
+      mockGeometryKey: '__OVRLEY_MOCK_ELEVATION_GEOMETRY',
+      includeArea: true,
+    })
   const isPlaceholder = getPreviewActivity(activity, previewSecond) === null
   const placeholderStaticGeometry = useMemo(
     () => (isPlaceholder ? buildPlaceholderElevationStaticGeometry({ width: data.width, height: data.height }) : null),

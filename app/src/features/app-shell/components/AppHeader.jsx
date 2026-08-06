@@ -15,13 +15,22 @@ import { isInteractiveElement } from '@/lib/utils'
  * @param {object} props - Component props.
  * @param {*} props.activityControls - Activity control state and handlers.
  * @param {*} props.backendStatus - Current backend status.
+ * @param {*} props.keyboardShortcutsControls - Keyboard shortcuts dialog state and handlers.
  * @param {function} props.onOpenDownloads - Callback invoked to open downloads.
  * @param {*} props.renderControls - Render control state and handlers.
  * @param {*} props.templateControls - Template control state and handlers.
  * @param {*} props.videoControls - Video import control state and handlers.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function AppHeader({ activityControls, backendStatus, onOpenDownloads, renderControls, templateControls, videoControls }) {
+export default function AppHeader({
+  activityControls,
+  backendStatus,
+  keyboardShortcutsControls,
+  onOpenDownloads,
+  renderControls,
+  templateControls,
+  videoControls,
+}) {
   const rawAppVersion = import.meta.env.VITE_OVRLEY_VERSION?.trim() || '0.00.0'
   const appVersion = rawAppVersion.startsWith('v') ? rawAppVersion : `v${rawAppVersion}`
   const { activityLabel, onOpenActivityFile } = activityControls
@@ -35,6 +44,8 @@ export default function AppHeader({ activityControls, backendStatus, onOpenDownl
     handleTemplateChange,
     loadedTemplateFilename,
     loadedTemplateSource,
+    onOpenChange,
+    open,
     showTemplateStatus,
     templates,
   } = templateControls
@@ -77,9 +88,13 @@ export default function AppHeader({ activityControls, backendStatus, onOpenDownl
           handleCreateNewTemplate={handleCreateNewTemplate}
           handleSaveTemplate={handleSaveTemplate}
           handleImportTemplate={handleImportTemplate}
+          open={open}
+          onOpenChange={onOpenChange}
           className="ml-4"
         />
+
         <ActionButtons
+          onOpenKeyboardShortcuts={keyboardShortcutsControls.openKeyboardShortcuts}
           onOpenRenderDialog={onOpenRenderDialog}
           onRenderPreviewFrame={onRenderPreviewFrame}
           renderDisabled={renderDisabled}

@@ -42,7 +42,7 @@ export default function ActivitySection({
 
       <div className="min-w-0 flex-1 overflow-hidden">
         <div className="flex min-w-0 items-center gap-2">
-          <Button className="mr-2 h-9 w-48 shrink-0 gap-2 border-border/70 px-5" onClick={onOpenActivityFile}>
+          <Button className="mr-2 h-9 w-48 shrink-0 gap-2 border-border/70 px-5" onClick={onOpenActivityFile} aria-keyshortcuts="Alt+A">
             <Activity className="h-3.5 w-3.5" />
             <span className="max-w-28 truncate">{activityLabel}</span>
           </Button>
@@ -67,6 +67,7 @@ export default function ActivitySection({
               variant="outline"
               className="w-48 mr-2 h-9 shrink-0 gap-2 border-border/70 px-5 text-muted-foreground hover:text-foreground text-sm"
               onClick={handleImportVideo}
+              aria-keyshortcuts="Mod+I"
             >
               <Film className="h-3.5 w-3.5" />
               <span className="truncate">{debugModeEnabled ? 'Import Video / Image' : 'Import Video'}</span>

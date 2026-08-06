@@ -75,13 +75,7 @@ export default function useTimelineViewport({
   }, [])
 
   // Media identity - structural media changes reset stale zoom/pan state, while sync timing changes preserve it.
-  const mediaIdentity = [
-    hasVideo,
-    importedVideoDuration,
-    hasActivityData,
-    activityDurationSeconds,
-    fallbackDurationSeconds,
-  ].join('|')
+  const mediaIdentity = [hasVideo, importedVideoDuration, hasActivityData, activityDurationSeconds, fallbackDurationSeconds].join('|')
 
   useEffect(() => {
     totalDurationRef.current = totalDuration
