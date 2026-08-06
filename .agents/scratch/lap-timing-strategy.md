@@ -76,10 +76,12 @@ Lap timing is added at three seams:
 ```rust
 pub struct ActivityColumns {
     // ... existing fields ...
-    pub lap_number: NumericSeries,          // source-provided lap numbers (empty if absent)
+    pub lap_number: LapNumberSeries,        // canonical source lap numbers (empty if absent)
     pub lap_markers: LapMarkers,            // metadata for implicit boundary detection
     // ...
 }
+
+pub type LapNumberSeries = Vec<Option<i64>>; // -1 out-lap, otherwise contiguous and 0-based
 
 pub enum LapMarkers {
     None,
@@ -88,9 +90,11 @@ pub enum LapMarkers {
 }
 
 pub struct TimingMarker {
-    pub name: String,                       // "Start", "Split", etc.; only Start/Finish used for lap boundaries
-    pub latitude: f64,
-    pub longitude: f64,
+    pub kind: TimingMarkerKind,             // Start or Split; only Start closes and opens laps
+    pub latitude_a: f64,                    // first endpoint of the timing line
+    pub longitude_a: f64,
+    pub latitude_b: f64,                    // second endpoint of the timing line
+    pub longitude_b: f64,
 }
 ```
 
@@ -155,8 +159,9 @@ The current lap is **not** included when selecting the reference lap.
 1. **Header aliases** (in `parser.rs`)
    - `lap`, `lap #`, `lap number` -> `Metric::LapNumber`
 2. **Column assembly** (in `columns.rs`)
-   - Select the lap column the same way other metrics are selected.
-   - Parse lap numbers as finite floats; treat `N/A`, blank, `null` as `None`.
+    - Select the lap column the same way other metrics are selected.
+    - Parse lap numbers as finite floats; treat `N/A`, blank, `null` as `None`.
+    - Normalize source lap labels once at extraction into contiguous 0-based integers; source values at or below zero represent the out-lap (`-1`).
 3. **AiM special case**
    - The existing preamble parser already swallows `Beacon Markers` and `Segment Times` as transient metadata.
    - Capture the `Beacon Markers` value into `ActivityColumns.lap_markers` instead of discarding it.
@@ -164,7 +169,7 @@ The current lap is **not** included when selecting the reference lap.
 ### VBO importer (`src/activity/vbo/`)
 
 1. **Section parsing** (in `mod.rs`)
-   - Parse `[laptiming]` section: read marker rows with `Name Latitude Longitude`.
+    - Parse `[laptiming]` section rows as a marker kind followed by two longitude/latitude endpoint pairs defining a finite timing line.
    - Store markers in `ActivityColumns.lap_markers`.
 2. **No change to timeline/distance**; the existing elapsed and distance series are reused.
 
@@ -178,19 +183,21 @@ output: lap_number[], lap_time_seconds[], delta_to_best_lap_seconds[]
         + metadata best_lap_time_seconds, lap_durations_seconds, lap_durations_best_so_far_seconds
 
 1. Resolve lap_number[]:
-   - If lap_number_source has any Some values, use it directly.
-     Map blank/N/A -> -1. Normalize to 0-based integers.
+    - If lap_number_source has any Some values, use it directly.
+      Map absence before the first timed lap to `-1` and hold the current lap across later absent samples.
    - Else if BeaconMarkers present, bin each sample by elapsed time range.
    - Else if TimingMarkers present, detect start/finish crossings in sample order.
    - Else all lap_number = -1 and all derived lap fields are null.
 
 2. Resolve lap_time_seconds[]:
-   - For each lap boundary index, lap_start_elapsed = elapsed_seconds[boundary].
-   - lap_time_seconds[i] = elapsed_seconds[i] - lap_start_elapsed of current lap.
-   - For lap_number == -1, value is null.
+    - Explicit source transitions use the transition sample's elapsed time.
+    - AiM uses the exact beacon elapsed time; VBO interpolates the crossing time within the intersecting route segment.
+    - lap_time_seconds[i] = elapsed_seconds[i] - lap_start_elapsed of current lap.
+    - For lap_number == -1, value is null.
 
 3. Resolve completed lap durations:
-   - For each lap n >= 0, duration = elapsed[last_index_of_lap_n] - elapsed[first_index_of_lap_n].
+    - For each pair of consecutive boundaries, duration = next_boundary_elapsed - current_boundary_elapsed.
+    - The final observed lap remains incomplete because no subsequent boundary closes it.
 
 4. Metadata lap_durations_seconds and lap_durations_best_so_far_seconds:
    - `lap_durations_seconds[n]` = duration of lap n.
@@ -208,9 +215,11 @@ output: lap_number[], lap_time_seconds[], delta_to_best_lap_seconds[]
 
 ## Trim/densify propagation
 
-- `trim.rs`: add `lap_number`, `lap_time_seconds`, and `delta_to_best_lap_seconds` to `TrimmedActivity`. Trim them alongside other numeric series. `lap_number` uses hold interpolation. Also scope the per-lap metadata arrays to the active trim window: omit laps that do not fully complete inside the trim.
+- `trim.rs`: add `lap_number`, `lap_time_seconds`, and `delta_to_best_lap_seconds` to `TrimmedActivity`. Trim them alongside other numeric series. `lap_number` uses hold interpolation and aligned series retain session lap IDs. Scope the compact metadata arrays to the active trim window by omitting laps whose opening or closing boundary lies outside the trim.
 - `interpolate.rs`: add the three series to `DenseSeriesReport` and wire them through `densify_activity` using the existing `RenderDataRequirements` gating pattern. Carry the scoped per-lap metadata through so the renderer receives it.
 - `normalize/mod.rs`: add boolean flags to `RenderDataRequirements` for the new lap series.
+
+> **TODO:** Replace the temporary `MissingSamplePolicy::Preserve` handling with a lap-aware interpolation helper. It must interpolate only when adjacent samples belong to the same lap, never interpolate across a lap-time reset, and retain `None` whenever either delta endpoint is unavailable. `Preserve` is only an interim improvement because it treats missing numeric endpoints as zero.
 
 ## Suggested implementation order
 
@@ -239,3 +248,7 @@ output: lap_number[], lap_time_seconds[], delta_to_best_lap_seconds[]
 1. Should partial first/last laps (out-lap, in-lap) be eligible for "session best"? _(Resolved: no. The per-lap metadata arrays are scoped to the active trim window; only laps that fully complete within the trim are included.)_
 2. If a source already provides a predicted-vs-best value (TrackAddict), should the overlay ever prefer it over our own computed delta? _(Resolved: yes)_
 3. How should the VBO crossing detector treat markers with the same lat/lon duplicated on consecutive `[laptiming]` rows? _(Unclear question; elaborate with example prior to implementation.)_
+
+## Testing
+
+- After implementing the finalizer, create a script that will parse all csv/vbo fixtures in tests/fixtures/activity, run it and assess if all required metrics are extracted properly.

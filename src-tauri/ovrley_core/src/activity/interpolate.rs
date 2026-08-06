@@ -655,6 +655,40 @@ pub fn densify_activity(
             course_lat,
             course_lon,
             time,
+            lap_number: if requirements.lap_number && !trimmed.lap_number.is_empty() {
+                let lap_number_options: Vec<Option<i64>> =
+                    trimmed.lap_number.iter().map(|v| Some(*v)).collect();
+                densify_hold_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &lap_number_options,
+                    &frame_elapsed_seconds,
+                )
+            } else {
+                Vec::new()
+            },
+            lap_time_seconds: if requirements.lap_time_seconds {
+                // TODO(lap-timing): replace Preserve with lap-aware interpolation that does not cross resets.
+                interpolate_numeric_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &trimmed.lap_time_seconds,
+                    &frame_elapsed_seconds,
+                    MissingSamplePolicy::Preserve,
+                )
+            } else {
+                Vec::new()
+            },
+            delta_to_best_lap_seconds: if requirements.delta_to_best_lap_seconds {
+                interpolate_numeric_series(
+                    &trimmed.sample_elapsed_seconds,
+                    &trimmed.delta_to_best_lap_seconds,
+                    &frame_elapsed_seconds,
+                    MissingSamplePolicy::Preserve,
+                )
+            } else {
+                Vec::new()
+            },
+            lap_durations_seconds: trimmed.lap_durations_seconds.clone(),
+            lap_durations_best_so_far_seconds: trimmed.lap_durations_best_so_far_seconds.clone(),
         },
     }
 }

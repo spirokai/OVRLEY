@@ -108,6 +108,12 @@ fn minimal_activity() -> ParsedActivity {
         gradient: Vec::new(),
         heading: Vec::new(),
         time: Vec::new(),
+        lap_number: Vec::new(),
+        lap_time_seconds: Vec::new(),
+        delta_to_best_lap_seconds: Vec::new(),
+        best_lap_time_seconds: None,
+        lap_durations_seconds: Vec::new(),
+        lap_durations_best_so_far_seconds: Vec::new(),
         extra: BTreeMap::new(),
     }
 }
@@ -162,6 +168,11 @@ fn minimal_dense_activity() -> DenseActivityReport {
             course_lat: vec![None; 3],
             course_lon: vec![None; 3],
             time: vec![None; 3],
+            lap_number: vec![None; 3],
+            lap_time_seconds: vec![None; 3],
+            delta_to_best_lap_seconds: vec![None; 3],
+            lap_durations_seconds: vec![],
+            lap_durations_best_so_far_seconds: vec![],
         },
     }
 }

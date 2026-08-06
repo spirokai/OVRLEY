@@ -74,6 +74,11 @@ pub fn empty_dense_series() -> DenseSeriesReport {
         course_lat: vec![],
         course_lon: vec![],
         time: vec![],
+        lap_number: vec![],
+        lap_time_seconds: vec![],
+        delta_to_best_lap_seconds: vec![],
+        lap_durations_seconds: vec![],
+        lap_durations_best_so_far_seconds: vec![],
     }
 }
 
@@ -151,5 +156,10 @@ pub fn minimal_trimmed_activity(times: Vec<f64>) -> TrimmedActivity {
         gradient: vec![],
         time: vec![],
         heading: vec![],
+        lap_number: vec![],
+        lap_time_seconds: vec![],
+        delta_to_best_lap_seconds: vec![],
+        lap_durations_seconds: vec![],
+        lap_durations_best_so_far_seconds: vec![],
     }
 }
