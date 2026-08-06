@@ -92,5 +92,6 @@ describe('AppHeader grouped-props contract', () => {
     expect(props).toContain('renderDisabled')
     expect(props).toContain('renderingVideo')
     expect(props).toContain('backendStatus')
+    expect(props).toContain('onOpenKeyboardShortcuts')
   })
 })

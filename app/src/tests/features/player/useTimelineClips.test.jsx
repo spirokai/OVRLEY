@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import useTimelineClips from '@/features/player/hooks/useTimelineClips'
 
 function renderClips(overrides = {}) {
@@ -73,5 +73,31 @@ describe('useTimelineClips', () => {
     })
 
     expect(result.current[0].tooltip.isVisible).toBe(false)
+  })
+
+  test('nudges a selected clip by one second with Shift+Arrow', () => {
+    const nudgeClip = vi.fn()
+    const commitClipNudge = vi.fn()
+    const { result } = renderClips({
+      commitClipNudge,
+      nudgeClip,
+      selectedClipId: 'video',
+      setSelectedClipId: vi.fn(),
+    })
+    const event = {
+      defaultPrevented: false,
+      key: 'ArrowRight',
+      preventDefault: vi.fn(),
+      shiftKey: true,
+      stopPropagation: vi.fn(),
+    }
+
+    act(() => {
+      result.current[0].clipProps.onKeyDown(event)
+      result.current[0].clipProps.onKeyUp(event)
+    })
+
+    expect(nudgeClip).toHaveBeenCalledWith('video', 1)
+    expect(commitClipNudge).toHaveBeenCalledOnce()
   })
 })

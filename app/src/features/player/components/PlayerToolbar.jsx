@@ -40,7 +40,12 @@ export default function PlayerToolbar({ toolbar }) {
         >
           <TabsList variant="toolbar" className="ml-1">
             {toolbar.fitTargets.map((target) => (
-              <TabsTrigger key={target.id} value={target.id} variant="toolbar">
+              <TabsTrigger
+                key={target.id}
+                value={target.id}
+                variant="toolbar"
+                aria-keyshortcuts={target.id === 'all' ? 'Shift+Z Alt+1' : target.id === 'activity' ? 'Alt+2' : 'Alt+3'}
+              >
                 {target.label}
               </TabsTrigger>
             ))}
@@ -55,6 +60,7 @@ export default function PlayerToolbar({ toolbar }) {
               variant="ghost"
               disabled={toolbar.exportRange.isDisabled}
               onClick={toolbar.exportRange.setStart}
+              aria-keyshortcuts="I"
             >
               <span aria-hidden="true" className="font-mono text-base font-normal">
                 [
@@ -69,6 +75,7 @@ export default function PlayerToolbar({ toolbar }) {
               variant="ghost"
               disabled={toolbar.exportRange.isDisabled}
               onClick={toolbar.exportRange.setEnd}
+              aria-keyshortcuts="O"
             >
               <span aria-hidden="true" className="font-mono text-base font-normal">
                 ]
@@ -86,6 +93,7 @@ export default function PlayerToolbar({ toolbar }) {
                   variant="ghost"
                   className="text-orange-400/90 hover:text-orange-300"
                   onClick={toolbar.exportRange.clear}
+                  aria-keyshortcuts="Mod+X"
                 >
                   <X className="h-3.5 w-3.5" />
                 </Button>
@@ -103,6 +111,7 @@ export default function PlayerToolbar({ toolbar }) {
           variant="toolbar"
           disabled={toolbar.transport.isDisabled}
           onClick={toolbar.transport.resetToStart}
+          aria-keyshortcuts="Home"
         >
           <Rewind className="h-3.5 w-3.5" />
         </Button>
@@ -113,6 +122,7 @@ export default function PlayerToolbar({ toolbar }) {
           variant="toolbar"
           disabled={toolbar.transport.isDisabled}
           onClick={toolbar.transport.stepBackward}
+          aria-keyshortcuts="ArrowLeft"
         >
           <StepBack className="h-3.5 w-3.5" />
         </Button>
@@ -123,6 +133,7 @@ export default function PlayerToolbar({ toolbar }) {
           variant={toolbar.transport.isPlaying ? 'secondary' : 'default'}
           disabled={toolbar.transport.isDisabled}
           onClick={toolbar.transport.isPlaying ? toolbar.transport.pause : toolbar.transport.play}
+          aria-keyshortcuts="Space"
         >
           {toolbar.transport.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" strokeWidth={2} />}
         </Button>
@@ -133,6 +144,7 @@ export default function PlayerToolbar({ toolbar }) {
           variant="toolbar"
           disabled={toolbar.transport.isDisabled}
           onClick={toolbar.transport.stepForward}
+          aria-keyshortcuts="ArrowRight"
         >
           <StepForward className="h-3.5 w-3.5" />
         </Button>
@@ -143,22 +155,26 @@ export default function PlayerToolbar({ toolbar }) {
           variant="toolbar"
           disabled={toolbar.transport.isDisabled}
           onClick={toolbar.transport.jumpToEnd}
+          aria-keyshortcuts="End"
         >
           <Rewind className="h-3.5 w-3.5 rotate-180" />
         </Button>
       </div>
 
       <div className="flex w-48 shrink-0 items-center justify-end gap-4">
-        <Button
-          type="button"
-          aria-label={toolbar.isMuted ? 'Unmute video' : 'Mute video'}
-          aria-pressed={toolbar.isMuted}
-          variant="ghost"
-          size="toolbar-icon"
-          onClick={toolbar.toggleMute}
-        >
-          {toolbar.isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-        </Button>
+        {toolbar.hasVideo ? (
+          <Button
+            type="button"
+            aria-label={toolbar.isMuted ? 'Unmute video' : 'Mute video'}
+            aria-pressed={toolbar.isMuted}
+            variant="ghost"
+            size="toolbar-icon"
+            onClick={toolbar.toggleMute}
+            aria-keyshortcuts="M"
+          >
+            {toolbar.isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </Button>
+        ) : null}
         <span className="text-xs font-medium tabular-nums text-muted-foreground">
           {toolbar.timeLabel.current} / {toolbar.timeLabel.total}
         </span>

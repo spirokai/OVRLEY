@@ -180,6 +180,7 @@ function OverlayEditorContent({
   // Keyboard shortcuts
   useEditorKeyboard({
     config,
+    editorControls,
     onConfigChange,
     selectedWidgetIds: selection.selectedWidgetIds,
     selectedWidgets: selection.selectedWidgets,

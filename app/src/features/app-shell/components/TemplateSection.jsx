@@ -23,6 +23,8 @@ import { getTemplateGroups } from '../utils/templateGroups'
  * @param {function} props.handleCreateNewTemplate - Creates a new blank template.
  * @param {function} props.handleSaveTemplate - Saves the current template.
  * @param {function} props.handleImportTemplate - Imports a template from file.
+ * @param {boolean} props.open - Whether the template selector is open.
+ * @param {function} props.onOpenChange - Updates template selector visibility.
  * @returns {JSX.Element} Rendered component.
  */
 export default function TemplateSection({
@@ -35,14 +37,24 @@ export default function TemplateSection({
   handleCreateNewTemplate,
   handleSaveTemplate,
   handleImportTemplate,
+  open,
+  onOpenChange,
   className = '',
 }) {
   const templateGroups = useMemo(() => getTemplateGroups(templates), [templates])
 
   return (
     <div className={`flex min-w-0 items-center justify-start gap-2 ${className}`.trim()}>
-      <Select value={loadedTemplateSource === 'backend' ? loadedTemplateFilename || '' : ''} onValueChange={handleTemplateChange}>
-        <SelectTrigger className="h-8 w-56 max-w-[min(14rem,22vw)] shrink bg-surface text-xs border-border/70">
+      <Select
+        open={open}
+        onOpenChange={onOpenChange}
+        value={loadedTemplateSource === 'backend' ? loadedTemplateFilename || '' : ''}
+        onValueChange={(value) => {
+          handleTemplateChange(value)
+          onOpenChange(false)
+        }}
+      >
+        <SelectTrigger className="h-8 w-56 max-w-[min(14rem,22vw)] shrink bg-surface text-xs border-border/70" aria-keyshortcuts="Mod+T">
           <div className="flex items-center gap-2 truncate">
             <Sparkles className="h-3 w-3 shrink-0 text-primary" />
             <SelectValue placeholder={loadedTemplateSource === 'file' ? loadedTemplateFilename || 'Imported Template' : 'Select Template...'} />
@@ -72,6 +84,7 @@ export default function TemplateSection({
             size="icon"
             className="h-8 w-8 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
             onClick={handleCreateNewTemplate}
+            aria-keyshortcuts="Mod+N"
           >
             <FilePlus2 className="h-4 w-4" />
           </Button>
@@ -83,6 +96,7 @@ export default function TemplateSection({
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:bg-surface-accent-soft hover:text-primary"
               onClick={handleSaveTemplate}
+              aria-keyshortcuts="Mod+S"
             >
               <Save className="h-4 w-4" />
             </Button>
@@ -94,6 +108,7 @@ export default function TemplateSection({
             size="icon"
             className="h-8 w-8 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
             onClick={handleImportTemplate}
+            aria-keyshortcuts="Mod+O"
           >
             <FolderOpen className="h-4 w-4" />
           </Button>

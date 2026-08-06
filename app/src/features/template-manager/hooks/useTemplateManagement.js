@@ -70,6 +70,11 @@ export default function useTemplateManagement({ onTemplateCreated }) {
 
   // Local UI state — manages the new-template confirmation dialog visibility
   const [showNewTemplateConfirm, setShowNewTemplateConfirm] = useState(false)
+  const [templateSelectorOpen, setTemplateSelectorOpen] = useState(false)
+
+  const openTemplateSelector = useCallback(() => {
+    setTemplateSelectorOpen(true)
+  }, [])
 
   // Derived state — template save status computed from current editor state vs last saved snapshot
   const { currentTemplateState, status, showTemplateStatus } = useTemplateSaveStatus({
@@ -280,11 +285,14 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     handleTemplateChange,
     loadedTemplateFilename,
     loadedTemplateSource,
+    openTemplateSelector,
     restoreLastLoadedTemplate,
+    setTemplateSelectorOpen,
     setShowNewTemplateConfirm,
     showNewTemplateConfirm,
     showTemplateStatus,
     status,
+    templateSelectorOpen,
     templates,
   }
 }

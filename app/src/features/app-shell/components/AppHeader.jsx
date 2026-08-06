@@ -6,8 +6,6 @@
 import ActivitySection from './ActivitySection'
 import ActionButtons from './ActionButtons'
 import TemplateSection from './TemplateSection'
-import { Button } from '@/components/ui/button'
-import { Keyboard } from 'lucide-react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { isInteractiveElement } from '@/lib/utils'
 
@@ -46,6 +44,8 @@ export default function AppHeader({
     handleTemplateChange,
     loadedTemplateFilename,
     loadedTemplateSource,
+    onOpenChange,
+    open,
     showTemplateStatus,
     templates,
   } = templateControls
@@ -67,7 +67,7 @@ export default function AppHeader({
 
   return (
     <header className="relative z-50 shrink-0 select-none border-b border-border/70 bg-card backdrop-blur-sm" onMouseDown={handleHeaderMouseDown}>
-      <div className="grid grid-cols-[auto_auto_auto_minmax(0,1fr)] items-center gap-x-6 pb-3 pl-6 pr-1 pt-3">
+      <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-x-6 pb-3 pl-6 pr-1 pt-3">
         <ActivitySection
           activityLabel={activityLabel}
           onOpenActivityFile={onOpenActivityFile}
@@ -88,20 +88,13 @@ export default function AppHeader({
           handleCreateNewTemplate={handleCreateNewTemplate}
           handleSaveTemplate={handleSaveTemplate}
           handleImportTemplate={handleImportTemplate}
+          open={open}
+          onOpenChange={onOpenChange}
           className="ml-4"
         />
 
-        <Button
-          variant="outline"
-          size="toolbar-icon"
-          className="border-border/80 bg-background text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
-          onClick={keyboardShortcutsControls.openKeyboardShortcuts}
-          aria-label="Keyboard shortcuts"
-        >
-          <Keyboard className="size-3.5" />
-        </Button>
-
         <ActionButtons
+          onOpenKeyboardShortcuts={keyboardShortcutsControls.openKeyboardShortcuts}
           onOpenRenderDialog={onOpenRenderDialog}
           onRenderPreviewFrame={onRenderPreviewFrame}
           renderDisabled={renderDisabled}

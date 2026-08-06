@@ -1,5 +1,6 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useEffectEvent } from 'react'
 import { useStore as useZustandStore } from 'zustand'
+import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import useStore from '@/store/useStore'
 import { redoHistory, undoHistory } from '../undoHistory'
 
@@ -8,13 +9,14 @@ function isTextEditingElement(target) {
   return Boolean(target.closest('input, textarea, [role="textbox"], [contenteditable="true"]'))
 }
 
-function getHistoryCommand(event) {
-  if (!event.metaKey && !event.ctrlKey) return null
+function hasOpenKeyboardOverlay() {
+  if (typeof document === 'undefined') return false
 
-  const key = event.key.toLowerCase()
-  if (key === 'z') return event.shiftKey ? 'redo' : 'undo'
-  if (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey) return 'redo'
-  return null
+  return Boolean(
+    document.querySelector(
+      '[data-slot="dialog-content"], [data-slot="select-content"], [data-slot="popover-content"], [data-testid="widget-drawer-backdrop"]',
+    ),
+  )
 }
 
 /**
@@ -38,30 +40,28 @@ export default function useUndoRedo({ disabled = false } = {}) {
     redoHistory(useStore)
   }, [disabled])
 
+  const onKeyDown = useEffectEvent((event) => {
+    if (disabled || event.defaultPrevented || event.repeat || event.altKey || isTextEditingElement(event.target) || hasOpenKeyboardOverlay()) {
+      return
+    }
+
+    const match = matchKeyboardShortcut(event, 'history')
+    if (match?.commandId === 'history.undo' && hasPastStates) {
+      event.preventDefault()
+      undo()
+    } else if (match?.commandId === 'history.redo' && hasFutureStates) {
+      event.preventDefault()
+      redo()
+    }
+  })
+
   useEffect(() => {
-    if (disabled || typeof window === 'undefined') {
-      return undefined
-    }
+    if (typeof window === 'undefined') return undefined
 
-    const handleKeyDown = (event) => {
-      if (event.defaultPrevented || event.repeat || event.altKey || isTextEditingElement(event.target)) {
-        return
-      }
-
-      const command = getHistoryCommand(event)
-
-      if (command === 'undo' && hasPastStates) {
-        event.preventDefault()
-        undo()
-      } else if (command === 'redo' && hasFutureStates) {
-        event.preventDefault()
-        redo()
-      }
-    }
-
+    const handleKeyDown = (event) => onKeyDown(event)
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [disabled, hasFutureStates, hasPastStates, redo, undo])
+  }, [])
 
   return {
     canRedo: !disabled && hasFutureStates,

@@ -157,6 +157,7 @@ export default function VideoSyncSection({
               className="h-9 border-border/80 bg-surface-elevated px-3 text-xs font-semibold text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
               disabled={!activitySummary}
               onClick={onComputeVideoSync}
+              aria-keyshortcuts="Mod+Shift+A"
             >
               Auto-sync
             </Button>

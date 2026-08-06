@@ -24,6 +24,7 @@ import {
   LoadingOverlay,
   useActivityImport,
   useAppBootstrap,
+  useAppShellKeyboard,
   useBackendStatus,
   useEditorShellState,
 } from '@/features/app-shell'
@@ -80,7 +81,19 @@ function useRightClickDevtools() {
  * }}
  */
 function useAppShellComposition() {
-  const { config, isProcessing, globalDefaults, importingVideo, setConfig, setErrorMessage } = useAppShellStore()
+  const {
+    activitySummary,
+    computeVideoSync,
+    config,
+    isProcessing,
+    globalDefaults,
+    importingVideo,
+    importedVideoPath,
+    setConfig,
+    setErrorMessage,
+    toggleWidgetDrawer,
+    widgetDrawerOpen,
+  } = useAppShellStore()
   const widgetLiveEdits = useWidgetDraftState()
   const { backendStatus } = useBackendStatus()
   const editorShell = useEditorShellState()
@@ -108,6 +121,28 @@ function useAppShellComposition() {
       setErrorMessage(`Failed to open downloads folder: ${error.message}`)
     }
   }
+
+  useAppShellKeyboard({
+    activitySummary,
+    backendStatus,
+    computeVideoSync,
+    config,
+    handleActivityFileOpen,
+    handleCreateNewTemplate: templateManagement.handleCreateNewTemplate,
+    handleImportTemplate: templateManagement.handleImportTemplate,
+    handleImportVideo: videoControls.handleImportVideo,
+    handleOpenDownloads,
+    handleSaveTemplate: templateManagement.handleSaveTemplate,
+    importedMediaFilename: videoControls.importedMediaFilename,
+    importedVideoPath,
+    openRenderDialog: renderWorkflow.openRenderDialog,
+    openTemplateSelector: templateManagement.openTemplateSelector,
+    renderDisabled: renderWorkflow.renderDisabled,
+    showTemplateStatus: templateManagement.showTemplateStatus,
+    templateSelectorOpen: templateManagement.templateSelectorOpen,
+    toggleWidgetDrawer,
+    widgetDrawerOpen,
+  })
 
   const activityControls = {
     activityLabel: activityFilename === 'demo.gpxinit' ? 'Load GPX/FIT/SRT/IGC/CSV/VBO' : activityFilename || 'Load GPX/FIT/SRT/IGC/CSV/VBO',
@@ -145,6 +180,8 @@ function useAppShellComposition() {
     handleTemplateChange: templateManagement.handleTemplateChange,
     loadedTemplateFilename: templateManagement.loadedTemplateFilename,
     loadedTemplateSource: templateManagement.loadedTemplateSource,
+    open: templateManagement.templateSelectorOpen,
+    onOpenChange: templateManagement.setTemplateSelectorOpen,
     showTemplateStatus: templateManagement.showTemplateStatus,
     status: templateManagement.status,
     templates: templateManagement.templates,

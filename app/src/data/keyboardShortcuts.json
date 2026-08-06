@@ -1,0 +1,368 @@
+{
+  "commands": [
+    {
+      "id": "template.new",
+      "display": true,
+      "scope": "app",
+      "category": "Template and media",
+      "description": "New template",
+      "bindings": [{ "key": "n", "modifiers": ["mod"] }]
+    },
+    {
+      "id": "template.import",
+      "display": true,
+      "scope": "app",
+      "category": "Template and media",
+      "description": "Open template",
+      "bindings": [{ "key": "o", "modifiers": ["mod"] }]
+    },
+    {
+      "id": "template.save",
+      "display": true,
+      "scope": "app",
+      "category": "Template and media",
+      "description": "Save template",
+      "bindings": [{ "key": "s", "modifiers": ["mod"] }]
+    },
+    {
+      "id": "activity.import",
+      "display": true,
+      "scope": "app",
+      "category": "Template and media",
+      "description": "Import activity",
+      "bindings": [{ "key": "a", "modifiers": ["alt"] }]
+    },
+    {
+      "id": "video.import",
+      "display": true,
+      "scope": "app",
+      "category": "Template and media",
+      "description": "Import video",
+      "bindings": [{ "key": "i", "modifiers": ["mod"] }]
+    },
+    {
+      "id": "template.select",
+      "display": true,
+      "scope": "app",
+      "category": "Template and media",
+      "description": "Open template list",
+      "bindings": [{ "key": "t", "modifiers": ["mod"] }]
+    },
+    {
+      "id": "output.open",
+      "display": true,
+      "scope": "app",
+      "category": "Template and media",
+      "description": "Open export folder",
+      "bindings": [{ "key": "e", "modifiers": ["mod", "shift"] }]
+    },
+    {
+      "id": "sync.auto",
+      "display": true,
+      "scope": "app",
+      "category": "Synchronization",
+      "description": "Auto-sync video with activity",
+      "bindings": [{ "key": "a", "modifiers": ["mod", "shift"] }]
+    },
+    {
+      "id": "render.open",
+      "display": true,
+      "scope": "app",
+      "category": "Export",
+      "description": "Export overlay",
+      "bindings": [{ "key": "e", "modifiers": ["mod"] }]
+    },
+    {
+      "id": "drawer.toggle",
+      "display": true,
+      "scope": "app",
+      "category": "Panels and workspace",
+      "description": "Toggle widget drawer",
+      "bindings": [{ "key": "w", "modifiers": ["alt"] }]
+    },
+    {
+      "id": "editor.clearSelection",
+      "display": true,
+      "scope": "editor",
+      "category": "General editing",
+      "description": "Clear widget selection",
+      "bindings": [{ "key": "escape", "modifiers": [] }]
+    },
+    {
+      "id": "editor.delete",
+      "display": true,
+      "scope": "editor",
+      "category": "General editing",
+      "description": "Delete selected widgets",
+      "bindings": [
+        { "key": "delete", "modifiers": [] },
+        { "key": "backspace", "modifiers": [] }
+      ]
+    },
+    {
+      "id": "editor.copy",
+      "display": true,
+      "scope": "editor",
+      "category": "Editor",
+      "description": "Copy selected widgets",
+      "bindings": [{ "key": "c", "modifiers": ["mod"] }]
+    },
+    {
+      "id": "editor.paste",
+      "display": true,
+      "scope": "editor",
+      "category": "Editor",
+      "description": "Paste copied widgets",
+      "bindings": [{ "key": "v", "modifiers": ["mod"] }]
+    },
+    {
+      "id": "editor.nudge",
+      "display": true,
+      "scope": "editor",
+      "category": "General editing",
+      "description": "Nudge selected widgets",
+      "bindings": [
+        { "key": "arrowup", "modifiers": [], "step": 1 },
+        { "key": "arrowdown", "modifiers": [], "step": 1 },
+        { "key": "arrowleft", "modifiers": [], "step": 1 },
+        { "key": "arrowright", "modifiers": [], "step": 1 },
+        { "key": "arrowup", "modifiers": ["shift"], "step": 10 },
+        { "key": "arrowdown", "modifiers": ["shift"], "step": 10 },
+        { "key": "arrowleft", "modifiers": ["shift"], "step": 10 },
+        { "key": "arrowright", "modifiers": ["shift"], "step": 10 }
+      ]
+    },
+    {
+      "id": "editor.toggleSnap",
+      "display": true,
+      "scope": "editor",
+      "category": "General editing",
+      "description": "Toggle snapping to grid",
+      "bindings": [{ "key": "n", "modifiers": [] }]
+    },
+    {
+      "id": "editor.toggleGrid",
+      "display": true,
+      "scope": "editor",
+      "category": "General editing",
+      "description": "Toggle gridlines",
+      "bindings": [{ "key": "g", "modifiers": [] }]
+    },
+    {
+      "id": "editor.zoomIn",
+      "display": true,
+      "scope": "editor",
+      "category": "General editing",
+      "description": "Canvas zoom in",
+      "bindings": [
+        { "key": "+", "modifiers": ["mod"], "display": true },
+        { "key": "+", "modifiers": ["mod", "shift"], "display": false },
+        { "key": "=", "modifiers": ["mod"], "display": false },
+        { "key": "=", "modifiers": ["mod", "shift"], "display": false }
+      ]
+    },
+    {
+      "id": "editor.zoomOut",
+      "display": true,
+      "scope": "editor",
+      "category": "General editing",
+      "description": "Canvas zoom out",
+      "bindings": [{ "key": "-", "modifiers": ["mod"], "display": true }]
+    },
+    {
+      "id": "editor.resetZoom",
+      "display": true,
+      "scope": "editor",
+      "category": "General editing",
+      "description": "Reset canvas zoom to 100%",
+      "bindings": [{ "key": "0", "modifiers": ["mod"] }]
+    },
+    {
+      "id": "player.togglePlayback",
+      "display": true,
+      "scope": "player",
+      "category": "Playback",
+      "description": "Play/pause",
+      "bindings": [{ "key": "space", "modifiers": [] }]
+    },
+    {
+      "id": "player.stepBackward",
+      "display": true,
+      "scope": "player",
+      "category": "Playback",
+      "description": "Step backward 1 second",
+      "bindings": [{ "key": "arrowleft", "modifiers": [] }]
+    },
+    {
+      "id": "player.stepForward",
+      "display": true,
+      "scope": "player",
+      "category": "Playback",
+      "description": "Step forward 1 second",
+      "bindings": [{ "key": "arrowright", "modifiers": [] }]
+    },
+    {
+      "id": "player.resetToStart",
+      "display": true,
+      "scope": "player",
+      "category": "Playback",
+      "description": "Rewind to start",
+      "bindings": [
+        {
+          "key": "home",
+          "modifiers": [],
+          "display": true,
+          "label": "Home",
+          "displayAliases": ["Fn+Left Arrow"]
+        }
+      ]
+    },
+    {
+      "id": "player.jumpToEnd",
+      "display": true,
+      "scope": "player",
+      "category": "Playback",
+      "description": "Rewind to end",
+      "bindings": [
+        {
+          "key": "end",
+          "modifiers": [],
+          "display": true,
+          "label": "End",
+          "displayAliases": ["Fn+Right Arrow"]
+        }
+      ]
+    },
+    {
+      "id": "player.toggleMute",
+      "display": true,
+      "scope": "player",
+      "category": "Playback",
+      "description": "Mute/unmute video",
+      "bindings": [{ "key": "m", "modifiers": [] }]
+    },
+    {
+      "id": "export.setIn",
+      "display": true,
+      "scope": "player",
+      "category": "Export range",
+      "description": "Set export In point at playhead",
+      "bindings": [{ "key": "i", "modifiers": [] }]
+    },
+    {
+      "id": "export.setOut",
+      "display": true,
+      "scope": "player",
+      "category": "Export range",
+      "description": "Set export Out point at playhead",
+      "bindings": [{ "key": "o", "modifiers": [] }]
+    },
+    {
+      "id": "export.clear",
+      "display": true,
+      "scope": "player",
+      "category": "Export range",
+      "description": "Clear In and Out points",
+      "bindings": [{ "key": "x", "modifiers": ["mod"] }]
+    },
+    {
+      "id": "export.goToIn",
+      "display": true,
+      "scope": "player",
+      "category": "Export range",
+      "description": "Playhead to In point",
+      "bindings": [{ "key": "i", "modifiers": ["alt"] }]
+    },
+    {
+      "id": "export.goToOut",
+      "display": true,
+      "scope": "player",
+      "category": "Export range",
+      "description": "Playhead to Out point",
+      "bindings": [{ "key": "o", "modifiers": ["alt"] }]
+    },
+    {
+      "id": "timeline.fitAll",
+      "display": true,
+      "scope": "player",
+      "category": "Timeline",
+      "description": "Fit complete timeline",
+      "bindings": [{ "key": "z", "modifiers": ["shift"] }]
+    },
+    {
+      "id": "timeline.fitMedia",
+      "display": true,
+      "scope": "player",
+      "category": "Timeline",
+      "description": "Fit all media",
+      "bindings": [{ "key": "1", "modifiers": ["alt"] }]
+    },
+    {
+      "id": "timeline.fitActivity",
+      "display": true,
+      "scope": "player",
+      "category": "Timeline",
+      "description": "Fit activity",
+      "bindings": [{ "key": "2", "modifiers": ["alt"] }]
+    },
+    {
+      "id": "timeline.fitVideo",
+      "display": true,
+      "scope": "player",
+      "category": "Timeline",
+      "description": "Fit video",
+      "bindings": [{ "key": "3", "modifiers": ["alt"] }]
+    },
+    {
+      "id": "sync.globalNudge",
+      "display": true,
+      "scope": "player",
+      "category": "Synchronization",
+      "description": "Nudge synchronization globally",
+      "bindings": [
+        { "key": "[", "modifiers": [], "seconds": -1 },
+        { "key": "]", "modifiers": [], "seconds": 1 }
+      ]
+    },
+    {
+      "id": "timelineClip.nudge",
+      "display": true,
+      "scope": "timeline-clip",
+      "category": "Synchronization",
+      "description": "Nudge selected clip synchronization",
+      "bindings": [
+        { "key": "arrowleft", "modifiers": [], "seconds": -0.1 },
+        { "key": "arrowright", "modifiers": [], "seconds": 0.1 },
+        { "key": "arrowleft", "modifiers": ["shift"], "seconds": -1 },
+        { "key": "arrowright", "modifiers": ["shift"], "seconds": 1 }
+      ]
+    },
+    {
+      "id": "history.undo",
+      "display": true,
+      "scope": "history",
+      "category": "History",
+      "description": "Undo",
+      "bindings": [{ "key": "z", "modifiers": ["mod"] }]
+    },
+    {
+      "id": "history.redo",
+      "display": true,
+      "scope": "history",
+      "category": "History",
+      "description": "Redo",
+      "bindings": [
+        { "key": "z", "modifiers": ["mod", "shift"] },
+        { "key": "y", "modifiers": ["ctrl"], "display": false }
+      ]
+    },
+    {
+      "id": "drawer.close",
+      "display": true,
+      "scope": "drawer",
+      "category": "Panels and workspace",
+      "description": "Close widget drawer",
+      "bindings": [{ "key": "escape", "modifiers": [], "display": false }]
+    }
+  ]
+}
