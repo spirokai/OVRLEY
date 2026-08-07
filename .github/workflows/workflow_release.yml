@@ -3,11 +3,6 @@ name: OVRLEY Release Orchestrator
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: Ref whose Semantic Release tag should be released
-        required: true
-        default: main
-        type: string
       notes:
         description: GitHub Release notes and updater manifest notes
         required: false
@@ -31,7 +26,6 @@ jobs:
       - name: Checkout selected release ref
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.ref }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -39,7 +33,7 @@ jobs:
         id: identity
         shell: bash
         env:
-          RELEASE_REF: ${{ inputs.ref }}
+          RELEASE_REF: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           stable_tag_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'

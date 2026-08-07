@@ -2,12 +2,6 @@ name: OVRLEY Linux Release
 
 on:
   workflow_dispatch:
-    inputs:
-      ref:
-        description: Ref whose Semantic Release tag should be packaged
-        required: true
-        default: main
-        type: string
   workflow_call:
     inputs:
       release_ref:
@@ -43,9 +37,20 @@ jobs:
       - name: Checkout selected release ref
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_ref || inputs.ref }}
+          ref: ${{ inputs.release_ref }}
           fetch-depth: 0
           fetch-tags: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.25.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
 
       - name: Resolve and validate release identity
         id: release
@@ -87,27 +92,6 @@ jobs:
             echo "commit=$commit"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Create or validate independent draft release
-        if: github.event_name == 'workflow_dispatch'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        run: |
-          set -euo pipefail
-          api_url="https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG"
-          response_file="$RUNNER_TEMP/ovrley-linux-release.json"
-          status="$(curl -sS -o "$response_file" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$api_url")"
-          if [[ "$status" == '200' ]]; then
-            jq -e '.draft == true' "$response_file" >/dev/null || { echo "A published release already exists for $RELEASE_TAG." >&2; exit 1; }
-          elif [[ "$status" == '404' ]]; then
-            gh release create "$RELEASE_TAG" --draft --title "OVRLEY $RELEASE_TAG" --notes ''
-          else
-            echo "GitHub release lookup failed with HTTP $status." >&2
-            cat "$response_file" >&2
-            exit 1
-          fi
-
       - name: Install Linux build dependencies
         run: |
           sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list || true
@@ -123,23 +107,13 @@ jobs:
             curl \
             file \
             libayatana-appindicator3-dev \
+            libfuse2 \
             libgtk-3-dev \
             librsvg2-dev \
             libssl-dev \
             libwebkit2gtk-4.1-dev \
             patchelf \
             pkg-config
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10.25.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -174,6 +148,7 @@ jobs:
       - name: Build signed Linux AppImage
         run: pnpm tauri build --bundles appimage
         env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
           VITE_OVRLEY_VERSION: ${{ steps.release.outputs.tag }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -234,27 +209,13 @@ jobs:
             dist-release/OVRLEY-linux-x86_64-${{ steps.release.outputs.tag }}.AppImage.sig
           if-no-files-found: error
 
-      - name: Revalidate independent draft release before upload
-        if: github.event_name == 'workflow_dispatch'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        run: |
-          set -euo pipefail
-          response_file="$RUNNER_TEMP/ovrley-linux-release-final.json"
-          status="$(curl -sS -o "$response_file" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
-          [[ "$status" == '200' ]] || { echo "Release lookup failed with HTTP $status." >&2; exit 1; }
-          jq -e '.draft == true' "$response_file" >/dev/null || { echo "Release $RELEASE_TAG is published; refusing to upload." >&2; exit 1; }
-
       - name: Upload independent public Linux asset
         if: github.event_name == 'workflow_dispatch'
-        shell: bash
+        uses: softprops/action-gh-release@v3
+        with:
+          draft: true
+          tag_name: ${{ steps.release.outputs.tag }}
+          files: dist-release/OVRLEY-linux-x86_64-${{ steps.release.outputs.tag }}.AppImage
+          fail_on_unmatched_files: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        run: |
-          set -euo pipefail
-          gh release upload "$RELEASE_TAG" \
-            "dist-release/OVRLEY-linux-x86_64-${RELEASE_TAG}.AppImage" \
-            --clobber
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
