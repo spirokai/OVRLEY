@@ -336,7 +336,8 @@ fn respond_video_full(
         reader,
         Some(current.file_size as usize),
         None,
-    );
+    )
+    .with_chunked_threshold(usize::MAX);
     request.respond(response).map_err(|error| error.to_string())
 }
 
@@ -381,7 +382,8 @@ fn respond_video_range(
         reader,
         Some(range_len as usize),
         None,
-    );
+    )
+    .with_chunked_threshold(usize::MAX);
     request.respond(response).map_err(|error| error.to_string())
 }
 
@@ -403,13 +405,10 @@ fn respond_text(request: Request, status: StatusCode, body: &str) -> Result<(), 
 /// Sends an empty response with the supplied status and headers.
 fn respond_empty(request: Request, status: StatusCode, headers: Vec<Header>) -> Result<(), String> {
     request
-        .respond(Response::new(
-            status,
-            headers,
-            std::io::empty(),
-            Some(0),
-            None,
-        ))
+        .respond(
+            Response::new(status, headers, std::io::empty(), Some(0), None)
+                .with_chunked_threshold(usize::MAX),
+        )
         .map_err(|error| error.to_string())
 }
 

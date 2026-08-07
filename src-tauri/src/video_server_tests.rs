@@ -93,7 +93,7 @@ fn rejects_unsatisfiable_ranges() {
 /// files.
 #[test]
 fn serves_full_range_stale_clear_and_deleted_file_behaviors() {
-    let (path_a, data_a) = write_temp_file("a", 2048);
+    let (path_a, data_a) = write_temp_file("a", 64 * 1024);
     let (path_b, _data_b) = write_temp_file("b", 1024);
     let server = VideoServerHandle::new();
     server.start().expect("server starts");
@@ -110,16 +110,28 @@ fn serves_full_range_stale_clear_and_deleted_file_behaviors() {
     assert!(headers(&head).starts_with("HTTP/1.1 200 OK"));
     assert!(headers(&head).contains("Accept-Ranges: bytes"));
     assert!(headers(&head).contains("Content-Type: video/mp4"));
-    assert!(headers(&head).contains("Content-Length: 2048"));
+    assert!(headers(&head).contains("Content-Length: 65536"));
+    assert!(!headers(&head).contains("Transfer-Encoding: chunked"));
+
+    let full = request(
+        port,
+        &format!("GET /video/{id_a} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),
+    );
+    assert!(headers(&full).starts_with("HTTP/1.1 200 OK"));
+    assert!(headers(&full).contains("Content-Length: 65536"));
+    assert!(!headers(&full).contains("Transfer-Encoding: chunked"));
+    assert_eq!(body(&full), data_a);
 
     let range = request(
         port,
-        &format!("GET /video/{id_a} HTTP/1.1\r\nHost: 127.0.0.1\r\nRange: bytes=0-999\r\n\r\n"),
+        &format!("GET /video/{id_a} HTTP/1.1\r\nHost: 127.0.0.1\r\nRange: bytes=0-49999\r\n\r\n"),
     );
     assert!(headers(&range).starts_with("HTTP/1.1 206 Partial Content"));
-    assert!(headers(&range).contains("Content-Range: bytes 0-999/2048"));
-    assert_eq!(body(&range).len(), 1000);
-    assert_eq!(&body(&range), &data_a[..1000]);
+    assert!(headers(&range).contains("Content-Range: bytes 0-49999/65536"));
+    assert!(headers(&range).contains("Content-Length: 50000"));
+    assert!(!headers(&range).contains("Transfer-Encoding: chunked"));
+    assert_eq!(body(&range).len(), 50000);
+    assert_eq!(&body(&range), &data_a[..50000]);
 
     let suffix = request(
         port,
@@ -136,7 +148,7 @@ fn serves_full_range_stale_clear_and_deleted_file_behaviors() {
         ),
     );
     assert!(headers(&unsat).starts_with("HTTP/1.1 416 Range Not Satisfiable"));
-    assert!(headers(&unsat).contains("Content-Range: bytes */2048"));
+    assert!(headers(&unsat).contains("Content-Range: bytes */65536"));
 
     let url_b = server
         .set_video(path_b.clone(), "video/mp4".to_string())
