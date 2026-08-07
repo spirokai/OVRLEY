@@ -38,7 +38,6 @@ const defaultFfmpegArchives = {
 
 const expectedFfmpegVersion =
   process.platform === "darwin" && !process.env.OVRLEY_FFMPEG_ARCHIVE_URL ? PINNED_DARWIN_FFMPEG_VERSION : null;
-const requireStaticTools = process.platform === "win32" || process.platform === "linux";
 
 const defaultFfprobeArchives = {
   "darwin-arm64": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffprobe.zip",
@@ -161,11 +160,6 @@ async function checkFfmpeg(path) {
 
   const version = parseVersion(result.stdout);
 
-  const linkageStatus = checkFfmpegLinkage(path, "ffmpeg");
-  if (!linkageStatus.usable) {
-    return linkageStatus;
-  }
-
   if (expectedFfmpegVersion && version !== expectedFfmpegVersion) {
     return {
       usable: false,
@@ -202,10 +196,6 @@ function checkFfprobe(path, expectedVersion = null) {
   }
 
   const version = parseVersion(result.stdout);
-  const linkageStatus = checkFfmpegLinkage(path, "ffprobe");
-  if (!linkageStatus.usable) {
-    return linkageStatus;
-  }
 
   if (expectedVersion && version !== expectedVersion) {
     return {
@@ -218,30 +208,6 @@ function checkFfprobe(path, expectedVersion = null) {
     usable: true,
     message: `Bundled ffprobe is available at ${path}.`,
   };
-}
-
-function checkFfmpegLinkage(path, label) {
-  if (!requireStaticTools) {
-    return { usable: true };
-  }
-
-  const result = execFfmpeg(path, ["-hide_banner", "-buildconf"], { encoding: "utf8" });
-  if (result.status !== 0) {
-    return {
-      usable: false,
-      message: `Could not inspect bundled ${label} linkage at ${path}; downloading the canonical static build.`,
-    };
-  }
-
-  const configuration = `${result.stdout}\n${result.stderr}`;
-  if (!configuration.includes("--enable-static") || !configuration.includes("--disable-shared")) {
-    return {
-      usable: false,
-      message: `Bundled ${label} at ${path} is not the canonical static build; downloading it.`,
-    };
-  }
-
-  return { usable: true };
 }
 
 function verifyInstalledTools(ffmpegPath, ffprobePath) {
