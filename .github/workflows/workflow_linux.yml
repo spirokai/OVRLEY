@@ -147,9 +147,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate shared packaging resources
-        run: pnpm prepare:packaging
-
       - name: Normalize FFmpeg libraries for AppImage packaging
         shell: bash
         run: |
@@ -170,6 +167,9 @@ jobs:
           fi
           ls -li vendor/ffmpeg/lib/*.so*
           LD_LIBRARY_PATH="$PWD/vendor/ffmpeg/lib" vendor/ffmpeg/bin/ffmpeg -version
+
+      - name: Generate shared packaging resources
+        run: pnpm prepare:packaging
 
       - name: Build signed Linux AppImage
         run: pnpm tauri build --bundles appimage
