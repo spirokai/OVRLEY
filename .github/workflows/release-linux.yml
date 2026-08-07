@@ -95,6 +95,8 @@ jobs:
         run: pnpm tauri build --bundles deb
         env:
           VITE_OVRLEY_VERSION: ${{ steps.release_tag.outputs.tag }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Verify Debian package contains bundled FFmpeg
         shell: bash
