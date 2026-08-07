@@ -47,6 +47,17 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.25.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
       - name: Resolve and validate release identity
         id: release
         shell: bash
@@ -107,17 +118,6 @@ jobs:
             cat "$response_file" >&2
             exit 1
           fi
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10.25.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -186,7 +186,7 @@ jobs:
           if ($markersInInstallerInputs.Count -ne 0) { throw 'Portable marker leaked into NSIS build inputs.' }
 
           $expected = @($setupName, "$setupName.sig", $portableName)
-          $actual = @(Get-ChildItem $outputDirectory -File | ForEach-Object Name)
+           $actual = @(Get-ChildItem -LiteralPath $outputDirectory, $portableDirectory -File | ForEach-Object Name)
           $expectedNames = ($expected | Sort-Object) -join "`n"
           $actualNames = ($actual | Sort-Object) -join "`n"
           if ($actualNames -cne $expectedNames) { throw 'Windows output names are not canonical.' }
@@ -199,9 +199,8 @@ jobs:
         with:
           name: ovrley-windows-artifacts-${{ steps.release.outputs.tag }}
           path: |
-            dist-release/OVRLEY-windows-x86_64-${{ steps.release.outputs.tag }}-setup.exe
-            dist-release/OVRLEY-windows-x86_64-${{ steps.release.outputs.tag }}-setup.exe.sig
-            dist-release/OVRLEY-windows-x86_64-${{ steps.release.outputs.tag }}-portable.zip
+             dist-release/OVRLEY-windows-x86_64-${{ steps.release.outputs.tag }}-setup.exe
+             dist-portable/OVRLEY-windows-x86_64-${{ steps.release.outputs.tag }}-portable.zip
           if-no-files-found: error
 
       - name: Revalidate independent draft release before upload
@@ -225,7 +224,7 @@ jobs:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
-          gh release upload "$RELEASE_TAG" \
-            "dist-release/OVRLEY-windows-x86_64-${RELEASE_TAG}-setup.exe" \
-            "dist-release/OVRLEY-windows-x86_64-${RELEASE_TAG}-portable.zip" \
-            --clobber
+           gh release upload "$RELEASE_TAG" \
+             "dist-release/OVRLEY-windows-x86_64-${RELEASE_TAG}-setup.exe" \
+             "dist-portable/OVRLEY-windows-x86_64-${RELEASE_TAG}-portable.zip" \
+             --clobber

@@ -131,7 +131,7 @@ jobs:
         run: pnpm prepare:packaging
 
       - name: Build signed macOS DMG and updater archive
-        run: pnpm tauri build --target aarch64-apple-darwin --bundles dmg
+        run: pnpm tauri build --target aarch64-apple-darwin --bundles app,dmg
         env:
           VITE_OVRLEY_VERSION: ${{ steps.release.outputs.tag }}
           APPLE_SIGNING_IDENTITY: "-"
