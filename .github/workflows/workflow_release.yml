@@ -130,19 +130,19 @@ jobs:
           fetch-tags: true
 
       - name: Download Windows artifact set
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ovrley-windows-artifacts-${{ needs.resolve.outputs.tag }}
           path: artifact-downloads/windows
 
       - name: Download macOS artifact set
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ovrley-macos-artifacts-${{ needs.resolve.outputs.tag }}
           path: artifact-downloads/macos
 
       - name: Download Linux artifact set
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ovrley-linux-artifacts-${{ needs.resolve.outputs.tag }}
           path: artifact-downloads/linux
