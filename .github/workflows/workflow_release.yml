@@ -22,6 +22,7 @@ jobs:
       tag: ${{ steps.identity.outputs.tag }}
       version: ${{ steps.identity.outputs.version }}
       commit: ${{ steps.identity.outputs.commit }}
+      release_id: ${{ steps.draft.outputs.id }}
     steps:
       - name: Checkout selected release ref
         uses: actions/checkout@v6
@@ -57,24 +58,37 @@ jobs:
             echo "commit=$commit"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Reject a published release before starting builds
+      - name: Create or reuse draft before starting builds
+        id: draft
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+          RELEASE_NOTES: ${{ inputs.notes }}
         run: |
           set -euo pipefail
-          releases_file="$RUNNER_TEMP/ovrley-release-preflight.json"
+          releases_file="$RUNNER_TEMP/ovrley-releases.json"
+          release_file="$RUNNER_TEMP/ovrley-release.json"
+          request_file="$RUNNER_TEMP/ovrley-release-request.json"
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$releases_file"
           match_count="$(jq -r --arg tag "$RELEASE_TAG" '[.[][] | select(.tag_name == $tag)] | length' "$releases_file")"
           [[ "$match_count" -le 1 ]] || { echo "Multiple releases exist for tag $RELEASE_TAG." >&2; exit 1; }
           if [[ "$match_count" == 1 ]]; then
+            jq -e --arg tag "$RELEASE_TAG" '.[][] | select(.tag_name == $tag and .draft == true)' "$releases_file" >/dev/null || { echo "Published release $RELEASE_TAG already exists." >&2; exit 1; }
             release_id="$(jq -r --arg tag "$RELEASE_TAG" '.[][] | select(.tag_name == $tag) | .id' "$releases_file")"
-            gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" --jq '.draft' | grep -Fxq true || { echo "Published release $RELEASE_TAG already exists; nothing was modified." >&2; exit 1; }
-            echo "Draft release $RELEASE_TAG will be reused."
+            jq -n --arg body "$RELEASE_NOTES" '{body: $body, draft: true}' > "$request_file"
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" --input "$request_file" > "$release_file"
           else
-            echo "No release exists for $RELEASE_TAG; the publishing job will create a draft."
+            jq -n \
+              --arg tag "$RELEASE_TAG" \
+              --arg name "OVRLEY $RELEASE_TAG" \
+              --arg body "$RELEASE_NOTES" \
+              '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: false}' > "$request_file"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/releases" --input "$request_file" > "$release_file"
           fi
+          jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == true and (.id | type == "number")' "$release_file" >/dev/null || { echo "Release $RELEASE_TAG is not the expected draft." >&2; exit 1; }
+          release_id="$(jq -r '.id' "$release_file")"
+          echo "id=$release_id" >> "$GITHUB_OUTPUT"
 
   windows:
     name: Windows build
@@ -236,35 +250,11 @@ jobs:
           actual="$(find public-assets -maxdepth 1 -type f -printf '%f\n' | sort)"
           [[ "$actual" == "$expected" ]] || { echo 'Public asset staging is not exactly canonical.' >&2; exit 1; }
 
-      - name: Create or reuse the final draft release
-        id: release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
-        run: |
-          set -euo pipefail
-          releases_file="$RUNNER_TEMP/ovrley-releases.json"
-          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$releases_file"
-          match_count="$(jq -r --arg tag "$RELEASE_TAG" '[.[][] | select(.tag_name == $tag)] | length' "$releases_file")"
-          [[ "$match_count" -le 1 ]] || { echo "Multiple releases exist for tag $RELEASE_TAG." >&2; exit 1; }
-          if [[ "$match_count" == 1 ]]; then
-            release_id="$(jq -r --arg tag "$RELEASE_TAG" '.[][] | select(.tag_name == $tag) | .id' "$releases_file")"
-            gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" --jq '.draft' | grep -Fxq true || { echo "Release $RELEASE_TAG was published while builds were running." >&2; exit 1; }
-          else
-            gh release create "$RELEASE_TAG" --draft --title "OVRLEY $RELEASE_TAG" --notes-file release-notes.txt
-            gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$releases_file"
-            release_id="$(jq -r --arg tag "$RELEASE_TAG" '.[][] | select(.tag_name == $tag) | .id' "$releases_file")"
-            [[ "$release_id" =~ ^[1-9][0-9]*$ ]] || { echo "Could not resolve the new draft release ID for $RELEASE_TAG." >&2; exit 1; }
-          fi
-          gh release edit "$RELEASE_TAG" --draft --notes-file release-notes.txt
-          echo "id=$release_id" >> "$GITHUB_OUTPUT"
-
       - name: Remove stale draft assets from this release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_ID: ${{ steps.release.outputs.id }}
+          RELEASE_ID: ${{ needs.resolve.outputs.release_id }}
           RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
         run: |
           set -euo pipefail
@@ -305,7 +295,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_ID: ${{ steps.release.outputs.id }}
+          RELEASE_ID: ${{ needs.resolve.outputs.release_id }}
           RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
           RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
         run: |
