@@ -88,29 +88,8 @@ jobs:
           set -euo pipefail
           test -x vendor/ffmpeg/bin/ffmpeg
           test -x vendor/ffmpeg/bin/ffprobe
-
-      - name: Normalize FFmpeg libs for Tauri bundler
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cd vendor/ffmpeg/lib
-          for full in *.so.*.*.*; do
-            [ -e "$full" ] || continue
-            soname="${full%.*.*}"
-            unversioned="${soname%.*}"
-            rm -f "$soname" "$unversioned"
-            ln "$full" "$soname"
-          done
-          cd -
-
-          remaining="$(find vendor/ffmpeg/lib -maxdepth 1 -type l -print)"
-          if [ -n "$remaining" ]; then
-            echo "$remaining"
-            exit 1
-          fi
-          ls -li vendor/ffmpeg/lib/*.so*
-          LD_LIBRARY_PATH="$PWD/vendor/ffmpeg/lib" vendor/ffmpeg/bin/ffmpeg -version
+          vendor/ffmpeg/bin/ffmpeg -version
+          vendor/ffmpeg/bin/ffprobe -version
 
       - name: Build Tauri Debian package
         run: pnpm tauri build --bundles deb

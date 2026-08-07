@@ -151,7 +151,7 @@ The shared generator must run before `tauri build` so Tauri can include generate
 
 - Fonts
 - Templates
-- FFmpeg and FFprobe, including required runtime libraries
+- Self-contained FFmpeg and FFprobe command-line binaries
 - `THIRD_PARTY_NOTICES.txt`
 - Platform `INSTALL.txt` where one currently exists
 
@@ -254,7 +254,7 @@ Build requirements:
 - Architecture: x86_64
 - Bundle target: AppImage only
 - Enable updater artifact creation and signing
-- Preserve the existing FFmpeg shared-library normalization needed before Tauri packaging
+- Use the non-shared BtbN GPL build for self-contained FFmpeg and FFprobe binaries
 - Stop producing a Debian package in the new workflow
 
 Normalize outputs to:
@@ -267,8 +267,8 @@ Verify before upload:
 - Exact artifact names
 - AppImage and signature exist and are non-empty
 - AppImage executable bit is set
-- Extracted AppImage contains FFmpeg, FFprobe, required FFmpeg libraries, fonts, templates, notices, and Linux installation documentation
-- Extracted FFmpeg and FFprobe are executable and can load their bundled libraries
+- Extracted AppImage contains FFmpeg, FFprobe, fonts, templates, notices, and Linux installation documentation
+- Extracted FFmpeg and FFprobe are executable and run without a bundled shared-library directory
 - Native version equals the release tag
 
 Publishing behavior:

@@ -301,7 +301,7 @@ fn cuda_upload_probe_args(encoder: &str) -> Vec<String> {
 /// conservatively disabled instead of being shown optimistically.
 fn detect_ffmpeg_filters(ffmpeg_path: &Path) -> std::collections::BTreeSet<String> {
     let mut command = Command::new(ffmpeg_path);
-    configure_ffmpeg_command(&mut command, ffmpeg_path);
+    configure_ffmpeg_command(&mut command);
     let output = command.args(["-hide_banner", "-filters"]).output();
     let Ok(output) = output else {
         return std::collections::BTreeSet::new();

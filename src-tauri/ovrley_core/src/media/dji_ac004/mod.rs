@@ -99,7 +99,7 @@ fn detect_dji_meta_stream(ffmpeg_path: &Path, file_path: &Path) -> CoreResult<Op
         .arg("json")
         .arg("-show_streams")
         .arg(file_path);
-    configure_ffmpeg_command(&mut command, &ffprobe_path);
+    configure_ffmpeg_command(&mut command);
 
     let output = command
         .output()
@@ -153,7 +153,7 @@ fn extract_dji_meta_raw(
         .arg("-f")
         .arg("data")
         .arg("pipe:1");
-    configure_ffmpeg_command(&mut command, ffmpeg_path);
+    configure_ffmpeg_command(&mut command);
 
     let output = command
         .output()

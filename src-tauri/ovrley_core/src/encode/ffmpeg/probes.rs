@@ -247,7 +247,7 @@ pub(super) fn probe_codec(name: &str, ffmpeg_path: &Path, args: &[String]) -> bo
     let mut command = Command::new(ffmpeg_path);
     command.arg("-nostdin");
     command.args(args);
-    configure_ffmpeg_command(&mut command, ffmpeg_path);
+    configure_ffmpeg_command(&mut command);
     command.stdout(Stdio::null());
     command.stderr(Stdio::null());
 

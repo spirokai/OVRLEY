@@ -50,13 +50,8 @@ pub fn resolve_ffmpeg_binary(repo_root: &Path) -> CoreResult<PathBuf> {
     ))
 }
 
-/// Applies platform-specific process configuration for bundled FFmpeg tools.
-///
-/// Windows release builds hide the child console window. Linux portable builds
-/// ship FFmpeg as a shared build, so subprocesses need the sibling `lib`
-/// directory on `LD_LIBRARY_PATH` even when the app was not started through the
-/// portable launcher.
-pub fn configure_ffmpeg_command(command: &mut Command, binary_path: &Path) {
+/// Applies platform-specific process configuration for FFmpeg tools.
+pub fn configure_ffmpeg_command(command: &mut Command) {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -64,13 +59,15 @@ pub fn configure_ffmpeg_command(command: &mut Command, binary_path: &Path) {
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         command.creation_flags(CREATE_NO_WINDOW);
     }
-    apply_bundled_ffmpeg_library_path(command, binary_path);
+
+    #[cfg(not(windows))]
+    let _ = command;
 }
 
 /// Spawns one FFmpeg encode command with the pipe ownership shared by all video pipelines.
 pub(crate) fn spawn_ffmpeg(binary_path: &Path, args: &[String]) -> CoreResult<Child> {
     let mut command = Command::new(binary_path);
-    configure_ffmpeg_command(&mut command, binary_path);
+    configure_ffmpeg_command(&mut command);
     command
         .args(args)
         .stdin(Stdio::piped())
@@ -78,60 +75,6 @@ pub(crate) fn spawn_ffmpeg(binary_path: &Path, args: &[String]) -> CoreResult<Ch
         .stdout(Stdio::null())
         .spawn()
         .map_err(|error| CoreError::Encode(format!("Could not start ffmpeg: {error}")))
-}
-
-#[cfg(target_os = "linux")]
-fn apply_bundled_ffmpeg_library_path(command: &mut Command, binary_path: &Path) {
-    if !is_bundled_ffmpeg_tool(binary_path) {
-        return;
-    }
-
-    let Some(bin_dir) = binary_path.parent() else {
-        return;
-    };
-    let Some(ffmpeg_dir) = bin_dir.parent() else {
-        return;
-    };
-    let lib_dir = ffmpeg_dir.join("lib");
-    if !lib_dir.is_dir() {
-        return;
-    }
-
-    let mut value = lib_dir.to_string_lossy().to_string();
-    if let Some(existing) = env::var_os("LD_LIBRARY_PATH") {
-        let existing = existing.to_string_lossy();
-        if !existing.is_empty() {
-            value.push(':');
-            value.push_str(&existing);
-        }
-    }
-    command.env("LD_LIBRARY_PATH", value);
-}
-
-#[cfg(not(target_os = "linux"))]
-fn apply_bundled_ffmpeg_library_path(_command: &mut Command, _binary_path: &Path) {}
-
-#[cfg(target_os = "linux")]
-fn is_bundled_ffmpeg_tool(binary_path: &Path) -> bool {
-    let Some(bin_dir) = binary_path.parent() else {
-        return false;
-    };
-    if bin_dir.file_name().and_then(|name| name.to_str()) != Some("bin") {
-        return false;
-    }
-
-    let Some(ffmpeg_dir) = bin_dir.parent() else {
-        return false;
-    };
-    if ffmpeg_dir.file_name().and_then(|name| name.to_str()) != Some("ffmpeg") {
-        return false;
-    }
-
-    ffmpeg_dir
-        .parent()
-        .and_then(|name| name.file_name())
-        .and_then(|name| name.to_str())
-        == Some("vendor")
 }
 
 // Searches the process PATH for a binary with the requested platform filename.
