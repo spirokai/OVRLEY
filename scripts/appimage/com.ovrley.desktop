@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=OVRLEY
+Exec=OVRLEY
+Icon=ovrley
+Categories=AudioVideo;
+StartupWMClass=com.ovrley.desktop
+Terminal=false

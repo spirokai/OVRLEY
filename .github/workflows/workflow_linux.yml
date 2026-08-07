@@ -32,7 +32,7 @@ permissions:
 jobs:
   build:
     name: Build Linux x86_64 AppImage
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout selected release ref
         uses: actions/checkout@v6
@@ -124,34 +124,76 @@ jobs:
       - name: Generate shared packaging resources
         run: pnpm prepare:packaging
 
-      - name: Build signed Linux AppImage
-        run: pnpm tauri build --bundles appimage --verbose
+      - name: Build Linux application binary
+        run: pnpm tauri build --no-bundle --verbose
         env:
-          APPIMAGE_EXTRACT_AND_RUN: '1'
-          NO_STRIP: '1'
           VITE_OVRLEY_VERSION: ${{ steps.release.outputs.tag }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Normalize and validate Linux artifacts
+      - name: Package and sign minimal Linux AppImage
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.tag }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          version="$RELEASE_VERSION"
+          app_binary="src-tauri/target/release/app"
+          app_dir="$RUNNER_TEMP/OVRLEY.AppDir"
+          payload_dir="$app_dir/usr/lib/ovrley"
+          appimage_name="OVRLEY-linux-$version.AppImage"
+          appimage_path="dist-release/$appimage_name"
+          appimagetool="$RUNNER_TEMP/appimagetool-x86_64.AppImage"
+
+          [[ -x "$app_binary" ]] || { echo 'Release application binary is missing or not executable.' >&2; exit 1; }
+          ldd_output="$(ldd "$app_binary")"
+          printf '%s\n' "$ldd_output"
+          ! grep -q 'not found' <<< "$ldd_output" || { echo 'Release application binary has unresolved host dependencies.' >&2; exit 1; }
+          grep -q 'libwebkit2gtk-4.1.so.0 =>' <<< "$ldd_output" || { echo 'Release application binary is not linked to host WebKitGTK 4.1.' >&2; exit 1; }
+          grep -q 'libgtk-3.so.0 =>' <<< "$ldd_output" || { echo 'Release application binary is not linked to host GTK 3.' >&2; exit 1; }
+          grep -q 'libgio-2.0.so.0 =>' <<< "$ldd_output" || { echo 'Release application binary is not linked to host GIO.' >&2; exit 1; }
+          [[ -z "$(patchelf --print-rpath "$app_binary")" ]] || { echo 'Release application binary must not have an embedded library search path.' >&2; exit 1; }
+
+          rm -rf "$app_dir" dist-release
+          mkdir -p "$payload_dir/vendor" "$app_dir/usr/bin" "$app_dir/usr/share/applications" dist-release
+          install -m 0755 "$app_binary" "$payload_dir/OVRLEY"
+          cp -a vendor/ffmpeg "$payload_dir/vendor/ffmpeg"
+          cp -a fonts "$payload_dir/fonts"
+          cp -a templates "$payload_dir/templates"
+          install -m 0644 THIRD_PARTY_NOTICES.txt "$payload_dir/THIRD_PARTY_NOTICES.txt"
+          install -m 0644 INSTALL-linux.txt "$payload_dir/INSTALL.txt"
+          install -m 0755 scripts/appimage/AppRun "$app_dir/AppRun"
+          install -m 0644 scripts/appimage/com.ovrley.desktop "$app_dir/usr/share/applications/com.ovrley.desktop"
+          ln -s ../lib/ovrley/OVRLEY "$app_dir/usr/bin/OVRLEY"
+
+          for size in 32x32 64x64 128x128; do
+            install -Dm0644 "src-tauri/icons/$size.png" "$app_dir/usr/share/icons/hicolor/$size/apps/ovrley.png"
+          done
+          install -Dm0644 src-tauri/icons/128x128@2x.png "$app_dir/usr/share/icons/hicolor/256x256/apps/ovrley.png"
+          ln -s usr/share/applications/com.ovrley.desktop "$app_dir/com.ovrley.desktop"
+          ln -s usr/share/icons/hicolor/128x128/apps/ovrley.png "$app_dir/ovrley.png"
+          ln -s ovrley.png "$app_dir/.DirIcon"
+
+          curl --fail --location --retry 3 \
+            --output "$appimagetool" \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x "$appimagetool"
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 VERSION="$version" \
+            "$appimagetool" --no-appstream "$app_dir" "$appimage_path"
+          chmod +x "$appimage_path"
+          pnpm tauri signer sign "$appimage_path"
+
+      - name: Validate minimal Linux AppImage
         shell: bash
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
           version="$RELEASE_VERSION"
-          rm -rf dist-release
-          mkdir -p dist-release
-          appimage_source="$(find src-tauri/target -type f -path '*/bundle/appimage/*.AppImage' -print -quit)"
-          [[ -n "$appimage_source" && -s "$appimage_source" ]] || { echo 'Linux AppImage is missing or empty.' >&2; exit 1; }
-          [[ -s "$appimage_source.sig" ]] || { echo 'Linux AppImage signature is missing or empty.' >&2; exit 1; }
-          [[ -x "$appimage_source" ]] || { echo 'Linux AppImage is not executable.' >&2; exit 1; }
-          [[ "$(basename "$appimage_source")" == "OVRLEY_${version}_"*.AppImage ]] || { echo 'Native Linux AppImage version does not match the release tag.' >&2; exit 1; }
-
           appimage_name="OVRLEY-linux-$version.AppImage"
-          cp "$appimage_source" "dist-release/$appimage_name"
-          cp "$appimage_source.sig" "dist-release/$appimage_name.sig"
-          chmod +x "dist-release/$appimage_name"
+          [[ -s "dist-release/$appimage_name" ]] || { echo 'Linux AppImage is missing or empty.' >&2; exit 1; }
+          [[ -s "dist-release/$appimage_name.sig" ]] || { echo 'Linux AppImage signature is missing or empty.' >&2; exit 1; }
+          [[ -x "dist-release/$appimage_name" ]] || { echo 'Linux AppImage is not executable.' >&2; exit 1; }
 
           extract_directory="$RUNNER_TEMP/ovrley-appimage-check"
           rm -rf "$extract_directory" "$RUNNER_TEMP/squashfs-root"
@@ -161,8 +203,10 @@ jobs:
           appimage_root="$extract_directory/squashfs-root"
           [[ -d "$appimage_root" ]] || { echo 'AppImage extraction failed.' >&2; exit 1; }
 
+          app_binary="$appimage_root/usr/lib/ovrley/OVRLEY"
           ffmpeg_path="$(find "$appimage_root" -type f -path '*/vendor/ffmpeg/bin/ffmpeg' -print -quit)"
           ffprobe_path="$(find "$appimage_root" -type f -path '*/vendor/ffmpeg/bin/ffprobe' -print -quit)"
+          [[ -x "$app_binary" ]] || { echo 'Extracted AppImage is missing the OVRLEY executable.' >&2; exit 1; }
           [[ -n "$ffmpeg_path" && -x "$ffmpeg_path" ]] || { echo 'Extracted AppImage is missing executable FFmpeg.' >&2; exit 1; }
           [[ -n "$ffprobe_path" && -x "$ffprobe_path" ]] || { echo 'Extracted AppImage is missing executable FFprobe.' >&2; exit 1; }
           find "$appimage_root" -type d -path '*/fonts' -print -quit | grep -q . || { echo 'Extracted AppImage is missing fonts.' >&2; exit 1; }
@@ -173,7 +217,27 @@ jobs:
           desktop_file="$(find "$appimage_root/usr/share/applications" -maxdepth 1 -type f -name '*.desktop' -print -quit)"
           [[ -n "$desktop_file" ]] || { echo 'Extracted AppImage is missing its desktop entry.' >&2; exit 1; }
           grep -Fxq 'Name=OVRLEY' "$desktop_file" || { echo 'Extracted AppImage desktop entry has the wrong application name.' >&2; exit 1; }
+          grep -Fxq 'StartupWMClass=com.ovrley.desktop' "$desktop_file" || { echo 'Extracted AppImage desktop entry has the wrong GTK application ID.' >&2; exit 1; }
           find "$appimage_root/usr/share/icons/hicolor" -type f -name '*.png' -print -quit | grep -q . || { echo 'Extracted AppImage is missing its application icon assets.' >&2; exit 1; }
+
+          forbidden_payload="$(find "$appimage_root" \( -type f -o -type l \) \( \
+            -name 'libglib-2.0.so*' -o \
+            -name 'libgio-2.0.so*' -o \
+            -name 'libgobject-2.0.so*' -o \
+            -name 'libgmodule-2.0.so*' -o \
+            -name 'libgthread-2.0.so*' -o \
+            -name 'libgtk-3.so*' -o \
+            -name 'libgdk-3.so*' -o \
+            -name 'libwebkit2gtk-4.1.so*' -o \
+            -name 'libjavascriptcoregtk-4.1.so*' -o \
+            -name 'libgstreamer-1.0.so*' -o \
+            -name 'libgst*.so*' -o \
+            -name 'WebKitWebProcess' -o \
+            -name 'WebKitNetworkProcess' \
+          \) -print)"
+          [[ -z "$forbidden_payload" ]] || { printf 'AppImage contains forbidden host-stack files:\n%s\n' "$forbidden_payload" >&2; exit 1; }
+          ! grep -Eq 'LD_LIBRARY_PATH|GIO_MODULE|GST_PLUGIN|WEBKIT_EXEC_PATH' "$appimage_root/AppRun" || { echo 'AppRun overrides host library or plugin resolution.' >&2; exit 1; }
+
           "$ffmpeg_path" -version
           "$ffprobe_path" -version >/dev/null
 
