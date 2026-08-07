@@ -1,0 +1,260 @@
+name: OVRLEY Linux Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Ref whose Semantic Release tag should be packaged
+        required: true
+        default: main
+        type: string
+  workflow_call:
+    inputs:
+      release_ref:
+        description: Checked-out release ref
+        required: true
+        type: string
+      release_tag:
+        description: Stable Semantic Release tag
+        required: true
+        type: string
+      release_version:
+        description: Normalized stable release version
+        required: true
+        type: string
+      release_commit:
+        description: Commit SHA the release tag must point at
+        required: true
+        type: string
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Linux x86_64 AppImage
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout selected release ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.release_ref || inputs.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve and validate release identity
+        id: release
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.release_tag }}
+          INPUT_VERSION: ${{ inputs.release_version }}
+          INPUT_COMMIT: ${{ inputs.release_commit }}
+        run: |
+          set -euo pipefail
+          stable_tag_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          candidates=()
+          while IFS= read -r candidate; do
+            if [[ "$candidate" =~ $stable_tag_pattern ]]; then
+              candidates+=("$candidate")
+            fi
+          done < <(git tag --points-at HEAD)
+
+          if [[ "$GITHUB_EVENT_NAME" == 'workflow_call' ]]; then
+            tag="$INPUT_TAG"
+            version="$INPUT_VERSION"
+            commit="$INPUT_COMMIT"
+            [[ "$tag" =~ $stable_tag_pattern ]] || { echo "Reusable workflow received a non-stable tag: $tag" >&2; exit 1; }
+            [[ "$tag" == "$version" ]] || { echo "Reusable workflow tag and version differ." >&2; exit 1; }
+            [[ "$(git rev-parse HEAD)" == "$commit" ]] || { echo "Checked-out commit differs from the orchestrator commit." >&2; exit 1; }
+            [[ "${#candidates[@]}" == 1 && "${candidates[0]}" == "$tag" ]] || { echo "Reusable workflow tag is not the unique stable tag at HEAD." >&2; exit 1; }
+          else
+            [[ "${#candidates[@]}" == 1 ]] || { echo "Expected exactly one stable Semantic Release tag at HEAD." >&2; exit 1; }
+            tag="${candidates[0]}"
+            version="$tag"
+            commit="$(git rev-parse HEAD)"
+          fi
+
+          echo "commit=$commit"
+          echo "tag=$tag"
+          node scripts/set-release-version.mjs "$version"
+          {
+            echo "tag=$tag"
+            echo "commit=$commit"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or validate independent draft release
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG"
+          response_file="$RUNNER_TEMP/ovrley-linux-release.json"
+          status="$(curl -sS -o "$response_file" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$api_url")"
+          if [[ "$status" == '200' ]]; then
+            jq -e '.draft == true' "$response_file" >/dev/null || { echo "A published release already exists for $RELEASE_TAG." >&2; exit 1; }
+          elif [[ "$status" == '404' ]]; then
+            gh release create "$RELEASE_TAG" --draft --title "OVRLEY $RELEASE_TAG" --notes ''
+          else
+            echo "GitHub release lookup failed with HTTP $status." >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list || true
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources || true
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|http://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt || true
+          sudo apt-get clean
+          sudo apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+          sudo apt-get install -y --no-install-recommends \
+            -o Acquire::Retries=5 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            libgtk-3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            patchelf \
+            pkg-config
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.25.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate shared packaging resources
+        run: pnpm prepare:packaging
+
+      - name: Normalize FFmpeg libraries for AppImage packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd vendor/ffmpeg/lib
+          for full in *.so.*.*.*; do
+            [ -e "$full" ] || continue
+            soname="${full%.*.*}"
+            unversioned="${soname%.*}"
+            rm -f "$soname" "$unversioned"
+            ln "$full" "$soname"
+          done
+          cd -
+          remaining="$(find vendor/ffmpeg/lib -maxdepth 1 -type l -print)"
+          if [ -n "$remaining" ]; then
+            echo "$remaining"
+            exit 1
+          fi
+          ls -li vendor/ffmpeg/lib/*.so*
+          LD_LIBRARY_PATH="$PWD/vendor/ffmpeg/lib" vendor/ffmpeg/bin/ffmpeg -version
+
+      - name: Build signed Linux AppImage
+        run: pnpm tauri build --bundles appimage
+        env:
+          VITE_OVRLEY_VERSION: ${{ steps.release.outputs.tag }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Normalize and validate Linux artifacts
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          version="$RELEASE_VERSION"
+          rm -rf dist-release
+          mkdir -p dist-release
+          appimage_source="$(find src-tauri/target -type f -path '*/bundle/appimage/*.AppImage' -print -quit)"
+          [[ -n "$appimage_source" && -s "$appimage_source" ]] || { echo 'Linux AppImage is missing or empty.' >&2; exit 1; }
+          [[ -s "$appimage_source.sig" ]] || { echo 'Linux AppImage signature is missing or empty.' >&2; exit 1; }
+          [[ -x "$appimage_source" ]] || { echo 'Linux AppImage is not executable.' >&2; exit 1; }
+          [[ "$(basename "$appimage_source")" == "OVRLEY_${version}_"*.AppImage ]] || { echo 'Native Linux AppImage version does not match the release tag.' >&2; exit 1; }
+
+          appimage_name="OVRLEY-linux-x86_64-$version.AppImage"
+          cp "$appimage_source" "dist-release/$appimage_name"
+          cp "$appimage_source.sig" "dist-release/$appimage_name.sig"
+          chmod +x "dist-release/$appimage_name"
+
+          extract_directory="$RUNNER_TEMP/ovrley-appimage-check"
+          rm -rf "$extract_directory" "$RUNNER_TEMP/squashfs-root"
+          mkdir -p "$extract_directory"
+          appimage_path="$(realpath "dist-release/$appimage_name")"
+          (cd "$extract_directory" && "$appimage_path" --appimage-extract >/dev/null)
+          appimage_root="$extract_directory/squashfs-root"
+          [[ -d "$appimage_root" ]] || { echo 'AppImage extraction failed.' >&2; exit 1; }
+
+          ffmpeg_path="$(find "$appimage_root" -type f -path '*/vendor/ffmpeg/bin/ffmpeg' -print -quit)"
+          ffprobe_path="$(find "$appimage_root" -type f -path '*/vendor/ffmpeg/bin/ffprobe' -print -quit)"
+          [[ -n "$ffmpeg_path" && -x "$ffmpeg_path" ]] || { echo 'Extracted AppImage is missing executable FFmpeg.' >&2; exit 1; }
+          [[ -n "$ffprobe_path" && -x "$ffprobe_path" ]] || { echo 'Extracted AppImage is missing executable FFprobe.' >&2; exit 1; }
+          ffmpeg_root="$(dirname "$(dirname "$ffmpeg_path")")"
+          [[ -d "$ffmpeg_root/lib" ]] || { echo 'Extracted AppImage is missing FFmpeg libraries.' >&2; exit 1; }
+          [[ -d "$(dirname "$ffmpeg_path")" ]] || exit 1
+          find "$appimage_root" -type d -path '*/fonts' -print -quit | grep -q . || { echo 'Extracted AppImage is missing fonts.' >&2; exit 1; }
+          find "$appimage_root" -type d -path '*/templates' -print -quit | grep -q . || { echo 'Extracted AppImage is missing templates.' >&2; exit 1; }
+          find "$appimage_root" -type f -name 'THIRD_PARTY_NOTICES.txt' -print -quit | grep -q . || { echo 'Extracted AppImage is missing third-party notices.' >&2; exit 1; }
+          find "$appimage_root" -type f -name 'INSTALL.txt' -print -quit | grep -q . || { echo 'Extracted AppImage is missing Linux installation documentation.' >&2; exit 1; }
+          LD_LIBRARY_PATH="$(dirname "$ffmpeg_path")/../lib" "$ffmpeg_path" -version
+          LD_LIBRARY_PATH="$(dirname "$ffprobe_path")/../lib" "$ffprobe_path" -version >/dev/null
+
+          expected="$(printf '%s\n' "$appimage_name" "$appimage_name.sig" | sort)"
+          actual="$(find dist-release -maxdepth 1 -type f -printf '%f\n' | sort)"
+          [[ "$actual" == "$expected" ]] || { echo 'Linux output names are not canonical.' >&2; exit 1; }
+
+      - name: Upload Linux Actions artifact
+        if: github.event_name == 'workflow_call'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ovrley-linux-artifacts-${{ steps.release.outputs.tag }}
+          path: |
+            dist-release/OVRLEY-linux-x86_64-${{ steps.release.outputs.tag }}.AppImage
+            dist-release/OVRLEY-linux-x86_64-${{ steps.release.outputs.tag }}.AppImage.sig
+          if-no-files-found: error
+
+      - name: Revalidate independent draft release before upload
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          response_file="$RUNNER_TEMP/ovrley-linux-release-final.json"
+          status="$(curl -sS -o "$response_file" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          [[ "$status" == '200' ]] || { echo "Release lookup failed with HTTP $status." >&2; exit 1; }
+          jq -e '.draft == true' "$response_file" >/dev/null || { echo "Release $RELEASE_TAG is published; refusing to upload." >&2; exit 1; }
+
+      - name: Upload independent public Linux asset
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            "dist-release/OVRLEY-linux-x86_64-${RELEASE_TAG}.AppImage" \
+            --clobber

@@ -1,0 +1,231 @@
+name: OVRLEY Windows Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Ref whose Semantic Release tag should be packaged
+        required: true
+        default: main
+        type: string
+  workflow_call:
+    inputs:
+      release_ref:
+        description: Checked-out release ref
+        required: true
+        type: string
+      release_tag:
+        description: Stable Semantic Release tag
+        required: true
+        type: string
+      release_version:
+        description: Normalized stable release version
+        required: true
+        type: string
+      release_commit:
+        description: Commit SHA the release tag must point at
+        required: true
+        type: string
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Windows x86_64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout selected release ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.release_ref || inputs.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve and validate release identity
+        id: release
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.release_tag }}
+          INPUT_VERSION: ${{ inputs.release_version }}
+          INPUT_COMMIT: ${{ inputs.release_commit }}
+        run: |
+          set -euo pipefail
+          stable_tag_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          candidates=()
+          while IFS= read -r candidate; do
+            if [[ "$candidate" =~ $stable_tag_pattern ]]; then
+              candidates+=("$candidate")
+            fi
+          done < <(git tag --points-at HEAD)
+
+          if [[ "$GITHUB_EVENT_NAME" == 'workflow_call' ]]; then
+            tag="$INPUT_TAG"
+            version="$INPUT_VERSION"
+            commit="$INPUT_COMMIT"
+            [[ "$tag" =~ $stable_tag_pattern ]] || { echo "Reusable workflow received a non-stable tag: $tag" >&2; exit 1; }
+            [[ "$tag" == "$version" ]] || { echo "Reusable workflow tag and version differ." >&2; exit 1; }
+            [[ "$(git rev-parse HEAD)" == "$commit" ]] || { echo "Checked-out commit differs from the orchestrator commit." >&2; exit 1; }
+            [[ "${#candidates[@]}" == 1 && "${candidates[0]}" == "$tag" ]] || { echo "Reusable workflow tag is not the unique stable tag at HEAD." >&2; exit 1; }
+          else
+            [[ "${#candidates[@]}" == 1 ]] || { echo "Expected exactly one stable Semantic Release tag at HEAD." >&2; exit 1; }
+            tag="${candidates[0]}"
+            version="$tag"
+            commit="$(git rev-parse HEAD)"
+          fi
+
+          echo "commit=$commit"
+          echo "tag=$tag"
+          node scripts/set-release-version.mjs "$version"
+          {
+            echo "tag=$tag"
+            echo "commit=$commit"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or validate independent draft release
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG"
+          response_file="$RUNNER_TEMP/ovrley-windows-release.json"
+          status="$(curl -sS -o "$response_file" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$api_url")"
+          if [[ "$status" == '200' ]]; then
+            jq -e '.draft == true' "$response_file" >/dev/null || { echo "A published release already exists for $RELEASE_TAG." >&2; exit 1; }
+          elif [[ "$status" == '404' ]]; then
+            gh release create "$RELEASE_TAG" --draft --title "OVRLEY $RELEASE_TAG" --notes ''
+          else
+            echo "GitHub release lookup failed with HTTP $status." >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.25.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate shared packaging resources
+        run: pnpm prepare:packaging
+
+      - name: Build signed NSIS installer
+        run: pnpm tauri build --bundles nsis
+        env:
+          VITE_OVRLEY_VERSION: ${{ steps.release.outputs.tag }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Normalize and validate Windows artifacts
+        id: artifacts
+        shell: powershell
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:RELEASE_VERSION
+          $outputDirectory = Join-Path $PWD 'dist-release'
+          $portableDirectory = Join-Path $PWD 'dist-portable'
+          Remove-Item -LiteralPath $outputDirectory, $portableDirectory -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $outputDirectory | Out-Null
+
+          $setupCandidates = @(Get-ChildItem 'src-tauri\target' -Filter '*-setup.exe' -File -Recurse | Where-Object { $_.FullName -match '\\bundle\\nsis\\' })
+          if ($setupCandidates.Count -ne 1) { throw "Expected exactly one NSIS setup executable, found $($setupCandidates.Count)." }
+          $setupSource = $setupCandidates[0]
+          $signatureSource = Get-Item -LiteralPath "$($setupSource.FullName).sig"
+          if ($setupSource.Length -le 0 -or $signatureSource.Length -le 0) { throw 'NSIS setup or signature is empty.' }
+
+          $setupName = "OVRLEY-windows-x86_64-$version-setup.exe"
+          $portableName = "OVRLEY-windows-x86_64-$version-portable.zip"
+          $setupPath = Join-Path $outputDirectory $setupName
+          $signaturePath = Join-Path $outputDirectory "$setupName.sig"
+          Copy-Item -LiteralPath $setupSource.FullName -Destination $setupPath
+          Copy-Item -LiteralPath $signatureSource.FullName -Destination $signaturePath
+
+          $nativeBinary = Get-Item -LiteralPath 'src-tauri\target\release\app.exe'
+          if ($nativeBinary.Length -le 0) { throw 'The compiled application executable is missing or empty.' }
+          $nativeVersion = $nativeBinary.VersionInfo.ProductVersion
+          if ($nativeVersion -notmatch "^$([regex]::Escape($version))(\.0)?$") { throw "Native Windows version $nativeVersion does not match $version." }
+
+          node scripts/package-portable.mjs --version $version --archive-name $portableName
+          $portablePath = Join-Path $portableDirectory $portableName
+          if (-not (Test-Path -LiteralPath $portablePath)) { throw 'Portable ZIP was not produced.' }
+
+          $portableHash = (Get-FileHash -LiteralPath (Join-Path $portableDirectory 'OVRLEY\OVRLEY.exe')).Hash
+          $nativeHash = (Get-FileHash -LiteralPath $nativeBinary.FullName).Hash
+          if ($portableHash -ne $nativeHash) { throw 'Portable executable does not match the compiled installer executable.' }
+
+          $extractDirectory = Join-Path $env:RUNNER_TEMP 'ovrley-portable-check'
+          Remove-Item -LiteralPath $extractDirectory -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive -LiteralPath $portablePath -DestinationPath $extractDirectory
+          $portableRoot = Join-Path $extractDirectory 'OVRLEY'
+          foreach ($requiredPath in @('OVRLEY.exe', '.ovrley-portable', 'fonts', 'templates', 'vendor\ffmpeg\bin\ffmpeg.exe', 'vendor\ffmpeg\bin\ffprobe.exe', 'THIRD_PARTY_NOTICES.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $portableRoot $requiredPath))) { throw "Portable ZIP is missing $requiredPath." }
+          }
+
+          $markersInInstallerInputs = @(Get-ChildItem 'src-tauri\target\release' -Filter '.ovrley-portable' -File -Recurse -Force -ErrorAction SilentlyContinue)
+          if ($markersInInstallerInputs.Count -ne 0) { throw 'Portable marker leaked into NSIS build inputs.' }
+
+          $expected = @($setupName, "$setupName.sig", $portableName)
+          $actual = @(Get-ChildItem $outputDirectory -File | ForEach-Object Name)
+          $expectedNames = ($expected | Sort-Object) -join "`n"
+          $actualNames = ($actual | Sort-Object) -join "`n"
+          if ($actualNames -cne $expectedNames) { throw 'Windows output names are not canonical.' }
+          "setup=$setupPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "portable=$portablePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload Windows Actions artifact
+        if: github.event_name == 'workflow_call'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ovrley-windows-artifacts-${{ steps.release.outputs.tag }}
+          path: |
+            dist-release/OVRLEY-windows-x86_64-${{ steps.release.outputs.tag }}-setup.exe
+            dist-release/OVRLEY-windows-x86_64-${{ steps.release.outputs.tag }}-setup.exe.sig
+            dist-release/OVRLEY-windows-x86_64-${{ steps.release.outputs.tag }}-portable.zip
+          if-no-files-found: error
+
+      - name: Revalidate independent draft release before upload
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          response_file="$RUNNER_TEMP/ovrley-windows-release-final.json"
+          status="$(curl -sS -o "$response_file" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          [[ "$status" == '200' ]] || { echo "Release lookup failed with HTTP $status." >&2; exit 1; }
+          jq -e '.draft == true' "$response_file" >/dev/null || { echo "Release $RELEASE_TAG is published; refusing to upload." >&2; exit 1; }
+
+      - name: Upload independent public Windows assets
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            "dist-release/OVRLEY-windows-x86_64-${RELEASE_TAG}-setup.exe" \
+            "dist-release/OVRLEY-windows-x86_64-${RELEASE_TAG}-portable.zip" \
+            --clobber

@@ -12,6 +12,7 @@ import useAppBootstrap from './useAppBootstrap'
 import useAppShellKeyboard from './useAppShellKeyboard'
 import useBackendStatus from './useBackendStatus'
 import useEditorShellState from './useEditorShellState'
+import { useAppUpdate } from '@/features/app-update'
 import { useVideoImport } from '@/features/video-preview'
 import { useUndoRedo } from '@/features/undo-redo'
 import * as backend from '@/api/backend'
@@ -21,6 +22,7 @@ import * as backend from '@/api/backend'
  *
  * @returns {{
  *   activityImport: object,
+ *   appUpdate: object,
  *   appShell: object,
  *   backendState: object,
  *   editorShell: object,
@@ -46,6 +48,7 @@ export default function useAppShellComposition() {
   })
 
   useAppBootstrap()
+  const appUpdate = useAppUpdate()
 
   const { restoreLastLoadedTemplate } = templateManagement
 
@@ -74,6 +77,7 @@ export default function useAppShellComposition() {
 
   return {
     activityImport,
+    appUpdate,
     appShell,
     backendState,
     editorShell,

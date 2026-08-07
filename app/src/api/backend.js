@@ -205,6 +205,18 @@ export async function getPlatformInfo() {
 }
 
 /**
+ * Returns the Rust-owned application distribution kind.
+ * @returns {Promise<'installed'|'portable'>} Promise resolving to the canonical distribution kind.
+ */
+export async function getDistributionKind() {
+  const distributionKind = await invokeCommand('backend_distribution_kind', {})
+  if (distributionKind !== 'installed' && distributionKind !== 'portable') {
+    throw new Error(`Invalid distribution kind returned by backend: ${String(distributionKind)}`)
+  }
+  return distributionKind
+}
+
+/**
  * Opens the official Windows HEVC playback support page.
  * @returns {Promise<void>} Promise resolving when the system opener has been invoked.
  */

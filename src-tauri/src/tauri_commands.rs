@@ -12,6 +12,7 @@
 //! Forbidden dependencies: none (this is the Tauri boundary layer and may import
 //!       from any shell module).
 
+use crate::distribution::DistributionKind;
 use crate::preview_import::{content_type_for_path, preview_warnings_for_metadata};
 use crate::runtime_paths;
 use crate::video_server::VideoServerHandle;
@@ -48,6 +49,14 @@ pub(crate) async fn backend_health(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub(crate) async fn backend_current_os() -> Result<String, String> {
     serialize_command_result(&commands::backend_current_os())
+}
+
+/// Returns the distribution mode detected during Rust startup.
+#[tauri::command]
+pub(crate) async fn backend_distribution_kind(
+    state: tauri::State<'_, DistributionKind>,
+) -> Result<DistributionKind, String> {
+    Ok(*state)
 }
 
 /// Opens the official Microsoft Store page for Windows HEVC playback support.

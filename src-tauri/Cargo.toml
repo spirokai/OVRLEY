@@ -32,6 +32,8 @@ tauri = { version = "2.9.5", features = ["protocol-asset"] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
+tauri-plugin-process = "=2.2.0"
+tauri-plugin-updater = "=2.9.0"
 base64 = "0.22"
 open = "5"
 ovrley_core = { path = "ovrley_core" }

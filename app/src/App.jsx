@@ -11,6 +11,7 @@ import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
 import { WidgetDrawer } from '@/features/widget-drawer'
 import { NewTemplateConfirmDialog } from '@/features/template-manager'
+import { UpdatePromptDialog } from '@/features/app-update'
 import { AppHeader, ControlPanel, ErrorAlert, KeyboardShortcutsDialog, LoadingOverlay, useAppShellComposition } from '@/features/app-shell'
 import * as backend from './api/backend'
 
@@ -45,6 +46,7 @@ function AppShell() {
 
   const {
     activityImport,
+    appUpdate,
     appShell,
     backendState,
     editorShell,
@@ -66,6 +68,7 @@ function AppShell() {
     >
       <div className="relative flex h-full flex-col bg-background text-foreground">
         <ErrorAlert />
+        <UpdatePromptDialog {...appUpdate} />
         <RenderVideoDialog
           phase={renderWorkflow.renderDialogPhase}
           settings={renderWorkflow.renderSettingsDraft}

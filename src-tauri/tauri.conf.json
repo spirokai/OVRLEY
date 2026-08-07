@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../app/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "pnpm dev:frontend",
-    "beforeBuildCommand": "pnpm build:frontend"
+    "beforeDevCommand": "pnpm prepare:packaging && pnpm dev:frontend",
+    "beforeBuildCommand": "pnpm build:frontend && pnpm prepare:packaging"
   },
   "app": {
     "withGlobalTauri": true,
@@ -36,10 +36,12 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "resources": {
       "../fonts": "fonts",
       "../templates": "templates",
-      "../vendor/ffmpeg": "vendor/ffmpeg"
+      "../vendor/ffmpeg": "vendor/ffmpeg",
+      "../THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt"
     },
     "linux": {
       "deb": {
@@ -63,5 +65,14 @@
       "icons/icon.ico",
       "icons/icon.png"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDBENUE0NkEyQ0UwMzMyQ0IKUldUTE1nUE9va1phRFF1Q0hvSGZoQW5GOGRkYkwyOEFUblhtV3FmWnh4WFdyaXFNL0VWNjg1b2cK",
+      "endpoints": ["https://github.com/spirokai/OVRLEY/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

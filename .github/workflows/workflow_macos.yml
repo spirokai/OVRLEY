@@ -1,0 +1,241 @@
+name: OVRLEY macOS Apple Silicon Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Ref whose Semantic Release tag should be packaged
+        required: true
+        default: main
+        type: string
+  workflow_call:
+    inputs:
+      release_ref:
+        description: Checked-out release ref
+        required: true
+        type: string
+      release_tag:
+        description: Stable Semantic Release tag
+        required: true
+        type: string
+      release_version:
+        description: Normalized stable release version
+        required: true
+        type: string
+      release_commit:
+        description: Commit SHA the release tag must point at
+        required: true
+        type: string
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build macOS aarch64
+    runs-on: macos-14
+    steps:
+      - name: Checkout selected release ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.release_ref || inputs.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve and validate release identity
+        id: release
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.release_tag }}
+          INPUT_VERSION: ${{ inputs.release_version }}
+          INPUT_COMMIT: ${{ inputs.release_commit }}
+        run: |
+          set -euo pipefail
+          stable_tag_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          candidates=()
+          while IFS= read -r candidate; do
+            if [[ "$candidate" =~ $stable_tag_pattern ]]; then
+              candidates+=("$candidate")
+            fi
+          done < <(git tag --points-at HEAD)
+
+          if [[ "$GITHUB_EVENT_NAME" == 'workflow_call' ]]; then
+            tag="$INPUT_TAG"
+            version="$INPUT_VERSION"
+            commit="$INPUT_COMMIT"
+            [[ "$tag" =~ $stable_tag_pattern ]] || { echo "Reusable workflow received a non-stable tag: $tag" >&2; exit 1; }
+            [[ "$tag" == "$version" ]] || { echo "Reusable workflow tag and version differ." >&2; exit 1; }
+            [[ "$(git rev-parse HEAD)" == "$commit" ]] || { echo "Checked-out commit differs from the orchestrator commit." >&2; exit 1; }
+            [[ "${#candidates[@]}" == 1 && "${candidates[0]}" == "$tag" ]] || { echo "Reusable workflow tag is not the unique stable tag at HEAD." >&2; exit 1; }
+          else
+            [[ "${#candidates[@]}" == 1 ]] || { echo "Expected exactly one stable Semantic Release tag at HEAD." >&2; exit 1; }
+            tag="${candidates[0]}"
+            version="$tag"
+            commit="$(git rev-parse HEAD)"
+          fi
+
+          echo "commit=$commit"
+          echo "tag=$tag"
+          node scripts/set-release-version.mjs "$version"
+          {
+            echo "tag=$tag"
+            echo "commit=$commit"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or validate independent draft release
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG"
+          response_file="$RUNNER_TEMP/ovrley-macos-release.json"
+          status="$(curl -sS -o "$response_file" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$api_url")"
+          if [[ "$status" == '200' ]]; then
+            jq -e '.draft == true' "$response_file" >/dev/null || { echo "A published release already exists for $RELEASE_TAG." >&2; exit 1; }
+          elif [[ "$status" == '404' ]]; then
+            gh release create "$RELEASE_TAG" --draft --title "OVRLEY $RELEASE_TAG" --notes ''
+          else
+            echo "GitHub release lookup failed with HTTP $status." >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.25.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate shared packaging resources
+        run: pnpm prepare:packaging
+
+      - name: Build signed macOS DMG and updater archive
+        run: pnpm tauri build --target aarch64-apple-darwin --bundles dmg
+        env:
+          VITE_OVRLEY_VERSION: ${{ steps.release.outputs.tag }}
+          APPLE_SIGNING_IDENTITY: "-"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Normalize and validate macOS artifacts
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          version="$RELEASE_VERSION"
+          rm -rf dist-release
+          mkdir -p dist-release
+
+          app_bundle="$(find src-tauri/target -type d -path '*/bundle/macos/OVRLEY.app' -print -quit)"
+          [[ -n "$app_bundle" && -d "$app_bundle" ]] || { echo 'macOS app bundle was not produced.' >&2; exit 1; }
+          app_binary="$(find "$app_bundle/Contents/MacOS" -type f -perm -111 -print -quit)"
+          [[ -n "$app_binary" ]] || { echo 'macOS app executable was not found.' >&2; exit 1; }
+          file "$app_binary" | grep -q 'arm64' || { echo 'macOS app executable is not aarch64.' >&2; exit 1; }
+
+          for required_path in \
+            "$app_bundle/Contents/Resources/fonts" \
+            "$app_bundle/Contents/Resources/templates" \
+            "$app_bundle/Contents/Resources/vendor/ffmpeg/bin/ffmpeg" \
+            "$app_bundle/Contents/Resources/vendor/ffmpeg/bin/ffprobe" \
+            "$app_bundle/Contents/Resources/THIRD_PARTY_NOTICES.txt" \
+            "$app_bundle/Contents/Resources/INSTALL.txt"; do
+            [[ -e "$required_path" ]] || { echo "macOS app is missing $required_path" >&2; exit 1; }
+          done
+
+          codesign_output="$(codesign -dv --verbose=4 "$app_bundle" 2>&1 || true)"
+          echo "$codesign_output"
+          echo "$codesign_output" | grep -q 'Signature=adhoc' || { echo 'macOS app was not ad-hoc signed.' >&2; exit 1; }
+          native_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_bundle/Contents/Info.plist")"
+          [[ "$native_version" == "$version" ]] || { echo "Native macOS version $native_version does not match $version." >&2; exit 1; }
+
+          dmg_staging="$RUNNER_TEMP/ovrley-dmg-staging"
+          dmg_source="$RUNNER_TEMP/OVRLEY-install.dmg"
+          dmg_mount="$RUNNER_TEMP/ovrley-dmg-mount"
+          rm -rf "$dmg_staging" "$dmg_mount" "$dmg_source"
+          mkdir -p "$dmg_staging" "$dmg_mount"
+          ditto "$app_bundle" "$dmg_staging/OVRLEY.app"
+          cp INSTALL-macos.txt "$dmg_staging/INSTALL.txt"
+          ln -s /Applications "$dmg_staging/Applications"
+          hdiutil create -volname OVRLEY -srcfolder "$dmg_staging" -ov -format UDZO "$dmg_source" >/dev/null
+          hdiutil attach -nobrowse -readonly -mountpoint "$dmg_mount" "$dmg_source" >/dev/null
+          [[ -s "$dmg_mount/INSTALL.txt" && -d "$dmg_mount/OVRLEY.app" && -L "$dmg_mount/Applications" ]] || { hdiutil detach "$dmg_mount" >/dev/null; echo 'User-facing DMG is missing visible installation contents.' >&2; exit 1; }
+          hdiutil detach "$dmg_mount" >/dev/null
+
+          updater_source="$(find src-tauri/target -type f -path '*/bundle/macos/*.app.tar.gz' -print -quit)"
+          [[ -n "$dmg_source" && -s "$dmg_source" ]] || { echo 'macOS DMG is missing or empty.' >&2; exit 1; }
+          [[ -n "$updater_source" && -s "$updater_source" ]] || { echo 'macOS updater archive is missing or empty.' >&2; exit 1; }
+          [[ -s "$updater_source.sig" ]] || { echo 'macOS updater signature is missing or empty.' >&2; exit 1; }
+
+          dmg_name="OVRLEY-macos-aarch64-$version.dmg"
+          updater_name="OVRLEY-macos-aarch64-$version.app.tar.gz"
+          cp "$dmg_source" "dist-release/$dmg_name"
+          cp "$updater_source" "dist-release/$updater_name"
+          cp "$updater_source.sig" "dist-release/$updater_name.sig"
+
+          tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/vendor/ffmpeg/bin/ffmpeg' >/dev/null || { echo 'Updater archive is missing FFmpeg.' >&2; exit 1; }
+          tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/fonts/' >/dev/null || { echo 'Updater archive is missing fonts.' >&2; exit 1; }
+          tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/templates/' >/dev/null || { echo 'Updater archive is missing templates.' >&2; exit 1; }
+          tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/THIRD_PARTY_NOTICES.txt' >/dev/null || { echo 'Updater archive is missing third-party notices.' >&2; exit 1; }
+          tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/INSTALL.txt' >/dev/null || { echo 'Updater archive is missing macOS installation documentation.' >&2; exit 1; }
+          expected="$(printf '%s\n' "$dmg_name" "$updater_name" "$updater_name.sig" | sort)"
+          actual="$(find dist-release -type f -exec basename {} \; | sort)"
+          [[ "$actual" == "$expected" ]] || { echo 'macOS output names are not canonical.' >&2; exit 1; }
+
+      - name: Upload macOS Actions artifact
+        if: github.event_name == 'workflow_call'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ovrley-macos-artifacts-${{ steps.release.outputs.tag }}
+          path: |
+            dist-release/OVRLEY-macos-aarch64-${{ steps.release.outputs.tag }}.dmg
+            dist-release/OVRLEY-macos-aarch64-${{ steps.release.outputs.tag }}.app.tar.gz
+            dist-release/OVRLEY-macos-aarch64-${{ steps.release.outputs.tag }}.app.tar.gz.sig
+          if-no-files-found: error
+
+      - name: Revalidate independent draft release before upload
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          response_file="$RUNNER_TEMP/ovrley-macos-release-final.json"
+          status="$(curl -sS -o "$response_file" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          [[ "$status" == '200' ]] || { echo "Release lookup failed with HTTP $status." >&2; exit 1; }
+          jq -e '.draft == true' "$response_file" >/dev/null || { echo "Release $RELEASE_TAG is published; refusing to upload." >&2; exit 1; }
+
+      - name: Upload independent public macOS assets
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            "dist-release/OVRLEY-macos-aarch64-${RELEASE_TAG}.dmg" \
+            "dist-release/OVRLEY-macos-aarch64-${RELEASE_TAG}.app.tar.gz" \
+            --clobber
