@@ -98,7 +98,22 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Verify Debian package contains bundled FFmpeg
+      - name: Add no-update marker to Debian package
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb="$(find src-tauri/target/release/bundle/deb -name '*.deb' -print -quit)"
+          [[ -n "$deb" ]] || { echo 'No .deb package was produced.' >&2; exit 1; }
+
+          package_root="$RUNNER_TEMP/ovrley-deb-root"
+          rm -rf "$package_root"
+          dpkg-deb --raw-extract "$deb" "$package_root"
+          mapfile -t executables < <(find "$package_root/usr/bin" -maxdepth 1 -type f -perm /111 -print)
+          [[ "${#executables[@]}" == 1 ]] || { echo "Expected exactly one Debian application executable, found ${#executables[@]}." >&2; exit 1; }
+          touch "$(dirname "${executables[0]}")/.ovrley-portable"
+          fakeroot dpkg-deb --build "$package_root" "$deb"
+
+      - name: Verify Debian package contents
         shell: bash
         run: |
           set -euo pipefail
@@ -109,6 +124,7 @@ jobs:
           fi
           dpkg-deb -c "$DEB" | grep -E '/vendor/ffmpeg/bin/ffmpeg$'
           dpkg-deb -c "$DEB" | grep -E '/vendor/ffmpeg/bin/ffprobe$'
+          dpkg-deb -c "$DEB" | grep -E '/usr/bin/\.ovrley-portable$'
 
       - name: Normalize release artifact name
         shell: bash

@@ -69,7 +69,7 @@ jobs:
             fi
           done < <(git tag --points-at HEAD)
 
-          if [[ "$GITHUB_EVENT_NAME" == 'workflow_call' ]]; then
+          if [[ -n "$INPUT_TAG" ]]; then
             tag="$INPUT_TAG"
             version="$INPUT_VERSION"
             commit="$INPUT_COMMIT"
@@ -246,8 +246,8 @@ jobs:
           [[ "$actual" == "$expected" ]] || { echo 'Linux output names are not canonical.' >&2; exit 1; }
 
       - name: Upload Linux Actions artifact
-        if: github.event_name == 'workflow_call'
-        uses: actions/upload-artifact@v4
+        if: inputs.release_tag != ''
+        uses: actions/upload-artifact@v7
         with:
           name: ovrley-linux-artifacts-${{ steps.release.outputs.tag }}
           path: |
@@ -256,7 +256,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload independent public Linux asset
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.release_tag == ''
         uses: softprops/action-gh-release@v3
         with:
           draft: true

@@ -69,7 +69,7 @@ jobs:
             fi
           done < <(git tag --points-at HEAD)
 
-          if [[ "$GITHUB_EVENT_NAME" == 'workflow_call' ]]; then
+          if [[ -n "$INPUT_TAG" ]]; then
             tag="$INPUT_TAG"
             version="$INPUT_VERSION"
             commit="$INPUT_COMMIT"
@@ -145,15 +145,79 @@ jobs:
 
           dmg_staging="$RUNNER_TEMP/ovrley-dmg-staging"
           dmg_source="$RUNNER_TEMP/OVRLEY-install.dmg"
+          dmg_read_write="$RUNNER_TEMP/OVRLEY-install-rw.dmg"
           dmg_mount="$RUNNER_TEMP/ovrley-dmg-mount"
-          rm -rf "$dmg_staging" "$dmg_mount" "$dmg_source"
+          background_source="src-tauri/dmg/background.png"
+          retina_background_source="src-tauri/dmg/background@2x.png"
+          rm -rf "$dmg_staging" "$dmg_mount" "$dmg_source" "$dmg_read_write"
           mkdir -p "$dmg_staging" "$dmg_mount"
           ditto "$app_bundle" "$dmg_staging/OVRLEY.app"
           cp INSTALL-macos.txt "$dmg_staging/INSTALL.txt"
           ln -s /Applications "$dmg_staging/Applications"
-          hdiutil create -volname OVRLEY -srcfolder "$dmg_staging" -ov -format UDZO "$dmg_source" >/dev/null
+
+          [[ -e "$retina_background_source" && ! -f "$background_source" ]] && { echo 'The Retina DMG background requires src-tauri/dmg/background.png.' >&2; exit 1; }
+          if [[ -f "$background_source" ]]; then
+            background_width="$(sips -g pixelWidth "$background_source" | awk '/pixelWidth/ { print $2 }')"
+            background_height="$(sips -g pixelHeight "$background_source" | awk '/pixelHeight/ { print $2 }')"
+            [[ "$background_width" == 660 && "$background_height" == 440 ]] || { echo 'DMG background.png must be exactly 660x440 pixels.' >&2; exit 1; }
+
+            mkdir -p "$dmg_staging/.background"
+            background_name="background.png"
+            cp "$background_source" "$dmg_staging/.background/$background_name"
+            if [[ -f "$retina_background_source" ]]; then
+              retina_width="$(sips -g pixelWidth "$retina_background_source" | awk '/pixelWidth/ { print $2 }')"
+              retina_height="$(sips -g pixelHeight "$retina_background_source" | awk '/pixelHeight/ { print $2 }')"
+              [[ "$retina_width" == 1320 && "$retina_height" == 880 ]] || { echo 'DMG background@2x.png must be exactly 1320x880 pixels.' >&2; exit 1; }
+              background_name="background.tiff"
+              tiffutil -cathidpicheck "$background_source" "$retina_background_source" -out "$dmg_staging/.background/$background_name"
+              rm "$dmg_staging/.background/background.png"
+            fi
+
+            hdiutil create -volname OVRLEY -srcfolder "$dmg_staging" -ov -format UDRW "$dmg_read_write" >/dev/null
+            hdiutil attach -nobrowse -readwrite -mountpoint "$dmg_mount" "$dmg_read_write" >/dev/null
+            if ! osascript - "$background_name" <<'APPLESCRIPT'
+          on run arguments
+            set backgroundName to item 1 of arguments
+            tell application "Finder"
+              tell disk "OVRLEY"
+                open
+                set current view of container window to icon view
+                set toolbar visible of container window to false
+                set statusbar visible of container window to false
+                set pathbar visible of container window to false
+                set sidebar width of container window to 0
+                set bounds of container window to {100, 100, 760, 540}
+                set viewOptions to icon view options of container window
+                set arrangement of viewOptions to not arranged
+                set icon size of viewOptions to 112
+                set text size of viewOptions to 13
+                set background picture of viewOptions to file (".background:" & backgroundName)
+                set position of item "OVRLEY.app" to {165, 220}
+                set position of item "Applications" to {495, 220}
+                set position of item "INSTALL.txt" to {330, 370}
+                update without registering applications
+                delay 2
+                close
+              end tell
+            end tell
+          end run
+          APPLESCRIPT
+            then
+              hdiutil detach "$dmg_mount" >/dev/null || true
+              exit 1
+            fi
+            sync
+            hdiutil detach "$dmg_mount" >/dev/null
+            hdiutil convert "$dmg_read_write" -format UDZO -o "$dmg_source" >/dev/null
+          else
+            hdiutil create -volname OVRLEY -srcfolder "$dmg_staging" -ov -format UDZO "$dmg_source" >/dev/null
+          fi
+
           hdiutil attach -nobrowse -readonly -mountpoint "$dmg_mount" "$dmg_source" >/dev/null
           [[ -s "$dmg_mount/INSTALL.txt" && -d "$dmg_mount/OVRLEY.app" && -L "$dmg_mount/Applications" ]] || { hdiutil detach "$dmg_mount" >/dev/null; echo 'User-facing DMG is missing visible installation contents.' >&2; exit 1; }
+          if [[ -f "$background_source" ]]; then
+            [[ -s "$dmg_mount/.background/$background_name" && -f "$dmg_mount/.DS_Store" ]] || { hdiutil detach "$dmg_mount" >/dev/null; echo 'DMG background or Finder layout metadata is missing.' >&2; exit 1; }
+          fi
           hdiutil detach "$dmg_mount" >/dev/null
 
           updater_source="$(find src-tauri/target -type f -path '*/bundle/macos/*.app.tar.gz' -print -quit)"
@@ -177,8 +241,8 @@ jobs:
           [[ "$actual" == "$expected" ]] || { echo 'macOS output names are not canonical.' >&2; exit 1; }
 
       - name: Upload macOS Actions artifact
-        if: github.event_name == 'workflow_call'
-        uses: actions/upload-artifact@v4
+        if: inputs.release_tag != ''
+        uses: actions/upload-artifact@v7
         with:
           name: ovrley-macos-artifacts-${{ steps.release.outputs.tag }}
           path: |
@@ -188,7 +252,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload independent public macOS assets
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.release_tag == ''
         uses: softprops/action-gh-release@v3
         with:
           draft: true
