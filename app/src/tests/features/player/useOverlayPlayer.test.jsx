@@ -36,7 +36,7 @@ describe('useOverlayPlayer', () => {
   })
 
   test('builds the top-level toolbar and timeline view models', () => {
-    const { result } = renderHook(() => useOverlayPlayer({ backgroundMode: 'black' }))
+    const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
 
     expect(result.current.isVisible).toBe(true)
     expect(result.current.toolbar.fitTargets.map((target) => target.id)).toEqual(['video', 'activity'])
@@ -44,7 +44,7 @@ describe('useOverlayPlayer', () => {
   })
 
   test('routes toolbar transport commands through store playback state', () => {
-    const { result } = renderHook(() => useOverlayPlayer({ backgroundMode: 'black' }))
+    const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
 
     act(() => {
       result.current.toolbar.transport.stepForward()
@@ -62,7 +62,7 @@ describe('useOverlayPlayer', () => {
 
   test('routes playback, export, mute, and synchronization shortcuts', () => {
     resetStore({ importedVideoFps: 30 })
-    const { unmount } = renderHook(() => useOverlayPlayer({ backgroundMode: 'black' }))
+    const { unmount } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
 
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
@@ -93,7 +93,7 @@ describe('useOverlayPlayer', () => {
   })
 
   test('measures timeline after mount, shows clip geometry, and drags the playhead by timeline coordinates', async () => {
-    const { result } = renderHook(() => useOverlayPlayer({ backgroundMode: 'black' }))
+    const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
 
     expect(result.current.timeline.widthPx).toBe(0)
     expect(result.current.timeline.lanes[0].isVisible).toBe(false)

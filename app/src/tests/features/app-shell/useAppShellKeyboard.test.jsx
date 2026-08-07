@@ -79,7 +79,7 @@ describe('useAppShellKeyboard', () => {
     expect(actions.openTemplateSelector).toHaveBeenCalledOnce()
   })
 
-  test('suppresses shell commands in inputs', () => {
+  test('allows modified shell commands in inputs', () => {
     const { actions } = renderShellKeyboard()
     const input = document.createElement('input')
     document.body.appendChild(input)
@@ -88,7 +88,7 @@ describe('useAppShellKeyboard', () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, ctrlKey: true, key: 'n' }))
     })
 
-    expect(actions.handleCreateNewTemplate).not.toHaveBeenCalled()
+    expect(actions.handleCreateNewTemplate).toHaveBeenCalledOnce()
     input.remove()
   })
 

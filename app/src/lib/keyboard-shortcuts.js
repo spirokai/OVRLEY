@@ -59,4 +59,27 @@ export function matchKeyboardShortcut(event, scope) {
   return null
 }
 
+const NATIVE_EDITING_KEYS = new Set(['a', 'c', 'v', 'x', 'y', 'z'])
+
+/**
+ * Checks whether a form field should retain a matched shortcut.
+ *
+ * @param {KeyboardEvent} event - Keyboard event to inspect.
+ * @returns {boolean} True when the shortcut should remain with the field.
+ */
+export function isFormFieldShortcut(event) {
+  if (event.isComposing || !(event.target instanceof Element)) return Boolean(event.isComposing)
+
+  const field = event.target.closest(
+    'input, textarea, select, [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="textbox"], [contenteditable="true"]',
+  )
+  if (!field) return false
+
+  const hasCommandModifier = event.ctrlKey || event.metaKey || event.altKey
+  if (!hasCommandModifier) return true
+
+  const textEditor = event.target.closest('input, textarea, [role="textbox"], [contenteditable="true"]')
+  return Boolean(textEditor && (event.ctrlKey || event.metaKey) && NATIVE_EDITING_KEYS.has(getEventKey(event)))
+}
+
 export const keyboardShortcutManifest = shortcutManifest

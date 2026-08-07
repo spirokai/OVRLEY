@@ -18,21 +18,22 @@ function renderEditorKeyboard(overrides = {}) {
       type: 'backdrop',
     },
   ]
-  const editorControls = {
-    gridVisible: false,
-    onResetZoom: vi.fn(),
-    onSetGridVisible: vi.fn(),
-    onSetSnapToGrid: vi.fn(),
-    onZoomIn: vi.fn(),
-    onZoomOut: vi.fn(),
-    snapToGrid: false,
+  const editorShell = {
+    activeKeyboardWorkspace: 'editor',
+    decreaseZoom: vi.fn(),
+    editorGridVisible: false,
+    editorSnapToGrid: false,
+    increaseZoom: vi.fn(),
+    resetZoom: vi.fn(),
+    setEditorGridVisible: vi.fn(),
+    setEditorSnapToGrid: vi.fn(),
   }
 
   const hook = renderHook(() =>
     useEditorKeyboard({
       clipboardRef,
       config,
-      editorControls,
+      editorShell,
       onConfigChange,
       selectedWidgetIds: ['widget-1'],
       selectedWidgets,
@@ -40,7 +41,7 @@ function renderEditorKeyboard(overrides = {}) {
     }),
   )
 
-  return { ...hook, clipboardRef, config, editorControls, onConfigChange, setWidgetSelection }
+  return { ...hook, clipboardRef, config, editorShell, onConfigChange, setWidgetSelection }
 }
 
 describe('useEditorKeyboard', () => {
@@ -84,14 +85,14 @@ describe('useEditorKeyboard', () => {
   })
 
   test('routes grid and snapping toggles through shell controls', () => {
-    const { editorControls } = renderEditorKeyboard()
+    const { editorShell } = renderEditorKeyboard()
 
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n' }))
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'g' }))
     })
 
-    expect(editorControls.onSetSnapToGrid).toHaveBeenCalledWith(true)
-    expect(editorControls.onSetGridVisible).toHaveBeenCalledWith(true)
+    expect(editorShell.setEditorSnapToGrid).toHaveBeenCalledWith(true)
+    expect(editorShell.setEditorGridVisible).toHaveBeenCalledWith(true)
   })
 })

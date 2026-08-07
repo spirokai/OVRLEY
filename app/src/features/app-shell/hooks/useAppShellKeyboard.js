@@ -1,15 +1,10 @@
 import { useEffect, useEffectEvent } from 'react'
-import { isInteractiveElement } from '@/lib/utils'
-import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
+import { isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 
 function hasOpenKeyboardOverlay() {
   if (typeof document === 'undefined') return false
 
-  return Boolean(
-    document.querySelector(
-      '[data-slot="dialog-content"], [data-slot="select-content"], [data-slot="popover-content"], [data-testid="widget-drawer-backdrop"]',
-    ),
-  )
+  return Boolean(document.querySelector('[data-slot="dialog-content"], [data-slot="popover-content"], [data-testid="widget-drawer-backdrop"]'))
 }
 
 /**
@@ -33,13 +28,13 @@ export default function useAppShellKeyboard({
   const { openRenderDialog, renderDisabled } = renderWorkflow
   const { handleCreateNewTemplate, handleImportTemplate, handleSaveTemplate, openTemplateSelector, showTemplateStatus, templateSelectorOpen } =
     templateManagement
-  const { handleImportVideo, importedMediaFilename } = videoControls
+  const { handleImportVideo } = videoControls
 
   const onKeyDown = useEffectEvent((event) => {
-    if (event.repeat || event.defaultPrevented || isInteractiveElement(event.target)) return
+    if (event.repeat || event.defaultPrevented) return
 
     const match = matchKeyboardShortcut(event, 'app')
-    if (!match) return
+    if (!match || isFormFieldShortcut(event)) return
     if (hasOpenKeyboardOverlay() && !(match.commandId === 'drawer.toggle' && widgetDrawerOpen)) return
 
     switch (match.commandId) {
@@ -61,7 +56,6 @@ export default function useAppShellKeyboard({
         handleActivityFileOpen()
         return
       case 'video.import':
-        if (importedMediaFilename) return
         event.preventDefault()
         handleImportVideo()
         return
