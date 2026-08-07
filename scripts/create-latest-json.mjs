@@ -187,14 +187,14 @@ async function validateManifestFile(path, expected) {
 function canonicalNames(version) {
   return {
     public: {
-      windows: `OVRLEY-windows-${version}.exe`,
-      windowsPortable: `OVRLEY-windows-${version}-portable.zip`,
+      windows: `OVRLEY-win-${version}.exe`,
+      windowsPortable: `OVRLEY-win-${version}-portable.zip`,
       macosDmg: `OVRLEY-macos-${version}.dmg`,
       macosUpdater: `OVRLEY-macos-${version}.app.tar.gz`,
       linux: `OVRLEY-linux-${version}.AppImage`,
     },
     signatures: {
-      windows: `OVRLEY-windows-${version}.exe.sig`,
+      windows: `OVRLEY-win-${version}.exe.sig`,
       macos: `OVRLEY-macos-${version}.app.tar.gz.sig`,
       linux: `OVRLEY-linux-${version}.AppImage.sig`,
     },

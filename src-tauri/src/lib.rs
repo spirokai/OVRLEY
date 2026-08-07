@@ -53,6 +53,9 @@ pub(crate) struct BackendState {
 /// frontend as `render-progress` events (no polling). All of this happens
 /// before the frontend can invoke commands.
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+
     let video_server = video_server::VideoServerHandle::new();
 
     tauri::Builder::default()

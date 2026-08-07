@@ -127,8 +127,8 @@ jobs:
           $signatureSource = Get-Item -LiteralPath "$($setupSource.FullName).sig"
           if ($setupSource.Length -le 0 -or $signatureSource.Length -le 0) { throw 'NSIS setup or signature is empty.' }
 
-          $setupName = "OVRLEY-windows-$version.exe"
-          $portableName = "OVRLEY-windows-$version-portable.zip"
+          $setupName = "OVRLEY-win-$version.exe"
+          $portableName = "OVRLEY-win-$version-portable.zip"
           $setupPath = Join-Path $outputDirectory $setupName
           $signaturePath = Join-Path $outputDirectory "$setupName.sig"
           Copy-Item -LiteralPath $setupSource.FullName -Destination $setupPath
@@ -172,9 +172,9 @@ jobs:
         with:
           name: ovrley-windows-artifacts-${{ steps.release.outputs.tag }}
           path: |
-            dist-release/OVRLEY-windows-${{ steps.release.outputs.tag }}.exe
-            dist-release/OVRLEY-windows-${{ steps.release.outputs.tag }}.exe.sig
-            dist-portable/OVRLEY-windows-${{ steps.release.outputs.tag }}-portable.zip
+            dist-release/OVRLEY-win-${{ steps.release.outputs.tag }}.exe
+            dist-release/OVRLEY-win-${{ steps.release.outputs.tag }}.exe.sig
+            dist-portable/OVRLEY-win-${{ steps.release.outputs.tag }}-portable.zip
           if-no-files-found: error
 
       - name: Upload independent public Windows assets
@@ -184,8 +184,8 @@ jobs:
           draft: true
           tag_name: ${{ steps.release.outputs.tag }}
           files: |
-            dist-release/OVRLEY-windows-${{ steps.release.outputs.tag }}.exe
-            dist-portable/OVRLEY-windows-${{ steps.release.outputs.tag }}-portable.zip
+            dist-release/OVRLEY-win-${{ steps.release.outputs.tag }}.exe
+            dist-portable/OVRLEY-win-${{ steps.release.outputs.tag }}-portable.zip
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

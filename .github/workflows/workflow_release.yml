@@ -157,9 +157,9 @@ jobs:
           rm -rf release-staging public-assets
           mkdir -p release-staging public-assets
           expected=(
-            "OVRLEY-windows-${version}.exe"
-            "OVRLEY-windows-${version}.exe.sig"
-            "OVRLEY-windows-${version}-portable.zip"
+            "OVRLEY-win-${version}.exe"
+            "OVRLEY-win-${version}.exe.sig"
+            "OVRLEY-win-${version}-portable.zip"
             "OVRLEY-macos-${version}.dmg"
             "OVRLEY-macos-${version}.app.tar.gz"
             "OVRLEY-macos-${version}.app.tar.gz.sig"
@@ -223,14 +223,14 @@ jobs:
         run: |
           set -euo pipefail
           version="$RELEASE_VERSION"
-          cp "release-staging/OVRLEY-windows-${version}.exe" public-assets/
-          cp "release-staging/OVRLEY-windows-${version}-portable.zip" public-assets/
+          cp "release-staging/OVRLEY-win-${version}.exe" public-assets/
+          cp "release-staging/OVRLEY-win-${version}-portable.zip" public-assets/
           cp "release-staging/OVRLEY-macos-${version}.dmg" public-assets/
           cp "release-staging/OVRLEY-macos-${version}.app.tar.gz" public-assets/
           cp "release-staging/OVRLEY-linux-${version}.AppImage" public-assets/
           expected="$(printf '%s\n' \
-            "OVRLEY-windows-${version}.exe" \
-            "OVRLEY-windows-${version}-portable.zip" \
+            "OVRLEY-win-${version}.exe" \
+            "OVRLEY-win-${version}-portable.zip" \
             "OVRLEY-macos-${version}.dmg" \
             "OVRLEY-macos-${version}.app.tar.gz" \
             "OVRLEY-linux-${version}.AppImage" \
@@ -271,8 +271,8 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$release_json"
           jq -e '.draft == true' "$release_json" >/dev/null || { echo 'Release is no longer a draft.' >&2; exit 1; }
           canonical_names=(
-            "OVRLEY-windows-${RELEASE_VERSION}.exe"
-            "OVRLEY-windows-${RELEASE_VERSION}-portable.zip"
+            "OVRLEY-win-${RELEASE_VERSION}.exe"
+            "OVRLEY-win-${RELEASE_VERSION}-portable.zip"
             "OVRLEY-macos-${RELEASE_VERSION}.dmg"
             "OVRLEY-macos-${RELEASE_VERSION}.app.tar.gz"
             "OVRLEY-linux-${RELEASE_VERSION}.AppImage"
@@ -312,8 +312,8 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$release_json"
           jq -e '.draft == true' "$release_json" >/dev/null || { echo 'Release must remain a draft until validation completes.' >&2; exit 1; }
           expected="$(printf '%s\n' \
-            "OVRLEY-windows-${RELEASE_VERSION}.exe" \
-            "OVRLEY-windows-${RELEASE_VERSION}-portable.zip" \
+            "OVRLEY-win-${RELEASE_VERSION}.exe" \
+            "OVRLEY-win-${RELEASE_VERSION}-portable.zip" \
             "OVRLEY-macos-${RELEASE_VERSION}.dmg" \
             "OVRLEY-macos-${RELEASE_VERSION}.app.tar.gz" \
             "OVRLEY-linux-${RELEASE_VERSION}.AppImage" \
@@ -327,7 +327,7 @@ jobs:
           owner="${GITHUB_REPOSITORY%%/*}"
           repo="${GITHUB_REPOSITORY##*/}"
           base_url="https://github.com/$owner/$repo/releases/download/$RELEASE_TAG"
-          jq -e --arg url "$base_url/OVRLEY-windows-${RELEASE_VERSION}.exe" '.platforms["windows-x86_64"].url == $url' public-assets/latest.json >/dev/null
+          jq -e --arg url "$base_url/OVRLEY-win-${RELEASE_VERSION}.exe" '.platforms["windows-x86_64"].url == $url' public-assets/latest.json >/dev/null
           jq -e --arg url "$base_url/OVRLEY-macos-${RELEASE_VERSION}.app.tar.gz" '.platforms["darwin-aarch64"].url == $url' public-assets/latest.json >/dev/null
           jq -e --arg url "$base_url/OVRLEY-linux-${RELEASE_VERSION}.AppImage" '.platforms["linux-x86_64"].url == $url' public-assets/latest.json >/dev/null
 
