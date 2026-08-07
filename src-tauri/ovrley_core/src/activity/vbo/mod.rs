@@ -8,7 +8,8 @@ mod channels;
 
 use crate::activity::finalize::{finalize_activity_columns, FinalizeActivityResponse};
 use crate::activity::schema::{
-    ActivityColumns, RawActivityOptions, SmoothingOption,
+    ActivityColumns, LapMarkers, RawActivityOptions, SmoothingOption, TimingMarker,
+    TimingMarkerKind,
 };
 use crate::error::{CoreError, CoreResult};
 use crate::media::telemetry_math::{
@@ -36,6 +37,8 @@ struct Sections {
     column_names: Vec<String>,
     /// Numeric rows from the `[data]` section.
     data: Vec<DataRow>,
+    /// Raw marker lines from the `[laptiming]` section.
+    laptiming: Vec<String>,
 }
 
 /// One parsed VBO data row, retaining its source line for diagnostics.
@@ -150,6 +153,7 @@ fn parse_sections(text: &str) -> CoreResult<Sections> {
                     .map(|token| parse_data_value(token, line_number))
                     .collect::<CoreResult<Vec<_>>>()?,
             }),
+            "laptiming" => sections.laptiming.push(trimmed.to_string()),
             _ => {}
         }
     }
@@ -201,6 +205,39 @@ fn parse_data_value(token: &str, line_number: usize) -> CoreResult<f64> {
         )));
     }
     Ok(value)
+}
+
+/// Parses VBO `[laptiming]` rows into timing markers.
+///
+/// Each row contains a marker kind (`Start` or `Split`) followed by four
+/// coordinate values in VBO minute format: `lon_a lat_a lon_b lat_b`.
+/// Coordinates are converted to decimal degrees using the same convention
+/// as data rows.
+fn parse_laptiming_markers(lines: &[String]) -> Vec<TimingMarker> {
+    lines
+        .iter()
+        .filter_map(|line| {
+            let tokens: Vec<&str> = line.split_whitespace().collect();
+            if tokens.len() < 5 {
+                return None;
+            }
+            let kind = match tokens[0].to_ascii_lowercase().as_str() {
+                "start" => TimingMarkerKind::Start,
+                _ => TimingMarkerKind::Split,
+            };
+            let lon_a = tokens[1].parse::<f64>().ok()?;
+            let lat_a = tokens[2].parse::<f64>().ok()?;
+            let lon_b = tokens[3].parse::<f64>().ok()?;
+            let lat_b = tokens[4].parse::<f64>().ok()?;
+            Some(TimingMarker {
+                kind,
+                latitude_a: minutes_to_degrees(lat_a),
+                longitude_a: longitude_minutes_to_degrees(lon_a),
+                latitude_b: minutes_to_degrees(lat_b),
+                longitude_b: longitude_minutes_to_degrees(lon_b),
+            })
+        })
+        .collect()
 }
 
 /// Maps parsed VBO rows into the shared canonical activity-column representation.
@@ -334,6 +371,12 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         color_temperature: empty(),
         original_sample_count: sample_count,
         include_original_sample_count_metadata: false,
+        lap_number: vec![None; sample_count],
+        lap_markers: if sections.laptiming.is_empty() {
+            LapMarkers::None
+        } else {
+            LapMarkers::TimingMarkers(parse_laptiming_markers(&sections.laptiming))
+        },
     })
 }
 

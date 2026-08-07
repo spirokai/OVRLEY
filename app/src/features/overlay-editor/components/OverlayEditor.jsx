@@ -78,23 +78,23 @@ function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
   )
 }
 
-function CanvasToolbar({ editorControls, importedBackgroundImageFilename, importedVideoFilename }) {
+function CanvasToolbar({ editorShell, importedBackgroundImageFilename, importedVideoFilename, undoRedoControls }) {
   return (
     <div data-testid="canvas-editor-toolbar" className="pointer-events-auto absolute left-1/2 top-4 z-50 -translate-x-1/2">
       <EditorToolbar
-        backgroundMode={editorControls.backgroundMode}
-        onSetBackgroundMode={editorControls.onSetBackgroundMode}
+        backgroundMode={editorShell.editorBackgroundMode}
+        onSetBackgroundMode={editorShell.setEditorBackgroundMode}
         importedBackgroundImageFilename={importedBackgroundImageFilename}
         importedVideoFilename={importedVideoFilename}
-        zoomLevel={editorControls.zoomLevel}
-        onZoomIn={editorControls.onZoomIn}
-        onZoomOut={editorControls.onZoomOut}
-        onResetZoom={editorControls.onResetZoom}
-        gridVisible={editorControls.gridVisible}
-        onSetGridVisible={editorControls.onSetGridVisible}
-        snapToGrid={editorControls.snapToGrid}
-        onSetSnapToGrid={editorControls.onSetSnapToGrid}
-        undoRedoControls={editorControls.undoRedoControls}
+        zoomLevel={editorShell.editorZoomLevel}
+        onZoomIn={editorShell.increaseZoom}
+        onZoomOut={editorShell.decreaseZoom}
+        onResetZoom={editorShell.resetZoom}
+        gridVisible={editorShell.editorGridVisible}
+        onSetGridVisible={editorShell.setEditorGridVisible}
+        snapToGrid={editorShell.editorSnapToGrid}
+        onSetSnapToGrid={editorShell.setEditorSnapToGrid}
+        undoRedoControls={undoRedoControls}
       />
     </div>
   )
@@ -115,7 +115,7 @@ function EmptyOverlayState() {
 }
 
 function OverlayEditorContent({
-  editorControls,
+  editorShell,
   config,
   globalDefaults,
   onConfigChange,
@@ -128,6 +128,7 @@ function OverlayEditorContent({
   importedVideoFilename,
   showTemplateStatus,
   templateStatus,
+  undoRedoControls,
   widgetLiveEdits,
 }) {
   const [hoveredWidgetId, setHoveredWidgetId] = useState(null)
@@ -180,6 +181,7 @@ function OverlayEditorContent({
   // Keyboard shortcuts
   useEditorKeyboard({
     config,
+    editorShell,
     onConfigChange,
     selectedWidgetIds: selection.selectedWidgetIds,
     selectedWidgets: selection.selectedWidgets,
@@ -371,9 +373,10 @@ function OverlayEditorContent({
         width={overlayState.sceneSize.width}
       />
       <CanvasToolbar
-        editorControls={editorControls}
+        editorShell={editorShell}
         importedBackgroundImageFilename={importedBackgroundImageFilename}
         importedVideoFilename={importedVideoFilename}
+        undoRedoControls={undoRedoControls}
       />
       <div ref={scrollViewportRef} className="absolute left-0 right-0 top-12 bottom-0 overflow-auto" onWheel={handleWheel}>
         <div

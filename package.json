@@ -10,6 +10,7 @@
     "build": "pnpm tauri build",
     "dev:frontend": "cd app && pnpm dev",
     "build:frontend": "cd app && pnpm build",
+    "prepare:packaging": "node scripts/prepare-packaging-resources.mjs",
     "lint:frontend": "cd app && pnpm lint",
     "lint": "pnpm lint:frontend",
     "format:frontend": "cd app && pnpm format",

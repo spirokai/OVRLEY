@@ -60,6 +60,38 @@ describe('useOverlayPlayer', () => {
     expect(useStore.getState().previewPlaybackState).toBe('paused')
   })
 
+  test('routes playback, export, mute, and synchronization shortcuts', () => {
+    resetStore({ importedVideoFps: 30 })
+    const { unmount } = renderHook(() => useOverlayPlayer({ backgroundMode: 'black' }))
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    })
+    expect(useStore.getState().selectedSecond).toBe(1)
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home' }))
+    })
+    expect(useStore.getState().selectedSecond).toBe(0)
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' }))
+    })
+    expect(useStore.getState().exportRange).toMatchObject({ from: 0, type: 'custom' })
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' }))
+    })
+    expect(useStore.getState().isVideoMuted).toBe(true)
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: ']' }))
+    })
+    expect(useStore.getState().videoSyncOffsetSeconds).toBe(11)
+
+    unmount()
+  })
+
   test('measures timeline after mount, shows clip geometry, and drags the playhead by timeline coordinates', async () => {
     const { result } = renderHook(() => useOverlayPlayer({ backgroundMode: 'black' }))
 

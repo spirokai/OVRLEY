@@ -118,18 +118,18 @@ export default function EditorToolbar({
 
         <div className="mx-1 h-5 w-px bg-border/70" />
         <SimpleTooltip side="bottom" content="Zoom out">
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onZoomOut}>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onZoomOut} aria-keyshortcuts="Mod+-">
             <Minus className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
         <div className="min-w-14 text-center text-xs font-semibold text-muted-foreground">{Math.round(zoomLevel * 100)}%</div>
         <SimpleTooltip side="bottom" content="Zoom in">
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onZoomIn}>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onZoomIn} aria-keyshortcuts="Mod++">
             <ZoomIn className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
         <SimpleTooltip side="bottom" content="Reset zoom">
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onResetZoom}>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onResetZoom} aria-keyshortcuts="Mod+0">
             <RotateCcw className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
@@ -141,6 +141,7 @@ export default function EditorToolbar({
             size="icon"
             className="h-8 w-8"
             onClick={() => onSetGridVisible(!gridVisible)}
+            aria-keyshortcuts="G"
           >
             <Grid3X3 className="h-4 w-4" />
           </Button>
@@ -152,6 +153,7 @@ export default function EditorToolbar({
             size="icon"
             className="h-8 w-8"
             onClick={() => onSetSnapToGrid(!snapToGrid)}
+            aria-keyshortcuts="N"
           >
             <Magnet className="h-4 w-4" />
           </Button>

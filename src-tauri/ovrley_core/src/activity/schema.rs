@@ -28,9 +28,9 @@
 
 use super::elevation::preferred_elevation_series;
 use crate::MetricKind;
+use chrono_tz::Tz;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use chrono_tz::Tz;
 use std::collections::BTreeMap;
 
 /// Numeric telemetry series aligned with `sample_elapsed_seconds`.
@@ -39,6 +39,12 @@ use std::collections::BTreeMap;
 /// apply the metric's interpolation policy and preserve empty vectors for
 /// series that a template did not request.
 pub type NumericSeries = Vec<Option<f64>>;
+
+/// Canonical source lap numbers aligned with `sample_elapsed_seconds`.
+///
+/// Present values are normalized at extraction: `-1` is the out-lap and
+/// non-negative values are zero-based timed laps.
+pub type LapNumberSeries = Vec<Option<i64>>;
 
 /// Canonical string gear observations aligned with `sample_elapsed_seconds`.
 pub type GearSeries = Vec<Option<String>>;
@@ -122,6 +128,38 @@ pub struct DirectMetricGapPolicy {
     pub heading: bool,
 }
 
+/// Metadata carrier for implicit lap boundaries.
+#[derive(Clone, Debug)]
+pub enum LapMarkers {
+    None,
+    /// AiM: elapsed seconds of start/finish crossings.
+    BeaconMarkers(Vec<f64>),
+    /// VBO: start/finish lat/lon points.
+    TimingMarkers(Vec<TimingMarker>),
+}
+
+impl Default for LapMarkers {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+/// Single lap-timing marker from a VBO `[laptiming]` section.
+#[derive(Clone, Debug)]
+pub struct TimingMarker {
+    pub kind: TimingMarkerKind,
+    pub latitude_a: f64,
+    pub longitude_a: f64,
+    pub latitude_b: f64,
+    pub longitude_b: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TimingMarkerKind {
+    Start,
+    Split,
+}
+
 /// Columnar activity input used by the shared finalizer core.
 ///
 /// Browser parsers can still send row-oriented [`RawActivity`] JSON; the
@@ -181,6 +219,10 @@ pub struct ActivityColumns {
     pub color_temperature: NumericSeries,
     pub original_sample_count: usize,
     pub include_original_sample_count_metadata: bool,
+    /// Source-provided canonical lap numbers (empty if absent).
+    pub lap_number: LapNumberSeries,
+    /// Metadata for implicit boundary detection.
+    pub lap_markers: LapMarkers,
 }
 
 /// Per-metric smoothing request. Phase 0 only carries this through the schema.
@@ -484,6 +526,24 @@ pub struct ParsedActivity {
     /// Heading in degrees (0–360).
     #[serde(default)]
     pub heading: NumericSeries,
+    /// Lap number, 0-based. -1 for records before the first start/finish crossing.
+    #[serde(default)]
+    pub lap_number: Vec<i64>,
+    /// Seconds since the start of the current lap. Null during out-lap.
+    #[serde(default)]
+    pub lap_time_seconds: NumericSeries,
+    /// Delta of current lap time versus the best completed lap at the same distance.
+    #[serde(default)]
+    pub delta_to_best_lap_seconds: NumericSeries,
+    /// Duration of the fastest completed lap in the whole session.
+    #[serde(default)]
+    pub best_lap_time_seconds: Option<f64>,
+    /// Array of completed-lap durations, indexed by 0-based lap number.
+    #[serde(default)]
+    pub lap_durations_seconds: Vec<f64>,
+    /// Prefix-min of `lap_durations_seconds`; `best_so_far[n]` is the fastest lap among laps `0..=n`.
+    #[serde(default)]
+    pub lap_durations_best_so_far_seconds: Vec<f64>,
     /// Unrecognized fields preserved for compatibility with frontend payloads.
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -608,6 +668,15 @@ pub struct DenseSeriesReport {
     pub course_lon: Vec<Option<f64>>,
     /// Absolute RFC 3339 timestamps.
     pub time: Vec<Option<String>>,
+    /// Lap number for each frame, 0-based.
+    pub lap_number: Vec<Option<i64>>,
+    /// Lap time in seconds for each frame.
+    pub lap_time_seconds: Vec<Option<f64>>,
+    /// Delta to best lap in seconds for each frame.
+    pub delta_to_best_lap_seconds: Vec<Option<f64>>,
+    /// Per-lap metadata scoped to the active trim window.
+    pub lap_durations_seconds: Vec<f64>,
+    pub lap_durations_best_so_far_seconds: Vec<f64>,
 }
 
 impl DenseSeriesReport {
@@ -656,9 +725,7 @@ impl DenseSeriesReport {
             MetricKind::LeanAngle => Some(&self.lean_angle),
             MetricKind::DistanceToHome => Some(&self.distance_to_home),
             MetricKind::TotalAscent => Some(&self.total_ascent),
-            MetricKind::GearPosition
-            | MetricKind::GpsCoordinates
-            | MetricKind::Time => None,
+            MetricKind::GearPosition | MetricKind::GpsCoordinates | MetricKind::Time => None,
         }
     }
 }
@@ -762,4 +829,13 @@ pub struct TrimmedActivity {
     pub time: TimeSeries,
     /// Final source-activity distance from the parsed distance series.
     pub full_activity_distance: Option<f64>,
+    /// Trimmed lap number samples, 0-based.
+    pub lap_number: Vec<i64>,
+    /// Trimmed lap time samples in seconds.
+    pub lap_time_seconds: NumericSeries,
+    /// Trimmed delta-to-best-lap samples in seconds.
+    pub delta_to_best_lap_seconds: NumericSeries,
+    /// Per-lap metadata scoped to the active trim window.
+    pub lap_durations_seconds: Vec<f64>,
+    pub lap_durations_best_so_far_seconds: Vec<f64>,
 }

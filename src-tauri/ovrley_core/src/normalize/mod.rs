@@ -110,6 +110,9 @@ pub struct RenderDataRequirements {
     pub time: bool,
     pub distance_progress: bool,
     pub course: bool,
+    pub lap_number: bool,
+    pub lap_time_seconds: bool,
+    pub delta_to_best_lap_seconds: bool,
 }
 
 /// Validated render config where all output-affecting fields are explicit.

@@ -350,6 +350,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
         ),
         "lean angle" | "leanangle" => (Metric::LeanAngle, SourcePriority::Direct, None, None, None),
+        "lap" | "lap #" | "lap number" => (Metric::LapNumber, SourcePriority::Direct, None, None, None),
         "gear" => (
             Metric::GearPosition,
             SourcePriority::Direct,

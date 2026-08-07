@@ -38,7 +38,7 @@ function projectElevationValueToSvgY(elevationValue, dataRange, height, yScale) 
  * @returns {object|null} Geometry model for the renderer, or null while loading.
  */
 export function useElevationPreviewGeometry({ activity, data, exportRange, previewSecond, style }) {
-  const { areaSvgPoints, contentScale, exportWindow, fallbackDurationSeconds, geometryHeight, points, remainingSvgPoints, rustGeometry } = usePlotPreviewGeometry({
+  const { areaSvgPoints, exportWindow, fallbackDurationSeconds, points, remainingSvgPoints, rustGeometry } = usePlotPreviewGeometry({
     activity,
     data,
     exportRange,
@@ -80,7 +80,7 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
   const metricHit = findPointAtProgress(points, rustGeometry.progressValues, progress01)
   const elevationSeries = activity.sample_elevations.length ? activity.sample_elevations : activity.elevation
   const elevationValue = interpolateNumericSeries(activity.sample_elapsed_seconds, elevationSeries, previewSecond)
-  const markerY = projectElevationValueToSvgY(elevationValue, rustGeometry.dataRange, geometryHeight, data.y_scale)
+  const markerY = projectElevationValueToSvgY(elevationValue, rustGeometry.dataRange, data.height, data.y_scale)
   const markerPoint = markerY === null ? null : [metricHit.point[0], markerY]
   const completedPoints = buildElevationCompletedPoints(
     points,
@@ -91,12 +91,11 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
   )
 
   return {
-    contentScale,
     markerPoint,
     elevationValue,
     remainingSvgPoints,
     completedSvgPoints: pointsToSvg(completedPoints),
     areaSvgPoints,
-    completedAreaSvgPoints: areaToSvg(completedPoints, data.width, geometryHeight, null),
+    completedAreaSvgPoints: areaToSvg(completedPoints, data.width, data.height, null),
   }
 }

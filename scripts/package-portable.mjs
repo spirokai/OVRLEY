@@ -1,9 +1,22 @@
-import { chmod, cp, mkdir, readFile, readdir, rename, rm, stat } from "node:fs/promises";
-import { writeFile } from "node:fs/promises";
+import {
+  chmod,
+  cp,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import {
+  PACKAGING_DOCUMENTS,
+  preparePackagingResources,
+} from "./packaging-resources.mjs";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -19,20 +32,6 @@ const builtBinaryName = process.platform === "win32" ? "app.exe" : "app";
 const builtBinaryPath = join(targetDir, builtBinaryName);
 const vendorFfmpegDir = join(rootDir, "vendor", "ffmpeg");
 const portableResourceDirs = ["fonts", "templates"];
-const ffmpegBinaryPath = join(
-  rootDir,
-  "vendor",
-  "ffmpeg",
-  "bin",
-  process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg",
-);
-const ffprobeBinaryPath = join(
-  rootDir,
-  "vendor",
-  "ffmpeg",
-  "bin",
-  process.platform === "win32" ? "ffprobe.exe" : "ffprobe",
-);
 
 main().catch((error) => {
   console.error(`[portable] ${error.message}`);
@@ -40,10 +39,15 @@ main().catch((error) => {
 });
 
 async function main() {
-  await ensureFile(ffmpegBinaryPath, "FFmpeg binary");
-  await ensureFile(ffprobeBinaryPath, "FFprobe binary");
+  await preparePackagingResources(rootDir);
   const version = await readArchiveVersion();
-  const archivePath = join(distDir, `OVRLEY-${platformSlug()}-${version}.zip`);
+  const requestedArchiveName = readArg("--archive-name");
+  const archiveName =
+    requestedArchiveName ?? `OVRLEY-${platformSlug()}-${version}.zip`;
+  if (basename(archiveName) !== archiveName) {
+    throw new Error(`Archive name must not contain a path: ${archiveName}`);
+  }
+  const archivePath = join(distDir, archiveName);
 
   await rm(appDir, { recursive: true, force: true });
   await mkdir(distDir, { recursive: true });
@@ -54,14 +58,7 @@ async function main() {
     await packagePortableBinary(appDir);
   }
 
-  if (process.platform === "darwin") {
-    await writeFile(join(appDir, "INSTALL.txt"), buildMacosReadme());
-  }
-  if (process.platform === "linux") {
-    await writeFile(join(appDir, "INSTALL.txt"), buildLinuxReadme());
-  }
-
-  await writeFile(join(appDir, "THIRD_PARTY_NOTICES.txt"), buildThirdPartyNotice());
+  await copyGeneratedPackagingDocuments(appDir);
 
   await rm(archivePath, { force: true });
   await zipDirectory(appDir, archivePath);
@@ -96,11 +93,21 @@ async function packagePortableBinary(destinationDir) {
     const runtimeBinaryName = `${binaryName}-bin`;
     const runtimeBinaryPath = join(destinationDir, runtimeBinaryName);
     await rename(join(destinationDir, builtBinaryName), runtimeBinaryPath);
-    await writeFile(join(destinationDir, binaryName), buildLinuxLauncher(runtimeBinaryName));
+    await writeFile(
+      join(destinationDir, binaryName),
+      buildLinuxLauncher(runtimeBinaryName),
+    );
     await chmod(join(destinationDir, binaryName), 0o755);
     await chmod(runtimeBinaryPath, 0o755);
   } else if (binaryName !== builtBinaryName) {
-    await rename(join(destinationDir, builtBinaryName), join(destinationDir, binaryName));
+    await rename(
+      join(destinationDir, builtBinaryName),
+      join(destinationDir, binaryName),
+    );
+  }
+
+  if (process.platform === "win32") {
+    await writeFile(join(destinationDir, ".ovrley-portable"), "");
   }
 }
 
@@ -122,84 +129,81 @@ async function copyPortableFfmpeg(destinationDir) {
   await cp(vendorFfmpegDir, destinationFfmpegDir, { recursive: true });
 
   await ensureFile(
-    join(destinationFfmpegDir, "bin", process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg"),
+    join(
+      destinationFfmpegDir,
+      "bin",
+      process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg",
+    ),
     "Packaged FFmpeg binary",
   );
   await ensureFile(
-    join(destinationFfmpegDir, "bin", process.platform === "win32" ? "ffprobe.exe" : "ffprobe"),
+    join(
+      destinationFfmpegDir,
+      "bin",
+      process.platform === "win32" ? "ffprobe.exe" : "ffprobe",
+    ),
     "Packaged FFprobe binary",
   );
   if (process.platform === "linux") {
-    await ensureDirectory(join(destinationFfmpegDir, "lib"), "Packaged FFmpeg shared libraries");
+    await ensureDirectory(
+      join(destinationFfmpegDir, "lib"),
+      "Packaged FFmpeg shared libraries",
+    );
+  }
+}
+
+async function copyGeneratedPackagingDocuments(destinationDir) {
+  await cp(
+    join(rootDir, PACKAGING_DOCUMENTS.notice),
+    join(destinationDir, PACKAGING_DOCUMENTS.notice),
+  );
+
+  if (process.platform === "darwin") {
+    await cp(
+      join(rootDir, PACKAGING_DOCUMENTS.macosInstall),
+      join(destinationDir, "INSTALL.txt"),
+    );
+  } else if (process.platform === "linux") {
+    await cp(
+      join(rootDir, PACKAGING_DOCUMENTS.linuxInstall),
+      join(destinationDir, "INSTALL.txt"),
+    );
   }
 }
 
 async function packageMacosApp(destinationDir) {
   const appBundlePath = await resolveMacosAppBundle();
-  const bundledFfmpegPath = join(appBundlePath, "Contents", "Resources", "vendor", "ffmpeg", "bin", "ffmpeg");
-  const bundledFfprobePath = join(appBundlePath, "Contents", "Resources", "vendor", "ffmpeg", "bin", "ffprobe");
+  const bundledFfmpegPath = join(
+    appBundlePath,
+    "Contents",
+    "Resources",
+    "vendor",
+    "ffmpeg",
+    "bin",
+    "ffmpeg",
+  );
+  const bundledFfprobePath = join(
+    appBundlePath,
+    "Contents",
+    "Resources",
+    "vendor",
+    "ffmpeg",
+    "bin",
+    "ffprobe",
+  );
 
-  await ensureFile(bundledFfmpegPath, "Bundled FFmpeg binary inside macOS app bundle");
-  await ensureFile(bundledFfprobePath, "Bundled FFprobe binary inside macOS app bundle");
+  await ensureFile(
+    bundledFfmpegPath,
+    "Bundled FFmpeg binary inside macOS app bundle",
+  );
+  await ensureFile(
+    bundledFfprobePath,
+    "Bundled FFprobe binary inside macOS app bundle",
+  );
   await mkdir(destinationDir, { recursive: true });
-  await cp(appBundlePath, join(destinationDir, appBundleName), { recursive: true });
-}
-
-function buildThirdPartyNotice() {
-  const ffmpegVersion = spawnSync(ffmpegBinaryPath, ["-version"], {
-    encoding: "utf8",
-    env: bundledFfmpegEnv(ffmpegBinaryPath),
+  await cp(appBundlePath, join(destinationDir, appBundleName), {
+    recursive: true,
   });
-  const ffmpegLicense = spawnSync(ffmpegBinaryPath, ["-L"], {
-    encoding: "utf8",
-    env: bundledFfmpegEnv(ffmpegBinaryPath),
-  });
-  const versionText =
-    ffmpegVersion.status === 0 ? ffmpegVersion.stdout.trim() : "Unable to read ffmpeg -version output.";
-  const licenseText = ffmpegLicense.status === 0 ? ffmpegLicense.stdout.trim() : "Unable to read ffmpeg -L output.";
-
-  return [
-    "THIRD-PARTY NOTICES",
-    "",
-    "FFmpeg",
-    "-------",
-    "This portable OVRLEY distribution includes unmodified FFmpeg and FFprobe command-line binaries",
-    "and their required runtime libraries as separate components in the packaged resources.",
-    "",
-    "OVRLEY invokes ffmpeg as a subprocess for video encoding and ffprobe as a subprocess",
-    "for video metadata extraction. FFmpeg and FFprobe are not linked into the OVRLEY executable.",
-    "",
-    "Project: https://ffmpeg.org/",
-    "Source code: https://ffmpeg.org/download.html",
-    "License information: https://ffmpeg.org/legal.html",
-    "Upstream repository mirror: https://github.com/FFmpeg/FFmpeg",
-    "",
-    "Windows builds are downloaded from BtbN FFmpeg builds:",
-    "https://github.com/BtbN/FFmpeg-Builds",
-    "",
-    "Linux builds are downloaded from BtbN FFmpeg builds:",
-    "https://github.com/BtbN/FFmpeg-Builds",
-    "",
-    "macOS builds are downloaded from Evermeet/Tessus FFmpeg builds:",
-    "https://evermeet.cx/ffmpeg/",
-    "",
-    "ffmpeg -version",
-    "---------------",
-    versionText,
-    "",
-    "ffmpeg -L",
-    "---------",
-    licenseText,
-    "",
-  ].join("\n");
-}
-
-function bundledFfmpegEnv(path) {
-  const env = { ...process.env };
-  if (process.platform === "linux") {
-    env.LD_LIBRARY_PATH = `${join(dirname(path), "..", "lib")}:${env.LD_LIBRARY_PATH ?? ""}`;
-  }
-  return env;
 }
 
 const PORTABLE_EXCLUDED_TOP_LEVEL = new Set([
@@ -231,52 +235,20 @@ async function prunePortableRuntime(destinationDir) {
       continue;
     }
 
-    if (entry.name !== builtBinaryName && entry.name.toLowerCase().endsWith(".exe")) {
+    if (
+      entry.name !== builtBinaryName &&
+      entry.name.toLowerCase().endsWith(".exe")
+    ) {
       await rm(join(destinationDir, entry.name), { force: true });
       continue;
     }
 
-    if (PORTABLE_PRUNE_FILE_PATTERNS.some((pattern) => pattern.test(entry.name))) {
+    if (
+      PORTABLE_PRUNE_FILE_PATTERNS.some((pattern) => pattern.test(entry.name))
+    ) {
       await rm(join(destinationDir, entry.name), { force: true });
     }
   }
-}
-
-function buildMacosReadme() {
-  return [
-    "OVRLEY FOR macOS",
-    "",
-    "Install",
-    "-------",
-    "1. Extract the ZIP archive.",
-    "2. Move OVRLEY.app to your /Applications folder.",
-    "",
-    "Unsigned App Notice",
-    "-------------------",
-    "OVRLEY is not signed with an Apple Developer certificate, so macOS may block it from opening by default.",
-    "Run this command once in Terminal after moving the app to /Applications:",
-    "",
-    "xattr -cr /Applications/OVRLEY.app",
-    "",
-  ].join("\n");
-}
-
-function buildLinuxReadme() {
-  return [
-    "OVRLEY FOR LINUX",
-    "",
-    "Install",
-    "-------",
-    "1. Extract the ZIP archive.",
-    "2. Run ./OVRLEY from the extracted directory.",
-    "",
-    "Notes",
-    "-----",
-    "OVRLEY is packaged as a portable experimental Linux build.",
-    "The OVRLEY launcher sets LD_LIBRARY_PATH so bundled FFmpeg libraries are available.",
-    "Run OVRLEY-bin directly only if you provide an equivalent LD_LIBRARY_PATH yourself.",
-    "",
-  ].join("\n");
 }
 
 function buildLinuxLauncher(runtimeBinaryName) {
@@ -299,11 +271,21 @@ function buildLinuxLauncher(runtimeBinaryName) {
 
 function readArg(flag) {
   const index = args.indexOf(flag);
-  return index >= 0 ? args[index + 1] : null;
+  if (index < 0) {
+    return null;
+  }
+  const value = args[index + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error(`Argument ${flag} requires a value`);
+  }
+  return value;
 }
 
 async function resolveMacosAppBundle() {
-  const preferredPaths = [join(bundleDir, "macos", appBundleName), join(bundleDir, "dmg", appBundleName)];
+  const preferredPaths = [
+    join(bundleDir, "macos", appBundleName),
+    join(bundleDir, "dmg", appBundleName),
+  ];
 
   for (const candidate of preferredPaths) {
     if (await pathIsDirectory(candidate)) {
@@ -382,15 +364,22 @@ function platformSlug() {
 }
 
 async function readPackageVersion() {
-  const packageJson = JSON.parse(await readFile(join(rootDir, "package.json"), "utf8"));
-  if (typeof packageJson.version !== "string" || packageJson.version.length === 0) {
+  const packageJson = JSON.parse(
+    await readFile(join(rootDir, "package.json"), "utf8"),
+  );
+  if (
+    typeof packageJson.version !== "string" ||
+    packageJson.version.length === 0
+  ) {
     throw new Error("Could not read version from package.json");
   }
   return packageJson.version;
 }
 
 async function readArchiveVersion() {
-  const explicitVersion = normalizeVersion(readArg("--version") ?? process.env.PORTABLE_VERSION);
+  const explicitVersion = normalizeVersion(
+    readArg("--version") ?? process.env.PORTABLE_VERSION,
+  );
   if (explicitVersion) {
     return explicitVersion;
   }
@@ -435,7 +424,9 @@ async function fetchGitTags() {
 
   const stderr = result.stderr?.trim();
   if (stderr) {
-    console.warn(`[portable] Failed to fetch git tags; falling back without remote tags: ${stderr}`);
+    console.warn(
+      `[portable] Failed to fetch git tags; falling back without remote tags: ${stderr}`,
+    );
   }
 }
 

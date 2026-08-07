@@ -194,7 +194,17 @@ export function useVideoPreview(videoRef, isActive = true) {
     return () => {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
     }
-  }, [isActive, isVideoPlaybackMode, pausePreviewPlayback, previewPlaybackState, selectedSecond, videoRef, videoSrc, videoSyncOffsetPreviewSeconds, videoSyncOffsetSeconds])
+  }, [
+    isActive,
+    isVideoPlaybackMode,
+    pausePreviewPlayback,
+    previewPlaybackState,
+    selectedSecond,
+    videoRef,
+    videoSrc,
+    videoSyncOffsetPreviewSeconds,
+    videoSyncOffsetSeconds,
+  ])
 
   // Derived return values - aggregate imported-video warnings with local preview messages.
   const isOutOfRange = isVideoPreviewOutOfRange({

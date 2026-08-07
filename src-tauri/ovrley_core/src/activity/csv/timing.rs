@@ -38,6 +38,8 @@ pub(super) struct LocalPreamble {
     aim_time: Option<NaiveTime>,
     /// Date emitted by RaceChrono-style exports.
     racechrono_date: Option<NaiveDate>,
+    /// Elapsed seconds of start/finish crossings from AiM `Beacon Markers`.
+    pub(super) beacon_markers: Vec<f64>,
 }
 
 impl LocalPreamble {
@@ -66,6 +68,14 @@ impl LocalPreamble {
                 self.racechrono_date = record
                     .get(1)
                     .and_then(|value| NaiveDate::parse_from_str(value.trim(), "%d/%m/%Y").ok());
+            }
+            Some("beacon markers") => {
+                self.beacon_markers = record
+                    .iter()
+                    .skip(1)
+                    .filter_map(|value| value.trim().parse::<f64>().ok())
+                    .filter(|value| value.is_finite())
+                    .collect();
             }
             _ => {}
         }

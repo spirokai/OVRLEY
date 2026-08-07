@@ -1,3 +1,10 @@
 {
-  "bundle": {}
+  "bundle": {
+    "macOS": {
+      "signingIdentity": "-"
+    },
+    "resources": {
+      "../INSTALL-macos.txt": "INSTALL.txt"
+    }
+  }
 }

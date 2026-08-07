@@ -30,6 +30,7 @@ pub mod video_server; // test seam
 #[cfg(test)]
 mod video_server_tests;
 
+mod distribution;
 mod file_ops;
 mod preview_import;
 mod progress_sink;
@@ -58,9 +59,12 @@ pub fn run() {
         .manage(video_server)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             tauri_commands::backend_health,
             tauri_commands::backend_current_os,
+            tauri_commands::backend_distribution_kind,
             tauri_commands::backend_open_hevc_support,
             tauri_commands::backend_list_system_fonts,
             tauri_commands::backend_render,
@@ -89,6 +93,8 @@ pub fn run() {
             file_ops::write_parse_debug_file
         ])
         .setup(|app| {
+            app.manage(distribution::detect()?);
+
             #[cfg(debug_assertions)]
             {
                 app.handle().plugin(

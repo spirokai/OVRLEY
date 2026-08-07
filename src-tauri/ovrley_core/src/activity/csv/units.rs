@@ -186,7 +186,7 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
         Metric::ThrottlePosition | Metric::BrakePosition => matches!(unit, Unit::Percent),
         Metric::LeanAngle => matches!(unit, Unit::Degrees),
         Metric::GearPosition => matches!(unit, Unit::Raw),
-        Metric::CompanionDate | Metric::GpsCoordinate => matches!(unit, Unit::Raw),
+        Metric::CompanionDate | Metric::GpsCoordinate | Metric::LapNumber => matches!(unit, Unit::Raw),
     }
 }
 
@@ -225,6 +225,6 @@ fn default_unit(metric: Metric) -> Unit {
         Metric::ThrottlePosition | Metric::BrakePosition => Unit::Percent,
         Metric::LeanAngle => Unit::Degrees,
         Metric::GearPosition => Unit::Raw,
-        Metric::CompanionDate | Metric::GpsCoordinate => Unit::Raw,
+        Metric::CompanionDate | Metric::GpsCoordinate | Metric::LapNumber => Unit::Raw,
     }
 }

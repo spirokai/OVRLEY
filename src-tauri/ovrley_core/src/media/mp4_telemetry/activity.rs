@@ -190,6 +190,8 @@ pub fn build_activity_columns(
         color_temperature,
         original_sample_count: samples.len(),
         include_original_sample_count_metadata: true,
+        lap_number: vec![None; n],
+        lap_markers: crate::activity::schema::LapMarkers::None,
     }
 }
 

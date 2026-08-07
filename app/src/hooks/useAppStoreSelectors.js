@@ -14,12 +14,17 @@ export function useLayoutStore() {
 export function useAppShellStore() {
   return useStore(
     useShallow((state) => ({
+      activitySummary: state.activitySummary,
+      computeVideoSync: state.computeVideoSync,
       config: state.config,
       isProcessing: state.isProcessing,
       globalDefaults: state.globalDefaults,
       importingVideo: state.importingVideo,
+      importedVideoPath: state.importedVideoPath,
       setConfig: state.setConfig,
       setErrorMessage: state.setErrorMessage,
+      toggleWidgetDrawer: state.toggleWidgetDrawer,
+      widgetDrawerOpen: state.widgetDrawerOpen,
     })),
   )
 }

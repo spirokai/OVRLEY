@@ -2,8 +2,9 @@
  * Top-level player orchestration hook for the presentational overlay player components.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { isInteractiveElement } from '@/lib/utils'
 import { videoOverlapsActivity } from '@/lib/video-timing'
 import useStore from '@/store/useStore'
@@ -20,6 +21,16 @@ import useTimelineViewport from './useTimelineViewport'
 function getDevicePixelRatio() {
   if (typeof window === 'undefined') return 1
   return window.devicePixelRatio || 1
+}
+
+function hasOpenKeyboardOverlay() {
+  if (typeof document === 'undefined') return false
+
+  return Boolean(
+    document.querySelector(
+      '[data-slot="dialog-content"], [data-slot="select-content"], [data-slot="popover-content"], [data-testid="widget-drawer-backdrop"]',
+    ),
+  )
 }
 
 function getMarkerClassName(marker) {
@@ -58,7 +69,9 @@ export default function useOverlayPlayer({ backgroundMode }) {
       setSelectedSecond: state.setSelectedSecond,
       setVideoSyncOffset: state.setVideoSyncOffset,
       setVideoSyncOffsetPreview: state.setVideoSyncOffsetPreview,
+      setVideoSyncWarning: state.setVideoSyncWarning,
       startPreviewPlayback: state.startPreviewPlayback,
+      selectedWidgetIds: state.selectedWidgetIds,
       updatePreviewScrub: state.updatePreviewScrub,
       updateRate: state.updateRate,
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
@@ -192,36 +205,108 @@ export default function useOverlayPlayer({ backgroundMode }) {
     updateTimelineMetrics,
   ])
 
-  // Keyboard shortcuts - global commands route through the same playback API as toolbar buttons.
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.repeat || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !hasActivity) {
-        return
-      }
+  // Keyboard shortcuts - global commands route through the same APIs as toolbar buttons.
+  const onKeyDown = useEffectEvent((event) => {
+    if (event.repeat || event.defaultPrevented || isInteractiveElement(event.target) || hasOpenKeyboardOverlay()) return
 
-      if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
-        if (isInteractiveElement(event.target)) return
+    const match = matchKeyboardShortcut(event, 'player')
+    if (!match) return
+
+    switch (match.commandId) {
+      case 'player.stepBackward':
+      case 'player.stepForward':
+        if (!hasActivity || playerStore.selectedWidgetIds.length) return
         event.preventDefault()
-        stepBySeconds(event.code === 'ArrowRight' ? 1 : -1)
+        stepBySeconds(match.commandId === 'player.stepForward' ? 1 : -1)
         return
-      }
-
-      if (event.code !== 'Space' || isInteractiveElement(event.target)) {
+      case 'player.togglePlayback':
+        if (!hasActivity) return
+        event.preventDefault()
+        if (isPlaying) pause()
+        else play()
         return
-      }
-
-      event.preventDefault()
-      if (isPlaying) {
-        pause()
+      case 'player.resetToStart':
+        if (!hasActivity) return
+        event.preventDefault()
+        playback.resetToStart()
         return
-      }
-
-      play()
+      case 'player.jumpToEnd':
+        if (!hasActivity) return
+        event.preventDefault()
+        playback.jumpToEnd()
+        return
+      case 'player.toggleMute':
+        if (!hasVideo) return
+        event.preventDefault()
+        playerStore.toggleVideoMute()
+        return
+      case 'export.setIn':
+        if (!hasActivityData && !hasVideo) return
+        event.preventDefault()
+        exportTimeline.setBoundary('from', exportBoundarySecond)
+        return
+      case 'export.setOut':
+        if (!hasActivityData && !hasVideo) return
+        event.preventDefault()
+        exportTimeline.setBoundary('to', exportBoundarySecond)
+        return
+      case 'export.clear':
+        if (!hasActivityData && !hasVideo) return
+        event.preventDefault()
+        exportTimeline.clear()
+        return
+      case 'export.goToIn':
+        if (!exportTimeline.isCustom) return
+        event.preventDefault()
+        playback.commitScrub(exportTimeline.fromSecond)
+        return
+      case 'export.goToOut':
+        if (!exportTimeline.isCustom) return
+        event.preventDefault()
+        playback.commitScrub(exportTimeline.toSecond)
+        return
+      case 'timeline.fitAll':
+        if (!playback.hasActivity && !hasVideo) return
+        event.preventDefault()
+        viewport.resetView()
+        return
+      case 'timeline.fitMedia':
+        if (!viewport.fitTargets.some((target) => target.id === 'all')) return
+        event.preventDefault()
+        viewport.fitTarget('all')
+        return
+      case 'timeline.fitActivity':
+        if (!viewport.fitTargets.some((target) => target.id === 'activity')) return
+        event.preventDefault()
+        viewport.fitTarget('activity')
+        return
+      case 'timeline.fitVideo':
+        if (!viewport.fitTargets.some((target) => target.id === 'video')) return
+        event.preventDefault()
+        viewport.fitTarget('video')
+        return
+      case 'sync.globalNudge':
+        if (!hasVideo || !hasActivityData) return
+        event.preventDefault()
+        try {
+          playerStore.setVideoSyncOffset(playerStore.videoSyncOffsetSeconds + match.binding.seconds)
+          playerStore.setVideoSyncWarning(null)
+        } catch (error) {
+          playerStore.setVideoSyncWarning(error.message)
+        }
+        return
+      default:
+        return
     }
+  })
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const handleKeyDown = (event) => onKeyDown(event)
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [hasActivity, isPlaying, pause, play, stepBySeconds])
+  }, [])
 
   // Lane models - clip geometry and tooltip state are prepared before presentational rendering.
   const lanes = useTimelineClips({
@@ -355,6 +440,7 @@ export default function useOverlayPlayer({ backgroundMode }) {
         current: formatTimelineTime(playback.clampedPlayhead),
         total: formatTimelineTime(playback.totalDuration),
       },
+      hasVideo,
       isMuted: playerStore.isVideoMuted,
       toggleMute: playerStore.toggleVideoMute,
       transport: {

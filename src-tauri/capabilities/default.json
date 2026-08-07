@@ -8,6 +8,8 @@
     "core:event:default",
     "dialog:default",
     "store:default",
+    "updater:default",
+    "process:allow-restart",
     "core:webview:allow-internal-toggle-devtools",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",

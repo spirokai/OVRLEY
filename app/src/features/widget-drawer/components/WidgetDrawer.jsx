@@ -2,10 +2,11 @@
  * WidgetDrawer — collapsible left-side panel for widgets.
  */
 
+import { useEffect, useEffectEvent } from 'react'
+import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { useLayoutStore, useActivityStore } from '@/hooks/useAppStoreSelectors'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { WidgetButtonGrid } from './WidgetButtonGrid'
-import { useEffect } from 'react'
 
 /**
  * Provides widget drawer.
@@ -21,18 +22,22 @@ export function WidgetDrawer({ widgetLiveEdits }) {
     closeWidgetDrawer()
   }
 
+  const onKeyDown = useEffectEvent((event) => {
+    if (event.defaultPrevented) return
+    const match = matchKeyboardShortcut(event, 'drawer')
+    if (match?.commandId !== 'drawer.close') return
+
+    event.preventDefault()
+    closeWidgetDrawer()
+  })
+
   useEffect(() => {
-    if (!widgetDrawerOpen) return
+    if (!widgetDrawerOpen || typeof document === 'undefined') return undefined
 
-    function handleKeyDown(e) {
-      if (e.key === 'Escape') {
-        closeWidgetDrawer()
-      }
-    }
-
+    const handleKeyDown = (event) => onKeyDown(event)
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [closeWidgetDrawer, widgetDrawerOpen])
+  }, [widgetDrawerOpen])
 
   return (
     <>
@@ -57,6 +62,7 @@ export function WidgetDrawer({ widgetLiveEdits }) {
               onClick={toggleWidgetDrawer}
               className="flex items-center justify-center w-6 h-25 bg-primary text-primary-foreground rounded-r-xs cursor-pointer shrink-0"
               aria-label={widgetDrawerOpen ? 'Close widget drawer' : 'Open widget drawer'}
+              aria-keyshortcuts="Alt+W"
             >
               <span className="[writing-mode:vertical-lr] rotate-180 text-xs font-bold tracking-wider">WIDGETS</span>
             </button>

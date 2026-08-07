@@ -269,6 +269,25 @@ pub(super) fn build_activity_columns(
     let (rpm, _) = series(Metric::Rpm);
     let (throttle_position, _) = series(Metric::ThrottlePosition);
     let (brake_position, _) = series(Metric::BrakePosition);
+    let (source_lap_number, _) = series(Metric::LapNumber);
+    // Exporters use zero or absence for the out-lap and positive source labels
+    // for timed laps. Canonical IDs follow observed timed laps from zero so
+    // cropped recordings that begin at source lap N still have compact IDs.
+    let mut source_to_canonical = BTreeMap::new();
+    let lap_number = source_lap_number
+        .into_iter()
+        .map(|value| {
+            value.map(|value| {
+                let source_lap = value.round() as i64;
+                if source_lap <= 0 {
+                    -1
+                } else {
+                    let next_lap = source_to_canonical.len() as i64;
+                    *source_to_canonical.entry(source_lap).or_insert(next_lap)
+                }
+            })
+        })
+        .collect();
     let (mut lean_angle, _) = series(Metric::LeanAngle);
     if lean_angle.iter().all(Option::is_none) {
         lean_angle = derive_lean_from_speed_heading(&speed, &heading, &elapsed_seconds);
@@ -374,6 +393,12 @@ pub(super) fn build_activity_columns(
         focal_length: empty(),
         ev: empty(),
         color_temperature: empty(),
+        lap_number,
+        lap_markers: if preamble.beacon_markers.is_empty() {
+            crate::activity::schema::LapMarkers::None
+        } else {
+            crate::activity::schema::LapMarkers::BeaconMarkers(preamble.beacon_markers.clone())
+        },
     })
 }
 

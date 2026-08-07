@@ -31,9 +31,6 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
   const { style, geometry } = previewModel
   const shadow = getTextShadowParts(sceneStyle)
   const shadowFilterId = sanitizeSvgId(`${widget.id}-route-shadow-blur`)
-  const contentTransform = geometry.contentScale ? `scale(${geometry.contentScale.x}, ${geometry.contentScale.y})` : undefined
-  const remainingLineWidth = widget.data.remaining_line_width * globalScale
-  const completedLineWidth = widget.data.completed_line_width * globalScale
 
   return (
     <svg
@@ -44,12 +41,12 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
       style={{ opacity: getWidgetOpacity(widget.data, globalOpacity) }}
     >
       <PreviewSvgShadowBlurFilter id={shadowFilterId} shadow={shadow} />
-      <g style={{ transform: contentTransform, transformOrigin: '0 0' }}>
+      <g>
         <PreviewPolylineShadow
           points={geometry.remainingSvgPoints}
           shadow={shadow}
           blurFilterId={shadowFilterId}
-          strokeWidth={remainingLineWidth}
+          strokeWidth={widget.data.remaining_line_width}
           strokeOpacity={style.remainingLineOpacity}
           rotation={widget.data.rotation}
         />
@@ -57,8 +54,7 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
           fill="none"
           stroke={widget.data.remaining_line_color}
           strokeOpacity={style.remainingLineOpacity}
-          strokeWidth={remainingLineWidth}
-          vectorEffect="non-scaling-stroke"
+          strokeWidth={widget.data.remaining_line_width}
           strokeLinejoin="round"
           strokeLinecap="round"
           points={geometry.remainingSvgPoints}
@@ -67,14 +63,13 @@ export function OverlayRouteWidget({ widget, activity, previewSecond, globalOpac
           fill="none"
           stroke={widget.data.completed_line_color}
           strokeOpacity={style.completedLineOpacity}
-          strokeWidth={completedLineWidth}
-          vectorEffect="non-scaling-stroke"
+          strokeWidth={widget.data.completed_line_width}
           strokeLinejoin="round"
           strokeLinecap="round"
           points={geometry.completedSvgPoints}
         />
       </g>
-      <PreviewMarkerLayers layers={style.markerLayers} point={geometry.markerPoint} pointScale={geometry.contentScale} />
+      <PreviewMarkerLayers layers={style.markerLayers} point={geometry.markerPoint} />
     </svg>
   )
 }

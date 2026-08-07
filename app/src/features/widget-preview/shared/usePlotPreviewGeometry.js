@@ -109,22 +109,17 @@ export function usePlotPreviewGeometry({ activity, data, exportRange, style, plo
   }, [activity, buildGeometry, config?.scene?.end, config?.scene?.start, exportWindow, geometrySignature, mockGeometryKey, style.globalScale])
 
   const points = useMemo(
-    () => (rustGeometry ? rustGeometry.points.map(([x, y]) => [x / style.globalScale, y / style.globalScale]) : null),
-    [rustGeometry, style.globalScale],
+    () =>
+      rustGeometry
+        ? rustGeometry.points.map(([x, y]) => [(x * data.width) / rustGeometry.widgetWidth, (y * data.height) / rustGeometry.widgetHeight])
+        : null,
+    [data.height, data.width, rustGeometry],
   )
-  const geometryWidth = rustGeometry ? rustGeometry.widgetWidth / style.globalScale : data.width
-  const geometryHeight = rustGeometry ? rustGeometry.widgetHeight / style.globalScale : data.height
-  const contentScale = rustGeometry
-    ? {
-        x: data.width / geometryWidth,
-        y: data.height / geometryHeight,
-      }
-    : null
   const remainingSvgPoints = useMemo(() => (points ? pointsToSvg(points) : null), [points])
   const areaSvgPoints = useMemo(
-    () => (includeArea && points ? areaToSvg(points, geometryWidth, geometryHeight, null) : null),
-    [geometryHeight, geometryWidth, includeArea, points],
+    () => (includeArea && points ? areaToSvg(points, data.width, data.height, null) : null),
+    [data.height, data.width, includeArea, points],
   )
 
-  return { areaSvgPoints, contentScale, exportWindow, fallbackDurationSeconds, geometryHeight, points, remainingSvgPoints, rustGeometry }
+  return { areaSvgPoints, exportWindow, fallbackDurationSeconds, points, remainingSvgPoints, rustGeometry }
 }

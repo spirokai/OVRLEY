@@ -11,6 +11,7 @@
 //! before this shared seam and will later emit the same raw contract.
 
 pub mod gap;
+pub mod lap;
 pub mod metrics;
 pub mod smoothing;
 
@@ -285,6 +286,13 @@ fn finalize_columns_with_debug(
     let sync_time = explicit_sync_time.or(first_sample_time);
     let end_time = time_series.iter().rev().find_map(Clone::clone);
     let distance_progress_series = build_progress_series(&distance_series);
+    let lap_timing = lap::derive_lap_timing(
+        &elapsed_series,
+        &distance_series,
+        &course_series,
+        &columns.lap_number,
+        &columns.lap_markers,
+    );
 
     let mut metadata = columns.metadata.clone();
     if !metadata.is_object() {
@@ -315,6 +323,7 @@ fn finalize_columns_with_debug(
         } else {
             object.remove("original_sample_count");
         }
+        object.remove("best_lap_time_seconds");
         object.insert(
             "inserted_idle_sample_count".to_string(),
             json!(gap_debug.inserted_sample_count),
@@ -386,6 +395,12 @@ fn finalize_columns_with_debug(
         gradient: metric(&metric_series_map, "gradient"),
         time: time_series,
         heading: metric(&metric_series_map, "heading"),
+        lap_number: lap_timing.lap_number,
+        lap_time_seconds: lap_timing.lap_time_seconds,
+        delta_to_best_lap_seconds: lap_timing.delta_to_best_lap_seconds,
+        best_lap_time_seconds: lap_timing.best_lap_time_seconds,
+        lap_durations_seconds: lap_timing.lap_durations_seconds,
+        lap_durations_best_so_far_seconds: lap_timing.lap_durations_best_so_far_seconds,
         extra,
     };
 
@@ -465,6 +480,8 @@ fn activity_columns_from_samples(
         color_temperature: collect!(color_temperature),
         original_sample_count,
         include_original_sample_count_metadata: true,
+        lap_number: vec![None; raw_samples.len()],
+        lap_markers: crate::activity::schema::LapMarkers::None,
     }
 }
 
@@ -517,6 +534,7 @@ fn validate_column_lengths(columns: &ActivityColumns) -> CoreResult<()> {
         ("focal_length", columns.focal_length.len()),
         ("ev", columns.ev.len()),
         ("color_temperature", columns.color_temperature.len()),
+        ("lap_number", columns.lap_number.len()),
     ];
 
     for (name, len) in lengths {
@@ -576,10 +594,7 @@ fn validate_course_coordinate_ranges(
 /// camera timestamps), it is interpreted in the GPS-derived activity timezone
 /// and converted to UTC. Without a timezone, naive timestamps are treated as
 /// UTC.
-fn build_time_series(
-    columns: &ActivityColumns,
-    timezone: Option<Tz>,
-) -> Vec<Option<String>> {
+fn build_time_series(columns: &ActivityColumns, timezone: Option<Tz>) -> Vec<Option<String>> {
     columns
         .timestamp
         .iter()
@@ -592,10 +607,9 @@ fn build_time_series(
                         .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
                 );
             }
-            let naive =
-                NaiveDateTime::parse_from_str(value.trim(), "%Y-%m-%dT%H:%M:%S%.f")
-                    .or_else(|_| NaiveDateTime::parse_from_str(value.trim(), "%Y-%m-%dT%H:%M:%S"))
-                    .ok()?;
+            let naive = NaiveDateTime::parse_from_str(value.trim(), "%Y-%m-%dT%H:%M:%S%.f")
+                .or_else(|_| NaiveDateTime::parse_from_str(value.trim(), "%Y-%m-%dT%H:%M:%S"))
+                .ok()?;
             let utc = match timezone {
                 Some(tz) => tz
                     .from_local_datetime(&naive)
@@ -855,6 +869,8 @@ fn metric_units() -> Value {
         "torque": "nm",
         "vertical_oscillation": "raw",
         "vertical_speed": "mps",
+        "lap_time_seconds": "s",
+        "delta_to_best_lap_seconds": "s",
     })
 }
 

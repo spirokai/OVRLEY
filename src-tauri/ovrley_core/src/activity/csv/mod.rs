@@ -78,6 +78,8 @@ enum Metric {
     /// This is not emitted as an activity metric; it is split into separate
     /// latitude and longitude series during column assembly.
     GpsCoordinate,
+    /// Lap number from the source file.
+    LapNumber,
 }
 
 impl Metric {

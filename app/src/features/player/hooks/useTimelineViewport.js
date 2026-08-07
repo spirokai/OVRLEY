@@ -3,6 +3,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { roundToDevicePixel } from '../utils/timelineGeometry'
 import { getTimelineMinimum } from '../utils/playerTiming'
 import {
@@ -75,13 +76,7 @@ export default function useTimelineViewport({
   }, [])
 
   // Media identity - structural media changes reset stale zoom/pan state, while sync timing changes preserve it.
-  const mediaIdentity = [
-    hasVideo,
-    importedVideoDuration,
-    hasActivityData,
-    activityDurationSeconds,
-    fallbackDurationSeconds,
-  ].join('|')
+  const mediaIdentity = [hasVideo, importedVideoDuration, hasActivityData, activityDurationSeconds, fallbackDurationSeconds].join('|')
 
   useEffect(() => {
     totalDurationRef.current = totalDuration
@@ -259,16 +254,21 @@ export default function useTimelineViewport({
   // Wheel navigation - scroll zooms around the pointer; Ctrl+scroll pans the visible timeline.
   const handleWheel = useCallback(
     (event) => {
+      const match = matchKeyboardShortcut(event, 'player')
+      if (!match) return
+
       event.preventDefault()
       const rect = containerElement?.getBoundingClientRect()
       if (!rect) return
 
-      if (event.ctrlKey) {
+      if (match.commandId === 'timeline.wheelPan') {
         const span = viewport.viewEnd - viewport.viewStart
         const deltaSeconds = rect.width > 0 ? (event.deltaY / rect.width) * span : 0
         panBy(deltaSeconds)
         return
       }
+
+      if (match.commandId !== 'timeline.wheelZoom') return
 
       const pivot = viewport.viewStart + ((event.clientX - rect.left) / rect.width) * (viewport.viewEnd - viewport.viewStart)
       zoomBy(event.deltaY < 0 ? 1 : -1, pivot)

@@ -3,7 +3,7 @@
  * Container hook — composes sub-hooks and exposes template actions.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import { hasTauriRuntime } from '@/features/app-shell'
 import { fileFromSelectedPath, openSinglePath } from '@/lib/file-dialog'
@@ -70,6 +70,11 @@ export default function useTemplateManagement({ onTemplateCreated }) {
 
   // Local UI state — manages the new-template confirmation dialog visibility
   const [showNewTemplateConfirm, setShowNewTemplateConfirm] = useState(false)
+  const [templateSelectorOpen, setTemplateSelectorOpen] = useState(false)
+
+  const openTemplateSelector = useCallback(() => {
+    setTemplateSelectorOpen(true)
+  }, [])
 
   // Derived state — template save status computed from current editor state vs last saved snapshot
   const { currentTemplateState, status, showTemplateStatus } = useTemplateSaveStatus({
@@ -81,24 +86,6 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     aspectRatio,
     lastSavedTemplateState,
   })
-
-  // Side effects — closes the new-template confirmation dialog on Escape key press
-  useEffect(() => {
-    if (!showNewTemplateConfirm || typeof window === 'undefined') {
-      return undefined
-    }
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        setShowNewTemplateConfirm(false)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [showNewTemplateConfirm])
 
   // Template change handler — loads a template from the backend by filename
   const handleTemplateChange = useCallback(
@@ -298,11 +285,14 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     handleTemplateChange,
     loadedTemplateFilename,
     loadedTemplateSource,
+    openTemplateSelector,
     restoreLastLoadedTemplate,
+    setTemplateSelectorOpen,
     setShowNewTemplateConfirm,
     showNewTemplateConfirm,
     showTemplateStatus,
     status,
+    templateSelectorOpen,
     templates,
   }
 }

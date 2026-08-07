@@ -1,8 +1,5 @@
 /**
- * Integration test for AppHeader with grouped prop objects.
- *
- * Pins the current prop contract before the grouped-props pattern is unwound.
- * Verifies each child section receives correct props from AppHeader.
+ * Integration test for AppHeader with canonical owner objects.
  */
 
 import { render } from '@testing-library/react'
@@ -22,19 +19,20 @@ vi.mock('@/features/app-shell/components/ActionButtons', () => ({
 import AppHeader from '@/features/app-shell/components/AppHeader'
 
 const defaultProps = {
-  activityControls: { activityLabel: 'Test Activity', onOpenActivityFile: vi.fn() },
-  backendStatus: 'connected',
+  activityImport: { activityFilename: 'Test Activity', handleActivityFileOpen: vi.fn() },
+  appShell: { config: {} },
+  backendState: { backendStatus: 'connected' },
+  editorShell: { debugModeEnabled: false, openKeyboardShortcuts: vi.fn() },
   onOpenDownloads: vi.fn(),
-  renderControls: {
-    onOpenRenderDialog: vi.fn(),
-    onRenderPreviewFrame: undefined,
+  renderWorkflow: {
+    openRenderDialog: vi.fn(),
+    handleRenderPreviewFrame: undefined,
     renderPreviewFrameDisabled: undefined,
     renderDisabled: false,
     renderTooltipContent: null,
     renderingVideo: false,
   },
-  templateControls: {
-    config: {},
+  templateManagement: {
     handleCreateNewTemplate: vi.fn(),
     handleImportTemplate: vi.fn(),
     handleSaveTemplate: vi.fn(),
@@ -42,6 +40,8 @@ const defaultProps = {
     loadedTemplateFilename: null,
     loadedTemplateSource: null,
     showTemplateStatus: false,
+    templateSelectorOpen: false,
+    setTemplateSelectorOpen: vi.fn(),
     templates: [],
   },
   videoControls: {
@@ -67,7 +67,7 @@ describe('AppHeader grouped-props contract', () => {
     const { getByTestId } = render(<AppHeader {...defaultProps} />)
     const props = JSON.parse(getByTestId('activity-section').dataset.props)
 
-    expect(props).toContain('activityLabel')
+    expect(props).toContain('activityFilename')
     expect(props).toContain('onOpenActivityFile')
     expect(props).toContain('appVersion')
     expect(props).toContain('handleImportVideo')
@@ -91,5 +91,6 @@ describe('AppHeader grouped-props contract', () => {
     expect(props).toContain('renderDisabled')
     expect(props).toContain('renderingVideo')
     expect(props).toContain('backendStatus')
+    expect(props).toContain('onOpenKeyboardShortcuts')
   })
 })

@@ -1151,3 +1151,341 @@ fn airdata_datetime_utc_column_is_parsed_as_absolute_timestamps() {
     assert_eq!(activity.time[1].as_deref(), Some("2026-07-14T11:45:06.000Z"));
     assert_eq!(activity.time[2].as_deref(), Some("2026-07-14T11:45:06.000Z"));
 }
+
+mod lap_timing_fixture_tests {
+    use super::*;
+    use ovrley_core::activity::vbo::parse_vbo_activity_path;
+
+    struct LapExpectations {
+        fixture: &'static str,
+        min_laps: usize,
+        extraction: FixtureKind,
+    }
+
+    enum FixtureKind {
+        Csv,
+        Vbo,
+    }
+
+    fn parse(expectations: &LapExpectations) -> ovrley_core::activity::schema::ParsedActivity {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/activity")
+            .join(expectations.fixture);
+        match expectations.extraction {
+            FixtureKind::Csv => parse_csv_activity_path(&path).unwrap().parsed_activity,
+            FixtureKind::Vbo => parse_vbo_activity_path(&path, None).unwrap().parsed_activity,
+        }
+    }
+
+    fn lap_timing_fixtures() -> Vec<LapExpectations> {
+        vec![
+            LapExpectations {
+                fixture: "Amozoc - TrackAddict.csv",
+                min_laps: 5,
+                extraction: FixtureKind::Csv,
+            },
+            LapExpectations {
+                fixture: "sample AiM.csv",
+                min_laps: 5,
+                extraction: FixtureKind::Csv,
+            },
+            LapExpectations {
+                fixture: "sample LapLegend.csv",
+                min_laps: 0,
+                extraction: FixtureKind::Csv,
+            },
+            LapExpectations {
+                fixture: "sample Racebox.csv",
+                min_laps: 0,
+                extraction: FixtureKind::Csv,
+            },
+            LapExpectations {
+                fixture: "sample RaceChrono.csv",
+                min_laps: 0,
+                extraction: FixtureKind::Csv,
+            },
+            LapExpectations {
+                fixture: "session_20260713_185859_v1.csv",
+                min_laps: 0,
+                extraction: FixtureKind::Csv,
+            },
+            LapExpectations {
+                fixture: "session_20260713_185859_v2.csv",
+                min_laps: 0,
+                extraction: FixtureKind::Csv,
+            },
+            LapExpectations {
+                fixture: "VBO-test.vbo",
+                min_laps: 0,
+                extraction: FixtureKind::Vbo,
+            },
+        ]
+    }
+
+    #[test]
+    fn csv_fixtures_produce_lap_timing_series_aligned_with_elapsed_samples() {
+        for expectations in lap_timing_fixtures() {
+            let activity = parse(&expectations);
+            let n = activity.sample_elapsed_seconds.len();
+
+            assert!(
+                n > 0,
+                "{} must have samples",
+                expectations.fixture
+            );
+            assert_eq!(
+                activity.lap_number.len(),
+                n,
+                "{} lap_number length mismatch",
+                expectations.fixture
+            );
+            assert_eq!(
+                activity.lap_time_seconds.len(),
+                n,
+                "{} lap_time_seconds length mismatch",
+                expectations.fixture
+            );
+            assert_eq!(
+                activity.delta_to_best_lap_seconds.len(),
+                n,
+                "{} delta_to_best_lap_seconds length mismatch",
+                expectations.fixture
+            );
+        }
+    }
+
+    #[test]
+    fn csv_fixtures_populate_lap_duration_metadata_when_laps_are_detected() {
+        for expectations in lap_timing_fixtures() {
+            let activity = parse(&expectations);
+
+            if expectations.min_laps > 0 {
+                assert!(
+                    !activity.lap_durations_seconds.is_empty(),
+                    "{} must have lap durations",
+                    expectations.fixture
+                );
+                assert_eq!(
+                    activity.lap_durations_seconds.len(),
+                    activity.lap_durations_best_so_far_seconds.len(),
+                    "{} best_so_far length must match durations",
+                    expectations.fixture
+                );
+                assert!(
+                    activity.best_lap_time_seconds.is_some(),
+                    "{} must have best_lap_time_seconds",
+                    expectations.fixture
+                );
+                assert!(
+                    activity.lap_durations_seconds.len() >= expectations.min_laps,
+                    "{} must have at least {} laps, got {}",
+                    expectations.fixture,
+                    expectations.min_laps,
+                    activity.lap_durations_seconds.len()
+                );
+            } else {
+                assert!(
+                    !activity.lap_durations_seconds.is_empty()
+                        || activity.best_lap_time_seconds.is_none(),
+                    "{} must not have best lap when no durations exist",
+                    expectations.fixture
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn csv_fixtures_with_explicit_lap_columns_have_non_negative_lap_numbers() {
+        let fixtures_with_lap_column = [
+            "Amozoc - TrackAddict.csv",
+            "sample LapLegend.csv",
+            "sample Racebox.csv",
+            "sample RaceChrono.csv",
+            "session_20260713_185859_v1.csv",
+            "session_20260713_185859_v2.csv",
+        ];
+
+        for name in fixtures_with_lap_column {
+            let activity = parse(&LapExpectations {
+                fixture: name,
+                min_laps: 0,
+                extraction: FixtureKind::Csv,
+            });
+
+            let has_lap_numbers = activity.lap_number.iter().any(|&v| v >= 0);
+            assert!(
+                has_lap_numbers,
+                "{} must have at least one non-negative lap number",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn aim_fixture_beacon_markers_produce_lap_boundaries() {
+        let activity = parse(&LapExpectations {
+            fixture: "sample AiM.csv",
+            min_laps: 0,
+            extraction: FixtureKind::Csv,
+        });
+
+        assert!(
+            activity.lap_number.iter().any(|&v| v >= 0),
+            "AiM must produce lap numbers from Beacon Markers"
+        );
+
+        let lap_count = activity.lap_durations_seconds.len();
+        assert!(
+            lap_count > 0,
+            "AiM must produce completed laps from Beacon Markers"
+        );
+
+        assert!(
+            activity.best_lap_time_seconds.is_some(),
+            "AiM must produce best lap from Beacon Markers"
+        );
+
+        let expected_beacons = 7;
+        assert!(
+            lap_count <= expected_beacons,
+            "AiM Beacon Markers have {} markers, got {} laps",
+            expected_beacons,
+            lap_count
+        );
+    }
+
+    #[test]
+    fn vbo_fixture_produces_lap_timing_via_crossing_detection() {
+        let activity = parse(&LapExpectations {
+            fixture: "VBO-test.vbo",
+            min_laps: 0,
+            extraction: FixtureKind::Vbo,
+        });
+
+        assert_eq!(
+            activity.lap_number.len(),
+            activity.sample_elapsed_seconds.len(),
+            "VBO lap_number length must match elapsed"
+        );
+
+        let has_lap_data = activity.lap_number.iter().any(|&v| v >= 0);
+
+        if has_lap_data {
+            assert!(
+                !activity.lap_durations_seconds.is_empty(),
+                "VBO must produce lap durations when laps are detected"
+            );
+            assert!(
+                activity.best_lap_time_seconds.is_some(),
+                "VBO must produce best lap when laps are detected"
+            );
+            for (lap, &time) in activity.lap_time_seconds.iter().enumerate() {
+                if activity.lap_number[lap] >= 0 {
+                    assert!(
+                        time.is_some(),
+                        "VBO sample {} in lap {} must have lap_time",
+                        lap,
+                        activity.lap_number[lap]
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn trackaddict_fixture_produces_multi_lap_delta_to_best() {
+        let activity = parse(&LapExpectations {
+            fixture: "Amozoc - TrackAddict.csv",
+            min_laps: 0,
+            extraction: FixtureKind::Csv,
+        });
+
+        assert!(
+            activity.lap_durations_seconds.len() >= 2,
+            "TrackAddict must have at least 2 laps for delta comparison"
+        );
+
+        let deltas_after_first_lap = activity
+            .lap_number
+            .iter()
+            .enumerate()
+            .filter(|&(_, &lap)| lap >= 1)
+            .filter_map(|(i, _)| activity.delta_to_best_lap_seconds[i])
+            .collect::<Vec<f64>>();
+
+        assert!(
+            !deltas_after_first_lap.is_empty(),
+            "TrackAddict must produce delta values from lap 1 onward"
+        );
+    }
+
+    #[test]
+    fn out_lap_fixtures_carry_lap_number_minus_one() {
+        let out_lap_fixtures = [
+            "session_20260713_185859_v1.csv",
+            "session_20260713_185859_v2.csv",
+        ];
+
+        for name in out_lap_fixtures {
+            let activity = parse(&LapExpectations {
+                fixture: name,
+                min_laps: 0,
+                extraction: FixtureKind::Csv,
+            });
+
+            assert!(
+                activity.lap_number.iter().any(|&v| v == -1),
+                "{} must have out-lap samples with lap_number == -1",
+                name
+            );
+
+            let any_out_lap_with_null = activity
+                .lap_number
+                .iter()
+                .zip(activity.lap_time_seconds.iter())
+                .any(|(&lap, &time)| lap == -1 && time.is_none());
+
+            assert!(
+                any_out_lap_with_null,
+                "{} out-lap samples must have null lap_time_seconds",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn lap_time_seconds_increases_within_each_lap() {
+        for expectations in lap_timing_fixtures() {
+            let activity = parse(&expectations);
+            if activity.lap_durations_seconds.is_empty() {
+                continue;
+            }
+
+            let mut current_lap: i64 = -1;
+            let mut last_time: Option<f64> = None;
+
+            for (i, &lap) in activity.lap_number.iter().enumerate() {
+                if lap != current_lap {
+                    last_time = None;
+                    current_lap = lap;
+                }
+                if lap >= 0 {
+                    if let Some(time) = activity.lap_time_seconds[i] {
+                        if let Some(prev) = last_time {
+                            assert!(
+                                time >= prev - 1e-9,
+                                "{} lap_time_seconds must be non-decreasing within lap {} at sample {}: {} < {}",
+                                expectations.fixture,
+                                lap,
+                                i,
+                                time,
+                                prev
+                            );
+                        }
+                        last_time = Some(time);
+                    }
+                }
+            }
+        }
+    }
+}

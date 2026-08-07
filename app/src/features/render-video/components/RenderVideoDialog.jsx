@@ -5,6 +5,7 @@
 
 import { AlertTriangle, Play, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
@@ -28,8 +29,12 @@ import useRenderVideoDialogState from '../hooks/useRenderVideoDialogState'
 export default function RenderVideoDialog(props) {
   const ctx = useRenderVideoDialogState(props)
 
-  if (ctx.phase === 'closed' || !ctx.settings) {
-    return null
+  if (ctx.phase === 'closed') {
+    return <Dialog open={false} />
+  }
+
+  if (!ctx.settings) {
+    throw new Error('Render settings are required while the render dialog is open')
   }
 
   const isCompositeExport = ctx.exportMode === 'composite'
@@ -54,18 +59,37 @@ export default function RenderVideoDialog(props) {
   const hasBlockingResolutionMismatch = ctx.hasImportedVideo && ctx.resolutionMismatch
 
   return (
-    <div
-      className="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md"
-      onMouseDown={ctx.handleBackdropPointerDown}
+    <Dialog
+      open
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          ctx.onClose()
+        }
+      }}
     >
-      <div
+      <DialogContent
+        overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md"
         className="w-full max-w-lg rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
-        onMouseDown={(event) => event.stopPropagation()}
+        aria-describedby={undefined}
+        onEscapeKeyDown={(event) => {
+          if (ctx.isProgress) {
+            event.preventDefault()
+          }
+        }}
+        onPointerDownOutside={(event) => {
+          if (ctx.isProgress) {
+            event.preventDefault()
+          }
+        }}
       >
         {ctx.isProgress ? (
-          <RenderProgressPanel renderProgress={ctx.renderProgress} renderSummaryItems={renderSummaryItems} onCancel={ctx.handleCancel} />
+          <>
+            <DialogTitle className="sr-only">Exporting Overlay</DialogTitle>
+            <RenderProgressPanel renderProgress={ctx.renderProgress} renderSummaryItems={renderSummaryItems} onCancel={ctx.handleCancel} />
+          </>
         ) : hasBlockingResolutionMismatch ? (
           <div className="space-y-12 p-3">
+            <DialogTitle className="sr-only">Video resolution mismatch</DialogTitle>
             <div className="space-y-8">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-10 w-10 shrink-0 text-red-500" />
@@ -96,7 +120,7 @@ export default function RenderVideoDialog(props) {
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <Video className="h-4 w-4 text-primary" />
-                  <h2 className="text-sm font-semibold text-foreground">{ctx.dialogTitle}</h2>
+                  <DialogTitle className="text-sm font-semibold text-foreground">{ctx.dialogTitle}</DialogTitle>
                 </div>
 
                 {ctx.showExportModeOverride ? (
@@ -301,8 +325,8 @@ export default function RenderVideoDialog(props) {
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

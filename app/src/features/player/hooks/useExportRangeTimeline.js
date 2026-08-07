@@ -170,11 +170,13 @@ export default function useExportRangeTimeline({ totalDuration, timelineMinimum 
     cancelMarkerPreview,
     clear,
     commitMarker,
+    fromSecond,
     highlightRange,
     isCustom,
     markers,
     previewMarker,
     rangeLabel: isCustom ? `[${formatExportRangeTime(displayedFromSecond)}-${formatExportRangeTime(displayedToSecond)}]` : null,
     setBoundary,
+    toSecond,
   }
 }

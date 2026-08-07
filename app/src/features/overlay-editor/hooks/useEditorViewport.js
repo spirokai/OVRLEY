@@ -3,6 +3,7 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { clamp } from '@/lib/utils'
 import { VIEWPORT_PADDING, ZOOM_MAX, ZOOM_MIN } from '../data/overlayEditorConstants'
 
@@ -81,7 +82,9 @@ export function useEditorViewport({ onZoomLevelChange, sceneElement, sceneSize, 
 
   const handleWheel = useCallback(
     (event) => {
-      if (event.ctrlKey || event.metaKey) {
+      const match = matchKeyboardShortcut(event, 'editor')
+
+      if (match?.commandId === 'editor.wheelZoom') {
         if (event.deltaY === 0) {
           return
         }
@@ -93,7 +96,7 @@ export function useEditorViewport({ onZoomLevelChange, sceneElement, sceneSize, 
         return
       }
 
-      if (event.shiftKey) {
+      if (match?.commandId === 'editor.wheelScroll') {
         event.preventDefault()
         event.currentTarget.scrollLeft += getHorizontalWheelDelta(event)
       }

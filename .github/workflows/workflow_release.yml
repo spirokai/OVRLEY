@@ -1,0 +1,374 @@
+name: OVRLEY Release Orchestrator
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Ref whose Semantic Release tag should be released
+        required: true
+        default: main
+        type: string
+      notes:
+        description: GitHub Release notes and updater manifest notes
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  resolve:
+    name: Resolve release identity
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.identity.outputs.ref }}
+      tag: ${{ steps.identity.outputs.tag }}
+      version: ${{ steps.identity.outputs.version }}
+      commit: ${{ steps.identity.outputs.commit }}
+    steps:
+      - name: Checkout selected release ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve exactly one stable Semantic Release tag
+        id: identity
+        shell: bash
+        env:
+          RELEASE_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          stable_tag_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          candidates=()
+          while IFS= read -r candidate; do
+            if [[ "$candidate" =~ $stable_tag_pattern ]]; then
+              candidates+=("$candidate")
+            fi
+          done < <(git tag --points-at HEAD)
+          [[ "${#candidates[@]}" == 1 ]] || { echo 'Expected exactly one stable Semantic Release tag at HEAD.' >&2; exit 1; }
+
+          tag="${candidates[0]}"
+          commit="$(git rev-parse HEAD)"
+          version="$tag"
+          echo "commit=$commit"
+          echo "tag=$tag"
+          node scripts/set-release-version.mjs "$version"
+          {
+            echo "ref=$RELEASE_REF"
+            echo "tag=$tag"
+            echo "commit=$commit"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Reject a published release before starting builds
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG"
+          response_file="$RUNNER_TEMP/ovrley-release-preflight.json"
+          status="$(curl -sS -o "$response_file" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$api_url")"
+          if [[ "$status" == '200' ]]; then
+            jq -e '.draft == true' "$response_file" >/dev/null || { echo "Published release $RELEASE_TAG already exists; nothing was modified." >&2; exit 1; }
+            echo "Draft release $RELEASE_TAG will be reused."
+          elif [[ "$status" == '404' ]]; then
+            echo "No release exists for $RELEASE_TAG; the publishing job will create a draft."
+          else
+            echo "GitHub release lookup failed with HTTP $status." >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+
+  windows:
+    name: Windows build
+    needs: resolve
+    uses: ./.github/workflows/workflow_win.yml
+    with:
+      release_ref: ${{ needs.resolve.outputs.ref }}
+      release_tag: ${{ needs.resolve.outputs.tag }}
+      release_version: ${{ needs.resolve.outputs.version }}
+      release_commit: ${{ needs.resolve.outputs.commit }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  macos:
+    name: macOS Apple Silicon build
+    needs: resolve
+    uses: ./.github/workflows/workflow_macos.yml
+    with:
+      release_ref: ${{ needs.resolve.outputs.ref }}
+      release_tag: ${{ needs.resolve.outputs.tag }}
+      release_version: ${{ needs.resolve.outputs.version }}
+      release_commit: ${{ needs.resolve.outputs.commit }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  linux:
+    name: Linux build
+    needs: resolve
+    uses: ./.github/workflows/workflow_linux.yml
+    with:
+      release_ref: ${{ needs.resolve.outputs.ref }}
+      release_tag: ${{ needs.resolve.outputs.tag }}
+      release_version: ${{ needs.resolve.outputs.version }}
+      release_commit: ${{ needs.resolve.outputs.commit }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  publish:
+    name: Validate and publish complete release
+    needs: [resolve, windows, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the exact release commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve.outputs.commit }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Download Windows artifact set
+        uses: actions/download-artifact@v4
+        with:
+          name: ovrley-windows-artifacts-${{ needs.resolve.outputs.tag }}
+          path: artifact-downloads/windows
+
+      - name: Download macOS artifact set
+        uses: actions/download-artifact@v4
+        with:
+          name: ovrley-macos-artifacts-${{ needs.resolve.outputs.tag }}
+          path: artifact-downloads/macos
+
+      - name: Download Linux artifact set
+        uses: actions/download-artifact@v4
+        with:
+          name: ovrley-linux-artifacts-${{ needs.resolve.outputs.tag }}
+          path: artifact-downloads/linux
+
+      - name: Flatten and validate local release staging
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          version="$RELEASE_VERSION"
+          rm -rf release-staging public-assets
+          mkdir -p release-staging public-assets
+          expected=(
+            "OVRLEY-windows-x86_64-${version}-setup.exe"
+            "OVRLEY-windows-x86_64-${version}-setup.exe.sig"
+            "OVRLEY-windows-x86_64-${version}-portable.zip"
+            "OVRLEY-macos-aarch64-${version}.dmg"
+            "OVRLEY-macos-aarch64-${version}.app.tar.gz"
+            "OVRLEY-macos-aarch64-${version}.app.tar.gz.sig"
+            "OVRLEY-linux-x86_64-${version}.AppImage"
+            "OVRLEY-linux-x86_64-${version}.AppImage.sig"
+          )
+
+          while IFS= read -r source; do
+            filename="$(basename "$source")"
+            destination="release-staging/$filename"
+            [[ ! -e "$destination" ]] || { echo "Duplicate artifact name: $filename" >&2; exit 1; }
+            cp "$source" "$destination"
+          done < <(find artifact-downloads -type f -print)
+
+          actual=(release-staging/*)
+          [[ "${#actual[@]}" == "${#expected[@]}" ]] || { echo 'Unexpected number of downloaded artifact files.' >&2; exit 1; }
+          for filename in "${expected[@]}"; do
+            path="release-staging/$filename"
+            [[ -f "$path" && -s "$path" ]] || { echo "Missing or empty release artifact: $filename" >&2; exit 1; }
+          done
+          for path in release-staging/*.sig; do
+            [[ -n "$(tr -d '[:space:]' < "$path")" ]] || { echo "Empty signature: $path" >&2; exit 1; }
+          done
+
+      - name: Write supplied release notes
+        env:
+          RELEASE_NOTES: ${{ inputs.notes }}
+        shell: bash
+        run: printf '%s' "$RELEASE_NOTES" > release-notes.txt
+
+      - name: Generate strict updater manifest
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo="${GITHUB_REPOSITORY##*/}"
+          node scripts/create-latest-json.mjs \
+            --owner "$owner" \
+            --repo "$repo" \
+            --tag "$RELEASE_TAG" \
+            --version "$RELEASE_VERSION" \
+            --notes-file release-notes.txt \
+            --staging-dir release-staging \
+            --output public-assets/latest.json
+          node scripts/create-latest-json.mjs \
+            --owner "$owner" \
+            --repo "$repo" \
+            --tag "$RELEASE_TAG" \
+            --version "$RELEASE_VERSION" \
+            --notes-file release-notes.txt \
+            --staging-dir release-staging \
+            --validate-manifest public-assets/latest.json
+
+      - name: Assemble exactly six public assets
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          version="$RELEASE_VERSION"
+          cp "release-staging/OVRLEY-windows-x86_64-${version}-setup.exe" public-assets/
+          cp "release-staging/OVRLEY-windows-x86_64-${version}-portable.zip" public-assets/
+          cp "release-staging/OVRLEY-macos-aarch64-${version}.dmg" public-assets/
+          cp "release-staging/OVRLEY-macos-aarch64-${version}.app.tar.gz" public-assets/
+          cp "release-staging/OVRLEY-linux-x86_64-${version}.AppImage" public-assets/
+          expected="$(printf '%s\n' \
+            "OVRLEY-windows-x86_64-${version}-setup.exe" \
+            "OVRLEY-windows-x86_64-${version}-portable.zip" \
+            "OVRLEY-macos-aarch64-${version}.dmg" \
+            "OVRLEY-macos-aarch64-${version}.app.tar.gz" \
+            "OVRLEY-linux-x86_64-${version}.AppImage" \
+            latest.json | sort)"
+          actual="$(find public-assets -maxdepth 1 -type f -printf '%f\n' | sort)"
+          [[ "$actual" == "$expected" ]] || { echo 'Public asset staging is not exactly canonical.' >&2; exit 1; }
+
+      - name: Create or reuse the final draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG"
+          response_file="$RUNNER_TEMP/ovrley-release-publish.json"
+          status="$(curl -sS -o "$response_file" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$api_url")"
+          if [[ "$status" == '200' ]]; then
+            jq -e '.draft == true' "$response_file" >/dev/null || { echo "Release $RELEASE_TAG was published while builds were running." >&2; exit 1; }
+          elif [[ "$status" == '404' ]]; then
+            gh release create "$RELEASE_TAG" --draft --title "OVRLEY $RELEASE_TAG" --notes-file release-notes.txt
+          else
+            echo "GitHub release lookup failed with HTTP $status." >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+          gh release edit "$RELEASE_TAG" --draft --notes-file release-notes.txt
+
+      - name: Remove stale draft assets from this release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          release_json="$RUNNER_TEMP/ovrley-release-assets.json"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$release_json"
+          jq -e '.draft == true' "$release_json" >/dev/null || { echo 'Release is no longer a draft.' >&2; exit 1; }
+          canonical_names=(
+            "OVRLEY-windows-x86_64-${RELEASE_VERSION}-setup.exe"
+            "OVRLEY-windows-x86_64-${RELEASE_VERSION}-portable.zip"
+            "OVRLEY-macos-aarch64-${RELEASE_VERSION}.dmg"
+            "OVRLEY-macos-aarch64-${RELEASE_VERSION}.app.tar.gz"
+            "OVRLEY-linux-x86_64-${RELEASE_VERSION}.AppImage"
+            latest.json
+          )
+          while IFS=$'\t' read -r asset_id asset_name; do
+            [[ -n "$asset_id" ]] || continue
+            is_canonical=false
+            for canonical_name in "${canonical_names[@]}"; do
+              if [[ "$asset_name" == "$canonical_name" ]]; then
+                is_canonical=true
+                break
+              fi
+            done
+            [[ "$is_canonical" == true ]] || { echo "Draft contains unexpected asset $asset_name; refusing to publish." >&2; exit 1; }
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id"
+          done < <(jq -r '.assets[] | [.id, .name] | @tsv' "$release_json")
+
+      - name: Upload exactly six public release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" public-assets/* --clobber
+
+      - name: Validate authenticated draft asset inventory and manifest URLs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          release_json="$RUNNER_TEMP/ovrley-release-final-draft.json"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$release_json"
+          jq -e '.draft == true' "$release_json" >/dev/null || { echo 'Release must remain a draft until validation completes.' >&2; exit 1; }
+          expected="$(printf '%s\n' \
+            "OVRLEY-windows-x86_64-${RELEASE_VERSION}-setup.exe" \
+            "OVRLEY-windows-x86_64-${RELEASE_VERSION}-portable.zip" \
+            "OVRLEY-macos-aarch64-${RELEASE_VERSION}.dmg" \
+            "OVRLEY-macos-aarch64-${RELEASE_VERSION}.app.tar.gz" \
+            "OVRLEY-linux-x86_64-${RELEASE_VERSION}.AppImage" \
+            latest.json | sort)"
+          actual="$(jq -r '.assets[].name' "$release_json" | sort)"
+          [[ "$actual" == "$expected" ]] || { echo 'Draft release asset inventory is not exactly the six intended public assets.' >&2; exit 1; }
+          while IFS= read -r size; do
+            [[ "$size" =~ ^[1-9][0-9]*$ ]] || { echo 'Draft release contains an empty asset.' >&2; exit 1; }
+          done < <(jq -r '.assets[].size' "$release_json")
+
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo="${GITHUB_REPOSITORY##*/}"
+          base_url="https://github.com/$owner/$repo/releases/download/$RELEASE_TAG"
+          jq -e --arg url "$base_url/OVRLEY-windows-x86_64-${RELEASE_VERSION}-setup.exe" '.platforms["windows-x86_64"].url == $url' public-assets/latest.json >/dev/null
+          jq -e --arg url "$base_url/OVRLEY-macos-aarch64-${RELEASE_VERSION}.app.tar.gz" '.platforms["darwin-aarch64"].url == $url' public-assets/latest.json >/dev/null
+          jq -e --arg url "$base_url/OVRLEY-linux-x86_64-${RELEASE_VERSION}.AppImage" '.platforms["linux-x86_64"].url == $url' public-assets/latest.json >/dev/null
+
+      - name: Publish the validated release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          jq -e '.draft == true' <<<"$release_json" >/dev/null ||
+            { echo "Release $RELEASE_TAG is no longer a draft." >&2; exit 1; }
+
+          release_id="$(jq -er '.id | select(type == "number")' <<<"$release_json")"
+
+          gh api \
+            --method PATCH \
+            "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+            -F draft=false |
+            jq -e '.draft == false' >/dev/null
+
+      - name: Smoke-test public latest manifest and artifact URLs
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo="${GITHUB_REPOSITORY##*/}"
+          base_url="https://github.com/$owner/$repo/releases/latest/download"
+          curl --fail --location --retry 5 --retry-delay 3 "$base_url/latest.json" -o "$RUNNER_TEMP/latest.json"
+          jq -e --arg version "$RELEASE_VERSION" '.version == $version' "$RUNNER_TEMP/latest.json" >/dev/null
+          while IFS= read -r url; do
+            curl --fail --location --retry 5 --retry-delay 3 --output /dev/null "$url"
+          done < <(jq -r '.platforms[].url' "$RUNNER_TEMP/latest.json")
