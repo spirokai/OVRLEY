@@ -1,7 +1,7 @@
 //! Local HTTP preview server with byte-range support.
 //!
 //! Owns: the `VideoServerHandle` / `PreviewVideoState` lifecycle, the tiny_http
-//!       accept-loop thread, byte-range parsing (`parse_range`), and all
+//!       request workers, byte-range parsing (`parse_range`), and all
 //!       preview-video HTTP serving logic. The server binds to a random loopback
 //!       port at startup and serves video files to the frontend for in-app preview.
 //! Does not own: core rendering, video encoding, or activity parsing — those live
@@ -12,11 +12,11 @@
 //!       the Tauri shell — the Tauri shell wraps core, not vice versa).
 //!
 //! ## Thread Safety
-//! The preview server runs on a dedicated accept-loop thread. Shared state
+//! The preview server runs on four request-worker threads. Shared state
 //! (`VideoServerHandle.inner: Arc<Mutex<VideoServerInner>>`) is locked only on
 //! video-path changes and shutdown — the hot request-serving path locks neither
-//! a mutex nor the server handle. The accept loop exits when `shutdown_flag`
-//! (AtomicBool) is set to true.
+//! a mutex nor the server handle. Each worker exits when the shared shutdown
+//! state is set.
 //!
 //! ## Request Handling
 //! Supports HTTP range requests (`bytes=start-end`, `bytes=start-`,
@@ -35,14 +35,13 @@ use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 use uuid::Uuid;
 
 const CHUNK_SIZE: usize = 512 * 1024;
+const WORKER_COUNT: usize = 4;
 
 /// Handle for the local HTTP preview server.
 ///
 /// Created before the Tauri window opens and stored as managed app state.
 /// The inner state is `Arc<Mutex<...>>` so the handle can be cloned and
-/// shared between the Tauri command layer and the accept-loop thread.
-/// Call `start()` to bind the loopback socket and spawn the server thread,
-/// `stop()` to signal shutdown and join the thread.
+/// shared between the Tauri command layer and the request workers.
 #[derive(Clone)]
 pub struct VideoServerHandle {
     inner: Arc<Mutex<VideoServerInner>>,
@@ -123,9 +122,9 @@ impl Default for VideoServerHandle {
 impl VideoServerHandle {
     /// Starts the local HTTP server on `127.0.0.1` using a random available port.
     ///
-    /// The request loop runs on a dedicated thread so Tauri setup can return
-    /// promptly. Calling this more than once on the same shared handle is a
-    /// no-op after the first successful start.
+    /// Four workers receive requests from the shared server so a long video
+    /// response cannot block a later range request. Calling this more than once
+    /// on the same shared handle is a no-op after the first successful start.
     pub fn start(&self) -> Result<(), String> {
         {
             let guard = self.inner.lock().map_err(|error| error.to_string())?;
@@ -147,22 +146,28 @@ impl VideoServerHandle {
             guard.started = true;
         }
 
-        let inner = Arc::clone(&self.inner);
-        thread::spawn(move || loop {
-            match server.recv_timeout(Duration::from_millis(200)) {
-                Ok(Some(request)) => handle_request(&inner, request),
-                Ok(None) => {}
-                Err(error) => {
-                    log::warn!("Video preview server stopped receiving requests: {error}");
+        let server = Arc::new(server);
+        for _ in 0..WORKER_COUNT {
+            let server = Arc::clone(&server);
+            let inner = Arc::clone(&self.inner);
+            thread::spawn(move || loop {
+                match server.recv_timeout(Duration::from_millis(200)) {
+                    Ok(Some(request)) => handle_request(&inner, request),
+                    Ok(None) => {}
+                    Err(error) => {
+                        log::warn!(
+                            "Video preview server worker stopped receiving requests: {error}"
+                        );
+                        break;
+                    }
+                }
+
+                let should_shutdown = inner.lock().map(|guard| guard.shutdown).unwrap_or(true);
+                if should_shutdown {
                     break;
                 }
-            }
-
-            let should_shutdown = inner.lock().map(|guard| guard.shutdown).unwrap_or(true);
-            if should_shutdown {
-                break;
-            }
-        });
+            });
+        }
 
         Ok(())
     }
