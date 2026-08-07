@@ -105,12 +105,8 @@ async function main() {
 
   await rm(installDir, { recursive: true, force: true });
   await mkdir(binDir, { recursive: true });
-  const discoveredBinDir = dirname(discoveredBinary);
-  await copyExtractedFfmpegDir(discoveredBinDir, binDir);
-
-  if (dirname(discoveredProbeBinary) !== discoveredBinDir) {
-    await cp(discoveredProbeBinary, probeBinaryPath);
-  }
+  await cp(discoveredBinary, binaryPath);
+  await cp(discoveredProbeBinary, probeBinaryPath);
 
   if (process.platform !== "win32") {
     await chmod(binaryPath, 0o755);
@@ -132,12 +128,6 @@ async function main() {
 
 function execFfmpeg(path, args, options) {
   return spawnSync(path, args, options);
-}
-
-async function copyExtractedFfmpegDir(sourceDir, destinationDir) {
-  await cp(sourceDir, destinationDir, {
-    recursive: true,
-  });
 }
 
 async function checkFfmpeg(path) {

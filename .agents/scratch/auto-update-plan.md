@@ -37,11 +37,11 @@ The orchestrator runs all three OS workflows in parallel, collects their Actions
 
 The orchestrated GitHub Release contains exactly these six public assets:
 
-1. `OVRLEY-windows-x86_64-<version>-setup.exe`
-2. `OVRLEY-windows-x86_64-<version>-portable.zip`
-3. `OVRLEY-macos-aarch64-<version>.dmg`
-4. `OVRLEY-macos-aarch64-<version>.app.tar.gz`
-5. `OVRLEY-linux-x86_64-<version>.AppImage`
+1. `OVRLEY-windows-<version>.exe`
+2. `OVRLEY-windows-<version>-portable.zip`
+3. `OVRLEY-macos-<version>.dmg`
+4. `OVRLEY-macos-<version>.app.tar.gz`
+5. `OVRLEY-linux-<version>.AppImage`
 6. `latest.json`
 
 The generated `.sig` files are required build intermediates. They are transferred through Actions artifacts and consumed while generating `latest.json`, but are not uploaded as public GitHub Release assets. Their complete file contents are embedded in the corresponding manifest entries.
@@ -184,9 +184,9 @@ Build requirements:
 
 Normalize outputs to:
 
-- `OVRLEY-windows-x86_64-<version>-setup.exe`
+- `OVRLEY-windows-<version>.exe`
 - Its temporary `.sig`
-- `OVRLEY-windows-x86_64-<version>-portable.zip`
+- `OVRLEY-windows-<version>-portable.zip`
 
 Portable staging must:
 
@@ -225,8 +225,8 @@ Build requirements:
 
 Normalize outputs to:
 
-- `OVRLEY-macos-aarch64-<version>.dmg`
-- `OVRLEY-macos-aarch64-<version>.app.tar.gz`
+- `OVRLEY-macos-<version>.dmg`
+- `OVRLEY-macos-<version>.app.tar.gz`
 - Its temporary `.sig`
 
 Verify before upload:
@@ -259,7 +259,7 @@ Build requirements:
 
 Normalize outputs to:
 
-- `OVRLEY-linux-x86_64-<version>.AppImage`
+- `OVRLEY-linux-<version>.AppImage`
 - Its temporary `.sig`
 
 Verify before upload:

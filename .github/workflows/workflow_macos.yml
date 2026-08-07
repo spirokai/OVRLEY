@@ -161,8 +161,8 @@ jobs:
           [[ -n "$updater_source" && -s "$updater_source" ]] || { echo 'macOS updater archive is missing or empty.' >&2; exit 1; }
           [[ -s "$updater_source.sig" ]] || { echo 'macOS updater signature is missing or empty.' >&2; exit 1; }
 
-          dmg_name="OVRLEY-macos-aarch64-$version.dmg"
-          updater_name="OVRLEY-macos-aarch64-$version.app.tar.gz"
+          dmg_name="OVRLEY-macos-$version.dmg"
+          updater_name="OVRLEY-macos-$version.app.tar.gz"
           cp "$dmg_source" "dist-release/$dmg_name"
           cp "$updater_source" "dist-release/$updater_name"
           cp "$updater_source.sig" "dist-release/$updater_name.sig"
@@ -182,9 +182,9 @@ jobs:
         with:
           name: ovrley-macos-artifacts-${{ steps.release.outputs.tag }}
           path: |
-            dist-release/OVRLEY-macos-aarch64-${{ steps.release.outputs.tag }}.dmg
-            dist-release/OVRLEY-macos-aarch64-${{ steps.release.outputs.tag }}.app.tar.gz
-            dist-release/OVRLEY-macos-aarch64-${{ steps.release.outputs.tag }}.app.tar.gz.sig
+            dist-release/OVRLEY-macos-${{ steps.release.outputs.tag }}.dmg
+            dist-release/OVRLEY-macos-${{ steps.release.outputs.tag }}.app.tar.gz
+            dist-release/OVRLEY-macos-${{ steps.release.outputs.tag }}.app.tar.gz.sig
           if-no-files-found: error
 
       - name: Upload independent public macOS assets
@@ -194,8 +194,8 @@ jobs:
           draft: true
           tag_name: ${{ steps.release.outputs.tag }}
           files: |
-            dist-release/OVRLEY-macos-aarch64-${{ steps.release.outputs.tag }}.dmg
-            dist-release/OVRLEY-macos-aarch64-${{ steps.release.outputs.tag }}.app.tar.gz
+            dist-release/OVRLEY-macos-${{ steps.release.outputs.tag }}.dmg
+            dist-release/OVRLEY-macos-${{ steps.release.outputs.tag }}.app.tar.gz
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

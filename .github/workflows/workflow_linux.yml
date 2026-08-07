@@ -148,7 +148,7 @@ jobs:
           [[ -x "$appimage_source" ]] || { echo 'Linux AppImage is not executable.' >&2; exit 1; }
           [[ "$(basename "$appimage_source")" == "OVRLEY_${version}_"*.AppImage ]] || { echo 'Native Linux AppImage version does not match the release tag.' >&2; exit 1; }
 
-          appimage_name="OVRLEY-linux-x86_64-$version.AppImage"
+          appimage_name="OVRLEY-linux-$version.AppImage"
           cp "$appimage_source" "dist-release/$appimage_name"
           cp "$appimage_source.sig" "dist-release/$appimage_name.sig"
           chmod +x "dist-release/$appimage_name"
@@ -182,8 +182,8 @@ jobs:
         with:
           name: ovrley-linux-artifacts-${{ steps.release.outputs.tag }}
           path: |
-            dist-release/OVRLEY-linux-x86_64-${{ steps.release.outputs.tag }}.AppImage
-            dist-release/OVRLEY-linux-x86_64-${{ steps.release.outputs.tag }}.AppImage.sig
+            dist-release/OVRLEY-linux-${{ steps.release.outputs.tag }}.AppImage
+            dist-release/OVRLEY-linux-${{ steps.release.outputs.tag }}.AppImage.sig
           if-no-files-found: error
 
       - name: Upload independent public Linux asset
@@ -192,7 +192,7 @@ jobs:
         with:
           draft: true
           tag_name: ${{ steps.release.outputs.tag }}
-          files: dist-release/OVRLEY-linux-x86_64-${{ steps.release.outputs.tag }}.AppImage
+          files: dist-release/OVRLEY-linux-${{ steps.release.outputs.tag }}.AppImage
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
