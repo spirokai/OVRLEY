@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react'
+import { ChevronsRight, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
@@ -19,6 +19,8 @@ import { Progress } from '@/components/ui/progress'
  * @returns {JSX.Element|null} Rendered dialog or null when no update is active.
  */
 export default function UpdatePromptDialog({ open, phase, version, progress, progressPercent, progressLabel, onUpdateNow, onLater, onClose }) {
+  const currentVersion = import.meta.env.VITE_OVRLEY_VERSION?.trim() || '0.00.0'
+
   const downloading = phase === 'downloading'
   const failed = phase === 'failed'
   const determinate = progress?.mode === 'determinate'
@@ -36,16 +38,25 @@ export default function UpdatePromptDialog({ open, phase, version, progress, pro
             {failed ? 'Update failed' : downloading ? 'Downloading update' : 'Update available'}
           </DialogTitle>
         </div>
-        <DialogDescription className="mt-4 normal-case text-[0.9rem] font-light leading-5 text-muted-foreground">
-          {failed
-            ? 'The installed version remains available. You can close this dialog and continue working.'
-            : downloading
-              ? `Installing OVRLEY ${version}`
-              : `OVRLEY ${version} is ready to install.`}
+        <DialogDescription className="mt-6 normal-case text-[0.9rem] font-light leading-5 text-muted-foreground">
+          {failed ? (
+            'The installed version remains available. You can close this dialog and continue working.'
+          ) : downloading ? (
+            <span className="flex items-center justify-center gap-4 text-2xl font-bold text-foreground">
+              <span>{currentVersion}</span>
+              <ChevronsRight className="h-6 w-6 shrink-0 text-primary" aria-hidden="true" />
+              <span>{version}</span>
+            </span>
+          ) : (
+            <>
+              OVRLEY <span className="text-foreground font-bold">{version}</span> is now available.
+            </>
+          )}
         </DialogDescription>
 
         {downloading ? (
-          <div className="mt-5 space-y-2">
+          <div className="mt-3 space-y-2">
+            <p className="text-end text-xs text-muted-foreground tabular-nums">{determinate ? progressLabel : 'Downloading update...'}</p>
             {determinate ? (
               <Progress value={progressPercent} aria-label="Update download progress" />
             ) : (
@@ -53,7 +64,6 @@ export default function UpdatePromptDialog({ open, phase, version, progress, pro
                 <div className="bg-primary h-full w-1/3 animate-pulse rounded-full" />
               </div>
             )}
-            <p className="text-xs text-muted-foreground">{determinate ? progressLabel : 'Downloading update...'}</p>
           </div>
         ) : null}
 

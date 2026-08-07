@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
-import { DEBUG_MODE_ENABLED } from '@/lib/dev-config'
 import { readDownloadEvent, readUpdateMetadata } from '../utils/updateMetadata'
 import { formatUpdateProgress, getUpdateProgressPercent } from '../utils/updateProgress'
 
@@ -23,23 +22,6 @@ export default function useAppUpdate() {
   const dismissedRef = useRef(false)
 
   useEffect(() => {
-    const mockUpdate =
-      import.meta.env.DEV && DEBUG_MODE_ENABLED
-        ? {
-            version: '0.2.0',
-            downloadAndInstall: async () => {},
-          }
-        : null
-    if (mockUpdate) {
-      setState({
-        phase: 'available',
-        version: mockUpdate.version,
-        downloadAndInstall: mockUpdate.downloadAndInstall,
-        progress: null,
-        error: null,
-      })
-      return undefined
-    }
     if (!backend.hasTauriRuntime()) {
       return undefined
     }
