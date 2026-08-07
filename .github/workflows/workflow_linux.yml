@@ -121,34 +121,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Normalize FFmpeg libraries for AppImage packaging
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd vendor/ffmpeg/lib
-          for full in *.so.*.*.*; do
-            [ -e "$full" ] || continue
-            soname="${full%.*.*}"
-            unversioned="${soname%.*}"
-            rm -f "$soname" "$unversioned"
-            ln "$full" "$soname"
-          done
-          cd -
-          remaining="$(find vendor/ffmpeg/lib -maxdepth 1 -type l -print)"
-          if [ -n "$remaining" ]; then
-            echo "$remaining"
-            exit 1
-          fi
-          ls -li vendor/ffmpeg/lib/*.so*
-          LD_LIBRARY_PATH="$PWD/vendor/ffmpeg/lib" vendor/ffmpeg/bin/ffmpeg -version
-
       - name: Generate shared packaging resources
         run: pnpm prepare:packaging
 
       - name: Build signed Linux AppImage
-        run: pnpm tauri build --bundles appimage
+        run: pnpm tauri build --bundles appimage --verbose
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
+          NO_STRIP: '1'
           VITE_OVRLEY_VERSION: ${{ steps.release.outputs.tag }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -185,15 +165,12 @@ jobs:
           ffprobe_path="$(find "$appimage_root" -type f -path '*/vendor/ffmpeg/bin/ffprobe' -print -quit)"
           [[ -n "$ffmpeg_path" && -x "$ffmpeg_path" ]] || { echo 'Extracted AppImage is missing executable FFmpeg.' >&2; exit 1; }
           [[ -n "$ffprobe_path" && -x "$ffprobe_path" ]] || { echo 'Extracted AppImage is missing executable FFprobe.' >&2; exit 1; }
-          ffmpeg_root="$(dirname "$(dirname "$ffmpeg_path")")"
-          [[ -d "$ffmpeg_root/lib" ]] || { echo 'Extracted AppImage is missing FFmpeg libraries.' >&2; exit 1; }
-          [[ -d "$(dirname "$ffmpeg_path")" ]] || exit 1
           find "$appimage_root" -type d -path '*/fonts' -print -quit | grep -q . || { echo 'Extracted AppImage is missing fonts.' >&2; exit 1; }
           find "$appimage_root" -type d -path '*/templates' -print -quit | grep -q . || { echo 'Extracted AppImage is missing templates.' >&2; exit 1; }
           find "$appimage_root" -type f -name 'THIRD_PARTY_NOTICES.txt' -print -quit | grep -q . || { echo 'Extracted AppImage is missing third-party notices.' >&2; exit 1; }
           find "$appimage_root" -type f -name 'INSTALL.txt' -print -quit | grep -q . || { echo 'Extracted AppImage is missing Linux installation documentation.' >&2; exit 1; }
-          LD_LIBRARY_PATH="$(dirname "$ffmpeg_path")/../lib" "$ffmpeg_path" -version
-          LD_LIBRARY_PATH="$(dirname "$ffprobe_path")/../lib" "$ffprobe_path" -version >/dev/null
+          "$ffmpeg_path" -version
+          "$ffprobe_path" -version >/dev/null
 
           expected="$(printf '%s\n' "$appimage_name" "$appimage_name.sig" | sort)"
           actual="$(find dist-release -maxdepth 1 -type f -printf '%f\n' | sort)"

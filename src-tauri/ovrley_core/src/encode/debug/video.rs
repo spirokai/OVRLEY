@@ -226,7 +226,7 @@ pub(crate) fn write_sample_frame(
 ) -> CoreResult<()> {
     let png_path = debug_dir.join(format!("sample_{frame_index:04}.png"));
     let mut command = Command::new(ffmpeg_bin);
-    configure_ffmpeg_command(&mut command, ffmpeg_bin);
+    configure_ffmpeg_command(&mut command);
     command
         .arg("-loglevel")
         .arg("error")

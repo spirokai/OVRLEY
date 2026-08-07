@@ -144,12 +144,6 @@ async function copyPortableFfmpeg(destinationDir) {
     ),
     "Packaged FFprobe binary",
   );
-  if (process.platform === "linux") {
-    await ensureDirectory(
-      join(destinationFfmpegDir, "lib"),
-      "Packaged FFmpeg shared libraries",
-    );
-  }
 }
 
 async function copyGeneratedPackagingDocuments(destinationDir) {
@@ -257,12 +251,8 @@ function buildLinuxLauncher(runtimeBinaryName) {
     "set -eu",
     'APP_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)',
     'FFMPEG_BIN="$APP_DIR/vendor/ffmpeg/bin/ffmpeg"',
-    'FFMPEG_LIB_DIR="$APP_DIR/vendor/ffmpeg/lib"',
     'if [ -x "$FFMPEG_BIN" ]; then',
     '  export OVRLEY_FFMPEG="$FFMPEG_BIN"',
-    "fi",
-    'if [ -d "$FFMPEG_LIB_DIR" ]; then',
-    '  export LD_LIBRARY_PATH="$FFMPEG_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
     "fi",
     `exec "$APP_DIR/${runtimeBinaryName}" "$@"`,
     "",

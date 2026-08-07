@@ -1,5 +1,5 @@
 import { stat, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 export const PACKAGING_DOCUMENTS = {
@@ -62,7 +62,7 @@ function buildThirdPartyNotice(ffmpegBinaryPath) {
     "FFmpeg",
     "-------",
     "This OVRLEY distribution includes unmodified FFmpeg and FFprobe command-line binaries",
-    "and their required runtime libraries as separate components in the packaged resources.",
+    "as separate components in the packaged resources.",
     "",
     "OVRLEY invokes ffmpeg as a subprocess for video encoding and ffprobe as a subprocess",
     "for video metadata extraction. FFmpeg and FFprobe are not linked into the OVRLEY executable.",
@@ -122,7 +122,7 @@ function buildLinuxInstallDocument() {
     "",
     "Notes",
     "-----",
-    "The AppImage includes OVRLEY, FFmpeg, FFprobe, and their required runtime libraries.",
+    "The AppImage includes OVRLEY and self-contained FFmpeg and FFprobe command-line tools.",
     "",
   ].join("\n");
 }
@@ -130,7 +130,6 @@ function buildLinuxInstallDocument() {
 function runFfmpegCommand(binaryPath, args) {
   const result = spawnSync(binaryPath, args, {
     encoding: "utf8",
-    env: bundledFfmpegEnv(binaryPath),
   });
 
   if (result.error || result.status !== 0) {
@@ -140,14 +139,6 @@ function runFfmpegCommand(binaryPath, args) {
   }
 
   return result.stdout.trim();
-}
-
-function bundledFfmpegEnv(binaryPath) {
-  const env = { ...process.env };
-  if (process.platform === "linux") {
-    env.LD_LIBRARY_PATH = `${join(dirname(binaryPath), "..", "lib")}:${env.LD_LIBRARY_PATH ?? ""}`;
-  }
-  return env;
 }
 
 async function ensureFile(path, label) {

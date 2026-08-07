@@ -71,7 +71,7 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
         "-show_streams",
         file_path,
     ]);
-    configure_ffmpeg_command(&mut command, &ffprobe_path);
+    configure_ffmpeg_command(&mut command);
 
     let output = command
         .output()
