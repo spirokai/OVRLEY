@@ -157,14 +157,14 @@ jobs:
           rm -rf release-staging public-assets
           mkdir -p release-staging public-assets
           expected=(
-            "OVRLEY-windows-x86_64-${version}-setup.exe"
-            "OVRLEY-windows-x86_64-${version}-setup.exe.sig"
-            "OVRLEY-windows-x86_64-${version}-portable.zip"
-            "OVRLEY-macos-aarch64-${version}.dmg"
-            "OVRLEY-macos-aarch64-${version}.app.tar.gz"
-            "OVRLEY-macos-aarch64-${version}.app.tar.gz.sig"
-            "OVRLEY-linux-x86_64-${version}.AppImage"
-            "OVRLEY-linux-x86_64-${version}.AppImage.sig"
+            "OVRLEY-windows-${version}.exe"
+            "OVRLEY-windows-${version}.exe.sig"
+            "OVRLEY-windows-${version}-portable.zip"
+            "OVRLEY-macos-${version}.dmg"
+            "OVRLEY-macos-${version}.app.tar.gz"
+            "OVRLEY-macos-${version}.app.tar.gz.sig"
+            "OVRLEY-linux-${version}.AppImage"
+            "OVRLEY-linux-${version}.AppImage.sig"
           )
 
           while IFS= read -r source; do
@@ -223,17 +223,17 @@ jobs:
         run: |
           set -euo pipefail
           version="$RELEASE_VERSION"
-          cp "release-staging/OVRLEY-windows-x86_64-${version}-setup.exe" public-assets/
-          cp "release-staging/OVRLEY-windows-x86_64-${version}-portable.zip" public-assets/
-          cp "release-staging/OVRLEY-macos-aarch64-${version}.dmg" public-assets/
-          cp "release-staging/OVRLEY-macos-aarch64-${version}.app.tar.gz" public-assets/
-          cp "release-staging/OVRLEY-linux-x86_64-${version}.AppImage" public-assets/
+          cp "release-staging/OVRLEY-windows-${version}.exe" public-assets/
+          cp "release-staging/OVRLEY-windows-${version}-portable.zip" public-assets/
+          cp "release-staging/OVRLEY-macos-${version}.dmg" public-assets/
+          cp "release-staging/OVRLEY-macos-${version}.app.tar.gz" public-assets/
+          cp "release-staging/OVRLEY-linux-${version}.AppImage" public-assets/
           expected="$(printf '%s\n' \
-            "OVRLEY-windows-x86_64-${version}-setup.exe" \
-            "OVRLEY-windows-x86_64-${version}-portable.zip" \
-            "OVRLEY-macos-aarch64-${version}.dmg" \
-            "OVRLEY-macos-aarch64-${version}.app.tar.gz" \
-            "OVRLEY-linux-x86_64-${version}.AppImage" \
+            "OVRLEY-windows-${version}.exe" \
+            "OVRLEY-windows-${version}-portable.zip" \
+            "OVRLEY-macos-${version}.dmg" \
+            "OVRLEY-macos-${version}.app.tar.gz" \
+            "OVRLEY-linux-${version}.AppImage" \
             latest.json | sort)"
           actual="$(find public-assets -maxdepth 1 -type f -printf '%f\n' | sort)"
           [[ "$actual" == "$expected" ]] || { echo 'Public asset staging is not exactly canonical.' >&2; exit 1; }
@@ -271,11 +271,11 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$release_json"
           jq -e '.draft == true' "$release_json" >/dev/null || { echo 'Release is no longer a draft.' >&2; exit 1; }
           canonical_names=(
-            "OVRLEY-windows-x86_64-${RELEASE_VERSION}-setup.exe"
-            "OVRLEY-windows-x86_64-${RELEASE_VERSION}-portable.zip"
-            "OVRLEY-macos-aarch64-${RELEASE_VERSION}.dmg"
-            "OVRLEY-macos-aarch64-${RELEASE_VERSION}.app.tar.gz"
-            "OVRLEY-linux-x86_64-${RELEASE_VERSION}.AppImage"
+            "OVRLEY-windows-${RELEASE_VERSION}.exe"
+            "OVRLEY-windows-${RELEASE_VERSION}-portable.zip"
+            "OVRLEY-macos-${RELEASE_VERSION}.dmg"
+            "OVRLEY-macos-${RELEASE_VERSION}.app.tar.gz"
+            "OVRLEY-linux-${RELEASE_VERSION}.AppImage"
             latest.json
           )
           while IFS=$'\t' read -r asset_id asset_name; do
@@ -312,11 +312,11 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$release_json"
           jq -e '.draft == true' "$release_json" >/dev/null || { echo 'Release must remain a draft until validation completes.' >&2; exit 1; }
           expected="$(printf '%s\n' \
-            "OVRLEY-windows-x86_64-${RELEASE_VERSION}-setup.exe" \
-            "OVRLEY-windows-x86_64-${RELEASE_VERSION}-portable.zip" \
-            "OVRLEY-macos-aarch64-${RELEASE_VERSION}.dmg" \
-            "OVRLEY-macos-aarch64-${RELEASE_VERSION}.app.tar.gz" \
-            "OVRLEY-linux-x86_64-${RELEASE_VERSION}.AppImage" \
+            "OVRLEY-windows-${RELEASE_VERSION}.exe" \
+            "OVRLEY-windows-${RELEASE_VERSION}-portable.zip" \
+            "OVRLEY-macos-${RELEASE_VERSION}.dmg" \
+            "OVRLEY-macos-${RELEASE_VERSION}.app.tar.gz" \
+            "OVRLEY-linux-${RELEASE_VERSION}.AppImage" \
             latest.json | sort)"
           actual="$(jq -r '.assets[].name' "$release_json" | sort)"
           [[ "$actual" == "$expected" ]] || { echo 'Draft release asset inventory is not exactly the six intended public assets.' >&2; exit 1; }
@@ -327,9 +327,9 @@ jobs:
           owner="${GITHUB_REPOSITORY%%/*}"
           repo="${GITHUB_REPOSITORY##*/}"
           base_url="https://github.com/$owner/$repo/releases/download/$RELEASE_TAG"
-          jq -e --arg url "$base_url/OVRLEY-windows-x86_64-${RELEASE_VERSION}-setup.exe" '.platforms["windows-x86_64"].url == $url' public-assets/latest.json >/dev/null
-          jq -e --arg url "$base_url/OVRLEY-macos-aarch64-${RELEASE_VERSION}.app.tar.gz" '.platforms["darwin-aarch64"].url == $url' public-assets/latest.json >/dev/null
-          jq -e --arg url "$base_url/OVRLEY-linux-x86_64-${RELEASE_VERSION}.AppImage" '.platforms["linux-x86_64"].url == $url' public-assets/latest.json >/dev/null
+          jq -e --arg url "$base_url/OVRLEY-windows-${RELEASE_VERSION}.exe" '.platforms["windows-x86_64"].url == $url' public-assets/latest.json >/dev/null
+          jq -e --arg url "$base_url/OVRLEY-macos-${RELEASE_VERSION}.app.tar.gz" '.platforms["darwin-aarch64"].url == $url' public-assets/latest.json >/dev/null
+          jq -e --arg url "$base_url/OVRLEY-linux-${RELEASE_VERSION}.AppImage" '.platforms["linux-x86_64"].url == $url' public-assets/latest.json >/dev/null
 
       - name: Publish the validated release
         shell: bash
