@@ -3,11 +3,6 @@
     "enableGTKAppId": true
   },
   "bundle": {
-    "linux": {
-      "appimage": {
-        "bundleMediaFramework": true
-      }
-    },
     "resources": {
       "../INSTALL-linux.txt": "INSTALL.txt"
     }
