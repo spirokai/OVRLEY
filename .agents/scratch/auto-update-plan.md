@@ -37,8 +37,8 @@ The orchestrator runs all three OS workflows in parallel, collects their Actions
 
 The orchestrated GitHub Release contains exactly these six public assets:
 
-1. `OVRLEY-windows-<version>.exe`
-2. `OVRLEY-windows-<version>-portable.zip`
+1. `OVRLEY-win-<version>.exe`
+2. `OVRLEY-win-<version>-portable.zip`
 3. `OVRLEY-macos-<version>.dmg`
 4. `OVRLEY-macos-<version>.app.tar.gz`
 5. `OVRLEY-linux-<version>.AppImage`
@@ -184,9 +184,9 @@ Build requirements:
 
 Normalize outputs to:
 
-- `OVRLEY-windows-<version>.exe`
+- `OVRLEY-win-<version>.exe`
 - Its temporary `.sig`
-- `OVRLEY-windows-<version>-portable.zip`
+- `OVRLEY-win-<version>-portable.zip`
 
 Portable staging must:
 
