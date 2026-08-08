@@ -141,8 +141,31 @@ fn candidate_columns<'a>(
                 && column_unit(column, units_row).is_some()
         })
         .collect::<Vec<_>>();
-    candidates.sort_by_key(|column| (column.priority, column.index));
+    candidates.sort_by_key(|column| {
+        (
+            power_unit_priority(metric, column_unit(column, units_row)),
+            column.priority,
+            column.index,
+        )
+    });
     candidates
+}
+
+/// Prefers explicit watt power sources over kilowatts and metric horsepower.
+///
+/// Each source remains a single selected column; this only ranks otherwise
+/// compatible alternatives for the same canonical metric.
+fn power_unit_priority(metric: Metric, unit: Option<Unit>) -> u8 {
+    if metric != Metric::Power {
+        return 0;
+    }
+
+    match unit {
+        Some(Unit::Watts) => 0,
+        Some(Unit::Kilowatts) => 1,
+        Some(Unit::MetricHorsepower) => 2,
+        _ => u8::MAX,
+    }
 }
 
 /// Parses, converts, and validates one metric observation.
@@ -215,7 +238,14 @@ fn validate(metric: Metric, value: f64) -> Option<f64> {
     match metric {
         Metric::Latitude if !(-90.0..=90.0).contains(&value) => None,
         Metric::Longitude if !(-180.0..=180.0).contains(&value) => None,
-        Metric::Speed | Metric::Distance | Metric::DistanceToHome | Metric::Rpm if value < 0.0 => {
+        Metric::Speed
+        | Metric::Distance
+        | Metric::DistanceToHome
+        | Metric::Rpm
+        | Metric::Power
+        | Metric::Torque
+            if value < 0.0 =>
+        {
             None
         }
         Metric::ThrottlePosition | Metric::BrakePosition if !(0.0..=100.0).contains(&value) => None,

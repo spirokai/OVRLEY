@@ -777,6 +777,47 @@ fn vehicle_sources_and_accelerator_pedals_win_and_controls_normalize_by_column()
 }
 
 #[test]
+fn enriched_vehicle_columns_feed_existing_canonical_metrics() {
+    let csv = "Time,Estimated Torque (Nm),Estimated Power (kW),Estimated Power (CV),Estimated Gear,RPM,Throttle Position (%)\n\
+0,35.5,10.0,20.0,4,3214,27.5\n\
+1,,,,5,,\n\
+2,,,,,,\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "enriched.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.torque, vec![Some(35.5), None, None]);
+    assert_eq!(activity.power, vec![Some(10_000.0), None, None]);
+    assert_eq!(
+        activity.gear_position,
+        vec![Some("4".to_string()), Some("5".to_string()), None]
+    );
+    assert_eq!(activity.rpm, vec![Some(3214.0), None, None]);
+    assert_eq!(activity.throttle_position, vec![Some(27.5), None, None]);
+
+    let cv_csv = "Time,Estimated Power (CV)\n0,20.0\n1,\n";
+    let cv_activity = parse_csv_activity_reader(Cursor::new(cv_csv), "cv.csv")
+        .unwrap()
+        .parsed_activity;
+    assert_close(cv_activity.power[0], 14_709.975);
+    assert_eq!(cv_activity.power[1], None);
+}
+
+#[test]
+fn explicit_watts_outrank_kw_and_cv_power_sources() {
+    let csv = "Time,Estimated Power (CV),Power (kW),Power (W)\n\
+0,20,10,12345\n\
+1,21,11,23456\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "power-priority.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.power, vec![Some(12_345.0), Some(23_456.0)]);
+}
+
+#[test]
 fn acceleration_axes_preserve_signs_and_scalar_uses_the_agreed_precedence() {
     let semantic_csv =
         "Time,Lateral acceleration (G),Longitudinal acceleration (G),Lean angle (deg)\n\

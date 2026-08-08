@@ -267,6 +267,8 @@ pub(super) fn build_activity_columns(
         heading: preserve_heading_gaps,
     };
     let (rpm, _) = series(Metric::Rpm);
+    let (power, _) = series(Metric::Power);
+    let (torque, _) = series(Metric::Torque);
     let (throttle_position, _) = series(Metric::ThrottlePosition);
     let (brake_position, _) = series(Metric::BrakePosition);
     let (source_lap_number, _) = series(Metric::LapNumber);
@@ -373,13 +375,13 @@ pub(super) fn build_activity_columns(
         include_original_sample_count_metadata: false,
         heartrate: empty(),
         cadence: empty(),
-        power: empty(),
+        power,
         temperature: empty(),
         calories: empty(),
         gradient: empty(),
         pace: empty(),
         vertical_speed: empty(),
-        torque: empty(),
+        torque,
         stroke_rate: empty(),
         stride_length: empty(),
         vertical_oscillation: empty(),
