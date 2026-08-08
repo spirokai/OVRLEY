@@ -1,9 +1,9 @@
 import { getPreviewFontFamily, getPreviewTextBaseline, getPreviewVerticalMetrics, measurePreviewText } from '../../shared/textMeasurement'
 import { getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
-import { getLapTimerDisplayValue } from './lapTimer'
+import { getLapTimerDisplayState } from './lapTimer'
 
 /**
- * Builds the intrinsic text layout for a Current Lap or Best Lap widget.
+ * Builds the intrinsic text layout for a lap timer widget.
  * @param {object} params
  * @param {object} params.widget - Lap timer widget configuration.
  * @param {object|null} params.activity - Parsed activity with lap timing data.
@@ -13,7 +13,8 @@ import { getLapTimerDisplayValue } from './lapTimer'
 export function buildLapTimerPreviewModel({ widget, activity, previewSecond }) {
   const fontFamily = getPreviewFontFamily(widget.data.font)
   const displayActivity = getPreviewActivity(activity, previewSecond)
-  const valueText = getLapTimerDisplayValue(displayActivity, previewSecond, widget.data.lap_timer_mode)
+  const displayState = getLapTimerDisplayState(displayActivity, previewSecond, widget.data.lap_timer_mode)
+  const valueText = displayState.valueText
   const valueLineHeight = widget.data.font_size * 0.92
   const valueMeasure = measurePreviewText(valueText, widget.data.font_size, fontFamily)
   const valueVerticalMetrics = getPreviewVerticalMetrics(valueText, widget.data.font_size, fontFamily)
@@ -49,8 +50,14 @@ export function buildLapTimerPreviewModel({ widget, activity, previewSecond }) {
   return {
     content: {
       type: 'lap_timer',
-      labelText: showLabel ? widget.data.label : '',
+      labelText: showLabel ? widget.data.label.toUpperCase() : '',
       valueText,
+      valueColor:
+        widget.data.lap_timer_mode === 'delta'
+          ? displayState.useNegativeDeltaColor
+            ? widget.data.negative_delta_color
+            : widget.data.positive_delta_color
+          : widget.data.color,
       labelFontSize,
       labelBaseline,
       valueBaseline,

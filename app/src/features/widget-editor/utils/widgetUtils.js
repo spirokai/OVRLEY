@@ -170,14 +170,11 @@ export function createMetricValueDefaults(type, globalDefaults, selection = {}) 
   if (type === 'lap_timer') {
     const mode = LAP_TIMER_MODES.find((candidate) => candidate.value === lapTimerMode)
     if (!mode) throw new Error(`Unsupported lap timer mode: ${lapTimerMode}`)
-    const deltaColor = getGlobalColor(globalDefaults, 'color_values')
     return {
       ...createSharedMetricDefaults(type, globalDefaults, 'lap_timer', font),
       ...LAP_TIMER_DEFAULTS,
       lap_timer_mode: mode.value,
       label: mode.label,
-      positive_delta_color: deltaColor,
-      negative_delta_color: deltaColor,
     }
   }
 

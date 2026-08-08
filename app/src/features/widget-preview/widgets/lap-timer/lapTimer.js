@@ -1,3 +1,6 @@
+import { interpolateNumericSeries, MISSING_SAMPLE_POLICY } from '@/lib/interpolation'
+import { getHoldSeriesValue } from '@/features/overlay-editor/utils/overlayEditorUtils'
+
 const PLACEHOLDER = '--:--.--'
 
 /**
@@ -17,6 +20,22 @@ export function formatLapDuration(durationSeconds) {
 }
 
 /**
+ * Formats a delta with an explicit sign and two decimals.
+ * @param {number|null} deltaSeconds - Delta in seconds, or null before a reference exists.
+ * @returns {string} Formatted delta.
+ */
+export function formatLapDelta(deltaSeconds) {
+  if (deltaSeconds === null || deltaSeconds === 0) return '+0.00'
+  const roundedMagnitude = Math.round(Math.abs(deltaSeconds) * 100) / 100
+  return `${deltaSeconds < 0 ? '-' : '+'}${roundedMagnitude.toFixed(2)}`
+}
+
+function getDeltaAt(activity, previewSecond) {
+  if (activity === null) return null
+  return interpolateNumericSeries(activity.sample_elapsed_seconds, activity.delta_to_best_lap_seconds, previewSecond, MISSING_SAMPLE_POLICY.PRESERVE)
+}
+
+/**
  * Resolves the lap timer state at an activity timestamp.
  * @param {object|null} activity - Parsed activity with lap timing fields.
  * @param {number} previewSecond - Absolute activity timestamp in seconds.
@@ -24,19 +43,20 @@ export function formatLapDuration(durationSeconds) {
  */
 export function getLapTimerState(activity, previewSecond) {
   if (activity === null) return { lapNumber: -1, currentLapTime: null, bestLapTime: null }
+  const lapNumber = getHoldSeriesValue(activity.sample_elapsed_seconds, activity.lap_number, previewSecond)
+  if (lapNumber === null) throw new Error(`Lap number is missing at ${previewSecond} seconds`)
+
   let startedLapCount = 0
   for (const lapStart of activity.lap_start_elapsed_seconds) {
     if (lapStart <= previewSecond) startedLapCount += 1
     else break
   }
-  if (startedLapCount === 0) return { lapNumber: -1, currentLapTime: null, bestLapTime: null }
+  const completedLapCount = Math.max(startedLapCount - 1, 0)
+  const currentLapTime = lapNumber >= 0 ? previewSecond - activity.lap_start_elapsed_seconds[lapNumber] : null
+  if (completedLapCount === 0) return { lapNumber, currentLapTime, bestLapTime: null }
 
-  const lapNumber = startedLapCount - 1
-  const currentLapTime = previewSecond - activity.lap_start_elapsed_seconds[lapNumber]
-  if (lapNumber === 0) return { lapNumber, currentLapTime, bestLapTime: null }
-
-  const bestLapTime = activity.lap_durations_best_so_far_seconds[lapNumber - 1]
-  if (bestLapTime === undefined) throw new Error(`Best lap metadata is missing for completed lap ${lapNumber}`)
+  const bestLapTime = activity.lap_durations_best_so_far_seconds[completedLapCount - 1]
+  if (bestLapTime === undefined) throw new Error(`Best lap metadata is missing for completed lap ${completedLapCount}`)
   return { lapNumber, currentLapTime, bestLapTime }
 }
 
@@ -44,12 +64,35 @@ export function getLapTimerState(activity, previewSecond) {
  * Returns the display value for a lap timer widget.
  * @param {object|null} activity - Parsed activity with lap timing fields.
  * @param {number} previewSecond - Absolute activity timestamp in seconds.
- * @param {'current_lap'|'best_lap'} mode - Lap timer readout mode.
+ * @param {'current_lap'|'best_lap'|'delta'} mode - Lap timer readout mode.
+ * @returns {{ valueText: string, useNegativeDeltaColor: boolean }} Formatted widget state.
+ */
+export function getLapTimerDisplayState(activity, previewSecond, mode) {
+  if (mode === 'delta') {
+    const delta = getDeltaAt(activity, previewSecond)
+    return { valueText: formatLapDelta(delta), useNegativeDeltaColor: delta === null || delta <= 0 }
+  }
+  if (mode !== 'current_lap' && mode !== 'best_lap') throw new Error(`Unsupported lap timer mode: ${mode}`)
+  const state = getLapTimerState(activity, previewSecond)
+  if (state.lapNumber < 0) {
+    return {
+      valueText: mode === 'best_lap' && state.bestLapTime !== null ? formatLapDuration(state.bestLapTime) : PLACEHOLDER,
+      useNegativeDeltaColor: false,
+    }
+  }
+  return {
+    valueText: formatLapDuration(mode === 'current_lap' ? state.currentLapTime : (state.bestLapTime ?? state.currentLapTime)),
+    useNegativeDeltaColor: false,
+  }
+}
+
+/**
+ * Returns the formatted display value for a lap timer widget.
+ * @param {object|null} activity - Parsed activity with lap timing fields.
+ * @param {number} previewSecond - Absolute activity timestamp in seconds.
+ * @param {'current_lap'|'best_lap'|'delta'} mode - Lap timer readout mode.
  * @returns {string} Formatted widget value.
  */
 export function getLapTimerDisplayValue(activity, previewSecond, mode) {
-  if (mode !== 'current_lap' && mode !== 'best_lap') throw new Error(`Unsupported lap timer mode: ${mode}`)
-  const state = getLapTimerState(activity, previewSecond)
-  if (state.lapNumber < 0) return PLACEHOLDER
-  return formatLapDuration(mode === 'current_lap' ? state.currentLapTime : (state.bestLapTime ?? state.currentLapTime))
+  return getLapTimerDisplayState(activity, previewSecond, mode).valueText
 }

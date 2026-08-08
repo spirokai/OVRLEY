@@ -39,10 +39,24 @@ describe('template snapshot standard metric schema', () => {
       lap_timer_mode: 'best_lap',
       show_label: true,
       label: 'Best Lap',
-      positive_delta_color: '#ffffff',
-      negative_delta_color: '#ffffff',
+      positive_delta_color: '#ff6e83',
+      negative_delta_color: '#61ffab',
     })
     expect(normalized.values[0]).not.toHaveProperty('display_variants')
+  })
+
+  test('creates Delta with its label and manifest colors instead of the global text color', () => {
+    const lapTimer = createMetricValueDefaults('lap_timer', { color_values: '#ffffff' }, { lapTimerMode: 'delta' })
+
+    expect(lapTimer).toMatchObject({
+      value: 'lap_timer',
+      display_type: 'lap_timer',
+      lap_timer_mode: 'delta',
+      show_label: true,
+      label: 'Delta',
+      positive_delta_color: '#ff6e83',
+      negative_delta_color: '#61ffab',
+    })
   })
 
   test('partitions lean-angle shared defaults from variant geometry', () => {

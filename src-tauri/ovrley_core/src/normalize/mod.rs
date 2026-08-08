@@ -253,6 +253,16 @@ impl ValidatedRenderConfig {
                 }
                 continue;
             }
+            if let PreparedValue::LapTimer(widget) = value {
+                match widget.mode {
+                    LapTimerMode::CurrentLap | LapTimerMode::BestLap => {
+                        requirements.lap_number = true;
+                        requirements.lap_time_seconds = true;
+                    }
+                    LapTimerMode::Delta => requirements.delta_to_best_lap_seconds = true,
+                }
+                continue;
+            }
             match value.metric_kind() {
                 MetricKind::Speed => requirements.speed = true,
                 MetricKind::Distance => requirements.distance = true,
@@ -302,10 +312,7 @@ impl ValidatedRenderConfig {
                 MetricKind::Heading => requirements.heading = true,
                 MetricKind::Time => requirements.time = true,
                 MetricKind::Calories => requirements.calories = true,
-                MetricKind::LapTimer => {
-                    requirements.lap_number = true;
-                    requirements.lap_time_seconds = true;
-                }
+                MetricKind::LapTimer => unreachable!("lap_timer must use dedicated validation"),
             }
         }
 

@@ -1,4 +1,4 @@
-//! Current and best lap timer text widgets.
+//! Lap timer text widgets.
 
 use super::types::{LapTimerWidgetCache, StaticLayer};
 use crate::activity::schema::DenseActivityReport;
@@ -11,6 +11,7 @@ use crate::render::text::{
     measure_text_with_font, resolve_font, ResolvedTextStyle,
 };
 use skia_safe::Canvas;
+use skia_safe::Color;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
@@ -32,6 +33,17 @@ pub fn format_lap_duration(duration_seconds: f64) -> String {
         format!("{hours:02}:{minutes:02}:{seconds:02}.{remainder:02}")
     } else {
         format!("{minutes:02}:{seconds:02}.{remainder:02}")
+    }
+}
+
+pub fn format_lap_delta(delta_seconds: Option<f64>) -> String {
+    match delta_seconds {
+        Some(delta) => {
+            let sign = if delta < 0.0 { '-' } else { '+' };
+            let rounded_magnitude = (delta.abs() * 100.0).round() / 100.0;
+            format!("{sign}{rounded_magnitude:.2}")
+        }
+        None => "+0.00".to_string(),
     }
 }
 
@@ -60,14 +72,40 @@ fn lap_time_at(
         })
 }
 
+fn delta_at(dense_activity: &DenseActivityReport, frame_index: usize) -> CoreResult<Option<f64>> {
+    dense_activity
+        .series
+        .delta_to_best_lap_seconds
+        .get(frame_index)
+        .copied()
+        .ok_or_else(|| {
+            CoreError::Render(format!(
+                "delta_to_best_lap_seconds is missing at frame {frame_index}"
+            ))
+        })
+}
+
+fn delta_color(
+    positive_color: [u8; 4],
+    negative_color: [u8; 4],
+    delta_seconds: Option<f64>,
+) -> [u8; 4] {
+    if delta_seconds.is_some_and(|delta| delta > 0.0) {
+        positive_color
+    } else {
+        negative_color
+    }
+}
+
+fn lap_timer_label_text(label: &str) -> String {
+    label.to_uppercase()
+}
+
 fn best_lap_text(
     dense_activity: &DenseActivityReport,
     lap_number: i64,
     current_lap_time: f64,
 ) -> CoreResult<String> {
-    if lap_number < 0 {
-        return Ok(PLACEHOLDER.to_string());
-    }
     if lap_number == 0 {
         return Ok(format_lap_duration(current_lap_time));
     }
@@ -89,19 +127,48 @@ pub fn lap_timer_value_text(
     dense_activity: &DenseActivityReport,
     frame_index: usize,
 ) -> CoreResult<String> {
+    if mode == LapTimerMode::Delta {
+        return delta_at(dense_activity, frame_index).map(format_lap_delta);
+    }
     let lap_number = lap_number_at(dense_activity, frame_index)?;
     let current_lap_time = lap_time_at(dense_activity, frame_index)?;
     if lap_number < 0 {
-        return Ok(PLACEHOLDER.to_string());
+        if mode == LapTimerMode::CurrentLap {
+            return Ok(PLACEHOLDER.to_string());
+        }
+        let frame_elapsed = dense_activity
+            .frame_elapsed_seconds
+            .get(frame_index)
+            .copied()
+            .ok_or_else(|| {
+                CoreError::Render(format!(
+                    "frame_elapsed_seconds is missing at frame {frame_index}"
+                ))
+            })?;
+        let completed_lap_count = dense_activity
+            .series
+            .lap_start_elapsed_seconds
+            .partition_point(|lap_start| *lap_start <= frame_elapsed)
+            .saturating_sub(1);
+        return if completed_lap_count == 0 {
+            Ok(PLACEHOLDER.to_string())
+        } else {
+            state_value_text(dense_activity, completed_lap_count)
+        };
     }
-    let current_lap_time = current_lap_time.ok_or_else(|| {
-        CoreError::Render(format!(
-            "active lap {lap_number} is missing lap_time_seconds at frame {frame_index}"
-        ))
-    })?;
+    let require_current_lap_time = || {
+        current_lap_time.ok_or_else(|| {
+            CoreError::Render(format!(
+                "active lap {lap_number} is missing lap_time_seconds at frame {frame_index}"
+            ))
+        })
+    };
     match mode {
-        LapTimerMode::CurrentLap => Ok(format_lap_duration(current_lap_time)),
-        LapTimerMode::BestLap => best_lap_text(dense_activity, lap_number, current_lap_time),
+        LapTimerMode::CurrentLap => require_current_lap_time().map(format_lap_duration),
+        LapTimerMode::BestLap => {
+            best_lap_text(dense_activity, lap_number, require_current_lap_time()?)
+        }
+        LapTimerMode::Delta => unreachable!("delta mode returns before lap-time resolution"),
     }
 }
 
@@ -128,14 +195,18 @@ fn draw_content(
     label: &str,
     show_label: bool,
     value: &str,
+    value_color: Option<Color>,
     font_dirs: &[PathBuf],
 ) -> CoreResult<()> {
-    let (label_style, value_style) = content_styles(style, show_label);
+    let (label_style, mut value_style) = content_styles(style, show_label);
     if let Some(label_style) = label_style {
         draw_text_with_vertical_metrics_text(canvas, label, label, &label_style, font_dirs)?;
     }
 
-    draw_text_with_vertical_metrics_text(canvas, value, "0123456789-:.", &value_style, font_dirs)
+    if let Some(value_color) = value_color {
+        value_style.color = value_color;
+    }
+    draw_text_with_vertical_metrics_text(canvas, value, "0123456789+-:.", &value_style, font_dirs)
 }
 
 fn content_styles(
@@ -212,13 +283,20 @@ fn prepare_content_layer(
     value: &str,
     font_dirs: &[PathBuf],
 ) -> CoreResult<StaticLayer> {
+    let label = lap_timer_label_text(label);
     let (label_style, value_style) = content_styles(style, show_label);
     let mut bounds = None;
     if let Some(label_style) = label_style {
-        include_text_bounds(&mut bounds, label, label, &label_style, font_dirs)?;
+        include_text_bounds(&mut bounds, &label, &label, &label_style, font_dirs)?;
     }
 
-    include_text_bounds(&mut bounds, value, "0123456789-:.", &value_style, font_dirs)?;
+    include_text_bounds(
+        &mut bounds,
+        value,
+        "0123456789+-:.",
+        &value_style,
+        font_dirs,
+    )?;
 
     let (min_x, min_y, max_x, max_y) = bounds
         .ok_or_else(|| CoreError::Render("lap timer cache content has no drawable text".into()))?;
@@ -236,9 +314,10 @@ fn prepare_content_layer(
     draw_content(
         surface.canvas(),
         &local_style,
-        label,
+        &label,
         show_label,
         value,
+        None,
         font_dirs,
     )?;
 
@@ -317,19 +396,34 @@ pub fn draw_lap_timer(
     }
 
     let value = lap_timer_value_text(validated.mode, dense_activity, frame_index)?;
+    let label = lap_timer_label_text(&validated.label);
+    let value_color = if validated.mode == LapTimerMode::Delta {
+        let color = delta_color(
+            validated.positive_delta_color,
+            validated.negative_delta_color,
+            delta_at(dense_activity, frame_index)?,
+        );
+        Some(Color::from_argb(color[3], color[0], color[1], color[2]))
+    } else {
+        None
+    };
     draw_content(
         canvas,
         style,
-        &validated.label,
+        &label,
         validated.show_label,
         &value,
+        value_color,
         font_dirs,
     )
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{format_lap_duration, prepare_content_layer};
+    use super::{
+        delta_color, format_lap_delta, format_lap_duration, lap_timer_label_text,
+        prepare_content_layer,
+    };
     use crate::render::text::ResolvedTextStyle;
     use skia_safe::Color;
 
@@ -338,6 +432,31 @@ mod tests {
         assert_eq!(format_lap_duration(3.456), "00:03.46");
         assert_eq!(format_lap_duration(3599.999), "01:00:00.00");
         assert_eq!(format_lap_duration(3661.2), "01:01:01.20");
+    }
+
+    #[test]
+    fn formats_delta_with_an_explicit_sign_and_positive_zero() {
+        assert_eq!(format_lap_delta(None), "+0.00");
+        assert_eq!(format_lap_delta(Some(0.0)), "+0.00");
+        assert_eq!(format_lap_delta(Some(0.125)), "+0.13");
+        assert_eq!(format_lap_delta(Some(-0.125)), "-0.13");
+    }
+
+    #[test]
+    fn uses_negative_color_for_missing_and_zero_delta() {
+        let positive = [0, 255, 0, 255];
+        let negative = [255, 0, 0, 255];
+
+        assert_eq!(delta_color(positive, negative, None), negative);
+        assert_eq!(delta_color(positive, negative, Some(0.0)), negative);
+        assert_eq!(delta_color(positive, negative, Some(0.25)), positive);
+        assert_eq!(delta_color(positive, negative, Some(-0.25)), negative);
+    }
+
+    #[test]
+    fn capitalizes_lap_timer_labels_for_rendering() {
+        assert_eq!(lap_timer_label_text("current lap"), "CURRENT LAP");
+        assert_eq!(lap_timer_label_text("Delta"), "DELTA");
     }
 
     #[test]

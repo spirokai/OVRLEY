@@ -11,7 +11,6 @@ use crate::interpolation::interpolate_points;
 /// Sample-aligned lap IDs plus the exact elapsed time of each lap boundary.
 struct ResolvedLaps {
     lap_number: Vec<i64>,
-    timing_lap_number: Vec<i64>,
     lap_start_elapsed: Vec<f64>,
 }
 
@@ -67,7 +66,7 @@ pub fn derive_lap_timing(
     let resolved = resolve_laps(elapsed_series, course, lap_number_source, lap_markers);
     let (lap_time_seconds, lap_durations_seconds) = compute_lap_times(
         elapsed_series,
-        &resolved.timing_lap_number,
+        &resolved.lap_number,
         &resolved.lap_start_elapsed,
     );
     let best_lap_time_seconds = lap_durations_seconds
@@ -77,7 +76,7 @@ pub fn derive_lap_timing(
     let lap_durations_best_so_far_seconds = compute_best_so_far(&lap_durations_seconds);
     let delta_to_best_lap_seconds = compute_delta_to_best(
         distance_series,
-        &resolved.timing_lap_number,
+        &resolved.lap_number,
         &lap_time_seconds,
         &lap_durations_seconds,
         &lap_durations_best_so_far_seconds,
@@ -121,7 +120,6 @@ fn resolve_laps(
         LapMarkers::TimingMarkers(markers) => resolve_from_timing_markers(elapsed, course, markers),
         LapMarkers::None => ResolvedLaps {
             lap_number: vec![-1; elapsed.len()],
-            timing_lap_number: vec![-1; elapsed.len()],
             lap_start_elapsed: Vec::new(),
         },
     }
@@ -129,7 +127,6 @@ fn resolve_laps(
 
 fn resolve_from_source(elapsed: &[f64], lap_number_source: &[Option<i64>]) -> ResolvedLaps {
     let mut lap_number = Vec::with_capacity(lap_number_source.len());
-    let mut timing_lap_number = Vec::with_capacity(lap_number_source.len());
     let mut lap_start_elapsed = Vec::new();
     let mut current_source_lap = -1;
     let mut current_timing_lap = -1;
@@ -146,13 +143,11 @@ fn resolve_from_source(elapsed: &[f64], lap_number_source: &[Option<i64>]) -> Re
             }
             current_source_lap = source_lap;
         }
-        lap_number.push(current_source_lap);
-        timing_lap_number.push(current_timing_lap);
+        lap_number.push(current_timing_lap);
     }
 
     ResolvedLaps {
         lap_number,
-        timing_lap_number,
         lap_start_elapsed,
     }
 }
@@ -161,7 +156,6 @@ fn resolve_from_beacons(elapsed: &[f64], beacons: &[f64]) -> ResolvedLaps {
     if beacons.is_empty() {
         return ResolvedLaps {
             lap_number: vec![-1; elapsed.len()],
-            timing_lap_number: vec![-1; elapsed.len()],
             lap_start_elapsed: Vec::new(),
         };
     }
@@ -186,7 +180,6 @@ fn resolve_from_beacons(elapsed: &[f64], beacons: &[f64]) -> ResolvedLaps {
         .take_while(|beacon| *beacon <= last_elapsed)
         .collect();
     ResolvedLaps {
-        timing_lap_number: lap_number.clone(),
         lap_number,
         lap_start_elapsed,
     }
@@ -205,7 +198,6 @@ fn resolve_from_timing_markers(
     if start_markers.is_empty() || course.len() < 2 {
         return ResolvedLaps {
             lap_number: vec![-1; course.len()],
-            timing_lap_number: vec![-1; course.len()],
             lap_start_elapsed: Vec::new(),
         };
     }
@@ -256,7 +248,6 @@ fn resolve_from_timing_markers(
     }
 
     ResolvedLaps {
-        timing_lap_number: lap_number.clone(),
         lap_number,
         lap_start_elapsed,
     }
@@ -503,12 +494,12 @@ mod tests {
         let distance: Vec<Option<f64>> =
             vec![Some(0.0), Some(10.0), Some(20.0), Some(30.0), Some(40.0)];
         let course = vec![(None, None); 5];
-        let source = vec![Some(0), Some(0), Some(1), Some(1), None];
+        let source = vec![Some(-1), Some(-1), Some(1), Some(1), Some(2)];
 
         let result = derive_lap_timing(&elapsed, &distance, &course, &source, &LapMarkers::None);
 
-        assert_eq!(result.lap_number, vec![0, 0, 1, 1, 1]);
-        assert!(result.lap_time_seconds[0].unwrap() >= 0.0);
+        assert_eq!(result.lap_number, vec![-1, -1, 0, 0, 1]);
+        assert_eq!(result.lap_time_seconds[0], None);
         assert!(result.lap_time_seconds[2].unwrap() >= 0.0);
         assert!(result.lap_durations_seconds.len() >= 1);
     }

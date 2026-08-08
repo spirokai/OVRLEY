@@ -60,12 +60,13 @@
         "layoutMode": "intrinsic",
         "defaults": {
           "show_label": true,
-          "positive_delta_color": "#ffffff",
-          "negative_delta_color": "#ffffff"
+          "negative_delta_color": "#61ffab",
+          "positive_delta_color": "#ff6e83"
         },
         "modes": [
           { "value": "current_lap", "label": "Current Lap" },
-          { "value": "best_lap", "label": "Best Lap" }
+          { "value": "best_lap", "label": "Best Lap" },
+          { "value": "delta", "label": "Delta" }
         ],
         "configFields": ["lap_timer_mode", "label"]
       },

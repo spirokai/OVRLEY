@@ -6,7 +6,7 @@ import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
 import { useFontMetrics } from '../../shared/useFontMetrics'
 
 /**
- * Renders a Current Lap or Best Lap text widget.
+ * Renders a lap timer text widget.
  * @param {object} props - Widget preview props.
  * @returns {JSX.Element} Lap timer SVG preview.
  */
@@ -44,7 +44,7 @@ export function OverlayLapTimerWidget({ widget, activity, previewSecond, globalO
         text={content.valueText}
         x={visualBounds.offsetX}
         baseline={content.valueBaseline + visualBounds.offsetY}
-        color={widget.data.color}
+        color={content.valueColor}
         fontFamily={fontFamily}
         fontSize={widget.data.font_size}
         opacity={opacity}
