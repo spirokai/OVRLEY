@@ -59,6 +59,7 @@ describe('standard metric widget catalog', () => {
       'throttle_position',
       'brake_position',
       'lean_angle',
+      'lap_timer',
     ])
     expect(STANDARD_METRIC_WIDGET_TYPES).toEqual(expect.arrayContaining(CURRENT_STANDARD_METRIC_WIDGET_TYPES))
 

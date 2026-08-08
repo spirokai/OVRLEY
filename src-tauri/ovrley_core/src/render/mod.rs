@@ -27,7 +27,8 @@ use crate::render::format::frame_index_for_second;
 use crate::render::static_layer::{cached_labels_image, config_has_static_metric_icons};
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
 use crate::render::text::{
-    validated_gradient_style, validated_time_style, validated_value_style, ResolvedTextStyle,
+    validated_gradient_style, validated_lap_timer_style, validated_time_style,
+    validated_value_style, ResolvedTextStyle,
 };
 use crate::render::widgets::types::PreparedValue;
 use crate::render::widgets::value::MetricWidgetRequest;
@@ -623,6 +624,32 @@ fn render_frame_to_surface(
                         validated_time: None,
                         timezone: None,
                     })?;
+                }
+                PreparedValue::LapTimer(validated) => {
+                    let style = validated_lap_timer_style(validated, &prepared_assets.scene, scale);
+                    let crate::render::widgets::types::PresentationCache::LapTimer(cache) =
+                        prepared_assets
+                            .presentation_caches
+                            .get(&idx)
+                            .ok_or_else(|| {
+                                CoreError::Render(format!(
+                                    "lap timer cache is missing for value {idx}"
+                                ))
+                            })?
+                    else {
+                        return Err(CoreError::Render(format!(
+                            "lap timer cache has the wrong type for value {idx}"
+                        )));
+                    };
+                    crate::render::widgets::lap_timer::draw_lap_timer(
+                        canvas,
+                        validated,
+                        cache,
+                        dense_activity,
+                        frame_index,
+                        &style,
+                        &paths.font_dirs,
+                    )?;
                 }
                 PreparedValue::HeadingTape(_)
                 | PreparedValue::LeanAngle(_)

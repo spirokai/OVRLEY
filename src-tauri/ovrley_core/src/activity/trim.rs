@@ -106,68 +106,6 @@ fn last_finite(series: &[Option<f64>]) -> Option<f64> {
         .find(|value| value.is_finite())
 }
 
-/// Keeps durations only for laps whose opening and closing boundaries are both
-/// inside the trim. Aligned live series retain their original session lap IDs.
-fn scope_lap_metadata(
-    activity: &ParsedActivity,
-    start: f64,
-    end: f64,
-) -> CoreResult<(Vec<f64>, Vec<f64>)> {
-    if activity.lap_number.is_empty() {
-        return Ok((Vec::new(), Vec::new()));
-    }
-    let sample_count = activity.sample_elapsed_seconds.len();
-    if activity.lap_number.len() != sample_count || activity.lap_time_seconds.len() != sample_count
-    {
-        return Err(CoreError::Activity(
-            "lap timing series must align with sample_elapsed_seconds".into(),
-        ));
-    }
-
-    let mut lap_starts = Vec::new();
-    let mut previous_lap = -1;
-    for (index, lap) in activity.lap_number.iter().copied().enumerate() {
-        if lap >= 0 && lap != previous_lap {
-            let lap_time = activity.lap_time_seconds[index].ok_or_else(|| {
-                CoreError::Activity(format!("lap {lap} starts without a lap_time_seconds value"))
-            })?;
-            // This also recovers interpolated VBO/AiM boundaries that fall
-            // between the first sample of the lap and its preceding sample.
-            lap_starts.push((lap, activity.sample_elapsed_seconds[index] - lap_time));
-        }
-        previous_lap = lap;
-    }
-
-    let mut lap_durations_seconds = Vec::new();
-    for pair in lap_starts.windows(2) {
-        let (source_lap, lap_start) = pair[0];
-        let completion = pair[1].1;
-        if lap_start < start || completion > end {
-            continue;
-        }
-        let duration = activity
-            .lap_durations_seconds
-            .get(source_lap as usize)
-            .copied()
-            .ok_or_else(|| {
-                CoreError::Activity(format!(
-                    "completed lap {source_lap} has no lap duration metadata"
-                ))
-            })?;
-        lap_durations_seconds.push(duration);
-    }
-    let mut best = f64::INFINITY;
-    let lap_durations_best_so_far_seconds = lap_durations_seconds
-        .iter()
-        .map(|duration| {
-            best = best.min(*duration);
-            best
-        })
-        .collect();
-
-    Ok((lap_durations_seconds, lap_durations_best_so_far_seconds))
-}
-
 /// Trims a parsed activity to a scene range.
 ///
 /// The returned timeline starts at `0.0` seconds and ends at `end - start`.
@@ -211,11 +149,14 @@ pub fn trim_activity(
     // ── Phase 2: find interior source-sample indices ─────────────────────
     let elapsed = &activity.sample_elapsed_seconds;
     let (start_inner_index, end_inner_index) = split_trim_indices(elapsed, start, end);
-    let (lap_durations_seconds, lap_durations_best_so_far_seconds) = if requirements.lap_number
+    let lap_metadata_required = requirements.lap_number
         || requirements.lap_time_seconds
-        || requirements.delta_to_best_lap_seconds
-    {
-        scope_lap_metadata(activity, start, end)?
+        || requirements.delta_to_best_lap_seconds;
+    let (lap_durations_seconds, lap_durations_best_so_far_seconds) = if lap_metadata_required {
+        (
+            activity.lap_durations_seconds.clone(),
+            activity.lap_durations_best_so_far_seconds.clone(),
+        )
     } else {
         (Vec::new(), Vec::new())
     };
@@ -232,6 +173,23 @@ pub fn trim_activity(
             .map(|value| *value - start),
     );
     trimmed_elapsed.push(end - start);
+    let lap_start_elapsed_seconds = if lap_metadata_required {
+        activity
+            .lap_start_elapsed_seconds
+            .iter()
+            .map(|lap_start| *lap_start - start)
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    let lap_states = if requirements.lap_number || requirements.lap_time_seconds {
+        trimmed_elapsed
+            .iter()
+            .map(|elapsed| crate::activity::lap::lap_state_at(&lap_start_elapsed_seconds, *elapsed))
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
 
     // ── Phase 4: trim distance progress, course, and start timestamp ─────
     // Absolute distance progress is not re-normalized to the trim — route
@@ -824,39 +782,20 @@ pub fn trim_activity(
             Vec::new()
         },
         full_activity_distance: last_finite(&activity.distance),
-        lap_number: if requirements.lap_number && !activity.lap_number.is_empty() {
-            let lap_number_options: Vec<Option<i64>> =
-                activity.lap_number.iter().map(|v| Some(*v)).collect();
-            let boundary_values = densify_hold_series(elapsed, &lap_number_options, &[start, end]);
-            let start_lap = boundary_values[0].unwrap_or(-1);
-            let end_lap = boundary_values[1].unwrap_or(-1);
-            trim_series(
-                &lap_number_options,
-                start_inner_index,
-                end_inner_index,
-                Some(start_lap),
-                Some(end_lap),
-            )
-            .into_iter()
-            .map(|v| v.unwrap_or(-1))
-            .collect()
+        lap_number: if requirements.lap_number {
+            lap_states.iter().map(|state| state.lap_number).collect()
         } else {
             Vec::new()
         },
         lap_time_seconds: if requirements.lap_time_seconds {
-            // TODO(lap-timing): replace Preserve with lap-aware interpolation that does not cross resets.
-            trim_numeric_series(
-                elapsed,
-                &activity.lap_time_seconds,
-                start,
-                end,
-                start_inner_index,
-                end_inner_index,
-                InterpolationStrategy::Numeric(MissingSamplePolicy::Preserve),
-            )
+            lap_states
+                .iter()
+                .map(|state| state.lap_time_seconds)
+                .collect()
         } else {
             Vec::new()
         },
+        lap_start_elapsed_seconds,
         delta_to_best_lap_seconds: if requirements.delta_to_best_lap_seconds {
             trim_numeric_series(
                 elapsed,
@@ -873,4 +812,39 @@ pub fn trim_activity(
         lap_durations_seconds,
         lap_durations_best_so_far_seconds,
     })
+}
+
+#[cfg(test)]
+mod lap_tests {
+    use super::trim_activity;
+    use crate::activity::schema::ParsedActivity;
+    use crate::normalize::RenderDataRequirements;
+
+    #[test]
+    fn preserves_original_lap_time_and_best_history_when_scene_starts_mid_lap() {
+        let activity: ParsedActivity = serde_json::from_value(serde_json::json!({
+            "sample_elapsed_seconds": [0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0],
+            "lap_number": [-1, -1, 0, 0, 1, 1, 2],
+            "lap_time_seconds": [null, null, 0.0, 2.0, 0.0, 2.0, 0.0],
+            "lap_start_elapsed_seconds": [4.0, 8.0, 12.0],
+            "lap_durations_seconds": [4.0, 4.0],
+            "lap_durations_best_so_far_seconds": [4.0, 4.0],
+            "trim_end_seconds": 12.0
+        }))
+        .unwrap();
+        let requirements = RenderDataRequirements {
+            lap_number: true,
+            lap_time_seconds: true,
+            ..RenderDataRequirements::default()
+        };
+
+        let trimmed = trim_activity(&activity, 5.0, 11.0, &requirements).unwrap();
+
+        assert_eq!(trimmed.lap_number[0], 0);
+        assert_eq!(trimmed.lap_time_seconds[0], Some(1.0));
+        assert_eq!(trimmed.lap_number.last(), Some(&1));
+        assert_eq!(trimmed.lap_time_seconds.last(), Some(&Some(3.0)));
+        assert_eq!(trimmed.lap_durations_seconds, vec![4.0, 4.0]);
+        assert_eq!(trimmed.lap_durations_best_so_far_seconds, vec![4.0, 4.0]);
+    }
 }

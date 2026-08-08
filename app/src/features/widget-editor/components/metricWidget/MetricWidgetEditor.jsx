@@ -17,6 +17,7 @@ import ArcDisplaySection from './ArcDisplaySection'
 import HeadingTapeDisplaySection from './HeadingTapeDisplaySection'
 import LeanAngleDisplaySection from './LeanAngleDisplaySection'
 import GForceWidgetEditor from '../GForceWidgetEditor'
+import LapTimerDisplaySection from './LapTimerDisplaySection'
 
 /**
  * Registry mapping display_type values to their editor section components.
@@ -30,6 +31,7 @@ const DISPLAY_SECTION = {
   corner: ArcDisplaySection,
   lean_angle: LeanAngleDisplaySection,
   g_force: GForceWidgetEditor,
+  lap_timer: LapTimerDisplaySection,
 }
 
 /**

@@ -54,6 +54,7 @@ pub fn draw_metric_presentation(
 ) -> Option<WidgetRenderReport> {
     match display_type {
         DisplayType::Text => None,
+        DisplayType::LapTimer => None,
         DisplayType::Tape => draw_tape_presentation(
             canvas,
             metric_kind,

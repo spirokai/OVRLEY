@@ -13,6 +13,7 @@ mod gradient;
 mod heading;
 mod helpers;
 mod label;
+mod lap_timer;
 mod lean_angle;
 mod linear_gauge;
 pub mod raw;
@@ -49,6 +50,7 @@ pub use g_force::{validate_g_force, GForceAxis, ValidatedGForceWidget};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};
 pub use label::{validate_label, ValidatedLabel};
+pub use lap_timer::{validate_lap_timer, LapTimerMode, ValidatedLapTimer};
 pub(crate) use lean_angle::LEAN_ANGLE_MAX_FILL_SWEEP;
 pub use lean_angle::{
     lean_angle_layout, validate_lean_angle, LeanAngleLayout, ValidatedLeanAngleWidget,
@@ -157,6 +159,9 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
             }
             if value.value == MetricKind::Gradient {
                 return validate_gradient_widget(value, idx).map(PreparedValue::Gradient);
+            }
+            if value.value == MetricKind::LapTimer {
+                return validate_lap_timer(value, idx).map(PreparedValue::LapTimer);
             }
             if value.value == MetricKind::Time && value.display_type == DisplayType::Text {
                 return validate_time_value(value, idx, &scene).map(PreparedValue::TimeText);
@@ -297,6 +302,10 @@ impl ValidatedRenderConfig {
                 MetricKind::Heading => requirements.heading = true,
                 MetricKind::Time => requirements.time = true,
                 MetricKind::Calories => requirements.calories = true,
+                MetricKind::LapTimer => {
+                    requirements.lap_number = true;
+                    requirements.lap_time_seconds = true;
+                }
             }
         }
 

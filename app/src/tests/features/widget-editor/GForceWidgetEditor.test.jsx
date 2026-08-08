@@ -17,7 +17,7 @@ beforeAll(() => {
 })
 
 function makeWidget(variant = {}) {
-  const data = createMetricValueDefaults('g_force', { font_values: 'Arial.ttf' }, 'g_force')
+  const data = createMetricValueDefaults('g_force', { font_values: 'Arial.ttf' }, { displayType: 'g_force' })
   return {
     id: 'g-force-1',
     type: 'g_force',

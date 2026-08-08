@@ -3,15 +3,15 @@
  */
 
 import { GROUPED_QUICKMENU_ITEMS } from '@/lib/widget/widget-icons'
-import { DisplayTypePopover } from './DisplayTypePopover'
+import { WidgetOptionPopover } from './WidgetOptionPopover'
 
 function WidgetButton({ item, onClick, isAvailable }) {
   const Icon = item.icon
-  const hasMultipleTypes = item.displayTypes.length > 1
+  const hasMultipleOptions = item.options.length > 1
 
   const button = (
     <button
-      onClick={hasMultipleTypes ? undefined : () => onClick(item.type)}
+      onClick={hasMultipleOptions ? undefined : () => onClick({ type: item.type, ...item.options[0].selection })}
       className="group relative flex flex-col items-center justify-center gap-2 w-full aspect-square rounded-xs border border-border/70 bg-surface transition-all hover:border-accent-border hover:bg-surface-accent-soft/30 cursor-pointer overflow-hidden"
     >
       {isAvailable && (
@@ -26,12 +26,12 @@ function WidgetButton({ item, onClick, isAvailable }) {
     </button>
   )
 
-  if (!hasMultipleTypes) return button
+  if (!hasMultipleOptions) return button
 
   return (
-    <DisplayTypePopover displayTypes={item.displayTypes} onSelect={(displayType) => onClick(item.type, displayType)}>
+    <WidgetOptionPopover options={item.options} onSelect={(selection) => onClick({ type: item.type, ...selection })}>
       {button}
-    </DisplayTypePopover>
+    </WidgetOptionPopover>
   )
 }
 
@@ -39,7 +39,7 @@ function WidgetButton({ item, onClick, isAvailable }) {
  * Renders a scrollable 3-column grid of widget-type buttons, grouped by category.
  *
  * @param {object} props
- * @param {(type: string, displayType?: string) => void} props.onAddWidget — Called with the widget type (and optional display type) when a button is clicked.
+ * @param {(request: {type: string, displayType?: string, lapTimerMode?: string}) => void} props.onAddWidget - Called with a canonical creation request.
  * @param {string[]} [props.validAttributes] — Core metric attribute names available in the loaded activity.
  * @param {string[]} [props.extendedAttributes] — Extended metric attribute names available in the loaded activity.
  * @returns {JSX.Element} Rendered React element.

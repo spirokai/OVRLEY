@@ -7,9 +7,9 @@
 
 use crate::normalize::{
     ResolvedBarGeometry, ValidatedArcGaugeWidget, ValidatedBackdrop, ValidatedGForceWidget,
-    ValidatedGradientWidget, ValidatedHeading, ValidatedLabel, ValidatedLeanAngleWidget,
-    ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget, ValidatedSceneConfig,
-    ValidatedTimeValue, ValidatedValueWidget,
+    ValidatedGradientWidget, ValidatedHeading, ValidatedLabel, ValidatedLapTimer,
+    ValidatedLeanAngleWidget, ValidatedLinearGaugeOrientation, ValidatedLinearGaugeWidget,
+    ValidatedSceneConfig, ValidatedTimeValue, ValidatedValueWidget,
 };
 use crate::types::{DisplayType, MetricKind, TrackFillStyle};
 use chrono_tz::Tz;
@@ -65,6 +65,7 @@ pub enum PresentationCache {
     LinearGauge(LinearGaugeCache),
     ArcGauge(ArcGaugeCache),
     GForce(GForceWidgetCache),
+    LapTimer(LapTimerWidgetCache),
 }
 
 /// One validated render value, keyed implicitly by its index in the config array.
@@ -78,6 +79,7 @@ pub enum PreparedValue {
     LinearGauge(ValidatedLinearGaugeWidget),
     ArcGauge(ValidatedArcGaugeWidget),
     GForce(ValidatedGForceWidget),
+    LapTimer(ValidatedLapTimer),
 }
 
 impl PreparedValue {
@@ -91,6 +93,7 @@ impl PreparedValue {
             Self::LinearGauge(value) => value.metric,
             Self::ArcGauge(value) => value.metric,
             Self::GForce(_) => MetricKind::GForce,
+            Self::LapTimer(_) => MetricKind::LapTimer,
         }
     }
 
@@ -104,6 +107,7 @@ impl PreparedValue {
             Self::LinearGauge(_) => DisplayType::Linear,
             Self::ArcGauge(value) => value.display_type,
             Self::GForce(_) => DisplayType::GForce,
+            Self::LapTimer(_) => DisplayType::LapTimer,
         }
     }
 
@@ -117,6 +121,7 @@ impl PreparedValue {
             Self::LinearGauge(value) => value.x,
             Self::ArcGauge(value) => value.x,
             Self::GForce(value) => value.x,
+            Self::LapTimer(value) => value.x,
         }
     }
 
@@ -130,6 +135,7 @@ impl PreparedValue {
             Self::LinearGauge(value) => value.y,
             Self::ArcGauge(value) => value.y,
             Self::GForce(value) => value.y,
+            Self::LapTimer(value) => value.y,
         }
     }
 }
@@ -308,6 +314,12 @@ pub struct GForceFrameState {
     pub marker_y: f32,
     pub magnitude: Option<f64>,
     pub label: String,
+}
+
+/// Prepared static text images for best-lap states.
+#[derive(Clone, Debug)]
+pub struct LapTimerWidgetCache {
+    pub(crate) state_layers: BTreeMap<usize, StaticLayer>,
 }
 
 /// Cached static empty track and border for a lean-angle sector.

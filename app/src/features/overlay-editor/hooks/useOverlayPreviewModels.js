@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { buildMetricWidgetPreviewModel } from '@/features/widget-preview/widgets/metric/model'
+import { buildLapTimerPreviewModel } from '@/features/widget-preview/widgets/lap-timer/model'
 import { buildTextWidgetPreviewModel } from '@/features/widget-preview/widgets/text/model'
 import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 import { getPreviewFontFamily } from '@/features/widget-preview/shared/textMeasurement'
@@ -13,7 +14,12 @@ function buildPreviewModels({ renderedWidgets, category, activity, previewSecond
   for (const widget of renderedWidgets) {
     if (widget.category !== category) continue
 
-    const model = category === 'values' ? buildMetricWidgetPreviewModel({ widget, activity, previewSecond }) : buildTextWidgetPreviewModel({ widget })
+    const model =
+      category === 'values'
+        ? widget.data.display_type === 'lap_timer'
+          ? buildLapTimerPreviewModel({ widget, activity, previewSecond })
+          : buildMetricWidgetPreviewModel({ widget, activity, previewSecond })
+        : buildTextWidgetPreviewModel({ widget })
 
     if (model) models[widget.id] = model
   }

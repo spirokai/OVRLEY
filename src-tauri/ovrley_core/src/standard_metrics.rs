@@ -27,6 +27,7 @@ pub enum StandardMetricFormatterKind {
     Coordinates,
     Distance,
     Elevation,
+    LapTimer,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -286,6 +287,7 @@ fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
         "distance_to_home" => Some(MetricKind::DistanceToHome),
         "total_ascent" => Some(MetricKind::TotalAscent),
         "calories" => Some(MetricKind::Calories),
+        "lap_timer" => Some(MetricKind::LapTimer),
         _ => None,
     }
 }
@@ -330,6 +332,7 @@ fn metric_kind_to_key(kind: MetricKind) -> &'static str {
         MetricKind::DistanceToHome => "distance_to_home",
         MetricKind::TotalAscent => "total_ascent",
         MetricKind::Calories => "calories",
+        MetricKind::LapTimer => "lap_timer",
     }
 }
 

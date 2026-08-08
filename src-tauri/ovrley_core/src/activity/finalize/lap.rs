@@ -34,6 +34,8 @@ pub struct LapTimingResult {
     pub lap_number: Vec<i64>,
     /// Elapsed time since the exact opening boundary of each active lap.
     pub lap_time_seconds: NumericSeries,
+    /// Exact activity-relative start time of each canonical lap.
+    pub lap_start_elapsed_seconds: Vec<f64>,
     /// Live difference from the best previously completed lap at the same distance.
     pub delta_to_best_lap_seconds: NumericSeries,
     /// Fastest duration among laps closed by a subsequent boundary.
@@ -83,6 +85,7 @@ pub fn derive_lap_timing(
     LapTimingResult {
         lap_number: resolved.lap_number,
         lap_time_seconds,
+        lap_start_elapsed_seconds: resolved.lap_start_elapsed,
         delta_to_best_lap_seconds,
         best_lap_time_seconds,
         lap_durations_seconds,
@@ -94,6 +97,7 @@ fn empty_result(sample_count: usize) -> LapTimingResult {
     LapTimingResult {
         lap_number: vec![-1; sample_count],
         lap_time_seconds: vec![None; sample_count],
+        lap_start_elapsed_seconds: Vec::new(),
         delta_to_best_lap_seconds: vec![None; sample_count],
         best_lap_time_seconds: None,
         lap_durations_seconds: Vec::new(),

@@ -532,6 +532,9 @@ pub struct ParsedActivity {
     /// Seconds since the start of the current lap. Null during out-lap.
     #[serde(default)]
     pub lap_time_seconds: NumericSeries,
+    /// Exact activity-relative start time of each canonical lap.
+    #[serde(default)]
+    pub lap_start_elapsed_seconds: Vec<f64>,
     /// Delta of current lap time versus the best completed lap at the same distance.
     #[serde(default)]
     pub delta_to_best_lap_seconds: NumericSeries,
@@ -672,9 +675,11 @@ pub struct DenseSeriesReport {
     pub lap_number: Vec<Option<i64>>,
     /// Lap time in seconds for each frame.
     pub lap_time_seconds: Vec<Option<f64>>,
+    /// Exact scene-relative start time of each canonical lap.
+    pub lap_start_elapsed_seconds: Vec<f64>,
     /// Delta to best lap in seconds for each frame.
     pub delta_to_best_lap_seconds: Vec<Option<f64>>,
-    /// Per-lap metadata scoped to the active trim window.
+    /// Completed-lap metadata retained from the full activity through scene trim.
     pub lap_durations_seconds: Vec<f64>,
     pub lap_durations_best_so_far_seconds: Vec<f64>,
 }
@@ -725,7 +730,10 @@ impl DenseSeriesReport {
             MetricKind::LeanAngle => Some(&self.lean_angle),
             MetricKind::DistanceToHome => Some(&self.distance_to_home),
             MetricKind::TotalAscent => Some(&self.total_ascent),
-            MetricKind::GearPosition | MetricKind::GpsCoordinates | MetricKind::Time => None,
+            MetricKind::GearPosition
+            | MetricKind::GpsCoordinates
+            | MetricKind::Time
+            | MetricKind::LapTimer => None,
         }
     }
 }
@@ -833,9 +841,11 @@ pub struct TrimmedActivity {
     pub lap_number: Vec<i64>,
     /// Trimmed lap time samples in seconds.
     pub lap_time_seconds: NumericSeries,
+    /// Exact scene-relative start time of each canonical lap.
+    pub lap_start_elapsed_seconds: Vec<f64>,
     /// Trimmed delta-to-best-lap samples in seconds.
     pub delta_to_best_lap_seconds: NumericSeries,
-    /// Per-lap metadata scoped to the active trim window.
+    /// Completed-lap metadata retained from the full activity through scene trim.
     pub lap_durations_seconds: Vec<f64>,
     pub lap_durations_best_so_far_seconds: Vec<f64>,
 }

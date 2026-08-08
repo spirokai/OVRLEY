@@ -397,6 +397,7 @@ fn finalize_columns_with_debug(
         heading: metric(&metric_series_map, "heading"),
         lap_number: lap_timing.lap_number,
         lap_time_seconds: lap_timing.lap_time_seconds,
+        lap_start_elapsed_seconds: lap_timing.lap_start_elapsed_seconds,
         delta_to_best_lap_seconds: lap_timing.delta_to_best_lap_seconds,
         best_lap_time_seconds: lap_timing.best_lap_time_seconds,
         lap_durations_seconds: lap_timing.lap_durations_seconds,

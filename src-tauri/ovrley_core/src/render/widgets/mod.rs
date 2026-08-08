@@ -19,6 +19,8 @@ pub mod gauges;
 mod geometry;
 /// Heading compass tape widget implementation.
 pub mod heading;
+/// Current and best lap timer text widget implementation.
+pub(crate) mod lap_timer;
 /// Lean-angle sector widget implementation.
 pub mod lean_angle;
 /// Marker and dot drawing helpers.
@@ -49,6 +51,7 @@ pub(crate) use elevation::draw_elevation_widget;
 pub use g_force::{draw_g_force_widget, prepare_g_force_cache};
 pub use gauges::arc::{draw_arc_gauge_widget, prepare_arc_gauge_cache};
 pub use gauges::linear::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
+pub use lap_timer::lap_timer_value_text;
 pub use lean_angle::{draw_lean_angle_widget, prepare_lean_angle_cache};
 pub use metric_presentation::draw_metric_presentation;
 pub(crate) use route::draw_route_widget;
@@ -174,6 +177,19 @@ pub fn prepare_render_assets(
                 assets
                     .presentation_caches
                     .insert(idx, types::PresentationCache::GForce(cache));
+            }
+            PreparedValue::LapTimer(validated) => {
+                let cache = lap_timer::prepare_lap_timer_cache(
+                    validated,
+                    dense_activity,
+                    &assets.scene,
+                    assets.scene.scale,
+                    &paths.font_dirs,
+                    prepare_profiler,
+                )?;
+                assets
+                    .presentation_caches
+                    .insert(idx, types::PresentationCache::LapTimer(cache));
             }
             _ => {}
         }

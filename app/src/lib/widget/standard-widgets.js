@@ -82,6 +82,12 @@ export const TEXT_LABEL_DEFAULTS = Object.freeze({ ...standardWidgetsManifest.la
 /** Default values for the "heading_tape" display variant. */
 export const HEADING_TAPE_DEFAULTS = Object.freeze(standardMetricsManifest.displayTypes.definitions.heading_tape.defaults)
 
+/** Flat defaults and readout modes for the intrinsic lap timer display. */
+export const LAP_TIMER_DEFAULTS = Object.freeze({ ...standardMetricsManifest.displayTypes.definitions.lap_timer.defaults })
+export const LAP_TIMER_MODES = Object.freeze(
+  standardMetricsManifest.displayTypes.definitions.lap_timer.modes.map((mode) => Object.freeze({ ...mode })),
+)
+
 // ---------------------------------------------------------------------------
 // Backdrop display type constants (assets/standard-widgets.json)
 // ---------------------------------------------------------------------------

@@ -54,6 +54,21 @@
           }
         }
       },
+      "lap_timer": {
+        "label": "Lap Timer",
+        "icon": { "source": "shared", "assetFile": "display-type-text.svg" },
+        "layoutMode": "intrinsic",
+        "defaults": {
+          "show_label": true,
+          "positive_delta_color": "#ffffff",
+          "negative_delta_color": "#ffffff"
+        },
+        "modes": [
+          { "value": "current_lap", "label": "Current Lap" },
+          { "value": "best_lap", "label": "Best Lap" }
+        ],
+        "configFields": ["lap_timer_mode", "label"]
+      },
       "heading_tape": {
         "label": "Heading Tape",
         "icon": {
@@ -263,7 +278,8 @@
       "gps_coordinates": ["text"],
       "distance_to_home": ["text", "linear"],
       "total_ascent": ["text", "linear"],
-      "calories": ["text", "linear"]
+      "calories": ["text", "linear"],
+      "lap_timer": ["lap_timer"]
     }
   },
   "definitions": [
@@ -1160,6 +1176,22 @@
       "icon": {
         "source": "custom",
         "assetFile": "widget-lean-angle.svg"
+      },
+      "category": "motosports"
+    },
+    {
+      "type": "lap_timer",
+      "current": true,
+      "label": "Lap Timer",
+      "defaultDisplayUnit": "none",
+      "supportedDisplayUnits": [],
+      "showUnitsByDefault": false,
+      "formatter": "laptimer",
+      "interpolation": "hold",
+      "unitsMode": "hidden",
+      "icon": {
+        "source": "shared",
+        "assetFile": "widget-time.svg"
       },
       "category": "motosports"
     }

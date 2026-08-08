@@ -1,12 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 
-import { Presentation, Type } from 'lucide-react'
+import { Presentation, Timer, Type } from 'lucide-react'
 import {
   CURRENT_STANDARD_METRIC_WIDGET_TYPES,
   STANDARD_METRIC_WIDGET_TYPES,
   BACKDROP_TYPE_DEFINITIONS,
   BACKDROP_TYPE_LABELS,
   DISPLAY_TYPE_LABELS,
+  LAP_TIMER_MODES,
 } from './standard-widgets'
 import { getStandardMetricDefinition, getSupportedDisplayTypes, isStandardMetricWidgetType } from './standard-metrics'
 import { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS } from './widget-icon-data'
@@ -100,6 +101,7 @@ export const TYPE_ICONS = {
   backdrop: Presentation,
   label: Type,
   ...widgetIconComponents,
+  lap_timer: Timer,
 }
 
 export const DISPLAY_TYPE_ICONS = Object.fromEntries(
@@ -114,17 +116,25 @@ export function getWidgetDisplayTypes(type) {
   return ['text']
 }
 
-export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradient', 'backdrop', ...CURRENT_STANDARD_METRIC_WIDGET_TYPES].map(
-  (type) => ({
+export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradient', 'backdrop', ...CURRENT_STANDARD_METRIC_WIDGET_TYPES]
+  .filter((type) => type !== 'lap_timer')
+  .map((type) => ({
     type,
     icon: TYPE_ICONS[type],
     label: WIDGET_DRAWER_LABELS[type] ?? TYPE_LABELS[type],
-    displayTypes: getWidgetDisplayTypes(type).map((value) => ({
+    options: getWidgetDisplayTypes(type).map((value) => ({
       value,
       label: type === 'backdrop' ? (BACKDROP_TYPE_LABELS[value] ?? value) : (DISPLAY_TYPE_LABELS[value] ?? value),
+      icon: DISPLAY_TYPE_ICONS[value],
+      selection: { displayType: value },
     })),
-  }),
-)
+  }))
+  .concat({
+    type: 'lap_timer',
+    icon: Timer,
+    label: 'Lap Timer',
+    options: LAP_TIMER_MODES.map((mode) => ({ ...mode, icon: Timer, selection: { lapTimerMode: mode.value } })),
+  })
 
 const NON_METRIC_CATEGORIES = {
   backdrop: 'general',

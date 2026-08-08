@@ -6,8 +6,8 @@
 
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::{
-    ValidatedGradientWidget, ValidatedLabel, ValidatedSceneConfig, ValidatedTimeValue,
-    ValidatedValueWidget,
+    ValidatedGradientWidget, ValidatedLabel, ValidatedLapTimer, ValidatedSceneConfig,
+    ValidatedTimeValue, ValidatedValueWidget,
 };
 use skia_safe::{
     image_filters,
@@ -153,6 +153,36 @@ pub fn validated_time_style(
     scale: f32,
 ) -> ResolvedTextStyle {
     validated_value_style(&validated.base, scene, scale)
+}
+
+/// Resolves the text style shared by current and best lap widgets.
+pub fn validated_lap_timer_style(
+    validated: &ValidatedLapTimer,
+    scene: &ValidatedSceneConfig,
+    scale: f32,
+) -> ResolvedTextStyle {
+    let opacity = validated.opacity;
+    let color = Color::from_argb(
+        validated.color[3],
+        validated.color[0],
+        validated.color[1],
+        validated.color[2],
+    );
+
+    ResolvedTextStyle {
+        x: validated.x,
+        y: validated.y,
+        font_name: Some(validated.font_name.clone()),
+        font_size: validated.font_size * scale,
+        line_height: validated.font_size * scale * 0.92,
+        color,
+        opacity,
+        shadow_color: scene_shadow_color(scene, opacity),
+        shadow_strength: scene.shadow_strength * scale,
+        shadow_distance: scene.shadow_distance * scale,
+        border_color: scene_border_color(scene, opacity),
+        border_thickness: scene.border_thickness * scale,
+    }
 }
 
 /// Resolves a text style from a validated gradient widget and scene config.
