@@ -561,7 +561,7 @@ fn racebox_fixture_imports_through_the_path_entry_point() {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity/sample Racebox.csv");
 
-    let response = parse_csv_activity_path(&fixture).unwrap();
+    let response = parse_csv_activity_path(&fixture, None).unwrap();
     let activity = response.parsed_activity;
 
     assert_eq!(activity.file_name.as_deref(), Some("sample Racebox.csv"));
@@ -621,12 +621,19 @@ fn csv_command_returns_the_native_path_response() {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity/sample Racebox.csv");
 
-    let response = backend_parse_csv_activity(fixture.to_str().unwrap()).unwrap();
+    let repo_root =
+        std::env::temp_dir().join(format!("ovrley-csv-debug-test-{}", std::process::id()));
+    let paths = ovrley_core::paths::AppPaths::from_repo_root(repo_root.clone());
+    let response = backend_parse_csv_activity(&paths, fixture.to_str().unwrap()).unwrap();
     // debug_payload is Some only in debug builds
     if cfg!(not(debug_assertions)) {
         assert!(response.debug_payload.is_none());
     } else {
         assert!(response.debug_payload.is_some());
+        assert!(repo_root
+            .join("debug/activities/sample Racebox-parse-debug.json")
+            .is_file());
+        std::fs::remove_dir_all(repo_root).unwrap();
     }
     let activity = response.parsed_activity;
 
@@ -1088,7 +1095,9 @@ fn parse_fixture(name: &str) -> ovrley_core::activity::schema::ParsedActivity {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity")
         .join(name);
-    parse_csv_activity_path(&path).unwrap().parsed_activity
+    parse_csv_activity_path(&path, None)
+        .unwrap()
+        .parsed_activity
 }
 
 fn assert_close(actual: Option<f64>, expected: f64) {
@@ -1206,7 +1215,11 @@ mod lap_timing_fixture_tests {
             .join("tests/fixtures/activity")
             .join(expectations.fixture);
         match expectations.extraction {
-            FixtureKind::Csv => parse_csv_activity_path(&path).unwrap().parsed_activity,
+            FixtureKind::Csv => {
+                parse_csv_activity_path(&path, None)
+                    .unwrap()
+                    .parsed_activity
+            }
             FixtureKind::Vbo => {
                 parse_vbo_activity_path(&path, None)
                     .unwrap()

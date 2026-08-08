@@ -111,9 +111,11 @@ pub(crate) async fn backend_finalize_activity(
 /// Parses a native CSV path through the core columnar activity pipeline.
 #[tauri::command]
 pub(crate) async fn backend_parse_csv_activity(
+    app: AppHandle,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
-    commands::backend_parse_csv_activity(&path).map_err(|error| error.to_string())
+    commands::backend_parse_csv_activity(&runtime_paths::app_paths(&app)?, &path)
+        .map_err(|error| error.to_string())
 }
 
 /// Parses a native VBO path through the core columnar activity pipeline.
