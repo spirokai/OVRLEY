@@ -340,11 +340,33 @@ pub fn densify_activity(
     } else {
         Vec::new()
     };
-    let dense_lap_states = if requirements.lap_number || requirements.lap_time_seconds {
+    let dense_lap_number = if requirements.lap_number || requirements.lap_time_seconds {
+        let source_lap_number = trimmed
+            .lap_number
+            .iter()
+            .copied()
+            .map(Some)
+            .collect::<Vec<_>>();
+        densify_hold_series(
+            &trimmed.sample_elapsed_seconds,
+            &source_lap_number,
+            &frame_elapsed_seconds,
+        )
+    } else {
+        Vec::new()
+    };
+    let dense_lap_time_seconds = if requirements.lap_time_seconds {
         frame_elapsed_seconds
             .iter()
-            .map(|elapsed| {
-                crate::activity::lap::lap_state_at(&trimmed.lap_start_elapsed_seconds, *elapsed)
+            .zip(&dense_lap_number)
+            .map(|(elapsed, lap_number)| {
+                lap_number.and_then(|lap_number| {
+                    crate::activity::lap::lap_time_at(
+                        &trimmed.lap_start_elapsed_seconds,
+                        lap_number,
+                        *elapsed,
+                    )
+                })
             })
             .collect::<Vec<_>>()
     } else {
@@ -666,18 +688,12 @@ pub fn densify_activity(
             course_lon,
             time,
             lap_number: if requirements.lap_number {
-                dense_lap_states
-                    .iter()
-                    .map(|state| Some(state.lap_number))
-                    .collect()
+                dense_lap_number
             } else {
                 Vec::new()
             },
             lap_time_seconds: if requirements.lap_time_seconds {
-                dense_lap_states
-                    .iter()
-                    .map(|state| state.lap_time_seconds)
-                    .collect()
+                dense_lap_time_seconds
             } else {
                 Vec::new()
             },

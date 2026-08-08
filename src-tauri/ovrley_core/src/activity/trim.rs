@@ -182,10 +182,25 @@ pub fn trim_activity(
     } else {
         Vec::new()
     };
-    let lap_states = if requirements.lap_number || requirements.lap_time_seconds {
+    let lap_number = if requirements.lap_number || requirements.lap_time_seconds {
         trimmed_elapsed
             .iter()
-            .map(|elapsed| crate::activity::lap::lap_state_at(&lap_start_elapsed_seconds, *elapsed))
+            .map(|trimmed_elapsed| {
+                let source_elapsed = *trimmed_elapsed + start;
+                let source_index = elapsed.partition_point(|value| *value <= source_elapsed) - 1;
+                activity.lap_number[source_index]
+            })
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    let lap_time_seconds = if requirements.lap_time_seconds {
+        trimmed_elapsed
+            .iter()
+            .zip(&lap_number)
+            .map(|(elapsed, lap_number)| {
+                crate::activity::lap::lap_time_at(&lap_start_elapsed_seconds, *lap_number, *elapsed)
+            })
             .collect::<Vec<_>>()
     } else {
         Vec::new()
@@ -783,15 +798,12 @@ pub fn trim_activity(
         },
         full_activity_distance: last_finite(&activity.distance),
         lap_number: if requirements.lap_number {
-            lap_states.iter().map(|state| state.lap_number).collect()
+            lap_number
         } else {
             Vec::new()
         },
         lap_time_seconds: if requirements.lap_time_seconds {
-            lap_states
-                .iter()
-                .map(|state| state.lap_time_seconds)
-                .collect()
+            lap_time_seconds
         } else {
             Vec::new()
         },

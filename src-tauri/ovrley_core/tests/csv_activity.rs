@@ -586,6 +586,37 @@ fn racebox_fixture_imports_through_the_path_entry_point() {
     );
     assert_eq!(activity.speed.first(), Some(&Some(1.5166666666666666)));
     assert_eq!(activity.elevation.first(), Some(&Some(147.8)));
+    let closing_lap_index = activity
+        .sample_elapsed_seconds
+        .iter()
+        .position(|elapsed| (*elapsed - 536.24).abs() < 1e-9)
+        .unwrap();
+    assert_eq!(activity.lap_number[closing_lap_index - 1], 4);
+    assert_eq!(activity.lap_number[closing_lap_index], -1);
+    assert_eq!(activity.lap_time_seconds[closing_lap_index], None);
+    assert_eq!(activity.lap_durations_seconds.len(), 4);
+}
+
+#[test]
+fn csv_lap_values_preserve_positive_integer_labels_and_reject_other_values() {
+    let csv = "Time,Speed,Lap\n\
+0,10,4\n\
+1,10,4\n\
+2,10,3\n\
+3,10,3\n\
+4,10,2\n\
+5,10,0\n\
+6,10,-1\n\
+7,10,1.5\n\
+8,10,-\n\
+9,10,null\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "laps.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.lap_number, vec![4, 4, 3, 3, 2, -1, -1, -1, -1, -1]);
+    assert_eq!(activity.lap_durations_seconds, vec![2.0, 2.0, 1.0]);
 }
 
 #[test]

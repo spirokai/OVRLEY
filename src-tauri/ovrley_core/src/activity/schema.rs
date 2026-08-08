@@ -40,10 +40,10 @@ use std::collections::BTreeMap;
 /// series that a template did not request.
 pub type NumericSeries = Vec<Option<f64>>;
 
-/// Canonical source lap numbers aligned with `sample_elapsed_seconds`.
+/// Source lap labels aligned with `sample_elapsed_seconds`.
 ///
-/// Present values are normalized at extraction: `-1` is the out-lap and
-/// non-negative values are zero-based timed laps.
+/// Present values are normalized at extraction: `-1` is the pre-lap and
+/// valid source labels are preserved as supplied.
 pub type LapNumberSeries = Vec<Option<i64>>;
 
 /// Canonical string gear observations aligned with `sample_elapsed_seconds`.
@@ -526,7 +526,7 @@ pub struct ParsedActivity {
     /// Heading in degrees (0–360).
     #[serde(default)]
     pub heading: NumericSeries,
-    /// Lap number, 0-based. -1 for records before the first start/finish crossing.
+    /// Lap label; explicit positive source labels are preserved. -1 for pre-lap records.
     #[serde(default)]
     pub lap_number: Vec<i64>,
     /// Seconds since the start of the current lap. Null during out-lap.

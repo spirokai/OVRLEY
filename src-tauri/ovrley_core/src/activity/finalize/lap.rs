@@ -11,6 +11,7 @@ use crate::interpolation::interpolate_points;
 /// Sample-aligned lap IDs plus the exact elapsed time of each lap boundary.
 struct ResolvedLaps {
     lap_number: Vec<i64>,
+    timing_lap_number: Vec<i64>,
     lap_start_elapsed: Vec<f64>,
 }
 
@@ -66,7 +67,7 @@ pub fn derive_lap_timing(
     let resolved = resolve_laps(elapsed_series, course, lap_number_source, lap_markers);
     let (lap_time_seconds, lap_durations_seconds) = compute_lap_times(
         elapsed_series,
-        &resolved.lap_number,
+        &resolved.timing_lap_number,
         &resolved.lap_start_elapsed,
     );
     let best_lap_time_seconds = lap_durations_seconds
@@ -76,7 +77,7 @@ pub fn derive_lap_timing(
     let lap_durations_best_so_far_seconds = compute_best_so_far(&lap_durations_seconds);
     let delta_to_best_lap_seconds = compute_delta_to_best(
         distance_series,
-        &resolved.lap_number,
+        &resolved.timing_lap_number,
         &lap_time_seconds,
         &lap_durations_seconds,
         &lap_durations_best_so_far_seconds,
@@ -120,6 +121,7 @@ fn resolve_laps(
         LapMarkers::TimingMarkers(markers) => resolve_from_timing_markers(elapsed, course, markers),
         LapMarkers::None => ResolvedLaps {
             lap_number: vec![-1; elapsed.len()],
+            timing_lap_number: vec![-1; elapsed.len()],
             lap_start_elapsed: Vec::new(),
         },
     }
@@ -127,27 +129,30 @@ fn resolve_laps(
 
 fn resolve_from_source(elapsed: &[f64], lap_number_source: &[Option<i64>]) -> ResolvedLaps {
     let mut lap_number = Vec::with_capacity(lap_number_source.len());
+    let mut timing_lap_number = Vec::with_capacity(lap_number_source.len());
     let mut lap_start_elapsed = Vec::new();
-    let mut current_lap = -1;
+    let mut current_source_lap = -1;
+    let mut current_timing_lap = -1;
 
     for (index, source_lap) in lap_number_source.iter().copied().enumerate() {
         if let Some(source_lap) = source_lap {
-            if source_lap >= 0 && source_lap != current_lap {
-                assert_eq!(
-                    source_lap as usize,
-                    lap_start_elapsed.len(),
-                    "canonical source lap numbers must be contiguous and zero-based"
-                );
+            if source_lap != current_source_lap {
                 lap_start_elapsed.push(elapsed[index]);
+                current_timing_lap = if source_lap >= 0 {
+                    lap_start_elapsed.len() as i64 - 1
+                } else {
+                    -1
+                };
             }
-            current_lap = source_lap;
+            current_source_lap = source_lap;
         }
-        // Sparse observations after a lap starts inherit the last canonical ID.
-        lap_number.push(current_lap);
+        lap_number.push(current_source_lap);
+        timing_lap_number.push(current_timing_lap);
     }
 
     ResolvedLaps {
         lap_number,
+        timing_lap_number,
         lap_start_elapsed,
     }
 }
@@ -156,10 +161,11 @@ fn resolve_from_beacons(elapsed: &[f64], beacons: &[f64]) -> ResolvedLaps {
     if beacons.is_empty() {
         return ResolvedLaps {
             lap_number: vec![-1; elapsed.len()],
+            timing_lap_number: vec![-1; elapsed.len()],
             lap_start_elapsed: Vec::new(),
         };
     }
-    let lap_number = elapsed
+    let lap_number: Vec<i64> = elapsed
         .iter()
         .map(|e| {
             let mut lap: i64 = -1;
@@ -180,6 +186,7 @@ fn resolve_from_beacons(elapsed: &[f64], beacons: &[f64]) -> ResolvedLaps {
         .take_while(|beacon| *beacon <= last_elapsed)
         .collect();
     ResolvedLaps {
+        timing_lap_number: lap_number.clone(),
         lap_number,
         lap_start_elapsed,
     }
@@ -198,6 +205,7 @@ fn resolve_from_timing_markers(
     if start_markers.is_empty() || course.len() < 2 {
         return ResolvedLaps {
             lap_number: vec![-1; course.len()],
+            timing_lap_number: vec![-1; course.len()],
             lap_start_elapsed: Vec::new(),
         };
     }
@@ -248,6 +256,7 @@ fn resolve_from_timing_markers(
     }
 
     ResolvedLaps {
+        timing_lap_number: lap_number.clone(),
         lap_number,
         lap_start_elapsed,
     }
@@ -342,6 +351,13 @@ fn compute_delta_to_best(
     }
 
     let lap_start_distances = compute_lap_start_distances(distance_series, lap_number);
+    let reference_points_by_lap = build_reference_lap_points(
+        distance_series,
+        lap_time_series,
+        lap_number,
+        &lap_start_distances,
+        lap_durations.len(),
+    );
 
     let mut delta = vec![None; n];
 
@@ -369,7 +385,6 @@ fn compute_delta_to_best(
             _ => continue,
         };
 
-        let ref_lap_start = lap_start_distances[reference_lap_idx];
         let cur_lap_start = lap_start_distances[lap_idx];
 
         let current_lap_distance = current_distance - cur_lap_start;
@@ -377,27 +392,17 @@ fn compute_delta_to_best(
             continue;
         }
 
-        let reference_samples = extract_lap_samples(
-            distance_series,
-            lap_time_series,
-            lap_number,
-            reference_lap_idx,
-        );
-        if reference_samples.len() < 2 {
+        let reference_points = &reference_points_by_lap[reference_lap_idx];
+        if reference_points.len() < 2 {
             continue;
         }
-
-        let reference_points: Vec<(f64, f64)> = reference_samples
-            .iter()
-            .map(|(distance, time)| (distance - ref_lap_start, *time))
-            .collect();
 
         let ref_lap_max_distance = reference_points[reference_points.len() - 1].0;
         if ref_lap_max_distance <= 0.0 || current_lap_distance > ref_lap_max_distance {
             continue;
         }
 
-        let reference_lap_time = interpolate_points(&reference_points, current_lap_distance);
+        let reference_lap_time = interpolate_points(reference_points, current_lap_distance);
 
         if let Some(ref_time) = reference_lap_time {
             delta[i] = Some(current_lap_time - ref_time);
@@ -440,22 +445,27 @@ fn best_lap_index_for_lap(lap_idx: usize, durations: &[f64], best_so_far: &[f64]
     candidate
 }
 
-fn extract_lap_samples(
+fn build_reference_lap_points(
     distance_series: &[Option<f64>],
     lap_time_series: &[Option<f64>],
     lap_number: &[i64],
-    target_lap: usize,
-) -> Vec<(f64, f64)> {
-    distance_series
-        .iter()
-        .zip(lap_time_series)
-        .zip(lap_number)
-        .filter_map(|((distance, time), lap)| {
-            (*lap == target_lap as i64)
-                .then(|| distance.zip(*time))
-                .flatten()
-        })
-        .collect()
+    lap_start_distances: &[f64],
+    completed_lap_count: usize,
+) -> Vec<Vec<(f64, f64)>> {
+    assert!(completed_lap_count <= lap_start_distances.len());
+    let mut points_by_lap = vec![Vec::new(); completed_lap_count];
+    for ((distance, lap_time), lap) in distance_series.iter().zip(lap_time_series).zip(lap_number) {
+        let Ok(lap_idx) = usize::try_from(*lap) else {
+            continue;
+        };
+        if lap_idx >= completed_lap_count {
+            continue;
+        }
+        if let (Some(distance), Some(lap_time)) = (distance, lap_time) {
+            points_by_lap[lap_idx].push((distance - lap_start_distances[lap_idx], *lap_time));
+        }
+    }
+    points_by_lap
 }
 
 #[cfg(test)]

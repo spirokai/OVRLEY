@@ -25,6 +25,23 @@ pub fn lap_state_at(lap_start_elapsed_seconds: &[f64], elapsed: f64) -> LapState
     }
 }
 
+pub fn lap_time_at(
+    lap_start_elapsed_seconds: &[f64],
+    lap_number: i64,
+    elapsed: f64,
+) -> Option<f64> {
+    if lap_number < 0 {
+        return None;
+    }
+    lap_start_elapsed_seconds
+        .get(
+            lap_start_elapsed_seconds
+                .partition_point(|start| *start <= elapsed)
+                .checked_sub(1)?,
+        )
+        .map(|start| elapsed - start)
+}
+
 pub fn validate_lap_timing_contract(activity: &ParsedActivity) -> CoreResult<()> {
     let has_lap_data = !activity.lap_number.is_empty()
         || !activity.lap_time_seconds.is_empty()
@@ -75,13 +92,15 @@ pub fn validate_lap_timing_contract(activity: &ParsedActivity) -> CoreResult<()>
         ));
     }
     for (index, elapsed) in activity.sample_elapsed_seconds.iter().copied().enumerate() {
-        let expected = lap_state_at(&activity.lap_start_elapsed_seconds, elapsed);
-        if activity.lap_number[index] != expected.lap_number {
+        let lap_number = activity.lap_number[index];
+        if lap_number < -1 {
             return Err(CoreError::Activity(format!(
-                "lap_number[{index}] does not match lap_start_elapsed_seconds"
+                "lap_number[{index}] must be -1 or a nonnegative source label"
             )));
         }
-        match (activity.lap_time_seconds[index], expected.lap_time_seconds) {
+        let expected_lap_time =
+            lap_time_at(&activity.lap_start_elapsed_seconds, lap_number, elapsed);
+        match (activity.lap_time_seconds[index], expected_lap_time) {
             (None, None) => {}
             (Some(actual), Some(expected))
                 if actual.is_finite() && actual >= 0.0 && (actual - expected).abs() <= 1e-6 => {}
