@@ -157,8 +157,8 @@ pub(super) fn lap_log_header_style(style: &ResolvedTextStyle) -> ResolvedTextSty
 
 /// Measures the right edge of each lap-log table column.
 ///
-/// Column widths account for headers, completed lap values, active lap values,
-/// and all delta values so the table does not shift as the activity advances.
+/// Numeric slots use the widest digit in the widget font, so proportional fonts
+/// remain stable without measuring every frame-aligned value.
 pub(super) fn log_column_rights(
     style: &ResolvedTextStyle,
     dense_activity: &DenseActivityReport,
@@ -170,56 +170,64 @@ pub(super) fn log_column_rights(
         style.font_name.as_deref(),
         style.font_size * LABEL_FONT_RATIO,
     )?;
-    let row_width = |text: &str| measure_text_with_font(text, &row_font).width;
     let header_width = |text: &str| measure_text_with_font(text, &header_font).width;
+    let character_width = |character: char| {
+        let mut buffer = [0; 4];
+        measure_text_with_font(character.encode_utf8(&mut buffer), &row_font).width
+    };
+    let widest_digit = ('0'..='9').map(&character_width).fold(0.0, f32::max);
+    let widest_sign = character_width('+').max(character_width('-'));
+    let colon_width = character_width(':');
+    let decimal_point_width = character_width('.');
 
-    let lap_width = (1..=dense_activity.series.lap_durations_seconds.len() + 1)
-        .map(|lap_number| row_width(&lap_number.to_string()))
-        .fold(header_width("LAP"), f32::max);
-    let time_width = dense_activity
+    let max_completed_lap_time = dense_activity
         .series
         .lap_durations_seconds
         .iter()
         .copied()
-        .map(super::text::format_lap_duration)
-        .chain(
-            dense_activity
+        .fold(0.0, f64::max);
+    let max_current_lap_time = dense_activity
+        .frame_elapsed_seconds
+        .last()
+        .and_then(|activity_end| {
+            let started_lap_count = dense_activity
                 .series
-                .lap_time_seconds
-                .iter()
-                .flatten()
-                .copied()
-                .map(super::text::format_lap_duration),
-        )
-        .map(|text| row_width(&text))
-        .fold(header_width("TIME"), f32::max);
-    let completed_deltas = dense_activity
-        .series
-        .lap_durations_seconds
-        .iter()
-        .enumerate()
-        .map(|(lap_index, duration)| {
-            let delta = lap_index.checked_sub(1).map(|previous_index| {
-                *duration - dense_activity.series.lap_durations_best_so_far_seconds[previous_index]
-            });
-            super::text::format_lap_delta(delta)
-        });
-    let delta_width = completed_deltas
-        .chain(
-            dense_activity
-                .series
-                .delta_to_best_lap_seconds
-                .iter()
-                .copied()
-                .map(super::text::format_lap_delta),
-        )
-        .map(|text| row_width(&text))
-        .fold(header_width("DELTA"), f32::max);
+                .lap_start_elapsed_seconds
+                .partition_point(|lap_start| lap_start <= activity_end);
+            started_lap_count.checked_sub(1).map(|lap_index| {
+                activity_end - dense_activity.series.lap_start_elapsed_seconds[lap_index]
+            })
+        })
+        .unwrap_or(0.0);
+    let max_lap_hundredths =
+        (max_completed_lap_time.max(max_current_lap_time) * 100.0).round() as u64;
+    let uses_hours = max_lap_hundredths >= 360_000;
+    let hour_digits = if uses_hours {
+        decimal_digit_count(max_lap_hundredths / 360_000).max(2)
+    } else {
+        0
+    };
+    let lap_digits =
+        decimal_digit_count(dense_activity.series.lap_durations_seconds.len() as u64 + 1);
+    let time_digits = if uses_hours { hour_digits + 6 } else { 6 };
+    let time_colons = if uses_hours { 2 } else { 1 };
+    let delta_integer_digits = decimal_digit_count(max_lap_hundredths / 100);
+
+    let lap_width = header_width("LAP").max(lap_digits as f32 * widest_digit);
+    let time_width = header_width("TIME").max(
+        time_digits as f32 * widest_digit + time_colons as f32 * colon_width + decimal_point_width,
+    );
+    let delta_width = header_width("DELTA")
+        .max(widest_sign + (delta_integer_digits + 2) as f32 * widest_digit + decimal_point_width);
     let gap = style.font_size * LOG_COLUMN_GAP_RATIO;
     let lap_right = style.x + lap_width;
     let time_right = lap_right + gap + time_width;
     let delta_right = time_right + gap + delta_width;
     Ok([lap_right, time_right, delta_right])
+}
+
+fn decimal_digit_count(value: u64) -> usize {
+    value.max(1).ilog10() as usize + 1
 }
 
 /// Positions one right-aligned lap-log cell at the supplied top coordinate.

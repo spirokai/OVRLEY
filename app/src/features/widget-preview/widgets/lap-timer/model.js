@@ -1,13 +1,6 @@
 import { getPreviewFontFamily, getPreviewTextBaseline, getPreviewVerticalMetrics, measurePreviewText } from '../../shared/textMeasurement'
 import { getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
-import {
-  buildLapLogCompletedRows,
-  formatLapDelta,
-  formatLapDuration,
-  getLapLogFrameState,
-  getLapTimerDisplayState,
-  LAP_LOG_HEADERS,
-} from './lapTimer'
+import { buildLapLogCompletedRows, getLapLogFrameState, getLapTimerDisplayState, LAP_LOG_HEADERS } from './lapTimer'
 
 const LINE_HEIGHT_RATIO = 0.92
 const LABEL_FONT_RATIO = 0.35
@@ -16,37 +9,46 @@ const LOG_ROW_GAP_RATIO = 0.38
 const LOG_HEADER_OPACITY = 0.7
 const TABLE_VERTICAL_METRICS_TEXT = '0123456789+-:.'
 
-function maxMeasuredWidth(entries, fontFamily) {
-  return Math.max(...entries.map(({ text, fontSize }) => measurePreviewText(text, fontSize, fontFamily).width))
+function decimalDigitCount(value) {
+  return Math.max(1, Math.floor(Math.log10(Math.max(1, value))) + 1)
+}
+
+function getLapLogSizing(activity) {
+  if (activity === null) return { lapDigits: 1, timeDigits: 6, timeColons: 1, deltaIntegerDigits: 1 }
+
+  const maxCompletedLapTime = activity.lap_durations_seconds.reduce((maximum, duration) => Math.max(maximum, duration), 0)
+  const lastLapStart = activity.lap_start_elapsed_seconds.at(-1)
+  const maxCurrentLapTime = lastLapStart === undefined ? 0 : Math.max(0, activity.trim_end_seconds - lastLapStart)
+  const maxLapHundredths = Math.round(Math.max(maxCompletedLapTime, maxCurrentLapTime) * 100)
+  const usesHours = maxLapHundredths >= 360_000
+  const hourDigits = usesHours ? Math.max(2, decimalDigitCount(Math.floor(maxLapHundredths / 360_000))) : 0
+
+  return {
+    lapDigits: decimalDigitCount(activity.lap_durations_seconds.length + 1),
+    timeDigits: usesHours ? hourDigits + 6 : 6,
+    timeColons: usesHours ? 2 : 1,
+    deltaIntegerDigits: decimalDigitCount(Math.floor(maxLapHundredths / 100)),
+  }
 }
 
 function getLapLogColumnRights(activity, fontSize, headerFontSize, fontFamily) {
-  const lapTexts =
-    activity === null
-      ? []
-      : [...activity.lap_durations_seconds.map((_, index) => String(index + 1)), String(activity.lap_durations_seconds.length + 1)]
-  const timeTexts =
-    activity === null
-      ? []
-      : [
-          ...activity.lap_durations_seconds.map(formatLapDuration),
-          ...activity.lap_time_seconds.filter((value) => value !== null).map(formatLapDuration),
-        ]
-  const deltaTexts =
-    activity === null
-      ? []
-      : [
-          ...activity.lap_durations_seconds.map((duration, index) =>
-            formatLapDelta(index === 0 ? null : duration - activity.lap_durations_best_so_far_seconds[index - 1]),
-          ),
-          ...activity.delta_to_best_lap_seconds.map(formatLapDelta),
-        ]
+  const sizing = getLapLogSizing(activity)
+  const measureRowCharacter = (character) => measurePreviewText(character, fontSize, fontFamily).width
+  const widestDigit = Math.max(...'0123456789'.split('').map(measureRowCharacter))
+  const widestSign = Math.max(measureRowCharacter('+'), measureRowCharacter('-'))
+  const colonWidth = measureRowCharacter(':')
+  const decimalPointWidth = measureRowCharacter('.')
+  const rowWidths = [
+    sizing.lapDigits * widestDigit,
+    sizing.timeDigits * widestDigit + sizing.timeColons * colonWidth + decimalPointWidth,
+    widestSign + (sizing.deltaIntegerDigits + 2) * widestDigit + decimalPointWidth,
+  ]
   const gap = fontSize * LOG_COLUMN_GAP_RATIO
-  const columnWidth = (columnIndex, texts) =>
-    maxMeasuredWidth([{ text: LAP_LOG_HEADERS[columnIndex], fontSize: headerFontSize }, ...texts.map((text) => ({ text, fontSize }))], fontFamily)
-  const lapRight = columnWidth(0, lapTexts)
-  const timeRight = lapRight + gap + columnWidth(1, timeTexts)
-  return [lapRight, timeRight, timeRight + gap + columnWidth(2, deltaTexts)]
+  const columnWidth = (columnIndex) =>
+    Math.max(rowWidths[columnIndex], measurePreviewText(LAP_LOG_HEADERS[columnIndex], headerFontSize, fontFamily).width)
+  const lapRight = columnWidth(0)
+  const timeRight = lapRight + gap + columnWidth(1)
+  return [lapRight, timeRight, timeRight + gap + columnWidth(2)]
 }
 
 function buildLapLogRow({ texts, opacityMultiplier, fontSize, lineHeight, top, deltaColor, color, columnRights, fontFamily }) {
