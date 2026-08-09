@@ -22,116 +22,14 @@ mod common;
 
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
 use ovrley_core::debug::RenderProfiler;
-use ovrley_core::normalize::raw::ValueConfig;
+use ovrley_core::normalize::{raw::RenderConfig, validate_render_config};
 use ovrley_core::render::surface::create_surface;
-use ovrley_core::render::text::ResolvedTextStyle;
 use ovrley_core::render::widgets::metric_presentation::draw_metric_presentation;
-use ovrley_core::render::widgets::types::{HeadingWidgetCache, PresentationCache};
+use ovrley_core::render::widgets::types::{HeadingWidgetCache, PreparedValue};
 use ovrley_core::types::{DisplayType, MetricKind};
-use skia_safe::Color;
 use std::collections::BTreeMap;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
-
-fn default_value_config(display_type: DisplayType) -> ValueConfig {
-    ValueConfig {
-        value: MetricKind::Heading,
-        x: 100.0,
-        y: 200.0,
-        font: None,
-        font_family: None,
-        font_size: None,
-        color: None,
-        opacity: None,
-        suffix: None,
-        prefix: None,
-        unit: None,
-        hours_offset: None,
-        time_format: None,
-        format: None,
-        decimal_rounding: None,
-        decimals: None,
-        show_icon: None,
-        icon_color: None,
-        icon_size: None,
-        icon_offset_x: None,
-        icon_offset_y: None,
-        show_units: None,
-        show_full_distance: None,
-        show_full_ascent: None,
-        coordinate_format: None,
-        unit_color: None,
-        display_unit: None,
-        balance_format: None,
-        value_offset: None,
-        triangle_positive_color: None,
-        triangle_negative_color: None,
-        show_sign: None,
-        show_triangle: None,
-        triangle_width: None,
-        shadow_color: None,
-        shadow_strength: None,
-        shadow_distance: None,
-        border_color: None,
-        border_thickness: None,
-        border_strength: None,
-        border_distance: None,
-        display_type,
-        lap_timer_mode: None,
-        show_label: None,
-        label: None,
-        positive_delta_color: None,
-        negative_delta_color: None,
-        width: None,
-        height: None,
-        rotation: None,
-        orientation: None,
-        arc_angle: None,
-        corner_orientation: None,
-        inner_widget_offset_x: None,
-        inner_widget_offset_y: None,
-        value_offset_x: None,
-        value_offset_y: None,
-        track_thickness: None,
-        track_corner_radius: None,
-        track_border_thickness: None,
-        track_border_color: None,
-        track_empty_color: None,
-        track_empty_opacity: None,
-        track_filled_color: None,
-        track_filled_opacity: None,
-        track_fill_flat: None,
-        track_fill_style: None,
-        bar_count: None,
-        bar_gap: None,
-        show_min_max_labels: None,
-        min_max_label_font: None,
-        min_max_label_font_size: None,
-        min_max_label_position: None,
-        min_max_label_color: None,
-        diameter: None,
-        fill_color: None,
-        fill_opacity: None,
-        border_opacity: None,
-        marker_size: None,
-        marker_color: None,
-        marker_opacity: None,
-        axis_horizontal: None,
-        axis_vertical: None,
-        invert_horizontal: None,
-        invert_vertical: None,
-        clip_percentile: None,
-        label_font: None,
-        label_font_size: None,
-        label_color: None,
-        label_decimals: None,
-        label_unit: None,
-        label_unit_color: None,
-        label_offset_x: None,
-        label_offset_y: None,
-        extra: BTreeMap::new(),
-    }
-}
 
 fn default_heading_cache(display_type: DisplayType) -> HeadingWidgetCache {
     HeadingWidgetCache {
@@ -158,20 +56,25 @@ fn default_heading_cache(display_type: DisplayType) -> HeadingWidgetCache {
     }
 }
 
-fn presentation_caches_with(
-    idx: usize,
-    display_type: DisplayType,
-) -> BTreeMap<usize, PresentationCache> {
-    let mut caches = BTreeMap::new();
-    caches.insert(
-        idx,
-        PresentationCache::HeadingTape(default_heading_cache(display_type)),
-    );
-    caches
+fn validated_value(value: serde_json::Value) -> PreparedValue {
+    let raw = RenderConfig {
+        scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
+        backdrops: vec![],
+        labels: vec![],
+        values: vec![serde_json::from_value(value).unwrap()],
+        plots: serde_json::Value::Object(serde_json::Map::new()),
+        extra: BTreeMap::new(),
+    };
+    validate_render_config(raw).unwrap().values.remove(0)
 }
 
-fn empty_caches() -> BTreeMap<usize, PresentationCache> {
-    BTreeMap::new()
+fn prepared_heading(cache_display_type: Option<DisplayType>) -> PreparedValue {
+    let mut value = validated_value(full_heading_tape_config(100, 200));
+    let PreparedValue::HeadingTape(widget) = &mut value else {
+        panic!("heading tape config must produce a typed heading value")
+    };
+    widget.cache = cache_display_type.map(default_heading_cache);
+    value
 }
 
 fn empty_dense_series() -> DenseSeriesReport {
@@ -191,207 +94,47 @@ fn default_dense_activity() -> DenseActivityReport {
     }
 }
 
-fn default_style() -> ResolvedTextStyle {
-    ResolvedTextStyle {
-        x: 0.0,
-        y: 0.0,
-        font_name: None,
-        font_size: 60.0,
-        line_height: 55.2,
-        color: Color::WHITE,
-        opacity: 1.0,
-        shadow_color: None,
-        shadow_strength: 0.0,
-        shadow_distance: 0.0,
-        border_color: None,
-        border_thickness: 0.0,
-    }
-}
-
-// ── DisplayType dispatch ──────────────────────────────────────────────────
+// ── Typed prepared-value dispatch ──────────────────────────────────────────
 
 #[test]
-fn text_display_type_returns_none_from_presentation_dispatch() {
-    let value = default_value_config(DisplayType::Text);
+fn intrinsic_text_value_returns_none_from_presentation_dispatch() {
+    let value = validated_value(full_speed_text_config(100, 200));
     let dense = default_dense_activity();
-    let style = default_style();
-    let mut surface = create_surface(1920, 1080).unwrap();
-    let mut profiler = RenderProfiler::default();
-    let caches = empty_caches();
-
-    let result = draw_metric_presentation(
-        surface.canvas(),
-        value.value,
-        value.display_type,
-        &style,
-        &dense,
-        0,
-        1.0,
-        &[],
-        &caches,
-        0,
-        &mut profiler,
-    );
-
-    assert!(
-        result.is_none(),
-        "Text display type should return None from presentation dispatch"
-    );
-}
-
-#[test]
-fn tape_display_type_with_heading_cache_draws_successfully() {
-    let value = default_value_config(DisplayType::Tape);
-    let dense = default_dense_activity();
-    let style = default_style();
-    let caches = presentation_caches_with(0, DisplayType::Tape);
     let mut surface = create_surface(1920, 1080).unwrap();
     let mut profiler = RenderProfiler::default();
 
-    let result = draw_metric_presentation(
-        surface.canvas(),
-        value.value,
-        value.display_type,
-        &style,
-        &dense,
-        0,
-        1.0,
-        &[],
-        &caches,
-        0,
-        &mut profiler,
-    );
+    let result =
+        draw_metric_presentation(surface.canvas(), &value, &dense, 0, 1.0, &[], &mut profiler);
 
-    assert!(
-        result.is_some(),
-        "Tape display with heading cache should produce a report"
-    );
-    let report = result.unwrap();
-    assert_eq!(report.geometry.widget_width, 400);
-    assert_eq!(report.geometry.widget_height, 80);
+    assert!(result.is_none());
 }
 
 #[test]
-fn tape_display_type_without_cache_returns_none() {
-    let value = default_value_config(DisplayType::Tape);
+fn typed_heading_value_with_cache_draws_successfully() {
+    let value = prepared_heading(Some(DisplayType::Tape));
     let dense = default_dense_activity();
-    let style = default_style();
     let mut surface = create_surface(1920, 1080).unwrap();
     let mut profiler = RenderProfiler::default();
-    let caches = empty_caches();
 
-    let result = draw_metric_presentation(
-        surface.canvas(),
-        value.value,
-        value.display_type,
-        &style,
-        &dense,
-        0,
-        1.0,
-        &[],
-        &caches,
-        0,
-        &mut profiler,
-    );
+    let result =
+        draw_metric_presentation(surface.canvas(), &value, &dense, 0, 1.0, &[], &mut profiler)
+            .expect("prepared heading tape must draw");
 
-    assert!(
-        result.is_none(),
-        "Tape display without cache should return None"
-    );
+    assert_eq!(result.geometry.widget_width, 400);
+    assert_eq!(result.geometry.widget_height, 80);
 }
 
 #[test]
-fn tape_display_type_with_text_cache_returns_none() {
-    let value = default_value_config(DisplayType::Tape);
+fn typed_heading_value_without_prepared_cache_returns_none() {
+    let value = prepared_heading(None);
     let dense = default_dense_activity();
-    let style = default_style();
-    let caches = presentation_caches_with(0, DisplayType::Text);
     let mut surface = create_surface(1920, 1080).unwrap();
     let mut profiler = RenderProfiler::default();
 
-    let result = draw_metric_presentation(
-        surface.canvas(),
-        value.value,
-        value.display_type,
-        &style,
-        &dense,
-        0,
-        1.0,
-        &[],
-        &caches,
-        0,
-        &mut profiler,
-    );
+    let result =
+        draw_metric_presentation(surface.canvas(), &value, &dense, 0, 1.0, &[], &mut profiler);
 
-    assert!(
-        result.is_none(),
-        "Tape display with Text cache should return None (presentation switched away)"
-    );
-}
-
-#[test]
-fn tape_display_type_with_non_heading_metric_returns_none() {
-    let mut value = default_value_config(DisplayType::Tape);
-    value.value = MetricKind::Speed;
-    let dense = default_dense_activity();
-    let style = default_style();
-    let caches = presentation_caches_with(0, DisplayType::Tape);
-    let mut surface = create_surface(1920, 1080).unwrap();
-    let mut profiler = RenderProfiler::default();
-
-    let result = draw_metric_presentation(
-        surface.canvas(),
-        value.value,
-        value.display_type,
-        &style,
-        &dense,
-        0,
-        1.0,
-        &[],
-        &caches,
-        0,
-        &mut profiler,
-    );
-
-    assert!(
-        result.is_none(),
-        "Tape display with non-heading metric should return None"
-    );
-}
-
-#[test]
-fn future_boxed_display_types_return_none() {
-    let dense = default_dense_activity();
-    let style = default_style();
-    let mut surface = create_surface(1920, 1080).unwrap();
-    let mut profiler = RenderProfiler::default();
-    let caches = empty_caches();
-
-    for display_type in [
-        DisplayType::Linear,
-        DisplayType::Arc,
-        DisplayType::Corner,
-        DisplayType::LeanAngle,
-    ] {
-        let value = default_value_config(display_type);
-        let result = draw_metric_presentation(
-            surface.canvas(),
-            value.value,
-            value.display_type,
-            &style,
-            &dense,
-            0,
-            1.0,
-            &[],
-            &caches,
-            0,
-            &mut profiler,
-        );
-        assert!(
-            result.is_none(),
-            "Future display type {display_type:?} should return None until implemented"
-        );
-    }
+    assert!(result.is_none());
 }
 
 fn full_heading_tape_config(x: i32, y: i32) -> serde_json::Value {
@@ -468,7 +211,6 @@ fn prepare_assets_distinct_caches_per_value_index() {
     use ovrley_core::normalize::validate_render_config;
     use ovrley_core::paths::AppPaths;
     use ovrley_core::render::widgets::prepare_render_assets;
-    use ovrley_core::render::widgets::types::PresentationCache;
     use std::path::PathBuf;
 
     let heading_tape_at_pos_0 = full_heading_tape_config(10, 20);
@@ -512,31 +254,21 @@ fn prepare_assets_distinct_caches_per_value_index() {
 
     let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
 
-    assert_eq!(
-        assets.presentation_caches.len(),
-        2,
-        "Two heading_tape values should produce two distinct caches"
-    );
+    let PreparedValue::HeadingTape(widget_0) = &assets.values()[0] else {
+        panic!("index 0 must remain a heading tape")
+    };
+    let PreparedValue::StandardText(_) = &assets.values()[1] else {
+        panic!("index 1 must remain intrinsic text")
+    };
+    let PreparedValue::HeadingTape(widget_2) = &assets.values()[2] else {
+        panic!("index 2 must remain a heading tape")
+    };
+    let cache_0 = widget_0.cache.as_ref().expect("index 0 must own its cache");
+    let cache_2 = widget_2.cache.as_ref().expect("index 2 must own its cache");
 
-    let cache_0 = assets.presentation_caches.get(&0);
-    let cache_2 = assets.presentation_caches.get(&2);
-    assert!(cache_0.is_some(), "Cache should exist at index 0");
-    assert!(cache_2.is_some(), "Cache should exist at index 2");
-    assert!(
-        assets.presentation_caches.get(&1).is_none(),
-        "No cache at index 1 (speed_text)"
-    );
-
-    if let (Some(PresentationCache::HeadingTape(c0)), Some(PresentationCache::HeadingTape(c2))) =
-        (cache_0, cache_2)
-    {
-        assert_ne!(
-            c0.x, c2.x,
-            "Caches at different indices should reflect different value positions"
-        );
-        assert_eq!(c0.x, 10.0, "Index-0 cache should use index-0 position");
-        assert_eq!(c2.x, 400.0, "Index-2 cache should use index-2 position");
-    }
+    assert_ne!(cache_0.x, cache_2.x);
+    assert_eq!(cache_0.x, 10.0);
+    assert_eq!(cache_2.x, 400.0);
 }
 
 // ── Full-frame: boxed-widget report collection ────────────────────────────

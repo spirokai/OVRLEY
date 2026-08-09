@@ -23,7 +23,10 @@ mod time;
 mod value;
 
 use crate::error::{CoreError, CoreResult};
-use crate::render::widgets::types::{PreparedLapTimer, PreparedValue};
+use crate::render::widgets::types::{
+    PreparedArcGauge, PreparedGForce, PreparedHeadingTape, PreparedLapTimer, PreparedLeanAngle,
+    PreparedLinearGauge, PreparedValue,
+};
 use crate::types::{DisplayType, MetricKind};
 use raw::RenderConfig;
 
@@ -147,15 +150,30 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
         .map(|(idx, value)| {
             if value.value == MetricKind::GForce && value.display_type == DisplayType::GForce {
                 let value = value.with_promoted_display_variant("g_force")?;
-                return validate_g_force(value, idx).map(PreparedValue::GForce);
+                return validate_g_force(value, idx).map(|validated| {
+                    PreparedValue::GForce(PreparedGForce {
+                        validated,
+                        cache: None,
+                    })
+                });
             }
             if value.value == MetricKind::Heading && value.display_type == DisplayType::Tape {
-                return validate_heading(&value, idx, &scene).map(PreparedValue::HeadingTape);
+                return validate_heading(&value, idx, &scene).map(|validated| {
+                    PreparedValue::HeadingTape(PreparedHeadingTape {
+                        validated,
+                        cache: None,
+                    })
+                });
             }
             if value.value == MetricKind::LeanAngle && value.display_type == DisplayType::LeanAngle
             {
                 let value = value.with_promoted_display_variant("lean_angle")?;
-                return validate_lean_angle(value, idx).map(PreparedValue::LeanAngle);
+                return validate_lean_angle(value, idx).map(|validated| {
+                    PreparedValue::LeanAngle(PreparedLeanAngle {
+                        validated,
+                        cache: None,
+                    })
+                });
             }
             if value.value == MetricKind::Gradient {
                 return validate_gradient_widget(value, idx).map(PreparedValue::Gradient);
@@ -173,15 +191,30 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
             }
             if value.display_type == DisplayType::Linear {
                 let value = value.with_promoted_display_variant("linear")?;
-                return validate_linear_gauge(value, idx).map(PreparedValue::LinearGauge);
+                return validate_linear_gauge(value, idx).map(|validated| {
+                    PreparedValue::LinearGauge(PreparedLinearGauge {
+                        validated,
+                        cache: None,
+                    })
+                });
             }
             if value.display_type == DisplayType::Arc {
                 let value = value.with_promoted_display_variant("arc")?;
-                return validate_arc_gauge(value, idx).map(PreparedValue::ArcGauge);
+                return validate_arc_gauge(value, idx).map(|validated| {
+                    PreparedValue::ArcGauge(PreparedArcGauge {
+                        validated,
+                        cache: None,
+                    })
+                });
             }
             if value.display_type == DisplayType::Corner {
                 let value = value.with_promoted_display_variant("corner")?;
-                return validate_corner_gauge(value, idx).map(PreparedValue::ArcGauge);
+                return validate_corner_gauge(value, idx).map(|validated| {
+                    PreparedValue::ArcGauge(PreparedArcGauge {
+                        validated,
+                        cache: None,
+                    })
+                });
             }
             validate_value_widget(value, idx).map(PreparedValue::StandardText)
         })
@@ -249,7 +282,10 @@ impl ValidatedRenderConfig {
 
         for value in &self.values {
             if let PreparedValue::GForce(widget) = value {
-                for axis in [widget.axis_horizontal, widget.axis_vertical] {
+                for axis in [
+                    widget.validated.axis_horizontal,
+                    widget.validated.axis_vertical,
+                ] {
                     match axis {
                         GForceAxis::X => requirements.g_force_x = true,
                         GForceAxis::Y => requirements.g_force_y = true,

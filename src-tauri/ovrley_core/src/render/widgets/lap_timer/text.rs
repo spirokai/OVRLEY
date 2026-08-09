@@ -75,7 +75,7 @@ pub fn format_lap_delta(delta_seconds: Option<f64>) -> String {
 pub(super) fn lap_state_at_frame(
     dense_activity: &DenseActivityReport,
     frame_index: usize,
-) -> CoreResult<crate::activity::lap::LapState> {
+) -> CoreResult<crate::activity::lap_timing::LapState> {
     let elapsed = dense_activity
         .frame_elapsed_seconds
         .get(frame_index)
@@ -91,10 +91,23 @@ pub(super) fn lap_state_at_frame(
         .get(frame_index)
         .copied()
         .flatten()
-        .ok_or_else(|| CoreError::Render(format!("lap_number is missing at frame {frame_index}")))?;
-    Ok(crate::activity::lap::lap_state_at(
+        .ok_or_else(|| {
+            CoreError::Render(format!("lap_number is missing at frame {frame_index}"))
+        })?;
+    let lap_time_seconds = dense_activity
+        .series
+        .lap_time_seconds
+        .get(frame_index)
+        .copied()
+        .ok_or_else(|| {
+            CoreError::Render(format!(
+                "lap_time_seconds is missing at frame {frame_index}"
+            ))
+        })?;
+    Ok(crate::activity::lap_timing::lap_state_from_aligned(
         &dense_activity.series.lap_start_elapsed_seconds,
         lap_number,
+        lap_time_seconds,
         elapsed,
     ))
 }

@@ -44,7 +44,6 @@ use crate::error::CoreResult;
 use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
 use crate::render::widgets::types::PreparedValue;
-use std::collections::BTreeMap;
 
 pub(crate) use backdrop::draw_backdrops_static_layer;
 pub(crate) use elevation::draw_elevation_widget;
@@ -55,9 +54,7 @@ pub use lap_timer::{lap_log_text_state, lap_timer_value_text, LapLogTextState};
 pub use lean_angle::{draw_lean_angle_widget, prepare_lean_angle_cache};
 pub use metric_presentation::draw_metric_presentation;
 pub(crate) use route::draw_route_widget;
-pub use types::{
-    MetricPresentationReport, PreparedRenderAssets, PresentationCache, WidgetRenderReport,
-};
+pub use types::{MetricPresentationReport, PreparedRenderAssets, WidgetRenderReport};
 pub(crate) use value::{
     draw_metric_value_widget_with_config, draw_static_metric_icon_for_value_validated,
     has_static_metric_icon_validated,
@@ -93,7 +90,6 @@ pub fn prepare_render_assets(
         values,
         route_cache: None,
         elevation_cache: None,
-        presentation_caches: BTreeMap::new(),
         base_rgba: None,
     };
 
@@ -117,66 +113,56 @@ pub fn prepare_render_assets(
         )?);
     }
 
-    for (idx, value) in assets.values.iter_mut().enumerate() {
+    for value in &mut assets.values {
         match value {
-            PreparedValue::HeadingTape(validated) => {
+            PreparedValue::HeadingTape(widget) => {
                 let cache = heading::prepare_heading_cache(
                     &assets.scene,
-                    validated,
+                    &widget.validated,
                     &paths.font_dirs,
                     prepare_profiler,
                 )?;
-                assets
-                    .presentation_caches
-                    .insert(idx, types::PresentationCache::HeadingTape(cache));
+                widget.cache = Some(cache);
             }
-            PreparedValue::LinearGauge(validated) => {
+            PreparedValue::LinearGauge(widget) => {
                 let cache = gauges::linear::prepare_linear_gauge_cache(
-                    validated,
+                    &widget.validated,
                     dense_activity,
                     &assets.scene,
                     assets.scene.scale,
                     &paths.font_dirs,
                     prepare_profiler,
                 )?;
-                assets
-                    .presentation_caches
-                    .insert(idx, types::PresentationCache::LinearGauge(cache));
+                widget.cache = Some(cache);
             }
-            PreparedValue::ArcGauge(validated) => {
+            PreparedValue::ArcGauge(widget) => {
                 let cache = gauges::arc::prepare_arc_gauge_cache(
-                    validated,
+                    &widget.validated,
                     dense_activity,
                     &assets.scene,
                     assets.scene.scale,
                     &paths.font_dirs,
                     prepare_profiler,
                 )?;
-                assets
-                    .presentation_caches
-                    .insert(idx, types::PresentationCache::ArcGauge(cache));
+                widget.cache = Some(cache);
             }
-            PreparedValue::LeanAngle(validated) => {
+            PreparedValue::LeanAngle(widget) => {
                 let cache = lean_angle::prepare_lean_angle_cache(
-                    validated,
+                    &widget.validated,
                     &assets.scene,
                     prepare_profiler,
                 )?;
-                assets
-                    .presentation_caches
-                    .insert(idx, types::PresentationCache::LeanAngle(cache));
+                widget.cache = Some(cache);
             }
-            PreparedValue::GForce(validated) => {
+            PreparedValue::GForce(widget) => {
                 let cache = g_force::prepare_g_force_cache(
-                    validated,
+                    &widget.validated,
                     &assets.scene,
                     activity,
                     dense_activity,
                     prepare_profiler,
                 )?;
-                assets
-                    .presentation_caches
-                    .insert(idx, types::PresentationCache::GForce(cache));
+                widget.cache = Some(cache);
             }
             PreparedValue::LapTimer(widget) => {
                 let cache = lap_timer::prepare_lap_timer_cache(

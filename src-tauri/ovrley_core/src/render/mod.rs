@@ -28,7 +28,7 @@ use crate::render::static_layer::{cached_labels_image, config_has_static_metric_
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
 use crate::render::text::{
     validated_gradient_style, validated_lap_timer_style, validated_time_style,
-    validated_value_style, ResolvedTextStyle,
+    validated_value_style,
 };
 use crate::render::widgets::types::PreparedValue;
 use crate::render::widgets::value::MetricWidgetRequest;
@@ -651,43 +651,18 @@ fn render_frame_to_surface(
         Ok(())
     })?;
 
-    // Phase 2: Boxed metric presentation rendering, dispatched by DisplayType.
-    // Each value looks up its own presentation cache by index. Types without
-    // a cache (unimplemented placeholders) are skipped — nothing to draw.
+    // Phase 2: boxed values draw through the typed cache they own.
+    // A missing cache means preparation did not produce a drawable presentation.
     let mut metric_presentations = Vec::new();
     for (idx, value) in &boxed_values {
-        let Some(_cache) = prepared_assets.presentation_caches.get(idx) else {
-            continue;
-        };
-        // Heading tape is the only boxed type with a cache. Its draw function
-        // ignores the style (heading data comes from dense_activity), so we
-        // construct a no-op default here rather than falling back to legacy
-        // scene/value resolution.
-        let default_style = ResolvedTextStyle {
-            x: value.x(),
-            y: value.y(),
-            font_name: None,
-            font_size: 1.0,
-            line_height: 1.0,
-            color: skia_safe::Color::TRANSPARENT,
-            opacity: 0.0,
-            shadow_color: None,
-            shadow_strength: 0.0,
-            shadow_distance: 0.0,
-            border_color: None,
-            border_thickness: 0.0,
-        };
+        // Dispatch reads the cache directly from this prepared value.
         let report = draw_metric_presentation(
             canvas,
-            value.metric_kind(),
-            value.display_type(),
-            &default_style,
+            value,
             dense_activity,
             frame_index,
             scale,
             &paths.font_dirs,
-            &prepared_assets.presentation_caches,
-            *idx,
             frame_profiler,
         );
         if let Some(report) = report {

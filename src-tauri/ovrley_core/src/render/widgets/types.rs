@@ -57,14 +57,39 @@ pub struct MetricPresentationReport {
     pub widget: WidgetRenderReport,
 }
 
-/// Per-widget presentation cache, keyed by value index in the config array.
+/// Validated heading-tape configuration together with its typed cache.
 #[derive(Clone, Debug)]
-pub enum PresentationCache {
-    HeadingTape(HeadingWidgetCache),
-    LeanAngle(LeanAngleCache),
-    LinearGauge(LinearGaugeCache),
-    ArcGauge(ArcGaugeCache),
-    GForce(GForceWidgetCache),
+pub struct PreparedHeadingTape {
+    pub validated: ValidatedHeading,
+    pub cache: Option<HeadingWidgetCache>,
+}
+
+/// Validated lean-angle configuration together with its typed cache.
+#[derive(Clone, Debug)]
+pub struct PreparedLeanAngle {
+    pub validated: ValidatedLeanAngleWidget,
+    pub cache: Option<LeanAngleCache>,
+}
+
+/// Validated linear-gauge configuration together with its typed cache.
+#[derive(Clone, Debug)]
+pub struct PreparedLinearGauge {
+    pub validated: ValidatedLinearGaugeWidget,
+    pub cache: Option<LinearGaugeCache>,
+}
+
+/// Validated arc/corner-gauge configuration together with its typed cache.
+#[derive(Clone, Debug)]
+pub struct PreparedArcGauge {
+    pub validated: ValidatedArcGaugeWidget,
+    pub cache: Option<ArcGaugeCache>,
+}
+
+/// Validated G-force configuration together with its typed cache.
+#[derive(Clone, Debug)]
+pub struct PreparedGForce {
+    pub validated: ValidatedGForceWidget,
+    pub cache: Option<GForceWidgetCache>,
 }
 
 /// Validated lap-timer configuration together with its render-owned cache.
@@ -80,11 +105,11 @@ pub enum PreparedValue {
     StandardText(ValidatedValueWidget),
     TimeText(ValidatedTimeValue),
     Gradient(ValidatedGradientWidget),
-    HeadingTape(ValidatedHeading),
-    LeanAngle(ValidatedLeanAngleWidget),
-    LinearGauge(ValidatedLinearGaugeWidget),
-    ArcGauge(ValidatedArcGaugeWidget),
-    GForce(ValidatedGForceWidget),
+    HeadingTape(PreparedHeadingTape),
+    LeanAngle(PreparedLeanAngle),
+    LinearGauge(PreparedLinearGauge),
+    ArcGauge(PreparedArcGauge),
+    GForce(PreparedGForce),
     LapTimer(PreparedLapTimer),
 }
 
@@ -96,8 +121,8 @@ impl PreparedValue {
             Self::Gradient(_) => MetricKind::Gradient,
             Self::HeadingTape(_) => MetricKind::Heading,
             Self::LeanAngle(_) => MetricKind::LeanAngle,
-            Self::LinearGauge(value) => value.metric,
-            Self::ArcGauge(value) => value.metric,
+            Self::LinearGauge(value) => value.validated.metric,
+            Self::ArcGauge(value) => value.validated.metric,
             Self::GForce(_) => MetricKind::GForce,
             Self::LapTimer(_) => MetricKind::LapTimer,
         }
@@ -111,7 +136,7 @@ impl PreparedValue {
             Self::HeadingTape(_) => DisplayType::Tape,
             Self::LeanAngle(_) => DisplayType::LeanAngle,
             Self::LinearGauge(_) => DisplayType::Linear,
-            Self::ArcGauge(value) => value.display_type,
+            Self::ArcGauge(value) => value.validated.display_type,
             Self::GForce(_) => DisplayType::GForce,
             Self::LapTimer(_) => DisplayType::LapTimer,
         }
@@ -122,11 +147,11 @@ impl PreparedValue {
             Self::StandardText(value) => value.x,
             Self::TimeText(value) => value.base.x,
             Self::Gradient(value) => value.x,
-            Self::HeadingTape(value) => value.x,
-            Self::LeanAngle(value) => value.x,
-            Self::LinearGauge(value) => value.x,
-            Self::ArcGauge(value) => value.x,
-            Self::GForce(value) => value.x,
+            Self::HeadingTape(value) => value.validated.x,
+            Self::LeanAngle(value) => value.validated.x,
+            Self::LinearGauge(value) => value.validated.x,
+            Self::ArcGauge(value) => value.validated.x,
+            Self::GForce(value) => value.validated.x,
             Self::LapTimer(value) => value.validated.x,
         }
     }
@@ -136,11 +161,11 @@ impl PreparedValue {
             Self::StandardText(value) => value.y,
             Self::TimeText(value) => value.base.y,
             Self::Gradient(value) => value.y,
-            Self::HeadingTape(value) => value.y,
-            Self::LeanAngle(value) => value.y,
-            Self::LinearGauge(value) => value.y,
-            Self::ArcGauge(value) => value.y,
-            Self::GForce(value) => value.y,
+            Self::HeadingTape(value) => value.validated.y,
+            Self::LeanAngle(value) => value.validated.y,
+            Self::LinearGauge(value) => value.validated.y,
+            Self::ArcGauge(value) => value.validated.y,
+            Self::GForce(value) => value.validated.y,
             Self::LapTimer(value) => value.validated.y,
         }
     }
@@ -156,11 +181,15 @@ pub struct PreparedRenderAssets {
     pub(crate) values: Vec<PreparedValue>,
     pub(crate) route_cache: Option<RouteWidgetCache>,
     pub(crate) elevation_cache: Option<ElevationWidgetCache>,
-    pub presentation_caches: BTreeMap<usize, PresentationCache>,
     pub(crate) base_rgba: Option<Vec<u8>>,
 }
 
 impl PreparedRenderAssets {
+    /// Returns values after widget-specific typed caches have been prepared.
+    pub fn values(&self) -> &[PreparedValue] {
+        &self.values
+    }
+
     /// Returns the elevation geometry as a JSON value for parity tests.
     ///
     /// The JSON shape matches `ElevationGeometryResponse` — points as

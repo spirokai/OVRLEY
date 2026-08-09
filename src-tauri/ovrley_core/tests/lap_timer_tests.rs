@@ -244,13 +244,13 @@ fn lap_log_config_requests_all_canonical_lap_series() {
 }
 
 #[test]
-fn renderer_text_uses_boundaries_for_active_lap_time() {
+fn renderer_text_uses_canonical_aligned_lap_time() {
     let mut activity = lap_activity();
-    activity.series.lap_time_seconds[2] = None;
+    activity.series.lap_time_seconds[2] = Some(12.34);
 
     assert_eq!(
         lap_timer_value_text(LapTimerMode::CurrentLap, &activity, 2).unwrap(),
-        "00:00.00"
+        "00:12.34"
     );
 }
 
