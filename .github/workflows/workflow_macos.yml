@@ -175,7 +175,7 @@ jobs:
             fi
 
             hdiutil create -volname OVRLEY -srcfolder "$dmg_staging" -ov -format UDRW "$dmg_read_write" >/dev/null
-            hdiutil attach -readwrite -noautoopen -mountpoint "$dmg_mount" "$dmg_read_write" >/dev/null
+            hdiutil attach -nobrowse -readwrite -noautoopen -mountpoint "$dmg_mount" "$dmg_read_write" >/dev/null
             if ! osascript - "$background_name" "$dmg_finder_name" <<'APPLESCRIPT'
           on run arguments
             set backgroundName to item 1 of arguments
