@@ -79,7 +79,6 @@ pub fn derive_lap_timing(
         &resolved.lap_number,
         &lap_time_seconds,
         &lap_durations_seconds,
-        &lap_durations_best_so_far_seconds,
     );
 
     LapTimingResult {
@@ -159,18 +158,17 @@ fn resolve_from_beacons(elapsed: &[f64], beacons: &[f64]) -> ResolvedLaps {
             lap_start_elapsed: Vec::new(),
         };
     }
-    let lap_number: Vec<i64> = elapsed
+    let mut started_lap_count = 0;
+    let lap_number = elapsed
         .iter()
-        .map(|e| {
-            let mut lap: i64 = -1;
-            for (i, beacon) in beacons.iter().enumerate() {
-                if *e >= *beacon {
-                    lap = i as i64;
-                } else {
-                    break;
-                }
+        .map(|sample_elapsed| {
+            while beacons
+                .get(started_lap_count)
+                .is_some_and(|beacon| *beacon <= *sample_elapsed)
+            {
+                started_lap_count += 1;
             }
-            lap
+            started_lap_count as i64 - 1
         })
         .collect();
     let last_elapsed = elapsed.last().copied().unwrap_or(0.0);
@@ -334,10 +332,9 @@ fn compute_delta_to_best(
     lap_number: &[i64],
     lap_time_series: &[Option<f64>],
     lap_durations: &[f64],
-    best_so_far: &[f64],
 ) -> NumericSeries {
     let n = lap_number.len();
-    if n == 0 || lap_durations.is_empty() || best_so_far.is_empty() {
+    if n == 0 || lap_durations.is_empty() {
         return vec![None; n];
     }
 
@@ -349,6 +346,7 @@ fn compute_delta_to_best(
         &lap_start_distances,
         lap_durations.len(),
     );
+    let reference_lap_indices = best_lap_indices(lap_durations);
 
     let mut delta = vec![None; n];
 
@@ -358,10 +356,10 @@ fn compute_delta_to_best(
             continue;
         }
         let lap_idx = lap as usize;
-        if lap_idx == 0 || lap_idx > best_so_far.len() {
+        if lap_idx == 0 || lap_idx > lap_durations.len() {
             continue;
         }
-        let reference_lap_idx = best_lap_index_for_lap(lap_idx, lap_durations, best_so_far);
+        let reference_lap_idx = reference_lap_indices[lap_idx - 1];
         if reference_lap_idx >= lap_start_distances.len() || lap_idx >= lap_start_distances.len() {
             continue;
         }
@@ -425,15 +423,18 @@ fn compute_lap_start_distances(distance_series: &[Option<f64>], lap_number: &[i6
     start_distances
 }
 
-fn best_lap_index_for_lap(lap_idx: usize, durations: &[f64], best_so_far: &[f64]) -> usize {
-    let target_best = best_so_far[lap_idx - 1];
-    let mut candidate = lap_idx - 1;
-    for i in (0..lap_idx).rev() {
-        if (durations[i] - target_best).abs() < 1e-9 {
-            candidate = i;
-        }
-    }
-    candidate
+fn best_lap_indices(durations: &[f64]) -> Vec<usize> {
+    let mut best_index = 0;
+    durations
+        .iter()
+        .enumerate()
+        .map(|(index, duration)| {
+            if *duration < durations[best_index] {
+                best_index = index;
+            }
+            best_index
+        })
+        .collect()
 }
 
 fn build_reference_lap_points(

@@ -9,7 +9,7 @@ use super::layout::{
     lap_log_header_style,
 };
 use super::text::{
-    delta_at, delta_color, lap_log_frame_state, lap_number_at, lap_timer_label_text,
+    delta_at, delta_color, lap_log_frame_state, lap_state_at_frame, lap_timer_label_text,
     lap_timer_value_text, rgba_color,
 };
 use super::{LINE_HEIGHT_RATIO, LOG_ROW_GAP_RATIO};
@@ -25,7 +25,7 @@ use std::path::PathBuf;
 ///
 /// Lap-log and completed best-lap states use cached layers. Current-lap, delta,
 /// and the initial best-lap state draw their changing value directly.
-pub fn draw_lap_timer(
+pub(crate) fn draw_lap_timer(
     canvas: &Canvas,
     validated: &ValidatedLapTimer,
     cache: &LapTimerWidgetCache,
@@ -35,10 +35,20 @@ pub fn draw_lap_timer(
     font_dirs: &[PathBuf],
 ) -> CoreResult<()> {
     if validated.mode == LapTimerMode::LapLog {
+        let LapTimerWidgetCache::LapLog {
+            header_layer,
+            column_rights,
+            completed_row_layers,
+        } = cache
+        else {
+            return Err(CoreError::Render("lap log has the wrong cache mode".into()));
+        };
         return draw_lap_log_frame(
             canvas,
             validated,
-            cache,
+            header_layer,
+            *column_rights,
+            completed_row_layers,
             dense_activity,
             frame_index,
             style,
@@ -47,19 +57,25 @@ pub fn draw_lap_timer(
     }
 
     if validated.mode == LapTimerMode::BestLap {
-        let lap_number = lap_number_at(dense_activity, frame_index)?;
+        let LapTimerWidgetCache::BestLap { state_layers } = cache else {
+            return Err(CoreError::Render(
+                "best lap has the wrong cache mode".into(),
+            ));
+        };
+        let lap_number = lap_state_at_frame(dense_activity, frame_index)?.lap_number;
         if lap_number > 0 {
-            let layer = cache
-                .state_layers
-                .get(&(lap_number as usize))
-                .ok_or_else(|| {
-                    CoreError::Render(format!(
-                        "best lap cache is missing completed lap {lap_number}"
-                    ))
-                })?;
+            let layer = state_layers.get(&(lap_number as usize)).ok_or_else(|| {
+                CoreError::Render(format!(
+                    "best lap cache is missing completed lap {lap_number}"
+                ))
+            })?;
             draw_cached_layer(canvas, layer);
             return Ok(());
         }
+    } else if !matches!(cache, LapTimerWidgetCache::Dynamic) {
+        return Err(CoreError::Render(
+            "dynamic lap timer has the wrong cache mode".into(),
+        ));
     }
 
     let value = lap_timer_value_text(validated.mode, dense_activity, frame_index)?;
@@ -92,7 +108,9 @@ pub fn draw_lap_timer(
 fn draw_lap_log_frame(
     canvas: &Canvas,
     validated: &ValidatedLapTimer,
-    cache: &LapTimerWidgetCache,
+    header_layer: &crate::render::widgets::types::StaticLayer,
+    column_rights: [f32; 3],
+    completed_row_layers: &[crate::render::widgets::types::StaticLayer],
     dense_activity: &DenseActivityReport,
     frame_index: usize,
     style: &ResolvedTextStyle,
@@ -100,32 +118,30 @@ fn draw_lap_log_frame(
 ) -> CoreResult<()> {
     let state = lap_log_frame_state(dense_activity, frame_index)?;
     let completed_lap_count = state.completed_lap_count;
-    let header_layer = cache
-        .log_header_layer
-        .as_ref()
-        .ok_or_else(|| CoreError::Render("lap log cache is missing the header layer".into()))?;
     draw_cached_layer(canvas, header_layer);
-    if completed_lap_count > 0 {
-        let completed_layer = cache
-            .state_layers
-            .get(&completed_lap_count)
-            .ok_or_else(|| {
-                CoreError::Render(format!(
-                    "lap log cache is missing completed-lap state {completed_lap_count}"
-                ))
-            })?;
-        let completed_rows_offset = if state.current_row.is_some() {
-            style.font_size * (LINE_HEIGHT_RATIO + LOG_ROW_GAP_RATIO)
-        } else {
-            0.0
-        };
-        draw_cached_layer_with_y_offset(canvas, completed_layer, completed_rows_offset);
+    if completed_lap_count > completed_row_layers.len() {
+        return Err(CoreError::Render(format!(
+            "lap log cache is missing completed lap {completed_lap_count}"
+        )));
+    }
+    let row_stride = style.font_size * (LINE_HEIGHT_RATIO + LOG_ROW_GAP_RATIO);
+    let current_row_offset = if state.current_row.is_some() {
+        row_stride
+    } else {
+        0.0
+    };
+    for (display_index, lap_index) in (0..completed_lap_count).rev().enumerate() {
+        draw_cached_layer_with_y_offset(
+            canvas,
+            &completed_row_layers[lap_index],
+            current_row_offset + display_index as f32 * row_stride,
+        );
     }
     if let Some(current_row) = state.current_row {
         draw_current_lap_log_row(
             canvas,
             validated,
-            cache,
+            column_rights,
             style,
             &current_row.cells,
             current_row.delta_seconds,
@@ -139,15 +155,12 @@ fn draw_lap_log_frame(
 fn draw_current_lap_log_row(
     canvas: &Canvas,
     validated: &ValidatedLapTimer,
-    cache: &LapTimerWidgetCache,
+    column_rights: [f32; 3],
     style: &ResolvedTextStyle,
     cells: &[String; 3],
     delta_seconds: Option<f64>,
     font_dirs: &[PathBuf],
 ) -> CoreResult<()> {
-    let column_rights = cache
-        .log_column_rights
-        .ok_or_else(|| CoreError::Render("lap log cache is missing column layout".into()))?;
     let row_gap = style.font_size * LOG_ROW_GAP_RATIO;
     draw_log_row(
         canvas,

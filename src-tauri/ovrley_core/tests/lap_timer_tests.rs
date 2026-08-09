@@ -77,10 +77,10 @@ fn delta_config_uses_its_canonical_mode_colors_and_data_requirement() {
     let PreparedValue::LapTimer(widget) = &config.values[0] else {
         panic!("expected a validated lap timer");
     };
-    assert_eq!(widget.mode, LapTimerMode::Delta);
-    assert_eq!(widget.label, "Delta");
-    assert_eq!(widget.positive_delta_color, [0, 255, 0, 255]);
-    assert_eq!(widget.negative_delta_color, [255, 0, 0, 255]);
+    assert_eq!(widget.validated.mode, LapTimerMode::Delta);
+    assert_eq!(widget.validated.label, "Delta");
+    assert_eq!(widget.validated.positive_delta_color, [0, 255, 0, 255]);
+    assert_eq!(widget.validated.negative_delta_color, [255, 0, 0, 255]);
 
     let requirements = config.render_data_requirements().unwrap();
     assert!(requirements.delta_to_best_lap_seconds);
@@ -184,9 +184,9 @@ fn renderer_lap_log_covers_out_lap_first_lap_and_activity_wide_completions() {
 
     activity.series.lap_number[3] = Some(-1);
     activity.series.lap_time_seconds[3] = None;
-    let returned_to_pre_lap = lap_log_text_state(&activity, 3).unwrap();
-    assert_eq!(returned_to_pre_lap.completed_rows.len(), 2);
-    assert_eq!(returned_to_pre_lap.current_row, None);
+    let returned_to_out_lap = lap_log_text_state(&activity, 3).unwrap();
+    assert_eq!(returned_to_out_lap.completed_rows.len(), 2);
+    assert_eq!(returned_to_out_lap.current_row, None);
 }
 
 #[test]
@@ -234,8 +234,8 @@ fn lap_log_config_requests_all_canonical_lap_series() {
     let PreparedValue::LapTimer(widget) = &config.values[0] else {
         panic!("expected a validated lap timer");
     };
-    assert_eq!(widget.mode, LapTimerMode::LapLog);
-    assert_eq!(widget.label, "Lap Times");
+    assert_eq!(widget.validated.mode, LapTimerMode::LapLog);
+    assert_eq!(widget.validated.label, "Lap Times");
 
     let requirements = config.render_data_requirements().unwrap();
     assert!(requirements.lap_number);
@@ -244,14 +244,14 @@ fn lap_log_config_requests_all_canonical_lap_series() {
 }
 
 #[test]
-fn renderer_text_rejects_an_active_lap_without_a_time() {
+fn renderer_text_uses_boundaries_for_active_lap_time() {
     let mut activity = lap_activity();
     activity.series.lap_time_seconds[2] = None;
 
-    let error = lap_timer_value_text(LapTimerMode::CurrentLap, &activity, 2).unwrap_err();
-    assert!(error
-        .to_string()
-        .contains("active lap 1 is missing lap_time_seconds at frame 2"));
+    assert_eq!(
+        lap_timer_value_text(LapTimerMode::CurrentLap, &activity, 2).unwrap(),
+        "00:00.00"
+    );
 }
 
 #[test]

@@ -117,7 +117,7 @@ pub fn prepare_render_assets(
         )?);
     }
 
-    for (idx, value) in assets.values.iter().enumerate() {
+    for (idx, value) in assets.values.iter_mut().enumerate() {
         match value {
             PreparedValue::HeadingTape(validated) => {
                 let cache = heading::prepare_heading_cache(
@@ -178,18 +178,16 @@ pub fn prepare_render_assets(
                     .presentation_caches
                     .insert(idx, types::PresentationCache::GForce(cache));
             }
-            PreparedValue::LapTimer(validated) => {
+            PreparedValue::LapTimer(widget) => {
                 let cache = lap_timer::prepare_lap_timer_cache(
-                    validated,
+                    &widget.validated,
                     dense_activity,
                     &assets.scene,
                     assets.scene.scale,
                     &paths.font_dirs,
                     prepare_profiler,
                 )?;
-                assets
-                    .presentation_caches
-                    .insert(idx, types::PresentationCache::LapTimer(cache));
+                widget.cache = Some(cache);
             }
             _ => {}
         }

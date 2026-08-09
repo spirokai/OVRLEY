@@ -625,22 +625,12 @@ fn render_frame_to_surface(
                         timezone: None,
                     })?;
                 }
-                PreparedValue::LapTimer(validated) => {
+                PreparedValue::LapTimer(widget) => {
+                    let validated = &widget.validated;
                     let style = validated_lap_timer_style(validated, &prepared_assets.scene, scale);
-                    let crate::render::widgets::types::PresentationCache::LapTimer(cache) =
-                        prepared_assets
-                            .presentation_caches
-                            .get(&idx)
-                            .ok_or_else(|| {
-                                CoreError::Render(format!(
-                                    "lap timer cache is missing for value {idx}"
-                                ))
-                            })?
-                    else {
-                        return Err(CoreError::Render(format!(
-                            "lap timer cache has the wrong type for value {idx}"
-                        )));
-                    };
+                    let cache = widget.cache.as_ref().ok_or_else(|| {
+                        CoreError::Render(format!("lap timer cache is missing for value {idx}"))
+                    })?;
                     crate::render::widgets::lap_timer::draw_lap_timer(
                         canvas,
                         validated,

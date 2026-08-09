@@ -23,7 +23,7 @@ mod time;
 mod value;
 
 use crate::error::{CoreError, CoreResult};
-use crate::render::widgets::types::PreparedValue;
+use crate::render::widgets::types::{PreparedLapTimer, PreparedValue};
 use crate::types::{DisplayType, MetricKind};
 use raw::RenderConfig;
 
@@ -161,7 +161,12 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
                 return validate_gradient_widget(value, idx).map(PreparedValue::Gradient);
             }
             if value.value == MetricKind::LapTimer {
-                return validate_lap_timer(value, idx).map(PreparedValue::LapTimer);
+                return validate_lap_timer(value, idx).map(|validated| {
+                    PreparedValue::LapTimer(PreparedLapTimer {
+                        validated,
+                        cache: None,
+                    })
+                });
             }
             if value.value == MetricKind::Time && value.display_type == DisplayType::Text {
                 return validate_time_value(value, idx, &scene).map(PreparedValue::TimeText);
@@ -254,7 +259,7 @@ impl ValidatedRenderConfig {
                 continue;
             }
             if let PreparedValue::LapTimer(widget) = value {
-                match widget.mode {
+                match widget.validated.mode {
                     LapTimerMode::CurrentLap | LapTimerMode::BestLap => {
                         requirements.lap_number = true;
                         requirements.lap_time_seconds = true;

@@ -65,7 +65,13 @@ pub enum PresentationCache {
     LinearGauge(LinearGaugeCache),
     ArcGauge(ArcGaugeCache),
     GForce(GForceWidgetCache),
-    LapTimer(LapTimerWidgetCache),
+}
+
+/// Validated lap-timer configuration together with its render-owned cache.
+#[derive(Clone, Debug)]
+pub struct PreparedLapTimer {
+    pub validated: ValidatedLapTimer,
+    pub(crate) cache: Option<LapTimerWidgetCache>,
 }
 
 /// One validated render value, keyed implicitly by its index in the config array.
@@ -79,7 +85,7 @@ pub enum PreparedValue {
     LinearGauge(ValidatedLinearGaugeWidget),
     ArcGauge(ValidatedArcGaugeWidget),
     GForce(ValidatedGForceWidget),
-    LapTimer(ValidatedLapTimer),
+    LapTimer(PreparedLapTimer),
 }
 
 impl PreparedValue {
@@ -121,7 +127,7 @@ impl PreparedValue {
             Self::LinearGauge(value) => value.x,
             Self::ArcGauge(value) => value.x,
             Self::GForce(value) => value.x,
-            Self::LapTimer(value) => value.x,
+            Self::LapTimer(value) => value.validated.x,
         }
     }
 
@@ -135,7 +141,7 @@ impl PreparedValue {
             Self::LinearGauge(value) => value.y,
             Self::ArcGauge(value) => value.y,
             Self::GForce(value) => value.y,
-            Self::LapTimer(value) => value.y,
+            Self::LapTimer(value) => value.validated.y,
         }
     }
 }
@@ -316,12 +322,18 @@ pub struct GForceFrameState {
     pub label: String,
 }
 
-/// Prepared static text images for quasi-static lap-timer states.
+/// Prepared resources owned by each lap-timer presentation mode.
 #[derive(Clone, Debug)]
-pub struct LapTimerWidgetCache {
-    pub(crate) state_layers: BTreeMap<usize, StaticLayer>,
-    pub(crate) log_header_layer: Option<StaticLayer>,
-    pub(crate) log_column_rights: Option<[f32; 3]>,
+pub(crate) enum LapTimerWidgetCache {
+    Dynamic,
+    BestLap {
+        state_layers: BTreeMap<usize, StaticLayer>,
+    },
+    LapLog {
+        header_layer: StaticLayer,
+        column_rights: [f32; 3],
+        completed_row_layers: Vec<StaticLayer>,
+    },
 }
 
 /// Cached static empty track and border for a lean-angle sector.

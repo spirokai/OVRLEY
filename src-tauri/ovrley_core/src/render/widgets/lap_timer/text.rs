@@ -71,34 +71,32 @@ pub fn format_lap_delta(delta_seconds: Option<f64>) -> String {
     }
 }
 
-/// Reads the lap number for a dense-activity frame.
-pub(super) fn lap_number_at(
+/// Resolves canonical lap state for a dense-activity frame.
+pub(super) fn lap_state_at_frame(
     dense_activity: &DenseActivityReport,
     frame_index: usize,
-) -> CoreResult<i64> {
-    dense_activity
-        .series
-        .lap_number
-        .get(frame_index)
-        .and_then(|value| *value)
-        .ok_or_else(|| CoreError::Render(format!("lap_number is missing at frame {frame_index}")))
-}
-
-/// Reads the current lap duration for a dense-activity frame.
-pub(super) fn lap_time_at(
-    dense_activity: &DenseActivityReport,
-    frame_index: usize,
-) -> CoreResult<Option<f64>> {
-    dense_activity
-        .series
-        .lap_time_seconds
+) -> CoreResult<crate::activity::lap::LapState> {
+    let elapsed = dense_activity
+        .frame_elapsed_seconds
         .get(frame_index)
         .copied()
         .ok_or_else(|| {
             CoreError::Render(format!(
-                "lap_time_seconds is missing at frame {frame_index}"
+                "frame_elapsed_seconds is missing at frame {frame_index}"
             ))
-        })
+        })?;
+    let lap_number = dense_activity
+        .series
+        .lap_number
+        .get(frame_index)
+        .copied()
+        .flatten()
+        .ok_or_else(|| CoreError::Render(format!("lap_number is missing at frame {frame_index}")))?;
+    Ok(crate::activity::lap::lap_state_at(
+        &dense_activity.series.lap_start_elapsed_seconds,
+        lap_number,
+        elapsed,
+    ))
 }
 
 /// Reads the current delta to the best lap for a dense-activity frame.
@@ -116,30 +114,6 @@ pub(super) fn delta_at(
                 "delta_to_best_lap_seconds is missing at frame {frame_index}"
             ))
         })
-}
-
-/// Counts completed laps at a dense-activity frame.
-///
-/// A lap start at or before the frame's elapsed time is considered visible.
-/// The initial activity boundary is not counted as a completed lap.
-pub(super) fn completed_lap_count_at(
-    dense_activity: &DenseActivityReport,
-    frame_index: usize,
-) -> CoreResult<usize> {
-    let frame_elapsed = dense_activity
-        .frame_elapsed_seconds
-        .get(frame_index)
-        .copied()
-        .ok_or_else(|| {
-            CoreError::Render(format!(
-                "frame_elapsed_seconds is missing at frame {frame_index}"
-            ))
-        })?;
-    Ok(dense_activity
-        .series
-        .lap_start_elapsed_seconds
-        .partition_point(|lap_start| *lap_start <= frame_elapsed)
-        .saturating_sub(1))
 }
 
 /// Selects the configured color for a lap delta.
@@ -211,30 +185,24 @@ pub fn lap_timer_value_text(
     if mode == LapTimerMode::Delta {
         return delta_at(dense_activity, frame_index).map(format_lap_delta);
     }
-    let lap_number = lap_number_at(dense_activity, frame_index)?;
-    let current_lap_time = lap_time_at(dense_activity, frame_index)?;
-    if lap_number < 0 {
+    let lap_state = lap_state_at_frame(dense_activity, frame_index)?;
+    if lap_state.lap_number < 0 {
         if mode == LapTimerMode::CurrentLap {
             return Ok(PLACEHOLDER.to_string());
         }
-        let completed_lap_count = completed_lap_count_at(dense_activity, frame_index)?;
-        return if completed_lap_count == 0 {
+        return if lap_state.completed_lap_count == 0 {
             Ok(PLACEHOLDER.to_string())
         } else {
-            state_value_text(dense_activity, completed_lap_count)
+            state_value_text(dense_activity, lap_state.completed_lap_count)
         };
     }
-    let require_current_lap_time = || {
-        current_lap_time.ok_or_else(|| {
-            CoreError::Render(format!(
-                "active lap {lap_number} is missing lap_time_seconds at frame {frame_index}"
-            ))
-        })
-    };
+    let current_lap_time = lap_state
+        .lap_time_seconds
+        .expect("validated active lap state has a lap time");
     match mode {
-        LapTimerMode::CurrentLap => require_current_lap_time().map(format_lap_duration),
+        LapTimerMode::CurrentLap => Ok(format_lap_duration(current_lap_time)),
         LapTimerMode::BestLap => {
-            best_lap_text(dense_activity, lap_number, require_current_lap_time()?)
+            best_lap_text(dense_activity, lap_state.lap_number, current_lap_time)
         }
         LapTimerMode::Delta => unreachable!("delta mode returns before lap-time resolution"),
         LapTimerMode::LapLog => unreachable!("lap_log returns before value resolution"),
@@ -294,21 +262,18 @@ pub(super) fn lap_log_frame_state(
     dense_activity: &DenseActivityReport,
     frame_index: usize,
 ) -> CoreResult<LapLogFrameState> {
-    let lap_number = lap_number_at(dense_activity, frame_index)?;
-    let completed_lap_count = completed_lap_count_at(dense_activity, frame_index)?;
+    let lap_state = lap_state_at_frame(dense_activity, frame_index)?;
 
-    let current_row = if lap_number < 0 {
+    let current_row = if lap_state.lap_number < 0 {
         None
     } else {
-        let current_lap_time = lap_time_at(dense_activity, frame_index)?.ok_or_else(|| {
-            CoreError::Render(format!(
-                "active lap {lap_number} is missing lap_time_seconds at frame {frame_index}"
-            ))
-        })?;
+        let current_lap_time = lap_state
+            .lap_time_seconds
+            .expect("validated active lap state has a lap time");
         let delta = delta_at(dense_activity, frame_index)?;
         Some(LapLogTextRow {
             cells: [
-                (lap_number + 1).to_string(),
+                (lap_state.lap_number + 1).to_string(),
                 format_lap_duration(current_lap_time),
                 format_lap_delta(delta),
             ],
@@ -317,7 +282,7 @@ pub(super) fn lap_log_frame_state(
     };
 
     Ok(LapLogFrameState {
-        completed_lap_count,
+        completed_lap_count: lap_state.completed_lap_count,
         current_row,
     })
 }
