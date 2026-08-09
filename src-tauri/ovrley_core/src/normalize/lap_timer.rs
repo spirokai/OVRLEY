@@ -10,6 +10,7 @@ pub enum LapTimerMode {
     CurrentLap,
     BestLap,
     Delta,
+    LapLog,
 }
 
 #[derive(Clone, Debug)]
@@ -46,6 +47,7 @@ pub fn validate_lap_timer(value: ValueConfig, index: usize) -> CoreResult<Valida
         "current_lap" => LapTimerMode::CurrentLap,
         "best_lap" => LapTimerMode::BestLap,
         "delta" => LapTimerMode::Delta,
+        "lap_log" => LapTimerMode::LapLog,
         other => {
             return Err(CoreError::Config(format!(
                 "{}: unsupported mode '{other}'",

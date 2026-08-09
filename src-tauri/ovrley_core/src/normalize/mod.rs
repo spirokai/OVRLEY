@@ -260,6 +260,11 @@ impl ValidatedRenderConfig {
                         requirements.lap_time_seconds = true;
                     }
                     LapTimerMode::Delta => requirements.delta_to_best_lap_seconds = true,
+                    LapTimerMode::LapLog => {
+                        requirements.lap_number = true;
+                        requirements.lap_time_seconds = true;
+                        requirements.delta_to_best_lap_seconds = true;
+                    }
                 }
                 continue;
             }

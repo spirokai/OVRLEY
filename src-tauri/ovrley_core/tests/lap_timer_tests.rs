@@ -4,7 +4,9 @@ use common::builders::empty_dense_series;
 use ovrley_core::activity::parse_activity_json;
 use ovrley_core::activity::schema::DenseActivityReport;
 use ovrley_core::normalize::LapTimerMode;
-use ovrley_core::render::widgets::{lap_timer_value_text, types::PreparedValue};
+use ovrley_core::render::widgets::{
+    lap_log_text_state, lap_timer_value_text, types::PreparedValue,
+};
 use serde_json::json;
 
 fn lap_activity() -> DenseActivityReport {
@@ -144,6 +146,101 @@ fn renderer_text_uses_pretrim_delta_reference_for_a_scene_starting_mid_lap() {
         lap_timer_value_text(LapTimerMode::Delta, &activity, 0).unwrap(),
         "-0.42"
     );
+}
+
+#[test]
+fn renderer_lap_log_covers_out_lap_first_lap_and_activity_wide_completions() {
+    let mut activity = lap_activity();
+
+    let out_lap = lap_log_text_state(&activity, 0).unwrap();
+    assert!(out_lap.completed_rows.is_empty());
+    assert_eq!(out_lap.current_row, None);
+
+    let first_lap = lap_log_text_state(&activity, 1).unwrap();
+    assert!(first_lap.completed_rows.is_empty());
+    let first_lap_current = first_lap.current_row.unwrap();
+    assert_eq!(first_lap_current.cells, ["1", "00:00.50", "+0.00"]);
+    assert_eq!(first_lap_current.delta_seconds, None);
+
+    let after_two_completions = lap_log_text_state(&activity, 3).unwrap();
+    assert_eq!(
+        after_two_completions
+            .completed_rows
+            .iter()
+            .map(|row| row.cells.clone())
+            .collect::<Vec<_>>(),
+        vec![
+            ["2".to_string(), "00:03.00".to_string(), "-1.00".to_string(),],
+            ["1".to_string(), "00:04.00".to_string(), "+0.00".to_string(),],
+        ]
+    );
+    assert_eq!(
+        after_two_completions.completed_rows[0].delta_seconds,
+        Some(-1.0)
+    );
+    let current_row = after_two_completions.current_row.unwrap();
+    assert_eq!(current_row.cells, ["3", "00:01.00", "-0.25"]);
+    assert_eq!(current_row.delta_seconds, Some(-0.25));
+
+    activity.series.lap_number[3] = Some(-1);
+    activity.series.lap_time_seconds[3] = None;
+    let returned_to_pre_lap = lap_log_text_state(&activity, 3).unwrap();
+    assert_eq!(returned_to_pre_lap.completed_rows.len(), 2);
+    assert_eq!(returned_to_pre_lap.current_row, None);
+}
+
+#[test]
+fn renderer_lap_log_keeps_original_lap_numbers_when_scene_starts_mid_lap() {
+    let mut activity = lap_activity();
+    activity.frame_count = 2;
+    activity.frame_elapsed_seconds = vec![0.0, 1.0];
+    activity.series.lap_number = vec![Some(1), Some(2)];
+    activity.series.lap_time_seconds = vec![Some(2.5), Some(0.0)];
+    activity.series.delta_to_best_lap_seconds = vec![Some(-0.5), Some(0.0)];
+    activity.series.lap_start_elapsed_seconds = vec![-4.5, -0.5, 1.0];
+
+    let scene_start = lap_log_text_state(&activity, 0).unwrap();
+    assert_eq!(scene_start.completed_rows[0].cells[0], "1");
+    assert_eq!(scene_start.current_row.unwrap().cells[0], "2");
+
+    let completion_inside_scene = lap_log_text_state(&activity, 1).unwrap();
+    assert_eq!(completion_inside_scene.completed_rows[0].cells[0], "2");
+    assert_eq!(completion_inside_scene.current_row.unwrap().cells[0], "3");
+}
+
+#[test]
+fn lap_log_config_requests_all_canonical_lap_series() {
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [{
+            "value": "lap_timer",
+            "display_type": "lap_timer",
+            "lap_timer_mode": "lap_log",
+            "x": 10.0,
+            "y": 20.0,
+            "font": "Arial.ttf",
+            "font_size": 72.0,
+            "color": "#abcdef",
+            "opacity": 1.0,
+            "show_label": true,
+            "label": "Lap Times",
+            "positive_delta_color": "#00ff00",
+            "negative_delta_color": "#ff0000"
+        }],
+        "plots": []
+    }));
+
+    let PreparedValue::LapTimer(widget) = &config.values[0] else {
+        panic!("expected a validated lap timer");
+    };
+    assert_eq!(widget.mode, LapTimerMode::LapLog);
+    assert_eq!(widget.label, "Lap Times");
+
+    let requirements = config.render_data_requirements().unwrap();
+    assert!(requirements.lap_number);
+    assert!(requirements.lap_time_seconds);
+    assert!(requirements.delta_to_best_lap_seconds);
 }
 
 #[test]

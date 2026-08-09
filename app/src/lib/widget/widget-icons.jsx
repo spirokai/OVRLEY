@@ -10,7 +10,7 @@ import {
   LAP_TIMER_MODES,
 } from './standard-widgets'
 import { getStandardMetricDefinition, getSupportedDisplayTypes, isStandardMetricWidgetType } from './standard-metrics'
-import { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS } from './widget-icon-data'
+import { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS, getIconSvgByAssetFile } from './widget-icon-data'
 
 export { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS }
 
@@ -38,6 +38,20 @@ export function WidgetIcon({ type, ...props }) {
 
 export function DisplayTypeIcon({ displayType, ...props }) {
   return <ParsedSvgIcon data={DISPLAY_TYPE_ICON_SVGS[displayType]} {...props} />
+}
+
+function createLapTimerModeIcon({ source, name, assetFile }) {
+  if (source === 'lucide') {
+    if (name !== 'Timer') throw new Error(`Unsupported lap timer Lucide icon: ${name}`)
+    return Timer
+  }
+
+  if (source !== 'shared' && source !== 'custom') throw new Error(`Unsupported lap timer icon source: ${source}`)
+
+  const data = getIconSvgByAssetFile(assetFile)
+  const Icon = (props) => <ParsedSvgIcon data={data} {...props} />
+  Icon.displayName = `LapTimerModeIcon.${assetFile}`
+  return Icon
 }
 
 const STANDARD_METRIC_TYPE_LABELS = Object.fromEntries(
@@ -132,8 +146,8 @@ export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradien
   .concat({
     type: 'lap_timer',
     icon: Timer,
-    label: 'Lap Timer',
-    options: LAP_TIMER_MODES.map((mode) => ({ ...mode, icon: Timer, selection: { lapTimerMode: mode.value } })),
+    label: DISPLAY_TYPE_LABELS.lap_timer,
+    options: LAP_TIMER_MODES.map((mode) => ({ ...mode, icon: createLapTimerModeIcon(mode.icon), selection: { lapTimerMode: mode.value } })),
   })
 
 const NON_METRIC_CATEGORIES = {

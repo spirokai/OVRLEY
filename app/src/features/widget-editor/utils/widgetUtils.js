@@ -173,6 +173,7 @@ export function createMetricValueDefaults(type, globalDefaults, selection = {}) 
     return {
       ...createSharedMetricDefaults(type, globalDefaults, 'lap_timer', font),
       ...LAP_TIMER_DEFAULTS,
+      font_size: mode.font_size,
       lap_timer_mode: mode.value,
       label: mode.label,
     }

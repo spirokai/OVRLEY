@@ -51,7 +51,7 @@ pub(crate) use elevation::draw_elevation_widget;
 pub use g_force::{draw_g_force_widget, prepare_g_force_cache};
 pub use gauges::arc::{draw_arc_gauge_widget, prepare_arc_gauge_cache};
 pub use gauges::linear::{draw_linear_gauge_widget, prepare_linear_gauge_cache};
-pub use lap_timer::lap_timer_value_text;
+pub use lap_timer::{lap_log_text_state, lap_timer_value_text, LapLogTextState};
 pub use lean_angle::{draw_lean_angle_widget, prepare_lean_angle_cache};
 pub use metric_presentation::draw_metric_presentation;
 pub(crate) use route::draw_route_widget;

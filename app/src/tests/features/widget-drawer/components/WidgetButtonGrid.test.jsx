@@ -63,7 +63,7 @@ describe('WidgetButtonGrid', () => {
     expect(onAddWidget).toHaveBeenCalledWith({ type: 'speed', displayType: 'text' })
   })
 
-  test('lap timer presents Current Lap, Best Lap, and Delta readouts', async () => {
+  test('lap timer presents all four canonical readouts', async () => {
     const onAddWidget = vi.fn()
     const user = userEvent.setup()
     render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
@@ -72,9 +72,10 @@ describe('WidgetButtonGrid', () => {
     expect(screen.getByRole('button', { name: 'Current Lap' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Best Lap' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delta' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Delta' }))
+    expect(screen.getByRole('button', { name: 'Lap Times' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Lap Times' }))
 
-    expect(onAddWidget).toHaveBeenCalledWith({ type: 'lap_timer', lapTimerMode: 'delta' })
+    expect(onAddWidget).toHaveBeenCalledWith({ type: 'lap_timer', lapTimerMode: 'lap_log' })
   })
 
   test('clicking a backdrop display type uses backdrop labels and calls onAddWidget', async () => {

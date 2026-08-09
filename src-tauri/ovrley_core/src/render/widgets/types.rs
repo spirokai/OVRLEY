@@ -316,10 +316,12 @@ pub struct GForceFrameState {
     pub label: String,
 }
 
-/// Prepared static text images for best-lap states.
+/// Prepared static text images for quasi-static lap-timer states.
 #[derive(Clone, Debug)]
 pub struct LapTimerWidgetCache {
     pub(crate) state_layers: BTreeMap<usize, StaticLayer>,
+    pub(crate) log_header_layer: Option<StaticLayer>,
+    pub(crate) log_column_rights: Option<[f32; 3]>,
 }
 
 /// Cached static empty track and border for a lean-angle sector.

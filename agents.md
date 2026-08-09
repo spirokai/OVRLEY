@@ -4,7 +4,7 @@
 
 These rules are mandatory for all new and modified code:
 
-- Required data MUST be consumed as a strict contract and malformed input MUST fail loudly. Fallbacks are permitted only for documented optional absence; they MUST NOT repair malformed present data.
+- Required data MUST be consumed as a strict contract and malformed config input MUST fail loudly. Fallbacks are permitted only for documented optional absence; they MUST NOT repair malformed present data. This concerns ONLY user config/input, NOT external activity data which we have no control over.
 - The codebase MUST use one canonical naming scheme and data shape. API mismatches MUST be fixed at their owner, never hidden behind aliases, remapped objects, compatibility branches, or secondary adapters.
 - Validation and normalization MUST happen once at ingress. Consumers MUST NOT repeat coercion or defensive checks such as `typeof`, `Boolean`, `Number.isFinite`, or `Number.isInteger` for validated fields.
 - Components MUST be presentational. Stateful and reusable presentation logic MUST live in hooks; pure computation, formatting, and transformation MUST live in utilities.

@@ -48,6 +48,17 @@ import displayTypeCircleSvg from '../../../../assets/widget-icons/display-type-c
 import displayTypeRectangleSvg from '../../../../assets/widget-icons/display-type-rectangle.svg?raw'
 import displayTypeGForceSvg from '../../../../assets/widget-icons/display-type-g-force.svg?raw'
 
+const iconAssetModules = import.meta.glob('../../../../assets/widget-icons/*.svg', {
+  eager: true,
+  import: 'default',
+  query: '?raw',
+})
+
+const iconSvgMarkupByAssetFile = Object.fromEntries(
+  Object.entries(iconAssetModules).map(([path, svgMarkup]) => [path.slice(path.lastIndexOf('/') + 1), svgMarkup]),
+)
+const parsedIconAssets = new Map()
+
 function parseMetricIconSvg(svgMarkup) {
   const rootTag = svgMarkup.match(/<svg[^>]*>/i)?.[0]
   if (!rootTag) throw new Error('Metric icon asset must contain an SVG root element')
@@ -64,6 +75,17 @@ function parseMetricIconSvg(svgMarkup) {
     strokeWidth: Number(strokeWidthMatch?.[1] || 2),
     innerMarkup: (innerMarkupMatch?.[1] || '').trim(),
   }
+}
+
+/**
+ * Resolves an SVG asset discovered from `assets/widget-icons` by its manifest filename.
+ * @param {string} assetFile - Exact `assetFile` value from a manifest icon definition.
+ * @returns {{fill: string, stroke: string, strokeWidth: number, innerMarkup: string}} Parsed SVG icon data.
+ */
+export function getIconSvgByAssetFile(assetFile) {
+  if (!Object.hasOwn(iconSvgMarkupByAssetFile, assetFile)) throw new Error(`Unsupported icon asset: ${assetFile}`)
+  if (!parsedIconAssets.has(assetFile)) parsedIconAssets.set(assetFile, parseMetricIconSvg(iconSvgMarkupByAssetFile[assetFile]))
+  return parsedIconAssets.get(assetFile)
 }
 
 export const METRIC_ICON_SVGS = {

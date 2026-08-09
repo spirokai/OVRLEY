@@ -3,6 +3,8 @@ import { getHoldSeriesValue } from '@/features/overlay-editor/utils/overlayEdito
 
 const PLACEHOLDER = '--:--.--'
 
+export const LAP_LOG_HEADERS = Object.freeze(['LAP', 'TIME', 'DELTA'])
+
 /**
  * Formats a lap duration using the renderer's MM:SS.ss / HH:MM:SS.ss contract.
  * @param {number} durationSeconds - Validated duration in seconds.
@@ -39,10 +41,10 @@ function getDeltaAt(activity, previewSecond) {
  * Resolves the lap timer state at an activity timestamp.
  * @param {object|null} activity - Parsed activity with lap timing fields.
  * @param {number} previewSecond - Absolute activity timestamp in seconds.
- * @returns {{ lapNumber: number, currentLapTime: number|null, bestLapTime: number|null }} Lap state.
+ * @returns {{ lapNumber: number, completedLapCount: number, currentLapTime: number|null, bestLapTime: number|null }} Lap state.
  */
 export function getLapTimerState(activity, previewSecond) {
-  if (activity === null) return { lapNumber: -1, currentLapTime: null, bestLapTime: null }
+  if (activity === null) return { lapNumber: -1, completedLapCount: 0, currentLapTime: null, bestLapTime: null }
   const lapNumber = getHoldSeriesValue(activity.sample_elapsed_seconds, activity.lap_number, previewSecond)
   if (lapNumber === null) throw new Error(`Lap number is missing at ${previewSecond} seconds`)
 
@@ -53,18 +55,85 @@ export function getLapTimerState(activity, previewSecond) {
   }
   const completedLapCount = Math.max(startedLapCount - 1, 0)
   const currentLapTime = lapNumber >= 0 ? previewSecond - activity.lap_start_elapsed_seconds[lapNumber] : null
-  if (completedLapCount === 0) return { lapNumber, currentLapTime, bestLapTime: null }
+  if (completedLapCount === 0) return { lapNumber, completedLapCount, currentLapTime, bestLapTime: null }
 
   const bestLapTime = activity.lap_durations_best_so_far_seconds[completedLapCount - 1]
   if (bestLapTime === undefined) throw new Error(`Best lap metadata is missing for completed lap ${completedLapCount}`)
-  return { lapNumber, currentLapTime, bestLapTime }
+  return { lapNumber, completedLapCount, currentLapTime, bestLapTime }
+}
+
+/**
+ * Prepares all completed lap-log rows in descending order.
+ * @param {object|null} activity - Parsed activity with canonical lap timing fields.
+ * @returns {Array<{lapText: string, timeText: string, deltaText: string, useNegativeDeltaColor: boolean}>} Prepared rows.
+ */
+export function buildLapLogCompletedRows(activity) {
+  if (activity === null) return []
+
+  return activity.lap_durations_seconds
+    .map((duration, lapIndex) => {
+      const previousBest = lapIndex === 0 ? null : activity.lap_durations_best_so_far_seconds[lapIndex - 1]
+      if (lapIndex > 0 && previousBest === undefined) throw new Error(`Best lap metadata is missing before completed lap ${lapIndex + 1}`)
+      const delta = previousBest === null ? null : duration - previousBest
+      return {
+        lapText: String(lapIndex + 1),
+        timeText: formatLapDuration(duration),
+        deltaText: formatLapDelta(delta),
+        useNegativeDeltaColor: delta === null || delta <= 0,
+      }
+    })
+    .reverse()
+}
+
+/**
+ * Resolves the per-preview lap-log state without rebuilding completed rows.
+ * @param {object|null} activity - Parsed activity with canonical lap timing fields.
+ * @param {number} previewSecond - Absolute activity timestamp in seconds.
+ * @returns {{ completedLapCount: number, currentRow: object|null }} Live log state.
+ */
+export function getLapLogFrameState(activity, previewSecond) {
+  if (activity === null) return { completedLapCount: 0, currentRow: null }
+
+  const state = getLapTimerState(activity, previewSecond)
+  const completedLapCount = state.completedLapCount
+  if (completedLapCount > activity.lap_durations_seconds.length) {
+    throw new Error(`Lap duration metadata is missing for completed lap ${completedLapCount}`)
+  }
+
+  const currentDelta = getDeltaAt(activity, previewSecond)
+  const currentRow =
+    state.lapNumber < 0
+      ? null
+      : {
+          lapText: String(state.lapNumber + 1),
+          timeText: formatLapDuration(state.currentLapTime),
+          deltaText: formatLapDelta(currentDelta),
+          useNegativeDeltaColor: currentDelta === null || currentDelta <= 0,
+        }
+
+  return { completedLapCount, currentRow }
+}
+
+/**
+ * Resolves the activity-wide lap log rows at an activity timestamp.
+ * @param {object|null} activity - Parsed activity with canonical lap timing fields.
+ * @param {number} previewSecond - Absolute activity timestamp in seconds.
+ * @returns {{ completedRows: Array<{lapText: string, timeText: string, deltaText: string, useNegativeDeltaColor: boolean}>, currentRow: object|null }} Log rows.
+ */
+export function getLapLogDisplayState(activity, previewSecond) {
+  const completedRows = buildLapLogCompletedRows(activity)
+  const frameState = getLapLogFrameState(activity, previewSecond)
+  return {
+    completedRows: completedRows.slice(completedRows.length - frameState.completedLapCount),
+    currentRow: frameState.currentRow,
+  }
 }
 
 /**
  * Returns the display value for a lap timer widget.
  * @param {object|null} activity - Parsed activity with lap timing fields.
  * @param {number} previewSecond - Absolute activity timestamp in seconds.
- * @param {'current_lap'|'best_lap'|'delta'} mode - Lap timer readout mode.
+ * @param {'current_lap'|'best_lap'|'delta'} mode - Scalar lap timer readout mode.
  * @returns {{ valueText: string, useNegativeDeltaColor: boolean }} Formatted widget state.
  */
 export function getLapTimerDisplayState(activity, previewSecond, mode) {

@@ -55,18 +55,32 @@
         }
       },
       "lap_timer": {
-        "label": "Lap Timer",
-        "icon": { "source": "shared", "assetFile": "display-type-text.svg" },
+        "label": "Lap Times",
         "layoutMode": "intrinsic",
         "defaults": {
           "show_label": true,
           "negative_delta_color": "#61ffab",
-          "positive_delta_color": "#ff6e83"
+          "positive_delta_color": "#ff6e83",
+          "font_size": 50
         },
         "modes": [
-          { "value": "current_lap", "label": "Current Lap" },
-          { "value": "best_lap", "label": "Best Lap" },
-          { "value": "delta", "label": "Delta" }
+          { "value": "current_lap", "label": "Current Lap", "icon": { "source": "lucide", "name": "Timer" } },
+          {
+            "value": "best_lap",
+            "label": "Best Lap",
+            "icon": { "source": "custom", "assetFile": "display-mode-best-lap.svg" }
+          },
+          {
+            "value": "delta",
+            "label": "Live Delta",
+            "icon": { "source": "custom", "assetFile": "display-mode-delta.svg" }
+          },
+          {
+            "value": "lap_log",
+            "label": "Lap Log",
+            "font_size": 30,
+            "icon": { "source": "custom", "assetFile": "display-mode-lap-log.svg" }
+          }
         ],
         "configFields": ["lap_timer_mode", "label"]
       },

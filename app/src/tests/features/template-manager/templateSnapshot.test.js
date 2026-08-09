@@ -53,9 +53,23 @@ describe('template snapshot standard metric schema', () => {
       display_type: 'lap_timer',
       lap_timer_mode: 'delta',
       show_label: true,
-      label: 'Delta',
+      label: 'Live Delta',
       positive_delta_color: '#ff6e83',
       negative_delta_color: '#61ffab',
+    })
+  })
+
+  test('creates the canonical lap-log display with its default label', () => {
+    const lapTimer = createMetricValueDefaults('lap_timer', { color_values: '#abcdef' }, { lapTimerMode: 'lap_log' })
+
+    expect(lapTimer).toMatchObject({
+      value: 'lap_timer',
+      display_type: 'lap_timer',
+      lap_timer_mode: 'lap_log',
+      show_label: true,
+      label: 'Lap Log',
+      font_size: 30,
+      color: '#abcdef',
     })
   })
 

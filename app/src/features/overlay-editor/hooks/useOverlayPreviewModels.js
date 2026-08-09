@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { buildMetricWidgetPreviewModel } from '@/features/widget-preview/widgets/metric/model'
-import { buildLapTimerPreviewModel } from '@/features/widget-preview/widgets/lap-timer/model'
+import { buildLapTimerPreviewModel, prepareLapLogPreview } from '@/features/widget-preview/widgets/lap-timer/model'
 import { buildTextWidgetPreviewModel } from '@/features/widget-preview/widgets/text/model'
 import { isBoxedDisplayType } from '@/lib/widget/standard-metrics'
 import { getPreviewFontFamily } from '@/features/widget-preview/shared/textMeasurement'
@@ -8,7 +8,7 @@ import { useFontMetrics } from '@/features/widget-preview/shared/useFontMetrics'
 
 const EMPTY_PREVIEW_MODELS = {}
 
-function buildPreviewModels({ renderedWidgets, category, activity, previewSecond }) {
+function buildPreviewModels({ renderedWidgets, category, activity, previewSecond, lapLogPreparations }) {
   const models = {}
 
   for (const widget of renderedWidgets) {
@@ -17,7 +17,7 @@ function buildPreviewModels({ renderedWidgets, category, activity, previewSecond
     const model =
       category === 'values'
         ? widget.data.display_type === 'lap_timer'
-          ? buildLapTimerPreviewModel({ widget, activity, previewSecond })
+          ? buildLapTimerPreviewModel({ widget, activity, previewSecond, lapLogPreparation: lapLogPreparations[widget.id] })
           : buildMetricWidgetPreviewModel({ widget, activity, previewSecond })
         : buildTextWidgetPreviewModel({ widget })
 
@@ -25,6 +25,16 @@ function buildPreviewModels({ renderedWidgets, category, activity, previewSecond
   }
 
   return Object.keys(models).length ? models : EMPTY_PREVIEW_MODELS
+}
+
+function prepareLapLogs(renderedWidgets, activity) {
+  const preparations = {}
+  for (const widget of renderedWidgets) {
+    if (widget.category === 'values' && widget.data.display_type === 'lap_timer' && widget.data.lap_timer_mode === 'lap_log') {
+      preparations[widget.id] = prepareLapLogPreview({ widget, activity })
+    }
+  }
+  return preparations
 }
 
 function buildFontRequests(renderedWidgets) {
@@ -49,12 +59,18 @@ function buildFontRequests(renderedWidgets) {
 export default function useOverlayPreviewModels({ renderedWidgets, activity, previewSecond }) {
   const fontRequests = useMemo(() => buildFontRequests(renderedWidgets), [renderedWidgets])
   const fontMetricsVersion = useFontMetrics(fontRequests)
+  const lapLogPreparations = useMemo(
+    () => prepareLapLogs(renderedWidgets, activity),
+    // Font readiness changes canvas measurements without changing the preparation inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activity, fontMetricsVersion, renderedWidgets],
+  )
 
   const metricPreviewModels = useMemo(
-    () => buildPreviewModels({ renderedWidgets, category: 'values', activity, previewSecond }),
+    () => buildPreviewModels({ renderedWidgets, category: 'values', activity, previewSecond, lapLogPreparations }),
     // Font readiness changes canvas measurements without changing the model inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activity, fontMetricsVersion, previewSecond, renderedWidgets],
+    [activity, fontMetricsVersion, lapLogPreparations, previewSecond, renderedWidgets],
   )
 
   const textPreviewModels = useMemo(
