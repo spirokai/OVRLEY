@@ -6,6 +6,10 @@ use super::Metric;
 /// Precedence used when multiple columns provide the same metric.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(super) enum SourcePriority {
+    /// OBD speed reported by the vehicle.
+    ObdSpeed,
+    /// Unqualified or logger-provided direct speed.
+    DirectSpeed,
     /// Preferred direct or source-qualified measurement.
     Preferred,
     /// Accelerometer source for acceleration axes.
@@ -47,6 +51,8 @@ pub(super) enum AccelerationKind {
 pub(super) enum SourceQualifier {
     /// GPS-derived source.
     Gps,
+    /// On-board diagnostics source.
+    Obd,
     /// Software-calculated source.
     Calculated,
     /// Vehicle bus or vehicle-state source.

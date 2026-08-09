@@ -122,6 +122,20 @@ describe('getInterpolatedActivityValue — hold interpolation', () => {
     ).toBeNull()
   })
 
+  test('preserve metric displays an exact missing sample as zero', () => {
+    expect(
+      getInterpolatedActivityValue(
+        {
+          trim_end_seconds: 2,
+          sample_elapsed_seconds: [0, 1, 2],
+          torque: [10, null, 30],
+        },
+        'torque',
+        1,
+      ),
+    ).toBe(0)
+  })
+
   test('hold metric with sparse data returns last known value skipping nulls', () => {
     const sparseActivity = {
       trim_end_seconds: 4,

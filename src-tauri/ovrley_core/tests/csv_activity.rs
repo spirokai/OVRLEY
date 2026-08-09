@@ -737,10 +737,10 @@ fn vehicle_gear_outranks_calculated_gear() {
 }
 
 #[test]
-fn gps_sources_outrank_unqualified_calculated_and_vehicle_sources() {
-    let csv = "Time,Latitude,GPS Latitude,Longitude,GPS Longitude,Distance,GPS Distance 2D,Speed (m/s) *calc,GPS Speed (m/s),Vehicle Speed (m/s),Speed (m/s) *estimate\n\
-0,10,20,30,40,100,200,3,4,5,999\n\
-1,11,21,31,41,110,220,6,7,8,999\n";
+fn qualified_sources_use_metric_specific_priority() {
+    let csv = "Time,Latitude,GPS Latitude,Longitude,GPS Longitude,Distance,GPS Distance 2D,Speed (m/s),Speed (m/s) *calc,GPS Speed (m/s),Vehicle Speed (m/s),Speed (OBD)(km/h),Speed (m/s) *estimate\n\
+0,10,20,30,40,100,200,9,3,4,5,-,999\n\
+1,11,21,31,41,110,220,12,6,7,8,-,999\n";
 
     let activity = parse_csv_activity_reader(Cursor::new(csv), "priorities.csv")
         .unwrap()
@@ -751,7 +751,7 @@ fn gps_sources_outrank_unqualified_calculated_and_vehicle_sources() {
         vec![(Some(20.0), Some(40.0)), (Some(21.0), Some(41.0))]
     );
     assert_eq!(activity.distance, vec![Some(0.0), Some(20.0)]);
-    assert_eq!(activity.speed, vec![Some(4.0), Some(7.0)]);
+    assert_eq!(activity.speed, vec![Some(9.0), Some(12.0)]);
 }
 
 #[test]
@@ -943,7 +943,7 @@ fn racechrono_v1_and_v2_fixtures_import_with_strict_rebased_timelines() {
 
     let racechrono = parse_fixture("sample RaceChrono.csv");
     assert_eq!(racechrono.course[0], (Some(32.0854405), Some(-81.0744080)));
-    assert_close(racechrono.speed[0], 0.032);
+    assert_close(racechrono.speed[0], 0.0);
     assert_close(racechrono.elevation[0], 8.962);
     assert_close(racechrono.heading[0], 81.941);
     assert_close(racechrono.rpm[0], 747.0);
@@ -1193,6 +1193,41 @@ fn airdata_datetime_utc_column_is_parsed_as_absolute_timestamps() {
         activity.time[2].as_deref(),
         Some("2026-07-14T11:45:06.000Z")
     );
+}
+
+#[test]
+fn torque_pro_gps_time_is_parsed_as_an_absolute_timestamp() {
+    let activity = parse_fixture("torquePro.csv");
+
+    assert_eq!(
+        activity.time.first().and_then(Option::as_deref),
+        Some("2026-08-05T17:57:56.000Z")
+    );
+    assert_eq!(
+        activity.sync_time.as_deref(),
+        Some("2026-08-05T17:57:56.000Z")
+    );
+    assert_close(
+        activity.torque.iter().copied().find_map(|value| value),
+        0.18320802 * 1.356,
+    );
+    assert_close(activity.speed[6], 0.0);
+    assert_close(activity.throttle_position[0], 8.23529412);
+}
+
+#[test]
+fn torque_pro_header_variants_map_throttle_and_trip_distance() {
+    let csv = "GPS Time,Throttle Position (Manifold)(%),Trip Distance(km)\n\
+Wed Aug 05 18:57:56 GMT+01:00 2026,8.25,0\n\
+Wed Aug 05 18:57:57 GMT+01:00 2026,12.5,1.5\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "torque-headers.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.throttle_position, vec![Some(8.25), Some(12.5)]);
+    assert_eq!(activity.distance, vec![Some(0.0), Some(1500.0)]);
+    assert_eq!(activity.metadata["total_distance_m"], 1500.0);
 }
 
 mod lap_timing_fixture_tests {
