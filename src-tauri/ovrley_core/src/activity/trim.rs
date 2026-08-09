@@ -199,12 +199,11 @@ pub fn trim_activity(
             .iter()
             .zip(&lap_number)
             .map(|(elapsed, lap_number)| {
-                crate::activity::lap::lap_state_at(
+                crate::activity::lap_timing::lap_time_at(
                     &lap_start_elapsed_seconds,
                     *lap_number,
                     *elapsed,
                 )
-                .lap_time_seconds
             })
             .collect::<Vec<_>>()
     } else {

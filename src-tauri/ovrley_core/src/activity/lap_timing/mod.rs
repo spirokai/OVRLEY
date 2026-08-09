@@ -1,25 +1,80 @@
-//! Canonical lap-state contract and queries.
+//! Canonical lap-timing derivation, validation, and time-based queries.
+//!
+//! This module is the single owner of the lap-timing domain. Finalization calls
+//! [`derive_lap_timing`] to construct canonical sample-aligned series, activity
+//! ingestion calls [`validate_lap_timing_contract`] at the parsed-activity
+//! boundary. Trimming and densification call [`lap_time_at`] to construct their
+//! aligned timer series, while rendering calls [`lap_state_from_aligned`] so it
+//! consumes those canonical series instead of deriving them again.
+//!
+//! Boundary-source resolution and distance-based delta calculation remain
+//! private implementation details so callers consume one canonical contract.
 
-use crate::activity::schema::ParsedActivity;
+mod boundaries;
+mod delta;
+mod derive;
+
+use crate::activity::schema::{NumericSeries, ParsedActivity};
 use crate::error::{CoreError, CoreResult};
 
+pub(crate) use derive::derive_lap_timing;
+
+/// Canonical lap state at one activity-relative elapsed time.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct LapState {
-    pub lap_number: i64,
-    pub lap_time_seconds: Option<f64>,
-    pub completed_lap_count: usize,
+pub(crate) struct LapState {
+    /// Canonical zero-based lap number, or `-1` while outside an active lap.
+    pub(crate) lap_number: i64,
+    /// Elapsed seconds since the active lap boundary, if a lap is active.
+    pub(crate) lap_time_seconds: Option<f64>,
+    /// Number of laps closed by a subsequent boundary at this elapsed time.
+    pub(crate) completed_lap_count: usize,
 }
 
-pub fn lap_state_at(
+/// Canonical lap series and compact completed-lap metadata produced at finalization.
+pub(crate) struct LapTimingResult {
+    /// Canonical sample-aligned lap IDs; `-1` denotes the out-lap.
+    pub(crate) lap_number: Vec<i64>,
+    /// Elapsed time since the exact opening boundary of each active lap.
+    pub(crate) lap_time_seconds: NumericSeries,
+    /// Exact activity-relative start time of each canonical lap.
+    pub(crate) lap_start_elapsed_seconds: Vec<f64>,
+    /// Live difference from the best previously completed lap at the same distance.
+    pub(crate) delta_to_best_lap_seconds: NumericSeries,
+    /// Fastest duration among laps closed by a subsequent boundary.
+    pub(crate) best_lap_time_seconds: Option<f64>,
+    /// Completed durations indexed by canonical lap ID.
+    pub(crate) lap_durations_seconds: Vec<f64>,
+    /// Prefix minimum of `lap_durations_seconds`.
+    pub(crate) lap_durations_best_so_far_seconds: Vec<f64>,
+}
+
+/// Computes live time for one canonical lap at an activity-relative elapsed time.
+///
+/// The aligned lap number selects its exact opening boundary. Negative labels
+/// represent an out-lap and therefore have no live lap time.
+pub(crate) fn lap_time_at(
     lap_start_elapsed_seconds: &[f64],
     lap_number: i64,
     elapsed: f64,
-) -> LapState {
-    let started_lap_count = lap_start_elapsed_seconds.partition_point(|start| *start <= elapsed);
-    let lap_time_seconds = usize::try_from(lap_number)
+) -> Option<f64> {
+    usize::try_from(lap_number)
         .ok()
         .and_then(|lap_index| lap_start_elapsed_seconds.get(lap_index))
-        .map(|lap_start| elapsed - lap_start);
+        .map(|lap_start| elapsed - lap_start)
+}
+
+/// Combines canonical aligned frame state with boundary-derived lap history.
+///
+/// The aligned lap number and time remain authoritative for the active frame.
+/// Exact boundaries only determine how many laps have been closed by `elapsed`,
+/// including during an out-lap after completed laps.
+pub(crate) fn lap_state_from_aligned(
+    lap_start_elapsed_seconds: &[f64],
+    lap_number: i64,
+    lap_time_seconds: Option<f64>,
+    elapsed: f64,
+) -> LapState {
+    let started_lap_count = lap_start_elapsed_seconds.partition_point(|start| *start <= elapsed);
     LapState {
         lap_number,
         lap_time_seconds,
@@ -27,7 +82,12 @@ pub fn lap_state_at(
     }
 }
 
-pub fn validate_lap_timing_contract(activity: &ParsedActivity) -> CoreResult<()> {
+/// Validates every lap-timing field in a parsed activity as one strict contract.
+///
+/// Activities without any lap fields are valid optional absence. Once any lap
+/// field is present, aligned series, ordered boundaries, completed durations,
+/// prefix minima, and derived lap times must all agree.
+pub(crate) fn validate_lap_timing_contract(activity: &ParsedActivity) -> CoreResult<()> {
     let has_lap_data = !activity.lap_number.is_empty()
         || !activity.lap_time_seconds.is_empty()
         || !activity.lap_start_elapsed_seconds.is_empty()
@@ -110,12 +170,8 @@ pub fn validate_lap_timing_contract(activity: &ParsedActivity) -> CoreResult<()>
                 "lap_number[{index}] must be -1 or a nonnegative source label"
             )));
         }
-        let expected_state = lap_state_at(
-            &activity.lap_start_elapsed_seconds,
-            lap_number,
-            elapsed,
-        );
-        let expected_lap_time = expected_state.lap_time_seconds;
+        let expected_lap_time =
+            lap_time_at(&activity.lap_start_elapsed_seconds, lap_number, elapsed);
         match (activity.lap_time_seconds[index], expected_lap_time) {
             (None, None) => {}
             (Some(actual), Some(expected))
@@ -133,32 +189,31 @@ pub fn validate_lap_timing_contract(activity: &ParsedActivity) -> CoreResult<()>
 
 #[cfg(test)]
 mod tests {
-    use super::lap_state_at;
+    use super::{lap_state_from_aligned, lap_time_at};
 
+    /// Verifies active lap time resets at each exact canonical boundary.
     #[test]
     fn lap_state_resets_at_exact_boundaries() {
         let starts = [0.8, 2.9];
         let targets = [0.0, 0.8, 1.0, 2.8, 2.9, 3.0];
         let lap_numbers = [-1, 0, 0, 0, 1, 1];
-        let states = targets
+        let lap_times = targets
             .iter()
             .zip(lap_numbers)
-            .map(|(target, lap_number)| lap_state_at(&starts, lap_number, *target))
+            .map(|(target, lap_number)| lap_time_at(&starts, lap_number, *target))
             .collect::<Vec<_>>();
 
-        assert_eq!(states[0].lap_number, -1);
-        assert_eq!(states[0].lap_time_seconds, None);
-        assert_eq!(states[1].lap_number, 0);
-        assert_eq!(states[1].lap_time_seconds, Some(0.0));
-        assert!((states[3].lap_time_seconds.unwrap() - 2.0).abs() < 1e-9);
-        assert_eq!(states[4].lap_number, 1);
-        assert_eq!(states[4].lap_time_seconds, Some(0.0));
-        assert!((states[5].lap_time_seconds.unwrap() - 0.1).abs() < 1e-9);
+        assert_eq!(lap_times[0], None);
+        assert_eq!(lap_times[1], Some(0.0));
+        assert!((lap_times[3].unwrap() - 2.0).abs() < 1e-9);
+        assert_eq!(lap_times[4], Some(0.0));
+        assert!((lap_times[5].unwrap() - 0.1).abs() < 1e-9);
     }
 
+    /// Verifies an inactive state retains the count of previously completed laps.
     #[test]
     fn inactive_state_keeps_completed_lap_history() {
-        let state = lap_state_at(&[0.8, 2.9, 5.0], -1, 6.0);
+        let state = lap_state_from_aligned(&[0.8, 2.9, 5.0], -1, None, 6.0);
 
         assert_eq!(state.lap_number, -1);
         assert_eq!(state.lap_time_seconds, None);
