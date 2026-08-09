@@ -8,22 +8,11 @@ export const PACKAGING_DOCUMENTS = {
   linuxInstall: "INSTALL-linux.txt",
 };
 
-export async function preparePackagingResources(
-  rootDir = resolve(import.meta.dirname, ".."),
-) {
+export async function preparePackagingResources(rootDir = resolve(import.meta.dirname, "..")) {
   await ensureDirectory(join(rootDir, "fonts"), "Fonts source directory");
-  await ensureDirectory(
-    join(rootDir, "templates"),
-    "Templates source directory",
-  );
+  await ensureDirectory(join(rootDir, "templates"), "Templates source directory");
 
-  const ffmpegBinary = join(
-    rootDir,
-    "vendor",
-    "ffmpeg",
-    "bin",
-    process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg",
-  );
+  const ffmpegBinary = join(rootDir, "vendor", "ffmpeg", "bin", process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg");
   const ffprobeBinary = join(
     rootDir,
     "vendor",
@@ -36,14 +25,8 @@ export async function preparePackagingResources(
 
   const noticePath = join(rootDir, PACKAGING_DOCUMENTS.notice);
   await writeFile(noticePath, buildThirdPartyNotice(ffmpegBinary));
-  await writeFile(
-    join(rootDir, PACKAGING_DOCUMENTS.macosInstall),
-    buildMacosInstallDocument(),
-  );
-  await writeFile(
-    join(rootDir, PACKAGING_DOCUMENTS.linuxInstall),
-    buildLinuxInstallDocument(),
-  );
+  await writeFile(join(rootDir, PACKAGING_DOCUMENTS.macosInstall), buildMacosInstallDocument());
+  await writeFile(join(rootDir, PACKAGING_DOCUMENTS.linuxInstall), buildLinuxInstallDocument());
 
   return {
     noticePath,
@@ -79,7 +62,7 @@ function buildThirdPartyNotice(ffmpegBinaryPath) {
     "https://github.com/BtbN/FFmpeg-Builds",
     "",
     "macOS builds are downloaded from Evermeet/Tessus FFmpeg builds:",
-    "https://evermeet.cx/ffmpeg/",
+    "https://ffmpeg.martin-riedl.de/",
     "",
     "ffmpeg -version",
     "---------------",
@@ -104,8 +87,8 @@ function buildMacosInstallDocument() {
     "Unsigned App Notice",
     "-------------------",
     "OVRLEY is ad-hoc signed and is not notarized with an Apple Developer certificate,",
-    "so macOS may block it from opening by default.",
-    "Use right-click Open or approve OVRLEY in Privacy & Security on first launch.",
+    "so macOS may block it from opening by default. Use the following command to remove the quarantine attribute and allow OVRLEY to run:",
+    "sudo xattr -cr /Applications/OVRLEY.app",
     "",
   ].join("\n");
 }

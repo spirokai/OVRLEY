@@ -139,6 +139,7 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
   const interpolatedValue = interpolateNumericSeries(elapsedSeries, series, elapsedSecond, policy)
 
   if (interpolatedValue !== null) return interpolatedValue
+  if (interpolationMode === 'preserve') return 0
   return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
 }
 

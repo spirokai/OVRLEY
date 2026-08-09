@@ -40,10 +40,10 @@ use std::collections::BTreeMap;
 /// series that a template did not request.
 pub type NumericSeries = Vec<Option<f64>>;
 
-/// Canonical source lap numbers aligned with `sample_elapsed_seconds`.
+/// Source lap labels aligned with `sample_elapsed_seconds`.
 ///
-/// Present values are normalized at extraction: `-1` is the out-lap and
-/// non-negative values are zero-based timed laps.
+/// Present values are normalized at extraction: `-1` is the pre-lap and
+/// valid source labels are preserved as supplied.
 pub type LapNumberSeries = Vec<Option<i64>>;
 
 /// Canonical string gear observations aligned with `sample_elapsed_seconds`.
@@ -526,12 +526,15 @@ pub struct ParsedActivity {
     /// Heading in degrees (0–360).
     #[serde(default)]
     pub heading: NumericSeries,
-    /// Lap number, 0-based. -1 for records before the first start/finish crossing.
+    /// Lap label; explicit positive source labels are preserved. -1 for pre-lap records.
     #[serde(default)]
     pub lap_number: Vec<i64>,
     /// Seconds since the start of the current lap. Null during out-lap.
     #[serde(default)]
     pub lap_time_seconds: NumericSeries,
+    /// Exact activity-relative start time of each canonical lap.
+    #[serde(default)]
+    pub lap_start_elapsed_seconds: Vec<f64>,
     /// Delta of current lap time versus the best completed lap at the same distance.
     #[serde(default)]
     pub delta_to_best_lap_seconds: NumericSeries,
@@ -672,9 +675,11 @@ pub struct DenseSeriesReport {
     pub lap_number: Vec<Option<i64>>,
     /// Lap time in seconds for each frame.
     pub lap_time_seconds: Vec<Option<f64>>,
+    /// Exact scene-relative start time of each canonical lap.
+    pub lap_start_elapsed_seconds: Vec<f64>,
     /// Delta to best lap in seconds for each frame.
     pub delta_to_best_lap_seconds: Vec<Option<f64>>,
-    /// Per-lap metadata scoped to the active trim window.
+    /// Completed-lap metadata retained from the full activity through scene trim.
     pub lap_durations_seconds: Vec<f64>,
     pub lap_durations_best_so_far_seconds: Vec<f64>,
 }
@@ -725,7 +730,10 @@ impl DenseSeriesReport {
             MetricKind::LeanAngle => Some(&self.lean_angle),
             MetricKind::DistanceToHome => Some(&self.distance_to_home),
             MetricKind::TotalAscent => Some(&self.total_ascent),
-            MetricKind::GearPosition | MetricKind::GpsCoordinates | MetricKind::Time => None,
+            MetricKind::GearPosition
+            | MetricKind::GpsCoordinates
+            | MetricKind::Time
+            | MetricKind::LapTimer => None,
         }
     }
 }
@@ -833,9 +841,11 @@ pub struct TrimmedActivity {
     pub lap_number: Vec<i64>,
     /// Trimmed lap time samples in seconds.
     pub lap_time_seconds: NumericSeries,
+    /// Exact scene-relative start time of each canonical lap.
+    pub lap_start_elapsed_seconds: Vec<f64>,
     /// Trimmed delta-to-best-lap samples in seconds.
     pub delta_to_best_lap_seconds: NumericSeries,
-    /// Per-lap metadata scoped to the active trim window.
+    /// Completed-lap metadata retained from the full activity through scene trim.
     pub lap_durations_seconds: Vec<f64>,
     pub lap_durations_best_so_far_seconds: Vec<f64>,
 }

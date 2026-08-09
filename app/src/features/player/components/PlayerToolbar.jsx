@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
  */
 export default function PlayerToolbar({ toolbar }) {
   return (
-    <div className="flex w-full items-center justify-between gap-4">
+    <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
       <div className="flex items-center gap-1">
         <SimpleTooltip side="top" content="Zoom out">
           <Button type="button" aria-label="Zoom out" size="toolbar-icon" variant="toolbar" onClick={toolbar.zoomOut}>
@@ -161,7 +161,7 @@ export default function PlayerToolbar({ toolbar }) {
         </Button>
       </div>
 
-      <div className="flex w-48 shrink-0 items-center justify-end gap-4">
+      <div className="flex w-48 shrink-0 items-center justify-end justify-self-end gap-4">
         {toolbar.hasVideo ? (
           <Button
             type="button"

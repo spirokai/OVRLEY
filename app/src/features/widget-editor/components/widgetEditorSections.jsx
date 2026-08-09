@@ -110,8 +110,8 @@ export function FontSection({
   title = 'Typography',
   showTextInput = false,
   fontSizeLabel = 'Font Size',
-  sizeMin = 8,
-  sizeMax = 300,
+  sizeMin = 20,
+  sizeMax = 200,
   colorLabel = 'Font Color',
   showFormatSelect = false,
 }) {

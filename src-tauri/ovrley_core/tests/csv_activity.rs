@@ -165,10 +165,7 @@ fn katana_fixture_reconstructs_time_gps_and_telemetry() {
 
     assert_eq!(activity.sample_elapsed_seconds.len(), 366);
     assert_eq!(activity.sample_elapsed_seconds[0], 0.0);
-    assert_eq!(
-        activity.sample_elapsed_seconds.last().copied(),
-        Some(365.0)
-    );
+    assert_eq!(activity.sample_elapsed_seconds.last().copied(), Some(365.0));
     assert!(activity
         .sample_elapsed_seconds
         .windows(2)
@@ -187,11 +184,11 @@ fn katana_fixture_reconstructs_time_gps_and_telemetry() {
         Some("2026-07-25T11:18:11.160Z")
     );
 
-    assert_eq!(
-        activity.course[0],
-        (Some(51.178278), Some(0.301071))
-    );
-    assert!(activity.course.iter().any(|(lat, lon)| lat.is_some() && lon.is_some()));
+    assert_eq!(activity.course[0], (Some(51.178278), Some(0.301071)));
+    assert!(activity
+        .course
+        .iter()
+        .any(|(lat, lon)| lat.is_some() && lon.is_some()));
 
     assert_eq!(activity.speed[0], Some(0.0));
     assert!(activity.speed.iter().any(Option::is_some));
@@ -564,7 +561,7 @@ fn racebox_fixture_imports_through_the_path_entry_point() {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity/sample Racebox.csv");
 
-    let response = parse_csv_activity_path(&fixture).unwrap();
+    let response = parse_csv_activity_path(&fixture, None).unwrap();
     let activity = response.parsed_activity;
 
     assert_eq!(activity.file_name.as_deref(), Some("sample Racebox.csv"));
@@ -586,6 +583,37 @@ fn racebox_fixture_imports_through_the_path_entry_point() {
     );
     assert_eq!(activity.speed.first(), Some(&Some(1.5166666666666666)));
     assert_eq!(activity.elevation.first(), Some(&Some(147.8)));
+    let closing_lap_index = activity
+        .sample_elapsed_seconds
+        .iter()
+        .position(|elapsed| (*elapsed - 536.24).abs() < 1e-9)
+        .unwrap();
+    assert_eq!(activity.lap_number[closing_lap_index - 1], 3);
+    assert_eq!(activity.lap_number[closing_lap_index], -1);
+    assert_eq!(activity.lap_time_seconds[closing_lap_index], None);
+    assert_eq!(activity.lap_durations_seconds.len(), 4);
+}
+
+#[test]
+fn csv_lap_values_normalize_positive_integer_labels_and_reject_other_values() {
+    let csv = "Time,Speed,Lap\n\
+0,10,4\n\
+1,10,4\n\
+2,10,3\n\
+3,10,3\n\
+4,10,2\n\
+5,10,0\n\
+6,10,-1\n\
+7,10,1.5\n\
+8,10,-\n\
+9,10,null\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "laps.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.lap_number, vec![0, 0, 1, 1, 2, -1, -1, -1, -1, -1]);
+    assert_eq!(activity.lap_durations_seconds, vec![2.0, 2.0, 1.0]);
 }
 
 #[test]
@@ -593,12 +621,19 @@ fn csv_command_returns_the_native_path_response() {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity/sample Racebox.csv");
 
-    let response = backend_parse_csv_activity(fixture.to_str().unwrap()).unwrap();
+    let repo_root =
+        std::env::temp_dir().join(format!("ovrley-csv-debug-test-{}", std::process::id()));
+    let paths = ovrley_core::paths::AppPaths::from_repo_root(repo_root.clone());
+    let response = backend_parse_csv_activity(&paths, fixture.to_str().unwrap()).unwrap();
     // debug_payload is Some only in debug builds
     if cfg!(not(debug_assertions)) {
         assert!(response.debug_payload.is_none());
     } else {
         assert!(response.debug_payload.is_some());
+        assert!(repo_root
+            .join("debug/activities/sample Racebox-parse-debug.json")
+            .is_file());
+        std::fs::remove_dir_all(repo_root).unwrap();
     }
     let activity = response.parsed_activity;
 
@@ -702,10 +737,10 @@ fn vehicle_gear_outranks_calculated_gear() {
 }
 
 #[test]
-fn gps_sources_outrank_unqualified_calculated_and_vehicle_sources() {
-    let csv = "Time,Latitude,GPS Latitude,Longitude,GPS Longitude,Distance,GPS Distance 2D,Speed (m/s) *calc,GPS Speed (m/s),Vehicle Speed (m/s),Speed (m/s) *estimate\n\
-0,10,20,30,40,100,200,3,4,5,999\n\
-1,11,21,31,41,110,220,6,7,8,999\n";
+fn qualified_sources_use_metric_specific_priority() {
+    let csv = "Time,Latitude,GPS Latitude,Longitude,GPS Longitude,Distance,GPS Distance 2D,Speed (m/s),Speed (m/s) *calc,GPS Speed (m/s),Vehicle Speed (m/s),Speed (OBD)(km/h),Speed (m/s) *estimate\n\
+0,10,20,30,40,100,200,9,3,4,5,-,999\n\
+1,11,21,31,41,110,220,12,6,7,8,-,999\n";
 
     let activity = parse_csv_activity_reader(Cursor::new(csv), "priorities.csv")
         .unwrap()
@@ -716,7 +751,7 @@ fn gps_sources_outrank_unqualified_calculated_and_vehicle_sources() {
         vec![(Some(20.0), Some(40.0)), (Some(21.0), Some(41.0))]
     );
     assert_eq!(activity.distance, vec![Some(0.0), Some(20.0)]);
-    assert_eq!(activity.speed, vec![Some(4.0), Some(7.0)]);
+    assert_eq!(activity.speed, vec![Some(9.0), Some(12.0)]);
 }
 
 #[test]
@@ -908,7 +943,7 @@ fn racechrono_v1_and_v2_fixtures_import_with_strict_rebased_timelines() {
 
     let racechrono = parse_fixture("sample RaceChrono.csv");
     assert_eq!(racechrono.course[0], (Some(32.0854405), Some(-81.0744080)));
-    assert_close(racechrono.speed[0], 0.032);
+    assert_close(racechrono.speed[0], 0.0);
     assert_close(racechrono.elevation[0], 8.962);
     assert_close(racechrono.heading[0], 81.941);
     assert_close(racechrono.rpm[0], 747.0);
@@ -1060,7 +1095,9 @@ fn parse_fixture(name: &str) -> ovrley_core::activity::schema::ParsedActivity {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity")
         .join(name);
-    parse_csv_activity_path(&path).unwrap().parsed_activity
+    parse_csv_activity_path(&path, None)
+        .unwrap()
+        .parsed_activity
 }
 
 fn assert_close(actual: Option<f64>, expected: f64) {
@@ -1148,8 +1185,49 @@ fn airdata_datetime_utc_column_is_parsed_as_absolute_timestamps() {
 
     assert_eq!(activity.time.len(), 3);
     assert_eq!(activity.time[0], None);
-    assert_eq!(activity.time[1].as_deref(), Some("2026-07-14T11:45:06.000Z"));
-    assert_eq!(activity.time[2].as_deref(), Some("2026-07-14T11:45:06.000Z"));
+    assert_eq!(
+        activity.time[1].as_deref(),
+        Some("2026-07-14T11:45:06.000Z")
+    );
+    assert_eq!(
+        activity.time[2].as_deref(),
+        Some("2026-07-14T11:45:06.000Z")
+    );
+}
+
+#[test]
+fn torque_pro_gps_time_is_parsed_as_an_absolute_timestamp() {
+    let activity = parse_fixture("torquePro.csv");
+
+    assert_eq!(
+        activity.time.first().and_then(Option::as_deref),
+        Some("2026-08-05T17:57:56.000Z")
+    );
+    assert_eq!(
+        activity.sync_time.as_deref(),
+        Some("2026-08-05T17:57:56.000Z")
+    );
+    assert_close(
+        activity.torque.iter().copied().find_map(|value| value),
+        0.18320802 * 1.356,
+    );
+    assert_close(activity.speed[6], 0.0);
+    assert_close(activity.throttle_position[0], 8.23529412);
+}
+
+#[test]
+fn torque_pro_header_variants_map_throttle_and_trip_distance() {
+    let csv = "GPS Time,Throttle Position (Manifold)(%),Trip Distance(km)\n\
+Wed Aug 05 18:57:56 GMT+01:00 2026,8.25,0\n\
+Wed Aug 05 18:57:57 GMT+01:00 2026,12.5,1.5\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "torque-headers.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.throttle_position, vec![Some(8.25), Some(12.5)]);
+    assert_eq!(activity.distance, vec![Some(0.0), Some(1500.0)]);
+    assert_eq!(activity.metadata["total_distance_m"], 1500.0);
 }
 
 mod lap_timing_fixture_tests {
@@ -1172,8 +1250,16 @@ mod lap_timing_fixture_tests {
             .join("tests/fixtures/activity")
             .join(expectations.fixture);
         match expectations.extraction {
-            FixtureKind::Csv => parse_csv_activity_path(&path).unwrap().parsed_activity,
-            FixtureKind::Vbo => parse_vbo_activity_path(&path, None).unwrap().parsed_activity,
+            FixtureKind::Csv => {
+                parse_csv_activity_path(&path, None)
+                    .unwrap()
+                    .parsed_activity
+            }
+            FixtureKind::Vbo => {
+                parse_vbo_activity_path(&path, None)
+                    .unwrap()
+                    .parsed_activity
+            }
         }
     }
 
@@ -1228,11 +1314,7 @@ mod lap_timing_fixture_tests {
             let activity = parse(&expectations);
             let n = activity.sample_elapsed_seconds.len();
 
-            assert!(
-                n > 0,
-                "{} must have samples",
-                expectations.fixture
-            );
+            assert!(n > 0, "{} must have samples", expectations.fixture);
             assert_eq!(
                 activity.lap_number.len(),
                 n,

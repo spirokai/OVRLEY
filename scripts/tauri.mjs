@@ -6,6 +6,10 @@ const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tauriScript = join(rootDir, 'node_modules', '@tauri-apps', 'cli', 'tauri.js')
 
 const args = process.argv.slice(2)
+const tauriArgs =
+  args[0] === 'dev'
+    ? [...args, '--config', JSON.stringify({ bundle: { resources: { '../THIRD_PARTY_NOTICES.txt': null } } })]
+    : args
 const shouldBuildPortable =
   args[0] === 'build' &&
   !args.includes('--help') &&
@@ -15,7 +19,7 @@ const shouldBuildPortable =
   !args.includes('--no-bundle')
 
 if (!shouldBuildPortable) {
-  process.exitCode = await run(process.execPath, [tauriScript, ...args])
+  process.exitCode = await run(process.execPath, [tauriScript, ...tauriArgs])
 } else {
   const tauriBuildArgs = defaultTauriBuildArgs(args)
   const buildCode = await run(process.execPath, [tauriScript, ...tauriBuildArgs])

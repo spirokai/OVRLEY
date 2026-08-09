@@ -8,7 +8,7 @@ use ovrley_core::paths::AppPaths;
 use ovrley_core::render::widgets::gauges::arc::{
     arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles,
 };
-use ovrley_core::render::widgets::types::PresentationCache;
+use ovrley_core::render::widgets::types::PreparedValue;
 use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
 use ovrley_core::types::{DisplayType, MetricKind, TrackFillStyle};
 use std::collections::BTreeMap;
@@ -106,9 +106,13 @@ fn prepare_assets_builds_arc_cache_with_static_unit_and_frame_values() {
 
     let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
 
-    let Some(PresentationCache::ArcGauge(cache)) = assets.presentation_caches.get(&0) else {
+    let PreparedValue::ArcGauge(widget) = &assets.values()[0] else {
         panic!("arc gauge should prepare a gauge cache at value index 0");
     };
+    let cache = widget
+        .cache
+        .as_ref()
+        .expect("arc gauge cache must be prepared");
     assert_eq!(cache.frame_states[1].fill01, 0.5);
     assert_eq!(cache.frame_states[1].value_text, "108");
     assert!(
@@ -132,9 +136,13 @@ fn bars_style_resolves_configured_arc_geometry_into_the_cache() {
     let mut profiler = RenderProfiler::default();
     let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
 
-    let Some(PresentationCache::ArcGauge(cache)) = assets.presentation_caches.get(&0) else {
+    let PreparedValue::ArcGauge(widget) = &assets.values()[0] else {
         panic!("arc bars should use the arc gauge cache");
     };
+    let cache = widget
+        .cache
+        .as_ref()
+        .expect("arc bars cache must be prepared");
     assert_eq!(cache.track_fill_style, TrackFillStyle::Bars);
     assert_eq!(cache.bar_geometry.unwrap().count, 8);
 }

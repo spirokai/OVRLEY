@@ -46,6 +46,7 @@ function getUiScale(width) {
  * loading and store hydration do not participate in these values.
  *
  * @returns {{
+ *   activeKeyboardWorkspace: string,
  *   closeKeyboardShortcuts: Function,
  *   decreaseZoom: Function,
  *   debugModeEnabled: boolean,
@@ -57,6 +58,7 @@ function getUiScale(width) {
  *   keyboardShortcutsOpen: boolean,
  *   openKeyboardShortcuts: Function,
  *   resetZoom: Function,
+ *   setActiveKeyboardWorkspace: Function,
  *   setEditorBackgroundMode: Function,
  *   setEditorGridVisible: Function,
  *   setEditorSnapToGrid: Function,
@@ -73,6 +75,7 @@ export default function useEditorShellState() {
   const [editorSnapToGrid, setEditorSnapToGrid] = useState(false)
   const [uiScale, setUiScale] = useState(() => (typeof window === 'undefined' ? 1 : getUiScale(window.innerWidth)))
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false)
+  const [activeKeyboardWorkspace, setActiveKeyboardWorkspace] = useState('editor')
   // Debug-only controls are surfaced from the app-level development flag.
   const debugModeEnabled = import.meta.env.DEV && DEBUG_MODE_ENABLED
 
@@ -118,6 +121,7 @@ export default function useEditorShellState() {
   }
 
   return {
+    activeKeyboardWorkspace,
     closeKeyboardShortcuts,
     decreaseZoom,
     debugModeEnabled,
@@ -129,6 +133,7 @@ export default function useEditorShellState() {
     keyboardShortcutsOpen,
     openKeyboardShortcuts,
     resetZoom,
+    setActiveKeyboardWorkspace,
     setEditorBackgroundMode,
     setEditorGridVisible,
     setEditorSnapToGrid,

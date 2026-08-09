@@ -22,14 +22,59 @@ describe('template snapshot standard metric schema', () => {
   })
 
   test('seeds the arc font size as shared widget data rather than variant data', () => {
-    const speedDefaults = createMetricValueDefaults('speed', undefined, 'arc')
+    const speedDefaults = createMetricValueDefaults('speed', undefined, { displayType: 'arc' })
 
     expect(speedDefaults.font_size).toBe(60)
     expect(speedDefaults.display_variants.arc).not.toHaveProperty('font_size')
   })
 
+  test('preserves the flat lap timer contract during durable normalization', () => {
+    const lapTimer = createMetricValueDefaults('lap_timer', undefined, { lapTimerMode: 'best_lap' })
+
+    const normalized = normalizeTemplateConfig({ scene: {}, values: [lapTimer] })
+
+    expect(normalized.values[0]).toMatchObject({
+      value: 'lap_timer',
+      display_type: 'lap_timer',
+      lap_timer_mode: 'best_lap',
+      show_label: true,
+      label: 'Best Lap',
+      positive_delta_color: '#ff6e83',
+      negative_delta_color: '#61ffab',
+    })
+    expect(normalized.values[0]).not.toHaveProperty('display_variants')
+  })
+
+  test('creates Delta with its label and manifest colors instead of the global text color', () => {
+    const lapTimer = createMetricValueDefaults('lap_timer', { color_values: '#ffffff' }, { lapTimerMode: 'delta' })
+
+    expect(lapTimer).toMatchObject({
+      value: 'lap_timer',
+      display_type: 'lap_timer',
+      lap_timer_mode: 'delta',
+      show_label: true,
+      label: 'Live Delta',
+      positive_delta_color: '#ff6e83',
+      negative_delta_color: '#61ffab',
+    })
+  })
+
+  test('creates the canonical lap-log display with its default label', () => {
+    const lapTimer = createMetricValueDefaults('lap_timer', { color_values: '#abcdef' }, { lapTimerMode: 'lap_log' })
+
+    expect(lapTimer).toMatchObject({
+      value: 'lap_timer',
+      display_type: 'lap_timer',
+      lap_timer_mode: 'lap_log',
+      show_label: true,
+      label: 'Lap Log',
+      font_size: 30,
+      color: '#abcdef',
+    })
+  })
+
   test('partitions lean-angle shared defaults from variant geometry', () => {
-    const leanAngleDefaults = createMetricValueDefaults('lean_angle', undefined, 'lean_angle')
+    const leanAngleDefaults = createMetricValueDefaults('lean_angle', undefined, { displayType: 'lean_angle' })
     const themedLeanAngleDefaults = createMetricValueDefaults(
       'lean_angle',
       {
@@ -37,7 +82,7 @@ describe('template snapshot standard metric schema', () => {
         color_values: '#123456',
         color_units: '#abcdef',
       },
-      'lean_angle',
+      { displayType: 'lean_angle' },
     )
 
     expect(leanAngleDefaults).toMatchObject({
@@ -65,7 +110,7 @@ describe('template snapshot standard metric schema', () => {
   })
 
   test('rejects malformed durable lean-angle geometry at normalization', () => {
-    const leanAngle = createMetricValueDefaults('lean_angle', undefined, 'lean_angle')
+    const leanAngle = createMetricValueDefaults('lean_angle', undefined, { displayType: 'lean_angle' })
     const { diameter: _diameter, ...missingDiameter } = leanAngle.display_variants.lean_angle
 
     expect(() =>
@@ -88,7 +133,7 @@ describe('template snapshot standard metric schema', () => {
   })
 
   test('seeds G-force label typography from value globals', () => {
-    const defaults = createMetricValueDefaults('g_force', { font_values: 'Roboto.ttf' }, 'g_force')
+    const defaults = createMetricValueDefaults('g_force', { font_values: 'Roboto.ttf' }, { displayType: 'g_force' })
 
     expect(defaults.display_variants.g_force.label_font).toBe('Roboto.ttf')
     expect(defaults.display_variants.g_force.label_font_size).toBe(50)

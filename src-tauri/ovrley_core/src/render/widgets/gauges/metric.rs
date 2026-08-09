@@ -54,14 +54,19 @@ pub(crate) fn metric_values(series: &DenseSeriesReport, metric: MetricKind) -> &
         | MetricKind::GpsCoordinates
         | MetricKind::Gradient
         | MetricKind::TotalAscent
-        | MetricKind::Time => &[],
+        | MetricKind::Time
+        | MetricKind::LapTimer => &[],
         metric => series.numeric_series_for(metric).unwrap_or(&[]),
     }
 }
 
 /// Converts a raw telemetry min/max value through the selected display unit
 /// and rounds it to the nearest integer label.
-pub(crate) fn format_gauge_label(kind: MetricKind, display_unit: Option<&str>, value: f64) -> String {
+pub(crate) fn format_gauge_label(
+    kind: MetricKind,
+    display_unit: Option<&str>,
+    value: f64,
+) -> String {
     let converted = convert_standard_metric_value(kind, display_unit, value);
     (converted.round() as i64).to_string()
 }

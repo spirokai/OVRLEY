@@ -7,7 +7,7 @@ use ovrley_core::normalize::raw::ValueConfig;
 use ovrley_core::normalize::{validate_render_config, ValidatedLinearGaugeOrientation};
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::widgets::gauges::linear::{bar_fill_rect, bordered_bar_fill_rect};
-use ovrley_core::render::widgets::types::PresentationCache;
+use ovrley_core::render::widgets::types::PreparedValue;
 use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
 use ovrley_core::types::{DisplayType, MetricKind, TrackFillStyle};
 use std::collections::BTreeMap;
@@ -128,9 +128,13 @@ fn prepare_assets_builds_linear_gauge_cache_with_activity_range() {
 
     let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
 
-    let Some(PresentationCache::LinearGauge(cache)) = assets.presentation_caches.get(&0) else {
+    let PreparedValue::LinearGauge(widget) = &assets.values()[0] else {
         panic!("linear gauge should prepare a gauge cache at value index 0");
     };
+    let cache = widget
+        .cache
+        .as_ref()
+        .expect("linear gauge cache must be prepared");
     assert_eq!(cache.frame_states[1].fill01, 0.5);
 }
 
@@ -155,9 +159,13 @@ fn bars_style_resolves_configured_linear_geometry_into_the_cache() {
     let mut profiler = RenderProfiler::default();
     let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
 
-    let Some(PresentationCache::LinearGauge(cache)) = assets.presentation_caches.get(&0) else {
+    let PreparedValue::LinearGauge(widget) = &assets.values()[0] else {
         panic!("linear bars should use the linear gauge cache");
     };
+    let cache = widget
+        .cache
+        .as_ref()
+        .expect("linear bars cache must be prepared");
     assert_eq!(cache.track_fill_style, TrackFillStyle::Bars);
     assert_eq!(cache.bar_geometry.unwrap().count, 8);
 }

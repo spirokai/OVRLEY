@@ -60,6 +60,8 @@ enum Metric {
     GForceZ,
     /// Engine speed in revolutions per minute.
     Rpm,
+    /// Engine torque in newton-metres.
+    Torque,
     /// Throttle position as a percentage from zero to one hundred.
     ThrottlePosition,
     /// Brake position as a percentage from zero to one hundred.
@@ -108,7 +110,10 @@ impl Metric {
 /// The path's final UTF-8 filename is retained in the finalized activity. An
 /// invalid path or filename is returned as a [`CoreError`](crate::error::CoreError),
 /// while CSV, header, and timeline failures include CSV import context.
-pub fn parse_csv_activity_path(path: &Path) -> CoreResult<FinalizeActivityResponse> {
+pub fn parse_csv_activity_path(
+    path: &Path,
+    repo_root: Option<&Path>,
+) -> CoreResult<FinalizeActivityResponse> {
     let file = File::open(path).map_err(|source| CoreError::Io {
         path: path.to_path_buf(),
         source,
@@ -123,7 +128,7 @@ pub fn parse_csv_activity_path(path: &Path) -> CoreResult<FinalizeActivityRespon
             ))
         })?;
 
-    parse_csv_activity_reader(file, file_name)
+    parse_csv_activity(file, file_name, repo_root)
 }
 
 /// Parses CSV data from a reader and finalizes canonical columns.
@@ -139,6 +144,14 @@ pub fn parse_csv_activity_path(path: &Path) -> CoreResult<FinalizeActivityRespon
 pub fn parse_csv_activity_reader<R: Read>(
     reader: R,
     file_name: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    parse_csv_activity(reader, file_name, None)
+}
+
+fn parse_csv_activity<R: Read>(
+    reader: R,
+    file_name: &str,
+    repo_root: Option<&Path>,
 ) -> CoreResult<FinalizeActivityResponse> {
     let result = (|| {
         let mut records = csv::ReaderBuilder::new()
@@ -203,7 +216,7 @@ pub fn parse_csv_activity_reader<R: Read>(
             file_name,
         )?;
 
-        finalize_activity_columns(&columns, None)
+        finalize_activity_columns(&columns, repo_root)
     })();
 
     result.map_err(|error| CoreError::Activity(format!("CSV import '{file_name}': {error}")))

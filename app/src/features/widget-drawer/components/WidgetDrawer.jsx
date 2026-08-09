@@ -17,8 +17,8 @@ export function WidgetDrawer({ widgetLiveEdits }) {
   const { activitySummary } = useActivityStore()
   const { addWidget } = useWidgetManager({ widgetLiveEdits })
 
-  const handleAddWidget = (type, displayType) => {
-    addWidget(type, displayType)
+  const handleAddWidget = (request) => {
+    addWidget(request)
     closeWidgetDrawer()
   }
 

@@ -80,8 +80,11 @@ pub fn backend_finalize_activity(paths: &AppPaths, raw_activity_json: &str) -> C
 }
 
 /// Parses and finalizes a native CSV activity without a frontend RawActivity hop.
-pub fn backend_parse_csv_activity(path: &str) -> CoreResult<FinalizeActivityResponse> {
-    crate::activity::csv::parse_csv_activity_path(Path::new(path))
+pub fn backend_parse_csv_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    crate::activity::csv::parse_csv_activity_path(Path::new(path), Some(&paths.repo_root))
 }
 
 /// Parses and finalizes a native VBO activity without a frontend RawActivity hop.

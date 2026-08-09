@@ -31,6 +31,7 @@ import {
   DEFAULT_GLOBAL_DEFAULTS,
   DISPLAY_VARIANT_KEYS,
   ELEVATION_PLOT_KEYS,
+  LAP_TIMER_KEYS,
   LABEL_KEYS,
   SCENE_DURABLE_KEYS,
   SCENE_RENDER_TIME_ONLY_KEYS,
@@ -194,14 +195,15 @@ function normalizeValue(value = {}) {
   normalizeLeanAngleGeometry(value)
   const valueDefaults = type === 'gradient' ? GRADIENT_DEFAULTS : TYPE_DEFAULTS[type] || {}
   const extraKeys = Object.keys(valueDefaults).filter((key) => !VALUE_SHARED_KEYS.includes(key))
-  const keys = [...VALUE_SHARED_KEYS, ...extraKeys]
+  const keys = [...VALUE_SHARED_KEYS, ...extraKeys, ...(type === 'lap_timer' ? LAP_TIMER_KEYS : [])]
   const withDefaults = { ...TEXT_DEFAULTS, ...TYPE_DEFAULTS[type], ...value }
   const pickedValue = pickDefined(withDefaults, keys)
   if (typeof pickedValue.display_unit !== 'string') {
     delete pickedValue.display_unit
   }
   if (pickedValue.display_type && pickedValue.display_type !== 'text') {
-    pickedValue.display_variants = (initDisplayVariant(pickedValue, pickedValue.display_type) || pickedValue).display_variants
+    const initializedValue = initDisplayVariant(pickedValue, pickedValue.display_type)
+    if (initializedValue.display_variants) pickedValue.display_variants = initializedValue.display_variants
   }
   if (pickedValue.display_variants) {
     pickedValue.display_variants = normalizeDisplayVariants(pickedValue.display_variants)

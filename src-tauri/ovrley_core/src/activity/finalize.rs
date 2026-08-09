@@ -11,7 +11,6 @@
 //! before this shared seam and will later emit the same raw contract.
 
 pub mod gap;
-pub mod lap;
 pub mod metrics;
 pub mod smoothing;
 
@@ -26,6 +25,7 @@ use crate::activity::finalize::metrics::{
 use crate::activity::finalize::smoothing::{
     circular_ema, smoothing_window_for_seconds, zero_phase_smooth,
 };
+use crate::activity::lap_timing::derive_lap_timing;
 use crate::activity::schema::{
     ActivityColumns, GearSeries, ParsedActivity, RawActivity, RawSample,
 };
@@ -286,7 +286,7 @@ fn finalize_columns_with_debug(
     let sync_time = explicit_sync_time.or(first_sample_time);
     let end_time = time_series.iter().rev().find_map(Clone::clone);
     let distance_progress_series = build_progress_series(&distance_series);
-    let lap_timing = lap::derive_lap_timing(
+    let lap_timing = derive_lap_timing(
         &elapsed_series,
         &distance_series,
         &course_series,
@@ -397,6 +397,7 @@ fn finalize_columns_with_debug(
         heading: metric(&metric_series_map, "heading"),
         lap_number: lap_timing.lap_number,
         lap_time_seconds: lap_timing.lap_time_seconds,
+        lap_start_elapsed_seconds: lap_timing.lap_start_elapsed_seconds,
         delta_to_best_lap_seconds: lap_timing.delta_to_best_lap_seconds,
         best_lap_time_seconds: lap_timing.best_lap_time_seconds,
         lap_durations_seconds: lap_timing.lap_durations_seconds,

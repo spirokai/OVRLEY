@@ -179,6 +179,11 @@ jobs:
           on run arguments
             set backgroundName to item 1 of arguments
             tell application "Finder"
+              repeat with attempt from 1 to 30
+                if exists disk "OVRLEY" then exit repeat
+                delay 1
+              end repeat
+              if not (exists disk "OVRLEY") then error "Finder did not discover the mounted OVRLEY disk within 30 seconds."
               tell disk "OVRLEY"
                 open
                 set current view of container window to icon view

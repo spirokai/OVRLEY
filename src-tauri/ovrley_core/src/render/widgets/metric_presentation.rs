@@ -18,100 +18,80 @@
 
 use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
-use crate::render::text::ResolvedTextStyle;
 use crate::render::widgets::g_force::draw_g_force_widget;
 use crate::render::widgets::gauges::arc::draw_arc_gauge_widget;
 use crate::render::widgets::gauges::linear::draw_linear_gauge_widget;
 use crate::render::widgets::heading::draw_heading_widget;
 use crate::render::widgets::lean_angle::draw_lean_angle_widget;
-use crate::render::widgets::types::{PresentationCache, WidgetRenderReport};
-use crate::types::{DisplayType, MetricKind};
+use crate::render::widgets::types::{
+    ArcGaugeCache, GForceWidgetCache, HeadingWidgetCache, LeanAngleCache, LinearGaugeCache,
+    PreparedValue, WidgetRenderReport,
+};
+use crate::types::DisplayType;
 use skia_safe::Canvas;
-use std::collections::BTreeMap;
 
 /// Draws a boxed metric presentation for a value widget.
 ///
-/// This is called for non-intrinsic display types (anything other than `Text`).
-/// The presentation is selected by `DisplayType`, and the metric kind determines
-/// the data source.
+/// This is called for prepared boxed values. Matching on [`PreparedValue`] keeps
+/// each validated widget paired with its own typed cache, so dispatch cannot
+/// observe a cache belonging to another value or presentation mode.
 ///
 /// Returns `Some(WidgetRenderReport)` if the presentation was drawn, or `None`
-/// if the display type has no boxed rendering implementation yet (future display
-/// types like linear, arc, and corner).
-#[allow(clippy::too_many_arguments)]
+/// for intrinsic values and a boxed widget whose cache has not been prepared.
 pub fn draw_metric_presentation(
     canvas: &Canvas,
-    metric_kind: MetricKind,
-    display_type: DisplayType,
-    base_style: &ResolvedTextStyle,
+    value: &PreparedValue,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
     scale: f32,
     font_dirs: &[std::path::PathBuf],
-    presentation_caches: &BTreeMap<usize, PresentationCache>,
-    value_idx: usize,
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
-    match display_type {
-        DisplayType::Text => None,
-        DisplayType::Tape => draw_tape_presentation(
+    match value {
+        PreparedValue::HeadingTape(widget) => draw_tape_presentation(
             canvas,
-            metric_kind,
-            base_style,
             dense_activity,
             frame_index,
-            scale,
-            font_dirs,
-            presentation_caches.get(&value_idx),
+            widget.cache.as_ref(),
             frame_profiler,
         ),
-        DisplayType::Linear => draw_linear_presentation(
+        PreparedValue::LinearGauge(widget) => {
+            draw_linear_presentation(canvas, widget.cache.as_ref(), frame_index, frame_profiler)
+        }
+        PreparedValue::ArcGauge(widget) => {
+            draw_arc_presentation(canvas, widget.cache.as_ref(), frame_index, frame_profiler)
+        }
+        PreparedValue::LeanAngle(widget) => draw_lean_angle_presentation(
             canvas,
-            presentation_caches.get(&value_idx),
-            frame_index,
-            frame_profiler,
-        ),
-        DisplayType::Arc | DisplayType::Corner => draw_arc_presentation(
-            canvas,
-            presentation_caches.get(&value_idx),
-            frame_index,
-            frame_profiler,
-        ),
-        DisplayType::LeanAngle => draw_lean_angle_presentation(
-            canvas,
-            metric_kind,
-            presentation_caches.get(&value_idx),
+            widget.cache.as_ref(),
             dense_activity,
             frame_index,
             scale,
             font_dirs,
             frame_profiler,
         ),
-        DisplayType::GForce => draw_g_force_presentation(
+        PreparedValue::GForce(widget) => draw_g_force_presentation(
             canvas,
-            metric_kind,
-            presentation_caches.get(&value_idx),
+            widget.cache.as_ref(),
             frame_index,
             font_dirs,
             frame_profiler,
         ),
+        PreparedValue::StandardText(_)
+        | PreparedValue::TimeText(_)
+        | PreparedValue::Gradient(_)
+        | PreparedValue::LapTimer(_) => None,
     }
 }
 
 fn draw_g_force_presentation(
     canvas: &Canvas,
-    metric_kind: MetricKind,
-    cache: Option<&PresentationCache>,
+    cache: Option<&GForceWidgetCache>,
     frame_index: usize,
     font_dirs: &[std::path::PathBuf],
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
-    assert_eq!(
-        metric_kind,
-        MetricKind::GForce,
-        "g_force display type requires the g_force metric"
-    );
-    let Some(PresentationCache::GForce(g_force_cache)) = cache else {
+    let Some(g_force_cache) = cache else {
         panic!("g_force presentation requires its prepared GForce cache");
     };
     draw_g_force_widget(
@@ -125,20 +105,14 @@ fn draw_g_force_presentation(
 
 fn draw_lean_angle_presentation(
     canvas: &Canvas,
-    metric_kind: MetricKind,
-    cache: Option<&PresentationCache>,
+    cache: Option<&LeanAngleCache>,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
     scale: f32,
     font_dirs: &[std::path::PathBuf],
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
-    if metric_kind != MetricKind::LeanAngle {
-        return None;
-    }
-    let PresentationCache::LeanAngle(lean_angle_cache) = cache? else {
-        return None;
-    };
+    let lean_angle_cache = cache?;
     draw_lean_angle_widget(
         canvas,
         lean_angle_cache,
@@ -154,13 +128,11 @@ fn draw_lean_angle_presentation(
 /// per-frame fill-composite rendering to the shared linear gauge module.
 fn draw_linear_presentation(
     canvas: &Canvas,
-    cache: Option<&PresentationCache>,
+    cache: Option<&LinearGaugeCache>,
     frame_index: usize,
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
-    let PresentationCache::LinearGauge(gauge_cache) = cache? else {
-        return None;
-    };
+    let gauge_cache = cache?;
     draw_linear_gauge_widget(canvas, gauge_cache, frame_index, frame_profiler)
 }
 
@@ -168,13 +140,11 @@ fn draw_linear_presentation(
 /// static track/unit layer and all dynamic value/fill state.
 fn draw_arc_presentation(
     canvas: &Canvas,
-    cache: Option<&PresentationCache>,
+    cache: Option<&ArcGaugeCache>,
     frame_index: usize,
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
-    let PresentationCache::ArcGauge(gauge_cache) = cache? else {
-        return None;
-    };
+    let gauge_cache = cache?;
     draw_arc_gauge_widget(canvas, gauge_cache, frame_index, frame_profiler)
 }
 
@@ -183,25 +153,14 @@ fn draw_arc_presentation(
 /// The heading tape is a boxed presentation that scrolls a 360-degree compass
 /// tape based on the current heading value. The tape image is pre-rendered during
 /// preparation and composited per-frame with a scroll offset and clip rect.
-#[allow(clippy::too_many_arguments)]
 fn draw_tape_presentation(
     canvas: &Canvas,
-    metric_kind: MetricKind,
-    _base_style: &ResolvedTextStyle,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
-    _scale: f32,
-    _font_dirs: &[std::path::PathBuf],
-    cache: Option<&PresentationCache>,
+    cache: Option<&HeadingWidgetCache>,
     frame_profiler: &mut RenderProfiler,
 ) -> Option<WidgetRenderReport> {
-    if metric_kind != MetricKind::Heading {
-        return None;
-    }
-
-    let PresentationCache::HeadingTape(heading_cache) = cache? else {
-        return None;
-    };
+    let heading_cache = cache?;
 
     if heading_cache.display_type == DisplayType::Text {
         return None;

@@ -37,6 +37,10 @@ pub(super) enum Unit {
     Percent,
     /// Revolutions per minute.
     RevolutionsPerMinute,
+    /// Newton-metres.
+    NewtonMetres,
+    /// Foot-pounds force.
+    FootPounds,
     /// Unscaled numeric value.
     Raw,
 }
@@ -89,6 +93,9 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
         "g" => Unit::G,
         "%" | "percent" | "percentage" => Unit::Percent,
         "rpm" => Unit::RevolutionsPerMinute,
+        "nm" | "n-m" | "n m" | "n·m" => Unit::NewtonMetres,
+        "ft-lb" | "ft-lbs" | "lb-ft" | "lbs-ft" | "ft lb" | "ft lbs" | "lb ft"
+        | "lbs ft" => Unit::FootPounds,
         "#" | "raw" => Unit::Raw,
         _ => return DeclaredUnit::Unsupported(UnitDimension::Unknown),
     };
@@ -183,6 +190,7 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
             matches!(unit, Unit::G)
         }
         Metric::Rpm => matches!(unit, Unit::RevolutionsPerMinute),
+        Metric::Torque => matches!(unit, Unit::NewtonMetres | Unit::FootPounds),
         Metric::ThrottlePosition | Metric::BrakePosition => matches!(unit, Unit::Percent),
         Metric::LeanAngle => matches!(unit, Unit::Degrees),
         Metric::GearPosition => matches!(unit, Unit::Raw),
@@ -197,6 +205,7 @@ pub(super) fn convert(value: f64, unit: Unit) -> f64 {
         Unit::MilesPerHour => value * 0.44704,
         Unit::Kilometres => value * 1000.0,
         Unit::Feet => value * 0.3048,
+        Unit::FootPounds => value * 1.356,
         Unit::Seconds
         | Unit::DecimalDegrees
         | Unit::MetresPerSecond
@@ -205,6 +214,7 @@ pub(super) fn convert(value: f64, unit: Unit) -> f64 {
         | Unit::G
         | Unit::Percent
         | Unit::RevolutionsPerMinute
+        | Unit::NewtonMetres
         | Unit::Raw => value,
     }
 }
@@ -222,6 +232,7 @@ fn default_unit(metric: Metric) -> Unit {
         Metric::Heading => Unit::Degrees,
         Metric::GForce | Metric::GForceX | Metric::GForceY | Metric::GForceZ => Unit::G,
         Metric::Rpm => Unit::RevolutionsPerMinute,
+        Metric::Torque => Unit::NewtonMetres,
         Metric::ThrottlePosition | Metric::BrakePosition => Unit::Percent,
         Metric::LeanAngle => Unit::Degrees,
         Metric::GearPosition => Unit::Raw,

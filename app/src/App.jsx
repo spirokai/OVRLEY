@@ -100,7 +100,11 @@ function AppShell() {
               label={importingVideo ? 'Importing your video...' : 'Processing your activity...'}
             />
             <WidgetDrawer widgetLiveEdits={widgetLiveEdits} />
-            <div className="min-h-0 flex-1">
+            <div
+              className="min-h-0 flex-1"
+              onFocusCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
+              onPointerDownCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
+            >
               <OverlayEditor
                 config={config}
                 globalDefaults={globalDefaults}
@@ -119,10 +123,18 @@ function AppShell() {
                 widgetLiveEdits={widgetLiveEdits}
               />
             </div>
-            <OverlayPlayer backgroundMode={editorShell.editorBackgroundMode} />
+            <OverlayPlayer
+              activeKeyboardWorkspace={editorShell.activeKeyboardWorkspace}
+              backgroundMode={editorShell.editorBackgroundMode}
+              onActivateKeyboardWorkspace={() => editorShell.setActiveKeyboardWorkspace('player')}
+            />
           </div>
 
-          <div className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto border-l border-border/70 bg-card/60 backdrop-blur-sm">
+          <div
+            className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto border-l border-border/70 bg-card/60 backdrop-blur-sm"
+            onFocusCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
+            onPointerDownCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
+          >
             <ControlPanel config={config} onConfigChange={setConfig} widgetLiveEdits={widgetLiveEdits} />
           </div>
         </div>

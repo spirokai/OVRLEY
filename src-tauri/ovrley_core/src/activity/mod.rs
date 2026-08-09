@@ -13,6 +13,8 @@ pub(crate) mod elevation;
 pub mod finalize;
 /// Interpolation helpers used for numeric, coordinate, and timestamp series.
 pub mod interpolate;
+/// Canonical lap-timing derivation, validation, and queries.
+pub(crate) mod lap_timing;
 /// Serializable activity payloads and internal dense/trimmed report types.
 pub mod schema;
 /// Scene-window trimming for parsed activity samples.
@@ -48,6 +50,7 @@ pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
         })
     }?;
     activity.timezone = parse_activity_timezone(&activity.metadata)?;
+    lap_timing::validate_lap_timing_contract(&activity)?;
     Ok(activity)
 }
 

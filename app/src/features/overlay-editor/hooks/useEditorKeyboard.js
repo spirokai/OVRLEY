@@ -4,8 +4,7 @@
 
 import { useEffect, useEffectEvent } from 'react'
 import { deleteWidgetsInConfig, duplicateWidgetsInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
-import { isInteractiveElement } from '@/lib/utils'
-import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
+import { isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 
 function hasOpenKeyboardOverlay() {
   if (typeof document === 'undefined') return false
@@ -31,10 +30,10 @@ function hasOpenKeyboardOverlay() {
  */
 export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, selectedWidgets, setWidgetSelection, clipboardRef, editorShell }) {
   const onKeyDown = useEffectEvent((event) => {
-    if (event.defaultPrevented || isInteractiveElement(event.target)) return
+    if (event.defaultPrevented) return
 
     const match = matchKeyboardShortcut(event, 'editor')
-    if (!match) return
+    if (!match || isFormFieldShortcut(event)) return
 
     switch (match.commandId) {
       case 'editor.clearSelection':
@@ -70,7 +69,7 @@ export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, s
         return
       }
       case 'editor.nudge': {
-        if (!selectedWidgets.length) return
+        if (editorShell.activeKeyboardWorkspace !== 'editor' || !selectedWidgets.length) return
         const step = match.binding.step
         const delta = {
           x: match.binding.key === 'arrowleft' ? -step : match.binding.key === 'arrowright' ? step : 0,

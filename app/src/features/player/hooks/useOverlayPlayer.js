@@ -4,8 +4,7 @@
 
 import { useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
-import { isInteractiveElement } from '@/lib/utils'
+import { isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { videoOverlapsActivity } from '@/lib/video-timing'
 import useStore from '@/store/useStore'
 import { formatTimelineTime, snapTimelineSecondToFrame } from '../utils/playerTiming'
@@ -26,11 +25,7 @@ function getDevicePixelRatio() {
 function hasOpenKeyboardOverlay() {
   if (typeof document === 'undefined') return false
 
-  return Boolean(
-    document.querySelector(
-      '[data-slot="dialog-content"], [data-slot="select-content"], [data-slot="popover-content"], [data-testid="widget-drawer-backdrop"]',
-    ),
-  )
+  return Boolean(document.querySelector('[data-slot="dialog-content"], [data-slot="popover-content"], [data-testid="widget-drawer-backdrop"]'))
 }
 
 function getMarkerClassName(marker) {
@@ -42,11 +37,12 @@ function getMarkerClassName(marker) {
 /**
  * Composes store selection, playback, viewport, export range, gestures, clips, and keyboard commands.
  *
- * @param {{ backgroundMode: string }} options Overlay player inputs.
+ * @param {{ activeKeyboardWorkspace: string, backgroundMode: string }} options Overlay player inputs.
+ * @param {string} options.activeKeyboardWorkspace Active keyboard command workspace.
  * @param {string} options.backgroundMode Active preview background mode.
  * @returns {object} Presentational view model for the overlay player.
  */
-export default function useOverlayPlayer({ backgroundMode }) {
+export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMode }) {
   // Store selector - gathers the entire player-facing store contract in one subscription.
   const playerStore = useStore(
     useShallow((state) => ({
@@ -207,15 +203,15 @@ export default function useOverlayPlayer({ backgroundMode }) {
 
   // Keyboard shortcuts - global commands route through the same APIs as toolbar buttons.
   const onKeyDown = useEffectEvent((event) => {
-    if (event.repeat || event.defaultPrevented || isInteractiveElement(event.target) || hasOpenKeyboardOverlay()) return
+    if (event.repeat || event.defaultPrevented || hasOpenKeyboardOverlay()) return
 
     const match = matchKeyboardShortcut(event, 'player')
-    if (!match) return
+    if (!match || isFormFieldShortcut(event)) return
 
     switch (match.commandId) {
       case 'player.stepBackward':
       case 'player.stepForward':
-        if (!hasActivity || playerStore.selectedWidgetIds.length) return
+        if (activeKeyboardWorkspace !== 'player' || !hasActivity || playerStore.selectedWidgetIds.length) return
         event.preventDefault()
         stepBySeconds(match.commandId === 'player.stepForward' ? 1 : -1)
         return

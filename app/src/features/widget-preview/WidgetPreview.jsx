@@ -28,6 +28,7 @@
 import { createElement, memo } from 'react'
 import { OverlayTextWidget } from './widgets/text/TextPreview'
 import { OverlayMetricWidget } from './widgets/metric/MetricPreview'
+import { OverlayLapTimerWidget } from './widgets/lap-timer/LapTimerPreview'
 import { OverlayRouteWidget } from './widgets/route/RoutePreview'
 import { OverlayElevationWidget } from './widgets/elevation/ElevationPreview'
 import { OverlayHeadingWidget } from './widgets/heading/HeadingPreview'
@@ -118,6 +119,19 @@ function WidgetPreview({
         previewSecond={previewSecond}
         globalOpacity={globalOpacity}
         globalScale={globalScale}
+        sceneStyle={sceneStyle}
+      />
+    )
+  }
+
+  if (widget.data.display_type === 'lap_timer') {
+    return (
+      <OverlayLapTimerWidget
+        widget={widget}
+        activity={activity}
+        previewSecond={previewSecond}
+        globalOpacity={globalOpacity}
+        metricPreviewModel={metricPreviewModel}
         sceneStyle={sceneStyle}
       />
     )

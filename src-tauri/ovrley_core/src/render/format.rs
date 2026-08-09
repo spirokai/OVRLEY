@@ -429,6 +429,9 @@ fn format_validated_standard_metric_parts<'a>(
         Some(StandardMetricFormatterKind::Coordinates) => {
             unreachable!("planned metric formatter reached the active renderer")
         }
+        Some(StandardMetricFormatterKind::LapTimer) => {
+            unreachable!("lap_timer must use the dedicated lap timer renderer")
+        }
         None => "--".to_string(),
     };
 
@@ -481,10 +484,7 @@ fn format_validated_time_text(
     }
 }
 
-fn format_time_in_zone<TzValue>(
-    validated: &ValidatedTimeValue,
-    value: DateTime<TzValue>,
-) -> String
+fn format_time_in_zone<TzValue>(validated: &ValidatedTimeValue, value: DateTime<TzValue>) -> String
 where
     TzValue: TimeZone,
     TzValue::Offset: std::fmt::Display,
@@ -652,7 +652,11 @@ fn format_coordinate_placeholder(coordinate_format: &str) -> String {
     }
 }
 
-pub(crate) fn convert_standard_metric_value(kind: MetricKind, display_unit: Option<&str>, value: f64) -> f64 {
+pub(crate) fn convert_standard_metric_value(
+    kind: MetricKind,
+    display_unit: Option<&str>,
+    value: f64,
+) -> f64 {
     match kind {
         MetricKind::Heartrate
         | MetricKind::Cadence

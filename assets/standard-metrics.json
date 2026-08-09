@@ -54,6 +54,36 @@
           }
         }
       },
+      "lap_timer": {
+        "label": "Lap Times",
+        "layoutMode": "intrinsic",
+        "defaults": {
+          "show_label": true,
+          "negative_delta_color": "#61ffab",
+          "positive_delta_color": "#ff6e83",
+          "font_size": 50
+        },
+        "modes": [
+          { "value": "current_lap", "label": "Current Lap", "icon": { "source": "lucide", "name": "Timer" } },
+          {
+            "value": "best_lap",
+            "label": "Best Lap",
+            "icon": { "source": "custom", "assetFile": "display-mode-best-lap.svg" }
+          },
+          {
+            "value": "delta",
+            "label": "Live Delta",
+            "icon": { "source": "custom", "assetFile": "display-mode-delta.svg" }
+          },
+          {
+            "value": "lap_log",
+            "label": "Lap Log",
+            "font_size": 30,
+            "icon": { "source": "custom", "assetFile": "display-mode-lap-log.svg" }
+          }
+        ],
+        "configFields": ["lap_timer_mode", "label"]
+      },
       "heading_tape": {
         "label": "Heading Tape",
         "icon": {
@@ -263,7 +293,8 @@
       "gps_coordinates": ["text"],
       "distance_to_home": ["text", "linear"],
       "total_ascent": ["text", "linear"],
-      "calories": ["text", "linear"]
+      "calories": ["text", "linear"],
+      "lap_timer": ["lap_timer"]
     }
   },
   "definitions": [
@@ -1160,6 +1191,22 @@
       "icon": {
         "source": "custom",
         "assetFile": "widget-lean-angle.svg"
+      },
+      "category": "motosports"
+    },
+    {
+      "type": "lap_timer",
+      "current": true,
+      "label": "Lap Timer",
+      "defaultDisplayUnit": "none",
+      "supportedDisplayUnits": [],
+      "showUnitsByDefault": false,
+      "formatter": "laptimer",
+      "interpolation": "hold",
+      "unitsMode": "hidden",
+      "icon": {
+        "source": "shared",
+        "assetFile": "widget-time.svg"
       },
       "category": "motosports"
     }

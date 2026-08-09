@@ -1,15 +1,16 @@
 /* eslint-disable react-refresh/only-export-components */
 
-import { Presentation, Type } from 'lucide-react'
+import { Presentation, Timer, Type } from 'lucide-react'
 import {
   CURRENT_STANDARD_METRIC_WIDGET_TYPES,
   STANDARD_METRIC_WIDGET_TYPES,
   BACKDROP_TYPE_DEFINITIONS,
   BACKDROP_TYPE_LABELS,
   DISPLAY_TYPE_LABELS,
+  LAP_TIMER_MODES,
 } from './standard-widgets'
 import { getStandardMetricDefinition, getSupportedDisplayTypes, isStandardMetricWidgetType } from './standard-metrics'
-import { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS } from './widget-icon-data'
+import { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS, getIconSvgByAssetFile } from './widget-icon-data'
 
 export { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS }
 
@@ -37,6 +38,20 @@ export function WidgetIcon({ type, ...props }) {
 
 export function DisplayTypeIcon({ displayType, ...props }) {
   return <ParsedSvgIcon data={DISPLAY_TYPE_ICON_SVGS[displayType]} {...props} />
+}
+
+function createLapTimerModeIcon({ source, name, assetFile }) {
+  if (source === 'lucide') {
+    if (name !== 'Timer') throw new Error(`Unsupported lap timer Lucide icon: ${name}`)
+    return Timer
+  }
+
+  if (source !== 'shared' && source !== 'custom') throw new Error(`Unsupported lap timer icon source: ${source}`)
+
+  const data = getIconSvgByAssetFile(assetFile)
+  const Icon = (props) => <ParsedSvgIcon data={data} {...props} />
+  Icon.displayName = `LapTimerModeIcon.${assetFile}`
+  return Icon
 }
 
 const STANDARD_METRIC_TYPE_LABELS = Object.fromEntries(
@@ -100,6 +115,7 @@ export const TYPE_ICONS = {
   backdrop: Presentation,
   label: Type,
   ...widgetIconComponents,
+  lap_timer: Timer,
 }
 
 export const DISPLAY_TYPE_ICONS = Object.fromEntries(
@@ -114,17 +130,25 @@ export function getWidgetDisplayTypes(type) {
   return ['text']
 }
 
-export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradient', 'backdrop', ...CURRENT_STANDARD_METRIC_WIDGET_TYPES].map(
-  (type) => ({
+export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradient', 'backdrop', ...CURRENT_STANDARD_METRIC_WIDGET_TYPES]
+  .filter((type) => type !== 'lap_timer')
+  .map((type) => ({
     type,
     icon: TYPE_ICONS[type],
     label: WIDGET_DRAWER_LABELS[type] ?? TYPE_LABELS[type],
-    displayTypes: getWidgetDisplayTypes(type).map((value) => ({
+    options: getWidgetDisplayTypes(type).map((value) => ({
       value,
       label: type === 'backdrop' ? (BACKDROP_TYPE_LABELS[value] ?? value) : (DISPLAY_TYPE_LABELS[value] ?? value),
+      icon: DISPLAY_TYPE_ICONS[value],
+      selection: { displayType: value },
     })),
-  }),
-)
+  }))
+  .concat({
+    type: 'lap_timer',
+    icon: Timer,
+    label: DISPLAY_TYPE_LABELS.lap_timer,
+    options: LAP_TIMER_MODES.map((mode) => ({ ...mode, icon: createLapTimerModeIcon(mode.icon), selection: { lapTimerMode: mode.value } })),
+  })
 
 const NON_METRIC_CATEGORIES = {
   backdrop: 'general',

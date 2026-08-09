@@ -60,7 +60,22 @@ describe('WidgetButtonGrid', () => {
     expect(screen.getByRole('button', { name: 'Arc Gauge' })).toBeInTheDocument()
     await user.click(textDisplayOption)
 
-    expect(onAddWidget).toHaveBeenCalledWith('speed', 'text')
+    expect(onAddWidget).toHaveBeenCalledWith({ type: 'speed', displayType: 'text' })
+  })
+
+  test('lap timer presents all four canonical readouts', async () => {
+    const onAddWidget = vi.fn()
+    const user = userEvent.setup()
+    render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
+
+    await user.click(screen.getByText('Lap Timer').closest('button'))
+    expect(screen.getByRole('button', { name: 'Current Lap' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Best Lap' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delta' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lap Times' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Lap Times' }))
+
+    expect(onAddWidget).toHaveBeenCalledWith({ type: 'lap_timer', lapTimerMode: 'lap_log' })
   })
 
   test('clicking a backdrop display type uses backdrop labels and calls onAddWidget', async () => {
@@ -74,7 +89,7 @@ describe('WidgetButtonGrid', () => {
     expect(screen.queryByRole('button', { name: 'rectangle' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Rectangle' }))
 
-    expect(onAddWidget).toHaveBeenCalledWith('backdrop', 'rectangle')
+    expect(onAddWidget).toHaveBeenCalledWith({ type: 'backdrop', displayType: 'rectangle' })
   })
 
   test('clicking a button does not auto-close the drawer', async () => {

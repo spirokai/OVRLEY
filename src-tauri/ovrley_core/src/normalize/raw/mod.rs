@@ -261,6 +261,16 @@ pub struct ValueConfig {
     #[serde(default)]
     pub display_type: DisplayType,
     #[serde(default)]
+    pub lap_timer_mode: Option<String>,
+    #[serde(default)]
+    pub show_label: Option<bool>,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub positive_delta_color: Option<String>,
+    #[serde(default)]
+    pub negative_delta_color: Option<String>,
+    #[serde(default)]
     pub width: Option<u32>,
     #[serde(default)]
     pub height: Option<u32>,

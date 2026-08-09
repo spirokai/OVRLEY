@@ -155,8 +155,8 @@ pub(super) fn is_compatible_units_row(record: &StringRecord, columns: &[HeaderCo
 /// Resolves one normalized header cell through the explicit alias registry.
 ///
 /// Unknown aliases return `None`. Header annotations supply units or control
-/// semantics, while source qualifiers adjust precedence without changing the
-/// canonical metric represented by the alias.
+/// semantics, while source qualifiers resolve source-specific meanings such as
+/// absolute GPS time and otherwise adjust precedence.
 fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
     let (semantic, annotation, source) = split_header(value)?;
     let declared_unit = annotation
@@ -165,6 +165,13 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         .unwrap_or(DeclaredUnit::Absent);
     let (metric, alias_priority, timing, mut control, acceleration) = match semantic.as_str() {
         "datetime" => (
+            Metric::Timestamp,
+            SourcePriority::Direct,
+            Some(TimingKind::ExplicitUtc),
+            None,
+            None,
+        ),
+        "time" if source == Some(SourceQualifier::Gps) => (
             Metric::Timestamp,
             SourcePriority::Direct,
             Some(TimingKind::ExplicitUtc),
@@ -215,10 +222,12 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
             None,
         ),
-        "speed" | "kph" => (Metric::Speed, SourcePriority::Direct, None, None, None),
-        "gspd" => (Metric::Speed, SourcePriority::Direct, None, None, None),
+        "speed" | "kph" => (Metric::Speed, SourcePriority::DirectSpeed, None, None, None),
+        "gspd" => (Metric::Speed, SourcePriority::DirectSpeed, None, None, None),
         "vehspd1" => (Metric::Speed, SourcePriority::Vehicle, None, None, None),
-        "distance" => (Metric::Distance, SourcePriority::Direct, None, None, None),
+        "distance" | "trip distance" => {
+            (Metric::Distance, SourcePriority::Direct, None, None, None)
+        }
         "mileage" => (Metric::Distance, SourcePriority::Direct, None, None, None),
         "distance to home" | "distance from home" | "home distance" => (
             Metric::DistanceToHome,
@@ -250,21 +259,21 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         "accel xyz" | "combined acceleration" => {
             (Metric::GForce, SourcePriority::Direct, None, None, None)
         }
-        "gforcex" | "x" | "accel x" | "x acceleration" => (
+        "gravity x" | "gforcex" | "x" | "accel x" | "x acceleration" => (
             Metric::GForceX,
             SourcePriority::AccelerationSensor,
             None,
             None,
             Some(AccelerationKind::Literal),
         ),
-        "gforcey" | "y" | "accel y" | "y acceleration" => (
+        "gravity y" | "gforcey" | "y" | "accel y" | "y acceleration" => (
             Metric::GForceY,
             SourcePriority::AccelerationSensor,
             None,
             None,
             Some(AccelerationKind::Literal),
         ),
-        "gforcez" | "z" | "accel z" | "z acceleration" => (
+        "gravity z" | "gforcez" | "z" | "accel z" | "z acceleration" => (
             Metric::GForceZ,
             SourcePriority::AccelerationSensor,
             None,
@@ -293,6 +302,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(AccelerationKind::Semantic),
         ),
         "rpm" | "engine rpm" => (Metric::Rpm, SourcePriority::Direct, None, None, None),
+        "torque" => (Metric::Torque, SourcePriority::Direct, None, None, None),
         "accelerator position" | "accelerator pedal position" => (
             Metric::ThrottlePosition,
             SourcePriority::Pedal,
@@ -300,7 +310,13 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(ControlKind::Percentage),
             None,
         ),
-        "throttle position" | "throttlepos" => (
+        "throttle position"
+        | "throttlepos"
+        | "throttle position(manifold)"
+        | "throttle position (manifold)"
+        | "throttle position manifold"
+        | "manifold throttle position"
+        | "relative throttle position" => (
             Metric::ThrottlePosition,
             SourcePriority::Direct,
             None,
@@ -351,7 +367,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         ),
         "lean angle" | "leanangle" => (Metric::LeanAngle, SourcePriority::Direct, None, None, None),
         "lap" | "lap #" | "lap number" => (Metric::LapNumber, SourcePriority::Direct, None, None, None),
-        "gear" => (
+        "gear" | "gear position" | "estimated gear"=> (
             Metric::GearPosition,
             SourcePriority::Direct,
             None,
@@ -385,6 +401,11 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         control = Some(ControlKind::Percentage);
     }
     let source_priority = match (metric, source) {
+        (Metric::Speed, Some(SourceQualifier::Obd)) => SourcePriority::ObdSpeed,
+        (
+            Metric::Speed,
+            Some(SourceQualifier::Accelerometer | SourceQualifier::Logger),
+        ) => SourcePriority::DirectSpeed,
         (
             Metric::Latitude
             | Metric::Longitude
@@ -398,20 +419,23 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             SourcePriority::Direct
         }
         (_, Some(SourceQualifier::Calculated)) => SourcePriority::Calculated,
-        (Metric::ThrottlePosition, Some(SourceQualifier::Vehicle | SourceQualifier::Logger))
+        (
+            Metric::ThrottlePosition,
+            Some(SourceQualifier::Obd | SourceQualifier::Vehicle | SourceQualifier::Logger),
+        )
             if alias_priority == SourcePriority::Pedal =>
         {
             SourcePriority::Preferred
         }
         (
             Metric::GearPosition | Metric::Rpm | Metric::ThrottlePosition | Metric::BrakePosition,
-            Some(SourceQualifier::Vehicle | SourceQualifier::Logger),
+            Some(SourceQualifier::Obd | SourceQualifier::Vehicle | SourceQualifier::Logger),
         ) => SourcePriority::VehicleState,
         (
             Metric::GForceX | Metric::GForceY | Metric::GForceZ,
             Some(SourceQualifier::Accelerometer | SourceQualifier::Logger),
         ) => SourcePriority::AccelerationSensor,
-        (_, Some(SourceQualifier::Vehicle)) => SourcePriority::Vehicle,
+        (_, Some(SourceQualifier::Obd | SourceQualifier::Vehicle)) => SourcePriority::Vehicle,
         (_, Some(SourceQualifier::Accelerometer | SourceQualifier::Logger)) => {
             SourcePriority::Direct
         }
@@ -434,32 +458,47 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
 ///
 /// Supported forms include parenthetical units with or without a leading space
 /// (`Alt(m)` and `Altitude (m)`), a trailing percent marker, parenthetical
-/// source qualifiers, and a ` *source` suffix. Contradictory source qualifiers
-/// are rejected.
+/// source qualifiers, combined `(source)(unit)` suffixes, and a ` *source`
+/// suffix. Contradictory source qualifiers are rejected.
 fn split_header(value: &str) -> Option<(String, Option<String>, Option<SourceQualifier>)> {
     let normalized = normalize_syntax(value);
     let (without_source, explicit_source) = match normalized.rsplit_once(" *") {
         Some((base, source)) => (base, Some(parse_source(source)?)),
         None => (normalized.as_str(), None),
     };
-    if let Some(open) = without_source.rfind('(') {
-        if without_source.ends_with(')') {
-            let annotation = &without_source[open + 1..without_source.len() - 1];
-            if let Some(parenthetical_source) = parse_source(annotation) {
-                let source = combine_sources(explicit_source, Some(parenthetical_source))?;
-                return split_semantic_source(without_source[..open].trim(), None, source);
-            }
-            return split_semantic_source(
-                without_source[..open].trim(),
-                Some(annotation.to_string()),
-                explicit_source,
-            );
+    if let Some((base, annotation)) = split_parenthetical(without_source) {
+        if let Some(parenthetical_source) = parse_source(annotation) {
+            let source = combine_sources(explicit_source, Some(parenthetical_source))?;
+            return split_semantic_source(base, None, source);
         }
+        if let Some((semantic, qualifier)) = split_parenthetical(base) {
+            if let Some(parenthetical_source) = parse_source(qualifier) {
+                let source = combine_sources(explicit_source, Some(parenthetical_source))?;
+                return split_semantic_source(
+                    semantic,
+                    Some(annotation.to_string()),
+                    source,
+                );
+            }
+        }
+        return split_semantic_source(
+            base,
+            Some(annotation.to_string()),
+            explicit_source,
+        );
     }
     if let Some(semantic) = without_source.strip_suffix(" %") {
         return split_semantic_source(semantic, Some("%".to_string()), explicit_source);
     }
     split_semantic_source(without_source, None, explicit_source)
+}
+
+fn split_parenthetical(value: &str) -> Option<(&str, &str)> {
+    if !value.ends_with(')') {
+        return None;
+    }
+    let open = value.rfind('(')?;
+    Some((value[..open].trim(), &value[open + 1..value.len() - 1]))
 }
 
 /// Removes a leading source qualifier from a normalized semantic name.
@@ -474,7 +513,7 @@ fn split_semantic_source(
     let (semantic, semantic_source) = [
         ("gps ", SourceQualifier::Gps),
         ("calculated ", SourceQualifier::Calculated),
-        ("obd ", SourceQualifier::Vehicle),
+        ("obd ", SourceQualifier::Obd),
         ("can ", SourceQualifier::Vehicle),
         ("vehicle ", SourceQualifier::Vehicle),
         ("accelerometer ", SourceQualifier::Accelerometer),
@@ -507,7 +546,8 @@ fn parse_source(source: &str) -> Option<SourceQualifier> {
     match source {
         "gps" => Some(SourceQualifier::Gps),
         "calc" | "calculated" => Some(SourceQualifier::Calculated),
-        "obd" | "vehicle" | "can" => Some(SourceQualifier::Vehicle),
+        "obd" => Some(SourceQualifier::Obd),
+        "vehicle" | "can" => Some(SourceQualifier::Vehicle),
         "acc" | "accelerometer" => Some(SourceQualifier::Accelerometer),
         "logger" => Some(SourceQualifier::Logger),
         _ => None,

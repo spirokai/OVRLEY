@@ -100,6 +100,8 @@ pub enum MetricKind {
     TotalAscent,
     #[serde(rename = "calories")]
     Calories,
+    #[serde(rename = "lap_timer")]
+    LapTimer,
 }
 
 /// Visual representation mode for a value widget.
@@ -131,6 +133,8 @@ pub enum DisplayType {
     LeanAngle,
     #[serde(rename = "g_force")]
     GForce,
+    #[serde(rename = "lap_timer")]
+    LapTimer,
 }
 
 impl DisplayType {
@@ -144,6 +148,7 @@ impl DisplayType {
             DisplayType::Tape => "heading_tape",
             DisplayType::LeanAngle => "lean_angle",
             DisplayType::GForce => "g_force",
+            DisplayType::LapTimer => "lap_timer",
         }
     }
 }
@@ -186,6 +191,7 @@ impl<'de> Deserialize<'de> for DisplayType {
                 "heading_tape" => Ok(DisplayType::Tape),
                 "lean_angle" => Ok(DisplayType::LeanAngle),
                 "g_force" => Ok(DisplayType::GForce),
+                "lap_timer" => Ok(DisplayType::LapTimer),
                 _ => Ok(DisplayType::default()),
             },
             _ => Ok(DisplayType::default()),

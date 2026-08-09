@@ -267,25 +267,17 @@ pub(super) fn build_activity_columns(
         heading: preserve_heading_gaps,
     };
     let (rpm, _) = series(Metric::Rpm);
+    let (torque, _) = series(Metric::Torque);
     let (throttle_position, _) = series(Metric::ThrottlePosition);
     let (brake_position, _) = series(Metric::BrakePosition);
     let (source_lap_number, _) = series(Metric::LapNumber);
-    // Exporters use zero or absence for the out-lap and positive source labels
-    // for timed laps. Canonical IDs follow observed timed laps from zero so
-    // cropped recordings that begin at source lap N still have compact IDs.
-    let mut source_to_canonical = BTreeMap::new();
     let lap_number = source_lap_number
         .into_iter()
-        .map(|value| {
-            value.map(|value| {
-                let source_lap = value.round() as i64;
-                if source_lap <= 0 {
-                    -1
-                } else {
-                    let next_lap = source_to_canonical.len() as i64;
-                    *source_to_canonical.entry(source_lap).or_insert(next_lap)
-                }
-            })
+        .map(|value| match value {
+            Some(value) if value > 0.0 && value.fract() == 0.0 && value <= i64::MAX as f64 => {
+                Some(value as i64)
+            }
+            _ => Some(-1),
         })
         .collect();
     let (mut lean_angle, _) = series(Metric::LeanAngle);
@@ -379,7 +371,7 @@ pub(super) fn build_activity_columns(
         gradient: empty(),
         pace: empty(),
         vertical_speed: empty(),
-        torque: empty(),
+        torque,
         stroke_rate: empty(),
         stride_length: empty(),
         vertical_oscillation: empty(),

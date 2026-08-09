@@ -94,7 +94,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
   }
 
   // Add widget — creates a new widget of the given type with defaults and appends to config
-  const addWidget = (type, displayType) => {
+  const addWidget = ({ type, displayType, lapTimerMode }) => {
     const nextConfig = structuredClone(config)
     let targetCategory = null
 
@@ -108,7 +108,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
       targetCategory = 'labels'
     } else if (isStandardMetricWidgetType(type) || ['gradient', 'time'].includes(type)) {
       if (!nextConfig.values) nextConfig.values = []
-      nextConfig.values.push(createMetricValueDefaults(type, globalDefaults, displayType))
+      nextConfig.values.push(createMetricValueDefaults(type, globalDefaults, { displayType, lapTimerMode }))
       targetCategory = 'values'
     } else if (['course', 'elevation'].includes(type)) {
       if (!nextConfig.plots) nextConfig.plots = []
@@ -161,7 +161,8 @@ export function useWidgetManager({ widgetLiveEdits }) {
       return
     }
 
-    setConfig(replaceWidgetInConfig(config, id, createMetricValueDefaults(widget.type, globalDefaults)))
+    const selection = widget.type === 'lap_timer' ? { lapTimerMode: 'current_lap' } : {}
+    setConfig(replaceWidgetInConfig(config, id, createMetricValueDefaults(widget.type, globalDefaults, selection)))
   }
 
   return {

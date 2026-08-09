@@ -36,6 +36,12 @@ function resetStore(overrides = {}) {
 }
 
 describe('OverlayPlayer', () => {
+  const playerProps = {
+    activeKeyboardWorkspace: 'player',
+    backgroundMode: 'black',
+    onActivateKeyboardWorkspace: vi.fn(),
+  }
+
   beforeEach(() => {
     vi.restoreAllMocks()
     installResizeObserver()
@@ -43,7 +49,7 @@ describe('OverlayPlayer', () => {
   })
 
   test('renders the presentational toolbar and timeline through the public component', () => {
-    render(<OverlayPlayer backgroundMode="black" />)
+    render(<OverlayPlayer {...playerProps} />)
 
     expect(screen.getByRole('group', { name: 'Timeline' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
@@ -58,7 +64,7 @@ describe('OverlayPlayer', () => {
       importedVideoPath: null,
     })
 
-    render(<OverlayPlayer backgroundMode="black" />)
+    render(<OverlayPlayer {...playerProps} />)
 
     expect(screen.queryByRole('group', { name: 'Timeline' })).not.toBeInTheDocument()
   })
@@ -82,12 +88,12 @@ describe('OverlayPlayer', () => {
       importedVideoPath: null,
     })
 
-    const { rerender } = render(<OverlayPlayer backgroundMode="black" />)
+    const { rerender } = render(<OverlayPlayer {...playerProps} />)
 
     expect(screen.queryByRole('group', { name: 'Timeline' })).not.toBeInTheDocument()
 
     act(() => resetStore())
-    rerender(<OverlayPlayer backgroundMode="black" />)
+    rerender(<OverlayPlayer {...playerProps} />)
 
     const clip = screen.getByLabelText('ride.fit')
     expect(clip).toBeInTheDocument()

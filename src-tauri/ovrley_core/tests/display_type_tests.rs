@@ -174,8 +174,8 @@ fn complete_linear_display_type_validates_as_gauge() {
     let PreparedValue::LinearGauge(value) = config.values.into_iter().next().unwrap() else {
         panic!("linear display type should validate as a linear gauge prepared value");
     };
-    assert_eq!(value.display_type, DisplayType::Linear);
-    assert_eq!(value.width, 200);
+    assert_eq!(value.validated.display_type, DisplayType::Linear);
+    assert_eq!(value.validated.width, 200);
 }
 
 #[test]
@@ -221,8 +221,8 @@ fn complete_g_force_display_type_validates_with_canonical_marker_and_label_field
     let PreparedValue::GForce(value) = config.values.into_iter().next().unwrap() else {
         panic!("g_force display type should validate as a G-force prepared value");
     };
-    assert_eq!(value.marker_size, 12.0);
-    assert_eq!(value.label_decimals, 1);
+    assert_eq!(value.validated.marker_size, 12.0);
+    assert_eq!(value.validated.label_decimals, 1);
 }
 
 #[test]

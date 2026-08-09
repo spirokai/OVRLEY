@@ -37,7 +37,7 @@ describe('GForceWidgetEditor', () => {
     const widget = {
       id: 'g-force-1',
       type: 'g_force',
-      data: createMetricValueDefaults('g_force', { font_values: 'Arial.ttf' }, 'g_force'),
+      data: createMetricValueDefaults('g_force', { font_values: 'Arial.ttf' }, { displayType: 'g_force' }),
     }
     render(<MetricWidgetEditor widget={widget} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
 
@@ -54,7 +54,7 @@ describe('GForceWidgetEditor', () => {
     const widget = {
       id: 'g-force-1',
       type: 'g_force',
-      data: createMetricValueDefaults('g_force', { font_values: 'Arial.ttf' }, 'g_force'),
+      data: createMetricValueDefaults('g_force', { font_values: 'Arial.ttf' }, { displayType: 'g_force' }),
     }
     const updateWidgetData = vi.fn()
     const updateWidgetSize = vi.fn()

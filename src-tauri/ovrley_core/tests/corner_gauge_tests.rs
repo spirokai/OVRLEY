@@ -8,7 +8,7 @@ use ovrley_core::paths::AppPaths;
 use ovrley_core::render::widgets::gauges::arc::{
     arc_point, corner_gauge_geometry, corner_start_end_angles,
 };
-use ovrley_core::render::widgets::types::PresentationCache;
+use ovrley_core::render::widgets::types::PreparedValue;
 use ovrley_core::render::{render_preview_with_report, widgets::prepare_render_assets};
 use ovrley_core::types::{DisplayType, TrackFillStyle};
 use std::collections::BTreeMap;
@@ -120,9 +120,13 @@ fn corner_gauge_prepares_a_shared_arc_cache_and_renders_a_frame() {
     let mut profiler = RenderProfiler::default();
 
     let assets = prepare_render_assets(&paths, &config, &activity, &dense, &mut profiler).unwrap();
-    let Some(PresentationCache::ArcGauge(cache)) = assets.presentation_caches.get(&0) else {
+    let PreparedValue::ArcGauge(widget) = &assets.values()[0] else {
         panic!("corner gauge should use the shared arc cache");
     };
+    let cache = widget
+        .cache
+        .as_ref()
+        .expect("corner gauge cache must be prepared");
     assert_eq!(cache.start_angle, 180.0);
     assert_eq!(cache.sweep_angle, 90.0);
     assert_eq!(cache.frame_states[1].fill01, 0.5);
@@ -150,8 +154,8 @@ fn corner_bars_keep_the_configured_segment_count() {
         ovrley_core::render::widgets::types::PreparedValue::ArcGauge(gauge) => gauge,
         _ => panic!("corner should validate as an arc gauge"),
     };
-    assert_eq!(gauge.track_fill_style, TrackFillStyle::Bars);
-    assert_eq!(gauge.bar_geometry.unwrap().count, 6);
+    assert_eq!(gauge.validated.track_fill_style, TrackFillStyle::Bars);
+    assert_eq!(gauge.validated.bar_geometry.unwrap().count, 6);
 }
 
 fn validate_single_corner(

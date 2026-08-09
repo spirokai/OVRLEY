@@ -15,6 +15,8 @@ import {
   TEXT_LABEL_DEFAULTS,
   TYPE_DEFAULTS,
   HEADING_TAPE_DEFAULTS,
+  LAP_TIMER_DEFAULTS,
+  LAP_TIMER_MODES,
   COURSE_PLOT_DEFAULTS,
   ELEVATION_PLOT_DEFAULTS,
 } from '@/lib/widget/standard-widgets'
@@ -69,6 +71,18 @@ export function getWidgetFont(widget, fallback = 'Arial.ttf') {
  */
 export function getGlobalColor(globalDefaults, key, fallback = '#ffffff') {
   return globalDefaults?.[key] || fallback
+}
+
+function createSharedMetricDefaults(type, globalDefaults, displayType, font) {
+  return {
+    ...TEXT_DEFAULTS,
+    value: type,
+    display_type: displayType,
+    ...createFontSelection(font),
+    font_size: getDisplayTypeDefaultFontSize(displayType) ?? TEXT_FONT_SIZES[type] ?? TEXT_FONT_SIZES.default,
+    color: getGlobalColor(globalDefaults, 'color_values'),
+    opacity: globalDefaults?.opacity ?? 1,
+  }
 }
 
 /**
@@ -145,22 +159,28 @@ export function createBackdropDefaults(displayType) {
  *
  * @param {*} type - Widget or value type identifier.
  * @param {*} globalDefaults - Value for global defaults.
- * @param {string} [displayType] - Optional display type override (e.g. "text", "linear", "heading_tape").
+ * @param {object} [selection] - Canonical widget creation selection.
+ * @param {string} [selection.displayType] - Optional display type override (e.g. "text", "linear", "heading_tape").
+ * @param {string} [selection.lapTimerMode] - Required lap timer mode for lap timer widgets.
  * @returns {object} Derived data structure for downstream use.
  */
-export function createMetricValueDefaults(type, globalDefaults, displayType) {
-  const resolvedDisplayType = displayType || 'text'
-  const font = globalDefaults?.font_values || 'Arial.ttf'
-  const fontSelection = createFontSelection(font)
-  const sharedDefaults = {
-    ...TEXT_DEFAULTS,
-    value: type,
-    display_type: resolvedDisplayType,
-    ...fontSelection,
-    font_size: getDisplayTypeDefaultFontSize(resolvedDisplayType) ?? TEXT_FONT_SIZES[type] ?? TEXT_FONT_SIZES.default,
-    color: getGlobalColor(globalDefaults, 'color_values'),
-    opacity: globalDefaults?.opacity ?? 1,
+export function createMetricValueDefaults(type, globalDefaults, selection = {}) {
+  const { displayType, lapTimerMode } = selection
+  const font = globalDefaults?.font_values || TEXT_DEFAULTS.font
+  if (type === 'lap_timer') {
+    const mode = LAP_TIMER_MODES.find((candidate) => candidate.value === lapTimerMode)
+    if (!mode) throw new Error(`Unsupported lap timer mode: ${lapTimerMode}`)
+    return {
+      ...createSharedMetricDefaults(type, globalDefaults, 'lap_timer', font),
+      ...LAP_TIMER_DEFAULTS,
+      font_size: mode.font_size,
+      lap_timer_mode: mode.value,
+      label: mode.label,
+    }
   }
+
+  const resolvedDisplayType = displayType || 'text'
+  const sharedDefaults = createSharedMetricDefaults(type, globalDefaults, resolvedDisplayType, font)
   if (type === 'gradient') {
     return {
       ...sharedDefaults,

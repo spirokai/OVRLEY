@@ -340,6 +340,38 @@ pub fn densify_activity(
     } else {
         Vec::new()
     };
+    let dense_lap_number = if requirements.lap_number || requirements.lap_time_seconds {
+        let source_lap_number = trimmed
+            .lap_number
+            .iter()
+            .copied()
+            .map(Some)
+            .collect::<Vec<_>>();
+        densify_hold_series(
+            &trimmed.sample_elapsed_seconds,
+            &source_lap_number,
+            &frame_elapsed_seconds,
+        )
+    } else {
+        Vec::new()
+    };
+    let dense_lap_time_seconds = if requirements.lap_time_seconds {
+        frame_elapsed_seconds
+            .iter()
+            .zip(&dense_lap_number)
+            .map(|(elapsed, lap_number)| {
+                lap_number.and_then(|lap_number| {
+                    crate::activity::lap_timing::lap_time_at(
+                        &trimmed.lap_start_elapsed_seconds,
+                        lap_number,
+                        *elapsed,
+                    )
+                })
+            })
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
 
     // ── Phase 3: densify each requested numeric series ───────────────────
     // Empty vectors signal to render code that the series is not needed,
@@ -655,28 +687,17 @@ pub fn densify_activity(
             course_lat,
             course_lon,
             time,
-            lap_number: if requirements.lap_number && !trimmed.lap_number.is_empty() {
-                let lap_number_options: Vec<Option<i64>> =
-                    trimmed.lap_number.iter().map(|v| Some(*v)).collect();
-                densify_hold_series(
-                    &trimmed.sample_elapsed_seconds,
-                    &lap_number_options,
-                    &frame_elapsed_seconds,
-                )
+            lap_number: if requirements.lap_number {
+                dense_lap_number
             } else {
                 Vec::new()
             },
             lap_time_seconds: if requirements.lap_time_seconds {
-                // TODO(lap-timing): replace Preserve with lap-aware interpolation that does not cross resets.
-                interpolate_numeric_series(
-                    &trimmed.sample_elapsed_seconds,
-                    &trimmed.lap_time_seconds,
-                    &frame_elapsed_seconds,
-                    MissingSamplePolicy::Preserve,
-                )
+                dense_lap_time_seconds
             } else {
                 Vec::new()
             },
+            lap_start_elapsed_seconds: trimmed.lap_start_elapsed_seconds.clone(),
             delta_to_best_lap_seconds: if requirements.delta_to_best_lap_seconds {
                 interpolate_numeric_series(
                     &trimmed.sample_elapsed_seconds,
