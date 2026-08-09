@@ -147,6 +147,7 @@ jobs:
           dmg_source="$RUNNER_TEMP/OVRLEY-install.dmg"
           dmg_read_write="$RUNNER_TEMP/OVRLEY-install-rw.dmg"
           dmg_mount="$RUNNER_TEMP/ovrley-dmg-mount"
+          dmg_finder_name="$(basename "$dmg_mount")"
           background_source="src-tauri/dmg/background.png"
           retina_background_source="src-tauri/dmg/background@2x.png"
           rm -rf "$dmg_staging" "$dmg_mount" "$dmg_source" "$dmg_read_write"
@@ -174,17 +175,18 @@ jobs:
             fi
 
             hdiutil create -volname OVRLEY -srcfolder "$dmg_staging" -ov -format UDRW "$dmg_read_write" >/dev/null
-            hdiutil attach -nobrowse -readwrite -mountpoint "$dmg_mount" "$dmg_read_write" >/dev/null
-            if ! osascript - "$background_name" <<'APPLESCRIPT'
+            hdiutil attach -nobrowse -readwrite -noautoopen -mountpoint "$dmg_mount" "$dmg_read_write" >/dev/null
+            if ! osascript - "$background_name" "$dmg_finder_name" <<'APPLESCRIPT'
           on run arguments
             set backgroundName to item 1 of arguments
+            set diskName to item 2 of arguments
             tell application "Finder"
               repeat with attempt from 1 to 30
-                if exists disk "OVRLEY" then exit repeat
+                if exists disk (diskName as string) then exit repeat
                 delay 1
               end repeat
-              if not (exists disk "OVRLEY") then error "Finder did not discover the mounted OVRLEY disk within 30 seconds."
-              tell disk "OVRLEY"
+              if not (exists disk (diskName as string)) then error "Finder did not discover the mounted disk " & diskName & " within 30 seconds."
+              tell disk (diskName as string)
                 open
                 set current view of container window to icon view
                 set toolbar visible of container window to false
