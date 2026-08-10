@@ -68,12 +68,12 @@ describe('WidgetButtonGrid', () => {
     const user = userEvent.setup()
     render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
 
-    await user.click(screen.getByText('Lap Timer').closest('button'))
+    await user.click(screen.getByText('Lap Times').closest('button'))
     expect(screen.getByRole('button', { name: 'Current Lap' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Best Lap' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Delta' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Lap Times' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Lap Times' }))
+    expect(screen.getByRole('button', { name: 'Live Delta' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lap Log' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Lap Log' }))
 
     expect(onAddWidget).toHaveBeenCalledWith({ type: 'lap_timer', lapTimerMode: 'lap_log' })
   })
