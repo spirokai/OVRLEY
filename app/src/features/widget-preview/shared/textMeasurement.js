@@ -251,74 +251,41 @@ export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitTex
   }
 }
 
-function expandMetricBounds(currentBounds, left, top, right, bottom) {
-  return {
-    minX: Math.min(currentBounds.minX, left),
-    minY: Math.min(currentBounds.minY, top),
-    maxX: Math.max(currentBounds.maxX, right),
-    maxY: Math.max(currentBounds.maxY, bottom),
-  }
-}
-
-function getPreviewTextVisualBounds(segment) {
-  const left = segment.left - segment.boundsLeft
-  const top = segment.baseline - segment.ascent
-  const right = segment.left + segment.boundsRight
-  const bottom = segment.baseline + segment.descent
-
-  return { left, top, right, bottom }
-}
-
 /**
- * Computes the visual bounding box of a metric widget layout, accounting for icon offsets.
+ * Computes stable layout bounds for a metric widget, accounting for icon offsets.
  *
- * Evaluates the actual rendered extents of the icon (with offsets), value text,
- * and units text, then computes the minimal bounding rectangle and alignment offsets.
+ * Uses text advances rather than actual glyph ink bounds so fixed-width metric
+ * values do not make the selection target wobble as their glyphs change.
  *
  * @param {object|null} layout - Layout from getMetricWidgetLayout.
  * @param {object} [params={}] - Offset parameters.
  * @param {number} [params.iconOffsetX=0] - Horizontal icon offset relative to layout.
  * @param {number} [params.iconOffsetY=0] - Vertical icon offset relative to layout.
- * @returns {{ minX: number, minY: number, maxX: number, maxY: number, width: number, height: number, offsetX: number, offsetY: number }} Visual bounds and alignment offsets.
+ * @returns {{ minX: number, minY: number, maxX: number, maxY: number, width: number, height: number, offsetX: number, offsetY: number }} Stable layout bounds and alignment offsets.
  */
 export function getMetricWidgetVisualBounds(layout, { iconOffsetX = 0, iconOffsetY = 0 } = {}) {
-  // Empty layout — return zero bounds when no layout is provided
-  // Initialize bounds to infinity/negative-infinity for expansion
-  let bounds = {
-    minX: Number.POSITIVE_INFINITY,
-    minY: Number.POSITIVE_INFINITY,
-    maxX: Number.NEGATIVE_INFINITY,
-    maxY: Number.NEGATIVE_INFINITY,
-  }
-
-  // Icon bounds — expand the bounding rect to include the icon with user-specified offsets
-  if (layout.icon) {
-    const iconLeft = layout.icon.left + iconOffsetX
-    const iconTop = layout.icon.top + iconOffsetY
-    bounds = expandMetricBounds(bounds, iconLeft, iconTop, iconLeft + layout.icon.size, iconTop + layout.icon.size)
-  }
-
-  // Text bounds — expand the rect to include value and units text bounding boxes
-  const valueBounds = getPreviewTextVisualBounds(layout.value)
-  bounds = expandMetricBounds(bounds, valueBounds.left, valueBounds.top, valueBounds.right, valueBounds.bottom)
-  if (layout.units) {
-    const unitBounds = getPreviewTextVisualBounds(layout.units)
-    bounds = expandMetricBounds(bounds, unitBounds.left, unitBounds.top, unitBounds.right, unitBounds.bottom)
-  }
-
-  if (!layout.icon) {
-    bounds.minX = Math.max(bounds.minX, 0)
-  }
-
-  const width = Math.max(bounds.maxX - bounds.minX, 0)
-  const height = Math.max(bounds.maxY - bounds.minY, 0)
+  // Use layout advances rather than actual ink bounds. Ink bounds vary by
+  // glyph, even for fixed-width fonts, and would make the selection target wobble.
+  const iconLeft = layout.icon ? layout.icon.left + iconOffsetX : 0
+  const iconTop = layout.icon ? layout.icon.top + iconOffsetY : 0
+  const iconRight = layout.icon ? iconLeft + layout.icon.size : 0
+  const iconBottom = layout.icon ? iconTop + layout.icon.size : 0
+  const minX = layout.icon ? Math.min(0, iconLeft) : 0
+  const minY = layout.icon ? Math.min(0, iconTop) : 0
+  const maxX = layout.icon ? Math.max(layout.width, iconRight) : layout.width
+  const maxY = layout.icon ? Math.max(layout.height, iconBottom) : layout.height
+  const width = Math.max(maxX - minX, 0)
+  const height = Math.max(maxY - minY, 0)
 
   return {
-    ...bounds,
+    minX,
+    minY,
+    maxX,
+    maxY,
     width,
     height,
-    offsetX: -bounds.minX,
-    offsetY: -bounds.minY,
+    offsetX: -minX,
+    offsetY: -minY,
   }
 }
 
