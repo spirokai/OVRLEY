@@ -781,8 +781,14 @@ fn format_aperture_value(fnum: f64, _decimals: usize) -> String {
 }
 
 fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option<&str>) -> String {
-    let left = format_number(left_value.clamp(0.0, 100.0), decimals);
-    let right = format_number((100.0 - left_value).clamp(0.0, 100.0), decimals);
+    // FIT's missing-balance sentinel can decode as 127; show degenerate values as neutral.
+    let normalized_left = if left_value >= 100.0 {
+        50.0
+    } else {
+        left_value.clamp(0.0, 100.0)
+    };
+    let left = format_number(normalized_left, decimals);
+    let right = format_number(100.0 - normalized_left, decimals);
     match balance_format.unwrap_or("plain") {
         "percent_label" => format!("{left}%/{right}%"),
         "plain" => format!("{left}/{right}"),
@@ -809,6 +815,12 @@ mod tests {
         assert_eq!(format_balance_value(60.0, 0, Some("plain")), "60/40");
         assert_eq!(format_balance_value(48.0, 0, Some("l_prefix")), "L48/R52");
         assert_eq!(format_balance_value(70.0, 0, Some("l_suffix")), "70L/30R");
+    }
+
+    #[test]
+    fn invalid_or_degenerate_balance_is_displayed_as_neutral() {
+        assert_eq!(format_balance_value(100.0, 0, Some("plain")), "50/50");
+        assert_eq!(format_balance_value(127.0, 0, Some("percent_label")), "50%/50%");
     }
 
     #[test]

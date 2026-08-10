@@ -475,6 +475,15 @@ describe('left_right_balance format variants', () => {
     expect(model?.valueText).toBe('0%/100%')
     expect(model?.unitText).toBe('')
   })
+
+  test.each([100, 127])('formats %s as neutral balance', (value) => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('left_right_balance', { display_unit: 'percent', balance_format: 'percent_label' }),
+      activity: makeActivity('left_right_balance', value),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('50%/50%')
+  })
 })
 
 describe('Phase 4 camera metric formatting', () => {
