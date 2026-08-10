@@ -117,7 +117,7 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   linux:
-    name: Linux build
+    name: AppImage build
     needs: resolve
     uses: ./.github/workflows/workflow_linux.yml
     with:
@@ -177,6 +177,7 @@ jobs:
             "OVRLEY-macos-${version}.app.tar.gz.sig"
             "OVRLEY-linux-${version}.AppImage"
             "OVRLEY-linux-${version}.AppImage.sig"
+            "OVRLEY-linux-${version}-AppImage.zip"
           )
 
           while IFS= read -r source; do
@@ -228,7 +229,7 @@ jobs:
             --staging-dir release-staging \
             --validate-manifest public-assets/latest.json
 
-      - name: Assemble exactly six public assets
+      - name: Assemble exactly seven public assets
         shell: bash
         env:
           RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
@@ -240,12 +241,14 @@ jobs:
           cp "release-staging/OVRLEY-macos-${version}.dmg" public-assets/
           cp "release-staging/OVRLEY-macos-${version}.app.tar.gz" public-assets/
           cp "release-staging/OVRLEY-linux-${version}.AppImage" public-assets/
+          cp "release-staging/OVRLEY-linux-${version}-AppImage.zip" public-assets/
           expected="$(printf '%s\n' \
             "OVRLEY-win-${version}.exe" \
             "OVRLEY-win-${version}-portable.zip" \
             "OVRLEY-macos-${version}.dmg" \
             "OVRLEY-macos-${version}.app.tar.gz" \
             "OVRLEY-linux-${version}.AppImage" \
+            "OVRLEY-linux-${version}-AppImage.zip" \
             latest.json | sort)"
           actual="$(find public-assets -maxdepth 1 -type f -printf '%f\n' | sort)"
           [[ "$actual" == "$expected" ]] || { echo 'Public asset staging is not exactly canonical.' >&2; exit 1; }
@@ -267,6 +270,7 @@ jobs:
             "OVRLEY-macos-${RELEASE_VERSION}.dmg"
             "OVRLEY-macos-${RELEASE_VERSION}.app.tar.gz"
             "OVRLEY-linux-${RELEASE_VERSION}.AppImage"
+            "OVRLEY-linux-${RELEASE_VERSION}-AppImage.zip"
             latest.json
           )
           while IFS=$'\t' read -r asset_id asset_name; do
@@ -282,7 +286,7 @@ jobs:
             gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id"
           done < <(jq -r '.assets[] | [.id, .name] | @tsv' "$release_json")
 
-      - name: Upload exactly six draft release assets
+      - name: Upload exactly seven draft release assets
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -309,9 +313,10 @@ jobs:
             "OVRLEY-macos-${RELEASE_VERSION}.dmg" \
             "OVRLEY-macos-${RELEASE_VERSION}.app.tar.gz" \
             "OVRLEY-linux-${RELEASE_VERSION}.AppImage" \
+            "OVRLEY-linux-${RELEASE_VERSION}-AppImage.zip" \
             latest.json | sort)"
           actual="$(jq -r '.assets[].name' "$release_json" | sort)"
-          [[ "$actual" == "$expected" ]] || { echo 'Draft release asset inventory is not exactly the six intended public assets.' >&2; exit 1; }
+          [[ "$actual" == "$expected" ]] || { echo 'Draft release asset inventory is not exactly the seven intended public assets.' >&2; exit 1; }
           while IFS= read -r size; do
             [[ "$size" =~ ^[1-9][0-9]*$ ]] || { echo 'Draft release contains an empty asset.' >&2; exit 1; }
           done < <(jq -r '.assets[].size' "$release_json")

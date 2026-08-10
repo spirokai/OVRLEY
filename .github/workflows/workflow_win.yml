@@ -1,4 +1,4 @@
-name: OVRLEY Windows Release
+name: Release Windows
 
 on:
   workflow_dispatch:

@@ -192,6 +192,7 @@ function canonicalNames(version) {
       macosDmg: `OVRLEY-macos-${version}.dmg`,
       macosUpdater: `OVRLEY-macos-${version}.app.tar.gz`,
       linux: `OVRLEY-linux-${version}.AppImage`,
+      linuxArchive: `OVRLEY-linux-${version}-AppImage.zip`,
     },
     signatures: {
       windows: `OVRLEY-win-${version}.exe.sig`,
