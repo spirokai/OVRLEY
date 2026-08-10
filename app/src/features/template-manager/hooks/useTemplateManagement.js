@@ -112,9 +112,11 @@ export default function useTemplateManagement({ onTemplateCreated }) {
           setLastSavedTemplateState(templateState)
         })
         await setPreference('last-template', { source: 'backend', filename })
+        return true
       } catch (error) {
         console.error('Failed to load template:', error)
         setErrorMessage(`Failed to load template: ${getErrorMessage(error, 'Unknown error')}`)
+        return false
       } finally {
         setProcessing(false)
       }
@@ -266,16 +268,20 @@ export default function useTemplateManagement({ onTemplateCreated }) {
   }, [confirmCreateNewTemplate, status])
 
   // Always point to the latest handleTemplateChange so restoreLastLoadedTemplate
-  // can be a stable (empty-deps) callback while still invoking the current handler.
+  // can invoke the current handler without depending on it.
   const handleTemplateChangeRef = useRef(handleTemplateChange)
   handleTemplateChangeRef.current = handleTemplateChange
 
   const restoreLastLoadedTemplate = useCallback(async () => {
     const saved = await getPreference('last-template')
     if (saved?.source === 'backend' && saved.filename) {
-      handleTemplateChangeRef.current(saved.filename)
+      const restored = await handleTemplateChangeRef.current(saved.filename)
+      if (!restored) {
+        replaceEditorDocument(useStore, createNewTemplate)
+        await deletePreference('last-template')
+      }
     }
-  }, [])
+  }, [createNewTemplate])
 
   return {
     confirmCreateNewTemplate,
