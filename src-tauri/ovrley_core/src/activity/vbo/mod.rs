@@ -334,6 +334,7 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         heartrate: empty(),
         cadence: empty(),
         power: empty(),
+        engine_power: empty(),
         temperature: empty(),
         calories: empty(),
         gradient: empty(),

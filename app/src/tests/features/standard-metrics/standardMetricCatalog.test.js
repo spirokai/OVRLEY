@@ -33,6 +33,7 @@ describe('standard metric widget catalog', () => {
       'heartrate',
       'cadence',
       'power',
+      'engine_power',
       'temperature',
       'pace',
       'g_force',
@@ -216,7 +217,7 @@ describe('standard metric widget catalog', () => {
 
   test('existing metrics carry interpolation and unitsMode defaults', () => {
     const linearTypes = ['speed', 'distance', 'heartrate', 'temperature', 'heading']
-    const preserveTypes = ['cadence', 'power', 'pace']
+    const preserveTypes = ['cadence', 'power', 'engine_power', 'pace']
     for (const type of linearTypes) {
       expect(getStandardMetricInterpolation(type)).toBe('linear')
       expect(getStandardMetricUnitsMode(type)).toBe('selectable')

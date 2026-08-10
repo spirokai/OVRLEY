@@ -551,6 +551,24 @@
       "category": "cycling"
     },
     {
+      "type": "engine_power",
+      "current": true,
+      "label": "Engine Power",
+      "defaultDisplayUnit": "w",
+      "supportedDisplayUnits": [
+        { "value": "w", "label": "W" }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "integer",
+      "interpolation": "preserve",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "shared",
+        "assetFile": "widget-power.svg"
+      },
+      "category": "vehicle"
+    },
+    {
       "type": "temperature",
       "current": true,
       "label": "Temperature",

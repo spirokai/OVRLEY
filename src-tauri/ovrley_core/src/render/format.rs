@@ -661,6 +661,7 @@ pub(crate) fn convert_standard_metric_value(
         MetricKind::Heartrate
         | MetricKind::Cadence
         | MetricKind::Power
+        | MetricKind::EnginePower
         | MetricKind::GroundContactTime
         | MetricKind::StrokeRate
         | MetricKind::GearPosition
