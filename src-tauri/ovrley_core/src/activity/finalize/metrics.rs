@@ -608,6 +608,7 @@ pub fn derive_activity_metric_series(
     insert_metric!("barometric_altitude", &null_series);
     insert_metric!("cadence", &null_series);
     insert_metric!("core_temperature", &null_series);
+    insert_metric!("engine_power", &null_series);
     let derived_calories = derive_calories_from_power(&direct["power"], elapsed_series);
     map.insert(
         "calories".to_string(),
@@ -748,6 +749,7 @@ fn direct_metrics(
     collect!("lean_angle", lean_angle);
     collect!("pace", pace);
     collect!("power", power);
+    collect!("engine_power", engine_power);
     collect!("rpm", rpm);
     collect!("speed", speed);
     collect!("stride_length", stride_length);

@@ -158,6 +158,7 @@ pub fn build_activity_columns(
         heartrate: none(),
         cadence: none(),
         power: none(),
+        engine_power: none(),
         temperature: none(),
         calories: none(),
         gradient: none(),

@@ -100,6 +100,7 @@ export const METRIC_ICON_SVGS = {
   left_right_balance: parseMetricIconSvg(leftRightBalanceIconSvg),
   pace: parseMetricIconSvg(paceIconSvg),
   power: parseMetricIconSvg(powerIconSvg),
+  engine_power: parseMetricIconSvg(powerIconSvg),
   speed: parseMetricIconSvg(speedIconSvg),
   stride_length: parseMetricIconSvg(strideLengthIconSvg),
   stroke_rate: parseMetricIconSvg(strokeRateIconSvg),
