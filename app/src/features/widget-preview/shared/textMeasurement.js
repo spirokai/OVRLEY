@@ -254,8 +254,8 @@ export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitTex
 /**
  * Computes stable layout bounds for a metric widget, accounting for icon offsets.
  *
- * Uses text advances rather than actual glyph ink bounds so fixed-width metric
- * values do not make the selection target wobble as their glyphs change.
+ * Uses horizontal text advances and vertical glyph ink bounds so fixed-width
+ * values do not wobble while the selection height stays visually tight.
  *
  * @param {object|null} layout - Layout from getMetricWidgetLayout.
  * @param {object} [params={}] - Offset parameters.
@@ -264,16 +264,24 @@ export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitTex
  * @returns {{ minX: number, minY: number, maxX: number, maxY: number, width: number, height: number, offsetX: number, offsetY: number }} Stable layout bounds and alignment offsets.
  */
 export function getMetricWidgetVisualBounds(layout, { iconOffsetX = 0, iconOffsetY = 0 } = {}) {
-  // Use layout advances rather than actual ink bounds. Ink bounds vary by
+  // Use horizontal layout advances rather than ink bounds. Ink widths vary by
   // glyph, even for fixed-width fonts, and would make the selection target wobble.
   const iconLeft = layout.icon ? layout.icon.left + iconOffsetX : 0
   const iconTop = layout.icon ? layout.icon.top + iconOffsetY : 0
   const iconRight = layout.icon ? iconLeft + layout.icon.size : 0
   const iconBottom = layout.icon ? iconTop + layout.icon.size : 0
   const minX = layout.icon ? Math.min(0, iconLeft) : 0
-  const minY = layout.icon ? Math.min(0, iconTop) : 0
   const maxX = layout.icon ? Math.max(layout.width, iconRight) : layout.width
-  const maxY = layout.icon ? Math.max(layout.height, iconBottom) : layout.height
+  let minY = layout.value.baseline - layout.value.ascent
+  let maxY = layout.value.baseline + layout.value.descent
+  if (layout.units) {
+    minY = Math.min(minY, layout.units.baseline - layout.units.ascent)
+    maxY = Math.max(maxY, layout.units.baseline + layout.units.descent)
+  }
+  if (layout.icon) {
+    minY = Math.min(minY, iconTop)
+    maxY = Math.max(maxY, iconBottom)
+  }
   const width = Math.max(maxX - minX, 0)
   const height = Math.max(maxY - minY, 0)
 

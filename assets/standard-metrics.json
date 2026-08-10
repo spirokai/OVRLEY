@@ -553,11 +553,9 @@
     {
       "type": "engine_power",
       "current": true,
-      "label": "Engine Power",
+      "label": "Eng. Power",
       "defaultDisplayUnit": "w",
-      "supportedDisplayUnits": [
-        { "value": "w", "label": "W" }
-      ],
+      "supportedDisplayUnits": [{ "value": "w", "label": "W" }],
       "showUnitsByDefault": true,
       "formatter": "integer",
       "interpolation": "preserve",
@@ -566,7 +564,7 @@
         "source": "shared",
         "assetFile": "widget-power.svg"
       },
-      "category": "vehicle"
+      "category": "motosports"
     },
     {
       "type": "temperature",
