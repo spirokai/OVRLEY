@@ -40,6 +40,8 @@ pub enum MetricKind {
     Cadence,
     #[serde(rename = "power")]
     Power,
+    #[serde(rename = "engine_power")]
+    EnginePower,
     #[serde(rename = "temperature")]
     Temperature,
     #[serde(rename = "pace")]

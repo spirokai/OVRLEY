@@ -302,7 +302,17 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(AccelerationKind::Semantic),
         ),
         "rpm" | "engine rpm" => (Metric::Rpm, SourcePriority::Direct, None, None, None),
-        "torque" => (Metric::Torque, SourcePriority::Direct, None, None, None),
+        "power"
+        | "estimated power"
+        | "engine kw (at the wheels)"
+        | "horsepower (at the wheels)" => (
+            Metric::EnginePower,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
+        "torque" | "estimated torque" => (Metric::Torque, SourcePriority::Direct, None, None, None),
         "accelerator position" | "accelerator pedal position" => (
             Metric::ThrottlePosition,
             SourcePriority::Pedal,

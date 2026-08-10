@@ -60,6 +60,8 @@ enum Metric {
     GForceZ,
     /// Engine speed in revolutions per minute.
     Rpm,
+    /// Engine power in watts.
+    EnginePower,
     /// Engine torque in newton-metres.
     Torque,
     /// Throttle position as a percentage from zero to one hundred.

@@ -141,8 +141,32 @@ fn candidate_columns<'a>(
                 && column_unit(column, units_row).is_some()
         })
         .collect::<Vec<_>>();
-    candidates.sort_by_key(|column| (column.priority, column.index));
+    candidates.sort_by_key(|column| {
+        (
+            power_unit_priority(
+                metric,
+                column_unit(column, units_row).expect("candidate has a compatible unit"),
+            ),
+            column.priority,
+            column.index,
+        )
+    });
     candidates
+}
+
+/// Prefers explicit watts over kilowatts and metric horsepower for engine power.
+fn power_unit_priority(metric: Metric, unit: Unit) -> u8 {
+    if metric != Metric::EnginePower {
+        return 0;
+    }
+
+    match unit {
+        Unit::Watts => 0,
+        Unit::Kilowatts => 1,
+        Unit::MetricHorsepower => 2,
+        Unit::MechanicalHorsepower => 3,
+        _ => unreachable!("engine power candidates only have power-compatible units"),
+    }
 }
 
 /// Parses, converts, and validates one metric observation.
