@@ -628,6 +628,11 @@ fn render_frame_to_surface(
                 PreparedValue::LapTimer(widget) => {
                     let validated = &widget.validated;
                     let style = validated_lap_timer_style(validated, &prepared_assets.scene, scale);
+                    let label_style = crate::render::text::validated_lap_timer_label_style(
+                        validated,
+                        &prepared_assets.scene,
+                        scale,
+                    );
                     let cache = widget.cache.as_ref().ok_or_else(|| {
                         CoreError::Render(format!("lap timer cache is missing for value {idx}"))
                     })?;
@@ -638,6 +643,7 @@ fn render_frame_to_surface(
                         dense_activity,
                         frame_index,
                         &style,
+                        &label_style,
                         &paths.font_dirs,
                     )?;
                 }

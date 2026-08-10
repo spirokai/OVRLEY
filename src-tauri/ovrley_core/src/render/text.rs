@@ -185,6 +185,25 @@ pub fn validated_lap_timer_style(
     }
 }
 
+/// Resolves the independently configured label style for a lap timer.
+pub fn validated_lap_timer_label_style(
+    validated: &ValidatedLapTimer,
+    scene: &ValidatedSceneConfig,
+    scale: f32,
+) -> ResolvedTextStyle {
+    let mut style = validated_lap_timer_style(validated, scene, scale);
+    style.font_name = Some(validated.label_font_name.clone());
+    style.font_size = validated.label_font_size * scale;
+    style.line_height = style.font_size * 0.92;
+    style.color = Color::from_argb(
+        validated.label_color[3],
+        validated.label_color[0],
+        validated.label_color[1],
+        validated.label_color[2],
+    );
+    style
+}
+
 /// Resolves a text style from a validated gradient widget and scene config.
 ///
 /// All output-affecting fields are already explicit in the validated type.

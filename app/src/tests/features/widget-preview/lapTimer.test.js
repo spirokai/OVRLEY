@@ -27,6 +27,9 @@ const widget = {
     font: 'Arial.ttf',
     font_size: 72,
     color: '#ffffff',
+    label_font: 'Teko.ttf',
+    label_font_size: 24,
+    label_color: '#abcdef',
     opacity: 1,
     show_label: true,
     label: 'Best Lap',
@@ -118,10 +121,11 @@ describe('lap timer preview state', () => {
     expect(model.content).not.toHaveProperty('labelText')
     expect(model.content.rows).toHaveLength(4)
     expect(model.content.rows[0].opacityMultiplier).toBe(0.7)
-    expect(model.content.rows[0].fontSize).toBe(widget.data.font_size * 0.35)
+    expect(model.content.rows[0].fontSize).toBe(widget.data.label_font_size)
+    expect(model.content.rows[0].fontFamily).toContain('Teko')
     expect(model.content.rows[1].fontSize).toBe(widget.data.font_size)
     expect(model.content.rows.slice(1).map((row) => row.cells[0].text)).toEqual(['3', '2', '1'])
-    expect(model.content.rows.map((row) => row.cells[2].color)).toEqual(['#ffffff', '#00ff00', '#ff0000', '#ff0000'])
+    expect(model.content.rows.map((row) => row.cells[2].color)).toEqual(['#abcdef', '#00ff00', '#ff0000', '#ff0000'])
     for (let columnIndex = 0; columnIndex < 3; columnIndex += 1) {
       const rightEdges = model.content.rows.map((row) => row.cells[columnIndex].left + row.cells[columnIndex].measure.width)
       expect(new Set(rightEdges).size).toBe(1)

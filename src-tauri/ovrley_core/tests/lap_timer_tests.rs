@@ -3,6 +3,7 @@ mod common;
 use common::builders::empty_dense_series;
 use ovrley_core::activity::parse_activity_json;
 use ovrley_core::activity::schema::DenseActivityReport;
+use ovrley_core::commands::validate_config_value;
 use ovrley_core::normalize::LapTimerMode;
 use ovrley_core::render::widgets::{
     lap_log_text_state, lap_timer_value_text, types::PreparedValue,
@@ -65,6 +66,9 @@ fn delta_config_uses_its_canonical_mode_colors_and_data_requirement() {
             "font": "Arial.ttf",
             "font_size": 72.0,
             "color": "#abcdef",
+            "label_font": "Teko.ttf",
+            "label_font_size": 24.0,
+            "label_color": "#123456",
             "opacity": 1.0,
             "show_label": true,
             "label": "Delta",
@@ -79,6 +83,9 @@ fn delta_config_uses_its_canonical_mode_colors_and_data_requirement() {
     };
     assert_eq!(widget.validated.mode, LapTimerMode::Delta);
     assert_eq!(widget.validated.label, "Delta");
+    assert_eq!(widget.validated.label_font_name, "Teko.ttf");
+    assert_eq!(widget.validated.label_font_size, 24.0);
+    assert_eq!(widget.validated.label_color, [18, 52, 86, 255]);
     assert_eq!(widget.validated.positive_delta_color, [0, 255, 0, 255]);
     assert_eq!(widget.validated.negative_delta_color, [255, 0, 0, 255]);
 
@@ -86,6 +93,60 @@ fn delta_config_uses_its_canonical_mode_colors_and_data_requirement() {
     assert!(requirements.delta_to_best_lap_seconds);
     assert!(!requirements.lap_number);
     assert!(!requirements.lap_time_seconds);
+}
+
+#[test]
+fn lap_timer_label_typography_is_a_strict_ingress_contract() {
+    let base = json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [{
+            "value": "lap_timer",
+            "display_type": "lap_timer",
+            "lap_timer_mode": "current_lap",
+            "x": 10.0,
+            "y": 20.0,
+            "font": "Arial.ttf",
+            "font_size": 72.0,
+            "color": "#abcdef",
+            "opacity": 1.0,
+            "show_label": true,
+            "label": "Current Lap",
+            "label_font": "Teko.ttf",
+            "label_font_size": 24.0,
+            "label_color": "#123456",
+            "positive_delta_color": "#00ff00",
+            "negative_delta_color": "#ff0000"
+        }],
+        "plots": []
+    });
+
+    let mut missing_font = base.clone();
+    missing_font["values"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("label_font");
+    let error = validate_config_value(&missing_font)
+        .err()
+        .unwrap()
+        .to_string();
+    assert!(error.contains("values[0].label_font"));
+
+    let mut invalid_size = base.clone();
+    invalid_size["values"][0]["label_font_size"] = json!(0);
+    let error = validate_config_value(&invalid_size)
+        .err()
+        .unwrap()
+        .to_string();
+    assert!(error.contains("values[0].label_font_size"));
+
+    let mut invalid_color = base;
+    invalid_color["values"][0]["label_color"] = json!("red");
+    let error = validate_config_value(&invalid_color)
+        .err()
+        .unwrap()
+        .to_string();
+    assert!(error.contains("values[0].label_color"));
 }
 
 #[test]
@@ -222,6 +283,9 @@ fn lap_log_config_requests_all_canonical_lap_series() {
             "font": "Arial.ttf",
             "font_size": 72.0,
             "color": "#abcdef",
+            "label_font": "Teko.ttf",
+            "label_font_size": 24.0,
+            "label_color": "#123456",
             "opacity": 1.0,
             "show_label": true,
             "label": "Lap Times",

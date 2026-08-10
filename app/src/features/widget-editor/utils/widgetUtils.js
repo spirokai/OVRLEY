@@ -174,6 +174,9 @@ export function createMetricValueDefaults(type, globalDefaults, selection = {}) 
       ...createSharedMetricDefaults(type, globalDefaults, 'lap_timer', font),
       ...LAP_TIMER_DEFAULTS,
       font_size: mode.font_size,
+      label_font: globalDefaults?.font_text || TEXT_LABEL_DEFAULTS.font,
+      label_font_size: mode.label_font_size,
+      label_color: getGlobalColor(globalDefaults, 'color_text'),
       lap_timer_mode: mode.value,
       label: mode.label,
     }

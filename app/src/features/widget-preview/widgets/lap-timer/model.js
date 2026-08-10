@@ -3,7 +3,6 @@ import { getPreviewActivity } from '@/features/overlay-editor/utils/overlayEdito
 import { buildLapLogCompletedRows, getLapLogFrameState, getLapTimerDisplayState, LAP_LOG_HEADERS } from './lapTimer'
 
 const LINE_HEIGHT_RATIO = 0.92
-const LABEL_FONT_RATIO = 0.35
 const LOG_COLUMN_GAP_RATIO = 1.8
 const LOG_ROW_GAP_RATIO = 0.38
 const LOG_HEADER_OPACITY = 0.7
@@ -31,7 +30,7 @@ function getLapLogSizing(activity) {
   }
 }
 
-function getLapLogColumnRights(activity, fontSize, headerFontSize, fontFamily) {
+function getLapLogColumnRights(activity, fontSize, headerFontSize, fontFamily, labelFontFamily) {
   const sizing = getLapLogSizing(activity)
   const measureRowCharacter = (character) => measurePreviewText(character, fontSize, fontFamily).width
   const widestDigit = Math.max(...'0123456789'.split('').map(measureRowCharacter))
@@ -45,7 +44,7 @@ function getLapLogColumnRights(activity, fontSize, headerFontSize, fontFamily) {
   ]
   const gap = fontSize * LOG_COLUMN_GAP_RATIO
   const columnWidth = (columnIndex) =>
-    Math.max(rowWidths[columnIndex], measurePreviewText(LAP_LOG_HEADERS[columnIndex], headerFontSize, fontFamily).width)
+    Math.max(rowWidths[columnIndex], measurePreviewText(LAP_LOG_HEADERS[columnIndex], headerFontSize, labelFontFamily).width)
   const lapRight = columnWidth(0)
   const timeRight = lapRight + gap + columnWidth(1)
   return [lapRight, timeRight, timeRight + gap + columnWidth(2)]
@@ -68,6 +67,7 @@ function buildLapLogRow({ texts, opacityMultiplier, fontSize, lineHeight, top, d
     cells,
     opacityMultiplier,
     fontSize,
+    fontFamily,
     offsetY: 0,
     valueText: texts.join(' '),
     bounds: {
@@ -89,13 +89,14 @@ function buildLapLogRow({ texts, opacityMultiplier, fontSize, lineHeight, top, d
 export function prepareLapLogPreview({ widget, activity }) {
   const fontSize = widget.data.font_size
   const fontFamily = getPreviewFontFamily(widget.data.font)
+  const labelFontFamily = getPreviewFontFamily(widget.data.label_font)
   const rowLineHeight = fontSize * LINE_HEIGHT_RATIO
   const rowGap = fontSize * LOG_ROW_GAP_RATIO
   const rowStride = rowLineHeight + rowGap
-  const headerFontSize = fontSize * LABEL_FONT_RATIO
+  const headerFontSize = widget.data.label_font_size
   const headerLineHeight = headerFontSize * LINE_HEIGHT_RATIO
   const dataTop = headerLineHeight + rowGap
-  const columnRights = getLapLogColumnRights(activity, fontSize, headerFontSize, fontFamily)
+  const columnRights = getLapLogColumnRights(activity, fontSize, headerFontSize, fontFamily, labelFontFamily)
   const headerRow = buildLapLogRow({
     texts: LAP_LOG_HEADERS,
     opacityMultiplier: LOG_HEADER_OPACITY,
@@ -103,9 +104,9 @@ export function prepareLapLogPreview({ widget, activity }) {
     lineHeight: headerLineHeight,
     top: 0,
     deltaColor: null,
-    color: widget.data.color,
+    color: widget.data.label_color,
     columnRights,
-    fontFamily,
+    fontFamily: labelFontFamily,
   })
   const completedRows = buildLapLogCompletedRows(activity).map((row, rowIndex) =>
     buildLapLogRow({
@@ -183,6 +184,7 @@ function buildLapLogPreviewModel({ widget, displayActivity, previewSecond, prepa
  */
 export function buildLapTimerPreviewModel({ widget, activity, previewSecond, lapLogPreparation }) {
   const fontFamily = getPreviewFontFamily(widget.data.font)
+  const labelFontFamily = getPreviewFontFamily(widget.data.label_font)
   const displayActivity = getPreviewActivity(activity, previewSecond)
   if (widget.data.lap_timer_mode === 'lap_log') {
     if (lapLogPreparation === undefined) throw new Error('Lap log preview requires prepared layout')
@@ -194,10 +196,10 @@ export function buildLapTimerPreviewModel({ widget, activity, previewSecond, lap
   const valueMeasure = measurePreviewText(valueText, widget.data.font_size, fontFamily)
   const valueVerticalMetrics = getPreviewVerticalMetrics(valueText, widget.data.font_size, fontFamily)
   const showLabel = widget.data.show_label
-  const labelFontSize = widget.data.font_size * LABEL_FONT_RATIO
+  const labelFontSize = widget.data.label_font_size
   const labelLineHeight = labelFontSize * LINE_HEIGHT_RATIO
-  const labelMeasure = showLabel ? measurePreviewText(widget.data.label, labelFontSize, fontFamily) : null
-  const labelVerticalMetrics = showLabel ? getPreviewVerticalMetrics(widget.data.label, labelFontSize, fontFamily) : null
+  const labelMeasure = showLabel ? measurePreviewText(widget.data.label, labelFontSize, labelFontFamily) : null
+  const labelVerticalMetrics = showLabel ? getPreviewVerticalMetrics(widget.data.label, labelFontSize, labelFontFamily) : null
   const labelBaseline = showLabel
     ? getPreviewTextBaseline({
         lineHeight: labelLineHeight,
