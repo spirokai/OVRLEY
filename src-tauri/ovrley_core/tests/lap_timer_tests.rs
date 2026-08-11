@@ -210,7 +210,7 @@ fn renderer_text_uses_pretrim_delta_reference_for_a_scene_starting_mid_lap() {
 }
 
 #[test]
-fn renderer_lap_log_covers_out_lap_first_lap_and_activity_wide_completions() {
+fn renderer_lap_log_rebases_completed_rows_without_changing_live_delta() {
     let mut activity = lap_activity();
 
     let out_lap = lap_log_text_state(&activity, 0).unwrap();
@@ -231,13 +231,17 @@ fn renderer_lap_log_covers_out_lap_first_lap_and_activity_wide_completions() {
             .map(|row| row.cells.clone())
             .collect::<Vec<_>>(),
         vec![
-            ["2".to_string(), "00:03.00".to_string(), "-1.00".to_string(),],
-            ["1".to_string(), "00:04.00".to_string(), "+0.00".to_string(),],
+            ["2".to_string(), "00:03.00".to_string(), "+0.00".to_string(),],
+            ["1".to_string(), "00:04.00".to_string(), "+1.00".to_string(),],
         ]
     );
     assert_eq!(
         after_two_completions.completed_rows[0].delta_seconds,
-        Some(-1.0)
+        Some(0.0)
+    );
+    assert_eq!(
+        after_two_completions.completed_rows[1].delta_seconds,
+        Some(1.0)
     );
     let current_row = after_two_completions.current_row.unwrap();
     assert_eq!(current_row.cells, ["3", "00:01.00", "-0.25"]);

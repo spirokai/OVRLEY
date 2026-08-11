@@ -92,8 +92,8 @@ describe('lap timer preview state', () => {
     })
     expect(getLapLogDisplayState(activity, 13)).toEqual({
       completedRows: [
-        { lapText: '2', timeText: '00:03.00', deltaText: '-1.00', useNegativeDeltaColor: true },
-        { lapText: '1', timeText: '00:04.00', deltaText: '+0.00', useNegativeDeltaColor: true },
+        { lapText: '2', timeText: '00:03.00', deltaText: '+0.00', useNegativeDeltaColor: true },
+        { lapText: '1', timeText: '00:04.00', deltaText: '+1.00', useNegativeDeltaColor: false },
       ],
       currentRow: { lapText: '3', timeText: '00:02.00', deltaText: '+0.25', useNegativeDeltaColor: false },
     })
@@ -101,8 +101,8 @@ describe('lap timer preview state', () => {
     const returnedToPreLap = { ...activity, lap_number: [...activity.lap_number.slice(0, 6), -1, -1] }
     expect(getLapLogDisplayState(returnedToPreLap, 13)).toEqual({
       completedRows: [
-        { lapText: '2', timeText: '00:03.00', deltaText: '-1.00', useNegativeDeltaColor: true },
-        { lapText: '1', timeText: '00:04.00', deltaText: '+0.00', useNegativeDeltaColor: true },
+        { lapText: '2', timeText: '00:03.00', deltaText: '+0.00', useNegativeDeltaColor: true },
+        { lapText: '1', timeText: '00:04.00', deltaText: '+1.00', useNegativeDeltaColor: false },
       ],
       currentRow: null,
     })
@@ -125,7 +125,7 @@ describe('lap timer preview state', () => {
     expect(model.content.rows[0].fontFamily).toContain('Teko')
     expect(model.content.rows[1].fontSize).toBe(widget.data.font_size)
     expect(model.content.rows.slice(1).map((row) => row.cells[0].text)).toEqual(['3', '2', '1'])
-    expect(model.content.rows.map((row) => row.cells[2].color)).toEqual(['#abcdef', '#00ff00', '#ff0000', '#ff0000'])
+    expect(model.content.rows.map((row) => row.cells[2].color)).toEqual(['#abcdef', '#00ff00', '#ff0000', '#00ff00'])
     for (let columnIndex = 0; columnIndex < 3; columnIndex += 1) {
       const rightEdges = model.content.rows.map((row) => row.cells[columnIndex].left + row.cells[columnIndex].measure.width)
       expect(new Set(rightEdges).size).toBe(1)

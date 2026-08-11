@@ -80,7 +80,7 @@ function buildLapLogRow({ texts, opacityMultiplier, fontSize, lineHeight, top, d
 }
 
 /**
- * Prepares invariant lap-log column and completed-row layout.
+ * Prepares invariant lap-log column and header layout.
  * @param {object} params
  * @param {object} params.widget - Lap-log widget configuration.
  * @param {object|null} params.activity - Parsed activity with lap timing data.
@@ -108,31 +108,25 @@ export function prepareLapLogPreview({ widget, activity }) {
     columnRights,
     fontFamily: labelFontFamily,
   })
-  const completedRows = buildLapLogCompletedRows(activity).map((row, rowIndex) =>
-    buildLapLogRow({
-      texts: [row.lapText, row.timeText, row.deltaText],
-      opacityMultiplier: 1,
-      fontSize,
-      lineHeight: rowLineHeight,
-      top: dataTop + rowIndex * rowStride,
-      deltaColor: row.useNegativeDeltaColor ? widget.data.negative_delta_color : widget.data.positive_delta_color,
-      color: widget.data.color,
-      columnRights,
-      fontFamily,
-    }),
-  )
-
-  return { columnRights, completedRows, dataTop, fontFamily, fontSize, headerRow, rowLineHeight, rowStride }
+  return { columnRights, dataTop, fontFamily, fontSize, headerRow, rowLineHeight, rowStride }
 }
 
 function buildLapLogPreviewModel({ widget, displayActivity, previewSecond, prepared }) {
   const state = getLapLogFrameState(displayActivity, previewSecond)
-  if (state.completedLapCount > prepared.completedRows.length) {
-    throw new Error(`Prepared lap log rows are missing completed lap ${state.completedLapCount}`)
-  }
-  const completedRows = prepared.completedRows.slice(prepared.completedRows.length - state.completedLapCount)
-  const completedRowsOffset =
-    -(prepared.completedRows.length - state.completedLapCount) * prepared.rowStride + (state.currentRow === null ? 0 : prepared.rowStride)
+  const completedRowsTop = prepared.dataTop + (state.currentRow === null ? 0 : prepared.rowStride)
+  const completedRows = buildLapLogCompletedRows(displayActivity, state.completedLapCount).map((row, rowIndex) =>
+    buildLapLogRow({
+      texts: [row.lapText, row.timeText, row.deltaText],
+      opacityMultiplier: 1,
+      fontSize: prepared.fontSize,
+      lineHeight: prepared.rowLineHeight,
+      top: completedRowsTop + rowIndex * prepared.rowStride,
+      deltaColor: row.useNegativeDeltaColor ? widget.data.negative_delta_color : widget.data.positive_delta_color,
+      color: widget.data.color,
+      columnRights: prepared.columnRights,
+      fontFamily: prepared.fontFamily,
+    }),
+  )
   const rows = [
     prepared.headerRow,
     ...(state.currentRow
@@ -150,7 +144,7 @@ function buildLapLogPreviewModel({ widget, displayActivity, previewSecond, prepa
           }),
         ]
       : []),
-    ...completedRows.map((row) => (completedRowsOffset === 0 ? row : { ...row, offsetY: completedRowsOffset })),
+    ...completedRows,
   ]
   const minX = Math.min(...rows.map((row) => row.bounds.minX))
   const minY = Math.min(...rows.map((row) => row.bounds.minY + row.offsetY))
