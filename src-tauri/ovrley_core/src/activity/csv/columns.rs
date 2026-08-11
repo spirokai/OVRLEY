@@ -143,7 +143,9 @@ pub(super) fn build_activity_columns(
             && column.is_some_and(|column| {
                 matches!(
                     column.priority,
-                    SourcePriority::Preferred | SourcePriority::Direct
+                    SourcePriority::Preferred
+                        | SourcePriority::Direct
+                        | SourcePriority::DirectSpeed
                 )
             });
         if uses_gps_update {

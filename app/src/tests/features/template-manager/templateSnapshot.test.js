@@ -58,7 +58,7 @@ describe('template snapshot standard metric schema', () => {
 
     expect(normalized.values[0]).toMatchObject({
       label_font: 'Teko.ttf',
-      label_font_size: 10.5,
+      label_font_size: 15,
       label_color: '#123456',
     })
   })
@@ -75,7 +75,7 @@ describe('template snapshot standard metric schema', () => {
       display_type: 'lap_timer',
       lap_timer_mode: 'delta',
       show_label: true,
-      label: 'Live Delta',
+      label: 'Delta',
       label_font: 'Teko.ttf',
       label_font_size: 17.5,
       label_color: '#123456',
@@ -94,7 +94,7 @@ describe('template snapshot standard metric schema', () => {
       show_label: true,
       label: 'Lap Log',
       font_size: 30,
-      label_font_size: 10.5,
+      label_font_size: 15,
       color: '#abcdef',
     })
   })

@@ -71,7 +71,7 @@ describe('WidgetButtonGrid', () => {
     await user.click(screen.getByText('Lap Times').closest('button'))
     expect(screen.getByRole('button', { name: 'Current Lap' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Best Lap' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Live Delta' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delta' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Lap Log' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Lap Log' }))
 

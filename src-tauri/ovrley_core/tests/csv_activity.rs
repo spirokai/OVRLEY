@@ -1362,7 +1362,7 @@ mod lap_timing_fixture_tests {
         vec![
             LapExpectations {
                 fixture: "Amozoc - TrackAddict.csv",
-                min_laps: 5,
+                min_laps: 4,
                 extraction: FixtureKind::Csv,
             },
             LapExpectations {

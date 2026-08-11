@@ -511,8 +511,8 @@ mod tests {
 
         let error = ParallelFramePoolPlan::for_resources(
             crate::render::FrameSize {
-                width: 7680,
-                height: 4320,
+                width: 11520,
+                height: 6480,
             },
             NonZeroUsize::new(2).unwrap(),
             8,
