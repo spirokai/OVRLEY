@@ -150,8 +150,7 @@ fn derive_lean_from_speed_heading_with_window(
                         dh += 360.0;
                     }
                     let omega_rad_s = dh.to_radians() / dt;
-                    lean[i] =
-                        lean_angle_from_speed_and_heading_rate(speed, omega_rad_s);
+                    lean[i] = lean_angle_from_speed_and_heading_rate(speed, omega_rad_s);
                     break;
                 }
             }

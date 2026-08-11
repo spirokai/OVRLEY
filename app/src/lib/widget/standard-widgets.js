@@ -85,7 +85,9 @@ export const HEADING_TAPE_DEFAULTS = Object.freeze(standardMetricsManifest.displ
 /** Flat defaults and readout modes for the intrinsic lap timer display. */
 export const LAP_TIMER_DEFAULTS = Object.freeze({ ...standardMetricsManifest.displayTypes.definitions.lap_timer.defaults })
 export const LAP_TIMER_MODES = Object.freeze(
-  standardMetricsManifest.displayTypes.definitions.lap_timer.modes.map((mode) => Object.freeze({ font_size: LAP_TIMER_DEFAULTS.font_size, ...mode })),
+  standardMetricsManifest.displayTypes.definitions.lap_timer.modes.map((mode) =>
+    Object.freeze({ font_size: LAP_TIMER_DEFAULTS.font_size, label_font_size: LAP_TIMER_DEFAULTS.label_font_size, ...mode }),
+  ),
 )
 
 // ---------------------------------------------------------------------------

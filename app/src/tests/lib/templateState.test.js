@@ -426,6 +426,17 @@ describe('syncGlobalDefaultsToConfig', () => {
     expect(result.values[0].color).toBe('#ff0000')
   })
 
+  test('pushes text font and color globals into lap timer labels', () => {
+    const config = {
+      values: [{ id: 'lap-1', value: 'lap_timer', label_font: 'Arial.ttf', label_color: '#ffffff' }],
+    }
+    const globals = { font_text: 'LabelFont.ttf', color_text: '#123456' }
+    const result = syncGlobalDefaultsToConfig(config, globals)
+
+    expect(result.values[0].label_font).toBe('LabelFont.ttf')
+    expect(result.values[0].label_color).toBe('#123456')
+  })
+
   test('pushes font_values into the G-force label variant', () => {
     const config = {
       values: [{ id: 'g-force-1', value: 'g_force', display_variants: { g_force: { label_font: 'Arial.ttf' } } }],

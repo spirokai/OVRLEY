@@ -1,4 +1,4 @@
-name: Release Linux Experimental
+name: Release Debian Package
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   build:
-    name: Build linux experimental
+    name: Build Debian package
     runs-on: ubuntu-latest
 
     steps:
@@ -57,7 +57,9 @@ jobs:
             libssl-dev \
             libwebkit2gtk-4.1-dev \
             patchelf \
-            pkg-config
+            pkg-config \
+            unzip \
+            zip
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -75,6 +77,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Generate shared packaging resources
+        run: pnpm prepare:packaging
 
       - name: Set package version
         run: |
@@ -126,25 +131,39 @@ jobs:
           dpkg-deb -c "$DEB" | grep -E '/vendor/ffmpeg/bin/ffprobe$'
           dpkg-deb -c "$DEB" | grep -E '/usr/bin/\.ovrley-portable$'
 
-      - name: Normalize release artifact name
+      - name: Create Debian release archive
         shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release_tag.outputs.version }}
         run: |
           set -euo pipefail
+          version="$RELEASE_VERSION"
           mkdir -p dist-release
-          DEB="$(find src-tauri/target/release/bundle/deb -name '*.deb' -print -quit)"
-          if [ -z "$DEB" ]; then
+          deb="$(find src-tauri/target/release/bundle/deb -name '*.deb' -print -quit)"
+          if [ -z "$deb" ]; then
             echo "No .deb package was produced." >&2
             exit 1
           fi
-          cp "$DEB" "dist-release/OVRLEY-linux-${{ steps.release_tag.outputs.version }}.deb"
+          archive_root="$RUNNER_TEMP/ovrley-deb-archive"
+          archive_name="OVRLEY-linux-$version-deb.zip"
+          deb_name="OVRLEY-linux-$version.deb"
+          rm -rf "$archive_root"
+          mkdir -p "$archive_root"
+          install -m 0644 "$deb" "$archive_root/$deb_name"
+          install -m 0644 THIRD_PARTY_NOTICES.txt "$archive_root/THIRD_PARTY_NOTICES.txt"
+          install -m 0644 INSTALL-debian.txt "$archive_root/INSTALL.txt"
+          (cd "$archive_root" && zip -q "$GITHUB_WORKSPACE/dist-release/$archive_name" "$deb_name" THIRD_PARTY_NOTICES.txt INSTALL.txt)
+
+          expected="$(printf '%s\n' "$deb_name" THIRD_PARTY_NOTICES.txt INSTALL.txt | sort)"
+          actual="$(unzip -Z1 "dist-release/$archive_name" | sort)"
+          [[ "$actual" == "$expected" ]] || { echo 'Debian archive contents are not canonical.' >&2; exit 1; }
 
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v3
         with:
           draft: true
           tag_name: ${{ steps.release_tag.outputs.tag }}
-          files: |
-            dist-release/*.deb
+          files: dist-release/OVRLEY-linux-${{ steps.release_tag.outputs.version }}-deb.zip
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

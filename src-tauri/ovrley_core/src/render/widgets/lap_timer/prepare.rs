@@ -14,7 +14,9 @@ use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{LapTimerMode, ValidatedLapTimer, ValidatedSceneConfig};
-use crate::render::text::{validated_lap_timer_style, ResolvedTextStyle};
+use crate::render::text::{
+    validated_lap_timer_label_style, validated_lap_timer_style, ResolvedTextStyle,
+};
 use crate::render::widgets::types::{LapTimerWidgetCache, StaticLayer};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -33,6 +35,7 @@ pub(crate) fn prepare_lap_timer_cache(
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<LapTimerWidgetCache> {
     let style = validated_lap_timer_style(validated, scene, scale);
+    let label_style = validated_lap_timer_label_style(validated, scene, scale);
     match validated.mode {
         LapTimerMode::CurrentLap | LapTimerMode::Delta => Ok(LapTimerWidgetCache::Dynamic),
         LapTimerMode::BestLap => Ok(LapTimerWidgetCache::BestLap {
@@ -40,19 +43,21 @@ pub(crate) fn prepare_lap_timer_cache(
                 validated,
                 dense_activity,
                 &style,
+                &label_style,
                 font_dirs,
                 prepare_profiler,
             )?,
         }),
         LapTimerMode::LapLog => {
-            let column_rights = log_column_rights(&style, dense_activity, font_dirs)?;
+            let column_rights = log_column_rights(&style, &label_style, dense_activity, font_dirs)?;
             let header_layer = prepare_profiler.measure("lap_timer.cache_surface", || {
-                prepare_lap_log_header_layer(&style, column_rights, font_dirs)
+                prepare_lap_log_header_layer(&style, &label_style, column_rights, font_dirs)
             })?;
             let completed_row_layers = prepare_lap_log_row_layers(
                 validated,
                 dense_activity,
                 &style,
+                &label_style,
                 column_rights,
                 font_dirs,
                 prepare_profiler,
@@ -72,6 +77,7 @@ fn prepare_best_lap_layers(
     validated: &ValidatedLapTimer,
     dense_activity: &DenseActivityReport,
     style: &ResolvedTextStyle,
+    label_style: &ResolvedTextStyle,
     font_dirs: &[PathBuf],
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<BTreeMap<usize, StaticLayer>> {
@@ -85,6 +91,7 @@ fn prepare_best_lap_layers(
         let layer = prepare_profiler.measure("lap_timer.cache_surface", || {
             prepare_content_layer(
                 style,
+                label_style,
                 &validated.label,
                 validated.show_label,
                 &value,
@@ -101,6 +108,7 @@ fn prepare_lap_log_row_layers(
     validated: &ValidatedLapTimer,
     dense_activity: &DenseActivityReport,
     style: &ResolvedTextStyle,
+    label_style: &ResolvedTextStyle,
     column_rights: [f32; 3],
     font_dirs: &[PathBuf],
     prepare_profiler: &mut RenderProfiler,
@@ -112,6 +120,7 @@ fn prepare_lap_log_row_layers(
         let layer = prepare_profiler.measure("lap_timer.cache_surface", || {
             prepare_lap_log_rows_layer(
                 style,
+                label_style,
                 std::slice::from_ref(row),
                 validated.positive_delta_color,
                 validated.negative_delta_color,

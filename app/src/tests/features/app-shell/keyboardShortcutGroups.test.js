@@ -34,10 +34,10 @@ describe('keyboard shortcut help groups', () => {
     const groups = getKeyboardShortcutGroups()
     const synchronizationGroup = groups.find((group) => group.name === 'Timeline and sync')
     const fineClipShortcut = synchronizationGroup.shortcuts.find(
-      (shortcut) => shortcut.description === 'Nudge selected clip synchronization by 0.1 seconds',
+      (shortcut) => shortcut.description === 'Nudge selected clip sync offset by 0.1 seconds',
     )
     const coarseClipShortcut = synchronizationGroup.shortcuts.find(
-      (shortcut) => shortcut.description === 'Nudge selected clip synchronization by 1 second',
+      (shortcut) => shortcut.description === 'Nudge selected clip sync offset by 1 second',
     )
 
     expect(fineClipShortcut.options).toEqual([{ groupKey: '', keys: ['←', '→'], modifiers: [] }])
@@ -51,14 +51,13 @@ describe('keyboard shortcut help groups', () => {
     expect(workspaceGroup?.shortcuts.some((shortcut) => shortcut.description === 'Close widget drawer')).toBe(false)
   })
 
-  test('shows Home and Fn+Left Arrow as separate display options', () => {
+  test('shows Home as the display option for rewinding to the start', () => {
     const groups = getKeyboardShortcutGroups()
     const playbackGroup = groups.find((group) => group.name === 'Video player')
     const startShortcut = playbackGroup.shortcuts.find((shortcut) => shortcut.description === 'Rewind to start')
 
     expect(startShortcut.options).toEqual([
       { groupKey: 'label:Home', keys: ['Home'], modifiers: [] },
-      { groupKey: 'label:Fn+Left Arrow', keys: ['Fn+Left Arrow'], modifiers: [] },
     ])
   })
 })

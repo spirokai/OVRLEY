@@ -37,6 +37,14 @@ pub(super) enum Unit {
     Percent,
     /// Revolutions per minute.
     RevolutionsPerMinute,
+    /// Mechanical power in watts.
+    Watts,
+    /// Mechanical power in kilowatts.
+    Kilowatts,
+    /// Metric horsepower (CV).
+    MetricHorsepower,
+    /// Mechanical horsepower (hp).
+    MechanicalHorsepower,
     /// Newton-metres.
     NewtonMetres,
     /// Foot-pounds force.
@@ -93,9 +101,14 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
         "g" => Unit::G,
         "%" | "percent" | "percentage" => Unit::Percent,
         "rpm" => Unit::RevolutionsPerMinute,
+        "w" | "watt" | "watts" => Unit::Watts,
+        "kw" | "kilowatt" | "kilowatts" => Unit::Kilowatts,
+        "cv" => Unit::MetricHorsepower,
+        "hp" | "horsepower" | "horsepowers" => Unit::MechanicalHorsepower,
         "nm" | "n-m" | "n m" | "n·m" => Unit::NewtonMetres,
-        "ft-lb" | "ft-lbs" | "lb-ft" | "lbs-ft" | "ft lb" | "ft lbs" | "lb ft"
-        | "lbs ft" => Unit::FootPounds,
+        "ft-lb" | "ft-lbs" | "ft-lbf" | "ft·lbf" | "ft lb" | "ft lbs" | "ft lbf" | "lb-ft"
+        | "lbs-ft" | "lb ft" | "lbs ft" | "lbf-ft" | "lbf ft" | "foot-pound" | "foot pound"
+        | "foot pounds" => Unit::FootPounds,
         "#" | "raw" => Unit::Raw,
         _ => return DeclaredUnit::Unsupported(UnitDimension::Unknown),
     };
@@ -190,11 +203,19 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
             matches!(unit, Unit::G)
         }
         Metric::Rpm => matches!(unit, Unit::RevolutionsPerMinute),
+        Metric::EnginePower => {
+            matches!(
+                unit,
+                Unit::Watts | Unit::Kilowatts | Unit::MetricHorsepower | Unit::MechanicalHorsepower
+            )
+        }
         Metric::Torque => matches!(unit, Unit::NewtonMetres | Unit::FootPounds),
         Metric::ThrottlePosition | Metric::BrakePosition => matches!(unit, Unit::Percent),
         Metric::LeanAngle => matches!(unit, Unit::Degrees),
         Metric::GearPosition => matches!(unit, Unit::Raw),
-        Metric::CompanionDate | Metric::GpsCoordinate | Metric::LapNumber => matches!(unit, Unit::Raw),
+        Metric::CompanionDate | Metric::GpsCoordinate | Metric::LapNumber => {
+            matches!(unit, Unit::Raw)
+        }
     }
 }
 
@@ -205,7 +226,10 @@ pub(super) fn convert(value: f64, unit: Unit) -> f64 {
         Unit::MilesPerHour => value * 0.44704,
         Unit::Kilometres => value * 1000.0,
         Unit::Feet => value * 0.3048,
-        Unit::FootPounds => value * 1.356,
+        Unit::Kilowatts => value * 1000.0,
+        Unit::MetricHorsepower => value * 735.49875,
+        Unit::MechanicalHorsepower => value * 745.699_871_582_270_2,
+        Unit::FootPounds => value * 1.355_817_948_331_400_4,
         Unit::Seconds
         | Unit::DecimalDegrees
         | Unit::MetresPerSecond
@@ -214,6 +238,7 @@ pub(super) fn convert(value: f64, unit: Unit) -> f64 {
         | Unit::G
         | Unit::Percent
         | Unit::RevolutionsPerMinute
+        | Unit::Watts
         | Unit::NewtonMetres
         | Unit::Raw => value,
     }
@@ -232,6 +257,7 @@ fn default_unit(metric: Metric) -> Unit {
         Metric::Heading => Unit::Degrees,
         Metric::GForce | Metric::GForceX | Metric::GForceY | Metric::GForceZ => Unit::G,
         Metric::Rpm => Unit::RevolutionsPerMinute,
+        Metric::EnginePower => Unit::Watts,
         Metric::Torque => Unit::NewtonMetres,
         Metric::ThrottlePosition | Metric::BrakePosition => Unit::Percent,
         Metric::LeanAngle => Unit::Degrees,

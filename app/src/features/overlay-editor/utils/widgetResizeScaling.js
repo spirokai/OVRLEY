@@ -304,6 +304,10 @@ export function buildScaleDraft(data, scaleFactor, widget, { round = true } = {}
     font_size: nextFontSize,
   }
 
+  if (widget?.data?.display_type === 'lap_timer') {
+    nextDraft.label_font_size = scaleNumber(data.label_font_size, scaleFactor, { min: 6, max: 400, round })
+  }
+
   if (widget?.category === 'values' && widget.type !== 'gradient') {
     Object.assign(nextDraft, {
       icon_size: scaleNumber(data.icon_size, scaleFactor, { min: 0, max: 400, round }),

@@ -236,28 +236,26 @@ pub(super) fn lap_log_completed_rows(
         )));
     }
 
+    if completed_lap_count == 0 {
+        return Ok(Vec::new());
+    }
+
+    let best_completed_lap = dense_activity
+        .series
+        .lap_durations_best_so_far_seconds
+        .get(completed_lap_count - 1)
+        .copied()
+        .ok_or_else(|| {
+            CoreError::Render(format!(
+                "best lap metadata is missing for completed lap {completed_lap_count}"
+            ))
+        })?;
+
     (0..completed_lap_count)
         .rev()
         .map(|lap_index| {
             let duration = dense_activity.series.lap_durations_seconds[lap_index];
-            let delta = if lap_index == 0 {
-                None
-            } else {
-                Some(
-                    duration
-                        - dense_activity
-                            .series
-                            .lap_durations_best_so_far_seconds
-                            .get(lap_index - 1)
-                            .copied()
-                            .ok_or_else(|| {
-                                CoreError::Render(format!(
-                                    "best lap metadata is missing before completed lap {}",
-                                    lap_index + 1
-                                ))
-                            })?,
-                )
-            };
+            let delta = Some(duration - best_completed_lap);
             Ok(LapLogTextRow {
                 cells: [
                     (lap_index + 1).to_string(),

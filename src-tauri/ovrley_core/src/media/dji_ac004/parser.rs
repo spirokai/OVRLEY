@@ -83,21 +83,21 @@ fn parse_point_from_sample(sample_data: &[u8], frame_index: usize) -> Option<Dji
         return None;
     }
 
-/// Timezone used by DJI AC004 metadata timestamps.
-///
-/// DJI firmware stores timestamps in China Standard Time (UTC+8) regardless of
-/// the camera's geographic location. Converting from this fixed timezone to UTC
-/// yields the correct absolute instant.
-///
-/// **Note**: It has not been verified whether this +8 offset is a universal
-/// behaviour of all AC004 remotes or whether it depends on the camera's
-/// configured timezone. The offset is derived from comparing the first GPS
-/// fix's raw timestamp with the video container's `creation_time` tag (UTC)
-/// across the files tested during development. If AC004 remotes shipped to
-/// other regions emit timestamps in a different local timezone this constant
-/// will need to be replaced with a runtime offset derived from the container
-/// metadata.
-const DJI_TIMEZONE: &str = "Asia/Shanghai";
+    /// Timezone used by DJI AC004 metadata timestamps.
+    ///
+    /// DJI firmware stores timestamps in China Standard Time (UTC+8) regardless of
+    /// the camera's geographic location. Converting from this fixed timezone to UTC
+    /// yields the correct absolute instant.
+    ///
+    /// **Note**: It has not been verified whether this +8 offset is a universal
+    /// behaviour of all AC004 remotes or whether it depends on the camera's
+    /// configured timezone. The offset is derived from comparing the first GPS
+    /// fix's raw timestamp with the video container's `creation_time` tag (UTC)
+    /// across the files tested during development. If AC004 remotes shipped to
+    /// other regions emit timestamps in a different local timezone this constant
+    /// will need to be replaced with a runtime offset derived from the container
+    /// metadata.
+    const DJI_TIMEZONE: &str = "Asia/Shanghai";
 
     let altitude = get_varint(fix_msg, 2).map_or(0.0, |value| value as f64 / 1000.0);
     let timestamp_msg = get_submessage(fix_msg, 6)?;

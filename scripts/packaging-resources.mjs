@@ -6,6 +6,7 @@ export const PACKAGING_DOCUMENTS = {
   notice: "THIRD_PARTY_NOTICES.txt",
   macosInstall: "INSTALL-macos.txt",
   linuxInstall: "INSTALL-linux.txt",
+  debianInstall: "INSTALL-debian.txt",
 };
 
 export async function preparePackagingResources(rootDir = resolve(import.meta.dirname, "..")) {
@@ -27,11 +28,13 @@ export async function preparePackagingResources(rootDir = resolve(import.meta.di
   await writeFile(noticePath, buildThirdPartyNotice(ffmpegBinary));
   await writeFile(join(rootDir, PACKAGING_DOCUMENTS.macosInstall), buildMacosInstallDocument());
   await writeFile(join(rootDir, PACKAGING_DOCUMENTS.linuxInstall), buildLinuxInstallDocument());
+  await writeFile(join(rootDir, PACKAGING_DOCUMENTS.debianInstall), buildDebianInstallDocument());
 
   return {
     noticePath,
     macosInstallPath: join(rootDir, PACKAGING_DOCUMENTS.macosInstall),
     linuxInstallPath: join(rootDir, PACKAGING_DOCUMENTS.linuxInstall),
+    debianInstallPath: join(rootDir, PACKAGING_DOCUMENTS.debianInstall),
   };
 }
 
@@ -87,7 +90,7 @@ function buildMacosInstallDocument() {
     "Unsigned App Notice",
     "-------------------",
     "OVRLEY is ad-hoc signed and is not notarized with an Apple Developer certificate,",
-    "so macOS may block it from opening by default. Use the following command to remove the quarantine attribute and allow OVRLEY to run:",
+    "so macOS gatekeeper may block it from opening by default. Use the following command to remove the quarantine attribute and allow OVRLEY to run:",
     "sudo xattr -cr /Applications/OVRLEY.app",
     "",
   ].join("\n");
@@ -100,12 +103,47 @@ function buildLinuxInstallDocument() {
     "Install",
     "-------",
     "1. Download the OVRLEY AppImage.",
-    "2. Mark it executable with: chmod +x OVRLEY-*.AppImage",
+    "2. Mark it executable with: 'chmod +x OVRLEY-*.AppImage' or right click and select 'Properties' -> 'Allow executing file'.",
     "3. Run the AppImage.",
+    "",
+    "Likely Runtime Dependencies (Debian/Ubuntu)",
+    "---------------------------------------------",
+    "The AppImage includes OVRLEY, FFmpeg, and FFprobe, but uses the host system's FUSE, WebKitGTK, GTK, application indicator, SVG, SSL, and GStreamer libraries. You may need to install these packages if they are not already present on your system:",
+    "",
+    "Ubuntu 24.04 or Debian 13:",
+    "sudo apt install libfuse2t64 libwebkit2gtk-4.1-0 libgtk-3-0t64 gstreamer1.0-libav gstreamer1.0-plugins-good",
+    "",
+    "Ubuntu 22.04 or Debian 12:",
+    "sudo apt install libfuse2 libwebkit2gtk-4.1-0 libgtk-3-0 gstreamer1.0-libav gstreamer1.0-plugins-good",
     "",
     "Notes",
     "-----",
     "The AppImage includes OVRLEY and self-contained FFmpeg and FFprobe command-line tools.",
+    "",
+  ].join("\n");
+}
+
+function buildDebianInstallDocument() {
+  return [
+    "OVRLEY FOR DEBIAN-BASED LINUX",
+    "",
+    "Install",
+    "-------",
+    "1. Extract the downloaded OVRLEY Debian ZIP archive.",
+    "2. Install the package with: sudo apt install ./OVRLEY-*.deb",
+    "3. Launch OVRLEY from the application menu.",
+    "",
+    "Dependencies",
+    "------------",
+    "The Debian package declares these runtime dependencies; apt installs them automatically:",
+    "- gstreamer1.0-libav",
+    "- gstreamer1.0-plugins-good",
+    "- libgtk-3-0",
+    "- libwebkit2gtk-4.1-0",
+    "",
+    "Notes",
+    "-----",
+    "The Debian package includes OVRLEY and self-contained FFmpeg and FFprobe command-line tools.",
     "",
   ].join("\n");
 }

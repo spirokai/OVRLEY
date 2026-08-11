@@ -81,13 +81,13 @@ describe('Wave 2 metric formatting', () => {
     expect(model?.unitText).toBe('CM')
   })
 
-  test('vertical_oscillation shows placeholder when missing', () => {
+  test('vertical_oscillation preserves missing samples as zero', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('vertical_oscillation', { display_unit: 'mm' }),
       activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], vertical_oscillation: [null] },
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('--')
+    expect(model?.valueText).toBe('0')
     expect(model?.unitText).toBe('MM')
   })
 })
@@ -414,13 +414,13 @@ describe('Wave 1 placeholder behavior', () => {
     expect(model?.unitText).toBe('HPA')
   })
 
-  test('left_right_balance shows placeholder when data missing', () => {
+  test('left_right_balance preserves missing samples as zero', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('left_right_balance', { display_unit: 'percent' }),
       activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], left_right_balance: [null] },
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('--/--')
+    expect(model?.valueText).toBe('0%/100%')
     expect(model?.unitText).toBe('')
   })
 })
@@ -466,14 +466,23 @@ describe('left_right_balance format variants', () => {
     expect(model?.unitText).toBe('')
   })
 
-  test('placeholder uses --/-- for all formats', () => {
+  test('zero values use the selected format', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: makeMetricWidget('left_right_balance', { display_unit: 'percent', balance_format: 'percent_label' }),
       activity: { trim_end_seconds: 0, sample_elapsed_seconds: [0], left_right_balance: [null] },
       previewSecond: 0,
     })
-    expect(model?.valueText).toBe('--/--')
+    expect(model?.valueText).toBe('0%/100%')
     expect(model?.unitText).toBe('')
+  })
+
+  test.each([100, 127])('formats %s as neutral balance', (value) => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('left_right_balance', { display_unit: 'percent', balance_format: 'percent_label' }),
+      activity: makeActivity('left_right_balance', value),
+      previewSecond: 0,
+    })
+    expect(model?.valueText).toBe('50%/50%')
   })
 })
 

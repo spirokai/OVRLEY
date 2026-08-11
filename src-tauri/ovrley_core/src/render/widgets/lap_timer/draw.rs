@@ -32,6 +32,7 @@ pub(crate) fn draw_lap_timer(
     dense_activity: &DenseActivityReport,
     frame_index: usize,
     style: &ResolvedTextStyle,
+    label_style: &ResolvedTextStyle,
     font_dirs: &[PathBuf],
 ) -> CoreResult<()> {
     if validated.mode == LapTimerMode::LapLog {
@@ -52,6 +53,7 @@ pub(crate) fn draw_lap_timer(
             dense_activity,
             frame_index,
             style,
+            label_style,
             font_dirs,
         );
     }
@@ -93,6 +95,7 @@ pub(crate) fn draw_lap_timer(
     draw_content(
         canvas,
         style,
+        label_style,
         &label,
         validated.show_label,
         &value,
@@ -114,6 +117,7 @@ fn draw_lap_log_frame(
     dense_activity: &DenseActivityReport,
     frame_index: usize,
     style: &ResolvedTextStyle,
+    label_style: &ResolvedTextStyle,
     font_dirs: &[PathBuf],
 ) -> CoreResult<()> {
     let state = lap_log_frame_state(dense_activity, frame_index)?;
@@ -143,6 +147,7 @@ fn draw_lap_log_frame(
             validated,
             column_rights,
             style,
+            label_style,
             &current_row.cells,
             current_row.delta_seconds,
             font_dirs,
@@ -157,6 +162,7 @@ fn draw_current_lap_log_row(
     validated: &ValidatedLapTimer,
     column_rights: [f32; 3],
     style: &ResolvedTextStyle,
+    label_style: &ResolvedTextStyle,
     cells: &[String; 3],
     delta_seconds: Option<f64>,
     font_dirs: &[PathBuf],
@@ -172,7 +178,7 @@ fn draw_current_lap_log_row(
             delta_seconds,
         ))),
         column_rights,
-        style.y + lap_log_header_style(style).line_height + row_gap,
+        style.y + lap_log_header_style(label_style).line_height + row_gap,
         font_dirs,
     )
 }

@@ -61,7 +61,10 @@
           "show_label": true,
           "negative_delta_color": "#61ffab",
           "positive_delta_color": "#ff6e83",
-          "font_size": 50
+          "font_size": 50,
+          "label_font": "Arial.ttf",
+          "label_font_size": 17.5,
+          "label_color": "#ffffff"
         },
         "modes": [
           { "value": "current_lap", "label": "Current Lap", "icon": { "source": "lucide", "name": "Timer" } },
@@ -72,13 +75,14 @@
           },
           {
             "value": "delta",
-            "label": "Live Delta",
+            "label": "Delta",
             "icon": { "source": "custom", "assetFile": "display-mode-delta.svg" }
           },
           {
             "value": "lap_log",
             "label": "Lap Log",
             "font_size": 30,
+            "label_font_size": 15,
             "icon": { "source": "custom", "assetFile": "display-mode-lap-log.svg" }
           }
         ],
@@ -549,6 +553,22 @@
         "assetFile": "widget-power.svg"
       },
       "category": "cycling"
+    },
+    {
+      "type": "engine_power",
+      "current": true,
+      "label": "Eng. Power",
+      "defaultDisplayUnit": "w",
+      "supportedDisplayUnits": [{ "value": "w", "label": "W" }],
+      "showUnitsByDefault": true,
+      "formatter": "integer",
+      "interpolation": "preserve",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "shared",
+        "assetFile": "widget-power.svg"
+      },
+      "category": "motosports"
     },
     {
       "type": "temperature",

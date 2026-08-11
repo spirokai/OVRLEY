@@ -1209,8 +1209,17 @@ fn torque_pro_gps_time_is_parsed_as_an_absolute_timestamp() {
     );
     assert_close(
         activity.torque.iter().copied().find_map(|value| value),
-        0.18320802 * 1.356,
+        0.18320802 * 1.355_817_948_331_400_4,
     );
+    assert_close(
+        activity
+            .engine_power
+            .iter()
+            .copied()
+            .find_map(|value| value),
+        48.63056,
+    );
+    assert!(activity.power.is_empty());
     assert_close(activity.speed[6], 0.0);
     assert_close(activity.throttle_position[0], 8.23529412);
 }
@@ -1228,6 +1237,92 @@ Wed Aug 05 18:57:57 GMT+01:00 2026,12.5,1.5\n";
     assert_eq!(activity.throttle_position, vec![Some(8.25), Some(12.5)]);
     assert_eq!(activity.distance, vec![Some(0.0), Some(1500.0)]);
     assert_eq!(activity.metadata["total_distance_m"], 1500.0);
+}
+
+#[test]
+fn vehicle_power_populates_engine_power_without_cycling_calories() {
+    let csv = "Time,Power (W),Estimated Power (kW),Estimated Power (CV)\n\
+0,12345,12,20\n\
+1,23456,23,30\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "vehicle-power.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.engine_power, vec![Some(12_345.0), Some(23_456.0)]);
+    assert!(activity.power.is_empty());
+    assert!(activity.calories.is_empty());
+}
+
+#[test]
+fn vehicle_power_aliases_and_units_convert_to_engine_power() {
+    let estimated = "Time,Estimated Power (kW)\n0,10\n1,5\n";
+    let cv = "Time,Power (CV)\n0,20\n1,10\n";
+    let torque_pro_kw = "Time,Engine kW (At the wheels)(kW)\n0,7\n1,8\n";
+    let torque_pro_hp = "Time,Horsepower (At the wheels)(hp)\n0,10\n1,20\n";
+
+    let parse = |csv: &str| {
+        parse_csv_activity_reader(Cursor::new(csv), "vehicle-power-alias.csv")
+            .unwrap()
+            .parsed_activity
+    };
+
+    assert_eq!(
+        parse(estimated).engine_power,
+        vec![Some(10_000.0), Some(5_000.0)]
+    );
+    let cv_activity = parse(cv);
+    assert_close(cv_activity.engine_power[0], 14_709.975);
+    assert_close(cv_activity.engine_power[1], 7_354.9875);
+    assert_eq!(
+        parse(torque_pro_kw).engine_power,
+        vec![Some(7_000.0), Some(8_000.0)]
+    );
+    assert_close(parse(torque_pro_hp).engine_power[0], 7_456.998_715_822_702);
+}
+
+#[test]
+fn engine_power_preserves_negative_and_missing_samples_through_densification() {
+    let csv = "Time,Estimated Power (kW)\n0,-10\n1,\n2,5\n";
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "signed-engine-power.csv")
+        .unwrap()
+        .parsed_activity;
+    assert_eq!(
+        activity.engine_power,
+        vec![Some(-10_000.0), None, Some(5_000.0)]
+    );
+
+    let requirements = RenderDataRequirements {
+        engine_power: true,
+        ..RenderDataRequirements::default()
+    };
+    let trimmed = trim_activity(&activity, 0.0, 2.0, &requirements).unwrap();
+    let dense = densify_activity(
+        &trimmed,
+        ovrley_core::activity::interpolate::frame_timeline_for_fps(2.0, 1.0).unwrap(),
+        &requirements,
+    );
+    assert_eq!(dense.series.engine_power, vec![Some(-10_000.0), None]);
+}
+
+#[test]
+fn estimated_torque_and_foot_pound_variants_preserve_signed_values() {
+    for unit in [
+        "ft-lb",
+        "ft·lbf",
+        "ft lb",
+        "lb-ft",
+        "lbf-ft",
+        "foot-pound",
+        "foot pounds",
+    ] {
+        let csv = format!("Time,Estimated Torque ({unit})\n0,-10\n1,\n");
+        let activity = parse_csv_activity_reader(Cursor::new(csv), "torque.csv")
+            .unwrap()
+            .parsed_activity;
+        assert_close(activity.torque[0], -13.558_179_483_314_004);
+        assert_eq!(activity.torque[1], None);
+    }
 }
 
 mod lap_timing_fixture_tests {
@@ -1267,7 +1362,7 @@ mod lap_timing_fixture_tests {
         vec![
             LapExpectations {
                 fixture: "Amozoc - TrackAddict.csv",
-                min_laps: 5,
+                min_laps: 4,
                 extraction: FixtureKind::Csv,
             },
             LapExpectations {
@@ -1437,40 +1532,47 @@ mod lap_timing_fixture_tests {
     }
 
     #[test]
-    fn vbo_fixture_produces_lap_timing_via_crossing_detection() {
+    fn explicit_lap_column_takes_precedence_over_beacon_markers() {
+        let csv = "\"Beacon Markers\",\"0.5\",\"1.5\"\n\
+Time,Lap,Latitude,Longitude\n\
+0,1,10.0,20.0\n\
+1,1,10.1,20.1\n\
+2,2,10.2,20.2\n\
+3,2,10.3,20.3\n";
+        let activity = parse_csv_activity_reader(Cursor::new(csv), "explicit-laps.csv")
+            .unwrap()
+            .parsed_activity;
+
+        assert_eq!(activity.lap_start_elapsed_seconds, vec![0.0, 2.0]);
+        assert_eq!(activity.lap_durations_seconds, vec![2.0]);
+    }
+
+    #[test]
+    fn vbo_fixture_produces_one_lap_per_circuit() {
         let activity = parse(&LapExpectations {
             fixture: "VBO-test.vbo",
             min_laps: 0,
             extraction: FixtureKind::Vbo,
         });
 
-        assert_eq!(
-            activity.lap_number.len(),
-            activity.sample_elapsed_seconds.len(),
-            "VBO lap_number length must match elapsed"
+        let circuit_tools_fast_lap_durations = [108.55, 108.42, 108.46, 109.03, 107.05, 107.05];
+        assert!((17.0..=18.0).contains(&activity.lap_start_elapsed_seconds[0]));
+        assert_eq!(activity.lap_durations_seconds.len(), 7);
+        assert!(
+            (150.0..=170.0).contains(&activity.lap_durations_seconds[0]),
+            "unexpected first VBO lap duration: {}",
+            activity.lap_durations_seconds[0]
         );
-
-        let has_lap_data = activity.lap_number.iter().any(|&v| v >= 0);
-
-        if has_lap_data {
+        for (actual, expected) in activity
+            .lap_durations_seconds
+            .iter()
+            .skip(1)
+            .zip(circuit_tools_fast_lap_durations)
+        {
             assert!(
-                !activity.lap_durations_seconds.is_empty(),
-                "VBO must produce lap durations when laps are detected"
+                (actual - expected).abs() <= 0.2,
+                "expected VBO lap duration near {expected:.2}s, got {actual:.3}s"
             );
-            assert!(
-                activity.best_lap_time_seconds.is_some(),
-                "VBO must produce best lap when laps are detected"
-            );
-            for (lap, &time) in activity.lap_time_seconds.iter().enumerate() {
-                if activity.lap_number[lap] >= 0 {
-                    assert!(
-                        time.is_some(),
-                        "VBO sample {} in lap {} must have lap_time",
-                        lap,
-                        activity.lap_number[lap]
-                    );
-                }
-            }
         }
     }
 

@@ -33,7 +33,14 @@ const previewMocks = vi.hoisted(() => ({
 
 function OverlayEditor(props) {
   const widgetLiveEdits = useWidgetDraftState()
-  return <OverlayEditorView {...props} widgetLiveEdits={widgetLiveEdits} />
+  return (
+    <OverlayEditorView
+      {...props}
+      editorShell={props.editorShell ?? defaultEditorShell}
+      undoRedoControls={props.undoRedoControls ?? defaultUndoRedoControls}
+      widgetLiveEdits={widgetLiveEdits}
+    />
+  )
 }
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -136,18 +143,20 @@ function makeConfig(labels) {
   }
 }
 
-const defaultEditorControls = {
-  backgroundMode: 'black',
-  gridVisible: false,
-  onResetZoom: vi.fn(),
-  onSetBackgroundMode: vi.fn(),
-  onSetGridVisible: vi.fn(),
-  onSetSnapToGrid: vi.fn(),
-  onZoomIn: vi.fn(),
-  onZoomOut: vi.fn(),
-  snapToGrid: false,
-  undoRedoControls: { canRedo: false, canUndo: false, redo: vi.fn(), undo: vi.fn() },
-  zoomLevel: 1,
+const defaultUndoRedoControls = { canRedo: false, canUndo: false, redo: vi.fn(), undo: vi.fn() }
+
+const defaultEditorShell = {
+  activeKeyboardWorkspace: 'editor',
+  decreaseZoom: vi.fn(),
+  editorBackgroundMode: 'black',
+  editorGridVisible: false,
+  editorSnapToGrid: false,
+  editorZoomLevel: 1,
+  increaseZoom: vi.fn(),
+  resetZoom: vi.fn(),
+  setEditorBackgroundMode: vi.fn(),
+  setEditorGridVisible: vi.fn(),
+  setEditorSnapToGrid: vi.fn(),
 }
 
 describe('OverlayEditor selection flow', () => {
@@ -173,7 +182,7 @@ describe('OverlayEditor selection flow', () => {
     const { container } = render(
       <OverlayEditor
         config={config}
-        editorControls={defaultEditorControls}
+        editorShell={defaultEditorShell}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
@@ -226,7 +235,7 @@ describe('OverlayEditor selection flow', () => {
     const { container } = render(
       <OverlayEditor
         config={useStore.getState().config}
-        editorControls={defaultEditorControls}
+        editorShell={defaultEditorShell}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
@@ -278,7 +287,7 @@ describe('OverlayEditor selection flow', () => {
     const { container } = render(
       <OverlayEditor
         config={useStore.getState().config}
-        editorControls={defaultEditorControls}
+        editorShell={defaultEditorShell}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
@@ -327,7 +336,7 @@ describe('OverlayEditor selection flow', () => {
     const { container, getByTestId } = render(
       <OverlayEditor
         config={useStore.getState().config}
-        editorControls={defaultEditorControls}
+        editorShell={defaultEditorShell}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={onConfigChange}
         zoomLevel={1}
@@ -371,7 +380,7 @@ describe('OverlayEditor selection flow', () => {
     const { getByTestId, queryByTestId } = render(
       <OverlayEditor
         config={useStore.getState().config}
-        editorControls={defaultEditorControls}
+        editorShell={defaultEditorShell}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
@@ -532,7 +541,7 @@ describe('OverlayEditor selection flow', () => {
     const { container, getByTestId } = render(
       <OverlayEditor
         config={config}
-        editorControls={defaultEditorControls}
+        editorShell={defaultEditorShell}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
@@ -584,7 +593,7 @@ describe('OverlayEditor selection flow', () => {
     const { container, getByTestId } = render(
       <OverlayEditor
         config={config}
-        editorControls={defaultEditorControls}
+        editorShell={defaultEditorShell}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
@@ -637,7 +646,7 @@ describe('OverlayEditor selection flow', () => {
     const { container, getByTestId } = render(
       <OverlayEditor
         config={config}
-        editorControls={defaultEditorControls}
+        editorShell={defaultEditorShell}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
@@ -670,7 +679,7 @@ describe('OverlayEditor selection flow', () => {
     const { getByTestId } = render(
       <OverlayEditor
         config={config}
-        editorControls={defaultEditorControls}
+        editorShell={defaultEditorShell}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
@@ -704,7 +713,7 @@ describe('OverlayEditor selection flow', () => {
     const { container, rerender } = render(
       <OverlayEditor
         config={config}
-        editorControls={defaultEditorControls}
+        editorShell={defaultEditorShell}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}
@@ -730,7 +739,7 @@ describe('OverlayEditor selection flow', () => {
       rerender(
         <OverlayEditor
           config={nextConfig}
-          editorControls={defaultEditorControls}
+          editorShell={defaultEditorShell}
           globalDefaults={{ opacity: 1, scale: 1 }}
           onConfigChange={vi.fn()}
           zoomLevel={1}
@@ -757,7 +766,7 @@ describe('OverlayEditor selection flow', () => {
     render(
       <OverlayEditor
         config={config}
-        editorControls={defaultEditorControls}
+        editorShell={defaultEditorShell}
         globalDefaults={{ opacity: 1, scale: 1 }}
         onConfigChange={vi.fn()}
         zoomLevel={1}

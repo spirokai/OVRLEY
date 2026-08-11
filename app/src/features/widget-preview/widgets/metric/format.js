@@ -238,7 +238,8 @@ function formatBalance(value, decimals, balanceFormat) {
     }
   }
 
-  const leftValue = Math.min(Math.max(value, 0), 100)
+  // FIT's missing-balance sentinel can decode as 127; show degenerate values as neutral.
+  const leftValue = value >= 100 ? 50 : Math.min(Math.max(value, 0), 100)
   const rightValue = Math.min(Math.max(100 - leftValue, 0), 100)
   const leftText = decimals > 0 ? leftValue.toFixed(decimals) : Math.round(leftValue).toString()
   const rightText = decimals > 0 ? rightValue.toFixed(decimals) : Math.round(rightValue).toString()
