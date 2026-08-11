@@ -22,7 +22,7 @@ import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts
 import { getUpdateRateOptions, normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { useFpsMode } from '@/hooks/useFpsMode'
 import { RESOLUTIONS } from '../data/sceneSettingsConstants'
-import { timeToSeconds, sanitizeNumber } from '../utils/sceneSettingsUtils'
+import { parseVideoFilenameCreationTime, timeToSeconds, sanitizeNumber } from '../utils/sceneSettingsUtils'
 
 function getResolutionPresetId(scene) {
   if (!scene) return '1080p'
@@ -83,12 +83,14 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     importedVideoPath,
     importedVideoResolution,
     resetGlobalDefaults,
+    resetVideoCreationTime,
     setAspectRatioPreset,
     setCustomAspectRatio,
     setExportRange,
     setGlobalDefault,
     setSceneFpsAndUpdateRate,
     setUpdateRate,
+    setVideoCreationTimeFromFilename,
     setVideoSyncOffset,
     setVideoSyncWarning,
     setVideoSyncTimezoneMode,
@@ -116,12 +118,14 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       importedVideoPath: state.importedVideoPath,
       importedVideoResolution: state.importedVideoResolution,
       resetGlobalDefaults: state.resetGlobalDefaults,
+      resetVideoCreationTime: state.resetVideoCreationTime,
       setAspectRatioPreset: state.setAspectRatioPreset,
       setCustomAspectRatio: state.setCustomAspectRatio,
       setExportRange: state.setExportRange,
       setGlobalDefault: state.setGlobalDefault,
       setSceneFpsAndUpdateRate: state.setSceneFpsAndUpdateRate,
       setUpdateRate: state.setUpdateRate,
+      setVideoCreationTimeFromFilename: state.setVideoCreationTimeFromFilename,
       setVideoSyncOffset: state.setVideoSyncOffset,
       setVideoSyncWarning: state.setVideoSyncWarning,
       setVideoSyncTimezoneMode: state.setVideoSyncTimezoneMode,
@@ -169,6 +173,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   const videoResolutionMismatch =
     Boolean(scene?.width && scene?.height && importedVideoResolution) &&
     (Number(scene.width) !== Number(importedVideoResolution.width) || Number(scene.height) !== Number(importedVideoResolution.height))
+  const filenameCreationTimeAvailable = parseVideoFilenameCreationTime(importedVideoPath) !== null
 
   const sceneStyleValue = (key, fallback) => scene?.[key] ?? fallback
 
@@ -269,7 +274,11 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       importedVideoFps,
       importedVideoPath,
       importedVideoResolution,
+      filenameCreationTimeAvailable,
+      canResetVideoCreationTime: importedVideoTimeSource === 'filename',
       offsetInput,
+      setVideoCreationTimeFromFilename,
+      resetVideoCreationTime,
       setOffsetInput,
       setVideoSyncTimezoneMode,
       videoResolutionMismatch,
