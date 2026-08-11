@@ -9,8 +9,9 @@ use crate::interpolation::interpolate_points;
 
 /// Computes each sample's live time delta against the best previously completed lap.
 ///
-/// Samples outside a lap, on the first lap, beyond reference distance coverage,
-/// or without usable distance/time values remain `None`.
+/// Samples outside a lap, on the first lap, or without usable distance/time
+/// values remain `None`. After passing reference distance coverage, delta keeps
+/// accumulating against the completed reference lap duration.
 pub(super) fn compute_delta_to_best(
     distance_series: &[Option<f64>],
     lap_number: &[i64],
@@ -68,14 +69,20 @@ pub(super) fn compute_delta_to_best(
             continue;
         }
         let reference_lap_max_distance = reference_points[reference_points.len() - 1].0;
-        if reference_lap_max_distance <= 0.0 || current_lap_distance > reference_lap_max_distance {
+        if reference_lap_max_distance <= 0.0 {
             continue;
         }
 
-        if let Some(reference_lap_time) = interpolate_points(reference_points, current_lap_distance)
+        let reference_lap_time = if current_lap_distance > reference_lap_max_distance {
+            lap_durations[reference_lap_index]
+        } else if let Some(reference_lap_time) =
+            interpolate_points(reference_points, current_lap_distance)
         {
-            delta[index] = Some(current_lap_time - reference_lap_time);
-        }
+            reference_lap_time
+        } else {
+            continue;
+        };
+        delta[index] = Some(current_lap_time - reference_lap_time);
     }
 
     delta
@@ -154,12 +161,33 @@ fn build_reference_lap_points(
 
 #[cfg(test)]
 mod tests {
-    use super::best_lap_indices;
+    use super::{best_lap_indices, compute_delta_to_best};
 
     /// Verifies reference selection tracks the earliest fastest completed lap.
     #[test]
     fn best_lap_selection_uses_prefix_minimum_indices() {
         assert_eq!(best_lap_indices(&[10.0, 5.0, 7.0, 4.0]), vec![0, 1, 1, 3]);
         assert_eq!(best_lap_indices(&[5.0, 5.0]), vec![0, 0]);
+    }
+
+    /// Verifies an overdue lap keeps accumulating delta after passing reference distance coverage.
+    #[test]
+    fn delta_continues_after_reference_lap_distance() {
+        let delta = compute_delta_to_best(
+            &[
+                Some(0.0),
+                Some(50.0),
+                Some(100.0),
+                Some(120.0),
+                Some(230.0),
+                Some(250.0),
+            ],
+            &[0, 0, 0, 1, 1, 1],
+            &[Some(0.0), Some(5.0), Some(9.0), Some(0.0), Some(12.0), Some(20.0)],
+            &[10.0],
+        );
+
+        assert_eq!(delta[4], Some(2.0));
+        assert_eq!(delta[5], Some(10.0));
     }
 }

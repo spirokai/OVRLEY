@@ -1522,40 +1522,47 @@ mod lap_timing_fixture_tests {
     }
 
     #[test]
-    fn vbo_fixture_produces_lap_timing_via_crossing_detection() {
+    fn explicit_lap_column_takes_precedence_over_beacon_markers() {
+        let csv = "\"Beacon Markers\",\"0.5\",\"1.5\"\n\
+Time,Lap,Latitude,Longitude\n\
+0,1,10.0,20.0\n\
+1,1,10.1,20.1\n\
+2,2,10.2,20.2\n\
+3,2,10.3,20.3\n";
+        let activity = parse_csv_activity_reader(Cursor::new(csv), "explicit-laps.csv")
+            .unwrap()
+            .parsed_activity;
+
+        assert_eq!(activity.lap_start_elapsed_seconds, vec![0.0, 2.0]);
+        assert_eq!(activity.lap_durations_seconds, vec![2.0]);
+    }
+
+    #[test]
+    fn vbo_fixture_produces_one_lap_per_circuit() {
         let activity = parse(&LapExpectations {
             fixture: "VBO-test.vbo",
             min_laps: 0,
             extraction: FixtureKind::Vbo,
         });
 
-        assert_eq!(
-            activity.lap_number.len(),
-            activity.sample_elapsed_seconds.len(),
-            "VBO lap_number length must match elapsed"
+        let circuit_tools_fast_lap_durations = [108.55, 108.42, 108.46, 109.03, 107.05, 107.05];
+        assert!((17.0..=18.0).contains(&activity.lap_start_elapsed_seconds[0]));
+        assert_eq!(activity.lap_durations_seconds.len(), 7);
+        assert!(
+            (150.0..=170.0).contains(&activity.lap_durations_seconds[0]),
+            "unexpected first VBO lap duration: {}",
+            activity.lap_durations_seconds[0]
         );
-
-        let has_lap_data = activity.lap_number.iter().any(|&v| v >= 0);
-
-        if has_lap_data {
+        for (actual, expected) in activity
+            .lap_durations_seconds
+            .iter()
+            .skip(1)
+            .zip(circuit_tools_fast_lap_durations)
+        {
             assert!(
-                !activity.lap_durations_seconds.is_empty(),
-                "VBO must produce lap durations when laps are detected"
+                (actual - expected).abs() <= 0.2,
+                "expected VBO lap duration near {expected:.2}s, got {actual:.3}s"
             );
-            assert!(
-                activity.best_lap_time_seconds.is_some(),
-                "VBO must produce best lap when laps are detected"
-            );
-            for (lap, &time) in activity.lap_time_seconds.iter().enumerate() {
-                if activity.lap_number[lap] >= 0 {
-                    assert!(
-                        time.is_some(),
-                        "VBO sample {} in lap {} must have lap_time",
-                        lap,
-                        activity.lap_number[lap]
-                    );
-                }
-            }
         }
     }
 

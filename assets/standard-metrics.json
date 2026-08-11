@@ -82,7 +82,7 @@
             "value": "lap_log",
             "label": "Lap Log",
             "font_size": 30,
-            "label_font_size": 10.5,
+            "label_font_size": 15,
             "icon": { "source": "custom", "assetFile": "display-mode-lap-log.svg" }
           }
         ],

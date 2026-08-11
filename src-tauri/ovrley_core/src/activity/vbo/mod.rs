@@ -25,6 +25,10 @@ use std::path::Path;
 const MIDNIGHT_ROLLOVER_THRESHOLD_SECONDS: f64 = 12.0 * 60.0 * 60.0;
 /// Number of seconds added when a time-of-day value rolls over to the next day.
 const SECONDS_PER_DAY: f64 = 24.0 * 60.0 * 60.0;
+/// Width of the timing gate constructed perpendicular to a VBO lap-marker direction pair.
+const TIMING_GATE_WIDTH_METERS: f64 = 40.0;
+/// Spherical-earth radius used only for local timing-gate projection.
+const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
 
 /// Sections extracted from the text-based VBO container.
 #[derive(Default)]
@@ -207,12 +211,13 @@ fn parse_data_value(token: &str, line_number: usize) -> CoreResult<f64> {
     Ok(value)
 }
 
-/// Parses VBO `[laptiming]` rows into timing markers.
+/// Parses VBO `[laptiming]` rows into canonical finite timing gates.
 ///
 /// Each row contains a marker kind (`Start` or `Split`) followed by four
-/// coordinate values in VBO minute format: `lon_a lat_a lon_b lat_b`.
-/// Coordinates are converted to decimal degrees using the same convention
-/// as data rows.
+/// coordinate values in VBO minute format: `lon_a lat_a lon_b lat_b`. The two
+/// source points define the timing location followed by a heading reference.
+/// The canonical gate is centred on the first point and constructed
+/// perpendicular to that direction with a 20-metre reach on either side.
 fn parse_laptiming_markers(lines: &[String]) -> Vec<TimingMarker> {
     lines
         .iter()
@@ -229,15 +234,48 @@ fn parse_laptiming_markers(lines: &[String]) -> Vec<TimingMarker> {
             let lat_a = tokens[2].parse::<f64>().ok()?;
             let lon_b = tokens[3].parse::<f64>().ok()?;
             let lat_b = tokens[4].parse::<f64>().ok()?;
-            Some(TimingMarker {
+            timing_gate_from_direction(
                 kind,
-                latitude_a: minutes_to_degrees(lat_a),
-                longitude_a: longitude_minutes_to_degrees(lon_a),
-                latitude_b: minutes_to_degrees(lat_b),
-                longitude_b: longitude_minutes_to_degrees(lon_b),
-            })
+                minutes_to_degrees(lat_a),
+                longitude_minutes_to_degrees(lon_a),
+                minutes_to_degrees(lat_b),
+                longitude_minutes_to_degrees(lon_b),
+            )
         })
         .collect()
+}
+
+/// Constructs a finite gate perpendicular to a direction pair in local metre coordinates.
+fn timing_gate_from_direction(
+    kind: TimingMarkerKind,
+    latitude_a: f64,
+    longitude_a: f64,
+    latitude_b: f64,
+    longitude_b: f64,
+) -> Option<TimingMarker> {
+    let meters_per_degree_latitude = EARTH_RADIUS_METERS * std::f64::consts::PI / 180.0;
+    let meters_per_degree_longitude =
+        meters_per_degree_latitude * latitude_a.to_radians().cos();
+    let direction_east = (longitude_b - longitude_a) * meters_per_degree_longitude;
+    let direction_north = (latitude_b - latitude_a) * meters_per_degree_latitude;
+    let direction_length = direction_east.hypot(direction_north);
+    if direction_length <= f64::EPSILON || meters_per_degree_longitude.abs() <= f64::EPSILON {
+        return None;
+    }
+
+    let half_width = TIMING_GATE_WIDTH_METERS / 2.0;
+    let gate_offset_east = -direction_north / direction_length * half_width;
+    let gate_offset_north = direction_east / direction_length * half_width;
+    let gate_offset_latitude = gate_offset_north / meters_per_degree_latitude;
+    let gate_offset_longitude = gate_offset_east / meters_per_degree_longitude;
+
+    Some(TimingMarker {
+        kind,
+        latitude_a: latitude_a - gate_offset_latitude,
+        longitude_a: longitude_a - gate_offset_longitude,
+        latitude_b: latitude_a + gate_offset_latitude,
+        longitude_b: longitude_a + gate_offset_longitude,
+    })
 }
 
 /// Maps parsed VBO rows into the shared canonical activity-column representation.

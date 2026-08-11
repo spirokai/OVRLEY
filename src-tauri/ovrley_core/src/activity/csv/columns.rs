@@ -272,15 +272,23 @@ pub(super) fn build_activity_columns(
     let (throttle_position, _) = series(Metric::ThrottlePosition);
     let (brake_position, _) = series(Metric::BrakePosition);
     let (source_lap_number, _) = series(Metric::LapNumber);
-    let lap_number = source_lap_number
-        .into_iter()
-        .map(|value| match value {
-            Some(value) if value > 0.0 && value.fract() == 0.0 && value <= i64::MAX as f64 => {
-                Some(value as i64)
-            }
-            _ => Some(-1),
-        })
-        .collect();
+    let has_lap_number_column = header
+        .columns
+        .iter()
+        .any(|column| column.metric == Metric::LapNumber);
+    let lap_number = if has_lap_number_column {
+        source_lap_number
+            .into_iter()
+            .map(|value| match value {
+                Some(value) if value > 0.0 && value.fract() == 0.0 && value <= i64::MAX as f64 => {
+                    Some(value as i64)
+                }
+                _ => Some(-1),
+            })
+            .collect()
+    } else {
+        vec![None; sample_count]
+    };
     let (mut lean_angle, _) = series(Metric::LeanAngle);
     if lean_angle.iter().all(Option::is_none) {
         lean_angle = derive_lean_from_speed_heading(&speed, &heading, &elapsed_seconds);
