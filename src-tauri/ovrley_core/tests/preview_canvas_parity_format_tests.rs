@@ -56,7 +56,8 @@ fn engine_power_uses_the_standard_numeric_renderer_lookup() {
     let dense = common::builders::dense_report_with(|s| {
         s.engine_power = vec![Some(12_345.6)];
     });
-    let engine_power = common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
+    let engine_power =
+        common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
 
     let parts =
         ovrley_core::render::format::format_validated_metric_parts(&engine_power, &dense, 0)

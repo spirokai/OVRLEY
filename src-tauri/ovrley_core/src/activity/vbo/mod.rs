@@ -181,13 +181,11 @@ fn parse_creation_date(line: &str, line_number: usize) -> CoreResult<NaiveDate> 
     let time = tokens.next();
     let parsed = date
         .and_then(|date| NaiveDate::parse_from_str(date, "%d/%m/%Y").ok())
-        .zip(
-            time.and_then(|time| {
-                NaiveTime::parse_from_str(time, "%H:%M:%S")
-                    .or_else(|_| NaiveTime::parse_from_str(time, "%H:%M"))
-                    .ok()
-            }),
-        )
+        .zip(time.and_then(|time| {
+            NaiveTime::parse_from_str(time, "%H:%M:%S")
+                .or_else(|_| NaiveTime::parse_from_str(time, "%H:%M"))
+                .ok()
+        }))
         .filter(|_| matches!(separator, Some("at" | "@")));
     parsed.map(|(date, _)| date).ok_or_else(|| {
         CoreError::Activity(format!(
@@ -254,8 +252,7 @@ fn timing_gate_from_direction(
     longitude_b: f64,
 ) -> Option<TimingMarker> {
     let meters_per_degree_latitude = EARTH_RADIUS_METERS * std::f64::consts::PI / 180.0;
-    let meters_per_degree_longitude =
-        meters_per_degree_latitude * latitude_a.to_radians().cos();
+    let meters_per_degree_longitude = meters_per_degree_latitude * latitude_a.to_radians().cos();
     let direction_east = (longitude_b - longitude_a) * meters_per_degree_longitude;
     let direction_north = (latitude_b - latitude_a) * meters_per_degree_latitude;
     let direction_length = direction_east.hypot(direction_north);

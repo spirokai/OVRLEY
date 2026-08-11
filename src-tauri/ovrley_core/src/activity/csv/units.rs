@@ -106,9 +106,9 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
         "cv" => Unit::MetricHorsepower,
         "hp" | "horsepower" | "horsepowers" => Unit::MechanicalHorsepower,
         "nm" | "n-m" | "n m" | "n·m" => Unit::NewtonMetres,
-        "ft-lb" | "ft-lbs" | "ft-lbf" | "ft·lbf" | "ft lb" | "ft lbs" | "ft lbf"
-        | "lb-ft" | "lbs-ft" | "lb ft" | "lbs ft" | "lbf-ft" | "lbf ft" | "foot-pound"
-        | "foot pound" | "foot pounds" => Unit::FootPounds,
+        "ft-lb" | "ft-lbs" | "ft-lbf" | "ft·lbf" | "ft lb" | "ft lbs" | "ft lbf" | "lb-ft"
+        | "lbs-ft" | "lb ft" | "lbs ft" | "lbf-ft" | "lbf ft" | "foot-pound" | "foot pound"
+        | "foot pounds" => Unit::FootPounds,
         "#" | "raw" => Unit::Raw,
         _ => return DeclaredUnit::Unsupported(UnitDimension::Unknown),
     };
@@ -206,17 +206,16 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
         Metric::EnginePower => {
             matches!(
                 unit,
-                Unit::Watts
-                    | Unit::Kilowatts
-                    | Unit::MetricHorsepower
-                    | Unit::MechanicalHorsepower
+                Unit::Watts | Unit::Kilowatts | Unit::MetricHorsepower | Unit::MechanicalHorsepower
             )
         }
         Metric::Torque => matches!(unit, Unit::NewtonMetres | Unit::FootPounds),
         Metric::ThrottlePosition | Metric::BrakePosition => matches!(unit, Unit::Percent),
         Metric::LeanAngle => matches!(unit, Unit::Degrees),
         Metric::GearPosition => matches!(unit, Unit::Raw),
-        Metric::CompanionDate | Metric::GpsCoordinate | Metric::LapNumber => matches!(unit, Unit::Raw),
+        Metric::CompanionDate | Metric::GpsCoordinate | Metric::LapNumber => {
+            matches!(unit, Unit::Raw)
+        }
     }
 }
 

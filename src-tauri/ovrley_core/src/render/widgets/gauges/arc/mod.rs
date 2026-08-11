@@ -24,9 +24,7 @@ use crate::activity::schema::DenseActivityReport;
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedArcGaugeWidget, ValidatedSceneConfig};
-use crate::render::format::{
-    format_validated_metric_parts, resolve_metric_display_value,
-};
+use crate::render::format::{format_validated_metric_parts, resolve_metric_display_value};
 use crate::render::surface::create_surface;
 use crate::render::text::{
     draw_text, draw_text_with_vertical_metrics_text, origin_x_for_centered_text, parse_color,

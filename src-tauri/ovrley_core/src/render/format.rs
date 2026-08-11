@@ -821,7 +821,10 @@ mod tests {
     #[test]
     fn invalid_or_degenerate_balance_is_displayed_as_neutral() {
         assert_eq!(format_balance_value(100.0, 0, Some("plain")), "50/50");
-        assert_eq!(format_balance_value(127.0, 0, Some("percent_label")), "50%/50%");
+        assert_eq!(
+            format_balance_value(127.0, 0, Some("percent_label")),
+            "50%/50%"
+        );
     }
 
     #[test]

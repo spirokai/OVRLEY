@@ -1212,7 +1212,11 @@ fn torque_pro_gps_time_is_parsed_as_an_absolute_timestamp() {
         0.18320802 * 1.355_817_948_331_400_4,
     );
     assert_close(
-        activity.engine_power.iter().copied().find_map(|value| value),
+        activity
+            .engine_power
+            .iter()
+            .copied()
+            .find_map(|value| value),
         48.63056,
     );
     assert!(activity.power.is_empty());
@@ -1263,15 +1267,18 @@ fn vehicle_power_aliases_and_units_convert_to_engine_power() {
             .parsed_activity
     };
 
-    assert_eq!(parse(estimated).engine_power, vec![Some(10_000.0), Some(5_000.0)]);
+    assert_eq!(
+        parse(estimated).engine_power,
+        vec![Some(10_000.0), Some(5_000.0)]
+    );
     let cv_activity = parse(cv);
     assert_close(cv_activity.engine_power[0], 14_709.975);
     assert_close(cv_activity.engine_power[1], 7_354.9875);
-    assert_eq!(parse(torque_pro_kw).engine_power, vec![Some(7_000.0), Some(8_000.0)]);
-    assert_close(
-        parse(torque_pro_hp).engine_power[0],
-        7_456.998_715_822_702,
+    assert_eq!(
+        parse(torque_pro_kw).engine_power,
+        vec![Some(7_000.0), Some(8_000.0)]
     );
+    assert_close(parse(torque_pro_hp).engine_power[0], 7_456.998_715_822_702);
 }
 
 #[test]
@@ -1280,7 +1287,10 @@ fn engine_power_preserves_negative_and_missing_samples_through_densification() {
     let activity = parse_csv_activity_reader(Cursor::new(csv), "signed-engine-power.csv")
         .unwrap()
         .parsed_activity;
-    assert_eq!(activity.engine_power, vec![Some(-10_000.0), None, Some(5_000.0)]);
+    assert_eq!(
+        activity.engine_power,
+        vec![Some(-10_000.0), None, Some(5_000.0)]
+    );
 
     let requirements = RenderDataRequirements {
         engine_power: true,

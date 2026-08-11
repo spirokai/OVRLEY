@@ -376,8 +376,10 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
         ),
         "lean angle" | "leanangle" => (Metric::LeanAngle, SourcePriority::Direct, None, None, None),
-        "lap" | "lap #" | "lap number" => (Metric::LapNumber, SourcePriority::Direct, None, None, None),
-        "gear" | "gear position" | "estimated gear"=> (
+        "lap" | "lap #" | "lap number" => {
+            (Metric::LapNumber, SourcePriority::Direct, None, None, None)
+        }
+        "gear" | "gear position" | "estimated gear" => (
             Metric::GearPosition,
             SourcePriority::Direct,
             None,
@@ -396,7 +398,9 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
     let mut declared_unit = declared_unit;
     if metric == Metric::Timestamp
         && annotation.as_deref().is_some_and(|ann| {
-            ann.eq_ignore_ascii_case("utc") || ann.eq_ignore_ascii_case("gmt") || ann.eq_ignore_ascii_case("z")
+            ann.eq_ignore_ascii_case("utc")
+                || ann.eq_ignore_ascii_case("gmt")
+                || ann.eq_ignore_ascii_case("z")
         })
     {
         declared_unit = DeclaredUnit::Absent;
@@ -412,10 +416,9 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
     }
     let source_priority = match (metric, source) {
         (Metric::Speed, Some(SourceQualifier::Obd)) => SourcePriority::ObdSpeed,
-        (
-            Metric::Speed,
-            Some(SourceQualifier::Accelerometer | SourceQualifier::Logger),
-        ) => SourcePriority::DirectSpeed,
+        (Metric::Speed, Some(SourceQualifier::Accelerometer | SourceQualifier::Logger)) => {
+            SourcePriority::DirectSpeed
+        }
         (
             Metric::Latitude
             | Metric::Longitude
@@ -432,11 +435,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
         (
             Metric::ThrottlePosition,
             Some(SourceQualifier::Obd | SourceQualifier::Vehicle | SourceQualifier::Logger),
-        )
-            if alias_priority == SourcePriority::Pedal =>
-        {
-            SourcePriority::Preferred
-        }
+        ) if alias_priority == SourcePriority::Pedal => SourcePriority::Preferred,
         (
             Metric::GearPosition | Metric::Rpm | Metric::ThrottlePosition | Metric::BrakePosition,
             Some(SourceQualifier::Obd | SourceQualifier::Vehicle | SourceQualifier::Logger),
@@ -484,18 +483,10 @@ fn split_header(value: &str) -> Option<(String, Option<String>, Option<SourceQua
         if let Some((semantic, qualifier)) = split_parenthetical(base) {
             if let Some(parenthetical_source) = parse_source(qualifier) {
                 let source = combine_sources(explicit_source, Some(parenthetical_source))?;
-                return split_semantic_source(
-                    semantic,
-                    Some(annotation.to_string()),
-                    source,
-                );
+                return split_semantic_source(semantic, Some(annotation.to_string()), source);
             }
         }
-        return split_semantic_source(
-            base,
-            Some(annotation.to_string()),
-            explicit_source,
-        );
+        return split_semantic_source(base, Some(annotation.to_string()), explicit_source);
     }
     if let Some(semantic) = without_source.strip_suffix(" %") {
         return split_semantic_source(semantic, Some("%".to_string()), explicit_source);

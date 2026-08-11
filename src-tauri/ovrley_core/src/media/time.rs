@@ -81,10 +81,7 @@ pub(crate) fn gpsu_millis_to_video_start_rfc3339(
 /// the naive timestamp into an absolute UTC instant. Returns `None` when the
 /// timezone name is unrecognized, the timestamp text is malformed, or the
 /// local time is ambiguous (e.g. DST spring-forward gap).
-pub(crate) fn dji_timestamp_to_rfc3339(
-    timestamp_text: &str,
-    tz_name: &str,
-) -> Option<String> {
+pub(crate) fn dji_timestamp_to_rfc3339(timestamp_text: &str, tz_name: &str) -> Option<String> {
     let naive = NaiveDateTime::parse_from_str(timestamp_text, DJI_TIMESTAMP_FORMAT).ok()?;
     let tz: Tz = tz_name.parse().ok()?;
     let local_dt = tz.from_local_datetime(&naive).single()?;
@@ -122,12 +119,18 @@ mod tests {
 
     #[test]
     fn dji_timestamp_parser_rejects_invalid_timezone() {
-        assert_eq!(dji_timestamp_to_rfc3339("2026-03-15 23:58:14", "Not/A_Tz"), None);
+        assert_eq!(
+            dji_timestamp_to_rfc3339("2026-03-15 23:58:14", "Not/A_Tz"),
+            None
+        );
     }
 
     #[test]
     fn dji_timestamp_parser_rejects_malformed_timestamp() {
-        assert_eq!(dji_timestamp_to_rfc3339("2026-13-01 99:99:99", "Europe/Prague"), None);
+        assert_eq!(
+            dji_timestamp_to_rfc3339("2026-13-01 99:99:99", "Europe/Prague"),
+            None
+        );
     }
 
     #[test]
