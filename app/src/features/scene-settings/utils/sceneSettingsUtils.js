@@ -43,19 +43,37 @@ export function parseTimeOffset(value) {
 }
 
 /**
+ * Extracts a local creation timestamp from a video filename.
+ *
+ * @param {string|null} path - Video file path.
+ * @returns {string|null} Local ISO timestamp, or null when unavailable or invalid.
+ */
+export function parseVideoFilenameCreationTime(path) {
+  const filename = path?.split(/[\\/]/).pop()
+  const match = filename?.match(/(?:^|\D)(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})(?!\d)/)
+  if (!match) return null
+
+  const [, year, month, day, hour, minute, second] = match
+  const timestamp = `${year}-${month}-${day}T${hour}:${minute}:${second}`
+  const parsed = new Date(`${timestamp}Z`)
+  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 19) !== timestamp ? null : timestamp
+}
+
+/**
  * Formats a video creation timestamp according to its authoritative source.
- * GPS timestamps are converted into the recording timezone; ffprobe timestamps
- * retain their container clock text and only lose the UTC marker.
+ * GPS timestamps and explicitly UTC metadata timestamps are converted into the
+ * recording timezone. Local metadata timestamps retain their clock text.
  *
  * @param {string|null} timestamp - Canonical RFC 3339 timestamp.
  * @param {string|null} source - Timestamp source.
  * @param {string|null} timezone - IANA timezone for GPS timestamps.
+ * @param {string|null} [timezoneMode=null] - Selected ffprobe interpretation.
  * @returns {string} Display-formatted timestamp.
  */
-export function formatVideoCreationTime(timestamp, source, timezone) {
+export function formatVideoCreationTime(timestamp, source, timezone, timezoneMode = null) {
   if (!timestamp) return 'Unknown'
 
-  if (source === 'gps' && timezone) {
+  if ((source === 'gps' || ((source === 'ffprobe' || source === 'filename') && timezoneMode === 'utc')) && timezone) {
     const date = new Date(timestamp)
     const parts = new Intl.DateTimeFormat('en-GB', {
       timeZone: timezone,

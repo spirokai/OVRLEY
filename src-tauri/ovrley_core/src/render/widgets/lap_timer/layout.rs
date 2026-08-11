@@ -6,8 +6,8 @@
 
 use super::text::{delta_color, rgba_color, LapLogTextRow};
 use super::{
-    LABEL_FONT_RATIO, LINE_HEIGHT_RATIO, LOG_COLUMN_GAP_RATIO, LOG_HEADER_OPACITY,
-    LOG_ROW_GAP_RATIO, TABLE_VERTICAL_METRICS_TEXT,
+    LINE_HEIGHT_RATIO, LOG_COLUMN_GAP_RATIO, LOG_HEADER_OPACITY, LOG_ROW_GAP_RATIO,
+    TABLE_VERTICAL_METRICS_TEXT,
 };
 use crate::activity::schema::DenseActivityReport;
 use crate::error::{CoreError, CoreResult};
@@ -27,13 +27,14 @@ use std::path::PathBuf;
 pub(super) fn draw_content(
     canvas: &Canvas,
     style: &ResolvedTextStyle,
+    label_style: &ResolvedTextStyle,
     label: &str,
     show_label: bool,
     value: &str,
     value_color: Option<Color>,
     font_dirs: &[PathBuf],
 ) -> CoreResult<()> {
-    let (label_style, mut value_style) = content_styles(style, show_label);
+    let (label_style, mut value_style) = content_styles(style, label_style, show_label);
     if let Some(label_style) = label_style {
         draw_text_with_vertical_metrics_text(canvas, label, label, &label_style, font_dirs)?;
     }
@@ -53,19 +54,19 @@ pub(super) fn draw_content(
 /// Derives the label and value styles for a lap timer's stacked text.
 pub(super) fn content_styles(
     style: &ResolvedTextStyle,
+    label_style: &ResolvedTextStyle,
     show_label: bool,
 ) -> (Option<ResolvedTextStyle>, ResolvedTextStyle) {
-    let label_line_height = style.font_size * LABEL_FONT_RATIO * LINE_HEIGHT_RATIO;
-    let label_style = show_label.then(|| {
-        let mut label_style = style.clone();
-        label_style.font_size = style.font_size * LABEL_FONT_RATIO;
-        label_style.line_height = label_line_height;
-        label_style
-    });
+    let label_line_height = if show_label {
+        label_style.line_height
+    } else {
+        0.0
+    };
+    let resolved_label_style = show_label.then(|| label_style.clone());
     let mut value_style = style.clone();
-    value_style.y = style.y + if show_label { label_line_height } else { 0.0 };
+    value_style.y = style.y + label_line_height;
     value_style.line_height = style.font_size * LINE_HEIGHT_RATIO;
-    (label_style, value_style)
+    (resolved_label_style, value_style)
 }
 
 /// Expands text bounds to include one rendered text item.
@@ -148,11 +149,8 @@ fn scaled_opacity_style(style: &ResolvedTextStyle, multiplier: f32) -> ResolvedT
 }
 
 /// Builds the reduced-opacity style used by lap-log table headers.
-pub(super) fn lap_log_header_style(style: &ResolvedTextStyle) -> ResolvedTextStyle {
-    let mut header_style = scaled_opacity_style(style, LOG_HEADER_OPACITY);
-    header_style.font_size = style.font_size * LABEL_FONT_RATIO;
-    header_style.line_height = header_style.font_size * LINE_HEIGHT_RATIO;
-    header_style
+pub(super) fn lap_log_header_style(label_style: &ResolvedTextStyle) -> ResolvedTextStyle {
+    scaled_opacity_style(label_style, LOG_HEADER_OPACITY)
 }
 
 /// Measures the right edge of each lap-log table column.
@@ -161,14 +159,15 @@ pub(super) fn lap_log_header_style(style: &ResolvedTextStyle) -> ResolvedTextSty
 /// remain stable without measuring every frame-aligned value.
 pub(super) fn log_column_rights(
     style: &ResolvedTextStyle,
+    label_style: &ResolvedTextStyle,
     dense_activity: &DenseActivityReport,
     font_dirs: &[PathBuf],
 ) -> CoreResult<[f32; 3]> {
     let row_font = resolve_font(font_dirs, style.font_name.as_deref(), style.font_size)?;
     let header_font = resolve_font(
         font_dirs,
-        style.font_name.as_deref(),
-        style.font_size * LABEL_FONT_RATIO,
+        label_style.font_name.as_deref(),
+        label_style.font_size,
     )?;
     let header_width = |text: &str| measure_text_with_font(text, &header_font).width;
     let character_width = |character: char| {
@@ -302,18 +301,19 @@ pub(super) fn include_log_row_bounds(
 /// Renders the static lap-log header into a reusable image layer.
 pub(super) fn prepare_lap_log_header_layer(
     style: &ResolvedTextStyle,
+    label_style: &ResolvedTextStyle,
     column_rights: [f32; 3],
     font_dirs: &[PathBuf],
 ) -> CoreResult<StaticLayer> {
     let header = ["LAP".to_string(), "TIME".to_string(), "DELTA".to_string()];
-    let header_style = lap_log_header_style(style);
+    let header_style = lap_log_header_style(label_style);
     let mut bounds = None;
     include_log_row_bounds(
         &mut bounds,
         &header_style,
         &header,
         column_rights,
-        style.y,
+        label_style.y,
         font_dirs,
     )?;
 
@@ -327,18 +327,18 @@ pub(super) fn prepare_lap_log_header_layer(
     let mut surface = create_surface(layer_width, layer_height)?;
     surface.canvas().clear(Color::TRANSPARENT);
 
-    let mut local_style = style.clone();
-    local_style.x -= layer_x;
-    local_style.y -= layer_y;
+    let mut local_label_style = label_style.clone();
+    local_label_style.x -= layer_x;
+    local_label_style.y -= layer_y;
     let local_rights = column_rights.map(|right| right - layer_x);
-    let local_header_style = lap_log_header_style(&local_style);
+    let local_header_style = lap_log_header_style(&local_label_style);
     draw_log_row(
         surface.canvas(),
         &local_header_style,
         &header,
         None,
         local_rights,
-        local_style.y,
+        local_label_style.y,
         font_dirs,
     )?;
 
@@ -352,13 +352,14 @@ pub(super) fn prepare_lap_log_header_layer(
 /// Renders completed lap-log rows into a reusable image layer.
 pub(super) fn prepare_lap_log_rows_layer(
     style: &ResolvedTextStyle,
+    label_style: &ResolvedTextStyle,
     completed_rows: &[LapLogTextRow],
     positive_delta_color: [u8; 4],
     negative_delta_color: [u8; 4],
     column_rights: [f32; 3],
     font_dirs: &[PathBuf],
 ) -> CoreResult<StaticLayer> {
-    let header_style = lap_log_header_style(style);
+    let header_style = lap_log_header_style(label_style);
     let row_gap = style.font_size * LOG_ROW_GAP_RATIO;
     let data_top = style.y + header_style.line_height + row_gap;
     let row_stride = style.font_size * LINE_HEIGHT_RATIO + row_gap;
@@ -416,15 +417,16 @@ pub(super) fn prepare_lap_log_rows_layer(
 /// Renders a static lap timer label and value into a reusable image layer.
 pub(super) fn prepare_content_layer(
     style: &ResolvedTextStyle,
+    label_style: &ResolvedTextStyle,
     label: &str,
     show_label: bool,
     value: &str,
     font_dirs: &[PathBuf],
 ) -> CoreResult<StaticLayer> {
     let label = super::text::lap_timer_label_text(label);
-    let (label_style, value_style) = content_styles(style, show_label);
+    let (resolved_label_style, value_style) = content_styles(style, label_style, show_label);
     let mut bounds = None;
-    if let Some(label_style) = label_style {
+    if let Some(label_style) = resolved_label_style.as_ref() {
         include_text_bounds(&mut bounds, &label, &label, &label_style, font_dirs)?;
     }
 
@@ -449,9 +451,13 @@ pub(super) fn prepare_content_layer(
     let mut local_style = style.clone();
     local_style.x -= layer_x;
     local_style.y -= layer_y;
+    let mut local_label_style = label_style.clone();
+    local_label_style.x -= layer_x;
+    local_label_style.y -= layer_y;
     draw_content(
         surface.canvas(),
         &local_style,
+        &local_label_style,
         &label,
         show_label,
         value,

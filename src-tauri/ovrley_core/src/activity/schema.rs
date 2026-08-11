@@ -187,6 +187,7 @@ pub struct ActivityColumns {
     pub heartrate: NumericSeries,
     pub cadence: NumericSeries,
     pub power: NumericSeries,
+    pub engine_power: NumericSeries,
     pub temperature: NumericSeries,
     pub gradient: NumericSeries,
     pub pace: NumericSeries,
@@ -280,6 +281,9 @@ pub struct RawSample {
     /// Power in watts.
     #[serde(default)]
     pub power: Option<f64>,
+    /// Engine power in watts.
+    #[serde(default)]
+    pub engine_power: Option<f64>,
     /// Ambient/device temperature in Celsius.
     #[serde(default)]
     pub temperature: Option<f64>,
@@ -433,6 +437,9 @@ pub struct ParsedActivity {
     /// Power in watts.
     #[serde(default)]
     pub power: NumericSeries,
+    /// Engine power in watts.
+    #[serde(default)]
+    pub engine_power: NumericSeries,
     /// Temperature in degrees Celsius.
     #[serde(default)]
     pub temperature: NumericSeries,
@@ -609,6 +616,8 @@ pub struct DenseSeriesReport {
     pub cadence: Vec<Option<f64>>,
     /// Power in watts.
     pub power: Vec<Option<f64>>,
+    /// Engine power in watts.
+    pub engine_power: Vec<Option<f64>>,
     /// Temperature in degrees Celsius.
     pub temperature: Vec<Option<f64>>,
     /// Pace in seconds per kilometer.
@@ -699,6 +708,7 @@ impl DenseSeriesReport {
             MetricKind::Heartrate => Some(&self.heartrate),
             MetricKind::Cadence => Some(&self.cadence),
             MetricKind::Power => Some(&self.power),
+            MetricKind::EnginePower => Some(&self.engine_power),
             MetricKind::Temperature => Some(&self.temperature),
             MetricKind::Calories => Some(&self.calories),
             MetricKind::Pace => Some(&self.pace),
@@ -775,6 +785,8 @@ pub struct TrimmedActivity {
     pub cadence: NumericSeries,
     /// Trimmed power samples.
     pub power: NumericSeries,
+    /// Trimmed engine-power samples in watts.
+    pub engine_power: NumericSeries,
     /// Trimmed temperature samples in Celsius.
     pub temperature: NumericSeries,
     /// Trimmed pace samples in seconds per kilometer.

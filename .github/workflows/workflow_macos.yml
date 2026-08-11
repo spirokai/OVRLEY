@@ -1,4 +1,4 @@
-name: OVRLEY macOS Apple Silicon Release
+name: Release Apple Silicon
 
 on:
   workflow_dispatch:

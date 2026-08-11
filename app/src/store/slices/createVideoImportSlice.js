@@ -1,5 +1,5 @@
 import { detectCodecs } from '@/api/backend'
-import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
+import { formatVideoCreationTime, parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { createCachedPromise } from '@/lib/cached-promise'
 import { videoOverlapsActivity } from '@/lib/video-timing'
 
@@ -91,7 +91,9 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoFpsDen: null, // exact ffprobe FPS denominator
   importedVideoResolution: null, // display-oriented { width, height }
   importedVideoCreationTime: null, // ISO-8601 string or null
-  importedVideoTimeSource: null, // "gps" | "ffprobe" | "file_mtime" | null
+  importedVideoTimeSource: null, // "gps" | "ffprobe" | "file_mtime" | "filename" | null
+  detectedVideoCreationTime: null, // original creation time from imported metadata
+  detectedVideoTimeSource: null, // original creation-time source from imported metadata
   importedVideoImportId: null, // opaque local preview server import ID
   importedVideoPreviewUrl: null, // local HTTP preview URL for the video element
   importedVideoPreviewWarnings: [],
@@ -120,6 +122,8 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoResolution,
       importedVideoCreationTime: metadata.creationTime,
       importedVideoTimeSource: metadata.timeSource ?? null,
+      detectedVideoCreationTime: metadata.creationTime,
+      detectedVideoTimeSource: metadata.timeSource ?? null,
       importedVideoImportId: metadata.importId ?? null,
       importedVideoPreviewUrl: metadata.previewUrl ?? null,
       importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
@@ -148,6 +152,8 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoResolution: null,
       importedVideoCreationTime: null,
       importedVideoTimeSource: null,
+      detectedVideoCreationTime: null,
+      detectedVideoTimeSource: null,
       importedVideoImportId: null,
       importedVideoPreviewUrl: null,
       importedVideoPreviewWarnings: [],
@@ -174,6 +180,8 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoResolution: null,
       importedVideoCreationTime: null,
       importedVideoTimeSource: null,
+      detectedVideoCreationTime: null,
+      detectedVideoTimeSource: null,
       importedVideoImportId: null,
       importedVideoPreviewUrl: null,
       importedVideoPreviewWarnings: [],
@@ -215,6 +223,30 @@ export const createVideoImportSlice = (set, get) => ({
     }
 
     set({ videoSyncTimezoneMode: mode })
+    get().computeVideoSync(get().activitySummary)
+  },
+
+  setVideoCreationTimeFromFilename: () => {
+    const creationTime = parseVideoFilenameCreationTime(get().importedVideoPath)
+    if (creationTime === null) {
+      throw new Error('Video filename does not contain a valid YYYYMMDD_HHMMSS timestamp')
+    }
+
+    set({
+      importedVideoCreationTime: creationTime,
+      importedVideoTimeSource: 'filename',
+      videoSyncTimezoneMode: 'local',
+    })
+    get().computeVideoSync(get().activitySummary)
+  },
+
+  resetVideoCreationTime: () => {
+    const state = get()
+    set({
+      importedVideoCreationTime: state.detectedVideoCreationTime,
+      importedVideoTimeSource: state.detectedVideoTimeSource,
+      videoSyncTimezoneMode: null,
+    })
     get().computeVideoSync(get().activitySummary)
   },
 
@@ -277,7 +309,7 @@ export const createVideoImportSlice = (set, get) => ({
       let timezoneMode = null
       const videoDuration = state.importedVideoDuration
 
-      if (state.importedVideoTimeSource === 'ffprobe') {
+      if (state.importedVideoTimeSource === 'ffprobe' || state.importedVideoTimeSource === 'filename') {
         // An ffprobe `creation_time` tag cannot reliably identify its timezone.
         // Some cameras write a real UTC instant; others write local camera time
         // and append `Z`. Build both candidates, then keep only candidates whose
@@ -299,19 +331,18 @@ export const createVideoImportSlice = (set, get) => ({
         }
 
         if (candidates.length === 0) {
+          timezoneMode = state.videoSyncTimezoneMode ?? 'local'
           return {
             videoSyncOffsetSeconds: 0,
             videoSyncWarning: 'Video could not be synced with activity',
-            videoSyncTimezoneMode: null,
+            videoSyncTimezoneMode: timezoneMode,
           }
         }
 
-        const timezoneAmbiguous = candidates.length === 2 && withoutTimezone !== withTimezone
-        timezoneMode = timezoneAmbiguous ? (state.videoSyncTimezoneMode ?? 'local') : null
-        const selectedCandidate = timezoneAmbiguous
-          ? (candidates.find(({ timezoneApplied: candidateApplied }) => (candidateApplied ? 'utc' : 'local') === timezoneMode) ?? candidates[0])
-          : candidates[0]
-        videoStart = selectedCandidate.timestamp
+        const inferredMode = candidates[0].timezoneApplied ? 'utc' : 'local'
+        timezoneMode = state.videoSyncTimezoneMode ?? (candidates.length === 2 || inferredMode === 'utc' ? inferredMode : null)
+        const selectedMode = timezoneMode ?? inferredMode
+        videoStart = selectedMode === 'utc' ? withTimezone : withoutTimezone
       } else {
         videoStart = parseSyncTimestamp(state.importedVideoCreationTime, 'gps', timezone)
       }
@@ -324,13 +355,14 @@ export const createVideoImportSlice = (set, get) => ({
         }
       }
 
-      const offsetSeconds = (videoStart - activityStart) / 1000
+      const activityDurationSeconds = (activityEnd - activityStart) / 1000
+      const offsetSeconds = Math.min(Math.max((videoStart - activityStart) / 1000, 0), activityDurationSeconds)
 
       if (!videoTimestampOverlapsActivity(videoStart, videoDuration, activityStart, activityEnd)) {
         return {
-          videoSyncOffsetSeconds: 0,
+          videoSyncOffsetSeconds: offsetSeconds,
           videoSyncWarning: 'Video could not be synced with activity',
-          videoSyncTimezoneMode: null,
+          videoSyncTimezoneMode: timezoneMode,
         }
       }
 

@@ -7,8 +7,8 @@
  * @param {number} props.importedVideoDuration - Video duration in seconds.
  * @param {number} props.importedVideoFps - Video frame rate.
  * @param {object} props.importedVideoResolution - Video resolution ({ width, height }).
- * @param {number} props.importedVideoCreationTime - Video creation timestamp.
- * @param {string} props.importedVideoTimeSource - "gps" | "ffprobe" | "file_mtime" | null.
+ * @param {string} props.importedVideoCreationTime - Video creation timestamp.
+ * @param {string} props.importedVideoTimeSource - "gps" | "ffprobe" | "file_mtime" | "filename" | null.
  * @param {string} props.timezone - IANA timezone from the finalized activity metadata.
  * @param {string|null} props.videoSyncTimezoneMode - "local" or "utc" when both ffprobe interpretations fit.
  * @param {string|null} props.videoSyncWarning - Sync warning message (or null).
@@ -19,6 +19,10 @@
  * @param {function} props.onIncrement - Callback for increment/decrement.
  * @param {object} props.activitySummary - Activity summary data (or null).
  * @param {function} props.onComputeVideoSync - Callback to auto-sync.
+ * @param {boolean} props.filenameCreationTimeAvailable - Whether the filename contains a valid local timestamp.
+ * @param {function} props.onSetCreationTimeFromFilename - Applies the filename timestamp.
+ * @param {boolean} props.canResetCreationTime - Whether filename metadata currently overrides detected metadata.
+ * @param {function} props.onResetCreationTime - Restores the originally detected creation metadata.
  * @returns {JSX.Element} Rendered video sync section.
  */
 
@@ -26,7 +30,8 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Separator } from '@/components/ui/separator'
-import { Video, Bell, ChevronUp, ChevronDown } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Video, Bell, ChevronUp, ChevronDown, Clock3, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatVideoCreationTime } from '../utils/sceneSettingsUtils'
 
@@ -50,6 +55,10 @@ export default function VideoSyncSection({
   onIncrement,
   activitySummary,
   onComputeVideoSync,
+  filenameCreationTimeAvailable,
+  onSetCreationTimeFromFilename,
+  canResetCreationTime,
+  onResetCreationTime,
 }) {
   return (
     <div className="space-y-4 pt-4">
@@ -74,7 +83,7 @@ export default function VideoSyncSection({
         <div className="flex justify-between">
           <b>Created at:</b>
           <span className="text-xs font-normal text-foreground/70">
-            {formatVideoCreationTime(importedVideoCreationTime, importedVideoTimeSource, timezone)}
+            {formatVideoCreationTime(importedVideoCreationTime, importedVideoTimeSource, timezone, videoSyncTimezoneMode)}
           </span>
         </div>
         <div className="flex justify-between">
@@ -104,24 +113,56 @@ export default function VideoSyncSection({
         </div>
       )}
       {activitySummary && (
-        <div className="space-y-1">
-          <div className="flex items-center justify-between pt-2">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">Sync Offset</Label>
-            {videoSyncTimezoneMode && (
+        <div className="space-y-2 pt-2">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-1 items-center gap-2">
+              <Clock3 className="h-4 w-4 text-primary" />
+              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Video Sync</h4>
+              <Separator className="flex-1" />
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-2 h-6 w-6 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+              disabled={!canResetCreationTime}
+              onClick={onResetCreationTime}
+              aria-label="Restore detected video creation time"
+            >
+              <RotateCcw className="h-3 w-3" />
+            </Button>
+          </div>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold pt-2">Creation Time</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <Tabs
+              value={canResetCreationTime ? 'filename' : 'detected'}
+              onValueChange={(value) => (value === 'filename' ? onSetCreationTimeFromFilename() : onResetCreationTime())}
+            >
+              <TabsList variant="toolbar" className="grid h-9 w-full grid-cols-2 p-0.5">
+                <TabsTrigger variant="toolbar" value="detected" className="h-full px-2 text-[10px]">
+                  Detected
+                </TabsTrigger>
+                <TabsTrigger variant="toolbar" value="filename" className="h-full px-2 text-[10px]" disabled={!filenameCreationTimeAvailable}>
+                  Filename
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {timezone && (
               <div className="flex items-center gap-2">
-                <Label htmlFor="video-sync-timezone-toggle" className="text-[10px] text-muted-foreground uppercase font-bold">
-                  Timezone conversion
-                </Label>
                 <Switch
                   id="video-sync-timezone-toggle"
                   checked={videoSyncTimezoneMode === 'utc'}
+                  disabled={importedVideoTimeSource === 'filename'}
                   onCheckedChange={(checked) => onVideoSyncTimezoneModeChange(checked ? 'utc' : 'local')}
-                  aria-label="Timezone conversion"
+                  aria-label="Apply Timezone"
                 />
+                <Label htmlFor="video-sync-timezone-toggle" className="text-[10px] text-muted-foreground uppercase font-bold">
+                  Apply Timezone
+                </Label>
               </div>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold pt-2">Sync Offset</Label>
+          <div className="grid grid-cols-2 items-center gap-4">
             <div className="relative flex-1">
               <BlurInput
                 type="text"

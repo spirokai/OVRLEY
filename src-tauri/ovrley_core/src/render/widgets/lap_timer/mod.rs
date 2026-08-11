@@ -78,7 +78,11 @@ mod tests {
             border_thickness: 4.0,
         };
 
-        let layer = prepare_content_layer(&style, "Best Lap", true, "01:23.45", &[]).unwrap();
+        let mut label_style = style.clone();
+        label_style.font_size = 24.0;
+        label_style.line_height = 22.08;
+        let layer =
+            prepare_content_layer(&style, &label_style, "Best Lap", true, "01:23.45", &[]).unwrap();
 
         assert!(layer.x > 800.0);
         assert!(layer.y > 400.0);
@@ -91,8 +95,6 @@ pub(crate) use draw::draw_lap_timer;
 pub(crate) use prepare::prepare_lap_timer_cache;
 pub use text::{lap_log_text_state, lap_timer_value_text, LapLogTextState};
 
-/// Font-size ratio used for lap timer labels and table headers.
-const LABEL_FONT_RATIO: f32 = 0.35;
 /// Line-height ratio used by lap timer value and table text.
 const LINE_HEIGHT_RATIO: f32 = 0.92;
 /// Font-size ratio used for horizontal gaps between table columns.

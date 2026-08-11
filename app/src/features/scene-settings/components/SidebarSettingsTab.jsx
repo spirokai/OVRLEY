@@ -66,6 +66,10 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
             onIncrement={handlers.handleIncrement}
             activitySummary={videoSyncSettings.activitySummary}
             onComputeVideoSync={videoSyncSettings.computeVideoSync}
+            filenameCreationTimeAvailable={videoSyncSettings.filenameCreationTimeAvailable}
+            onSetCreationTimeFromFilename={videoSyncSettings.setVideoCreationTimeFromFilename}
+            canResetCreationTime={videoSyncSettings.canResetVideoCreationTime}
+            onResetCreationTime={videoSyncSettings.resetVideoCreationTime}
           />
         ) : null}
       </div>

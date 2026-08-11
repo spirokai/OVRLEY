@@ -63,18 +63,25 @@ export function getLapTimerState(activity, previewSecond) {
 }
 
 /**
- * Prepares all completed lap-log rows in descending order.
+ * Builds the completed lap-log rows visible at a timestamp in descending order.
  * @param {object|null} activity - Parsed activity with canonical lap timing fields.
+ * @param {number} completedLapCount - Number of laps completed at the timestamp.
  * @returns {Array<{lapText: string, timeText: string, deltaText: string, useNegativeDeltaColor: boolean}>} Prepared rows.
  */
-export function buildLapLogCompletedRows(activity) {
+export function buildLapLogCompletedRows(activity, completedLapCount) {
   if (activity === null) return []
+  if (completedLapCount === 0) return []
+  if (completedLapCount > activity.lap_durations_seconds.length) {
+    throw new Error(`Lap duration metadata is missing for completed lap ${completedLapCount}`)
+  }
+
+  const bestCompletedLap = activity.lap_durations_best_so_far_seconds[completedLapCount - 1]
+  if (bestCompletedLap === undefined) throw new Error(`Best lap metadata is missing for completed lap ${completedLapCount}`)
 
   return activity.lap_durations_seconds
+    .slice(0, completedLapCount)
     .map((duration, lapIndex) => {
-      const previousBest = lapIndex === 0 ? null : activity.lap_durations_best_so_far_seconds[lapIndex - 1]
-      if (lapIndex > 0 && previousBest === undefined) throw new Error(`Best lap metadata is missing before completed lap ${lapIndex + 1}`)
-      const delta = previousBest === null ? null : duration - previousBest
+      const delta = duration - bestCompletedLap
       return {
         lapText: String(lapIndex + 1),
         timeText: formatLapDuration(duration),
@@ -121,10 +128,9 @@ export function getLapLogFrameState(activity, previewSecond) {
  * @returns {{ completedRows: Array<{lapText: string, timeText: string, deltaText: string, useNegativeDeltaColor: boolean}>, currentRow: object|null }} Log rows.
  */
 export function getLapLogDisplayState(activity, previewSecond) {
-  const completedRows = buildLapLogCompletedRows(activity)
   const frameState = getLapLogFrameState(activity, previewSecond)
   return {
-    completedRows: completedRows.slice(completedRows.length - frameState.completedLapCount),
+    completedRows: buildLapLogCompletedRows(activity, frameState.completedLapCount),
     currentRow: frameState.currentRow,
   }
 }

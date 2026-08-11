@@ -13,7 +13,11 @@ import { useFontMetrics } from '../../shared/useFontMetrics'
  */
 export function OverlayLapTimerWidget({ widget, activity, previewSecond, globalOpacity, metricPreviewModel, sceneStyle }) {
   const fontFamily = getPreviewFontFamily(widget.data.font)
-  const fontMetricsVersion = useFontMetrics([{ fontFamily, fontSize: widget.data.font_size }])
+  const labelFontFamily = getPreviewFontFamily(widget.data.label_font)
+  const fontMetricsVersion = useFontMetrics([
+    { fontFamily, fontSize: widget.data.font_size },
+    { fontFamily: labelFontFamily, fontSize: widget.data.label_font_size },
+  ])
   const opacity = getWidgetOpacity(widget.data, globalOpacity)
   const shadow = getTextShadowParts(sceneStyle)
   const lapLogPreparation = useMemo(
@@ -40,8 +44,8 @@ export function OverlayLapTimerWidget({ widget, activity, previewSecond, globalO
           text={content.labelText}
           x={visualBounds.offsetX}
           baseline={content.labelBaseline + visualBounds.offsetY}
-          color={widget.data.color}
-          fontFamily={fontFamily}
+          color={widget.data.label_color}
+          fontFamily={labelFontFamily}
           fontSize={content.labelFontSize}
           opacity={opacity}
           shadow={shadow}
@@ -59,7 +63,7 @@ export function OverlayLapTimerWidget({ widget, activity, previewSecond, globalO
               x={cell.left + visualBounds.offsetX}
               baseline={cell.baseline + row.offsetY + visualBounds.offsetY}
               color={cell.color}
-              fontFamily={fontFamily}
+              fontFamily={row.fontFamily}
               fontSize={row.fontSize}
               opacity={opacity * row.opacityMultiplier}
               shadow={shadow}

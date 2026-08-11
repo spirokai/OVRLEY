@@ -1,6 +1,33 @@
 import { describe, expect, test } from 'vitest'
 
 import { buildMetricWidgetPreviewModel } from '@/features/widget-preview'
+import { getMetricWidgetVisualBounds } from '@/features/widget-preview/shared/textMeasurement'
+
+describe('metric widget visual bounds', () => {
+  test('uses text ink height while including units and icon extents', () => {
+    const bounds = getMetricWidgetVisualBounds(
+      {
+        width: 100,
+        height: 60,
+        icon: { left: 0, top: 25, size: 20 },
+        value: { baseline: 35, ascent: 20, descent: 5 },
+        units: { baseline: 18, ascent: 10, descent: 4 },
+      },
+      { iconOffsetX: -7, iconOffsetY: 5 },
+    )
+
+    expect(bounds).toEqual({
+      minX: -7,
+      minY: 8,
+      maxX: 100,
+      maxY: 50,
+      width: 107,
+      height: 42,
+      offsetX: 7,
+      offsetY: -8,
+    })
+  })
+})
 
 describe('core_temperature widget preview', () => {
   test('formats core_temperature from display_unit celsius', () => {

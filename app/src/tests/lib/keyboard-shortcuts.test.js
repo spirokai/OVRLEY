@@ -20,8 +20,8 @@ describe('keyboard shortcut matcher', () => {
   })
 
   test('keeps modifier matching exact for AltGr-like input', () => {
-    expect(matchKeyboardShortcut(keyEvent('a', { altKey: true }), 'app')?.commandId).toBe('activity.import')
-    expect(matchKeyboardShortcut(keyEvent('a', { altKey: true, ctrlKey: true }), 'app')).toBeNull()
+    expect(matchKeyboardShortcut(keyEvent('k', { ctrlKey: true }), 'app')?.commandId).toBe('activity.import')
+    expect(matchKeyboardShortcut(keyEvent('k', { altKey: true, ctrlKey: true }), 'app')).toBeNull()
   })
 
   test('preserves Ctrl+Y redo', () => {

@@ -1,4 +1,4 @@
-name: OVRLEY Linux Release
+name: Release AppImage
 
 on:
   workflow_dispatch:
@@ -113,7 +113,9 @@ jobs:
             libssl-dev \
             libwebkit2gtk-4.1-dev \
             patchelf \
-            pkg-config
+            pkg-config \
+            unzip \
+            zip
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -245,6 +247,27 @@ jobs:
           actual="$(find dist-release -maxdepth 1 -type f -printf '%f\n' | sort)"
           [[ "$actual" == "$expected" ]] || { echo 'Linux output names are not canonical.' >&2; exit 1; }
 
+      - name: Create AppImage release archive
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          version="$RELEASE_VERSION"
+          appimage_name="OVRLEY-linux-$version.AppImage"
+          archive_name="OVRLEY-linux-$version-AppImage.zip"
+          archive_root="$RUNNER_TEMP/ovrley-appimage-archive"
+          rm -rf "$archive_root"
+          mkdir -p "$archive_root"
+          install -m 0755 "dist-release/$appimage_name" "$archive_root/$appimage_name"
+          install -m 0644 THIRD_PARTY_NOTICES.txt "$archive_root/THIRD_PARTY_NOTICES.txt"
+          install -m 0644 INSTALL-linux.txt "$archive_root/INSTALL.txt"
+          (cd "$archive_root" && zip -q "$GITHUB_WORKSPACE/dist-release/$archive_name" "$appimage_name" THIRD_PARTY_NOTICES.txt INSTALL.txt)
+
+          expected="$(printf '%s\n' "$appimage_name" THIRD_PARTY_NOTICES.txt INSTALL.txt | sort)"
+          actual="$(unzip -Z1 "dist-release/$archive_name" | sort)"
+          [[ "$actual" == "$expected" ]] || { echo 'AppImage archive contents are not canonical.' >&2; exit 1; }
+
       - name: Upload Linux Actions artifact
         if: inputs.release_tag != ''
         uses: actions/upload-artifact@v7
@@ -253,15 +276,16 @@ jobs:
           path: |
             dist-release/OVRLEY-linux-${{ steps.release.outputs.tag }}.AppImage
             dist-release/OVRLEY-linux-${{ steps.release.outputs.tag }}.AppImage.sig
+            dist-release/OVRLEY-linux-${{ steps.release.outputs.tag }}-AppImage.zip
           if-no-files-found: error
 
-      - name: Upload independent public Linux asset
+      - name: Upload independent public Linux archive
         if: inputs.release_tag == ''
         uses: softprops/action-gh-release@v3
         with:
           draft: true
           tag_name: ${{ steps.release.outputs.tag }}
-          files: dist-release/OVRLEY-linux-${{ steps.release.outputs.tag }}.AppImage
+          files: dist-release/OVRLEY-linux-${{ steps.release.outputs.tag }}-AppImage.zip
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

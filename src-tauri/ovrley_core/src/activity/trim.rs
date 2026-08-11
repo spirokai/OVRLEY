@@ -411,6 +411,19 @@ pub fn trim_activity(
         } else {
             Vec::new()
         },
+        engine_power: if requirements.engine_power {
+            trim_numeric_series(
+                elapsed,
+                &activity.engine_power,
+                start,
+                end,
+                start_inner_index,
+                end_inner_index,
+                interpolation_strategy(crate::MetricKind::EnginePower),
+            )
+        } else {
+            Vec::new()
+        },
         temperature: if requirements.temperature {
             trim_numeric_series(
                 elapsed,

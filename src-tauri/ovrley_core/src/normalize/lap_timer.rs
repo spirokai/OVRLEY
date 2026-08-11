@@ -25,6 +25,9 @@ pub struct ValidatedLapTimer {
     pub opacity: f32,
     pub show_label: bool,
     pub label: String,
+    pub label_font_name: String,
+    pub label_font_size: f32,
+    pub label_color: [u8; 4],
     pub mode: LapTimerMode,
 }
 
@@ -63,6 +66,13 @@ pub fn validate_lap_timer(value: ValueConfig, index: usize) -> CoreResult<Valida
             field("font_size")
         )));
     }
+    let label_font_size = require_f32(value.label_font_size, &field("label_font_size"))?;
+    if label_font_size <= 0.0 {
+        return Err(CoreError::Config(format!(
+            "{}: must be > 0, got {label_font_size}",
+            field("label_font_size")
+        )));
+    }
     let opacity = require_f32(value.opacity, &field("opacity"))?;
     if !(0.0..=1.0).contains(&opacity) {
         return Err(CoreError::Config(format!(
@@ -73,6 +83,11 @@ pub fn validate_lap_timer(value: ValueConfig, index: usize) -> CoreResult<Valida
     let color = rgba_from_hex(
         require_string(value.color, &field("color"))?.as_str(),
         &field("color"),
+        opacity,
+    )?;
+    let label_color = rgba_from_hex(
+        require_string(value.label_color, &field("label_color"))?.as_str(),
+        &field("label_color"),
         opacity,
     )?;
     let positive_delta_color = rgba_from_hex(
@@ -97,6 +112,9 @@ pub fn validate_lap_timer(value: ValueConfig, index: usize) -> CoreResult<Valida
         opacity,
         show_label: require_bool(value.show_label, &field("show_label"))?,
         label: require_string(value.label, &field("label"))?,
+        label_font_name: require_string(value.label_font, &field("label_font"))?,
+        label_font_size,
+        label_color,
         mode,
     })
 }

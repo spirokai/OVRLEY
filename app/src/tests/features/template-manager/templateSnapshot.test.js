@@ -39,21 +39,46 @@ describe('template snapshot standard metric schema', () => {
       lap_timer_mode: 'best_lap',
       show_label: true,
       label: 'Best Lap',
+      label_font: 'Arial.ttf',
+      label_font_size: 17.5,
+      label_color: '#ffffff',
       positive_delta_color: '#ff6e83',
       negative_delta_color: '#61ffab',
     })
     expect(normalized.values[0]).not.toHaveProperty('display_variants')
   })
 
+  test('populates missing lap timer label typography from globals and mode defaults on template load', () => {
+    const lapTimer = createMetricValueDefaults('lap_timer', undefined, { lapTimerMode: 'lap_log' })
+    delete lapTimer.label_font
+    delete lapTimer.label_font_size
+    delete lapTimer.label_color
+
+    const normalized = normalizeTemplateConfig({ scene: {}, values: [lapTimer] }, { font_text: 'Teko.ttf', color_text: '#123456' })
+
+    expect(normalized.values[0]).toMatchObject({
+      label_font: 'Teko.ttf',
+      label_font_size: 15,
+      label_color: '#123456',
+    })
+  })
+
   test('creates Delta with its label and manifest colors instead of the global text color', () => {
-    const lapTimer = createMetricValueDefaults('lap_timer', { color_values: '#ffffff' }, { lapTimerMode: 'delta' })
+    const lapTimer = createMetricValueDefaults(
+      'lap_timer',
+      { color_values: '#ffffff', font_text: 'Teko.ttf', color_text: '#123456' },
+      { lapTimerMode: 'delta' },
+    )
 
     expect(lapTimer).toMatchObject({
       value: 'lap_timer',
       display_type: 'lap_timer',
       lap_timer_mode: 'delta',
       show_label: true,
-      label: 'Live Delta',
+      label: 'Delta',
+      label_font: 'Teko.ttf',
+      label_font_size: 17.5,
+      label_color: '#123456',
       positive_delta_color: '#ff6e83',
       negative_delta_color: '#61ffab',
     })
@@ -69,6 +94,7 @@ describe('template snapshot standard metric schema', () => {
       show_label: true,
       label: 'Lap Log',
       font_size: 30,
+      label_font_size: 15,
       color: '#abcdef',
     })
   })

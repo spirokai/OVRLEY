@@ -7,6 +7,15 @@ import { useLayoutEffect, useMemo } from 'react'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { CORNER_RESIZE_DIRECTIONS, EDGE_RESIZE_DIRECTIONS, MOVEABLE_ZOOM } from '../data/overlayEditorConstants'
 
+const SNAP_DIRECTIONS = {
+  left: true,
+  top: true,
+  right: true,
+  bottom: true,
+  center: true,
+  middle: true,
+}
+
 function getGridGuidelines(max, gridSize, enabled) {
   const guidelines = [0, max / 2, max]
 
@@ -98,6 +107,8 @@ export default function OverlayMoveable({
       rotatable={canRotateSelected}
       renderDirections={showEdgeResizeHandles ? EDGE_RESIZE_DIRECTIONS : CORNER_RESIZE_DIRECTIONS}
       snappable
+      snapDirections={SNAP_DIRECTIONS}
+      elementSnapDirections={SNAP_DIRECTIONS}
       snapThreshold={8}
       snapGap
       keepRatio={maintainAspectRatio}

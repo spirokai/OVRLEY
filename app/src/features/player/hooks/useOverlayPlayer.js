@@ -211,7 +211,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     switch (match.commandId) {
       case 'player.stepBackward':
       case 'player.stepForward':
-        if (activeKeyboardWorkspace !== 'player' || !hasActivity || playerStore.selectedWidgetIds.length) return
+        if (activeKeyboardWorkspace !== 'player' || !hasActivity) return
         event.preventDefault()
         stepBySeconds(match.commandId === 'player.stepForward' ? 1 : -1)
         return

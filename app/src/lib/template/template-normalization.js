@@ -37,7 +37,15 @@ import {
   SCENE_RENDER_TIME_ONLY_KEYS,
   VALUE_SHARED_KEYS,
 } from './template-constants'
-import { TYPE_DEFAULTS, TEXT_DEFAULTS, COURSE_PLOT_DEFAULTS, ELEVATION_PLOT_DEFAULTS, GRADIENT_DEFAULTS } from '../widget/standard-widgets'
+import {
+  TYPE_DEFAULTS,
+  TEXT_DEFAULTS,
+  COURSE_PLOT_DEFAULTS,
+  ELEVATION_PLOT_DEFAULTS,
+  GRADIENT_DEFAULTS,
+  LAP_TIMER_DEFAULTS,
+  LAP_TIMER_MODES,
+} from '../widget/standard-widgets'
 
 function cloneSerializable(value) {
   if (value === undefined) return undefined
@@ -190,13 +198,20 @@ function normalizeLinearGaugeLabelPosition(variant) {
   }
 }
 
-function normalizeValue(value = {}) {
+function normalizeValue(value = {}, globalDefaults) {
   const type = value.value
   normalizeLeanAngleGeometry(value)
   const valueDefaults = type === 'gradient' ? GRADIENT_DEFAULTS : TYPE_DEFAULTS[type] || {}
   const extraKeys = Object.keys(valueDefaults).filter((key) => !VALUE_SHARED_KEYS.includes(key))
   const keys = [...VALUE_SHARED_KEYS, ...extraKeys, ...(type === 'lap_timer' ? LAP_TIMER_KEYS : [])]
-  const withDefaults = { ...TEXT_DEFAULTS, ...TYPE_DEFAULTS[type], ...value }
+  const lapTimerDefaults = type === 'lap_timer' ? LAP_TIMER_DEFAULTS : {}
+  const withDefaults = { ...TEXT_DEFAULTS, ...TYPE_DEFAULTS[type], ...lapTimerDefaults, ...value }
+  if (type === 'lap_timer') {
+    const mode = LAP_TIMER_MODES.find((candidate) => candidate.value === value.lap_timer_mode)
+    if (value.label_font === undefined) withDefaults.label_font = globalDefaults?.font_text || LAP_TIMER_DEFAULTS.label_font
+    if (value.label_font_size === undefined && mode) withDefaults.label_font_size = mode.label_font_size
+    if (value.label_color === undefined) withDefaults.label_color = globalDefaults?.color_text || LAP_TIMER_DEFAULTS.label_color
+  }
   const pickedValue = pickDefined(withDefaults, keys)
   if (typeof pickedValue.display_unit !== 'string') {
     delete pickedValue.display_unit
@@ -256,7 +271,7 @@ export function normalizeTemplateConfig(config, globalDefaults) {
     for (const label of nextConfig.labels) normalizedConfig.labels.push(normalizeLabel(label))
   }
   if (Array.isArray(nextConfig.values)) {
-    for (const value of nextConfig.values) normalizedConfig.values.push(normalizeValue(value))
+    for (const value of nextConfig.values) normalizedConfig.values.push(normalizeValue(value, globalDefaults))
   }
   if (Array.isArray(nextConfig.plots)) {
     for (const plot of nextConfig.plots) normalizedConfig.plots.push(normalizePlot(plot, nextConfig, globalDefaults))

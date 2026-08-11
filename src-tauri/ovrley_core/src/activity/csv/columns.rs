@@ -143,7 +143,9 @@ pub(super) fn build_activity_columns(
             && column.is_some_and(|column| {
                 matches!(
                     column.priority,
-                    SourcePriority::Preferred | SourcePriority::Direct
+                    SourcePriority::Preferred
+                        | SourcePriority::Direct
+                        | SourcePriority::DirectSpeed
                 )
             });
         if uses_gps_update {
@@ -267,19 +269,28 @@ pub(super) fn build_activity_columns(
         heading: preserve_heading_gaps,
     };
     let (rpm, _) = series(Metric::Rpm);
+    let (engine_power, _) = series(Metric::EnginePower);
     let (torque, _) = series(Metric::Torque);
     let (throttle_position, _) = series(Metric::ThrottlePosition);
     let (brake_position, _) = series(Metric::BrakePosition);
     let (source_lap_number, _) = series(Metric::LapNumber);
-    let lap_number = source_lap_number
-        .into_iter()
-        .map(|value| match value {
-            Some(value) if value > 0.0 && value.fract() == 0.0 && value <= i64::MAX as f64 => {
-                Some(value as i64)
-            }
-            _ => Some(-1),
-        })
-        .collect();
+    let has_lap_number_column = header
+        .columns
+        .iter()
+        .any(|column| column.metric == Metric::LapNumber);
+    let lap_number = if has_lap_number_column {
+        source_lap_number
+            .into_iter()
+            .map(|value| match value {
+                Some(value) if value > 0.0 && value.fract() == 0.0 && value <= i64::MAX as f64 => {
+                    Some(value as i64)
+                }
+                _ => Some(-1),
+            })
+            .collect()
+    } else {
+        vec![None; sample_count]
+    };
     let (mut lean_angle, _) = series(Metric::LeanAngle);
     if lean_angle.iter().all(Option::is_none) {
         lean_angle = derive_lean_from_speed_heading(&speed, &heading, &elapsed_seconds);
@@ -366,6 +377,7 @@ pub(super) fn build_activity_columns(
         heartrate: empty(),
         cadence: empty(),
         power: empty(),
+        engine_power,
         temperature: empty(),
         calories: empty(),
         gradient: empty(),
