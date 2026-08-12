@@ -10,7 +10,7 @@ const DEFAULT_WINDOWS_FFMPEG_ARCHIVE =
   "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
 const DEFAULT_LINUX_FFMPEG_ARCHIVE =
   "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz";
-const PINNED_DARWIN_FFMPEG_VERSION = "8.1.2";
+const PINNED_DARWIN_FFMPEG_VERSION = "9.0";
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const installDir = join(rootDir, "vendor", "ffmpeg");
 const binDir = join(installDir, "bin");
@@ -32,16 +32,16 @@ const requiredFilters =
 const defaultFfmpegArchives = {
   "win32-x64": DEFAULT_WINDOWS_FFMPEG_ARCHIVE,
   "linux-x64": DEFAULT_LINUX_FFMPEG_ARCHIVE,
-  "darwin-arm64": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffmpeg.zip",
-  "darwin-x64": "https://ffmpeg.martin-riedl.de/download/macos/amd64/1783018342_8.1.2/ffmpeg.zip",
+  "darwin-arm64": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1785863997_9.0/ffmpeg.zip",
+  "darwin-x64": "https://ffmpeg.martin-riedl.de/download/macos/amd64/1785871427_9.0/ffmpeg.zip",
 };
 
 const expectedFfmpegVersion =
   process.platform === "darwin" && !process.env.OVRLEY_FFMPEG_ARCHIVE_URL ? PINNED_DARWIN_FFMPEG_VERSION : null;
 
 const defaultFfprobeArchives = {
-  "darwin-arm64": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffprobe.zip",
-  "darwin-x64": "https://ffmpeg.martin-riedl.de/download/macos/amd64/1783018342_8.1.2/ffprobe.zip",
+  "darwin-arm64": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1785863997_9.0/ffprobe.zip",
+  "darwin-x64": "https://ffmpeg.martin-riedl.de/download/macos/amd64/1785871427_9.0/ffprobe.zip",
 };
 
 main().catch((error) => {
