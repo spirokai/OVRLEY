@@ -122,6 +122,7 @@ pub fn validate_time_value(
             coordinate_format: None,
             unit_color: color,
             display_unit: String::new(),
+            starting_altitude_m: None,
             prefix,
             suffix,
             formatting: ValidatedValueFormatting::DecimalPlaces { decimals: 0 },

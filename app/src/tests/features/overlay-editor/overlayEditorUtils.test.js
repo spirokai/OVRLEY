@@ -9,7 +9,7 @@
 
 import { describe, expect, test } from 'vitest'
 import { getContainerFps } from '@/lib/update-rate'
-import { getInterpolatedActivityValue, getInterpolatedTimeValue, getMetricSeries } from '@/features/overlay-editor'
+import { getElevationProfileSeries, getInterpolatedActivityValue, getInterpolatedTimeValue, getMetricSeries } from '@/features/overlay-editor'
 import { getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
 
 describe('getContainerFps', () => {
@@ -49,6 +49,10 @@ describe('getMetricSeries', () => {
     expect(getMetricSeries(activity, 'altitude')).toBe(barometricAltitude)
     expect(getMetricSeries(activity, 'distance')).toBe(activity.distance)
     expect(getMetricSeries({ elevation }, 'altitude')).toBe(elevation)
+    const sampleElevations = [110, 130]
+
+    expect(getElevationProfileSeries({ sample_elevations: sampleElevations, elevation })).toBe(sampleElevations)
+    expect(getElevationProfileSeries({ sample_elevations: [], elevation })).toBe(elevation)
   })
 })
 

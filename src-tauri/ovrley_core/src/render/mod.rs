@@ -567,7 +567,8 @@ fn render_frame_to_surface(
             }
 
             match value {
-                PreparedValue::StandardText(validated) => {
+                PreparedValue::StandardText(prepared) => {
+                    let validated = &prepared.validated;
                     let style = validated_value_style(validated, &prepared_assets.scene, scale);
                     let static_icon_rendered_for_value =
                         static_metric_icons_rendered && has_static_metric_icon_validated(validated);
@@ -584,6 +585,7 @@ fn render_frame_to_surface(
                         validated: Some(validated),
                         validated_gradient: None,
                         validated_time: None,
+                        altitude_offset_m: prepared.altitude_offset_m,
                         timezone: None,
                     })?;
                 }
@@ -604,6 +606,7 @@ fn render_frame_to_surface(
                         validated: None,
                         validated_gradient: None,
                         validated_time: Some(validated),
+                        altitude_offset_m: 0.0,
                         timezone: prepared_assets.timezone,
                     })?;
                 }
@@ -622,6 +625,7 @@ fn render_frame_to_surface(
                         validated: None,
                         validated_gradient: Some(validated),
                         validated_time: None,
+                        altitude_offset_m: 0.0,
                         timezone: None,
                     })?;
                 }

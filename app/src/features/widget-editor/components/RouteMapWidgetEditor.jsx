@@ -149,12 +149,24 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
       </div>
       <div className="space-y-4">
         <SectionHeading icon={Map} title="Marker" />
-        <SelectField
-          label="Type"
-          value={markerVariant}
-          options={MARKER_VARIANT_OPTIONS}
-          onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <SelectField
+            label="Type"
+            value={markerVariant}
+            options={MARKER_VARIANT_OPTIONS}
+            onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
+          />
+          <SizeSlider
+            label=" Size"
+            value={markerSize}
+            min={0}
+            max={50}
+            step={1}
+            valueDisplay={`${markerSize}px`}
+            onChange={(value) => updateWidgetSize(widget.id, { marker_size: value })}
+            onCommit={() => commitWidgetSize(widget.id)}
+          />
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <ColorField
             label="Color"
@@ -172,16 +184,6 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <SizeSlider
-            label=" Size"
-            value={markerSize}
-            min={0}
-            max={50}
-            step={1}
-            valueDisplay={`${markerSize}px`}
-            onChange={(value) => updateWidgetSize(widget.id, { marker_size: value })}
-            onCommit={() => commitWidgetSize(widget.id)}
-          />
           {showVariantDiameter ? (
             <SizeSlider
               label={variantDiameterLabel}

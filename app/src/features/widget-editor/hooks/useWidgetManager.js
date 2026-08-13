@@ -15,6 +15,7 @@ import { createBackdropDefaults, createLabelDefaults, createMetricValueDefaults,
 import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
 import { updateLiveWidgetDraft } from '@/features/overlay-editor/utils/widgetDomHelpers'
 import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
+import { resolveInitialAltitudePresentation } from '@/lib/widget/altitude-correction'
 
 /**
  * Container hook for SidebarWidgetsTab that owns all store access,
@@ -36,22 +37,24 @@ import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDra
  */
 export function useWidgetManager({ widgetLiveEdits }) {
   // Store selectors — shallow-pick zustand state needed for widget management
-  const { config, globalDefaults, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
+  const { config, globalDefaults, parsedActivity, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
     useShallow((state) => ({
       config: state.config,
       globalDefaults: state.globalDefaults,
+      parsedActivity: state.parsedActivity,
       selectedWidgetId: state.selectedWidgetId,
       setConfig: state.setConfig,
       setSelectedWidgetId: state.setSelectedWidgetId,
     })),
   )
   const liveEdits = useWidgetDraftView(widgetLiveEdits)
-  const parsedActivity = useStore.getState().parsedActivity
 
   // Derived state — group and build the sidebar widget list from config
   const widgets = useMemo(() => {
-    return groupWidgetsForSidebar(applyWidgetDrafts(buildConfigWidgets(config), liveEdits.liveWidgetDrafts), TYPE_LABELS)
-  }, [config, liveEdits.liveWidgetDrafts])
+    const configWidgets = applyWidgetDrafts(buildConfigWidgets(config), liveEdits.liveWidgetDrafts)
+    const initializedWidgets = configWidgets.map((widget) => resolveInitialAltitudePresentation(widget, parsedActivity))
+    return groupWidgetsForSidebar(initializedWidgets, TYPE_LABELS)
+  }, [config, liveEdits.liveWidgetDrafts, parsedActivity])
 
   // Update handler — applies partial updates to a widget via config utility
   const updateWidgetData = (id, updates) => {
@@ -86,11 +89,17 @@ export function useWidgetManager({ widgetLiveEdits }) {
 
   // Numeric field handler — parses raw input, clamps to range, updates widget
   const setNumericField = (widgetId, key, rawValue, options = {}) => {
-    const { fallback = 0, min, max } = options
-    const parsed = parseInteger(rawValue, fallback)
+    const { fallback = 0, min, max, optional = false, integer = true, round = false, additionalUpdates = {} } = options
+    if (optional && rawValue === '') {
+      updateWidgetData(widgetId, { [key]: null, ...additionalUpdates })
+      return
+    }
+    let parsed = integer ? parseInteger(rawValue, fallback) : Number(rawValue)
+    if (round) parsed = Math.round(Number(rawValue))
+    if (!Number.isFinite(parsed)) throw new Error(`Invalid numeric value for ${key}`)
     const nextValue = min !== undefined || max !== undefined ? clamp(parsed, min ?? parsed, max ?? parsed) : parsed
 
-    updateWidgetData(widgetId, { [key]: nextValue })
+    updateWidgetData(widgetId, { [key]: nextValue, ...additionalUpdates })
   }
 
   // Add widget — creates a new widget of the given type with defaults and appends to config
@@ -108,7 +117,12 @@ export function useWidgetManager({ widgetLiveEdits }) {
       targetCategory = 'labels'
     } else if (isStandardMetricWidgetType(type) || ['gradient', 'time'].includes(type)) {
       if (!nextConfig.values) nextConfig.values = []
-      nextConfig.values.push(createMetricValueDefaults(type, globalDefaults, { displayType, lapTimerMode }))
+      nextConfig.values.push(
+        createMetricValueDefaults(type, globalDefaults, {
+          displayType,
+          lapTimerMode,
+        }),
+      )
       targetCategory = 'values'
     } else if (['course', 'elevation'].includes(type)) {
       if (!nextConfig.plots) nextConfig.plots = []
@@ -162,7 +176,15 @@ export function useWidgetManager({ widgetLiveEdits }) {
     }
 
     const selection = widget.type === 'lap_timer' ? { lapTimerMode: 'current_lap' } : {}
-    setConfig(replaceWidgetInConfig(config, id, createMetricValueDefaults(widget.type, globalDefaults, selection)))
+    setConfig(
+      replaceWidgetInConfig(
+        config,
+        id,
+        createMetricValueDefaults(widget.type, globalDefaults, {
+          ...selection,
+        }),
+      ),
+    )
   }
 
   return {

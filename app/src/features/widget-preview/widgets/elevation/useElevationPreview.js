@@ -4,6 +4,8 @@ import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
 import { useFontMetrics } from '../../shared/useFontMetrics'
 import { useElevationPreviewGeometry } from './useElevationPreviewGeometry'
 import { buildElevationPreviewStyle } from './style'
+import { applyAltitudeOffset, getAltitudeCorrectionMeters } from '@/lib/widget/altitude-correction'
+import { getElevationProfileSeries } from '@/features/overlay-editor'
 
 function formatElevationLabels(elevationValue) {
   if (elevationValue === null) return { metricLabel: '-- M', imperialLabel: '-- FT' }
@@ -31,7 +33,13 @@ export function useElevationPreview({ widget, activity, previewSecond, globalSca
 
   if (!geometry) return null
 
-  const labels = formatElevationLabels(geometry.elevationValue)
+  const labelOffset = getAltitudeCorrectionMeters(
+    getElevationProfileSeries(activity),
+    widget.data.starting_altitude,
+    widget.data.starting_altitude_unit,
+  )
+  const labelAltitude = applyAltitudeOffset(geometry.elevationValue, labelOffset)
+  const labels = formatElevationLabels(labelAltitude)
   const labelMeasurement = measurePreviewText(labels.metricLabel, widget.data.point_label.font_size, style.labelFontFamily)
 
   return {

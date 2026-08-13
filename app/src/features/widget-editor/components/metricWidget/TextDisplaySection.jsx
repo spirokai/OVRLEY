@@ -6,7 +6,8 @@ import {
 } from '@/lib/widget/standard-metrics'
 import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/widgets/metric/format'
 import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
-import { ToggleField, SelectField, SliderField } from '../widgetFormControls'
+import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
+import { buildMetricUnitUpdate } from '@/lib/widget/altitude-correction'
 
 const COORDINATE_FORMAT_OPTIONS = [
   { value: 'dms', label: 'Deg / Min / Sec' },
@@ -36,6 +37,13 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
   const maxDecimals = supportsDecimalPrecision ? 2 : 1
   const defaultDecimals = supportsDecimalPrecision ? 1 : 0
   const decimals = Number.isFinite(widget.data.decimals) ? Math.min(Math.max(widget.data.decimals, 0), maxDecimals) : defaultDecimals
+
+  const handleUnitChange = (value) => {
+    updateWidgetData(
+      widget.id,
+      buildMetricUnitUpdate(widget.type, widget.data.starting_altitude, getStandardMetricDisplayUnit(widget.type, widget.data), value),
+    )
+  }
 
   return (
     <>
@@ -122,7 +130,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
               onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
               selectLabel="Unit"
               value={getStandardMetricDisplayUnit(widget.type, widget.data)}
-              onValueChange={(value) => updateWidgetData(widget.id, { display_unit: value })}
+              onValueChange={handleUnitChange}
               options={isCoordinateWidget ? undefined : supportsUnitSelection ? unitOptions : undefined}
               showToggle={!isCoordinateWidget}
             />

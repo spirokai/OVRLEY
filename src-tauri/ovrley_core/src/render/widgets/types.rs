@@ -75,6 +75,7 @@ pub struct PreparedLeanAngle {
 #[derive(Clone, Debug)]
 pub struct PreparedLinearGauge {
     pub validated: ValidatedLinearGaugeWidget,
+    pub altitude_offset_m: f64,
     pub cache: Option<LinearGaugeCache>,
 }
 
@@ -82,7 +83,15 @@ pub struct PreparedLinearGauge {
 #[derive(Clone, Debug)]
 pub struct PreparedArcGauge {
     pub validated: ValidatedArcGaugeWidget,
+    pub altitude_offset_m: f64,
     pub cache: Option<ArcGaugeCache>,
+}
+
+/// Validated text metric together with activity-derived presentation state.
+#[derive(Clone, Debug)]
+pub struct PreparedStandardText {
+    pub validated: ValidatedValueWidget,
+    pub altitude_offset_m: f64,
 }
 
 /// Validated G-force configuration together with its typed cache.
@@ -102,7 +111,7 @@ pub struct PreparedLapTimer {
 /// One validated render value, keyed implicitly by its index in the config array.
 #[derive(Clone, Debug)]
 pub enum PreparedValue {
-    StandardText(ValidatedValueWidget),
+    StandardText(PreparedStandardText),
     TimeText(ValidatedTimeValue),
     Gradient(ValidatedGradientWidget),
     HeadingTape(PreparedHeadingTape),
@@ -116,7 +125,7 @@ pub enum PreparedValue {
 impl PreparedValue {
     pub fn metric_kind(&self) -> MetricKind {
         match self {
-            Self::StandardText(value) => value.metric,
+            Self::StandardText(value) => value.validated.metric,
             Self::TimeText(_) => MetricKind::Time,
             Self::Gradient(_) => MetricKind::Gradient,
             Self::HeadingTape(_) => MetricKind::Heading,
@@ -130,7 +139,7 @@ impl PreparedValue {
 
     pub fn display_type(&self) -> DisplayType {
         match self {
-            Self::StandardText(value) => value.display_type,
+            Self::StandardText(value) => value.validated.display_type,
             Self::TimeText(value) => value.base.display_type,
             Self::Gradient(_) => DisplayType::Text,
             Self::HeadingTape(_) => DisplayType::Tape,
@@ -144,7 +153,7 @@ impl PreparedValue {
 
     pub fn x(&self) -> f32 {
         match self {
-            Self::StandardText(value) => value.x,
+            Self::StandardText(value) => value.validated.x,
             Self::TimeText(value) => value.base.x,
             Self::Gradient(value) => value.x,
             Self::HeadingTape(value) => value.validated.x,
@@ -158,7 +167,7 @@ impl PreparedValue {
 
     pub fn y(&self) -> f32 {
         match self {
-            Self::StandardText(value) => value.y,
+            Self::StandardText(value) => value.validated.y,
             Self::TimeText(value) => value.base.y,
             Self::Gradient(value) => value.y,
             Self::HeadingTape(value) => value.validated.y,
@@ -473,6 +482,7 @@ pub struct ArcGaugeFrameState {
 #[derive(Clone, Debug)]
 pub(crate) struct ElevationWidgetCache {
     pub(crate) plot: NormalizedElevationPlot,
+    pub(crate) label_altitude_offset_m: f64,
     pub(crate) geometry: WidgetGeometry,
     pub(crate) frame_states: Vec<ElevationFrameState>,
     pub(crate) marker_layers: Vec<MarkerLayer>,

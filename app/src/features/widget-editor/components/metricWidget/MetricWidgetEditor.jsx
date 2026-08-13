@@ -6,8 +6,8 @@
  * creating a new section component and registering it below.
  */
 
-import { getDisplayTypeDefaultFontSize, getDisplayTypeOptions } from '@/lib/widget/standard-metrics'
-import { SelectField } from '../widgetFormControls'
+import { getDisplayTypeDefaultFontSize, getDisplayTypeOptions, getStandardMetricDisplayUnit } from '@/lib/widget/standard-metrics'
+import { NumberField, SelectField } from '../widgetFormControls'
 import { useCallback } from 'react'
 import { initDisplayVariant } from '@/lib/widget/widget-resolver'
 import { isTextDisplayType } from '@/lib/widget/display-type-behavior'
@@ -74,6 +74,15 @@ export default function MetricWidgetEditor({
           {/* <SectionHeading icon={Gauge} title="Display" /> */}
           <SelectField label="Display Type" value={displayType} onValueChange={handleDisplayTypeChange} options={displayOptions} />
         </div>
+      ) : null}
+
+      {widget.type === 'altitude' ? (
+        <NumberField
+          label="Starting Altitude"
+          value={widget.data.starting_altitude}
+          suffix={getStandardMetricDisplayUnit(widget.type, widget.data)}
+          onChange={(rawValue) => setNumericField(widget.id, 'starting_altitude', rawValue, { optional: true, round: true })}
+        />
       ) : null}
 
       {isTextDisplayType(displayType) ? (

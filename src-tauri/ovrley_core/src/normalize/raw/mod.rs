@@ -229,6 +229,8 @@ pub struct ValueConfig {
     #[serde(default)]
     pub display_unit: Option<String>,
     #[serde(default)]
+    pub starting_altitude: Option<f64>,
+    #[serde(default)]
     pub coordinate_format: Option<String>,
     #[serde(default)]
     pub balance_format: Option<String>,
@@ -602,6 +604,10 @@ pub struct ElevationPlotConfig {
     pub show_elevation_metric: Option<bool>,
     #[serde(default)]
     pub show_elevation_imperial: Option<bool>,
+    #[serde(default)]
+    pub starting_altitude: Option<f64>,
+    #[serde(default)]
+    pub starting_altitude_unit: Option<String>,
     #[serde(default)]
     pub y_scale: Option<f32>,
     #[serde(default)]

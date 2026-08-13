@@ -153,6 +153,18 @@ function getPreferredElevationSeries(activity) {
 }
 
 /**
+ * Returns the canonical source series used by elevation-profile presentation.
+ * Sample elevations own the profile when present; raw elevation is the
+ * documented fallback used by both profile geometry and marker labels.
+ *
+ * @param {object|null} activity - Parsed activity data.
+ * @returns {Array<unknown>|undefined} Elevation-profile source series.
+ */
+export function getElevationProfileSeries(activity) {
+  return activity?.sample_elevations?.length ? activity.sample_elevations : activity?.elevation
+}
+
+/**
  * Interpolates the time-of-day value at the given elapsed second.
  * Interpolates the ISO time series when available, falling back to sync_time
  * only when the activity has no time series values.

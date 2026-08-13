@@ -131,19 +131,26 @@ export function TextField({ label, value, onChange, placeholder = '' }) {
  * @param {*} props.step - Value for step.
  * @returns {JSX.Element} Rendered component output.
  */
-export function NumberField({ label, value, onChange, min, max, disabled = false, step = 1 }) {
+export function NumberField({ label, value, onChange, min, max, disabled = false, step = 1, suffix, integerDisplay = true }) {
   return (
     <FieldBlock label={label} disabled={disabled}>
-      <BlurInput
-        type="number"
-        disabled={disabled}
-        value={value === null || value === undefined || value === '' ? value : Math.round(value)}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(event) => onChange(event.target.value)}
-        className={CONTROL_CLASS}
-      />
+      <div className="relative">
+        <BlurInput
+          type="number"
+          disabled={disabled}
+          value={value === null || value === undefined || value === '' || !integerDisplay ? value : Math.round(value)}
+          min={min}
+          max={max}
+          step={step}
+          onChange={(event) => onChange(event.target.value)}
+          className={cn(CONTROL_CLASS, suffix && 'pr-16')}
+        />
+        {suffix ? (
+          <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-[10px] font-mono text-muted-foreground">
+            {suffix}
+          </span>
+        ) : null}
+      </div>
     </FieldBlock>
   )
 }

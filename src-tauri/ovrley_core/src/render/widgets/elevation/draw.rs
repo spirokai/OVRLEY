@@ -119,7 +119,7 @@ pub(crate) fn draw_elevation_widget(
                     canvas,
                     paths,
                     elevation_cache,
-                    state.elevation_m,
+                    state.elevation_m + elevation_cache.label_altitude_offset_m,
                     unit,
                     marker_abs_x,
                     marker_abs_y,

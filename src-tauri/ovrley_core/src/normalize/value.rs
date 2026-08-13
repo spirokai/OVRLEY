@@ -72,11 +72,36 @@ pub struct ValidatedValueWidget {
     pub coordinate_format: Option<String>,
     pub unit_color: [u8; 4],
     pub display_unit: String,
+    /// Optional presentation target for the first altitude sample, normalized to meters.
+    pub starting_altitude_m: Option<f64>,
     pub prefix: String,
     pub suffix: String,
     pub formatting: ValidatedValueFormatting,
     pub hours_offset: Option<i64>,
     pub format: Option<String>,
+}
+
+pub(super) fn normalize_starting_altitude_m(
+    metric: MetricKind,
+    starting_altitude: Option<f64>,
+    display_unit: &str,
+    path: &str,
+) -> CoreResult<Option<f64>> {
+    if metric != MetricKind::Altitude {
+        return Ok(None);
+    }
+
+    let meter_scale = match display_unit {
+        "m" => 1.0,
+        "ft" => 3.280_84,
+        unit => {
+            return Err(CoreError::Config(format!(
+                "{path}: expected 'm' or 'ft', got '{unit}'"
+            )))
+        }
+    };
+
+    Ok(starting_altitude.map(|altitude| altitude / meter_scale))
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +286,12 @@ fn validate_value_widget_fields(
             p("display_unit")
         )));
     }
+    let starting_altitude_m = normalize_starting_altitude_m(
+        value.value,
+        value.starting_altitude,
+        &display_unit,
+        &p("display_unit"),
+    )?;
 
     // -- affixes are output-affecting and must be explicit ----------------
     let prefix = require_string(value.prefix, &p("prefix"))?;
@@ -352,6 +383,7 @@ fn validate_value_widget_fields(
         coordinate_format,
         unit_color,
         display_unit,
+        starting_altitude_m,
         prefix,
         suffix,
         formatting,

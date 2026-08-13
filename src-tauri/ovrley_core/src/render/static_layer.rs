@@ -201,7 +201,7 @@ fn draw_static_metric_icons(
 
 fn text_value(value: &PreparedValue) -> Option<&crate::normalize::ValidatedValueWidget> {
     match value {
-        PreparedValue::StandardText(validated) => Some(validated),
+        PreparedValue::StandardText(prepared) => Some(&prepared.validated),
         PreparedValue::TimeText(validated) => Some(&validated.base),
         PreparedValue::Gradient(_)
         | PreparedValue::HeadingTape(_)

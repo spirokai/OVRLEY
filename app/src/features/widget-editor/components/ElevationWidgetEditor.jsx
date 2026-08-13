@@ -3,15 +3,21 @@
  */
 
 import { Map, Mountain, Palette } from 'lucide-react'
-import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
+import { ColorField, NumberField, SelectField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection, SectionHeading } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 import { Label } from '@/components/ui/label'
+import { convertAltitudeInputValue } from '@/lib/widget/altitude-correction'
 
 const MARKER_VARIANT_OPTIONS = [
   { value: 'single', label: 'Single Circle' },
   { value: 'ring', label: 'Concentric Ring' },
   { value: 'halo', label: 'Solid Halo' },
+]
+
+const ALTITUDE_UNIT_OPTIONS = [
+  { value: 'm', label: 'm' },
+  { value: 'ft', label: 'ft' },
 ]
 
 /**
@@ -42,6 +48,30 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
   return (
     <>
       <DimensionsSection widget={widget} setNumericField={setNumericField} />
+      <div className="grid grid-cols-2 gap-4">
+        <NumberField
+          label="Starting Elevation"
+          value={widget.data.starting_altitude}
+          onChange={(rawValue) =>
+            setNumericField(widget.id, 'starting_altitude', rawValue, {
+              optional: true,
+              round: true,
+              additionalUpdates: { starting_altitude_unit: widget.data.starting_altitude_unit },
+            })
+          }
+        />
+        <SelectField
+          label="Unit"
+          value={widget.data.starting_altitude_unit}
+          options={ALTITUDE_UNIT_OPTIONS}
+          onValueChange={(value) =>
+            updateWidgetData(widget.id, {
+              starting_altitude: convertAltitudeInputValue(widget.data.starting_altitude, widget.data.starting_altitude_unit, value),
+              starting_altitude_unit: value,
+            })
+          }
+        />
+      </div>
       <div className="space-y-4">
         <SectionHeading icon={Palette} title="Line Styling" />
         <SliderField
@@ -190,12 +220,24 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
       </div>
       <div className="space-y-4">
         <SectionHeading icon={Map} title="Marker" />
-        <SelectField
-          label="Marker Type"
-          value={markerVariant}
-          options={MARKER_VARIANT_OPTIONS}
-          onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <SelectField
+            label="Marker Type"
+            value={markerVariant}
+            options={MARKER_VARIANT_OPTIONS}
+            onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
+          />
+          <SizeSlider
+            label="Size"
+            value={markerSize}
+            min={0}
+            max={50}
+            step={1}
+            valueDisplay={`${markerSize}px`}
+            onChange={(value) => updateWidgetSize(widget.id, { marker_size: value })}
+            onCommit={() => commitWidgetSize(widget.id)}
+          />
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <ColorField
             label="Color"
@@ -213,16 +255,6 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <SizeSlider
-            label="Size"
-            value={markerSize}
-            min={0}
-            max={50}
-            step={1}
-            valueDisplay={`${markerSize}px`}
-            onChange={(value) => updateWidgetSize(widget.id, { marker_size: value })}
-            onCommit={() => commitWidgetSize(widget.id)}
-          />
           {showVariantDiameter ? (
             <SizeSlider
               label={variantDiameterLabel}
