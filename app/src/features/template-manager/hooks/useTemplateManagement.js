@@ -115,7 +115,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         return true
       } catch (error) {
         console.error('Failed to load template:', error)
-        setErrorMessage(`Failed to load template: ${getErrorMessage(error, 'Unknown error')}`)
+        setErrorMessage('Failed to load template.')
         return false
       } finally {
         setProcessing(false)
@@ -273,15 +273,21 @@ export default function useTemplateManagement({ onTemplateCreated }) {
   handleTemplateChangeRef.current = handleTemplateChange
 
   const restoreLastLoadedTemplate = useCallback(async () => {
-    const saved = await getPreference('last-template')
-    if (saved?.source === 'backend' && saved.filename) {
-      const restored = await handleTemplateChangeRef.current(saved.filename)
-      if (!restored) {
-        replaceEditorDocument(useStore, createNewTemplate)
-        await deletePreference('last-template')
+    try {
+      const saved = await getPreference('last-template')
+      if (saved?.source === 'backend' && saved.filename) {
+        const restored = await handleTemplateChangeRef.current(saved.filename)
+        if (!restored) {
+          replaceEditorDocument(useStore, createNewTemplate)
+          await deletePreference('last-template')
+        }
       }
+    } catch (error) {
+      console.error('Failed to restore last template:', error)
+      setErrorMessage('Failed to load template.')
+      replaceEditorDocument(useStore, createNewTemplate)
     }
-  }, [createNewTemplate])
+  }, [createNewTemplate, setErrorMessage])
 
   return {
     confirmCreateNewTemplate,

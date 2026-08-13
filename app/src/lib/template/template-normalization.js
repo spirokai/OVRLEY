@@ -200,6 +200,10 @@ function normalizeLinearGaugeLabelPosition(variant) {
 
 function normalizeValue(value = {}, globalDefaults) {
   const type = value.value
+  if (!Object.hasOwn(TYPE_DEFAULTS, type)) {
+    throw new Error(`Unknown value widget type: ${String(type)}`)
+  }
+
   normalizeLeanAngleGeometry(value)
   const valueDefaults = type === 'gradient' ? GRADIENT_DEFAULTS : TYPE_DEFAULTS[type] || {}
   const extraKeys = Object.keys(valueDefaults).filter((key) => !VALUE_SHARED_KEYS.includes(key))
