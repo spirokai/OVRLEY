@@ -10,13 +10,13 @@ Do not run a production build. Do not add feature tests. Preserve unrelated work
 
 ## Target Architecture
 
-The toolbar and shared drawer must be implemented as a separate feature module under `app/src/features/`. The module owns its presentation, container hooks, constants, and pure utilities while integrating with shell layout and rendering Widgets content supplied by `widget-drawer`.
+The toolbar and shared drawer must be implemented as a separate feature module under `app/src/features/`. Add only the presentation, lifecycle hook, constants, and normalization utility this feature needs. The app shell composes that feature into the horizontal layout and supplies Widgets content from `widget-drawer`.
 
 The finished frontend should have four clear responsibilities:
 
 1. The layout slice owns the canonical shared-drawer state machine.
-2. A shell-level preference hook hydrates and persists the optional durable drawer preference.
-3. App-shell presentation owns the toolbar, shared drawer frame, startup gate, and horizontal layout transition.
+2. A preference hook exported by the toolbar feature hydrates and persists the optional durable drawer preference; the app shell invokes it at its composition boundary.
+3. The toolbar feature owns the toolbar and shared drawer presentation. `App.jsx` owns their placement, the startup gate, and the horizontal allocation within the application shell.
 4. The widget-drawer feature supplies Widgets content and its successful-add behavior without owning generic shell positioning or pin state.
 
 The main-content row has this logical shape:
@@ -86,7 +86,8 @@ toolbar | pinned drawer allocation (0rem or 15rem) | scene canvas + timeline | r
 - Persist pin and active-tool changes after initialization.
 - Avoid writing the initial hydrated state back immediately unless the user changes it.
 - Keep save failures silent and retain current in-memory state.
-- Prevent stale asynchronous writes from causing in-memory rollback. Since the store plugin autosaves, no explicit save operation or rollback is required.
+- Serialize preference writes, or otherwise guarantee latest-write-wins ordering, so rapid pin or tool changes cannot leave an older preference on disk after a newer one.
+- Since the store plugin autosaves, do not add an explicit save operation or roll back in-memory layout state after a failed write.
 
 ### 4. Integrate with shell composition
 
@@ -98,7 +99,7 @@ toolbar | pinned drawer allocation (0rem or 15rem) | scene canvas + timeline | r
 
 ### 1. Add the toolbar
 
-- Add an app-shell presentational component for the vertical toolbar.
+- Add a presentational vertical-toolbar component to the new toolbar feature module.
 - Give the rail a fixed logical width of `3rem`, full main-content height, and non-shrinking layout behavior.
 - Render one Widgets button using an existing Lucide icon selected according to current visual conventions.
 - Give the button an accessible name, pressed/selected state, and `Alt+W` shortcut metadata.
@@ -107,7 +108,7 @@ toolbar | pinned drawer allocation (0rem or 15rem) | scene canvas + timeline | r
 
 ### 2. Add the shared drawer frame
 
-- Add an app-shell presentational drawer frame that receives active content, pinned state, visibility, pin action, and dismissal action.
+- Add a presentational shared-drawer frame to the new toolbar feature module. It receives active content, pinned state, visibility, pin action, and dismissal action.
 - Keep it fixed at `15rem` logical width and full main-content height.
 - Place the pin control in the top-right corner while reserving a content region below or around it that does not obscure the widget catalog.
 - Render only the active tool's content. Inactive tool content must be unmounted.
@@ -137,7 +138,7 @@ toolbar | pinned drawer allocation (0rem or 15rem) | scene canvas + timeline | r
 
 - Refactor the existing widget drawer component into Widgets drawer content, retaining its widget manager and activity-availability responsibilities.
 - Remove absolute positioning, translation, backdrop, attached text tab, and generic Escape ownership from the widget feature.
-- Keep the existing widget grid and option-popover behavior intact.
+- Keep the existing widget grid and option-popover behavior intact except for the explicit pinned Escape rule below.
 - Keep widget addition delegated through the existing widget manager.
 
 ### 2. Apply mode-dependent add dismissal
@@ -165,7 +166,8 @@ toolbar | pinned drawer allocation (0rem or 15rem) | scene canvas + timeline | r
 
 - Register Escape behavior at the shared drawer shell or a shell-owned hook rather than in Widgets content.
 - Listen for the existing drawer-close command only while the drawer is visible and unpinned.
-- In pinned mode, do not register or run drawer Escape handling. Per the agreed behavior, Escape must not dismiss nested temporary drawer UI through this drawer path.
+- In pinned mode, do not register or run drawer Escape dismissal.
+- Explicitly prevent temporary UI inside the drawer from handling Escape while pinned. For the current Widgets tool, pass the mode-dependent behavior to `WidgetOptionPopover` and prevent its Radix `PopoverContent` Escape dismissal through the primitive's Escape event API. Merely omitting the shared drawer listener is insufficient because the popover owns its own dismissal behavior.
 - Ensure unpinned Escape closes the drawer once and does not compete with duplicate old listeners.
 
 ### 3. Keep overlay shortcut blocking truthful
@@ -173,12 +175,12 @@ toolbar | pinned drawer allocation (0rem or 15rem) | scene canvas + timeline | r
 - Update the shell and player keyboard-overlay checks to recognize the generic unpinned drawer backdrop rather than a widget-specific implementation detail.
 - Do not classify a pinned drawer as a modal keyboard overlay; normal editor and player shortcuts should continue according to their existing workspace rules, except for the explicit pinned Escape decision above.
 
-## Phase 6: Coordinate Reflow Animation and Input Blocking
+## Phase 6: Animate One Allocation Slot and Block Input
 
 ### 1. Use one transition source
 
-- Drive the pinned drawer allocation from one animatable width or grid-track value in the app-shell layout.
-- Coordinate the drawer frame's overlay-to-layout positioning with the same duration and easing.
+- Add one relative, non-shrinking drawer-allocation slot immediately after the toolbar. Transition only its width between `0` and `15rem`.
+- Keep the `15rem` drawer absolutely positioned at the allocation slot's left edge in both modes. At zero slot width it overlays the workspace; at `15rem` slot width the same drawer occupies the reserved layout space. Do not switch positioning models or animate the drawer separately.
 - Prefer CSS transitions and transition events over timers. If a timer fallback is unavoidable, centralize the duration constant so layout and input blocking cannot drift.
 - Do not animate application-level transforms that would interfere with the existing global app scale.
 
@@ -187,7 +189,7 @@ toolbar | pinned drawer allocation (0rem or 15rem) | scene canvas + timeline | r
 - Track only whether a pin/unpin layout transition is active; do not persist it.
 - Start blocking before changing the allocation.
 - Place a transparent interaction blocker over the scene-canvas and timeline workspace for the transition duration, or disable pointer events on their shared container.
-- Keep toolbar and drawer controls usable only as needed to complete the current transition; prevent repeated pin input from creating overlapping transitions.
+- Keep the toolbar and drawer available, but disable repeated pin input until the current allocation transition completes.
 - Clear blocking from the relevant transition-end event and handle interrupted/unmounted transitions safely.
 - Keyboard focus does not need to be moved solely because pointer input is blocked.
 
@@ -219,9 +221,15 @@ toolbar | pinned drawer allocation (0rem or 15rem) | scene canvas + timeline | r
 - Remove the old attached vertical Widgets text tab and translate-based collapsed drawer shell.
 - Remove widget-specific backdrop identifiers and state names from generic app-shell consumers.
 - Remove duplicate Escape listeners and any now-unused imports or selectors.
-- Keep the widget-drawer public API focused on catalog content, with app-shell exports owning generic toolbar/drawer presentation.
+- Keep the widget-drawer public API focused on catalog content, with the new toolbar feature owning generic toolbar/drawer presentation.
 
-### 2. Preserve architectural rules
+### 2. Remove or update obsolete legacy tests
+
+- Treat compatibility maintenance as required: existing store, app-shell keyboard, and widget-drawer tests directly reference the removed widget-specific state, actions, text tab, and backdrop identifier.
+- Remove obsolete assertions or minimally update test setup/imports so the existing suite no longer encodes the superseded implementation.
+- Do not replace those assertions with new toolbar, pinning, persistence, startup, Escape-mode, or reflow behavior assertions; automated feature coverage remains out of scope by product decision.
+
+### 3. Preserve architectural rules
 
 - Components remain presentational. State-machine behavior and preference lifecycle live in the store, hooks, and pure utilities.
 - Normalize persisted input once at ingress. Consumers receive canonical values without repeated coercion.
@@ -229,7 +237,7 @@ toolbar | pinned drawer allocation (0rem or 15rem) | scene canvas + timeline | r
 - Do not add fallback branches for hypothetical future tools. The current allowlist contains Widgets and can be deliberately extended later.
 - Keep edits surgical and avoid unrelated app-shell refactoring.
 
-### 3. Update stale comments and documentation
+### 4. Update stale comments and documentation
 
 - Update JSDoc and module comments that describe the layout slice as a widget-drawer toggle.
 - Update app-shell and widget-drawer public API comments to describe the new responsibility boundary.
@@ -246,7 +254,7 @@ After implementation:
 3. Do not run `pnpm build`, `pnpm tauri build`, or any build wrapper without explicit user permission.
 4. Inspect the final diff and confirm unrelated worktree changes were not modified.
 
-Existing tests may need minimal compatibility updates only if renamed canonical layout APIs prevent the current suite from loading. Do not add new toolbar, drawer, persistence, startup, or reflow behavior assertions.
+Existing tests require compatibility cleanup because they reference the superseded widget-specific layout API and drawer shell. Do not add new toolbar, drawer, persistence, startup, Escape-mode, or reflow behavior assertions, and do not expand verification beyond the lint and diff checks required by the PRD.
 
 ## Completion Criteria
 
