@@ -56,8 +56,6 @@ describe('keyboard shortcut help groups', () => {
     const playbackGroup = groups.find((group) => group.name === 'Video player')
     const startShortcut = playbackGroup.shortcuts.find((shortcut) => shortcut.description === 'Rewind to start')
 
-    expect(startShortcut.options).toEqual([
-      { groupKey: 'label:Home', keys: ['Home'], modifiers: [] },
-    ])
+    expect(startShortcut.options).toEqual([{ groupKey: 'label:Home', keys: ['Home'], modifiers: [] }])
   })
 })

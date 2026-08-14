@@ -169,6 +169,12 @@ describe('normalizeTemplateConfig', () => {
     expect(result.values[0].show_units).toBe(true)
   })
 
+  test('rejects value widgets whose type is not in the standard metric manifest', () => {
+    expect(() => normalizeTemplateConfig({ values: [{ id: 'value-1', value: 'unknown_metric' }] })).toThrow(
+      'Unknown value widget type: unknown_metric',
+    )
+  })
+
   test('normalizes plots with fallback global defaults', () => {
     const config = {
       plots: [{ id: 'plot-1', value: 'elevation', x: 30, y: 40, point_label: {} }],

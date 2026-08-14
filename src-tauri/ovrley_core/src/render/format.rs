@@ -127,16 +127,25 @@ pub fn frame_index_for_second(
     index.clamp(0, dense_activity.frame_count.saturating_sub(1) as isize) as usize
 }
 
+pub(crate) fn altitude_offset_m(starting_altitude_m: Option<f64>, series: &[Option<f64>]) -> f64 {
+    starting_altitude_m
+        .zip(series.iter().flatten().next().copied())
+        .map(|(target, first)| target - first)
+        .unwrap_or(0.0)
+}
+
 /// Looks up one raw numeric sample by metric key and frame index.
 fn raw_value(
-    key: MetricKind,
+    validated: &ValidatedValueWidget,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
+    altitude_offset_m: f64,
 ) -> Option<f64> {
     dense_activity
         .series
-        .numeric_series_for(key)
+        .numeric_series_for(validated.metric)
         .and_then(|series| series.get(frame_index).copied().flatten())
+        .map(|value| value + altitude_offset_m)
 }
 
 /// Resolves the numeric value shown by text and numeric gauge widgets.
@@ -171,6 +180,16 @@ pub fn format_validated_metric_parts(
     validated: &ValidatedValueWidget,
     dense_activity: &DenseActivityReport,
     frame_index: usize,
+) -> Option<MetricDisplayParts> {
+    format_metric_presentation_parts(validated, dense_activity, frame_index, 0.0)
+}
+
+/// Builds metric display parts with render-prepared presentation offset.
+pub(crate) fn format_metric_presentation_parts(
+    validated: &ValidatedValueWidget,
+    dense_activity: &DenseActivityReport,
+    frame_index: usize,
+    altitude_offset_m: f64,
 ) -> Option<MetricDisplayParts> {
     let icon_kind = super::widgets::value::metric_icon_kind_for_value(validated.metric);
     if validated.metric == MetricKind::GpsCoordinates {
@@ -217,7 +236,12 @@ pub fn format_validated_metric_parts(
                 .get(frame_index)
                 .and_then(Option::as_deref),
         ),
-        metric => MetricValue::Numeric(raw_value(metric, dense_activity, frame_index)),
+        _ => MetricValue::Numeric(raw_value(
+            validated,
+            dense_activity,
+            frame_index,
+            altitude_offset_m,
+        )),
     };
     let (mut value_text, unit_text) =
         format_validated_standard_metric_parts(validated, dense_activity, value);

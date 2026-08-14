@@ -995,6 +995,9 @@
       "formatter": "decimal",
       "interpolation": "linear",
       "unitsMode": "selectable",
+      "defaults": {
+        "starting_altitude": null
+      },
       "icon": {
         "source": "custom",
         "assetFile": "widget-altitude.svg"

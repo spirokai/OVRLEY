@@ -21,7 +21,7 @@ pub(crate) use icons::metric_icon_kind_for_value;
 use crate::activity::schema::DenseActivityReport;
 use crate::error::CoreResult;
 use crate::normalize::{ValidatedGradientWidget, ValidatedTimeValue, ValidatedValueWidget};
-use crate::render::format::{format_validated_metric_parts, format_validated_time_parts};
+use crate::render::format::{format_metric_presentation_parts, format_validated_time_parts};
 use crate::render::text::ResolvedTextStyle;
 use crate::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
 use crate::types::{DisplayType, MetricKind};
@@ -64,6 +64,7 @@ pub(crate) struct MetricWidgetRequest<'a> {
     /// Pre-validated time widget. When present, the validated path is used
     /// instead of reading from legacy raw `ValueConfig`.
     pub validated_time: Option<&'a ValidatedTimeValue>,
+    pub altitude_offset_m: f64,
     pub timezone: Option<Tz>,
 }
 
@@ -128,9 +129,12 @@ pub(crate) fn draw_metric_value_widget_with_config(
     let validated = request.validated.expect(
         "standard metric text widget must be validated — validation happens at render entry point",
     );
-    let Some(parts) =
-        format_validated_metric_parts(validated, request.dense_activity, request.frame_index)
-    else {
+    let Some(parts) = format_metric_presentation_parts(
+        validated,
+        request.dense_activity,
+        request.frame_index,
+        request.altitude_offset_m,
+    ) else {
         return Ok(false);
     };
     draw_metric_parts(
@@ -261,6 +265,7 @@ mod tests {
                     validated: None,
                     validated_gradient: None,
                     validated_time: None,
+                    altitude_offset_m: 0.0,
                     timezone: None,
                 })
                 .unwrap(),
@@ -364,6 +369,7 @@ mod tests {
             coordinate_format: None,
             unit_color: [0xff, 0xff, 0xff, 0xff],
             display_unit: "kmh".to_string(),
+            starting_altitude_m: None,
             prefix: String::new(),
             suffix: String::new(),
             formatting: crate::normalize::ValidatedValueFormatting::DecimalPlaces { decimals: 0 },
@@ -385,6 +391,7 @@ mod tests {
                 validated: Some(&validated),
                 validated_gradient: None,
                 validated_time: None,
+                altitude_offset_m: 0.0,
                 timezone: None,
             })
             .unwrap(),
@@ -412,6 +419,7 @@ mod tests {
                 validated: Some(&validated),
                 validated_gradient: None,
                 validated_time: None,
+                altitude_offset_m: 0.0,
                 timezone: None,
             })
             .unwrap(),

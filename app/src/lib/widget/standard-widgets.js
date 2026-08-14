@@ -142,6 +142,7 @@ export const METRIC_TYPE_BASE_DEFAULTS = Object.freeze(
         Object.freeze({
           show_units: definition?.showUnitsByDefault ?? false,
           display_unit: definition?.defaultDisplayUnit,
+          ...(definition?.defaults ?? {}),
         }),
       ]
     }),

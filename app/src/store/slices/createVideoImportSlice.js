@@ -360,7 +360,7 @@ export const createVideoImportSlice = (set, get) => ({
 
       if (!videoTimestampOverlapsActivity(videoStart, videoDuration, activityStart, activityEnd)) {
         return {
-          videoSyncOffsetSeconds: offsetSeconds,
+          videoSyncOffsetSeconds: 0,
           videoSyncWarning: 'Video could not be synced with activity',
           videoSyncTimezoneMode: timezoneMode,
         }

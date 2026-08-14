@@ -6,8 +6,8 @@
  * creating a new section component and registering it below.
  */
 
-import { getDisplayTypeDefaultFontSize, getDisplayTypeOptions } from '@/lib/widget/standard-metrics'
-import { SelectField } from '../widgetFormControls'
+import { getDisplayTypeDefaultFontSize, getDisplayTypeOptions, getStandardMetricDisplayUnit } from '@/lib/widget/standard-metrics'
+import { NumberField, SelectField } from '../widgetFormControls'
 import { useCallback } from 'react'
 import { initDisplayVariant } from '@/lib/widget/widget-resolver'
 import { isTextDisplayType } from '@/lib/widget/display-type-behavior'
@@ -86,6 +86,19 @@ export default function MetricWidgetEditor({
         />
       ) : DisplaySection ? (
         <DisplaySection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
+      ) : null}
+
+      {widget.type === 'altitude' ? (
+        <div className="grid grid-cols-2 gap-4">
+          <NumberField
+            label="Altitude at start"
+            value={widget.data.starting_altitude}
+            placeholder={widget.startingAltitudePlaceholder}
+            suffix={getStandardMetricDisplayUnit(widget.type, widget.data)}
+            onChange={(rawValue) => setNumericField(widget.id, 'starting_altitude', rawValue, { optional: true, round: true })}
+            onReset={() => updateWidgetData(widget.id, { starting_altitude: null })}
+          />
+        </div>
       ) : null}
     </>
   )

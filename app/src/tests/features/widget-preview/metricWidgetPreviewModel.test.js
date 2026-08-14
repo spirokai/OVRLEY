@@ -173,12 +173,14 @@ describe('metric widget preview model standard metric units', () => {
   })
 
   test('formats the altitude widget from the canonical elevation series', () => {
+    const elevation = [100]
     const model = buildMetricWidgetPreviewModel({
       widget: {
         category: 'values',
         type: 'altitude',
         data: {
           display_unit: 'ft',
+          starting_altitude: 492,
           decimals: 0,
           show_units: true,
           show_icon: false,
@@ -187,13 +189,14 @@ describe('metric widget preview model standard metric units', () => {
       activity: {
         trim_end_seconds: 20,
         sample_elapsed_seconds: [0],
-        elevation: [100],
+        elevation,
       },
       previewSecond: 0,
     })
 
-    expect(model?.valueText).toBe('328')
+    expect(model?.valueText).toBe('492')
     expect(model?.unitText).toBe('FT')
+    expect(elevation).toEqual([100])
   })
 
   test('formats calories from the parsed activity series', () => {

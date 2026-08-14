@@ -16,24 +16,39 @@
   <h1><a href="https://www.ovrley.cc">WWW.OVRLEY.CC</a></h1>
   <br/>
   <br/>
-  <p>OVRLEY turns .fit and .gpx activity data into fully custom telemetry overlays for action-cam videos. It features an intuitive, WYSIWYG editor backed by a robust, hardware-accelerated native rendering engine.</p>
+  <p>OVRLEY turns .fit, .gpx, .srt, .igc, .csv, .vbo, and embedded .mp4 telemetry from activities, flights, motorsports, and cameras into fully customizable overlays for your videos. Its visual editor lets you design the overlay while a fast native rendering engine handles the final export.</p>
 </div>
 
 ## Features
 
-- **Universal Import**: Supports `.fit`, `.gpx`, `.srt` and `.mp4` (embedded telemetry) files from any device or service (Strava, Garmin, DJI, GoPro, Insta360 etc.). Works for any activity: running, cycling, drones, skiing, sailing, motorcycling, and more.
-- **Interactive Editor**: Drag-and-drop WYSISWG editor for live layout editing and template sharing.
+- **Broad Import Support**: Import `.fit`, `.gpx`, `.srt`, `.igc`, `.csv`, and `.vbo` activity files, or use telemetry embedded in supported camera videos. OVRLEY works with data from fitness devices, drones, action cameras, and motorsport loggers.
+- **Interactive Editor**: Drag-and-drop visual editor with live previews, reusable templates, undo/redo, centering guides, and data-availability indicators.
 - **Full Customization**: Shape every widget with your own styling, color, font, and size.
-- **29+ Widgets**: Speed, heartrate, power, cadence, date, temperature, elevation profile, map route, camera settings, and many more.
+- **40+ Widgets**: Show speed, heart rate, power, cadence, G-force, lean angle, RPM, throttle, brake position, lap times, GPS position, ascent, camera settings, and much more.
+- **Highly Customizable Animated Gauges**: Display your data using linear, arc, or corner gauges with bar, fill, and segmented-bar styles. Dedicated G-force and lean-angle gauges are also included. Customize their size, colors, borders, labels, angles, and other visual details.
+- **Lap Timing**: Show the current lap, best lap, live time difference, or a complete lap log from supported CSV and VBO files.
 - **Transparent Overlays**: Export with alpha channel (in real-time speed) for maximum flexibility in post-production. Use in Premiere Pro, DaVinci Resolve, Final Cut Pro, or any editor that supports layered video.
 - **Final Video Export**: Export your final video footage with overlays baked in - no separate compositing step required. Multiple codecs, hardware-accelerated pipelines, and custom bitrate.
-- **Hardware-Accelerated Export**: Export pipelines using GPU acceleration for maximum export speed for up to 8x and 2x export speeds (1080p@30fps and 4k@30fps).
-- **Realtimne Preview**: Preview at 4k@30fps directly inside the app before you export. Automatically syncs activity to your video, with manual offset possible.
-- **NLE-Style Timeline**: Multi-lane playback timeline with transport controls, zoom/pan, export-range markers, and keyboard shortcuts. Renders video and telemetry clips on a tick-marked axis for frame-accurate editing.
+- **Hardware-Accelerated Export**: Use supported NVIDIA, AMD, Intel, or Apple hardware to drastically speed up video export.
+- **Real-Time Preview**: Preview at up to 4K/30 fps directly inside the app before you export.
+- **Flexible Video Sync**: Automatically sync telemetry using camera timestamps, GPS timestamps or supported timestamps in video filenames. You can also adjust the sync by multiple approaches. Negative offsets are supported when the video starts before the telemetry.
+- **Video-Editing Timeline**: See video and telemetry as separate tracks, move through them frame by frame, zoom and pan, and choose exactly which part to export.
+- **Keyboard Shortcuts**: Use shortcuts for playback, editing, timeline navigation, and other common actions. The help button in the top toolbar shows the full list.
+- **Automatic Updates**: Installer builds can check for new versions at startup and update with your permission.
 - **100% Free & Offline**: No subscriptions. All data processing, rendering, and encoding happen locally on your machine. Your data never leaves your computer.
-- **Cross-Platform & Portable**: Runs on Windows, macOS, and Linux. Portable build - no installation required; just download and run.
+- **Windows, macOS, and Linux**: Choose an installer build with automatic updates or one of the available portable/manual packages.
 
-> ## Using OVRLEY: Download the exe/app file from latest release and just run it - no installation or setup required.
+> ### Using OVRLEY: Download the package for your operating system from the [latest release](https://github.com/spirokai/OVRLEY/releases/latest). Windows offers an installer and a portable ZIP, macOS uses a DMG, and Linux offers an AppImage and a DEB package. Installer, DMG, and AppImage builds can notify you when an update is available.
+
+## Supported Files
+
+- **Fitness and outdoor activities:** `.fit` and `.gpx`
+- **Action cameras and drones:** `.srt` files and telemetry embedded in supported `.mp4` videos, including footage from DJI, GoPro, and Insta360 devices
+- **Flight logs:** `.igc`
+- **Motorsport and custom data logs:** `.csv` and `.vbo`
+- **Video footage:** `.mp4`, `.mov`, and `.mkv`
+
+CSV support includes common exports from AiM, RaceChrono, RaceBox, LapLegend, TrackAddict, AirData, and Torque Pro. CSV and VBO files do not have one universal layout, so please report a file that OVRLEY does not recognize correctly.
 
 ## Project Summary
 
@@ -64,7 +79,7 @@ OVRLEY supports both exporting transparent overlays as well as final footage wit
 Compiling and running OVRLEY requires the following system-level toolchains:
 
 - **[Node.js](https://nodejs.org/) & [pnpm](https://pnpm.io/)** (Package management and script execution)
-- **[Rust Toolchain 1.85+](https://rust-lang.org/tools/install/)** (For compiling the Tauri shell and core engine)
+- **[Rust Toolchain 1.84](https://rust-lang.org/tools/install/)** (For compiling the Tauri shell and core engine)
 - **[FFmpeg 8.1+ (Full Build)](https://ffmpeg.org/download.html/)** (For video manipulation; **installed automatically**)
 
 > **Important:** The rendering engine requires an FFmpeg 8.1+ **Full Build** located within the `vendor/ffmpeg` directory to ensure compatibility with advanced hardware encoders. This is automatically handled by the installation process, but you can manually place your own build there.

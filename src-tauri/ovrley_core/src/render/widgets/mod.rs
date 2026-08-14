@@ -38,12 +38,34 @@ pub mod types;
 /// Metric value widgets, including icons and gradient triangles.
 pub mod value;
 
+use crate::activity::elevation::preferred_elevation_series;
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::debug::RenderProfiler;
 use crate::error::CoreResult;
 use crate::normalize::ValidatedRenderConfig;
 use crate::paths::AppPaths;
+use crate::render::format::altitude_offset_m;
 use crate::render::widgets::types::PreparedValue;
+
+fn apply_altitude_value_offset(value: &mut PreparedValue, altitude_series: &[Option<f64>]) {
+    match value {
+        PreparedValue::StandardText(widget) => {
+            widget.altitude_offset_m =
+                altitude_offset_m(widget.validated.starting_altitude_m, altitude_series);
+        }
+        PreparedValue::LinearGauge(widget) => {
+            widget.altitude_offset_m =
+                altitude_offset_m(widget.validated.starting_altitude_m, altitude_series);
+        }
+        PreparedValue::ArcGauge(widget) => {
+            widget.altitude_offset_m = altitude_offset_m(
+                widget.validated.inner_value.starting_altitude_m,
+                altitude_series,
+            );
+        }
+        _ => {}
+    }
+}
 
 pub(crate) use backdrop::draw_backdrops_static_layer;
 pub(crate) use elevation::draw_elevation_widget;
@@ -113,7 +135,11 @@ pub fn prepare_render_assets(
         )?);
     }
 
+    let altitude_series =
+        preferred_elevation_series(&activity.barometric_altitude, &activity.elevation);
+
     for value in &mut assets.values {
+        apply_altitude_value_offset(value, altitude_series);
         match value {
             PreparedValue::HeadingTape(widget) => {
                 let cache = heading::prepare_heading_cache(
@@ -127,6 +153,7 @@ pub fn prepare_render_assets(
             PreparedValue::LinearGauge(widget) => {
                 let cache = gauges::linear::prepare_linear_gauge_cache(
                     &widget.validated,
+                    widget.altitude_offset_m,
                     dense_activity,
                     &assets.scene,
                     assets.scene.scale,
@@ -138,6 +165,7 @@ pub fn prepare_render_assets(
             PreparedValue::ArcGauge(widget) => {
                 let cache = gauges::arc::prepare_arc_gauge_cache(
                     &widget.validated,
+                    widget.altitude_offset_m,
                     dense_activity,
                     &assets.scene,
                     assets.scene.scale,

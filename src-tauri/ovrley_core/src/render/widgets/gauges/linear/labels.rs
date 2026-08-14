@@ -37,6 +37,7 @@ pub(super) fn label_padding(
     font_dirs: &[PathBuf],
     min_value: f64,
     max_value: f64,
+    altitude_offset_m: f64,
 ) -> CoreResult<(u32, u32, u32, u32)> {
     if !gauge.show_min_max_labels {
         return Ok((0, 0, 0, 0));
@@ -44,7 +45,16 @@ pub(super) fn label_padding(
 
     let font_size = gauge.min_max_label_font_size * scale;
     let font = resolve_font(font_dirs, Some(&gauge.min_max_label_font), font_size)?;
-    let layout = label_layout(gauge, width, height, scale, &font, min_value, max_value);
+    let layout = label_layout(
+        gauge,
+        width,
+        height,
+        scale,
+        &font,
+        min_value,
+        max_value,
+        altitude_offset_m,
+    );
     let (_, min_bounds) = font.measure_str(&layout.min_label, None);
     let (_, max_bounds) = font.measure_str(&layout.max_label, None);
     let left = (layout.min_origin.x + min_bounds.left).min(layout.max_origin.x + max_bounds.left);
@@ -71,12 +81,21 @@ pub(super) fn label_layout(
     font: &skia_safe::Font,
     min_value: f64,
     max_value: f64,
+    altitude_offset_m: f64,
 ) -> LinearGaugeLabelLayout {
     let width = width as f32;
     let height = height as f32;
     let gap = label_gap(gauge.min_max_label_font_size * scale);
-    let min_label = format_gauge_label(gauge.metric, None, min_value);
-    let max_label = format_gauge_label(gauge.metric, None, max_value);
+    let min_label = format_gauge_label(
+        gauge.metric,
+        gauge.display_unit.as_deref(),
+        min_value + altitude_offset_m,
+    );
+    let max_label = format_gauge_label(
+        gauge.metric,
+        gauge.display_unit.as_deref(),
+        max_value + altitude_offset_m,
+    );
     let (_, metrics) = font.metrics();
     let (_, min_bounds) = font.measure_str(&min_label, None);
     let (_, max_bounds) = font.measure_str(&max_label, None);

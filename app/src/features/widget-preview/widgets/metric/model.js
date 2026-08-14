@@ -30,6 +30,7 @@ import {
   getInterpolatedActivityValue,
   getInterpolatedTimeValue,
   getMetricSeries,
+  resolveMetricPresentationValues,
 } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor/data/overlayEditorConstants'
 import { interpolateNumericSeries } from '@/lib/interpolation'
@@ -204,7 +205,8 @@ function formatMetricWidgetValue({ widget, activity, previewSecond }) {
     )
   }
 
-  return formatStandardMetricDisplay(widget.type, getInterpolatedActivityValue(activity, widget.type, previewSecond), widget.data)
+  const { value } = resolveMetricPresentationValues(widget, activity, previewSecond)
+  return formatStandardMetricDisplay(widget.type, value, widget.data)
 }
 
 /**
@@ -214,12 +216,11 @@ function formatMetricWidgetValue({ widget, activity, previewSecond }) {
  *
  * @param {object} params
  * @param {object} params.widget - Resolved metric widget.
- * @param {object} params.activity - Activity data with metric series.
- * @param {number} params.previewSecond - Current preview time.
+ * @param {number|null} params.presentationValue - Resolved value shown by the gauge.
  * @returns {{ valueText: string, unitText: string, fontFamily: string, fontSize: number, valueMeasure: object, valueVerticalMeasure: object, unitMeasure: object|null }|null}
  */
-export function buildArcGaugeInnerWidgetModel({ widget, activity, previewSecond }) {
-  const formatted = formatMetricWidgetValue({ widget, activity, previewSecond })
+export function buildArcGaugeInnerWidgetModel({ widget, presentationValue }) {
+  const formatted = formatStandardMetricDisplay(widget.type, presentationValue, widget.data)
   if (widget.type === 'gps_coordinates') {
     throw new Error('GPS coordinate widgets only support text display')
   }

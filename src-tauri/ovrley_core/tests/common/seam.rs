@@ -44,7 +44,7 @@ pub fn validate_scene_ffmpeg(ffmpeg: Value) -> CoreResult<ValidatedFfmpegConfig>
 
 pub fn expect_standard_value(value: PreparedValue, index: usize) -> ValidatedValueWidget {
     match value {
-        PreparedValue::StandardText(value) => value,
+        PreparedValue::StandardText(value) => value.validated,
         other => panic!("expected values[{index}] to be a standard text metric, got {other:?}"),
     }
 }
