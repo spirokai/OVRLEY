@@ -48,30 +48,6 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
   return (
     <>
       <DimensionsSection widget={widget} setNumericField={setNumericField} />
-      <div className="grid grid-cols-2 gap-4">
-        <NumberField
-          label="Starting Elevation"
-          value={widget.data.starting_altitude}
-          onChange={(rawValue) =>
-            setNumericField(widget.id, 'starting_altitude', rawValue, {
-              optional: true,
-              round: true,
-              additionalUpdates: { starting_altitude_unit: widget.data.starting_altitude_unit },
-            })
-          }
-        />
-        <SelectField
-          label="Unit"
-          value={widget.data.starting_altitude_unit}
-          options={ALTITUDE_UNIT_OPTIONS}
-          onValueChange={(value) =>
-            updateWidgetData(widget.id, {
-              starting_altitude: convertAltitudeInputValue(widget.data.starting_altitude, widget.data.starting_altitude_unit, value),
-              starting_altitude_unit: value,
-            })
-          }
-        />
-      </div>
       <div className="space-y-4">
         <SectionHeading icon={Palette} title="Line Styling" />
         <SliderField
@@ -359,6 +335,31 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
           </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <NumberField
+            label="Elevation at start"
+            value={widget.data.starting_altitude}
+            onChange={(rawValue) =>
+              setNumericField(widget.id, 'starting_altitude', rawValue, {
+                optional: true,
+                round: true,
+                additionalUpdates: { starting_altitude_unit: widget.data.starting_altitude_unit },
+              })
+            }
+          />
+          <SelectField
+            label=""
+            value={widget.data.starting_altitude_unit}
+            options={ALTITUDE_UNIT_OPTIONS}
+            onReset={() => updateWidgetData(widget.id, { starting_altitude: null })}
+            onValueChange={(value) =>
+              updateWidgetData(widget.id, {
+                starting_altitude: convertAltitudeInputValue(widget.data.starting_altitude, widget.data.starting_altitude_unit, value),
+                starting_altitude_unit: value,
+              })
+            }
+          />
         </div>
       </div>
     </>

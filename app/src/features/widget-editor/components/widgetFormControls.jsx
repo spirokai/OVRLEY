@@ -10,8 +10,10 @@ import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
 import HexColorPicker from '@/components/ui/hex-color-picker'
 import { cn } from '@/lib/utils'
+import { RotateCcw } from 'lucide-react'
 
 export const TIME_FORMATS = [
   { value: 'date-dd-mm-yyyy', label: 'Date only (DD-MM-YYYY)' },
@@ -48,7 +50,7 @@ export const TEMPERATURE_UNITS = [
 ]
 
 export const CONTROL_CLASS = 'h-9 border-border/70 bg-surface text-xs'
-const FIELD_LABEL_CLASS = 'text-[9px] text-muted-foreground uppercase font-bold'
+const FIELD_LABEL_CLASS = 'h-3 text-[9px] text-muted-foreground uppercase font-bold'
 
 /**
  * Renders the field block component.
@@ -57,14 +59,29 @@ const FIELD_LABEL_CLASS = 'text-[9px] text-muted-foreground uppercase font-bold'
  * @param {*} props.label - Field or UI label text.
  * @param {*} props.children - Nested React children.
  * @param {*} props.className - Additional class names to merge into the element.
+ * @param {Function} props.onReset - Optional callback that enables the reset action.
  * @returns {JSX.Element} Rendered component output.
  */
-export function FieldBlock({ label, children, className, disabled = false }) {
+export function FieldBlock({ label, children, className, disabled = false, onReset }) {
   return (
     <div className={cn('space-y-1', className)}>
-      <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
-        {label}
-      </Label>
+      <div className="relative h-3">
+        <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
+          {label}
+        </Label>
+        {onReset ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute -top-1 right-0 h-5 w-5 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+            onClick={onReset}
+            aria-label={label ? `Reset ${label}` : 'Reset field'}
+          >
+            <RotateCcw className="size-3.5" />
+          </Button>
+        ) : null}
+      </div>
       {children}
     </div>
   )
@@ -80,11 +97,12 @@ export function FieldBlock({ label, children, className, disabled = false }) {
  * @param {*} props.options - Configuration options for the helper.
  * @param {*} props.disabled - Value for disabled.
  * @param {object} props.contentProps - Positioning options passed to the select menu.
+ * @param {Function} props.onReset - Optional callback that enables the reset action.
  * @returns {JSX.Element} Rendered component output.
  */
-export function SelectField({ label, value, onValueChange, options, disabled = false, contentProps }) {
+export function SelectField({ label, value, onValueChange, options, disabled = false, contentProps, onReset }) {
   return (
-    <FieldBlock label={label} disabled={disabled}>
+    <FieldBlock label={label} disabled={disabled} onReset={onReset}>
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
         <SelectTrigger className={cn(CONTROL_CLASS, disabled && 'opacity-50 pointer-events-none')}>
           <SelectValue />
@@ -129,11 +147,12 @@ export function TextField({ label, value, onChange, placeholder = '' }) {
  * @param {*} props.min - Lower bound used by the calculation.
  * @param {*} props.max - Upper bound used by the calculation.
  * @param {*} props.step - Value for step.
+ * @param {Function} props.onReset - Optional callback that enables the reset action.
  * @returns {JSX.Element} Rendered component output.
  */
-export function NumberField({ label, value, onChange, min, max, disabled = false, step = 1, suffix, integerDisplay = true }) {
+export function NumberField({ label, value, onChange, min, max, disabled = false, step = 1, suffix, integerDisplay = true, onReset }) {
   return (
-    <FieldBlock label={label} disabled={disabled}>
+    <FieldBlock label={label} disabled={disabled} onReset={onReset}>
       <div className="relative">
         <BlurInput
           type="number"

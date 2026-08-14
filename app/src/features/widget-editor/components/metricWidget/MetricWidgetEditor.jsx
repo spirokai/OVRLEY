@@ -76,15 +76,6 @@ export default function MetricWidgetEditor({
         </div>
       ) : null}
 
-      {widget.type === 'altitude' ? (
-        <NumberField
-          label="Starting Altitude"
-          value={widget.data.starting_altitude}
-          suffix={getStandardMetricDisplayUnit(widget.type, widget.data)}
-          onChange={(rawValue) => setNumericField(widget.id, 'starting_altitude', rawValue, { optional: true, round: true })}
-        />
-      ) : null}
-
       {isTextDisplayType(displayType) ? (
         <TextDisplaySection
           widget={widget}
@@ -95,6 +86,18 @@ export default function MetricWidgetEditor({
         />
       ) : DisplaySection ? (
         <DisplaySection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
+      ) : null}
+
+      {widget.type === 'altitude' ? (
+        <div className="grid grid-cols-2 gap-4">
+          <NumberField
+            label="Altitude at start"
+            value={widget.data.starting_altitude}
+            suffix={getStandardMetricDisplayUnit(widget.type, widget.data)}
+            onChange={(rawValue) => setNumericField(widget.id, 'starting_altitude', rawValue, { optional: true, round: true })}
+            onReset={() => updateWidgetData(widget.id, { starting_altitude: null })}
+          />
+        </div>
       ) : null}
     </>
   )
