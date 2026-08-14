@@ -19,7 +19,6 @@ export {
 
 export {
   getMetricSeries,
-  getElevationProfileSeries,
   getPreviewActivity,
   getInterpolatedActivityValue,
   getInterpolatedTimeValue,

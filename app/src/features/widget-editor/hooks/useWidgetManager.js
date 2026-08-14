@@ -8,14 +8,13 @@ import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { TYPE_LABELS } from '@/lib/widget/widget-icons'
 import { deleteWidgetInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget/widget-config'
-import { buildConfigWidgets, groupWidgetsForSidebar } from '@/lib/widget/widget-presentation'
+import { buildConfigWidgets, groupWidgetsForSidebar, withAltitudeEditorPresentation } from '@/lib/widget/widget-presentation'
 import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
 import { clamp } from '@/lib/utils'
 import { createBackdropDefaults, createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
 import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
 import { updateLiveWidgetDraft } from '@/features/overlay-editor/utils/widgetDomHelpers'
 import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
-import { resolveInitialAltitudePresentation } from '@/lib/widget/altitude-correction'
 
 /**
  * Container hook for SidebarWidgetsTab that owns all store access,
@@ -52,8 +51,8 @@ export function useWidgetManager({ widgetLiveEdits }) {
   // Derived state — group and build the sidebar widget list from config
   const widgets = useMemo(() => {
     const configWidgets = applyWidgetDrafts(buildConfigWidgets(config), liveEdits.liveWidgetDrafts)
-    const initializedWidgets = configWidgets.map((widget) => resolveInitialAltitudePresentation(widget, parsedActivity))
-    return groupWidgetsForSidebar(initializedWidgets, TYPE_LABELS)
+    const presentedWidgets = configWidgets.map((widget) => withAltitudeEditorPresentation(widget, parsedActivity))
+    return groupWidgetsForSidebar(presentedWidgets, TYPE_LABELS)
   }, [config, liveEdits.liveWidgetDrafts, parsedActivity])
 
   // Update handler — applies partial updates to a widget via config utility
@@ -89,9 +88,9 @@ export function useWidgetManager({ widgetLiveEdits }) {
 
   // Numeric field handler — parses raw input, clamps to range, updates widget
   const setNumericField = (widgetId, key, rawValue, options = {}) => {
-    const { fallback = 0, min, max, optional = false, integer = true, round = false, additionalUpdates = {} } = options
+    const { fallback = 0, min, max, optional = false, integer = true, round = false } = options
     if (optional && rawValue === '') {
-      updateWidgetData(widgetId, { [key]: null, ...additionalUpdates })
+      updateWidgetData(widgetId, { [key]: null })
       return
     }
     let parsed = integer ? parseInteger(rawValue, fallback) : Number(rawValue)
@@ -99,7 +98,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
     if (!Number.isFinite(parsed)) throw new Error(`Invalid numeric value for ${key}`)
     const nextValue = min !== undefined || max !== undefined ? clamp(parsed, min ?? parsed, max ?? parsed) : parsed
 
-    updateWidgetData(widgetId, { [key]: nextValue, ...additionalUpdates })
+    updateWidgetData(widgetId, { [key]: nextValue })
   }
 
   // Add widget — creates a new widget of the given type with defaults and appends to config
@@ -176,15 +175,7 @@ export function useWidgetManager({ widgetLiveEdits }) {
     }
 
     const selection = widget.type === 'lap_timer' ? { lapTimerMode: 'current_lap' } : {}
-    setConfig(
-      replaceWidgetInConfig(
-        config,
-        id,
-        createMetricValueDefaults(widget.type, globalDefaults, {
-          ...selection,
-        }),
-      ),
-    )
+    setConfig(replaceWidgetInConfig(config, id, createMetricValueDefaults(widget.type, globalDefaults, selection)))
   }
 
   return {

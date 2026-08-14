@@ -7,7 +7,7 @@ import { ColorField, NumberField, SelectField, SizeSlider, SliderField, ToggleFi
 import { DimensionsSection, SectionHeading } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 import { Label } from '@/components/ui/label'
-import { convertAltitudeInputValue } from '@/lib/widget/altitude-correction'
+import { convertAltitudeInputValue } from '@/lib/widget/altitude'
 
 const MARKER_VARIANT_OPTIONS = [
   { value: 'single', label: 'Single Circle' },
@@ -340,13 +340,8 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
           <NumberField
             label="Elevation at start"
             value={widget.data.starting_altitude}
-            onChange={(rawValue) =>
-              setNumericField(widget.id, 'starting_altitude', rawValue, {
-                optional: true,
-                round: true,
-                additionalUpdates: { starting_altitude_unit: widget.data.starting_altitude_unit },
-              })
-            }
+            placeholder={widget.startingAltitudePlaceholder}
+            onChange={(rawValue) => setNumericField(widget.id, 'starting_altitude', rawValue, { optional: true, round: true })}
           />
           <SelectField
             label=""

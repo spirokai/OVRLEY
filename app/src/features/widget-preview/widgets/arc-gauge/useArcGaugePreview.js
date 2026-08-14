@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
+import { getPreviewActivity, resolveMetricPresentationValues } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { getArcGaugeLayout, getArcLabelGap, getCornerGaugeLayout } from './geometry'
 import { getArcInnerWidgetLayout } from './arcGaugeInnerLayout'
 import { getArcFilledTrackRevealSpec, getArcPoint } from './trackPath'
@@ -9,7 +9,6 @@ import { getTextShadowParts } from '../../shared/shadow'
 import { getPreviewFontFamily, measureArcPreviewText } from '../../shared/textMeasurement'
 import { useFontMetrics } from '../../shared/useFontMetrics'
 import { formatGaugeBoundaryLabel } from '../../shared/gaugeLabelFormat'
-import { resolveMetricPresentationValues } from '@/lib/widget/altitude-correction'
 
 /** Returns the SVG text origin that centers measured text around an x-coordinate. */
 function centeredTextX(measurement, centerX) {

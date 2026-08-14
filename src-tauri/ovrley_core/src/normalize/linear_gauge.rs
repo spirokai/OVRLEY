@@ -182,18 +182,18 @@ pub fn validate_linear_gauge(
         track_corner_radius_max(cross_extent, bar_span, bar_geometry.as_ref()),
     );
 
-    let (display_unit, starting_altitude_m) = if value.value == MetricKind::Altitude {
-        let display_unit = require_string(value.display_unit, &p("display_unit"))?;
-        let starting_altitude_m = normalize_starting_altitude_m(
-            value.value,
-            value.starting_altitude,
-            &display_unit,
-            &p("display_unit"),
-        )?;
-        (Some(display_unit), starting_altitude_m)
+    let display_unit = if value.value == MetricKind::Altitude {
+        Some(require_string(value.display_unit, &p("display_unit"))?)
     } else {
-        (value.display_unit, None)
+        value.display_unit
     };
+    let starting_altitude_m = normalize_starting_altitude_m(
+        value.value,
+        value.starting_altitude,
+        display_unit.as_deref(),
+        &p("starting_altitude"),
+        &p("display_unit"),
+    )?;
 
     Ok(ValidatedLinearGaugeWidget {
         metric: value.value,

@@ -7,7 +7,7 @@ import {
 import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/widgets/metric/format'
 import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
 import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
-import { buildMetricUnitUpdate } from '@/lib/widget/altitude-correction'
+import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 
 const COORDINATE_FORMAT_OPTIONS = [
   { value: 'dms', label: 'Deg / Min / Sec' },

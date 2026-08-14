@@ -4,8 +4,7 @@ import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
 import { useFontMetrics } from '../../shared/useFontMetrics'
 import { useElevationPreviewGeometry } from './useElevationPreviewGeometry'
 import { buildElevationPreviewStyle } from './style'
-import { applyAltitudeOffset, getAltitudeCorrectionMeters } from '@/lib/widget/altitude-correction'
-import { getElevationProfileSeries } from '@/features/overlay-editor'
+import { applyAltitudeOffset, getAltitudeCorrectionMeters, getElevationProfileSeries } from '@/lib/widget/altitude'
 
 function formatElevationLabels(elevationValue) {
   if (elevationValue === null) return { metricLabel: '-- M', imperialLabel: '-- FT' }

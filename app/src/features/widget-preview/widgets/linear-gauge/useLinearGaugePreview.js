@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
+import { getPreviewActivity, resolveMetricPresentationValues } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { getBarFillCount, getLinearBarRects } from '../../shared/gaugeBarGeometry'
 import {
   getLinearGaugeLabelLayout,
@@ -13,7 +13,6 @@ import { normalizeSvgShadowColor } from '../../shared/svgPreviewUtils'
 import { getPreviewFontFamily } from '../../shared/textMeasurement'
 import { useFontMetrics } from '../../shared/useFontMetrics'
 import { formatGaugeBoundaryLabel } from '../../shared/gaugeLabelFormat'
-import { resolveMetricPresentationValues } from '@/lib/widget/altitude-correction'
 
 /** Builds all non-JSX state for a normalized linear-gauge preview. */
 export function useLinearGaugePreviewPresentation({ widget, activity, previewSecond, globalOpacity, sceneStyle }) {

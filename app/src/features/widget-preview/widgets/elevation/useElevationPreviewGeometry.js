@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { getDistanceProgressAtElapsed, getElevationProfileSeries, getPreviewActivity, getWindowProgressAtTime } from '@/features/overlay-editor'
+import { getDistanceProgressAtElapsed, getPreviewActivity, getWindowProgressAtTime } from '@/features/overlay-editor'
+import { getElevationProfileSeries } from '@/lib/widget/altitude'
 import { buildElevationGeometry } from '@/api/backend'
 import { areaToSvg, findPointAtProgress, pointsToSvg } from '@/lib/geometryUtils'
 import { buildPlaceholderElevationPreviewGeometry, buildPlaceholderElevationStaticGeometry } from '../../shared/plotPlaceholderGeometry'

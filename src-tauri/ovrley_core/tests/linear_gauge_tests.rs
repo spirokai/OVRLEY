@@ -63,6 +63,28 @@ fn value_config_deserializes_linear_gauge_fields() {
 }
 
 #[test]
+fn rejects_starting_altitude_on_non_altitude_linear_gauge() {
+    let mut value = full_linear_gauge_config(20, 30);
+    value["starting_altitude"] = serde_json::json!(500);
+    let result = validate_render_config(RenderConfig {
+        scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
+        backdrops: vec![],
+        labels: vec![],
+        values: vec![serde_json::from_value(value).unwrap()],
+        plots: serde_json::Value::Object(serde_json::Map::new()),
+        extra: BTreeMap::new(),
+    });
+
+    let error = match result {
+        Ok(_) => panic!("starting_altitude must be rejected for speed gauges"),
+        Err(error) => error,
+    };
+    assert!(error
+        .to_string()
+        .contains("starting_altitude: is only valid for altitude widgets"));
+}
+
+#[test]
 fn linear_fill_rect_respects_horizontal_and_vertical_orientation() {
     let horizontal = bar_fill_rect(
         10.0,

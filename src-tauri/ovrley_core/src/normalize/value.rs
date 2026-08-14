@@ -84,19 +84,28 @@ pub struct ValidatedValueWidget {
 pub(super) fn normalize_starting_altitude_m(
     metric: MetricKind,
     starting_altitude: Option<f64>,
-    display_unit: &str,
-    path: &str,
+    display_unit: Option<&str>,
+    altitude_path: &str,
+    unit_path: &str,
 ) -> CoreResult<Option<f64>> {
     if metric != MetricKind::Altitude {
+        if starting_altitude.is_some() {
+            return Err(CoreError::Config(format!(
+                "{altitude_path}: is only valid for altitude widgets"
+            )));
+        }
         return Ok(None);
     }
+
+    let display_unit =
+        display_unit.ok_or_else(|| CoreError::Config(format!("{unit_path}: required")))?;
 
     let meter_scale = match display_unit {
         "m" => 1.0,
         "ft" => 3.280_84,
         unit => {
             return Err(CoreError::Config(format!(
-                "{path}: expected 'm' or 'ft', got '{unit}'"
+                "{unit_path}: expected 'm' or 'ft', got '{unit}'"
             )))
         }
     };
@@ -289,7 +298,8 @@ fn validate_value_widget_fields(
     let starting_altitude_m = normalize_starting_altitude_m(
         value.value,
         value.starting_altitude,
-        &display_unit,
+        Some(display_unit.as_str()),
+        &p("starting_altitude"),
         &p("display_unit"),
     )?;
 

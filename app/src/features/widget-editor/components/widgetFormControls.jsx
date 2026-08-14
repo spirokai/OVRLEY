@@ -147,10 +147,11 @@ export function TextField({ label, value, onChange, placeholder = '' }) {
  * @param {*} props.min - Lower bound used by the calculation.
  * @param {*} props.max - Upper bound used by the calculation.
  * @param {*} props.step - Value for step.
+ * @param {*} props.placeholder - Optional empty-state hint.
  * @param {Function} props.onReset - Optional callback that enables the reset action.
  * @returns {JSX.Element} Rendered component output.
  */
-export function NumberField({ label, value, onChange, min, max, disabled = false, step = 1, suffix, integerDisplay = true, onReset }) {
+export function NumberField({ label, value, onChange, min, max, disabled = false, step = 1, suffix, integerDisplay = true, placeholder, onReset }) {
   return (
     <FieldBlock label={label} disabled={disabled} onReset={onReset}>
       <div className="relative">
@@ -161,6 +162,7 @@ export function NumberField({ label, value, onChange, min, max, disabled = false
           min={min}
           max={max}
           step={step}
+          placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
           className={cn(CONTROL_CLASS, suffix && 'pr-16')}
         />

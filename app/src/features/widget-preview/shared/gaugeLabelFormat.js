@@ -7,8 +7,7 @@
  * value that already respects the chosen unit system.
  */
 
-import { convertStandardMetricValue } from '../widgets/metric/format'
-import { getStandardMetricDisplayUnit } from '@/lib/widget/standard-metrics'
+import { convertStandardMetricValue, getStandardMetricDisplayUnit } from '@/lib/widget/standard-metrics'
 
 /**
  * Converts a raw telemetry boundary value through the selected display unit

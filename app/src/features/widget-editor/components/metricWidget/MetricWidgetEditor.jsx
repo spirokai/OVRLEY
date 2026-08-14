@@ -93,6 +93,7 @@ export default function MetricWidgetEditor({
           <NumberField
             label="Altitude at start"
             value={widget.data.starting_altitude}
+            placeholder={widget.startingAltitudePlaceholder}
             suffix={getStandardMetricDisplayUnit(widget.type, widget.data)}
             onChange={(rawValue) => setNumericField(widget.id, 'starting_altitude', rawValue, { optional: true, round: true })}
             onReset={() => updateWidgetData(widget.id, { starting_altitude: null })}

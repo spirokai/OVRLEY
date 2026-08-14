@@ -30,11 +30,11 @@ import {
   getInterpolatedActivityValue,
   getInterpolatedTimeValue,
   getMetricSeries,
+  resolveMetricPresentationValues,
 } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { NUMERIC_PREVIEW_VERTICAL_METRICS_TEXT } from '@/features/overlay-editor/data/overlayEditorConstants'
 import { interpolateNumericSeries } from '@/lib/interpolation'
 import { isStandardMetricWidgetType, isBoxedDisplayType } from '@/lib/widget/standard-metrics'
-import { resolveMetricPresentationValues } from '@/lib/widget/altitude-correction'
 
 const COORDINATE_DIRECTION_GAP_PX = 8
 

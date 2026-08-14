@@ -12,6 +12,7 @@ import { DEFAULT_ACTIVITY_PREVIEW } from '../data/overlayEditorConfig'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
 import { interpolateNumericSeries, MISSING_SAMPLE_POLICY } from '@/lib/interpolation'
 import { getStandardMetricDefinition, getStandardMetricInterpolation } from '@/lib/widget/standard-metrics'
+import { applyAltitudeOffset, getAltitudeCorrectionMeters, getPreferredElevationSeries } from '@/lib/widget/altitude'
 
 /**
  * Returns the configured scene dimensions with defaults of 1920x1080.
@@ -97,6 +98,22 @@ export function getMetricSeries(activity, metricType) {
 }
 
 /**
+ * Resolves canonical geometry inputs and corrected display values for a metric preview.
+ * @param {object} widget
+ * @param {object|null} activity
+ * @param {number} previewSecond
+ * @returns {{rawValue: *, values: Array<unknown>, value: *, valueOffset: number}}
+ */
+export function resolveMetricPresentationValues(widget, activity, previewSecond) {
+  const values = getMetricSeries(activity, widget.type) ?? []
+  const rawValue = getInterpolatedActivityValue(activity, widget.type, previewSecond)
+  if (widget.type !== 'altitude') return { rawValue, values, value: rawValue, valueOffset: 0 }
+
+  const valueOffset = getAltitudeCorrectionMeters(values, widget.data.starting_altitude, widget.data.display_unit)
+  return { rawValue, values, value: applyAltitudeOffset(rawValue, valueOffset), valueOffset }
+}
+
+/**
  * Supplies activity data only while the current preview second belongs to it.
  *
  * @param {object|null} activity - Parsed activity data.
@@ -141,27 +158,6 @@ export function getInterpolatedActivityValue(activity, key, elapsedSecond) {
   if (interpolatedValue !== null) return interpolatedValue
   if (interpolationMode === 'preserve') return 0
   return DEFAULT_ACTIVITY_PREVIEW[key] ?? null
-}
-
-function getPreferredElevationSeries(activity) {
-  const barometricSeries = activity?.barometric_altitude
-  if (Array.isArray(barometricSeries) && barometricSeries.some((value) => value !== null && value !== undefined)) {
-    return barometricSeries
-  }
-
-  return activity?.elevation
-}
-
-/**
- * Returns the canonical source series used by elevation-profile presentation.
- * Sample elevations own the profile when present; raw elevation is the
- * documented fallback used by both profile geometry and marker labels.
- *
- * @param {object|null} activity - Parsed activity data.
- * @returns {Array<unknown>|undefined} Elevation-profile source series.
- */
-export function getElevationProfileSeries(activity) {
-  return activity?.sample_elevations?.length ? activity.sample_elevations : activity?.elevation
 }
 
 /**

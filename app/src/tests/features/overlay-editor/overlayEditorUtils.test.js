@@ -9,8 +9,9 @@
 
 import { describe, expect, test } from 'vitest'
 import { getContainerFps } from '@/lib/update-rate'
-import { getElevationProfileSeries, getInterpolatedActivityValue, getInterpolatedTimeValue, getMetricSeries } from '@/features/overlay-editor'
+import { getInterpolatedActivityValue, getInterpolatedTimeValue, getMetricSeries } from '@/features/overlay-editor'
 import { getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
+import { getElevationProfileSeries } from '@/lib/widget/altitude'
 
 describe('getContainerFps', () => {
   test('returns a number for common FPS and update rate combinations', () => {
