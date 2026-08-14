@@ -36,6 +36,7 @@ use std::path::PathBuf;
 /// Prepares the cached static layer and per-frame fill states.
 pub fn prepare_linear_gauge_cache(
     gauge: &ValidatedLinearGaugeWidget,
+    altitude_offset_m: f64,
     dense_activity: &DenseActivityReport,
     scene: &ValidatedSceneConfig,
     scale: f32,
@@ -62,6 +63,7 @@ pub fn prepare_linear_gauge_cache(
             font_dirs,
             min_value,
             max_value,
+            altitude_offset_m,
         )?;
         let left_padding = track_padding.max(label_left);
         let top_padding = track_padding.max(label_top);
@@ -100,6 +102,7 @@ pub fn prepare_linear_gauge_cache(
             font_dirs,
             min_value,
             max_value,
+            altitude_offset_m,
         )?;
 
         Ok(LinearGaugeCache {

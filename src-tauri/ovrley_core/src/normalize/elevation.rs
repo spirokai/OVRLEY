@@ -39,6 +39,8 @@ pub struct ValidatedElevationPlot {
     pub show_full_activity: bool,
     pub show_elevation_metric: bool,
     pub show_elevation_imperial: bool,
+    /// Optional presentation target for the first elevation sample, normalized to meters.
+    pub starting_altitude_m: Option<f64>,
     pub metric_label_offset_x: f32,
     pub metric_label_offset_y: f32,
     pub imperial_label_offset_x: f32,
@@ -133,6 +135,28 @@ pub fn validate_elevation_plot(
         .show_full_activity
         .ok_or_else(|| CoreError::Config(format!("{}: required", p("show_full_activity"))))?;
 
+    let starting_altitude_meter_scale = match plot.starting_altitude_unit.as_deref() {
+        Some("m") => Some(1.0),
+        Some("ft") => Some(3.280_84),
+        Some(unit) => {
+            return Err(CoreError::Config(format!(
+                "{}: expected 'm' or 'ft', got '{unit}'",
+                p("starting_altitude_unit")
+            )))
+        }
+        None => None,
+    };
+    let starting_altitude_m = match (plot.starting_altitude, starting_altitude_meter_scale) {
+        (Some(altitude), Some(scale)) => Some(altitude / scale),
+        (Some(_), None) => {
+            return Err(CoreError::Config(format!(
+                "{}: required",
+                p("starting_altitude_unit")
+            )))
+        }
+        (None, _) => None,
+    };
+
     let metric_label_offset_x =
         require_f32(plot.metric_label_offset_x, &p("metric_label_offset_x"))?;
     let metric_label_offset_y =
@@ -190,6 +214,7 @@ pub fn validate_elevation_plot(
         show_full_activity,
         show_elevation_metric,
         show_elevation_imperial,
+        starting_altitude_m,
         metric_label_offset_x,
         metric_label_offset_y,
         imperial_label_offset_x,

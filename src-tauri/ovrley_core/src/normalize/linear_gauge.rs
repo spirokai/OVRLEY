@@ -6,6 +6,7 @@
 
 use super::helpers::{require_bool, require_f32, require_string};
 use super::raw::ValueConfig;
+use super::value::normalize_starting_altitude_m;
 use super::{resolve_bar_style_geometry, track_corner_radius_max, ResolvedBarGeometry};
 use crate::error::{CoreError, CoreResult};
 use crate::standard_metrics::is_standard_metric;
@@ -53,6 +54,8 @@ pub struct ValidatedLinearGaugeWidget {
     pub min_max_label_font_size: f32,
     pub min_max_label_position: ValidatedLinearGaugeLabelPosition,
     pub min_max_label_color: String,
+    pub display_unit: Option<String>,
+    pub starting_altitude_m: Option<f64>,
 }
 
 /// Validates a raw value config as a linear gauge widget.
@@ -179,6 +182,19 @@ pub fn validate_linear_gauge(
         track_corner_radius_max(cross_extent, bar_span, bar_geometry.as_ref()),
     );
 
+    let display_unit = if value.value == MetricKind::Altitude {
+        Some(require_string(value.display_unit, &p("display_unit"))?)
+    } else {
+        value.display_unit
+    };
+    let starting_altitude_m = normalize_starting_altitude_m(
+        value.value,
+        value.starting_altitude,
+        display_unit.as_deref(),
+        &p("starting_altitude"),
+        &p("display_unit"),
+    )?;
+
     Ok(ValidatedLinearGaugeWidget {
         metric: value.value,
         x: value.x,
@@ -206,5 +222,7 @@ pub fn validate_linear_gauge(
         )?,
         min_max_label_position,
         min_max_label_color: require_string(value.min_max_label_color, &p("min_max_label_color"))?,
+        display_unit,
+        starting_altitude_m,
     })
 }

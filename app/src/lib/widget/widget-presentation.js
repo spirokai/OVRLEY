@@ -18,6 +18,7 @@
  */
 
 import { ensureWidgetIdsInConfig } from './widget-config'
+import { convertAltitudeValue, getElevationProfileSeries, getFirstAltitudeValue, getPreferredElevationSeries } from './altitude'
 
 /**
  * Flattens the config's backdrop/label/value/plot arrays into a uniform widget list
@@ -46,6 +47,25 @@ export function buildConfigWidgets(config) {
   })
 
   return widgets
+}
+
+/**
+ * Adds an activity-derived placeholder without changing configured altitude state.
+ * @param {object} widget
+ * @param {object|null} activity
+ * @returns {object}
+ */
+export function withAltitudeEditorPresentation(widget, activity) {
+  if (!['altitude', 'elevation'].includes(widget.type) || (widget.data.starting_altitude !== null && widget.data.starting_altitude !== undefined)) {
+    return widget
+  }
+
+  const series = widget.type === 'altitude' ? getPreferredElevationSeries(activity) : getElevationProfileSeries(activity)
+  const firstValue = getFirstAltitudeValue(series ?? [])
+  if (firstValue === null) return widget
+
+  const unit = widget.type === 'altitude' ? widget.data.display_unit : widget.data.starting_altitude_unit
+  return { ...widget, startingAltitudePlaceholder: Math.round(convertAltitudeValue(firstValue, 'm', unit)) }
 }
 
 /**

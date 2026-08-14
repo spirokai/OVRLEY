@@ -25,7 +25,7 @@ mod value;
 use crate::error::{CoreError, CoreResult};
 use crate::render::widgets::types::{
     PreparedArcGauge, PreparedGForce, PreparedHeadingTape, PreparedLapTimer, PreparedLeanAngle,
-    PreparedLinearGauge, PreparedValue,
+    PreparedLinearGauge, PreparedStandardText, PreparedValue,
 };
 use crate::types::{DisplayType, MetricKind};
 use raw::RenderConfig;
@@ -195,6 +195,7 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
                 return validate_linear_gauge(value, idx).map(|validated| {
                     PreparedValue::LinearGauge(PreparedLinearGauge {
                         validated,
+                        altitude_offset_m: 0.0,
                         cache: None,
                     })
                 });
@@ -204,6 +205,7 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
                 return validate_arc_gauge(value, idx).map(|validated| {
                     PreparedValue::ArcGauge(PreparedArcGauge {
                         validated,
+                        altitude_offset_m: 0.0,
                         cache: None,
                     })
                 });
@@ -213,11 +215,17 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
                 return validate_corner_gauge(value, idx).map(|validated| {
                     PreparedValue::ArcGauge(PreparedArcGauge {
                         validated,
+                        altitude_offset_m: 0.0,
                         cache: None,
                     })
                 });
             }
-            validate_value_widget(value, idx).map(PreparedValue::StandardText)
+            validate_value_widget(value, idx).map(|validated| {
+                PreparedValue::StandardText(PreparedStandardText {
+                    validated,
+                    altitude_offset_m: 0.0,
+                })
+            })
         })
         .collect::<CoreResult<Vec<_>>>()?;
 

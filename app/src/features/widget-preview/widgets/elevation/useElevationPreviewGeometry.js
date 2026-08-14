@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { getDistanceProgressAtElapsed, getPreviewActivity, getWindowProgressAtTime } from '@/features/overlay-editor'
+import { getElevationProfileSeries } from '@/lib/widget/altitude'
 import { buildElevationGeometry } from '@/api/backend'
 import { areaToSvg, findPointAtProgress, pointsToSvg } from '@/lib/geometryUtils'
 import { buildPlaceholderElevationPreviewGeometry, buildPlaceholderElevationStaticGeometry } from '../../shared/plotPlaceholderGeometry'
@@ -78,7 +79,7 @@ export function useElevationPreviewGeometry({ activity, data, exportRange, previ
   const frameElapsedFraction = Math.min(Math.max((previewSecond - elapsedWindowStart) / Math.max(sourceDuration, 1e-9), 0), 1)
 
   const metricHit = findPointAtProgress(points, rustGeometry.progressValues, progress01)
-  const elevationSeries = activity.sample_elevations.length ? activity.sample_elevations : activity.elevation
+  const elevationSeries = getElevationProfileSeries(activity)
   const elevationValue = interpolateNumericSeries(activity.sample_elapsed_seconds, elevationSeries, previewSecond)
   const markerY = projectElevationValueToSvgY(elevationValue, rustGeometry.dataRange, data.height, data.y_scale)
   const markerPoint = markerY === null ? null : [metricHit.point[0], markerY]

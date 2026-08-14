@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { getInterpolatedActivityValue, getMetricSeries, getPreviewActivity } from '@/features/overlay-editor/utils/overlayEditorUtils'
+import { getPreviewActivity, resolveMetricPresentationValues } from '@/features/overlay-editor/utils/overlayEditorUtils'
 import { getArcGaugeLayout, getArcLabelGap, getCornerGaugeLayout } from './geometry'
 import { getArcInnerWidgetLayout } from './arcGaugeInnerLayout'
 import { getArcFilledTrackRevealSpec, getArcPoint } from './trackPath'
@@ -49,10 +49,11 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
 
   return useMemo(() => {
     const displayActivity = getPreviewActivity(activity, previewSecond)
-    const value = getInterpolatedActivityValue(displayActivity, widget.data.value, previewSecond)
-    const values = getMetricSeries(displayActivity, widget.data.value) ?? []
+    const presentation = resolveMetricPresentationValues(widget, displayActivity, previewSecond)
     const layout =
-      widget.data.display_type === 'corner' ? getCornerGaugeLayout(widget.data, value, values) : getArcGaugeLayout(widget.data, value, values)
+      widget.data.display_type === 'corner'
+        ? getCornerGaugeLayout(widget.data, presentation.rawValue, presentation.values)
+        : getArcGaugeLayout(widget.data, presentation.rawValue, presentation.values)
     const trackGeometry = {
       centerX: layout.centerX,
       centerY: layout.centerY,
@@ -61,7 +62,7 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
       sweepAngle: layout.sweepAngle,
       trackThickness: layout.trackThickness,
     }
-    const innerModel = buildArcGaugeInnerWidgetModel({ widget, activity: displayActivity, previewSecond })
+    const innerModel = buildArcGaugeInnerWidgetModel({ widget, presentationValue: presentation.value })
     const opacity = widget.data.opacity * globalOpacity
     const segmented = widget.data.track_fill_style === 'bars'
     const fillEndCornerRadius = widget.data.track_fill_flat ? 0 : widget.data.track_corner_radius
@@ -84,8 +85,8 @@ export function useArcGaugePreviewPresentation({ widget, activity, previewSecond
       : null
     const metricType = widget.data.value
     const displayUnit = widget.data.display_unit
-    const minLabel = formatGaugeBoundaryLabel(metricType, layout.min, displayUnit)
-    const maxLabel = formatGaugeBoundaryLabel(metricType, layout.max, displayUnit)
+    const minLabel = formatGaugeBoundaryLabel(metricType, layout.min + presentation.valueOffset, displayUnit)
+    const maxLabel = formatGaugeBoundaryLabel(metricType, layout.max + presentation.valueOffset, displayUnit)
     const shadow = getTextShadowParts(sceneStyle)
 
     return {

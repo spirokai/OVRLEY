@@ -72,11 +72,45 @@ pub struct ValidatedValueWidget {
     pub coordinate_format: Option<String>,
     pub unit_color: [u8; 4],
     pub display_unit: String,
+    /// Optional presentation target for the first altitude sample, normalized to meters.
+    pub starting_altitude_m: Option<f64>,
     pub prefix: String,
     pub suffix: String,
     pub formatting: ValidatedValueFormatting,
     pub hours_offset: Option<i64>,
     pub format: Option<String>,
+}
+
+pub(super) fn normalize_starting_altitude_m(
+    metric: MetricKind,
+    starting_altitude: Option<f64>,
+    display_unit: Option<&str>,
+    altitude_path: &str,
+    unit_path: &str,
+) -> CoreResult<Option<f64>> {
+    if metric != MetricKind::Altitude {
+        if starting_altitude.is_some() {
+            return Err(CoreError::Config(format!(
+                "{altitude_path}: is only valid for altitude widgets"
+            )));
+        }
+        return Ok(None);
+    }
+
+    let display_unit =
+        display_unit.ok_or_else(|| CoreError::Config(format!("{unit_path}: required")))?;
+
+    let meter_scale = match display_unit {
+        "m" => 1.0,
+        "ft" => 3.280_84,
+        unit => {
+            return Err(CoreError::Config(format!(
+                "{unit_path}: expected 'm' or 'ft', got '{unit}'"
+            )))
+        }
+    };
+
+    Ok(starting_altitude.map(|altitude| altitude / meter_scale))
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +295,13 @@ fn validate_value_widget_fields(
             p("display_unit")
         )));
     }
+    let starting_altitude_m = normalize_starting_altitude_m(
+        value.value,
+        value.starting_altitude,
+        Some(display_unit.as_str()),
+        &p("starting_altitude"),
+        &p("display_unit"),
+    )?;
 
     // -- affixes are output-affecting and must be explicit ----------------
     let prefix = require_string(value.prefix, &p("prefix"))?;
@@ -352,6 +393,7 @@ fn validate_value_widget_fields(
         coordinate_format,
         unit_color,
         display_unit,
+        starting_altitude_m,
         prefix,
         suffix,
         formatting,

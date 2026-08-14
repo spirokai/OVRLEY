@@ -30,6 +30,7 @@ pub(super) fn draw_static_layer(
     max_value: f64,
     unit_text: Option<&str>,
     text_style: &ResolvedTextStyle,
+    altitude_offset_m: f64,
 ) -> CoreResult<()> {
     let track_thickness = gauge.track_thickness * scale;
     let border_thickness = gauge.track_border_thickness * scale;
@@ -83,7 +84,15 @@ pub(super) fn draw_static_layer(
 
     if gauge.show_min_max_labels {
         draw_arc_labels(
-            canvas, gauge, geometry, scale, font_dirs, min_value, max_value, text_style,
+            canvas,
+            gauge,
+            geometry,
+            scale,
+            font_dirs,
+            min_value,
+            max_value,
+            text_style,
+            altitude_offset_m,
         )?;
     }
     if let Some(unit_text) = unit_text {

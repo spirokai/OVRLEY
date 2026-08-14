@@ -29,6 +29,7 @@ pub(super) fn draw_static_layer(
     font_dirs: &[PathBuf],
     min_value: f64,
     max_value: f64,
+    altitude_offset_m: f64,
 ) -> CoreResult<()> {
     let width_px = width as f32;
     let height_px = height as f32;
@@ -81,7 +82,16 @@ pub(super) fn draw_static_layer(
     if gauge.show_min_max_labels {
         let font_size = gauge.min_max_label_font_size * scale;
         let font = resolve_font(font_dirs, Some(&gauge.min_max_label_font), font_size)?;
-        let layout = label_layout(gauge, width, height, scale, &font, min_value, max_value);
+        let layout = label_layout(
+            gauge,
+            width,
+            height,
+            scale,
+            &font,
+            min_value,
+            max_value,
+            altitude_offset_m,
+        );
         let mut text_paint = Paint::default();
         text_paint.set_anti_alias(true);
         text_paint.set_color(parse_color(&gauge.min_max_label_color, 1.0));

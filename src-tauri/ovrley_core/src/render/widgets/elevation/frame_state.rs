@@ -9,7 +9,7 @@ use super::super::common::{
 };
 use super::super::types::{ElevationFrameState, NormalizedElevationPlot, WidgetGeometry};
 use super::reduction::project_single_elevation_y;
-use crate::activity::elevation::preferred_elevation_series;
+use crate::activity::elevation::{elevation_profile_series, preferred_elevation_series};
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::normalize::ValidatedSceneConfig;
 
@@ -219,11 +219,7 @@ fn interpolate_elevation_for_elapsed_frames(
     frame_elapsed_seconds: &[f64],
     scene_start: f64,
 ) -> Vec<f64> {
-    let elevations = if activity.sample_elevations.is_empty() {
-        &activity.elevation
-    } else {
-        &activity.sample_elevations
-    };
+    let elevations = elevation_profile_series(&activity.sample_elevations, &activity.elevation);
     let elapsed_seconds = &activity.sample_elapsed_seconds;
     if elevations.is_empty() || elapsed_seconds.is_empty() {
         return vec![0.0; frame_elapsed_seconds.len()];

@@ -10,6 +10,7 @@ import {
   GRADIENT_ZERO_EPSILON,
 } from '@/features/overlay-editor/data/overlayEditorConstants'
 import {
+  convertStandardMetricValue,
   getStandardMetricDefinition,
   getStandardMetricDisplayUnit,
   getStandardMetricUnitLabel,
@@ -132,88 +133,6 @@ function formatDistanceValue(value, unit, decimals, showUnits) {
  * @param {number} value - Raw telemetry value in native units.
  * @returns {number} Converted value.
  */
-export function convertStandardMetricValue(type, value, displayUnit) {
-  switch (type) {
-    case 'speed':
-      switch (displayUnit) {
-        case 'mph':
-        case 'imperial':
-          return value * 2.23694
-        case 'kn':
-          return value * 1.943844
-        case 'mps':
-          return value
-        default:
-          return value * 3.6
-      }
-    case 'temperature':
-    case 'core_temperature':
-      return displayUnit === 'fahrenheit' ? (value * 9) / 5 + 32 : value
-    case 'pace':
-      return displayUnit === 'min_per_mi' ? value * 1.609344 : value
-    case 'distance':
-    case 'distance_to_home':
-      switch (displayUnit) {
-        case 'km':
-          return value / 1000
-        case 'mi':
-          return value / 1609.344
-        case 'ft':
-          return value * 3.28084
-        default:
-          return value
-      }
-    case 'g_force':
-      return displayUnit === 'mps2' ? value * 9.80665 : value
-    case 'air_pressure':
-      switch (displayUnit) {
-        case 'inhg':
-          return value * 29.5299830714
-        case 'mmhg':
-          return value * 750.061561303
-        case 'mbar':
-        case 'hpa':
-        default:
-          return value * 1000
-      }
-    case 'stride_length':
-      switch (displayUnit) {
-        case 'cm':
-          return value * 100
-        case 'ft':
-          return value * 3.28084
-        case 'in':
-          return value * 39.3701
-        default:
-          return value
-      }
-    case 'vertical_speed':
-      switch (displayUnit) {
-        case 'ftmin':
-          return value * 196.850394
-        case 'ftph':
-          return value * 11811.02364
-        case 'mph_vertical':
-          return value * 3600
-        default:
-          return value
-      }
-    case 'altitude':
-      return displayUnit === 'ft' ? value * 3.28084 : value
-    case 'total_ascent':
-      return displayUnit === 'ft' ? value * 3.28084 : value
-    case 'vertical_oscillation':
-      switch (displayUnit) {
-        case 'cm':
-          return value / 10
-        default:
-          return value
-      }
-    default:
-      return value
-  }
-}
-
 const BALANCE_FORMATS = {
   plain: { valueTemplate: (l, r) => `${l}/${r}`, placeholder: '--/--' },
   l_prefix: { valueTemplate: (l, r) => `L${l}/R${r}`, placeholder: '--/--' },

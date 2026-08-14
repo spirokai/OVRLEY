@@ -325,6 +325,7 @@ fn rejects_new_display_variants_on_the_wrong_metric() {
     for (field, value) in [
         ("coordinate_format", json!("dms")),
         ("show_full_ascent", json!(true)),
+        ("starting_altitude", json!(500)),
     ] {
         let mut speed = common::builders::speed_value_json();
         speed[field] = value;

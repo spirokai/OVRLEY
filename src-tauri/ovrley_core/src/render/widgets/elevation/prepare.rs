@@ -14,12 +14,13 @@ use super::super::types::{
 use super::reduction::{
     downsample_elevation_points, project_elevation_points, simplify_elevation_samples,
 };
-use crate::activity::elevation::preferred_elevation_series;
+use crate::activity::elevation::{elevation_profile_series, preferred_elevation_series};
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
 use crate::debug::RenderProfiler;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::RenderDataRequirements;
+use crate::render::format::altitude_offset_m;
 use crate::render::surface::create_surface;
 use std::time::Instant;
 
@@ -36,6 +37,10 @@ pub(crate) fn prepare_elevation_cache(
     let show_full_activity = validated.show_full_activity;
     let plot = super::normalize::normalize_elevation_plot(validated, scene);
     let raw_points = build_elevation_source_points(activity, show_full_activity, scene)?;
+    let label_altitude_offset_m = altitude_offset_m(
+        validated.starting_altitude_m,
+        elevation_profile_series(&activity.sample_elevations, &activity.elevation),
+    );
     let geometry = prepare_profiler.measure("build_elevation_cache.geometry", || {
         build_elevation_geometry(&plot, &raw_points)
     })?;
@@ -66,6 +71,7 @@ pub(crate) fn prepare_elevation_cache(
 
     Ok(ElevationWidgetCache {
         plot,
+        label_altitude_offset_m,
         geometry,
         frame_states,
         marker_layers,
@@ -222,11 +228,7 @@ pub(crate) fn build_elevation_source_points(
     let source_duration = scoped_source_duration(scene, activity, show_full_activity);
 
     if show_full_activity || !custom_export_range_active(scene) {
-        let source = if activity.sample_elevations.is_empty() {
-            &activity.elevation
-        } else {
-            &activity.sample_elevations
-        };
+        let source = elevation_profile_series(&activity.sample_elevations, &activity.elevation);
         return Ok(raw_elevation_points(
             source,
             &activity.sample_distance_progress,

@@ -196,3 +196,50 @@ export function getStandardMetricUnitsMode(type) {
   const definition = getStandardMetricDefinition(type)
   return definition?.unitsMode ?? null
 }
+
+/**
+ * Converts a canonical standard-metric value to a display unit.
+ * @param {string} type
+ * @param {number} value
+ * @param {string|null} displayUnit
+ * @returns {number}
+ */
+export function convertStandardMetricValue(type, value, displayUnit) {
+  switch (type) {
+    case 'speed':
+      if (displayUnit === 'mph' || displayUnit === 'imperial') return value * 2.23694
+      if (displayUnit === 'kn') return value * 1.943844
+      return displayUnit === 'mps' ? value : value * 3.6
+    case 'temperature':
+    case 'core_temperature':
+      return displayUnit === 'fahrenheit' ? (value * 9) / 5 + 32 : value
+    case 'pace':
+      return displayUnit === 'min_per_mi' ? value * 1.609344 : value
+    case 'distance':
+    case 'distance_to_home':
+      if (displayUnit === 'km') return value / 1000
+      if (displayUnit === 'mi') return value / 1609.344
+      return displayUnit === 'ft' ? value * 3.28084 : value
+    case 'g_force':
+      return displayUnit === 'mps2' ? value * 9.80665 : value
+    case 'air_pressure':
+      if (displayUnit === 'inhg') return value * 29.5299830714
+      if (displayUnit === 'mmhg') return value * 750.061561303
+      return value * 1000
+    case 'stride_length':
+      if (displayUnit === 'cm') return value * 100
+      if (displayUnit === 'ft') return value * 3.28084
+      return displayUnit === 'in' ? value * 39.3701 : value
+    case 'vertical_speed':
+      if (displayUnit === 'ftmin') return value * 196.850394
+      if (displayUnit === 'ftph') return value * 11811.02364
+      return displayUnit === 'mph_vertical' ? value * 3600 : value
+    case 'altitude':
+    case 'total_ascent':
+      return displayUnit === 'ft' ? value * 3.28084 : value
+    case 'vertical_oscillation':
+      return displayUnit === 'cm' ? value / 10 : value
+    default:
+      return value
+  }
+}
