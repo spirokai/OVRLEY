@@ -9,7 +9,9 @@ import { useEffect } from 'react'
 import { OverlayEditor } from '@/features/overlay-editor'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
-import { WidgetDrawer } from '@/features/widget-drawer'
+import { WidgetDrawerContent } from '@/features/widget-drawer'
+import { ToolbarDrawerLayout, useToolbarDrawer } from '@/features/toolbar'
+import { WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 import { NewTemplateConfirmDialog } from '@/features/template-manager'
 import { UpdatePromptDialog } from '@/features/app-update'
 import { AppHeader, ControlPanel, ErrorAlert, KeyboardShortcutsDialog, LoadingOverlay, useAppShellComposition } from '@/features/app-shell'
@@ -51,13 +53,23 @@ function AppShell() {
     backendState,
     editorShell,
     handleOpenDownloads,
+    layout,
     renderWorkflow,
     templateManagement,
     undoRedoControls,
     videoControls,
     widgetLiveEdits,
   } = useAppShellComposition()
+  const toolbarDrawer = useToolbarDrawer(layout)
   const { config, globalDefaults, importingVideo, isProcessing, setConfig } = appShell
+
+  if (!toolbarDrawer.initialized) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background text-foreground">
+        <span className="text-sm text-muted-foreground">OVRLEY is starting...</span>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -93,51 +105,59 @@ function AppShell() {
           videoControls={videoControls}
         />
 
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <div className="relative flex min-w-0 flex-1 flex-col bg-surface-darken">
-            <LoadingOverlay
-              show={isProcessing || importingVideo}
-              label={importingVideo ? 'Importing your video...' : 'Processing your activity...'}
-            />
-            <WidgetDrawer widgetLiveEdits={widgetLiveEdits} />
+        <ToolbarDrawerLayout
+          {...toolbarDrawer}
+          drawerContent={
+            toolbarDrawer.renderDrawerContent && toolbarDrawer.activeTool === WIDGETS_TOOL ? (
+              <WidgetDrawerContent widgetLiveEdits={widgetLiveEdits} />
+            ) : null
+          }
+          workspace={
+            <>
+              <LoadingOverlay
+                show={isProcessing || importingVideo}
+                label={importingVideo ? 'Importing your video...' : 'Processing your activity...'}
+              />
+              <div
+                className="min-h-0 flex-1"
+                onFocusCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
+                onPointerDownCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
+              >
+                <OverlayEditor
+                  config={config}
+                  globalDefaults={globalDefaults}
+                  onConfigChange={setConfig}
+                  zoomLevel={editorShell.editorZoomLevel}
+                  onZoomLevelChange={editorShell.setEditorZoomLevel}
+                  backgroundMode={editorShell.editorBackgroundMode}
+                  gridVisible={editorShell.editorGridVisible}
+                  snapToGrid={editorShell.editorSnapToGrid}
+                  importedBackgroundImageFilename={videoControls.importedBackgroundImageFilename}
+                  importedVideoFilename={videoControls.importedVideoFilename}
+                  editorShell={editorShell}
+                  undoRedoControls={undoRedoControls}
+                  showTemplateStatus={templateManagement.showTemplateStatus}
+                  templateStatus={templateManagement.status}
+                  widgetLiveEdits={widgetLiveEdits}
+                />
+              </div>
+              <OverlayPlayer
+                activeKeyboardWorkspace={editorShell.activeKeyboardWorkspace}
+                backgroundMode={editorShell.editorBackgroundMode}
+                onActivateKeyboardWorkspace={() => editorShell.setActiveKeyboardWorkspace('player')}
+              />
+            </>
+          }
+          controlPanel={
             <div
-              className="min-h-0 flex-1"
+              className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto border-l border-border/70 bg-card/60 backdrop-blur-sm"
               onFocusCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
               onPointerDownCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
             >
-              <OverlayEditor
-                config={config}
-                globalDefaults={globalDefaults}
-                onConfigChange={setConfig}
-                zoomLevel={editorShell.editorZoomLevel}
-                onZoomLevelChange={editorShell.setEditorZoomLevel}
-                backgroundMode={editorShell.editorBackgroundMode}
-                gridVisible={editorShell.editorGridVisible}
-                snapToGrid={editorShell.editorSnapToGrid}
-                importedBackgroundImageFilename={videoControls.importedBackgroundImageFilename}
-                importedVideoFilename={videoControls.importedVideoFilename}
-                editorShell={editorShell}
-                undoRedoControls={undoRedoControls}
-                showTemplateStatus={templateManagement.showTemplateStatus}
-                templateStatus={templateManagement.status}
-                widgetLiveEdits={widgetLiveEdits}
-              />
+              <ControlPanel config={config} onConfigChange={setConfig} widgetLiveEdits={widgetLiveEdits} />
             </div>
-            <OverlayPlayer
-              activeKeyboardWorkspace={editorShell.activeKeyboardWorkspace}
-              backgroundMode={editorShell.editorBackgroundMode}
-              onActivateKeyboardWorkspace={() => editorShell.setActiveKeyboardWorkspace('player')}
-            />
-          </div>
-
-          <div
-            className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto border-l border-border/70 bg-card/60 backdrop-blur-sm"
-            onFocusCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
-            onPointerDownCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}
-          >
-            <ControlPanel config={config} onConfigChange={setConfig} widgetLiveEdits={widgetLiveEdits} />
-          </div>
-        </div>
+          }
+        />
       </div>
     </div>
   )

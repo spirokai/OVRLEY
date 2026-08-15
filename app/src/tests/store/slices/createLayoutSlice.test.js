@@ -1,60 +1,54 @@
-/**
- * Tests for createLayoutSlice — verifies drawer open/close state management.
- */
-
-import { describe, test, expect } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { createLayoutSlice } from '@/store/slices/createLayoutSlice'
 
-function createMockSet() {
+function createLayoutHarness() {
   const state = {}
-  const set = (fn) => {
-    fn(state)
-  }
-  return { state, set }
+  const set = (update) => update(state)
+  const slice = createLayoutSlice(set, () => state)
+  Object.assign(state, slice)
+  return state
 }
 
 describe('createLayoutSlice', () => {
-  test('widgetDrawerOpen defaults to false', () => {
-    const { set } = createMockSet()
-    const get = () => ({})
+  test('initialization restores a pinned drawer visibly with its active tool', () => {
+    const state = createLayoutHarness()
 
-    const slice = createLayoutSlice(set, get)
+    state.initializeLeftDrawer({ pinned: true, activeTool: 'widgets' })
 
-    expect(slice.widgetDrawerOpen).toBe(false)
+    expect(state).toMatchObject({
+      activeLeftDrawerTool: 'widgets',
+      leftDrawerInitialized: true,
+      leftDrawerPinned: true,
+      leftDrawerVisible: true,
+    })
   })
 
-  test('toggleWidgetDrawer opens the drawer when closed', () => {
-    const { state, set } = createMockSet()
-    const get = () => state
+  test('selecting the active tool toggles only an unpinned drawer', () => {
+    const state = createLayoutHarness()
+    state.initializeLeftDrawer({ pinned: false, activeTool: 'widgets' })
 
-    const slice = createLayoutSlice(set, get)
+    state.selectLeftDrawerTool('widgets')
+    expect(state.leftDrawerVisible).toBe(true)
 
-    slice.toggleWidgetDrawer()
+    state.selectLeftDrawerTool('widgets')
+    expect(state.leftDrawerVisible).toBe(false)
 
-    expect(state.widgetDrawerOpen).toBe(true)
+    state.setLeftDrawerPinned(true)
+    state.selectLeftDrawerTool('widgets')
+    expect(state.leftDrawerVisible).toBe(true)
   })
 
-  test('toggleWidgetDrawer closes the drawer when open', () => {
-    const { state, set } = createMockSet()
-    state.widgetDrawerOpen = true
-    const get = () => state
+  test('dismissal and unpinning preserve the canonical visibility rules', () => {
+    const state = createLayoutHarness()
+    state.initializeLeftDrawer({ pinned: true, activeTool: 'widgets' })
 
-    const slice = createLayoutSlice(set, get)
+    state.dismissLeftDrawerOverlay()
+    expect(state.leftDrawerVisible).toBe(true)
 
-    slice.toggleWidgetDrawer()
+    state.setLeftDrawerPinned(false)
+    expect(state).toMatchObject({ leftDrawerPinned: false, leftDrawerVisible: true })
 
-    expect(state.widgetDrawerOpen).toBe(false)
-  })
-
-  test('closeWidgetDrawer closes the drawer when open', () => {
-    const { state, set } = createMockSet()
-    state.widgetDrawerOpen = true
-    const get = () => state
-
-    const slice = createLayoutSlice(set, get)
-
-    slice.closeWidgetDrawer()
-
-    expect(state.widgetDrawerOpen).toBe(false)
+    state.dismissLeftDrawerOverlay()
+    expect(state.leftDrawerVisible).toBe(false)
   })
 })

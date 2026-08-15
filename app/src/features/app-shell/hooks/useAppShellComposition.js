@@ -4,7 +4,7 @@
 
 import { useEffect } from 'react'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
-import { useAppShellStore } from '@/hooks/useAppStoreSelectors'
+import { useAppShellStore, useLayoutStore } from '@/hooks/useAppStoreSelectors'
 import { useRenderWorkflow } from '@/features/render-video'
 import { useTemplateManagement } from '@/features/template-manager'
 import useActivityImport from './useActivityImport'
@@ -27,6 +27,7 @@ import * as backend from '@/api/backend'
  *   backendState: object,
  *   editorShell: object,
  *   handleOpenDownloads: Function,
+ *   layout: object,
  *   renderWorkflow: object,
  *   templateManagement: object,
  *   undoRedoControls: object,
@@ -36,6 +37,7 @@ import * as backend from '@/api/backend'
  */
 export default function useAppShellComposition() {
   const appShell = useAppShellStore()
+  const layout = useLayoutStore()
   const widgetLiveEdits = useWidgetDraftState()
   const backendState = useBackendStatus()
   const editorShell = useEditorShellState()
@@ -73,6 +75,7 @@ export default function useAppShellComposition() {
     renderWorkflow,
     templateManagement,
     videoControls,
+    layout,
   })
 
   return {
@@ -82,6 +85,7 @@ export default function useAppShellComposition() {
     backendState,
     editorShell,
     handleOpenDownloads,
+    layout,
     renderWorkflow,
     templateManagement,
     undoRedoControls,

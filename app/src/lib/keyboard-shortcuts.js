@@ -82,4 +82,29 @@ export function isFormFieldShortcut(event) {
   return Boolean(textEditor && (event.ctrlKey || event.metaKey) && NATIVE_EDITING_KEYS.has(getEventKey(event)))
 }
 
+const KEYBOARD_OVERLAY_SELECTOR =
+  '[data-slot="dialog-content"], [data-slot="select-content"], [data-slot="popover-content"], [data-slot="left-drawer-backdrop"]'
+
+/**
+ * Reports whether global workspace shortcuts are blocked by temporary UI.
+ *
+ * @returns {boolean} Whether a keyboard-owning overlay is open.
+ */
+export function hasOpenOverlay() {
+  if (typeof document === 'undefined') return false
+
+  return Boolean(document.querySelector(KEYBOARD_OVERLAY_SELECTOR))
+}
+
+/**
+ * Reports whether Escape currently belongs to transient nested UI.
+ *
+ * @returns {boolean} Whether select or popover content is open.
+ */
+export function hasOpenPopup() {
+  if (typeof document === 'undefined') return false
+
+  return Boolean(document.querySelector('[data-slot="select-content"], [data-slot="popover-content"]'))
+}
+
 export const keyboardShortcutManifest = shortcutManifest

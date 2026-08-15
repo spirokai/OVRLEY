@@ -19,9 +19,19 @@ export function SimpleTooltip({ content, children, side = 'top', className = '' 
 
   if (!content) return children
 
-  const sideClasses = side === 'top' ? 'bottom-full left-1/2 -translate-x-1/2 mb-2' : 'top-full left-1/2 -translate-x-1/2 mt-2'
+  const sideClasses = {
+    top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
+    bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
+    left: 'right-full top-1/2 -translate-y-1/2 mr-2',
+    right: 'left-full top-1/2 -translate-y-1/2 ml-2',
+  }[side]
 
-  const arrowClasses = side === 'top' ? 'top-full border-t-surface-tooltip' : 'bottom-full border-b-surface-tooltip'
+  const arrowClasses = {
+    top: 'top-full left-1/2 -translate-x-1/2 -mt-px border-t-surface-tooltip',
+    bottom: 'bottom-full left-1/2 -translate-x-1/2 -mt-px border-b-surface-tooltip',
+    left: 'left-full top-1/2 -translate-y-1/2 -ml-px border-l-surface-tooltip',
+    right: 'right-full top-1/2 -translate-y-1/2 -mr-px border-r-surface-tooltip',
+  }[side]
 
   return (
     <div className={`relative inline-flex ${className}`} onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
@@ -32,7 +42,7 @@ export function SimpleTooltip({ content, children, side = 'top', className = '' 
         >
           {content}
           {/* Arrow */}
-          <div className={`absolute left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent ${arrowClasses}`} />
+          <div className={`absolute border-4 border-transparent ${arrowClasses}`} />
         </div>
       )}
     </div>
