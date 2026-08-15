@@ -1,9 +1,16 @@
-import { Blocks } from 'lucide-react'
+import { Blocks, FolderOpen, Activity, Film } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 
 const TOOLS = [
+  {
+    id: 'PROJECTS',
+    label: 'Projects',
+    icon: FolderOpen,
+  },
+  { id: 'ACTIVITY', label: 'Activity', icon: Activity },
+  { id: 'VIDEOS', label: 'Videos', icon: Film },
   {
     id: WIDGETS_TOOL,
     label: 'Widgets',
@@ -23,7 +30,7 @@ const TOOLS = [
  */
 export function VerticalToolbar({ activeTool, drawerVisible, width, onSelectTool }) {
   return (
-    <div className="z-70 flex h-full shrink-0 flex-col items-center border-r border-border/70 bg-card py-4" style={{ width }}>
+    <div className="z-70 flex h-full shrink-0 flex-col items-center border-r border-border/70 bg-card py-4 gap-2" style={{ width }}>
       {TOOLS.map((tool) => {
         const Icon = tool.icon
         const selected = drawerVisible && activeTool === tool.id
@@ -39,7 +46,7 @@ export function VerticalToolbar({ activeTool, drawerVisible, width, onSelectTool
               aria-pressed={selected}
               onClick={() => onSelectTool(tool.id)}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="size-4" />
             </Button>
           </SimpleTooltip>
         )
