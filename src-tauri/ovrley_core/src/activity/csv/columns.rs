@@ -334,6 +334,14 @@ pub(super) fn build_activity_columns(
             )
         })
         .chain([(
+            "pace".to_string(),
+            SmoothingOption {
+                enabled: true,
+                method: "zero_phase_ma".to_string(),
+                window_seconds: 5.0,
+            },
+        )])
+        .chain([(
             "heading".to_string(),
             SmoothingOption {
                 enabled: true,

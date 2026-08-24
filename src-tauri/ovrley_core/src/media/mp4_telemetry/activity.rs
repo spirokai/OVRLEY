@@ -136,14 +136,24 @@ pub fn build_activity_columns(
         sync_time,
         options: RawActivityOptions {
             skip_idle_gap_fill: true,
-            smoothing: [(
-                "heading".to_string(),
-                SmoothingOption {
-                    enabled: true,
-                    method: "circular_ema".to_string(),
-                    window_seconds: 0.0,
-                },
-            )]
+            smoothing: [
+                (
+                    "pace".to_string(),
+                    SmoothingOption {
+                        enabled: true,
+                        method: "zero_phase_ma".to_string(),
+                        window_seconds: 5.0,
+                    },
+                ),
+                (
+                    "heading".to_string(),
+                    SmoothingOption {
+                        enabled: true,
+                        method: "circular_ema".to_string(),
+                        window_seconds: 0.0,
+                    },
+                ),
+            ]
             .into(),
         },
         preserve_direct_metric_gaps: Default::default(),
