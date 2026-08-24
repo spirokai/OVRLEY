@@ -17,7 +17,7 @@ Transparent exports will use `overlay_<timestamp>.mov`, and composite exports wi
 
 A validated `RenderOutputTarget` will represent the request-specific destination in Rust. It will pass explicitly from render command ingress through the transparent or composite pipeline instead of entering template config or replacing stable application paths. Rust will probe the exact target before parsing or processing activity data. The single machine-readable `already_exists` rejection opens a dedicated overwrite-confirmation modal above the still-open render dialog; every other probe failure returns the operating system's error.
 
-After the backend accepts a render, the frontend retains the accepted full path for that job, derives its parent directory through the platform path API, and persists only that directory. Progress continues to expose a basename for presentation. Automatic opening uses the accepted absolute path, and Overlays opens the remembered directory.
+After the backend accepts a render, the frontend stores the accepted full path alongside the active render ID, derives its parent directory through the platform path API, and persists only that directory. Progress continues to expose a basename for presentation. Automatic opening uses the accepted absolute path, and Overlays opens the remembered directory.
 
 ## User Stories
 
@@ -109,16 +109,17 @@ After the backend accepts a render, the frontend retains the accepted full path 
 - Exclusive creation returning `ErrorKind::AlreadyExists` crosses Tauri as `{ code: 'already_exists', message }`. This is the only OVRLEY-owned output error code because it is the only error that changes frontend behavior.
 - Every other exact-path probe failure returns the operating system's original I/O error. OVRLEY does not classify missing parents, non-directory components, permissions, invalid names, extensions, or miscellaneous I/O failures into an application taxonomy.
 - Only `already_exists` opens overwrite confirmation. All other errors leave the confirmation phase and complete draft intact.
+- The `backend_render` Tauri command returns `Result<String, BackendRenderError>`: the success arm is the existing JSON string, and the error arm is a structured enum serializing to either `{ code: 'already_exists', message }` or `{ code: 'render_error', message }`. The shared `call_and_serialize` helper is not changed.
 - Overwrite confirmation is a second modal above the render dialog. Confirmation retries the unchanged normalized target with authorization. Editing, browsing, or mode-driven path change clears authorization.
 - Confirmed overwrite uses FFmpeg's direct output behavior. Staging, backup, rollback, and cross-platform atomic replacement are not introduced. The prior file can be lost after failure or cancellation.
 - A render is accepted only after synchronous command validation succeeds and the controller registers it. Output rejection does not transition permanently to progress.
 - The acceptance response exposes canonical `outputPath`, not duplicate output-directory or basename fields.
-- The frontend holds accepted `outputPath` for the active job, derives its directory using Tauri's platform path API, and persists only that directory under one canonical last-render-output key.
+- The frontend stores accepted `outputPath` alongside `activeRenderId`, derives its directory using Tauri's platform path API, and persists only that directory under one canonical last-render-output key.
 - Preference updates occur after acceptance regardless of encoding outcome. Rejection and all dialog/modal cancellations do not update them.
 - Preference-write failure is ancillary: it warns without cancelling or failing an accepted render, and leaves the previous preference unchanged.
 - Missing or unreadable optional preference state falls back to Documents/OVRLEY. A malformed present type or non-absolute value fails loudly.
 - Progress continues reporting `filename` as a basename. Full paths are not added to progress events.
-- Completion opening uses the active job's accepted path. The open-video command checks only that the current target is a file, not render-target extension, writability, or overwrite rules.
+- Completion opening uses the accepted output path stored with the active render. The open-video command checks only that the current target is a file, not render-target extension, writability, or overwrite rules.
 - Overlays reads the remembered directory and passes it to the native open-directory command. Absence uses the default; an inaccessible present directory errors without fallback.
 - Existing completion, cancellation, progress, codec, range, and render-mode behavior remains unchanged except where this specification says otherwise.
 

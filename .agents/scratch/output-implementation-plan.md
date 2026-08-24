@@ -14,14 +14,14 @@ The implementation must establish one request-owned `RenderOutputTarget`, valida
 
 The feature spans four ownership layers:
 
-1. **Rust core output contract** â€” owns suggested names, output-kind/extension rules, exact-path probing, structured output errors, and validated `RenderOutputTarget`.
-2. **Rust render orchestration and pipelines** â€” accept one validated target explicitly and never derive production output from `AppPaths.downloads_dir`.
-3. **Tauri/API boundary** â€” exposes suggestion, render-target inputs, the single machine-readable collision rejection, exact-path opening, and remembered-directory opening without hiding operating-system errors.
-4. **Frontend workflow and presentation** â€” owns the dialog draft, Save interaction, extension normalization, overwrite modal, transient accepted job state, and optional preference persistence.
+1. **Rust core output contract** — owns suggested names, output-kind/extension rules, exact-path probing, structured output errors, and validated `RenderOutputTarget`.
+2. **Rust render orchestration and pipelines** — accept one validated target explicitly and never derive production output from `AppPaths.downloads_dir`.
+3. **Tauri/API boundary** — exposes suggestion, render-target inputs, the single machine-readable collision rejection, exact-path opening, and remembered-directory opening without hiding operating-system errors.
+4. **Frontend workflow and presentation** — owns the dialog draft, Save interaction, extension normalization, overwrite modal, transient accepted job state, and optional preference persistence.
 
 The target does not enter template config. `AppPaths` remains stable runtime configuration. Directory and basename are derived from the one full path rather than stored as aliases.
 
-## Phase 1 â€” Lock the Contracts with Focused Tests
+## Phase 1 — Lock the Contracts with Focused Tests
 
 Use only the existing Rust command/pipeline seam and frontend render-workflow seam. Do not add component, API-wrapper, preference-helper, opener-command, or platform-error test suites for this feature.
 
@@ -34,9 +34,9 @@ Use only the existing Rust command/pipeline seam and frontend render-workflow se
 
 All other behavior should be covered by the owning implementation, existing regression tests, compilation, and a short manual smoke test. Avoid tests for individual error-code mappings, dialog button wiring, preference read/write permutations, generated timestamp values, or OS-specific permission behavior.
 
-## Phase 2 â€” Introduce the Rust Output Domain
+## Phase 2 — Introduce the Rust Output Domain and Thread It Through Pipelines
 
-Create a neutral core module for render-output contracts so command orchestration and both encode pipelines can depend on it without reverse-depending on one another.
+Create a neutral core module for render-output contracts, then make command orchestration and both encode pipelines depend on it explicitly without reverse-depending on one another.
 
 ### Canonical types
 
@@ -83,10 +83,6 @@ Create a neutral core module for render-output contracts so command orchestratio
 - Use a small RAII cleanup guard for a newly created probe so early error returns do not leave an empty file.
 - Do not recursively create directories, walk ancestors, inspect permission bits, stage outputs, back up existing files, or implement replacement transactions.
 
-## Phase 3 â€” Make Render Output an Explicit Pipeline Dependency
-
-Thread `RenderOutputTarget` through production render orchestration before adding frontend behavior.
-
 ### Command orchestration
 
 - Extend the core render command signature with raw output path, output kind, and overwrite authorization.
@@ -118,16 +114,17 @@ Thread `RenderOutputTarget` through production render orchestration before addin
 - Keep preview-frame rendering on `AppPaths.downloads_dir` unchanged.
 - Do not replace `downloads_dir` globally or mutate cloned `AppPaths` as an adapter.
 
-## Phase 4 â€” Preserve Structured Errors Across Tauri IPC
+## Phase 3 — Preserve Structured Errors Across Tauri IPC
 
 The current Tauri wrapper converts every core error to `String`, and the frontend normalizer discards object metadata. Both owners must change for the overwrite flow.
 
 ### Tauri shell
 
 - Extend `backend_render` arguments with `outputPath`, `outputKind`, and `overwrite`.
-- Return the serialized accepted result as today.
-- Give this command a serializable error type instead of routing it through the string-flattening `call_and_serialize` helper.
-- Map runtime path/setup failures to a general render command error without pretending they are output-target classifications.
+- Return the serialized accepted result as a JSON string, preserving the existing frontend `JSON.parse(result)` flow.
+- Give `backend_render` its own serializable error enum returning `Result<String, BackendRenderError>` so `call_and_serialize` is left unchanged and every other command stays on the existing `Result<String, String>` path.
+- Define the enum with exactly two variants that serialize to `{ code: 'already_exists', message }` and `{ code: 'render_error', message }`.
+- Map the core `OutputExists` rejection to the `already_exists` variant and every other failure to the general `render_error` variant.
 - Register a suggestion command accepting output kind and an optional remembered directory and returning one absolute path.
 - Change the video-opening command to accept an absolute `outputPath` and verify only that it currently identifies a file before invoking the OS opener.
 - Replace the fixed downloads-opening command with an output-directory command accepting an optional absolute directory:
@@ -148,9 +145,9 @@ The current Tauri wrapper converts every core error to `String`, and the fronten
   - Do not introduce message parsing or compatibility aliases.
 - Add API boundary tests proving structured codes survive invocation normalization.
 
-## Phase 5 â€” Add Frontend Path and Preference Utilities
+## Phase 4 — Add Frontend Path Utilities and Extend the Render Dialog
 
-Keep filesystem and normalization logic out of the presentational dialog.
+Keep filesystem and normalization logic out of the presentational dialog and extend `RenderVideoDialog` with output-path controls and stateful behavior in the existing render hooks.
 
 ### Preference contract
 
@@ -184,10 +181,6 @@ Keep filesystem and normalization logic out of the presentational dialog.
 - Return `null` on cancellation and never update preferences itself.
 - Keep last-directory persistence out of generic dialog helpers because this feature persists only after render acceptance.
 
-## Phase 6 â€” Extend Render Dialog State and Presentation
-
-Keep `RenderVideoDialog` presentational and put stateful behavior in the existing render hooks.
-
 ### Dialog draft initialization
 
 - Make dialog opening resolve its output suggestion before publishing a non-null confirmation draft.
@@ -212,7 +205,7 @@ Keep `RenderVideoDialog` presentational and put stateful behavior in the existin
 - Add a dedicated presentational overwrite-confirmation dialog layered above the render dialog.
 - The overwrite dialog receives only open state, target basename/path presentation data, confirm callback, and cancel callback; it owns no render logic.
 
-## Phase 7 â€” Correct the Render Acceptance Lifecycle
+## Phase 5 — Correct the Render Acceptance Lifecycle
 
 Refactor ownership so the render is not treated as active before the backend accepts it.
 
@@ -226,12 +219,13 @@ Refactor ownership so the render is not treated as active before the backend acc
 - Remove `setRenderingVideo`, `setActiveRenderId`, and progress mutation arguments from the utility.
 - Let the workflow own all UI/store lifecycle transitions.
 
-### Canonical active-job state
+### Accepted output path companion state
 
-- Replace the standalone active render ID with one transient active-render-job object containing `id` and accepted `outputPath`.
-- Provide one store action to set/clear the pair so ID and path cannot drift.
-- Update progress filtering to compare event render ID against the active job's ID.
-- On accepted response, atomically establish active job/rendering/progress state and move the dialog to `progress`.
+- Keep the existing `activeRenderId` field.
+- Add one transient `activeRenderOutputPath` field that is set and cleared together with `activeRenderId`.
+- Provide one store action to set/clear both fields so ID and path cannot drift.
+- Update progress filtering to compare event render ID against `activeRenderId`.
+- On accepted response, atomically establish `activeRenderId`, `activeRenderOutputPath`, rendering, and progress state, and move the dialog to `progress`.
 - Remove the unused standalone `videoFilename` state/setter if it remains unconsumed; progress already owns the display basename.
 
 ### Rejection and overwrite flow
@@ -247,11 +241,11 @@ Refactor ownership so the render is not treated as active before the backend acc
 
 - After acceptance, persist `dirname(response.outputPath)` asynchronously; failure warns but does not unwind accepted state.
 - Completion continues deriving/displaying basename from progress.
-- On successful completion, read `activeRenderJob.outputPath`, clear active job/rendering state, and call `openVideo` with the exact path.
-- Cancellation and error clear the complete active job object.
+- On successful completion, read `activeRenderOutputPath`, clear `activeRenderId`, `activeRenderOutputPath`, and rendering state, and call `openVideo` with the exact path.
+- Cancellation and error clear both `activeRenderId` and `activeRenderOutputPath`.
 - Preserve the existing initial progress snapshot so a very short render that finishes before subscription setup is still observed.
 
-## Phase 8 â€” Route the Overlays Action to the Remembered Directory
+## Phase 6 — Route the Overlays Action to the Remembered Directory
 
 - Move remembered-output-directory loading into a shared feature utility used by both render-dialog opening and the app-shell Overlays handler.
 - On Overlays invocation:
@@ -262,7 +256,7 @@ Refactor ownership so the render is not treated as active before the backend acc
 - Update keyboard shortcut behavior indirectly through the existing shared handler so button and shortcut cannot diverge.
 - Rename misleading internal `downloads` handler/API names where they now mean the remembered render output directory; do not retain aliases.
 
-## Phase 9 â€” Complete Regression Coverage
+## Phase 7 — Complete Regression Coverage
 
 Keep the feature-specific automated coverage to the six tests identified in Phase 1:
 
@@ -275,7 +269,7 @@ Keep the feature-specific automated coverage to the six tests identified in Phas
 
 Update existing assertions that depend on `video_composited_` or old function signatures only where required to keep their original contract valid. Do not multiply cases for every error code, platform, preference failure, input method, or modal interaction.
 
-## Phase 10 â€” Verification and Review Gates
+## Phase 8 — Verification and Review Gates
 
 Run verification in increasing cost order. Do not run a production build.
 
@@ -298,13 +292,12 @@ Run verification in increasing cost order. Do not run a production build.
 
 ## Suggested Commit Boundaries
 
-1. Add tested Rust `RenderOutputTarget`, suggestion, and `already_exists` rejection.
-2. Thread explicit targets through transparent/composite pipelines and migrate Rust callers/tests.
-3. Expose Tauri/API contracts while preserving structured rejection.
-4. Add frontend path/preference utilities and native Save behavior.
-5. Refactor render acceptance state and add overwrite interaction.
-6. Route completion and Overlays to accepted/remembered paths.
-7. Finish regression tests and documentation cleanup.
+1. Add tested Rust `RenderOutputTarget`, suggestion, `already_exists` rejection, and thread explicit targets through transparent/composite pipelines.
+2. Expose Tauri/API contracts while preserving structured rejection.
+3. Add frontend path/preference utilities, native Save behavior, and render dialog extension.
+4. Refactor render acceptance state and add overwrite interaction.
+5. Route completion and Overlays to accepted/remembered paths.
+6. Finish regression tests and documentation cleanup.
 
 Each boundary should compile and keep its owned tests green before moving onward. Do not retain temporary compatibility overloads between boundaries; update owners and callers together.
 
