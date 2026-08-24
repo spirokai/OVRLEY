@@ -60,6 +60,10 @@ function getScenePoint(sceneElement, sceneSize, clientX, clientY) {
   }
 }
 
+function isMoveableInteractionTarget(target) {
+  return target instanceof Element && Boolean(target.closest('.ovrley-moveable'))
+}
+
 /**
  * Finds widget IDs whose DOM bounding rects intersect with the given
  * scene-space selection rectangle. Used for marquee/selection box.
@@ -188,7 +192,7 @@ export default function useOverlayPointerHandlers({
 
   const handleSceneMouseDown = useCallback(
     (event) => {
-      if (event.button !== 0) {
+      if (event.button !== 0 || isMoveableInteractionTarget(event.target)) {
         return
       }
 

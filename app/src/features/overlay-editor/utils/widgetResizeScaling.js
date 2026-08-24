@@ -7,6 +7,7 @@
  */
 
 import { clamp } from '@/lib/utils'
+import { isBackdropWidget } from '@/lib/widget/display-type-behavior'
 import { buildFrameGeometryUpdate, resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
 
 function scaleNumber(value, scaleFactor, { min = -Infinity, max = Infinity, round = true } = {}) {
@@ -236,6 +237,22 @@ export function buildResizeUpdate(origin, framePatch, { round = false } = {}) {
   const contentDraft = buildResizeContentDraft(origin, scaleFactor, { round })
 
   return mergeResizeUpdate(origin.widgetData, lockedFramePatch, contentDraft)
+}
+
+/**
+ * Builds the render-ready data update for an active frame resize.
+ *
+ * @param {object} origin - Resize origin from captureResizeOrigin.
+ * @param {object} framePatch - Updated frame geometry.
+ * @param {object} widget - Widget definition being resized.
+ * @returns {object} Resolved live widget data.
+ */
+export function buildLiveResizeUpdate(origin, framePatch, widget) {
+  const resizeUpdate = buildResizeUpdate(origin, framePatch, { round: false })
+
+  return isBackdropWidget(widget)
+    ? { ...resizeUpdate, width: framePatch.width, height: framePatch.height }
+    : resolveActiveMetricWidgetData({ ...origin.widgetData, ...resizeUpdate })
 }
 
 /**

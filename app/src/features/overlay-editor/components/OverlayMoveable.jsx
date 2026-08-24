@@ -103,7 +103,7 @@ export default function OverlayMoveable({
       hideChildMoveableDefaultLines={isGroupDragActive && isGroupSelection}
       draggable
       resizable={canResizeSelected}
-      scalable={canScaleSelected}
+      scalable={canScaleSelected || isGroupSelection}
       rotatable={canRotateSelected}
       renderDirections={showEdgeResizeHandles ? EDGE_RESIZE_DIRECTIONS : CORNER_RESIZE_DIRECTIONS}
       snappable
@@ -111,7 +111,7 @@ export default function OverlayMoveable({
       elementSnapDirections={SNAP_DIRECTIONS}
       snapThreshold={8}
       snapGap
-      keepRatio={maintainAspectRatio}
+      keepRatio={maintainAspectRatio || isGroupSelection}
       useResizeObserver
       useMutationObserver
       elementGuidelines={elementGuidelines}
@@ -130,6 +130,9 @@ export default function OverlayMoveable({
       onScaleStart={handlers.onScaleStart}
       onScale={handlers.onScale}
       onScaleEnd={handlers.onScaleEnd}
+      onScaleGroupStart={handlers.onScaleGroupStart}
+      onScaleGroup={handlers.onScaleGroup}
+      onScaleGroupEnd={handlers.onScaleGroupEnd}
       onRotateStart={handlers.onRotateStart}
       onRotate={handlers.onRotate}
       onRotateEnd={handlers.onRotateEnd}

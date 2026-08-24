@@ -2,23 +2,32 @@
  * Scale handler group for OverlayMoveable.
  */
 
-import { getWidgetVisualBoundsFromTarget, updateLiveWidgetDraft } from '../utils/widgetDomHelpers'
-import { buildScaleDraft } from '../utils/widgetResizeScaling'
-import { buildScaleInteractionLayout, captureWidgetLayout } from '../utils/widgetInteractionGeometry'
+import { applyLiveWidgetStyles, getWidgetIdFromTarget, updateLiveWidgetDraft } from '../utils/widgetDomHelpers'
+import {
+  buildScaleInteractionCommit,
+  buildScaleInteractionDraft,
+  captureGroupScaleOrigins,
+  captureScaleInteractionOrigin,
+} from '../utils/widgetScaleInteraction'
 
 /**
- * Creates scale-related moveable handlers.
+ * Creates single- and group-scale Moveable handlers.
  *
  * @param {object} ctx - Shared handler context.
- * @param {object} ctx.interactionStartRef
- * @param {object} ctx.draftWidgetsRef
- * @param {object} ctx.selectedWidget
- * @param {object} ctx.selectedTarget
- * @param {number} ctx.globalScale
- * @param {Function} ctx.beginWidgetInteraction
- * @param {Function} ctx.endWidgetInteraction
- * @param {Function} ctx.commitWidgetUpdate
- * @param {Function} ctx.clearWidgetDraft
+ * @param {object} ctx.interactionStartRef - Mutable interaction origin ref.
+ * @param {object} ctx.draftWidgetsRef - Mutable live draft ref.
+ * @param {object} ctx.selectedWidget - Primary selected widget.
+ * @param {object} ctx.selectedTarget - Primary selected DOM target.
+ * @param {Array<object>} ctx.selectedWidgets - Selected widget definitions.
+ * @param {number} ctx.globalScale - Global widget scale.
+ * @param {Function} ctx.setLiveWidgetDraft - Single live draft updater.
+ * @param {Function} ctx.setLiveWidgetDraftsBatch - Batch live draft updater.
+ * @param {Function} ctx.commitWidgetUpdate - Single config commit.
+ * @param {Function} ctx.commitWidgetUpdates - Batch config commit.
+ * @param {Function} ctx.clearWidgetDraft - Clears one live draft.
+ * @param {Function} ctx.clearWidgetDrafts - Clears multiple live drafts.
+ * @param {Function} ctx.beginWidgetInteraction - Starts the live interaction.
+ * @param {Function} ctx.endWidgetInteraction - Ends the live interaction.
  * @returns {object} Scale handler methods.
  */
 export function useScaleHandlers({
@@ -26,96 +35,110 @@ export function useScaleHandlers({
   draftWidgetsRef,
   selectedWidget,
   selectedTarget,
+  selectedWidgets,
   globalScale,
   setLiveWidgetDraft,
+  setLiveWidgetDraftsBatch,
   commitWidgetUpdate,
+  commitWidgetUpdates,
   clearWidgetDraft,
+  clearWidgetDrafts,
   beginWidgetInteraction,
   endWidgetInteraction,
 }) {
-  // Scale handlers — uniform scaling of intrinsic widget data and layout.
   return {
     onScaleStart: ({ dragStart, target }) => {
-      if (!selectedWidget) return
+      if (!selectedWidget || !selectedTarget) return
 
-      if (dragStart) {
-        dragStart.set([0, 0])
-      }
+      dragStart?.set([0, 0])
+      const origin = captureScaleInteractionOrigin(target ?? selectedTarget, selectedWidget, globalScale)
 
-      const currentBounds = getWidgetVisualBoundsFromTarget(target ?? selectedTarget)
-      const startTarget = target ?? selectedTarget
-
-      interactionStartRef.current = {
-        id: selectedWidget.id,
-        data: selectedWidget.data,
-        x: selectedWidget.data.x ?? 0,
-        y: selectedWidget.data.y ?? 0,
-        layout: captureWidgetLayout(startTarget, selectedWidget, globalScale),
-        renderedMinX: currentBounds?.minX ?? 0,
-        renderedMinY: currentBounds?.minY ?? 0,
-        renderedMaxX: currentBounds?.maxX ?? 0,
-        renderedMaxY: currentBounds?.maxY ?? 0,
-        type: 'scale',
-      }
-      beginWidgetInteraction(selectedWidget.id, 'scale')
+      interactionStartRef.current = { ...origin, type: 'scale' }
+      beginWidgetInteraction(origin.id, 'scale')
     },
     onScale: ({ scale, drag, target }) => {
       const origin = interactionStartRef.current
-      if (!origin?.id) return
-      const rawScale = Number.isFinite(scale?.[0]) ? scale[0] : Number.isFinite(scale?.[1]) ? scale[1] : 1
-      const safeGlobalScale = globalScale > 0 ? globalScale : 1
-      const uniformScale = rawScale / safeGlobalScale
+      if (origin?.type !== 'scale') return
 
-      const tx = drag?.beforeTranslate?.[0] ?? 0
-      const ty = drag?.beforeTranslate?.[1] ?? 0
+      const draft = buildScaleInteractionDraft(origin, scale[0] / globalScale, drag, globalScale)
 
-      const gradientYOffset = selectedWidget.type === 'gradient' ? Math.min(0, -origin.data.value_offset) : 0
-      const nextX = origin.x + tx + origin.renderedMinX * (1 - uniformScale) * globalScale
-      const nextY = origin.y + ty + (origin.renderedMinY * globalScale + gradientYOffset) * (1 - uniformScale)
-
-      const scaledData = buildScaleDraft(origin.data, uniformScale, selectedWidget, { round: false })
-      const liveLayout = buildScaleInteractionLayout(origin.layout, {
-        scaleFactor: uniformScale,
-        globalScale,
-        translateX: tx,
-        translateY: ty,
-      })
       updateLiveWidgetDraft({
         draftWidgetsRef,
         setLiveWidgetDraft,
         widgetId: origin.id,
-        widget: selectedWidget,
-        updates: { ...scaledData, x: nextX, y: nextY },
+        widget: origin.widget,
+        updates: draft.data,
         target: target ?? selectedTarget,
         globalScale,
-        layout: liveLayout,
+        layout: draft.layout,
       })
     },
     onScaleEnd: () => {
       const origin = interactionStartRef.current
-      if (!origin?.id) return
+      if (origin?.type !== 'scale') return
 
-      const draft = draftWidgetsRef.current[origin.id]?.data
-      if (draft) {
-        const liveLayout = draftWidgetsRef.current[origin.id]?.layout
-        const finalScale = liveLayout?.scaleFactor ?? 1
-        const scaledDraft = buildScaleDraft(origin.data, finalScale, selectedWidget, { round: true })
-
-        const tx = liveLayout?.translateX ?? 0
-        const ty = liveLayout?.translateY ?? 0
-        const gradientYOffset = selectedWidget.type === 'gradient' ? Math.min(0, -origin.data.value_offset) : 0
-        const finalX = origin.x + tx + origin.renderedMinX * (1 - finalScale) * globalScale
-        const finalY = origin.y + ty + (origin.renderedMinY * globalScale + gradientYOffset) * (1 - finalScale)
-
-        commitWidgetUpdate(origin.id, {
-          x: Math.round(finalX),
-          y: Math.round(finalY),
-          ...scaledDraft,
-        })
+      const draft = draftWidgetsRef.current[origin.id]
+      if (draft?.layout) {
+        commitWidgetUpdate(origin.id, buildScaleInteractionCommit(origin, draft, globalScale))
       }
 
       clearWidgetDraft(origin.id)
       endWidgetInteraction(origin.id)
+      interactionStartRef.current = null
+    },
+    onScaleGroupStart: ({ events = [], targets = [] } = {}) => {
+      events.forEach((event) => event.dragStart?.set([0, 0]))
+
+      const originsById = captureGroupScaleOrigins(targets, selectedWidgets, globalScale)
+      const widgetIds = Object.keys(originsById)
+      if (!widgetIds.length) return
+
+      widgetIds.forEach((widgetId) => {
+        draftWidgetsRef.current[widgetId] = { data: {}, layout: null }
+      })
+      beginWidgetInteraction(widgetIds[0], 'group-scale')
+      interactionStartRef.current = {
+        originsById,
+        type: 'group-scale',
+        widgetIds,
+      }
+    },
+    onScaleGroup: ({ dist, events = [] } = {}) => {
+      const interaction = interactionStartRef.current
+      if (interaction?.type !== 'group-scale') return
+
+      const nextDraftsById = {}
+      events.forEach((event) => {
+        const widgetId = getWidgetIdFromTarget(event.target)
+        const origin = interaction.originsById[widgetId]
+        if (!origin) return
+
+        const draft = buildScaleInteractionDraft(origin, dist[0], event.drag, globalScale)
+        nextDraftsById[widgetId] = draft
+        applyLiveWidgetStyles(event.target, draft.layout, globalScale)
+      })
+
+      if (Object.keys(nextDraftsById).length) {
+        setLiveWidgetDraftsBatch(nextDraftsById)
+      }
+    },
+    onScaleGroupEnd: () => {
+      const interaction = interactionStartRef.current
+      if (interaction?.type !== 'group-scale') return
+
+      const updatesById = Object.fromEntries(
+        interaction.widgetIds.flatMap((widgetId) => {
+          const draft = draftWidgetsRef.current[widgetId]
+
+          return draft?.layout ? [[widgetId, buildScaleInteractionCommit(interaction.originsById[widgetId], draft, globalScale)]] : []
+        }),
+      )
+
+      if (Object.keys(updatesById).length) {
+        commitWidgetUpdates(updatesById)
+      }
+      clearWidgetDrafts(interaction.widgetIds)
+      endWidgetInteraction(interaction.widgetIds[0])
       interactionStartRef.current = null
     },
   }

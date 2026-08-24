@@ -48,7 +48,7 @@ function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels,
         return (
           <div
             key={widget.id}
-            className="absolute flex h-5 items-center gap-1 rounded-xs border border-border/70 bg-card/90 px-2 text-[11px] font-semibold leading-none text-muted-foreground shadow-sm"
+            className="ml-1 absolute flex h-5 items-center gap-1 rounded-xs border border-border/70 bg-card/90 px-2 text-[11px] font-semibold leading-none text-muted-foreground shadow-sm"
             style={{ left, top }}
           >
             <Icon className="h-3 w-3" />
@@ -221,9 +221,7 @@ function OverlayEditorContent({
     endWidgetInteraction: overlayState.endWidgetInteraction,
     effectiveSelectedWidgetIds,
     globalScale: overlayState.globalScale,
-    groupDragSelectionIds,
     interactionStartRef: overlayState.interactionStartRef,
-    renderedWidgetMap: overlayState.renderedWidgetMap,
     selectedWidget: selection.selectedWidget,
     selectedWidgets: selection.selectedWidgets,
     setGroupDragSelectionIds,
@@ -246,13 +244,17 @@ function OverlayEditorContent({
 
   const scaleHandlers = useScaleHandlers({
     clearWidgetDraft: overlayState.clearWidgetDraft,
+    clearWidgetDrafts: overlayState.clearWidgetDrafts,
     commitWidgetUpdate: overlayState.commitWidgetUpdate,
+    commitWidgetUpdates: overlayState.commitWidgetUpdates,
     draftWidgetsRef: overlayState.draftWidgetsRef,
     globalScale: overlayState.globalScale,
     interactionStartRef: overlayState.interactionStartRef,
     selectedTarget: selection.selectedTarget,
     selectedWidget: selection.selectedWidget,
+    selectedWidgets: selection.selectedWidgets,
     setLiveWidgetDraft: overlayState.setLiveWidgetDraft,
+    setLiveWidgetDraftsBatch: overlayState.setLiveWidgetDraftsBatch,
     beginWidgetInteraction: overlayState.beginWidgetInteraction,
     endWidgetInteraction: overlayState.endWidgetInteraction,
   })

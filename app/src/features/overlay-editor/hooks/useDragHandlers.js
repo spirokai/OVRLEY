@@ -37,9 +37,7 @@ function getAxisLockedTranslate(origin, beforeTranslate, inputEvent) {
  * @param {object} ctx.selectedWidget
  * @param {Array} ctx.selectedWidgets
  * @param {number} ctx.globalScale
- * @param {object} ctx.renderedWidgetMap
  * @param {Array} ctx.effectiveSelectedWidgetIds
- * @param {Array} ctx.groupDragSelectionIds
  * @param {Function} ctx.setLiveWidgetDraft
  * @param {Function} ctx.setLiveWidgetDraftsBatch
  * @param {Function} ctx.commitWidgetUpdate
@@ -58,9 +56,7 @@ export function useDragHandlers({
   selectedWidget,
   selectedWidgets,
   globalScale,
-  renderedWidgetMap,
   effectiveSelectedWidgetIds,
-  groupDragSelectionIds,
   setLiveWidgetDraft,
   setLiveWidgetDraftsBatch,
   commitWidgetUpdate,
@@ -75,7 +71,7 @@ export function useDragHandlers({
   // Drag handlers — single and group drag with axis lock via Ctrl key
   return {
     onDragStart: ({ target }) => {
-      if (!selectedWidget) return
+      if (!selectedWidget || effectiveSelectedWidgetIds.length !== 1) return
 
       const layout = captureWidgetLayout(target, selectedWidget, globalScale)
       const position = getWidgetInteractionPosition(selectedWidget, layout)
@@ -90,7 +86,7 @@ export function useDragHandlers({
     },
     onDrag: ({ beforeTranslate, inputEvent, target }) => {
       const origin = interactionStartRef.current
-      if (!origin?.id) return
+      if (origin?.type !== 'single-drag') return
       const lockedTranslate = getAxisLockedTranslate(origin, beforeTranslate, inputEvent)
 
       const nextDraft = {
@@ -105,7 +101,7 @@ export function useDragHandlers({
     },
     onDragEnd: () => {
       const origin = interactionStartRef.current
-      if (!origin?.id) return
+      if (origin?.type !== 'single-drag') return
 
       const draft = draftWidgetsRef.current[origin.id]?.data
       if (draft) {
@@ -151,10 +147,9 @@ export function useDragHandlers({
 
       events.forEach((childEvent) => {
         const widgetId = getWidgetIdFromTarget(childEvent.target)
-        const widget = widgetId ? renderedWidgetMap[widgetId] : null
         const widgetOrigin = widgetId ? origin.widgetsById[widgetId] : null
 
-        if (!widgetId || !widget || !widgetOrigin) {
+        if (!widgetId || !widgetOrigin) {
           return
         }
 
@@ -177,8 +172,7 @@ export function useDragHandlers({
       const origin = interactionStartRef.current
       if (origin?.type !== 'group-drag') return
 
-      const draggedWidgetIds = origin.widgetIds?.length ? [...origin.widgetIds] : [...groupDragSelectionIds]
-      const updatesById = draggedWidgetIds.reduce((accumulator, widgetId) => {
+      const updatesById = origin.widgetIds.reduce((accumulator, widgetId) => {
         const draft = draftWidgetsRef.current[widgetId]?.data
         const widgetOrigin = origin.widgetsById[widgetId]
 
@@ -197,8 +191,8 @@ export function useDragHandlers({
         commitWidgetUpdates(updatesById)
       }
 
-      clearWidgetDrafts(draggedWidgetIds)
-      endWidgetInteraction(draggedWidgetIds[0])
+      clearWidgetDrafts(origin.widgetIds)
+      endWidgetInteraction(origin.widgetIds[0])
       setIsGroupDragActive(false)
       setGroupDragSelectionIds([])
       interactionStartRef.current = null
