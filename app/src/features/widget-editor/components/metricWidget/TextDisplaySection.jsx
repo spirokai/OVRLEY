@@ -15,13 +15,6 @@ const COORDINATE_FORMAT_OPTIONS = [
   { value: 'ddm', label: 'Deg / Dec Min' },
 ]
 
-const DECIMAL_CONTROL_MAX = {
-  speed: 1,
-  distance: 2,
-  distance_to_home: 2,
-  total_ascent: 2,
-}
-
 /**
  * Renders text-specific display controls: font, decimals/balance, icon, units.
  *
@@ -39,10 +32,9 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
   const isDistanceWidget = widget.type === 'distance'
   const isCoordinateWidget = widget.type === 'gps_coordinates'
   const isTotalAscentWidget = widget.type === 'total_ascent'
-  const hasDecimalControl =
-    Object.hasOwn(DECIMAL_CONTROL_MAX, widget.type) || definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
+  const hasDecimalControl = definition?.maxDecimals !== undefined || definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
   const hasBalanceFormat = definition?.formatter === 'balance'
-  const maxDecimals = DECIMAL_CONTROL_MAX[widget.type] ?? 1
+  const maxDecimals = definition?.maxDecimals ?? 1
   const defaultDecimals = TYPE_DEFAULTS[widget.type]?.decimals ?? 1
   const decimals = Number.isFinite(widget.data.decimals) ? Math.min(Math.max(widget.data.decimals, 0), maxDecimals) : defaultDecimals
 

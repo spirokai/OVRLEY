@@ -16,6 +16,7 @@ import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
 import { getArcGaugeLayout, getCornerGaugeLayout } from '@/features/widget-preview/widgets/arc-gauge/geometry'
 import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
+import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 
 const ARC_MIN_ANGLE = 30
 const ARC_MAX_ANGLE = 360
@@ -60,6 +61,10 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
   const cornerRadiusMax = getArcCornerRadiusMax(arcData)
   const size = widget.data.width ?? arcData.width
   const barGapMax = arcData.track_fill_style === 'bars' ? getArcGapMax(arcData) : 0
+  const hasDecimalControl = definition?.maxDecimals !== undefined || definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
+  const maxDecimals = definition?.maxDecimals ?? 1
+  const defaultDecimals = TYPE_DEFAULTS[widget.type]?.decimals ?? 1
+  const decimals = Number.isFinite(widget.data.decimals) ? Math.min(Math.max(widget.data.decimals, 0), maxDecimals) : defaultDecimals
 
   const updateBoundedNumber = (updateVariant, key, rawValue, min, max) => {
     const value = Number(rawValue)
@@ -220,6 +225,19 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           onSliderCommit={() => commitWidgetSize(widget.id)}
         />
       </div>
+      {hasDecimalControl ? (
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            label="Decimals"
+            value={decimals}
+            min={0}
+            max={maxDecimals}
+            step={1}
+            valueDisplay={String(decimals)}
+            onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
+          />
+        </div>
+      ) : null}
 
       {unitsMode !== 'hidden' ? (
         <UnitsControlRow
