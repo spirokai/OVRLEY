@@ -24,6 +24,15 @@ function makeWidget(type, data = {}) {
 }
 
 describe('MetricWidgetEditor decimal control', () => {
+  test('shows a 0/1 decimal slider for speed', () => {
+    render(<MetricWidgetEditor widget={makeWidget('speed', { display_unit: 'kmh' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+
+    expect(screen.getByText('Decimals')).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('slider').some((slider) => slider.getAttribute('aria-valuemax') === '1' && slider.getAttribute('aria-valuenow') === '0'),
+    ).toBe(true)
+  })
+
   test('shows decimal toggle for g_force', () => {
     render(<MetricWidgetEditor widget={makeWidget('g_force', { display_unit: 'g' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
     expect(screen.getByText('Decimals')).toBeInTheDocument()

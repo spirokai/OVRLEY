@@ -52,6 +52,7 @@ fn activity_for(series_key: &str, raw: Option<f64>) -> DenseActivityReport {
     }
     let series = vec![raw];
     match series_key {
+        "speed" => s.speed = series,
         "pace" => s.pace = series,
         "g_force" => s.g_force = series,
         "air_pressure" => s.air_pressure = series,
@@ -141,6 +142,34 @@ fn pace_formats_as_min_mi() {
     );
     assert_eq!(value, "7:23");
     assert_eq!(unit, Some("MIN/MI".to_string()));
+}
+
+#[test]
+fn speed_preserves_requested_decimal_places_after_unit_conversion() {
+    let (whole, unit) = format_parts(
+        "speed",
+        "speed",
+        Some(10.0),
+        &[
+            ("display_unit", r#""kmh""#),
+            ("decimals", "0"),
+            ("show_units", "true"),
+        ],
+    );
+    assert_eq!(whole, "36");
+    assert_eq!(unit, Some("KM/H".to_string()));
+
+    let (decimal, _) = format_parts(
+        "speed",
+        "speed",
+        Some(10.0),
+        &[
+            ("display_unit", r#""kmh""#),
+            ("decimals", "1"),
+            ("show_units", "true"),
+        ],
+    );
+    assert_eq!(decimal, "36.0");
 }
 
 #[test]

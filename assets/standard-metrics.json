@@ -51,6 +51,9 @@
           },
           "vertical_speed": {
             "decimals": 1
+          },
+          "speed": {
+            "decimals": 0
           }
         }
       },

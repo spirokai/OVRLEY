@@ -69,7 +69,7 @@ export function ToolbarDrawerLayout({
               <PinIcon className="size-3.5" />
             </Button>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col pt-4">{drawerContent}</div>
+          <div className="flex min-h-0 flex-1 flex-col pt-10">{drawerContent}</div>
         </div>
       </div>
       {visible && !pinned ? (
