@@ -52,8 +52,8 @@ function resolveFrameGeometry(variantConfig, widgetData, frameDefaults) {
   }
 
   if (frameDefaults) {
-    geometry.width = widgetData?.width ?? variantConfig?.width ?? frameDefaults.width
-    geometry.height = widgetData?.height ?? variantConfig?.height ?? frameDefaults.height
+    geometry.width = variantConfig?.width ?? widgetData?.width ?? frameDefaults.width
+    geometry.height = variantConfig?.height ?? widgetData?.height ?? frameDefaults.height
   }
 
   return geometry
@@ -189,13 +189,14 @@ export function resolveActiveMetricWidgetData(widgetData) {
  *
  * @param {object} widgetData - The widget's stored data.
  * @param {string} displayType - The display type to initialize.
+ * @param {object|null} [frameFallback=widgetData] - Explicit fallback geometry used when the variant has no frame geometry.
  * @returns {object} Updated widget data with the initialized variant.
  */
-export function initDisplayVariant(widgetData, displayType) {
+export function initDisplayVariant(widgetData, displayType, frameFallback = widgetData) {
   if (!widgetData || displayType === 'text') return widgetData
 
   const variants = widgetData.display_variants || {}
-  const currentVariant = stripMetricSharedFields(variants[displayType])
+  const currentVariant = variants[displayType]
   const frameDefaults = getDefaultFrameDimensions(displayType)
   const nonGeometryDefaults = getDisplayTypeConfigDefaults(displayType)
 
@@ -203,8 +204,8 @@ export function initDisplayVariant(widgetData, displayType) {
 
   const variantDefaults = {
     ...(nonGeometryDefaults || {}),
-    ...(currentVariant || {}),
-    ...resolveFrameGeometry(currentVariant, widgetData, frameDefaults),
+    ...stripMetricSharedFields(currentVariant),
+    ...resolveFrameGeometry(currentVariant, frameFallback, frameDefaults),
   }
 
   if (!variantDefaults.min_max_label_font && widgetData.font) {
@@ -349,5 +350,35 @@ export function buildFrameGeometryUpdate(widgetData, geometryPatch) {
         ...variantPatch,
       },
     },
+  }
+}
+
+/**
+ * Builds the complete data update for switching a metric widget display type.
+ * New variants use manifest frame defaults; existing variants restore their
+ * own frame geometry. The active top-level frame remains synchronized through
+ * buildFrameGeometryUpdate.
+ *
+ * @param {object} widgetData - The widget's current stored data.
+ * @param {string} displayType - The display type to activate.
+ * @returns {object} Update patch suitable for updateWidgetData.
+ */
+export function buildDisplayTypeChangeUpdate(widgetData, displayType) {
+  const nextData = initDisplayVariant(widgetData, displayType, null)
+  const frameDefaults = getDefaultFrameDimensions(displayType)
+
+  if (!frameDefaults) {
+    return {
+      display_type: displayType,
+      display_variants: nextData.display_variants,
+    }
+  }
+
+  return {
+    display_type: displayType,
+    ...buildFrameGeometryUpdate(
+      { ...nextData, display_type: displayType },
+      resolveFrameGeometry(nextData.display_variants[displayType], null, frameDefaults),
+    ),
   }
 }
