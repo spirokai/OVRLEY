@@ -66,7 +66,7 @@
   --accent-foreground: var(--theme-color-background);
   --success: var(--theme-color-success);
   --destructive: rgb(196, 23, 23);
-  --border: color-mix(in srgb, var(--theme-color-background) 52%, var(--theme-color-ice) 48%);
+  --border: color-mix(in srgb, var(--theme-color-background) 62%, var(--theme-color-ice) 38%);
   --input: color-mix(in srgb, var(--theme-color-background) 70%, var(--theme-color-teal) 30%);
   --ring: color-mix(in srgb, var(--theme-color-accent) 70%, var(--theme-color-aqua) 30%);
   --chart-1: var(--theme-color-accent);

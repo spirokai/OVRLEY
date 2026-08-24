@@ -51,7 +51,7 @@ export default function AppHeader({
   }
 
   return (
-    <header className="relative z-50 shrink-0 select-none border-b border-border/70 bg-card backdrop-blur-sm" onMouseDown={handleHeaderMouseDown}>
+    <header className="relative z-50 shrink-0 select-none border-b border-border bg-card backdrop-blur-sm" onMouseDown={handleHeaderMouseDown}>
       <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-x-6 pb-3 pl-6 pr-1 pt-3">
         <ActivitySection
           activityFilename={activityImport.activityFilename}

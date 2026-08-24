@@ -39,6 +39,7 @@ export function ToolbarDrawerLayout({
 }) {
   const PinIcon = pinned ? PinOff : Pin
   const pinLabel = pinned ? 'Unpin drawer' : 'Pin drawer'
+  const drawerTitle = activeTool.toUpperCase()
 
   return (
     <div
@@ -49,14 +50,15 @@ export function ToolbarDrawerLayout({
       <VerticalToolbar activeTool={activeTool} drawerVisible={visible} width={TOOLBAR_WIDTH} onSelectTool={selectTool} />
       <div className="relative h-full min-w-0">
         <div
-          className={`absolute inset-y-0 left-0 z-60 flex flex-col overflow-hidden border-r border-border/70 bg-card shadow-lg shadow-black/80 transition-transform duration-300 ease-in-out ${
+          className={`absolute inset-y-0 left-0 z-60 flex flex-col overflow-hidden border-r border-border bg-card shadow-lg shadow-black/80 transition-transform duration-300 ease-in-out ${
             visible ? 'pointer-events-auto translate-x-0' : 'pointer-events-none -translate-x-full'
           }`}
           style={{ width: DRAWER_WIDTH }}
           aria-hidden={!visible}
           onTransitionEnd={handleDrawerTransitionEnd}
         >
-          <div className="absolute top-2 right-2 z-10">
+          <div className="flex shrink-0 items-center justify-between px-3 py-4">
+            <span className="text-sm font-extrabold uppercase tracking-wide text-muted-foreground">{drawerTitle}</span>
             <Button
               type="button"
               variant="ghost"
@@ -69,7 +71,7 @@ export function ToolbarDrawerLayout({
               <PinIcon className="size-3.5" />
             </Button>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col pt-10">{drawerContent}</div>
+          <div className="flex min-h-0 flex-1 flex-col">{drawerContent}</div>
         </div>
       </div>
       {visible && !pinned ? (

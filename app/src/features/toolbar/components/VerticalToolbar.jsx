@@ -30,7 +30,7 @@ const TOOLS = [
  */
 export function VerticalToolbar({ activeTool, drawerVisible, width, onSelectTool }) {
   return (
-    <div className="z-70 flex h-full shrink-0 flex-col items-center border-r border-border/70 bg-card py-4 gap-2" style={{ width }}>
+    <div className="z-70 flex h-full shrink-0 flex-col items-center border-r border-border bg-card py-4 gap-2" style={{ width }}>
       {TOOLS.map((tool) => {
         const Icon = tool.icon
         const selected = drawerVisible && activeTool === tool.id
