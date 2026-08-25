@@ -17,7 +17,7 @@ import { isInteractiveElement } from '@/lib/utils'
  * @param {*} props.appShell - App shell state.
  * @param {*} props.backendState - Current backend state.
  * @param {*} props.editorShell - Editor shell state and actions.
- * @param {function} props.onOpenDownloads - Callback invoked to open downloads.
+ * @param {function} props.onOpenOutputDirectory - Callback invoked to open render output.
  * @param {*} props.renderWorkflow - Render workflow state and actions.
  * @param {*} props.templateManagement - Template state and actions.
  * @param {*} props.videoControls - Video import control state and handlers.
@@ -28,7 +28,7 @@ export default function AppHeader({
   appShell,
   backendState,
   editorShell,
-  onOpenDownloads,
+  onOpenOutputDirectory,
   renderWorkflow,
   templateManagement,
   videoControls,
@@ -87,7 +87,7 @@ export default function AppHeader({
           renderTooltipContent={renderWorkflow.renderTooltipContent}
           renderingVideo={renderWorkflow.renderingVideo}
           backendStatus={backendState.backendStatus}
-          onOpenDownloads={onOpenDownloads}
+          onOpenOutputDirectory={onOpenOutputDirectory}
         />
       </div>
     </header>

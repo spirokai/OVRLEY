@@ -52,7 +52,11 @@ function normalizeBackendError(error, fallbackMessage = 'Unknown backend error')
   }
 
   if (error && typeof error === 'object' && typeof error.message === 'string' && error.message.trim()) {
-    return new Error(error.message)
+    const normalized = new Error(error.message)
+    if (typeof error.code === 'string' && error.code.trim()) {
+      normalized.code = error.code
+    }
+    return normalized
   }
 
   return new Error(fallbackMessage)
@@ -136,12 +140,28 @@ export async function socketReady() {
  * @param {*} parsedActivity - Normalized activity payload used by the app.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
-export async function renderVideo(config, parsedActivity) {
+export async function renderVideo(config, parsedActivity, { outputPath, outputKind, overwrite = false } = {}) {
   const safeConfig = safeJsonStringify(config)
   const safeParsedActivity = safeJsonStringify(parsedActivity)
   return apiCall('backend_render', {
     configJson: safeConfig,
     parsedActivityJson: safeParsedActivity,
+    outputPath,
+    outputKind,
+    overwrite,
+  })
+}
+
+/**
+ * Requests a fresh Rust-owned render output suggestion.
+ * @param {'transparent'|'composite'} outputKind - Output container kind.
+ * @param {string|undefined} rememberedDirectory - Optional accepted directory.
+ * @returns {Promise<string>} Absolute suggested output path.
+ */
+export async function suggestRenderOutputPath(outputKind, rememberedDirectory) {
+  return invokeCommand('backend_suggest_output_path', {
+    outputKind,
+    rememberedDirectory: rememberedDirectory ?? null,
   })
 }
 
@@ -347,11 +367,12 @@ async function openFolder(command) {
 }
 
 /**
- * Opens downloads.
+ * Opens the remembered render output directory.
+ * @param {string|undefined} directory - Optional remembered absolute directory.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
-export async function openDownloads() {
-  return openFolder('backend_open_downloads')
+export async function openOutputDirectory(directory) {
+  return apiCall('backend_open_output_directory', { directory: directory ?? null })
 }
 
 /**
@@ -365,11 +386,11 @@ export async function openTemplates() {
 /**
  * Opens video.
  *
- * @param {*} filename - Target filename for the operation.
+ * @param {string} outputPath - Complete absolute target path.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
-export async function openVideo(filename) {
-  return apiCall('backend_open_video', { filename })
+export async function openVideo(outputPath) {
+  return apiCall('backend_open_video', { outputPath })
 }
 
 /**

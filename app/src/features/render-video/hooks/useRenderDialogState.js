@@ -9,14 +9,23 @@
  * @param {string} params.renderStatus - Current render status from the store.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-export default function useRenderDialogState({ buildRenderSettingsDraft, renderDisabled, renderingVideo, renderStatus }) {
+export default function useRenderDialogState({
+  buildRenderSettingsDraft,
+  resolveRenderSettingsDraft,
+  onOpenError,
+  renderDisabled,
+  renderingVideo,
+  renderStatus,
+}) {
   // Dialog phase and renderSettingsDraft are true dialog-local state, not
   // mirrors of store values. The draft exists only for the lifetime of the
   // open dialog and can intentionally diverge from committed store settings.
   const [renderDialogPhase, setRenderDialogPhase] = useState('closed')
   const [renderSettingsDraft, setRenderSettingsDraft] = useState(null)
+  const [opening, setOpening] = useState(false)
+  const openingRef = useRef(false)
 
   // Auto-close the dialog after a render finishes, is cancelled, or errors.
   useEffect(() => {
@@ -26,14 +35,24 @@ export default function useRenderDialogState({ buildRenderSettingsDraft, renderD
   }, [renderDialogPhase, renderStatus, renderingVideo])
 
   // Opening creates a fresh draft from the current store-backed defaults.
-  const openRenderDialog = useCallback(() => {
-    if (renderDisabled) {
+  const openRenderDialog = useCallback(async () => {
+    if (renderDisabled || openingRef.current) {
       return
     }
 
-    setRenderSettingsDraft(buildRenderSettingsDraft())
-    setRenderDialogPhase('confirm')
-  }, [buildRenderSettingsDraft, renderDisabled])
+    openingRef.current = true
+    setOpening(true)
+    try {
+      const draft = resolveRenderSettingsDraft ? await resolveRenderSettingsDraft() : buildRenderSettingsDraft()
+      setRenderSettingsDraft(draft)
+      setRenderDialogPhase('confirm')
+    } catch (error) {
+      onOpenError?.(error)
+    } finally {
+      openingRef.current = false
+      setOpening(false)
+    }
+  }, [buildRenderSettingsDraft, onOpenError, renderDisabled, resolveRenderSettingsDraft])
 
   // Closing is blocked while an active render is in progress.
   const closeRenderDialog = useCallback(() => {
@@ -61,6 +80,7 @@ export default function useRenderDialogState({ buildRenderSettingsDraft, renderD
   return {
     renderDialogPhase,
     renderSettingsDraft,
+    opening,
     setRenderDialogPhase,
     openRenderDialog,
     closeRenderDialog,

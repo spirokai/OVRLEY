@@ -29,6 +29,7 @@ use ovrley_core::encode::pipeline::composite_plan::{
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::normalize::raw::{parse_config_json, RenderConfig};
 use ovrley_core::normalize::{parse_template_value, validate_render_config, ValidatedRenderConfig};
+use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
 use serde_json::Value;
 
@@ -100,7 +101,30 @@ pub fn derive_fixture_composite_plan(
     config.scene.composite_widget_update_rate = Some(update_rate);
     let mut scene = ovrley_core::normalize::validate_scene_config(config.scene).unwrap();
     let render = derive_composite_render_plan(&mut scene, None).unwrap();
-    derive_composite_pipeline_plan(&paths, &scene, render, true, None).unwrap()
+    let target = custom_output_target(&paths, "plan", RenderOutputKind::Composite);
+    derive_composite_pipeline_plan(&paths, &scene, render, true, None, &target).unwrap()
+}
+
+pub fn custom_output_target(
+    paths: &AppPaths,
+    label: &str,
+    kind: RenderOutputKind,
+) -> RenderOutputTarget {
+    let extension = kind.extension();
+    let directory = if paths.downloads_dir.is_absolute() && paths.downloads_dir.is_dir() {
+        paths.downloads_dir.clone()
+    } else {
+        std::env::temp_dir()
+    };
+    let path = directory.join(format!(
+        "custom-{label}-{}.{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos(),
+        extension
+    ));
+    RenderOutputTarget::validate(path.to_str().unwrap(), kind, false).unwrap()
 }
 
 /// Renders the shared composite fixture and returns the output details.
@@ -228,6 +252,7 @@ pub fn render_fixture_composite_with_paths(
     let dense_activity = build_dense_activity_report_validated(&activity, &validated).unwrap();
 
     // ── Phase 4: execute canonical frame-worker composite render ────
+    let output_target = custom_output_target(&paths, "render", RenderOutputKind::Composite);
     let filename = render_composite_video(
         &paths,
         &validated,
@@ -236,6 +261,7 @@ pub fn render_fixture_composite_with_paths(
         &controller,
         render_plan,
         true,
+        &output_target,
     )
     .map_err(|error| error.to_string())?;
 
@@ -262,7 +288,7 @@ pub fn composited_outputs(paths: &AppPaths) -> Vec<String> {
         .unwrap()
         .flatten()
         .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
-        .filter(|name| name.starts_with("video_composited_") && name.ends_with(".mp4"))
+        .filter(|name| name.ends_with(".mp4"))
         .collect::<Vec<_>>();
     outputs.sort();
     outputs
@@ -308,9 +334,7 @@ pub fn write_fixture_composite_debug_summary(path_name: &str) -> AppPaths {
         0.0,
         2,
     );
-    let output_path = paths
-        .downloads_dir
-        .join("video_composited_1778853729503903000.mp4");
+    let output_path = paths.downloads_dir.join("custom-debug-output.mp4");
     plan.output_path = output_path;
     let mut profiler = RenderProfiler::default();
     profiler.record_ms("frame.total", 1.0);

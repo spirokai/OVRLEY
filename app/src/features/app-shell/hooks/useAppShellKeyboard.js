@@ -12,7 +12,7 @@ export default function useAppShellKeyboard({
   activityImport,
   appShell,
   backendState,
-  handleOpenDownloads,
+  handleOpenOutputDirectory,
   renderWorkflow,
   templateManagement,
   videoControls,
@@ -64,7 +64,7 @@ export default function useAppShellKeyboard({
       case 'output.open':
         if (backendStatus !== 'connected') return
         event.preventDefault()
-        handleOpenDownloads()
+        handleOpenOutputDirectory()
         return
       case 'sync.auto':
         if (!importedVideoPath || !activitySummary) return

@@ -41,6 +41,16 @@ pub enum CoreError {
     #[error("Encoding error: {0}")]
     Encode(String),
 
+    #[error("Output already exists: {0}")]
+    OutputExists(String),
+
+    #[error("IO error at {path}: {source}")]
+    OutputIo {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("IO error at {path}: {source}")]
     Io {
         path: PathBuf,

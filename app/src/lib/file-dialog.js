@@ -1,4 +1,4 @@
-import { open } from '@tauri-apps/plugin-dialog'
+import { open, save } from '@tauri-apps/plugin-dialog'
 import { readSelectedFileBytes } from '@/api/backend'
 import { getPreference, setPreference } from '@/lib/preferences-store'
 
@@ -47,4 +47,19 @@ export async function openSinglePath(filters, options = {}) {
   }
 
   return selected
+}
+
+/**
+ * Opens the native save picker for a complete render target.
+ *
+ * @param {string} defaultPath - Current absolute output path.
+ * @param {string} extension - The single allowed output extension.
+ * @returns {Promise<string|null>} Selected path or null when cancelled.
+ */
+export async function saveSinglePath(defaultPath, extension) {
+  const selected = await save({
+    defaultPath,
+    filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+  })
+  return selected ?? null
 }

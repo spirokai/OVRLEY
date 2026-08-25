@@ -47,13 +47,13 @@ export function createMediaSlice(set, get) {
     importingVideo: false,
     renderingVideo: false,
     errorMessage: null,
-    videoFilename: null,
     activityFilename: null,
     activitySummary: null,
     parsedActivity: null,
     parsedActivitySource: null, // 'activity-file' | 'video-telemetry' | null
     stashedVideoTelemetry: null,
     activeRenderId: null,
+    activeRenderOutputPath: null,
     renderProgress: { ...DEFAULT_RENDER_PROGRESS },
 
     setProcessing: (processing) =>
@@ -66,14 +66,28 @@ export function createMediaSlice(set, get) {
         state.importingVideo = importing
       }),
 
-    setRenderingVideo: (rendering) =>
-      set((state) => {
-        state.renderingVideo = rendering
-      }),
+    startRenderSession: (renderId, outputPath, progress = {}) => {
+      const nextProgress = {
+        ...DEFAULT_RENDER_PROGRESS,
+        ...progress,
+        renderId,
+        status: 'rendering',
+      }
+      nextProgress.percent = nextProgress.total > 0 ? Math.round((nextProgress.current / nextProgress.total) * 100) : 0
 
-    setActiveRenderId: (renderId) =>
       set((state) => {
         state.activeRenderId = renderId
+        state.activeRenderOutputPath = outputPath
+        state.renderingVideo = true
+        state.renderProgress = nextProgress
+      })
+    },
+
+    clearRenderSession: () =>
+      set((state) => {
+        state.activeRenderId = null
+        state.activeRenderOutputPath = null
+        state.renderingVideo = false
       }),
 
     setRenderProgress: (progress) => {
@@ -96,11 +110,6 @@ export function createMediaSlice(set, get) {
     clearError: () =>
       set((state) => {
         state.errorMessage = null
-      }),
-
-    setVideoFilename: (filename) =>
-      set((state) => {
-        state.videoFilename = filename
       }),
 
     setActivityFilename: (filename) => {

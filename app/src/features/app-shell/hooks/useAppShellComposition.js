@@ -16,6 +16,7 @@ import { useAppUpdate } from '@/features/app-update'
 import { useVideoImport } from '@/features/video-preview'
 import { useUndoRedo } from '@/features/undo-redo'
 import * as backend from '@/api/backend'
+import { loadRememberedRenderDirectory } from '@/features/render-video/utils/render-output'
 
 /**
  * Orchestrates all shell-level hooks without adapting their public APIs.
@@ -26,7 +27,7 @@ import * as backend from '@/api/backend'
  *   appShell: object,
  *   backendState: object,
  *   editorShell: object,
- *   handleOpenDownloads: Function,
+ *   handleOpenOutputDirectory: Function,
  *   layout: object,
  *   renderWorkflow: object,
  *   templateManagement: object,
@@ -58,12 +59,13 @@ export default function useAppShellComposition() {
     restoreLastLoadedTemplate()
   }, [restoreLastLoadedTemplate])
 
-  const handleOpenDownloads = async () => {
+  const handleOpenOutputDirectory = async () => {
     try {
-      await backend.openDownloads()
+      const rememberedDirectory = await loadRememberedRenderDirectory()
+      await backend.openOutputDirectory(rememberedDirectory)
     } catch (error) {
-      console.error('Error opening downloads:', error)
-      appShell.setErrorMessage(`Failed to open downloads folder: ${error.message}`)
+      console.error('Error opening render output directory:', error)
+      appShell.setErrorMessage(`Failed to open render output folder: ${error.message}`)
     }
   }
 
@@ -71,7 +73,7 @@ export default function useAppShellComposition() {
     activityImport,
     appShell,
     backendState,
-    handleOpenDownloads,
+    handleOpenOutputDirectory,
     renderWorkflow,
     templateManagement,
     videoControls,
@@ -84,7 +86,7 @@ export default function useAppShellComposition() {
     appShell,
     backendState,
     editorShell,
-    handleOpenDownloads,
+    handleOpenOutputDirectory,
     layout,
     renderWorkflow,
     templateManagement,

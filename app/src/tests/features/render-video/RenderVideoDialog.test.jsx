@@ -81,4 +81,29 @@ describe('RenderVideoDialog', () => {
     expect(screen.getByDisplayValue('00:00:05')).toBeInTheDocument()
     expect(screen.getByDisplayValue('00:00:17')).toBeInTheDocument()
   })
+
+  test('commits the edited output path instead of the previous draft value', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <RenderVideoDialogHarness
+        initialSettings={{
+          fps: 30,
+          updateRate: 1,
+          exportMode: 'transparent',
+          exportCodec: 'prores_ks',
+          exportAcceleration: 'cpu',
+          exportRange: { ...DEFAULT_EXPORT_RANGE },
+          outputPath: 'C:\\renders\\previous.mov',
+        }}
+      />,
+    )
+
+    const outputPathInput = screen.getByRole('textbox', { name: 'Output path' })
+    await user.clear(outputPathInput)
+    await user.type(outputPathInput, 'C:\\missing\\nested\\output.mov')
+    await user.tab()
+
+    expect(outputPathInput).toHaveValue('C:\\missing\\nested\\output.mov')
+  })
 })

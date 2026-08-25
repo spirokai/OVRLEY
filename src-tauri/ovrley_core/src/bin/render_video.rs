@@ -16,6 +16,7 @@ use ovrley_core::activity::{build_dense_activity_report_validated, parse_activit
 use ovrley_core::commands::validate_config_value;
 use ovrley_core::encode::pipeline::transparent::render_video;
 use ovrley_core::encode::progress::RenderController;
+use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
 use serde_json::{Map, Value};
 use std::fs;
@@ -111,8 +112,28 @@ fn main() -> Result<(), String> {
             "Preparing render assets...",
         )
         .map_err(|e| e.to_string())?;
-    let filename = render_video(&paths, &config, &activity, &dense_activity, &controller)
-        .map_err(|e| e.to_string())?;
+    let output_path = paths.downloads_dir.join(format!(
+        "overlay_{}.mov",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|error| error.to_string())?
+            .as_nanos()
+    ));
+    let output_target = RenderOutputTarget::validate(
+        output_path.to_str().unwrap(),
+        RenderOutputKind::Transparent,
+        false,
+    )
+    .map_err(|error| error.to_string())?;
+    let filename = render_video(
+        &paths,
+        &config,
+        &activity,
+        &dense_activity,
+        &controller,
+        &output_target,
+    )
+    .map_err(|e| e.to_string())?;
     controller.finish_success(filename.clone());
     println!("{{\"filename\":\"{filename}\"}}");
     Ok(())

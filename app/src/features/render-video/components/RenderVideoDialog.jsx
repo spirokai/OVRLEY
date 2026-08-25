@@ -3,8 +3,9 @@
  * Pure presentational - all logic is in useRenderVideoDialogState.
  */
 
-import { AlertTriangle, Play, Video } from 'lucide-react'
+import { AlertTriangle, FolderOpen, Play, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
@@ -301,6 +302,34 @@ export default function RenderVideoDialog(props) {
                   onUseVideoRange={ctx.handleApplyImportedVideoRange}
                 />
               )}
+
+              <div className="space-y-2 pt-4">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Output file</Label>
+                <ButtonGroup className="w-full">
+                  <BlurInput
+                    value={ctx.settings.outputPath}
+                    onBlur={(event) => ctx.handleOutputPathCommit(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        ctx.handleOutputPathCommit(event.currentTarget.value)
+                      }
+                    }}
+                    className="h-9 min-w-0 flex-1 text-xs"
+                    aria-label="Output path"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
+                    onClick={ctx.handleBrowse}
+                    disabled={ctx.submissionPending}
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                  </Button>
+                </ButtonGroup>
+                {ctx.outputPathError ? <p className="text-xs text-red-500">{ctx.outputPathError}</p> : null}
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-6">
@@ -325,6 +354,29 @@ export default function RenderVideoDialog(props) {
             </div>
           </div>
         )}
+      </DialogContent>
+      <OverwriteConfirmDialog {...ctx} />
+    </Dialog>
+  )
+}
+
+function OverwriteConfirmDialog({ overwriteOpen, pendingOverwritePath, onOverwriteConfirm, onOverwriteCancel }) {
+  return (
+    <Dialog open={Boolean(overwriteOpen)} onOpenChange={(open) => !open && onOverwriteCancel?.()}>
+      <DialogContent
+        overlayClassName="absolute inset-0 z-130 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md"
+        className="w-full max-w-md rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl"
+      >
+        <DialogTitle className="text-sm font-semibold text-foreground">Overwrite existing file?</DialogTitle>
+        <p className="mt-3 break-all text-xs text-muted-foreground">{pendingOverwritePath}</p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button type="button" variant="outline" onClick={onOverwriteCancel}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={onOverwriteConfirm}>
+            Overwrite
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )

@@ -28,6 +28,7 @@ describe('renderVideo', () => {
     vi.mocked(backend.renderVideo).mockResolvedValue({
       started: true,
       render_id: 'render-1',
+      outputPath: 'C:\\renders\\overlay.mov',
     })
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
@@ -56,7 +57,7 @@ describe('renderVideo', () => {
       },
     })
 
-    await renderVideo(useStore.getState())
+    await renderVideo({ ...useStore.getState(), outputPath: 'C:\\renders\\overlay.mov', outputKind: 'transparent' })
 
     expect(backend.renderVideo).toHaveBeenCalledTimes(1)
     expect(backend.renderVideo).toHaveBeenCalledWith(
@@ -83,6 +84,7 @@ describe('renderVideo', () => {
       expect.objectContaining({
         sample_elapsed_seconds: [0, 10, 20],
       }),
+      expect.objectContaining({ outputPath: 'C:\\renders\\overlay.mov', outputKind: 'transparent', overwrite: false }),
     )
     expect(vi.mocked(backend.renderVideo).mock.calls.at(-1)?.[0]?.scene).not.toHaveProperty('updateRate')
   })
@@ -106,7 +108,7 @@ describe('renderVideo', () => {
       },
     })
 
-    await renderVideo(useStore.getState())
+    await renderVideo({ ...useStore.getState(), outputPath: 'C:\\renders\\overlay.mov', outputKind: 'transparent' })
 
     expect(backend.renderVideo).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -116,6 +118,7 @@ describe('renderVideo', () => {
         }),
       }),
       expect.any(Object),
+      expect.objectContaining({ outputPath: 'C:\\renders\\overlay.mov', outputKind: 'transparent', overwrite: false }),
     )
   })
 
@@ -137,6 +140,8 @@ describe('renderVideo', () => {
       importedVideoFpsDen: 1,
       importedVideoResolution: { width: 1920, height: 1080 },
       videoSyncOffsetSeconds: 10,
+      outputPath: 'C:\\renders\\video.mp4',
+      outputKind: 'composite',
     }
 
     await renderVideo(compositeOverrides)
@@ -152,6 +157,7 @@ describe('renderVideo', () => {
         }),
       }),
       expect.any(Object),
+      expect.objectContaining({ outputPath: 'C:\\renders\\video.mp4', outputKind: 'composite', overwrite: false }),
     )
 
     const submittedJobs = vi.mocked(backend.renderVideo).mock.calls.length
@@ -159,6 +165,8 @@ describe('renderVideo', () => {
       renderVideo({
         ...compositeOverrides,
         exportRange: { type: 'custom', from: 0, to: 5 },
+        outputPath: 'C:\\renders\\video.mp4',
+        outputKind: 'composite',
       }),
     ).rejects.toThrow('Custom export range must overlap the imported video range')
     expect(backend.renderVideo).toHaveBeenCalledTimes(submittedJobs)

@@ -17,6 +17,7 @@ import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
 import { getDefaultBitrate } from '../data/bitrateDefaults'
 import { createRenderEffectiveConfig } from '../utils/renderConfig'
+import { loadRememberedRenderDirectory, normalizeRenderOutputPath, rememberAcceptedRenderOutput } from '../utils/render-output'
 import useRenderDialogState from './useRenderDialogState'
 
 export default function useRenderWorkflow({ backendStatus }) {
@@ -27,11 +28,10 @@ export default function useRenderWorkflow({ backendStatus }) {
     exportRange,
     renderStatus,
     renderingVideo,
-    setActiveRenderId,
+    clearRenderSession,
     setErrorMessage,
     setRenderProgress,
-    setRenderingVideo,
-    setVideoFilename,
+    startRenderSession,
     updateRate,
   } = useRenderStore()
   const globalDefaults = useStore((state) => state.globalDefaults)
@@ -39,6 +39,10 @@ export default function useRenderWorkflow({ backendStatus }) {
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoResolution = useStore((state) => state.importedVideoResolution)
   const [renderingPreviewFrame, setRenderingPreviewFrame] = useState(false)
+  const [submissionPending, setSubmissionPending] = useState(false)
+  const [outputPathError, setOutputPathError] = useState(null)
+  const [overwriteOpen, setOverwriteOpen] = useState(false)
+  const [pendingOverwritePath, setPendingOverwritePath] = useState(null)
 
   const hasParsedActivity = Boolean(activitySummary)
   const canRender = Boolean(config && hasParsedActivity)
@@ -95,13 +99,56 @@ export default function useRenderWorkflow({ backendStatus }) {
     updateRate,
   ])
 
-  const { renderDialogPhase, renderSettingsDraft, setRenderDialogPhase, openRenderDialog, closeRenderDialog, updateRenderSettingsDraft } =
-    useRenderDialogState({
-      buildRenderSettingsDraft,
-      renderDisabled,
-      renderingVideo,
-      renderStatus,
-    })
+  const resolveRenderSettingsDraft = useCallback(async () => {
+    const draft = buildRenderSettingsDraft()
+    const outputKind = draft.exportMode === 'composite' ? 'composite' : 'transparent'
+    const rememberedDirectory = await loadRememberedRenderDirectory()
+    const outputPath = await backend.suggestRenderOutputPath(outputKind, rememberedDirectory)
+    return {
+      ...draft,
+      outputPath: normalizeRenderOutputPath(outputPath, draft.exportMode),
+    }
+  }, [buildRenderSettingsDraft])
+
+  const {
+    renderDialogPhase,
+    renderSettingsDraft,
+    setRenderDialogPhase,
+    openRenderDialog,
+    closeRenderDialog,
+    updateRenderSettingsDraft: updateDraftState,
+  } = useRenderDialogState({
+    buildRenderSettingsDraft,
+    onOpenError: (error) => setErrorMessage(error.message || 'Failed to prepare render output'),
+    resolveRenderSettingsDraft,
+    renderDisabled,
+    renderingVideo,
+    renderStatus,
+  })
+
+  const updateRenderSettingsDraft = useCallback(
+    (updates) => {
+      if (updates.outputPath !== undefined || updates.exportMode !== undefined) {
+        setOutputPathError(null)
+        setOverwriteOpen(false)
+        setPendingOverwritePath(null)
+      }
+      updateDraftState(updates)
+    },
+    [updateDraftState],
+  )
+
+  const handleOutputPathChange = useCallback(
+    (outputPath) => {
+      const exportMode = renderSettingsDraft?.exportMode || 'transparent'
+      const normalizedPath = normalizeRenderOutputPath(outputPath, exportMode)
+      setOutputPathError(null)
+      setOverwriteOpen(false)
+      setPendingOverwritePath(null)
+      updateDraftState({ outputPath: normalizedPath })
+    },
+    [renderSettingsDraft?.exportMode, updateDraftState],
+  )
 
   // Progress streaming — subscribes to backend `render-progress` events for
   // live render updates. Each event carries the full RenderProgress payload
@@ -167,12 +214,8 @@ export default function useRenderWorkflow({ backendStatus }) {
   useEffect(() => {
     if (!renderingVideo) return
 
-    let previousProgress = useStore.getState().renderProgress
-    const unsubscribe = useStore.subscribe((state) => {
-      const nextProgress = state.renderProgress
-      if (nextProgress === previousProgress) return
-      previousProgress = nextProgress
-
+    let previousProgress = null
+    const handleCompletion = (nextProgress) => {
       const { activeRenderId: nextActiveRenderId } = useStore.getState()
       if (nextProgress.renderId !== nextActiveRenderId) {
         return
@@ -181,102 +224,153 @@ export default function useRenderWorkflow({ backendStatus }) {
       const { filename, message, status } = nextProgress
 
       if (status === 'complete' && filename) {
-        setVideoFilename(filename)
-        setActiveRenderId(null)
-        setRenderingVideo(false)
-        backend.openVideo(filename).catch((error) => {
+        const outputPath = useStore.getState().activeRenderOutputPath
+        clearRenderSession()
+        if (!outputPath) {
+          setErrorMessage('Completed render output path is unavailable')
+          return
+        }
+        backend.openVideo(outputPath).catch((error) => {
           console.error('Error calling open-video:', error)
         })
         return
       }
 
       if (status === 'cancelled') {
-        setActiveRenderId(null)
-        setRenderingVideo(false)
+        clearRenderSession()
         return
       }
 
       if (status === 'error') {
-        setActiveRenderId(null)
-        setRenderingVideo(false)
+        clearRenderSession()
         if (message) {
           setErrorMessage(message)
         }
       }
+    }
+    const unsubscribe = useStore.subscribe((state) => {
+      const nextProgress = state.renderProgress
+      if (nextProgress === previousProgress) return
+      previousProgress = nextProgress
+      handleCompletion(nextProgress)
     })
+    handleCompletion(useStore.getState().renderProgress)
 
     return unsubscribe
-  }, [renderingVideo, setErrorMessage, setActiveRenderId, setRenderingVideo, setVideoFilename])
+  }, [clearRenderSession, renderingVideo, setErrorMessage])
 
   // Confirm handler — resolves dialog-local render choices, kicks off the
   // render IPC call, and manages error/recovery flow. Modal choices are not
   // promoted into editor state.
-  const handleRenderVideoConfirm = useCallback(async () => {
-    if (!config?.scene || !renderSettingsDraft) {
+  const submitRender = useCallback(
+    async (overwrite = false, expectedPath = null) => {
+      if (!config?.scene || !renderSettingsDraft || submissionPending) {
+        return
+      }
+
+      const exportMode = renderSettingsDraft.exportMode || (useStore.getState().importedVideoPath ? 'composite' : 'transparent')
+      const outputPath = normalizeRenderOutputPath(renderSettingsDraft.outputPath || '', exportMode)
+      if (!renderSettingsDraft.outputPath) {
+        setOutputPathError('Render output path is required')
+        return
+      }
+      if (expectedPath && outputPath !== expectedPath) {
+        setPendingOverwritePath(null)
+        setOverwriteOpen(false)
+        return
+      }
+      if (outputPath !== renderSettingsDraft.outputPath) {
+        updateDraftState({ outputPath })
+      }
+
+      const shouldComposite = exportMode === 'composite'
+      const nextExportRange = {
+        ...DEFAULT_EXPORT_RANGE,
+        ...(renderSettingsDraft.exportRange || {}),
+      }
+      const nextFps = sanitizeIntegerFps(renderSettingsDraft.fps || 30)
+      const nextUpdateRate = normalizeUpdateRateForFps(nextFps, renderSettingsDraft.updateRate)
+      const nextConfig = {
+        ...config,
+        scene: {
+          ...config.scene,
+          fps: nextFps,
+        },
+      }
+
+      setSubmissionPending(true)
+      try {
+        const { default: renderVideo } = await import('@/features/render-video/utils/render-video')
+        const result = await renderVideo({
+          config: nextConfig,
+          exportMode,
+          updateRate: nextUpdateRate,
+          exportRange: nextExportRange,
+          exportCodec: renderSettingsDraft.exportCodec,
+          exportBitrate: renderSettingsDraft.exportBitrate,
+          availableCodecs: useStore.getState().availableCodecs,
+          globalDefaults,
+          importedVideoDuration: useStore.getState().importedVideoDuration,
+          importedVideoFps: useStore.getState().importedVideoFps,
+          importedVideoFpsDen: useStore.getState().importedVideoFpsDen,
+          importedVideoFpsNum: useStore.getState().importedVideoFpsNum,
+          importedVideoPath: shouldComposite ? useStore.getState().importedVideoPath : null,
+          importedVideoResolution: useStore.getState().importedVideoResolution,
+          parsedActivity: useStore.getState().parsedActivity,
+          startSecond: useStore.getState().startSecond,
+          endSecond: useStore.getState().endSecond,
+          videoSyncOffsetSeconds: useStore.getState().videoSyncOffsetSeconds,
+          outputPath,
+          outputKind: shouldComposite ? 'composite' : 'transparent',
+          overwrite,
+        })
+        startRenderSession(result.render_id, result.outputPath, {
+          ...DEFAULT_RENDER_PROGRESS,
+          status: 'rendering',
+          message: 'Starting render...',
+        })
+        setOutputPathError(null)
+        setPendingOverwritePath(null)
+        setOverwriteOpen(false)
+        setRenderDialogPhase('progress')
+        void rememberAcceptedRenderOutput(result.outputPath)
+      } catch (error) {
+        if (error.code === 'already_exists') {
+          setPendingOverwritePath(outputPath)
+          setOverwriteOpen(true)
+        } else if (error.code === 'render_error') {
+          setOutputPathError(error.message)
+        } else {
+          setRenderDialogPhase('closed')
+          setErrorMessage(error.message || 'Unknown error')
+        }
+      } finally {
+        setSubmissionPending(false)
+      }
+    },
+    [config, globalDefaults, renderSettingsDraft, setErrorMessage, setRenderDialogPhase, startRenderSession, submissionPending, updateDraftState],
+  )
+
+  const handleRenderVideoConfirm = useCallback(() => submitRender(false), [submitRender])
+
+  const handleOverwriteConfirm = useCallback(() => {
+    if (!pendingOverwritePath) {
       return
     }
+    return submitRender(true, pendingOverwritePath)
+  }, [pendingOverwritePath, submitRender])
 
-    // The dialog draft is the source of truth once opened; imported video only
-    // provides the default when a draft does not yet carry an explicit mode.
-    const exportMode = renderSettingsDraft.exportMode || (useStore.getState().importedVideoPath ? 'composite' : 'transparent')
-    const shouldComposite = exportMode === 'composite'
-    const nextExportRange = {
-      ...DEFAULT_EXPORT_RANGE,
-      ...(renderSettingsDraft.exportRange || {}),
-    }
-    const nextFps = sanitizeIntegerFps(renderSettingsDraft.fps || 30)
-    const nextUpdateRate = normalizeUpdateRateForFps(nextFps, renderSettingsDraft.updateRate)
-    const nextConfig = {
-      ...config,
-      scene: {
-        ...config.scene,
-        fps: nextFps,
-      },
-    }
+  const handleOverwriteCancel = useCallback(() => {
+    setPendingOverwritePath(null)
+    setOverwriteOpen(false)
+  }, [])
 
-    setActiveRenderId(null)
-    setRenderProgress({
-      ...DEFAULT_RENDER_PROGRESS,
-      status: 'rendering',
-      message: 'Starting render...',
-    })
-    setRenderingVideo(true)
-    setRenderDialogPhase('progress')
-
-    try {
-      const { default: renderVideo } = await import('@/features/render-video/utils/render-video')
-      const result = await renderVideo({
-        config: nextConfig,
-        exportMode,
-        updateRate: nextUpdateRate,
-        exportRange: nextExportRange,
-        exportCodec: renderSettingsDraft.exportCodec,
-        exportBitrate: renderSettingsDraft.exportBitrate,
-        availableCodecs: useStore.getState().availableCodecs,
-        globalDefaults,
-        importedVideoDuration: useStore.getState().importedVideoDuration,
-        importedVideoFps: useStore.getState().importedVideoFps,
-        importedVideoFpsDen: useStore.getState().importedVideoFpsDen,
-        importedVideoFpsNum: useStore.getState().importedVideoFpsNum,
-        importedVideoPath: shouldComposite ? useStore.getState().importedVideoPath : null,
-        importedVideoResolution: useStore.getState().importedVideoResolution,
-        parsedActivity: useStore.getState().parsedActivity,
-        startSecond: useStore.getState().startSecond,
-        endSecond: useStore.getState().endSecond,
-        videoSyncOffsetSeconds: useStore.getState().videoSyncOffsetSeconds,
-        setActiveRenderId,
-        setRenderingVideo,
-        setRenderProgress,
-      })
-      if (result && result.cancelled) {
-        // cancelled
-      }
-    } catch (error) {
-      setRenderDialogPhase('closed')
-      console.error('Render failed:', error)
-      useStore.getState().setErrorMessage(error.message || 'Unknown error')
-    }
-  }, [config, globalDefaults, renderSettingsDraft, setActiveRenderId, setRenderProgress, setRenderingVideo, setRenderDialogPhase])
+  const handleCloseRenderDialog = useCallback(() => {
+    closeRenderDialog()
+    setPendingOverwritePath(null)
+    setOverwriteOpen(false)
+    setOutputPathError(null)
+  }, [closeRenderDialog])
 
   const handleRenderPreviewFrame = useCallback(async () => {
     if (renderPreviewFrameDisabled || !config?.scene) {
@@ -329,9 +423,9 @@ export default function useRenderWorkflow({ backendStatus }) {
       delete nextConfig.scene.updateRate
 
       const result = await backend.renderPreviewFrame(nextConfig, nextParsedActivity, selectedSecond)
-      if (result?.filename) {
+      if (result?.path) {
         try {
-          await backend.openVideo(result.filename)
+          await backend.openVideo(result.path)
         } catch (openError) {
           console.warn('Preview frame rendered, but opening the output failed:', openError)
         }
@@ -345,9 +439,12 @@ export default function useRenderWorkflow({ backendStatus }) {
   }, [config, exportCodec, exportRange, globalDefaults, renderPreviewFrameDisabled, renderSettingsDraft?.exportBitrate, setErrorMessage, updateRate])
 
   return {
-    closeRenderDialog,
+    closeRenderDialog: handleCloseRenderDialog,
     handleRenderPreviewFrame,
     handleRenderVideoConfirm,
+    handleOutputPathChange,
+    handleOverwriteCancel,
+    handleOverwriteConfirm,
     openRenderDialog,
     renderDialogPhase,
     renderDisabled,
@@ -355,6 +452,10 @@ export default function useRenderWorkflow({ backendStatus }) {
     renderSettingsDraft,
     renderTooltipContent,
     renderingVideo,
+    outputPathError,
+    overwriteOpen,
+    pendingOverwritePath,
+    submissionPending,
     updateRenderSettingsDraft,
   }
 }

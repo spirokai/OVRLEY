@@ -37,9 +37,11 @@ use ovrley_core::commands::backend_render;
 use ovrley_core::debug::RenderProgress;
 use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
 use ovrley_core::encode::progress::RenderController;
+use ovrley_core::error::CoreError;
 use ovrley_core::normalize::raw::parse_config_json;
 use ovrley_core::normalize::raw::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
+use ovrley_core::output::RenderOutputKind;
 use ovrley_core::paths::AppPaths;
 
 /// Verifies the transparent render branch does not alter dense activity
@@ -85,11 +87,43 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
                 "#,
         ),
         &synthetic_activity_json(),
+        &render_output_path("branch"),
+        RenderOutputKind::Composite,
+        false,
     )
     .unwrap();
 
     assert_eq!(result.get("started").and_then(Value::as_bool), Some(true));
     assert!(controller.progress().total > 0);
+}
+
+#[test]
+fn output_rejection_precedes_malformed_activity_processing() {
+    let paths = AppPaths::from_repo_root(PathBuf::from("."));
+    let controller = RenderController::default();
+    let output_path = std::env::temp_dir().join(format!(
+        "ovrley-command-rejection-{}.mov",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::write(&output_path, b"existing").unwrap();
+
+    let error = backend_render(
+        &paths,
+        &controller,
+        "not json",
+        "not json",
+        output_path.to_str().unwrap(),
+        RenderOutputKind::Transparent,
+        false,
+    )
+    .unwrap_err();
+
+    assert!(matches!(error, CoreError::OutputExists(_)));
+    assert_eq!(controller.progress().status, "idle");
+    std::fs::remove_file(output_path).unwrap();
 }
 
 #[test]
@@ -113,6 +147,9 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
                 "#,
         ),
         &short_fractional_activity_json(),
+        &render_output_path("clamp"),
+        RenderOutputKind::Composite,
+        false,
     )
     .unwrap();
 
@@ -127,7 +164,7 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
 /// Uses `test_config::sample_video_path()` (test-1080p.mp4). Configures a
 /// 0.2s composite render at 29.97 FPS with 2x widget update rate and 300s
 /// sync offset. Polls the controller until completion and verifies the
-/// output filename starts with `video_composited_`.
+/// output filename matches the explicit custom target.
 ///
 /// Requires live ffmpeg and the video fixture on disk.
 ///
@@ -158,6 +195,9 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
             video_path.to_string_lossy().replace('\\', "\\\\")
         )),
         &synthetic_activity_json(),
+        &render_output_path("pipeline"),
+        RenderOutputKind::Composite,
+        false,
     )
     .unwrap();
 
@@ -170,7 +210,7 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
         .filename
         .as_deref()
         .unwrap_or_default()
-        .starts_with("video_composited_"));
+        .starts_with("ovrley-command-pipeline-"));
 }
 
 /// Plan derivation must reject composite configs that omit `composite_bitrate`.
@@ -469,4 +509,11 @@ fn wait_for_completed_progress(controller: &RenderController) -> RenderProgress 
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
     controller.progress()
+}
+
+fn render_output_path(name: &str) -> String {
+    std::env::temp_dir()
+        .join(format!("ovrley-command-{name}-{}.mp4", std::process::id()))
+        .to_string_lossy()
+        .into_owned()
 }

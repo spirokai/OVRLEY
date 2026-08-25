@@ -11,7 +11,7 @@
 use crate::debug::TimingBucket;
 use crate::encode::debug::round3;
 use crate::encode::debug::video::{
-    prune_completed_timing_directories, DEBUG_TIMING_RETENTION_LIMIT,
+    prune_completed_timing_directories, timestamp_nanos, DEBUG_TIMING_RETENTION_LIMIT,
 };
 use crate::encode::pipeline::composite_plan::CompositePipelinePlan;
 use crate::error::{CoreError, CoreResult};
@@ -99,18 +99,11 @@ pub fn write_composite_timing_summary(
     frame_render_workers: usize,
     rendered_frames: u32,
 ) -> CoreResult<PathBuf> {
-    let debug_dir = paths.debug_render_dir.join(COMPOSITE_DEBUG_PHASE).join(
-        plan.output_path
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .and_then(|stem| stem.strip_prefix("video_composited_"))
-            .ok_or_else(|| {
-                CoreError::Encode(format!(
-                    "Composite output path does not match the canonical filename contract: {}",
-                    plan.output_path.display()
-                ))
-            })?,
-    );
+    let debug_id = timestamp_nanos()?.to_string();
+    let debug_dir = paths
+        .debug_render_dir
+        .join(COMPOSITE_DEBUG_PHASE)
+        .join(debug_id);
     fs::create_dir_all(&debug_dir).map_err(|error| CoreError::Io {
         path: debug_dir.clone(),
         source: error,

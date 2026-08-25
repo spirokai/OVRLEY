@@ -52,7 +52,7 @@ function AppShell() {
     appShell,
     backendState,
     editorShell,
-    handleOpenDownloads,
+    handleOpenOutputDirectory,
     layout,
     renderWorkflow,
     templateManagement,
@@ -87,6 +87,13 @@ function AppShell() {
           onSettingsChange={renderWorkflow.updateRenderSettingsDraft}
           onClose={renderWorkflow.closeRenderDialog}
           onConfirm={renderWorkflow.handleRenderVideoConfirm}
+          onOutputPathChange={renderWorkflow.handleOutputPathChange}
+          outputPathError={renderWorkflow.outputPathError}
+          overwriteOpen={renderWorkflow.overwriteOpen}
+          pendingOverwritePath={renderWorkflow.pendingOverwritePath}
+          onOverwriteConfirm={renderWorkflow.handleOverwriteConfirm}
+          onOverwriteCancel={renderWorkflow.handleOverwriteCancel}
+          submissionPending={renderWorkflow.submissionPending}
         />
         <NewTemplateConfirmDialog
           open={templateManagement.showNewTemplateConfirm}
@@ -99,7 +106,7 @@ function AppShell() {
           appShell={appShell}
           backendState={backendState}
           editorShell={editorShell}
-          onOpenDownloads={handleOpenDownloads}
+          onOpenOutputDirectory={handleOpenOutputDirectory}
           renderWorkflow={renderWorkflow}
           templateManagement={templateManagement}
           videoControls={videoControls}

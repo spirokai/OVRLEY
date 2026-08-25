@@ -14,6 +14,7 @@ use ovrley_core::commands::{parse_and_validate_config, validate_config_value};
 use ovrley_core::encode::ffmpeg::detect::detect_codecs;
 use ovrley_core::encode::pipeline::transparent::{render_video, rendered_frame_count};
 use ovrley_core::encode::progress::RenderController;
+use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
 use serde::Serialize;
 use serde_json::Value;
@@ -270,7 +271,19 @@ fn main() -> Result<(), String> {
             }
 
             let started = Instant::now();
-            let render_result = render_video(&paths, &config, &activity, &dense, &controller);
+            let output_path = paths
+                .downloads_dir
+                .join(format!("benchmark-{codec_name}-{run_num}.mov"));
+            let output_target = RenderOutputTarget::validate(
+                output_path.to_str().unwrap(),
+                RenderOutputKind::Transparent,
+                true,
+            )
+            .map_err(|error| error.to_string());
+            let render_result = output_target.and_then(|target| {
+                render_video(&paths, &config, &activity, &dense, &controller, &target)
+                    .map_err(|error| error.to_string())
+            });
             let elapsed_secs = started.elapsed().as_secs_f64();
 
             match render_result {
