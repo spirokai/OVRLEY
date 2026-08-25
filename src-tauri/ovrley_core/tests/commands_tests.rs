@@ -41,7 +41,6 @@ use ovrley_core::error::CoreError;
 use ovrley_core::normalize::raw::parse_config_json;
 use ovrley_core::normalize::raw::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
-use ovrley_core::output::RenderOutputKind;
 use ovrley_core::paths::AppPaths;
 
 /// Verifies the transparent render branch does not alter dense activity
@@ -88,7 +87,6 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
         ),
         &synthetic_activity_json(),
         &render_output_path("branch"),
-        RenderOutputKind::Composite,
         false,
     )
     .unwrap();
@@ -113,10 +111,9 @@ fn output_rejection_precedes_malformed_activity_processing() {
     let error = backend_render(
         &paths,
         &controller,
-        "not json",
+        &serde_json::to_string(&transparent_config(0.0, 10.0, 30.0)).unwrap(),
         "not json",
         output_path.to_str().unwrap(),
-        RenderOutputKind::Transparent,
         false,
     )
     .unwrap_err();
@@ -148,7 +145,6 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
         ),
         &short_fractional_activity_json(),
         &render_output_path("clamp"),
-        RenderOutputKind::Composite,
         false,
     )
     .unwrap();
@@ -196,7 +192,6 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
         )),
         &synthetic_activity_json(),
         &render_output_path("pipeline"),
-        RenderOutputKind::Composite,
         false,
     )
     .unwrap();

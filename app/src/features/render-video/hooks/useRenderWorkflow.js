@@ -106,7 +106,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     const outputPath = await backend.suggestRenderOutputPath(outputKind, rememberedDirectory)
     return {
       ...draft,
-      outputPath: normalizeRenderOutputPath(outputPath, draft.exportMode),
+      outputPath,
     }
   }, [buildRenderSettingsDraft])
 
@@ -124,6 +124,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     renderDisabled,
     renderingVideo,
     renderStatus,
+    submissionPending,
   })
 
   const updateRenderSettingsDraft = useCallback(
@@ -133,21 +134,22 @@ export default function useRenderWorkflow({ backendStatus }) {
         setOverwriteOpen(false)
         setPendingOverwritePath(null)
       }
-      updateDraftState(updates)
+      updateDraftState((currentDraft) => {
+        if (updates.outputPath === undefined && updates.exportMode === undefined) {
+          return updates
+        }
+
+        const nextExportMode = updates.exportMode ?? currentDraft.exportMode
+        const nextOutputPath = updates.outputPath ?? currentDraft.outputPath
+        return nextExportMode && nextOutputPath
+          ? {
+              ...updates,
+              outputPath: normalizeRenderOutputPath(nextOutputPath, nextExportMode),
+            }
+          : updates
+      })
     },
     [updateDraftState],
-  )
-
-  const handleOutputPathChange = useCallback(
-    (outputPath) => {
-      const exportMode = renderSettingsDraft?.exportMode || 'transparent'
-      const normalizedPath = normalizeRenderOutputPath(outputPath, exportMode)
-      setOutputPathError(null)
-      setOverwriteOpen(false)
-      setPendingOverwritePath(null)
-      updateDraftState({ outputPath: normalizedPath })
-    },
-    [renderSettingsDraft?.exportMode, updateDraftState],
   )
 
   // Progress streaming — subscribes to backend `render-progress` events for
@@ -269,7 +271,7 @@ export default function useRenderWorkflow({ backendStatus }) {
       }
 
       const exportMode = renderSettingsDraft.exportMode || (useStore.getState().importedVideoPath ? 'composite' : 'transparent')
-      const outputPath = normalizeRenderOutputPath(renderSettingsDraft.outputPath || '', exportMode)
+      const outputPath = renderSettingsDraft.outputPath
       if (!renderSettingsDraft.outputPath) {
         setOutputPathError('Render output path is required')
         return
@@ -279,10 +281,6 @@ export default function useRenderWorkflow({ backendStatus }) {
         setOverwriteOpen(false)
         return
       }
-      if (outputPath !== renderSettingsDraft.outputPath) {
-        updateDraftState({ outputPath })
-      }
-
       const shouldComposite = exportMode === 'composite'
       const nextExportRange = {
         ...DEFAULT_EXPORT_RANGE,
@@ -321,7 +319,6 @@ export default function useRenderWorkflow({ backendStatus }) {
           endSecond: useStore.getState().endSecond,
           videoSyncOffsetSeconds: useStore.getState().videoSyncOffsetSeconds,
           outputPath,
-          outputKind: shouldComposite ? 'composite' : 'transparent',
           overwrite,
         })
         startRenderSession(result.render_id, result.outputPath, {
@@ -338,7 +335,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         if (error.code === 'already_exists') {
           setPendingOverwritePath(outputPath)
           setOverwriteOpen(true)
-        } else if (error.code === 'render_error') {
+        } else if (error.code === 'output_error') {
           setOutputPathError(error.message)
         } else {
           setRenderDialogPhase('closed')
@@ -348,7 +345,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         setSubmissionPending(false)
       }
     },
-    [config, globalDefaults, renderSettingsDraft, setErrorMessage, setRenderDialogPhase, startRenderSession, submissionPending, updateDraftState],
+    [config, globalDefaults, renderSettingsDraft, setErrorMessage, setRenderDialogPhase, startRenderSession, submissionPending],
   )
 
   const handleRenderVideoConfirm = useCallback(() => submitRender(false), [submitRender])
@@ -442,7 +439,6 @@ export default function useRenderWorkflow({ backendStatus }) {
     closeRenderDialog: handleCloseRenderDialog,
     handleRenderPreviewFrame,
     handleRenderVideoConfirm,
-    handleOutputPathChange,
     handleOverwriteCancel,
     handleOverwriteConfirm,
     openRenderDialog,

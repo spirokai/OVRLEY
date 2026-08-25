@@ -43,7 +43,6 @@ describe('backend Tauri error normalization', () => {
         {},
         {
           outputPath: 'C:\\renders\\overlay.mov',
-          outputKind: 'transparent',
           overwrite: false,
         },
       ),

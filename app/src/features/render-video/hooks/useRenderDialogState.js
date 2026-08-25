@@ -18,6 +18,7 @@ export default function useRenderDialogState({
   renderDisabled,
   renderingVideo,
   renderStatus,
+  submissionPending,
 }) {
   // Dialog phase and renderSettingsDraft are true dialog-local state, not
   // mirrors of store values. The draft exists only for the lifetime of the
@@ -54,14 +55,14 @@ export default function useRenderDialogState({
     }
   }, [buildRenderSettingsDraft, onOpenError, renderDisabled, resolveRenderSettingsDraft])
 
-  // Closing is blocked while an active render is in progress.
+  // Closing is blocked while a render is being accepted or is already active.
   const closeRenderDialog = useCallback(() => {
-    if (renderDialogPhase === 'progress' || renderingVideo) {
+    if (submissionPending || renderDialogPhase === 'progress' || renderingVideo) {
       return
     }
 
     setRenderDialogPhase('closed')
-  }, [renderDialogPhase, renderingVideo])
+  }, [renderDialogPhase, renderingVideo, submissionPending])
 
   // Draft updates merge partial changes without mutating the current object.
   const updateRenderSettingsDraft = useCallback((updates) => {
@@ -70,9 +71,11 @@ export default function useRenderDialogState({
         return currentDraft
       }
 
+      const resolvedUpdates = typeof updates === 'function' ? updates(currentDraft) : updates
+
       return {
         ...currentDraft,
-        ...updates,
+        ...resolvedUpdates,
       }
     })
   }, [])

@@ -153,24 +153,18 @@ pub fn backend_render(
     config_json: &str,
     parsed_activity_json: &str,
     output_path: &str,
-    output_kind: RenderOutputKind,
     overwrite: bool,
 ) -> CoreResult<Value> {
-    let output_target = RenderOutputTarget::validate(output_path, output_kind, overwrite)?;
     let config = parse_config_json(config_json)?;
-    let parsed_activity = parse_activity_json(parsed_activity_json)?;
     let validated = crate::normalize::validate_render_config(config)?;
-    let expected_output_kind = if validated.scene.composite_video_path.is_some() {
+    let output_kind = if validated.scene.composite_video_path.is_some() {
         RenderOutputKind::Composite
     } else {
         RenderOutputKind::Transparent
     };
-    if output_target.kind() != expected_output_kind {
-        return Err(CoreError::Config(
-            "Render output kind does not match the render configuration".into(),
-        ));
-    }
-    if expected_output_kind == RenderOutputKind::Composite {
+    let output_target = RenderOutputTarget::validate(output_path, output_kind, overwrite)?;
+    let parsed_activity = parse_activity_json(parsed_activity_json)?;
+    if output_kind == RenderOutputKind::Composite {
         return start_composite_render(
             paths,
             controller,

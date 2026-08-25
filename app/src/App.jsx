@@ -87,7 +87,6 @@ function AppShell() {
           onSettingsChange={renderWorkflow.updateRenderSettingsDraft}
           onClose={renderWorkflow.closeRenderDialog}
           onConfirm={renderWorkflow.handleRenderVideoConfirm}
-          onOutputPathChange={renderWorkflow.handleOutputPathChange}
           outputPathError={renderWorkflow.outputPathError}
           overwriteOpen={renderWorkflow.overwriteOpen}
           pendingOverwritePath={renderWorkflow.pendingOverwritePath}

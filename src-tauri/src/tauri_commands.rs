@@ -47,6 +47,8 @@ fn call_and_serialize<T: serde::Serialize>(
 pub(crate) enum BackendRenderError {
     #[serde(rename = "already_exists")]
     AlreadyExists { message: String },
+    #[serde(rename = "output_error")]
+    OutputError { message: String },
     #[serde(rename = "render_error")]
     RenderError { message: String },
 }
@@ -55,9 +57,10 @@ impl BackendRenderError {
     fn from_core(error: CoreError) -> Self {
         match error {
             CoreError::OutputExists(message) => Self::AlreadyExists { message },
-            CoreError::OutputIo { path, source } => Self::RenderError {
+            CoreError::OutputIo { path, source } => Self::OutputError {
                 message: output_io_message(&path, &source),
             },
+            CoreError::OutputInvalid(message) => Self::OutputError { message },
             error => Self::RenderError {
                 message: error.to_string(),
             },
@@ -76,9 +79,21 @@ fn output_io_message(path: &Path, source: &std::io::Error) -> String {
             format!("The output directory does not exist: {directory}")
         }
         std::io::ErrorKind::PermissionDenied => {
-            format!("The output directory is not writable: {directory}")
+            format!(
+                "You do not have permission to write the output file: {}",
+                path.display()
+            )
         }
-        _ => format!("IO error at {}: {source}", path.display()),
+        std::io::ErrorKind::InvalidInput => {
+            format!(
+                "The output file name or path is not valid: {}",
+                path.display()
+            )
+        }
+        _ => format!(
+            "Could not create or write the output file at {}: {source}",
+            path.display()
+        ),
     }
 }
 
@@ -127,7 +142,6 @@ pub(crate) async fn backend_render(
     config_json: String,
     parsed_activity_json: String,
     output_path: String,
-    output_kind: RenderOutputKind,
     overwrite: bool,
 ) -> Result<String, BackendRenderError> {
     let paths = runtime_paths::app_paths(&app)
@@ -138,7 +152,6 @@ pub(crate) async fn backend_render(
         &config_json,
         &parsed_activity_json,
         &output_path,
-        output_kind,
         overwrite,
     )
     .map_err(BackendRenderError::from_core)?;

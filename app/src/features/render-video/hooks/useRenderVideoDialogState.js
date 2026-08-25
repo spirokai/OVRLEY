@@ -24,7 +24,7 @@ import {
   getVisibleAccelerationOptions,
   isOutputFormatAvailable,
 } from '../utils/codecUtils'
-import { getRenderOutputExtension, normalizeRenderOutputPath } from '../utils/render-output'
+import { getRenderOutputExtension } from '../utils/render-output'
 import useRenderVideoDerivedState from './useRenderVideoDerivedState'
 
 function getImportedVideoExportRange(durationSeconds, offsetSeconds) {
@@ -41,7 +41,6 @@ export default function useRenderVideoDialogState({
   onSettingsChange,
   onClose,
   onConfirm,
-  onOutputPathChange,
   outputPathError,
   overwriteOpen,
   pendingOverwritePath,
@@ -167,14 +166,12 @@ export default function useRenderVideoDialogState({
 
   const handleExportModeChange = useCallback(
     (exportMode) => {
-      const normalizedOutputPath = outputPath ? normalizeRenderOutputPath(outputPath, exportMode) : undefined
       // Only the first switch into transparent mode auto-prefills the imported
       // video span; after that, manual edits stay intact until the dialog closes.
       if (exportMode === 'transparent' && hasImportedVideo && !importedVideoRangePrefilledRef.current) {
         importedVideoRangePrefilledRef.current = true
         onSettingsChange({
           exportMode,
-          outputPath: normalizedOutputPath,
           exportRange: {
             ...(settings?.exportRange || {}),
             ...getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
@@ -183,20 +180,14 @@ export default function useRenderVideoDialogState({
         return
       }
 
-      onSettingsChange({ exportMode, ...(normalizedOutputPath ? { outputPath: normalizedOutputPath } : {}) })
+      onSettingsChange({ exportMode })
     },
-    [hasImportedVideo, importedVideoDuration, onSettingsChange, outputPath, settings?.exportRange, videoSyncOffsetSeconds],
+    [hasImportedVideo, importedVideoDuration, onSettingsChange, settings?.exportRange, videoSyncOffsetSeconds],
   )
 
   const handleOutputPathCommit = useCallback(
-    (nextOutputPath = outputPath) => {
-      if (!nextOutputPath) {
-        return
-      }
-      const normalizedPath = normalizeRenderOutputPath(nextOutputPath, exportMode)
-      onOutputPathChange ? onOutputPathChange(normalizedPath) : onSettingsChange({ outputPath: normalizedPath })
-    },
-    [exportMode, onOutputPathChange, onSettingsChange, outputPath],
+    (nextOutputPath = outputPath) => onSettingsChange({ outputPath: nextOutputPath }),
+    [onSettingsChange, outputPath],
   )
 
   const handleBrowse = useCallback(async () => {
@@ -205,10 +196,9 @@ export default function useRenderVideoDialogState({
     }
     const selectedPath = await saveSinglePath(outputPath, getRenderOutputExtension(exportMode))
     if (selectedPath) {
-      const normalizedPath = normalizeRenderOutputPath(selectedPath, exportMode)
-      onOutputPathChange ? onOutputPathChange(normalizedPath) : onSettingsChange({ outputPath: normalizedPath })
+      onSettingsChange({ outputPath: selectedPath })
     }
-  }, [exportMode, onOutputPathChange, onSettingsChange, outputPath])
+  }, [exportMode, onSettingsChange, outputPath])
 
   const handleOutputFormatChange = (value) => {
     const format = OUTPUT_FORMATS_BY_VALUE[value]

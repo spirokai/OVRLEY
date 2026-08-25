@@ -24,7 +24,7 @@ vi.mock('@/api/backend', () => ({
   }),
   openVideo: vi.fn().mockResolvedValue(undefined),
   renderPreviewFrame: vi.fn(),
-  suggestRenderOutputPath: vi.fn().mockResolvedValue('C:\\renders\\overlay.mov'),
+  suggestRenderOutputPath: vi.fn((outputKind) => Promise.resolve(outputKind === 'composite' ? 'C:\\renders\\video.mp4' : 'C:\\renders\\overlay.mov')),
 }))
 
 vi.mock('@/features/render-video/utils/render-video', () => ({
@@ -44,6 +44,9 @@ describe('useRenderWorkflow', () => {
   beforeEach(() => {
     renderVideoMock.mockReset().mockResolvedValue({ started: true, render_id: 'render-1', outputPath: 'C:\\renders\\overlay.mov' })
     vi.mocked(backend.openVideo).mockClear()
+    vi.mocked(backend.suggestRenderOutputPath).mockImplementation((outputKind) =>
+      Promise.resolve(outputKind === 'composite' ? 'C:\\renders\\video.mp4' : 'C:\\renders\\overlay.mov'),
+    )
     vi.mocked(renderOutput.rememberAcceptedRenderOutput).mockClear()
     useStore.setState(useStore.getInitialState(), true)
     useStore.setState({
@@ -121,6 +124,7 @@ describe('useRenderWorkflow', () => {
           to: 15.75,
         }),
         importedVideoPath: null,
+        outputPath: 'C:\\renders\\video.mov',
       }),
     )
   })
@@ -187,6 +191,61 @@ describe('useRenderWorkflow', () => {
 
     expect(renderVideoMock).toHaveBeenCalledTimes(2)
     expect(renderVideoMock.mock.calls[1][0]).toMatchObject({ outputPath: submittedPath, overwrite: true })
+  })
+
+  test('keeps the dialog open while render acceptance is pending', async () => {
+    let acceptRender
+    renderVideoMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          acceptRender = resolve
+        }),
+    )
+
+    const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
+    await act(async () => {
+      await result.current.openRenderDialog()
+    })
+
+    let submission
+    await act(async () => {
+      submission = result.current.handleRenderVideoConfirm()
+      await Promise.resolve()
+    })
+
+    expect(result.current.submissionPending).toBe(true)
+    act(() => result.current.closeRenderDialog())
+    expect(result.current.renderDialogPhase).toBe('confirm')
+
+    await act(async () => {
+      acceptRender({ started: true, render_id: 'render-1', outputPath: 'C:\\renders\\overlay.mov' })
+      await submission
+    })
+  })
+
+  test('keeps output errors with the draft and routes general render errors globally', async () => {
+    const outputError = Object.assign(new Error('The output directory does not exist'), { code: 'output_error' })
+    renderVideoMock.mockRejectedValueOnce(outputError)
+
+    const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
+    await act(async () => {
+      await result.current.openRenderDialog()
+    })
+    await act(async () => {
+      await result.current.handleRenderVideoConfirm()
+    })
+
+    expect(result.current.renderDialogPhase).toBe('confirm')
+    expect(result.current.outputPathError).toBe('The output directory does not exist')
+
+    const renderError = Object.assign(new Error('Invalid render configuration'), { code: 'render_error' })
+    renderVideoMock.mockRejectedValueOnce(renderError)
+    await act(async () => {
+      await result.current.handleRenderVideoConfirm()
+    })
+
+    expect(result.current.renderDialogPhase).toBe('closed')
+    expect(useStore.getState().errorMessage).toBe('Invalid render configuration')
   })
 
   test('enters progress and remembers the exact accepted output path only after acceptance', async () => {

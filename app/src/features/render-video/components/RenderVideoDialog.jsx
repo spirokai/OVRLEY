@@ -73,12 +73,12 @@ export default function RenderVideoDialog(props) {
         className="w-full max-w-lg rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
         aria-describedby={undefined}
         onEscapeKeyDown={(event) => {
-          if (ctx.isProgress) {
+          if (ctx.isProgress || ctx.submissionPending) {
             event.preventDefault()
           }
         }}
         onPointerDownOutside={(event) => {
-          if (ctx.isProgress) {
+          if (ctx.isProgress || ctx.submissionPending) {
             event.preventDefault()
           }
         }}
@@ -309,12 +309,6 @@ export default function RenderVideoDialog(props) {
                   <BlurInput
                     value={ctx.settings.outputPath}
                     onBlur={(event) => ctx.handleOutputPathCommit(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        ctx.handleOutputPathCommit(event.currentTarget.value)
-                      }
-                    }}
                     className="h-9 min-w-0 flex-1 text-xs"
                     aria-label="Output path"
                   />
@@ -338,7 +332,7 @@ export default function RenderVideoDialog(props) {
                 variant="outline"
                 className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
                 onClick={ctx.onClose}
-                disabled={ctx.renderingVideo}
+                disabled={ctx.renderingVideo || ctx.submissionPending}
               >
                 Cancel
               </Button>

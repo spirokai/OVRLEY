@@ -140,14 +140,13 @@ export async function socketReady() {
  * @param {*} parsedActivity - Normalized activity payload used by the app.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
-export async function renderVideo(config, parsedActivity, { outputPath, outputKind, overwrite = false } = {}) {
+export async function renderVideo(config, parsedActivity, { outputPath, overwrite = false } = {}) {
   const safeConfig = safeJsonStringify(config)
   const safeParsedActivity = safeJsonStringify(parsedActivity)
   return apiCall('backend_render', {
     configJson: safeConfig,
     parsedActivityJson: safeParsedActivity,
     outputPath,
-    outputKind,
     overwrite,
   })
 }

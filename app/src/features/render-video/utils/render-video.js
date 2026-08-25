@@ -34,7 +34,6 @@ export default async function renderVideo(overrides = {}) {
     updateRate,
     videoSyncOffsetSeconds,
     outputPath,
-    outputKind,
     overwrite = false,
   } = overrides
 
@@ -68,7 +67,7 @@ export default async function renderVideo(overrides = {}) {
     throw new Error('No parsed activity available')
   }
 
-  if (!outputPath || !outputKind) {
+  if (!outputPath) {
     throw new Error('Render output target is required')
   }
 
@@ -82,7 +81,6 @@ export default async function renderVideo(overrides = {}) {
 
   const data = await backend.renderVideo(config, parsedActivity, {
     outputPath,
-    outputKind,
     overwrite,
   })
 

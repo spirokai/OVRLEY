@@ -39,22 +39,19 @@ impl RenderOutputKind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RenderOutputTarget {
     path: PathBuf,
-    kind: RenderOutputKind,
 }
 
 impl RenderOutputTarget {
     /// Validates and probes one exact output path.
     pub fn validate(raw_path: &str, kind: RenderOutputKind, overwrite: bool) -> CoreResult<Self> {
         if raw_path.trim().is_empty() {
-            return Err(CoreError::Config(
-                "Render output path must not be empty".into(),
-            ));
+            return Err(CoreError::OutputInvalid("Choose an output file".into()));
         }
 
         let path = PathBuf::from(raw_path);
         if !path.is_absolute() {
-            return Err(CoreError::Config(format!(
-                "Render output path must be absolute: {}",
+            return Err(CoreError::OutputInvalid(format!(
+                "Choose a complete output path, including its folder: {}",
                 path.display()
             )));
         }
@@ -63,14 +60,14 @@ impl RenderOutputTarget {
             .file_name()
             .and_then(|value| value.to_str())
             .ok_or_else(|| {
-                CoreError::Config(format!(
-                    "Render output path has no usable filename: {}",
+                CoreError::OutputInvalid(format!(
+                    "The output path must include a file name: {}",
                     path.display()
                 ))
             })?;
         if filename.is_empty() || filename == "." || filename == ".." {
-            return Err(CoreError::Config(format!(
-                "Render output path has no usable filename: {}",
+            return Err(CoreError::OutputInvalid(format!(
+                "The output path must include a file name: {}",
                 path.display()
             )));
         }
@@ -79,15 +76,15 @@ impl RenderOutputTarget {
             .extension()
             .and_then(|value| value.to_str())
             .ok_or_else(|| {
-                CoreError::Config(format!(
-                    "Render output path must use .{}: {}",
+                CoreError::OutputInvalid(format!(
+                    "The output file must use .{}: {}",
                     kind.extension(),
                     path.display()
                 ))
             })?;
         if !extension.eq_ignore_ascii_case(kind.extension()) {
-            return Err(CoreError::Config(format!(
-                "Render output path must use .{}: {}",
+            return Err(CoreError::OutputInvalid(format!(
+                "The output file must use .{}: {}",
                 kind.extension(),
                 path.display()
             )));
@@ -96,7 +93,7 @@ impl RenderOutputTarget {
         match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(file) => {
                 let _cleanup = ProbeCleanup::new(path.clone(), file);
-                Ok(Self { path, kind })
+                Ok(Self { path })
             }
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
                 if !overwrite {
@@ -108,8 +105,8 @@ impl RenderOutputTarget {
                     source,
                 })?;
                 if !metadata.is_file() {
-                    return Err(CoreError::Config(format!(
-                        "Render output target is not a regular file: {}",
+                    return Err(CoreError::OutputInvalid(format!(
+                        "The selected output is not a file: {}",
                         path.display()
                     )));
                 }
@@ -121,7 +118,7 @@ impl RenderOutputTarget {
                         path: path.clone(),
                         source,
                     })?;
-                Ok(Self { path, kind })
+                Ok(Self { path })
             }
             Err(source) => Err(CoreError::OutputIo { path, source }),
         }
@@ -136,10 +133,6 @@ impl RenderOutputTarget {
             .file_name()
             .and_then(|value| value.to_str())
             .expect("RenderOutputTarget always has a Unicode filename")
-    }
-
-    pub fn kind(&self) -> RenderOutputKind {
-        self.kind
     }
 }
 

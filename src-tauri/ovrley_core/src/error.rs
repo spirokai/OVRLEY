@@ -44,6 +44,9 @@ pub enum CoreError {
     #[error("Output already exists: {0}")]
     OutputExists(String),
 
+    #[error("Invalid output: {0}")]
+    OutputInvalid(String),
+
     #[error("IO error at {path}: {source}")]
     OutputIo {
         path: PathBuf,
