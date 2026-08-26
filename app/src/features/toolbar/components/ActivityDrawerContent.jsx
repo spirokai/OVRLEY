@@ -1,29 +1,13 @@
-import { Activity, Database, FileUp, Route, Sparkles, Trash2 } from 'lucide-react'
-import { createPortal } from 'react-dom'
+import { Activity, Database, Route, Sparkles, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { cn } from '@/lib/utils'
-import { useActivityDropZone } from '../hooks/useActivityDropZone'
+import { useFileDropZone } from '../hooks/useFileDropZone'
 import { buildActivityDrawerViewModel } from '../utils/activityDrawerUtils'
-
-function FileDragCursor({ position }) {
-  if (!position) return null
-
-  return createPortal(
-    <div
-      aria-hidden="true"
-      className="cursor-pointer fixed z-1000 flex h-14 w-14 -translate-x-2 -translate-y-2 items-center justify-center rounded-md border-2 border-card bg-foreground text-card shadow-2xl"
-      style={{ left: position.x, top: position.y }}
-    >
-      <FileUp className="h-10 w-10" strokeWidth={1.5} />
-    </div>,
-    document.body,
-  )
-}
+import { FileDragCursor, FileDropZone } from './FileDropZone'
 
 function MetricGrid({ metrics, emptyLabel }) {
-  if (metrics.length === 0) return <p className="text-[0.7rem] text-muted-foreground/70">{emptyLabel}</p>
+  if (metrics.length === 0) return <p className="text-[0.7rem] text-muted-foreground/90 px-2">{emptyLabel}</p>
 
   return (
     <div className="grid grid-cols-2 gap-1.5">
@@ -52,7 +36,7 @@ function MetricGrid({ metrics, emptyLabel }) {
  * @returns {JSX.Element} Rendered drawer content.
  */
 export function ActivityDrawerContent({ activitySummary, filename, onBrowseActivity, onDeleteActivity, onDropActivityFiles }) {
-  const { dragPosition, dropZoneProps, dropZoneRef, isDraggingFile, isOverDropZone } = useActivityDropZone(onDropActivityFiles)
+  const { dragPosition, dropZoneProps, dropZoneRef, isDraggingFile, isOverDropZone } = useFileDropZone(onDropActivityFiles)
   const drawerViewModel = activitySummary ? buildActivityDrawerViewModel(activitySummary) : null
   const displayFilename = filename ?? activitySummary?.fileName
 
@@ -65,18 +49,13 @@ export function ActivityDrawerContent({ activitySummary, filename, onBrowseActiv
         Load activity
       </Button>
 
-      <div
-        ref={dropZoneRef}
-        className={cn(
-          'relative mt-4 flex min-h-24 shrink-0 flex-col items-center justify-center rounded-xs border border-dashed border-border/80 bg-surface px-4 text-center transition-colors',
-          isOverDropZone && 'border-primary bg-surface-accent-soft/30',
-        )}
-        {...dropZoneProps}
-      >
-        <FileUp className={cn('mb-2 h-5 w-5 text-muted-foreground', isOverDropZone && 'text-primary')} />
-        <p className="text-xs font-extrabold text-foreground">Drop activity file</p>
-        <p className="mt-1 text-[0.75rem] leading-tight text-muted-foreground">GPX, FIT, SRT, IGC, CSV, VBO</p>
-      </div>
+      <FileDropZone
+        dropZoneRef={dropZoneRef}
+        dropZoneProps={dropZoneProps}
+        isOverDropZone={isOverDropZone}
+        label="Drop activity file"
+        sublabel="GPX, FIT, SRT, IGC, CSV, VBO"
+      />
 
       {drawerViewModel ? (
         <div className="mt-10 space-y-8 border-t border-border/80 pt-2">
@@ -110,7 +89,7 @@ export function ActivityDrawerContent({ activitySummary, filename, onBrowseActiv
               }
               variant="drawer"
             />
-            <dl className="grid grid-cols-2 gap-x-4.5 gap-y-2 px-2 text-xs">
+            <dl className="grid grid-cols-2 gap-x-4.5 gap-y-1.5 px-2 text-xs">
               {drawerViewModel.metadataRows.map((row) => (
                 <div key={row.label} className="contents">
                   <dt className="font-bold text-muted-foreground">{row.label}</dt>

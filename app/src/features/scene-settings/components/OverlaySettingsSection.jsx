@@ -27,7 +27,7 @@ import { Label } from '@/components/ui/label'
 import { BlurInput } from '@/components/ui/blur-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Video, Gauge } from 'lucide-react'
+import { Video, Gauge, Bell } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ExportRangeSettings } from '@/features/render-video'
 import { ASPECT_RATIOS, RESOLUTIONS } from '../data/sceneSettingsConstants'
@@ -49,6 +49,7 @@ export default function OverlaySettingsSection({
   activitySummary,
   exportRange,
   onExportRangeChange,
+  videoResolutionMismatch,
 }) {
   return (
     <>
@@ -147,6 +148,13 @@ export default function OverlaySettingsSection({
           </div>
         )}
       </div>
+
+      {videoResolutionMismatch && (
+        <div className="flex gap-2 items-center rounded-sm bg-amber-500/15 p-2 pl-4 text-amber-400">
+          <Bell className="h-3 w-3 shrink-0" />
+          <p className="text-[0.65rem] font-semibold leading-tight">Overlay and video resolutions do not match</p>
+        </div>
+      )}
 
       <div className="space-y-3 rounded-xs border-none bg-surface-accent-soft/70 p-4">
         <div className="flex items-center justify-between">

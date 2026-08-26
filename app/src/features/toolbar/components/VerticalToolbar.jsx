@@ -1,11 +1,11 @@
 import { Activity, Blocks, Film } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
-import { ACTIVITY_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
+import { ACTIVITY_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 
 const TOOLS = [
   { id: ACTIVITY_TOOL, label: 'Activity', icon: Activity },
-  { id: 'VIDEO_TOOL', label: 'Video', icon: Film },
+  { id: VIDEO_TOOL, label: 'Video', icon: Film },
   {
     id: WIDGETS_TOOL,
     label: 'Widgets',
@@ -28,8 +28,7 @@ export function VerticalToolbar({ activeTool, drawerVisible, width, onSelectTool
     <div className="z-70 flex h-full shrink-0 flex-col items-center border-r border-border bg-card py-4 gap-2" style={{ width }}>
       {TOOLS.map((tool) => {
         const Icon = tool.icon
-        const selected = drawerVisible && activeTool === tool.label
-
+        const selected = drawerVisible && activeTool === tool.id
         return (
           <SimpleTooltip key={tool.id} side="right" content={tool.label}>
             <Button

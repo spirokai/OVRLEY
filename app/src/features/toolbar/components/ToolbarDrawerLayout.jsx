@@ -2,7 +2,7 @@ import { Pin, PinOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { VerticalToolbar } from './VerticalToolbar'
 
-const DRAWER_WIDTH = '20rem'
+const DRAWER_WIDTH = '22rem'
 const TOOLBAR_WIDTH = '3rem'
 
 /**

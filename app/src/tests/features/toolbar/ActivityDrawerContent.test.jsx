@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 
-vi.mock('@/features/toolbar/hooks/useActivityDropZone', () => ({
-  useActivityDropZone: () => ({
+vi.mock('@/features/toolbar/hooks/useFileDropZone', () => ({
+  useFileDropZone: () => ({
     dragPosition: null,
     dropZoneRef: { current: null },
     isDraggingFile: false,
@@ -76,7 +76,7 @@ describe('ActivityDrawerContent', () => {
     expect(screen.getByText('Location')).toBeInTheDocument()
     expect(screen.queryByText('G Force X')).not.toBeInTheDocument()
     expect(screen.getByText('Gradient')).toBeInTheDocument()
-    expect(screen.getAllByText('Speed')).toHaveLength(2)
+    expect(screen.getByText('Speed')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete activity' }))
     expect(onDeleteActivity).toHaveBeenCalledOnce()

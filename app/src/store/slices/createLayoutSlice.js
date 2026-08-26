@@ -1,4 +1,5 @@
 export const ACTIVITY_TOOL = 'activity'
+export const VIDEO_TOOL = 'video'
 export const WIDGETS_TOOL = 'widgets'
 
 /**

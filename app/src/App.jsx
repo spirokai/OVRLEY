@@ -10,8 +10,8 @@ import { OverlayEditor } from '@/features/overlay-editor'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
 import { WidgetDrawerContent } from '@/features/widget-drawer'
-import { ActivityDrawerContent, ToolbarDrawerLayout, useToolbarDrawer } from '@/features/toolbar'
-import { ACTIVITY_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
+import { ActivityDrawerContent, ToolbarDrawerLayout, useToolbarDrawer, VideoDrawerContent, useVideoSyncControls } from '@/features/toolbar'
+import { ACTIVITY_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 import { NewTemplateConfirmDialog } from '@/features/template-manager'
 import { UpdatePromptDialog } from '@/features/app-update'
 import { AppHeader, ControlPanel, ErrorAlert, KeyboardShortcutsDialog, LoadingOverlay, useAppShellComposition } from '@/features/app-shell'
@@ -61,6 +61,7 @@ function AppShell() {
     widgetLiveEdits,
   } = useAppShellComposition()
   const toolbarDrawer = useToolbarDrawer(layout)
+  const videoSync = useVideoSyncControls()
   const { config, globalDefaults, importingVideo, isProcessing, setConfig } = appShell
   let drawerContent = null
 
@@ -73,6 +74,16 @@ function AppShell() {
           onBrowseActivity={activityImport.handleActivityFileOpen}
           onDeleteActivity={activityImport.deleteActivity}
           onDropActivityFiles={activityImport.handleActivityFilesDrop}
+        />
+      )
+    } else if (toolbarDrawer.activeTool === VIDEO_TOOL) {
+      drawerContent = (
+        <VideoDrawerContent
+          videoSummary={videoControls.videoSummary}
+          onBrowseVideo={videoControls.handleImportVideo}
+          onDeleteVideo={videoControls.clearImportedVideo}
+          onDropVideoFiles={videoControls.handleVideoFilesDrop}
+          videoSync={videoSync}
         />
       )
     } else if (toolbarDrawer.activeTool === WIDGETS_TOOL) {

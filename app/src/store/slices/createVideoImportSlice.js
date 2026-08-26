@@ -290,7 +290,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (!timezone) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Activity timezone is required for video sync',
+          videoSyncWarning: 'timezone is required for video sync',
           videoSyncTimezoneMode: null,
         }
       }

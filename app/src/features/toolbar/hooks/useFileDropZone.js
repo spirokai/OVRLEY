@@ -9,12 +9,12 @@ function isPositionInsideElement(element, x, y) {
 }
 
 /**
- * Owns browser and native desktop drag/drop state for an activity drop target.
+ * Owns browser and native desktop drag/drop state for a generic file drop target.
  *
  * @param {(selections: Array<File|string>) => void} onDropFiles - Receives dropped browser files or native paths.
  * @returns {{dragPosition: {x: number, y: number}|null, dropZoneRef: React.RefObject, isDraggingFile: boolean, isOverDropZone: boolean, dropZoneProps: object}} Drop-zone presentation state and event props.
  */
-export function useActivityDropZone(onDropFiles) {
+export function useFileDropZone(onDropFiles) {
   const dropZoneRef = useRef(null)
   const [dragPosition, setDragPosition] = useState(null)
   const [isDraggingFile, setIsDraggingFile] = useState(false)
@@ -89,7 +89,7 @@ export function useActivityDropZone(onDropFiles) {
         else unlisten = stopListening
       })
       .catch((error) => {
-        console.error('Failed to register native activity drop zone:', error)
+        console.error('Failed to register native file drop zone:', error)
       })
 
     return () => {
