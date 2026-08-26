@@ -5,9 +5,9 @@
 import { useCallback, useId, useMemo, useState } from 'react'
 import { Video } from 'lucide-react'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
-import { formatTimelineTime } from '../utils/playerTiming'
+import { formatClockDuration } from '@/lib/time-format'
 import { getClipGeometry, getExportRangeHighlightGeometry } from '../utils/timelineGeometry'
-import { TYPE_LABELS } from '@/lib/widget/widget-icons'
+import { getActivityAttributeLabel } from '@/lib/widget/widget-icons'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
 const CLIP_SOURCE_COLUMN_WIDTH = '3rem'
@@ -99,8 +99,9 @@ export default function useTimelineClips({
 
     // Activity lane - always starts at zero and uses activity metadata for label/duration.
     if (hasActivity) {
-      const allAvailable = [...(activitySummary?.validAttributes || []), ...(activitySummary?.extendedAttributes || [])]
-      const availableMetrics = allAvailable.filter((type) => type in TYPE_LABELS).map((type) => TYPE_LABELS[type] || type)
+      const availableMetrics = activitySummary.availableMetrics
+        .map((metric) => getActivityAttributeLabel(metric.attribute))
+        .sort((left, right) => left.localeCompare(right))
 
       laneInputs.push({
         ariaLabel: 'Activity clip lane',
@@ -188,7 +189,7 @@ export default function useTimelineClips({
           left: widthPx > 0 ? `${(geometry.x / widthPx) * 100}%` : '0%',
           width: widthPx > 0 ? `${(geometry.width / widthPx) * 100}%` : '0%',
         },
-        durationLabel: formatTimelineTime(lane.durationSeconds),
+        durationLabel: formatClockDuration(lane.durationSeconds),
         highlightStyle:
           highlight?.isVisible === true
             ? {

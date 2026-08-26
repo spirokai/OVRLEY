@@ -46,6 +46,8 @@ export function useActivityStore() {
     useShallow((state) => ({
       activitySummary: state.activitySummary,
       activityFilename: state.activityFilename,
+      clearActivityFile: state.clearActivityFile,
+      parsedActivitySource: state.parsedActivitySource,
       setErrorMessage: state.setErrorMessage,
       setProcessing: state.setProcessing,
     })),

@@ -128,16 +128,20 @@ export function createMediaSlice(set, get) {
       let summary = null
       if (activity) {
         summary = {
+          availableMetrics: [...activity.valid_attributes, ...activity.extended_attributes].map((attribute) => ({
+            attribute,
+            source: activity.coverage[attribute].source,
+          })),
           durationSeconds: getDurationSeconds(activity),
           endTime: activity.metadata?.end_time ?? null,
-          extendedAttributes: activity.extended_attributes || [],
-          fileFormat: activity.file_format || null,
-          fileName: activity.file_name || null,
+          fileFormat: activity.file_format,
+          fileName: activity.file_name,
+          originalSampleCount: activity.metadata?.original_sample_count ?? null,
           sampleCount: activity.metadata?.sample_count ?? 0,
+          sport: activity.metadata?.sport ?? null,
           syncTime: activity.sync_time ?? null,
           timezone: activity.metadata?.timezone ?? null,
           totalDistanceMeters: activity.metadata?.total_distance_m ?? 0,
-          validAttributes: activity.valid_attributes || [],
         }
       }
 

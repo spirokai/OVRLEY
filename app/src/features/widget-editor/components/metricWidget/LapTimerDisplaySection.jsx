@@ -1,7 +1,8 @@
 import { Type } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
+import { SectionHeading } from '@/components/ui/section-heading'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
-import { FontSection, SectionHeading } from '../widgetEditorSections'
+import { FontSection } from '../widgetEditorSections'
 import { ColorField, SelectField, SizeSlider, TextField, ToggleField } from '../widgetFormControls'
 import { LAP_TIMER_MODES } from '@/lib/widget/standard-widgets'
 

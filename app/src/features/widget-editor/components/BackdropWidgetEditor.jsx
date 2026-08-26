@@ -2,8 +2,8 @@ import { Palette, Shapes } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 import { getBackdropTypeOptions } from '@/lib/widget/standard-widgets'
 import { initBackdropVariant } from '@/lib/widget/widget-resolver'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { parseInteger } from '../utils/widgetUtils'
-import { SectionHeading } from './widgetEditorSections'
 import { ColorField, NumberField, SelectField, SliderField } from './widgetFormControls'
 
 const RECTANGLE_CORNERS = [

@@ -3,8 +3,9 @@
  */
 
 import { Map, Palette } from 'lucide-react'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
-import { DimensionsSection, SectionHeading } from './widgetEditorSections'
+import { DimensionsSection } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 import { Label } from '@/components/ui/label'
 

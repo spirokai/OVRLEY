@@ -70,6 +70,22 @@ export const TYPE_LABELS = {
   ...STANDARD_METRIC_TYPE_LABELS,
 }
 
+/**
+ * Returns the canonical UI label for an available activity attribute.
+ * Attributes without a widget definition remain visible with a human-readable
+ * form of their backend identifier.
+ *
+ * @param {string} type - Canonical activity attribute identifier.
+ * @returns {string} Activity attribute label.
+ */
+export function getActivityAttributeLabel(type) {
+  if (TYPE_LABELS[type]) return TYPE_LABELS[type]
+
+  const words = []
+  for (const part of type.split('_')) words.push(part === 'gps' ? 'GPS' : part.charAt(0).toUpperCase() + part.slice(1))
+  return words.join(' ')
+}
+
 // Labels for the widget drawer, which may be shorter than the general labels
 
 export const WIDGET_DRAWER_LABELS = {

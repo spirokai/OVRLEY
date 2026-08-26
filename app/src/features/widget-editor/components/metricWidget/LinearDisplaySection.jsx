@@ -1,4 +1,4 @@
-import { SectionHeading } from '../widgetEditorSections'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { ToggleField, SelectField, SizeSlider, SliderField, ColorField } from '../widgetFormControls'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { useMemo } from 'react'

@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
 import { CircleGauge, Type } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widgetResizeScaling'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
-import { SectionHeading } from '../widgetEditorSections'
 import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
 
 /** Standard controls for G-force geometry, paint, marker, and label styling. */

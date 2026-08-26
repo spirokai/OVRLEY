@@ -261,8 +261,9 @@ fn finalize_columns_with_debug(
         &columns.options.smoothing,
     );
 
-    let coverage = build_metric_coverage(&metric_series_map);
-    let valid_attributes = build_valid_attributes(&coverage, &course_series, &time_series);
+    let mut coverage = build_metric_coverage(&metric_series_map);
+    insert_core_attribute_coverage(&mut coverage, &course_series, &time_series);
+    let valid_attributes = build_valid_attributes(&coverage);
     let extended_attributes = build_extended_attributes(&coverage);
     let duration_seconds = elapsed_series.last().copied().unwrap_or(0.0);
     let total_distance_meters = distance_series.last().copied().flatten().unwrap_or(0.0);
@@ -706,33 +707,40 @@ fn build_elapsed_series(columns: &ActivityColumns, time_series: &[Option<String>
 
 /// Computes the primary attribute list expected by legacy UI consumers.
 ///
-/// Course and time are structural series rather than metric descriptors, so they
-/// are checked directly; numeric attributes use the derived metric map to reflect
-/// both direct and fallback-derived availability.
-fn build_valid_attributes(
-    coverage: &BTreeMap<String, MetricCoverage>,
-    course_series: &[(Option<f64>, Option<f64>)],
-    time_series: &[Option<String>],
-) -> Vec<String> {
+/// Structural and numeric attributes share the same coverage contract by this
+/// stage, so advertised availability has one authoritative appraisal.
+fn build_valid_attributes(coverage: &BTreeMap<String, MetricCoverage>) -> Vec<String> {
     CORE_ACTIVITY_ATTRIBUTES
         .iter()
-        .filter(|attribute| {
-            let key = **attribute;
-            if key == "course" || key == "gps_coordinates" {
-                return course_series
-                    .iter()
-                    .any(|(lat, lon)| lat.is_some() && lon.is_some());
-            }
-            if key == "time" {
-                return time_series.iter().any(Option::is_some);
-            }
-            if key == "altitude" {
-                return coverage["elevation"].is_available();
-            }
-            coverage[key].is_available()
-        })
+        .filter(|attribute| coverage[**attribute].is_available())
         .map(|value| (*value).to_string())
         .collect()
+}
+
+/// Adds coverage for core widget attributes represented by structural series or
+/// an existing canonical metric. This keeps availability and provenance in one
+/// backend-owned contract for every advertised attribute.
+fn insert_core_attribute_coverage(
+    coverage: &mut BTreeMap<String, MetricCoverage>,
+    course_series: &[(Option<f64>, Option<f64>)],
+    time_series: &[Option<String>],
+) {
+    let coordinate_count = course_series
+        .iter()
+        .filter(|(latitude, longitude)| latitude.is_some() && longitude.is_some())
+        .count();
+    let coordinate_coverage =
+        MetricCoverage::from_direct_presence(coordinate_count, course_series.len());
+    coverage.insert("course".to_string(), coordinate_coverage.clone());
+    coverage.insert("gps_coordinates".to_string(), coordinate_coverage);
+
+    let time_count = time_series.iter().filter(|value| value.is_some()).count();
+    coverage.insert(
+        "time".to_string(),
+        MetricCoverage::from_direct_presence(time_count, time_series.len()),
+    );
+
+    coverage.insert("altitude".to_string(), coverage["elevation"].clone());
 }
 
 /// Computes optional metric attributes from populated finalized series.

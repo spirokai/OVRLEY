@@ -2,6 +2,8 @@
  * Pure helper functions for scene settings — sanitization and time parsing.
  */
 
+import { formatZonedDateTime } from '@/lib/time-format'
+
 export { timeToSeconds } from '@/features/overlay-editor/utils/exportRange'
 
 export function sanitizeNumber(val) {
@@ -74,21 +76,7 @@ export function formatVideoCreationTime(timestamp, source, timezone, timezoneMod
   if (!timestamp) return 'Unknown'
 
   if ((source === 'gps' || ((source === 'ffprobe' || source === 'filename') && timezoneMode === 'utc')) && timezone) {
-    const date = new Date(timestamp)
-    const parts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: timezone,
-      calendar: 'gregory',
-      numberingSystem: 'latn',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hourCycle: 'h23',
-    }).formatToParts(date)
-    const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
-    return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`
+    return formatZonedDateTime(timestamp, timezone)
   }
 
   return timestamp

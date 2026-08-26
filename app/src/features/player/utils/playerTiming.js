@@ -3,26 +3,6 @@
  */
 
 /**
- * Formats a timeline second value as a clock label.
- *
- * @param {number} value Timeline second value.
- * @returns {string} Timeline label in mm:ss or h:mm:ss format.
- */
-export function formatTimelineTime(value) {
-  const sign = value < 0 ? '-' : ''
-  const safeValue = Math.floor(Math.abs(value))
-  const hours = Math.floor(safeValue / 3600)
-  const minutes = Math.floor((safeValue % 3600) / 60)
-  const seconds = safeValue % 60
-
-  if (hours > 0) {
-    return `${sign}${[hours, minutes, seconds].map((part, index) => String(part).padStart(index === 0 ? 1 : 2, '0')).join(':')}`
-  }
-
-  return `${sign}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-}
-
-/**
  * Snaps a timeline timestamp to the nearest source-video frame.
  *
  * @param {number} second Timeline timestamp in seconds.

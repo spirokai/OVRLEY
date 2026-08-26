@@ -80,4 +80,14 @@ describe('useActivityImport native picker boundary', () => {
 
     expect(setErrorMessage).toHaveBeenCalledWith("Activity selection failed: CSV import 'broken.csv': CSV row 3 canonical time must not decrease")
   })
+
+  test('routes a dropped native VBO path through the same import boundary', async () => {
+    const { default: useActivityImport } = await import('@/features/app-shell/hooks/useActivityImport')
+    const { result } = renderHook(() => useActivityImport())
+
+    await act(() => result.current.handleActivityFilesDrop(['C:\\activities\\session.vbo']))
+
+    expect(importVboActivityPath.mock.calls[0][0]).toBe('C:\\activities\\session.vbo')
+    expect(importActivityFile).not.toHaveBeenCalled()
+  })
 })

@@ -1,16 +1,17 @@
 import { useEffect, useRef } from 'react'
 import { useLayoutStore } from '@/hooks/useAppStoreSelectors'
 import { getPreference, setPreference } from '@/lib/preferences-store'
-import { WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
+import { ACTIVITY_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 
 const PREFERENCE_KEY = 'leftDrawer'
 const DEFAULT_PREFERENCE = Object.freeze({
   pinned: false,
   activeTool: WIDGETS_TOOL,
 })
+const PERSISTABLE_TOOLS = new Set([ACTIVITY_TOOL, WIDGETS_TOOL])
 
 function normalizePreference(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || typeof value.pinned !== 'boolean' || value.activeTool !== WIDGETS_TOOL) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || typeof value.pinned !== 'boolean' || !PERSISTABLE_TOOLS.has(value.activeTool)) {
     return { ...DEFAULT_PREFERENCE }
   }
 

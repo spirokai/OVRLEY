@@ -4,7 +4,8 @@
 
 import { ColorField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
 import { Label } from '@/components/ui/label'
-import { FontSection, SectionHeading, UnitsControlRow } from './widgetEditorSections'
+import { SectionHeading } from '@/components/ui/section-heading'
+import { FontSection, UnitsControlRow } from './widgetEditorSections'
 import { TrendingUp } from 'lucide-react'
 import { getThemeColor } from '@/lib/theme'
 

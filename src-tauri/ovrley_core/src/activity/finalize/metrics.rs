@@ -50,6 +50,8 @@ pub struct MetricCoverage {
     #[serde(skip_serializing_if = "is_zero")]
     nonzero_count: usize,
     total_samples: usize,
+    #[serde(skip)]
+    has_usable_values: bool,
 }
 
 fn is_zero(value: &usize) -> bool {
@@ -57,6 +59,20 @@ fn is_zero(value: &usize) -> bool {
 }
 
 impl MetricCoverage {
+    pub(super) fn from_direct_presence(available_count: usize, total_samples: usize) -> Self {
+        Self {
+            source: if available_count > 0 {
+                MetricSource::Direct
+            } else {
+                MetricSource::Missing
+            },
+            available_count,
+            nonzero_count: 0,
+            total_samples,
+            has_usable_values: available_count > 0,
+        }
+    }
+
     fn from_series<T>(series: &[Option<T>], source: MetricSource) -> Self {
         let available_count = series.iter().filter(|value| value.is_some()).count();
         Self {
@@ -64,6 +80,7 @@ impl MetricCoverage {
             available_count,
             nonzero_count: available_count,
             total_samples: series.len(),
+            has_usable_values: available_count > 0,
         }
     }
 
@@ -80,6 +97,7 @@ impl MetricCoverage {
                     available_count,
                     nonzero_count,
                     total_samples: series.len(),
+                    has_usable_values: nonzero_count > 0,
                 }
             }
             MetricSeries::Gear(series) => Self::from_series(series, descriptor.source),
@@ -87,7 +105,7 @@ impl MetricCoverage {
     }
 
     pub fn is_available(&self) -> bool {
-        self.nonzero_count > 0
+        self.has_usable_values
     }
 }
 

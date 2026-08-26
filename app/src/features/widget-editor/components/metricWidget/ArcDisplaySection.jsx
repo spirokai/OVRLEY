@@ -8,9 +8,10 @@ import {
   getStandardMetricUnitsMode,
 } from '@/lib/widget/standard-metrics'
 import FontSelectField from '@/components/ui/font-select-field'
+import { SectionHeading } from '@/components/ui/section-heading'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
-import { FontSection, SectionHeading, UnitsControlRow } from '../widgetEditorSections'
+import { FontSection, UnitsControlRow } from '../widgetEditorSections'
 import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
 import { getArcGaugeLayout, getCornerGaugeLayout } from '@/features/widget-preview/widgets/arc-gauge/geometry'

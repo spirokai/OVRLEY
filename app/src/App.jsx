@@ -10,8 +10,8 @@ import { OverlayEditor } from '@/features/overlay-editor'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
 import { WidgetDrawerContent } from '@/features/widget-drawer'
-import { ToolbarDrawerLayout, useToolbarDrawer } from '@/features/toolbar'
-import { WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
+import { ActivityDrawerContent, ToolbarDrawerLayout, useToolbarDrawer } from '@/features/toolbar'
+import { ACTIVITY_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 import { NewTemplateConfirmDialog } from '@/features/template-manager'
 import { UpdatePromptDialog } from '@/features/app-update'
 import { AppHeader, ControlPanel, ErrorAlert, KeyboardShortcutsDialog, LoadingOverlay, useAppShellComposition } from '@/features/app-shell'
@@ -62,6 +62,23 @@ function AppShell() {
   } = useAppShellComposition()
   const toolbarDrawer = useToolbarDrawer(layout)
   const { config, globalDefaults, importingVideo, isProcessing, setConfig } = appShell
+  let drawerContent = null
+
+  if (toolbarDrawer.renderDrawerContent) {
+    if (toolbarDrawer.activeTool === ACTIVITY_TOOL) {
+      drawerContent = (
+        <ActivityDrawerContent
+          activitySummary={activityImport.activitySummary}
+          filename={activityImport.activityFilename}
+          onBrowseActivity={activityImport.handleActivityFileOpen}
+          onDeleteActivity={activityImport.deleteActivity}
+          onDropActivityFiles={activityImport.handleActivityFilesDrop}
+        />
+      )
+    } else if (toolbarDrawer.activeTool === WIDGETS_TOOL) {
+      drawerContent = <WidgetDrawerContent widgetLiveEdits={widgetLiveEdits} />
+    }
+  }
 
   if (!toolbarDrawer.initialized) {
     return (
@@ -113,11 +130,7 @@ function AppShell() {
 
         <ToolbarDrawerLayout
           {...toolbarDrawer}
-          drawerContent={
-            toolbarDrawer.renderDrawerContent && toolbarDrawer.activeTool === WIDGETS_TOOL ? (
-              <WidgetDrawerContent widgetLiveEdits={widgetLiveEdits} />
-            ) : null
-          }
+          drawerContent={drawerContent}
           workspace={
             <>
               <LoadingOverlay

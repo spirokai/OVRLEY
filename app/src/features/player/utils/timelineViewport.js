@@ -3,7 +3,8 @@
  */
 
 import { clamp } from '@/lib/utils'
-import { formatTimelineTime, getTimelineMinimum } from './playerTiming'
+import { formatClockDuration } from '@/lib/time-format'
+import { getTimelineMinimum } from './playerTiming'
 import { secondsToViewPx } from './timelineGeometry'
 
 const VIEWPORT_MATCH_EPSILON_SECONDS = 0.001
@@ -237,7 +238,7 @@ function formatTickLabel(second, step) {
   if (step < 1) {
     return `${second.toFixed(1)}s`
   }
-  return formatTimelineTime(second)
+  return formatClockDuration(second)
 }
 
 /**

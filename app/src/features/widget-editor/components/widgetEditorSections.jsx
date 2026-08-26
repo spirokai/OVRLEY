@@ -4,34 +4,13 @@
  */
 
 import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
-import { Separator } from '@/components/ui/separator'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { ColorField, NumberField, SelectField, SizeSlider, SliderField, TextField, TIME_FORMATS, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { createFontSelection } from '@/lib/fonts'
 import { getWidgetFont } from '../utils/widgetUtils'
 import { getThemeColor } from '@/lib/theme'
-
-/**
- * Renders the section heading component.
- *
- * @param {object} props - Component props.
- * @param {*} props.icon - Value for icon.
- * @param {*} props.title - Value for title.
- * @returns {JSX.Element} Rendered component output.
- */
-export function SectionHeading({ icon: Icon, title, trailing = null }) {
-  return (
-    <div className="flex w-full items-center gap-3">
-      <div className="flex min-w-0 flex-1 items-center gap-2 pt-3 pb-3">
-        <Icon className="h-3.5 w-3.5 text-primary" />
-        <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</h5>
-        <Separator className="flex-1" />
-      </div>
-      {trailing ? <div className="shrink-0">{trailing}</div> : null}
-    </div>
-  )
-}
 
 /**
  * Renders the position section component.

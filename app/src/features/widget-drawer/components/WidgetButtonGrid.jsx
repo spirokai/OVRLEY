@@ -36,12 +36,13 @@ function WidgetButton({ item, onClick, isAvailable }) {
  *
  * @param {object} props
  * @param {(request: {type: string, displayType?: string, lapTimerMode?: string}) => void} props.onAddWidget - Called with a canonical creation request.
- * @param {string[]} [props.validAttributes] — Core metric attribute names available in the loaded activity.
- * @param {string[]} [props.extendedAttributes] — Extended metric attribute names available in the loaded activity.
+ * @param {Array<{attribute: string, source: string}>} props.availableMetrics - Canonical available activity metrics.
  * @returns {JSX.Element} Rendered React element.
  */
-export function WidgetButtonGrid({ onAddWidget, validAttributes = [], extendedAttributes = [] }) {
-  const availableSet = new Set(['label', 'backdrop', ...(validAttributes || []), ...(extendedAttributes || [])])
+export function WidgetButtonGrid({ onAddWidget, availableMetrics }) {
+  const availableAttributes = new Set(availableMetrics.map((metric) => metric.attribute))
+  availableAttributes.add('label')
+  availableAttributes.add('backdrop')
 
   return (
     <div className="flex-1 overflow-y-auto thin-scrollbar pl-2 pr-1">
@@ -50,7 +51,7 @@ export function WidgetButtonGrid({ onAddWidget, validAttributes = [], extendedAt
           <div className="text-[0.7rem] font-bold uppercase tracking-wider text-muted-foreground/60 px-1 mb-1.5">{group.category}</div>
           <div className="grid grid-cols-4 gap-1">
             {group.items.map((item) => (
-              <WidgetButton key={item.type} item={item} onClick={onAddWidget} isAvailable={availableSet.has(item.type)} />
+              <WidgetButton key={item.type} item={item} onClick={onAddWidget} isAvailable={availableAttributes.has(item.type)} />
             ))}
           </div>
         </div>

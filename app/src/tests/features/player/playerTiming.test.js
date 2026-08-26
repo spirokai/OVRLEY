@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
+import { formatClockDuration } from '@/lib/time-format'
 import {
   createPlaybackAnchor,
-  formatTimelineTime,
   getTimelineMinimum,
   getTimelinePlaybackSecond,
   getTotalPlaybackDuration,
@@ -11,9 +11,9 @@ import {
 
 describe('playerTiming utilities', () => {
   test('formats timeline seconds as mm:ss or h:mm:ss labels', () => {
-    expect(formatTimelineTime(65)).toBe('01:05')
-    expect(formatTimelineTime(-65)).toBe('-01:05')
-    expect(formatTimelineTime(3661)).toBe('1:01:01')
+    expect(formatClockDuration(65)).toBe('01:05')
+    expect(formatClockDuration(-65)).toBe('-01:05')
+    expect(formatClockDuration(3661)).toBe('1:01:01')
     expect(snapTimelineSecondToFrame(12.38, 30, 5.25)).toBeCloseTo(12.3833333333)
   })
 

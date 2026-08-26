@@ -1,9 +1,9 @@
 import { CircleGauge } from 'lucide-react'
 import { Label } from '@/components/ui/label'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import useDisplayVariantUpdater from '../hooks/useDisplayVariantUpdater'
-import { SectionHeading } from './widgetEditorSections'
 import GForceDisplaySection from './metricWidget/GForceDisplaySection'
 
 const AXES = [

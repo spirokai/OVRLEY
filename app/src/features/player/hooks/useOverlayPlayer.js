@@ -5,9 +5,10 @@
 import { useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { hasOpenOverlay, isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
+import { formatClockDuration } from '@/lib/time-format'
 import { videoOverlapsActivity } from '@/lib/video-timing'
 import useStore from '@/store/useStore'
-import { formatTimelineTime, snapTimelineSecondToFrame } from '../utils/playerTiming'
+import { snapTimelineSecondToFrame } from '../utils/playerTiming'
 import { moveClipOffset, roundToDevicePixel, secondsToViewPx } from '../utils/timelineGeometry'
 
 import useClipDrag from './useClipDrag'
@@ -427,8 +428,8 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
         onClick: viewport.resetView,
       },
       timeLabel: {
-        current: formatTimelineTime(playback.clampedPlayhead),
-        total: formatTimelineTime(playback.totalDuration),
+        current: formatClockDuration(playback.clampedPlayhead),
+        total: formatClockDuration(playback.totalDuration),
       },
       hasVideo,
       isMuted: playerStore.isVideoMuted,

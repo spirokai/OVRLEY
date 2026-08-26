@@ -7,6 +7,10 @@ function renderClips(overrides = {}) {
     initialProps: {
       activityFilename: 'ride.fit',
       activitySummary: {
+        availableMetrics: [
+          { attribute: 'gps_coordinates', source: 'direct' },
+          { attribute: 'barometric_altitude', source: 'direct' },
+        ],
         durationSeconds: 100,
         fileFormat: 'fit',
         fileName: 'activity.fit',
@@ -42,6 +46,7 @@ describe('useTimelineClips', () => {
       durationSeconds: 100,
       formatLabel: 'FIT',
       label: 'ride.fit',
+      availableMetrics: ['Barometric Altitude', 'Location'],
       startSecond: 0,
     })
   })

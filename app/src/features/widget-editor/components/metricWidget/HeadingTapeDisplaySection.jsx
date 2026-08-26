@@ -1,8 +1,8 @@
 import { Compass, Ruler, Type, Target } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
+import { SectionHeading } from '@/components/ui/section-heading'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { ColorField, SizeSlider, SliderField, ToggleField, SelectField } from '../widgetFormControls'
-import { SectionHeading } from '../widgetEditorSections'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { useMemo } from 'react'
 
