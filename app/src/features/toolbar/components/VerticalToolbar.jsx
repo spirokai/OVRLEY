@@ -1,16 +1,16 @@
-import { Blocks, FolderOpen, Activity, Film } from 'lucide-react'
+import { Blocks } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 
 const TOOLS = [
-  {
-    id: 'PROJECTS',
-    label: 'Projects',
-    icon: FolderOpen,
-  },
-  { id: 'ACTIVITY', label: 'Activity', icon: Activity },
-  { id: 'VIDEOS', label: 'Videos', icon: Film },
+  // {
+  //   id: 'PROJECTS',
+  //   label: 'Projects',
+  //   icon: FolderOpen,
+  // },
+  // { id: 'ACTIVITY', label: 'Activity', icon: Activity },
+  // { id: 'VIDEOS', label: 'Videos', icon: Film },
   {
     id: WIDGETS_TOOL,
     label: 'Widgets',
