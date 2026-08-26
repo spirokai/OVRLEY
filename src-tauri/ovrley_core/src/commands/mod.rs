@@ -23,12 +23,13 @@ use crate::encode::pipeline::transparent::{render_video, rendered_frame_count};
 use crate::encode::progress::RenderController;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::{parse_config_json, parse_template_json};
+use crate::output::{RenderOutputKind, RenderOutputTarget};
 use serde::Serialize;
 use serde_json::{json, Value};
 use skia_safe::FontMgr;
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::paths::AppPaths;
@@ -151,12 +152,26 @@ pub fn backend_render(
     controller: &RenderController,
     config_json: &str,
     parsed_activity_json: &str,
+    output_path: &str,
+    overwrite: bool,
 ) -> CoreResult<Value> {
     let config = parse_config_json(config_json)?;
-    let parsed_activity = parse_activity_json(parsed_activity_json)?;
     let validated = crate::normalize::validate_render_config(config)?;
-    if validated.scene.composite_video_path.is_some() {
-        return start_composite_render(paths, controller, validated, parsed_activity);
+    let output_kind = if validated.scene.composite_video_path.is_some() {
+        RenderOutputKind::Composite
+    } else {
+        RenderOutputKind::Transparent
+    };
+    let output_target = RenderOutputTarget::validate(output_path, output_kind, overwrite)?;
+    let parsed_activity = parse_activity_json(parsed_activity_json)?;
+    if output_kind == RenderOutputKind::Composite {
+        return start_composite_render(
+            paths,
+            controller,
+            validated,
+            parsed_activity,
+            output_target,
+        );
     }
 
     let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
@@ -169,6 +184,7 @@ pub fn backend_render(
 
     let controller_clone = controller.clone();
     let paths = paths.clone();
+    let output_target_for_render = output_target.clone();
     std::thread::spawn(move || {
         match render_video(
             &paths,
@@ -176,6 +192,7 @@ pub fn backend_render(
             &parsed_activity,
             &dense_activity,
             &controller_clone,
+            &output_target_for_render,
         ) {
             Ok(filename) => controller_clone.finish_success(filename),
             Err(error) => {
@@ -187,7 +204,8 @@ pub fn backend_render(
 
     Ok(json!({
         "started": true,
-        "render_id": render_id
+        "render_id": render_id,
+        "outputPath": output_target.path()
     }))
 }
 
@@ -237,6 +255,7 @@ fn start_composite_render(
     controller: &RenderController,
     mut validated: crate::normalize::ValidatedRenderConfig,
     parsed_activity: ParsedActivity,
+    output_target: RenderOutputTarget,
 ) -> CoreResult<Value> {
     let activity_end = parsed_activity.trim_end_seconds.max(
         parsed_activity
@@ -257,6 +276,7 @@ fn start_composite_render(
 
     let controller_clone = controller.clone();
     let paths = paths.clone();
+    let output_target_for_render = output_target.clone();
     std::thread::spawn(move || {
         match render_composite_video(
             &paths,
@@ -266,6 +286,7 @@ fn start_composite_render(
             &controller_clone,
             plan,
             true,
+            &output_target_for_render,
         ) {
             Ok(filename) => controller_clone.finish_success(filename),
             Err(error) => {
@@ -277,7 +298,8 @@ fn start_composite_render(
 
     Ok(json!({
         "started": true,
-        "render_id": render_id
+        "render_id": render_id,
+        "outputPath": output_target.path()
     }))
 }
 
@@ -374,10 +396,40 @@ pub fn backend_get_template(paths: &AppPaths, filename: &str) -> CoreResult<Stri
     })
 }
 
-/// Opens the public downloads directory in the system file browser.
-pub fn backend_open_downloads(paths: &AppPaths) -> CoreResult<Value> {
-    open_path_in_system(&paths.downloads_dir)?;
+/// Opens the remembered render output directory, or the platform default.
+pub fn backend_open_output_directory(
+    paths: &AppPaths,
+    directory: Option<&str>,
+) -> CoreResult<Value> {
+    let target = match directory {
+        None => paths.downloads_dir.clone(),
+        Some(directory) => {
+            let path = Path::new(directory);
+            if !path.is_absolute() {
+                return Err(CoreError::Config(format!(
+                    "Render output directory must be absolute: {directory}"
+                )));
+            }
+            if !path.is_dir() {
+                return Err(CoreError::Config(format!(
+                    "Render output directory is not available: {directory}"
+                )));
+            }
+            path.to_path_buf()
+        }
+    };
+    open_path_in_system(&target)?;
     Ok(json!({ "message": "Folder opened" }))
+}
+
+/// Returns a fresh suggested render output path.
+pub fn backend_suggest_output_path(
+    paths: &AppPaths,
+    output_kind: RenderOutputKind,
+    remembered_directory: Option<&str>,
+) -> CoreResult<PathBuf> {
+    let remembered_directory = remembered_directory.map(Path::new);
+    crate::output::suggest_output_path(paths, output_kind, remembered_directory)
 }
 
 /// Opens the user templates directory in the system file browser.
@@ -386,18 +438,16 @@ pub fn backend_open_templates(paths: &AppPaths) -> CoreResult<Value> {
     Ok(json!({ "message": "Folder opened" }))
 }
 
-/// Opens a rendered video from the downloads directory.
-pub fn backend_open_video(paths: &AppPaths, filename: &str) -> CoreResult<Value> {
-    let downloads_path = paths.downloads_dir.join(filename);
-    let target = if downloads_path.is_file() {
-        downloads_path
-    } else {
+/// Opens a rendered video from its accepted absolute path.
+pub fn backend_open_video(output_path: &str) -> CoreResult<Value> {
+    let target = Path::new(output_path);
+    if !target.is_absolute() || !target.is_file() {
         return Err(CoreError::Config(format!(
-            "Video file not found: {filename}"
+            "Video file not found: {output_path}"
         )));
-    };
+    }
 
-    open_path_in_system(&target)?;
+    open_path_in_system(target)?;
     Ok(json!({ "message": "Video opened" }))
 }
 

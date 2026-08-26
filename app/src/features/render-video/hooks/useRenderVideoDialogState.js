@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { cancelRender } from '@/api/backend'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { useFpsMode } from '@/hooks/useFpsMode'
+import { saveSinglePath } from '@/lib/file-dialog'
 import { EXPORT_CODEC_LOOKUP, OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
 import {
   getExportCodecForSelection,
@@ -23,6 +24,7 @@ import {
   getVisibleAccelerationOptions,
   isOutputFormatAvailable,
 } from '../utils/codecUtils'
+import { getRenderOutputExtension } from '../utils/render-output'
 import useRenderVideoDerivedState from './useRenderVideoDerivedState'
 
 function getImportedVideoExportRange(durationSeconds, offsetSeconds) {
@@ -33,8 +35,21 @@ function getImportedVideoExportRange(durationSeconds, offsetSeconds) {
   }
 }
 
-export default function useRenderVideoDialogState({ phase, settings, onSettingsChange, onClose, onConfirm }) {
+export default function useRenderVideoDialogState({
+  phase,
+  settings,
+  onSettingsChange,
+  onClose,
+  onConfirm,
+  outputPathError,
+  overwriteOpen,
+  pendingOverwritePath,
+  onOverwriteConfirm,
+  onOverwriteCancel,
+  submissionPending = false,
+}) {
   const derived = useRenderVideoDerivedState({ settings })
+  const outputPath = settings?.outputPath
   const importedVideoRangePrefilledRef = useRef(false)
   const {
     availableCodecs,
@@ -170,6 +185,21 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     [hasImportedVideo, importedVideoDuration, onSettingsChange, settings?.exportRange, videoSyncOffsetSeconds],
   )
 
+  const handleOutputPathCommit = useCallback(
+    (nextOutputPath = outputPath) => onSettingsChange({ outputPath: nextOutputPath }),
+    [onSettingsChange, outputPath],
+  )
+
+  const handleBrowse = useCallback(async () => {
+    if (!outputPath) {
+      return
+    }
+    const selectedPath = await saveSinglePath(outputPath, getRenderOutputExtension(exportMode))
+    if (selectedPath) {
+      onSettingsChange({ outputPath: selectedPath })
+    }
+  }, [exportMode, onSettingsChange, outputPath])
+
   const handleOutputFormatChange = (value) => {
     const format = OUTPUT_FORMATS_BY_VALUE[value]
     if (!format) {
@@ -232,12 +262,14 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     isOutputFormatAvailable,
     onClose,
     onConfirm,
+    onOverwriteCancel,
+    onOverwriteConfirm,
     onSettingsChange,
     OUTPUT_FORMATS,
     phase,
     platformOs,
     renderProgress,
-    renderStartDisabled,
+    renderStartDisabled: renderStartDisabled || submissionPending || !settings?.outputPath,
     renderingVideo,
     resolutionMismatch,
     selectedAccelerationOptions,
@@ -245,6 +277,12 @@ export default function useRenderVideoDialogState({ phase, settings, onSettingsC
     selectedCodecIsMp4,
     selectedOutputFormatValue,
     settings,
+    handleBrowse,
+    handleOutputPathCommit,
+    outputPathError,
+    overwriteOpen,
+    pendingOverwritePath,
+    submissionPending,
     showExportModeOverride: hasImportedVideo,
     showExportRangeSettings: exportMode !== 'composite',
     updateRateOptions,

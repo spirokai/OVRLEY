@@ -1,22 +1,12 @@
 import { useCallback, useEffect, useEffectEvent } from 'react'
 import { useStore as useZustandStore } from 'zustand'
-import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
+import { hasOpenOverlay, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import useStore from '@/store/useStore'
 import { redoHistory, undoHistory } from '../undoHistory'
 
 function isTextEditingElement(target) {
   if (!(target instanceof Element)) return false
   return Boolean(target.closest('input, textarea, [role="textbox"], [contenteditable="true"]'))
-}
-
-function hasOpenKeyboardOverlay() {
-  if (typeof document === 'undefined') return false
-
-  return Boolean(
-    document.querySelector(
-      '[data-slot="dialog-content"], [data-slot="select-content"], [data-slot="popover-content"], [data-testid="widget-drawer-backdrop"]',
-    ),
-  )
 }
 
 /**
@@ -41,7 +31,7 @@ export default function useUndoRedo({ disabled = false } = {}) {
   }, [disabled])
 
   const onKeyDown = useEffectEvent((event) => {
-    if (disabled || event.defaultPrevented || event.repeat || event.altKey || isTextEditingElement(event.target) || hasOpenKeyboardOverlay()) {
+    if (disabled || event.defaultPrevented || event.repeat || event.altKey || isTextEditingElement(event.target) || hasOpenOverlay()) {
       return
     }
 

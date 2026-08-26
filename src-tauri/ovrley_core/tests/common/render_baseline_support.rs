@@ -22,6 +22,7 @@ use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
 use ovrley_core::encode::pipeline::transparent::{render_video, rendered_frame_count};
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::media::{video_probe::probe_video, SourceVideoMetadata};
+use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::render_preview_to_path;
 use serde::Deserialize;
@@ -253,15 +254,25 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
         .try_start(total_frames, &format!("transparent baseline {}", case.name))
         .context("failed to start transparent render controller")?;
 
-    let filename = render_video(
+    let output_path = runtime
+        .app_paths
+        .downloads_dir
+        .join(format!("custom-{}.mov", case.name));
+    let output_target = RenderOutputTarget::validate(
+        output_path.to_str().unwrap(),
+        RenderOutputKind::Transparent,
+        false,
+    )?;
+    let _filename = render_video(
         &runtime.app_paths,
         &validated,
         &activity,
         &dense_activity,
         &controller,
+        &output_target,
     )
     .context("transparent render failed")?;
-    let output_path = runtime.app_paths.downloads_dir.join(filename);
+    let output_path = output_target.path().to_path_buf();
     assert_nonempty_output(&output_path)?;
 
     let metadata = probe_video(&runtime.app_paths.repo_root, &output_path.to_string_lossy())
@@ -364,7 +375,16 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
         .context("failed to start composite render controller")?;
 
     // ── Phase 5: dispatch composite render through public entry point ──
-    let filename = render_composite_video(
+    let output_path = runtime
+        .app_paths
+        .downloads_dir
+        .join(format!("custom-{}.mp4", case.name));
+    let output_target = RenderOutputTarget::validate(
+        output_path.to_str().unwrap(),
+        RenderOutputKind::Composite,
+        false,
+    )?;
+    let _filename = render_composite_video(
         &runtime.app_paths,
         &validated,
         &activity,
@@ -372,9 +392,10 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
         &controller,
         render_plan,
         true,
+        &output_target,
     )
     .context("composite render failed")?;
-    let output_path = runtime.app_paths.downloads_dir.join(filename);
+    let output_path = output_target.path().to_path_buf();
     assert_nonempty_output(&output_path)?;
 
     // ── Phase 6: validate output metadata and compare decoded frames ──

@@ -107,7 +107,7 @@ export function BlurInput({ value: initialValue, onChange, onBlur, className, ..
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       className={cn(
-        'transition-colors',
+        'border-border/70 transition-colors',
         value !== initialValue && 'border-accent-border bg-surface-accent-soft',
         isNumberInput && 'pr-11 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
         className,

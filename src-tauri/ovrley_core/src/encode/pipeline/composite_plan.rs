@@ -3,11 +3,11 @@
 use std::path::{Path, PathBuf};
 
 use crate::encode::composite::CompositeRenderPlan;
-use crate::encode::debug::video::timestamp_nanos;
 use crate::encode::ffmpeg::catalog::CodecSelection;
 use crate::encode::ffmpeg::composite::{build_composite_ffmpeg_settings, CompositeFfmpegSettings};
 use crate::encode::fps::Fps;
 use crate::error::{CoreError, CoreResult};
+use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
 use crate::render::FrameSize;
 
@@ -225,11 +225,12 @@ impl CompositePipelinePlan {
 /// Frame counts are already fixed by `derive_composite_render_plan`; this phase
 /// adds only process resources that require application paths or source probing.
 pub fn derive_composite_pipeline_plan(
-    paths: &AppPaths,
+    _paths: &AppPaths,
     scene: &crate::normalize::ValidatedSceneConfig,
     render: CompositeRenderPlan,
     include_audio: bool,
     source_rotation_degrees: Option<i32>,
+    output_target: &RenderOutputTarget,
 ) -> CoreResult<CompositePipelinePlan> {
     // —— PHASE 1: VALIDATE & DERIVE TIMING VALUES ——
     let frame_size = FrameSize {
@@ -244,9 +245,7 @@ pub fn derive_composite_pipeline_plan(
         source_rotation_degrees,
     )?;
     // —— PHASE 3: GENERATE OUTPUT FILENAME ——
-    let output_path = paths
-        .downloads_dir
-        .join(format!("video_composited_{}.mp4", timestamp_nanos()?));
+    let output_path = output_target.path().to_path_buf();
 
     Ok(CompositePipelinePlan {
         render,

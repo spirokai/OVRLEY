@@ -359,6 +359,7 @@ export function parseSrtActivityFile(text, fileName) {
     options: {
       skip_idle_gap_fill: true,
       smoothing: {
+        pace: { enabled: true, method: 'zero_phase_ma', window_seconds: 5.0 },
         speed: { enabled: true, method: 'zero_phase_ma', window_seconds: 0.5 },
         vertical_speed: { enabled: true, method: 'zero_phase_ma', window_seconds: 1.0 },
         elevation: { enabled: true, method: 'zero_phase_ma', window_seconds: 1.0 },

@@ -17,7 +17,7 @@ import { isInteractiveElement } from '@/lib/utils'
  * @param {*} props.appShell - App shell state.
  * @param {*} props.backendState - Current backend state.
  * @param {*} props.editorShell - Editor shell state and actions.
- * @param {function} props.onOpenDownloads - Callback invoked to open downloads.
+ * @param {function} props.onOpenOutputDirectory - Callback invoked to open render output.
  * @param {*} props.renderWorkflow - Render workflow state and actions.
  * @param {*} props.templateManagement - Template state and actions.
  * @param {*} props.videoControls - Video import control state and handlers.
@@ -28,7 +28,7 @@ export default function AppHeader({
   appShell,
   backendState,
   editorShell,
-  onOpenDownloads,
+  onOpenOutputDirectory,
   renderWorkflow,
   templateManagement,
   videoControls,
@@ -51,7 +51,7 @@ export default function AppHeader({
   }
 
   return (
-    <header className="relative z-50 shrink-0 select-none border-b border-border/70 bg-card backdrop-blur-sm" onMouseDown={handleHeaderMouseDown}>
+    <header className="relative z-50 shrink-0 select-none border-b border-border bg-card backdrop-blur-sm" onMouseDown={handleHeaderMouseDown}>
       <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-x-6 pb-3 pl-6 pr-1 pt-3">
         <ActivitySection
           activityFilename={activityImport.activityFilename}
@@ -87,7 +87,7 @@ export default function AppHeader({
           renderTooltipContent={renderWorkflow.renderTooltipContent}
           renderingVideo={renderWorkflow.renderingVideo}
           backendStatus={backendState.backendStatus}
-          onOpenDownloads={onOpenDownloads}
+          onOpenOutputDirectory={onOpenOutputDirectory}
         />
       </div>
     </header>

@@ -4,17 +4,7 @@
 
 import { useEffect, useEffectEvent } from 'react'
 import { deleteWidgetsInConfig, duplicateWidgetsInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
-import { isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
-
-function hasOpenKeyboardOverlay() {
-  if (typeof document === 'undefined') return false
-
-  return Boolean(
-    document.querySelector(
-      '[data-slot="dialog-content"], [data-slot="select-content"], [data-slot="popover-content"], [data-testid="widget-drawer-backdrop"]',
-    ),
-  )
-}
+import { hasOpenOverlay, isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 
 /**
  * Registers keyboard listeners for editor actions.
@@ -37,7 +27,7 @@ export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, s
 
     switch (match.commandId) {
       case 'editor.clearSelection':
-        if (hasOpenKeyboardOverlay()) return
+        if (hasOpenOverlay()) return
         event.preventDefault()
         setWidgetSelection([])
         return

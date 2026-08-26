@@ -28,6 +28,8 @@ pub mod interpolation;
 pub mod media;
 /// Render config validation seam — zero backend-owned defaults.
 pub mod normalize;
+/// Render output naming, validation, and request-owned targets.
+pub mod output;
 /// Application path configuration and resolution.
 pub mod paths;
 /// Shared Ramer-Douglas-Peucker line simplification.

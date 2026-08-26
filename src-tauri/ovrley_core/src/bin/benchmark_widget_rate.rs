@@ -16,6 +16,7 @@ use ovrley_core::encode::pipeline::composite::render_composite_video;
 use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::media::video_probe::probe_video;
+use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
 use ovrley_core::paths::AppPaths;
 use serde::Serialize;
 use serde_json::Value;
@@ -359,15 +360,28 @@ fn main() -> Result<(), String> {
                 let started = Instant::now();
                 let render_plan = derive_composite_render_plan(&mut config.scene, None)
                     .expect("validated benchmark composite plan");
-                let render_result = render_composite_video(
-                    &paths,
-                    &config,
-                    &activity,
-                    &dense,
-                    &controller,
-                    render_plan,
+                let output_path = paths.downloads_dir.join(format!(
+                    "benchmark-{display_name}-ur{update_rate}-{run_num}.mp4"
+                ));
+                let render_result = RenderOutputTarget::validate(
+                    output_path.to_str().unwrap(),
+                    RenderOutputKind::Composite,
                     true,
-                );
+                )
+                .map_err(|error| error.to_string())
+                .and_then(|target| {
+                    render_composite_video(
+                        &paths,
+                        &config,
+                        &activity,
+                        &dense,
+                        &controller,
+                        render_plan,
+                        true,
+                        &target,
+                    )
+                    .map_err(|error| error.to_string())
+                });
                 let elapsed_secs = started.elapsed().as_secs_f64();
 
                 match render_result {

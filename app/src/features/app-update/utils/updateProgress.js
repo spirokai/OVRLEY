@@ -18,5 +18,5 @@ export function getUpdateProgressPercent(progress) {
  * @returns {string} Human-readable progress label.
  */
 export function formatUpdateProgress(progressPercent) {
-  return `${Math.round(progressPercent)}% downloaded`
+  return `${Math.round(progressPercent)}%`
 }

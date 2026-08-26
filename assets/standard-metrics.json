@@ -51,6 +51,9 @@
           },
           "vertical_speed": {
             "decimals": 1
+          },
+          "speed": {
+            "decimals": 0
           }
         }
       },
@@ -331,6 +334,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "speed",
+      "maxDecimals": 1,
       "interpolation": "linear",
       "unitsMode": "selectable",
       "icon": {
@@ -368,6 +372,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "decimal",
+      "maxDecimals": 2,
       "interpolation": "linear",
       "unitsMode": "selectable",
       "icon": {
@@ -434,6 +439,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "distance",
+      "maxDecimals": 2,
       "interpolation": "linear",
       "unitsMode": "selectable",
       "icon": {
@@ -461,6 +467,7 @@
       ],
       "showUnitsByDefault": true,
       "formatter": "elevation",
+      "maxDecimals": 2,
       "interpolation": "linear",
       "unitsMode": "selectable",
       "icon": {

@@ -4,7 +4,7 @@
 
 import { useEffect } from 'react'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
-import { useAppShellStore } from '@/hooks/useAppStoreSelectors'
+import { useAppShellStore, useLayoutStore } from '@/hooks/useAppStoreSelectors'
 import { useRenderWorkflow } from '@/features/render-video'
 import { useTemplateManagement } from '@/features/template-manager'
 import useActivityImport from './useActivityImport'
@@ -16,6 +16,7 @@ import { useAppUpdate } from '@/features/app-update'
 import { useVideoImport } from '@/features/video-preview'
 import { useUndoRedo } from '@/features/undo-redo'
 import * as backend from '@/api/backend'
+import { loadRememberedRenderDirectory } from '@/features/render-video/utils/render-output'
 
 /**
  * Orchestrates all shell-level hooks without adapting their public APIs.
@@ -26,7 +27,8 @@ import * as backend from '@/api/backend'
  *   appShell: object,
  *   backendState: object,
  *   editorShell: object,
- *   handleOpenDownloads: Function,
+ *   handleOpenOutputDirectory: Function,
+ *   layout: object,
  *   renderWorkflow: object,
  *   templateManagement: object,
  *   undoRedoControls: object,
@@ -36,6 +38,7 @@ import * as backend from '@/api/backend'
  */
 export default function useAppShellComposition() {
   const appShell = useAppShellStore()
+  const layout = useLayoutStore()
   const widgetLiveEdits = useWidgetDraftState()
   const backendState = useBackendStatus()
   const editorShell = useEditorShellState()
@@ -56,12 +59,13 @@ export default function useAppShellComposition() {
     restoreLastLoadedTemplate()
   }, [restoreLastLoadedTemplate])
 
-  const handleOpenDownloads = async () => {
+  const handleOpenOutputDirectory = async () => {
     try {
-      await backend.openDownloads()
+      const rememberedDirectory = await loadRememberedRenderDirectory()
+      await backend.openOutputDirectory(rememberedDirectory)
     } catch (error) {
-      console.error('Error opening downloads:', error)
-      appShell.setErrorMessage(`Failed to open downloads folder: ${error.message}`)
+      console.error('Error opening render output directory:', error)
+      appShell.setErrorMessage(`Failed to open render output folder: ${error.message}`)
     }
   }
 
@@ -69,10 +73,11 @@ export default function useAppShellComposition() {
     activityImport,
     appShell,
     backendState,
-    handleOpenDownloads,
+    handleOpenOutputDirectory,
     renderWorkflow,
     templateManagement,
     videoControls,
+    layout,
   })
 
   return {
@@ -81,7 +86,8 @@ export default function useAppShellComposition() {
     appShell,
     backendState,
     editorShell,
-    handleOpenDownloads,
+    handleOpenOutputDirectory,
+    layout,
     renderWorkflow,
     templateManagement,
     undoRedoControls,

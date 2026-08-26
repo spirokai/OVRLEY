@@ -15,14 +15,10 @@ function WidgetButton({ item, onClick, isAvailable }) {
       className="group relative flex flex-col items-center justify-center gap-2 w-full aspect-square rounded-xs border border-border/70 bg-surface transition-all hover:border-accent-border hover:bg-surface-accent-soft/30 cursor-pointer overflow-hidden"
     >
       {isAvailable && (
-        <span
-          aria-hidden="true"
-          className="absolute top-0 right-0 h-[6px] w-[6px] bg-success"
-          style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }}
-        />
+        <span aria-hidden="true" className="absolute top-0 right-0 h-1.5 w-1.5 bg-success" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }} />
       )}
       <Icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-      <span className="text-[9px] leading-tight text-foreground text-center px-0.5 group-hover:text-primary">{item.label}</span>
+      <span className="text-[0.65rem] leading-tight text-foreground text-center px-0.5 group-hover:text-primary">{item.label}</span>
     </button>
   )
 
@@ -48,11 +44,11 @@ export function WidgetButtonGrid({ onAddWidget, validAttributes = [], extendedAt
   const availableSet = new Set(['label', 'backdrop', ...(validAttributes || []), ...(extendedAttributes || [])])
 
   return (
-    <div className="flex-1 overflow-y-auto thin-scrollbar p-2">
+    <div className="flex-1 overflow-y-auto thin-scrollbar pl-2 pr-1">
       {GROUPED_QUICKMENU_ITEMS.map((group) => (
         <div key={group.category} className="mb-3">
-          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60 px-1 mb-1.5">{group.category}</div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="text-[0.7rem] font-bold uppercase tracking-wider text-muted-foreground/60 px-1 mb-1.5">{group.category}</div>
+          <div className="grid grid-cols-4 gap-1">
             {group.items.map((item) => (
               <WidgetButton key={item.type} item={item} onClick={onAddWidget} isAvailable={availableSet.has(item.type)} />
             ))}

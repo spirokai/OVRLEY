@@ -13,7 +13,7 @@ function renderShellKeyboard(configure = () => {}) {
     handleSaveTemplate: vi.fn(),
     openRenderDialog: vi.fn(),
     openTemplateSelector: vi.fn(),
-    toggleWidgetDrawer: vi.fn(),
+    selectLeftDrawerTool: vi.fn(),
   }
   const options = {
     activityImport: {
@@ -24,13 +24,16 @@ function renderShellKeyboard(configure = () => {}) {
       computeVideoSync: actions.computeVideoSync,
       config: { scene: {} },
       importedVideoPath: 'ride.mp4',
-      toggleWidgetDrawer: actions.toggleWidgetDrawer,
-      widgetDrawerOpen: false,
     },
     backendState: {
       backendStatus: 'connected',
     },
     handleOpenDownloads: actions.handleOpenDownloads,
+    layout: {
+      leftDrawerPinned: false,
+      leftDrawerVisible: false,
+      selectLeftDrawerTool: actions.selectLeftDrawerTool,
+    },
     renderWorkflow: {
       openRenderDialog: actions.openRenderDialog,
       renderDisabled: false,

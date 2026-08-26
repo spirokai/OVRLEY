@@ -4,9 +4,8 @@
 
 import { updateLiveWidgetDraft } from '../utils/widgetDomHelpers'
 import { buildFrameInteractionLayout, captureWidgetLayout, getWidgetInteractionPosition } from '../utils/widgetInteractionGeometry'
-import { buildResizeUpdate, captureResizeOrigin } from '../utils/widgetResizeScaling'
-import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
-import { resolveActiveMetricWidgetData } from '@/lib/widget/widget-resolver'
+import { buildLiveResizeUpdate, buildResizeUpdate, captureResizeOrigin } from '../utils/widgetResizeScaling'
+import { isFramedWidget } from '@/lib/widget/display-type-behavior'
 
 /**
  * Creates resize-related moveable handlers.
@@ -66,10 +65,7 @@ export function useResizeHandlers({
       const dimensionScale = isFramedWidget(selectedWidget) ? Math.max(Number(globalScale) || 1, 0.1) : 1
       const nextWidth = Math.max(width / dimensionScale, 8)
       const nextHeight = Math.max(height / dimensionScale, 8)
-      const resizeUpdate = buildResizeUpdate(origin, { x: nextX, y: nextY, width: nextWidth, height: nextHeight }, { round: false })
-      const liveResizeUpdate = isBackdropWidget(selectedWidget)
-        ? { ...resizeUpdate, width: nextWidth, height: nextHeight }
-        : resolveActiveMetricWidgetData({ ...origin.widgetData, ...resizeUpdate })
+      const liveResizeUpdate = buildLiveResizeUpdate(origin, { x: nextX, y: nextY, width: nextWidth, height: nextHeight }, selectedWidget)
       const liveLayout = buildFrameInteractionLayout(origin.layout, {
         width: nextWidth * (globalScale || 1),
         height: nextHeight * (globalScale || 1),

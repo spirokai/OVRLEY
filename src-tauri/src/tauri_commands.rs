@@ -19,7 +19,10 @@ use crate::video_server::VideoServerHandle;
 use crate::BackendState;
 use ovrley_core::activity::finalize::FinalizeActivityResponse;
 use ovrley_core::commands;
-use std::path::PathBuf;
+use ovrley_core::error::CoreError;
+use ovrley_core::output::RenderOutputKind;
+use serde::Serialize;
+use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 
 const WINDOWS_HEVC_EXTENSION_URL: &str = "https://apps.microsoft.com/detail/9nmzlz57r3t7";
@@ -37,6 +40,61 @@ fn call_and_serialize<T: serde::Serialize>(
     result: Result<T, impl ToString>,
 ) -> Result<String, String> {
     serialize_command_result(&result.map_err(|e| e.to_string())?)
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "code")]
+pub(crate) enum BackendRenderError {
+    #[serde(rename = "already_exists")]
+    AlreadyExists { message: String },
+    #[serde(rename = "output_error")]
+    OutputError { message: String },
+    #[serde(rename = "render_error")]
+    RenderError { message: String },
+}
+
+impl BackendRenderError {
+    fn from_core(error: CoreError) -> Self {
+        match error {
+            CoreError::OutputExists(message) => Self::AlreadyExists { message },
+            CoreError::OutputIo { path, source } => Self::OutputError {
+                message: output_io_message(&path, &source),
+            },
+            CoreError::OutputInvalid(message) => Self::OutputError { message },
+            error => Self::RenderError {
+                message: error.to_string(),
+            },
+        }
+    }
+}
+
+fn output_io_message(path: &Path, source: &std::io::Error) -> String {
+    let directory = path
+        .parent()
+        .map(|value| value.display().to_string())
+        .unwrap_or_else(|| path.display().to_string());
+
+    match source.kind() {
+        std::io::ErrorKind::NotFound => {
+            format!("The output directory does not exist: {directory}")
+        }
+        std::io::ErrorKind::PermissionDenied => {
+            format!(
+                "You do not have permission to write the output file: {}",
+                path.display()
+            )
+        }
+        std::io::ErrorKind::InvalidInput => {
+            format!(
+                "The output file name or path is not valid: {}",
+                path.display()
+            )
+        }
+        _ => format!(
+            "Could not create or write the output file at {}: {source}",
+            path.display()
+        ),
+    }
 }
 
 /// Returns a basic backend health payload for the frontend runtime check.
@@ -83,13 +141,21 @@ pub(crate) async fn backend_render(
     state: tauri::State<'_, BackendState>,
     config_json: String,
     parsed_activity_json: String,
-) -> Result<String, String> {
-    call_and_serialize(commands::backend_render(
-        &runtime_paths::app_paths(&app)?,
+    output_path: String,
+    overwrite: bool,
+) -> Result<String, BackendRenderError> {
+    let paths = runtime_paths::app_paths(&app)
+        .map_err(|message| BackendRenderError::RenderError { message })?;
+    let result = commands::backend_render(
+        &paths,
         &state.render_controller,
         &config_json,
         &parsed_activity_json,
-    ))
+        &output_path,
+        overwrite,
+    )
+    .map_err(BackendRenderError::from_core)?;
+    serialize_command_result(&result).map_err(|message| BackendRenderError::RenderError { message })
 }
 
 /// Finalizes frontend-extracted raw samples into a parsed activity payload.
@@ -164,12 +230,32 @@ pub(crate) async fn backend_progress(
     serialize_command_result(&commands::backend_progress(&state.render_controller))
 }
 
-/// Opens the application's downloads/output directory in the platform file manager.
+/// Opens the remembered render output directory in the platform file manager.
 #[tauri::command]
-pub(crate) async fn backend_open_downloads(app: AppHandle) -> Result<String, String> {
-    call_and_serialize(commands::backend_open_downloads(&runtime_paths::app_paths(
-        &app,
-    )?))
+pub(crate) async fn backend_open_output_directory(
+    app: AppHandle,
+    directory: Option<String>,
+) -> Result<String, String> {
+    call_and_serialize(commands::backend_open_output_directory(
+        &runtime_paths::app_paths(&app)?,
+        directory.as_deref(),
+    ))
+}
+
+/// Returns a fresh suggested render output path.
+#[tauri::command]
+pub(crate) async fn backend_suggest_output_path(
+    app: AppHandle,
+    output_kind: RenderOutputKind,
+    remembered_directory: Option<String>,
+) -> Result<String, String> {
+    let path = commands::backend_suggest_output_path(
+        &runtime_paths::app_paths(&app)?,
+        output_kind,
+        remembered_directory.as_deref(),
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
 }
 
 /// Opens the application's templates directory in the platform file manager.
@@ -182,11 +268,8 @@ pub(crate) async fn backend_open_templates(app: AppHandle) -> Result<String, Str
 
 /// Opens a rendered video file from the output directory.
 #[tauri::command]
-pub(crate) async fn backend_open_video(app: AppHandle, filename: String) -> Result<String, String> {
-    call_and_serialize(commands::backend_open_video(
-        &runtime_paths::app_paths(&app)?,
-        &filename,
-    ))
+pub(crate) async fn backend_open_video(output_path: String) -> Result<String, String> {
+    call_and_serialize(commands::backend_open_video(&output_path))
 }
 
 /// Lists bundled and user-created overlay templates.

@@ -1,11 +1,6 @@
 import { useEffect, useEffectEvent } from 'react'
-import { isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
-
-function hasOpenKeyboardOverlay() {
-  if (typeof document === 'undefined') return false
-
-  return Boolean(document.querySelector('[data-slot="dialog-content"], [data-slot="popover-content"], [data-testid="widget-drawer-backdrop"]'))
-}
+import { hasOpenOverlay, isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
+import { WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 
 /**
  * Registers shell-level template, media, export, and workspace commands.
@@ -17,13 +12,15 @@ export default function useAppShellKeyboard({
   activityImport,
   appShell,
   backendState,
-  handleOpenDownloads,
+  handleOpenOutputDirectory,
   renderWorkflow,
   templateManagement,
   videoControls,
+  layout,
 }) {
   const { handleActivityFileOpen } = activityImport
-  const { activitySummary, computeVideoSync, config, importedVideoPath, toggleWidgetDrawer, widgetDrawerOpen } = appShell
+  const { activitySummary, computeVideoSync, config, importedVideoPath } = appShell
+  const { leftDrawerPinned, leftDrawerVisible, selectLeftDrawerTool } = layout
   const { backendStatus } = backendState
   const { openRenderDialog, renderDisabled } = renderWorkflow
   const { handleCreateNewTemplate, handleImportTemplate, handleSaveTemplate, openTemplateSelector, showTemplateStatus, templateSelectorOpen } =
@@ -35,7 +32,7 @@ export default function useAppShellKeyboard({
 
     const match = matchKeyboardShortcut(event, 'app')
     if (!match || isFormFieldShortcut(event)) return
-    if (hasOpenKeyboardOverlay() && !(match.commandId === 'drawer.toggle' && widgetDrawerOpen)) return
+    if (hasOpenOverlay() && !(match.commandId === 'drawer.toggle' && leftDrawerVisible && !leftDrawerPinned)) return
 
     switch (match.commandId) {
       case 'template.new':
@@ -67,7 +64,7 @@ export default function useAppShellKeyboard({
       case 'output.open':
         if (backendStatus !== 'connected') return
         event.preventDefault()
-        handleOpenDownloads()
+        handleOpenOutputDirectory()
         return
       case 'sync.auto':
         if (!importedVideoPath || !activitySummary) return
@@ -81,7 +78,7 @@ export default function useAppShellKeyboard({
         return
       case 'drawer.toggle':
         event.preventDefault()
-        toggleWidgetDrawer()
+        selectLeftDrawerTool(WIDGETS_TOOL)
         return
       default:
         return

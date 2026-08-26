@@ -29,97 +29,64 @@ export default async function renderVideo(overrides = {}) {
     importedVideoPath,
     importedVideoResolution,
     parsedActivity,
-    setActiveRenderId,
-    setRenderingVideo,
-    setRenderProgress,
     startSecond,
     endSecond,
     updateRate,
     videoSyncOffsetSeconds,
+    outputPath,
+    overwrite = false,
   } = overrides
 
-  try {
-    const activeConfig = overrides.config || baseConfig
-    const activeUpdateRate = overrides.updateRate ?? updateRate
-    const activeExportMode = overrides.exportMode
-    const activeExportCodec = overrides.exportCodec ?? exportCodec
-    const activeExportBitrate = overrides.exportBitrate
+  const activeConfig = overrides.config || baseConfig
+  const activeUpdateRate = overrides.updateRate ?? updateRate
+  const activeExportMode = overrides.exportMode
+  const activeExportCodec = overrides.exportCodec ?? exportCodec
+  const activeExportBitrate = overrides.exportBitrate
 
-    const config = createRenderEffectiveConfig({
-      availableCodecs,
-      config: activeConfig,
-      exportBitrate: activeExportBitrate,
-      exportCodec: activeExportCodec,
-      exportMode: activeExportMode,
-      exportRange: overrides.exportRange ?? exportRange,
-      globalDefaults,
-      importedVideoDuration,
-      importedVideoFps,
-      importedVideoFpsDen,
-      importedVideoFpsNum,
-      importedVideoPath,
-      importedVideoResolution,
-      timelineStart: startSecond,
-      timelineEnd: endSecond,
-      updateRate: activeUpdateRate,
-      videoSyncOffsetSeconds,
-    })
+  const config = createRenderEffectiveConfig({
+    availableCodecs,
+    config: activeConfig,
+    exportBitrate: activeExportBitrate,
+    exportCodec: activeExportCodec,
+    exportMode: activeExportMode,
+    exportRange: overrides.exportRange ?? exportRange,
+    globalDefaults,
+    importedVideoDuration,
+    importedVideoFps,
+    importedVideoFpsDen,
+    importedVideoFpsNum,
+    importedVideoPath,
+    importedVideoResolution,
+    timelineStart: startSecond,
+    timelineEnd: endSecond,
+    updateRate: activeUpdateRate,
+    videoSyncOffsetSeconds,
+  })
 
-    if (!parsedActivity) {
-      throw new Error('No parsed activity available')
-    }
-
-    if (config.scene.start === undefined || config.scene.end === undefined) {
-      throw new Error('Timeline start and end must be set')
-    }
-
-    if (config.scene.start >= config.scene.end) {
-      throw new Error('Start time must be before end time')
-    }
-
-    setRenderingVideo(true)
-    setActiveRenderId(null)
-    setRenderProgress({
-      renderId: null,
-      current: 0,
-      total: 0,
-      encoded: 0,
-      status: 'rendering',
-      message: 'Starting render...',
-      estimatedSecondsRemaining: null,
-      filename: null,
-    })
-
-    const data = await backend.renderVideo(config, parsedActivity)
-
-    if (data.error) {
-      if (data.cancelled || data.error.toLowerCase().includes('cancelled')) {
-        return { success: false, cancelled: true }
-      }
-
-      throw new Error(data.error)
-    }
-
-    if (data.started) {
-      setActiveRenderId(data.render_id ?? null)
-      return { success: true, started: true }
-    }
-
-    throw new Error('Render did not start')
-  } catch (error) {
-    setActiveRenderId(null)
-    setRenderingVideo(false)
-    setRenderProgress({
-      renderId: null,
-      current: 0,
-      total: 0,
-      encoded: 0,
-      status: 'error',
-      message: error.message || 'Render failed to start',
-      estimatedSecondsRemaining: null,
-      filename: null,
-    })
-    console.error('Error in renderVideo:', error)
-    throw error
+  if (!parsedActivity) {
+    throw new Error('No parsed activity available')
   }
+
+  if (!outputPath) {
+    throw new Error('Render output target is required')
+  }
+
+  if (config.scene.start === undefined || config.scene.end === undefined) {
+    throw new Error('Timeline start and end must be set')
+  }
+
+  if (config.scene.start >= config.scene.end) {
+    throw new Error('Start time must be before end time')
+  }
+
+  const data = await backend.renderVideo(config, parsedActivity, {
+    outputPath,
+    overwrite,
+  })
+
+  if (data.started && data.render_id && data.outputPath) {
+    return data
+  }
+
+  throw new Error('Render did not start')
 }

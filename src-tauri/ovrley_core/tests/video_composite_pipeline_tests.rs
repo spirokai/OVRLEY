@@ -54,8 +54,8 @@ use ovrley_core::normalize::validate_render_config;
 use common::composite::{
     assert_argument_pair, cancel_after_delay, composite_debug_timing_summary,
     composite_debug_timing_summary_path, composite_test_config, composited_outputs,
-    derive_fixture_composite_plan, ffprobe_audio_codecs, ffprobe_video_rates, fixture_activity,
-    has_argument_pair, mutable_recent_template_config, render_fixture_composite,
+    custom_output_target, derive_fixture_composite_plan, ffprobe_audio_codecs, ffprobe_video_rates,
+    fixture_activity, has_argument_pair, mutable_recent_template_config, render_fixture_composite,
     spawn_fixture_composite_render, test_paths, test_paths_named,
     write_fixture_composite_debug_summary,
 };
@@ -156,7 +156,6 @@ fn test_4_4_builds_ffmpeg_settings_inside_composite_shell() {
     assert!(plan.ffmpeg_settings.filter_complex.contains("[1:v]"));
     assert!(plan.ffmpeg_settings.filter_complex.contains("[out]"));
     let output_filename = plan.output_path.file_name().unwrap().to_str().unwrap();
-    assert!(output_filename.starts_with("video_composited_"));
     assert!(output_filename.ends_with(".mp4"));
 }
 
@@ -286,7 +285,13 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
     let paths = test_paths();
     let mut scene = config.scene.clone();
     let render = derive_composite_render_plan(&mut scene, None).unwrap();
-    let plan = derive_composite_pipeline_plan(&paths, &scene, render, true, None).unwrap();
+    let output_target = custom_output_target(
+        &paths,
+        "plan",
+        ovrley_core::output::RenderOutputKind::Composite,
+    );
+    let plan =
+        derive_composite_pipeline_plan(&paths, &scene, render, true, None, &output_target).unwrap();
 
     assert!(!has_argument_pair(
         &plan.ffmpeg_settings.input_0_args,
@@ -497,10 +502,6 @@ fn test_7_1_timing_summary_exists() {
     let paths = write_fixture_composite_debug_summary("composite_debug_summary_exists");
 
     assert!(composite_debug_timing_summary_path(&paths).is_file());
-    assert!(composite_debug_timing_summary_path(&paths)
-        .parent()
-        .unwrap()
-        .ends_with("1778853729503903000"));
 }
 
 /// The debug timing summary must record `phase: "composite"` and
@@ -554,7 +555,7 @@ fn test_7_5_total_wall_time_is_recorded() {
     assert!(summary["overlay_filename"]
         .as_str()
         .unwrap()
-        .contains("video_composited_1778853729503903000.mp4"));
+        .contains("custom-debug-output.mp4"));
     assert!(summary["diagnostics"]["render_loop_ms"].as_f64().unwrap() > 0.0);
     assert!(
         summary["diagnostics"]["ffmpeg_finalize_wait_ms"]
@@ -634,6 +635,11 @@ fn test_frame_workers_render_short_composite_in_order() {
     controller
         .try_start(dense.frame_count as u32, "test_parallel_frame_workers")
         .unwrap();
+    let output_target = custom_output_target(
+        &paths,
+        "parallel",
+        ovrley_core::output::RenderOutputKind::Composite,
+    );
     let filename = render_composite_video(
         &paths,
         &validated,
@@ -642,6 +648,7 @@ fn test_frame_workers_render_short_composite_in_order() {
         &controller,
         render_plan,
         true,
+        &output_target,
     )
     .unwrap();
 
@@ -690,6 +697,11 @@ fn test_frame_worker_composite_render() {
         .try_start(dense.frame_count as u32, "test_parallel_2")
         .unwrap();
 
+    let output_target = custom_output_target(
+        &paths,
+        "parallel-2",
+        ovrley_core::output::RenderOutputKind::Composite,
+    );
     let result = render_composite_video(
         &paths,
         &validated,
@@ -698,6 +710,7 @@ fn test_frame_worker_composite_render() {
         &controller,
         render_plan,
         true,
+        &output_target,
     );
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();
@@ -733,6 +746,11 @@ fn test_frame_worker_composite_render_with_audio() {
         .try_start(dense.frame_count as u32, "test_parallel_audio")
         .unwrap();
 
+    let output_target = custom_output_target(
+        &paths,
+        "parallel-audio",
+        ovrley_core::output::RenderOutputKind::Composite,
+    );
     let result = render_composite_video(
         &paths,
         &validated,
@@ -741,6 +759,7 @@ fn test_frame_worker_composite_render_with_audio() {
         &controller,
         render_plan,
         true,
+        &output_target,
     );
     assert!(result.is_ok(), "Failed: {:?}", result);
     let filename = result.unwrap();

@@ -344,14 +344,24 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         metadata: json!({}),
         sync_time: None,
         options: RawActivityOptions {
-            smoothing: [(
-                "heading".to_string(),
-                SmoothingOption {
-                    enabled: true,
-                    method: "circular_ema".to_string(),
-                    window_seconds: 0.0,
-                },
-            )]
+            smoothing: [
+                (
+                    "pace".to_string(),
+                    SmoothingOption {
+                        enabled: true,
+                        method: "zero_phase_ma".to_string(),
+                        window_seconds: 5.0,
+                    },
+                ),
+                (
+                    "heading".to_string(),
+                    SmoothingOption {
+                        enabled: true,
+                        method: "circular_ema".to_string(),
+                        window_seconds: 0.0,
+                    },
+                ),
+            ]
             .into(),
             ..RawActivityOptions::default()
         },

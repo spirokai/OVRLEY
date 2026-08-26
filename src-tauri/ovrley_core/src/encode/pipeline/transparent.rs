@@ -46,6 +46,7 @@ use crate::encode::pipeline::queue::{merge_timing_maps, writer_worker, FrameBuff
 use crate::encode::progress::RenderController;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedRenderConfig;
+use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
 use crate::render::{prepare_preview_assets, FrameSize, VideoFrameRenderer};
 use std::io::{BufRead, BufReader};
@@ -121,6 +122,7 @@ pub fn render_video(
     activity: &ParsedActivity,
     dense_activity: &DenseActivityReport,
     controller: &RenderController,
+    output_target: &RenderOutputTarget,
 ) -> CoreResult<String> {
     // ── PHASE 1: SETUP — derive dimensions, frame counts, paths, and ffmpeg args ──
     let scene = &config.scene;
@@ -170,12 +172,7 @@ pub fn render_video(
         label_cache_status,
     )?;
 
-    let public_filename = format!(
-        "video_{}.{}",
-        crate::encode::debug::video::timestamp_nanos()?,
-        ffmpeg_settings.extension
-    );
-    let output_path = paths.downloads_dir.join(&public_filename);
+    let output_path = output_target.path();
     let mut output_guard = PartialOutputGuard::new(&output_path);
     let ffmpeg_bin = resolve_ffmpeg_binary(&paths.repo_root)?;
     let input_pix_fmt = ffmpeg_input_pix_fmt()?;
@@ -318,7 +315,7 @@ pub fn render_video(
         sample_frames,
         merged_timings,
     )?;
-    Ok(public_filename)
+    Ok(output_target.filename().to_owned())
 }
 
 /// Computes how many frames will be written after applying frame decimation.

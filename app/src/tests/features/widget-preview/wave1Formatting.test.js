@@ -49,6 +49,19 @@ describe('Vehicle metric formatting', () => {
   })
 })
 
+describe('Speed metric formatting', () => {
+  test('preserves the requested decimal places after unit conversion', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: makeMetricWidget('speed', { display_unit: 'kmh', decimals: 1 }),
+      activity: makeActivity('speed', 10),
+      previewSecond: 0,
+    })
+
+    expect(model?.valueText).toBe('36.0')
+    expect(model?.unitText).toBe('KM/H')
+  })
+})
+
 describe('Wave 2 metric formatting', () => {
   test('distance_to_home uses the shared distance conversion', () => {
     const model = buildMetricWidgetPreviewModel({

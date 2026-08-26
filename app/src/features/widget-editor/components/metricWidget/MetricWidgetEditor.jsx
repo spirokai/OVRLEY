@@ -9,7 +9,7 @@
 import { getDisplayTypeDefaultFontSize, getDisplayTypeOptions, getStandardMetricDisplayUnit } from '@/lib/widget/standard-metrics'
 import { NumberField, SelectField } from '../widgetFormControls'
 import { useCallback } from 'react'
-import { initDisplayVariant } from '@/lib/widget/widget-resolver'
+import { buildDisplayTypeChangeUpdate } from '@/lib/widget/widget-resolver'
 import { isTextDisplayType } from '@/lib/widget/display-type-behavior'
 import TextDisplaySection from './TextDisplaySection'
 import LinearDisplaySection from './LinearDisplaySection'
@@ -55,8 +55,7 @@ export default function MetricWidgetEditor({
 
   const handleDisplayTypeChange = useCallback(
     (value) => {
-      const nextData = initDisplayVariant(widget.data, value)
-      const patch = { display_type: value, display_variants: nextData.display_variants }
+      const patch = buildDisplayTypeChangeUpdate(widget.data, value)
       const defaultFontSize = getDisplayTypeDefaultFontSize(value)
       if (defaultFontSize !== null) patch.font_size = defaultFontSize
       updateWidgetData(widget.id, patch)

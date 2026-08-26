@@ -4,9 +4,14 @@ import useStore from '@/store/useStore'
 export function useLayoutStore() {
   return useStore(
     useShallow((state) => ({
-      closeWidgetDrawer: state.closeWidgetDrawer,
-      widgetDrawerOpen: state.widgetDrawerOpen,
-      toggleWidgetDrawer: state.toggleWidgetDrawer,
+      activeLeftDrawerTool: state.activeLeftDrawerTool,
+      dismissLeftDrawerOverlay: state.dismissLeftDrawerOverlay,
+      initializeLeftDrawer: state.initializeLeftDrawer,
+      leftDrawerInitialized: state.leftDrawerInitialized,
+      leftDrawerPinned: state.leftDrawerPinned,
+      leftDrawerVisible: state.leftDrawerVisible,
+      selectLeftDrawerTool: state.selectLeftDrawerTool,
+      setLeftDrawerPinned: state.setLeftDrawerPinned,
     })),
   )
 }
@@ -23,8 +28,6 @@ export function useAppShellStore() {
       importedVideoPath: state.importedVideoPath,
       setConfig: state.setConfig,
       setErrorMessage: state.setErrorMessage,
-      toggleWidgetDrawer: state.toggleWidgetDrawer,
-      widgetDrawerOpen: state.widgetDrawerOpen,
     })),
   )
 }
@@ -77,16 +80,16 @@ export function useRenderStore() {
     useShallow((state) => ({
       activitySummary: state.activitySummary,
       activeRenderId: state.activeRenderId,
+      activeRenderOutputPath: state.activeRenderOutputPath,
       config: state.config,
       exportCodec: state.exportCodec,
       exportRange: state.exportRange,
       renderStatus: state.renderProgress.status,
       renderingVideo: state.renderingVideo,
-      setActiveRenderId: state.setActiveRenderId,
+      clearRenderSession: state.clearRenderSession,
       setErrorMessage: state.setErrorMessage,
       setRenderProgress: state.setRenderProgress,
-      setRenderingVideo: state.setRenderingVideo,
-      setVideoFilename: state.setVideoFilename,
+      startRenderSession: state.startRenderSession,
       updateRate: state.updateRate,
     })),
   )

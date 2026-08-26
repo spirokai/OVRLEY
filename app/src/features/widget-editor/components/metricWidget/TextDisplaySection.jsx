@@ -8,6 +8,7 @@ import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/widgets/metric
 import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
 import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
+import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 
 const COORDINATE_FORMAT_OPTIONS = [
   { value: 'dms', label: 'Deg / Min / Sec' },
@@ -29,13 +30,12 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
   const showUnits = widget.data.show_units
   const supportsUnitSelection = unitOptions.length > 1
   const isDistanceWidget = widget.type === 'distance'
-  const supportsDecimalPrecision = ['distance', 'distance_to_home', 'total_ascent'].includes(widget.type)
   const isCoordinateWidget = widget.type === 'gps_coordinates'
   const isTotalAscentWidget = widget.type === 'total_ascent'
-  const hasDecimalControl = supportsDecimalPrecision || definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
+  const hasDecimalControl = definition?.maxDecimals !== undefined || definition?.formatter === 'decimal' || definition?.formatter === 'temperature'
   const hasBalanceFormat = definition?.formatter === 'balance'
-  const maxDecimals = supportsDecimalPrecision ? 2 : 1
-  const defaultDecimals = supportsDecimalPrecision ? 1 : 0
+  const maxDecimals = definition?.maxDecimals ?? 1
+  const defaultDecimals = TYPE_DEFAULTS[widget.type]?.decimals ?? 1
   const decimals = Number.isFinite(widget.data.decimals) ? Math.min(Math.max(widget.data.decimals, 0), maxDecimals) : defaultDecimals
 
   const handleUnitChange = (value) => {
@@ -50,15 +50,17 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
       <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
 
       {hasDecimalControl ? (
-        <SliderField
-          label="Decimals"
-          value={decimals}
-          min={0}
-          max={maxDecimals}
-          step={1}
-          valueDisplay={String(decimals)}
-          onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            label="Decimals"
+            value={decimals}
+            min={0}
+            max={maxDecimals}
+            step={1}
+            valueDisplay={String(decimals)}
+            onSliderChange={(value) => updateWidgetData(widget.id, { decimals: value })}
+          />
+        </div>
       ) : null}
 
       {hasBalanceFormat ? (

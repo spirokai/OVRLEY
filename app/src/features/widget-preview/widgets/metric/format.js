@@ -23,9 +23,10 @@ import { measurePreviewText, getPreviewTextBaseline } from '../../shared/textMea
  *
  * @param {number|null|undefined} value - Speed value in meters per second.
  * @param {string} unit - Target unit system ('kmh', 'mph', 'kn', 'mps').
+ * @param {number} decimals - Number of decimal places to display.
  * @returns {{ value: string, units: string }} Formatted speed string and unit label.
  */
-function formatSpeed(value, unit) {
+function formatSpeed(value, unit, decimals) {
   const conversions = {
     kmh: { units: 'KM/H' },
     mph: { units: 'MPH' },
@@ -39,7 +40,7 @@ function formatSpeed(value, unit) {
   }
 
   return {
-    value: Math.round(convertStandardMetricValue('speed', value, unit)).toString(),
+    value: formatFixedDecimal(convertStandardMetricValue('speed', value, unit), decimals),
     units: selection.units,
   }
 }
@@ -290,7 +291,7 @@ export function formatStandardMetricDisplay(type, value, widgetData) {
   const showUnits = widgetData.show_units
 
   if (definition.formatter === 'speed') {
-    return formatSpeed(value, displayUnit)
+    return formatSpeed(value, displayUnit, widgetData.decimals)
   }
 
   if (definition.formatter === 'temperature') {

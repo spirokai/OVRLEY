@@ -19,7 +19,7 @@ import WindowControls from './WindowControls'
  * @param {string|null} props.renderTooltipContent - Tooltip text for the render button.
  * @param {boolean} props.renderingVideo - Whether a render is in progress.
  * @param {string} props.backendStatus - Current backend connection status.
- * @param {function} props.onOpenDownloads - Opens the downloads/output folder.
+ * @param {function} props.onOpenOutputDirectory - Opens the render output folder.
  * @param {function} props.onOpenKeyboardShortcuts - Opens the keyboard shortcuts dialog.
  * @returns {JSX.Element} Rendered component.
  */
@@ -31,7 +31,7 @@ export default function ActionButtons({
   renderTooltipContent,
   renderingVideo,
   backendStatus,
-  onOpenDownloads,
+  onOpenOutputDirectory,
   onOpenKeyboardShortcuts,
 }) {
   return (
@@ -53,7 +53,7 @@ export default function ActionButtons({
             size="sm"
             className="h-9 gap-2 border-accent-border/70 px-4 text-muted-foreground hover:border-accent-border hover:bg-surface-accent-soft hover:text-foreground"
             disabled={backendStatus !== 'connected'}
-            onClick={onOpenDownloads}
+            onClick={onOpenOutputDirectory}
             aria-keyshortcuts="Mod+Shift+E"
           >
             <FolderOpen className="h-3.5 w-3.5" />

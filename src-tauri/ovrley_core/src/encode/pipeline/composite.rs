@@ -46,6 +46,7 @@ use crate::encode::pipeline::queue::{
 use crate::encode::progress::RenderController;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedRenderConfig;
+use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
 use crate::render::{prepare_preview_assets, VideoFrameRenderer};
 
@@ -267,6 +268,7 @@ pub fn render_composite_video(
     controller: &RenderController,
     render_plan: CompositeRenderPlan,
     include_audio: bool,
+    output_target: &RenderOutputTarget,
 ) -> CoreResult<String> {
     if controller.cancel_flag().load(Ordering::SeqCst) {
         return Err(CoreError::Cancelled);
@@ -288,6 +290,7 @@ pub fn render_composite_video(
         render_plan,
         include_audio,
         source_rotation_degrees,
+        output_target,
     )?;
     let task_count = usize::try_from(plan.render.overlay_frame_count).map_err(|_| {
         CoreError::Encode("Composite overlay frame count exceeds usize".to_string())
@@ -311,10 +314,6 @@ pub fn render_composite_video(
     let channels =
         ParallelFramePoolPlan::for_frame_size(plan.frame_size, workers)?.create_channels()?;
 
-    std::fs::create_dir_all(&paths.downloads_dir).map_err(|error| CoreError::Io {
-        path: paths.downloads_dir.clone(),
-        source: error,
-    })?;
     let mut output_guard = PartialOutputGuard::new(&plan.output_path);
     controller.set_frame_progress(0, plan.render.output_frame_count, 0, None, None);
 

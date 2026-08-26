@@ -30,4 +30,22 @@ describe('backend Tauri error normalization', () => {
 
     await expect(backend.getDefaultTemplateSavePath('acid.json')).rejects.toThrow('Documents folder unavailable')
   })
+
+  test('render rejection preserves the backend error code', async () => {
+    const invoke = vi.fn().mockRejectedValue({ code: 'already_exists', message: 'Output already exists' })
+    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+
+    const backend = await import('@/api/backend')
+
+    await expect(
+      backend.renderVideo(
+        {},
+        {},
+        {
+          outputPath: 'C:\\renders\\overlay.mov',
+          overwrite: false,
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'already_exists', message: 'Output already exists' })
+  })
 })
