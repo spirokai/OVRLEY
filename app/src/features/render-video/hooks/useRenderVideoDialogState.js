@@ -50,6 +50,7 @@ export default function useRenderVideoDialogState({
 }) {
   const derived = useRenderVideoDerivedState({ settings })
   const outputPath = settings?.outputPath
+  const exportRange = settings?.exportRange
   const importedVideoRangePrefilledRef = useRef(false)
   const {
     availableCodecs,
@@ -157,32 +158,24 @@ export default function useRenderVideoDialogState({
 
     importedVideoRangePrefilledRef.current = true
     onSettingsChange({
-      exportRange: {
-        ...(settings?.exportRange || {}),
-        ...getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
-      },
+      exportRange: getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
     })
-  }, [hasImportedVideo, importedVideoDuration, onSettingsChange, settings?.exportRange, videoSyncOffsetSeconds])
+  }, [hasImportedVideo, importedVideoDuration, onSettingsChange, videoSyncOffsetSeconds])
 
   const handleExportModeChange = useCallback(
     (exportMode) => {
-      // Only the first switch into transparent mode auto-prefills the imported
-      // video span; after that, manual edits stay intact until the dialog closes.
-      if (exportMode === 'transparent' && hasImportedVideo && !importedVideoRangePrefilledRef.current) {
-        importedVideoRangePrefilledRef.current = true
-        onSettingsChange({
-          exportMode,
-          exportRange: {
-            ...(settings?.exportRange || {}),
-            ...getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
-          },
-        })
+      if (exportMode !== 'transparent' || !hasImportedVideo || importedVideoRangePrefilledRef.current || exportRange?.type === 'custom') {
+        onSettingsChange({ exportMode })
         return
       }
 
-      onSettingsChange({ exportMode })
+      importedVideoRangePrefilledRef.current = true
+      onSettingsChange({
+        exportMode,
+        exportRange: getImportedVideoExportRange(importedVideoDuration, videoSyncOffsetSeconds),
+      })
     },
-    [hasImportedVideo, importedVideoDuration, onSettingsChange, settings?.exportRange, videoSyncOffsetSeconds],
+    [exportRange, hasImportedVideo, importedVideoDuration, onSettingsChange, videoSyncOffsetSeconds],
   )
 
   const handleOutputPathCommit = useCallback(

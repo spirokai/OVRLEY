@@ -82,6 +82,44 @@ describe('RenderVideoDialog', () => {
     expect(screen.getByDisplayValue('00:00:17')).toBeInTheDocument()
   })
 
+  test('preserves export markers when switching an imported-video dialog to transparent export', async () => {
+    useStore.setState({
+      importedVideoPath: 'C:\\video.mp4',
+      importedVideoFps: 30,
+      importedVideoDuration: 12,
+      importedVideoResolution: { width: 1920, height: 1080 },
+      videoSyncOffsetSeconds: 5,
+    })
+
+    const user = userEvent.setup()
+
+    render(
+      <RenderVideoDialogHarness
+        initialSettings={{
+          fps: 30,
+          updateRate: 1,
+          exportMode: 'composite',
+          exportCodec: 'libx264',
+          exportAcceleration: 'cpu',
+          exportBitrate: 20,
+          exportRange: {
+            ...DEFAULT_EXPORT_RANGE,
+            type: 'custom',
+            from: 2,
+            to: 8,
+          },
+        }}
+      />,
+    )
+
+    await user.click(screen.getByRole('tab', { name: 'Transparent' }))
+
+    expect(screen.getByDisplayValue('00:00:02')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('00:00:08')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('00:00:05')).not.toBeInTheDocument()
+    expect(screen.queryByDisplayValue('00:00:17')).not.toBeInTheDocument()
+  })
+
   test('commits the edited output path instead of the previous draft value', async () => {
     const user = userEvent.setup()
 
