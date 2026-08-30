@@ -148,7 +148,7 @@ describe('HeadingTapeDisplaySection', () => {
   test('disables indicator placement when style is highlight bar', () => {
     render(<HeadingTapeDisplaySection widget={makeHeadingTapeWidget({ indicator_style: 'highlight_bar' })} updateWidgetData={vi.fn()} />)
 
-    const placementTrigger = screen.getByText('Placement').closest('div').querySelector('button')
+    const placementTrigger = screen.getByText('Placement').closest('div').parentElement.querySelector('[data-slot="select-trigger"]')
 
     expect(placementTrigger).toBeDisabled()
   })

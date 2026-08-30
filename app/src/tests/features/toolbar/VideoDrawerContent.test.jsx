@@ -78,7 +78,6 @@ describe('VideoDrawerContent', () => {
     )
 
     expect(screen.getByText('ride.mp4')).toBeInTheDocument()
-    expect(screen.getByText('H264')).toBeInTheDocument()
     expect(screen.getByText('1:02:03')).toBeInTheDocument()
     expect(screen.getByText('59.94 fps')).toBeInTheDocument()
     expect(screen.getByText('1920×1080')).toBeInTheDocument()

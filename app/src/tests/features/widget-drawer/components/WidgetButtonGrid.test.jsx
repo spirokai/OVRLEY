@@ -9,7 +9,7 @@ import { WidgetButtonGrid } from '@/features/widget-drawer/components/WidgetButt
 
 describe('WidgetButtonGrid', () => {
   test('renders a button for each widget type including Wave 1 standard metrics', () => {
-    render(<WidgetButtonGrid onAddWidget={() => {}} />)
+    render(<WidgetButtonGrid onAddWidget={() => {}} availableMetrics={[]} />)
 
     const buttons = screen.getAllByRole('button')
     expect(buttons.length).toBeGreaterThan(0)
@@ -18,7 +18,7 @@ describe('WidgetButtonGrid', () => {
   })
 
   test('each button displays an icon', () => {
-    const { container } = render(<WidgetButtonGrid onAddWidget={() => {}} />)
+    const { container } = render(<WidgetButtonGrid onAddWidget={() => {}} availableMetrics={[]} />)
 
     const buttons = container.querySelectorAll('button')
     buttons.forEach((button) => {
@@ -27,7 +27,7 @@ describe('WidgetButtonGrid', () => {
   })
 
   test('each button displays the widget drawer label for the current drawer catalog', () => {
-    render(<WidgetButtonGrid onAddWidget={() => {}} />)
+    render(<WidgetButtonGrid onAddWidget={() => {}} availableMetrics={[]} />)
 
     expect(screen.getByText('HR')).toBeInTheDocument()
     expect(screen.getByText('Map')).toBeInTheDocument()
@@ -50,7 +50,7 @@ describe('WidgetButtonGrid', () => {
   test('clicking a metric display type calls onAddWidget with the correct type and display label', async () => {
     const onAddWidget = vi.fn()
     const user = userEvent.setup()
-    render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
+    render(<WidgetButtonGrid onAddWidget={onAddWidget} availableMetrics={[]} />)
 
     await user.click(screen.getByText('Speed').closest('button'))
     const textOptions = screen.getAllByRole('button', { name: 'Text' })
@@ -66,7 +66,7 @@ describe('WidgetButtonGrid', () => {
   test('lap timer presents all four canonical readouts', async () => {
     const onAddWidget = vi.fn()
     const user = userEvent.setup()
-    render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
+    render(<WidgetButtonGrid onAddWidget={onAddWidget} availableMetrics={[]} />)
 
     await user.click(screen.getByText('Lap Times').closest('button'))
     expect(screen.getByRole('button', { name: 'Current Lap' })).toBeInTheDocument()
@@ -81,7 +81,7 @@ describe('WidgetButtonGrid', () => {
   test('clicking a backdrop display type uses backdrop labels and calls onAddWidget', async () => {
     const onAddWidget = vi.fn()
     const user = userEvent.setup()
-    render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
+    render(<WidgetButtonGrid onAddWidget={onAddWidget} availableMetrics={[]} />)
 
     await user.click(screen.getByText('Backdrop').closest('button'))
     expect(screen.getByRole('button', { name: 'Rectangle' })).toBeInTheDocument()
@@ -95,7 +95,7 @@ describe('WidgetButtonGrid', () => {
   test('clicking a button does not auto-close the drawer', async () => {
     const onAddWidget = vi.fn()
     const user = userEvent.setup()
-    render(<WidgetButtonGrid onAddWidget={onAddWidget} />)
+    render(<WidgetButtonGrid onAddWidget={onAddWidget} availableMetrics={[]} />)
 
     await user.click(screen.getByText('HR').closest('button'))
     const textOptions = screen.getAllByRole('button', { name: 'Text' })
