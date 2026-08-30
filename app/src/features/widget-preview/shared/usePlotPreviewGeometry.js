@@ -31,11 +31,11 @@ function replaceGeometryPlot(config, plotType, plotData) {
   return { ...config, plots }
 }
 
-function buildPlotGeometryConfig({ config, globalDefaults, activity, exportWindow, globalScale, plotType, plotData }) {
+function buildPlotGeometryConfig({ config, globalDefaults, activity, exportWindow, globalScale, plotType, plotData, widgetUpdateRate }) {
   if (!config || !activity || !hasTauriRuntime()) return null
 
   const duration = activity.trim_end_seconds
-  const { updateRate, start, end, ...sceneRest } = config.scene
+  const { start, end, ...sceneRest } = config.scene
   const geometryConfig = replaceGeometryPlot(config, plotType, plotData)
 
   return {
@@ -44,7 +44,7 @@ function buildPlotGeometryConfig({ config, globalDefaults, activity, exportWindo
       ...globalDefaults,
       ...sceneRest,
       scale: globalScale,
-      update_rate: updateRate,
+      update_rate: widgetUpdateRate,
       start: exportWindow.active ? exportWindow.start : (start ?? 0),
       end: exportWindow.active ? exportWindow.end : (end ?? duration),
       custom_export_range_active: exportWindow.active,
@@ -71,6 +71,7 @@ export function usePlotPreviewGeometry({ activity, data, exportRange, style, plo
   const config = useStore((state) => state.config)
   const globalDefaults = useStore((state) => state.globalDefaults)
   const fallbackDurationSeconds = useStore((state) => state.fallbackDurationSeconds)
+  const widgetUpdateRate = useStore((state) => state.renderSettings.widgetUpdateRate)
   const exportWindow = useMemo(
     () => resolveExportRangeWindow(activity, exportRange, data.show_full_activity),
     [activity, data.show_full_activity, exportRange],
@@ -87,8 +88,9 @@ export function usePlotPreviewGeometry({ activity, data, exportRange, style, plo
       globalDefaults,
       globalScale: style.globalScale,
       plotType,
+      widgetUpdateRate,
     }
-  }, [activity, config, data, exportWindow, globalDefaults, plotType, style.globalScale])
+  }, [activity, config, data, exportWindow, globalDefaults, plotType, style.globalScale, widgetUpdateRate])
 
   useEffect(() => {
     const geometryConfig = buildPlotGeometryConfig(latestInputsRef.current)
@@ -106,7 +108,17 @@ export function usePlotPreviewGeometry({ activity, data, exportRange, style, plo
     return () => {
       cancelled = true
     }
-  }, [activity, buildGeometry, config?.scene?.end, config?.scene?.start, exportWindow, geometrySignature, mockGeometryKey, style.globalScale])
+  }, [
+    activity,
+    buildGeometry,
+    config?.scene?.end,
+    config?.scene?.start,
+    exportWindow,
+    geometrySignature,
+    mockGeometryKey,
+    style.globalScale,
+    widgetUpdateRate,
+  ])
 
   const points = useMemo(
     () =>

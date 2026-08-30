@@ -25,6 +25,7 @@ const defaultProps = {
   editorShell: { debugModeEnabled: false, openKeyboardShortcuts: vi.fn() },
   onOpenDownloads: vi.fn(),
   projectLifecycle: {
+    status: 'Unsaved',
     handleNewProject: vi.fn(),
     handleOpenProject: vi.fn(),
     handleSaveProject: vi.fn(),
@@ -80,6 +81,7 @@ describe('AppHeader grouped-props contract', () => {
     expect(props).toContain('onSaveProject')
     expect(props).toContain('onSaveProjectAs')
     expect(props).toContain('appVersion')
+    expect(props).toContain('status')
   })
 
   test('TemplateSection receives template selector and CRUD props', () => {

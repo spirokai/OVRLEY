@@ -47,7 +47,9 @@ const mockConfig = {
 const mockGlobalDefaults = {}
 
 vi.mock('@/store/useStore', () => ({
-  default: vi.fn((selector) => selector({ config: mockConfig, globalDefaults: mockGlobalDefaults, fallbackDurationSeconds: 73 })),
+  default: vi.fn((selector) =>
+    selector({ config: mockConfig, globalDefaults: mockGlobalDefaults, fallbackDurationSeconds: 73, renderSettings: { widgetUpdateRate: 1 } }),
+  ),
 }))
 
 // Mock geometryUtils — the hook still uses local marker interpolation

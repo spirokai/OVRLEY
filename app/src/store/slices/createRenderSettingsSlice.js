@@ -11,8 +11,8 @@ export const DEFAULT_RENDER_SETTINGS = Object.freeze({
 
 function validateRenderSettings(settings) {
   if (!Number.isFinite(settings.fps) || settings.fps <= 0) throw new Error('Render FPS must be a positive finite number')
-  if (!Number.isFinite(settings.widgetUpdateRate) || settings.widgetUpdateRate <= 0) {
-    throw new Error('Widget update rate must be a positive finite number')
+  if (!Number.isInteger(settings.widgetUpdateRate) || settings.widgetUpdateRate <= 0) {
+    throw new Error('Widget update rate must be a positive integer')
   }
   if (settings.exportMode !== 'transparent' && settings.exportMode !== 'composite') throw new Error('Invalid export mode')
   if (typeof settings.codec !== 'string' || !settings.codec) throw new Error('Render codec is required')

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { deepEqual } from '@/store/store-utils'
 import useStore from '@/store/useStore'
-import { filenameFromPath } from '../utils/projectPaths'
+import { filenameFromSelectedPath } from '@/lib/utils'
 import { createProjectDirtyProjection, createProjectSnapshot } from '../utils/projectSnapshot'
 
 function currentDirtyProjection(state, projectPath) {
@@ -56,7 +56,7 @@ export default function useProjectDocumentState() {
     loadedProjectPath,
     markNew,
     markSaved,
-    projectName: filenameFromPath(loadedProjectPath),
+    projectName: filenameFromSelectedPath(loadedProjectPath),
     status,
   }
 }

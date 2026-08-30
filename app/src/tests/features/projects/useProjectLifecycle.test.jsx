@@ -6,9 +6,11 @@ import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlic
 import useStore from '@/store/useStore'
 
 const boundaries = vi.hoisted(() => ({
+  clearPreviewVideo: vi.fn(),
   getDefaultProjectDirectory: vi.fn(),
   openSinglePath: vi.fn(),
   readProjectFile: vi.fn(),
+  registerPreviewVideo: vi.fn(),
   saveSinglePath: vi.fn(),
   selectedPathIsFile: vi.fn(),
   writeProjectFile: vi.fn(),
@@ -16,8 +18,10 @@ const boundaries = vi.hoisted(() => ({
 
 vi.mock('@/api/backend', async (importOriginal) => ({
   ...(await importOriginal()),
+  clearPreviewVideo: boundaries.clearPreviewVideo,
   getDefaultProjectDirectory: boundaries.getDefaultProjectDirectory,
   readProjectFile: boundaries.readProjectFile,
+  registerPreviewVideo: boundaries.registerPreviewVideo,
   selectedPathIsFile: boundaries.selectedPathIsFile,
   writeProjectFile: boundaries.writeProjectFile,
 }))
@@ -33,6 +37,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     vi.clearAllMocks()
     useStore.setState(useStore.getInitialState(), true)
     useStore.temporal.getState().clear()
+    boundaries.clearPreviewVideo.mockResolvedValue(null)
+    boundaries.registerPreviewVideo.mockResolvedValue({ importId: 'owner-import-id', previewUrl: 'http://preview/video' })
   })
 
   test('delegates source population to each owner before restoring project settings', async () => {
@@ -63,6 +69,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       },
       timeline: { playheadSecond: 30, viewStart: 20, viewEnd: 60 },
     }
+    project.editor.config.scene.fps = project.render.fps
+    project.editor.config.scene.updateRate = project.render.widgetUpdateRate
 
     boundaries.openSinglePath.mockResolvedValue(projectPath)
     boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Users\\test\\Documents\\OVRLEY\\projects')
@@ -71,43 +79,49 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       resolvedSources: { activityPath, videoPath },
     })
     boundaries.selectedPathIsFile.mockResolvedValue(true)
-    let finishActivityLoad
-    let finishVideoLoad
-    const loadActivityPath = vi.fn(
+    let finishActivityPreparation
+    let finishVideoPreparation
+    const preparedActivity = {
+      source: { kind: 'file', path: activityPath },
+      parsedActivity: {
+        valid_attributes: [],
+        extended_attributes: [],
+        coverage: {},
+        metadata: { duration_seconds: 100 },
+        file_format: 'fit',
+        file_name: 'ride.fit',
+      },
+    }
+    const prepareActivityPath = vi.fn(
       (path) =>
         new Promise((resolve) => {
-          finishActivityLoad = () => {
-            useStore.setState({
-              activitySource: { kind: 'file', path },
-              parsedActivity: { owner: 'activity-loader' },
-              parsedActivitySource: 'activity-file',
-              activitySummary: { durationSeconds: 100 },
-            })
-            resolve()
-          }
+          finishActivityPreparation = () => resolve({ ...preparedActivity, source: { kind: 'file', path } })
         }),
     )
-    const loadVideoPath = vi.fn(
+    const prepareVideoPath = vi.fn(
       (path) =>
         new Promise((resolve) => {
-          finishVideoLoad = () => {
-            useStore.setState({
-              importedVideoPath: path,
-              importedVideoDuration: 40,
-              importedVideoResolution: { width: 1920, height: 1080 },
-              importedVideoImportId: 'owner-import-id',
+          finishVideoPreparation = () =>
+            resolve({
+              path,
+              telemetry: null,
+              importedVideoState: {
+                importedVideoPath: path,
+                importedVideoDuration: 40,
+                importedVideoResolution: { width: 1920, height: 1080 },
+              },
             })
-            resolve()
-          }
         }),
     )
     const clearHistory = vi.spyOn(useStore.temporal.getState(), 'clear')
+    const onSetBackgroundMode = vi.fn()
     const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        loadActivityPath,
         clearImportedVideo: vi.fn(),
-        loadVideoPath,
+        onSetBackgroundMode,
+        prepareActivityPath,
+        prepareVideoPath,
       }),
     )
 
@@ -116,24 +130,25 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       openPromise = result.current.handleOpenProject()
     })
     await waitFor(() => {
-      expect(loadActivityPath).toHaveBeenCalledOnce()
-      expect(loadVideoPath).toHaveBeenCalledOnce()
+      expect(prepareActivityPath).toHaveBeenCalledOnce()
+      expect(prepareVideoPath).toHaveBeenCalledOnce()
     })
-    finishActivityLoad()
-    finishVideoLoad()
+    expect(useStore.getState().activitySource).toBeNull()
+    expect(useStore.getState().importedVideoPath).toBeNull()
+    finishActivityPreparation()
+    finishVideoPreparation()
     await act(async () => openPromise)
 
     expect(boundaries.openSinglePath).toHaveBeenCalledWith(expect.any(Array), {
       defaultPath: 'C:\\Users\\test\\Documents\\OVRLEY\\projects',
       lastDirectoryKey: 'last-project-dir',
     })
-    expect(loadActivityPath).toHaveBeenCalledOnce()
-    expect(loadActivityPath).toHaveBeenCalledWith(activityPath)
-    expect(loadVideoPath).toHaveBeenCalledOnce()
-    expect(loadVideoPath).toHaveBeenCalledWith(videoPath)
+    expect(prepareActivityPath).toHaveBeenCalledWith(activityPath)
+    expect(prepareVideoPath).toHaveBeenCalledWith(videoPath)
+    expect(boundaries.registerPreviewVideo).toHaveBeenCalledWith(videoPath)
 
     const state = useStore.getState()
-    expect(state.parsedActivity).toEqual({ owner: 'activity-loader' })
+    expect(state.parsedActivity).toBe(preparedActivity.parsedActivity)
     expect(state.config.scene.width).toBe(1280)
     expect(state.globalDefaults.color_text).toBe('#123456')
     expect(state.loadedTemplateSource).toBeNull()
@@ -144,6 +159,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(state.selectedSecond).toBe(30)
     expect(state.timelineViewport).toEqual({ viewStart: 20, viewEnd: 60 })
     expect(state.previewPlaybackState).toBe('paused')
+    expect(onSetBackgroundMode).toHaveBeenCalledWith('video')
     expect(clearHistory).toHaveBeenCalled()
     expect(result.current.status).toBe('Saved')
 
@@ -160,9 +176,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        loadActivityPath: vi.fn(),
         clearImportedVideo: vi.fn(),
-        loadVideoPath: vi.fn(),
+        prepareActivityPath: vi.fn(),
+        prepareVideoPath: vi.fn(),
       }),
     )
 
@@ -173,7 +189,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     })
   })
 
-  test('New Project clears session state and restores only the loaded template widget baseline', async () => {
+  test('New Project asks for confirmation and discards changes when the user discards', async () => {
     const initialState = useStore.getState()
     const templateSource = { kind: 'file', path: 'C:\\Templates\\race.json' }
     const templateState = createDurableTemplateState({
@@ -210,13 +226,21 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        loadActivityPath: vi.fn(),
         clearImportedVideo,
-        loadVideoPath: vi.fn(),
+        prepareActivityPath: vi.fn(),
+        prepareVideoPath: vi.fn(),
       }),
     )
 
-    await act(() => result.current.handleNewProject())
+    let createPromise
+    act(() => {
+      createPromise = result.current.handleNewProject()
+    })
+    await waitFor(() => expect(result.current.newProjectConfirmDialog.open).toBe(true))
+    expect(clearImportedVideo).not.toHaveBeenCalled()
+
+    act(() => result.current.newProjectConfirmDialog.onDiscard())
+    await act(async () => createPromise)
 
     const state = useStore.getState()
     expect(clearImportedVideo).toHaveBeenCalledOnce()
@@ -231,6 +255,83 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(state.selectedSecond).toBe(0)
     expect(state.timelineViewport).toEqual({ viewStart: 0, viewEnd: 73 })
     expect(result.current.loadedProjectPath).toBeNull()
+    expect(result.current.status).toBe('Unsaved')
+  })
+
+  test('New Project saves the current project first when the user chooses Save', async () => {
+    const initialState = useStore.getState()
+    const templateSource = { kind: 'file', path: 'C:\\Templates\\race.json' }
+    const templateState = createDurableTemplateState({
+      config: {
+        ...initialState.config,
+        labels: [{ id: 'template-widget', text: 'Template', x: 10, y: 20 }],
+      },
+      globalDefaults: initialState.globalDefaults,
+    })
+    useStore.setState({
+      loadedTemplateSource: templateSource,
+      lastSavedTemplateState: templateState,
+      config: {
+        ...templateState.config,
+        labels: [...templateState.config.labels, { id: 'project-widget', text: 'Project', x: 30, y: 40 }],
+      },
+    })
+    boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
+    boundaries.saveSinglePath.mockResolvedValue('C:\\Projects\\project.oly')
+    boundaries.writeProjectFile.mockResolvedValue(null)
+
+    const clearImportedVideo = vi.fn(async () => useStore.getState().clearImportedVideo())
+    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
+    const { result } = renderHook(() =>
+      useProjectLifecycle({
+        clearImportedVideo,
+        prepareActivityPath: vi.fn(),
+        prepareVideoPath: vi.fn(),
+      }),
+    )
+
+    let createPromise
+    act(() => {
+      createPromise = result.current.handleNewProject()
+    })
+    await waitFor(() => expect(result.current.newProjectConfirmDialog.open).toBe(true))
+
+    act(() => result.current.newProjectConfirmDialog.onSave())
+    await act(async () => createPromise)
+
+    expect(boundaries.saveSinglePath).toHaveBeenCalledOnce()
+    expect(boundaries.writeProjectFile).toHaveBeenCalledOnce()
+    expect(useStore.getState().config.labels.map((widget) => widget.id)).toEqual(['template-widget'])
+    expect(result.current.loadedProjectPath).toBeNull()
+    expect(result.current.status).toBe('Unsaved')
+  })
+
+  test('New Project keeps the session when the user cancels the confirmation', async () => {
+    const initialState = useStore.getState()
+    useStore.setState({ activitySource: { kind: 'file', path: 'C:\\Media\\ride.fit' }, parsedActivity: { samples: [] } })
+
+    const clearImportedVideo = vi.fn()
+    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
+    const { result } = renderHook(() =>
+      useProjectLifecycle({
+        clearImportedVideo,
+        prepareActivityPath: vi.fn(),
+        prepareVideoPath: vi.fn(),
+      }),
+    )
+
+    let createPromise
+    act(() => {
+      createPromise = result.current.handleNewProject()
+    })
+    await waitFor(() => expect(result.current.newProjectConfirmDialog.open).toBe(true))
+
+    act(() => result.current.newProjectConfirmDialog.onCancel())
+    const outcome = await act(async () => createPromise)
+
+    expect(outcome).toBe(false)
+    expect(clearImportedVideo).not.toHaveBeenCalled()
+    expect(useStore.getState().activitySource).toEqual({ kind: 'file', path: 'C:\\Media\\ride.fit' })
     expect(result.current.status).toBe('Unsaved')
   })
 
@@ -264,13 +365,15 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       resolvedSources: { activityPath: missingActivityPath, videoPath: null },
     })
     boundaries.selectedPathIsFile.mockResolvedValue(false)
-    const loadActivityPath = vi.fn()
+    const prepareActivityPath = vi.fn()
+    const onSetBackgroundMode = vi.fn()
     const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        loadActivityPath,
         clearImportedVideo: vi.fn(),
-        loadVideoPath: vi.fn(),
+        onSetBackgroundMode,
+        prepareActivityPath,
+        prepareVideoPath: vi.fn(),
       }),
     )
 
@@ -282,9 +385,122 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     act(() => result.current.missingSourceDialog.onLoadAnyway())
     await act(async () => openPromise)
 
-    expect(loadActivityPath).not.toHaveBeenCalled()
+    expect(prepareActivityPath).not.toHaveBeenCalled()
+    expect(onSetBackgroundMode).not.toHaveBeenCalled()
     expect(useStore.getState().activitySource).toBeNull()
     expect(result.current.loadedProjectPath).toBe(projectPath)
     expect(result.current.status).toBe('Modified')
+  })
+
+  test('keeps the current session untouched when either parallel preparation fails', async () => {
+    const initialState = useStore.getState()
+    const projectPath = 'C:\\Events\\Broken.oly'
+    const project = {
+      format: 'ovrley-project',
+      version: 1,
+      savedAt: '2026-08-27T12:00:00.000Z',
+      editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
+      sources: {
+        activity: { path: { kind: 'project-relative', value: 'broken.fit' } },
+        video: { path: { kind: 'project-relative', value: 'ride.mp4' } },
+      },
+      sync: { videoOffsetSeconds: 0, videoTimezoneMode: null },
+      render: { ...DEFAULT_RENDER_SETTINGS, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
+    }
+    useStore.setState({
+      activitySource: { kind: 'file', path: 'C:\\Current\\ride.fit' },
+      importedBackgroundImagePath: 'C:\\Current\\background.png',
+    })
+    boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
+    boundaries.openSinglePath.mockResolvedValue(projectPath)
+    boundaries.readProjectFile.mockResolvedValue({
+      project,
+      resolvedSources: { activityPath: 'C:\\Events\\broken.fit', videoPath: 'C:\\Events\\ride.mp4' },
+    })
+    boundaries.selectedPathIsFile.mockResolvedValue(true)
+    const prepareActivityPath = vi.fn().mockRejectedValue(new Error('invalid activity'))
+    const prepareVideoPath = vi.fn().mockResolvedValue({ path: 'C:\\Events\\ride.mp4' })
+    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
+    const { result } = renderHook(() =>
+      useProjectLifecycle({
+        clearImportedVideo: vi.fn(),
+        prepareActivityPath,
+        prepareVideoPath,
+      }),
+    )
+
+    await act(() => result.current.handleOpenProject())
+
+    expect(prepareActivityPath).toHaveBeenCalledOnce()
+    expect(prepareVideoPath).toHaveBeenCalledOnce()
+    expect(boundaries.registerPreviewVideo).not.toHaveBeenCalled()
+    expect(boundaries.clearPreviewVideo).not.toHaveBeenCalled()
+    expect(useStore.getState().activitySource.path).toBe('C:\\Current\\ride.fit')
+    expect(useStore.getState().importedBackgroundImagePath).toBe('C:\\Current\\background.png')
+  })
+
+  test('clears a previous background image when the opened project has no video', async () => {
+    const initialState = useStore.getState()
+    const projectPath = 'C:\\Events\\Empty.oly'
+    const project = {
+      format: 'ovrley-project',
+      version: 1,
+      savedAt: '2026-08-27T12:00:00.000Z',
+      editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
+      sources: { activity: null, video: null },
+      sync: { videoOffsetSeconds: 0, videoTimezoneMode: null },
+      render: { ...DEFAULT_RENDER_SETTINGS, exportMode: 'transparent', range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
+    }
+    useStore.setState({ importedBackgroundImagePath: 'C:\\Current\\background.png' })
+    boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
+    boundaries.openSinglePath.mockResolvedValue(projectPath)
+    boundaries.readProjectFile.mockResolvedValue({ project, resolvedSources: { activityPath: null, videoPath: null } })
+    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
+    const { result } = renderHook(() =>
+      useProjectLifecycle({
+        clearImportedVideo: vi.fn(),
+        prepareActivityPath: vi.fn(),
+        prepareVideoPath: vi.fn(),
+      }),
+    )
+
+    await act(() => result.current.handleOpenProject())
+
+    expect(boundaries.clearPreviewVideo).toHaveBeenCalledOnce()
+    expect(useStore.getState().importedBackgroundImagePath).toBeNull()
+  })
+
+  test('rejects a second project command while the first command owns the lock', async () => {
+    let finishDirectoryLookup
+    boundaries.getDefaultProjectDirectory.mockReturnValue(
+      new Promise((resolve) => {
+        finishDirectoryLookup = resolve
+      }),
+    )
+    const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
+    const { result } = renderHook(() =>
+      useProjectLifecycle({
+        clearImportedVideo: vi.fn(),
+        prepareActivityPath: vi.fn(),
+        prepareVideoPath: vi.fn(),
+      }),
+    )
+
+    let openPromise
+    act(() => {
+      openPromise = result.current.handleOpenProject()
+    })
+    expect(result.current.loadingProject).toBe(true)
+    const secondResult = await act(() => result.current.handleSaveProjectAs())
+    finishDirectoryLookup('C:\\Projects')
+    boundaries.openSinglePath.mockResolvedValue(null)
+    await act(async () => openPromise)
+
+    expect(secondResult).toBe(false)
+    expect(result.current.loadingProject).toBe(false)
+    expect(boundaries.getDefaultProjectDirectory).toHaveBeenCalledOnce()
+    expect(boundaries.saveSinglePath).not.toHaveBeenCalled()
   })
 })

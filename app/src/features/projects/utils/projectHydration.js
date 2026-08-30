@@ -2,6 +2,7 @@ import { clamp } from '@/lib/utils'
 import { clampToView } from '@/features/player/utils/timelineViewport'
 import { getTimelineMinimum } from '@/features/player/utils/playerTiming'
 import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlice'
+import { activateParsedActivity } from '@/lib/activity/import-activity'
 
 /**
  * Replaces project-owned session state for a new project.
@@ -83,7 +84,34 @@ export function applyProjectOwnedState(store, project) {
     draft.renderSettings = { ...project.render, range }
     draft.selectedSecond = clamp(project.timeline.playheadSecond, timelineMinimum, timelineEnd)
     draft.timelineViewport = timelineViewport
+    draft.skipNextTimelineViewportReset = true
     draft.previewPlaybackState = 'paused'
     draft.previewPlaybackSource = 'timeline'
   })
+}
+
+/**
+ * Commits staged media through one synchronous project transition.
+ * @param {object} store Zustand application store.
+ * @param {object} project Validated project payload.
+ * @param {{activity: object|null, video: object|null}} sources Prepared project sources.
+ */
+export function applyPreparedProjectState(store, project, sources) {
+  store.setState((draft) => {
+    draft.activitySource = null
+    draft.parsedActivity = null
+    draft.parsedActivitySource = null
+    draft.activitySummary = null
+    draft.stashedVideoTelemetry = null
+  })
+
+  const state = store.getState()
+  state.clearImportedVideo()
+  if (sources.video) {
+    store.setState(sources.video.importedVideoState)
+    if (sources.video.telemetry) state.loadVideoTelemetry(sources.video.telemetry)
+  }
+  if (sources.activity) activateParsedActivity(sources.activity, store.getState())
+
+  applyProjectOwnedState(store, project)
 }

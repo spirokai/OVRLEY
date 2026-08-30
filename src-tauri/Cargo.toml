@@ -40,3 +40,4 @@ ovrley_core = { path = "ovrley_core" }
 tiny_http = "0.12"
 uuid = { version = "1", features = ["v4"] }
 zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
+chrono = { version = "0.4", default-features = false, features = ["std"] }

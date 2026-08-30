@@ -322,6 +322,74 @@ struct ImportPreviewVideoResponse {
     warnings: Vec<String>,
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RegisterPreviewVideoResponse {
+    import_id: String,
+    preview_url: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PreparePreviewVideoResponse {
+    metadata: serde_json::Value,
+    warnings: Vec<String>,
+}
+
+fn prepare_preview_video(
+    app: &AppHandle,
+    path: &str,
+) -> Result<PreparePreviewVideoResponse, String> {
+    let metadata = std::fs::metadata(path)
+        .map_err(|error| format!("Failed to read video file metadata: {error}"))?;
+    if !metadata.is_file() {
+        return Err(format!("Video path is not a file: {path}"));
+    }
+    let video_metadata = commands::backend_probe_video(&runtime_paths::app_paths(app)?, path)
+        .map_err(|error| error.to_string())?;
+    Ok(PreparePreviewVideoResponse {
+        warnings: preview_warnings_for_metadata(&video_metadata),
+        metadata: video_metadata,
+    })
+}
+
+/// Probes a project video without changing the active preview registration.
+#[tauri::command]
+pub(crate) async fn backend_prepare_preview_video(
+    app: AppHandle,
+    path: String,
+) -> Result<String, String> {
+    serialize_command_result(&prepare_preview_video(&app, &path)?)
+}
+
+fn register_preview_video(
+    state: &VideoServerHandle,
+    path: String,
+) -> Result<RegisterPreviewVideoResponse, String> {
+    let preview_url = state.set_video(PathBuf::from(&path), content_type_for_path(&path))?;
+    let import_id = preview_url
+        .rsplit('/')
+        .next()
+        .ok_or_else(|| "Failed to read import ID from preview URL".to_string())?
+        .to_string();
+    Ok(RegisterPreviewVideoResponse {
+        import_id,
+        preview_url,
+    })
+}
+
+/// Registers an already-probed video with the preview server.
+///
+/// Project loading probes sources in parallel before entering its commit
+/// phase. This command performs only the fast, fallible preview registration.
+#[tauri::command]
+pub(crate) async fn backend_register_preview_video(
+    state: tauri::State<'_, VideoServerHandle>,
+    path: String,
+) -> Result<String, String> {
+    serialize_command_result(&register_preview_video(&state, path)?)
+}
+
 /// Imports a local video into the HTTP preview server and returns preview state.
 ///
 /// The original filesystem path remains the source of truth for export. The
@@ -332,26 +400,13 @@ pub(crate) async fn backend_import_preview_video(
     state: tauri::State<'_, VideoServerHandle>,
     path: String,
 ) -> Result<String, String> {
-    let path_buf = PathBuf::from(&path);
-    let metadata = std::fs::metadata(&path_buf)
-        .map_err(|error| format!("Failed to read video file metadata: {error}"))?;
-    if !metadata.is_file() {
-        return Err(format!("Video path is not a file: {}", path_buf.display()));
-    }
-
-    let video_metadata = commands::backend_probe_video(&runtime_paths::app_paths(&app)?, &path)
-        .map_err(|e| e.to_string())?;
-    let preview_url = state.set_video(path_buf, content_type_for_path(&path))?;
-    let import_id = preview_url
-        .rsplit('/')
-        .next()
-        .ok_or_else(|| "Failed to read import ID from preview URL".to_string())?
-        .to_string();
+    let prepared = prepare_preview_video(&app, &path)?;
+    let registration = register_preview_video(&state, path)?;
     let response = ImportPreviewVideoResponse {
-        import_id,
-        preview_url,
-        warnings: preview_warnings_for_metadata(&video_metadata),
-        metadata: video_metadata,
+        import_id: registration.import_id,
+        preview_url: registration.preview_url,
+        warnings: prepared.warnings,
+        metadata: prepared.metadata,
     };
 
     serialize_command_result(&response)

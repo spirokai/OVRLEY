@@ -28,6 +28,8 @@ describe('project snapshot contract', () => {
 
     expect(project).not.toHaveProperty('template')
     expect(project.editor.config).toEqual(expect.objectContaining({ scene: expect.objectContaining({ width: 1920, height: 1080 }) }))
+    expect(project.editor.config.scene.fps).toBe(project.render.fps)
+    expect(project.editor.config.scene.updateRate).toBe(project.render.widgetUpdateRate)
     expect(project.editor.globalDefaults).toEqual(useStore.getState().globalDefaults)
     expect(project.sources).toEqual({
       activity: { path: { kind: 'project-relative', value: 'media/ride.fit' } },

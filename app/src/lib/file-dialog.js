@@ -1,6 +1,7 @@
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { readSelectedFileBytes } from '@/api/backend'
 import { getPreference, setPreference } from '@/lib/preferences-store'
+import { directoryFromSelectedPath, filenameFromSelectedPath, pathInDirectory } from '@/lib/utils'
 
 export const selectBrowserFile = (accept) =>
   new Promise((resolve) => {
@@ -16,19 +17,6 @@ export async function fileFromSelectedPath(selectedPath, fallbackName = 'file') 
   const bytes = await readSelectedFileBytes(selectedPath)
   const filename = String(selectedPath).split(/[/\\]/).pop() || fallbackName
   return new File([bytes], filename, { type: 'application/octet-stream' })
-}
-
-function directoryFromSelectedPath(path) {
-  return String(path).replace(/[\\/][^\\/]*$/, '')
-}
-
-function filenameFromSelectedPath(path) {
-  return String(path).split(/[\\/]/).at(-1)
-}
-
-function pathInDirectory(directory, filename) {
-  const separator = String(directory).includes('\\') ? '\\' : '/'
-  return `${String(directory).replace(/[\\/]$/, '')}${separator}${filename}`
 }
 
 export async function openSinglePath(filters, options = {}) {

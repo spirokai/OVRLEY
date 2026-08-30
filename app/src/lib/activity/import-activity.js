@@ -31,7 +31,7 @@ export async function parseActivityFile(file) {
   return finalized.parsed_activity
 }
 
-export async function activateParsedActivity({ source, parsedActivity }, storeState) {
+export function activateParsedActivity({ source, parsedActivity }, storeState) {
   const { setActivitySource, activateActivityFile } = storeState
 
   setActivitySource(source)

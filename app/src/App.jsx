@@ -20,9 +20,16 @@ import {
 } from '@/features/toolbar'
 import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 import { MissingSourceDialog } from '@/features/projects'
-import { NewTemplateConfirmDialog } from '@/features/template-manager'
 import { UpdatePromptDialog } from '@/features/app-update'
-import { AppHeader, ControlPanel, ErrorAlert, KeyboardShortcutsDialog, LoadingOverlay, useAppShellComposition } from '@/features/app-shell'
+import {
+  AppHeader,
+  ControlPanel,
+  ErrorAlert,
+  KeyboardShortcutsDialog,
+  LoadingOverlay,
+  UnsavedChangesDialog,
+  useAppShellComposition,
+} from '@/features/app-shell'
 import * as backend from './api/backend'
 
 function useRightClickDevtools() {
@@ -144,11 +151,8 @@ function AppShell() {
           onOverwriteCancel={renderWorkflow.handleOverwriteCancel}
           submissionPending={renderWorkflow.submissionPending}
         />
-        <NewTemplateConfirmDialog
-          open={templateManagement.showNewTemplateConfirm}
-          onCancel={() => templateManagement.setShowNewTemplateConfirm(false)}
-          onConfirm={templateManagement.confirmCreateNewTemplate}
-        />
+        <UnsavedChangesDialog {...templateManagement.newTemplateConfirmDialog} />
+        <UnsavedChangesDialog {...projectLifecycle.newProjectConfirmDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
         <KeyboardShortcutsDialog open={editorShell.keyboardShortcutsOpen} onClose={editorShell.closeKeyboardShortcuts} />
         <AppHeader
@@ -169,8 +173,10 @@ function AppShell() {
           workspace={
             <>
               <LoadingOverlay
-                show={isProcessing || importingVideo}
-                label={importingVideo ? 'Importing your video...' : 'Processing your activity...'}
+                show={projectLifecycle.loadingProject || isProcessing || importingVideo}
+                label={
+                  projectLifecycle.loadingProject ? 'Loading project...' : importingVideo ? 'Importing your video...' : 'Processing your activity...'
+                }
               />
               <div
                 className="min-h-0 flex-1"

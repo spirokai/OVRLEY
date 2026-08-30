@@ -99,7 +99,7 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
     <div className="space-y-6">
       <div className="space-y-3">
         {widgets.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-border/70 py-8 text-center">
+          <div className="rounded-sm border border-dashed border-border/70 py-8 text-center ml-3">
             <p className="text-xs text-muted-foreground">No active widgets</p>
           </div>
         ) : (

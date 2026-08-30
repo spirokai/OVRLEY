@@ -63,6 +63,7 @@ export default function AppHeader({
           onLoadProject={projectLifecycle.handleOpenProject}
           onSaveProject={projectLifecycle.handleSaveProject}
           onSaveProjectAs={projectLifecycle.handleSaveProjectAs}
+          status={projectLifecycle.status}
         />
 
         <TemplateSection

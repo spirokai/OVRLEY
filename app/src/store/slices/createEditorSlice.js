@@ -97,6 +97,7 @@ export function createEditorSlice(set, get) {
     endSecond: 73,
     selectedSecond: 0,
     timelineViewport: { viewStart: 0, viewEnd: 73 },
+    skipNextTimelineViewportReset: false,
     previewPlaybackState: 'paused',
     previewPlaybackSource: 'timeline',
     isVideoMuted: false,

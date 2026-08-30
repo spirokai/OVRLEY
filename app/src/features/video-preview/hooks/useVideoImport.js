@@ -2,10 +2,11 @@
  * Video import - background media selection and preview management.
  */
 
-import { clearPreviewVideo, extractVideoTelemetry, importPreviewVideo } from '@/api/backend'
+import { clearPreviewVideo, extractVideoTelemetry, importPreviewVideo, preparePreviewVideo } from '@/api/backend'
 import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import { openSinglePath } from '@/lib/file-dialog'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
+import { createImportedVideoState } from '@/store/slices/createVideoImportSlice'
 import useStore from '@/store/useStore'
 
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'mkv'])
@@ -28,6 +29,26 @@ async function extractAndStoreVideoTelemetry(filePath) {
   } catch (error) {
     console.warn('MP4 telemetry extraction failed (non-fatal):', error)
   }
+}
+
+/**
+ * Probes a project video without mutating preview-server or application state.
+ * @param {string} path Absolute video path.
+ * @returns {Promise<{path: string, metadata: object, telemetry: object|null}>} Prepared video source.
+ */
+export async function prepareVideoPath(path) {
+  if (typeof path !== 'string' || path.length === 0) throw new Error('Video import requires a file path.')
+  if (!isVideoPath(path)) throw new Error('Selected file is not a supported video.')
+
+  const telemetryPromise = extractVideoTelemetry(path)
+    .then((response) => response?.parsed_activity ?? null)
+    .catch((error) => {
+      console.warn('MP4 telemetry extraction failed (non-fatal):', error)
+      return null
+    })
+  const [preview, telemetry] = await Promise.all([preparePreviewVideo(path), telemetryPromise])
+  const importedVideoState = createImportedVideoState({ ...preview.metadata, previewWarnings: preview.warnings })
+  return { path, importedVideoState, telemetry }
 }
 
 async function importVideoSelection(selection, { setImportingVideo, setImportedVideo, setConfig, clearVideoTelemetry, onSetBackgroundMode }) {
@@ -226,5 +247,6 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     handleImportVideo,
     handleVideoFilesDrop,
     loadVideoPath,
+    prepareVideoPath,
   }
 }

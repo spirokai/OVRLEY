@@ -3,6 +3,7 @@
 //! `project.json` is validated here before any frontend orchestration sees it.
 //! Archive and platform-path details do not leak into application state.
 
+use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs::{self, File};
@@ -115,7 +116,7 @@ enum VideoTimezoneMode {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectRender {
     fps: f64,
-    widget_update_rate: f64,
+    widget_update_rate: u32,
     export_mode: ExportMode,
     codec: String,
     bitrate_mbps: Option<f64>,
@@ -203,7 +204,7 @@ fn validate_project(project: &ProjectDocument) -> Result<(), String> {
     if project.version != PROJECT_VERSION {
         return Err(format!("Unsupported project version: {}", project.version));
     }
-    if project.saved_at.trim().is_empty() || !project.saved_at.contains('T') {
+    if DateTime::parse_from_rfc3339(&project.saved_at).is_err() {
         return Err("Project savedAt must be an ISO-8601 timestamp".into());
     }
     if let Some(source) = &project.sources.activity {
@@ -215,7 +216,6 @@ fn validate_project(project: &ProjectDocument) -> Result<(), String> {
     for (label, value) in [
         ("sync.videoOffsetSeconds", project.sync.video_offset_seconds),
         ("render.fps", project.render.fps),
-        ("render.widgetUpdateRate", project.render.widget_update_rate),
         ("render.range.from", project.render.range.from),
         ("render.range.to", project.render.range.to),
         ("timeline.playheadSecond", project.timeline.playhead_second),
@@ -226,7 +226,7 @@ fn validate_project(project: &ProjectDocument) -> Result<(), String> {
             return Err(format!("{label} must be finite"));
         }
     }
-    if project.render.fps <= 0.0 || project.render.widget_update_rate <= 0.0 {
+    if project.render.fps <= 0.0 || project.render.widget_update_rate == 0 {
         return Err("Render fps and widgetUpdateRate must be positive".into());
     }
     if let Some(bitrate) = project.render.bitrate_mbps {
@@ -250,11 +250,19 @@ fn validate_project(project: &ProjectDocument) -> Result<(), String> {
     if project.timeline.view_start >= project.timeline.view_end {
         return Err("Timeline viewport requires viewStart < viewEnd".into());
     }
-    validate_editor(&project.editor)?;
+    validate_editor(
+        &project.editor,
+        project.render.fps,
+        project.render.widget_update_rate,
+    )?;
     Ok(())
 }
 
-fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
+fn validate_editor(
+    editor: &ProjectEditor,
+    render_fps: f64,
+    widget_update_rate: u32,
+) -> Result<(), String> {
     let globals = &editor.global_defaults;
     for (label, value) in [
         (
@@ -308,6 +316,9 @@ fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
         .ok_or_else(|| "editor.config.scene must be an object".to_string())?;
     scene.insert("start".into(), Value::from(0.0));
     scene.insert("end".into(), Value::from(1.0));
+    scene.insert("fps".into(), Value::from(render_fps));
+    scene.remove("updateRate");
+    scene.insert("update_rate".into(), Value::from(widget_update_rate));
     scene.entry("scale").or_insert(Value::from(globals.scale));
     scene
         .entry("font")
@@ -339,9 +350,21 @@ fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
 }
 
 fn parse_project(input: &str) -> Result<ProjectDocument, String> {
-    let project: ProjectDocument =
+    let mut project: ProjectDocument =
         serde_json::from_str(input).map_err(|error| format!("Invalid project JSON: {error}"))?;
     validate_project(&project)?;
+    let scene = project
+        .editor
+        .config
+        .get_mut("scene")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| "editor.config.scene must be an object".to_string())?;
+    scene.insert("fps".into(), Value::from(project.render.fps));
+    scene.insert(
+        "updateRate".into(),
+        Value::from(project.render.widget_update_rate),
+    );
+    scene.remove("update_rate");
     Ok(project)
 }
 
@@ -536,7 +559,7 @@ mod tests {
             },
             "sync": { "videoOffsetSeconds": 0.0, "videoTimezoneMode": null },
             "render": {
-                "fps": 30.0, "widgetUpdateRate": 1.0, "exportMode": "transparent", "codec": "prores_ks",
+                "fps": 30.0, "widgetUpdateRate": 1, "exportMode": "transparent", "codec": "prores_ks",
                 "bitrateMbps": null, "range": { "type": "all", "from": 0.0, "to": 0.0 }
             },
             "timeline": { "playheadSecond": 0.0, "viewStart": 0.0, "viewEnd": 73.0 }
@@ -599,6 +622,28 @@ mod tests {
     fn rejects_malformed_editor_widget_state() {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
         project["editor"]["globalDefaults"]["opacity"] = Value::from(2.0);
+
+        assert!(parse_project(&project.to_string()).is_err());
+    }
+
+    #[test]
+    fn normalizes_editor_render_mirrors_from_project_render_settings() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["editor"]["config"]["scene"]["fps"] = Value::from(60.0);
+        project["editor"]["config"]["scene"]["updateRate"] = Value::from(4.0);
+
+        let parsed = parse_project(&project.to_string()).unwrap();
+        assert_eq!(parsed.editor.config["scene"]["fps"], Value::from(30.0));
+        assert_eq!(
+            parsed.editor.config["scene"]["updateRate"],
+            Value::from(1.0)
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_saved_timestamp() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["savedAt"] = Value::from("notTtimestamp");
 
         assert!(parse_project(&project.to_string()).is_err());
     }

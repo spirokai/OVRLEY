@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import { openSinglePath, saveSinglePath } from '@/lib/file-dialog'
+import { pathInDirectory } from '@/lib/utils'
+import { useUnsavedChangesConfirm } from '@/features/app-shell'
 import useStore from '@/store/useStore'
 import { createNewProject, loadProject, saveProject } from '../projectOperations'
-import { pathInDirectory } from '../utils/projectPaths'
 import { LAST_PROJECT_DIRECTORY_KEY } from '../utils/projectSnapshot'
 import useProjectDocumentState from './useProjectDocumentState'
 import useProjectSourceRecovery from './useProjectSourceRecovery'
@@ -13,21 +14,29 @@ const PROJECT_FILTER = [{ name: 'OVRLEY Project', extensions: ['oly'] }]
 /**
  * Coordinates project commands with project UI state.
  * @param {object} options Project media-owner operations.
- * @param {function} options.loadActivityPath Loads one activity source path.
+ * @param {function} options.prepareActivityPath Parses one activity source without committing it.
  * @param {function} options.clearImportedVideo Clears the active video source.
- * @param {function} options.loadVideoPath Loads one video source path.
+ * @param {function} options.prepareVideoPath Probes one video source without committing it.
+ * @param {function} [options.onSetBackgroundMode] Shell setter for the editor background mode.
  * @returns {object} Project lifecycle state and command handlers.
  */
-export default function useProjectLifecycle({ loadActivityPath, clearImportedVideo, loadVideoPath }) {
+export default function useProjectLifecycle({ prepareActivityPath, clearImportedVideo, prepareVideoPath, onSetBackgroundMode }) {
   const { conflictingOperation, loadedProjectPath, markNew, markSaved, projectName, status } = useProjectDocumentState()
   const { dialog: missingSourceDialog, resolveProjectSources } = useProjectSourceRecovery()
-  const [operationBusy, setOperationBusy] = useState(false)
-  const busy = operationBusy || conflictingOperation
+  const {
+    answerConfirm: answerUnsavedChangesConfirm,
+    isOpen: isNewProjectConfirmOpen,
+    requestConfirm: requestUnsavedChangesConfirm,
+  } = useUnsavedChangesConfirm()
+  const [activeOperation, setActiveOperation] = useState(null)
+  const operationLock = useRef(false)
+  const busy = activeOperation !== null || conflictingOperation
 
   const runOperation = useCallback(
     async (operationName, operation) => {
-      if (busy) return false
-      setOperationBusy(true)
+      if (operationLock.current || conflictingOperation) return false
+      operationLock.current = true
+      setActiveOperation(operationName)
       try {
         return await operation()
       } catch (error) {
@@ -35,39 +44,25 @@ export default function useProjectLifecycle({ loadActivityPath, clearImportedVid
         useStore.getState().setErrorMessage(`Failed to ${operationName}: ${error.message}`)
         return false
       } finally {
-        setOperationBusy(false)
+        operationLock.current = false
+        setActiveOperation(null)
       }
     },
-    [busy],
+    [conflictingOperation],
   )
 
-  const handleOpenProject = useCallback(async () => {
-    if (busy) return
-    try {
-      const defaultPath = await backend.getDefaultProjectDirectory()
-      const path = await openSinglePath(PROJECT_FILTER, { defaultPath, lastDirectoryKey: LAST_PROJECT_DIRECTORY_KEY })
-      if (!path) return false
-      return runOperation('open project', async () => {
-        const project = await loadProject({ path, resolveProjectSources, loadActivityPath, loadVideoPath, clearImportedVideo })
+  const handleOpenProject = useCallback(
+    () =>
+      runOperation('open project', async () => {
+        const defaultPath = await backend.getDefaultProjectDirectory()
+        const path = await openSinglePath(PROJECT_FILTER, { defaultPath, lastDirectoryKey: LAST_PROJECT_DIRECTORY_KEY })
+        if (!path) return false
+        const project = await loadProject({ path, resolveProjectSources, prepareActivityPath, prepareVideoPath, onSetBackgroundMode })
         if (!project) return false
         markSaved(path, project)
         return true
-      })
-    } catch (error) {
-      console.error('Failed to open project picker:', error)
-      useStore.getState().setErrorMessage(`Failed to open project picker: ${error.message}`)
-      return false
-    }
-  }, [busy, clearImportedVideo, loadActivityPath, loadVideoPath, markSaved, resolveProjectSources, runOperation])
-
-  const handleNewProject = useCallback(
-    () =>
-      runOperation('create project', async () => {
-        await createNewProject({ clearImportedVideo })
-        markNew()
-        return true
       }),
-    [clearImportedVideo, markNew, runOperation],
+    [markSaved, onSetBackgroundMode, prepareActivityPath, prepareVideoPath, resolveProjectSources, runOperation],
   )
 
   const save = useCallback(
@@ -91,6 +86,34 @@ export default function useProjectLifecycle({ loadActivityPath, clearImportedVid
   const handleSaveProject = useCallback(() => save(false), [save])
   const handleSaveProjectAs = useCallback(() => save(true), [save])
 
+  // Create new project — asks to save unsaved changes before discarding them
+  const handleNewProject = useCallback(async () => {
+    if (status !== 'Saved') {
+      const action = await requestUnsavedChangesConfirm()
+      if (action === 'cancel') return false
+      if (action === 'save') {
+        const saved = await save(false)
+        if (!saved) return false
+      }
+    }
+
+    return runOperation('create project', async () => {
+      await createNewProject({ clearImportedVideo })
+      markNew()
+      return true
+    })
+  }, [clearImportedVideo, markNew, requestUnsavedChangesConfirm, runOperation, save, status])
+
+  const newProjectConfirmDialog = {
+    open: isNewProjectConfirmOpen,
+    title: 'Create New Project',
+    description: 'Your project has unsaved changes. Save them or discard them.',
+    discardLabel: 'New Project',
+    onCancel: () => answerUnsavedChangesConfirm('cancel'),
+    onSave: () => answerUnsavedChangesConfirm('save'),
+    onDiscard: () => answerUnsavedChangesConfirm('discard'),
+  }
+
   return {
     busy,
     handleNewProject,
@@ -98,7 +121,9 @@ export default function useProjectLifecycle({ loadActivityPath, clearImportedVid
     handleSaveProject,
     handleSaveProjectAs,
     loadedProjectPath,
+    loadingProject: activeOperation === 'open project',
     missingSourceDialog,
+    newProjectConfirmDialog,
     projectName,
     status,
   }

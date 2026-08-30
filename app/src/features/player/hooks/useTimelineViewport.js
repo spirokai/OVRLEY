@@ -98,6 +98,10 @@ export default function useTimelineViewport({
 
   // Full-range reset - loading different media should never leave the user stranded in an old viewport.
   useEffect(() => {
+    if (useStore.getState().skipNextTimelineViewportReset) {
+      useStore.setState({ skipNextTimelineViewportReset: false })
+      return
+    }
     setViewport(fitToFull(totalDurationRef.current, timelineMinimumRef.current))
   }, [mediaIdentity, setViewport])
 

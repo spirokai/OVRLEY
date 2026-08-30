@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const importActivityFile = vi.hoisted(() => vi.fn())
 const importActivityPath = vi.hoisted(() => vi.fn())
+const parseActivityPath = vi.hoisted(() => vi.fn())
 const openSinglePath = vi.hoisted(() => vi.fn())
 const setErrorMessage = vi.hoisted(() => vi.fn())
 const setProcessing = vi.hoisted(() => vi.fn())
@@ -11,7 +12,7 @@ vi.mock('@/api/backend', () => ({ hasTauriRuntime: () => true }))
 vi.mock('@/hooks/useAppStoreSelectors', () => ({
   useActivityStore: () => ({ activityFilename: null, setErrorMessage, setProcessing }),
 }))
-vi.mock('@/lib/activity/import-activity', () => ({ default: importActivityFile, importActivityPath }))
+vi.mock('@/lib/activity/import-activity', () => ({ default: importActivityFile, importActivityPath, parseActivityPath }))
 vi.mock('@/lib/file-dialog', () => ({
   openSinglePath,
   selectBrowserFile: vi.fn(),

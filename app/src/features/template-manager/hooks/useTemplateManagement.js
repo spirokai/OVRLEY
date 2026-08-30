@@ -5,7 +5,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
-import { hasTauriRuntime } from '@/features/app-shell'
+import { hasTauriRuntime, useUnsavedChangesConfirm } from '@/features/app-shell'
 import { fileFromSelectedPath, openSinglePath } from '@/lib/file-dialog'
 import { deletePreference, getPreference, setPreference } from '@/lib/preferences-store'
 import { useTemplateStore } from '@/hooks/useAppStoreSelectors'
@@ -62,9 +62,8 @@ export default function useTemplateManagement({ onTemplateCreated }) {
   } = useTemplateStore()
 
   const { fetchTemplates } = useTemplateFetching()
+  const { answerConfirm, isOpen: isNewTemplateConfirmOpen, requestConfirm } = useUnsavedChangesConfirm()
 
-  // Local UI state — manages the new-template confirmation dialog visibility
-  const [showNewTemplateConfirm, setShowNewTemplateConfirm] = useState(false)
   const [templateSelectorOpen, setTemplateSelectorOpen] = useState(false)
 
   const openTemplateSelector = useCallback(() => {
@@ -214,24 +213,38 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     }
   }, [globalDefaults, loadTemplateState, setErrorMessage])
 
-  // Confirm create new — executes the new template action and closes confirmation
+  // Confirm create new — executes the new template action after the confirmation is answered
   const confirmCreateNewTemplate = useCallback(() => {
     replaceEditorDocument(useStore, createNewTemplate)
     deletePreference('last-template')
     onTemplateCreated()
-    setShowNewTemplateConfirm(false)
   }, [createNewTemplate, onTemplateCreated])
 
-  // Create new template — shows confirmation dialog if there are unsaved changes
-  const handleCreateNewTemplate = useCallback(() => {
-    const hasUnsavedChanges = status === 'Draft' || status === 'Modified'
-    if (hasUnsavedChanges) {
-      setShowNewTemplateConfirm(true)
+  // Create new template — asks to save unsaved changes before discarding them
+  const handleCreateNewTemplate = useCallback(async () => {
+    if (status !== 'Draft' && status !== 'Modified') {
+      confirmCreateNewTemplate()
       return
     }
 
+    const action = await requestConfirm()
+    if (action === 'cancel') return
+    if (action === 'save') {
+      const saved = await handleSaveTemplate()
+      if (saved === undefined) return
+    }
     confirmCreateNewTemplate()
-  }, [confirmCreateNewTemplate, status])
+  }, [confirmCreateNewTemplate, handleSaveTemplate, requestConfirm, status])
+
+  const newTemplateConfirmDialog = {
+    open: isNewTemplateConfirmOpen,
+    title: 'Create New Template',
+    description: 'Your template has unsaved changes. Save them or discard them.',
+    discardLabel: 'New Template',
+    onCancel: () => answerConfirm('cancel'),
+    onSave: () => answerConfirm('save'),
+    onDiscard: () => answerConfirm('discard'),
+  }
 
   // Always point to the latest handleTemplateChange so restoreLastLoadedTemplate
   // can invoke the current handler without depending on it.
@@ -262,18 +275,16 @@ export default function useTemplateManagement({ onTemplateCreated }) {
   }, [createNewTemplate, loadTemplateState, setErrorMessage])
 
   return {
-    confirmCreateNewTemplate,
     handleCreateNewTemplate,
     handleImportTemplate,
     handleSaveTemplate,
     handleTemplateChange,
     loadedTemplateSource,
     loadTemplateState,
+    newTemplateConfirmDialog,
     openTemplateSelector,
     restoreLastLoadedTemplate,
     setTemplateSelectorOpen,
-    setShowNewTemplateConfirm,
-    showNewTemplateConfirm,
     showTemplateStatus,
     status,
     templateSelectorOpen,

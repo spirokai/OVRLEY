@@ -16,15 +16,17 @@ import { Activity, FilePlus2, Film, FolderOpen, Menu, Save } from 'lucide-react'
  * @param {object} props.icon - Lucide icon component.
  * @param {string} props.label - Item label.
  * @param {function} props.onClick - Action invoked on click.
+ * @param {boolean} [props.disabled] - Renders the item as disabled.
  * @param {string} [props.shortcut] - ARIA keyboard shortcut.
  * @returns {JSX.Element} Rendered component.
  */
-function MenuItem({ icon: Icon, label, onClick, shortcut }) {
+function MenuItem({ icon: Icon, label, onClick, disabled, shortcut }) {
   return (
     <Button
       variant="ghost"
       className="w-full justify-start gap-3 px-2 text-xs font-semibold uppercase"
       onClick={onClick}
+      disabled={disabled}
       aria-keyshortcuts={shortcut}
     >
       <Icon className="size-4" />
@@ -43,6 +45,7 @@ function MenuItem({ icon: Icon, label, onClick, shortcut }) {
  * @param {function} props.onNewProject - Starts a blank project from the current template.
  * @param {function} props.onLoadProject - Opens the project file picker.
  * @param {function} props.onSaveProject - Saves the project to its current path.
+ * @param {string} props.status - Project document status: 'Unsaved' | 'Saved' | 'Modified'.
  * @param {function} props.onSaveProjectAs - Saves the project to a new path.
  * @returns {JSX.Element} Rendered component.
  */
@@ -54,6 +57,7 @@ export default function ActivitySection({
   onLoadProject,
   onSaveProject,
   onSaveProjectAs,
+  status,
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -85,7 +89,7 @@ export default function ActivitySection({
           <div className="flex flex-col gap-0.5">
             <MenuItem icon={FilePlus2} label="New Project" shortcut="Mod+N" onClick={() => run(onNewProject)} />
             <MenuItem icon={FolderOpen} label="Load Project" shortcut="Mod+O" onClick={() => run(onLoadProject)} />
-            <MenuItem icon={Save} label="Save Project" shortcut="Mod+S" onClick={() => run(onSaveProject)} />
+            <MenuItem icon={Save} label="Save Project" shortcut="Mod+S" disabled={status === 'Saved'} onClick={() => run(onSaveProject)} />
             <MenuItem icon={Save} label="Save Project As" shortcut="Mod+Shift+S" onClick={() => run(onSaveProjectAs)} />
           </div>
 

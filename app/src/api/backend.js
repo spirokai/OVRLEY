@@ -480,6 +480,24 @@ export async function importPreviewVideo(path) {
 }
 
 /**
+ * Probes a video without changing preview-server state.
+ * @param {string} path Absolute source video path.
+ * @returns {Promise<object>} Canonical source metadata.
+ */
+export async function preparePreviewVideo(path) {
+  return apiCall('backend_prepare_preview_video', { path })
+}
+
+/**
+ * Registers an already-probed video with the local preview server.
+ * @param {string} path Absolute source video path.
+ * @returns {Promise<{importId: string, previewUrl: string}>} Runtime preview identity.
+ */
+export async function registerPreviewVideo(path) {
+  return apiCall('backend_register_preview_video', { path })
+}
+
+/**
  * Clears the currently registered local HTTP preview video.
  *
  * @returns {Promise<*>} Promise resolving when the preview has been cleared.

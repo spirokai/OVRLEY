@@ -65,7 +65,7 @@ function validateImportedVideoTiming(metadata) {
   }
 }
 
-function createImportedVideoState(metadata) {
+export function createImportedVideoState(metadata) {
   validateImportedVideoTiming(metadata)
   return {
     importedVideoPath: metadata.path,

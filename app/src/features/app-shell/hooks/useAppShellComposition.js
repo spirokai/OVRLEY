@@ -48,12 +48,16 @@ export default function useAppShellComposition() {
   const renderWorkflow = useRenderWorkflow({ backendStatus: backendState.backendStatus })
   const videoControls = useVideoImport({ debugModeEnabled: editorShell.debugModeEnabled, onSetBackgroundMode: editorShell.setEditorBackgroundMode })
   const projectLifecycle = useProjectLifecycle({
-    loadActivityPath: activityImport.loadActivityPath,
     clearImportedVideo: videoControls.clearImportedVideo,
-    loadVideoPath: videoControls.loadVideoPath,
+    onSetBackgroundMode: editorShell.setEditorBackgroundMode,
+    prepareActivityPath: activityImport.prepareActivityPath,
+    prepareVideoPath: videoControls.prepareVideoPath,
   })
   const undoRedoControls = useUndoRedo({
-    disabled: renderWorkflow.renderDialogPhase !== 'closed' || templateManagement.showNewTemplateConfirm,
+    disabled:
+      renderWorkflow.renderDialogPhase !== 'closed' ||
+      templateManagement.newTemplateConfirmDialog.open ||
+      projectLifecycle.newProjectConfirmDialog.open,
   })
 
   useAppBootstrap()

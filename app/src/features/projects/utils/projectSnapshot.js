@@ -13,11 +13,14 @@ export const LAST_PROJECT_DIRECTORY_KEY = 'last-project-dir'
  */
 export function createProjectSnapshot(state, projectPath) {
   const source = (path) => (path ? { path: createPathLocator(path, projectPath) } : null)
+  const editor = createDurableEditorState({ config: state.config, globalDefaults: state.globalDefaults })
+  editor.config.scene.fps = state.renderSettings.fps
+  editor.config.scene.updateRate = state.renderSettings.widgetUpdateRate
   return {
     format: PROJECT_FORMAT,
     version: PROJECT_VERSION,
     savedAt: new Date().toISOString(),
-    editor: createDurableEditorState({ config: state.config, globalDefaults: state.globalDefaults }),
+    editor,
     sources: {
       activity: source(state.activitySource?.path),
       video: source(state.importedVideoPath),

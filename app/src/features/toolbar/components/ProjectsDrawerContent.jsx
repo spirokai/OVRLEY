@@ -12,7 +12,14 @@ export function ProjectsDrawerContent({ projectName, projectPath, status, busy, 
         <FolderOpen className="size-4" /> Open Project
       </Button>
       <div className="grid grid-cols-2 gap-2">
-        <Button type="button" variant="secondary" className="w-full gap-2" disabled={busy} onClick={onSave} aria-keyshortcuts="Mod+S">
+        <Button
+          type="button"
+          variant="secondary"
+          className="w-full gap-2"
+          disabled={busy || status === 'Saved'}
+          onClick={onSave}
+          aria-keyshortcuts="Mod+S"
+        >
           <Save className="size-4" /> Save Project
         </Button>
         <Button type="button" variant="secondary" className="w-full" disabled={busy} onClick={onSaveAs} aria-keyshortcuts="Mod+Shift+S">

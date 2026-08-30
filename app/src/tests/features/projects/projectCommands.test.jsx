@@ -16,6 +16,7 @@ describe('New Project command surfaces', () => {
         onLoadProject={vi.fn()}
         onSaveProject={vi.fn()}
         onSaveProjectAs={vi.fn()}
+        status="Unsaved"
       />,
     )
 
@@ -43,6 +44,45 @@ describe('New Project command surfaces', () => {
     fireEvent.click(screen.getByRole('button', { name: 'New Project' }))
 
     expect(onNew).toHaveBeenCalledOnce()
+  })
+
+  test('disables Save Project when the document is Saved, in the File menu', () => {
+    const onSaveProject = vi.fn()
+    render(
+      <ActivitySection
+        appVersion="v1.0.0"
+        onImportActivity={vi.fn()}
+        onImportVideo={vi.fn()}
+        onNewProject={vi.fn()}
+        onLoadProject={vi.fn()}
+        onSaveProject={onSaveProject}
+        onSaveProjectAs={vi.fn()}
+        status="Saved"
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'File menu' }))
+    expect(screen.getByRole('button', { name: 'Save Project' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save Project As' })).toBeEnabled()
+  })
+
+  test('disables Save Project when the document is Saved, in the Projects drawer', () => {
+    const onSave = vi.fn()
+    render(
+      <ProjectsDrawerContent
+        projectName={null}
+        projectPath={null}
+        status="Saved"
+        busy={false}
+        onNew={vi.fn()}
+        onOpen={vi.fn()}
+        onSave={onSave}
+        onSaveAs={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Save Project' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save Project As' })).toBeEnabled()
   })
 
   test('offers loading without the missing source', () => {

@@ -5,7 +5,7 @@
 import { useCallback } from 'react'
 import { hasTauriRuntime } from '@/api/backend'
 import { useActivityStore } from '@/hooks/useAppStoreSelectors'
-import importActivityFile, { importActivityPath } from '@/lib/activity/import-activity'
+import importActivityFile, { importActivityPath, parseActivityPath } from '@/lib/activity/import-activity'
 import { openSinglePath, selectBrowserFile } from '@/lib/file-dialog'
 import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import useStore from '@/store/useStore'
@@ -85,5 +85,6 @@ export default function useActivityImport() {
     handleActivityFileOpen,
     handleActivityFilesDrop,
     loadActivityPath: loadActivitySelection,
+    prepareActivityPath: parseActivityPath,
   }
 }
