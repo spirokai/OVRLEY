@@ -67,9 +67,10 @@ describe('useSceneSettingsState', () => {
     act(() => {
       result.current.handlers.handleResolutionChange('custom')
       result.current.handlers.handleFpsModeChange('custom')
+      useStore.getState().setRenderFpsAndUpdateRate(60, 1)
     })
 
-    rerender({ config: { ...initialConfig, scene: { ...initialConfig.scene, width: 1280, height: 720, fps: 60 } } })
+    rerender({ config: { ...initialConfig, scene: { ...initialConfig.scene, width: 1280, height: 720 } } })
 
     expect(result.current.overlaySettings.resId).toBe('720p')
     expect(result.current.overlaySettings.fpsMode).toBe('60')
@@ -155,7 +156,7 @@ describe('handleFpsModeChange', () => {
       result.current.handlers.handleFpsModeChange('60')
     })
 
-    expect(useStore.getState().config.scene.fps).toBe(60)
+    expect(useStore.getState().renderSettings.fps).toBe(60)
   })
 
   test('enters custom FPS mode without changing scene fps', () => {

@@ -4,6 +4,7 @@
 
 export { ActivityDrawerContent } from './components/ActivityDrawerContent'
 export { FileDropZone } from './components/FileDropZone'
+export { ProjectsDrawerContent } from './components/ProjectsDrawerContent'
 export { ToolbarDrawerLayout } from './components/ToolbarDrawerLayout'
 export { VerticalToolbar } from './components/VerticalToolbar'
 export { VideoDrawerContent } from './components/VideoDrawerContent'

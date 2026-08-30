@@ -15,8 +15,9 @@ function createTimelineElement(width = 500) {
 function resetStore(overrides = {}) {
   useStore.setState(useStore.getInitialState(), true)
   useStore.setState({
-    activityFilename: 'ride.fit',
+    activitySource: { kind: 'file', path: 'C:\\activities\\ride.fit' },
     activitySummary: {
+      availableMetrics: [],
       durationSeconds: 100,
       fileFormat: 'fit',
       fileName: 'activity.fit',
@@ -77,7 +78,7 @@ describe('useOverlayPlayer', () => {
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'i' }))
     })
-    expect(useStore.getState().exportRange).toMatchObject({ from: 0, type: 'custom' })
+    expect(useStore.getState().renderSettings.range).toMatchObject({ from: 0, type: 'custom' })
 
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' }))

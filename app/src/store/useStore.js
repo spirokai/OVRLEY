@@ -9,6 +9,7 @@ import { createMediaSlice } from './slices/createMediaSlice'
 import { createTemplateSlice } from './slices/createTemplateSlice'
 import { createVideoImportSlice } from './slices/createVideoImportSlice'
 import { createLayoutSlice } from './slices/createLayoutSlice'
+import { createRenderSettingsSlice } from './slices/createRenderSettingsSlice'
 import { withEditorHistory } from '@/features/undo-redo/undoHistory'
 
 function createStoreState(set, get) {
@@ -17,6 +18,7 @@ function createStoreState(set, get) {
     ...createEditorSlice(set, get),
     ...createMediaSlice(set, get),
     ...createVideoImportSlice(set, get),
+    ...createRenderSettingsSlice(set, get),
     ...createLayoutSlice(set, get),
   }
 }

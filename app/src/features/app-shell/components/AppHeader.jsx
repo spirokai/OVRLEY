@@ -18,6 +18,7 @@ import { isInteractiveElement } from '@/lib/utils'
  * @param {*} props.backendState - Current backend state.
  * @param {*} props.editorShell - Editor shell state and actions.
  * @param {function} props.onOpenOutputDirectory - Callback invoked to open render output.
+ * @param {*} props.projectLifecycle - Project lifecycle state and actions.
  * @param {*} props.renderWorkflow - Render workflow state and actions.
  * @param {*} props.templateManagement - Template state and actions.
  * @param {*} props.videoControls - Video import control state and handlers.
@@ -29,6 +30,7 @@ export default function AppHeader({
   backendState,
   editorShell,
   onOpenOutputDirectory,
+  projectLifecycle,
   renderWorkflow,
   templateManagement,
   videoControls,
@@ -54,18 +56,17 @@ export default function AppHeader({
     <header className="relative z-50 shrink-0 select-none border-b border-border bg-card backdrop-blur-sm" onMouseDown={handleHeaderMouseDown}>
       <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-x-6 pb-3 pl-6 pr-1 pt-3">
         <ActivitySection
-          activityFilename={activityImport.activityFilename}
-          onOpenActivityFile={activityImport.handleActivityFileOpen}
-          debugModeEnabled={editorShell.debugModeEnabled}
           appVersion={appVersion}
-          importedMediaFilename={videoControls.importedMediaFilename}
-          handleImportVideo={videoControls.handleImportVideo}
-          clearImportedVideo={videoControls.clearImportedVideo}
+          onImportActivity={activityImport.handleActivityFileOpen}
+          onImportVideo={videoControls.handleImportVideo}
+          onNewProject={projectLifecycle.handleNewProject}
+          onLoadProject={projectLifecycle.handleOpenProject}
+          onSaveProject={projectLifecycle.handleSaveProject}
+          onSaveProjectAs={projectLifecycle.handleSaveProjectAs}
         />
 
         <TemplateSection
           loadedTemplateSource={templateManagement.loadedTemplateSource}
-          loadedTemplateFilename={templateManagement.loadedTemplateFilename}
           handleTemplateChange={templateManagement.handleTemplateChange}
           templates={templateManagement.templates}
           config={appShell.config}

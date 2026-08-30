@@ -61,38 +61,36 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   const {
     activitySummary,
     aspectRatio,
-    exportRange,
     globalDefaults,
     importedVideoFps,
     importedVideoResolution,
     setAspectRatioPreset,
     setCustomAspectRatio,
-    setExportRange,
+    renderSettings,
+    setRenderRange,
     setGlobalDefault,
-    setSceneFpsAndUpdateRate,
-    setUpdateRate,
-    updateRate,
+    setRenderFpsAndUpdateRate,
+    setRenderWidgetUpdateRate,
   } = useStore(
     useShallow((state) => ({
       activitySummary: state.activitySummary,
       aspectRatio: state.aspectRatio,
-      exportRange: state.exportRange,
       globalDefaults: state.globalDefaults,
       importedVideoFps: state.importedVideoFps,
       importedVideoResolution: state.importedVideoResolution,
       setAspectRatioPreset: state.setAspectRatioPreset,
       setCustomAspectRatio: state.setCustomAspectRatio,
-      setExportRange: state.setExportRange,
+      renderSettings: state.renderSettings,
+      setRenderRange: state.setRenderRange,
       setGlobalDefault: state.setGlobalDefault,
-      setSceneFpsAndUpdateRate: state.setSceneFpsAndUpdateRate,
-      setUpdateRate: state.setUpdateRate,
-      updateRate: state.updateRate,
+      setRenderFpsAndUpdateRate: state.setRenderFpsAndUpdateRate,
+      setRenderWidgetUpdateRate: state.setRenderWidgetUpdateRate,
     })),
   )
 
   const availableFonts = useAvailableFonts()
   const editorConfig = useMemo(() => createEditorEffectiveConfig({ config, globalDefaults }), [config, globalDefaults])
-  const scene = editorConfig?.scene
+  const scene = editorConfig?.scene ? { ...editorConfig.scene, fps: renderSettings.fps } : null
   const sceneResolutionKey = getSceneResolutionKey(scene)
   const derivedResId = getResolutionPresetId(scene)
 
@@ -102,9 +100,9 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
   const { fpsMode, handleFpsModeChange, handleCustomFpsChange } = useFpsMode({
     fps: scene?.fps,
     onFpsChange: (nextFps) => {
-      setSceneFpsAndUpdateRate(nextFps, normalizeUpdateRateForFps(nextFps, updateRate))
+      setRenderFpsAndUpdateRate(nextFps, normalizeUpdateRateForFps(nextFps, renderSettings.widgetUpdateRate))
     },
-    updateRate,
+    updateRate: renderSettings.widgetUpdateRate,
   })
 
   const handleCustomFpsChangeEvent = useCallback((e) => handleCustomFpsChange(e.target.value), [handleCustomFpsChange])
@@ -143,7 +141,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     onConfigChange({ ...config, scene: { ...config.scene, width: preset.w, height: preset.h } })
   }
 
-  const handleUpdateRateChange = (v) => setUpdateRate(parseInt(v))
+  const handleUpdateRateChange = (v) => setRenderWidgetUpdateRate(parseInt(v))
 
   const handlers = {
     handleAspectRatioChange,
@@ -158,13 +156,13 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
     overlaySettings: {
       activitySummary,
       aspectRatio,
-      exportRange,
+      exportRange: renderSettings.range,
       fpsMode,
       importedVideoFps,
       importedVideoResolution,
       resId,
       scene,
-      updateRate,
+      updateRate: renderSettings.widgetUpdateRate,
       updateRateOptions,
       videoResolutionMismatch,
     },
@@ -176,7 +174,7 @@ export default function useSceneSettingsState({ config, onConfigChange }) {
       availableFonts,
     },
     handlers,
-    setExportRange,
-    setUpdateRate,
+    setExportRange: setRenderRange,
+    setUpdateRate: setRenderWidgetUpdateRate,
   }
 }

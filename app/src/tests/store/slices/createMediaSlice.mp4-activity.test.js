@@ -63,12 +63,12 @@ describe('MP4 activity — store actions', () => {
       expect(state.videoSyncWarning).toBeNull()
     })
 
-    test('sets activityFilename to null when telemetry activates', () => {
-      useStore.setState({ activityFilename: 'old.fit' })
+    test('sets activitySource to null when telemetry activates', () => {
+      useStore.setState({ activitySource: { kind: 'file', path: 'C:\\old.fit' } })
 
       useStore.getState().loadVideoTelemetry(mp4Telemetry)
 
-      expect(useStore.getState().activityFilename).toBeNull()
+      expect(useStore.getState().activitySource).toBeNull()
     })
 
     test('updates activitySummary from telemetry payload', () => {
@@ -206,22 +206,23 @@ describe('MP4 activity — store actions', () => {
       expect(state.stashedVideoTelemetry).toEqual(mp4Telemetry)
     })
 
-    test('clears activityFilename by default', () => {
-      useStore.setState({ activityFilename: 'ride.fit' })
+    test('clears activitySource by default', () => {
+      useStore.setState({ activitySource: { kind: 'file', path: 'C:\\ride.fit' } })
       useStore.getState().activateActivityFile(activityFile)
 
       useStore.getState().clearActivityFile()
 
-      expect(useStore.getState().activityFilename).toBeNull()
+      expect(useStore.getState().activitySource).toBeNull()
     })
 
-    test('preserves activityFilename when clearFilename is false', () => {
-      useStore.setState({ activityFilename: 'ride.fit' })
+    test('preserves activitySource when clearFilename is false', () => {
+      const activitySource = { kind: 'file', path: 'C:\\ride.fit' }
+      useStore.setState({ activitySource })
       useStore.getState().activateActivityFile(activityFile)
 
       useStore.getState().clearActivityFile({ clearFilename: false })
 
-      expect(useStore.getState().activityFilename).toBe('ride.fit')
+      expect(useStore.getState().activitySource).toEqual(activitySource)
     })
 
     test('sets videoSyncOffsetSeconds to 0 and clears warning when restoring video telemetry', () => {

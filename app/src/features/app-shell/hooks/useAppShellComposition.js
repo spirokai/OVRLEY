@@ -17,6 +17,7 @@ import { useVideoImport } from '@/features/video-preview'
 import { useUndoRedo } from '@/features/undo-redo'
 import * as backend from '@/api/backend'
 import { loadRememberedRenderDirectory } from '@/features/render-video/utils/render-output'
+import { useProjectLifecycle } from '@/features/projects'
 
 /**
  * Orchestrates all shell-level hooks without adapting their public APIs.
@@ -46,6 +47,11 @@ export default function useAppShellComposition() {
   const templateManagement = useTemplateManagement({ onTemplateCreated: editorShell.resetZoom })
   const renderWorkflow = useRenderWorkflow({ backendStatus: backendState.backendStatus })
   const videoControls = useVideoImport({ debugModeEnabled: editorShell.debugModeEnabled, onSetBackgroundMode: editorShell.setEditorBackgroundMode })
+  const projectLifecycle = useProjectLifecycle({
+    loadActivityPath: activityImport.loadActivityPath,
+    clearImportedVideo: videoControls.clearImportedVideo,
+    loadVideoPath: videoControls.loadVideoPath,
+  })
   const undoRedoControls = useUndoRedo({
     disabled: renderWorkflow.renderDialogPhase !== 'closed' || templateManagement.showNewTemplateConfirm,
   })
@@ -74,6 +80,7 @@ export default function useAppShellComposition() {
     appShell,
     backendState,
     handleOpenOutputDirectory,
+    projectLifecycle,
     renderWorkflow,
     templateManagement,
     videoControls,
@@ -88,6 +95,7 @@ export default function useAppShellComposition() {
     editorShell,
     handleOpenOutputDirectory,
     layout,
+    projectLifecycle,
     renderWorkflow,
     templateManagement,
     undoRedoControls,

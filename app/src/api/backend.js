@@ -440,6 +440,35 @@ export async function readSelectedFileBytes(path) {
   return payload instanceof Uint8Array ? payload : new Uint8Array(payload)
 }
 
+/** @param {string} path Absolute resolved source path. */
+export async function selectedPathIsFile(path) {
+  return invokeCommand('selected_path_is_file', { path })
+}
+
+/** @returns {Promise<string>} Absolute Documents/OVRLEY/projects directory. */
+export async function getDefaultProjectDirectory() {
+  return invokeCommand('default_project_directory')
+}
+
+/**
+ * Reads and validates an OVRLEY project archive.
+ * @param {string} path - Absolute `.oly` path.
+ * @returns {Promise<object>} Validated project and resolved source paths.
+ */
+export async function readProjectFile(path) {
+  return invokeCommand('read_project_file', { path })
+}
+
+/**
+ * Validates and atomically writes an OVRLEY project archive.
+ * @param {string} path - Absolute `.oly` path.
+ * @param {string} projectJson - Canonical project JSON.
+ * @returns {Promise<string>} Written path.
+ */
+export async function writeProjectFile(path, projectJson) {
+  return invokeCommand('write_project_file', { path, projectJson })
+}
+
 /**
  * Imports a video into the local HTTP preview server.
  *

@@ -60,10 +60,10 @@ function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels,
   )
 }
 
-function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
+function CanvasStatusBadges({ height, showProjectStatus, status, width }) {
   return (
     <div data-testid="canvas-status-badges" className="pointer-events-none absolute right-8 top-4 z-50 flex items-center gap-2">
-      {showTemplateStatus ? (
+      {showProjectStatus ? (
         <Badge
           variant={status === 'Modified' ? 'secondary' : 'outline'}
           className={`h-6 rounded-xs text-[10px] shadow-lg backdrop-blur-sm ${status === 'Modified' ? 'border-accent-border bg-surface-accent-soft/20 text-primary' : 'bg-card/85'}`}
@@ -126,8 +126,8 @@ function OverlayEditorContent({
   snapToGrid,
   importedBackgroundImageFilename,
   importedVideoFilename,
-  showTemplateStatus,
-  templateStatus,
+  showProjectStatus,
+  projectStatus,
   undoRedoControls,
   widgetLiveEdits,
 }) {
@@ -370,8 +370,8 @@ function OverlayEditorContent({
     <div ref={viewportRef} className="relative flex h-full flex-1 overflow-hidden">
       <CanvasStatusBadges
         height={overlayState.sceneSize.height}
-        showTemplateStatus={showTemplateStatus}
-        status={templateStatus}
+        showProjectStatus={showProjectStatus}
+        status={projectStatus}
         width={overlayState.sceneSize.width}
       />
       <CanvasToolbar

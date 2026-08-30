@@ -23,7 +23,7 @@ function storeActions() {
   return {
     activateActivityFile: vi.fn(),
     clearActivitySummary: vi.fn(),
-    setActivityFilename: vi.fn(),
+    setActivitySource: vi.fn(),
     setEndSecond: vi.fn(),
     setFallbackDurationSeconds: vi.fn(),
     setSelectedSecond: vi.fn(),
@@ -80,7 +80,7 @@ describe('import-activity store boundary', () => {
     expect(rawActivity.file_format).toBe('igc')
     expect(rawActivity.raw_samples.length).toBeGreaterThan(0)
     expect(parseCsvActivity).not.toHaveBeenCalled()
-    expect(store.setActivityFilename).toHaveBeenCalledWith('654G6NG1.IGC')
+    expect(store.setActivitySource).toHaveBeenCalledWith(null)
     expect(store.activateActivityFile).toHaveBeenCalledWith({
       metadata: {
         duration_seconds: 0,
@@ -109,7 +109,7 @@ describe('import-activity store boundary', () => {
 
     expect(parseCsvActivity).toHaveBeenCalledWith('C:\\activities\\sample Racebox.csv')
     expect(finalizeActivity).not.toHaveBeenCalled()
-    expect(store.setActivityFilename).toHaveBeenCalledWith('sample Racebox.csv')
+    expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\sample Racebox.csv' })
     expect(store.activateActivityFile).toHaveBeenCalledWith({
       metadata: {
         duration_seconds: 12.8,
@@ -126,7 +126,7 @@ describe('import-activity store boundary', () => {
 
     expect(parseVboActivity).toHaveBeenCalledWith('C:\\activities\\session.vbo')
     expect(finalizeActivity).not.toHaveBeenCalled()
-    expect(store.setActivityFilename).toHaveBeenCalledWith('session.vbo')
+    expect(store.setActivitySource).toHaveBeenCalledWith({ kind: 'file', path: 'C:\\activities\\session.vbo' })
     expect(store.activateActivityFile).toHaveBeenCalledWith({
       metadata: {
         duration_seconds: 4.2,

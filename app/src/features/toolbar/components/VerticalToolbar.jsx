@@ -1,9 +1,10 @@
-import { Activity, Blocks, Film } from 'lucide-react'
+import { Activity, Blocks, Film, FolderKanban } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
-import { ACTIVITY_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
+import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 
 const TOOLS = [
+  { id: PROJECTS_TOOL, label: 'Projects', icon: FolderKanban },
   { id: ACTIVITY_TOOL, label: 'Activity', icon: Activity },
   { id: VIDEO_TOOL, label: 'Video', icon: Film },
   {

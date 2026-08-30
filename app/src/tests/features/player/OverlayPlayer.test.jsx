@@ -24,8 +24,9 @@ function clearResizeObserver() {
 function resetStore(overrides = {}) {
   useStore.setState(useStore.getInitialState(), true)
   useStore.setState({
-    activityFilename: 'ride.fit',
+    activitySource: { kind: 'file', path: 'C:\\activities\\ride.fit' },
     activitySummary: {
+      availableMetrics: [],
       durationSeconds: 100,
       fileFormat: 'fit',
       fileName: 'activity.fit',
@@ -59,7 +60,7 @@ describe('OverlayPlayer', () => {
 
   test('renders nothing when there is no activity and no imported video', () => {
     resetStore({
-      activityFilename: null,
+      activitySource: null,
       activitySummary: null,
       importedVideoPath: null,
     })
@@ -83,7 +84,7 @@ describe('OverlayPlayer', () => {
       toJSON: () => ({}),
     })
     resetStore({
-      activityFilename: null,
+      activitySource: null,
       activitySummary: null,
       importedVideoPath: null,
     })

@@ -19,8 +19,17 @@ function keyEvent(key, modifiers = {}) {
 
 describe('keyboard shortcut matcher', () => {
   test('matches Ctrl and Command as mod bindings', () => {
-    expect(matchKeyboardShortcut(keyEvent('n', { ctrlKey: true }), 'app')?.commandId).toBe('template.new')
-    expect(matchKeyboardShortcut(keyEvent('n', { metaKey: true }), 'app')?.commandId).toBe('template.new')
+    expect(matchKeyboardShortcut(keyEvent('n', { ctrlKey: true }), 'app')?.commandId).toBe('project.new')
+    expect(matchKeyboardShortcut(keyEvent('n', { metaKey: true }), 'app')?.commandId).toBe('project.new')
+  })
+
+  test('matches project workflow and reassigned template bindings', () => {
+    expect(matchKeyboardShortcut(keyEvent('o', { ctrlKey: true }), 'app')?.commandId).toBe('project.open')
+    expect(matchKeyboardShortcut(keyEvent('s', { ctrlKey: true }), 'app')?.commandId).toBe('project.save')
+    expect(matchKeyboardShortcut(keyEvent('s', { ctrlKey: true, shiftKey: true }), 'app')?.commandId).toBe('project.saveAs')
+    expect(matchKeyboardShortcut(keyEvent('t', { ctrlKey: true, shiftKey: true }), 'app')?.commandId).toBe('template.new')
+    expect(matchKeyboardShortcut(keyEvent('l', { ctrlKey: true, shiftKey: true }), 'app')?.commandId).toBe('template.import')
+    expect(matchKeyboardShortcut(keyEvent('p', { ctrlKey: true, shiftKey: true }), 'app')?.commandId).toBe('template.save')
   })
 
   test('keeps modifier matching exact for AltGr-like input', () => {

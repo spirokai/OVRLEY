@@ -192,8 +192,8 @@ describe('OverlayEditor selection flow', () => {
         snapToGrid={false}
         importedBackgroundImageFilename={null}
         importedVideoFilename={null}
-        showTemplateStatus={false}
-        templateStatus="Saved"
+        showProjectStatus={false}
+        projectStatus="Saved"
       />,
     )
 
@@ -245,8 +245,8 @@ describe('OverlayEditor selection flow', () => {
         snapToGrid={false}
         importedBackgroundImageFilename={null}
         importedVideoFilename={null}
-        showTemplateStatus={false}
-        templateStatus="Saved"
+        showProjectStatus={false}
+        projectStatus="Saved"
       />,
     )
 
@@ -297,8 +297,8 @@ describe('OverlayEditor selection flow', () => {
         snapToGrid={false}
         importedBackgroundImageFilename={null}
         importedVideoFilename={null}
-        showTemplateStatus={false}
-        templateStatus="Saved"
+        showProjectStatus={false}
+        projectStatus="Saved"
       />,
     )
 
@@ -346,8 +346,8 @@ describe('OverlayEditor selection flow', () => {
         snapToGrid={false}
         importedBackgroundImageFilename={null}
         importedVideoFilename={null}
-        showTemplateStatus={false}
-        templateStatus="Saved"
+        showProjectStatus={false}
+        projectStatus="Saved"
       />,
     )
 
@@ -390,8 +390,8 @@ describe('OverlayEditor selection flow', () => {
         snapToGrid={false}
         importedBackgroundImageFilename={null}
         importedVideoFilename={null}
-        showTemplateStatus={false}
-        templateStatus="Saved"
+        showProjectStatus={false}
+        projectStatus="Saved"
       />,
     )
 
@@ -551,8 +551,8 @@ describe('OverlayEditor selection flow', () => {
         snapToGrid={false}
         importedBackgroundImageFilename={null}
         importedVideoFilename={null}
-        showTemplateStatus={false}
-        templateStatus="Saved"
+        showProjectStatus={false}
+        projectStatus="Saved"
       />,
     )
 
@@ -603,8 +603,8 @@ describe('OverlayEditor selection flow', () => {
         snapToGrid={false}
         importedBackgroundImageFilename={null}
         importedVideoFilename={null}
-        showTemplateStatus={false}
-        templateStatus="Saved"
+        showProjectStatus={false}
+        projectStatus="Saved"
       />,
     )
 
@@ -656,8 +656,8 @@ describe('OverlayEditor selection flow', () => {
         snapToGrid={false}
         importedBackgroundImageFilename={null}
         importedVideoFilename={null}
-        showTemplateStatus={false}
-        templateStatus="Saved"
+        showProjectStatus={false}
+        projectStatus="Saved"
       />,
     )
 
@@ -689,8 +689,8 @@ describe('OverlayEditor selection flow', () => {
         snapToGrid={false}
         importedBackgroundImageFilename={null}
         importedVideoFilename={null}
-        showTemplateStatus
-        templateStatus="Modified"
+        showProjectStatus
+        projectStatus="Modified"
       />,
     )
 
@@ -723,8 +723,8 @@ describe('OverlayEditor selection flow', () => {
         snapToGrid={false}
         importedBackgroundImageFilename={null}
         importedVideoFilename={null}
-        showTemplateStatus={false}
-        templateStatus="Saved"
+        showProjectStatus={false}
+        projectStatus="Saved"
       />,
     )
 
@@ -749,8 +749,8 @@ describe('OverlayEditor selection flow', () => {
           snapToGrid={false}
           importedBackgroundImageFilename={null}
           importedVideoFilename={null}
-          showTemplateStatus={false}
-          templateStatus="Saved"
+          showProjectStatus={false}
+          projectStatus="Saved"
         />,
       )
     })
@@ -776,8 +776,8 @@ describe('OverlayEditor selection flow', () => {
         snapToGrid={false}
         importedBackgroundImageFilename={null}
         importedVideoFilename={null}
-        showTemplateStatus={false}
-        templateStatus="Saved"
+        showProjectStatus={false}
+        projectStatus="Saved"
       />,
     )
 

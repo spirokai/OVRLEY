@@ -10,8 +10,16 @@ import { OverlayEditor } from '@/features/overlay-editor'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
 import { WidgetDrawerContent } from '@/features/widget-drawer'
-import { ActivityDrawerContent, ToolbarDrawerLayout, useToolbarDrawer, VideoDrawerContent, useVideoSyncControls } from '@/features/toolbar'
-import { ACTIVITY_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
+import {
+  ActivityDrawerContent,
+  ProjectsDrawerContent,
+  ToolbarDrawerLayout,
+  useToolbarDrawer,
+  VideoDrawerContent,
+  useVideoSyncControls,
+} from '@/features/toolbar'
+import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
+import { MissingSourceDialog } from '@/features/projects'
 import { NewTemplateConfirmDialog } from '@/features/template-manager'
 import { UpdatePromptDialog } from '@/features/app-update'
 import { AppHeader, ControlPanel, ErrorAlert, KeyboardShortcutsDialog, LoadingOverlay, useAppShellComposition } from '@/features/app-shell'
@@ -54,6 +62,7 @@ function AppShell() {
     editorShell,
     handleOpenOutputDirectory,
     layout,
+    projectLifecycle,
     renderWorkflow,
     templateManagement,
     undoRedoControls,
@@ -66,7 +75,20 @@ function AppShell() {
   let drawerContent = null
 
   if (toolbarDrawer.renderDrawerContent) {
-    if (toolbarDrawer.activeTool === ACTIVITY_TOOL) {
+    if (toolbarDrawer.activeTool === PROJECTS_TOOL) {
+      drawerContent = (
+        <ProjectsDrawerContent
+          projectName={projectLifecycle.projectName}
+          projectPath={projectLifecycle.loadedProjectPath}
+          status={projectLifecycle.status}
+          busy={projectLifecycle.busy}
+          onNew={projectLifecycle.handleNewProject}
+          onOpen={projectLifecycle.handleOpenProject}
+          onSave={projectLifecycle.handleSaveProject}
+          onSaveAs={projectLifecycle.handleSaveProjectAs}
+        />
+      )
+    } else if (toolbarDrawer.activeTool === ACTIVITY_TOOL) {
       drawerContent = (
         <ActivityDrawerContent
           activitySummary={activityImport.activitySummary}
@@ -127,6 +149,7 @@ function AppShell() {
           onCancel={() => templateManagement.setShowNewTemplateConfirm(false)}
           onConfirm={templateManagement.confirmCreateNewTemplate}
         />
+        <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
         <KeyboardShortcutsDialog open={editorShell.keyboardShortcutsOpen} onClose={editorShell.closeKeyboardShortcuts} />
         <AppHeader
           activityImport={activityImport}
@@ -134,6 +157,7 @@ function AppShell() {
           backendState={backendState}
           editorShell={editorShell}
           onOpenOutputDirectory={handleOpenOutputDirectory}
+          projectLifecycle={projectLifecycle}
           renderWorkflow={renderWorkflow}
           templateManagement={templateManagement}
           videoControls={videoControls}
@@ -166,8 +190,8 @@ function AppShell() {
                   importedVideoFilename={videoControls.importedVideoFilename}
                   editorShell={editorShell}
                   undoRedoControls={undoRedoControls}
-                  showTemplateStatus={templateManagement.showTemplateStatus}
-                  templateStatus={templateManagement.status}
+                  showProjectStatus={projectLifecycle.status !== 'Saved'}
+                  projectStatus={projectLifecycle.status}
                   widgetLiveEdits={widgetLiveEdits}
                 />
               </div>

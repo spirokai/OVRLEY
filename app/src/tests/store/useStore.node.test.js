@@ -22,6 +22,6 @@ describe('useStore without browser globals', () => {
     expect(state.config).toBeDefined()
     expect(state.globalDefaults).toBeDefined()
     expect(state.startSecond).toBe(0)
-    expect(state.loadedTemplateFilename).toBeNull()
+    expect(state.loadedTemplateSource).toBeNull()
   })
 })

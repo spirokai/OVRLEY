@@ -42,8 +42,8 @@ function resolvePreviewClockMode() {
  */
 export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSeconds, onPreviewSecond }) {
   // Store selectors — picks scene FPS, update rate, and imported video FPS from Zustand
-  const sceneFps = useStore((state) => state.config?.scene?.fps ?? 30)
-  const updateRate = useStore((state) => state.updateRate)
+  const sceneFps = useStore((state) => state.renderSettings.fps)
+  const updateRate = useStore((state) => state.renderSettings.widgetUpdateRate)
   const importedVideoFps = useStore((state) => state.importedVideoFps)
 
   // Internal refs — tracks scheduled callback handle, callback type ('video'|'animation'),

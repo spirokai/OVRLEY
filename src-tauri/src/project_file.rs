@@ -1,0 +1,605 @@
+//! Strict `.oly` project archive boundary.
+//!
+//! `project.json` is validated here before any frontend orchestration sees it.
+//! Archive and platform-path details do not leak into application state.
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::fs::{self, File};
+use std::io::{Read, Write};
+use std::path::{Component, Path, PathBuf};
+use tauri::Manager;
+use uuid::Uuid;
+use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipArchive, ZipWriter};
+
+const PROJECT_FORMAT: &str = "ovrley-project";
+const PROJECT_VERSION: u32 = 1;
+const PROJECT_JSON_ENTRY: &str = "project.json";
+const PREVIEW_ENTRY: &str = "preview.png";
+const MAX_PROJECT_JSON_SIZE: u64 = 4 * 1024 * 1024;
+const MAX_PREVIEW_SIZE: u64 = 32 * 1024 * 1024;
+const MAX_ARCHIVE_SIZE: u64 = 40 * 1024 * 1024;
+
+#[tauri::command]
+pub(crate) fn default_project_directory(app: tauri::AppHandle) -> Result<String, String> {
+    let directory = app
+        .path()
+        .document_dir()
+        .map_err(|error| error.to_string())?
+        .join("OVRLEY")
+        .join("projects");
+    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    Ok(path_string(directory))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ProjectDocument {
+    format: String,
+    version: u32,
+    saved_at: String,
+    editor: ProjectEditor,
+    sources: ProjectSources,
+    sync: ProjectSync,
+    render: ProjectRender,
+    timeline: ProjectTimeline,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectEditor {
+    config: Value,
+    global_defaults: GlobalDefaults,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GlobalDefaults {
+    border_color: String,
+    border_thickness: f64,
+    shadow_color: String,
+    shadow_strength: f64,
+    shadow_distance: f64,
+    font_values: String,
+    font_text: String,
+    color_values: String,
+    color_text: String,
+    color_icons: String,
+    color_units: String,
+    font_size: f64,
+    opacity: f64,
+    scale: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "value",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+enum PathLocator {
+    ProjectRelative(String),
+    Absolute(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProjectSources {
+    activity: Option<ProjectSource>,
+    video: Option<ProjectSource>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProjectSource {
+    path: PathLocator,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectSync {
+    video_offset_seconds: f64,
+    video_timezone_mode: Option<VideoTimezoneMode>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum VideoTimezoneMode {
+    Local,
+    Utc,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectRender {
+    fps: f64,
+    widget_update_rate: f64,
+    export_mode: ExportMode,
+    codec: String,
+    bitrate_mbps: Option<f64>,
+    range: ProjectRange,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum ExportMode {
+    Transparent,
+    Composite,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectRange {
+    #[serde(rename = "type")]
+    range_type: RangeType,
+    from: f64,
+    to: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum RangeType {
+    All,
+    Custom,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectTimeline {
+    playhead_second: f64,
+    view_start: f64,
+    view_end: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResolvedSources {
+    activity_path: Option<String>,
+    video_path: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReadProjectResult {
+    project: ProjectDocument,
+    resolved_sources: ResolvedSources,
+}
+
+fn validate_locator(locator: &PathLocator) -> Result<(), String> {
+    let (value, must_be_absolute) = match locator {
+        PathLocator::ProjectRelative(value) => (value, false),
+        PathLocator::Absolute(value) => (value, true),
+    };
+    if value.trim().is_empty() {
+        return Err("Project path locator value must not be empty".into());
+    }
+    let path = Path::new(value);
+    if must_be_absolute != path.is_absolute() {
+        return Err(if must_be_absolute {
+            "Absolute project locator must contain an absolute path".into()
+        } else {
+            "Project-relative locator must contain a relative path".into()
+        });
+    }
+    if !must_be_absolute
+        && path.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err("Project-relative locator must remain inside the project directory".into());
+    }
+    Ok(())
+}
+
+fn validate_project(project: &ProjectDocument) -> Result<(), String> {
+    if project.format != PROJECT_FORMAT {
+        return Err(format!("Unsupported project format: {}", project.format));
+    }
+    if project.version != PROJECT_VERSION {
+        return Err(format!("Unsupported project version: {}", project.version));
+    }
+    if project.saved_at.trim().is_empty() || !project.saved_at.contains('T') {
+        return Err("Project savedAt must be an ISO-8601 timestamp".into());
+    }
+    if let Some(source) = &project.sources.activity {
+        validate_locator(&source.path)?;
+    }
+    if let Some(source) = &project.sources.video {
+        validate_locator(&source.path)?;
+    }
+    for (label, value) in [
+        ("sync.videoOffsetSeconds", project.sync.video_offset_seconds),
+        ("render.fps", project.render.fps),
+        ("render.widgetUpdateRate", project.render.widget_update_rate),
+        ("render.range.from", project.render.range.from),
+        ("render.range.to", project.render.range.to),
+        ("timeline.playheadSecond", project.timeline.playhead_second),
+        ("timeline.viewStart", project.timeline.view_start),
+        ("timeline.viewEnd", project.timeline.view_end),
+    ] {
+        if !value.is_finite() {
+            return Err(format!("{label} must be finite"));
+        }
+    }
+    if project.render.fps <= 0.0 || project.render.widget_update_rate <= 0.0 {
+        return Err("Render fps and widgetUpdateRate must be positive".into());
+    }
+    if let Some(bitrate) = project.render.bitrate_mbps {
+        if !bitrate.is_finite() || bitrate <= 0.0 {
+            return Err("render.bitrateMbps must be a positive finite number or null".into());
+        }
+    }
+    if project.render.codec.trim().is_empty() {
+        return Err("render.codec must not be empty".into());
+    }
+    if matches!(project.render.export_mode, ExportMode::Composite)
+        && project.sources.video.is_none()
+    {
+        return Err("Composite export mode requires a video source".into());
+    }
+    if matches!(project.render.range.range_type, RangeType::Custom)
+        && project.render.range.from >= project.render.range.to
+    {
+        return Err("Custom render range requires from < to".into());
+    }
+    if project.timeline.view_start >= project.timeline.view_end {
+        return Err("Timeline viewport requires viewStart < viewEnd".into());
+    }
+    validate_editor(&project.editor)?;
+    Ok(())
+}
+
+fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
+    let globals = &editor.global_defaults;
+    for (label, value) in [
+        (
+            "editor.globalDefaults.borderThickness",
+            globals.border_thickness,
+        ),
+        (
+            "editor.globalDefaults.shadowStrength",
+            globals.shadow_strength,
+        ),
+        (
+            "editor.globalDefaults.shadowDistance",
+            globals.shadow_distance,
+        ),
+        ("editor.globalDefaults.fontSize", globals.font_size),
+        ("editor.globalDefaults.opacity", globals.opacity),
+        ("editor.globalDefaults.scale", globals.scale),
+    ] {
+        if !value.is_finite() {
+            return Err(format!("{label} must be finite"));
+        }
+    }
+    if globals.border_thickness < 0.0
+        || globals.shadow_strength < 0.0
+        || globals.shadow_distance < 0.0
+        || globals.font_size <= 0.0
+        || !(0.0..=1.0).contains(&globals.opacity)
+        || globals.scale <= 0.0
+    {
+        return Err("Editor global defaults contain an out-of-range number".into());
+    }
+    for (label, value) in [
+        ("borderColor", &globals.border_color),
+        ("shadowColor", &globals.shadow_color),
+        ("fontValues", &globals.font_values),
+        ("fontText", &globals.font_text),
+        ("colorValues", &globals.color_values),
+        ("colorText", &globals.color_text),
+        ("colorIcons", &globals.color_icons),
+        ("colorUnits", &globals.color_units),
+    ] {
+        if value.trim().is_empty() {
+            return Err(format!("editor.globalDefaults.{label} must not be empty"));
+        }
+    }
+
+    let mut config = editor.config.clone();
+    let scene = config
+        .get_mut("scene")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| "editor.config.scene must be an object".to_string())?;
+    scene.insert("start".into(), Value::from(0.0));
+    scene.insert("end".into(), Value::from(1.0));
+    scene.entry("scale").or_insert(Value::from(globals.scale));
+    scene
+        .entry("font")
+        .or_insert(Value::from(globals.font_values.clone()));
+    scene
+        .entry("font_size")
+        .or_insert(Value::from(globals.font_size));
+    scene
+        .entry("opacity")
+        .or_insert(Value::from(globals.opacity));
+    scene
+        .entry("shadow_color")
+        .or_insert(Value::from(globals.shadow_color.clone()));
+    scene
+        .entry("shadow_strength")
+        .or_insert(Value::from(globals.shadow_strength));
+    scene
+        .entry("shadow_distance")
+        .or_insert(Value::from(globals.shadow_distance));
+    scene
+        .entry("border_color")
+        .or_insert(Value::from(globals.border_color.clone()));
+    scene
+        .entry("border_thickness")
+        .or_insert(Value::from(globals.border_thickness));
+    ovrley_core::commands::validate_config_value(&config)
+        .map_err(|error| format!("Invalid editor widget config: {error}"))?;
+    Ok(())
+}
+
+fn parse_project(input: &str) -> Result<ProjectDocument, String> {
+    let project: ProjectDocument =
+        serde_json::from_str(input).map_err(|error| format!("Invalid project JSON: {error}"))?;
+    validate_project(&project)?;
+    Ok(project)
+}
+
+fn resolve_locator(project_path: &Path, locator: &PathLocator) -> Result<PathBuf, String> {
+    validate_locator(locator)?;
+    let path = match locator {
+        PathLocator::Absolute(value) => PathBuf::from(value),
+        PathLocator::ProjectRelative(value) => project_path
+            .parent()
+            .ok_or_else(|| "Project path has no parent directory".to_string())?
+            .join(value),
+    };
+    Ok(path)
+}
+
+fn path_string(path: PathBuf) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+fn resolved_sources(
+    project_path: &Path,
+    project: &ProjectDocument,
+) -> Result<ResolvedSources, String> {
+    let activity_path = project
+        .sources
+        .activity
+        .as_ref()
+        .map(|source| resolve_locator(project_path, &source.path).map(path_string))
+        .transpose()?;
+    let video_path = project
+        .sources
+        .video
+        .as_ref()
+        .map(|source| resolve_locator(project_path, &source.path).map(path_string))
+        .transpose()?;
+    Ok(ResolvedSources {
+        activity_path,
+        video_path,
+    })
+}
+
+fn read_archive(path: &Path) -> Result<ProjectDocument, String> {
+    let metadata = fs::metadata(path).map_err(|error| error.to_string())?;
+    if metadata.len() > MAX_ARCHIVE_SIZE {
+        return Err("Project archive exceeds the 40 MiB size limit".into());
+    }
+    let file = File::open(path).map_err(|error| error.to_string())?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|error| format!("Invalid project archive: {error}"))?;
+    let mut project_index = None;
+    let mut preview_seen = false;
+    for index in 0..archive.len() {
+        let entry = archive
+            .by_index_raw(index)
+            .map_err(|error| error.to_string())?;
+        match entry.name() {
+            PROJECT_JSON_ENTRY => {
+                if project_index.replace(index).is_some() {
+                    return Err("Project archive contains duplicate project.json entries".into());
+                }
+                if entry.size() > MAX_PROJECT_JSON_SIZE {
+                    return Err("project.json exceeds the 4 MiB size limit".into());
+                }
+            }
+            PREVIEW_ENTRY => {
+                if preview_seen {
+                    return Err("Project archive contains duplicate preview.png entries".into());
+                }
+                preview_seen = true;
+                if entry.size() > MAX_PREVIEW_SIZE {
+                    return Err("preview.png exceeds the 32 MiB size limit".into());
+                }
+            }
+            name => return Err(format!("Unexpected project archive entry: {name}")),
+        }
+    }
+    let index =
+        project_index.ok_or_else(|| "Project archive is missing project.json".to_string())?;
+    let mut entry = archive.by_index(index).map_err(|error| error.to_string())?;
+    let mut contents = String::with_capacity(entry.size() as usize);
+    entry
+        .read_to_string(&mut contents)
+        .map_err(|error| format!("project.json is not valid UTF-8: {error}"))?;
+    parse_project(&contents)
+}
+
+#[tauri::command]
+pub(crate) fn read_project_file(path: String) -> Result<ReadProjectResult, String> {
+    let project_path = PathBuf::from(path);
+    let project = read_archive(&project_path)?;
+    let resolved_sources = resolved_sources(&project_path, &project)?;
+    Ok(ReadProjectResult {
+        project,
+        resolved_sources,
+    })
+}
+
+fn write_archive(path: &Path, project_json: &str) -> Result<(), String> {
+    let file = File::create(path).map_err(|error| error.to_string())?;
+    let mut writer = ZipWriter::new(file);
+    writer
+        .start_file(
+            PROJECT_JSON_ENTRY,
+            SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+        )
+        .map_err(|error| error.to_string())?;
+    writer
+        .write_all(project_json.as_bytes())
+        .map_err(|error| error.to_string())?;
+    let file = writer.finish().map_err(|error| error.to_string())?;
+    file.sync_all().map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn atomic_replace(source: &Path, target: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+
+    const MOVEFILE_REPLACE_EXISTING: u32 = 0x1;
+    const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
+
+    #[link(name = "Kernel32")]
+    extern "system" {
+        fn MoveFileExW(
+            existing_file_name: *const u16,
+            new_file_name: *const u16,
+            flags: u32,
+        ) -> i32;
+    }
+
+    let source_wide: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
+    let target_wide: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
+    let result = unsafe {
+        MoveFileExW(
+            source_wide.as_ptr(),
+            target_wide.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if result == 0 {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn atomic_replace(source: &Path, target: &Path) -> Result<(), String> {
+    fs::rename(source, target).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub(crate) fn write_project_file(path: String, project_json: String) -> Result<String, String> {
+    parse_project(&project_json)?;
+    if project_json.len() as u64 > MAX_PROJECT_JSON_SIZE {
+        return Err("project.json exceeds the 4 MiB size limit".into());
+    }
+    let target = PathBuf::from(&path);
+    let parent = target
+        .parent()
+        .ok_or_else(|| "Project target has no parent directory".to_string())?;
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let temporary = parent.join(format!(".ovrley-project-{}.tmp", Uuid::new_v4()));
+    if let Err(error) = write_archive(&temporary, &project_json) {
+        let _ = fs::remove_file(&temporary);
+        return Err(error);
+    }
+    atomic_replace(&temporary, &target).map_err(|error| {
+        let _ = fs::remove_file(&temporary);
+        error
+    })?;
+    Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_project_json() -> String {
+        let config = include_str!("../../templates/acid-titanium.json");
+        let fixture: Value = serde_json::from_str(config).unwrap();
+        serde_json::json!({
+            "format": PROJECT_FORMAT,
+            "version": PROJECT_VERSION,
+            "savedAt": "2026-08-27T12:00:00.000Z",
+            "editor": {
+                "config": fixture["config"],
+                "globalDefaults": fixture["settings"]["globalDefaults"]
+            },
+            "sources": {
+                "activity": { "path": { "kind": "project-relative", "value": "media/session.fit" } },
+                "video": null
+            },
+            "sync": { "videoOffsetSeconds": 0.0, "videoTimezoneMode": null },
+            "render": {
+                "fps": 30.0, "widgetUpdateRate": 1.0, "exportMode": "transparent", "codec": "prores_ks",
+                "bitrateMbps": null, "range": { "type": "all", "from": 0.0, "to": 0.0 }
+            },
+            "timeline": { "playheadSecond": 0.0, "viewStart": 0.0, "viewEnd": 73.0 }
+        }).to_string()
+    }
+
+    #[test]
+    fn project_archive_round_trip_and_path_resolution() {
+        let directory =
+            std::env::temp_dir().join(format!("ovrley-project-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("Race.oly");
+        write_project_file(path_string(path.clone()), valid_project_json()).unwrap();
+        let result = read_project_file(path_string(path)).unwrap();
+        assert_eq!(result.project.version, PROJECT_VERSION);
+        assert_eq!(
+            result.resolved_sources.activity_path,
+            Some(path_string(directory.join("media/session.fit")))
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_contracts() {
+        for invalid in [
+            "not json".to_string(),
+            valid_project_json().replace(PROJECT_FORMAT, "wrong-project"),
+            valid_project_json().replace("\"version\":1", "\"version\":99"),
+            valid_project_json().replace("\"fps\":30.0", "\"fps\":0.0"),
+        ] {
+            assert!(parse_project(&invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn resolves_absolute_locator_without_rebasing() {
+        let absolute = if cfg!(windows) {
+            r"D:\media\ride.fit"
+        } else {
+            "/media/ride.fit"
+        };
+        let project = Path::new(if cfg!(windows) {
+            r"C:\events\Race.oly"
+        } else {
+            "/events/Race.oly"
+        });
+        let resolved = resolve_locator(project, &PathLocator::Absolute(absolute.into())).unwrap();
+        assert_eq!(resolved, PathBuf::from(absolute));
+    }
+
+    #[test]
+    fn rejects_a_template_reference_in_the_project_contract() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["template"] = serde_json::json!({ "source": null });
+
+        assert!(parse_project(&project.to_string()).is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_editor_widget_state() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["editor"]["globalDefaults"]["opacity"] = Value::from(2.0);
+
+        assert!(parse_project(&project.to_string()).is_err());
+    }
+}

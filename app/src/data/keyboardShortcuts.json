@@ -4,25 +4,53 @@
       "name": "General commands",
       "commands": [
         {
+          "id": "project.new",
+          "display": true,
+          "scope": "app",
+          "description": "New project",
+          "bindings": [{ "key": "n", "modifiers": ["mod"] }]
+        },
+        {
+          "id": "project.open",
+          "display": true,
+          "scope": "app",
+          "description": "Open project",
+          "bindings": [{ "key": "o", "modifiers": ["mod"] }]
+        },
+        {
+          "id": "project.save",
+          "display": true,
+          "scope": "app",
+          "description": "Save project",
+          "bindings": [{ "key": "s", "modifiers": ["mod"] }]
+        },
+        {
+          "id": "project.saveAs",
+          "display": true,
+          "scope": "app",
+          "description": "Save project as",
+          "bindings": [{ "key": "s", "modifiers": ["mod", "shift"] }]
+        },
+        {
           "id": "template.new",
           "display": true,
           "scope": "app",
           "description": "New template",
-          "bindings": [{ "key": "n", "modifiers": ["mod"] }]
+          "bindings": [{ "key": "t", "modifiers": ["mod", "shift"] }]
         },
         {
           "id": "template.import",
           "display": true,
           "scope": "app",
           "description": "Open template",
-          "bindings": [{ "key": "o", "modifiers": ["mod"] }]
+          "bindings": [{ "key": "l", "modifiers": ["mod", "shift"] }]
         },
         {
           "id": "template.save",
           "display": true,
           "scope": "app",
           "description": "Save template",
-          "bindings": [{ "key": "s", "modifiers": ["mod"] }]
+          "bindings": [{ "key": "p", "modifiers": ["mod", "shift"] }]
         },
         {
           "id": "activity.import",

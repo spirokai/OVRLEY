@@ -5,6 +5,7 @@
 import { clearPreviewVideo, extractVideoTelemetry, importPreviewVideo } from '@/api/backend'
 import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import { openSinglePath } from '@/lib/file-dialog'
+import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import useStore from '@/store/useStore'
 
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'mkv'])
@@ -64,15 +65,19 @@ async function importVideoSelection(selection, { setImportingVideo, setImportedV
       ...currentConfig,
       scene: {
         ...currentConfig.scene,
-        ...(metadata.fps ? { fps: Math.round(metadata.fps) } : {}),
         width: importedVideoResolution.width,
         height: importedVideoResolution.height,
       },
     })
+    if (metadata.fps) {
+      const { renderSettings, setRenderFpsAndUpdateRate } = useStore.getState()
+      const fps = Math.round(metadata.fps)
+      setRenderFpsAndUpdateRate(fps, normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate))
+    }
   })
   onSetBackgroundMode?.('video')
 
-  void extractAndStoreVideoTelemetry(path)
+  await extractAndStoreVideoTelemetry(path)
 }
 
 export default function useVideoImport({ debugModeEnabled = false, onSetBackgroundMode }) {
@@ -99,6 +104,20 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
   const importedVideoFilename = importedVideoPath ? importedVideoPath.split(/[/\\]/).pop() : null
   const importedBackgroundImageFilename = importedBackgroundImagePath ? importedBackgroundImagePath.split(/[/\\]/).pop() : null
   const importedMediaFilename = importedBackgroundImageFilename || importedVideoFilename
+
+  const loadVideoPath = async (path) => {
+    try {
+      await importVideoSelection(path, {
+        setImportingVideo,
+        setImportedVideo,
+        setConfig,
+        clearVideoTelemetry,
+        onSetBackgroundMode,
+      })
+    } finally {
+      setImportingVideo(false)
+    }
+  }
 
   const handleImportVideo = async () => {
     try {
@@ -129,13 +148,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         return
       }
 
-      await importVideoSelection(selected, {
-        setImportingVideo,
-        setImportedVideo,
-        setConfig,
-        clearVideoTelemetry,
-        onSetBackgroundMode,
-      })
+      await loadVideoPath(selected)
     } catch (err) {
       console.error('Failed to import background media:', err)
       setErrorMessage(`Video import failed: ${err.message}`)
@@ -166,13 +179,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
         return
       }
 
-      await importVideoSelection(selection, {
-        setImportingVideo,
-        setImportedVideo,
-        setConfig,
-        clearVideoTelemetry,
-        onSetBackgroundMode,
-      })
+      await loadVideoPath(selection)
     } catch (err) {
       console.error('Video drop failed:', err)
       setErrorMessage(`Video drop failed: ${err.message}`)
@@ -218,5 +225,6 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
     clearImportedVideo: handleClearImportedVideo,
     handleImportVideo,
     handleVideoFilesDrop,
+    loadVideoPath,
   }
 }

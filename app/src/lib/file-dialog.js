@@ -18,9 +18,22 @@ export async function fileFromSelectedPath(selectedPath, fallbackName = 'file') 
   return new File([bytes], filename, { type: 'application/octet-stream' })
 }
 
+function directoryFromSelectedPath(path) {
+  return String(path).replace(/[\\/][^\\/]*$/, '')
+}
+
+function filenameFromSelectedPath(path) {
+  return String(path).split(/[\\/]/).at(-1)
+}
+
+function pathInDirectory(directory, filename) {
+  const separator = String(directory).includes('\\') ? '\\' : '/'
+  return `${String(directory).replace(/[\\/]$/, '')}${separator}${filename}`
+}
+
 export async function openSinglePath(filters, options = {}) {
-  const { lastDirectoryKey } = options
-  let defaultPath
+  const { defaultPath: initialDefaultPath, lastDirectoryKey } = options
+  let defaultPath = initialDefaultPath
 
   if (lastDirectoryKey) {
     try {
@@ -39,8 +52,7 @@ export async function openSinglePath(filters, options = {}) {
 
   if (selected && lastDirectoryKey) {
     try {
-      const dir = selected.replace(/[\\/][^\\/]*$/, '')
-      await setPreference(lastDirectoryKey, dir)
+      await setPreference(lastDirectoryKey, directoryFromSelectedPath(selected))
     } catch {
       // store may be unavailable
     }
@@ -54,12 +66,32 @@ export async function openSinglePath(filters, options = {}) {
  *
  * @param {string} defaultPath - Current absolute output path.
  * @param {string} extension - The single allowed output extension.
+ * @param {string} [filterName] User-facing file type name.
+ * @param {{lastDirectoryKey?: string}} [options] Persistent directory preference.
  * @returns {Promise<string|null>} Selected path or null when cancelled.
  */
-export async function saveSinglePath(defaultPath, extension) {
+export async function saveSinglePath(defaultPath, extension, filterName = extension.toUpperCase(), options = {}) {
+  const { lastDirectoryKey } = options
+  let resolvedDefaultPath = defaultPath
+  if (lastDirectoryKey) {
+    try {
+      const savedDirectory = await getPreference(lastDirectoryKey)
+      const filename = filenameFromSelectedPath(defaultPath)
+      if (savedDirectory && filename) resolvedDefaultPath = pathInDirectory(savedDirectory, filename)
+    } catch {
+      // store unavailable — retain the supplied default path
+    }
+  }
   const selected = await save({
-    defaultPath,
-    filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+    defaultPath: resolvedDefaultPath,
+    filters: [{ name: filterName, extensions: [extension] }],
   })
+  if (selected && lastDirectoryKey) {
+    try {
+      await setPreference(lastDirectoryKey, directoryFromSelectedPath(selected))
+    } catch {
+      // store may be unavailable
+    }
+  }
   return selected ?? null
 }

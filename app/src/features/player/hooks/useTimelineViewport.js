@@ -3,6 +3,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import useStore from '@/store/useStore'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { roundToDevicePixel } from '../utils/timelineGeometry'
 import { getTimelineMinimum } from '../utils/playerTiming'
@@ -62,7 +64,15 @@ export default function useTimelineViewport({
   const timelineMinimumRef = useRef(timelineMinimum)
   const [containerElement, setContainerElement] = useState(null)
   const [widthPx, setWidthPx] = useState(0)
-  const [viewport, setViewport] = useState(() => fitToFull(totalDuration, timelineMinimum))
+  const viewport = useStore(useShallow((state) => state.timelineViewport))
+  const setTimelineViewport = useStore((state) => state.setTimelineViewport)
+  const setViewport = useCallback(
+    (nextViewport) => {
+      const current = useStore.getState().timelineViewport
+      setTimelineViewport(typeof nextViewport === 'function' ? nextViewport(current) : nextViewport)
+    },
+    [setTimelineViewport],
+  )
   const viewportRef = useRef(viewport)
 
   // Stable follow callbacks read this ref synchronously while returning viewport deltas.
@@ -89,7 +99,7 @@ export default function useTimelineViewport({
   // Full-range reset - loading different media should never leave the user stranded in an old viewport.
   useEffect(() => {
     setViewport(fitToFull(totalDurationRef.current, timelineMinimumRef.current))
-  }, [mediaIdentity])
+  }, [mediaIdentity, setViewport])
 
   // Duration changes can shorten the current viewport without changing its zoom level.
   useEffect(() => {
@@ -97,7 +107,7 @@ export default function useTimelineViewport({
     setViewport((previousViewport) =>
       clampToView(previousViewport.viewStart, previousViewport.viewEnd, totalDurationRef.current, timelineMinimumRef.current),
     )
-  }, [isDragging, timelineMinimum, totalDuration])
+  }, [isDragging, setViewport, timelineMinimum, totalDuration])
 
   // Width measurement - immediate rect reads avoid invisible geometry before ResizeObserver fires.
   useEffect(() => {
@@ -145,7 +155,7 @@ export default function useTimelineViewport({
         totalDuration: totalDurationRef.current,
       }),
     )
-  }, [isDragging, isPlaying, playheadSecond])
+  }, [isDragging, isPlaying, playheadSecond, setViewport])
 
   // Fit targets - tabs are derived from canonical ranges so there is no separate active-tab state.
   const fitTargets = useMemo(
@@ -183,34 +193,37 @@ export default function useTimelineViewport({
         setViewport(target.viewport)
       }
     },
-    [fitTargets],
+    [fitTargets, setViewport],
   )
 
   // Reset command - toolbar reset always returns to the latest full timeline duration.
   const resetView = useCallback(() => {
     setViewport(fitToFull(totalDurationRef.current, timelineMinimumRef.current))
-  }, [])
+  }, [setViewport])
 
   // Follow command - reuses playhead-follow behavior for active edge scrolling during a drag.
-  const followSecond = useCallback((second, timelineMinimum) => {
-    const previousViewport = viewportRef.current
-    const nextViewport = followPlayhead({
-      playheadSecond: second,
-      timelineMinimum,
-      viewStart: previousViewport.viewStart,
-      viewEnd: previousViewport.viewEnd,
-      totalDuration: totalDurationRef.current,
-    })
+  const followSecond = useCallback(
+    (second, timelineMinimum) => {
+      const previousViewport = viewportRef.current
+      const nextViewport = followPlayhead({
+        playheadSecond: second,
+        timelineMinimum,
+        viewStart: previousViewport.viewStart,
+        viewEnd: previousViewport.viewEnd,
+        totalDuration: totalDurationRef.current,
+      })
 
-    if (nextViewport.viewStart === previousViewport.viewStart && nextViewport.viewEnd === previousViewport.viewEnd) return null
+      if (nextViewport.viewStart === previousViewport.viewStart && nextViewport.viewEnd === previousViewport.viewEnd) return null
 
-    viewportRef.current = nextViewport
-    setViewport(nextViewport)
-    return {
-      deltaStart: nextViewport.viewStart - previousViewport.viewStart,
-      viewport: nextViewport,
-    }
-  }, [])
+      viewportRef.current = nextViewport
+      setViewport(nextViewport)
+      return {
+        deltaStart: nextViewport.viewStart - previousViewport.viewStart,
+        viewport: nextViewport,
+      }
+    },
+    [setViewport],
+  )
 
   // Zoom command - pivots around the playhead or wheel pointer while preserving timeline bounds.
   const zoomBy = useCallback(
@@ -227,7 +240,7 @@ export default function useTimelineViewport({
         }),
       )
     },
-    [widthPx],
+    [setViewport, widthPx],
   )
 
   const zoomOut = useCallback(() => {
@@ -239,17 +252,20 @@ export default function useTimelineViewport({
   }, [playheadSecond, zoomBy])
 
   // Pan command - lane-background drag passes seconds, while pure helpers enforce clamping.
-  const panBy = useCallback((deltaSeconds) => {
-    setViewport((previousViewport) =>
-      panViewport({
-        viewStart: previousViewport.viewStart,
-        viewEnd: previousViewport.viewEnd,
-        deltaSeconds,
-        timelineMinimum: timelineMinimumRef.current,
-        totalDuration: totalDurationRef.current,
-      }),
-    )
-  }, [])
+  const panBy = useCallback(
+    (deltaSeconds) => {
+      setViewport((previousViewport) =>
+        panViewport({
+          viewStart: previousViewport.viewStart,
+          viewEnd: previousViewport.viewEnd,
+          deltaSeconds,
+          timelineMinimum: timelineMinimumRef.current,
+          totalDuration: totalDurationRef.current,
+        }),
+      )
+    },
+    [setViewport],
+  )
 
   // Wheel navigation - scroll zooms around the pointer; Ctrl+scroll pans the visible timeline.
   const handleWheel = useCallback(

@@ -9,7 +9,11 @@ function renderShellKeyboard(configure = () => {}) {
     handleCreateNewTemplate: vi.fn(),
     handleImportTemplate: vi.fn(),
     handleImportVideo: vi.fn(),
-    handleOpenDownloads: vi.fn(),
+    handleNewProject: vi.fn(),
+    handleOpenOutputDirectory: vi.fn(),
+    handleOpenProject: vi.fn(),
+    handleSaveProject: vi.fn(),
+    handleSaveProjectAs: vi.fn(),
     handleSaveTemplate: vi.fn(),
     openRenderDialog: vi.fn(),
     openTemplateSelector: vi.fn(),
@@ -28,11 +32,17 @@ function renderShellKeyboard(configure = () => {}) {
     backendState: {
       backendStatus: 'connected',
     },
-    handleOpenDownloads: actions.handleOpenDownloads,
+    handleOpenOutputDirectory: actions.handleOpenOutputDirectory,
     layout: {
       leftDrawerPinned: false,
       leftDrawerVisible: false,
       selectLeftDrawerTool: actions.selectLeftDrawerTool,
+    },
+    projectLifecycle: {
+      handleNewProject: actions.handleNewProject,
+      handleOpenProject: actions.handleOpenProject,
+      handleSaveProject: actions.handleSaveProject,
+      handleSaveProjectAs: actions.handleSaveProjectAs,
     },
     renderWorkflow: {
       openRenderDialog: actions.openRenderDialog,
@@ -60,7 +70,7 @@ function renderShellKeyboard(configure = () => {}) {
 }
 
 describe('useAppShellKeyboard', () => {
-  test('routes Ctrl+N and Ctrl+I to their shell commands', () => {
+  test('routes project and video shortcuts to their shell commands', () => {
     const { actions } = renderShellKeyboard()
 
     act(() => {
@@ -68,8 +78,36 @@ describe('useAppShellKeyboard', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'i' }))
     })
 
-    expect(actions.handleCreateNewTemplate).toHaveBeenCalledOnce()
+    expect(actions.handleNewProject).toHaveBeenCalledOnce()
     expect(actions.handleImportVideo).toHaveBeenCalledOnce()
+  })
+
+  test('routes project open, save, and save-as shortcuts', () => {
+    const { actions } = renderShellKeyboard()
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'o' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 's' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, shiftKey: true, key: 's' }))
+    })
+
+    expect(actions.handleOpenProject).toHaveBeenCalledOnce()
+    expect(actions.handleSaveProject).toHaveBeenCalledOnce()
+    expect(actions.handleSaveProjectAs).toHaveBeenCalledOnce()
+  })
+
+  test('keeps template commands on their reassigned shortcuts', () => {
+    const { actions } = renderShellKeyboard()
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, shiftKey: true, key: 't' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, shiftKey: true, key: 'l' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, shiftKey: true, key: 'p' }))
+    })
+
+    expect(actions.handleCreateNewTemplate).toHaveBeenCalledOnce()
+    expect(actions.handleImportTemplate).toHaveBeenCalledOnce()
+    expect(actions.handleSaveTemplate).toHaveBeenCalledOnce()
   })
 
   test('opens the template selector with Ctrl+T', () => {
@@ -91,7 +129,7 @@ describe('useAppShellKeyboard', () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, ctrlKey: true, key: 'n' }))
     })
 
-    expect(actions.handleCreateNewTemplate).toHaveBeenCalledOnce()
+    expect(actions.handleNewProject).toHaveBeenCalledOnce()
     input.remove()
   })
 
@@ -113,13 +151,13 @@ describe('useAppShellKeyboard', () => {
     })
 
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 's' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, shiftKey: true, key: 'p' }))
       window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'e' }))
       window.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, shiftKey: true, key: 'e' }))
     })
 
     expect(actions.handleSaveTemplate).not.toHaveBeenCalled()
     expect(actions.openRenderDialog).not.toHaveBeenCalled()
-    expect(actions.handleOpenDownloads).not.toHaveBeenCalled()
+    expect(actions.handleOpenOutputDirectory).not.toHaveBeenCalled()
   })
 })

@@ -13,6 +13,7 @@ export default function useAppShellKeyboard({
   appShell,
   backendState,
   handleOpenOutputDirectory,
+  projectLifecycle,
   renderWorkflow,
   templateManagement,
   videoControls,
@@ -22,6 +23,7 @@ export default function useAppShellKeyboard({
   const { activitySummary, computeVideoSync, config, importedVideoPath } = appShell
   const { leftDrawerPinned, leftDrawerVisible, selectLeftDrawerTool } = layout
   const { backendStatus } = backendState
+  const { handleNewProject, handleOpenProject, handleSaveProject, handleSaveProjectAs } = projectLifecycle
   const { openRenderDialog, renderDisabled } = renderWorkflow
   const { handleCreateNewTemplate, handleImportTemplate, handleSaveTemplate, openTemplateSelector, showTemplateStatus, templateSelectorOpen } =
     templateManagement
@@ -35,6 +37,22 @@ export default function useAppShellKeyboard({
     if (hasOpenOverlay() && !(match.commandId === 'drawer.toggle' && leftDrawerVisible && !leftDrawerPinned)) return
 
     switch (match.commandId) {
+      case 'project.new':
+        event.preventDefault()
+        handleNewProject()
+        return
+      case 'project.open':
+        event.preventDefault()
+        handleOpenProject()
+        return
+      case 'project.save':
+        event.preventDefault()
+        handleSaveProject()
+        return
+      case 'project.saveAs':
+        event.preventDefault()
+        handleSaveProjectAs()
+        return
       case 'template.new':
         event.preventDefault()
         handleCreateNewTemplate()

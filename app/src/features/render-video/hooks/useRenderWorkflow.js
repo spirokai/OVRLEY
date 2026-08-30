@@ -15,7 +15,6 @@ import { buildPreviewFrameWindow } from '@/lib/preview-timing'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import useStore from '@/store/useStore'
-import { getDefaultBitrate } from '../data/bitrateDefaults'
 import { createRenderEffectiveConfig } from '../utils/renderConfig'
 import { loadRememberedRenderDirectory, normalizeRenderOutputPath, rememberAcceptedRenderOutput } from '../utils/render-output'
 import useRenderDialogState from './useRenderDialogState'
@@ -24,20 +23,17 @@ export default function useRenderWorkflow({ backendStatus }) {
   const {
     activitySummary,
     config,
-    exportCodec,
-    exportRange,
+    renderSettings,
     renderStatus,
     renderingVideo,
     clearRenderSession,
     setErrorMessage,
     setRenderProgress,
     startRenderSession,
-    updateRate,
+    setRenderSettings,
   } = useRenderStore()
   const globalDefaults = useStore((state) => state.globalDefaults)
-  const importedVideoFps = useStore((state) => state.importedVideoFps)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
-  const importedVideoResolution = useStore((state) => state.importedVideoResolution)
   const [renderingPreviewFrame, setRenderingPreviewFrame] = useState(false)
   const [submissionPending, setSubmissionPending] = useState(false)
   const [outputPathError, setOutputPathError] = useState(null)
@@ -66,38 +62,19 @@ export default function useRenderWorkflow({ backendStatus }) {
   const renderPreviewFrameDisabled = renderDisabled || renderingPreviewFrame
 
   const buildRenderSettingsDraft = useCallback(() => {
-    const templateFps = sanitizeIntegerFps(config?.scene?.fps || 30)
-    const fps = importedVideoPath && importedVideoFps ? sanitizeIntegerFps(Math.round(importedVideoFps)) : templateFps
-    const defaultCodec = importedVideoPath ? 'libx264' : exportCodec || 'prores_ks'
-    const draftExportRange = { ...DEFAULT_EXPORT_RANGE, ...(exportRange || {}) }
+    const fps = sanitizeIntegerFps(renderSettings.fps)
+    const codec = renderSettings.codec
+    const draftExportRange = { ...DEFAULT_EXPORT_RANGE, ...renderSettings.range }
 
     return {
       fps,
-      updateRate: normalizeUpdateRateForFps(fps, updateRate),
-      exportMode: importedVideoPath ? 'composite' : 'transparent',
-      exportCodec: defaultCodec,
-      exportBitrate: importedVideoPath
-        ? getDefaultBitrate(
-            importedVideoResolution?.width || config?.scene?.width,
-            importedVideoResolution?.height || config?.scene?.height,
-            importedVideoFps || fps,
-            defaultCodec,
-          )
-        : undefined,
+      updateRate: normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate),
+      exportMode: importedVideoPath ? renderSettings.exportMode : 'transparent',
+      exportCodec: codec,
+      exportBitrate: renderSettings.bitrateMbps ?? undefined,
       exportRange: draftExportRange,
     }
-  }, [
-    config?.scene?.fps,
-    config?.scene?.height,
-    config?.scene?.width,
-    exportCodec,
-    exportRange,
-    importedVideoFps,
-    importedVideoPath,
-    importedVideoResolution?.height,
-    importedVideoResolution?.width,
-    updateRate,
-  ])
+  }, [importedVideoPath, renderSettings])
 
   const resolveRenderSettingsDraft = useCallback(async () => {
     const draft = buildRenderSettingsDraft()
@@ -321,6 +298,14 @@ export default function useRenderWorkflow({ backendStatus }) {
           outputPath,
           overwrite,
         })
+        setRenderSettings({
+          fps: nextFps,
+          widgetUpdateRate: nextUpdateRate,
+          exportMode,
+          codec: renderSettingsDraft.exportCodec,
+          bitrateMbps: renderSettingsDraft.exportBitrate ?? null,
+          range: nextExportRange,
+        })
         startRenderSession(result.render_id, result.outputPath, {
           ...DEFAULT_RENDER_PROGRESS,
           status: 'rendering',
@@ -345,7 +330,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         setSubmissionPending(false)
       }
     },
-    [config, globalDefaults, renderSettingsDraft, setErrorMessage, setRenderDialogPhase, startRenderSession, submissionPending],
+    [config, globalDefaults, renderSettingsDraft, setErrorMessage, setRenderDialogPhase, setRenderSettings, startRenderSession, submissionPending],
   )
 
   const handleRenderVideoConfirm = useCallback(() => submitRender(false), [submitRender])
@@ -385,8 +370,8 @@ export default function useRenderWorkflow({ backendStatus }) {
         availableCodecs: useStore.getState().availableCodecs,
         config,
         exportBitrate: renderSettingsDraft?.exportBitrate,
-        exportCodec,
-        exportRange,
+        exportCodec: renderSettings.codec,
+        exportRange: renderSettings.range,
         globalDefaults,
         importedVideoDuration: useStore.getState().importedVideoDuration,
         importedVideoFps: useStore.getState().importedVideoFps,
@@ -396,7 +381,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         importedVideoResolution: useStore.getState().importedVideoResolution,
         timelineEnd: useStore.getState().endSecond,
         timelineStart: useStore.getState().startSecond,
-        updateRate,
+        updateRate: renderSettings.widgetUpdateRate,
         videoSyncOffsetSeconds: useStore.getState().videoSyncOffsetSeconds,
       })
       const previewFps = sanitizeIntegerFps(nextConfig.scene.fps || 30)
@@ -415,7 +400,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         start: sceneStart + previewWindow.start,
         end: sceneStart + previewWindow.end,
         fps: previewFps,
-        update_rate: normalizeUpdateRateForFps(previewFps, updateRate),
+        update_rate: normalizeUpdateRateForFps(previewFps, renderSettings.widgetUpdateRate),
       }
       delete nextConfig.scene.updateRate
 
@@ -433,7 +418,7 @@ export default function useRenderWorkflow({ backendStatus }) {
     } finally {
       setRenderingPreviewFrame(false)
     }
-  }, [config, exportCodec, exportRange, globalDefaults, renderPreviewFrameDisabled, renderSettingsDraft?.exportBitrate, setErrorMessage, updateRate])
+  }, [config, globalDefaults, renderPreviewFrameDisabled, renderSettings, renderSettingsDraft?.exportBitrate, setErrorMessage])
 
   return {
     closeRenderDialog: handleCloseRenderDialog,

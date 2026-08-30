@@ -41,7 +41,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   // Store selector - gathers the entire player-facing store contract in one subscription.
   const playerStore = useStore(
     useShallow((state) => ({
-      activityFilename: state.activityFilename,
+      activityFilename: state.activitySource?.path?.split(/[/\\]/).at(-1) ?? state.activitySummary?.fileName ?? null,
       activitySummary: state.activitySummary,
       beginPreviewScrub: state.beginPreviewScrub,
       commitPreviewScrub: state.commitPreviewScrub,
@@ -55,7 +55,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       isVideoMuted: state.isVideoMuted,
       previewPlaybackSource: state.previewPlaybackSource,
       previewPlaybackState: state.previewPlaybackState,
-      sceneFps: state.config?.scene?.fps ?? 30,
+      sceneFps: state.renderSettings.fps,
       selectedSecond: state.selectedSecond,
       setSelectedSecond: state.setSelectedSecond,
       setVideoSyncOffset: state.setVideoSyncOffset,
@@ -64,7 +64,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       startPreviewPlayback: state.startPreviewPlayback,
       selectedWidgetIds: state.selectedWidgetIds,
       updatePreviewScrub: state.updatePreviewScrub,
-      updateRate: state.updateRate,
+      updateRate: state.renderSettings.widgetUpdateRate,
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
       videoSyncOffsetPreviewSeconds: state.videoSyncOffsetPreviewSeconds,
     })),

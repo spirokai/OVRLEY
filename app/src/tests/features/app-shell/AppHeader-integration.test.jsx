@@ -24,6 +24,12 @@ const defaultProps = {
   backendState: { backendStatus: 'connected' },
   editorShell: { debugModeEnabled: false, openKeyboardShortcuts: vi.fn() },
   onOpenDownloads: vi.fn(),
+  projectLifecycle: {
+    handleNewProject: vi.fn(),
+    handleOpenProject: vi.fn(),
+    handleSaveProject: vi.fn(),
+    handleSaveProjectAs: vi.fn(),
+  },
   renderWorkflow: {
     openRenderDialog: vi.fn(),
     handleRenderPreviewFrame: undefined,
@@ -63,15 +69,17 @@ describe('AppHeader grouped-props contract', () => {
     expect(getByTestId('action-buttons')).toBeTruthy()
   })
 
-  test('ActivitySection receives activity and video import props', () => {
+  test('ActivitySection receives project and media import props', () => {
     const { getByTestId } = render(<AppHeader {...defaultProps} />)
     const props = JSON.parse(getByTestId('activity-section').dataset.props)
 
-    expect(props).toContain('activityFilename')
-    expect(props).toContain('onOpenActivityFile')
+    expect(props).toContain('onImportActivity')
+    expect(props).toContain('onImportVideo')
+    expect(props).toContain('onNewProject')
+    expect(props).toContain('onLoadProject')
+    expect(props).toContain('onSaveProject')
+    expect(props).toContain('onSaveProjectAs')
     expect(props).toContain('appVersion')
-    expect(props).toContain('handleImportVideo')
-    expect(props).toContain('clearImportedVideo')
   })
 
   test('TemplateSection receives template selector and CRUD props', () => {

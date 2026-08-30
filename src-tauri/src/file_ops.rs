@@ -65,3 +65,9 @@ pub(crate) fn write_parse_debug_file(filename: String, contents: String) -> Resu
 pub(crate) fn read_selected_file_bytes(path: String) -> Result<Vec<u8>, String> {
     std::fs::read(path).map_err(|e| e.to_string())
 }
+
+/// Checks one resolved source path without reading or interpreting its contents.
+#[tauri::command]
+pub(crate) fn selected_path_is_file(path: String) -> bool {
+    PathBuf::from(path).is_file()
+}

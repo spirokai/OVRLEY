@@ -5,7 +5,7 @@ import useStore from '@/store/useStore'
 
 function resetStore(exportRange = { from: 10, to: 20, type: 'custom' }) {
   useStore.setState(useStore.getInitialState(), true)
-  useStore.setState({ exportRange })
+  useStore.setState((state) => ({ renderSettings: { ...state.renderSettings, range: exportRange } }))
 }
 
 describe('useExportRangeTimeline', () => {
@@ -31,7 +31,7 @@ describe('useExportRangeTimeline', () => {
     })
 
     expect(result.current.highlightRange).toEqual({ fromSecond: 18.5, toSecond: 20 })
-    expect(useStore.getState().exportRange.from).toBe(10)
+    expect(useStore.getState().renderSettings.range.from).toBe(10)
   })
 
   test('commits snapped marker movement and avoids redundant writes', () => {
@@ -41,14 +41,14 @@ describe('useExportRangeTimeline', () => {
       result.current.commitMarker('from', 18.5)
     })
 
-    expect(useStore.getState().exportRange.from).toBe(18.5)
+    expect(useStore.getState().renderSettings.range.from).toBe(18.5)
 
-    const sameRange = useStore.getState().exportRange
+    const sameRange = useStore.getState().renderSettings.range
     act(() => {
       result.current.commitMarker('from', 18.5)
     })
 
-    expect(useStore.getState().exportRange).toBe(sameRange)
+    expect(useStore.getState().renderSettings.range).toBe(sameRange)
   })
 
   test('returns no markers when the export range is not custom', () => {
@@ -68,13 +68,13 @@ describe('useExportRangeTimeline', () => {
       result.current.setBoundary('from', 12.9)
     })
 
-    expect(useStore.getState().exportRange).toEqual(expect.objectContaining({ type: 'custom', from: 12.9, to: 45 }))
+    expect(useStore.getState().renderSettings.range).toEqual(expect.objectContaining({ type: 'custom', from: 12.9, to: 45 }))
 
     act(() => {
       result.current.setBoundary('to', 42.9)
     })
 
-    expect(useStore.getState().exportRange).toEqual(expect.objectContaining({ type: 'custom', from: 12.9, to: 42.9 }))
+    expect(useStore.getState().renderSettings.range).toEqual(expect.objectContaining({ type: 'custom', from: 12.9, to: 42.9 }))
 
     act(() => {
       result.current.setBoundary('to', 5)

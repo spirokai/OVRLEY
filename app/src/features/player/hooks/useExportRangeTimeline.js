@@ -25,8 +25,8 @@ export default function useExportRangeTimeline({ totalDuration, timelineMinimum 
   // Store selector - export range inputs remain the source of truth outside active drag preview.
   const { exportRange, setExportRange } = useStore(
     useShallow((state) => ({
-      exportRange: state.exportRange,
-      setExportRange: state.setExportRange,
+      exportRange: state.renderSettings.range,
+      setExportRange: state.setRenderRange,
     })),
   )
 

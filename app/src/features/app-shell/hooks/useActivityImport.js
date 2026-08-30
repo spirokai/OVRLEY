@@ -5,45 +5,44 @@
 import { useCallback } from 'react'
 import { hasTauriRuntime } from '@/api/backend'
 import { useActivityStore } from '@/hooks/useAppStoreSelectors'
-import importActivityFile, { importCsvActivityPath, importVboActivityPath } from '@/lib/activity/import-activity'
-import { fileFromSelectedPath, openSinglePath, selectBrowserFile } from '@/lib/file-dialog'
+import importActivityFile, { importActivityPath } from '@/lib/activity/import-activity'
+import { openSinglePath, selectBrowserFile } from '@/lib/file-dialog'
 import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import useStore from '@/store/useStore'
 
 export default function useActivityImport() {
   const { activityFilename, activitySummary, clearActivityFile, parsedActivitySource, setErrorMessage, setProcessing } = useActivityStore()
 
-  const importSelection = useCallback(
+  const loadActivitySelection = useCallback(
     async (selection) => {
+      let runImport
+      if (typeof selection === 'string') {
+        runImport = () => importActivityPath(selection, useStore.getState())
+      } else if (selection instanceof File) {
+        runImport = () => importActivityFile(selection, useStore.getState())
+      } else {
+        throw new Error('Activity import requires one file.')
+      }
+      setProcessing(true)
       try {
-        let runImport
-
-        if (typeof selection === 'string') {
-          const lowerPath = selection.toLowerCase()
-          if (lowerPath.endsWith('.csv')) {
-            runImport = () => importCsvActivityPath(selection, useStore.getState())
-          } else if (lowerPath.endsWith('.vbo')) {
-            runImport = () => importVboActivityPath(selection, useStore.getState())
-          } else {
-            const selectedFile = await fileFromSelectedPath(selection, 'activity')
-            runImport = () => importActivityFile(selectedFile, useStore.getState())
-          }
-        } else if (selection instanceof File) {
-          runImport = () => importActivityFile(selection, useStore.getState())
-        } else {
-          throw new Error('Activity import requires one file.')
-        }
-
-        setProcessing(true)
         await runWithoutEditorHistory(useStore, runImport)
-      } catch (error) {
-        console.error('Activity selection failed:', error)
-        setErrorMessage(`Activity selection failed: ${error.message}`)
       } finally {
         setProcessing(false)
       }
     },
-    [setErrorMessage, setProcessing],
+    [setProcessing],
+  )
+
+  const importSelection = useCallback(
+    async (selection) => {
+      try {
+        await loadActivitySelection(selection)
+      } catch (error) {
+        console.error('Activity selection failed:', error)
+        setErrorMessage(`Activity selection failed: ${error.message}`)
+      }
+    },
+    [loadActivitySelection, setErrorMessage],
   )
 
   const handleActivityFileOpen = useCallback(async () => {
@@ -85,5 +84,6 @@ export default function useActivityImport() {
     deleteActivity: parsedActivitySource === 'activity-file' ? clearActivityFile : null,
     handleActivityFileOpen,
     handleActivityFilesDrop,
+    loadActivityPath: loadActivitySelection,
   }
 }

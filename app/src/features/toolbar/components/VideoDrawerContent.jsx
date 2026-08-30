@@ -96,46 +96,6 @@ function VideoSyncControls({
         </Button>
       </div>
 
-      {videoSyncWarning && (
-        <div className="flex gap-2 items-center rounded-sm bg-amber-500/15 p-2 pl-4 text-amber-400">
-          <Bell className="h-3 w-3 shrink-0" />
-          <p className="text-[0.65rem] font-semibold leading-tight">{videoSyncWarning}</p>
-        </div>
-      )}
-
-      <div className="space-y-3">
-        <Label className="text-[10px] text-muted-foreground uppercase font-bold">Creation Time</Label>
-        <div className="grid grid-cols-2 gap-4">
-          <Tabs
-            value={canResetCreationTime ? 'filename' : 'detected'}
-            onValueChange={(value) => (value === 'filename' ? setVideoCreationTimeFromFilename() : resetVideoCreationTime())}
-          >
-            <TabsList variant="toolbar" className="grid h-9 w-full grid-cols-2 p-0.5">
-              <TabsTrigger variant="toolbar" value="detected" className="h-full px-2 text-[10px]">
-                Detected
-              </TabsTrigger>
-              <TabsTrigger variant="toolbar" value="filename" className="h-full px-2 text-[10px]" disabled={!filenameCreationTimeAvailable}>
-                Filename
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          {timezone && (
-            <div className="flex items-center gap-2">
-              <Switch
-                id="video-sync-timezone-toggle"
-                checked={videoSyncTimezoneMode === 'utc'}
-                disabled={importedVideoTimeSource === 'filename'}
-                onCheckedChange={(checked) => setVideoSyncTimezoneMode(checked ? 'utc' : 'local')}
-                aria-label="Apply Timezone"
-              />
-              <Label htmlFor="video-sync-timezone-toggle" className="text-[10px] text-muted-foreground uppercase font-bold">
-                Apply Timezone
-              </Label>
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="space-y-3">
         <Label className="text-[10px] text-muted-foreground uppercase font-bold">Sync Offset</Label>
         <div className="grid grid-cols-2 items-center gap-4">
@@ -180,7 +140,45 @@ function VideoSyncControls({
             Auto-sync
           </Button>
         </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-4 pt-1">
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Creation Time</Label>
+          <Tabs
+            value={canResetCreationTime ? 'filename' : 'detected'}
+            onValueChange={(value) => (value === 'filename' ? setVideoCreationTimeFromFilename() : resetVideoCreationTime())}
+          >
+            <TabsList variant="toolbar" className="grid h-8 w-full grid-cols-2 p-0.5">
+              <TabsTrigger variant="toolbar" value="detected" className="h-full px-2 text-[0.7rem]">
+                Detected
+              </TabsTrigger>
+              <TabsTrigger variant="toolbar" value="filename" className="h-full px-2 text-[0.7rem]" disabled={!filenameCreationTimeAvailable}>
+                Filename
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {timezone && (
+            <>
+              <Label htmlFor="video-sync-timezone-toggle" className="mb-2 text-[10px] text-muted-foreground uppercase font-bold">
+                Apply Timezone
+              </Label>
+              <div className="mb-2 flex items-center gap-2">
+                <Switch
+                  id="video-sync-timezone-toggle"
+                  checked={videoSyncTimezoneMode === 'utc'}
+                  disabled={importedVideoTimeSource === 'filename'}
+                  onCheckedChange={(checked) => setVideoSyncTimezoneMode(checked ? 'utc' : 'local')}
+                  aria-label="Apply Timezone"
+                />
+              </div>
+            </>
+          )}
+        </div>
       </div>
+      {videoSyncWarning && (
+        <div className="flex gap-2 items-center rounded-sm bg-amber-500/15 p-2 pl-4 text-amber-400">
+          <Bell className="h-3 w-3 shrink-0" />
+          <p className="text-[0.65rem] font-semibold leading-tight">{videoSyncWarning}</p>
+        </div>
+      )}
     </section>
   )
 }
