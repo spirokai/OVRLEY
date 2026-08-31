@@ -19,7 +19,7 @@ import {
   useVideoSyncControls,
 } from '@/features/toolbar'
 import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
-import { MissingSourceDialog } from '@/features/projects'
+import { MissingSourceDialog, StartupProjectsDialog } from '@/features/projects'
 import { UpdatePromptDialog } from '@/features/app-update'
 import {
   AppHeader,
@@ -126,8 +126,8 @@ function AppShell() {
 
   if (!toolbarDrawer.initialized) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-background text-foreground">
-        <span className="text-sm text-muted-foreground">OVRLEY is starting...</span>
+      <div className="relative h-screen w-full bg-background text-foreground">
+        <LoadingOverlay show label="OVRLEY is starting..." />
       </div>
     )
   }
@@ -141,6 +141,7 @@ function AppShell() {
     >
       <div className="relative flex h-full flex-col bg-background text-foreground">
         <ErrorAlert />
+        <StartupProjectsDialog {...projectLifecycle.startupProjectDialog} open={projectLifecycle.startupProjectDialog.open && !appUpdate.open} />
         <UpdatePromptDialog {...appUpdate} />
         <RenderVideoDialog
           phase={renderWorkflow.renderDialogPhase}

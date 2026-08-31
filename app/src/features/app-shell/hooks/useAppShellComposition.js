@@ -2,7 +2,7 @@
  * Composes shell-level hooks and returns their owned state unchanged.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { useAppShellStore, useLayoutStore } from '@/hooks/useAppStoreSelectors'
 import { useRenderWorkflow } from '@/features/render-video'
@@ -38,6 +38,7 @@ import { useProjectLifecycle } from '@/features/projects'
  * }}
  */
 export default function useAppShellComposition() {
+  const [templateRestoreComplete, setTemplateRestoreComplete] = useState(false)
   const appShell = useAppShellStore()
   const layout = useLayoutStore()
   const widgetLiveEdits = useWidgetDraftState()
@@ -50,8 +51,10 @@ export default function useAppShellComposition() {
   const projectLifecycle = useProjectLifecycle({
     clearImportedVideo: videoControls.clearImportedVideo,
     onSetBackgroundMode: editorShell.setEditorBackgroundMode,
+    onCreateBlankTemplate: templateManagement.createBlankTemplate,
     prepareActivityPath: activityImport.prepareActivityPath,
     prepareVideoPath: videoControls.prepareVideoPath,
+    startupReady: backendState.backendReady && templateRestoreComplete,
   })
   const undoRedoControls = useUndoRedo({
     disabled:
@@ -66,7 +69,7 @@ export default function useAppShellComposition() {
   const { restoreLastLoadedTemplate } = templateManagement
 
   useEffect(() => {
-    restoreLastLoadedTemplate()
+    restoreLastLoadedTemplate().finally(() => setTemplateRestoreComplete(true))
   }, [restoreLastLoadedTemplate])
 
   const handleOpenOutputDirectory = async () => {

@@ -34,6 +34,55 @@ pub(crate) fn default_project_directory(app: tauri::AppHandle) -> Result<String,
     Ok(path_string(directory))
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProjectFileSummary {
+    name: String,
+    path: String,
+}
+
+#[tauri::command]
+pub(crate) fn list_project_files(directory: String) -> Result<Vec<ProjectFileSummary>, String> {
+    let directory = PathBuf::from(directory);
+    if !directory.is_absolute() {
+        return Err("Project directory must be an absolute path".into());
+    }
+
+    let mut projects = Vec::new();
+    for entry in fs::read_dir(&directory).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path();
+        let is_project = entry
+            .file_type()
+            .map_err(|error| error.to_string())?
+            .is_file()
+            && path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("oly"));
+        if !is_project {
+            continue;
+        }
+
+        let name = path
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| "Project filename must be valid UTF-8".to_string())?;
+        projects.push(ProjectFileSummary {
+            name: name.to_string(),
+            path: path_string(path),
+        });
+    }
+
+    projects.sort_by(|left, right| {
+        left.name
+            .to_lowercase()
+            .cmp(&right.name.to_lowercase())
+            .then_with(|| left.path.cmp(&right.path))
+    });
+    Ok(projects)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ProjectDocument {

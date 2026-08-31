@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import { openSinglePath, saveSinglePath } from '@/lib/file-dialog'
+import { getPreference } from '@/lib/preferences-store'
 import { pathInDirectory } from '@/lib/utils'
 import { useUnsavedChangesConfirm } from '@/features/app-shell'
 import useStore from '@/store/useStore'
@@ -18,9 +19,18 @@ const PROJECT_FILTER = [{ name: 'OVRLEY Project', extensions: ['oly'] }]
  * @param {function} options.clearImportedVideo Clears the active video source.
  * @param {function} options.prepareVideoPath Probes one video source without committing it.
  * @param {function} [options.onSetBackgroundMode] Shell setter for the editor background mode.
+ * @param {boolean} [options.startupReady] Whether application startup completed successfully.
+ * @param {function} [options.onCreateBlankTemplate] Creates the blank template selected from the startup dialog.
  * @returns {object} Project lifecycle state and command handlers.
  */
-export default function useProjectLifecycle({ prepareActivityPath, clearImportedVideo, prepareVideoPath, onSetBackgroundMode }) {
+export default function useProjectLifecycle({
+  prepareActivityPath,
+  clearImportedVideo,
+  prepareVideoPath,
+  onSetBackgroundMode,
+  startupReady = false,
+  onCreateBlankTemplate,
+}) {
   const { conflictingOperation, loadedProjectPath, markNew, markSaved, projectName, status } = useProjectDocumentState()
   const { dialog: missingSourceDialog, resolveProjectSources } = useProjectSourceRecovery()
   const {
@@ -29,8 +39,39 @@ export default function useProjectLifecycle({ prepareActivityPath, clearImported
     requestConfirm: requestUnsavedChangesConfirm,
   } = useUnsavedChangesConfirm()
   const [activeOperation, setActiveOperation] = useState(null)
+  const [startupDialogOpen, setStartupDialogOpen] = useState(false)
+  const [startupProjects, setStartupProjects] = useState([])
+  const [startupOpeningPath, setStartupOpeningPath] = useState(null)
   const operationLock = useRef(false)
+  const startupLoaded = useRef(false)
   const busy = activeOperation !== null || conflictingOperation
+
+  useEffect(() => {
+    if (!startupReady || startupLoaded.current) return
+    startupLoaded.current = true
+
+    const loadStartupProjects = async () => {
+      try {
+        const rememberedDirectory = await getPreference(LAST_PROJECT_DIRECTORY_KEY)
+        if (rememberedDirectory !== null && rememberedDirectory !== undefined && typeof rememberedDirectory !== 'string') {
+          throw new Error('Saved project directory must be a path string')
+        }
+        if (typeof rememberedDirectory === 'string' && !rememberedDirectory.trim()) {
+          throw new Error('Saved project directory must not be empty')
+        }
+        const directory = rememberedDirectory ?? (await backend.getDefaultProjectDirectory())
+        setStartupProjects(await backend.listProjectFiles(directory))
+      } catch (error) {
+        console.error('Failed to list startup projects:', error)
+        const message = error instanceof Error ? error.message : String(error)
+        useStore.getState().setErrorMessage(`Failed to list projects: ${message}`)
+      } finally {
+        setStartupDialogOpen(true)
+      }
+    }
+
+    loadStartupProjects()
+  }, [startupReady])
 
   const runOperation = useCallback(
     async (operationName, operation) => {
@@ -51,18 +92,24 @@ export default function useProjectLifecycle({ prepareActivityPath, clearImported
     [conflictingOperation],
   )
 
+  const loadProjectPath = useCallback(
+    async (path) => {
+      const project = await loadProject({ path, resolveProjectSources, prepareActivityPath, prepareVideoPath, onSetBackgroundMode })
+      if (!project) return false
+      markSaved(path, project)
+      return true
+    },
+    [markSaved, onSetBackgroundMode, prepareActivityPath, prepareVideoPath, resolveProjectSources],
+  )
+
   const handleOpenProject = useCallback(
     () =>
       runOperation('open project', async () => {
         const defaultPath = await backend.getDefaultProjectDirectory()
         const path = await openSinglePath(PROJECT_FILTER, { defaultPath, lastDirectoryKey: LAST_PROJECT_DIRECTORY_KEY })
-        if (!path) return false
-        const project = await loadProject({ path, resolveProjectSources, prepareActivityPath, prepareVideoPath, onSetBackgroundMode })
-        if (!project) return false
-        markSaved(path, project)
-        return true
+        return path ? loadProjectPath(path) : false
       }),
-    [markSaved, onSetBackgroundMode, prepareActivityPath, prepareVideoPath, resolveProjectSources, runOperation],
+    [loadProjectPath, runOperation],
   )
 
   const save = useCallback(
@@ -85,6 +132,23 @@ export default function useProjectLifecycle({ prepareActivityPath, clearImported
 
   const handleSaveProject = useCallback(() => save(false), [save])
   const handleSaveProjectAs = useCallback(() => save(true), [save])
+
+  const handleOpenProjectPath = useCallback((path) => runOperation('open project', () => loadProjectPath(path)), [loadProjectPath, runOperation])
+
+  const handleStartupNewProject = useCallback(async () => {
+    await onCreateBlankTemplate()
+    setStartupDialogOpen(false)
+  }, [onCreateBlankTemplate])
+
+  const handleStartupOpenProject = useCallback(
+    async (path) => {
+      setStartupOpeningPath(path)
+      setStartupDialogOpen(false)
+      await handleOpenProjectPath(path)
+      setStartupOpeningPath(null)
+    },
+    [handleOpenProjectPath],
+  )
 
   // Create new project — asks to save unsaved changes before discarding them
   const handleNewProject = useCallback(async () => {
@@ -125,6 +189,14 @@ export default function useProjectLifecycle({ prepareActivityPath, clearImported
     missingSourceDialog,
     newProjectConfirmDialog,
     projectName,
+    startupProjectDialog: {
+      open: startupDialogOpen,
+      openingPath: startupOpeningPath,
+      projects: startupProjects,
+      onDismiss: () => setStartupDialogOpen(false),
+      onNewProject: handleStartupNewProject,
+      onOpenProject: handleStartupOpenProject,
+    },
     status,
   }
 }

@@ -97,6 +97,7 @@ pub fn run() {
             file_ops::write_template_file,
             file_ops::write_parse_debug_file,
             project_file::default_project_directory,
+            project_file::list_project_files,
             project_file::read_project_file,
             project_file::write_project_file
         ])

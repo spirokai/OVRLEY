@@ -275,6 +275,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
   }, [createNewTemplate, loadTemplateState, setErrorMessage])
 
   return {
+    createBlankTemplate: confirmCreateNewTemplate,
     handleCreateNewTemplate,
     handleImportTemplate,
     handleSaveTemplate,

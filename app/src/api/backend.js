@@ -451,6 +451,30 @@ export async function getDefaultProjectDirectory() {
 }
 
 /**
+ * Lists `.oly` projects directly inside a project directory.
+ * @param {string} directory Absolute project directory.
+ * @returns {Promise<Array<{name: string, path: string}>>} Project summaries sorted by name.
+ */
+export async function listProjectFiles(directory) {
+  const projects = await invokeCommand('list_project_files', { directory })
+  if (
+    !Array.isArray(projects) ||
+    projects.some(
+      (project) =>
+        !project ||
+        typeof project !== 'object' ||
+        typeof project.name !== 'string' ||
+        !project.name ||
+        typeof project.path !== 'string' ||
+        !project.path,
+    )
+  ) {
+    throw new Error('Invalid project list returned by backend')
+  }
+  return projects
+}
+
+/**
  * Reads and validates an OVRLEY project archive.
  * @param {string} path - Absolute `.oly` path.
  * @returns {Promise<object>} Validated project and resolved source paths.
