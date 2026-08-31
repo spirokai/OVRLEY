@@ -24,7 +24,7 @@ function MenuItem({ icon: Icon, label, onClick, disabled, shortcut }) {
   return (
     <Button
       variant="ghost"
-      className="w-full justify-start gap-3 px-2 text-xs font-semibold uppercase"
+      className="w-full justify-start gap-3 px-2 text-[0.7rem] font-semibold uppercase"
       onClick={onClick}
       disabled={disabled}
       aria-keyshortcuts={shortcut}
@@ -85,8 +85,8 @@ export default function ActivitySection({
             File
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" sideOffset={6} className="w-52 p-1.5">
-          <div className="flex flex-col gap-0.5">
+        <PopoverContent align="start" sideOffset={6} className="w-48 p-1.5">
+          <div className="flex flex-col gap-0.2">
             <MenuItem icon={FilePlus2} label="New Project" shortcut="Mod+N" onClick={() => run(onNewProject)} />
             <MenuItem icon={FolderOpen} label="Load Project" shortcut="Mod+O" onClick={() => run(onLoadProject)} />
             <MenuItem icon={Save} label="Save Project" shortcut="Mod+S" disabled={status === 'Saved'} onClick={() => run(onSaveProject)} />

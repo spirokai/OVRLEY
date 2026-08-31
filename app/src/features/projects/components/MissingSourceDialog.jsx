@@ -6,7 +6,7 @@ export function MissingSourceDialog({ sourceRole, open, onLocate, onLoadAnyway, 
     <Dialog open={open}>
       <DialogContent
         className="w-full max-w-lg rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
-        overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md"
+        overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
       >
         <DialogTitle className="text-lg font-bold">{sourceRole === 'video' ? 'Video' : 'Activity'} source not found</DialogTitle>
         <DialogDescription className="mt-2 text-sm text-muted-foreground">

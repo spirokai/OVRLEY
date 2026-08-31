@@ -1,17 +1,54 @@
-import { FilePlus2, FolderOpen, Save } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Activity, FilePlus2, Film, FolderOpen, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SectionHeading } from '@/components/ui/section-heading'
 
-export function ProjectsDrawerContent({ projectName, projectPath, status, busy, onNew, onOpen, onSave, onSaveAs }) {
+function ProjectSource({ icon: Icon, label, filename, path }) {
+  if (!path) return null
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 pb-4 thin-scrollbar">
-      <Button type="button" className="w-full gap-2" disabled={busy} onClick={onNew} aria-keyshortcuts="Mod+N">
-        <FilePlus2 className="size-4" /> New Project
-      </Button>
-      <Button type="button" variant="secondary" className="w-full gap-2" disabled={busy} onClick={onOpen} aria-keyshortcuts="Mod+O">
-        <FolderOpen className="size-4" /> Open Project
-      </Button>
-      <div className="grid grid-cols-2 gap-2">
+    <section className="min-w-0 space-y-3 px-1">
+      <SectionHeading
+        icon={Icon}
+        title={label}
+        trailing={
+          <p className="max-w-32 truncate text-xs font-medium text-foreground/90" title={filename}>
+            {filename}
+          </p>
+        }
+        variant="drawer"
+      />
+      <p className="min-w-0 break-all text-xs text-muted-foreground" title={path}>
+        {path}
+      </p>
+    </section>
+  )
+}
+
+export function ProjectsDrawerContent({
+  projectName,
+  projectPath,
+  activityFilename,
+  activityPath,
+  videoFilename,
+  videoPath,
+  status,
+  busy,
+  onNew,
+  onOpen,
+  onSave,
+  onSaveAs,
+}) {
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-3 pb-4 thin-scrollbar">
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <Button type="button" className="w-full gap-2" disabled={busy} onClick={onNew} aria-keyshortcuts="Mod+N">
+            <FilePlus2 className="size-4" /> New Project
+          </Button>
+          <Button type="button" variant="secondary" className="w-full gap-2" disabled={busy} onClick={onOpen} aria-keyshortcuts="Mod+O">
+            <FolderOpen className="size-4" /> Open Project
+          </Button>
+        </div>
         <Button
           type="button"
           variant="secondary"
@@ -23,22 +60,23 @@ export function ProjectsDrawerContent({ projectName, projectPath, status, busy, 
           <Save className="size-4" /> Save Project
         </Button>
         <Button type="button" variant="secondary" className="w-full" disabled={busy} onClick={onSaveAs} aria-keyshortcuts="Mod+Shift+S">
-          Save Project As
+          <Save className="size-4" /> Save Project As
         </Button>
       </div>
-      <div className="rounded-md border border-border bg-background/40 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <span className="min-w-0 truncate text-sm font-bold" title={projectPath ?? undefined}>
-            {projectName || 'Unsaved project'}
-          </span>
-          <Badge variant="outline">{status}</Badge>
+
+      {projectPath ? (
+        <div className="mt-10 min-w-0 space-y-6 border-t border-border/80 pt-2">
+          <div className="min-w-0 pb-2 pl-1 pt-4 text-sm font-extrabold text-foreground">
+            <span className="block min-w-0 truncate" title={projectName}>
+              {projectName}
+            </span>
+          </div>
+          <div className="min-w-0 space-y-8">
+            <ProjectSource icon={Activity} label="Activity" filename={activityFilename} path={activityPath} />
+            <ProjectSource icon={Film} label="Video" filename={videoFilename} path={videoPath} />
+          </div>
         </div>
-        {projectPath ? (
-          <p className="mt-1 truncate text-xs text-muted-foreground" title={projectPath}>
-            {projectPath}
-          </p>
-        ) : null}
-      </div>
+      ) : null}
     </div>
   )
 }

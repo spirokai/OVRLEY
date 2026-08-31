@@ -87,6 +87,10 @@ function AppShell() {
         <ProjectsDrawerContent
           projectName={projectLifecycle.projectName}
           projectPath={projectLifecycle.loadedProjectPath}
+          activityFilename={activityImport.activityFilename}
+          activityPath={activityImport.activityPath}
+          videoFilename={videoControls.videoSummary.filename}
+          videoPath={videoControls.videoSummary.path}
           status={projectLifecycle.status}
           busy={projectLifecycle.busy}
           onNew={projectLifecycle.handleNewProject}
