@@ -236,10 +236,10 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     act(() => {
       createPromise = result.current.handleNewProject()
     })
-    await waitFor(() => expect(result.current.newProjectConfirmDialog.open).toBe(true))
+    await waitFor(() => expect(result.current.unsavedProjectDialog.open).toBe(true))
     expect(clearImportedVideo).not.toHaveBeenCalled()
 
-    act(() => result.current.newProjectConfirmDialog.onDiscard())
+    act(() => result.current.unsavedProjectDialog.onDiscard())
     await act(async () => createPromise)
 
     const state = useStore.getState()
@@ -294,9 +294,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     act(() => {
       createPromise = result.current.handleNewProject()
     })
-    await waitFor(() => expect(result.current.newProjectConfirmDialog.open).toBe(true))
+    await waitFor(() => expect(result.current.unsavedProjectDialog.open).toBe(true))
 
-    act(() => result.current.newProjectConfirmDialog.onSave())
+    act(() => result.current.unsavedProjectDialog.onSave())
     await act(async () => createPromise)
 
     expect(boundaries.saveSinglePath).toHaveBeenCalledOnce()
@@ -324,9 +324,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     act(() => {
       createPromise = result.current.handleNewProject()
     })
-    await waitFor(() => expect(result.current.newProjectConfirmDialog.open).toBe(true))
+    await waitFor(() => expect(result.current.unsavedProjectDialog.open).toBe(true))
 
-    act(() => result.current.newProjectConfirmDialog.onCancel())
+    act(() => result.current.unsavedProjectDialog.onCancel())
     const outcome = await act(async () => createPromise)
 
     expect(outcome).toBe(false)

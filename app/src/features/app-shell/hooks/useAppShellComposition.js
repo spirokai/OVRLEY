@@ -12,6 +12,7 @@ import useAppBootstrap from './useAppBootstrap'
 import useAppShellKeyboard from './useAppShellKeyboard'
 import useBackendStatus from './useBackendStatus'
 import useEditorShellState from './useEditorShellState'
+import useWindowCloseGuard from './useWindowCloseGuard'
 import { useAppUpdate } from '@/features/app-update'
 import { useVideoImport } from '@/features/video-preview'
 import { useUndoRedo } from '@/features/undo-redo'
@@ -56,11 +57,10 @@ export default function useAppShellComposition() {
     prepareVideoPath: videoControls.prepareVideoPath,
     startupReady: backendState.backendReady && templateRestoreComplete,
   })
+  useWindowCloseGuard(projectLifecycle.handleCloseRequest)
   const undoRedoControls = useUndoRedo({
     disabled:
-      renderWorkflow.renderDialogPhase !== 'closed' ||
-      templateManagement.newTemplateConfirmDialog.open ||
-      projectLifecycle.newProjectConfirmDialog.open,
+      renderWorkflow.renderDialogPhase !== 'closed' || templateManagement.newTemplateConfirmDialog.open || projectLifecycle.unsavedProjectDialog.open,
   })
 
   useAppBootstrap()

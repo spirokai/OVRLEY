@@ -33,12 +33,9 @@ export default function useProjectLifecycle({
 }) {
   const { conflictingOperation, loadedProjectPath, markNew, markSaved, projectName, status } = useProjectDocumentState()
   const { dialog: missingSourceDialog, resolveProjectSources } = useProjectSourceRecovery()
-  const {
-    answerConfirm: answerUnsavedChangesConfirm,
-    isOpen: isNewProjectConfirmOpen,
-    requestConfirm: requestUnsavedChangesConfirm,
-  } = useUnsavedChangesConfirm()
+  const { answerConfirm: answerProjectConfirm, isOpen: isProjectConfirmOpen, requestConfirm: requestProjectConfirm } = useUnsavedChangesConfirm()
   const [activeOperation, setActiveOperation] = useState(null)
+  const [confirmationIntent, setConfirmationIntent] = useState('new')
   const [startupDialogOpen, setStartupDialogOpen] = useState(false)
   const [startupProjects, setStartupProjects] = useState([])
   const [startupOpeningPath, setStartupOpeningPath] = useState(null)
@@ -151,35 +148,50 @@ export default function useProjectLifecycle({
   )
 
   // Create new project — asks to save unsaved changes before discarding them
-  const handleNewProject = useCallback(async () => {
-    if (status !== 'Saved') {
-      const action = await requestUnsavedChangesConfirm()
+  const confirmProjectTransition = useCallback(
+    async (intent) => {
+      if (status === 'Saved') return true
+
+      setConfirmationIntent(intent)
+      const action = await requestProjectConfirm()
       if (action === 'cancel') return false
-      if (action === 'save') {
-        const saved = await save(false)
-        if (!saved) return false
-      }
-    }
+      if (action === 'save') return save(false)
+      return true
+    },
+    [requestProjectConfirm, save, status],
+  )
+
+  const handleNewProject = useCallback(async () => {
+    if (!(await confirmProjectTransition('new'))) return false
 
     return runOperation('create project', async () => {
       await createNewProject({ clearImportedVideo })
       markNew()
       return true
     })
-  }, [clearImportedVideo, markNew, requestUnsavedChangesConfirm, runOperation, save, status])
+  }, [clearImportedVideo, confirmProjectTransition, markNew, runOperation])
 
-  const newProjectConfirmDialog = {
-    open: isNewProjectConfirmOpen,
-    title: 'Create New Project',
-    description: 'Your project has unsaved changes. Save them or discard them.',
-    discardLabel: 'New Project',
-    onCancel: () => answerUnsavedChangesConfirm('cancel'),
-    onSave: () => answerUnsavedChangesConfirm('save'),
-    onDiscard: () => answerUnsavedChangesConfirm('discard'),
+  const handleCloseRequest = useCallback(
+    () => (isProjectConfirmOpen ? Promise.resolve(false) : confirmProjectTransition('close')),
+    [confirmProjectTransition, isProjectConfirmOpen],
+  )
+
+  const closingApplication = confirmationIntent === 'close'
+  const unsavedProjectDialog = {
+    open: isProjectConfirmOpen,
+    title: closingApplication ? 'Unsaved changes' : 'Create New Project',
+    description: closingApplication
+      ? 'Your project has unsaved changes. Do you want to save the changes or close OVRLEY without saving?'
+      : 'Your project has unsaved changes. Save them or discard them.',
+    discardLabel: closingApplication ? 'Close Without Saving' : 'New Project',
+    onCancel: () => answerProjectConfirm('cancel'),
+    onSave: () => answerProjectConfirm('save'),
+    onDiscard: () => answerProjectConfirm('discard'),
   }
 
   return {
     busy,
+    handleCloseRequest,
     handleNewProject,
     handleOpenProject,
     handleSaveProject,
@@ -187,7 +199,6 @@ export default function useProjectLifecycle({
     loadedProjectPath,
     loadingProject: activeOperation === 'open project',
     missingSourceDialog,
-    newProjectConfirmDialog,
     projectName,
     startupProjectDialog: {
       open: startupDialogOpen,
@@ -198,5 +209,6 @@ export default function useProjectLifecycle({
       onOpenProject: handleStartupOpenProject,
     },
     status,
+    unsavedProjectDialog,
   }
 }

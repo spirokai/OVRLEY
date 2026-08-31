@@ -157,7 +157,7 @@ function AppShell() {
           submissionPending={renderWorkflow.submissionPending}
         />
         <UnsavedChangesDialog {...templateManagement.newTemplateConfirmDialog} />
-        <UnsavedChangesDialog {...projectLifecycle.newProjectConfirmDialog} />
+        <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
         <KeyboardShortcutsDialog open={editorShell.keyboardShortcutsOpen} onClose={editorShell.closeKeyboardShortcuts} />
         <AppHeader
