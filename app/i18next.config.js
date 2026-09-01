@@ -7,7 +7,7 @@ export default defineConfig({
   locales: locales,
 
   extract: {
-    input: ['src/**/*.{ts, tsx, js,jsx}'],
+    input: ['src/**/*.{js,jsx}', '!src/tests/**'],
     output: 'src/i18n/locales/{{language}}-translation.json',
 
     primaryLanguage: 'en',
