@@ -74,12 +74,12 @@ export function withAltitudeEditorPresentation(widget, activity) {
  * subsequent widgets in the same group get null.
  *
  * @param {object[]} widgets - Uniform widget list from buildConfigWidgets.
- * @param {object} typeLabels - Lookup from widget.type to display label.
+ * @param {(type: string) => string} getTypeName - Resolves a configured widget type to its display name.
  * @returns {object[]} Widgets with groupLabel annotations.
  */
-export function groupWidgetsForSidebar(widgets, typeLabels) {
+export function groupWidgetsForSidebar(widgets, getTypeName) {
   const grouped = widgets.reduce((accumulator, widget) => {
-    const typeName = typeLabels[widget.type] || widget.type
+    const typeName = getTypeName(widget.type)
     if (!accumulator[typeName]) accumulator[typeName] = []
     accumulator[typeName].push({ ...widget, name: widget.type === 'label' ? widget.name : typeName })
     return accumulator

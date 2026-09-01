@@ -46,7 +46,7 @@ describe('useTimelineClips', () => {
       durationSeconds: 100,
       formatLabel: 'FIT',
       label: 'ride.fit',
-      availableMetrics: ['Barometric Altitude', 'Location'],
+      availableMetrics: ['Barometric Altitude', 'GPS Coordinates'],
       startSecond: 0,
     })
   })

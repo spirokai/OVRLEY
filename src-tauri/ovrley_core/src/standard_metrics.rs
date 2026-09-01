@@ -108,7 +108,6 @@ pub struct StandardMetricDefinition {
     pub kind: MetricKind,
     pub key: String,
     pub current: bool,
-    pub label: String,
     pub default_display_unit: String,
     pub supported_display_units: Vec<StandardMetricUnitOption>,
     pub show_units_by_default: bool,
@@ -124,7 +123,6 @@ struct RawStandardMetricDefinition {
     #[serde(rename = "type")]
     key: String,
     current: bool,
-    label: String,
     default_display_unit: String,
     supported_display_units: Vec<StandardMetricUnitOption>,
     show_units_by_default: bool,
@@ -137,7 +135,7 @@ struct RawStandardMetricDefinition {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RawDisplayTypeDefinition {
-    label: String,
+    label_key: String,
     layout_mode: DisplayTypeLayoutMode,
     #[serde(default)]
     default_frame_width: Option<u32>,
@@ -177,7 +175,7 @@ impl DisplayTypeManifest {
                 (
                     key,
                     DisplayTypeDefinition {
-                        label: raw_def.label,
+                        label_key: raw_def.label_key,
                         layout_mode: raw_def.layout_mode,
                         default_frame_width: raw_def.default_frame_width,
                         default_frame_height: raw_def.default_frame_height,
@@ -231,7 +229,6 @@ fn load_manifest() -> StandardMetricManifest {
                     kind,
                     key: definition.key,
                     current: definition.current,
-                    label: definition.label,
                     default_display_unit: definition.default_display_unit,
                     supported_display_units: definition.supported_display_units,
                     show_units_by_default: definition.show_units_by_default,
@@ -450,7 +447,7 @@ pub enum DisplayTypeLayoutMode {
 /// Formal definition of a display type from the shared manifest.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DisplayTypeDefinition {
-    pub label: String,
+    pub label_key: String,
     pub layout_mode: DisplayTypeLayoutMode,
     pub default_frame_width: Option<u32>,
     pub default_frame_height: Option<u32>,
@@ -461,14 +458,13 @@ pub fn display_type_definition(display_type: &str) -> Option<&'static DisplayTyp
     manifest().display_types.definitions.get(display_type)
 }
 
-/// Look up the human-readable label for a `display_type` value.
-pub fn display_type_label(display_type: &str) -> &str {
+/// Look up the translation key for a `display_type` value.
+pub fn display_type_label_key(display_type: &str) -> Option<&str> {
     manifest()
         .display_types
         .definitions
         .get(display_type)
-        .map(|def| def.label.as_str())
-        .unwrap_or(display_type)
+        .map(|definition| definition.label_key.as_str())
 }
 
 /// Check whether a display type uses boxed (framed) layout.

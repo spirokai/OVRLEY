@@ -11,6 +11,11 @@ use std::sync::OnceLock;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StandardWidgetDefinition {
+    pub defaults: Value,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct BackdropTypeDefinition {
     pub label: String,
     pub defaults: Value,
 }
@@ -18,6 +23,12 @@ pub struct StandardWidgetDefinition {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RawStandardWidgetDefinition {
+    defaults: Value,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawBackdropTypeDefinition {
     label: String,
     defaults: Value,
 }
@@ -26,7 +37,12 @@ struct RawStandardWidgetDefinition {
 #[serde(rename_all = "camelCase")]
 struct RawStandardWidgetSection {
     definitions: HashMap<String, RawStandardWidgetDefinition>,
-    #[serde(default)]
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawBackdropSection {
+    definitions: HashMap<String, RawBackdropTypeDefinition>,
     defaults: Vec<String>,
 }
 
@@ -36,13 +52,12 @@ struct RawStandardWidgetManifest {
     plot: RawStandardWidgetSection,
     gradient: RawStandardWidgetSection,
     label: RawStandardWidgetSection,
-    backdrops: RawStandardWidgetSection,
+    backdrops: RawBackdropSection,
 }
 
 #[derive(Clone, Debug)]
 struct StandardWidgetSection {
     definitions: HashMap<String, StandardWidgetDefinition>,
-    defaults: Vec<String>,
 }
 
 impl StandardWidgetSection {
@@ -54,6 +69,31 @@ impl StandardWidgetSection {
                 (
                     key,
                     StandardWidgetDefinition {
+                        defaults: definition.defaults,
+                    },
+                )
+            })
+            .collect();
+
+        Self { definitions }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct BackdropSection {
+    definitions: HashMap<String, BackdropTypeDefinition>,
+    defaults: Vec<String>,
+}
+
+impl BackdropSection {
+    fn from_raw(raw: RawBackdropSection) -> Self {
+        let definitions = raw
+            .definitions
+            .into_iter()
+            .map(|(key, definition)| {
+                (
+                    key,
+                    BackdropTypeDefinition {
                         label: definition.label,
                         defaults: definition.defaults,
                     },
@@ -73,7 +113,7 @@ struct StandardWidgetManifest {
     plot: StandardWidgetSection,
     gradient: StandardWidgetSection,
     label: StandardWidgetSection,
-    backdrops: StandardWidgetSection,
+    backdrops: BackdropSection,
 }
 
 static STANDARD_WIDGET_MANIFEST: OnceLock<StandardWidgetManifest> = OnceLock::new();
@@ -93,7 +133,7 @@ fn load_manifest() -> StandardWidgetManifest {
         plot: StandardWidgetSection::from_raw(raw.plot),
         gradient: StandardWidgetSection::from_raw(raw.gradient),
         label: StandardWidgetSection::from_raw(raw.label),
-        backdrops: StandardWidgetSection::from_raw(raw.backdrops),
+        backdrops: BackdropSection::from_raw(raw.backdrops),
     }
 }
 
@@ -109,7 +149,7 @@ pub fn label_widget_definition(key: &str) -> Option<&'static StandardWidgetDefin
     manifest().label.definitions.get(key)
 }
 
-pub fn backdrop_type_definition(display_type: &str) -> Option<&'static StandardWidgetDefinition> {
+pub fn backdrop_type_definition(display_type: &str) -> Option<&'static BackdropTypeDefinition> {
     manifest().backdrops.definitions.get(display_type)
 }
 

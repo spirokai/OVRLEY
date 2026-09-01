@@ -53,7 +53,7 @@ export default function MetricWidgetEditor({
 }) {
   const { t } = useTranslation()
   const displayType = widget.data.display_type || 'text'
-  const displayOptions = getDisplayTypeOptions(widget.type)
+  const displayOptions = getDisplayTypeOptions(widget.type, t)
 
   const handleDisplayTypeChange = useCallback(
     (value) => {

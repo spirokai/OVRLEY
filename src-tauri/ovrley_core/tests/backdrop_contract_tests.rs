@@ -18,20 +18,16 @@ use std::path::PathBuf;
 #[test]
 fn standard_widgets_manifest_exposes_legacy_sections_through_definitions() {
     let course = plot_widget_definition("course").expect("course plot definition");
-    assert_eq!(course.label, "Course");
     assert_eq!(course.defaults["value"], "course");
     assert_eq!(course.defaults["width"], 400);
 
     let elevation = plot_widget_definition("elevation").expect("elevation plot definition");
-    assert_eq!(elevation.label, "Elevation");
     assert_eq!(elevation.defaults["point_label"]["font"], "Arial.ttf");
 
     let gradient = gradient_widget_definition("gradient").expect("gradient definition");
-    assert_eq!(gradient.label, "Gradient");
     assert_eq!(gradient.defaults["triangle_width"], 72);
 
     let label = label_widget_definition("label").expect("label definition");
-    assert_eq!(label.label, "Text");
     assert_eq!(label.defaults["text"], "New Text");
 }
 

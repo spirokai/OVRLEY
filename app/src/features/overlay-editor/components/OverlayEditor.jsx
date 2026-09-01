@@ -27,8 +27,10 @@ import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-beha
 import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from '../utils/widgetRenderGeometry'
 import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
 import { useTranslation } from 'react-i18next'
+import { getWidgetTypeName } from '@/lib/widget/widget-icons'
 
 function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels, selectedWidgetIds, widgets }) {
+  const { t } = useTranslation()
   const visibleWidgets = useMemo(() => {
     const visibleIds = new Set(selectedWidgetIds)
     if (hoveredWidgetId) visibleIds.add(hoveredWidgetId)
@@ -53,7 +55,7 @@ function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels,
             style={{ left, top }}
           >
             <Icon className="h-3 w-3" />
-            <span>{widget.type}</span>
+            <span>{getWidgetTypeName(widget.type, t)}</span>
           </div>
         )
       })}
@@ -110,7 +112,9 @@ function EmptyOverlayState() {
           <LayoutGrid className="h-6 w-6" />
         </div>
         <p className="text-sm font-semibold text-foreground">{t('overlay-editor.overlayCanvasReady', 'Overlay canvas ready')}</p>
-        <p className="mt-2 text-sm text-muted-foreground">{t('overlay-editor.emptyEditorHint', 'Load a template or add widgets to start positioning the overlay.')}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t('overlay-editor.emptyEditorHint', 'Load a template or add widgets to start positioning the overlay.')}
+        </p>
       </div>
     </div>
   )

@@ -50,7 +50,7 @@ export default function TimelineLane({ lane }) {
         <div
           id={lane.tooltip.id}
           role="tooltip"
-          className="pointer-events-none absolute bottom-full z-1000 mb-2 max-w-56 -translate-x-1/2 rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-left text-xs text-foreground shadow-2xl"
+          className="pointer-events-none absolute bottom-full z-1000 mb-2 max-w-124 -translate-x-1/2 rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-left text-xs text-foreground shadow-2xl"
           style={lane.tooltip.style}
         >
           <div className="text-[0.72rem] font-semibold leading-snug">{lane.label}</div>

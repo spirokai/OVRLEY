@@ -2,7 +2,7 @@
 //!
 //! Verifies that the shared `assets/standard-metrics.json` manifest is loaded
 //! correctly and the display-type helpers expose the formal presentation
-//! contract: label, layout mode (intrinsic/boxed), default frame dimensions,
+//! contract: label key, layout mode (intrinsic/boxed), default frame dimensions,
 //! per-metric overrides, and supported display types.
 //!
 //! ## Type
@@ -16,7 +16,7 @@
 //! - Per-metric override regressions
 
 use ovrley_core::standard_metrics::{
-    default_frame_dimensions, display_type_definition, display_type_label, is_boxed_display_type,
+    default_frame_dimensions, display_type_definition, display_type_label_key, is_boxed_display_type,
     is_display_type_supported, supported_display_types, DisplayTypeLayoutMode,
 };
 use ovrley_core::MetricKind;
@@ -29,48 +29,57 @@ const G_FORCE_FRAME: (u32, u32) = (274, 274);
 #[test]
 fn display_type_definitions_load_from_manifest() {
     let text = display_type_definition("text").expect("text must exist");
-    assert_eq!(text.label, "Text");
+    assert_eq!(text.label_key, "widgets.displayTypes.text");
     assert_eq!(text.layout_mode, DisplayTypeLayoutMode::Intrinsic);
     assert!(text.default_frame_width.is_none());
     assert!(text.default_frame_height.is_none());
 
     let linear = display_type_definition("linear").expect("linear must exist");
-    assert_eq!(linear.label, "Linear Bar");
+    assert_eq!(linear.label_key, "widgets.displayTypes.linear");
     assert_eq!(linear.layout_mode, DisplayTypeLayoutMode::Boxed);
     assert_eq!(linear.default_frame_width, Some(LINEAR_FRAME.0));
     assert_eq!(linear.default_frame_height, Some(LINEAR_FRAME.1));
 
     let arc = display_type_definition("arc").expect("arc must exist");
-    assert_eq!(arc.label, "Arc Gauge");
+    assert_eq!(arc.label_key, "widgets.displayTypes.arc");
     assert_eq!(arc.layout_mode, DisplayTypeLayoutMode::Boxed);
     assert_eq!(arc.default_frame_width, Some(ARC_FRAME.0));
     assert_eq!(arc.default_frame_height, Some(ARC_FRAME.1));
 
     let heading_tape = display_type_definition("heading_tape").expect("heading_tape must exist");
-    assert_eq!(heading_tape.label, "Heading Tape");
+    assert_eq!(heading_tape.label_key, "widgets.displayTypes.headingTape");
     assert_eq!(heading_tape.layout_mode, DisplayTypeLayoutMode::Boxed);
     assert_eq!(heading_tape.default_frame_width, Some(600));
     assert_eq!(heading_tape.default_frame_height, Some(100));
 
     let lean_angle = display_type_definition("lean_angle").expect("lean_angle must exist");
-    assert_eq!(lean_angle.label, "Lean Angle");
+    assert_eq!(lean_angle.label_key, "widgets.displayTypes.leanAngle");
     assert_eq!(lean_angle.layout_mode, DisplayTypeLayoutMode::Boxed);
     assert!(lean_angle.default_frame_width.is_none());
     assert!(lean_angle.default_frame_height.is_none());
 
     let g_force = display_type_definition("g_force").expect("g_force must exist");
-    assert_eq!(g_force.label, "G-Force");
+    assert_eq!(g_force.label_key, "widgets.displayTypes.gForce");
     assert_eq!(g_force.layout_mode, DisplayTypeLayoutMode::Boxed);
     assert_eq!(g_force.default_frame_width, Some(G_FORCE_FRAME.0));
     assert_eq!(g_force.default_frame_height, Some(G_FORCE_FRAME.1));
 }
 
 #[test]
-fn display_type_label_returns_label_or_key() {
-    assert_eq!(display_type_label("text"), "Text");
-    assert_eq!(display_type_label("heading_tape"), "Heading Tape");
-    assert_eq!(display_type_label("linear"), "Linear Bar");
-    assert_eq!(display_type_label("unknown_type"), "unknown_type");
+fn display_type_label_key_returns_translation_key_for_known_types() {
+    assert_eq!(
+        display_type_label_key("text"),
+        Some("widgets.displayTypes.text")
+    );
+    assert_eq!(
+        display_type_label_key("heading_tape"),
+        Some("widgets.displayTypes.headingTape")
+    );
+    assert_eq!(
+        display_type_label_key("linear"),
+        Some("widgets.displayTypes.linear")
+    );
+    assert_eq!(display_type_label_key("unknown_type"), None);
 }
 
 #[test]

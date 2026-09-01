@@ -41,7 +41,7 @@ export function buildActivityDrawerViewModel(activitySummary, t) {
 
   const metricGroups = { derived: [], extracted: [] }
   for (const metric of activitySummary.availableMetrics) {
-    const label = getActivityAttributeLabel(metric.attribute)
+    const label = getActivityAttributeLabel(metric.attribute, t)
     for (const group of METRIC_GROUPS_BY_SOURCE[metric.source]) metricGroups[group].push(label)
   }
   metricGroups.derived.sort((left, right) => left.localeCompare(right))

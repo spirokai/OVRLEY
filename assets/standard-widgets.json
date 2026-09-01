@@ -1,8 +1,25 @@
 {
+  "categories": {
+    "general": "widgets.categories.general",
+    "cycling": "widgets.categories.cycling",
+    "running": "widgets.categories.running",
+    "motosports": "widgets.categories.motosports",
+    "camera": "widgets.categories.camera",
+    "other": "widgets.categories.other"
+  },
+  "time": {
+    "type": "time",
+    "nameKey": "widgets.types.time.name",
+    "shortNameKey": "widgets.types.time.shortName",
+    "category": "general"
+  },
   "plot": {
     "definitions": {
       "course": {
-        "label": "Course",
+        "type": "course",
+        "nameKey": "widgets.types.course.name",
+        "shortNameKey": "widgets.types.course.shortName",
+        "category": "general",
         "defaults": {
           "value": "course",
           "x": 100,
@@ -29,7 +46,10 @@
         }
       },
       "elevation": {
-        "label": "Elevation",
+        "type": "elevation",
+        "nameKey": "widgets.types.elevation.name",
+        "shortNameKey": "widgets.types.elevation.shortName",
+        "category": "general",
         "defaults": {
           "value": "elevation",
           "x": 100,
@@ -78,7 +98,10 @@
   "gradient": {
     "definitions": {
       "gradient": {
-        "label": "Gradient",
+        "type": "gradient",
+        "nameKey": "widgets.types.gradient.name",
+        "shortNameKey": "widgets.types.gradient.shortName",
+        "category": "general",
         "defaults": {
           "decimals": 1,
           "unit_color": "#ffffff",
@@ -95,7 +118,10 @@
   "label": {
     "definitions": {
       "label": {
-        "label": "Text",
+        "type": "label",
+        "nameKey": "widgets.types.label.name",
+        "shortNameKey": "widgets.types.label.shortName",
+        "category": "general",
         "defaults": {
           "x": 100,
           "y": 100,
@@ -109,10 +135,15 @@
     }
   },
   "backdrops": {
+    "type": "backdrop",
+    "nameKey": "widgets.types.backdrop.name",
+    "shortNameKey": "widgets.types.backdrop.shortName",
+    "category": "general",
     "defaults": ["rectangle"],
     "definitions": {
       "circle": {
         "label": "Circle",
+        "labelKey": "widgets.backdropTypes.circle",
         "icon": { "source": "shared", "assetFile": "display-type-circle.svg" },
         "defaults": {
           "display_type": "circle",
@@ -129,6 +160,7 @@
       },
       "rectangle": {
         "label": "Rectangle",
+        "labelKey": "widgets.backdropTypes.rectangle",
         "icon": { "source": "shared", "assetFile": "display-type-rectangle.svg" },
         "defaults": {
           "display_type": "rectangle",

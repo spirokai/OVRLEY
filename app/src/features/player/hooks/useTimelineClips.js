@@ -101,7 +101,7 @@ export default function useTimelineClips({
     // Activity lane - always starts at zero and uses activity metadata for label/duration.
     if (hasActivity) {
       const availableMetrics = activitySummary.availableMetrics
-        .map((metric) => getActivityAttributeLabel(metric.attribute))
+        .map((metric) => getActivityAttributeLabel(metric.attribute, i18next.t))
         .sort((left, right) => left.localeCompare(right))
 
       laneInputs.push({

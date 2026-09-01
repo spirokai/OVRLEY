@@ -145,8 +145,9 @@ export default function useProjectLifecycle({
   const handleStartupOpenProject = useCallback(
     async (path) => {
       setStartupOpeningPath(path)
+      setStartupDialogOpen(false)
       try {
-        if (await handleOpenProjectPath(path)) setStartupDialogOpen(false)
+        if (!(await handleOpenProjectPath(path))) setStartupDialogOpen(true)
       } finally {
         setStartupOpeningPath(null)
       }

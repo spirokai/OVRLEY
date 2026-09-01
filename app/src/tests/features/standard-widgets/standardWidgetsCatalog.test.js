@@ -5,15 +5,27 @@ import {
   BACKDROP_DEFAULT_DISPLAY_TYPES,
   BACKDROP_RECTANGLE_DEFAULTS,
   BACKDROP_TYPE_DEFINITIONS,
-  BACKDROP_TYPE_LABELS,
+  BACKDROP_TYPE_LABEL_KEYS,
   COURSE_PLOT_DEFAULTS,
   ELEVATION_PLOT_DEFAULTS,
   GRADIENT_DEFAULTS,
   TEXT_LABEL_DEFAULTS,
+  WIDGET_TYPE_DEFINITIONS,
   getBackdropTypeOptions,
 } from '@/lib/widget/standard-widgets'
+import i18next from '@/i18n'
 
 describe('standard widget manifest contract', () => {
+  test('discovers non-metric widget definitions from their manifest-owned type metadata', () => {
+    expect(Object.keys(WIDGET_TYPE_DEFINITIONS)).toEqual(expect.arrayContaining(['backdrop', 'label', 'time', 'elevation', 'course', 'gradient']))
+    expect(WIDGET_TYPE_DEFINITIONS.course).toMatchObject({
+      type: 'course',
+      nameKey: 'widgets.types.course.name',
+      shortNameKey: 'widgets.types.course.shortName',
+      category: 'general',
+    })
+  })
+
   test('preserves existing defaults through definition-backed exports', () => {
     expect(COURSE_PLOT_DEFAULTS).toMatchObject({
       value: 'course',
@@ -32,9 +44,9 @@ describe('standard widget manifest contract', () => {
 
   test('exposes backdrop definitions and rectangle as the default display type', () => {
     expect(Object.keys(BACKDROP_TYPE_DEFINITIONS)).toEqual(['circle', 'rectangle'])
-    expect(BACKDROP_TYPE_LABELS).toEqual({
-      circle: 'Circle',
-      rectangle: 'Rectangle',
+    expect(BACKDROP_TYPE_LABEL_KEYS).toEqual({
+      circle: 'widgets.backdropTypes.circle',
+      rectangle: 'widgets.backdropTypes.rectangle',
     })
     expect(BACKDROP_DEFAULT_DISPLAY_TYPES).toEqual(['rectangle'])
     expect(BACKDROP_CIRCLE_DEFAULTS).toEqual({
@@ -67,7 +79,7 @@ describe('standard widget manifest contract', () => {
       round_bottom_left: false,
       round_bottom_right: true,
     })
-    expect(getBackdropTypeOptions()).toEqual([
+    expect(getBackdropTypeOptions(i18next.t)).toEqual([
       { value: 'circle', label: 'Circle' },
       { value: 'rectangle', label: 'Rectangle' },
     ])

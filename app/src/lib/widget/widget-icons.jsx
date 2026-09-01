@@ -3,13 +3,15 @@
 import { Presentation, Timer, Type } from 'lucide-react'
 import {
   CURRENT_STANDARD_METRIC_WIDGET_TYPES,
-  STANDARD_METRIC_WIDGET_TYPES,
   BACKDROP_TYPE_DEFINITIONS,
-  BACKDROP_TYPE_LABELS,
-  DISPLAY_TYPE_LABELS,
+  BACKDROP_TYPE_LABEL_KEYS,
+  DISPLAY_TYPE_LABEL_KEYS,
   LAP_TIMER_MODES,
+  WIDGET_CATEGORY_NAME_KEYS,
+  WIDGET_TYPE_DEFINITIONS,
+  requireWidgetTypeDefinition,
 } from './standard-widgets'
-import { getStandardMetricDefinition, getSupportedDisplayTypes, isStandardMetricWidgetType } from './standard-metrics'
+import { getSupportedDisplayTypes, isStandardMetricWidgetType } from './standard-metrics'
 import { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS, getIconSvgByAssetFile } from './widget-icon-data'
 
 export { METRIC_ICON_SVGS, DISPLAY_TYPE_ICON_SVGS }
@@ -54,65 +56,36 @@ function createLapTimerModeIcon({ source, name, assetFile }) {
   return Icon
 }
 
-const STANDARD_METRIC_TYPE_LABELS = Object.fromEntries(
-  STANDARD_METRIC_WIDGET_TYPES.map((type) => [type, getStandardMetricDefinition(type)?.label || type]),
-)
-
-// General widget labels used throughout the app.
-export const TYPE_LABELS = {
-  backdrop: 'Backdrop',
-  label: 'Text',
-  course: 'Route Map',
-  elevation: 'Elevation',
-  gradient: 'Gradient',
-  time: 'Time',
-  heading: 'Heading',
-  ...STANDARD_METRIC_TYPE_LABELS,
-}
-
 /**
  * Returns the canonical UI label for an available activity attribute.
  * Attributes without a widget definition remain visible with a human-readable
  * form of their backend identifier.
  *
  * @param {string} type - Canonical activity attribute identifier.
+ * @param {import('i18next').TFunction} translate - Translation function.
  * @returns {string} Activity attribute label.
  */
-export function getActivityAttributeLabel(type) {
-  if (TYPE_LABELS[type]) return TYPE_LABELS[type]
+export function getActivityAttributeLabel(type, translate) {
+  const definition = WIDGET_TYPE_DEFINITIONS[type]
+  if (definition) return translate(definition.nameKey)
 
   const words = []
   for (const part of type.split('_')) words.push(part === 'gps' ? 'GPS' : part.charAt(0).toUpperCase() + part.slice(1))
-  return words.join(' ')
+  return translate(`widgets.activityAttributes.${type}`, words.join(' '))
 }
 
-// Labels for the widget drawer, which may be shorter than the general labels
-
-export const WIDGET_DRAWER_LABELS = {
-  backdrop: 'Backdrop',
-  label: 'Text',
-  elevation: 'Elev.',
-  heartrate: 'HR',
-  time: 'Time',
-  temperature: 'Temp.',
-  gradient: 'Grad.',
-  course: 'Map',
-  air_pressure: 'Air Press.',
-  distance: 'Dist.',
-  ground_contact_time: 'GCT',
-  left_right_balance: 'L/R Bal.',
-  stride_length: 'Stride',
-  stroke_rate: 'S/R',
-  vertical_speed: 'V. Speed',
-  gear_position: 'Gear',
-  vertical_oscillation: 'V. Osc.',
-  core_temperature: 'Core T.',
-  throttle_position: 'Throttle',
-  brake_position: 'Brake',
-  lean_angle: 'Lean',
+/**
+ * Returns the translated long name for a configured widget type.
+ * @param {string} type - Canonical widget type.
+ * @param {import('i18next').TFunction} translate - Translation function.
+ * @returns {string} Translated widget name.
+ */
+export function getWidgetTypeName(type, translate) {
+  const definition = requireWidgetTypeDefinition(type)
+  return translate(definition.nameKey)
 }
 
-const widgetTypes = Object.keys(TYPE_LABELS).filter((type) => !['backdrop', 'label'].includes(type))
+const widgetTypes = Object.keys(WIDGET_TYPE_DEFINITIONS).filter((type) => !['backdrop', 'label'].includes(type))
 
 const widgetIconComponents = {}
 widgetTypes.forEach((type) => {
@@ -151,10 +124,11 @@ export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradien
   .map((type) => ({
     type,
     icon: TYPE_ICONS[type],
-    label: WIDGET_DRAWER_LABELS[type] ?? TYPE_LABELS[type],
+    shortNameKey: requireWidgetTypeDefinition(type).shortNameKey,
+    category: requireWidgetTypeDefinition(type).category,
     options: getWidgetDisplayTypes(type).map((value) => ({
       value,
-      label: type === 'backdrop' ? (BACKDROP_TYPE_LABELS[value] ?? value) : (DISPLAY_TYPE_LABELS[value] ?? value),
+      labelKey: type === 'backdrop' ? BACKDROP_TYPE_LABEL_KEYS[value] : DISPLAY_TYPE_LABEL_KEYS[value],
       icon: DISPLAY_TYPE_ICONS[value],
       selection: { displayType: value },
     })),
@@ -162,35 +136,22 @@ export const QUICKMENU_ITEMS = ['label', 'time', 'elevation', 'course', 'gradien
   .concat({
     type: 'lap_timer',
     icon: Timer,
-    label: DISPLAY_TYPE_LABELS.lap_timer,
+    shortNameKey: requireWidgetTypeDefinition('lap_timer').shortNameKey,
+    category: requireWidgetTypeDefinition('lap_timer').category,
     options: LAP_TIMER_MODES.map((mode) => ({ ...mode, icon: createLapTimerModeIcon(mode.icon), selection: { lapTimerMode: mode.value } })),
   })
-
-const NON_METRIC_CATEGORIES = {
-  backdrop: 'general',
-  label: 'general',
-  time: 'general',
-  elevation: 'general',
-  course: 'general',
-  gradient: 'general',
-}
-
-function getWidgetCategory(type) {
-  if (type in NON_METRIC_CATEGORIES) return NON_METRIC_CATEGORIES[type]
-  return getStandardMetricDefinition(type)?.category || 'other'
-}
-
-const CATEGORY_ORDER = ['general', 'cycling', 'running', 'motosports', 'camera', 'other']
 
 export const GROUPED_QUICKMENU_ITEMS = (() => {
   const groups = {}
   for (const item of QUICKMENU_ITEMS) {
-    const cat = getWidgetCategory(item.type)
-    if (!groups[cat]) groups[cat] = []
-    groups[cat].push(item)
+    if (!groups[item.category]) groups[item.category] = []
+    groups[item.category].push(item)
   }
-  return CATEGORY_ORDER.map((cat) => ({
-    category: cat,
-    items: groups[cat] || [],
-  })).filter((g) => g.items.length > 0)
+  return Object.entries(WIDGET_CATEGORY_NAME_KEYS)
+    .map(([category, nameKey]) => ({
+      category,
+      nameKey,
+      items: groups[category] ?? [],
+    }))
+    .filter((group) => group.items.length > 0)
 })()

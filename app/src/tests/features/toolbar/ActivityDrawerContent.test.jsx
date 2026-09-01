@@ -73,7 +73,7 @@ describe('ActivityDrawerContent', () => {
     expect(screen.getByRole('heading', { name: 'Calculated' })).toBeInTheDocument()
     expect(screen.getByText('Cadence')).toBeInTheDocument()
     expect(screen.getByText('Barometric Altitude')).toBeInTheDocument()
-    expect(screen.getByText('Location')).toBeInTheDocument()
+    expect(screen.getByText('GPS Coordinates')).toBeInTheDocument()
     expect(screen.queryByText('G Force X')).not.toBeInTheDocument()
     expect(screen.getByText('Gradient')).toBeInTheDocument()
     expect(screen.getByText('Speed')).toBeInTheDocument()

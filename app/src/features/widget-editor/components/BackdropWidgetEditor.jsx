@@ -53,7 +53,7 @@ function CornerGrid({ rectangleData, onToggle }) {
 export default function BackdropWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
   const { t } = useTranslation()
   const displayType = widget.data.display_type || 'rectangle'
-  const displayOptions = useMemo(() => getBackdropTypeOptions(), [])
+  const displayOptions = useMemo(() => getBackdropTypeOptions(t), [t])
   const activeData = useMemo(() => widget.data.display_variants?.[displayType] ?? {}, [displayType, widget.data.display_variants])
   const resolvedData = { ...widget.data, ...activeData, display_type: displayType }
   const borderMax = maxBorderThickness(resolvedData)

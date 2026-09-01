@@ -18,7 +18,7 @@
     "importTemplate": "Importovat šablonu",
     "importVideo": "Importovat video",
     "keyboardShortcuts": "Klávesové zkratky",
-    "keyboardShortcutsDescription": "Následující klávesové zkratky vám usnadní práci v OVRLEY:",
+    "keyboardShortcutsDescription": "Následující klávesové zkratky vám usnadní práci:",
     "loadingEditorData": "Načítání dat editoru...",
     "loadProject": "Otevřít projekt",
     "newProject": "Nový projekt",
@@ -115,7 +115,7 @@
     "sourceNotFound": "Zdrojový soubor ({{sourceRole}}) nebyl nalezen",
     "unsavedChangesTitle": "Neuložené změny",
     "unsavedChanges": "Projekt obsahuje neuložené změny. Uložte je, nebo je zahoďte.",
-    "unsavedChangesBeforeExit": "Projekt obsahuje neuložené změny. Chcete je uložit, nebo OVRLEY zavřít bez uložení?",
+    "unsavedChangesBeforeExit": "Projekt obsahuje neuložené změny. Chcete je uložit, nebo zavřít bez uložení?",
     "video": "Video"
   },
   "render-video": {
@@ -358,6 +358,84 @@
     "theVideoPreviewCouldNotBeLoaded": "Náhled videa se nepodařilo načíst.",
     "videoOrImage": "Video nebo obrázek",
     "videoPreviewLoadingWasAborted": "Načítání náhledu videa bylo přerušeno."
+  },
+  "widgets": {
+    "activityAttributes": {
+      "barometric_altitude": "Barometrická nadmořská výška"
+    },
+    "backdropTypes": {
+      "circle": "Kruh",
+      "rectangle": "Obdélník"
+    },
+    "categories": {
+      "camera": "Kamera",
+      "cycling": "Cyklistika",
+      "general": "Obecné",
+      "motosports": "Motorsport",
+      "other": "Ostatní",
+      "running": "Běh"
+    },
+    "displayTypes": {
+      "arc": "Obloukový ukazatel",
+      "corner": "Rohový ukazatel",
+      "gForce": "Přetížení",
+      "headingTape": "Pás směru",
+      "lapTimer": "Časy kol",
+      "leanAngle": "Úhel náklonu",
+      "linear": "Lineární ukazatel",
+      "text": "Text"
+    },
+    "lapTimerModes": {
+      "bestLap": "Nejlepší kolo",
+      "currentLap": "Aktuální kolo",
+      "delta": "Rozdíl",
+      "lapLog": "Přehled kol"
+    },
+    "types": {
+      "air_pressure": { "name": "Tlak vzduchu", "shortName": "Tlak" },
+      "altitude": { "name": "Nadmořská výška", "shortName": "Výška" },
+      "aperture": { "name": "Clona", "shortName": "Clona" },
+      "backdrop": { "name": "Pozadí", "shortName": "Pozadí" },
+      "brake_position": { "name": "Poloha brzdy", "shortName": "Brzda" },
+      "cadence": { "name": "Kadence", "shortName": "Kadence" },
+      "calories": { "name": "Kalorie", "shortName": "Kalorie" },
+      "color_temperature": { "name": "Teplota barev", "shortName": "Tepl. barev" },
+      "core_temperature": { "name": "Teplota těla", "shortName": "Tepl. těla" },
+      "course": { "name": "Mapa trasy", "shortName": "Mapa" },
+      "distance": { "name": "Vzdálenost", "shortName": "Vzdál." },
+      "distance_to_home": { "name": "Vzdálenost domů", "shortName": "Domů" },
+      "elevation": { "name": "Výškový profil", "shortName": "Profil" },
+      "engine_power": { "name": "Výkon motoru", "shortName": "Výk. motoru" },
+      "ev": { "name": "EV", "shortName": "EV" },
+      "focal_length": { "name": "Ohnisková vzdálenost", "shortName": "Ohnisko" },
+      "g_force": { "name": "Přetížení", "shortName": "Přetížení" },
+      "gear_position": { "name": "Zařazený převod", "shortName": "Převod" },
+      "gps_coordinates": { "name": "GPS souřadnice", "shortName": "Poloha" },
+      "gradient": { "name": "Sklon", "shortName": "Sklon" },
+      "ground_contact_time": { "name": "Doba kontaktu se zemí", "shortName": "Kontakt" },
+      "heading": { "name": "Směr", "shortName": "Směr" },
+      "heartrate": { "name": "Tepová frekvence", "shortName": "Tep" },
+      "iso": { "name": "ISO", "shortName": "ISO" },
+      "label": { "name": "Text", "shortName": "Text" },
+      "lap_timer": { "name": "Čas kola", "shortName": "Časy kol" },
+      "lean_angle": { "name": "Úhel náklonu", "shortName": "Náklon" },
+      "left_right_balance": { "name": "Vyvážení L/P", "shortName": "L/P vyváž." },
+      "pace": { "name": "Tempo", "shortName": "Tempo" },
+      "power": { "name": "Výkon", "shortName": "Výkon" },
+      "rpm": { "name": "Otáčky motoru", "shortName": "RPM" },
+      "shutter_speed": { "name": "Rychlost závěrky", "shortName": "Závěrka" },
+      "speed": { "name": "Rychlost", "shortName": "Rychlost" },
+      "stride_length": { "name": "Délka kroku", "shortName": "Krok" },
+      "stroke_rate": { "name": "Frekvence záběrů", "shortName": "Frekv. záb." },
+      "temperature": { "name": "Teplota", "shortName": "Teplota" },
+      "throttle_position": { "name": "Poloha plynu", "shortName": "Plyn" },
+      "time": { "name": "Čas", "shortName": "Čas" },
+      "torque": { "name": "Točivý moment", "shortName": "Moment" },
+      "total_ascent": { "name": "Celkové stoupání", "shortName": "Stoupání" },
+      "vertical_oscillation": { "name": "Vertikální oscilace", "shortName": "Vert. osc." },
+      "vertical_ratio": { "name": "Vertikální poměr", "shortName": "Vert. poměr" },
+      "vertical_speed": { "name": "Vertikální rychlost", "shortName": "Vert. rychl." }
+    }
   },
   "widget-editor": {
     "alignment": "Zarovnání",

@@ -212,7 +212,7 @@ describe('groupWidgetsForSidebar', () => {
       { id: 'w4', type: 'cadence', name: 'Cad', category: 'values' },
     ]
 
-    const result = groupWidgetsForSidebar(widgets, typeLabels)
+    const result = groupWidgetsForSidebar(widgets, (type) => typeLabels[type])
 
     const types = [...new Set(result.map((w) => w.type))]
     const groupLabels = result.map((w) => w.groupLabel).filter(Boolean)
@@ -228,18 +228,20 @@ describe('groupWidgetsForSidebar', () => {
       { id: 'w2', type: 'label', name: 'B' },
     ]
 
-    const result = groupWidgetsForSidebar(widgets, typeLabels)
+    const result = groupWidgetsForSidebar(widgets, (type) => typeLabels[type])
 
     expect(result[0].groupLabel).toBe('Text')
     expect(result[1].groupLabel).toBeNull()
   })
 
-  test('falls back to widget type when typeLabel is missing', () => {
+  test('propagates a missing widget type contract failure', () => {
     const widgets = [{ id: 'w1', type: 'unknown_type', name: 'X' }]
 
-    const result = groupWidgetsForSidebar(widgets, {})
-
-    expect(result[0].groupLabel).toBe('unknown_type')
+    expect(() =>
+      groupWidgetsForSidebar(widgets, (type) => {
+        throw new Error(`Unknown widget type: ${type}`)
+      }),
+    ).toThrow('Unknown widget type: unknown_type')
   })
 })
 
