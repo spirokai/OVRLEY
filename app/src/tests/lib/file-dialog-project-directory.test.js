@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from 'vitest'
 
 const dialog = vi.hoisted(() => ({ open: vi.fn(), save: vi.fn() }))
-const preferences = vi.hoisted(() => ({ getPreference: vi.fn(), setPreference: vi.fn() }))
+const preferences = vi.hoisted(() => ({ getOptionalPathPreference: vi.fn(), setPreference: vi.fn() }))
 
 vi.mock('@tauri-apps/plugin-dialog', () => dialog)
 vi.mock('@/api/backend', () => ({ readSelectedFileBytes: vi.fn() }))
@@ -15,7 +15,7 @@ beforeEach(() => {
 
 test('project open and Save As share one persistent directory preference', async () => {
   let rememberedDirectory = 'D:\\OVRLEY Projects'
-  preferences.getPreference.mockImplementation(async () => rememberedDirectory)
+  preferences.getOptionalPathPreference.mockImplementation(async () => rememberedDirectory)
   preferences.setPreference.mockImplementation(async (_key, directory) => {
     rememberedDirectory = directory
   })
@@ -44,7 +44,7 @@ test('project open and Save As share one persistent directory preference', async
 })
 
 test('cancelled project dialogs do not change the remembered directory', async () => {
-  preferences.getPreference.mockResolvedValue('D:\\OVRLEY Projects')
+  preferences.getOptionalPathPreference.mockResolvedValue('D:\\OVRLEY Projects')
   dialog.open.mockResolvedValue(null)
   dialog.save.mockResolvedValue(null)
 

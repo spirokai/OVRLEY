@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as backend from '@/api/backend'
 import { openSinglePath, saveSinglePath } from '@/lib/file-dialog'
-import { getPreference } from '@/lib/preferences-store'
+import { getOptionalPathPreference } from '@/lib/preferences-store'
 import { pathInDirectory } from '@/lib/utils'
 import { useUnsavedChangesConfirm } from '@/features/app-shell'
 import useStore from '@/store/useStore'
@@ -20,7 +20,6 @@ const PROJECT_FILTER = [{ name: 'OVRLEY Project', extensions: ['oly'] }]
  * @param {function} options.prepareVideoPath Probes one video source without committing it.
  * @param {function} [options.onSetBackgroundMode] Shell setter for the editor background mode.
  * @param {boolean} [options.startupReady] Whether application startup completed successfully.
- * @param {function} [options.onCreateBlankTemplate] Creates the blank template selected from the startup dialog.
  * @returns {object} Project lifecycle state and command handlers.
  */
 export default function useProjectLifecycle({
@@ -29,7 +28,6 @@ export default function useProjectLifecycle({
   prepareVideoPath,
   onSetBackgroundMode,
   startupReady = false,
-  onCreateBlankTemplate,
 }) {
   const { conflictingOperation, loadedProjectPath, markNew, markSaved, projectName, status } = useProjectDocumentState()
   const { dialog: missingSourceDialog, resolveProjectSources } = useProjectSourceRecovery()
@@ -49,13 +47,7 @@ export default function useProjectLifecycle({
 
     const loadStartupProjects = async () => {
       try {
-        const rememberedDirectory = await getPreference(LAST_PROJECT_DIRECTORY_KEY)
-        if (rememberedDirectory !== null && rememberedDirectory !== undefined && typeof rememberedDirectory !== 'string') {
-          throw new Error('Saved project directory must be a path string')
-        }
-        if (typeof rememberedDirectory === 'string' && !rememberedDirectory.trim()) {
-          throw new Error('Saved project directory must not be empty')
-        }
+        const rememberedDirectory = await getOptionalPathPreference(LAST_PROJECT_DIRECTORY_KEY)
         const directory = rememberedDirectory ?? (await backend.getDefaultProjectDirectory())
         setStartupProjects(await backend.listProjectFiles(directory))
       } catch (error) {
@@ -132,17 +124,28 @@ export default function useProjectLifecycle({
 
   const handleOpenProjectPath = useCallback((path) => runOperation('open project', () => loadProjectPath(path)), [loadProjectPath, runOperation])
 
+  const createProject = useCallback(
+    () =>
+      runOperation('create project', async () => {
+        await createNewProject({ clearImportedVideo })
+        markNew()
+        return true
+      }),
+    [clearImportedVideo, markNew, runOperation],
+  )
+
   const handleStartupNewProject = useCallback(async () => {
-    await onCreateBlankTemplate()
-    setStartupDialogOpen(false)
-  }, [onCreateBlankTemplate])
+    if (await createProject()) setStartupDialogOpen(false)
+  }, [createProject])
 
   const handleStartupOpenProject = useCallback(
     async (path) => {
       setStartupOpeningPath(path)
-      setStartupDialogOpen(false)
-      await handleOpenProjectPath(path)
-      setStartupOpeningPath(null)
+      try {
+        if (await handleOpenProjectPath(path)) setStartupDialogOpen(false)
+      } finally {
+        setStartupOpeningPath(null)
+      }
     },
     [handleOpenProjectPath],
   )
@@ -163,13 +166,8 @@ export default function useProjectLifecycle({
 
   const handleNewProject = useCallback(async () => {
     if (!(await confirmProjectTransition('new'))) return false
-
-    return runOperation('create project', async () => {
-      await createNewProject({ clearImportedVideo })
-      markNew()
-      return true
-    })
-  }, [clearImportedVideo, confirmProjectTransition, markNew, runOperation])
+    return createProject()
+  }, [confirmProjectTransition, createProject])
 
   const handleCloseRequest = useCallback(
     () => (isProjectConfirmOpen ? Promise.resolve(false) : confirmProjectTransition('close')),

@@ -1,6 +1,6 @@
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { readSelectedFileBytes } from '@/api/backend'
-import { getPreference, setPreference } from '@/lib/preferences-store'
+import { getOptionalPathPreference, setPreference } from '@/lib/preferences-store'
 import { directoryFromSelectedPath, filenameFromSelectedPath, pathInDirectory } from '@/lib/utils'
 
 export const selectBrowserFile = (accept) =>
@@ -24,12 +24,8 @@ export async function openSinglePath(filters, options = {}) {
   let defaultPath = initialDefaultPath
 
   if (lastDirectoryKey) {
-    try {
-      const saved = await getPreference(lastDirectoryKey)
-      if (saved) defaultPath = saved
-    } catch {
-      // store unavailable — proceed without default path
-    }
+    const savedDirectory = await getOptionalPathPreference(lastDirectoryKey)
+    if (savedDirectory) defaultPath = savedDirectory
   }
 
   const selected = await open({
@@ -62,13 +58,9 @@ export async function saveSinglePath(defaultPath, extension, filterName = extens
   const { lastDirectoryKey } = options
   let resolvedDefaultPath = defaultPath
   if (lastDirectoryKey) {
-    try {
-      const savedDirectory = await getPreference(lastDirectoryKey)
-      const filename = filenameFromSelectedPath(defaultPath)
-      if (savedDirectory && filename) resolvedDefaultPath = pathInDirectory(savedDirectory, filename)
-    } catch {
-      // store unavailable — retain the supplied default path
-    }
+    const savedDirectory = await getOptionalPathPreference(lastDirectoryKey)
+    const filename = filenameFromSelectedPath(defaultPath)
+    if (savedDirectory && filename) resolvedDefaultPath = pathInDirectory(savedDirectory, filename)
   }
   const selected = await save({
     defaultPath: resolvedDefaultPath,

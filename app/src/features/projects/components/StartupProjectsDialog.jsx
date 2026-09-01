@@ -1,11 +1,25 @@
 import { FileBox, Plus } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 
-function ProjectCard({ name, path, disabled, onOpen }) {
+function ProjectCard({ kind, name, title, disabled, onClick }) {
+  const isNewProject = kind === 'new'
+
   return (
-    <button type="button" className="group min-w-0 cursor-pointer text-center" disabled={disabled} onClick={() => onOpen(path)} title={path}>
-      <span className="flex aspect-video w-full items-center justify-center rounded-xs border border-border/80 bg-surface text-muted-foreground transition-colors group-hover:border-accent-border group-hover:bg-surface-elevated group-hover:text-primary group-focus-visible:border-primary group-focus-visible:outline-none group-disabled:opacity-50">
-        <FileBox className="size-10" strokeWidth={1.5} aria-hidden="true" />
+    <button type="button" className="group min-w-0 cursor-pointer text-center" disabled={disabled} onClick={onClick} title={title}>
+      <span
+        className={cn(
+          'flex aspect-video w-full items-center justify-center rounded-xs border border-border/80 bg-surface text-muted-foreground transition-colors group-hover:border-primary group-hover:bg-surface-elevated group-hover:text-primary group-focus-visible:border-primary group-focus-visible:outline-none group-disabled:opacity-50',
+          isNewProject && 'border-dashed',
+        )}
+      >
+        {isNewProject ? (
+          <span className="flex size-18 items-center justify-center rounded-full bg-foreground/10 text-foreground/70 transition-colors group-hover:bg-foreground/15 group-hover:text-foreground">
+            <Plus className="size-12" strokeWidth={3} aria-hidden="true" />
+          </span>
+        ) : (
+          <FileBox className="size-10" strokeWidth={1.5} aria-hidden="true" />
+        )}
       </span>
       <span className="mt-2 block truncate text-xs font-medium text-foreground">{name}</span>
     </button>
@@ -26,17 +40,17 @@ export default function StartupProjectsDialog({ open, projects, openingPath, onD
         </DialogDescription>
 
         <div className="mt-6 grid min-h-120 max-h-200 content-start items-start grid-cols-[repeat(auto-fill,minmax(12.7575rem,1fr))] gap-x-4 gap-y-6 overflow-y-auto pr-1 thin-scrollbar">
-          <button type="button" className="group min-w-0 cursor-pointer text-center" disabled={openingPath !== null} onClick={onNewProject}>
-            <span className="flex aspect-video w-full items-center justify-center rounded-xs border border-dashed border-border/80 bg-surface transition-colors group-hover:border-primary group-focus-visible:border-primary group-focus-visible:outline-none group-disabled:opacity-50">
-              <span className="flex size-18 items-center justify-center rounded-full bg-foreground/10 text-foreground/70 transition-colors group-hover:bg-foreground/15 group-hover:text-foreground">
-                <Plus className="size-12" strokeWidth={3} aria-hidden="true" />
-              </span>
-            </span>
-            <span className="mt-2 block truncate text-xs font-medium text-foreground">New Project</span>
-          </button>
+          <ProjectCard kind="new" name="New Project" disabled={openingPath !== null} onClick={onNewProject} />
 
           {projects.map((project) => (
-            <ProjectCard key={project.path} name={project.name} path={project.path} disabled={openingPath !== null} onOpen={onOpenProject} />
+            <ProjectCard
+              key={project.path}
+              kind="existing"
+              name={project.name}
+              title={project.path}
+              disabled={openingPath !== null}
+              onClick={() => onOpenProject(project.path)}
+            />
           ))}
         </div>
       </DialogContent>

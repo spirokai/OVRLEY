@@ -52,7 +52,6 @@ export default function useAppShellComposition() {
   const projectLifecycle = useProjectLifecycle({
     clearImportedVideo: videoControls.clearImportedVideo,
     onSetBackgroundMode: editorShell.setEditorBackgroundMode,
-    onCreateBlankTemplate: templateManagement.createBlankTemplate,
     prepareActivityPath: activityImport.prepareActivityPath,
     prepareVideoPath: videoControls.prepareVideoPath,
     startupReady: backendState.backendReady && templateRestoreComplete,
