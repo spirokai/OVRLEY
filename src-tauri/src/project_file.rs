@@ -3,12 +3,14 @@
 //! `project.json` is validated here before any frontend orchestration sees it.
 //! Archive and platform-path details do not leak into application state.
 
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
+use std::process::{Command, Stdio};
 use tauri::Manager;
 use uuid::Uuid;
 use zip::write::SimpleFileOptions;
@@ -17,10 +19,12 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 const PROJECT_FORMAT: &str = "ovrley-project";
 const PROJECT_VERSION: u32 = 1;
 const PROJECT_JSON_ENTRY: &str = "project.json";
-const PREVIEW_ENTRY: &str = "preview.png";
+const THUMBNAIL_ENTRY: &str = "thumbnail.png";
 const MAX_PROJECT_JSON_SIZE: u64 = 4 * 1024 * 1024;
-const MAX_PREVIEW_SIZE: u64 = 32 * 1024 * 1024;
+const MAX_THUMBNAIL_SIZE: u64 = 2 * 1024 * 1024;
 const MAX_ARCHIVE_SIZE: u64 = 40 * 1024 * 1024;
+const THUMBNAIL_FILTER: &str =
+    "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2:color=black@0";
 
 #[tauri::command]
 pub(crate) fn default_project_directory(app: tauri::AppHandle) -> Result<String, String> {
@@ -39,6 +43,22 @@ pub(crate) fn default_project_directory(app: tauri::AppHandle) -> Result<String,
 pub(crate) struct ProjectFileSummary {
     name: String,
     path: String,
+    thumbnail_data_url: Option<String>,
+}
+
+fn read_thumbnail_data_url(path: &Path) -> Option<String> {
+    let file = File::open(path).ok()?;
+    let mut archive = ZipArchive::new(file).ok()?;
+    let mut entry = archive.by_name(THUMBNAIL_ENTRY).ok()?;
+    if entry.size() > MAX_THUMBNAIL_SIZE {
+        return None;
+    }
+    let mut bytes = Vec::with_capacity(entry.size() as usize);
+    entry.read_to_end(&mut bytes).ok()?;
+    Some(format!(
+        "data:image/png;base64,{}",
+        BASE64_STANDARD.encode(bytes)
+    ))
 }
 
 #[tauri::command]
@@ -70,6 +90,7 @@ pub(crate) fn list_project_files(directory: String) -> Result<Vec<ProjectFileSum
             .ok_or_else(|| "Project filename must be valid UTF-8".to_string())?;
         projects.push(ProjectFileSummary {
             name: name.to_string(),
+            thumbnail_data_url: read_thumbnail_data_url(&path),
             path: path_string(path),
         });
     }
@@ -464,7 +485,7 @@ fn read_archive(path: &Path) -> Result<ProjectDocument, String> {
     let mut archive =
         ZipArchive::new(file).map_err(|error| format!("Invalid project archive: {error}"))?;
     let mut project_index = None;
-    let mut preview_seen = false;
+    let mut thumbnail_seen = false;
     for index in 0..archive.len() {
         let entry = archive
             .by_index_raw(index)
@@ -478,13 +499,13 @@ fn read_archive(path: &Path) -> Result<ProjectDocument, String> {
                     return Err("project.json exceeds the 4 MiB size limit".into());
                 }
             }
-            PREVIEW_ENTRY => {
-                if preview_seen {
-                    return Err("Project archive contains duplicate preview.png entries".into());
+            THUMBNAIL_ENTRY => {
+                if thumbnail_seen {
+                    return Err("Project archive contains duplicate thumbnail.png entries".into());
                 }
-                preview_seen = true;
-                if entry.size() > MAX_PREVIEW_SIZE {
-                    return Err("preview.png exceeds the 32 MiB size limit".into());
+                thumbnail_seen = true;
+                if entry.size() > MAX_THUMBNAIL_SIZE {
+                    return Err("thumbnail.png exceeds the 2 MiB size limit".into());
                 }
             }
             name => return Err(format!("Unexpected project archive entry: {name}")),
@@ -511,7 +532,7 @@ pub(crate) fn read_project_file(path: String) -> Result<ReadProjectResult, Strin
     })
 }
 
-fn write_archive(path: &Path, project_json: &str) -> Result<(), String> {
+fn write_archive(path: &Path, project_json: &str, thumbnail: Option<&[u8]>) -> Result<(), String> {
     let file = File::create(path).map_err(|error| error.to_string())?;
     let mut writer = ZipWriter::new(file);
     writer
@@ -523,9 +544,51 @@ fn write_archive(path: &Path, project_json: &str) -> Result<(), String> {
     writer
         .write_all(project_json.as_bytes())
         .map_err(|error| error.to_string())?;
+    if let Some(thumbnail) = thumbnail {
+        writer
+            .start_file(
+                THUMBNAIL_ENTRY,
+                SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+            )
+            .map_err(|error| error.to_string())?;
+        writer
+            .write_all(thumbnail)
+            .map_err(|error| error.to_string())?;
+    }
     let file = writer.finish().map_err(|error| error.to_string())?;
     file.sync_all().map_err(|error| error.to_string())?;
     Ok(())
+}
+
+fn generate_thumbnail(ffmpeg: &Path, video_path: &Path) -> Option<Vec<u8>> {
+    let mut command = Command::new(ffmpeg);
+    ovrley_core::encode::ffmpeg::binary::configure_ffmpeg_command(&mut command);
+    let output = command
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("error")
+        .arg("-i")
+        .arg(video_path)
+        .arg("-frames:v")
+        .arg("1")
+        .arg("-vf")
+        .arg(THUMBNAIL_FILTER)
+        .arg("-f")
+        .arg("image2pipe")
+        .arg("-vcodec")
+        .arg("png")
+        .arg("pipe:1")
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    if !output.status.success()
+        || output.stdout.is_empty()
+        || output.stdout.len() as u64 > MAX_THUMBNAIL_SIZE
+    {
+        return None;
+    }
+    Some(output.stdout)
 }
 
 #[cfg(windows)]
@@ -564,9 +627,12 @@ fn atomic_replace(source: &Path, target: &Path) -> Result<(), String> {
     fs::rename(source, target).map_err(|error| error.to_string())
 }
 
-#[tauri::command]
-pub(crate) fn write_project_file(path: String, project_json: String) -> Result<String, String> {
-    parse_project(&project_json)?;
+fn write_project_file_sync(
+    path: String,
+    project_json: String,
+    ffmpeg: Option<&Path>,
+) -> Result<String, String> {
+    let project = parse_project(&project_json)?;
     if project_json.len() as u64 > MAX_PROJECT_JSON_SIZE {
         return Err("project.json exceeds the 4 MiB size limit".into());
     }
@@ -575,8 +641,14 @@ pub(crate) fn write_project_file(path: String, project_json: String) -> Result<S
         .parent()
         .ok_or_else(|| "Project target has no parent directory".to_string())?;
     fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let thumbnail = project
+        .sources
+        .video
+        .as_ref()
+        .and_then(|source| resolve_locator(&target, &source.path).ok())
+        .and_then(|video_path| ffmpeg.and_then(|ffmpeg| generate_thumbnail(ffmpeg, &video_path)));
     let temporary = parent.join(format!(".ovrley-project-{}.tmp", Uuid::new_v4()));
-    if let Err(error) = write_archive(&temporary, &project_json) {
+    if let Err(error) = write_archive(&temporary, &project_json, thumbnail.as_deref()) {
         let _ = fs::remove_file(&temporary);
         return Err(error);
     }
@@ -585,6 +657,24 @@ pub(crate) fn write_project_file(path: String, project_json: String) -> Result<S
         error
     })?;
     Ok(path)
+}
+
+#[tauri::command]
+pub(crate) async fn write_project_file(
+    app: tauri::AppHandle,
+    path: String,
+    project_json: String,
+) -> Result<String, String> {
+    let ffmpeg = crate::runtime_paths::app_paths(&app)
+        .ok()
+        .and_then(|paths| {
+            ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&paths.repo_root).ok()
+        });
+    tauri::async_runtime::spawn_blocking(move || {
+        write_project_file_sync(path, project_json, ffmpeg.as_deref())
+    })
+    .await
+    .map_err(|error| format!("Project save task failed: {error}"))?
 }
 
 #[cfg(test)]
@@ -621,13 +711,62 @@ mod tests {
             std::env::temp_dir().join(format!("ovrley-project-test-{}", Uuid::new_v4()));
         fs::create_dir_all(&directory).unwrap();
         let path = directory.join("Race.oly");
-        write_project_file(path_string(path.clone()), valid_project_json()).unwrap();
+        write_project_file_sync(path_string(path.clone()), valid_project_json(), None).unwrap();
         let result = read_project_file(path_string(path)).unwrap();
         assert_eq!(result.project.version, PROJECT_VERSION);
         assert_eq!(
             result.resolved_sources.activity_path,
             Some(path_string(directory.join("media/session.fit")))
         );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn project_summary_includes_archived_thumbnail() {
+        let directory =
+            std::env::temp_dir().join(format!("ovrley-project-thumbnail-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("Race.oly");
+        let thumbnail = b"\x89PNG\r\n\x1a\nthumbnail";
+        write_archive(&path, &valid_project_json(), Some(thumbnail)).unwrap();
+
+        let projects = list_project_files(path_string(directory.clone())).unwrap();
+
+        assert_eq!(projects.len(), 1);
+        assert_eq!(
+            projects[0].thumbnail_data_url.as_deref(),
+            Some(
+                format!(
+                    "data:image/png;base64,{}",
+                    BASE64_STANDARD.encode(thumbnail)
+                )
+                .as_str()
+            )
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn thumbnail_failure_does_not_block_project_save() {
+        let directory =
+            std::env::temp_dir().join(format!("ovrley-project-save-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("Race.oly");
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["sources"]["video"] = serde_json::json!({
+            "path": { "kind": "project-relative", "value": "missing.mp4" }
+        });
+        let missing_ffmpeg = directory.join("missing-ffmpeg-binary");
+
+        write_project_file_sync(
+            path_string(path.clone()),
+            project.to_string(),
+            Some(&missing_ffmpeg),
+        )
+        .unwrap();
+
+        assert!(read_project_file(path_string(path.clone())).is_ok());
+        assert!(read_thumbnail_data_url(&path).is_none());
         fs::remove_dir_all(directory).unwrap();
     }
 

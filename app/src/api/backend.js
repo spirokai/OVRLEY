@@ -453,7 +453,7 @@ export async function getDefaultProjectDirectory() {
 /**
  * Lists `.oly` projects directly inside a project directory.
  * @param {string} directory Absolute project directory.
- * @returns {Promise<Array<{name: string, path: string}>>} Project summaries sorted by name.
+ * @returns {Promise<Array<{name: string, path: string, thumbnailDataUrl: string|null}>>} Project summaries sorted by name.
  */
 export async function listProjectFiles(directory) {
   const projects = await invokeCommand('list_project_files', { directory })
@@ -466,7 +466,9 @@ export async function listProjectFiles(directory) {
         typeof project.name !== 'string' ||
         !project.name ||
         typeof project.path !== 'string' ||
-        !project.path,
+        !project.path ||
+        (project.thumbnailDataUrl !== null &&
+          (typeof project.thumbnailDataUrl !== 'string' || !project.thumbnailDataUrl.startsWith('data:image/png;base64,'))),
     )
   ) {
     throw new Error('Invalid project list returned by backend')

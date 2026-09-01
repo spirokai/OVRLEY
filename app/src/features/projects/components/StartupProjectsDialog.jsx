@@ -2,14 +2,14 @@ import { FileBox, Plus } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
-function ProjectCard({ kind, name, title, disabled, onClick }) {
+function ProjectCard({ kind, name, title, thumbnailDataUrl, disabled, onClick }) {
   const isNewProject = kind === 'new'
 
   return (
     <button type="button" className="group min-w-0 cursor-pointer text-center" disabled={disabled} onClick={onClick} title={title}>
       <span
         className={cn(
-          'flex aspect-video w-full items-center justify-center rounded-xs border border-border/80 bg-surface text-muted-foreground transition-colors group-hover:border-primary group-hover:bg-surface-elevated group-hover:text-primary group-focus-visible:border-primary group-focus-visible:outline-none group-disabled:opacity-50',
+          'flex aspect-video w-full items-center justify-center overflow-hidden rounded-xs border border-foreground/80 bg-surface text-muted-foreground transition-colors group-hover:border-primary group-hover:bg-surface-elevated group-hover:text-primary group-focus-visible:border-primary group-focus-visible:outline-none group-disabled:opacity-50',
           isNewProject && 'border-dashed',
         )}
       >
@@ -17,11 +17,13 @@ function ProjectCard({ kind, name, title, disabled, onClick }) {
           <span className="flex size-18 items-center justify-center rounded-full bg-foreground/10 text-foreground/70 transition-colors group-hover:bg-foreground/15 group-hover:text-foreground">
             <Plus className="size-12" strokeWidth={3} aria-hidden="true" />
           </span>
+        ) : thumbnailDataUrl ? (
+          <img src={thumbnailDataUrl} alt="" className="size-full object-cover" />
         ) : (
           <FileBox className="size-10" strokeWidth={1.5} aria-hidden="true" />
         )}
       </span>
-      <span className="mt-2 block truncate text-xs font-medium text-foreground">{name}</span>
+      <span className="mt-2 block truncate text-sm font-medium text-foreground">{name}</span>
     </button>
   )
 }
@@ -48,6 +50,7 @@ export default function StartupProjectsDialog({ open, projects, openingPath, onD
               kind="existing"
               name={project.name}
               title={project.path}
+              thumbnailDataUrl={project.thumbnailDataUrl}
               disabled={openingPath !== null}
               onClick={() => onOpenProject(project.path)}
             />
