@@ -21,6 +21,7 @@ import {
 } from '../utils/templateSnapshot'
 import { useTemplateSaveStatus } from './useTemplateSaveStatus'
 import { selectBrowserTemplateFile, getFilenameFromPath, getFilenameFromTemplateId } from '../utils/templateFileUtils'
+import i18next from 'i18next'
 
 function getErrorMessage(error, fallbackMessage) {
   if (error instanceof Error && error.message) {
@@ -144,7 +145,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         const { save } = await import('@tauri-apps/plugin-dialog')
         const defaultPath = await backend.getDefaultTemplateSavePath(suggestedFilename)
         const selectedPath = await save({
-          title: 'Save Template',
+          title: i18next.t('template-manager.saveTemplate', 'Save Template'),
           defaultPath,
           filters: [
             {
@@ -238,8 +239,8 @@ export default function useTemplateManagement({ onTemplateCreated }) {
 
   const newTemplateConfirmDialog = {
     open: isNewTemplateConfirmOpen,
-    title: 'Create New Template',
-    description: 'Your template has unsaved changes. Save them or discard them.',
+    title: i18next.t('template-manager.createNewTemplate', 'Create New Template'),
+    description: i18next.t('template-manager.unsavedChanges', 'Your template has unsaved changes. Save them or discard them.'),
     discardLabel: 'New Template',
     onCancel: () => answerConfirm('cancel'),
     onSave: () => answerConfirm('save'),

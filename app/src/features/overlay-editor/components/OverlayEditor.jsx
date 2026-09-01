@@ -26,6 +26,7 @@ import { useRotateHandlers } from '../hooks/useRotateHandlers'
 import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
 import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from '../utils/widgetRenderGeometry'
 import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
+import { useTranslation } from 'react-i18next'
 
 function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels, selectedWidgetIds, widgets }) {
   const visibleWidgets = useMemo(() => {
@@ -101,14 +102,15 @@ function CanvasToolbar({ editorShell, importedBackgroundImageFilename, importedV
 }
 
 function EmptyOverlayState() {
+  const { t } = useTranslation()
   return (
     <div className="flex h-full items-center justify-center p-8">
       <div className="max-w-sm rounded-sm border border-dashed border-border/70 bg-card/60 px-8 py-10 text-center shadow-[0_30px_80px_rgba(0,0,0,0.25)] backdrop-blur-sm">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center bg-surface-elevated text-primary">
           <LayoutGrid className="h-6 w-6" />
         </div>
-        <p className="text-sm font-semibold text-foreground">Overlay canvas ready</p>
-        <p className="mt-2 text-sm text-muted-foreground">Load a template or add widgets to start positioning the overlay.</p>
+        <p className="text-sm font-semibold text-foreground">{t('overlay-editor.overlayCanvasReady', 'Overlay canvas ready')}</p>
+        <p className="mt-2 text-sm text-muted-foreground">{t('overlay-editor.emptyEditorHint', 'Load a template or add widgets to start positioning the overlay.')}</p>
       </div>
     </div>
   )

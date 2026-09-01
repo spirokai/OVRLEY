@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Kbd } from '@/components/ui/kbd'
 import { getKeyboardShortcutGroups } from '../utils/keyboardShortcutGroups'
+import { useTranslation } from 'react-i18next'
 
 const shortcutGroups = getKeyboardShortcutGroups()
 
@@ -20,6 +21,7 @@ const shortcutGroups = getKeyboardShortcutGroups()
  * @returns {JSX.Element} Rendered component output.
  */
 export default function KeyboardShortcutsDialog({ open, onClose }) {
+  const { t } = useTranslation()
   return (
     <Dialog
       open={open}
@@ -36,10 +38,10 @@ export default function KeyboardShortcutsDialog({ open, onClose }) {
       >
         <div className="flex items-center gap-3 px-6">
           <Keyboard className="h-4 w-4 text-primary" />
-          <DialogTitle className="text-sm font-semibold text-foreground">Keyboard Shortcuts</DialogTitle>
+          <DialogTitle className="text-sm font-semibold text-foreground">{t('app-shell.keyboardShortcuts', 'Keyboard Shortcuts')}</DialogTitle>
         </div>
         <p className="pt-6 pb-3 normal-case font-light text-[0.9rem] px-6">
-          You can use the following keyboard shortcuts to improve your workflow within OVRLEY:
+          {t('app-shell.keyboardShortcutsDescription', 'You can use the following keyboard shortcuts to improve your workflow within OVRLEY:')}
         </p>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 border-t border-b border-border/60">
@@ -87,7 +89,7 @@ export default function KeyboardShortcutsDialog({ open, onClose }) {
             className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
             onClick={onClose}
           >
-            Close
+            {t('app-shell.close', 'Close')}
           </Button>
         </div>
       </DialogContent>

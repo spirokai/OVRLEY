@@ -32,5 +32,10 @@
   },
   "dependencies": {
     "@tauri-apps/plugin-shell": "~2.3.3"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "i18next-cli@1.72.1": "patches/i18next-cli@1.72.1.patch"
+    }
   }
 }

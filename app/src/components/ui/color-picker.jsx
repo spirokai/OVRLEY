@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useTranslation } from 'react-i18next'
 
 const ROOT_NAME = 'ColorPicker'
 const ROOT_IMPL_NAME = 'ColorPickerImpl'
@@ -991,6 +992,7 @@ function ColorPickerAlphaSlider(props) {
  * @returns {JSX.Element} Rendered component output.
  */
 function ColorPickerSwatch(props) {
+  const { t } = useTranslation()
   const { asChild, className, ...swatchProps } = props
 
   const context = useColorPickerContext(SWATCH_NAME)
@@ -1019,7 +1021,7 @@ function ColorPickerSwatch(props) {
     }
   }, [color])
 
-  const ariaLabel = !color ? 'No color selected' : `Current color: ${colorToString(color, format)}`
+  const ariaLabel = !color ? t('components.noColorSelected', 'No color selected') : t('components.currentColorVal', 'Current color: {{val}}', { val: colorToString(color, format) })
 
   const SwatchPrimitive = asChild ? SlotPrimitive.Slot : 'div'
 
@@ -1200,6 +1202,7 @@ function InputGroupItem({ className, position, ...props }) {
  * @returns {JSX.Element} Rendered component output.
  */
 function HexInput(props) {
+  const { t } = useTranslation()
   const { color, onColorChange, context, withoutAlpha, className, onBlur, onFocus, ...inputProps } = props
 
   const hexValue = rgbToHex(color)
@@ -1258,7 +1261,7 @@ function HexInput(props) {
   if (withoutAlpha) {
     return (
       <InputGroupItem
-        aria-label="Hex color value"
+        aria-label={t('components.hexColorValue', 'Hex color value')}
         position="isolated"
         {...inputProps}
         placeholder="#000000"
@@ -1275,7 +1278,7 @@ function HexInput(props) {
   return (
     <div data-slot="color-picker-input-wrapper " className={cn(className, 'flex items-center rounded-xs w-39')}>
       <InputGroupItem
-        aria-label="Hex color value"
+        aria-label={t('components.hexColorValue', 'Hex color value')}
         position="first"
         {...inputProps}
         placeholder="#000000"
@@ -1287,7 +1290,7 @@ function HexInput(props) {
         disabled={context.disabled}
       />
       <InputGroupItem
-        aria-label="Alpha transparency percentage"
+        aria-label={t('components.alphaTransparencyPercentage', 'Alpha transparency percentage')}
         position="last"
         {...inputProps}
         placeholder="100"
@@ -1311,6 +1314,7 @@ function HexInput(props) {
  * @returns {JSX.Element} Rendered component output.
  */
 function RgbInput(props) {
+  const { t } = useTranslation()
   const { color, onColorChange, context, withoutAlpha, className, ...inputProps } = props
 
   const rValue = Math.round(color?.r ?? 0)
@@ -1333,7 +1337,7 @@ function RgbInput(props) {
   return (
     <div data-slot="color-picker-input-wrapper" className={cn('flex items-center', className)}>
       <InputGroupItem
-        aria-label="Red color component (0-255)"
+        aria-label={t('components.redColorComponent0255', 'Red color component (0-255)')}
         position="first"
         {...inputProps}
         placeholder="0"
@@ -1348,7 +1352,7 @@ function RgbInput(props) {
         disabled={context.disabled}
       />
       <InputGroupItem
-        aria-label="Green color component (0-255)"
+        aria-label={t('components.greenColorComponent0255', 'Green color component (0-255)')}
         position="middle"
         {...inputProps}
         placeholder="0"
@@ -1362,7 +1366,7 @@ function RgbInput(props) {
         disabled={context.disabled}
       />
       <InputGroupItem
-        aria-label="Blue color component (0-255)"
+        aria-label={t('components.blueColorComponent0255', 'Blue color component (0-255)')}
         position={withoutAlpha ? 'last' : 'middle'}
         {...inputProps}
         placeholder="0"
@@ -1377,7 +1381,7 @@ function RgbInput(props) {
       />
       {!withoutAlpha && (
         <InputGroupItem
-          aria-label="Alpha transparency percentage"
+          aria-label={t('components.alphaTransparencyPercentage', 'Alpha transparency percentage')}
           position="last"
           {...inputProps}
           placeholder="100"
@@ -1402,6 +1406,7 @@ function RgbInput(props) {
  * @returns {JSX.Element} Rendered component output.
  */
 function HslInput(props) {
+  const { t } = useTranslation()
   const { color, onColorChange, context, withoutAlpha, className, ...inputProps } = props
 
   const hsl = React.useMemo(() => rgbToHsl(color), [color])
@@ -1432,7 +1437,7 @@ function HslInput(props) {
   return (
     <div data-slot="color-picker-input-wrapper" className={cn('flex items-center rounded-xs', className)}>
       <InputGroupItem
-        aria-label="Hue degree (0-360)"
+        aria-label={t('components.hueDegree0360', 'Hue degree (0-360)')}
         position="first"
         {...inputProps}
         placeholder="0"
@@ -1447,7 +1452,7 @@ function HslInput(props) {
         disabled={context.disabled}
       />
       <InputGroupItem
-        aria-label="Saturation percentage (0-100)"
+        aria-label={t('components.saturationPercentage0100', 'Saturation percentage (0-100)')}
         position="middle"
         {...inputProps}
         placeholder="0"
@@ -1461,7 +1466,7 @@ function HslInput(props) {
         disabled={context.disabled}
       />
       <InputGroupItem
-        aria-label="Lightness percentage (0-100)"
+        aria-label={t('components.lightnessPercentage0100', 'Lightness percentage (0-100)')}
         position={withoutAlpha ? 'last' : 'middle'}
         {...inputProps}
         placeholder="0"
@@ -1476,7 +1481,7 @@ function HslInput(props) {
       />
       {!withoutAlpha && (
         <InputGroupItem
-          aria-label="Alpha transparency percentage"
+          aria-label={t('components.alphaTransparencyPercentage', 'Alpha transparency percentage')}
           position="last"
           {...inputProps}
           placeholder="100"
@@ -1501,6 +1506,7 @@ function HslInput(props) {
  * @returns {JSX.Element} Rendered component output.
  */
 function HsbInput(props) {
+  const { t } = useTranslation()
   const { hsv, onColorChange, context, withoutAlpha, className, ...inputProps } = props
 
   const alphaValue = Math.round((hsv?.a ?? 1) * 100)
@@ -1531,7 +1537,7 @@ function HsbInput(props) {
   return (
     <div data-slot="color-picker-input-wrapper" className={cn('flex items-center rounded-sm', className)}>
       <InputGroupItem
-        aria-label="Hue degree (0-360)"
+        aria-label={t('components.hueDegree0360', 'Hue degree (0-360)')}
         position="first"
         {...inputProps}
         placeholder="0"
@@ -1545,7 +1551,7 @@ function HsbInput(props) {
         disabled={context.disabled}
       />
       <InputGroupItem
-        aria-label="Saturation percentage (0-100)"
+        aria-label={t('components.saturationPercentage0100', 'Saturation percentage (0-100)')}
         position="middle"
         {...inputProps}
         placeholder="0"
@@ -1559,7 +1565,7 @@ function HsbInput(props) {
         disabled={context.disabled}
       />
       <InputGroupItem
-        aria-label="Brightness percentage (0-100)"
+        aria-label={t('components.brightnessPercentage0100', 'Brightness percentage (0-100)')}
         position={withoutAlpha ? 'last' : 'middle'}
         {...inputProps}
         placeholder="0"
@@ -1574,7 +1580,7 @@ function HsbInput(props) {
       />
       {!withoutAlpha && (
         <InputGroupItem
-          aria-label="Alpha transparency percentage"
+          aria-label={t('components.alphaTransparencyPercentage', 'Alpha transparency percentage')}
           position="last"
           {...inputProps}
           placeholder="100"

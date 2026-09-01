@@ -31,6 +31,7 @@ import { Video, Gauge, Bell } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ExportRangeSettings } from '@/features/render-video'
 import { ASPECT_RATIOS, RESOLUTIONS } from '../data/sceneSettingsConstants'
+import { useTranslation } from 'react-i18next'
 
 export default function OverlaySettingsSection({
   aspectRatio,
@@ -51,17 +52,18 @@ export default function OverlaySettingsSection({
   onExportRangeChange,
   videoResolutionMismatch,
 }) {
+  const { t } = useTranslation()
   return (
     <>
       <div className="flex items-center gap-3 mb-2">
         <Video className="h-4 w-4 text-primary" />
-        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Overlay</h4>
+        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('scene-settings.overlay', 'Overlay')}</h4>
         <Separator className="flex-1" />
       </div>
 
       <div className="grid grid-cols-2 gap-4 pt-4">
         <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Aspect Ratio</Label>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.aspectRatio', 'Aspect Ratio')}</Label>
           <Select value={aspectRatio} onValueChange={onAspectRatioChange}>
             <SelectTrigger className="h-9 text-xs">
               <SelectValue />
@@ -77,7 +79,7 @@ export default function OverlaySettingsSection({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Resolution</Label>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.resolution', 'Resolution')}</Label>
           <Select value={resId} disabled={aspectRatio === 'custom'} onValueChange={onResChange}>
             <SelectTrigger className="h-9 text-xs">
               <SelectValue />
@@ -88,7 +90,7 @@ export default function OverlaySettingsSection({
                   {r.name}
                 </SelectItem>
               ))}
-              <SelectItem value="custom">Custom</SelectItem>
+              <SelectItem value="custom">{t('scene-settings.custom', 'Custom')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -97,11 +99,11 @@ export default function OverlaySettingsSection({
       {(aspectRatio === 'custom' || resId === 'custom') && (
         <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1">
           <div className="space-y-2">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">Width</Label>
+            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.width', 'Width')}</Label>
             <BlurInput type="number" value={scene?.width ?? ''} onChange={(e) => onUpdateScene('width', e.target.value)} className="h-9 text-xs" />
           </div>
           <div className="space-y-2">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">Height</Label>
+            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.height', 'Height')}</Label>
             <BlurInput type="number" value={scene?.height ?? ''} onChange={(e) => onUpdateScene('height', e.target.value)} className="h-9 text-xs" />
           </div>
         </div>
@@ -109,10 +111,10 @@ export default function OverlaySettingsSection({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Framerate</Label>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.framerate', 'Framerate')}</Label>
           {importedVideoFps ? (
             <div className="flex h-9 items-center rounded-sm border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground cursor-not-allowed opacity-50">
-              Locked to {Math.round(importedVideoFps)} fps
+              {t('scene-settings.lockedTo', 'Locked to')} {Math.round(importedVideoFps)} fps
             </div>
           ) : (
             <Select value={fpsMode} onValueChange={onFpsModeChange}>
@@ -123,14 +125,14 @@ export default function OverlaySettingsSection({
                 <SelectItem value="24">24 fps</SelectItem>
                 <SelectItem value="30">30 fps</SelectItem>
                 <SelectItem value="60">60 fps</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
+                <SelectItem value="custom">{t('scene-settings.custom', 'Custom')}</SelectItem>
               </SelectContent>
             </Select>
           )}
         </div>
         {!importedVideoFps && fpsMode === 'custom' && (
           <div className="space-y-2 animate-in fade-in slide-in-from-left-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">Custom FPS</Label>
+            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.customFps', 'Custom FPS')}</Label>
             <BlurInput
               type="number"
               min={1}
@@ -152,7 +154,7 @@ export default function OverlaySettingsSection({
       {videoResolutionMismatch && (
         <div className="flex gap-2 items-center rounded-sm bg-amber-500/15 p-2 pl-4 text-amber-400">
           <Bell className="h-3 w-3 shrink-0" />
-          <p className="text-[0.65rem] font-semibold leading-tight">Overlay and video resolutions do not match</p>
+          <p className="text-[0.65rem] font-semibold leading-tight">{t('scene-settings.resolutionMismatch', 'Overlay and video resolutions do not match')}</p>
         </div>
       )}
 
@@ -160,7 +162,7 @@ export default function OverlaySettingsSection({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Gauge className="h-4 w-4 text-primary" />
-            <Label className="text-xs font-semibold">Widget Update Rate</Label>
+            <Label className="text-xs font-semibold">{t('scene-settings.widgetUpdateRate', 'Widget Update Rate')}</Label>
           </div>
         </div>
         <Tabs value={updateRate.toString()} onValueChange={onUpdateRateChange}>

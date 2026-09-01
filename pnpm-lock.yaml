@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  i18next-cli@1.72.1:
+    hash: f985374c4b47e57d5a1cc51229313ab63e270282fabcf2563cf8e43f09a79546
+    path: patches/i18next-cli@1.72.1.patch
+
 importers:
 
   .:
@@ -164,8 +169,8 @@ importers:
         specifier: ^16.5.0
         version: 16.5.0
       i18next-cli:
-        specifier: ^1.72.0
-        version: 1.72.0(react-dom@19.2.3(react@19.2.3))
+        specifier: ^1.72.1
+        version: 1.72.1(patch_hash=f985374c4b47e57d5a1cc51229313ab63e270282fabcf2563cf8e43f09a79546)(react-dom@19.2.3(react@19.2.3))
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1
@@ -3124,8 +3129,8 @@ packages:
     resolution: {integrity: sha512-eKCa6bwnJhvxj14kZk5NCPc6Hb6BdsU9DZcOnmQKSnO1VKrfV0zCvtttPZUsBvjmNDn8rpcJfpwSYnHBjc95MQ==}
     engines: {node: '>=18.18.0'}
 
-  i18next-cli@1.72.0:
-    resolution: {integrity: sha512-pyfxzvm3jvFi1DCuZXOg+kIFaZlvQahRzBkNYmxuHlTa6kSGFpoMws6ZfL/JJyVcjE1uQOxbJ5vzo3XWSTTtsQ==}
+  i18next-cli@1.72.1:
+    resolution: {integrity: sha512-4ryXcgNas4HGIh4aztnfichnbcbfI268T6KGHBgotSQ+DHYa1ULMN7QMOYbPwMtkxda2wqBHzjFY3DhD6Pm8AA==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -7911,7 +7916,7 @@ snapshots:
 
   human-signals@8.0.1: {}
 
-  i18next-cli@1.72.0(react-dom@19.2.3(react@19.2.3)):
+  i18next-cli@1.72.1(patch_hash=f985374c4b47e57d5a1cc51229313ab63e270282fabcf2563cf8e43f09a79546)(react-dom@19.2.3(react@19.2.3)):
     dependencies:
       '@croct/json5-parser': 0.2.2
       '@swc/core': 1.16.1

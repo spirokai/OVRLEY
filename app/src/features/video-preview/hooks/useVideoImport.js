@@ -8,6 +8,7 @@ import { openSinglePath } from '@/lib/file-dialog'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { createImportedVideoState } from '@/store/slices/createVideoImportSlice'
 import useStore from '@/store/useStore'
+import i18next from 'i18next'
 
 const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'mkv'])
 const DEBUG_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
@@ -145,7 +146,7 @@ export default function useVideoImport({ debugModeEnabled = false, onSetBackgrou
       const selected = await openSinglePath(
         [
           {
-            name: debugModeEnabled ? 'Video or Image' : 'Video',
+            name: debugModeEnabled ? i18next.t('video-preview.videoOrImage', 'Video or Image') : 'Video',
             extensions: debugModeEnabled ? ['mp4', 'mov', 'mkv', 'png', 'jpg', 'jpeg', 'webp'] : ['mp4', 'mov', 'mkv'],
           },
         ],

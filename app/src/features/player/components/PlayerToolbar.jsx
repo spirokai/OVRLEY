@@ -2,6 +2,7 @@ import { Pause, Play, Rewind, RotateCcw, StepBack, StepForward, Volume2, VolumeX
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Presentational toolbar for zoom, fit target, transport, and time display controls.
@@ -9,23 +10,24 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
  * @param {{ toolbar: object }} props Toolbar view model.
  */
 export default function PlayerToolbar({ toolbar }) {
+  const { t } = useTranslation()
   return (
     <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
       <div className="flex items-center gap-1">
-        <SimpleTooltip side="top" content="Zoom out">
-          <Button type="button" aria-label="Zoom out" size="toolbar-icon" variant="toolbar" onClick={toolbar.zoomOut}>
+        <SimpleTooltip side="top" content={t('player.zoomOut', 'Zoom out')}>
+          <Button type="button" aria-label={t('player.zoomOut', 'Zoom out')} size="toolbar-icon" variant="toolbar" onClick={toolbar.zoomOut}>
             <ZoomOut className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
-        <SimpleTooltip side="top" content="Zoom in">
-          <Button type="button" aria-label="Zoom in" size="toolbar-icon" variant="toolbar" onClick={toolbar.zoomIn}>
+        <SimpleTooltip side="top" content={t('player.zoomIn', 'Zoom in')}>
+          <Button type="button" aria-label={t('player.zoomIn', 'Zoom in')} size="toolbar-icon" variant="toolbar" onClick={toolbar.zoomIn}>
             <ZoomIn className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
-        <SimpleTooltip side="top" content="Reset view">
+        <SimpleTooltip side="top" content={t('player.resetView', 'Reset view')}>
           <Button
             type="button"
-            aria-label="Reset view"
+            aria-label={t('player.resetView', 'Reset view')}
             size="toolbar-icon"
             variant="toolbar"
             disabled={toolbar.resetView.disabled}
@@ -52,10 +54,10 @@ export default function PlayerToolbar({ toolbar }) {
           </TabsList>
         </Tabs>
         <div className="ml-2 flex items-center gap-1">
-          <SimpleTooltip side="top" content="Set export start at playhead">
+          <SimpleTooltip side="top" content={t('player.setExportStartAtPlayhead', 'Set export start at playhead')}>
             <Button
               type="button"
-              aria-label="Set export start at playhead"
+              aria-label={t('player.setExportStartAtPlayhead', 'Set export start at playhead')}
               size="toolbar-icon"
               variant="ghost"
               disabled={toolbar.exportRange.isDisabled}
@@ -67,10 +69,10 @@ export default function PlayerToolbar({ toolbar }) {
               </span>
             </Button>
           </SimpleTooltip>
-          <SimpleTooltip side="top" content="Set export end at playhead">
+          <SimpleTooltip side="top" content={t('player.setExportEndAtPlayhead', 'Set export end at playhead')}>
             <Button
               type="button"
-              aria-label="Set export end at playhead"
+              aria-label={t('player.setExportEndAtPlayhead', 'Set export end at playhead')}
               size="toolbar-icon"
               variant="ghost"
               disabled={toolbar.exportRange.isDisabled}
@@ -85,10 +87,10 @@ export default function PlayerToolbar({ toolbar }) {
           {toolbar.exportRange.isCustom ? (
             <div className="ml-1 flex items-center gap-0.5 text-orange-400/90">
               <span className="text-xs font-medium tabular-nums">{toolbar.exportRange.label}</span>
-              <SimpleTooltip side="top" content="Clear custom export range">
+              <SimpleTooltip side="top" content={t('player.clearCustomExportRange', 'Clear custom export range')}>
                 <Button
                   type="button"
-                  aria-label="Clear custom export range"
+                  aria-label={t('player.clearCustomExportRange', 'Clear custom export range')}
                   size="toolbar-icon"
                   variant="ghost"
                   className="text-orange-400/90 hover:text-orange-300"
@@ -106,7 +108,7 @@ export default function PlayerToolbar({ toolbar }) {
       <div className="flex items-center gap-1 rounded-xs border border-border/30 p-0.5 shadow-sm">
         <Button
           type="button"
-          aria-label="Rewind to start"
+          aria-label={t('player.rewindToStart', 'Rewind to start')}
           size="toolbar-icon"
           variant="toolbar"
           disabled={toolbar.transport.isDisabled}
@@ -117,7 +119,7 @@ export default function PlayerToolbar({ toolbar }) {
         </Button>
         <Button
           type="button"
-          aria-label="Step back"
+          aria-label={t('player.stepBack', 'Step back')}
           size="toolbar-icon"
           variant="toolbar"
           disabled={toolbar.transport.isDisabled}
@@ -139,7 +141,7 @@ export default function PlayerToolbar({ toolbar }) {
         </Button>
         <Button
           type="button"
-          aria-label="Step forward"
+          aria-label={t('player.stepForward', 'Step forward')}
           size="toolbar-icon"
           variant="toolbar"
           disabled={toolbar.transport.isDisabled}
@@ -150,7 +152,7 @@ export default function PlayerToolbar({ toolbar }) {
         </Button>
         <Button
           type="button"
-          aria-label="Rewind to end"
+          aria-label={t('player.rewindToEnd', 'Rewind to end')}
           size="toolbar-icon"
           variant="toolbar"
           disabled={toolbar.transport.isDisabled}

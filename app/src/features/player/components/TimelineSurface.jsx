@@ -1,6 +1,7 @@
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { GripVertical } from 'lucide-react'
 import TimelineLane from './TimelineLane'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Presentational timeline surface containing the axis, lanes, playhead, and export markers.
@@ -8,9 +9,10 @@ import TimelineLane from './TimelineLane'
  * @param {{ timeline: object }} props Timeline view model.
  */
 export default function TimelineSurface({ timeline }) {
+  const { t } = useTranslation()
   return (
     <div {...timeline.containerProps} className="relative mt-2" role="group" aria-label="Timeline">
-      <div aria-label="Timeline axis" className="relative h-7 w-full cursor-crosshair select-none mt-4 mb-1" role="group" {...timeline.axisProps}>
+      <div aria-label={t('player.timelineAxis', 'Timeline axis')} className="relative h-7 w-full cursor-crosshair select-none mt-4 mb-1" role="group" {...timeline.axisProps}>
         {timeline.ticks.minor.map((tick) => (
           <div key={tick.id} className="absolute top-0 h-1.5 w-px bg-border/70" style={tick.lineStyle} />
         ))}
@@ -25,7 +27,7 @@ export default function TimelineSurface({ timeline }) {
       </div>
 
       <div
-        aria-label="Timeline lane background"
+        aria-label={t('player.timelineLaneBackground', 'Timeline lane background')}
         className="relative w-full cursor-e-resize select-none bg-foreground/10 active:cursor-e-resize border border-border/40 space-y-0.5 py-1"
         role="group"
         {...timeline.panSurfaceProps}

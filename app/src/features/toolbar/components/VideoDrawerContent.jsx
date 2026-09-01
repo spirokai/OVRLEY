@@ -10,6 +10,7 @@ import { formatClockDuration } from '@/lib/time-format'
 import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { useFileDropZone } from '../hooks/useFileDropZone'
 import { FileDragCursor, FileDropZone } from './FileDropZone'
+import { useTranslation } from 'react-i18next'
 
 const UNKNOWN_VALUE = 'Unknown'
 
@@ -24,32 +25,35 @@ function formatTimeSource(source) {
   return labels[source] ?? source
 }
 
-function buildVideoDrawerViewModel(videoSummary, timezone, timezoneMode) {
+function buildVideoDrawerViewModel(videoSummary, timezone, timezoneMode, t) {
   const metadataRows = [
-    { label: 'Duration', value: videoSummary.duration ? formatClockDuration(videoSummary.duration) : UNKNOWN_VALUE },
-    { label: 'Frame rate', value: videoSummary.fps ? `${Math.round(videoSummary.fps * 100) / 100} fps` : UNKNOWN_VALUE },
+    { label: t('toolbar.duration', 'Duration'), value: videoSummary.duration ? formatClockDuration(videoSummary.duration) : UNKNOWN_VALUE },
     {
-      label: 'Resolution',
+      label: t('toolbar.frameRate', 'Frame rate'),
+      value: videoSummary.fps ? t('toolbar.valFps', { defaultValue: '{{val}} fps', val: Math.round(videoSummary.fps * 100) / 100 }) : UNKNOWN_VALUE,
+    },
+    {
+      label: t('toolbar.resolution', 'Resolution'),
       value: videoSummary.resolution ? `${videoSummary.resolution.width}×${videoSummary.resolution.height}` : UNKNOWN_VALUE,
     },
     {
-      label: 'Created at',
+      label: t('toolbar.createdAt', 'Created at'),
       value: formatVideoCreationTime(videoSummary.creationTime, videoSummary.timeSource, timezone, timezoneMode) || UNKNOWN_VALUE,
     },
     {
-      label: 'Time source',
+      label: t('toolbar.timeSource', 'Time source'),
       value: formatTimeSource(videoSummary.timeSource),
     },
     {
-      label: 'Codec',
+      label: t('toolbar.codec', 'Codec'),
       value: videoSummary.codecName || videoSummary.codecLongName || UNKNOWN_VALUE,
     },
     {
-      label: 'Bit rate',
+      label: t('toolbar.bitRate', 'Bit rate'),
       value: videoSummary.bitRate ? `${(Number(videoSummary.bitRate) / 1_000_000).toFixed(0)} Mbps` : UNKNOWN_VALUE,
     },
     {
-      label: 'Camera',
+      label: t('toolbar.camera', 'Camera'),
       value: videoSummary.cameraModel || videoSummary.cameraType || UNKNOWN_VALUE,
     },
   ]
@@ -77,12 +81,13 @@ function VideoSyncControls({
   setVideoSyncTimezoneMode,
   submitOffsetInput,
 }) {
+  const { t } = useTranslation()
   if (!activitySummary) return null
 
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
-        <SectionHeading icon={Clock3} title="Video Sync" variant="drawer" />
+        <SectionHeading icon={Clock3} title={t('toolbar.videoSync', 'Video Sync')} variant="drawer" />
         <Button
           type="button"
           variant="ghost"
@@ -90,14 +95,14 @@ function VideoSyncControls({
           className="ml-2 h-6 w-6 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
           disabled={!canResetCreationTime}
           onClick={resetVideoCreationTime}
-          aria-label="Restore detected video creation time"
+          aria-label={t('toolbar.restoreDetectedVideoCreationTime', 'Restore detected video creation time')}
         >
           <RotateCcw className="h-3 w-3" />
         </Button>
       </div>
 
       <div className="space-y-3">
-        <Label className="text-[10px] text-muted-foreground uppercase font-bold">Sync Offset</Label>
+        <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('toolbar.syncOffset', 'Sync Offset')}</Label>
         <div className="grid grid-cols-2 items-center gap-4">
           <div className="relative flex-1">
             <BlurInput
@@ -106,7 +111,7 @@ function VideoSyncControls({
               onChange={(e) => setOffsetInput(e.target.value)}
               onBlur={(e) => submitOffsetInput(e.target.value)}
               className="h-9 text-xs pr-11 w-full border border-border/70"
-              placeholder="Seconds or MM:SS"
+              placeholder={t('toolbar.secondsOrMmss', 'Seconds or MM:SS')}
             />
             <div className="absolute inset-y-1 right-1 flex w-5 flex-col overflow-hidden rounded border border-none bg-surface-strong">
               <button
@@ -137,28 +142,28 @@ function VideoSyncControls({
             onClick={() => computeVideoSync(activitySummary)}
             aria-keyshortcuts="Mod+Shift+A"
           >
-            Auto-sync
+            {t('toolbar.autosync', 'Auto-sync')}
           </Button>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-4 pt-1">
-          <Label className="text-[10px] text-muted-foreground uppercase font-bold">Creation Time</Label>
+          <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('toolbar.creationTime', 'Creation Time')}</Label>
           <Tabs
             value={canResetCreationTime ? 'filename' : 'detected'}
             onValueChange={(value) => (value === 'filename' ? setVideoCreationTimeFromFilename() : resetVideoCreationTime())}
           >
             <TabsList variant="toolbar" className="grid h-8 w-full grid-cols-2 p-0.5">
               <TabsTrigger variant="toolbar" value="detected" className="h-full px-2 text-[0.7rem]">
-                Detected
+                {t('toolbar.detected', 'Detected')}
               </TabsTrigger>
               <TabsTrigger variant="toolbar" value="filename" className="h-full px-2 text-[0.7rem]" disabled={!filenameCreationTimeAvailable}>
-                Filename
+                {t('toolbar.filename', 'Filename')}
               </TabsTrigger>
             </TabsList>
           </Tabs>
           {timezone && (
             <>
               <Label htmlFor="video-sync-timezone-toggle" className="mb-2 text-[10px] text-muted-foreground uppercase font-bold">
-                Apply Timezone
+                {t('toolbar.applyTimezone', 'Apply Timezone')}
               </Label>
               <div className="mb-2 flex items-center gap-2">
                 <Switch
@@ -166,7 +171,7 @@ function VideoSyncControls({
                   checked={videoSyncTimezoneMode === 'utc'}
                   disabled={importedVideoTimeSource === 'filename'}
                   onCheckedChange={(checked) => setVideoSyncTimezoneMode(checked ? 'utc' : 'local')}
-                  aria-label="Apply Timezone"
+                  aria-label={t('toolbar.applyTimezone', 'Apply Timezone')}
                 />
               </div>
             </>
@@ -195,10 +200,11 @@ function VideoSyncControls({
  * @returns {JSX.Element} Rendered drawer content.
  */
 export function VideoDrawerContent({ videoSummary, onBrowseVideo, onDeleteVideo, onDropVideoFiles, videoSync }) {
+  const { t } = useTranslation()
   const { dragPosition, dropZoneProps, dropZoneRef, isDraggingFile, isOverDropZone } = useFileDropZone(onDropVideoFiles)
   const drawerViewModel = useMemo(
-    () => (videoSummary?.path ? buildVideoDrawerViewModel(videoSummary, videoSync.timezone, videoSync.videoSyncTimezoneMode) : null),
-    [videoSummary, videoSync.timezone, videoSync.videoSyncTimezoneMode],
+    () => (videoSummary?.path ? buildVideoDrawerViewModel(videoSummary, videoSync.timezone, videoSync.videoSyncTimezoneMode, t) : null),
+    [t, videoSummary, videoSync.timezone, videoSync.videoSyncTimezoneMode],
   )
   const displayFilename = videoSummary?.filename ?? videoSummary?.path?.split(/[/\\]/).pop()
 
@@ -208,14 +214,14 @@ export function VideoDrawerContent({ videoSummary, onBrowseVideo, onDeleteVideo,
 
       <Button type="button" className="h-9 w-full gap-2" onClick={onBrowseVideo} aria-keyshortcuts="Mod+I">
         <Film className="h-4 w-4" />
-        Load video
+        {t('toolbar.loadVideo', 'Load video')}
       </Button>
 
       <FileDropZone
         dropZoneRef={dropZoneRef}
         dropZoneProps={dropZoneProps}
         isOverDropZone={isOverDropZone}
-        label="Drop video file"
+        label={t('toolbar.dropVideoFile', 'Drop video file')}
         sublabel="MP4, MOV, MKV"
       />
 
@@ -235,7 +241,7 @@ export function VideoDrawerContent({ videoSummary, onBrowseVideo, onDeleteVideo,
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-surface-accent-soft hover:text-primary"
                   onClick={onDeleteVideo}
-                  aria-label="Delete video"
+                  aria-label={t('toolbar.deleteVideo', 'Delete video')}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>

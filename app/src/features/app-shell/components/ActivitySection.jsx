@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
 import { Activity, FilePlus2, Film, FolderOpen, Menu, Save } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Renders a full-width action row inside the menu popover.
@@ -59,6 +60,7 @@ export default function ActivitySection({
   onSaveProjectAs,
   status,
 }) {
+  const { t } = useTranslation()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const run = (action) => {
@@ -80,29 +82,29 @@ export default function ActivitySection({
 
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
         <PopoverTrigger asChild>
-          <Button type="button" className="h-9 w-21 gap-3" aria-label="File menu">
+          <Button type="button" className="h-9 w-21 gap-3" aria-label={t('app-shell.fileMenu', 'File menu')}>
             <Menu className="h-4 w-4" />
-            File
+            {t('app-shell.file', 'File')}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" sideOffset={6} className="w-44 p-1">
           <div className="flex flex-col">
-            <MenuItem icon={FilePlus2} label="New Project" shortcut="Mod+N" onClick={() => run(onNewProject)} />
-            <MenuItem icon={FolderOpen} label="Load Project" shortcut="Mod+O" onClick={() => run(onLoadProject)} />
-            <MenuItem icon={Save} label="Save Project" shortcut="Mod+S" disabled={status === 'Saved'} onClick={() => run(onSaveProject)} />
-            <MenuItem icon={Save} label="Save Project As" shortcut="Mod+Shift+S" onClick={() => run(onSaveProjectAs)} />
+            <MenuItem icon={FilePlus2} label={t('app-shell.newProject', 'New Project')} shortcut="Mod+N" onClick={() => run(onNewProject)} />
+            <MenuItem icon={FolderOpen} label={t('app-shell.loadProject', 'Load Project')} shortcut="Mod+O" onClick={() => run(onLoadProject)} />
+            <MenuItem icon={Save} label={t('app-shell.saveProject', 'Save Project')} shortcut="Mod+S" disabled={status === 'Saved'} onClick={() => run(onSaveProject)} />
+            <MenuItem icon={Save} label={t('app-shell.saveProjectAs', 'Save Project As')} shortcut="Mod+Shift+S" onClick={() => run(onSaveProjectAs)} />
           </div>
 
           <Separator className="my-1.5" />
 
           <div className="flex flex-col gap-0.5">
-            <MenuItem icon={Activity} label="Import Activity" onClick={() => run(onImportActivity)} />
+            <MenuItem icon={Activity} label={t('app-shell.importActivity', 'Import Activity')} onClick={() => run(onImportActivity)} />
           </div>
 
           <Separator className="my-1.5" />
 
           <div className="flex flex-col gap-0.5">
-            <MenuItem icon={Film} label="Import Video" onClick={() => run(onImportVideo)} />
+            <MenuItem icon={Film} label={t('app-shell.importVideo', 'Import Video')} onClick={() => run(onImportVideo)} />
           </div>
         </PopoverContent>
       </Popover>

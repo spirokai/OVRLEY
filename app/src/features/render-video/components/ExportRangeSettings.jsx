@@ -13,6 +13,7 @@ import {
   getCustomExportRangeDefault,
   setExportRangeBoundaryFromTimeInput,
 } from '@/features/overlay-editor/utils/exportRange'
+import { useTranslation } from 'react-i18next'
 
 function sanitizeTimeInput(value) {
   const input = String(value).trim()
@@ -41,6 +42,7 @@ function preventDecimalInput(event) {
  * @returns {JSX.Element} Rendered component output.
  */
 export default function ExportRangeSettings({ exportRange, onExportRangeChange, showUseVideoRangeAction = false, onUseVideoRange }) {
+  const { t } = useTranslation()
   const parsedActivity = useStore((state) => state.parsedActivity)
   const activityEndSecond = getActivityDurationSeconds(parsedActivity)
 
@@ -48,7 +50,7 @@ export default function ExportRangeSettings({ exportRange, onExportRangeChange, 
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <Label className="text-xs font-medium">Custom Export Range</Label>
+          <Label className="text-xs font-medium">{t('render-video.customExportRange', 'Custom Export Range')}</Label>
         </div>
         <Switch
           checked={exportRange.type === 'custom'}
@@ -68,7 +70,7 @@ export default function ExportRangeSettings({ exportRange, onExportRangeChange, 
       {exportRange.type === 'custom' ? (
         <div className={`grid gap-4 ${showUseVideoRangeAction ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]' : 'grid-cols-2'}`}>
           <div className="space-y-1.5">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">From</Label>
+            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('render-video.from', 'From')}</Label>
             <BlurInput
               value={formatExportRangeTime(exportRange.from)}
               onKeyDown={preventDecimalInput}
@@ -76,18 +78,18 @@ export default function ExportRangeSettings({ exportRange, onExportRangeChange, 
                 onExportRangeChange(setExportRangeBoundaryFromTimeInput(exportRange, 'from', sanitizeTimeInput(event.target.value)))
               }
               className="h-9 text-xs font-mono"
-              placeholder="00:00:00 or 800"
+              placeholder={t('render-video.000000Or800', '00:00:00 or 800')}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold">To</Label>
+            <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('render-video.to', 'To')}</Label>
             <BlurInput
               value={formatExportRangeTime(exportRange.to)}
               onKeyDown={preventDecimalInput}
               onChange={(event) => onExportRangeChange(setExportRangeBoundaryFromTimeInput(exportRange, 'to', sanitizeTimeInput(event.target.value)))}
               className="h-9 text-xs font-mono"
-              placeholder="00:00:00 or 900"
+              placeholder={t('render-video.000000Or900', '00:00:00 or 900')}
             />
           </div>
 
@@ -100,7 +102,7 @@ export default function ExportRangeSettings({ exportRange, onExportRangeChange, 
                 className="h-9 border-border/80 bg-surface-elevated px-2 text-[10px] font-semibold text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
                 onClick={onUseVideoRange}
               >
-                Use Video Range
+                {t('render-video.useVideoRange', 'Use Video Range')}
               </Button>
             </div>
           ) : null}

@@ -1,6 +1,7 @@
 import { FileBox, Plus } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { useTranslation } from 'react-i18next'
 
 function ProjectCard({ kind, name, title, thumbnailDataUrl, disabled, onClick }) {
   const isNewProject = kind === 'new'
@@ -29,6 +30,7 @@ function ProjectCard({ kind, name, title, thumbnailDataUrl, disabled, onClick })
 }
 
 export default function StartupProjectsDialog({ open, projects, openingPath, onDismiss, onNewProject, onOpenProject }) {
+  const { t } = useTranslation()
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onDismiss()}>
       <DialogContent
@@ -36,11 +38,7 @@ export default function StartupProjectsDialog({ open, projects, openingPath, onD
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/70 px-4 backdrop-blur-md"
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
-        <DialogTitle className="text-sm font-semibold text-primary">Open a project</DialogTitle>
-        <DialogDescription className="mt-2 text-xs leading-5 text-muted-foreground">
-          Start a new project or continue with an existing one.
-        </DialogDescription>
-
+        <DialogTitle className="text-sm font-semibold text-primary">{t('projects.openAProject', 'Open a project')}</DialogTitle>
         <div className="mt-6 grid min-h-120 max-h-200 content-start items-start grid-cols-[repeat(auto-fill,minmax(12.7575rem,1fr))] gap-x-4 gap-y-6 overflow-y-auto pr-1 thin-scrollbar">
           <ProjectCard kind="new" name="New Project" disabled={openingPath !== null} onClick={onNewProject} />
 

@@ -1,3 +1,4 @@
+import i18next from 'i18next'
 /**
  * Renders the loading overlay portion of the application interface.
  */
@@ -30,7 +31,7 @@ function Spinner({ className = 'h-4 w-4' }) {
  * @param {boolean} props.show - Whether to show the loading overlay.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function LoadingOverlay({ label = 'Loading editor data...', show }) {
+export default function LoadingOverlay({ label = i18next.t('app-shell.loadingEditorData', 'Loading editor data...'), show }) {
   if (!show) {
     return null
   }

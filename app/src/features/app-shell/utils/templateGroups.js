@@ -1,3 +1,4 @@
+import i18next from 'i18next'
 /**
  * Template grouping and resolution utilities for the app shell.
  * These helpers sort and group templates by resolution for the template selector UI.
@@ -36,7 +37,7 @@ export function getTemplateGroups(templates) {
 
   templates.forEach((template) => {
     const resolution = getTemplateResolution(template)
-    const key = resolution ? resolution.label : 'Unknown Resolution'
+    const key = resolution ? resolution.label : i18next.t('app-shell.unknownResolution', 'Unknown Resolution')
     const group = groupsByKey.get(key) || {
       key,
       label: key,

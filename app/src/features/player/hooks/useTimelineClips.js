@@ -8,6 +8,7 @@ import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
 import { getClipGeometry, getExportRangeHighlightGeometry } from '../utils/timelineGeometry'
 import { getActivityAttributeLabel } from '@/lib/widget/widget-icons'
+import i18next from 'i18next'
 
 const TEXT_HIDE_THRESHOLD_REM = 3
 const CLIP_SOURCE_COLUMN_WIDTH = '3rem'
@@ -86,7 +87,7 @@ export default function useTimelineClips({
     // Video lane - starts at the sync offset so clip geometry represents real timeline placement.
     if (hasVideo) {
       laneInputs.push({
-        ariaLabel: 'Video clip lane',
+        ariaLabel: i18next.t('player.videoClipLane', 'Video clip lane'),
         durationSeconds: importedVideoDuration ?? 0,
         formatLabel: 'MP4',
         icon: Video,
@@ -104,7 +105,7 @@ export default function useTimelineClips({
         .sort((left, right) => left.localeCompare(right))
 
       laneInputs.push({
-        ariaLabel: 'Activity clip lane',
+        ariaLabel: i18next.t('player.activityClipLane', 'Activity clip lane'),
         availableMetrics,
         durationSeconds: activityDurationSeconds,
         formatLabel: activitySummary?.fileFormat === 'mp4_telemetry' ? 'MP4' : activitySummary?.fileFormat?.toUpperCase() || 'DATA',

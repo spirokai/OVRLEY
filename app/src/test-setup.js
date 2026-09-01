@@ -3,6 +3,7 @@
  */
 
 import '@testing-library/jest-dom/vitest'
+import './i18n/index.js'
 
 if (typeof HTMLCanvasElement !== 'undefined') {
   HTMLCanvasElement.prototype.getContext = function () {

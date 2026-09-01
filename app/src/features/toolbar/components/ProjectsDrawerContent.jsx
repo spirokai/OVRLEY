@@ -1,6 +1,7 @@
 import { Activity, FilePlus2, Film, FolderOpen, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SectionHeading } from '@/components/ui/section-heading'
+import { useTranslation } from 'react-i18next'
 
 function ProjectSource({ icon: Icon, label, filename, path }) {
   if (!path) return null
@@ -38,15 +39,16 @@ export function ProjectsDrawerContent({
   onSave,
   onSaveAs,
 }) {
+  const { t } = useTranslation()
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-3 pb-4 thin-scrollbar">
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <Button type="button" className="w-full gap-2" disabled={busy} onClick={onNew} aria-keyshortcuts="Mod+N">
-            <FilePlus2 className="size-4" /> New Project
+            <FilePlus2 className="size-4" /> {t('toolbar.newProject', 'New Project')}
           </Button>
           <Button type="button" variant="secondary" className="w-full gap-2" disabled={busy} onClick={onOpen} aria-keyshortcuts="Mod+O">
-            <FolderOpen className="size-4" /> Open Project
+            <FolderOpen className="size-4" /> {t('toolbar.openProject', 'Open Project')}
           </Button>
         </div>
         <Button
@@ -57,10 +59,10 @@ export function ProjectsDrawerContent({
           onClick={onSave}
           aria-keyshortcuts="Mod+S"
         >
-          <Save className="size-4" /> Save Project
+          <Save className="size-4" /> {t('toolbar.saveProject', 'Save Project')}
         </Button>
         <Button type="button" variant="secondary" className="w-full" disabled={busy} onClick={onSaveAs} aria-keyshortcuts="Mod+Shift+S">
-          <Save className="size-4" /> Save Project As
+          <Save className="size-4" /> {t('toolbar.saveProjectAs', 'Save Project As')}
         </Button>
       </div>
 
@@ -72,7 +74,7 @@ export function ProjectsDrawerContent({
             </span>
           </div>
           <div className="min-w-0 space-y-8">
-            <ProjectSource icon={Activity} label="Activity" filename={activityFilename} path={activityPath} />
+            <ProjectSource icon={Activity} label={t('toolbar.activity', 'Activity')} filename={activityFilename} path={activityPath} />
             <ProjectSource icon={Film} label="Video" filename={videoFilename} path={videoPath} />
           </div>
         </div>

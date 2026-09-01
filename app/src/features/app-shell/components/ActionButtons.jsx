@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { CircleHelp, FolderOpen, ImageDown, Play } from 'lucide-react'
 import WindowControls from './WindowControls'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Renders the render and overlays action buttons.
@@ -34,6 +35,7 @@ export default function ActionButtons({
   onOpenOutputDirectory,
   onOpenKeyboardShortcuts,
 }) {
+  const { t } = useTranslation()
   return (
     <div className="flex min-w-fit items-center justify-end gap-3">
       <div className="flex items-center gap-4">
@@ -42,12 +44,12 @@ export default function ActionButtons({
           size="toolbar-icon"
           className="h-9 w-9 bg-background text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
           onClick={onOpenKeyboardShortcuts}
-          aria-label="Keyboard shortcuts"
+          aria-label={t('app-shell.keyboardShortcuts', 'Keyboard shortcuts')}
         >
           <CircleHelp className="size-4.5" />
         </Button>
 
-        <SimpleTooltip side="bottom" content={backendStatus !== 'connected' ? 'Backend offline' : null}>
+        <SimpleTooltip side="bottom" content={backendStatus !== 'connected' ? t('app-shell.backendOffline', 'Backend offline') : null}>
           <Button
             variant="outline"
             size="sm"
@@ -57,7 +59,7 @@ export default function ActionButtons({
             aria-keyshortcuts="Mod+Shift+E"
           >
             <FolderOpen className="h-3.5 w-3.5" />
-            <span>Overlays</span>
+            <span>{t('app-shell.overlays', 'Overlays')}</span>
           </Button>
         </SimpleTooltip>
       </div>

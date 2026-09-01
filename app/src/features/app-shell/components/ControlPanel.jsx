@@ -6,6 +6,7 @@ import { Settings2, Activity } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SidebarSettingsTab } from '@/features/scene-settings'
 import { SidebarWidgetsTab } from '@/features/widget-editor'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Renders the control panel component.
@@ -17,6 +18,7 @@ import { SidebarWidgetsTab } from '@/features/widget-editor'
  * @returns {JSX.Element} Rendered component output.
  */
 export default function ControlPanel({ config, onConfigChange, widgetLiveEdits }) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col h-full bg-card">
       <Tabs defaultValue="settings" className="flex-1 flex flex-col min-h-0">
@@ -24,11 +26,11 @@ export default function ControlPanel({ config, onConfigChange, widgetLiveEdits }
           <TabsList variant="main" className="grid w-full grid-cols-2 ">
             <TabsTrigger variant="main" value="settings" className="text-sm gap-2 cursor-pointer p-4 pt-6">
               <Settings2 className="h-4 w-4" />
-              Settings
+              {t('app-shell.settings', 'Settings')}
             </TabsTrigger>
             <TabsTrigger variant="main" value="widgets" className="text-sm gap-2 cursor-pointer p-4 pt-6">
               <Activity className="h-4 w-4" />
-              Widgets
+              {t('app-shell.widgets', 'Widgets')}
             </TabsTrigger>
           </TabsList>
         </div>

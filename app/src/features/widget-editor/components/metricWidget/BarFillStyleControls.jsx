@@ -1,4 +1,5 @@
 import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
+import { useTranslation } from 'react-i18next'
 
 const BAR_COUNT_MAX = 64
 
@@ -27,9 +28,10 @@ function buildBarGeometryUpdate(data, update, getCornerRadiusMax) {
 }
 
 export function BarFillStyleField({ data, suggestBarGeometry, updateVariant }) {
+  const { t } = useTranslation()
   return (
     <SelectField
-      label="Track Style"
+      label={t('widget-editor.trackStyle', 'Track Style')}
       value={data.track_fill_style ?? 'fill'}
       onValueChange={(track_fill_style) => updateVariant(buildFillStyleUpdate(data, track_fill_style, suggestBarGeometry))}
       options={FILL_STYLE_OPTIONS}
@@ -39,10 +41,11 @@ export function BarFillStyleField({ data, suggestBarGeometry, updateVariant }) {
 }
 
 export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updateVariant, updateVariantSize, commitWidgetSize, widgetId }) {
+  const { t } = useTranslation()
   if (data.track_fill_style !== 'bars') {
     return (
       <div className="flex items-center justify-between gap-2 px-1 pb-2 pt-2">
-        <span className="text-[9px] font-bold uppercase text-muted-foreground">Flat Track</span>
+        <span className="text-[9px] font-bold uppercase text-muted-foreground">{t('widget-editor.flatTrack', 'Flat Track')}</span>
         <ToggleField checked={data.track_fill_flat} onCheckedChange={(track_fill_flat) => updateVariant({ track_fill_flat })} />
       </div>
     )
@@ -51,7 +54,7 @@ export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updat
   return (
     <>
       <SliderField
-        label="Bar Count"
+        label={t('widget-editor.barCount', 'Bar Count')}
         value={data.bar_count}
         min={2}
         max={BAR_COUNT_MAX}
@@ -62,7 +65,7 @@ export function BarFillStyleDetails({ data, barGapMax, getCornerRadiusMax, updat
         onSliderCommit={() => commitWidgetSize(widgetId)}
       />
       <SliderField
-        label="Bar Gap"
+        label={t('widget-editor.barGap', 'Bar Gap')}
         value={data.bar_gap}
         min={0}
         max={barGapMax}

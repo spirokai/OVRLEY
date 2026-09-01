@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSepa
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { FilePlus2, FolderOpen, Save, Sparkles } from 'lucide-react'
 import { getTemplateGroups } from '../utils/templateGroups'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Renders the template management controls in the app header.
@@ -39,6 +40,7 @@ export default function TemplateSection({
   onOpenChange,
   className = '',
 }) {
+  const { t } = useTranslation()
   const templateGroups = useMemo(() => getTemplateGroups(templates), [templates])
 
   return (
@@ -57,7 +59,7 @@ export default function TemplateSection({
             <Sparkles className="h-3 w-3 shrink-0 text-primary" />
             <SelectValue
               placeholder={
-                loadedTemplateSource?.kind === 'file' ? loadedTemplateSource.path.split(/[/\\]/).at(-1) || 'Imported Template' : 'Select Template...'
+                loadedTemplateSource?.kind === 'file' ? loadedTemplateSource.path.split(/[/\\]/).at(-1) || 'Imported Template' : t('app-shell.selectTemplate', 'Select Template...')
               }
             />
           </div>
@@ -80,7 +82,7 @@ export default function TemplateSection({
       </Select>
 
       <div className="flex shrink-0 items-center gap-1">
-        <SimpleTooltip side="bottom" content="New Template">
+        <SimpleTooltip side="bottom" content={t('app-shell.newTemplate', 'New Template')}>
           <Button
             variant="ghost"
             size="icon"
@@ -91,7 +93,7 @@ export default function TemplateSection({
             <FilePlus2 className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
-        <SimpleTooltip side="bottom" content="Import Template">
+        <SimpleTooltip side="bottom" content={t('app-shell.importTemplate', 'Import Template')}>
           <Button
             variant="ghost"
             size="icon"
@@ -103,7 +105,7 @@ export default function TemplateSection({
           </Button>
         </SimpleTooltip>
         {config && (
-          <SimpleTooltip side="bottom" content="Save Template">
+          <SimpleTooltip side="bottom" content={t('app-shell.saveTemplate', 'Save Template')}>
             <Button
               variant="ghost"
               size="icon"

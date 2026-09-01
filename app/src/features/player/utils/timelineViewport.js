@@ -6,6 +6,7 @@ import { clamp } from '@/lib/utils'
 import { formatClockDuration } from '@/lib/time-format'
 import { getTimelineMinimum } from './playerTiming'
 import { secondsToViewPx } from './timelineGeometry'
+import i18next from 'i18next'
 
 const VIEWPORT_MATCH_EPSILON_SECONDS = 0.001
 const ZOOM_FACTOR = 1.6
@@ -201,7 +202,7 @@ export function buildFitTargets({
     componentRanges.push({ start, end })
     targets.push({
       id: 'video',
-      label: 'Video',
+      label: i18next.t('player.video', 'Video'),
       viewport: fitRangeToViewport({ rangeStart: start, rangeEnd: end, timelineMinimum, totalDuration, widthPx }),
     })
   }
@@ -211,14 +212,14 @@ export function buildFitTargets({
     componentRanges.push({ start: 0, end: duration })
     targets.push({
       id: 'activity',
-      label: 'Activity',
+      label: i18next.t('player.activity', 'Activity'),
       viewport: fitRangeToViewport({ rangeStart: 0, rangeEnd: duration, timelineMinimum, totalDuration, widthPx }),
     })
   }
 
   const coversFullTimeline = componentRanges.some(({ start, end }) => start <= timelineMinimum && end >= totalDuration)
   if (!coversFullTimeline) {
-    targets.unshift({ id: 'all', label: 'All', viewport: fitToFull(totalDuration, timelineMinimum) })
+    targets.unshift({ id: 'all', label: i18next.t('player.all', 'All'), viewport: fitToFull(totalDuration, timelineMinimum) })
   }
 
   return targets

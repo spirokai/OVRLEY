@@ -5,6 +5,7 @@ import { SectionHeading } from '@/components/ui/section-heading'
 import { useFileDropZone } from '../hooks/useFileDropZone'
 import { buildActivityDrawerViewModel } from '../utils/activityDrawerUtils'
 import { FileDragCursor, FileDropZone } from './FileDropZone'
+import { useTranslation } from 'react-i18next'
 
 function MetricGrid({ metrics, emptyLabel }) {
   if (metrics.length === 0) return <p className="text-[0.7rem] text-muted-foreground/90 px-2">{emptyLabel}</p>
@@ -36,8 +37,9 @@ function MetricGrid({ metrics, emptyLabel }) {
  * @returns {JSX.Element} Rendered drawer content.
  */
 export function ActivityDrawerContent({ activitySummary, filename, onBrowseActivity, onDeleteActivity, onDropActivityFiles }) {
+  const { t } = useTranslation()
   const { dragPosition, dropZoneProps, dropZoneRef, isDraggingFile, isOverDropZone } = useFileDropZone(onDropActivityFiles)
-  const drawerViewModel = activitySummary ? buildActivityDrawerViewModel(activitySummary) : null
+  const drawerViewModel = activitySummary ? buildActivityDrawerViewModel(activitySummary, t) : null
   const displayFilename = filename ?? activitySummary?.fileName
 
   return (
@@ -46,14 +48,14 @@ export function ActivityDrawerContent({ activitySummary, filename, onBrowseActiv
 
       <Button type="button" className="h-9 w-full gap-2" onClick={onBrowseActivity} aria-keyshortcuts="Alt+A">
         <Activity className="h-4 w-4" />
-        Load activity
+        {t('toolbar.loadActivity', 'Load activity')}
       </Button>
 
       <FileDropZone
         dropZoneRef={dropZoneRef}
         dropZoneProps={dropZoneProps}
         isOverDropZone={isOverDropZone}
-        label="Drop activity file"
+        label={t('toolbar.dropActivityFile', 'Drop activity file')}
         sublabel="GPX, FIT, SRT, IGC, CSV, VBO"
       />
 
@@ -73,7 +75,7 @@ export function ActivityDrawerContent({ activitySummary, filename, onBrowseActiv
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-surface-accent-soft hover:text-primary"
                   onClick={onDeleteActivity}
-                  aria-label="Delete activity"
+                  aria-label={t('toolbar.deleteActivity', 'Delete activity')}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>

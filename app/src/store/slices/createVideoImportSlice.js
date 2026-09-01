@@ -2,6 +2,7 @@ import { detectCodecs } from '@/api/backend'
 import { formatVideoCreationTime, parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { createCachedPromise } from '@/lib/cached-promise'
 import { videoOverlapsActivity } from '@/lib/video-timing'
+import i18next from 'i18next'
 
 /**
  * Converts a timestamp to the comparison clock used for activity sync.
@@ -284,7 +285,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (!state.importedVideoCreationTime) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Could not determine video creation time',
+          videoSyncWarning: i18next.t('store.couldNotDetermineVideoCreationTime', 'Could not determine video creation time'),
           videoSyncTimezoneMode: null,
         }
       }
@@ -293,7 +294,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (!timezone) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'timezone is required for video sync',
+          videoSyncWarning: i18next.t('store.timezoneIsRequiredForVideoSync', 'timezone is required for video sync'),
           videoSyncTimezoneMode: null,
         }
       }
@@ -303,7 +304,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (activityStart === null || activityEnd === null) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Invalid timestamp formats',
+          videoSyncWarning: i18next.t('store.invalidTimestampFormats', 'Invalid timestamp formats'),
           videoSyncTimezoneMode: null,
         }
       }
@@ -328,7 +329,7 @@ export const createVideoImportSlice = (set, get) => ({
         if (withoutTimezone === null || withTimezone === null) {
           return {
             videoSyncOffsetSeconds: 0,
-            videoSyncWarning: 'Invalid timestamp formats',
+            videoSyncWarning: i18next.t('store.invalidTimestampFormats', 'Invalid timestamp formats'),
             videoSyncTimezoneMode: null,
           }
         }
@@ -337,7 +338,7 @@ export const createVideoImportSlice = (set, get) => ({
           timezoneMode = state.videoSyncTimezoneMode ?? 'local'
           return {
             videoSyncOffsetSeconds: 0,
-            videoSyncWarning: 'Video could not be synced with activity',
+            videoSyncWarning: i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity'),
             videoSyncTimezoneMode: timezoneMode,
           }
         }
@@ -353,7 +354,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (videoStart === null) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Invalid timestamp formats',
+          videoSyncWarning: i18next.t('store.invalidTimestampFormats', 'Invalid timestamp formats'),
           videoSyncTimezoneMode: null,
         }
       }
@@ -364,7 +365,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (!videoTimestampOverlapsActivity(videoStart, videoDuration, activityStart, activityEnd)) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Video could not be synced with activity',
+          videoSyncWarning: i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity'),
           videoSyncTimezoneMode: timezoneMode,
         }
       }

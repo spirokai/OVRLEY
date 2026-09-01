@@ -5,6 +5,7 @@ import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts
 import { FontSection } from '../widgetEditorSections'
 import { ColorField, SelectField, SizeSlider, TextField, ToggleField } from '../widgetFormControls'
 import { LAP_TIMER_MODES } from '@/lib/widget/standard-widgets'
+import { useTranslation } from 'react-i18next'
 
 const LAP_TIMER_MODES_BY_VALUE = Object.fromEntries(LAP_TIMER_MODES.map((mode) => [mode.value, mode]))
 
@@ -19,6 +20,7 @@ const LAP_TIMER_MODES_BY_VALUE = Object.fromEntries(LAP_TIMER_MODES.map((mode) =
  * @returns {JSX.Element} Lap timer controls.
  */
 export default function LapTimerDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+  const { t } = useTranslation()
   const availableFonts = useAvailableFonts()
 
   return (
@@ -52,7 +54,7 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
           <TextField label="Label" value={widget.data.label} onChange={(label) => updateWidgetData(widget.id, { label })} />
         ) : null}
         <SizeSlider
-          label="Label Font Size"
+          label={t('widget-editor.labelFontSize', 'Label Font Size')}
           value={widget.data.label_font_size}
           min={6}
           max={100}
@@ -63,7 +65,7 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
         />
         <div className="grid grid-cols-2 items-end gap-4">
           <FontSelectField
-            label="Label Font"
+            label={t('widget-editor.labelFont', 'Label Font')}
             value={widget.data.label_font}
             onValueChange={(label_font) => updateWidgetData(widget.id, { label_font })}
             recommendedFonts={availableFonts.recommendedFonts}
@@ -71,18 +73,18 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
             triggerClassName="h-9 border-border/70 bg-surface text-xs"
             labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
           />
-          <ColorField label="Label Color" value={widget.data.label_color} onChange={(label_color) => updateWidgetData(widget.id, { label_color })} />
+          <ColorField label={t('widget-editor.labelColor', 'Label Color')} value={widget.data.label_color} onChange={(label_color) => updateWidgetData(widget.id, { label_color })} />
         </div>
       </div>
       {widget.data.lap_timer_mode === 'delta' || widget.data.lap_timer_mode === 'lap_log' ? (
         <div className="grid grid-cols-2 gap-4">
           <ColorField
-            label="Positive Delta Color"
+            label={t('widget-editor.positiveDeltaColor', 'Positive Delta Color')}
             value={widget.data.positive_delta_color}
             onChange={(positive_delta_color) => updateWidgetData(widget.id, { positive_delta_color })}
           />
           <ColorField
-            label="Negative Delta Color"
+            label={t('widget-editor.negativeDeltaColor', 'Negative Delta Color')}
             value={widget.data.negative_delta_color}
             onChange={(negative_delta_color) => updateWidgetData(widget.id, { negative_delta_color })}
           />

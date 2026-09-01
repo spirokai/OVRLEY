@@ -8,6 +8,7 @@ import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from '.
 import { DimensionsSection } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 import { Label } from '@/components/ui/label'
+import { useTranslation } from 'react-i18next'
 
 const MARKER_VARIANT_OPTIONS = [
   { value: 'single', label: 'Single Circle' },
@@ -25,6 +26,7 @@ const MARKER_VARIANT_OPTIONS = [
  * @returns {JSX.Element} Rendered component output.
  */
 export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
+  const { t } = useTranslation()
   const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
   const completedLineOpacity = widget.data.completed_line_opacity
   const remainingLineOpacity = widget.data.remaining_line_opacity
@@ -43,7 +45,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
       <DimensionsSection widget={widget} setNumericField={setNumericField} />
 
       <SliderField
-        label="Map Rotation"
+        label={t('widget-editor.mapRotation', 'Map Rotation')}
         value={rotation}
         min={-180}
         max={180}
@@ -54,7 +56,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
       />
 
       <div className="space-y-4">
-        <SectionHeading icon={Palette} title="Line Styling" />
+        <SectionHeading icon={Palette} title={t('widget-editor.lineStyling', 'Line Styling')} />
         <SliderField
           label="Thickness"
           value={lineWidth}
@@ -87,7 +89,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
-            label="Route Detail"
+            label={t('widget-editor.routeDetail', 'Route Detail')}
             value={targetDensity}
             min={0.25}
             max={1.5}
@@ -103,7 +105,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
         </div>
         <div className="grid grid-cols-2 gap-4">
           <ColorField
-            label="Finished Color"
+            label={t('widget-editor.finishedColor', 'Finished Color')}
             value={widget.data.completed_line_color || getThemeColor('ice')}
             onChange={(value) =>
               updateWidgetData(widget.id, {
@@ -113,14 +115,14 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             }
           />
           <ColorField
-            label="Remaining Color"
+            label={t('widget-editor.remainingColor', 'Remaining Color')}
             value={widget.data.remaining_line_color || getThemeColor('teal')}
             onChange={(value) => updateWidgetData(widget.id, { remaining_line_color: value })}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
-            label="Finished Opacity"
+            label={t('widget-editor.finishedOpacity', 'Finished Opacity')}
             value={completedLineOpacity}
             min={0}
             max={100}
@@ -129,7 +131,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             onSliderChange={(value) => updateWidgetData(widget.id, { completed_line_opacity: value })}
           />
           <SliderField
-            label="Remaining Opacity"
+            label={t('widget-editor.remainingOpacity', 'Remaining Opacity')}
             value={remainingLineOpacity}
             min={0}
             max={100}
@@ -140,7 +142,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center justify-between gap-2 pl-1 pt-2 pb-2">
-            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">Show Full Activity</Label>
+            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.showFullActivity', 'Show Full Activity')}</Label>
             <ToggleField
               checked={widget.data.show_full_activity}
               onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_activity: checked })}
@@ -158,7 +160,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
             onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
           />
           <SizeSlider
-            label=" Size"
+            label={t('widget-editor.size', ' Size')}
             value={markerSize}
             min={0}
             max={50}

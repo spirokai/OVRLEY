@@ -9,6 +9,7 @@ import { createNewProject, loadProject, saveProject } from '../projectOperations
 import { LAST_PROJECT_DIRECTORY_KEY } from '../utils/projectSnapshot'
 import useProjectDocumentState from './useProjectDocumentState'
 import useProjectSourceRecovery from './useProjectSourceRecovery'
+import i18next from 'i18next'
 
 const PROJECT_FILTER = [{ name: 'OVRLEY Project', extensions: ['oly'] }]
 
@@ -93,7 +94,7 @@ export default function useProjectLifecycle({
 
   const handleOpenProject = useCallback(
     () =>
-      runOperation('open project', async () => {
+      runOperation(i18next.t('projects.openProject', 'open project'), async () => {
         const defaultPath = await backend.getDefaultProjectDirectory()
         const path = await openSinglePath(PROJECT_FILTER, { defaultPath, lastDirectoryKey: LAST_PROJECT_DIRECTORY_KEY })
         return path ? loadProjectPath(path) : false
@@ -103,7 +104,7 @@ export default function useProjectLifecycle({
 
   const save = useCallback(
     (saveAs) =>
-      runOperation('save project', async () => {
+      runOperation(i18next.t('projects.saveProject', 'save project'), async () => {
         let path = loadedProjectPath
         if (saveAs || !path) {
           const defaultDirectory = await backend.getDefaultProjectDirectory()
@@ -122,11 +123,11 @@ export default function useProjectLifecycle({
   const handleSaveProject = useCallback(() => save(false), [save])
   const handleSaveProjectAs = useCallback(() => save(true), [save])
 
-  const handleOpenProjectPath = useCallback((path) => runOperation('open project', () => loadProjectPath(path)), [loadProjectPath, runOperation])
+  const handleOpenProjectPath = useCallback((path) => runOperation(i18next.t('projects.openProject', 'open project'), () => loadProjectPath(path)), [loadProjectPath, runOperation])
 
   const createProject = useCallback(
     () =>
-      runOperation('create project', async () => {
+      runOperation(i18next.t('projects.createProject', 'create project'), async () => {
         await createNewProject({ clearImportedVideo })
         markNew()
         return true
@@ -177,11 +178,11 @@ export default function useProjectLifecycle({
   const closingApplication = confirmationIntent === 'close'
   const unsavedProjectDialog = {
     open: isProjectConfirmOpen,
-    title: closingApplication ? 'Unsaved changes' : 'Create New Project',
+    title: closingApplication ? 'Unsaved changes' : i18next.t('projects.createNewProject', 'Create New Project'),
     description: closingApplication
-      ? 'Your project has unsaved changes. Do you want to save the changes or close OVRLEY without saving?'
-      : 'Your project has unsaved changes. Save them or discard them.',
-    discardLabel: closingApplication ? 'Close Without Saving' : 'New Project',
+      ? i18next.t('projects.unsavedChangesBeforeExit', 'Your project has unsaved changes. Do you want to save the changes or close OVRLEY without saving?')
+      : i18next.t('projects.unsavedChanges', 'Your project has unsaved changes. Save them or discard them.'),
+    discardLabel: closingApplication ? i18next.t('projects.closeWithoutSaving', 'Close Without Saving') : 'New Project',
     onCancel: () => answerProjectConfirm('cancel'),
     onSave: () => answerProjectConfirm('save'),
     onDiscard: () => answerProjectConfirm('discard'),
@@ -195,7 +196,7 @@ export default function useProjectLifecycle({
     handleSaveProject,
     handleSaveProjectAs,
     loadedProjectPath,
-    loadingProject: activeOperation === 'open project',
+    loadingProject: activeOperation === i18next.t('projects.openProject', 'open project'),
     missingSourceDialog,
     projectName,
     startupProjectDialog: {

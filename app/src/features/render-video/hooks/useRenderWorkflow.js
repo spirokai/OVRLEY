@@ -18,6 +18,7 @@ import useStore from '@/store/useStore'
 import { createRenderEffectiveConfig } from '../utils/renderConfig'
 import { loadRememberedRenderDirectory, normalizeRenderOutputPath, rememberAcceptedRenderOutput } from '../utils/render-output'
 import useRenderDialogState from './useRenderDialogState'
+import i18next from 'i18next'
 
 export default function useRenderWorkflow({ backendStatus }) {
   const {
@@ -45,17 +46,17 @@ export default function useRenderWorkflow({ backendStatus }) {
   const renderDisabled = !canRender || renderingVideo || backendStatus !== 'connected'
   const renderTooltipContent = useMemo(() => {
     if (!config) {
-      return hasParsedActivity ? 'Load a template first' : 'Load a template and GPX/FIT activity first'
+      return hasParsedActivity ? i18next.t('render-video.loadATemplateFirst', 'Load a template first') : i18next.t('render-video.loadATemplateAndGpxfitActivityFirst', 'Load a template and GPX/FIT activity first')
     }
     if (!hasParsedActivity) {
-      return 'Load a GPX/FIT activity first'
+      return i18next.t('render-video.loadAGpxfitActivityFirst', 'Load a GPX/FIT activity first')
     }
     if (backendStatus !== 'connected') {
-      return 'Backend offline'
+      return i18next.t('render-video.backendOffline', 'Backend offline')
     }
 
     if (renderingVideo) {
-      return 'Rendering already in progress'
+      return i18next.t('render-video.renderingAlreadyInProgress', 'Rendering already in progress')
     }
     return null
   }, [backendStatus, config, hasParsedActivity, renderingVideo])
@@ -309,7 +310,7 @@ export default function useRenderWorkflow({ backendStatus }) {
         startRenderSession(result.render_id, result.outputPath, {
           ...DEFAULT_RENDER_PROGRESS,
           status: 'rendering',
-          message: 'Starting render...',
+          message: i18next.t('render-video.startingRender', 'Starting render...'),
         })
         setOutputPathError(null)
         setPendingOverwritePath(null)

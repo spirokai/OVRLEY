@@ -31,6 +31,7 @@ import {
   useAppShellComposition,
 } from '@/features/app-shell'
 import * as backend from './api/backend'
+import { useTranslation } from 'react-i18next'
 
 function useRightClickDevtools() {
   useEffect(() => {
@@ -59,6 +60,7 @@ function useRightClickDevtools() {
  * @returns {JSX.Element} Rendered component output.
  */
 function AppShell() {
+  const { t } = useTranslation()
   useRightClickDevtools()
 
   const {
@@ -127,7 +129,7 @@ function AppShell() {
   if (!toolbarDrawer.initialized) {
     return (
       <div className="relative h-screen w-full bg-background text-foreground">
-        <LoadingOverlay show label="OVRLEY is starting..." />
+        <LoadingOverlay show label={t('app.ovrleyIsStarting', 'OVRLEY is starting...')} />
       </div>
     )
   }
@@ -180,7 +182,11 @@ function AppShell() {
               <LoadingOverlay
                 show={projectLifecycle.loadingProject || isProcessing || importingVideo}
                 label={
-                  projectLifecycle.loadingProject ? 'Loading project...' : importingVideo ? 'Importing your video...' : 'Processing your activity...'
+                  projectLifecycle.loadingProject
+                    ? t('app.loadingProject', 'Loading project...')
+                    : importingVideo
+                      ? t('app.importingYourVideo', 'Importing your video...')
+                      : t('app.processingYourActivity', 'Processing your activity...')
                 }
               />
               <div

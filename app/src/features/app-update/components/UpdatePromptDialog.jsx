@@ -2,6 +2,7 @@ import { ChevronsRight, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Presents update state without owning updater side effects.
@@ -19,6 +20,7 @@ import { Progress } from '@/components/ui/progress'
  * @returns {JSX.Element|null} Rendered dialog or null when no update is active.
  */
 export default function UpdatePromptDialog({ open, phase, version, progress, progressPercent, progressLabel, onUpdateNow, onLater, onClose }) {
+  const { t } = useTranslation()
   const currentVersion = import.meta.env.VITE_OVRLEY_VERSION?.trim() || '0.00.0'
 
   const downloading = phase === 'downloading'
@@ -35,12 +37,12 @@ export default function UpdatePromptDialog({ open, phase, version, progress, pro
         <div className="flex items-center gap-3">
           <Download className="h-4 w-4 text-primary" />
           <DialogTitle className="text-sm font-semibold text-foreground">
-            {failed ? 'Update failed' : downloading ? 'Downloading update' : 'Update available'}
+            {failed ? t('app-update.updateFailed', 'Update failed') : downloading ? t('app-update.downloadingUpdate', 'Downloading update') : t('app-update.updateAvailable', 'Update available')}
           </DialogTitle>
         </div>
         <DialogDescription className="mt-6 normal-case text-[0.9rem] font-light leading-5 text-muted-foreground">
           {failed ? (
-            'The installed version remains available. You can close this dialog and continue working.'
+            t('app-update.continueWithInstalledVersion', 'The installed version remains available. You can close this dialog and continue working.')
           ) : downloading ? (
             <span className="flex items-center justify-center gap-4 text-2xl font-bold text-foreground">
               <span>{currentVersion}</span>
@@ -49,16 +51,16 @@ export default function UpdatePromptDialog({ open, phase, version, progress, pro
             </span>
           ) : (
             <>
-              OVRLEY <span className="text-foreground font-bold">{version}</span> is now available.
+              OVRLEY <span className="text-foreground font-bold">{version}</span> {t('app-update.isNowAvailable', 'is now available.')}
             </>
           )}
         </DialogDescription>
 
         {downloading ? (
           <div className="mt-3 space-y-2">
-            <p className="text-end text-xs text-muted-foreground tabular-nums">{determinate ? progressLabel : 'Downloading update...'}</p>
+            <p className="text-end text-xs text-muted-foreground tabular-nums">{determinate ? progressLabel : t('app-update.downloadingUpdate', 'Downloading update...')}</p>
             {determinate ? (
-              <Progress value={progressPercent} aria-label="Update download progress" />
+              <Progress value={progressPercent} aria-label={t('app-update.updateDownloadProgress', 'Update download progress')} />
             ) : (
               <div className="bg-primary/20 h-2 w-full overflow-hidden rounded-full">
                 <div className="bg-primary h-full w-1/3 animate-pulse rounded-full" />
@@ -75,7 +77,7 @@ export default function UpdatePromptDialog({ open, phase, version, progress, pro
               className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
               onClick={onClose}
             >
-              Close
+              {t('app-update.close', 'Close')}
             </Button>
           ) : null}
           {!downloading && !failed ? (
@@ -85,12 +87,12 @@ export default function UpdatePromptDialog({ open, phase, version, progress, pro
               className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
               onClick={onLater}
             >
-              Later
+              {t('app-update.later', 'Later')}
             </Button>
           ) : null}
           {!downloading && !failed ? (
             <Button type="button" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={onUpdateNow}>
-              Update now
+              {t('app-update.updateNow', 'Update now')}
             </Button>
           ) : null}
         </div>
