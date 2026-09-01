@@ -24,7 +24,7 @@ function MenuItem({ icon: Icon, label, onClick, disabled, shortcut }) {
   return (
     <Button
       variant="ghost"
-      className="w-full justify-start gap-3 px-2 text-[0.65rem] font-semibold uppercase"
+      className="w-full justify-start gap-3 px-2 text-[0.7rem] font-semibold uppercase hover:bg-muted-foreground/10"
       onClick={onClick}
       disabled={disabled}
       aria-keyshortcuts={shortcut}
