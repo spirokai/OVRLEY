@@ -82,17 +82,28 @@ export default function ActivitySection({
 
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
         <PopoverTrigger asChild>
-          <Button type="button" className="h-9 w-21 gap-3" aria-label={t('app-shell.fileMenu', 'File menu')}>
+          <Button type="button" className="h-9 gap-3" aria-label={t('app-shell.fileMenu', 'File menu')}>
             <Menu className="h-4 w-4" />
             {t('app-shell.file', 'File')}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" sideOffset={6} className="w-44 p-1">
+        <PopoverContent align="start" sideOffset={6} className="w-50 p-1">
           <div className="flex flex-col">
             <MenuItem icon={FilePlus2} label={t('app-shell.newProject', 'New Project')} shortcut="Mod+N" onClick={() => run(onNewProject)} />
             <MenuItem icon={FolderOpen} label={t('app-shell.loadProject', 'Load Project')} shortcut="Mod+O" onClick={() => run(onLoadProject)} />
-            <MenuItem icon={Save} label={t('app-shell.saveProject', 'Save Project')} shortcut="Mod+S" disabled={status === 'Saved'} onClick={() => run(onSaveProject)} />
-            <MenuItem icon={Save} label={t('app-shell.saveProjectAs', 'Save Project As')} shortcut="Mod+Shift+S" onClick={() => run(onSaveProjectAs)} />
+            <MenuItem
+              icon={Save}
+              label={t('app-shell.saveProject', 'Save Project')}
+              shortcut="Mod+S"
+              disabled={status === 'Saved'}
+              onClick={() => run(onSaveProject)}
+            />
+            <MenuItem
+              icon={Save}
+              label={t('app-shell.saveProjectAs', 'Save Project As')}
+              shortcut="Mod+Shift+S"
+              onClick={() => run(onSaveProjectAs)}
+            />
           </div>
 
           <Separator className="my-1.5" />

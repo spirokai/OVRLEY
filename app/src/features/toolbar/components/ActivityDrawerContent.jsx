@@ -83,7 +83,7 @@ export function ActivityDrawerContent({ activitySummary, filename, onBrowseActiv
             </div>
             <SectionHeading
               icon={Route}
-              title="Details"
+              title={t('toolbar.details', 'Details')}
               trailing={
                 <Badge variant="outline" className="px-2 py-0.2 mr-1 text-[0.75rem] font-extrabold rounded-none text-primary border-primary">
                   {drawerViewModel.formatLabel}
@@ -104,13 +104,13 @@ export function ActivityDrawerContent({ activitySummary, filename, onBrowseActiv
           </section>
 
           <section className="space-y-4">
-            <SectionHeading icon={Database} title="Extracted" variant="drawer" />
-            <MetricGrid metrics={drawerViewModel.metricGroups.extracted} emptyLabel="No data were extracted" />
+            <SectionHeading icon={Database} title={t('toolbar.extracted', 'Extracted')} variant="drawer" />
+            <MetricGrid metrics={drawerViewModel.metricGroups.extracted} emptyLabel={t('toolbar.noDataExtracted', 'No data were extracted')} />
           </section>
 
           <section className="space-y-4">
-            <SectionHeading icon={Sparkles} title="Calculated" variant="drawer" />
-            <MetricGrid metrics={drawerViewModel.metricGroups.derived} emptyLabel="No data were calculated" />
+            <SectionHeading icon={Sparkles} title={t('toolbar.calculated', 'Calculated')} variant="drawer" />
+            <MetricGrid metrics={drawerViewModel.metricGroups.derived} emptyLabel={t('toolbar.noDataCalculated', 'No data were calculated')} />
           </section>
         </div>
       ) : null}

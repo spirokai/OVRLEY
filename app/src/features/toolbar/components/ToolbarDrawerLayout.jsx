@@ -1,6 +1,7 @@
 import { Pin, PinOff } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { VerticalToolbar } from './VerticalToolbar'
+import { TOOL_DEFINITIONS, VerticalToolbar } from './VerticalToolbar'
 
 const DRAWER_WIDTH = '21rem'
 const TOOLBAR_WIDTH = '3rem'
@@ -37,9 +38,12 @@ export function ToolbarDrawerLayout({
   handleAllocationTransitionEnd,
   handleDrawerTransitionEnd,
 }) {
+  const { t } = useTranslation()
   const PinIcon = pinned ? PinOff : Pin
-  const pinLabel = pinned ? 'Unpin drawer' : 'Pin drawer'
-  const drawerTitle = activeTool.toUpperCase()
+  const pinLabel = t(pinned ? 'toolbar.unpinDrawer' : 'toolbar.pinDrawer')
+  const tool = TOOL_DEFINITIONS.find((definition) => definition.id === activeTool)
+  if (!tool) throw new Error(`Unsupported toolbar tool: ${activeTool}`)
+  const drawerTitle = t(tool.labelKey)
 
   return (
     <div

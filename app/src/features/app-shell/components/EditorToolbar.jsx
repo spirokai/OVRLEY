@@ -136,7 +136,7 @@ export default function EditorToolbar({
           </Button>
         </SimpleTooltip>
         <div className="mx-1 h-5 w-px bg-border/70" />
-        <SimpleTooltip side="bottom" content="Grid">
+        <SimpleTooltip side="bottom" content={t('app-shell.grid', 'Toggle grid')}>
           <Button
             type="button"
             variant={gridVisible ? 'default' : 'ghost'}

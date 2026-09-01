@@ -6,63 +6,10 @@ import { Switch } from '@/components/ui/switch'
 import { BlurInput } from '@/components/ui/blur-input'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { formatClockDuration } from '@/lib/time-format'
-import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { useFileDropZone } from '../hooks/useFileDropZone'
 import { FileDragCursor, FileDropZone } from './FileDropZone'
 import { useTranslation } from 'react-i18next'
-
-const UNKNOWN_VALUE = 'Unknown'
-
-function formatTimeSource(source) {
-  if (!source) return UNKNOWN_VALUE
-  const labels = {
-    gps: 'GPS timestamp',
-    ffprobe: 'Metadata',
-    file_mtime: 'File modified',
-    filename: 'Filename',
-  }
-  return labels[source] ?? source
-}
-
-function buildVideoDrawerViewModel(videoSummary, timezone, timezoneMode, t) {
-  const metadataRows = [
-    { label: t('toolbar.duration', 'Duration'), value: videoSummary.duration ? formatClockDuration(videoSummary.duration) : UNKNOWN_VALUE },
-    {
-      label: t('toolbar.frameRate', 'Frame rate'),
-      value: videoSummary.fps ? t('toolbar.valFps', { defaultValue: '{{val}} fps', val: Math.round(videoSummary.fps * 100) / 100 }) : UNKNOWN_VALUE,
-    },
-    {
-      label: t('toolbar.resolution', 'Resolution'),
-      value: videoSummary.resolution ? `${videoSummary.resolution.width}×${videoSummary.resolution.height}` : UNKNOWN_VALUE,
-    },
-    {
-      label: t('toolbar.createdAt', 'Created at'),
-      value: formatVideoCreationTime(videoSummary.creationTime, videoSummary.timeSource, timezone, timezoneMode) || UNKNOWN_VALUE,
-    },
-    {
-      label: t('toolbar.timeSource', 'Time source'),
-      value: formatTimeSource(videoSummary.timeSource),
-    },
-    {
-      label: t('toolbar.codec', 'Codec'),
-      value: videoSummary.codecName || videoSummary.codecLongName || UNKNOWN_VALUE,
-    },
-    {
-      label: t('toolbar.bitRate', 'Bit rate'),
-      value: videoSummary.bitRate ? `${(Number(videoSummary.bitRate) / 1_000_000).toFixed(0)} Mbps` : UNKNOWN_VALUE,
-    },
-    {
-      label: t('toolbar.camera', 'Camera'),
-      value: videoSummary.cameraModel || videoSummary.cameraType || UNKNOWN_VALUE,
-    },
-  ]
-
-  return {
-    formatLabel: videoSummary.codecName?.toUpperCase() || UNKNOWN_VALUE,
-    metadataRows,
-  }
-}
+import { buildVideoDrawerViewModel } from '../utils/videoDrawerUtils'
 
 function VideoSyncControls({
   activitySummary,
@@ -116,6 +63,7 @@ function VideoSyncControls({
             <div className="absolute inset-y-1 right-1 flex w-5 flex-col overflow-hidden rounded border border-none bg-surface-strong">
               <button
                 type="button"
+                aria-label={t('toolbar.increaseSyncOffset', 'Increase sync offset')}
                 className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => incrementOffset(0.1)}
@@ -125,6 +73,7 @@ function VideoSyncControls({
               <div className="h-px bg-border/60" />
               <button
                 type="button"
+                aria-label={t('toolbar.decreaseSyncOffset', 'Decrease sync offset')}
                 className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => incrementOffset(-0.1)}
@@ -247,7 +196,7 @@ export function VideoDrawerContent({ videoSummary, onBrowseVideo, onDeleteVideo,
                 </Button>
               ) : null}
             </div>
-            <SectionHeading icon={Film} title="Details" variant="drawer" />
+            <SectionHeading icon={Film} title={t('toolbar.details', 'Details')} variant="drawer" />
             <dl className="grid grid-cols-2 gap-x-4.5 gap-y-1.5 px-2 text-xs">
               {drawerViewModel.metadataRows.map((row) => (
                 <div key={row.label} className="contents">

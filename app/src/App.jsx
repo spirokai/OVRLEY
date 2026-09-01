@@ -32,6 +32,7 @@ import {
 } from '@/features/app-shell'
 import * as backend from './api/backend'
 import { useTranslation } from 'react-i18next'
+import { changeLanguagePreference } from '@/i18n/language-preference'
 
 function useRightClickDevtools() {
   useEffect(() => {
@@ -60,7 +61,7 @@ function useRightClickDevtools() {
  * @returns {JSX.Element} Rendered component output.
  */
 function AppShell() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   useRightClickDevtools()
 
   const {
@@ -161,7 +162,12 @@ function AppShell() {
         <UnsavedChangesDialog {...templateManagement.newTemplateConfirmDialog} />
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
-        <KeyboardShortcutsDialog open={editorShell.keyboardShortcutsOpen} onClose={editorShell.closeKeyboardShortcuts} />
+        <KeyboardShortcutsDialog
+          open={editorShell.keyboardShortcutsOpen}
+          locale={i18n.resolvedLanguage}
+          onLocaleChange={changeLanguagePreference}
+          onClose={editorShell.closeKeyboardShortcuts}
+        />
         <AppHeader
           activityImport={activityImport}
           appShell={appShell}

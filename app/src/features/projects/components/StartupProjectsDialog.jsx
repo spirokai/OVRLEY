@@ -40,7 +40,7 @@ export default function StartupProjectsDialog({ open, projects, openingPath, onD
       >
         <DialogTitle className="text-sm font-semibold text-primary">{t('projects.openAProject', 'Open a project')}</DialogTitle>
         <div className="mt-6 grid min-h-120 max-h-200 content-start items-start grid-cols-[repeat(auto-fill,minmax(12.7575rem,1fr))] gap-x-4 gap-y-6 overflow-y-auto pr-1 thin-scrollbar">
-          <ProjectCard kind="new" name="New Project" disabled={openingPath !== null} onClick={onNewProject} />
+          <ProjectCard kind="new" name={t('projects.newProject')} disabled={openingPath !== null} onClick={onNewProject} />
 
           {projects.map((project) => (
             <ProjectCard

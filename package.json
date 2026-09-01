@@ -34,6 +34,23 @@
     "@tauri-apps/plugin-shell": "~2.3.3"
   },
   "pnpm": {
+    "packageExtensions": {
+      "react-css-styled@1.1.9": {
+        "peerDependencies": {
+          "react": "*"
+        }
+      },
+      "react-moveable@0.56.0": {
+        "peerDependencies": {
+          "react": "*"
+        }
+      },
+      "react-selecto@1.26.3": {
+        "peerDependencies": {
+          "react": "*"
+        }
+      }
+    },
     "patchedDependencies": {
       "i18next-cli@1.72.1": "patches/i18next-cli@1.72.1.patch"
     }

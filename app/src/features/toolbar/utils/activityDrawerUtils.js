@@ -1,7 +1,6 @@
 import { formatClockDuration, formatZonedDateTime } from '@/lib/time-format'
 import { getActivityAttributeLabel } from '@/lib/widget/widget-icons'
 
-const UNKNOWN_VALUE = 'Unknown'
 const METRIC_GROUPS_BY_SOURCE = {
   direct: ['extracted'],
   derived: ['derived'],
@@ -16,20 +15,21 @@ const METRIC_GROUPS_BY_SOURCE = {
  * @returns {{formatLabel: string, metadataRows: Array<{label: string, value: string}>, metricGroups: {derived: string[], extracted: string[]}}} Drawer display model.
  */
 export function buildActivityDrawerViewModel(activitySummary, t) {
-  let startTime = UNKNOWN_VALUE
+  const unknownValue = t('toolbar.unknown', 'Unknown')
+  let startTime = unknownValue
   if (activitySummary.timezone) startTime = formatZonedDateTime(activitySummary.syncTime, activitySummary.timezone)
 
-  let distance = `${Math.round(activitySummary.totalDistanceMeters)} m`
+  let distance = `${Math.round(activitySummary.totalDistanceMeters).toLocaleString()} m`
   if (activitySummary.totalDistanceMeters >= 1000) {
     distance = `${(activitySummary.totalDistanceMeters / 1000).toLocaleString(undefined, { maximumFractionDigits: 2 })} km`
   }
 
   const metadataRows = [
     { label: t('toolbar.startTime', 'Start time'), value: startTime },
-    { label: t('toolbar.timezone', 'Timezone'), value: activitySummary.timezone ?? UNKNOWN_VALUE },
+    { label: t('toolbar.timezone', 'Timezone'), value: activitySummary.timezone ?? unknownValue },
     { label: t('toolbar.distance', 'Distance'), value: distance },
     { label: t('toolbar.duration', 'Duration'), value: formatClockDuration(activitySummary.durationSeconds) },
-    { label: t('toolbar.activityType', 'Activity type'), value: activitySummary.sport ?? UNKNOWN_VALUE },
+    { label: t('toolbar.activityType', 'Activity type'), value: activitySummary.sport ?? unknownValue },
   ]
 
   if (activitySummary.originalSampleCount !== null) {
@@ -47,7 +47,7 @@ export function buildActivityDrawerViewModel(activitySummary, t) {
   metricGroups.derived.sort((left, right) => left.localeCompare(right))
   metricGroups.extracted.sort((left, right) => left.localeCompare(right))
 
-  let formatLabel = UNKNOWN_VALUE
+  let formatLabel = unknownValue
   if (activitySummary.fileFormat) formatLabel = activitySummary.fileFormat.toUpperCase()
 
   return {

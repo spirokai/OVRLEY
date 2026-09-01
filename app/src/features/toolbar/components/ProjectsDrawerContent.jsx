@@ -75,7 +75,7 @@ export function ProjectsDrawerContent({
           </div>
           <div className="min-w-0 space-y-8">
             <ProjectSource icon={Activity} label={t('toolbar.activity', 'Activity')} filename={activityFilename} path={activityPath} />
-            <ProjectSource icon={Film} label="Video" filename={videoFilename} path={videoPath} />
+            <ProjectSource icon={Film} label={t('toolbar.video', 'Video')} filename={videoFilename} path={videoPath} />
           </div>
         </div>
       ) : null}
