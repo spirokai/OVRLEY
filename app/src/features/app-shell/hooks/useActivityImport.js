@@ -11,7 +11,8 @@ import { runWithoutEditorHistory } from '@/features/undo-redo/undoHistory'
 import useStore from '@/store/useStore'
 
 export default function useActivityImport() {
-  const { activityFilename, activitySource, activitySummary, clearActivityFile, parsedActivitySource, setErrorMessage, setProcessing } = useActivityStore()
+  const { activityFilename, activitySource, activitySummary, clearActivityFile, parsedActivitySource, setErrorMessage, setProcessing } =
+    useActivityStore()
 
   const loadActivitySelection = useCallback(
     async (selection) => {
