@@ -256,9 +256,28 @@ fn interpolate_time_series(
     // here would hide a mismatch between the activity start and its actual
     // timestamp samples and would make the time widget display the wrong time.
     if y_values.iter().any(Option::is_some) {
+        // Build the filtered source points once. Rebuilding them for every
+        // frame makes densification quadratic for large activities.
+        let points = x_values
+            .iter()
+            .copied()
+            .zip(y_values.iter())
+            .filter_map(|(x, value)| {
+                value
+                    .as_deref()
+                    .and_then(|raw| DateTime::parse_from_rfc3339(raw).ok())
+                    .map(|time| (x, time.timestamp_millis() as f64))
+            })
+            .collect::<Vec<_>>();
         return target_x_values
             .iter()
-            .map(|target| interpolate_time_series_value(x_values, y_values, *target))
+            .map(|target| {
+                interpolate_points(&points, *target).map(|millis| {
+                    DateTime::<Utc>::from_timestamp_millis(millis.round() as i64)
+                        .unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
+                        .to_rfc3339_opts(SecondsFormat::Millis, true)
+                })
+            })
             .collect();
     }
 
@@ -329,7 +348,7 @@ pub fn densify_activity(
     };
 
     // Timestamps use the source time series when available. sync_time is only
-    // used for formats that have no absolute timestamp samples.
+    // used for formats that have no absolute timestamp samples at all.
     let time = if requirements.time && !trimmed.time.is_empty() {
         interpolate_time_series(
             trimmed.sync_time.as_deref(),

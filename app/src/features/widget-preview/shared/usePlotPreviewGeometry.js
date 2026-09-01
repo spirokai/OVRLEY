@@ -35,7 +35,7 @@ function buildPlotGeometryConfig({ config, globalDefaults, activity, exportWindo
   if (!config || !activity || !hasTauriRuntime()) return null
 
   const duration = activity.trim_end_seconds
-  const { start, end, ...sceneRest } = config.scene
+  const { start, end, updateRate: _updateRate, ...sceneRest } = config.scene
   const geometryConfig = replaceGeometryPlot(config, plotType, plotData)
 
   return {
