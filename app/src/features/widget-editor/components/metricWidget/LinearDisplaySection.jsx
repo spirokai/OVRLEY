@@ -10,15 +10,15 @@ import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBa
 import { useTranslation } from 'react-i18next'
 
 const ORIENTATION_OPTIONS = [
-  { value: 'horizontal', label: 'Horizontal' },
-  { value: 'vertical', label: 'Vertical' },
+  { value: 'horizontal', labelKey: 'widget-editor.horizontal', defaultLabel: 'Horizontal' },
+  { value: 'vertical', labelKey: 'widget-editor.vertical', defaultLabel: 'Vertical' },
 ]
 
 const POSITION_OPTIONS = [
-  { value: 'top', label: 'Top' },
-  { value: 'bottom', label: 'Bottom' },
-  { value: 'left', label: 'Left' },
-  { value: 'right', label: 'Right' },
+  { value: 'top', labelKey: 'widget-editor.top', defaultLabel: 'Top' },
+  { value: 'bottom', labelKey: 'widget-editor.bottom', defaultLabel: 'Bottom' },
+  { value: 'left', labelKey: 'widget-editor.left', defaultLabel: 'Left' },
+  { value: 'right', labelKey: 'widget-editor.right', defaultLabel: 'Right' },
 ]
 
 const LABEL_POSITION_SWAP = {
@@ -42,6 +42,11 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
   const updateLinear = useDisplayVariantUpdater(widget, 'linear', linearData, updateWidgetData)
   const updateLinearSize = useDisplayVariantUpdater(widget, 'linear', linearData, updateWidgetSize)
   const availableFonts = useAvailableFonts()
+  const orientationOptions = useMemo(
+    () => ORIENTATION_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })),
+    [t],
+  )
+  const positionOptions = useMemo(() => POSITION_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })), [t])
   const cornerRadiusMax = getLinearTrackCornerRadiusMax(linearData)
   const updateOrientation = (orientation) => {
     if (orientation === linearData.orientation) return
@@ -59,11 +64,11 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
   }
   const availablePositions = useMemo(() => {
     if (linearData.orientation === 'horizontal') {
-      return POSITION_OPTIONS.filter((option) => option.value === 'top' || option.value === 'bottom')
+      return positionOptions.filter((option) => option.value === 'top' || option.value === 'bottom')
     } else {
-      return POSITION_OPTIONS.filter((option) => option.value === 'left' || option.value === 'right')
+      return positionOptions.filter((option) => option.value === 'left' || option.value === 'right')
     }
-  }, [linearData.orientation])
+  }, [linearData.orientation, positionOptions])
 
   const widthSliderBounds = useMemo(() => {
     if (linearData.orientation === 'vertical') {
@@ -117,7 +122,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4 pt-2">
-          <SelectField label="Orientation" value={linearData.orientation} onValueChange={updateOrientation} options={ORIENTATION_OPTIONS} />
+          <SelectField label={t('widget-editor.orientation', 'Orientation')} value={linearData.orientation} onValueChange={updateOrientation} options={orientationOptions} />
           <BarFillStyleField data={linearData} suggestBarGeometry={getSuggestedLinearBarGeometry} updateVariant={updateLinear} />
           <BarFillStyleDetails
             data={linearData}
@@ -220,7 +225,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             disabled={!linearData.show_min_max_labels}
           />
           <SelectField
-            label="Position"
+            label={t('widget-editor.position', 'Position')}
             disabled={!linearData.show_min_max_labels}
             value={linearData.min_max_label_position}
             onValueChange={(value) => updateLinear({ min_max_label_position: value })}

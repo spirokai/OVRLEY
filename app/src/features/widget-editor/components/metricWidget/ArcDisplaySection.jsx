@@ -83,7 +83,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
   return (
     <>
       <div className="space-y-4">
-        <SectionHeading icon={SlidersHorizontal} title={isCornerGauge ? 'Corner Track' : t('widget-editor.arcTrack', 'Arc Track')} />
+        <SectionHeading icon={SlidersHorizontal} title={isCornerGauge ? t('widget-editor.cornerTrack', 'Corner Track') : t('widget-editor.arcTrack', 'Arc Track')} />
         <div className="grid grid-cols-1 gap-4">
           <SizeSlider
             label="Size"

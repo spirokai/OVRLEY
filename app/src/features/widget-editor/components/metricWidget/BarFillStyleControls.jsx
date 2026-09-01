@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next'
 const BAR_COUNT_MAX = 64
 
 const FILL_STYLE_OPTIONS = [
-  { value: 'fill', label: 'Continuous Fill' },
-  { value: 'bars', label: 'Segmented Bars' },
+  { value: 'fill', labelKey: 'widget-editor.continuousFill', defaultLabel: 'Continuous Fill' },
+  { value: 'bars', labelKey: 'widget-editor.segmentedBars', defaultLabel: 'Segmented Bars' },
 ]
 
 function buildFillStyleUpdate(data, track_fill_style, suggestBarGeometry) {
@@ -34,7 +34,7 @@ export function BarFillStyleField({ data, suggestBarGeometry, updateVariant }) {
       label={t('widget-editor.trackStyle', 'Track Style')}
       value={data.track_fill_style ?? 'fill'}
       onValueChange={(track_fill_style) => updateVariant(buildFillStyleUpdate(data, track_fill_style, suggestBarGeometry))}
-      options={FILL_STYLE_OPTIONS}
+      options={FILL_STYLE_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) }))}
       contentProps={{ position: 'popper', side: 'bottom', align: 'start' }}
     />
   )

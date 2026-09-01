@@ -64,7 +64,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
       </div>
       <div className="space-y-4">
         <div className="flex w-full items-center gap-3">
-          <SectionHeading icon={TrendingUp} title="Indicator" />
+          <SectionHeading icon={TrendingUp} title={t('widget-editor.indicator', 'Indicator')} />
           <div className="shrink-0 pt-1">
             <ToggleField checked={widget.data.show_triangle} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_triangle: checked })} />
           </div>

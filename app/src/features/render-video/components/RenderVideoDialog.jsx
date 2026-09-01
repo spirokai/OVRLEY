@@ -99,15 +99,20 @@ export default function RenderVideoDialog(props) {
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-10 w-10 shrink-0 text-red-500" />
                 <p className="pl-2 font-bold text-sm leading-relaxed text-red-500">
-                  {t('render-video.overlayResolution', 'Overlay resolution')} ({ctx.config?.scene?.width}x{ctx.config?.scene?.height}){' '}
-                  {t('render-video.mustMatchImportedVideo', 'must match imported video')}({ctx.importedVideoResolution?.width}x
-                  {ctx.importedVideoResolution?.height}).
+                  {t(
+                    'render-video.videoResolutionMismatchMessage',
+                    'Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}}).',
+                    {
+                      overlayResolution: `${ctx.config?.scene?.width}x${ctx.config?.scene?.height}`,
+                      videoResolution: `${ctx.importedVideoResolution?.width}x${ctx.importedVideoResolution?.height}`,
+                    },
+                  )}
                 </p>
               </div>
               <p className="text-sm leading-6 text-muted-foreground text-justify">
                 {t(
                   'render-video.resolutionMismatchInstructions',
-                  'This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different\n                template.',
+                  'This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different template.',
                 )}
               </p>
             </div>
@@ -153,8 +158,7 @@ export default function RenderVideoDialog(props) {
                 </Label>
                 {isCompositeExport && ctx.importedVideoFps ? (
                   <div className="flex h-9 items-center rounded-sm border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground">
-                    {t('render-video.lockedToVideoFps', 'Locked to video FPS (')}
-                    {Math.round(ctx.importedVideoFps)} fps)
+                    {t('render-video.lockedToVideoFps', 'Locked to video FPS ({{fps}} fps)', { fps: Math.round(ctx.importedVideoFps) })}
                   </div>
                 ) : (
                   <Select value={ctx.fpsMode} onValueChange={ctx.handleFpsModeChange}>
@@ -214,7 +218,7 @@ export default function RenderVideoDialog(props) {
                   </TabsList>
                 </Tabs>
                 <p className="text-[10px] text-muted-foreground">
-                  {t('render-video.outputContainer', 'Output container:')} {ctx.containerFps.toFixed(2).replace(/\.00$/, '')} fps
+                  {t('render-video.outputContainerFps', 'Output container: {{fps}} fps', { fps: ctx.containerFps.toFixed(2).replace(/\.00$/, '') })}
                 </p>
               </div>
 

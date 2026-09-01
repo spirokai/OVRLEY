@@ -77,7 +77,7 @@ export default function GForceWidgetEditor({ widget, updateWidgetData, updateWid
         <SectionHeading icon={CircleGauge} title={t('widget-editor.axisMapping', 'Axis Mapping')} />
         <div className="grid grid-cols-1 gap-4">
           <GForceAxisRow
-            label="Horizontal"
+            label={t('widget-editor.horizontal', 'Horizontal')}
             value={data.axis_horizontal}
             onValueChange={selectHorizontalAxis}
             inverted={data.invert_horizontal}
@@ -85,7 +85,7 @@ export default function GForceWidgetEditor({ widget, updateWidgetData, updateWid
             switchId={`${widget.id}-invert-horizontal`}
           />
           <GForceAxisRow
-            label="Vertical"
+            label={t('widget-editor.vertical', 'Vertical')}
             value={data.axis_vertical}
             onValueChange={selectVerticalAxis}
             inverted={data.invert_vertical}

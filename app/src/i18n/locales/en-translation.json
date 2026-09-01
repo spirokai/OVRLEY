@@ -42,12 +42,12 @@
     "close": "Close",
     "continueWithInstalledVersion": "The installed version remains available. You can close this dialog and continue working.",
     "downloadingUpdate": "Downloading update",
-    "isNowAvailable": "is now available.",
     "later": "Later",
     "updateAvailable": "Update available",
     "updateDownloadProgress": "Update download progress",
     "updateFailed": "Update failed",
-    "updateNow": "Update now"
+    "updateNow": "Update now",
+    "versionNowAvailable": "OVRLEY <0>{{version}}</0> is now available."
   },
   "components": {
     "alphaTransparencyPercentage": "Alpha transparency percentage",
@@ -99,6 +99,7 @@
     "zoomOut": "Zoom out"
   },
   "projects": {
+    "activity": "Activity",
     "cancel": "Cancel",
     "closeWithoutSaving": "Close Without Saving",
     "createNewProject": "Create New Project",
@@ -109,9 +110,10 @@
     "openAProject": "Open a project",
     "openProject": "open project",
     "saveProject": "save project",
-    "sourceNotFound": "source not found",
+    "sourceNotFound": "{{sourceRole}} source not found",
     "unsavedChanges": "Your project has unsaved changes. Save them or discard them.",
-    "unsavedChangesBeforeExit": "Your project has unsaved changes. Do you want to save the changes or close OVRLEY without saving?"
+    "unsavedChangesBeforeExit": "Your project has unsaved changes. Do you want to save the changes or close OVRLEY without saving?",
+    "video": "Video"
   },
   "render-video": {
     "000000Or800": "00:00:00 or 800",
@@ -135,21 +137,19 @@
     "loadAGpxfitActivityFirst": "Load a GPX/FIT activity first",
     "loadATemplateAndGpxfitActivityFirst": "Load a template and GPX/FIT activity first",
     "loadATemplateFirst": "Load a template first",
-    "lockedToVideoFps": "Locked to video FPS (",
+    "lockedToVideoFps": "Locked to video FPS ({{fps}} fps)",
     "minutesMinSecondsSec": "{{minutes}} min {{seconds}} sec",
     "mp4Codecs": "MP4 Codecs",
-    "mustMatchImportedVideo": "must match imported video",
-    "outputContainer": "Output container:",
+    "outputContainerFps": "Output container: {{fps}} fps",
     "outputFile": "Output file",
     "outputPath": "Output path",
-    "overlayResolution": "Overlay resolution",
     "overwrite": "Overwrite",
     "overwriteExistingFile": "Overwrite existing file?",
     "percentComplete": "{{percent}}% Complete",
     "processingFrames": "Processing frames...",
     "renderFps": "Render FPS",
     "renderingAlreadyInProgress": "Rendering already in progress",
-    "resolutionMismatchInstructions": "This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different\n                template.",
+    "resolutionMismatchInstructions": "This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different template.",
     "secondsSec": "{{seconds}} sec",
     "startingRender": "Starting render...",
     "startRender": "Start Render",
@@ -162,6 +162,7 @@
     "videoImported": "Video imported",
     "videoRequired": "Video required",
     "videoResolutionMismatch": "Video resolution mismatch",
+    "videoResolutionMismatchMessage": "Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}}).",
     "widgetUpdateRate": "Widget Update Rate"
   },
   "scene-settings": {
@@ -177,7 +178,7 @@
     "height": "Height",
     "icons": "Icons",
     "labels": "Labels",
-    "lockedTo": "Locked to",
+    "lockedToFps": "Locked to {{fps}} fps",
     "overlay": "Overlay",
     "resolution": "Resolution",
     "resolutionMismatch": "Overlay and video resolutions do not match",
@@ -240,8 +241,8 @@
     "videoSync": "Video Sync"
   },
   "undo-redo": {
-    "redoCtrlcmdshiftz": "Redo (Ctrl/Cmd+Shift+Z)",
-    "undoCtrlcmdz": "Undo (Ctrl/Cmd+Z)"
+    "redoCtrlcmdshiftz": "Redo",
+    "undoCtrlcmdz": "Undo"
   },
   "video-preview": {
     "aborterror": "AbortError",
@@ -272,7 +273,9 @@
     "cardinalColor": "Cardinal Color",
     "colorNegative": "Color Negative",
     "colorPositive": "Color Positive",
+    "continuousFill": "Continuous Fill",
     "cornerOrientation": "Corner Orientation",
+    "cornerTrack": "Corner Track",
     "cornerRadius": "Corner Radius",
     "displayType": "Display Type",
     "displayUnits": "Display Units",
@@ -292,6 +295,7 @@
     "gforcePlot": "G-Force Plot",
     "horizontalOffset": "Horizontal Offset",
     "horizontalPosition": "Horizontal Position",
+    "horizontal": "Horizontal",
     "imperialLabel": "Imperial Label",
     "imperialOffsetX": "Imperial Offset X",
     "imperialOffsetY": "Imperial Offset Y",
@@ -325,7 +329,9 @@
     "minorTicks": "Minor Ticks",
     "negativeDeltaColor": "Negative Delta Color",
     "noActiveWidgets": "No active widgets",
+    "orientation": "Orientation",
     "pixelsPerDegree": "Pixels per Degree",
+    "position": "Position",
     "positiveDeltaColor": "Positive Delta Color",
     "profileDetail": "Profile Detail",
     "remainingColor": "Remaining Color",
@@ -340,13 +346,20 @@
     "showIndicator": "Show Indicator",
     "showSign": "Show sign",
     "size": " Size",
+    "segmentedBars": "Segmented Bars",
     "tapeScale": "Tape Scale",
     "tickColor": "Tick Color",
     "trackStyle": "Track Style",
+    "top": "Top",
     "unitColor": "Unit Color",
     "valueOffset": "Value Offset",
     "verticalOffset": "Vertical Offset",
     "verticalPosition": "Vertical Position",
-    "verticalScale": "Vertical Scale"
+    "verticalScale": "Vertical Scale",
+    "vertical": "Vertical",
+    "bottom": "Bottom",
+    "left": "Left",
+    "right": "Right",
+    "indicator": "Indicator"
   }
 }

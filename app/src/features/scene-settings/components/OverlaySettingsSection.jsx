@@ -114,7 +114,7 @@ export default function OverlaySettingsSection({
           <Label className="text-[10px] text-muted-foreground uppercase font-bold">{t('scene-settings.framerate', 'Framerate')}</Label>
           {importedVideoFps ? (
             <div className="flex h-9 items-center rounded-sm border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground cursor-not-allowed opacity-50">
-              {t('scene-settings.lockedTo', 'Locked to')} {Math.round(importedVideoFps)} fps
+              {t('scene-settings.lockedToFps', 'Locked to {{fps}} fps', { fps: Math.round(importedVideoFps) })}
             </div>
           ) : (
             <Select value={fpsMode} onValueChange={onFpsModeChange}>

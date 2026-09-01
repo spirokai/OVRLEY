@@ -42,12 +42,12 @@
     "close": "",
     "continueWithInstalledVersion": "",
     "downloadingUpdate": "",
-    "isNowAvailable": "",
     "later": "",
     "updateAvailable": "",
     "updateDownloadProgress": "",
     "updateFailed": "",
-    "updateNow": ""
+    "updateNow": "",
+    "versionNowAvailable": ""
   },
   "components": {
     "alphaTransparencyPercentage": "",
@@ -99,6 +99,7 @@
     "zoomOut": ""
   },
   "projects": {
+    "activity": "",
     "cancel": "",
     "closeWithoutSaving": "",
     "createNewProject": "",
@@ -111,7 +112,8 @@
     "saveProject": "",
     "sourceNotFound": "",
     "unsavedChanges": "",
-    "unsavedChangesBeforeExit": ""
+    "unsavedChangesBeforeExit": "",
+    "video": ""
   },
   "render-video": {
     "000000Or800": "",
@@ -138,11 +140,9 @@
     "lockedToVideoFps": "",
     "minutesMinSecondsSec": "",
     "mp4Codecs": "",
-    "mustMatchImportedVideo": "",
-    "outputContainer": "",
+    "outputContainerFps": "",
     "outputFile": "",
     "outputPath": "",
-    "overlayResolution": "",
     "overwrite": "",
     "overwriteExistingFile": "",
     "percentComplete": "",
@@ -162,6 +162,7 @@
     "videoImported": "",
     "videoRequired": "",
     "videoResolutionMismatch": "",
+    "videoResolutionMismatchMessage": "",
     "widgetUpdateRate": ""
   },
   "scene-settings": {
@@ -177,7 +178,7 @@
     "height": "",
     "icons": "",
     "labels": "",
-    "lockedTo": "",
+    "lockedToFps": "",
     "overlay": "",
     "resolution": "",
     "resolutionMismatch": "",

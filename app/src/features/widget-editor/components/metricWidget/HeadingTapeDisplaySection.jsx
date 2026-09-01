@@ -187,7 +187,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
       </div>
 
       <div className="space-y-4">
-        <SectionHeading icon={Target} title="Indicator" />
+        <SectionHeading icon={Target} title={t('widget-editor.indicator', 'Indicator')} />
         <div className="flex items-center justify-between gap-2 px-1">
           <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.showIndicator', 'Show Indicator')}</span>
           <ToggleField checked={tapeData.show_indicator} onCheckedChange={(checked) => updateTape({ show_indicator: checked })} />

@@ -2,7 +2,7 @@ import { ChevronsRight, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 
 /**
  * Presents update state without owning updater side effects.
@@ -50,9 +50,12 @@ export default function UpdatePromptDialog({ open, phase, version, progress, pro
               <span>{version}</span>
             </span>
           ) : (
-            <>
-              OVRLEY <span className="text-foreground font-bold">{version}</span> {t('app-update.isNowAvailable', 'is now available.')}
-            </>
+            <Trans
+              i18nKey="app-update.versionNowAvailable"
+              defaults="OVRLEY <0>{{version}}</0> is now available."
+              values={{ version: version ?? '' }}
+              components={[<span key="0" className="text-foreground font-bold" />]}
+            />
           )}
         </DialogDescription>
 
