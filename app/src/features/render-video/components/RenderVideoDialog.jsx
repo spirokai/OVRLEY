@@ -133,7 +133,7 @@ export default function RenderVideoDialog(props) {
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <Video className="h-4 w-4 text-primary" />
-                  <DialogTitle className="text-sm font-semibold text-foreground">{ctx.dialogTitle}</DialogTitle>
+                  <DialogTitle className="text-sm font-semibold text-foreground">{t('render-video.exportSettings', 'Export Settings')}</DialogTitle>
                 </div>
 
                 {ctx.showExportModeOverride ? (

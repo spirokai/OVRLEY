@@ -8,7 +8,7 @@ import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/
  * Canonical toolbar tool definitions. Components resolve `labelKey` through
  * i18n at render time so this data contains no user-facing copy.
  */
-export const TOOL_DEFINITIONS = [
+const TOOL_DEFINITIONS = [
   { id: PROJECTS_TOOL, labelKey: 'toolbar.projects', icon: FolderKanban },
   { id: ACTIVITY_TOOL, labelKey: 'toolbar.activity', icon: Activity },
   { id: VIDEO_TOOL, labelKey: 'toolbar.video', icon: Film },

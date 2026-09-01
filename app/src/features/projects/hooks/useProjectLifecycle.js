@@ -123,7 +123,10 @@ export default function useProjectLifecycle({
   const handleSaveProject = useCallback(() => save(false), [save])
   const handleSaveProjectAs = useCallback(() => save(true), [save])
 
-  const handleOpenProjectPath = useCallback((path) => runOperation(i18next.t('projects.openProject', 'open project'), () => loadProjectPath(path)), [loadProjectPath, runOperation])
+  const handleOpenProjectPath = useCallback(
+    (path) => runOperation(i18next.t('projects.openProject', 'open project'), () => loadProjectPath(path)),
+    [loadProjectPath, runOperation],
+  )
 
   const createProject = useCallback(
     () =>
@@ -178,9 +181,12 @@ export default function useProjectLifecycle({
   const closingApplication = confirmationIntent === 'close'
   const unsavedProjectDialog = {
     open: isProjectConfirmOpen,
-    title: closingApplication ? 'Unsaved changes' : i18next.t('projects.createNewProject', 'Create New Project'),
+    title: closingApplication ? i18next.t('projects.unsavedChangesTitle') : i18next.t('projects.createNewProject', 'Create New Project'),
     description: closingApplication
-      ? i18next.t('projects.unsavedChangesBeforeExit', 'Your project has unsaved changes. Do you want to save the changes or close OVRLEY without saving?')
+      ? i18next.t(
+          'projects.unsavedChangesBeforeExit',
+          'Your project has unsaved changes. Do you want to save the changes or close OVRLEY without saving?',
+        )
       : i18next.t('projects.unsavedChanges', 'Your project has unsaved changes. Save them or discard them.'),
     discardLabel: closingApplication ? i18next.t('projects.closeWithoutSaving', 'Close Without Saving') : 'New Project',
     onCancel: () => answerProjectConfirm('cancel'),

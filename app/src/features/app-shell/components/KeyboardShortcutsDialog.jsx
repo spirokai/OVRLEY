@@ -3,6 +3,7 @@
  * Pure presentational — all logic is managed by the parent.
  */
 
+import { useMemo } from 'react'
 import { Keyboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -11,8 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { locales } from '@/i18n/locales'
 import { getKeyboardShortcutGroups } from '../utils/keyboardShortcutGroups'
 import { useTranslation } from 'react-i18next'
-
-const shortcutGroups = getKeyboardShortcutGroups()
 
 /**
  * Renders the keyboard shortcuts dialog component.
@@ -26,6 +25,7 @@ const shortcutGroups = getKeyboardShortcutGroups()
  */
 export default function KeyboardShortcutsDialog({ open, locale, onLocaleChange, onClose }) {
   const { t } = useTranslation()
+  const shortcutGroups = useMemo(() => getKeyboardShortcutGroups(t), [t])
   return (
     <Dialog
       open={open}

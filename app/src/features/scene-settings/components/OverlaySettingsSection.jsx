@@ -71,7 +71,7 @@ export default function OverlaySettingsSection({
             <SelectContent>
               {ASPECT_RATIOS.map((r) => (
                 <SelectItem key={r.id} value={r.id}>
-                  {r.name}
+                  {t(r.labelKey)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -87,7 +87,7 @@ export default function OverlaySettingsSection({
             <SelectContent>
               {(RESOLUTIONS[aspectRatio] || []).map((r) => (
                 <SelectItem key={r.id} value={r.id}>
-                  {r.name}
+                  {t(r.labelKey)}
                 </SelectItem>
               ))}
               <SelectItem value="custom">{t('scene-settings.custom', 'Custom')}</SelectItem>

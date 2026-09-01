@@ -231,13 +231,10 @@ export default function useRenderVideoDialogState({
     })
   }
 
-  const dialogTitle = 'Export Settings'
-
   return {
     availableCodecs,
     config,
     containerFps,
-    dialogTitle,
     exportMode,
     fpsMode,
     handleAccelerationChange,

@@ -1,97 +1,97 @@
 {
   "categories": [
     {
-      "name": "General commands",
+      "nameKey": "keyboard-shortcuts.generalCommands",
       "commands": [
         {
           "id": "project.new",
           "display": true,
           "scope": "app",
-          "description": "New project",
+          "descriptionKey": "keyboard-shortcuts.projectNew",
           "bindings": [{ "key": "n", "modifiers": ["mod"] }]
         },
         {
           "id": "project.open",
           "display": true,
           "scope": "app",
-          "description": "Open project",
+          "descriptionKey": "keyboard-shortcuts.projectOpen",
           "bindings": [{ "key": "o", "modifiers": ["mod"] }]
         },
         {
           "id": "project.save",
           "display": true,
           "scope": "app",
-          "description": "Save project",
+          "descriptionKey": "keyboard-shortcuts.projectSave",
           "bindings": [{ "key": "s", "modifiers": ["mod"] }]
         },
         {
           "id": "project.saveAs",
           "display": true,
           "scope": "app",
-          "description": "Save project as",
+          "descriptionKey": "keyboard-shortcuts.projectSaveAs",
           "bindings": [{ "key": "s", "modifiers": ["mod", "shift"] }]
         },
         {
           "id": "template.new",
           "display": true,
           "scope": "app",
-          "description": "New template",
+          "descriptionKey": "keyboard-shortcuts.templateNew",
           "bindings": [{ "key": "t", "modifiers": ["mod", "shift"] }]
         },
         {
           "id": "template.import",
           "display": true,
           "scope": "app",
-          "description": "Open template",
+          "descriptionKey": "keyboard-shortcuts.templateImport",
           "bindings": [{ "key": "l", "modifiers": ["mod", "shift"] }]
         },
         {
           "id": "template.save",
           "display": true,
           "scope": "app",
-          "description": "Save template",
+          "descriptionKey": "keyboard-shortcuts.templateSave",
           "bindings": [{ "key": "p", "modifiers": ["mod", "shift"] }]
         },
         {
           "id": "activity.import",
           "display": true,
           "scope": "app",
-          "description": "Import activity",
+          "descriptionKey": "keyboard-shortcuts.activityImport",
           "bindings": [{ "key": "k", "modifiers": ["mod"] }]
         },
         {
           "id": "video.import",
           "display": true,
           "scope": "app",
-          "description": "Import video",
+          "descriptionKey": "keyboard-shortcuts.videoImport",
           "bindings": [{ "key": "i", "modifiers": ["mod"] }]
         },
         {
           "id": "template.select",
           "display": true,
           "scope": "app",
-          "description": "Open template list",
+          "descriptionKey": "keyboard-shortcuts.templateSelect",
           "bindings": [{ "key": "t", "modifiers": ["mod"] }]
         },
         {
           "id": "output.open",
           "display": true,
           "scope": "app",
-          "description": "Open export folder",
+          "descriptionKey": "keyboard-shortcuts.outputOpen",
           "bindings": [{ "key": "e", "modifiers": ["mod", "shift"] }]
         },
         {
           "id": "history.undo",
           "display": true,
           "scope": "history",
-          "description": "Undo",
+          "descriptionKey": "keyboard-shortcuts.historyUndo",
           "bindings": [{ "key": "z", "modifiers": ["mod"] }]
         },
         {
           "id": "history.redo",
           "display": true,
           "scope": "history",
-          "description": "Redo",
+          "descriptionKey": "keyboard-shortcuts.historyRedo",
           "bindings": [
             { "key": "z", "modifiers": ["mod", "shift"] },
             { "key": "y", "modifiers": ["ctrl"], "display": false }
@@ -101,40 +101,40 @@
           "id": "render.open",
           "display": true,
           "scope": "app",
-          "description": "Export overlay",
+          "descriptionKey": "keyboard-shortcuts.renderOpen",
           "bindings": [{ "key": "e", "modifiers": ["mod"] }]
         },
         {
           "id": "drawer.toggle",
           "display": true,
           "scope": "app",
-          "description": "Open/close widget drawer",
+          "descriptionKey": "keyboard-shortcuts.drawerToggle",
           "bindings": [{ "key": "w", "modifiers": ["alt"] }]
         },
         {
           "id": "drawer.close",
           "display": true,
           "scope": "drawer",
-          "description": "Close widget drawer",
+          "descriptionKey": "keyboard-shortcuts.drawerClose",
           "bindings": [{ "key": "escape", "modifiers": [], "display": false }]
         }
       ]
     },
     {
-      "name": "Widget editor",
+      "nameKey": "keyboard-shortcuts.widgetEditor",
       "commands": [
         {
           "id": "editor.clearSelection",
           "display": true,
           "scope": "editor",
-          "description": "Clear widget selection",
+          "descriptionKey": "keyboard-shortcuts.editorClearSelection",
           "bindings": [{ "key": "escape", "modifiers": [] }]
         },
         {
           "id": "editor.delete",
           "display": true,
           "scope": "editor",
-          "description": "Delete selected widgets",
+          "descriptionKey": "keyboard-shortcuts.editorDelete",
           "bindings": [
             { "key": "delete", "modifiers": [] },
             { "key": "backspace", "modifiers": [] }
@@ -144,51 +144,51 @@
           "id": "editor.copy",
           "display": true,
           "scope": "editor",
-          "description": "Copy selected widgets",
+          "descriptionKey": "keyboard-shortcuts.editorCopy",
           "bindings": [{ "key": "c", "modifiers": ["mod"] }]
         },
         {
           "id": "editor.paste",
           "display": true,
           "scope": "editor",
-          "description": "Paste copied widgets",
+          "descriptionKey": "keyboard-shortcuts.editorPaste",
           "bindings": [{ "key": "v", "modifiers": ["mod"] }]
         },
         {
           "id": "editor.nudge",
           "display": true,
           "scope": "editor",
-          "description": "Nudge selected widgets",
+          "descriptionKey": "keyboard-shortcuts.editorNudge",
           "bindings": [
-            { "key": "arrowup", "modifiers": [], "step": 1, "description": "Move widget by 1 pixel" },
-            { "key": "arrowdown", "modifiers": [], "step": 1, "description": "Move widget by 1 pixel" },
-            { "key": "arrowleft", "modifiers": [], "step": 1, "description": "Move widget by 1 pixel" },
-            { "key": "arrowright", "modifiers": [], "step": 1, "description": "Move widget by 1 pixel" },
-            { "key": "arrowup", "modifiers": ["shift"], "step": 10, "description": "Move widget by 10 pixels" },
-            { "key": "arrowdown", "modifiers": ["shift"], "step": 10, "description": "Move widget by 10 pixels" },
-            { "key": "arrowleft", "modifiers": ["shift"], "step": 10, "description": "Move widget by 10 pixels" },
-            { "key": "arrowright", "modifiers": ["shift"], "step": 10, "description": "Move widget by 10 pixels" }
+            { "key": "arrowup", "modifiers": [], "step": 1, "descriptionKey": "keyboard-shortcuts.editorMoveWidgetOnePixel" },
+            { "key": "arrowdown", "modifiers": [], "step": 1, "descriptionKey": "keyboard-shortcuts.editorMoveWidgetOnePixel" },
+            { "key": "arrowleft", "modifiers": [], "step": 1, "descriptionKey": "keyboard-shortcuts.editorMoveWidgetOnePixel" },
+            { "key": "arrowright", "modifiers": [], "step": 1, "descriptionKey": "keyboard-shortcuts.editorMoveWidgetOnePixel" },
+            { "key": "arrowup", "modifiers": ["shift"], "step": 10, "descriptionKey": "keyboard-shortcuts.editorMoveWidgetTenPixels" },
+            { "key": "arrowdown", "modifiers": ["shift"], "step": 10, "descriptionKey": "keyboard-shortcuts.editorMoveWidgetTenPixels" },
+            { "key": "arrowleft", "modifiers": ["shift"], "step": 10, "descriptionKey": "keyboard-shortcuts.editorMoveWidgetTenPixels" },
+            { "key": "arrowright", "modifiers": ["shift"], "step": 10, "descriptionKey": "keyboard-shortcuts.editorMoveWidgetTenPixels" }
           ]
         },
         {
           "id": "editor.toggleSnap",
           "display": true,
           "scope": "editor",
-          "description": "Toggle snapping to grid",
+          "descriptionKey": "keyboard-shortcuts.editorToggleSnap",
           "bindings": [{ "key": "n", "modifiers": [] }]
         },
         {
           "id": "editor.toggleGrid",
           "display": true,
           "scope": "editor",
-          "description": "Toggle gridlines",
+          "descriptionKey": "keyboard-shortcuts.editorToggleGrid",
           "bindings": [{ "key": "g", "modifiers": [] }]
         },
         {
           "id": "editor.zoomIn",
           "display": true,
           "scope": "editor",
-          "description": "Canvas zoom in",
+          "descriptionKey": "keyboard-shortcuts.editorZoomIn",
           "bindings": [
             { "key": "+", "modifiers": ["mod"], "display": true },
             { "key": "+", "modifiers": ["mod", "shift"], "display": false },
@@ -200,64 +200,64 @@
           "id": "editor.zoomOut",
           "display": true,
           "scope": "editor",
-          "description": "Canvas zoom out",
+          "descriptionKey": "keyboard-shortcuts.editorZoomOut",
           "bindings": [{ "key": "-", "modifiers": ["mod"], "display": true }]
         },
         {
           "id": "editor.resetZoom",
           "display": true,
           "scope": "editor",
-          "description": "Reset canvas zoom",
+          "descriptionKey": "keyboard-shortcuts.editorResetZoom",
           "bindings": [{ "key": "0", "modifiers": ["mod"] }]
         },
         {
           "id": "editor.wheelZoom",
           "display": true,
           "scope": "editor",
-          "description": "Zoom canvas at pointer",
+          "descriptionKey": "keyboard-shortcuts.editorWheelZoom",
           "bindings": [{ "key": "wheel", "modifiers": ["mod"] }]
         },
         {
           "id": "editor.wheelScroll",
           "display": true,
           "scope": "editor",
-          "description": "Scroll canvas",
+          "descriptionKey": "keyboard-shortcuts.editorWheelScroll",
           "bindings": [
-            { "key": "wheel", "modifiers": [], "displayOnly": true, "description": "Scroll canvas vertically" },
-            { "key": "wheel", "modifiers": ["shift"], "description": "Scroll canvas horizontally" }
+            { "key": "wheel", "modifiers": [], "displayOnly": true, "descriptionKey": "keyboard-shortcuts.editorScrollCanvasVertically" },
+            { "key": "wheel", "modifiers": ["shift"], "descriptionKey": "keyboard-shortcuts.editorScrollCanvasHorizontally" }
           ]
         }
       ]
     },
     {
-      "name": "Video player",
+      "nameKey": "keyboard-shortcuts.videoPlayer",
       "commands": [
         {
           "id": "player.togglePlayback",
           "display": true,
           "scope": "player",
-          "description": "Play/pause",
+          "descriptionKey": "keyboard-shortcuts.playerTogglePlayback",
           "bindings": [{ "key": "space", "modifiers": [] }]
         },
         {
           "id": "player.stepBackward",
           "display": true,
           "scope": "player",
-          "description": "Step backward 1 second",
+          "descriptionKey": "keyboard-shortcuts.playerStepBackward",
           "bindings": [{ "key": "arrowleft", "modifiers": [] }]
         },
         {
           "id": "player.stepForward",
           "display": true,
           "scope": "player",
-          "description": "Step forward 1 second",
+          "descriptionKey": "keyboard-shortcuts.playerStepForward",
           "bindings": [{ "key": "arrowright", "modifiers": [] }]
         },
         {
           "id": "player.resetToStart",
           "display": true,
           "scope": "player",
-          "description": "Rewind to start",
+          "descriptionKey": "keyboard-shortcuts.playerResetToStart",
           "bindings": [
             {
               "key": "home",
@@ -271,7 +271,7 @@
           "id": "player.jumpToEnd",
           "display": true,
           "scope": "player",
-          "description": "Rewind to end",
+          "descriptionKey": "keyboard-shortcuts.playerJumpToEnd",
           "bindings": [
             {
               "key": "end",
@@ -285,103 +285,103 @@
           "id": "player.toggleMute",
           "display": true,
           "scope": "player",
-          "description": "Mute/unmute video",
+          "descriptionKey": "keyboard-shortcuts.playerToggleMute",
           "bindings": [{ "key": "m", "modifiers": [] }]
         },
         {
           "id": "export.setIn",
           "display": true,
           "scope": "player",
-          "description": "Set export start at playhead",
+          "descriptionKey": "keyboard-shortcuts.exportSetIn",
           "bindings": [{ "key": "i", "modifiers": [] }]
         },
         {
           "id": "export.setOut",
           "display": true,
           "scope": "player",
-          "description": "Set export end at playhead",
+          "descriptionKey": "keyboard-shortcuts.exportSetOut",
           "bindings": [{ "key": "o", "modifiers": [] }]
         },
         {
           "id": "export.clear",
           "display": true,
           "scope": "player",
-          "description": "Clear custom export range",
+          "descriptionKey": "keyboard-shortcuts.exportClear",
           "bindings": [{ "key": "x", "modifiers": ["mod"] }]
         },
         {
           "id": "export.goToIn",
           "display": true,
           "scope": "player",
-          "description": "Move playhead to export start",
+          "descriptionKey": "keyboard-shortcuts.exportGoToIn",
           "bindings": [{ "key": "i", "modifiers": ["alt"] }]
         },
         {
           "id": "export.goToOut",
           "display": true,
           "scope": "player",
-          "description": "Move playhead to export end",
+          "descriptionKey": "keyboard-shortcuts.exportGoToOut",
           "bindings": [{ "key": "o", "modifiers": ["alt"] }]
         }
       ]
     },
     {
-      "name": "Timeline and sync",
+      "nameKey": "keyboard-shortcuts.timelineAndSync",
       "commands": [
         {
           "id": "timeline.fitAll",
           "display": true,
           "scope": "player",
-          "description": "Show entire timeline",
+          "descriptionKey": "keyboard-shortcuts.timelineFitAll",
           "bindings": [{ "key": "z", "modifiers": ["shift"] }]
         },
         {
           "id": "timeline.fitMedia",
           "display": true,
           "scope": "player",
-          "description": "Switch timeline to all media",
+          "descriptionKey": "keyboard-shortcuts.timelineFitMedia",
           "bindings": [{ "key": "1", "modifiers": ["alt"] }]
         },
         {
           "id": "timeline.fitActivity",
           "display": true,
           "scope": "player",
-          "description": "Switch timeline to show activity",
+          "descriptionKey": "keyboard-shortcuts.timelineFitActivity",
           "bindings": [{ "key": "2", "modifiers": ["alt"] }]
         },
         {
           "id": "timeline.fitVideo",
           "display": true,
           "scope": "player",
-          "description": "Switch timeline to show video",
+          "descriptionKey": "keyboard-shortcuts.timelineFitVideo",
           "bindings": [{ "key": "3", "modifiers": ["alt"] }]
         },
         {
           "id": "timeline.wheelZoom",
           "display": true,
           "scope": "player",
-          "description": "Zoom timeline at pointer",
+          "descriptionKey": "keyboard-shortcuts.timelineWheelZoom",
           "bindings": [{ "key": "wheel", "modifiers": ["ctrl"] }]
         },
         {
           "id": "timeline.wheelPan",
           "display": true,
           "scope": "player",
-          "description": "Pan timeline",
+          "descriptionKey": "keyboard-shortcuts.timelineWheelPan",
           "bindings": [{ "key": "wheel", "modifiers": [] }]
         },
         {
           "id": "sync.auto",
           "display": true,
           "scope": "app",
-          "description": "Auto-sync video with activity",
+          "descriptionKey": "keyboard-shortcuts.syncAuto",
           "bindings": [{ "key": "a", "modifiers": ["mod", "shift"] }]
         },
         {
           "id": "sync.globalNudge",
           "display": true,
           "scope": "player",
-          "description": "Adjust sync offset by 1 second",
+          "descriptionKey": "keyboard-shortcuts.syncGlobalNudge",
           "bindings": [
             { "key": "[", "modifiers": [], "seconds": -1 },
             { "key": "]", "modifiers": [], "seconds": 1 }
@@ -391,31 +391,31 @@
           "id": "timelineClip.nudge",
           "display": true,
           "scope": "timeline-clip",
-          "description": "Nudge selected clip synchronization",
+          "descriptionKey": "keyboard-shortcuts.timelineClipNudge",
           "bindings": [
             {
               "key": "arrowleft",
               "modifiers": [],
               "seconds": -0.1,
-              "description": "Nudge selected clip sync offset by 0.1 seconds"
+              "descriptionKey": "keyboard-shortcuts.timelineClipNudgeTenthSecond"
             },
             {
               "key": "arrowright",
               "modifiers": [],
               "seconds": 0.1,
-              "description": "Nudge selected clip sync offset by 0.1 seconds"
+              "descriptionKey": "keyboard-shortcuts.timelineClipNudgeTenthSecond"
             },
             {
               "key": "arrowleft",
               "modifiers": ["shift"],
               "seconds": -1,
-              "description": "Nudge selected clip sync offset by 1 second"
+              "descriptionKey": "keyboard-shortcuts.timelineClipNudgeSecond"
             },
             {
               "key": "arrowright",
               "modifiers": ["shift"],
               "seconds": 1,
-              "description": "Nudge selected clip sync offset by 1 second"
+              "descriptionKey": "keyboard-shortcuts.timelineClipNudgeSecond"
             }
           ]
         }

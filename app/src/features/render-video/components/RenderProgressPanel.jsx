@@ -26,7 +26,7 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
   const { t } = useTranslation()
   const [isCancelling, setIsCancelling] = useState(false)
 
-  const { percent, current, total, message, estimatedSecondsRemaining, renderingFps, encoded } = renderProgress
+  const { percent, current, total, estimatedSecondsRemaining, renderingFps, encoded } = renderProgress
 
   useEffect(() => {
     if (renderProgress.status !== 'rendering') {
@@ -46,7 +46,7 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
 
   const isFinalizing = percent >= 100
 
-  let subMessage = message || t('render-video.processingFrames', 'Processing frames...')
+  let subMessage = t('render-video.renderingFrames', 'Rendering frames...')
   if (isFinalizing) {
     subMessage = encoded && total > 0 ? t('render-video.encodingValVal2Frames', 'Encoding: {{val}} / {{val2}} frames', { val: encoded.toLocaleString(), val2: total.toLocaleString() }) : t('render-video.encodingOutputFile', 'Encoding output file...')
   }
@@ -59,7 +59,9 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
           <Film className="h-5 w-5 text-primary/60" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-foreground">{isFinalizing ? 'Finalizing Video' : 'Exporting Overlay'}</h2>
+          <h2 className="text-xl font-bold text-foreground">
+            {isFinalizing ? t('render-video.finalizingVideo', 'Finalizing Video') : t('render-video.exportingOverlay', 'Exporting Overlay')}
+          </h2>
           <p className="text-sm tabular-nums text-muted-foreground">{subMessage}</p>
           {renderSummaryItems.length > 0 && (
             <p className="pt-8 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 text-[0.65rem] text-muted-foreground/55">
@@ -78,7 +80,10 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
         <div className="flex justify-between text-xs font-medium tabular-nums">
           <span className="text-primary">{t('render-video.percentComplete', '{{percent}}% Complete', { percent })}</span>
           <span className="text-muted-foreground">
-            {current.toLocaleString()} / {total.toLocaleString()} frames
+            {t('render-video.frameProgress', '{{current}} / {{total}} frames', {
+              current: current.toLocaleString(),
+              total: total.toLocaleString(),
+            })}
           </span>
         </div>
         <Progress value={percent} className="h-2 bg-surface-strong" />
@@ -114,10 +119,10 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
           {isCancelling ? (
             <>
               <Loader2 className="h-3 w-3 animate-spin" />
-              Cancelling...
+              {t('render-video.cancelling', 'Cancelling...')}
             </>
           ) : (
-            'Cancel'
+            t('render-video.cancel', 'Cancel')
           )}
         </Button>
       </div>
