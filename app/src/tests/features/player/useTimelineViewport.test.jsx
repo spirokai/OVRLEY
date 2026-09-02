@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useTimelineViewport from '@/features/player/hooks/useTimelineViewport'
+import useStore from '@/store/useStore'
 
 function createMeasuredElement(width = 500) {
   return {
@@ -12,6 +13,10 @@ function createMeasuredElement(width = 500) {
 }
 
 describe('useTimelineViewport', () => {
+  beforeEach(() => {
+    useStore.setState(useStore.getInitialState(), true)
+  })
+
   test('initializes to full range and re-fits when the media shape changes', () => {
     const { result, rerender } = renderHook(
       ([activityDurationSeconds, totalDuration]) => useTimelineViewport({ activityDurationSeconds, hasActivityData: true, totalDuration }),
@@ -25,6 +30,17 @@ describe('useTimelineViewport', () => {
     })
 
     expect(result.current.viewport).toEqual({ viewStart: 0, viewEnd: 200 })
+  })
+
+  test('preserves a project-restored viewport across the next media identity change', () => {
+    useStore.setState({
+      timelineViewport: { viewStart: 20, viewEnd: 60 },
+      skipNextTimelineViewportReset: true,
+    })
+    const { result } = renderHook(() => useTimelineViewport({ activityDurationSeconds: 100, hasActivityData: true, totalDuration: 100 }))
+
+    expect(result.current.viewport).toEqual({ viewStart: 20, viewEnd: 60 })
+    expect(useStore.getState().skipNextTimelineViewportReset).toBe(false)
   })
 
   test('zooms around the current playhead and can reset to full range', () => {

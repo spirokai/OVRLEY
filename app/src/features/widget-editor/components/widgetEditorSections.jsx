@@ -4,34 +4,14 @@
  */
 
 import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
-import { Separator } from '@/components/ui/separator'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { ColorField, NumberField, SelectField, SizeSlider, SliderField, TextField, TIME_FORMATS, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { createFontSelection } from '@/lib/fonts'
 import { getWidgetFont } from '../utils/widgetUtils'
 import { getThemeColor } from '@/lib/theme'
-
-/**
- * Renders the section heading component.
- *
- * @param {object} props - Component props.
- * @param {*} props.icon - Value for icon.
- * @param {*} props.title - Value for title.
- * @returns {JSX.Element} Rendered component output.
- */
-export function SectionHeading({ icon: Icon, title, trailing = null }) {
-  return (
-    <div className="flex w-full items-center gap-3">
-      <div className="flex min-w-0 flex-1 items-center gap-2 pt-3 pb-3">
-        <Icon className="h-3.5 w-3.5 text-primary" />
-        <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</h5>
-        <Separator className="flex-1" />
-      </div>
-      {trailing ? <div className="shrink-0">{trailing}</div> : null}
-    </div>
-  )
-}
+import { useTranslation } from 'react-i18next'
 
 /**
  * Renders the position section component.
@@ -43,14 +23,15 @@ export function SectionHeading({ icon: Icon, title, trailing = null }) {
  * @returns {JSX.Element} Rendered component output.
  */
 export function PositionSection({ widget, setNumericField, updateWidgetData, headerAction = null }) {
+  const { t } = useTranslation()
   const opacity = Math.round(widget.data.opacity * 100)
 
   return (
     <div className="space-y-4">
       <SectionHeading icon={Move} title="General" trailing={headerAction} />
       <div className="grid grid-cols-2 gap-4 pt-2">
-        <NumberField label="Horizontal Position" value={widget.data.x} onChange={(rawValue) => setNumericField(widget.id, 'x', rawValue)} />
-        <NumberField label="Vertical Position" value={widget.data.y} onChange={(rawValue) => setNumericField(widget.id, 'y', rawValue)} />
+        <NumberField label={t('widget-editor.horizontalPosition', 'Horizontal Position')} value={widget.data.x} onChange={(rawValue) => setNumericField(widget.id, 'x', rawValue)} />
+        <NumberField label={t('widget-editor.verticalPosition', 'Vertical Position')} value={widget.data.y} onChange={(rawValue) => setNumericField(widget.id, 'y', rawValue)} />
       </div>
       <SliderField
         label="Transparency"
@@ -115,6 +96,7 @@ export function FontSection({
   colorLabel = 'Font Color',
   showFormatSelect = false,
 }) {
+  const { t } = useTranslation()
   const fontSize = widget.data.font_size
   const availableFonts = useAvailableFonts()
 
@@ -147,7 +129,7 @@ export function FontSection({
       />
       <div className="grid grid-cols-2 gap-4 items-end">
         <FontSelectField
-          label="Font Family"
+          label={t('widget-editor.fontFamily', 'Font Family')}
           value={getWidgetFont(widget)}
           onValueChange={(value) => updateWidgetData(widget.id, createFontSelection(value))}
           recommendedFonts={availableFonts.recommendedFonts}
@@ -189,6 +171,7 @@ export function IconSection({
   showUnitsToggle = false,
   unitsField = null,
 }) {
+  const { t } = useTranslation()
   const iconSize = widget.data.icon_size
   return (
     <div className="space-y-4">
@@ -220,13 +203,13 @@ export function IconSection({
       <div className="grid grid-cols-2 gap-4">
         <NumberField
           disabled={!widget.data.show_icon}
-          label="Horizontal Offset"
+          label={t('widget-editor.horizontalOffset', 'Horizontal Offset')}
           value={widget.data.icon_offset_x}
           onChange={(rawValue) => setNumericField(widget.id, 'icon_offset_x', rawValue)}
         />
         <NumberField
           disabled={!widget.data.show_icon}
-          label="Vertical Offset"
+          label={t('widget-editor.verticalOffset', 'Vertical Offset')}
           value={widget.data.icon_offset_y}
           onChange={(rawValue) => setNumericField(widget.id, 'icon_offset_y', rawValue)}
         />
@@ -236,7 +219,7 @@ export function IconSection({
         unitsField
       ) : showUnitsToggle ? (
         <ToggleField
-          label="Display Units"
+          label={t('widget-editor.displayUnits', 'Display Units')}
           checked={widget.data.show_units}
           onCheckedChange={(checked) => updateWidgetData(widget.id, { show_units: checked })}
         />

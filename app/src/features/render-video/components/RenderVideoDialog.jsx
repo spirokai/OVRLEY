@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ExportRangeSettings from './ExportRangeSettings'
 import RenderProgressPanel from './RenderProgressPanel'
 import useRenderVideoDialogState from '../hooks/useRenderVideoDialogState'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Renders the render video dialog component.
@@ -28,6 +29,7 @@ import useRenderVideoDialogState from '../hooks/useRenderVideoDialogState'
  * @returns {JSX.Element} Rendered component output.
  */
 export default function RenderVideoDialog(props) {
+  const { t } = useTranslation()
   const ctx = useRenderVideoDialogState(props)
 
   if (ctx.phase === 'closed') {
@@ -52,10 +54,12 @@ export default function RenderVideoDialog(props) {
   const renderSummaryItems = [
     ctx.config?.scene?.width && ctx.config?.scene?.height ? `${ctx.config.scene.width}x${ctx.config.scene.height}` : null,
     Number.isFinite(fps) ? `${fps} fps` : null,
-    Number.isFinite(Number(ctx.settings.updateRate)) ? `Update 1/${Number(ctx.settings.updateRate)}` : null,
+    Number.isFinite(Number(ctx.settings.updateRate))
+      ? t('render-video.update1val', { defaultValue: 'Update 1/{{val}}', val: Number(ctx.settings.updateRate) })
+      : null,
     outputFormatLabel || ctx.settings.exportCodec || null,
     accelerationLabel || null,
-    Number.isFinite(durationSeconds) && durationSeconds >= 0 ? formatDurationSummary(durationSeconds) : null,
+    Number.isFinite(durationSeconds) && durationSeconds >= 0 ? formatDurationSummary(durationSeconds, t) : null,
   ].filter(Boolean)
   const hasBlockingResolutionMismatch = ctx.hasImportedVideo && ctx.resolutionMismatch
 
@@ -69,7 +73,7 @@ export default function RenderVideoDialog(props) {
       }}
     >
       <DialogContent
-        overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md"
+        overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
         className="w-full max-w-lg rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
         aria-describedby={undefined}
         onEscapeKeyDown={(event) => {
@@ -85,23 +89,31 @@ export default function RenderVideoDialog(props) {
       >
         {ctx.isProgress ? (
           <>
-            <DialogTitle className="sr-only">Exporting Overlay</DialogTitle>
+            <DialogTitle className="sr-only">{t('render-video.exportingOverlay', 'Exporting Overlay')}</DialogTitle>
             <RenderProgressPanel renderProgress={ctx.renderProgress} renderSummaryItems={renderSummaryItems} onCancel={ctx.handleCancel} />
           </>
         ) : hasBlockingResolutionMismatch ? (
           <div className="space-y-12 p-3">
-            <DialogTitle className="sr-only">Video resolution mismatch</DialogTitle>
+            <DialogTitle className="sr-only">{t('render-video.videoResolutionMismatch', 'Video resolution mismatch')}</DialogTitle>
             <div className="space-y-8">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-10 w-10 shrink-0 text-red-500" />
                 <p className="pl-2 font-bold text-sm leading-relaxed text-red-500">
-                  Overlay resolution ({ctx.config?.scene?.width}x{ctx.config?.scene?.height}) must match imported video (
-                  {ctx.importedVideoResolution?.width}x{ctx.importedVideoResolution?.height}).
+                  {t(
+                    'render-video.videoResolutionMismatchMessage',
+                    'Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}}).',
+                    {
+                      overlayResolution: `${ctx.config?.scene?.width}x${ctx.config?.scene?.height}`,
+                      videoResolution: `${ctx.importedVideoResolution?.width}x${ctx.importedVideoResolution?.height}`,
+                    },
+                  )}
                 </p>
               </div>
               <p className="text-sm leading-6 text-muted-foreground text-justify">
-                This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different
-                template.
+                {t(
+                  'render-video.resolutionMismatchInstructions',
+                  'This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different template.',
+                )}
               </p>
             </div>
             <div className="flex justify-end">
@@ -111,7 +123,7 @@ export default function RenderVideoDialog(props) {
                 className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
                 onClick={ctx.onClose}
               >
-                Cancel
+                {t('render-video.cancel', 'Cancel')}
               </Button>
             </div>
           </div>
@@ -121,17 +133,17 @@ export default function RenderVideoDialog(props) {
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <Video className="h-4 w-4 text-primary" />
-                  <DialogTitle className="text-sm font-semibold text-foreground">{ctx.dialogTitle}</DialogTitle>
+                  <DialogTitle className="text-sm font-semibold text-foreground">{t('render-video.exportSettings', 'Export Settings')}</DialogTitle>
                 </div>
 
                 {ctx.showExportModeOverride ? (
                   <Tabs value={ctx.exportMode} onValueChange={ctx.handleExportModeChange}>
                     <TabsList className="h-7 bg-surface p-0.5" variant="toolbar">
                       <TabsTrigger value="transparent" className="px-2 text-[10px]" variant="toolbar">
-                        Transparent
+                        {t('render-video.transparent', 'Transparent')}
                       </TabsTrigger>
                       <TabsTrigger value="composite" className="px-2 text-[10px]" variant="toolbar">
-                        Full Video
+                        {t('render-video.fullVideo', 'Full Video')}
                       </TabsTrigger>
                     </TabsList>
                   </Tabs>
@@ -141,10 +153,12 @@ export default function RenderVideoDialog(props) {
 
             <div className="grid gap-8 lg:grid-cols-1">
               <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Framerate</Label>
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  {t('render-video.framerate', 'Framerate')}
+                </Label>
                 {isCompositeExport && ctx.importedVideoFps ? (
                   <div className="flex h-9 items-center rounded-sm border border-border/70 bg-surface-elevated px-3 text-xs text-muted-foreground">
-                    Locked to video FPS ({Math.round(ctx.importedVideoFps)} fps)
+                    {t('render-video.lockedToVideoFps', 'Locked to video FPS ({{fps}} fps)', { fps: Math.round(ctx.importedVideoFps) })}
                   </div>
                 ) : (
                   <Select value={ctx.fpsMode} onValueChange={ctx.handleFpsModeChange}>
@@ -155,7 +169,7 @@ export default function RenderVideoDialog(props) {
                       <SelectItem value="24">24 fps</SelectItem>
                       <SelectItem value="30">30 fps</SelectItem>
                       <SelectItem value="60">60 fps</SelectItem>
-                      <SelectItem value="custom">Custom</SelectItem>
+                      <SelectItem value="custom">{t('render-video.custom', 'Custom')}</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
@@ -163,7 +177,9 @@ export default function RenderVideoDialog(props) {
 
               {(!isCompositeExport || !ctx.importedVideoFps) && ctx.fpsMode === 'custom' && (
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Custom FPS</Label>
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    {t('render-video.customFps', 'Custom FPS')}
+                  </Label>
                   <BlurInput
                     type="number"
                     min={1}
@@ -184,7 +200,7 @@ export default function RenderVideoDialog(props) {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Label className="text-xs font-semibold">Widget Update Rate</Label>
+                    <Label className="text-xs font-semibold">{t('render-video.widgetUpdateRate', 'Widget Update Rate')}</Label>
                   </div>
                 </div>
                 <Tabs value={ctx.settings.updateRate.toString()} onValueChange={(value) => ctx.onSettingsChange({ updateRate: parseInt(value, 10) })}>
@@ -201,12 +217,16 @@ export default function RenderVideoDialog(props) {
                     ))}
                   </TabsList>
                 </Tabs>
-                <p className="text-[10px] text-muted-foreground">Output container: {ctx.containerFps.toFixed(2).replace(/\.00$/, '')} fps</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {t('render-video.outputContainerFps', 'Output container: {{fps}} fps', { fps: ctx.containerFps.toFixed(2).replace(/\.00$/, '') })}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Codec / Output Format</Label>
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    {t('render-video.codecOutputFormat', 'Codec / Output Format')}
+                  </Label>
                   <Select value={ctx.selectedOutputFormatValue} onValueChange={ctx.handleOutputFormatChange}>
                     <SelectTrigger className="h-9 text-xs">
                       <SelectValue />
@@ -214,10 +234,10 @@ export default function RenderVideoDialog(props) {
                     <SelectContent>
                       <SelectGroup>
                         <SelectLabel className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
-                          <span>Transparent Codecs</span>
+                          <span>{t('render-video.transparentCodecs', 'Transparent Codecs')}</span>
                           {ctx.hasImportedVideo && (
                             <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
-                              Video imported
+                              {t('render-video.videoImported', 'Video imported')}
                             </span>
                           )}
                         </SelectLabel>
@@ -231,10 +251,10 @@ export default function RenderVideoDialog(props) {
 
                       <SelectGroup>
                         <SelectLabel className="mt-1 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest">
-                          <span>MP4 Codecs</span>
+                          <span>{t('render-video.mp4Codecs', 'MP4 Codecs')}</span>
                           {!ctx.hasImportedVideo && (
                             <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-primary">
-                              Video required
+                              {t('render-video.videoRequired', 'Video required')}
                             </span>
                           )}
                         </SelectLabel>
@@ -246,7 +266,11 @@ export default function RenderVideoDialog(props) {
                             <SelectItem key={option.value} value={option.value} disabled={disabled}>
                               <span className="flex w-full items-center justify-between gap-3">
                                 <span className="min-w-0 truncate">{option.label}</span>
-                                {!available && <span className="shrink-0 text-right text-[10px] text-muted-foreground">Unavailable</span>}
+                                {!available && (
+                                  <span className="shrink-0 text-right text-[10px] text-muted-foreground">
+                                    {t('render-video.unavailable', 'Unavailable')}
+                                  </span>
+                                )}
                               </span>
                             </SelectItem>
                           )
@@ -257,7 +281,9 @@ export default function RenderVideoDialog(props) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Hardware Acceleration</Label>
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    {t('render-video.hardwareAcceleration', 'Hardware Acceleration')}
+                  </Label>
                   <Select value={ctx.selectedAccelerationValue} onValueChange={ctx.handleAccelerationChange}>
                     <SelectTrigger className="h-9 text-xs">
                       <SelectValue />
@@ -267,7 +293,11 @@ export default function RenderVideoDialog(props) {
                         <SelectItem key={option.value} value={option.value} disabled={!option.available}>
                           <span className="flex w-full items-center justify-between gap-3">
                             <span className="min-w-0 truncate">{option.label}</span>
-                            {!option.available && <span className="shrink-0 text-right text-[10px] text-muted-foreground">Unavailable</span>}
+                            {!option.available && (
+                              <span className="shrink-0 text-right text-[10px] text-muted-foreground">
+                                {t('render-video.unavailable', 'Unavailable')}
+                              </span>
+                            )}
                           </span>
                         </SelectItem>
                       ))}
@@ -279,7 +309,9 @@ export default function RenderVideoDialog(props) {
               {ctx.selectedCodecIsMp4 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Bitrate</Label>
+                    <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {t('render-video.bitrate', 'Bitrate')}
+                    </Label>
                     <span className="rounded bg-surface-strong px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
                       {ctx.settings.exportBitrate ?? 20} Mbps
                     </span>
@@ -304,13 +336,15 @@ export default function RenderVideoDialog(props) {
               )}
 
               <div className="space-y-2 pt-4">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Output file</Label>
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  {t('render-video.outputFile', 'Output file')}
+                </Label>
                 <ButtonGroup className="w-full">
                   <BlurInput
                     value={ctx.settings.outputPath}
                     onBlur={(event) => ctx.handleOutputPathCommit(event.target.value)}
                     className="h-9 min-w-0 flex-1 text-xs"
-                    aria-label="Output path"
+                    aria-label={t('render-video.outputPath', 'Output path')}
                   />
                   <Button
                     type="button"
@@ -334,7 +368,7 @@ export default function RenderVideoDialog(props) {
                 onClick={ctx.onClose}
                 disabled={ctx.renderingVideo || ctx.submissionPending}
               >
-                Cancel
+                {t('render-video.cancel', 'Cancel')}
               </Button>
               <Button
                 type="button"
@@ -343,7 +377,7 @@ export default function RenderVideoDialog(props) {
                 disabled={ctx.renderStartDisabled}
               >
                 <Play className="h-4 w-4" />
-                Start Render
+                {t('render-video.startRender', 'Start Render')}
               </Button>
             </div>
           </div>
@@ -355,20 +389,23 @@ export default function RenderVideoDialog(props) {
 }
 
 function OverwriteConfirmDialog({ overwriteOpen, pendingOverwritePath, onOverwriteConfirm, onOverwriteCancel }) {
+  const { t } = useTranslation()
   return (
     <Dialog open={Boolean(overwriteOpen)} onOpenChange={(open) => !open && onOverwriteCancel?.()}>
       <DialogContent
-        overlayClassName="absolute inset-0 z-130 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md"
+        overlayClassName="absolute inset-0 z-130 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
         className="w-full max-w-md rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl"
       >
-        <DialogTitle className="text-sm font-semibold text-foreground">Overwrite existing file?</DialogTitle>
+        <DialogTitle className="text-sm font-semibold text-foreground">
+          {t('render-video.overwriteExistingFile', 'Overwrite existing file?')}
+        </DialogTitle>
         <p className="mt-3 break-all text-xs text-muted-foreground">{pendingOverwritePath}</p>
         <div className="mt-6 flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={onOverwriteCancel}>
-            Cancel
+            {t('render-video.cancel', 'Cancel')}
           </Button>
           <Button type="button" onClick={onOverwriteConfirm}>
-            Overwrite
+            {t('render-video.overwrite', 'Overwrite')}
           </Button>
         </div>
       </DialogContent>
@@ -376,14 +413,14 @@ function OverwriteConfirmDialog({ overwriteOpen, pendingOverwritePath, onOverwri
   )
 }
 
-function formatDurationSummary(durationSeconds) {
+function formatDurationSummary(durationSeconds, t) {
   const roundedSeconds = Math.round(durationSeconds)
   const minutes = Math.floor(roundedSeconds / 60)
   const seconds = roundedSeconds % 60
 
   if (minutes > 0) {
-    return `${minutes} min ${seconds} sec`
+    return t('render-video.minutesMinSecondsSec', { defaultValue: '{{minutes}} min {{seconds}} sec', minutes, seconds })
   }
 
-  return `${seconds} sec`
+  return t('render-video.secondsSec', { defaultValue: '{{seconds}} sec', seconds })
 }

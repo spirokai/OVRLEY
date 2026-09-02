@@ -22,7 +22,7 @@ export default function useAppUpdate() {
   const dismissedRef = useRef(false)
 
   useEffect(() => {
-    if (!backend.hasTauriRuntime()) {
+    if (import.meta.env.DEV || !backend.hasTauriRuntime()) {
       return undefined
     }
 

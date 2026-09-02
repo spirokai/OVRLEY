@@ -18,7 +18,7 @@ import { parseSrtActivityFile } from './srt-parser.js'
  * @param {*} file - File object being loaded or saved.
  * @returns {Promise<*>} Promise resolving to the operation result.
  */
-async function parseActivityFile(file) {
+export async function parseActivityFile(file) {
   const lowerName = file.name.toLowerCase()
   let rawActivity
   if (lowerName.endsWith('.fit')) rawActivity = await parseFitActivityFile(file)
@@ -31,10 +31,10 @@ async function parseActivityFile(file) {
   return finalized.parsed_activity
 }
 
-async function loadActivityIntoStore({ filename, parsedActivity, storeState }) {
-  const { setActivityFilename, activateActivityFile } = storeState
+export function activateParsedActivity({ source, parsedActivity }, storeState) {
+  const { setActivitySource, activateActivityFile } = storeState
 
-  setActivityFilename(filename)
+  setActivitySource(source)
   activateActivityFile(parsedActivity)
 
   const durationSeconds = Number(parsedActivity?.metadata?.duration_seconds || 0)
@@ -70,11 +70,11 @@ function filenameFromNativePath(path) {
   return filename
 }
 
-async function importAndActivateActivity(filename, loadParsedActivity, store) {
+async function importAndActivateActivity(source, loadParsedActivity, store) {
   try {
-    store.clearActivitySummary()
     const parsedActivity = await loadParsedActivity()
-    await loadActivityIntoStore({ filename, parsedActivity, storeState: store })
+    store.clearActivitySummary()
+    await activateParsedActivity({ source, parsedActivity }, store)
     return parsedActivity
   } catch (error) {
     console.error('Activity parse error:', {
@@ -86,6 +86,19 @@ async function importAndActivateActivity(filename, loadParsedActivity, store) {
 }
 
 /**
+ * Runs the canonical native activity load operation for any supported format.
+ * @param {string} path Absolute native activity path.
+ * @param {object} storeActions Activity store owner actions.
+ * @returns {Promise<object>} Activated parsed activity.
+ */
+export async function importActivityPath(path, storeActions) {
+  const staged = await parseActivityPath(path)
+  storeActions.clearActivitySummary()
+  await activateParsedActivity(staged, storeActions)
+  return staged.parsedActivity
+}
+
+/**
  * Imports a native CSV activity path through the Rust columnar pipeline.
  *
  * @param {string} path - Native path returned by the desktop file picker.
@@ -93,8 +106,7 @@ async function importAndActivateActivity(filename, loadParsedActivity, store) {
  * @returns {Promise<object>} Promise resolving to the activated parsed activity.
  */
 export async function importCsvActivityPath(path, storeActions) {
-  const filename = filenameFromNativePath(path)
-  return importAndActivateActivity(filename, async () => (await backend.parseCsvActivity(path)).parsed_activity, storeActions)
+  return importActivityPath(path, storeActions)
 }
 
 /**
@@ -105,8 +117,26 @@ export async function importCsvActivityPath(path, storeActions) {
  * @returns {Promise<object>} Promise resolving to the activated parsed activity.
  */
 export async function importVboActivityPath(path, storeActions) {
+  return importActivityPath(path, storeActions)
+}
+
+/**
+ * Parses a native activity path without mutating application state.
+ *
+ * @param {string} path - Absolute native activity path.
+ * @returns {Promise<{source: {kind: 'file', path: string}, parsedActivity: object}>} Staged activity.
+ */
+export async function parseActivityPath(path) {
   const filename = filenameFromNativePath(path)
-  return importAndActivateActivity(filename, async () => (await backend.parseVboActivity(path)).parsed_activity, storeActions)
+  const lowerPath = path.toLowerCase()
+  let parsedActivity
+  if (lowerPath.endsWith('.csv')) parsedActivity = (await backend.parseCsvActivity(path)).parsed_activity
+  else if (lowerPath.endsWith('.vbo')) parsedActivity = (await backend.parseVboActivity(path)).parsed_activity
+  else {
+    const file = await (await import('@/lib/file-dialog')).fileFromSelectedPath(path, 'activity')
+    parsedActivity = await parseActivityFile(file)
+  }
+  return { source: { kind: 'file', path }, parsedActivity, filename }
 }
 
 /**
@@ -118,5 +148,5 @@ export async function importVboActivityPath(path, storeActions) {
  */
 export default async function importActivityFile(file, storeActions) {
   if (!(file instanceof File)) throw new Error('Activity import requires a browser File object.')
-  return importAndActivateActivity(file.name, () => parseActivityFile(file), storeActions)
+  return importAndActivateActivity(null, () => parseActivityFile(file), storeActions)
 }

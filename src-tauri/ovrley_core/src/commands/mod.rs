@@ -528,13 +528,17 @@ fn template_descriptor(
     }
     let (width, height) = read_template_resolution(&value).unwrap_or((0, 0));
 
-    Some(json!({
+    let mut descriptor = json!({
         "id": id,
         "name": filename.trim_end_matches(".json").replace('_', " ").to_uppercase(),
         "type": template_type,
         "width": width,
         "height": height
-    }))
+    });
+    if template_type == "user" {
+        descriptor["path"] = Value::String(path.to_string_lossy().into_owned());
+    }
+    Some(descriptor)
 }
 
 // Opens a path with the operating system's default handler.

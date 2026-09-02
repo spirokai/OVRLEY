@@ -30,7 +30,7 @@ function materializeWidgets(rawWidgets, globalDefaults) {
 
 export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onConfigChange }, widgetLiveEdits) {
   const selectedSecond = useStore((state) => state.selectedSecond)
-  const exportRange = useStore((state) => state.exportRange)
+  const exportRange = useStore((state) => state.renderSettings.range)
   const importedVideoPath = useStore((state) => state.importedVideoPath)
   const importedVideoDuration = useStore((state) => state.importedVideoDuration)
   const videoSyncOffsetSeconds = useStore((state) => state.videoSyncOffsetSeconds)

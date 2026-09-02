@@ -1,10 +1,11 @@
 import { Compass, Ruler, Type, Target } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
+import { SectionHeading } from '@/components/ui/section-heading'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { ColorField, SizeSlider, SliderField, ToggleField, SelectField } from '../widgetFormControls'
-import { SectionHeading } from '../widgetEditorSections'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const ALIGNMENT_OPTIONS = [
   { value: 'below', label: 'Below' },
@@ -30,6 +31,7 @@ const INDICATOR_PLACEMENT_OPTIONS = [
  * @param {Function} props.updateWidgetData - Updates widget data.
  */
 export default function HeadingTapeDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+  const { t } = useTranslation()
   const tapeData = useMemo(() => widget.data.display_variants?.heading_tape ?? {}, [widget.data.display_variants?.heading_tape])
   const updateTape = useDisplayVariantUpdater(widget, 'heading_tape', tapeData, updateWidgetData)
   const updateTapeSize = useDisplayVariantUpdater(widget, 'heading_tape', tapeData, updateWidgetSize)
@@ -43,9 +45,9 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
   return (
     <>
       <div className="space-y-4">
-        <SectionHeading icon={Compass} title="Tape Scale" />
+        <SectionHeading icon={Compass} title={t('widget-editor.tapeScale', 'Tape Scale')} />
         <SizeSlider
-          label="Pixels per Degree"
+          label={t('widget-editor.pixelsPerDegree', 'Pixels per Degree')}
           value={tapeData.pixels_per_degree}
           min={1}
           max={20}
@@ -61,11 +63,11 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 px-1 pb-2">
-              <span className="text-[9px] text-muted-foreground uppercase font-bold">Major Ticks</span>
+              <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.majorTicks', 'Major Ticks')}</span>
               <ToggleField checked={showMajorTicks} onCheckedChange={(checked) => updateTape({ show_major_ticks: checked })} />
             </div>
             <SliderField
-              label="Major Length"
+              label={t('widget-editor.majorLength', 'Major Length')}
               value={tapeData.major_tick_length_pct}
               min={5}
               max={100}
@@ -76,7 +78,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
             <SliderField
-              label="Major Thickness"
+              label={t('widget-editor.majorThickness', 'Major Thickness')}
               value={tapeData.major_tick_thickness}
               min={0.5}
               max={8}
@@ -90,11 +92,11 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
           </div>
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 px-1 pb-2">
-              <span className="text-[9px] text-muted-foreground uppercase font-bold">Minor Ticks</span>
+              <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.minorTicks', 'Minor Ticks')}</span>
               <ToggleField checked={showMinorTicks} onCheckedChange={(checked) => updateTape({ show_minor_ticks: checked })} />
             </div>
             <SliderField
-              label="Minor Length"
+              label={t('widget-editor.minorLength', 'Minor Length')}
               value={tapeData.minor_tick_length_pct}
               min={5}
               max={100}
@@ -105,7 +107,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
               onSliderCommit={() => commitWidgetSize(widget.id)}
             />
             <SliderField
-              label="Minor Thickness"
+              label={t('widget-editor.minorThickness', 'Minor Thickness')}
               value={tapeData.minor_tick_thickness}
               min={0.5}
               max={8}
@@ -119,11 +121,11 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Tick Color" value={tapeData.tick_color} onChange={(value) => updateTape({ tick_color: value })} />
-          <ColorField label="Cardinal Color" value={tapeData.cardinal_tick_color} onChange={(value) => updateTape({ cardinal_tick_color: value })} />
+          <ColorField label={t('widget-editor.tickColor', 'Tick Color')} value={tapeData.tick_color} onChange={(value) => updateTape({ tick_color: value })} />
+          <ColorField label={t('widget-editor.cardinalColor', 'Cardinal Color')} value={tapeData.cardinal_tick_color} onChange={(value) => updateTape({ cardinal_tick_color: value })} />
         </div>
         <SelectField
-          label="Alignment"
+          label={t('widget-editor.alignment', 'Alignment')}
           value={tapeData.tick_alignment}
           onValueChange={(value) => updateTape({ tick_alignment: value })}
           options={ALIGNMENT_OPTIONS}
@@ -133,7 +135,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
       <div className="space-y-4">
         <SectionHeading icon={Type} title="Labels" />
         <FontSelectField
-          label="Label Font"
+          label={t('widget-editor.labelFont', 'Label Font')}
           value={tapeData.label_font}
           onValueChange={(value) => updateTape({ label_font: value })}
           recommendedFonts={availableFonts.recommendedFonts}
@@ -143,25 +145,25 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
         />
         <div className="grid grid-cols-2 gap-4 py-2">
           <div className="flex items-center justify-between gap-2 px-1">
-            <span className="text-[9px] text-muted-foreground uppercase font-bold">Minor Labels</span>
+            <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.minorLabels', 'Minor Labels')}</span>
             <ToggleField checked={showMinorLabels} onCheckedChange={(checked) => updateTape({ show_minor_labels: checked })} />
           </div>
           <div className="flex items-center justify-between gap-2 px-1">
-            <span className="text-[9px] text-muted-foreground uppercase font-bold">Major Labels</span>
+            <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.majorLabels', 'Major Labels')}</span>
             <ToggleField checked={showMajorLabels} onCheckedChange={(checked) => updateTape({ show_major_labels: checked })} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Label Color" value={tapeData.label_color} onChange={(value) => updateTape({ label_color: value })} />
+          <ColorField label={t('widget-editor.labelColor', 'Label Color')} value={tapeData.label_color} onChange={(value) => updateTape({ label_color: value })} />
           <ColorField
-            label="Cardinal Color"
+            label={t('widget-editor.cardinalColor', 'Cardinal Color')}
             value={tapeData.cardinal_label_color}
             onChange={(value) => updateTape({ cardinal_label_color: value })}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SizeSlider
-            label="Font Size"
+            label={t('widget-editor.fontSize', 'Font Size')}
             value={tapeData.label_font_size}
             min={6}
             max={36}
@@ -185,9 +187,9 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
       </div>
 
       <div className="space-y-4">
-        <SectionHeading icon={Target} title="Indicator" />
+        <SectionHeading icon={Target} title={t('widget-editor.indicator', 'Indicator')} />
         <div className="flex items-center justify-between gap-2 px-1">
-          <span className="text-[9px] text-muted-foreground uppercase font-bold">Show Indicator</span>
+          <span className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.showIndicator', 'Show Indicator')}</span>
           <ToggleField checked={tapeData.show_indicator} onCheckedChange={(checked) => updateTape({ show_indicator: checked })} />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -206,9 +208,9 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Indicator Color" value={tapeData.indicator_color} onChange={(value) => updateTape({ indicator_color: value })} />
+          <ColorField label={t('widget-editor.indicatorColor', 'Indicator Color')} value={tapeData.indicator_color} onChange={(value) => updateTape({ indicator_color: value })} />
           <SizeSlider
-            label="Indicator Size"
+            label={t('widget-editor.indicatorSize', 'Indicator Size')}
             value={tapeData.indicator_size}
             min={4}
             max={40}

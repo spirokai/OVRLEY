@@ -9,6 +9,7 @@ import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSectio
 import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
+import { useTranslation } from 'react-i18next'
 
 const COORDINATE_FORMAT_OPTIONS = [
   { value: 'dms', label: 'Deg / Min / Sec' },
@@ -24,6 +25,7 @@ const COORDINATE_FORMAT_OPTIONS = [
  * @param {Function} props.setNumericField - Sets a numeric field.
  */
 export default function TextDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
+  const { t } = useTranslation()
   const definition = getStandardMetricDefinition(widget.type)
   const unitsMode = getStandardMetricUnitsMode(widget.type)
   const unitOptions = getStandardMetricUnitOptions(widget.type)
@@ -65,7 +67,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
 
       {hasBalanceFormat ? (
         <SelectField
-          label="Balance Format"
+          label={t('widget-editor.balanceFormat', 'Balance Format')}
           value={widget.data.balance_format}
           onValueChange={(value) => updateWidgetData(widget.id, { balance_format: value })}
           options={BALANCE_FORMAT_OPTIONS}
@@ -75,7 +77,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
       {isDistanceWidget ? (
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center justify-between py-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Show Full Distance</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t('widget-editor.showFullDistance', 'Show Full Distance')}</span>
             <ToggleField
               checked={widget.data.show_full_distance ?? true}
               onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_distance: checked })}
@@ -104,7 +106,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
       {isTotalAscentWidget ? (
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center justify-between py-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Show Full Ascent</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t('widget-editor.showFullAscent', 'Show Full Ascent')}</span>
             <ToggleField
               checked={widget.data.show_full_ascent}
               onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_ascent: checked })}

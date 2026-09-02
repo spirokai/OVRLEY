@@ -10,12 +10,29 @@ import { OverlayEditor } from '@/features/overlay-editor'
 import { OverlayPlayer } from '@/features/player'
 import { RenderVideoDialog } from '@/features/render-video'
 import { WidgetDrawerContent } from '@/features/widget-drawer'
-import { ToolbarDrawerLayout, useToolbarDrawer } from '@/features/toolbar'
-import { WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
-import { NewTemplateConfirmDialog } from '@/features/template-manager'
+import {
+  ActivityDrawerContent,
+  ProjectsDrawerContent,
+  ToolbarDrawerLayout,
+  useToolbarDrawer,
+  VideoDrawerContent,
+  useVideoSyncControls,
+} from '@/features/toolbar'
+import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
+import { MissingSourceDialog, StartupProjectsDialog } from '@/features/projects'
 import { UpdatePromptDialog } from '@/features/app-update'
-import { AppHeader, ControlPanel, ErrorAlert, KeyboardShortcutsDialog, LoadingOverlay, useAppShellComposition } from '@/features/app-shell'
+import {
+  AppHeader,
+  ControlPanel,
+  ErrorAlert,
+  KeyboardShortcutsDialog,
+  LoadingOverlay,
+  UnsavedChangesDialog,
+  useAppShellComposition,
+} from '@/features/app-shell'
 import * as backend from './api/backend'
+import { useTranslation } from 'react-i18next'
+import { changeLanguagePreference } from '@/i18n/language-preference'
 
 function useRightClickDevtools() {
   useEffect(() => {
@@ -44,6 +61,7 @@ function useRightClickDevtools() {
  * @returns {JSX.Element} Rendered component output.
  */
 function AppShell() {
+  const { t, i18n } = useTranslation()
   useRightClickDevtools()
 
   const {
@@ -54,6 +72,7 @@ function AppShell() {
     editorShell,
     handleOpenOutputDirectory,
     layout,
+    projectLifecycle,
     renderWorkflow,
     templateManagement,
     undoRedoControls,
@@ -61,12 +80,57 @@ function AppShell() {
     widgetLiveEdits,
   } = useAppShellComposition()
   const toolbarDrawer = useToolbarDrawer(layout)
+  const videoSync = useVideoSyncControls()
   const { config, globalDefaults, importingVideo, isProcessing, setConfig } = appShell
+  let drawerContent = null
+
+  if (toolbarDrawer.renderDrawerContent) {
+    if (toolbarDrawer.activeTool === PROJECTS_TOOL) {
+      drawerContent = (
+        <ProjectsDrawerContent
+          projectName={projectLifecycle.projectName}
+          projectPath={projectLifecycle.loadedProjectPath}
+          activityFilename={activityImport.activityFilename}
+          activityPath={activityImport.activityPath}
+          videoFilename={videoControls.videoSummary.filename}
+          videoPath={videoControls.videoSummary.path}
+          status={projectLifecycle.status}
+          busy={projectLifecycle.busy}
+          onNew={projectLifecycle.handleNewProject}
+          onOpen={projectLifecycle.handleOpenProject}
+          onSave={projectLifecycle.handleSaveProject}
+          onSaveAs={projectLifecycle.handleSaveProjectAs}
+        />
+      )
+    } else if (toolbarDrawer.activeTool === ACTIVITY_TOOL) {
+      drawerContent = (
+        <ActivityDrawerContent
+          activitySummary={activityImport.activitySummary}
+          filename={activityImport.activityFilename}
+          onBrowseActivity={activityImport.handleActivityFileOpen}
+          onDeleteActivity={activityImport.deleteActivity}
+          onDropActivityFiles={activityImport.handleActivityFilesDrop}
+        />
+      )
+    } else if (toolbarDrawer.activeTool === VIDEO_TOOL) {
+      drawerContent = (
+        <VideoDrawerContent
+          videoSummary={videoControls.videoSummary}
+          onBrowseVideo={videoControls.handleImportVideo}
+          onDeleteVideo={videoControls.clearImportedVideo}
+          onDropVideoFiles={videoControls.handleVideoFilesDrop}
+          videoSync={videoSync}
+        />
+      )
+    } else if (toolbarDrawer.activeTool === WIDGETS_TOOL) {
+      drawerContent = <WidgetDrawerContent widgetLiveEdits={widgetLiveEdits} />
+    }
+  }
 
   if (!toolbarDrawer.initialized) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-background text-foreground">
-        <span className="text-sm text-muted-foreground">OVRLEY is starting...</span>
+      <div className="relative h-screen w-full bg-background text-foreground">
+        <LoadingOverlay show label={t('app.ovrleyIsStarting', 'OVRLEY is starting...')} />
       </div>
     )
   }
@@ -80,6 +144,7 @@ function AppShell() {
     >
       <div className="relative flex h-full flex-col bg-background text-foreground">
         <ErrorAlert />
+        <StartupProjectsDialog {...projectLifecycle.startupProjectDialog} open={projectLifecycle.startupProjectDialog.open && !appUpdate.open} />
         <UpdatePromptDialog {...appUpdate} />
         <RenderVideoDialog
           phase={renderWorkflow.renderDialogPhase}
@@ -94,18 +159,22 @@ function AppShell() {
           onOverwriteCancel={renderWorkflow.handleOverwriteCancel}
           submissionPending={renderWorkflow.submissionPending}
         />
-        <NewTemplateConfirmDialog
-          open={templateManagement.showNewTemplateConfirm}
-          onCancel={() => templateManagement.setShowNewTemplateConfirm(false)}
-          onConfirm={templateManagement.confirmCreateNewTemplate}
+        <UnsavedChangesDialog {...templateManagement.newTemplateConfirmDialog} />
+        <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
+        <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
+        <KeyboardShortcutsDialog
+          open={editorShell.keyboardShortcutsOpen}
+          locale={i18n.resolvedLanguage}
+          onLocaleChange={changeLanguagePreference}
+          onClose={editorShell.closeKeyboardShortcuts}
         />
-        <KeyboardShortcutsDialog open={editorShell.keyboardShortcutsOpen} onClose={editorShell.closeKeyboardShortcuts} />
         <AppHeader
           activityImport={activityImport}
           appShell={appShell}
           backendState={backendState}
           editorShell={editorShell}
           onOpenOutputDirectory={handleOpenOutputDirectory}
+          projectLifecycle={projectLifecycle}
           renderWorkflow={renderWorkflow}
           templateManagement={templateManagement}
           videoControls={videoControls}
@@ -113,16 +182,18 @@ function AppShell() {
 
         <ToolbarDrawerLayout
           {...toolbarDrawer}
-          drawerContent={
-            toolbarDrawer.renderDrawerContent && toolbarDrawer.activeTool === WIDGETS_TOOL ? (
-              <WidgetDrawerContent widgetLiveEdits={widgetLiveEdits} />
-            ) : null
-          }
+          drawerContent={drawerContent}
           workspace={
             <>
               <LoadingOverlay
-                show={isProcessing || importingVideo}
-                label={importingVideo ? 'Importing your video...' : 'Processing your activity...'}
+                show={projectLifecycle.loadingProject || isProcessing || importingVideo}
+                label={
+                  projectLifecycle.loadingProject
+                    ? t('app.loadingProject', 'Loading project...')
+                    : importingVideo
+                      ? t('app.importingYourVideo', 'Importing your video...')
+                      : t('app.processingYourActivity', 'Processing your activity...')
+                }
               />
               <div
                 className="min-h-0 flex-1"
@@ -142,8 +213,8 @@ function AppShell() {
                   importedVideoFilename={videoControls.importedVideoFilename}
                   editorShell={editorShell}
                   undoRedoControls={undoRedoControls}
-                  showTemplateStatus={templateManagement.showTemplateStatus}
-                  templateStatus={templateManagement.status}
+                  showProjectStatus={projectLifecycle.status !== 'Saved'}
+                  projectStatus={projectLifecycle.status}
                   widgetLiveEdits={widgetLiveEdits}
                 />
               </div>

@@ -1,10 +1,11 @@
 import { CircleGauge } from 'lucide-react'
 import { Label } from '@/components/ui/label'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import useDisplayVariantUpdater from '../hooks/useDisplayVariantUpdater'
-import { SectionHeading } from './widgetEditorSections'
 import GForceDisplaySection from './metricWidget/GForceDisplaySection'
+import { useTranslation } from 'react-i18next'
 
 const AXES = [
   { value: 'x', label: 'X' },
@@ -25,12 +26,13 @@ const AXES = [
  * @returns {JSX.Element}
  */
 function GForceAxisRow({ label, value, onValueChange, onInvertChange, inverted, switchId }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-2" data-testid={`${label.toLowerCase()}-axis-row`}>
-      <Label className="text-[9px] text-muted-foreground uppercase font-bold">{label} axis</Label>
+      <Label className="text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.labelAxis', '{{label}} axis', { label })}</Label>
       <div className="grid grid-cols-2 gap-4">
         <Tabs value={value} onValueChange={onValueChange}>
-          <TabsList variant="toolbar" aria-label={`${label} axis`}>
+          <TabsList variant="toolbar" aria-label={t('widget-editor.labelAxis', '{{label}} axis', { label })}>
             {AXES.map((axis) => (
               <span key={axis.value} className="inline-flex">
                 <TabsTrigger value={axis.value} variant="toolbar" className="p-3 px-5 font-bold">
@@ -42,7 +44,7 @@ function GForceAxisRow({ label, value, onValueChange, onInvertChange, inverted, 
         </Tabs>
         <div className="flex justify-between items-center gap-2 pl-1">
           <Label htmlFor={switchId} className="text-[9px] text-muted-foreground uppercase font-bold">
-            Invert sign
+            {t('widget-editor.invertSign', 'Invert sign')}
           </Label>
           <Switch id={switchId} checked={inverted} onCheckedChange={onInvertChange} />
         </div>
@@ -53,6 +55,7 @@ function GForceAxisRow({ label, value, onValueChange, onInvertChange, inverted, 
 
 /** Renders G-force display controls and axis mapping controls. */
 export default function GForceWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+  const { t } = useTranslation()
   const data = widget.data.display_variants.g_force
   const updateGForce = useDisplayVariantUpdater(widget, 'g_force', data, updateWidgetData)
   const selectHorizontalAxis = (axis_horizontal) => {
@@ -71,10 +74,10 @@ export default function GForceWidgetEditor({ widget, updateWidgetData, updateWid
         commitWidgetSize={commitWidgetSize}
       />
       <div className="space-y-4">
-        <SectionHeading icon={CircleGauge} title="Axis Mapping" />
+        <SectionHeading icon={CircleGauge} title={t('widget-editor.axisMapping', 'Axis Mapping')} />
         <div className="grid grid-cols-1 gap-4">
           <GForceAxisRow
-            label="Horizontal"
+            label={t('widget-editor.horizontal', 'Horizontal')}
             value={data.axis_horizontal}
             onValueChange={selectHorizontalAxis}
             inverted={data.invert_horizontal}
@@ -82,7 +85,7 @@ export default function GForceWidgetEditor({ widget, updateWidgetData, updateWid
             switchId={`${widget.id}-invert-horizontal`}
           />
           <GForceAxisRow
-            label="Vertical"
+            label={t('widget-editor.vertical', 'Vertical')}
             value={data.axis_vertical}
             onValueChange={selectVerticalAxis}
             inverted={data.invert_vertical}

@@ -2,18 +2,24 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useStore from '@/store/useStore'
 
 const mp4Telemetry = {
+  coverage: { speed: { source: 'direct' } },
+  extended_attributes: [],
   metadata: { duration_seconds: 120, sample_count: 240 },
   file_format: 'mp4-telemetry',
   valid_attributes: ['speed'],
 }
 
 const activityFile = {
+  coverage: { heartrate: { source: 'direct' }, speed: { source: 'direct' } },
+  extended_attributes: [],
   metadata: { duration_seconds: 3600, sample_count: 7200 },
   file_format: 'fit',
-  valid_attributes: ['speed', 'heart_rate'],
+  valid_attributes: ['speed', 'heartrate'],
 }
 
 const shortMp4Telemetry = {
+  coverage: { speed: { source: 'direct' } },
+  extended_attributes: [],
   metadata: { sample_count: 45 },
   trim_end_seconds: 2.509,
   file_format: 'mp4-telemetry',
@@ -57,12 +63,12 @@ describe('MP4 activity — store actions', () => {
       expect(state.videoSyncWarning).toBeNull()
     })
 
-    test('sets activityFilename to null when telemetry activates', () => {
-      useStore.setState({ activityFilename: 'old.fit' })
+    test('sets activitySource to null when telemetry activates', () => {
+      useStore.setState({ activitySource: { kind: 'file', path: 'C:\\old.fit' } })
 
       useStore.getState().loadVideoTelemetry(mp4Telemetry)
 
-      expect(useStore.getState().activityFilename).toBeNull()
+      expect(useStore.getState().activitySource).toBeNull()
     })
 
     test('updates activitySummary from telemetry payload', () => {
@@ -111,6 +117,10 @@ describe('MP4 activity — store actions', () => {
 
       const summary = useStore.getState().activitySummary
       expect(summary).not.toBeNull()
+      expect(summary.availableMetrics).toEqual([
+        { attribute: 'speed', source: 'direct' },
+        { attribute: 'heartrate', source: 'direct' },
+      ])
       expect(summary.durationSeconds).toBe(3600)
     })
 
@@ -196,22 +206,23 @@ describe('MP4 activity — store actions', () => {
       expect(state.stashedVideoTelemetry).toEqual(mp4Telemetry)
     })
 
-    test('clears activityFilename by default', () => {
-      useStore.setState({ activityFilename: 'ride.fit' })
+    test('clears activitySource by default', () => {
+      useStore.setState({ activitySource: { kind: 'file', path: 'C:\\ride.fit' } })
       useStore.getState().activateActivityFile(activityFile)
 
       useStore.getState().clearActivityFile()
 
-      expect(useStore.getState().activityFilename).toBeNull()
+      expect(useStore.getState().activitySource).toBeNull()
     })
 
-    test('preserves activityFilename when clearFilename is false', () => {
-      useStore.setState({ activityFilename: 'ride.fit' })
+    test('preserves activitySource when clearFilename is false', () => {
+      const activitySource = { kind: 'file', path: 'C:\\ride.fit' }
+      useStore.setState({ activitySource })
       useStore.getState().activateActivityFile(activityFile)
 
       useStore.getState().clearActivityFile({ clearFilename: false })
 
-      expect(useStore.getState().activityFilename).toBe('ride.fit')
+      expect(useStore.getState().activitySource).toEqual(activitySource)
     })
 
     test('sets videoSyncOffsetSeconds to 0 and clears warning when restoring video telemetry', () => {

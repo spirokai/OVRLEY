@@ -8,7 +8,6 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
 import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
@@ -59,37 +58,27 @@ describe('createTemplateSlice — pure state actions', () => {
   })
 
   test('setUpdateRate is pure — updates updateRate in state', () => {
-    useStore.getState().setUpdateRate(5)
+    useStore.getState().setRenderWidgetUpdateRate(5)
 
-    expect(useStore.getState().updateRate).toBe(5)
+    expect(useStore.getState().renderSettings.widgetUpdateRate).toBe(5)
   })
 
   test('setExportRange is pure — merges into exportRange', () => {
-    useStore.getState().setExportRange({ from: 5.25, to: 60.75 })
+    useStore.getState().setRenderRange({ from: 5.25, to: 60.75 })
 
-    expect(useStore.getState().exportRange.type).toBe(DEFAULT_EXPORT_RANGE.type)
-    expect(useStore.getState().exportRange.from).toBe(5.25)
-    expect(useStore.getState().exportRange.to).toBe(60.75)
+    expect(useStore.getState().renderSettings.range.type).toBe('all')
+    expect(useStore.getState().renderSettings.range.from).toBe(5.25)
+    expect(useStore.getState().renderSettings.range.to).toBe(60.75)
   })
 
   test('setExportCodec is pure — updates exportCodec and normalizes', () => {
-    useStore.getState().setPlatformOs('macos')
-    useStore.getState().setExportCodec('prores_videotoolbox')
-
-    expect(useStore.getState().exportCodec).toBe('prores_videotoolbox')
-  })
-
-  test('setExportCodec normalizes platform-specific video codecs', () => {
-    useStore.getState().setPlatformOs('linux')
-    useStore.getState().setExportCodec('h264_vaapi')
-    expect(useStore.getState().exportCodec).toBe('h264_vaapi')
-
+    useStore.getState().setRenderSettings({
+      ...useStore.getState().renderSettings,
+      codec: 'prores_videotoolbox',
+    })
     useStore.getState().setPlatformOs('windows')
-    expect(useStore.getState().exportCodec).toBe('libx264')
 
-    useStore.getState().setPlatformOs('linux')
-    useStore.getState().setExportCodec('h264_videotoolbox')
-    expect(useStore.getState().exportCodec).toBe('libx264')
+    expect(useStore.getState().renderSettings.codec).toBe('prores_videotoolbox')
   })
 
   test('setPlatformOs is pure — updates platformOs and normalizes codec', () => {
@@ -141,13 +130,13 @@ describe('createTemplateSlice — pure state actions', () => {
 
   test('createNewTemplate is pure — resets state to defaults without network', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
-    useStore.getState().setUpdateRate(5)
+    useStore.getState().setRenderWidgetUpdateRate(5)
     useStore.getState().createNewTemplate()
 
     expect(useStore.getState().config).toEqual(DEFAULT_CONFIG)
     expect(useStore.getState().globalDefaults).toEqual(DEFAULT_GLOBAL_DEFAULTS)
-    expect(useStore.getState().updateRate).toBe(1)
-    expect(useStore.getState().loadedTemplateFilename).toBeNull()
+    expect(useStore.getState().renderSettings.widgetUpdateRate).toBe(5)
+    expect(useStore.getState().loadedTemplateSource).toBeNull()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -159,10 +148,10 @@ describe('createTemplateSlice — pure state actions', () => {
   })
 
   test('setLoadedTemplate is pure — sets filename and source', () => {
-    useStore.getState().setLoadedTemplate('my-template.json', 'file')
+    const source = { kind: 'file', path: 'C:\\templates\\my-template.json' }
+    useStore.getState().setLoadedTemplateSource(source)
 
-    expect(useStore.getState().loadedTemplateFilename).toBe('my-template.json')
-    expect(useStore.getState().loadedTemplateSource).toBe('file')
+    expect(useStore.getState().loadedTemplateSource).toEqual(source)
   })
 
   test('setCommunityTemplateFilename is a pure setter — no network I/O or UI side effects', () => {
@@ -192,7 +181,7 @@ describe('createTemplateSlice — pure state actions', () => {
         config: templateConfig,
         settings: { globalDefaults: { color_text: '#abcdef' } },
       },
-      { filename: 'imported.json', source: 'file' },
+      { source: { kind: 'file', path: 'C:\\templates\\imported.json' } },
     )
 
     const state = useStore.getState()
@@ -210,8 +199,7 @@ describe('createTemplateSlice — pure state actions', () => {
     expect(effectiveConfig.scene.color_text).toBe('#abcdef')
     expect(state.startSecond).toBe(0)
     expect(state.endSecond).toBe(73)
-    expect(state.loadedTemplateFilename).toBe('imported.json')
-    expect(state.loadedTemplateSource).toBe('file')
+    expect(state.loadedTemplateSource).toEqual({ kind: 'file', path: 'C:\\templates\\imported.json' })
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 })

@@ -11,6 +11,8 @@ import { useCallback } from 'react'
 import * as backend from '@/api/backend'
 import useStore from '@/store/useStore'
 
+let pendingTemplateFetch = null
+
 /**
  * Hook that provides a fetchTemplates callback for orchestration layers.
  *
@@ -21,12 +23,19 @@ import useStore from '@/store/useStore'
  */
 export default function useTemplateFetching() {
   const fetchTemplates = useCallback(async () => {
-    try {
-      const templates = await backend.listTemplates()
-      useStore.getState().setTemplates(templates)
-    } catch (err) {
-      console.error('Failed to fetch templates:', err)
+    if (!pendingTemplateFetch) {
+      pendingTemplateFetch = (async () => {
+        try {
+          const templates = await backend.listTemplates()
+          useStore.getState().setTemplates(templates)
+        } catch (err) {
+          console.error('Failed to fetch templates:', err)
+        } finally {
+          pendingTemplateFetch = null
+        }
+      })()
     }
+    return pendingTemplateFetch
   }, [])
 
   return { fetchTemplates }

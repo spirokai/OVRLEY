@@ -5,9 +5,10 @@
 import { useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { hasOpenOverlay, isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
+import { formatClockDuration } from '@/lib/time-format'
 import { videoOverlapsActivity } from '@/lib/video-timing'
 import useStore from '@/store/useStore'
-import { formatTimelineTime, snapTimelineSecondToFrame } from '../utils/playerTiming'
+import { snapTimelineSecondToFrame } from '../utils/playerTiming'
 import { moveClipOffset, roundToDevicePixel, secondsToViewPx } from '../utils/timelineGeometry'
 
 import useClipDrag from './useClipDrag'
@@ -40,7 +41,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   // Store selector - gathers the entire player-facing store contract in one subscription.
   const playerStore = useStore(
     useShallow((state) => ({
-      activityFilename: state.activityFilename,
+      activityFilename: state.activitySource?.path?.split(/[/\\]/).at(-1) ?? state.activitySummary?.fileName ?? null,
       activitySummary: state.activitySummary,
       beginPreviewScrub: state.beginPreviewScrub,
       commitPreviewScrub: state.commitPreviewScrub,
@@ -54,7 +55,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       isVideoMuted: state.isVideoMuted,
       previewPlaybackSource: state.previewPlaybackSource,
       previewPlaybackState: state.previewPlaybackState,
-      sceneFps: state.config?.scene?.fps ?? 30,
+      sceneFps: state.renderSettings.fps,
       selectedSecond: state.selectedSecond,
       setSelectedSecond: state.setSelectedSecond,
       setVideoSyncOffset: state.setVideoSyncOffset,
@@ -63,7 +64,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       startPreviewPlayback: state.startPreviewPlayback,
       selectedWidgetIds: state.selectedWidgetIds,
       updatePreviewScrub: state.updatePreviewScrub,
-      updateRate: state.updateRate,
+      updateRate: state.renderSettings.widgetUpdateRate,
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
       videoSyncOffsetPreviewSeconds: state.videoSyncOffsetPreviewSeconds,
     })),
@@ -427,8 +428,8 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
         onClick: viewport.resetView,
       },
       timeLabel: {
-        current: formatTimelineTime(playback.clampedPlayhead),
-        total: formatTimelineTime(playback.totalDuration),
+        current: formatClockDuration(playback.clampedPlayhead),
+        total: formatClockDuration(playback.totalDuration),
       },
       hasVideo,
       isMuted: playerStore.isVideoMuted,

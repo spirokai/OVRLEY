@@ -15,25 +15,17 @@ import { createTemplateState } from '../utils/templateSnapshot'
  * @param {object} params
  * @param {object|null} params.config - Current editor config.
  * @param {object|null} params.globalDefaults - Current global defaults.
- * @param {number} params.updateRate - Current update rate (FPS).
- * @param {object} params.exportRange - Current export range settings.
- * @param {string} params.exportCodec - Current export codec.
- * @param {string} params.aspectRatio - Current aspect ratio.
  * @param {object|null} params.lastSavedTemplateState - Snapshot from the last save operation.
  * @returns {{ currentTemplateState: object|null, status: string|null, showTemplateStatus: boolean }}
  */
-export function useTemplateSaveStatus({ config, globalDefaults, updateRate, exportRange, exportCodec, aspectRatio, lastSavedTemplateState }) {
+export function useTemplateSaveStatus({ config, globalDefaults, lastSavedTemplateState }) {
   const currentTemplateState = useMemo(
     () =>
       createTemplateState({
         config,
         globalDefaults,
-        updateRate,
-        exportRange,
-        exportCodec,
-        aspectRatio,
       }),
-    [config, globalDefaults, updateRate, exportRange, exportCodec, aspectRatio],
+    [config, globalDefaults],
   )
 
   const status = useMemo(() => {

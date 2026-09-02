@@ -2,7 +2,7 @@
  * Composes shell-level hooks and returns their owned state unchanged.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { useAppShellStore, useLayoutStore } from '@/hooks/useAppStoreSelectors'
 import { useRenderWorkflow } from '@/features/render-video'
@@ -12,11 +12,13 @@ import useAppBootstrap from './useAppBootstrap'
 import useAppShellKeyboard from './useAppShellKeyboard'
 import useBackendStatus from './useBackendStatus'
 import useEditorShellState from './useEditorShellState'
+import useWindowCloseGuard from './useWindowCloseGuard'
 import { useAppUpdate } from '@/features/app-update'
 import { useVideoImport } from '@/features/video-preview'
 import { useUndoRedo } from '@/features/undo-redo'
 import * as backend from '@/api/backend'
 import { loadRememberedRenderDirectory } from '@/features/render-video/utils/render-output'
+import { useProjectLifecycle } from '@/features/projects'
 
 /**
  * Orchestrates all shell-level hooks without adapting their public APIs.
@@ -37,6 +39,7 @@ import { loadRememberedRenderDirectory } from '@/features/render-video/utils/ren
  * }}
  */
 export default function useAppShellComposition() {
+  const [templateRestoreComplete, setTemplateRestoreComplete] = useState(false)
   const appShell = useAppShellStore()
   const layout = useLayoutStore()
   const widgetLiveEdits = useWidgetDraftState()
@@ -46,8 +49,17 @@ export default function useAppShellComposition() {
   const templateManagement = useTemplateManagement({ onTemplateCreated: editorShell.resetZoom })
   const renderWorkflow = useRenderWorkflow({ backendStatus: backendState.backendStatus })
   const videoControls = useVideoImport({ debugModeEnabled: editorShell.debugModeEnabled, onSetBackgroundMode: editorShell.setEditorBackgroundMode })
+  const projectLifecycle = useProjectLifecycle({
+    clearImportedVideo: videoControls.clearImportedVideo,
+    onSetBackgroundMode: editorShell.setEditorBackgroundMode,
+    prepareActivityPath: activityImport.prepareActivityPath,
+    prepareVideoPath: videoControls.prepareVideoPath,
+    startupReady: backendState.backendReady && templateRestoreComplete,
+  })
+  useWindowCloseGuard(projectLifecycle.handleCloseRequest)
   const undoRedoControls = useUndoRedo({
-    disabled: renderWorkflow.renderDialogPhase !== 'closed' || templateManagement.showNewTemplateConfirm,
+    disabled:
+      renderWorkflow.renderDialogPhase !== 'closed' || templateManagement.newTemplateConfirmDialog.open || projectLifecycle.unsavedProjectDialog.open,
   })
 
   useAppBootstrap()
@@ -56,7 +68,7 @@ export default function useAppShellComposition() {
   const { restoreLastLoadedTemplate } = templateManagement
 
   useEffect(() => {
-    restoreLastLoadedTemplate()
+    restoreLastLoadedTemplate().finally(() => setTemplateRestoreComplete(true))
   }, [restoreLastLoadedTemplate])
 
   const handleOpenOutputDirectory = async () => {
@@ -74,6 +86,7 @@ export default function useAppShellComposition() {
     appShell,
     backendState,
     handleOpenOutputDirectory,
+    projectLifecycle,
     renderWorkflow,
     templateManagement,
     videoControls,
@@ -88,6 +101,7 @@ export default function useAppShellComposition() {
     editorShell,
     handleOpenOutputDirectory,
     layout,
+    projectLifecycle,
     renderWorkflow,
     templateManagement,
     undoRedoControls,

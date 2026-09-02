@@ -36,6 +36,25 @@ function applyParsedDataToScene(state, activity) {
   }
 }
 
+function createActivitySummary(activity) {
+  return {
+    availableMetrics: [...activity.valid_attributes, ...activity.extended_attributes].map((attribute) => ({
+      attribute,
+      source: activity.coverage[attribute].source,
+    })),
+    durationSeconds: getDurationSeconds(activity),
+    endTime: activity.metadata?.end_time ?? null,
+    fileFormat: activity.file_format,
+    fileName: activity.file_name,
+    originalSampleCount: activity.metadata?.original_sample_count ?? null,
+    sampleCount: activity.metadata?.sample_count ?? 0,
+    sport: activity.metadata?.sport ?? null,
+    syncTime: activity.sync_time ?? null,
+    timezone: activity.metadata?.timezone ?? null,
+    totalDistanceMeters: activity.metadata?.total_distance_m ?? 0,
+  }
+}
+
 /**
  * Media slice — activity summary, render progress, error state, video/gpx filenames.
  * @param {Function} set - Zustand setter.
@@ -47,7 +66,7 @@ export function createMediaSlice(set, get) {
     importingVideo: false,
     renderingVideo: false,
     errorMessage: null,
-    activityFilename: null,
+    activitySource: null,
     activitySummary: null,
     parsedActivity: null,
     parsedActivitySource: null, // 'activity-file' | 'video-telemetry' | null
@@ -112,33 +131,16 @@ export function createMediaSlice(set, get) {
         state.errorMessage = null
       }),
 
-    setActivityFilename: (filename) => {
+    setActivitySource: (source) => {
       set((state) => {
-        state.activityFilename = filename
-      })
-    },
-
-    setActivityFilenameFromFile: (file) => {
-      set((state) => {
-        state.activityFilename = file?.name || null
+        state.activitySource = source
       })
     },
 
     setActivitySummary: (activity, { computeVideoSync = true } = {}) => {
       let summary = null
       if (activity) {
-        summary = {
-          durationSeconds: getDurationSeconds(activity),
-          endTime: activity.metadata?.end_time ?? null,
-          extendedAttributes: activity.extended_attributes || [],
-          fileFormat: activity.file_format || null,
-          fileName: activity.file_name || null,
-          sampleCount: activity.metadata?.sample_count ?? 0,
-          syncTime: activity.sync_time ?? null,
-          timezone: activity.metadata?.timezone ?? null,
-          totalDistanceMeters: activity.metadata?.total_distance_m ?? 0,
-          validAttributes: activity.valid_attributes || [],
-        }
+        summary = createActivitySummary(activity)
       }
 
       set((state) => {
@@ -185,7 +187,7 @@ export function createMediaSlice(set, get) {
           state.parsedActivity = activity
           state.parsedActivitySource = 'video-telemetry'
           state.stashedVideoTelemetry = null
-          state.activityFilename = null
+          state.activitySource = null
           state.videoSyncOffsetSeconds = 0
           state.videoSyncOffsetPreviewSeconds = null
           state.videoSyncWarning = null
@@ -203,7 +205,7 @@ export function createMediaSlice(set, get) {
 
       set((state) => {
         if (clearFilename) {
-          state.activityFilename = null
+          state.activitySource = null
         }
       })
 
@@ -264,7 +266,7 @@ export function createMediaSlice(set, get) {
     setDemoActivity: () =>
       set((state) => {
         const demoDuration = 7946
-        state.activityFilename = 'demo.gpxinit'
+        state.activitySource = null
         state.fallbackDurationSeconds = demoDuration
         state.startSecond = 0
         state.endSecond = demoDuration

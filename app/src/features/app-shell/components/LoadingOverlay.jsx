@@ -1,3 +1,4 @@
+import i18next from 'i18next'
 /**
  * Renders the loading overlay portion of the application interface.
  */
@@ -30,13 +31,13 @@ function Spinner({ className = 'h-4 w-4' }) {
  * @param {boolean} props.show - Whether to show the loading overlay.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function LoadingOverlay({ label = 'Loading editor data...', show }) {
+export default function LoadingOverlay({ label = i18next.t('app-shell.loadingEditorData', 'Loading editor data...'), show }) {
   if (!show) {
     return null
   }
 
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
+    <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-overlay/95">
       <div className="flex flex-col items-center gap-2">
         <Spinner className="h-8 w-8" />
         <span className="text-sm text-muted-foreground">{label}</span>

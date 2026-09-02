@@ -12,6 +12,7 @@ import { SCRUB_SEEK_EPSILON_SECONDS, SCRUB_SEEK_INTERVAL_MS } from '../data/vide
 import { primeVideoFirstFrame, syncVideoCurrentTime } from '../utils/videoPreviewPlayback'
 import { createVideoPreviewScrubScheduler } from '../utils/videoPreviewScrubScheduler'
 import { isVideoPreviewOutOfRange, resolveVideoPreviewSource } from '../utils/videoPreviewSource'
+import i18next from 'i18next'
 
 /**
  * Manages the video preview element and synchronization with the global playhead.
@@ -139,7 +140,7 @@ export function useVideoPreview(videoRef, isActive = true) {
           return
         }
 
-        if (error?.name !== 'AbortError' && error?.name !== 'NotAllowedError') {
+        if (error?.name !== i18next.t('video-preview.aborterror', 'AbortError') && error?.name !== 'NotAllowedError') {
           console.error('[useVideoPreview] Failed to start playback', error)
         }
 

@@ -96,6 +96,8 @@ export function createEditorSlice(set, get) {
     startSecond: 0,
     endSecond: 73,
     selectedSecond: 0,
+    timelineViewport: { viewStart: 0, viewEnd: 73 },
+    skipNextTimelineViewportReset: false,
     previewPlaybackState: 'paused',
     previewPlaybackSource: 'timeline',
     isVideoMuted: false,
@@ -167,6 +169,15 @@ export function createEditorSlice(set, get) {
 
       set((state) => {
         state.selectedSecond = safeSecond
+      })
+    },
+
+    setTimelineViewport: (viewport) => {
+      if (!viewport || !Number.isFinite(viewport.viewStart) || !Number.isFinite(viewport.viewEnd) || viewport.viewStart >= viewport.viewEnd) {
+        throw new Error('Timeline viewport requires finite viewStart < viewEnd')
+      }
+      set((state) => {
+        state.timelineViewport = { viewStart: viewport.viewStart, viewEnd: viewport.viewEnd }
       })
     },
 

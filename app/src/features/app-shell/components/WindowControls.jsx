@@ -1,5 +1,6 @@
 import { Minus, Square, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const noopWindow = {
   minimize: () => {},
@@ -13,6 +14,7 @@ const noopWindow = {
  * Returns nothing on macOS — the OS provides native traffic light buttons.
  */
 export default function WindowControls() {
+  const { t } = useTranslation()
   const [appWindow, setAppWindow] = useState(noopWindow)
 
   useEffect(() => {
@@ -55,7 +57,7 @@ export default function WindowControls() {
         <button
           className="flex h-full w-10 items-center justify-center text-muted-foreground transition-colors hover:bg-destructive hover:text-white"
           onClick={() => appWindow.close()}
-          aria-label="Close"
+          aria-label={t('app-shell.close', 'Close')}
           type="button"
         >
           <X className="h-4 w-4" />

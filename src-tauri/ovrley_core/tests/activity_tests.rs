@@ -109,6 +109,8 @@ fn finalizes_raw_activity_with_idle_gap_debug_payload() {
     assert_eq!(coverage["speed"]["source"], "mixed");
     assert_eq!(coverage["speed"]["availableCount"], 5);
     assert_eq!(coverage["distance"]["availableCount"], 6);
+    assert_eq!(coverage["gps_coordinates"]["source"], "direct");
+    assert_eq!(coverage["gps_coordinates"]["availableCount"], 6);
 
     let debug_payload = response
         .debug_payload

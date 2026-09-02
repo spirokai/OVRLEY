@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { Film, Grid3X3, Image, LayoutGrid, Magnet, Minus, RotateCcw, Square, ZoomIn } from 'lucide-react'
 import { UndoRedoControls } from '@/features/undo-redo'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Renders the editor toolbar controls for background mode, zoom, grid, and snap.
@@ -42,6 +43,7 @@ export default function EditorToolbar({
   onSetSnapToGrid,
   undoRedoControls,
 }) {
+  const { t } = useTranslation()
   return (
     <div>
       <div className="flex items-center gap-1 rounded-xs border border-border/70 bg-card/80 p-1 backdrop-blur-sm shadow-lg">
@@ -52,7 +54,7 @@ export default function EditorToolbar({
           onUndo={undoRedoControls.undo}
         />
         <div className="mx-1 h-5 w-px bg-border/70" />
-        <SimpleTooltip side="bottom" content="Checkered background">
+        <SimpleTooltip side="bottom" content={t('app-shell.checkeredBackground', 'Checkered background')}>
           <Button
             type="button"
             variant={backgroundMode === 'checker' ? 'default' : 'ghost'}
@@ -63,7 +65,7 @@ export default function EditorToolbar({
             <LayoutGrid className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
-        <SimpleTooltip side="bottom" content="Black background">
+        <SimpleTooltip side="bottom" content={t('app-shell.blackBackground', 'Black background')}>
           <Button
             type="button"
             variant={backgroundMode === 'black' ? 'default' : 'ghost'}
@@ -74,7 +76,7 @@ export default function EditorToolbar({
             <Square className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
-        <SimpleTooltip side="bottom" content="White background">
+        <SimpleTooltip side="bottom" content={t('app-shell.whiteBackground', 'White background')}>
           <Button
             type="button"
             variant={backgroundMode === 'white' ? 'default' : 'ghost'}
@@ -90,7 +92,7 @@ export default function EditorToolbar({
           <>
             <div className="mx-1 h-5 w-px bg-border/70" />
             {importedBackgroundImageFilename ? (
-              <SimpleTooltip side="bottom" content="Image background">
+              <SimpleTooltip side="bottom" content={t('app-shell.imageBackground', 'Image background')}>
                 <Button
                   type="button"
                   variant={backgroundMode === 'image' ? 'default' : 'ghost'}
@@ -102,7 +104,7 @@ export default function EditorToolbar({
                 </Button>
               </SimpleTooltip>
             ) : null}
-            <SimpleTooltip side="bottom" content="Video background">
+            <SimpleTooltip side="bottom" content={t('app-shell.videoBackground', 'Video background')}>
               <Button
                 type="button"
                 variant={backgroundMode === 'video' ? 'default' : 'ghost'}
@@ -117,24 +119,24 @@ export default function EditorToolbar({
         )}
 
         <div className="mx-1 h-5 w-px bg-border/70" />
-        <SimpleTooltip side="bottom" content="Zoom out">
+        <SimpleTooltip side="bottom" content={t('app-shell.zoomOut', 'Zoom out')}>
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onZoomOut} aria-keyshortcuts="Mod+-">
             <Minus className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
         <div className="min-w-14 text-center text-xs font-semibold text-muted-foreground">{Math.round(zoomLevel * 100)}%</div>
-        <SimpleTooltip side="bottom" content="Zoom in">
+        <SimpleTooltip side="bottom" content={t('app-shell.zoomIn', 'Zoom in')}>
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onZoomIn} aria-keyshortcuts="Mod++">
             <ZoomIn className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
-        <SimpleTooltip side="bottom" content="Reset zoom">
+        <SimpleTooltip side="bottom" content={t('app-shell.resetZoom', 'Reset zoom')}>
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onResetZoom} aria-keyshortcuts="Mod+0">
             <RotateCcw className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
         <div className="mx-1 h-5 w-px bg-border/70" />
-        <SimpleTooltip side="bottom" content="Grid">
+        <SimpleTooltip side="bottom" content={t('app-shell.grid', 'Toggle grid')}>
           <Button
             type="button"
             variant={gridVisible ? 'default' : 'ghost'}
@@ -146,7 +148,7 @@ export default function EditorToolbar({
             <Grid3X3 className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
-        <SimpleTooltip side="bottom" content="Snap to grid">
+        <SimpleTooltip side="bottom" content={t('app-shell.snapToGrid', 'Snap to grid')}>
           <Button
             type="button"
             variant={snapToGrid ? 'default' : 'ghost'}

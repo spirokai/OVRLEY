@@ -1,34 +1,72 @@
 /**
- * Left column of the app header — activity file and video import controls.
+ * Left column of the app header — file menu for project and media import actions.
  * Pure presentational component.
  */
 
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Activity, Film, X } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Separator } from '@/components/ui/separator'
+import { Activity, FilePlus2, Film, FolderOpen, Menu, Save } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 /**
- * Renders the activity and video controls in the app header.
+ * Renders a full-width action row inside the menu popover.
  *
  * @param {object} props
- * @param {string|null} props.activityFilename - Imported activity filename.
- * @param {function} props.onOpenActivityFile - Opens the activity file picker.
- * @param {boolean} props.debugModeEnabled - Whether debug-only media features are enabled.
+ * @param {object} props.icon - Lucide icon component.
+ * @param {string} props.label - Item label.
+ * @param {function} props.onClick - Action invoked on click.
+ * @param {boolean} [props.disabled] - Renders the item as disabled.
+ * @param {string} [props.shortcut] - ARIA keyboard shortcut.
+ * @returns {JSX.Element} Rendered component.
+ */
+function MenuItem({ icon: Icon, label, onClick, disabled, shortcut }) {
+  return (
+    <Button
+      variant="ghost"
+      className="w-full justify-start gap-3 px-2 text-[0.7rem] font-semibold uppercase hover:bg-muted-foreground/10"
+      onClick={onClick}
+      disabled={disabled}
+      aria-keyshortcuts={shortcut}
+    >
+      <Icon className="size-3.5" />
+      {label}
+    </Button>
+  )
+}
+
+/**
+ * Renders the project and media import menu in the app header.
+ *
+ * @param {object} props
  * @param {string|null} props.appVersion - Build-time app version display label.
- * @param {string|null} props.importedMediaFilename - Filename of the imported background media, or null.
- * @param {function} props.handleImportVideo - Opens the video import picker.
- * @param {function} props.clearImportedVideo - Clears the imported video.
+ * @param {function} props.onImportActivity - Opens the activity file picker.
+ * @param {function} props.onImportVideo - Opens the video import picker.
+ * @param {function} props.onNewProject - Starts a blank project from the current template.
+ * @param {function} props.onLoadProject - Opens the project file picker.
+ * @param {function} props.onSaveProject - Saves the project to its current path.
+ * @param {string} props.status - Project document status: 'Unsaved' | 'Saved' | 'Modified'.
+ * @param {function} props.onSaveProjectAs - Saves the project to a new path.
  * @returns {JSX.Element} Rendered component.
  */
 export default function ActivitySection({
-  activityFilename,
-  onOpenActivityFile,
-  debugModeEnabled,
   appVersion,
-  importedMediaFilename,
-  handleImportVideo,
-  clearImportedVideo,
+  onImportActivity,
+  onImportVideo,
+  onNewProject,
+  onLoadProject,
+  onSaveProject,
+  onSaveProjectAs,
+  status,
 }) {
-  const activityLabel = activityFilename && activityFilename !== 'demo.gpxinit' ? activityFilename : 'Load GPX/FIT/SRT/IGC/CSV/VBO'
+  const { t } = useTranslation()
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const run = (action) => {
+    setMenuOpen(false)
+    action()
+  }
 
   return (
     <div className="flex min-w-0 items-center gap-6 overflow-hidden">
@@ -42,41 +80,45 @@ export default function ActivitySection({
 
       <div className="h-8 w-px shrink-0 bg-border/60" />
 
-      <div className="min-w-0 flex-1 overflow-hidden">
-        <div className="flex min-w-0 items-center gap-2">
-          <Button className="mr-2 h-9 w-48 shrink-0 gap-2 border-border/70 px-5" onClick={onOpenActivityFile} aria-keyshortcuts="Alt+A">
-            <Activity className="h-3.5 w-3.5" />
-            <span className="max-w-28 truncate">{activityLabel}</span>
+      <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+        <PopoverTrigger asChild>
+          <Button type="button" className="h-9 gap-3" aria-label={t('app-shell.fileMenu', 'File menu')}>
+            <Menu className="h-4 w-4" />
+            {t('app-shell.file', 'File')}
           </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" sideOffset={6} className="w-50 p-1">
+          <div className="flex flex-col">
+            <MenuItem icon={FilePlus2} label={t('app-shell.newProject', 'New Project')} shortcut="Mod+N" onClick={() => run(onNewProject)} />
+            <MenuItem icon={FolderOpen} label={t('app-shell.loadProject', 'Load Project')} shortcut="Mod+O" onClick={() => run(onLoadProject)} />
+            <MenuItem
+              icon={Save}
+              label={t('app-shell.saveProject', 'Save Project')}
+              shortcut="Mod+S"
+              disabled={status === 'Saved'}
+              onClick={() => run(onSaveProject)}
+            />
+            <MenuItem
+              icon={Save}
+              label={t('app-shell.saveProjectAs', 'Save Project As')}
+              shortcut="Mod+Shift+S"
+              onClick={() => run(onSaveProjectAs)}
+            />
+          </div>
 
-          {importedMediaFilename ? (
-            <div className="w-48 mr-2 flex h-9 shrink-0 items-center rounded-sm border border-border/70 bg-surface-elevated pl-3 pr-2 text-xs text-foreground justify-between">
-              <div className="flex items-center gap-2 truncate">
-                <Film className="mr-2 h-4 w-4 text-primary" />
-                <span className="truncate">{importedMediaFilename}</span>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="ml-1 h-6 w-6 text-muted-foreground hover:bg-accent/15 hover:text-foreground"
-                onClick={clearImportedVideo}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ) : (
-            <Button
-              variant="outline"
-              className="w-48 mr-2 h-9 shrink-0 gap-2 border-border/70 px-5 text-muted-foreground hover:text-foreground text-sm"
-              onClick={handleImportVideo}
-              aria-keyshortcuts="Mod+I"
-            >
-              <Film className="h-3.5 w-3.5" />
-              <span className="truncate">{debugModeEnabled ? 'Import Video / Image' : 'Import Video'}</span>
-            </Button>
-          )}
-        </div>
-      </div>
+          <Separator className="my-1.5" />
+
+          <div className="flex flex-col gap-0.5">
+            <MenuItem icon={Activity} label={t('app-shell.importActivity', 'Import Activity')} onClick={() => run(onImportActivity)} />
+          </div>
+
+          <Separator className="my-1.5" />
+
+          <div className="flex flex-col gap-0.5">
+            <MenuItem icon={Film} label={t('app-shell.importVideo', 'Import Video')} onClick={() => run(onImportVideo)} />
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

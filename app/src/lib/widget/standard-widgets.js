@@ -33,6 +33,50 @@ export const STANDARD_METRIC_DEFINITIONS = Object.freeze(
   Object.fromEntries(standardMetricsManifest.definitions.map((definition) => [definition.type, Object.freeze(definition)])),
 )
 
+const standardWidgetTypeDefinitions = {}
+const pendingManifestEntries = [standardWidgetsManifest]
+
+while (pendingManifestEntries.length > 0) {
+  const entry = pendingManifestEntries.pop()
+  if (!entry || Array.isArray(entry) || typeof entry !== 'object') continue
+
+  const metadataFields = ['type', 'nameKey', 'shortNameKey', 'category']
+  const carriesWidgetMetadata = metadataFields.some((field) => Object.hasOwn(entry, field))
+  if (carriesWidgetMetadata) {
+    if (metadataFields.some((field) => !entry[field])) throw new Error(`Incomplete standard widget metadata: ${entry.type ?? 'missing type'}`)
+    if (Object.hasOwn(standardWidgetTypeDefinitions, entry.type)) throw new Error(`Duplicate standard widget type: ${entry.type}`)
+    standardWidgetTypeDefinitions[entry.type] = Object.freeze(entry)
+    continue
+  }
+
+  pendingManifestEntries.push(...Object.values(entry))
+}
+
+const widgetTypeDefinitions = { ...standardWidgetTypeDefinitions, ...STANDARD_METRIC_DEFINITIONS }
+
+for (const [type, definition] of Object.entries(widgetTypeDefinitions)) {
+  if (!definition.nameKey || !definition.shortNameKey || !Object.hasOwn(standardWidgetsManifest.categories, definition.category)) {
+    throw new Error(`Invalid widget type metadata: ${type}`)
+  }
+}
+
+/** Canonical UI metadata and behavior definition for every supported widget type. */
+export const WIDGET_TYPE_DEFINITIONS = Object.freeze(widgetTypeDefinitions)
+
+/** Ordered map of category ID to translation key. */
+export const WIDGET_CATEGORY_NAME_KEYS = Object.freeze({ ...standardWidgetsManifest.categories })
+
+/**
+ * Resolve a supported widget type through the canonical catalog.
+ * @param {string} type - Canonical widget type.
+ * @returns {object} Widget type definition.
+ */
+export function requireWidgetTypeDefinition(type) {
+  const definition = WIDGET_TYPE_DEFINITIONS[type]
+  if (!definition) throw new Error(`Unknown widget type: ${type}`)
+  return definition
+}
+
 /** Metric types marked as `current` — actively shipping widget types. */
 export const CURRENT_STANDARD_METRIC_WIDGET_TYPES = Object.freeze(
   standardMetricsManifest.definitions.filter((definition) => definition.current).map((definition) => definition.type),
@@ -47,7 +91,7 @@ export const STANDARD_METRIC_WIDGET_TYPES = Object.freeze(standardMetricsManifes
 
 /**
  * Map of display_type value -> definition object.
- * Each definition includes: `label`, `layoutMode` ("intrinsic" | "boxed"),
+ * Each definition includes: `labelKey`, `layoutMode` ("intrinsic" | "boxed"),
  * and, for explicitly sized boxed presentations, `defaultFrameWidth` and
  * `defaultFrameHeight`.
  */
@@ -55,8 +99,14 @@ export const DISPLAY_TYPE_DEFINITIONS = Object.freeze(
   Object.fromEntries(Object.entries(standardMetricsManifest.displayTypes.definitions).map(([key, def]) => [key, Object.freeze(def)])),
 )
 
-/** Map of display_type value -> human-readable label for dropdown menus. */
-export const DISPLAY_TYPE_LABELS = Object.freeze(Object.fromEntries(Object.entries(DISPLAY_TYPE_DEFINITIONS).map(([key, def]) => [key, def.label])))
+for (const [displayType, definition] of Object.entries(DISPLAY_TYPE_DEFINITIONS)) {
+  if (!definition.labelKey) throw new Error(`Display type is missing labelKey: ${displayType}`)
+}
+
+/** Map of display_type value -> translation key for dropdown menus. */
+export const DISPLAY_TYPE_LABEL_KEYS = Object.freeze(
+  Object.fromEntries(Object.entries(DISPLAY_TYPE_DEFINITIONS).map(([key, definition]) => [key, definition.labelKey])),
+)
 
 /** The default set of display types available to all metric value widgets. */
 export const DEFAULT_DISPLAY_TYPES = Object.freeze([...standardMetricsManifest.displayTypes.defaults])
@@ -99,9 +149,13 @@ export const BACKDROP_TYPE_DEFINITIONS = Object.freeze(
   Object.fromEntries(Object.entries(standardWidgetsManifest.backdrops.definitions).map(([key, definition]) => [key, Object.freeze(definition)])),
 )
 
-/** Map of backdrop display_type value -> human-readable label. */
-export const BACKDROP_TYPE_LABELS = Object.freeze(
-  Object.fromEntries(Object.entries(BACKDROP_TYPE_DEFINITIONS).map(([key, definition]) => [key, definition.label])),
+for (const [displayType, definition] of Object.entries(BACKDROP_TYPE_DEFINITIONS)) {
+  if (!definition.labelKey) throw new Error(`Backdrop type is missing labelKey: ${displayType}`)
+}
+
+/** Map of backdrop display_type value -> translation key. */
+export const BACKDROP_TYPE_LABEL_KEYS = Object.freeze(
+  Object.fromEntries(Object.entries(BACKDROP_TYPE_DEFINITIONS).map(([key, definition]) => [key, definition.labelKey])),
 )
 
 /** The default backdrop display type list. */
@@ -115,12 +169,13 @@ export const BACKDROP_RECTANGLE_DEFAULTS = Object.freeze({ ...standardWidgetsMan
 
 /**
  * Build the {value, label} option list for a backdrop display_type dropdown.
+ * @param {import('i18next').TFunction} translate - Translation function.
  * @returns {Array<{value: string, label: string}>}
  */
-export function getBackdropTypeOptions() {
+export function getBackdropTypeOptions(translate) {
   return Object.entries(BACKDROP_TYPE_DEFINITIONS).map(([value, definition]) => ({
     value,
-    label: definition.label,
+    label: translate(definition.labelKey),
   }))
 }
 

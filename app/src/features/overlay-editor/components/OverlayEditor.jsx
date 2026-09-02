@@ -26,8 +26,11 @@ import { useRotateHandlers } from '../hooks/useRotateHandlers'
 import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-behavior'
 import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from '../utils/widgetRenderGeometry'
 import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
+import { useTranslation } from 'react-i18next'
+import { getWidgetTypeName } from '@/lib/widget/widget-icons'
 
 function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels, selectedWidgetIds, widgets }) {
+  const { t } = useTranslation()
   const visibleWidgets = useMemo(() => {
     const visibleIds = new Set(selectedWidgetIds)
     if (hoveredWidgetId) visibleIds.add(hoveredWidgetId)
@@ -52,7 +55,7 @@ function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels,
             style={{ left, top }}
           >
             <Icon className="h-3 w-3" />
-            <span>{widget.type}</span>
+            <span>{getWidgetTypeName(widget.type, t)}</span>
           </div>
         )
       })}
@@ -60,10 +63,10 @@ function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels,
   )
 }
 
-function CanvasStatusBadges({ height, showTemplateStatus, status, width }) {
+function CanvasStatusBadges({ height, showProjectStatus, status, width }) {
   return (
     <div data-testid="canvas-status-badges" className="pointer-events-none absolute right-8 top-4 z-50 flex items-center gap-2">
-      {showTemplateStatus ? (
+      {showProjectStatus ? (
         <Badge
           variant={status === 'Modified' ? 'secondary' : 'outline'}
           className={`h-6 rounded-xs text-[10px] shadow-lg backdrop-blur-sm ${status === 'Modified' ? 'border-accent-border bg-surface-accent-soft/20 text-primary' : 'bg-card/85'}`}
@@ -101,14 +104,17 @@ function CanvasToolbar({ editorShell, importedBackgroundImageFilename, importedV
 }
 
 function EmptyOverlayState() {
+  const { t } = useTranslation()
   return (
     <div className="flex h-full items-center justify-center p-8">
       <div className="max-w-sm rounded-sm border border-dashed border-border/70 bg-card/60 px-8 py-10 text-center shadow-[0_30px_80px_rgba(0,0,0,0.25)] backdrop-blur-sm">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center bg-surface-elevated text-primary">
           <LayoutGrid className="h-6 w-6" />
         </div>
-        <p className="text-sm font-semibold text-foreground">Overlay canvas ready</p>
-        <p className="mt-2 text-sm text-muted-foreground">Load a template or add widgets to start positioning the overlay.</p>
+        <p className="text-sm font-semibold text-foreground">{t('overlay-editor.overlayCanvasReady', 'Overlay canvas ready')}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t('overlay-editor.emptyEditorHint', 'Load a template or add widgets to start positioning the overlay.')}
+        </p>
       </div>
     </div>
   )
@@ -126,8 +132,8 @@ function OverlayEditorContent({
   snapToGrid,
   importedBackgroundImageFilename,
   importedVideoFilename,
-  showTemplateStatus,
-  templateStatus,
+  showProjectStatus,
+  projectStatus,
   undoRedoControls,
   widgetLiveEdits,
 }) {
@@ -370,8 +376,8 @@ function OverlayEditorContent({
     <div ref={viewportRef} className="relative flex h-full flex-1 overflow-hidden">
       <CanvasStatusBadges
         height={overlayState.sceneSize.height}
-        showTemplateStatus={showTemplateStatus}
-        status={templateStatus}
+        showProjectStatus={showProjectStatus}
+        status={projectStatus}
         width={overlayState.sceneSize.width}
       />
       <CanvasToolbar

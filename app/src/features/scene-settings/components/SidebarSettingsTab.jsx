@@ -14,12 +14,11 @@
 
 import useSceneSettingsState from '../hooks/useSceneSettingsState'
 import OverlaySettingsSection from './OverlaySettingsSection'
-import VideoSyncSection from './VideoSyncSection'
 import GlobalSettingsSection from './GlobalSettingsSection'
 
 export default function SidebarSettingsTab({ config, onConfigChange }) {
   const state = useSceneSettingsState({ config, onConfigChange })
-  const { overlaySettings, videoSyncSettings, globalSettings, handlers } = state
+  const { overlaySettings, globalSettings, handlers } = state
 
   return (
     <div className="space-y-8 outline-none pb-6 px-4">
@@ -32,6 +31,7 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           scene={overlaySettings.scene}
           onUpdateScene={handlers.updateScene}
           importedVideoFps={overlaySettings.importedVideoFps}
+          importedVideoResolution={overlaySettings.importedVideoResolution}
           fpsMode={overlaySettings.fpsMode}
           onFpsModeChange={handlers.handleFpsModeChange}
           onCustomFpsChange={handlers.handleCustomFpsChange}
@@ -41,37 +41,8 @@ export default function SidebarSettingsTab({ config, onConfigChange }) {
           activitySummary={overlaySettings.activitySummary}
           exportRange={overlaySettings.exportRange}
           onExportRangeChange={state.setExportRange}
+          videoResolutionMismatch={overlaySettings.videoResolutionMismatch}
         />
-
-        {videoSyncSettings.importedVideoPath ? (
-          <VideoSyncSection
-            importedVideoDuration={videoSyncSettings.importedVideoDuration}
-            importedVideoFps={videoSyncSettings.importedVideoFps}
-            importedVideoResolution={videoSyncSettings.importedVideoResolution}
-            importedVideoCodecName={videoSyncSettings.importedVideoCodecName}
-            importedVideoCodecLongName={videoSyncSettings.importedVideoCodecLongName}
-            importedVideoBitRate={videoSyncSettings.importedVideoBitRate}
-            importedVideoCameraType={videoSyncSettings.importedVideoCameraType}
-            importedVideoCameraModel={videoSyncSettings.importedVideoCameraModel}
-            importedVideoCreationTime={videoSyncSettings.importedVideoCreationTime}
-            importedVideoTimeSource={videoSyncSettings.importedVideoTimeSource}
-            timezone={videoSyncSettings.timezone}
-            videoSyncTimezoneMode={videoSyncSettings.videoSyncTimezoneMode}
-            onVideoSyncTimezoneModeChange={videoSyncSettings.setVideoSyncTimezoneMode}
-            videoSyncWarning={videoSyncSettings.videoSyncWarning}
-            videoResolutionMismatch={videoSyncSettings.videoResolutionMismatch}
-            offsetInput={videoSyncSettings.offsetInput}
-            onOffsetInputChange={videoSyncSettings.setOffsetInput}
-            onOffsetBlur={handlers.handleOffsetBlur}
-            onIncrement={handlers.handleIncrement}
-            activitySummary={videoSyncSettings.activitySummary}
-            onComputeVideoSync={videoSyncSettings.computeVideoSync}
-            filenameCreationTimeAvailable={videoSyncSettings.filenameCreationTimeAvailable}
-            onSetCreationTimeFromFilename={videoSyncSettings.setVideoCreationTimeFromFilename}
-            canResetCreationTime={videoSyncSettings.canResetVideoCreationTime}
-            onResetCreationTime={videoSyncSettings.resetVideoCreationTime}
-          />
-        ) : null}
       </div>
 
       <GlobalSettingsSection

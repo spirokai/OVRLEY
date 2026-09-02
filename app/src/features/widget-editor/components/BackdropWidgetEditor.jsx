@@ -2,9 +2,10 @@ import { Palette, Shapes } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 import { getBackdropTypeOptions } from '@/lib/widget/standard-widgets'
 import { initBackdropVariant } from '@/lib/widget/widget-resolver'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { parseInteger } from '../utils/widgetUtils'
-import { SectionHeading } from './widgetEditorSections'
 import { ColorField, NumberField, SelectField, SliderField } from './widgetFormControls'
+import { useTranslation } from 'react-i18next'
 
 const RECTANGLE_CORNERS = [
   { key: 'round_top_left', label: 'Round top left corner', className: 'rounded-tl-md' },
@@ -21,8 +22,9 @@ function maxBorderThickness(data) {
 }
 
 function CornerGrid({ rectangleData, onToggle }) {
+  const { t } = useTranslation()
   return (
-    <div className="grid h-32 w-32 grid-cols-2 grid-rows-2 gap-2 py-3 pr-3 pl-1" aria-label="Rounded corners" data-testid="corner-grid">
+    <div className="grid h-32 w-32 grid-cols-2 grid-rows-2 gap-2 py-3 pr-3 pl-1" aria-label={t('widget-editor.roundedCorners', 'Rounded corners')} data-testid="corner-grid">
       {RECTANGLE_CORNERS.map((corner) => {
         const active = Boolean(rectangleData[corner.key])
         return (
@@ -49,8 +51,9 @@ function CornerGrid({ rectangleData, onToggle }) {
 }
 
 export default function BackdropWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+  const { t } = useTranslation()
   const displayType = widget.data.display_type || 'rectangle'
-  const displayOptions = useMemo(() => getBackdropTypeOptions(), [])
+  const displayOptions = useMemo(() => getBackdropTypeOptions(t), [t])
   const activeData = useMemo(() => widget.data.display_variants?.[displayType] ?? {}, [displayType, widget.data.display_variants])
   const resolvedData = { ...widget.data, ...activeData, display_type: displayType }
   const borderMax = maxBorderThickness(resolvedData)
@@ -150,7 +153,7 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
         <div className="grid h-32 grid-rows-2" data-testid="corner-control-rows">
           <div className="min-h-0">
             <SliderField
-              label="Border Thickness"
+              label={t('widget-editor.borderThickness', 'Border Thickness')}
               value={Math.min(widget.data.border_thickness ?? 0, borderMax)}
               min={0}
               max={borderMax}
@@ -163,7 +166,7 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
           </div>
           <div className="min-h-0">
             <SliderField
-              label="Corner Radius"
+              label={t('widget-editor.cornerRadius', 'Corner Radius')}
               value={cornerRadius}
               min={0}
               max={radiusMax}
@@ -182,23 +185,23 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
   return (
     <>
       <div className="space-y-4">
-        <SelectField label="Display Type" value={displayType} onValueChange={handleDisplayTypeChange} options={displayOptions} />
+        <SelectField label={t('widget-editor.displayType', 'Display Type')} value={displayType} onValueChange={handleDisplayTypeChange} options={displayOptions} />
         {renderSizeControls()}
       </div>
 
       <div className="space-y-4">
-        <SectionHeading icon={Palette} title="Backdrop Style" />
+        <SectionHeading icon={Palette} title={t('widget-editor.backdropStyle', 'Backdrop Style')} />
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Fill Color" value={widget.data.fill_color} onChange={(value) => updateWidgetData(widget.id, { fill_color: value })} />
+          <ColorField label={t('widget-editor.fillColor', 'Fill Color')} value={widget.data.fill_color} onChange={(value) => updateWidgetData(widget.id, { fill_color: value })} />
           <ColorField
-            label="Border Color"
+            label={t('widget-editor.borderColor', 'Border Color')}
             value={widget.data.border_color}
             onChange={(value) => updateWidgetData(widget.id, { border_color: value })}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
-            label="Fill Opacity"
+            label={t('widget-editor.fillOpacity', 'Fill Opacity')}
             value={widget.data.fill_opacity}
             min={0}
             max={1}
@@ -207,7 +210,7 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
             onSliderChange={(value) => updateWidgetData(widget.id, { fill_opacity: value })}
           />
           <SliderField
-            label="Border Opacity"
+            label={t('widget-editor.borderOpacity', 'Border Opacity')}
             value={widget.data.border_opacity}
             min={0}
             max={1}
@@ -218,7 +221,7 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
         </div>
         {displayType === 'circle' ? (
           <SliderField
-            label="Border Thickness"
+            label={t('widget-editor.borderThickness', 'Border Thickness')}
             value={Math.min(widget.data.border_thickness ?? 0, borderMax)}
             min={0}
             max={borderMax}

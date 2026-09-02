@@ -1,14 +1,16 @@
 import { useMemo } from 'react'
 import { CircleGauge, Type } from 'lucide-react'
 import FontSelectField from '@/components/ui/font-select-field'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { buildUniformResizeUpdate } from '@/features/overlay-editor/utils/widgetResizeScaling'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
-import { SectionHeading } from '../widgetEditorSections'
 import { ColorField, SizeSlider, SliderField } from '../widgetFormControls'
+import { useTranslation } from 'react-i18next'
 
 /** Standard controls for G-force geometry, paint, marker, and label styling. */
 export default function GForceDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+  const { t } = useTranslation()
   const data = useMemo(() => widget.data.display_variants.g_force, [widget.data.display_variants.g_force])
   const updateGForce = useDisplayVariantUpdater(widget, 'g_force', data, updateWidgetData)
   const updateGForceSize = useDisplayVariantUpdater(widget, 'g_force', data, updateWidgetSize)
@@ -24,7 +26,7 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
   return (
     <>
       <div className="space-y-4">
-        <SectionHeading icon={CircleGauge} title="G-Force Plot" />
+        <SectionHeading icon={CircleGauge} title={t('widget-editor.gforcePlot', 'G-Force Plot')} />
         <SizeSlider
           label="Size"
           value={data.diameter}
@@ -35,9 +37,9 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
           onCommit={() => commitWidgetSize(widget.id)}
         />
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Fill Color" value={data.fill_color} onChange={(fill_color) => updateGForce({ fill_color })} />
+          <ColorField label={t('widget-editor.fillColor', 'Fill Color')} value={data.fill_color} onChange={(fill_color) => updateGForce({ fill_color })} />
           <SliderField
-            label="Fill Opacity"
+            label={t('widget-editor.fillOpacity', 'Fill Opacity')}
             value={data.fill_opacity}
             min={0}
             max={1}
@@ -47,9 +49,9 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Border Color" value={data.border_color} onChange={(border_color) => updateGForce({ border_color })} />
+          <ColorField label={t('widget-editor.borderColor', 'Border Color')} value={data.border_color} onChange={(border_color) => updateGForce({ border_color })} />
           <SliderField
-            label="Border Thickness"
+            label={t('widget-editor.borderThickness', 'Border Thickness')}
             value={data.border_thickness}
             min={0}
             max={borderMax}
@@ -60,9 +62,9 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Marker Color" value={data.marker_color} onChange={(marker_color) => updateGForce({ marker_color })} />
+          <ColorField label={t('widget-editor.markerColor', 'Marker Color')} value={data.marker_color} onChange={(marker_color) => updateGForce({ marker_color })} />
           <SizeSlider
-            label="Marker Size"
+            label={t('widget-editor.markerSize', 'Marker Size')}
             value={data.marker_size}
             min={2}
             max={48}
@@ -73,7 +75,7 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
-            label="Marker Opacity"
+            label={t('widget-editor.markerOpacity', 'Marker Opacity')}
             value={data.marker_opacity}
             min={0}
             max={1}
@@ -82,7 +84,7 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             onSliderChange={(marker_opacity) => updateGForce({ marker_opacity })}
           />
           <SliderField
-            label="Border Opacity"
+            label={t('widget-editor.borderOpacity', 'Border Opacity')}
             value={data.border_opacity}
             min={0}
             max={1}
@@ -97,7 +99,7 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
         <SectionHeading icon={Type} title="Label" />
         <div className="grid grid-cols-2 gap-4">
           <FontSelectField
-            label="Label Font"
+            label={t('widget-editor.labelFont', 'Label Font')}
             value={data.label_font}
             onValueChange={(label_font) => updateGForce({ label_font })}
             recommendedFonts={availableFonts.recommendedFonts}
@@ -106,7 +108,7 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
           />
           <SizeSlider
-            label="Font Size"
+            label={t('widget-editor.fontSize', 'Font Size')}
             value={data.label_font_size}
             min={6}
             max={100}
@@ -116,12 +118,12 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Label Color" value={data.label_color} onChange={(label_color) => updateGForce({ label_color })} />
-          <ColorField label="Unit Color" value={data.label_unit_color} onChange={(label_unit_color) => updateGForce({ label_unit_color })} />
+          <ColorField label={t('widget-editor.labelColor', 'Label Color')} value={data.label_color} onChange={(label_color) => updateGForce({ label_color })} />
+          <ColorField label={t('widget-editor.unitColor', 'Unit Color')} value={data.label_unit_color} onChange={(label_unit_color) => updateGForce({ label_unit_color })} />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
-            label="Horizontal Offset"
+            label={t('widget-editor.horizontalOffset', 'Horizontal Offset')}
             value={data.label_offset_x}
             min={-100}
             max={100}
@@ -131,7 +133,7 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
             onSliderCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
-            label="Vertical Offset"
+            label={t('widget-editor.verticalOffset', 'Vertical Offset')}
             value={data.label_offset_y}
             min={-100}
             max={100}

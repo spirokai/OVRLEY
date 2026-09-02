@@ -48,4 +48,27 @@ describe('backend Tauri error normalization', () => {
       ),
     ).rejects.toMatchObject({ code: 'already_exists', message: 'Output already exists' })
   })
+
+  test('listProjectFiles accepts canonical optional thumbnail data', async () => {
+    const projects = [
+      {
+        name: 'Race',
+        path: 'C:\\Projects\\Race.oly',
+        thumbnailDataUrl: 'data:image/png;base64,dGh1bWJuYWls',
+      },
+    ]
+    const invoke = vi.fn().mockResolvedValue(projects)
+    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+    const backend = await import('@/api/backend')
+
+    await expect(backend.listProjectFiles('C:\\Projects')).resolves.toEqual(projects)
+  })
+
+  test('listProjectFiles rejects malformed thumbnail data', async () => {
+    const invoke = vi.fn().mockResolvedValue([{ name: 'Race', path: 'C:\\Projects\\Race.oly', thumbnailDataUrl: 'file:///thumbnail.png' }])
+    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+    const backend = await import('@/api/backend')
+
+    await expect(backend.listProjectFiles('C:\\Projects')).rejects.toThrow('Invalid project list returned by backend')
+  })
 })

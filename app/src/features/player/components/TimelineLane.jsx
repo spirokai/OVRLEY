@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next'
 /**
  * Presentational clip lane renderer.
  *
  * @param {{ lane: object }} props Lane view model.
  */
 export default function TimelineLane({ lane }) {
+  const { t } = useTranslation()
   const Icon = lane.icon
 
   return (
@@ -48,12 +50,12 @@ export default function TimelineLane({ lane }) {
         <div
           id={lane.tooltip.id}
           role="tooltip"
-          className="pointer-events-none absolute bottom-full z-1000 mb-2 max-w-56 -translate-x-1/2 rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-left text-xs text-foreground shadow-2xl"
+          className="pointer-events-none absolute bottom-full z-1000 mb-2 max-w-124 -translate-x-1/2 rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-left text-xs text-foreground shadow-2xl"
           style={lane.tooltip.style}
         >
           <div className="text-[0.72rem] font-semibold leading-snug">{lane.label}</div>
           <div className="mt-1 flex items-center justify-between gap-4 border-t border-border/40 pt-1 text-[0.65rem] text-muted-foreground">
-            <span className="font-medium">Duration</span>
+            <span className="font-medium">{t('player.duration', 'Duration')}</span>
             <span className="tabular-nums text-foreground">{lane.durationLabel}</span>
           </div>
           {lane.availableMetrics?.length > 0 && (

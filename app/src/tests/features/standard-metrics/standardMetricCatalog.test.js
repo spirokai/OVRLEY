@@ -4,7 +4,8 @@ import {
   CURRENT_STANDARD_METRIC_WIDGET_TYPES,
   STANDARD_METRIC_WIDGET_TYPES,
   DISPLAY_TYPE_DEFINITIONS,
-  DISPLAY_TYPE_LABELS,
+  DISPLAY_TYPE_LABEL_KEYS,
+  WIDGET_TYPE_DEFINITIONS,
 } from '@/lib/widget/standard-widgets'
 import {
   getStandardMetricDefinition,
@@ -19,7 +20,8 @@ import {
   getDisplayTypeOptions,
 } from '@/lib/widget/standard-metrics'
 import { isTextDisplayType, isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
-import { METRIC_ICON_SVGS, TYPE_LABELS } from '@/lib/widget/widget-icons'
+import { METRIC_ICON_SVGS } from '@/lib/widget/widget-icons'
+import i18next from '@/i18n'
 
 describe('standard metric widget catalog', () => {
   test('covers the existing and Wave 1 shared standard metric widgets', () => {
@@ -68,7 +70,8 @@ describe('standard metric widget catalog', () => {
     const distance = getStandardMetricDefinition('distance')
 
     expect(speed).toMatchObject({
-      label: 'Speed',
+      nameKey: 'widgets.types.speed.name',
+      shortNameKey: 'widgets.types.speed.shortName',
       defaultDisplayUnit: 'kmh',
       showUnitsByDefault: true,
       icon: {
@@ -77,7 +80,8 @@ describe('standard metric widget catalog', () => {
     })
     expect(speed.supportedDisplayUnits.map((option) => option.value)).toEqual(['kmh', 'mph', 'kn', 'mps'])
     expect(distance).toMatchObject({
-      label: 'Distance',
+      nameKey: 'widgets.types.distance.name',
+      shortNameKey: 'widgets.types.distance.shortName',
       defaultDisplayUnit: 'km',
       showUnitsByDefault: true,
       icon: {
@@ -150,11 +154,11 @@ describe('standard metric widget catalog', () => {
     expect(isStandardMetricWidgetType('course')).toBe(false)
   })
 
-  test('feeds standard metric labels into shared widget label lookups', () => {
-    expect(TYPE_LABELS.speed).toBe(getStandardMetricDefinition('speed').label)
-    expect(TYPE_LABELS.distance).toBe(getStandardMetricDefinition('distance').label)
-    expect(TYPE_LABELS.pace).toBe(getStandardMetricDefinition('pace').label)
-    expect(TYPE_LABELS.core_temperature).toBe(getStandardMetricDefinition('core_temperature').label)
+  test('feeds standard metric definitions into the canonical widget type catalog', () => {
+    expect(WIDGET_TYPE_DEFINITIONS.speed).toBe(getStandardMetricDefinition('speed'))
+    expect(WIDGET_TYPE_DEFINITIONS.distance).toBe(getStandardMetricDefinition('distance'))
+    expect(WIDGET_TYPE_DEFINITIONS.pace).toBe(getStandardMetricDefinition('pace'))
+    expect(WIDGET_TYPE_DEFINITIONS.core_temperature).toBe(getStandardMetricDefinition('core_temperature'))
   })
 
   test('Phase 1 SRT camera metrics are in the standard metric catalog', () => {
@@ -296,10 +300,10 @@ describe('display type definitions', () => {
     expect(DISPLAY_TYPE_DEFINITIONS.text.defaultFrameHeight).toBeUndefined()
   })
 
-  test('DISPLAY_TYPE_LABELS is derived from definitions', () => {
-    expect(DISPLAY_TYPE_LABELS.text).toBe('Text')
-    expect(DISPLAY_TYPE_LABELS.linear).toBe('Linear Bar')
-    expect(Object.keys(DISPLAY_TYPE_LABELS)).toEqual(Object.keys(DISPLAY_TYPE_DEFINITIONS))
+  test('DISPLAY_TYPE_LABEL_KEYS is derived from definitions', () => {
+    expect(DISPLAY_TYPE_LABEL_KEYS.text).toBe('widgets.displayTypes.text')
+    expect(DISPLAY_TYPE_LABEL_KEYS.linear).toBe('widgets.displayTypes.linear')
+    expect(Object.keys(DISPLAY_TYPE_LABEL_KEYS)).toEqual(Object.keys(DISPLAY_TYPE_DEFINITIONS))
   })
 
   test('getDisplayTypeDefinition returns the definition or null', () => {
@@ -307,9 +311,9 @@ describe('display type definitions', () => {
     expect(getDisplayTypeDefinition('nonexistent')).toBeNull()
   })
 
-  test('getDisplayTypeLabel returns label or falls back to key', () => {
-    expect(getDisplayTypeLabel('text')).toBe('Text')
-    expect(getDisplayTypeLabel('unknown')).toBe('unknown')
+  test('getDisplayTypeLabel translates known display types and rejects unknown types', () => {
+    expect(getDisplayTypeLabel('text', i18next.t)).toBe('Text')
+    expect(() => getDisplayTypeLabel('unknown', i18next.t)).toThrow('Unknown display type: unknown')
   })
 
   test('isBoxedDisplayType correctly classifies display types', () => {
@@ -339,7 +343,7 @@ describe('display type definitions', () => {
   })
 
   test('getDisplayTypeOptions builds dropdown options from definitions', () => {
-    const headingOptions = getDisplayTypeOptions('heading')
+    const headingOptions = getDisplayTypeOptions('heading', i18next.t)
     expect(headingOptions).toEqual([
       { value: 'text', label: 'Text' },
       { value: 'heading_tape', label: 'Heading Tape' },

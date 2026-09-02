@@ -1,4 +1,4 @@
-import { SectionHeading } from '../widgetEditorSections'
+import { SectionHeading } from '@/components/ui/section-heading'
 import { ToggleField, SelectField, SizeSlider, SliderField, ColorField } from '../widgetFormControls'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { useMemo } from 'react'
@@ -7,17 +7,18 @@ import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
 import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
+import { useTranslation } from 'react-i18next'
 
 const ORIENTATION_OPTIONS = [
-  { value: 'horizontal', label: 'Horizontal' },
-  { value: 'vertical', label: 'Vertical' },
+  { value: 'horizontal', labelKey: 'widget-editor.horizontal', defaultLabel: 'Horizontal' },
+  { value: 'vertical', labelKey: 'widget-editor.vertical', defaultLabel: 'Vertical' },
 ]
 
 const POSITION_OPTIONS = [
-  { value: 'top', label: 'Top' },
-  { value: 'bottom', label: 'Bottom' },
-  { value: 'left', label: 'Left' },
-  { value: 'right', label: 'Right' },
+  { value: 'top', labelKey: 'widget-editor.top', defaultLabel: 'Top' },
+  { value: 'bottom', labelKey: 'widget-editor.bottom', defaultLabel: 'Bottom' },
+  { value: 'left', labelKey: 'widget-editor.left', defaultLabel: 'Left' },
+  { value: 'right', labelKey: 'widget-editor.right', defaultLabel: 'Right' },
 ]
 
 const LABEL_POSITION_SWAP = {
@@ -36,10 +37,16 @@ const LABEL_POSITION_SWAP = {
  * @param {Function} props.updateWidgetData - Updates widget data.
  */
 export default function LinearDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+  const { t } = useTranslation()
   const linearData = useMemo(() => widget.data.display_variants?.linear ?? {}, [widget.data.display_variants?.linear])
   const updateLinear = useDisplayVariantUpdater(widget, 'linear', linearData, updateWidgetData)
   const updateLinearSize = useDisplayVariantUpdater(widget, 'linear', linearData, updateWidgetSize)
   const availableFonts = useAvailableFonts()
+  const orientationOptions = useMemo(
+    () => ORIENTATION_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })),
+    [t],
+  )
+  const positionOptions = useMemo(() => POSITION_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })), [t])
   const cornerRadiusMax = getLinearTrackCornerRadiusMax(linearData)
   const updateOrientation = (orientation) => {
     if (orientation === linearData.orientation) return
@@ -57,11 +64,11 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
   }
   const availablePositions = useMemo(() => {
     if (linearData.orientation === 'horizontal') {
-      return POSITION_OPTIONS.filter((option) => option.value === 'top' || option.value === 'bottom')
+      return positionOptions.filter((option) => option.value === 'top' || option.value === 'bottom')
     } else {
-      return POSITION_OPTIONS.filter((option) => option.value === 'left' || option.value === 'right')
+      return positionOptions.filter((option) => option.value === 'left' || option.value === 'right')
     }
-  }, [linearData.orientation])
+  }, [linearData.orientation, positionOptions])
 
   const widthSliderBounds = useMemo(() => {
     if (linearData.orientation === 'vertical') {
@@ -81,7 +88,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
   return (
     <>
       <div className="space-y-4">
-        <SectionHeading icon={SlidersHorizontal} title="Gauge Track" />
+        <SectionHeading icon={SlidersHorizontal} title={t('widget-editor.gaugeTrack', 'Gauge Track')} />
         <div className="grid grid-cols-2 gap-4">
           <SizeSlider
             label="Width"
@@ -115,7 +122,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4 pt-2">
-          <SelectField label="Orientation" value={linearData.orientation} onValueChange={updateOrientation} options={ORIENTATION_OPTIONS} />
+          <SelectField label={t('widget-editor.orientation', 'Orientation')} value={linearData.orientation} onValueChange={updateOrientation} options={orientationOptions} />
           <BarFillStyleField data={linearData} suggestBarGeometry={getSuggestedLinearBarGeometry} updateVariant={updateLinear} />
           <BarFillStyleDetails
             data={linearData}
@@ -127,7 +134,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             widgetId={widget.id}
           />
           <SliderField
-            label="Corner Radius"
+            label={t('widget-editor.cornerRadius', 'Corner Radius')}
             value={linearData.track_corner_radius}
             min={0}
             max={cornerRadiusMax}
@@ -139,7 +146,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Border Color" value={linearData.track_border_color} onChange={(value) => updateLinear({ track_border_color: value })} />
+          <ColorField label={t('widget-editor.borderColor', 'Border Color')} value={linearData.track_border_color} onChange={(value) => updateLinear({ track_border_color: value })} />
           <SliderField
             label="Border"
             value={linearData.track_border_thickness}
@@ -154,9 +161,9 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Empty Color" value={linearData.track_empty_color} onChange={(value) => updateLinear({ track_empty_color: value })} />
+          <ColorField label={t('widget-editor.emptyColor', 'Empty Color')} value={linearData.track_empty_color} onChange={(value) => updateLinear({ track_empty_color: value })} />
           <SliderField
-            label="Empty Opacity"
+            label={t('widget-editor.emptyOpacity', 'Empty Opacity')}
             value={linearData.track_empty_opacity}
             min={0}
             max={1}
@@ -166,9 +173,9 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Filled Color" value={linearData.track_filled_color} onChange={(value) => updateLinear({ track_filled_color: value })} />
+          <ColorField label={t('widget-editor.filledColor', 'Filled Color')} value={linearData.track_filled_color} onChange={(value) => updateLinear({ track_filled_color: value })} />
           <SliderField
-            label="Filled Opacity"
+            label={t('widget-editor.filledOpacity', 'Filled Opacity')}
             value={linearData.track_filled_opacity}
             min={0}
             max={1}
@@ -181,14 +188,14 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
 
       <div className="space-y-4">
         <div className="flex flex-row items-center gap-3">
-          <SectionHeading icon={Tags} title="Min/Max Labels" />
+          <SectionHeading icon={Tags} title={t('widget-editor.minmaxLabels', 'Min/Max Labels')} />
           <div className="shrink-0 pt-1">
             <ToggleField checked={linearData.show_min_max_labels} onCheckedChange={(checked) => updateLinear({ show_min_max_labels: checked })} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4 pt-2">
           <FontSelectField
-            label="Label Font"
+            label={t('widget-editor.labelFont', 'Label Font')}
             value={linearData.min_max_label_font}
             disabled={!linearData.show_min_max_labels}
             onValueChange={(value) => updateLinear({ min_max_label_font: value })}
@@ -198,7 +205,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
           />
           <SizeSlider
-            label="Font Size"
+            label={t('widget-editor.fontSize', 'Font Size')}
             disabled={!linearData.show_min_max_labels}
             value={linearData.min_max_label_font_size}
             min={6}
@@ -212,13 +219,13 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
 
         <div className="grid grid-cols-2 gap-4">
           <ColorField
-            label="Label Color"
+            label={t('widget-editor.labelColor', 'Label Color')}
             value={linearData.min_max_label_color}
             onChange={(value) => updateLinear({ min_max_label_color: value })}
             disabled={!linearData.show_min_max_labels}
           />
           <SelectField
-            label="Position"
+            label={t('widget-editor.position', 'Position')}
             disabled={!linearData.show_min_max_labels}
             value={linearData.min_max_label_position}
             onValueChange={(value) => updateLinear({ min_max_label_position: value })}

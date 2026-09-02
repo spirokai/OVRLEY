@@ -2,7 +2,7 @@
   "displayTypes": {
     "definitions": {
       "text": {
-        "label": "Text",
+        "labelKey": "widgets.displayTypes.text",
         "icon": { "source": "shared", "assetFile": "display-type-text.svg" },
         "layoutMode": "intrinsic",
         "defaults": {
@@ -58,7 +58,7 @@
         }
       },
       "lap_timer": {
-        "label": "Lap Times",
+        "labelKey": "widgets.displayTypes.lapTimer",
         "layoutMode": "intrinsic",
         "defaults": {
           "show_label": true,
@@ -70,20 +70,28 @@
           "label_color": "#ffffff"
         },
         "modes": [
-          { "value": "current_lap", "label": "Current Lap", "icon": { "source": "lucide", "name": "Timer" } },
+          {
+            "value": "current_lap",
+            "label": "Current Lap",
+            "labelKey": "widgets.lapTimerModes.currentLap",
+            "icon": { "source": "lucide", "name": "Timer" }
+          },
           {
             "value": "best_lap",
             "label": "Best Lap",
+            "labelKey": "widgets.lapTimerModes.bestLap",
             "icon": { "source": "custom", "assetFile": "display-mode-best-lap.svg" }
           },
           {
             "value": "delta",
             "label": "Delta",
+            "labelKey": "widgets.lapTimerModes.delta",
             "icon": { "source": "custom", "assetFile": "display-mode-delta.svg" }
           },
           {
             "value": "lap_log",
             "label": "Lap Log",
+            "labelKey": "widgets.lapTimerModes.lapLog",
             "font_size": 30,
             "label_font_size": 15,
             "icon": { "source": "custom", "assetFile": "display-mode-lap-log.svg" }
@@ -92,7 +100,7 @@
         "configFields": ["lap_timer_mode", "label"]
       },
       "heading_tape": {
-        "label": "Heading Tape",
+        "labelKey": "widgets.displayTypes.headingTape",
         "icon": {
           "source": "shared",
           "assetFile": "display-type-heading-tape.svg"
@@ -127,7 +135,7 @@
         }
       },
       "lean_angle": {
-        "label": "Lean Angle",
+        "labelKey": "widgets.displayTypes.leanAngle",
         "icon": {
           "source": "shared",
           "assetFile": "display-type-lean-angle.svg"
@@ -154,7 +162,7 @@
         }
       },
       "g_force": {
-        "label": "G-Force",
+        "labelKey": "widgets.displayTypes.gForce",
         "icon": {
           "source": "shared",
           "assetFile": "display-type-g-force.svg"
@@ -189,7 +197,7 @@
         }
       },
       "linear": {
-        "label": "Linear Bar",
+        "labelKey": "widgets.displayTypes.linear",
         "icon": { "source": "shared", "assetFile": "display-type-linear.svg" },
         "layoutMode": "boxed",
         "defaultFrameWidth": 200,
@@ -215,7 +223,7 @@
         }
       },
       "arc": {
-        "label": "Arc Gauge",
+        "labelKey": "widgets.displayTypes.arc",
         "icon": {
           "source": "lucide",
           "name": "Gauge",
@@ -248,7 +256,7 @@
         }
       },
       "corner": {
-        "label": "Corner Gauge",
+        "labelKey": "widgets.displayTypes.corner",
         "icon": {
           "source": "custom",
           "name": "CornerGauge",
@@ -308,7 +316,8 @@
     {
       "type": "speed",
       "current": true,
-      "label": "Speed",
+      "nameKey": "widgets.types.speed.name",
+      "shortNameKey": "widgets.types.speed.shortName",
       "defaultDisplayUnit": "kmh",
       "supportedDisplayUnits": [
         {
@@ -346,7 +355,8 @@
     {
       "type": "distance",
       "current": true,
-      "label": "Distance",
+      "nameKey": "widgets.types.distance.name",
+      "shortNameKey": "widgets.types.distance.shortName",
       "defaultDisplayUnit": "km",
       "supportedDisplayUnits": [
         {
@@ -384,7 +394,8 @@
     {
       "type": "gps_coordinates",
       "current": true,
-      "label": "Location",
+      "nameKey": "widgets.types.gps_coordinates.name",
+      "shortNameKey": "widgets.types.gps_coordinates.shortName",
       "defaultDisplayUnit": "both",
       "supportedDisplayUnits": [
         {
@@ -413,7 +424,8 @@
     {
       "type": "distance_to_home",
       "current": true,
-      "label": "Home",
+      "nameKey": "widgets.types.distance_to_home.name",
+      "shortNameKey": "widgets.types.distance_to_home.shortName",
       "defaultDisplayUnit": "m",
       "supportedDisplayUnits": [
         {
@@ -451,7 +463,8 @@
     {
       "type": "total_ascent",
       "current": true,
-      "label": "Ascent",
+      "nameKey": "widgets.types.total_ascent.name",
+      "shortNameKey": "widgets.types.total_ascent.shortName",
       "defaultDisplayUnit": "m",
       "supportedDisplayUnits": [
         {
@@ -479,7 +492,8 @@
     {
       "type": "calories",
       "current": true,
-      "label": "Calories",
+      "nameKey": "widgets.types.calories.name",
+      "shortNameKey": "widgets.types.calories.shortName",
       "defaultDisplayUnit": "kcal",
       "supportedDisplayUnits": [
         {
@@ -501,7 +515,8 @@
     {
       "type": "heartrate",
       "current": true,
-      "label": "Heart Rate",
+      "nameKey": "widgets.types.heartrate.name",
+      "shortNameKey": "widgets.types.heartrate.shortName",
       "defaultDisplayUnit": "bpm",
       "supportedDisplayUnits": [
         {
@@ -522,7 +537,8 @@
     {
       "type": "cadence",
       "current": true,
-      "label": "Cadence",
+      "nameKey": "widgets.types.cadence.name",
+      "shortNameKey": "widgets.types.cadence.shortName",
       "defaultDisplayUnit": "rpm",
       "supportedDisplayUnits": [
         {
@@ -543,7 +559,8 @@
     {
       "type": "power",
       "current": true,
-      "label": "Power",
+      "nameKey": "widgets.types.power.name",
+      "shortNameKey": "widgets.types.power.shortName",
       "defaultDisplayUnit": "w",
       "supportedDisplayUnits": [
         {
@@ -564,7 +581,8 @@
     {
       "type": "engine_power",
       "current": true,
-      "label": "Eng. Power",
+      "nameKey": "widgets.types.engine_power.name",
+      "shortNameKey": "widgets.types.engine_power.shortName",
       "defaultDisplayUnit": "w",
       "supportedDisplayUnits": [{ "value": "w", "label": "W" }],
       "showUnitsByDefault": true,
@@ -580,7 +598,8 @@
     {
       "type": "temperature",
       "current": true,
-      "label": "Temperature",
+      "nameKey": "widgets.types.temperature.name",
+      "shortNameKey": "widgets.types.temperature.shortName",
       "defaultDisplayUnit": "celsius",
       "supportedDisplayUnits": [
         {
@@ -605,7 +624,8 @@
     {
       "type": "pace",
       "current": true,
-      "label": "Pace",
+      "nameKey": "widgets.types.pace.name",
+      "shortNameKey": "widgets.types.pace.shortName",
       "defaultDisplayUnit": "min_per_km",
       "supportedDisplayUnits": [
         {
@@ -633,7 +653,8 @@
     {
       "type": "g_force",
       "current": true,
-      "label": "G-Force",
+      "nameKey": "widgets.types.g_force.name",
+      "shortNameKey": "widgets.types.g_force.shortName",
       "defaultDisplayUnit": "g",
       "supportedDisplayUnits": [
         {
@@ -660,7 +681,8 @@
     {
       "type": "air_pressure",
       "current": true,
-      "label": "Air Pressure",
+      "nameKey": "widgets.types.air_pressure.name",
+      "shortNameKey": "widgets.types.air_pressure.shortName",
       "defaultDisplayUnit": "hpa",
       "supportedDisplayUnits": [
         {
@@ -698,7 +720,8 @@
     {
       "type": "ground_contact_time",
       "current": true,
-      "label": "Ground Contact Time",
+      "nameKey": "widgets.types.ground_contact_time.name",
+      "shortNameKey": "widgets.types.ground_contact_time.shortName",
       "defaultDisplayUnit": "ms",
       "supportedDisplayUnits": [
         {
@@ -720,7 +743,8 @@
     {
       "type": "left_right_balance",
       "current": true,
-      "label": "Left/Right Balance",
+      "nameKey": "widgets.types.left_right_balance.name",
+      "shortNameKey": "widgets.types.left_right_balance.shortName",
       "defaultDisplayUnit": "percent",
       "supportedDisplayUnits": [
         {
@@ -743,7 +767,8 @@
     {
       "type": "stride_length",
       "current": true,
-      "label": "Stride Length",
+      "nameKey": "widgets.types.stride_length.name",
+      "shortNameKey": "widgets.types.stride_length.shortName",
       "defaultDisplayUnit": "m",
       "supportedDisplayUnits": [
         {
@@ -781,7 +806,8 @@
     {
       "type": "stroke_rate",
       "current": true,
-      "label": "Stroke Rate",
+      "nameKey": "widgets.types.stroke_rate.name",
+      "shortNameKey": "widgets.types.stroke_rate.shortName",
       "defaultDisplayUnit": "spm",
       "supportedDisplayUnits": [
         {
@@ -803,7 +829,8 @@
     {
       "type": "torque",
       "current": true,
-      "label": "Torque",
+      "nameKey": "widgets.types.torque.name",
+      "shortNameKey": "widgets.types.torque.shortName",
       "defaultDisplayUnit": "nm",
       "supportedDisplayUnits": [
         {
@@ -825,7 +852,8 @@
     {
       "type": "vertical_speed",
       "current": true,
-      "label": "Vertical Speed",
+      "nameKey": "widgets.types.vertical_speed.name",
+      "shortNameKey": "widgets.types.vertical_speed.shortName",
       "defaultDisplayUnit": "mps",
       "supportedDisplayUnits": [
         {
@@ -863,7 +891,8 @@
     {
       "type": "gear_position",
       "current": true,
-      "label": "Gear Position",
+      "nameKey": "widgets.types.gear_position.name",
+      "shortNameKey": "widgets.types.gear_position.shortName",
       "defaultDisplayUnit": "gear",
       "supportedDisplayUnits": [
         {
@@ -885,7 +914,8 @@
     {
       "type": "vertical_ratio",
       "current": true,
-      "label": "V. Ratio",
+      "nameKey": "widgets.types.vertical_ratio.name",
+      "shortNameKey": "widgets.types.vertical_ratio.shortName",
       "defaultDisplayUnit": "percent",
       "supportedDisplayUnits": [
         {
@@ -907,7 +937,8 @@
     {
       "type": "vertical_oscillation",
       "current": true,
-      "label": "Vertical Oscillation",
+      "nameKey": "widgets.types.vertical_oscillation.name",
+      "shortNameKey": "widgets.types.vertical_oscillation.shortName",
       "defaultDisplayUnit": "mm",
       "supportedDisplayUnits": [
         {
@@ -935,7 +966,8 @@
     {
       "type": "core_temperature",
       "current": true,
-      "label": "Core Temperature",
+      "nameKey": "widgets.types.core_temperature.name",
+      "shortNameKey": "widgets.types.core_temperature.shortName",
       "defaultDisplayUnit": "celsius",
       "supportedDisplayUnits": [
         {
@@ -961,7 +993,8 @@
     {
       "type": "heading",
       "current": true,
-      "label": "Heading",
+      "nameKey": "widgets.types.heading.name",
+      "shortNameKey": "widgets.types.heading.shortName",
       "defaultDisplayUnit": "degrees",
       "supportedDisplayUnits": [
         {
@@ -983,7 +1016,8 @@
     {
       "type": "altitude",
       "current": true,
-      "label": "Altitude",
+      "nameKey": "widgets.types.altitude.name",
+      "shortNameKey": "widgets.types.altitude.shortName",
       "dataSource": "elevation",
       "defaultDisplayUnit": "m",
       "supportedDisplayUnits": [
@@ -1014,7 +1048,8 @@
     {
       "type": "iso",
       "current": true,
-      "label": "ISO",
+      "nameKey": "widgets.types.iso.name",
+      "shortNameKey": "widgets.types.iso.shortName",
       "defaultDisplayUnit": "iso",
       "supportedDisplayUnits": [
         {
@@ -1035,7 +1070,8 @@
     {
       "type": "aperture",
       "current": true,
-      "label": "Aperture",
+      "nameKey": "widgets.types.aperture.name",
+      "shortNameKey": "widgets.types.aperture.shortName",
       "defaultDisplayUnit": "fnum",
       "supportedDisplayUnits": [
         {
@@ -1056,7 +1092,8 @@
     {
       "type": "shutter_speed",
       "current": true,
-      "label": "Shutter",
+      "nameKey": "widgets.types.shutter_speed.name",
+      "shortNameKey": "widgets.types.shutter_speed.shortName",
       "defaultDisplayUnit": "seconds",
       "supportedDisplayUnits": [
         {
@@ -1077,7 +1114,8 @@
     {
       "type": "focal_length",
       "current": true,
-      "label": "Focal L.",
+      "nameKey": "widgets.types.focal_length.name",
+      "shortNameKey": "widgets.types.focal_length.shortName",
       "defaultDisplayUnit": "mm",
       "supportedDisplayUnits": [
         {
@@ -1099,7 +1137,8 @@
     {
       "type": "ev",
       "current": true,
-      "label": "EV",
+      "nameKey": "widgets.types.ev.name",
+      "shortNameKey": "widgets.types.ev.shortName",
       "defaultDisplayUnit": "ev",
       "supportedDisplayUnits": [
         {
@@ -1120,7 +1159,8 @@
     {
       "type": "color_temperature",
       "current": true,
-      "label": "WB",
+      "nameKey": "widgets.types.color_temperature.name",
+      "shortNameKey": "widgets.types.color_temperature.shortName",
       "defaultDisplayUnit": "kelvin",
       "supportedDisplayUnits": [
         {
@@ -1142,7 +1182,8 @@
     {
       "type": "rpm",
       "current": true,
-      "label": "RPM",
+      "nameKey": "widgets.types.rpm.name",
+      "shortNameKey": "widgets.types.rpm.shortName",
       "defaultDisplayUnit": "rpm",
       "supportedDisplayUnits": [
         {
@@ -1164,7 +1205,8 @@
     {
       "type": "throttle_position",
       "current": true,
-      "label": "Throttle Position",
+      "nameKey": "widgets.types.throttle_position.name",
+      "shortNameKey": "widgets.types.throttle_position.shortName",
       "defaultDisplayUnit": "percent",
       "supportedDisplayUnits": [
         {
@@ -1185,7 +1227,8 @@
     {
       "type": "brake_position",
       "current": true,
-      "label": "Brake Position",
+      "nameKey": "widgets.types.brake_position.name",
+      "shortNameKey": "widgets.types.brake_position.shortName",
       "defaultDisplayUnit": "percent",
       "supportedDisplayUnits": [
         {
@@ -1206,7 +1249,8 @@
     {
       "type": "lean_angle",
       "current": true,
-      "label": "Lean Angle",
+      "nameKey": "widgets.types.lean_angle.name",
+      "shortNameKey": "widgets.types.lean_angle.shortName",
       "defaultDisplayUnit": "degrees",
       "supportedDisplayUnits": [
         {
@@ -1227,7 +1271,8 @@
     {
       "type": "lap_timer",
       "current": true,
-      "label": "Lap Timer",
+      "nameKey": "widgets.types.lap_timer.name",
+      "shortNameKey": "widgets.types.lap_timer.shortName",
       "defaultDisplayUnit": "none",
       "supportedDisplayUnits": [],
       "showUnitsByDefault": false,

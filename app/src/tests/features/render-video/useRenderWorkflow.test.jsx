@@ -127,9 +127,39 @@ describe('useRenderWorkflow', () => {
         outputPath: 'C:\\renders\\video.mov',
       }),
     )
+    expect(useStore.getState().renderSettings).toMatchObject({
+      exportMode: 'transparent',
+      codec: 'prores_ks',
+      range: { type: 'custom', from: 5.25, to: 15.75 },
+    })
   })
 
-  test('dispatches composite mode with imported-video compositing inputs and keeps durable transparent settings untouched', async () => {
+  test('defaults to composite with a video and to transparent without one', async () => {
+    useStore.setState({ importedVideoPath: 'C:\\video.mp4' })
+    const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
+
+    await act(async () => result.current.openRenderDialog())
+    expect(result.current.renderSettingsDraft.exportMode).toBe('composite')
+
+    act(() => result.current.closeRenderDialog())
+    act(() => useStore.setState({ importedVideoPath: null }))
+    await act(async () => result.current.openRenderDialog())
+    expect(result.current.renderSettingsDraft.exportMode).toBe('transparent')
+  })
+
+  test('preserves an explicit transparent project setting when a video is present', async () => {
+    useStore.setState({
+      importedVideoPath: 'C:\\video.mp4',
+      renderSettings: { ...useStore.getState().renderSettings, exportMode: 'transparent' },
+    })
+    const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
+
+    await act(async () => result.current.openRenderDialog())
+
+    expect(result.current.renderSettingsDraft.exportMode).toBe('transparent')
+  })
+
+  test('dispatches committed composite mode with imported-video compositing inputs', async () => {
     useStore.setState({
       importedVideoPath: 'C:\\video.mp4',
       importedVideoFps: 30,
@@ -137,11 +167,10 @@ describe('useRenderWorkflow', () => {
       importedVideoFpsNum: 30,
       importedVideoFpsDen: 1,
       importedVideoResolution: { width: 1920, height: 1080 },
-      exportCodec: 'prores_ks',
-      exportRange: {
-        type: 'custom',
-        from: 1.25,
-        to: 2.75,
+      renderSettings: {
+        ...useStore.getState().renderSettings,
+        exportMode: 'composite',
+        codec: 'libx264',
       },
     })
 

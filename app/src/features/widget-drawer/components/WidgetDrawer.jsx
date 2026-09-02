@@ -20,11 +20,5 @@ export function WidgetDrawerContent({ widgetLiveEdits }) {
     dismissLeftDrawerOverlay()
   }
 
-  return (
-    <WidgetButtonGrid
-      onAddWidget={handleAddWidget}
-      validAttributes={activitySummary?.validAttributes}
-      extendedAttributes={activitySummary?.extendedAttributes}
-    />
-  )
+  return <WidgetButtonGrid onAddWidget={handleAddWidget} availableMetrics={activitySummary?.availableMetrics ?? []} />
 }

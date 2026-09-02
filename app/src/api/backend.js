@@ -440,6 +440,61 @@ export async function readSelectedFileBytes(path) {
   return payload instanceof Uint8Array ? payload : new Uint8Array(payload)
 }
 
+/** @param {string} path Absolute resolved source path. */
+export async function selectedPathIsFile(path) {
+  return invokeCommand('selected_path_is_file', { path })
+}
+
+/** @returns {Promise<string>} Absolute Documents/OVRLEY/projects directory. */
+export async function getDefaultProjectDirectory() {
+  return invokeCommand('default_project_directory')
+}
+
+/**
+ * Lists `.oly` projects directly inside a project directory.
+ * @param {string} directory Absolute project directory.
+ * @returns {Promise<Array<{name: string, path: string, thumbnailDataUrl: string|null}>>} Project summaries sorted by name.
+ */
+export async function listProjectFiles(directory) {
+  const projects = await invokeCommand('list_project_files', { directory })
+  if (
+    !Array.isArray(projects) ||
+    projects.some(
+      (project) =>
+        !project ||
+        typeof project !== 'object' ||
+        typeof project.name !== 'string' ||
+        !project.name ||
+        typeof project.path !== 'string' ||
+        !project.path ||
+        (project.thumbnailDataUrl !== null &&
+          (typeof project.thumbnailDataUrl !== 'string' || !project.thumbnailDataUrl.startsWith('data:image/png;base64,'))),
+    )
+  ) {
+    throw new Error('Invalid project list returned by backend')
+  }
+  return projects
+}
+
+/**
+ * Reads and validates an OVRLEY project archive.
+ * @param {string} path - Absolute `.oly` path.
+ * @returns {Promise<object>} Validated project and resolved source paths.
+ */
+export async function readProjectFile(path) {
+  return invokeCommand('read_project_file', { path })
+}
+
+/**
+ * Validates and atomically writes an OVRLEY project archive.
+ * @param {string} path - Absolute `.oly` path.
+ * @param {string} projectJson - Canonical project JSON.
+ * @returns {Promise<string>} Written path.
+ */
+export async function writeProjectFile(path, projectJson) {
+  return invokeCommand('write_project_file', { path, projectJson })
+}
+
 /**
  * Imports a video into the local HTTP preview server.
  *
@@ -448,6 +503,24 @@ export async function readSelectedFileBytes(path) {
  */
 export async function importPreviewVideo(path) {
   return apiCall('backend_import_preview_video', { path })
+}
+
+/**
+ * Probes a video without changing preview-server state.
+ * @param {string} path Absolute source video path.
+ * @returns {Promise<object>} Canonical source metadata.
+ */
+export async function preparePreviewVideo(path) {
+  return apiCall('backend_prepare_preview_video', { path })
+}
+
+/**
+ * Registers an already-probed video with the local preview server.
+ * @param {string} path Absolute source video path.
+ * @returns {Promise<{importId: string, previewUrl: string}>} Runtime preview identity.
+ */
+export async function registerPreviewVideo(path) {
+  return apiCall('backend_register_preview_video', { path })
 }
 
 /**

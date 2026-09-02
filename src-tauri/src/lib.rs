@@ -34,6 +34,7 @@ mod distribution;
 mod file_ops;
 mod preview_import;
 mod progress_sink;
+mod project_file;
 mod runtime_paths;
 mod tauri_commands;
 
@@ -81,6 +82,8 @@ pub fn run() {
             tauri_commands::backend_open_templates,
             tauri_commands::backend_open_video,
             tauri_commands::backend_probe_video,
+            tauri_commands::backend_prepare_preview_video,
+            tauri_commands::backend_register_preview_video,
             tauri_commands::backend_import_preview_video,
             tauri_commands::backend_extract_video_telemetry,
             tauri_commands::backend_clear_preview_video,
@@ -90,8 +93,13 @@ pub fn run() {
             tauri_commands::backend_build_route_geometry,
             file_ops::default_template_save_path,
             file_ops::read_selected_file_bytes,
+            file_ops::selected_path_is_file,
             file_ops::write_template_file,
-            file_ops::write_parse_debug_file
+            file_ops::write_parse_debug_file,
+            project_file::default_project_directory,
+            project_file::list_project_files,
+            project_file::read_project_file,
+            project_file::write_project_file
         ])
         .setup(|app| {
             app.manage(distribution::detect()?);

@@ -8,15 +8,17 @@ import {
   getStandardMetricUnitsMode,
 } from '@/lib/widget/standard-metrics'
 import FontSelectField from '@/components/ui/font-select-field'
+import { SectionHeading } from '@/components/ui/section-heading'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
-import { FontSection, SectionHeading, UnitsControlRow } from '../widgetEditorSections'
+import { FontSection, UnitsControlRow } from '../widgetEditorSections'
 import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from '../widgetFormControls'
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
 import { getArcGaugeLayout, getCornerGaugeLayout } from '@/features/widget-preview/widgets/arc-gauge/geometry'
 import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
+import { useTranslation } from 'react-i18next'
 
 const ARC_MIN_ANGLE = 30
 const ARC_MAX_ANGLE = 360
@@ -48,6 +50,7 @@ function getArcCornerRadiusMax(data) {
  * render them.
  */
 export default function ArcDisplaySection({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+  const { t } = useTranslation()
   const displayType = widget.data.display_type
   const isCornerGauge = displayType === 'corner'
   const arcData = useMemo(() => widget.data.display_variants?.[displayType] ?? {}, [displayType, widget.data.display_variants])
@@ -80,7 +83,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
   return (
     <>
       <div className="space-y-4">
-        <SectionHeading icon={SlidersHorizontal} title={isCornerGauge ? 'Corner Track' : 'Arc Track'} />
+        <SectionHeading icon={SlidersHorizontal} title={isCornerGauge ? t('widget-editor.cornerTrack', 'Corner Track') : t('widget-editor.arcTrack', 'Arc Track')} />
         <div className="grid grid-cols-1 gap-4">
           <SizeSlider
             label="Size"
@@ -96,14 +99,14 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
         <div className="grid grid-cols-2 gap-4 pt-2">
           {isCornerGauge ? (
             <SelectField
-              label="Corner Orientation"
+              label={t('widget-editor.cornerOrientation', 'Corner Orientation')}
               value={arcData.corner_orientation}
               onValueChange={(corner_orientation) => updateArc({ corner_orientation })}
               options={CORNER_ORIENTATION_OPTIONS}
             />
           ) : (
             <SliderField
-              label="Arc Angle"
+              label={t('widget-editor.arcAngle', 'Arc Angle')}
               value={arcData.arc_angle}
               min={ARC_MIN_ANGLE}
               max={ARC_MAX_ANGLE}
@@ -133,7 +136,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
         <div className="grid grid-cols-2 gap-4">
           <BarFillStyleField data={arcData} suggestBarGeometry={suggestArcBarGeometry} updateVariant={updateArc} />
           <SliderField
-            label="Corner Radius"
+            label={t('widget-editor.cornerRadius', 'Corner Radius')}
             value={arcData.track_corner_radius}
             min={0}
             max={cornerRadiusMax}
@@ -154,7 +157,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Border Color" value={arcData.track_border_color} onChange={(track_border_color) => updateArc({ track_border_color })} />
+          <ColorField label={t('widget-editor.borderColor', 'Border Color')} value={arcData.track_border_color} onChange={(track_border_color) => updateArc({ track_border_color })} />
           <SliderField
             label="Border"
             value={arcData.track_border_thickness}
@@ -168,9 +171,9 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Empty Color" value={arcData.track_empty_color} onChange={(track_empty_color) => updateArc({ track_empty_color })} />
+          <ColorField label={t('widget-editor.emptyColor', 'Empty Color')} value={arcData.track_empty_color} onChange={(track_empty_color) => updateArc({ track_empty_color })} />
           <SliderField
-            label="Empty Opacity"
+            label={t('widget-editor.emptyOpacity', 'Empty Opacity')}
             value={arcData.track_empty_opacity}
             min={0}
             max={1}
@@ -180,9 +183,9 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label="Filled Color" value={arcData.track_filled_color} onChange={(track_filled_color) => updateArc({ track_filled_color })} />
+          <ColorField label={t('widget-editor.filledColor', 'Filled Color')} value={arcData.track_filled_color} onChange={(track_filled_color) => updateArc({ track_filled_color })} />
           <SliderField
-            label="Filled Opacity"
+            label={t('widget-editor.filledOpacity', 'Filled Opacity')}
             value={arcData.track_filled_opacity}
             min={0}
             max={1}
@@ -203,7 +206,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
       />
       <div className="grid grid-cols-2 gap-4">
         <SliderField
-          label="Horizontal Offset"
+          label={t('widget-editor.horizontalOffset', 'Horizontal Offset')}
           value={arcData.inner_widget_offset_x}
           min={-50}
           max={50}
@@ -214,7 +217,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           onSliderCommit={() => commitWidgetSize(widget.id)}
         />
         <SliderField
-          label="Vertical Offset"
+          label={t('widget-editor.verticalOffset', 'Vertical Offset')}
           value={arcData.inner_widget_offset_y}
           min={-50}
           max={50}
@@ -260,14 +263,14 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
 
       <div className="space-y-4">
         <div className="flex w-full items-center gap-3">
-          <SectionHeading icon={Tags} title="Min/Max Labels" />
+          <SectionHeading icon={Tags} title={t('widget-editor.minmaxLabels', 'Min/Max Labels')} />
           <div className="shrink-0 pt-1">
             <ToggleField checked={arcData.show_min_max_labels} onCheckedChange={(show_min_max_labels) => updateArc({ show_min_max_labels })} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4 pt-2">
           <FontSelectField
-            label="Label Font"
+            label={t('widget-editor.labelFont', 'Label Font')}
             value={arcData.min_max_label_font}
             disabled={!arcData.show_min_max_labels}
             onValueChange={(min_max_label_font) => updateArc({ min_max_label_font })}
@@ -277,7 +280,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
           />
           <SizeSlider
-            label="Font Size"
+            label={t('widget-editor.fontSize', 'Font Size')}
             disabled={!arcData.show_min_max_labels}
             value={arcData.min_max_label_font_size}
             min={6}
@@ -289,7 +292,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           />
         </div>
         <ColorField
-          label="Label Color"
+          label={t('widget-editor.labelColor', 'Label Color')}
           value={arcData.min_max_label_color}
           disabled={!arcData.show_min_max_labels}
           onChange={(min_max_label_color) => updateArc({ min_max_label_color })}

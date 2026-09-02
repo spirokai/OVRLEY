@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import HexColorPicker from '@/components/ui/hex-color-picker'
 import { cn } from '@/lib/utils'
 import { RotateCcw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export const TIME_FORMATS = [
   { value: 'date-dd-mm-yyyy', label: 'Date only (DD-MM-YYYY)' },
@@ -63,6 +64,7 @@ const FIELD_LABEL_CLASS = 'h-3 text-[9px] text-muted-foreground uppercase font-b
  * @returns {JSX.Element} Rendered component output.
  */
 export function FieldBlock({ label, children, className, disabled = false, onReset }) {
+  const { t } = useTranslation()
   return (
     <div className={cn('space-y-1', className)}>
       <div className="relative h-3">
@@ -76,7 +78,7 @@ export function FieldBlock({ label, children, className, disabled = false, onRes
             size="icon"
             className="absolute -top-1 right-0 h-5 w-5 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
             onClick={onReset}
-            aria-label={label ? `Reset ${label}` : 'Reset field'}
+            aria-label={label ? t('widget-editor.resetLabel', 'Reset {{label}}', { label }) : t('widget-editor.resetField', 'Reset field')}
           >
             <RotateCcw className="size-3.5" />
           </Button>

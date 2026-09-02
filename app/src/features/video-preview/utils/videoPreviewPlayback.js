@@ -3,6 +3,7 @@
  */
 
 import { incrementPreviewPerfCounter, previewPerfCounterName } from '@/lib/previewPerf'
+import i18next from 'i18next'
 
 const HAVE_CURRENT_DATA = 2
 const FIRST_FRAME_PRIME_SECOND = 0.001
@@ -106,14 +107,14 @@ export function primeVideoFirstFrame(video) {
 export function describeMediaError(error) {
   switch (error?.code) {
     case MediaError.MEDIA_ERR_ABORTED:
-      return 'Video preview loading was aborted.'
+      return i18next.t('video-preview.videoPreviewLoadingWasAborted', 'Video preview loading was aborted.')
     case MediaError.MEDIA_ERR_NETWORK:
-      return 'The local preview server could not read the video file. The file may have been moved, deleted, or become unavailable.'
+      return i18next.t('video-preview.errors.fileUnavailable', 'The local preview server could not read the video file. The file may have been moved, deleted, or become unavailable.')
     case MediaError.MEDIA_ERR_DECODE:
-      return 'The video could not be decoded by the system video player. This may happen with some HEVC, 10-bit, or 4:2:2 files.'
+      return i18next.t('video-preview.errors.decodeFailed', 'The video could not be decoded by the system video player. This may happen with some HEVC, 10-bit, or 4:2:2 files.')
     case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-      return 'This video format is not supported by the system video player.'
+      return i18next.t('video-preview.errors.unsupportedFormat', 'This video format is not supported by the system video player.')
     default:
-      return 'The video preview could not be loaded.'
+      return i18next.t('video-preview.theVideoPreviewCouldNotBeLoaded', 'The video preview could not be loaded.')
   }
 }

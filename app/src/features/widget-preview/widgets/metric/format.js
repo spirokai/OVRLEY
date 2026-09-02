@@ -16,6 +16,7 @@ import {
   getStandardMetricUnitLabel,
   getStandardMetricUnitsMode,
 } from '@/lib/widget/standard-metrics'
+import { getZonedDateTimeParts } from '@/lib/time-format'
 import { measurePreviewText, getPreviewTextBaseline } from '../../shared/textMeasurement'
 
 /**
@@ -368,22 +369,7 @@ export function formatTimeValue(format, timestamp, timezone) {
   // timezone must remain deterministic and must never resolve through the
   // user's computer timezone.
   const timezoneOptions = { timeZone: timezone || 'UTC' }
-  const dateTimeParts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-GB', {
-      ...timezoneOptions,
-      calendar: 'gregory',
-      numberingSystem: 'latn',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hourCycle: 'h23',
-    })
-      .formatToParts(date)
-      .map(({ type, value }) => [type, value]),
-  )
+  const dateTimeParts = getZonedDateTimeParts(timestamp, timezoneOptions.timeZone)
 
   // Extract all date/time components for format string composition. Intl applies
   // the IANA zone's historical and daylight-saving rules when one is supplied.

@@ -23,7 +23,7 @@ vi.mock('@/store/useStore', () => ({
         },
       },
       importedVideoFps: undefined,
-      updateRate: 1,
+      renderSettings: { fps: 30, widgetUpdateRate: 1 },
     }),
   ),
 }))

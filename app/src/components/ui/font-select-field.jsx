@@ -6,6 +6,7 @@ import { useMemo } from 'react'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatFontLabel, normalizeFontKey } from '@/lib/fonts'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Renders the font select field component.
@@ -30,6 +31,7 @@ export default function FontSelectField({
   triggerClassName = 'h-8 text-xs',
   labelClassName = 'text-[10px] text-muted-foreground uppercase font-bold',
 }) {
+  const { t } = useTranslation()
   const systemFontOptions = useMemo(() => systemFonts.map((fontName) => ({ id: fontName, name: fontName })), [systemFonts])
   const mergedRecommendedFonts = useMemo(() => {
     const byId = new Map()
@@ -76,7 +78,7 @@ export default function FontSelectField({
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectLabel>Recommended</SelectLabel>
+            <SelectLabel>{t('components.recommended', 'Recommended')}</SelectLabel>
             {recommendedOptions.map((font) => (
               <SelectItem key={font.id} value={font.id}>
                 {font.name}
@@ -87,7 +89,7 @@ export default function FontSelectField({
             <>
               <SelectSeparator />
               <SelectGroup>
-                <SelectLabel>System</SelectLabel>
+                <SelectLabel>{t('components.system', 'System')}</SelectLabel>
                 {filteredSystemFonts.map((font) => (
                   <SelectItem key={font.id} value={font.id}>
                     {font.name}

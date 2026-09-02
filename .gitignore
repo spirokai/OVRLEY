@@ -29,6 +29,8 @@ build/
 .ruff_cache
 
 # App specific
+.env
+app/.env
 app/dist/
 app/dist-ssr/
 /debug/

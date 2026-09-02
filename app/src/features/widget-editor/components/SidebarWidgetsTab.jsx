@@ -17,6 +17,7 @@ import MetricWidgetEditor from './metricWidget/MetricWidgetEditor'
 import RouteMapWidgetEditor from './RouteMapWidgetEditor'
 import TextWidgetEditor from './TextWidgetEditor'
 import TimeWidgetEditor from './TimeWidgetEditor'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Widget type → editor component dispatch map.
@@ -80,6 +81,7 @@ function renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWi
  * @returns {JSX.Element} Rendered component output.
  */
 export default function SidebarWidgetsTab({ widgetLiveEdits }) {
+  const { t } = useTranslation()
   const {
     config,
     widgets,
@@ -99,8 +101,8 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
     <div className="space-y-6">
       <div className="space-y-3">
         {widgets.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-border/70 py-8 text-center">
-            <p className="text-xs text-muted-foreground">No active widgets</p>
+          <div className="rounded-sm border border-dashed border-border/70 py-8 text-center ml-3">
+            <p className="text-xs text-muted-foreground">{t('widget-editor.noActiveWidgets', 'No active widgets')}</p>
           </div>
         ) : (
           <Accordion

@@ -11,7 +11,7 @@
 import {
   STANDARD_METRIC_DEFINITIONS,
   DISPLAY_TYPE_DEFINITIONS,
-  DISPLAY_TYPE_LABELS,
+  DISPLAY_TYPE_LABEL_KEYS,
   DISPLAY_TYPE_OVERRIDES,
   DEFAULT_DISPLAY_TYPES,
   TEXT_DEFAULTS,
@@ -35,10 +35,13 @@ export function getDisplayTypeDefinition(displayType) {
 /**
  * Look up the human-readable label for a display_type value.
  * @param {string} displayType - display_type key (e.g. "text", "linear")
- * @returns {string} the label, or the key unchanged if unknown
+ * @param {import('i18next').TFunction} translate - Translation function.
+ * @returns {string} Translated display type label.
  */
-export function getDisplayTypeLabel(displayType) {
-  return DISPLAY_TYPE_LABELS[displayType] ?? displayType
+export function getDisplayTypeLabel(displayType, translate) {
+  const labelKey = DISPLAY_TYPE_LABEL_KEYS[displayType]
+  if (!labelKey) throw new Error(`Unknown display type: ${displayType}`)
+  return translate(labelKey)
 }
 
 /**
@@ -79,12 +82,13 @@ export function getSupportedDisplayTypes(metricType) {
 /**
  * Build the {value, label} option list for a display_type dropdown.
  * @param {string} metricType - metric type string
+ * @param {import('i18next').TFunction} translate - Translation function.
  * @returns {Array<{value: string, label: string}>}
  */
-export function getDisplayTypeOptions(metricType) {
+export function getDisplayTypeOptions(metricType, translate) {
   return getSupportedDisplayTypes(metricType).map((value) => ({
     value,
-    label: getDisplayTypeLabel(value),
+    label: getDisplayTypeLabel(value, translate),
   }))
 }
 

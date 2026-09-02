@@ -25,7 +25,7 @@ export default function useCommunityTemplate() {
   const selectCommunityTemplate = useCallback(async (filename) => {
     const store = useStore.getState()
 
-    store.setLoadedTemplate(null, null)
+    store.setLoadedTemplateSource(null)
     store.setCommunityTemplateFilename(filename)
 
     if (!filename) return
@@ -42,7 +42,7 @@ export default function useCommunityTemplate() {
       const state = useStore.getState()
 
       replaceEditorDocument(useStore, () => {
-        if (!state.activityFilename) {
+        if (!state.activitySource) {
           useStore.getState().setDemoActivity()
         }
         useStore.getState().setConfig(data)

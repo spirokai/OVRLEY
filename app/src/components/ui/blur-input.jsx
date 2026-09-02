@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Renders the blur input component.
@@ -20,6 +21,7 @@ import { cn } from '@/lib/utils'
  * @returns {JSX.Element} Rendered component output.
  */
 export function BlurInput({ value: initialValue, onChange, onBlur, className, ...props }) {
+  const { t } = useTranslation()
   const [value, setValue] = useState(initialValue)
   const inputRef = useRef(null)
   const draftValueRef = useRef(initialValue)
@@ -126,7 +128,7 @@ export function BlurInput({ value: initialValue, onChange, onBlur, className, ..
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleStep('up')}
             disabled={props.disabled}
-            aria-label="Increase value"
+            aria-label={t('components.increaseValue', 'Increase value')}
           >
             <ChevronUp className="h-3 w-3" />
           </button>
@@ -137,7 +139,7 @@ export function BlurInput({ value: initialValue, onChange, onBlur, className, ..
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleStep('down')}
             disabled={props.disabled}
-            aria-label="Decrease value"
+            aria-label={t('components.decreaseValue', 'Decrease value')}
           >
             <ChevronDown className="h-3 w-3" />
           </button>

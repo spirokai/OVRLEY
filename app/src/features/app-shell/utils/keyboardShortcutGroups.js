@@ -1,3 +1,4 @@
+import i18next from 'i18next'
 import { keyboardShortcutManifest } from '@/lib/keyboard-shortcuts'
 
 const KEY_LABELS = {
@@ -42,9 +43,10 @@ function getBindingParts(binding) {
 /**
  * Groups manifest commands for the keyboard help dialog.
  *
+ * @param {(key: string) => string} [translate=i18next.t] - Translation function for display labels.
  * @returns {Array<{ name: string, shortcuts: Array<object> }>} Help groups.
  */
-export function getKeyboardShortcutGroups() {
+export function getKeyboardShortcutGroups(translate = i18next.t.bind(i18next)) {
   return keyboardShortcutManifest.categories
     .map((category) => {
       const shortcuts = []
@@ -55,7 +57,7 @@ export function getKeyboardShortcutGroups() {
         if (!visibleBindings.length) return
 
         visibleBindings.forEach((binding) => {
-          const description = binding.description || command.description
+          const description = translate(binding.descriptionKey || command.descriptionKey)
           let shortcut = shortcuts.find((candidate) => candidate.description === description)
           if (!shortcut) {
             shortcut = {
@@ -81,7 +83,7 @@ export function getKeyboardShortcutGroups() {
         })
       })
 
-      return { name: category.name, shortcuts }
+      return { name: translate(category.nameKey), shortcuts }
     })
     .filter((category) => category.shortcuts.length)
 }

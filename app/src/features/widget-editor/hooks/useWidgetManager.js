@@ -4,9 +4,10 @@
  */
 
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
-import { TYPE_LABELS } from '@/lib/widget/widget-icons'
+import { getWidgetTypeName } from '@/lib/widget/widget-icons'
 import { deleteWidgetInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget/widget-config'
 import { buildConfigWidgets, groupWidgetsForSidebar, withAltitudeEditorPresentation } from '@/lib/widget/widget-presentation'
 import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
@@ -35,6 +36,7 @@ import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDra
  * }}
  */
 export function useWidgetManager({ widgetLiveEdits }) {
+  const { t } = useTranslation()
   // Store selectors — shallow-pick zustand state needed for widget management
   const { config, globalDefaults, parsedActivity, selectedWidgetId, setConfig, setSelectedWidgetId } = useStore(
     useShallow((state) => ({
@@ -52,8 +54,8 @@ export function useWidgetManager({ widgetLiveEdits }) {
   const widgets = useMemo(() => {
     const configWidgets = applyWidgetDrafts(buildConfigWidgets(config), liveEdits.liveWidgetDrafts)
     const presentedWidgets = configWidgets.map((widget) => withAltitudeEditorPresentation(widget, parsedActivity))
-    return groupWidgetsForSidebar(presentedWidgets, TYPE_LABELS)
-  }, [config, liveEdits.liveWidgetDrafts, parsedActivity])
+    return groupWidgetsForSidebar(presentedWidgets, (type) => getWidgetTypeName(type, t))
+  }, [config, liveEdits.liveWidgetDrafts, parsedActivity, t])
 
   // Update handler — applies partial updates to a widget via config utility
   const updateWidgetData = (id, updates) => {

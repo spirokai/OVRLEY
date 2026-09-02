@@ -67,9 +67,10 @@ describe('useSceneSettingsState', () => {
     act(() => {
       result.current.handlers.handleResolutionChange('custom')
       result.current.handlers.handleFpsModeChange('custom')
+      useStore.getState().setRenderFpsAndUpdateRate(60, 1)
     })
 
-    rerender({ config: { ...initialConfig, scene: { ...initialConfig.scene, width: 1280, height: 720, fps: 60 } } })
+    rerender({ config: { ...initialConfig, scene: { ...initialConfig.scene, width: 1280, height: 720 } } })
 
     expect(result.current.overlaySettings.resId).toBe('720p')
     expect(result.current.overlaySettings.fpsMode).toBe('60')
@@ -155,7 +156,7 @@ describe('handleFpsModeChange', () => {
       result.current.handlers.handleFpsModeChange('60')
     })
 
-    expect(useStore.getState().config.scene.fps).toBe(60)
+    expect(useStore.getState().renderSettings.fps).toBe(60)
   })
 
   test('enters custom FPS mode without changing scene fps', () => {
@@ -173,56 +174,5 @@ describe('handleFpsModeChange', () => {
 
     expect(result.current.overlaySettings.fpsMode).toBe('custom')
     expect(config.scene.fps).toBe(30)
-  })
-})
-
-describe('handleOffsetBlur', () => {
-  test('parses and rounds a simple time string', () => {
-    act(() => {
-      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
-    })
-    const onConfigChange = vi.fn()
-    const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
-
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange }))
-
-    act(() => {
-      result.current.handlers.handleOffsetBlur('1:30')
-    })
-
-    expect(useStore.getState().videoSyncOffsetSeconds).toBe(90)
-    expect(result.current.videoSyncSettings.offsetInput).toBe('90')
-  })
-
-  test('parses colon-delimited time (H:MM:SS)', () => {
-    act(() => {
-      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
-    })
-    const onConfigChange = vi.fn()
-    const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
-
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange }))
-
-    act(() => {
-      result.current.handlers.handleOffsetBlur('1:00:30')
-    })
-
-    expect(useStore.getState().videoSyncOffsetSeconds).toBe(3630)
-  })
-
-  test('parses decimal seconds and rounds to 1 decimal', () => {
-    act(() => {
-      useStore.setState({ aspectRatio: '16:9', updateRate: 1 })
-    })
-    const onConfigChange = vi.fn()
-    const config = { ...DEFAULT_CONFIG, scene: { ...DEFAULT_CONFIG.scene } }
-
-    const { result } = renderHook(() => useSceneSettingsState({ config, onConfigChange }))
-
-    act(() => {
-      result.current.handlers.handleOffsetBlur('5.55')
-    })
-
-    expect(useStore.getState().videoSyncOffsetSeconds).toBe(5.6)
   })
 })

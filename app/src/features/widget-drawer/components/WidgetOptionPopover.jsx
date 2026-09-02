@@ -1,16 +1,18 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 
 /**
  * Presents the canonical creation options for a widget catalog entry.
  *
  * @param {object} props
- * @param {Array<{value: string, label: string, icon: React.ComponentType, selection: object}>} props.options - Available creation options.
+ * @param {Array<{value: string, labelKey: string, icon: React.ComponentType, selection: object}>} props.options - Available creation options.
  * @param {(selection: object) => void} props.onSelect - Called with the selected creation fields.
  * @param {React.ReactNode} props.children - Popover trigger.
  * @returns {JSX.Element} Rendered React element.
  */
 export function WidgetOptionPopover({ options, onSelect, children }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
   return (
@@ -30,7 +32,7 @@ export function WidgetOptionPopover({ options, onSelect, children }) {
                 className="group flex items-center gap-4 px-[0.4rem] py-[0.3rem] rounded-none hover:bg-accent text-[0.85rem] hover:text-accent-foreground cursor-pointer text-left"
               >
                 <Icon className="h-4.5 w-4.5 shrink-0 text-muted-foreground group-hover:text-accent-foreground" />
-                <span>{option.label}</span>
+                <span>{t(option.labelKey)}</span>
               </button>
             )
           })}

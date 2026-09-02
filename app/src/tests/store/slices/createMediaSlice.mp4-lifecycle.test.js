@@ -2,15 +2,19 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import useStore from '@/store/useStore'
 
 const mp4Telemetry = {
+  coverage: { speed: { source: 'direct' } },
+  extended_attributes: [],
   metadata: { duration_seconds: 120, sample_count: 240 },
   file_format: 'mp4-telemetry',
   valid_attributes: ['speed'],
 }
 
 const activityFile = {
+  coverage: { heartrate: { source: 'direct' }, speed: { source: 'direct' } },
+  extended_attributes: [],
   metadata: { duration_seconds: 3600, sample_count: 7200 },
   file_format: 'fit',
-  valid_attributes: ['speed', 'heart_rate'],
+  valid_attributes: ['speed', 'heartrate'],
 }
 
 function resetStore() {

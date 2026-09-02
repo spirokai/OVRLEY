@@ -2,6 +2,7 @@ import { detectCodecs } from '@/api/backend'
 import { formatVideoCreationTime, parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { createCachedPromise } from '@/lib/cached-promise'
 import { videoOverlapsActivity } from '@/lib/video-timing'
+import i18next from 'i18next'
 
 /**
  * Converts a timestamp to the comparison clock used for activity sync.
@@ -65,6 +66,33 @@ function validateImportedVideoTiming(metadata) {
   }
 }
 
+export function createImportedVideoState(metadata) {
+  validateImportedVideoTiming(metadata)
+  return {
+    importedVideoPath: metadata.path,
+    importedVideoDuration: metadata.duration,
+    importedVideoFps: metadata.fps,
+    importedVideoFpsNum: metadata.fpsNum,
+    importedVideoFpsDen: metadata.fpsDen,
+    importedVideoResolution: displayResolutionForImportedVideo(metadata),
+    importedVideoCreationTime: metadata.creationTime,
+    importedVideoTimeSource: metadata.timeSource ?? null,
+    detectedVideoCreationTime: metadata.creationTime,
+    detectedVideoTimeSource: metadata.timeSource ?? null,
+    importedVideoImportId: metadata.importId ?? null,
+    importedVideoPreviewUrl: metadata.previewUrl ?? null,
+    importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
+    importedBackgroundImagePath: null,
+    videoSyncOffsetPreviewSeconds: null,
+    videoSyncTimezoneMode: null,
+    importedVideoCodecName: metadata.codecName ?? null,
+    importedVideoCodecLongName: metadata.codecLongName ?? null,
+    importedVideoBitRate: metadata.bitRate ?? null,
+    importedVideoCameraType: metadata.cameraType ?? null,
+    importedVideoCameraModel: metadata.cameraModel ?? null,
+  }
+}
+
 function validateVideoSyncOffset(seconds, videoDuration, label = 'Video sync offset') {
   if (!Number.isFinite(seconds)) {
     throw new Error(`${label} must be a finite number`)
@@ -110,36 +138,12 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoCameraModel: null,
 
   setImportedVideo: (metadata) => {
-    validateImportedVideoTiming(metadata)
-    const importedVideoResolution = displayResolutionForImportedVideo(metadata)
-
-    set({
-      importedVideoPath: metadata.path,
-      importedVideoDuration: metadata.duration,
-      importedVideoFps: metadata.fps,
-      importedVideoFpsNum: metadata.fpsNum,
-      importedVideoFpsDen: metadata.fpsDen,
-      importedVideoResolution,
-      importedVideoCreationTime: metadata.creationTime,
-      importedVideoTimeSource: metadata.timeSource ?? null,
-      detectedVideoCreationTime: metadata.creationTime,
-      detectedVideoTimeSource: metadata.timeSource ?? null,
-      importedVideoImportId: metadata.importId ?? null,
-      importedVideoPreviewUrl: metadata.previewUrl ?? null,
-      importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
-      importedBackgroundImagePath: null,
-      videoSyncOffsetPreviewSeconds: null,
-      videoSyncTimezoneMode: null,
-      importedVideoCodecName: metadata.codecName ?? null,
-      importedVideoCodecLongName: metadata.codecLongName ?? null,
-      importedVideoBitRate: metadata.bitRate ?? null,
-      importedVideoCameraType: metadata.cameraType ?? null,
-      importedVideoCameraModel: metadata.cameraModel ?? null,
-    })
+    const importedVideoState = createImportedVideoState(metadata)
+    set(importedVideoState)
 
     get().syncVideoMetadata()
 
-    return importedVideoResolution
+    return importedVideoState.importedVideoResolution
   },
 
   setImportedBackgroundImage: (path) =>
@@ -281,7 +285,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (!state.importedVideoCreationTime) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Could not determine video creation time',
+          videoSyncWarning: i18next.t('store.couldNotDetermineVideoCreationTime', 'Could not determine video creation time'),
           videoSyncTimezoneMode: null,
         }
       }
@@ -290,7 +294,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (!timezone) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Activity timezone is required for video sync',
+          videoSyncWarning: i18next.t('store.timezoneIsRequiredForVideoSync', 'timezone is required for video sync'),
           videoSyncTimezoneMode: null,
         }
       }
@@ -300,7 +304,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (activityStart === null || activityEnd === null) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Invalid timestamp formats',
+          videoSyncWarning: i18next.t('store.invalidTimestampFormats', 'Invalid timestamp formats'),
           videoSyncTimezoneMode: null,
         }
       }
@@ -325,7 +329,7 @@ export const createVideoImportSlice = (set, get) => ({
         if (withoutTimezone === null || withTimezone === null) {
           return {
             videoSyncOffsetSeconds: 0,
-            videoSyncWarning: 'Invalid timestamp formats',
+            videoSyncWarning: i18next.t('store.invalidTimestampFormats', 'Invalid timestamp formats'),
             videoSyncTimezoneMode: null,
           }
         }
@@ -334,7 +338,7 @@ export const createVideoImportSlice = (set, get) => ({
           timezoneMode = state.videoSyncTimezoneMode ?? 'local'
           return {
             videoSyncOffsetSeconds: 0,
-            videoSyncWarning: 'Video could not be synced with activity',
+            videoSyncWarning: i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity'),
             videoSyncTimezoneMode: timezoneMode,
           }
         }
@@ -350,7 +354,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (videoStart === null) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Invalid timestamp formats',
+          videoSyncWarning: i18next.t('store.invalidTimestampFormats', 'Invalid timestamp formats'),
           videoSyncTimezoneMode: null,
         }
       }
@@ -361,7 +365,7 @@ export const createVideoImportSlice = (set, get) => ({
       if (!videoTimestampOverlapsActivity(videoStart, videoDuration, activityStart, activityEnd)) {
         return {
           videoSyncOffsetSeconds: 0,
-          videoSyncWarning: 'Video could not be synced with activity',
+          videoSyncWarning: i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity'),
           videoSyncTimezoneMode: timezoneMode,
         }
       }

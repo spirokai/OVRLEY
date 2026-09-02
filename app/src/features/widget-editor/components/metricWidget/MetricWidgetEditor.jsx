@@ -18,6 +18,7 @@ import HeadingTapeDisplaySection from './HeadingTapeDisplaySection'
 import LeanAngleDisplaySection from './LeanAngleDisplaySection'
 import GForceWidgetEditor from '../GForceWidgetEditor'
 import LapTimerDisplaySection from './LapTimerDisplaySection'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Registry mapping display_type values to their editor section components.
@@ -50,8 +51,9 @@ export default function MetricWidgetEditor({
   setNumericField,
   showDisplayControls = true,
 }) {
+  const { t } = useTranslation()
   const displayType = widget.data.display_type || 'text'
-  const displayOptions = getDisplayTypeOptions(widget.type)
+  const displayOptions = getDisplayTypeOptions(widget.type, t)
 
   const handleDisplayTypeChange = useCallback(
     (value) => {
@@ -71,7 +73,7 @@ export default function MetricWidgetEditor({
       {showTypeDropdown ? (
         <div className="space-y-2">
           {/* <SectionHeading icon={Gauge} title="Display" /> */}
-          <SelectField label="Display Type" value={displayType} onValueChange={handleDisplayTypeChange} options={displayOptions} />
+          <SelectField label={t('widget-editor.displayType', 'Display Type')} value={displayType} onValueChange={handleDisplayTypeChange} options={displayOptions} />
         </div>
       ) : null}
 
@@ -90,7 +92,7 @@ export default function MetricWidgetEditor({
       {widget.type === 'altitude' ? (
         <div className="grid grid-cols-2 gap-4">
           <NumberField
-            label="Altitude at start"
+            label={t('widget-editor.altitudeAtStart', 'Altitude at start')}
             value={widget.data.starting_altitude}
             placeholder={widget.startingAltitudePlaceholder}
             suffix={getStandardMetricDisplayUnit(widget.type, widget.data)}

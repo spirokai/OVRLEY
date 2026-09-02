@@ -3,13 +3,16 @@
  * Pure presentational — all logic is managed by the parent.
  */
 
+import { useMemo } from 'react'
 import { Keyboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Kbd } from '@/components/ui/kbd'
+// Restore these imports when the language selector is made public again.
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+// import { locales } from '@/i18n/locales'
 import { getKeyboardShortcutGroups } from '../utils/keyboardShortcutGroups'
-
-const shortcutGroups = getKeyboardShortcutGroups()
+import { useTranslation } from 'react-i18next'
 
 /**
  * Renders the keyboard shortcuts dialog component.
@@ -20,6 +23,8 @@ const shortcutGroups = getKeyboardShortcutGroups()
  * @returns {JSX.Element} Rendered component output.
  */
 export default function KeyboardShortcutsDialog({ open, onClose }) {
+  const { t } = useTranslation()
+  const shortcutGroups = useMemo(() => getKeyboardShortcutGroups(t), [t])
   return (
     <Dialog
       open={open}
@@ -30,20 +35,44 @@ export default function KeyboardShortcutsDialog({ open, onClose }) {
       }}
     >
       <DialogContent
-        overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/92 px-4 backdrop-blur-md"
+        overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
         className="flex h-[80vh] max-h-200 w-full max-w-3xl flex-col rounded-sm border border-accent-border/80 bg-card/95 py-6 shadow-2xl shadow-background/50"
         aria-describedby={undefined}
       >
-        <div className="flex items-center gap-3 px-6">
-          <Keyboard className="h-4 w-4 text-primary" />
-          <DialogTitle className="text-sm font-semibold text-foreground">Keyboard Shortcuts</DialogTitle>
+        <div className="flex items-center justify-between gap-3 px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <Keyboard className="h-4 w-4 shrink-0 text-primary" />
+            <DialogTitle className="truncate text-sm font-semibold text-foreground">
+              {t('app-shell.keyboardShortcuts', 'Keyboard Shortcuts')}
+            </DialogTitle>
+          </div>
+          {/*
+            Temporarily hidden for the next release. Restore this block and the
+            locale/onLocaleChange props when language selection is public again.
+
+            <Select value={locale} onValueChange={onLocaleChange}>
+              <SelectTrigger
+                className="h-8 w-44 shrink-0 bg-surface text-xs"
+                aria-label={t('app-shell.language', 'Language')}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end">
+                {locales.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          */}
         </div>
-        <p className="py-6 normal-case font-light text-[0.9rem] px-6">
-          You can use the following keyboard shortcuts to improve your workflow within OVRLEY:
+        <p className="pt-6 pb-3 normal-case font-light text-[0.9rem] px-6">
+          {t('app-shell.keyboardShortcutsDescription', 'You can use the following keyboard shortcuts to improve your workflow within OVRLEY:')}
         </p>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6">
-          <div className="space-y-8">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 border-t border-b border-border/60">
+          <div className="space-y-8 py-4">
             {shortcutGroups.map((category) => (
               <div key={category.name} className="space-y-3">
                 <h3 className="text-[1rem] font-extrabold uppercase text-primary">{category.name}</h3>
@@ -87,7 +116,7 @@ export default function KeyboardShortcutsDialog({ open, onClose }) {
             className="border-border/80 bg-surface-elevated text-foreground shadow-xs hover:bg-surface-strong hover:text-foreground"
             onClick={onClose}
           >
-            Close
+            {t('app-shell.close', 'Close')}
           </Button>
         </div>
       </DialogContent>
