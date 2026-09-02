@@ -73,7 +73,12 @@ export default function MetricWidgetEditor({
       {showTypeDropdown ? (
         <div className="space-y-2">
           {/* <SectionHeading icon={Gauge} title="Display" /> */}
-          <SelectField label={t('widget-editor.displayType', 'Display Type')} value={displayType} onValueChange={handleDisplayTypeChange} options={displayOptions} />
+          <SelectField
+            label={t('widget-editor.displayType', 'Display Type')}
+            value={displayType}
+            onValueChange={handleDisplayTypeChange}
+            options={displayOptions}
+          />
         </div>
       ) : null}
 

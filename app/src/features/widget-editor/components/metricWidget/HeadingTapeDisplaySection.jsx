@@ -8,20 +8,32 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 const ALIGNMENT_OPTIONS = [
-  { value: 'below', label: 'Below' },
-  { value: 'centered', label: 'Centered' },
+  { value: 'below', labelKey: 'widget-editor.alignmentBelow', defaultLabel: 'Below' },
+  { value: 'centered', labelKey: 'widget-editor.alignmentCentered', defaultLabel: 'Centered' },
 ]
 
 const INDICATOR_STYLE_OPTIONS = [
-  { value: 'chevron', label: 'Chevron' },
-  { value: 'highlight_bar', label: 'Highlight Bar' },
+  { value: 'chevron', labelKey: 'widget-editor.indicatorStyleChevron', defaultLabel: 'Chevron' },
+  { value: 'highlight_bar', labelKey: 'widget-editor.indicatorStyleHighlightBar', defaultLabel: 'Highlight Bar' },
 ]
 
 const INDICATOR_PLACEMENT_OPTIONS = [
-  { value: 'top', label: 'Top' },
-  { value: 'bottom', label: 'Bottom' },
-  { value: 'both', label: 'Both' },
+  { value: 'top', labelKey: 'widget-editor.top', defaultLabel: 'Top' },
+  { value: 'bottom', labelKey: 'widget-editor.bottom', defaultLabel: 'Bottom' },
+  { value: 'both', labelKey: 'widget-editor.both', defaultLabel: 'Both' },
 ]
+
+/**
+ * Maps option constants using the {value, labelKey, defaultLabel} shape into
+ * translated {value, label} options.
+ *
+ * @param {Array<{value: string, labelKey: string, defaultLabel: string}>} options - Option constants.
+ * @param {import('i18next').TFunction} translate - Translation function.
+ * @returns {Array<{value: string, label: string}>} Translated options.
+ */
+function translateOptions(options, translate) {
+  return options.map(({ value, labelKey, defaultLabel }) => ({ value, label: translate(labelKey, defaultLabel) }))
+}
 
 /**
  * Renders heading tape display controls: tape scale, ticks, labels, indicator.
@@ -59,7 +71,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
       </div>
 
       <div className="space-y-4">
-        <SectionHeading icon={Ruler} title="Ticks" />
+        <SectionHeading icon={Ruler} title={t('widget-editor.ticks', 'Ticks')} />
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 px-1 pb-2">
@@ -121,19 +133,27 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.tickColor', 'Tick Color')} value={tapeData.tick_color} onChange={(value) => updateTape({ tick_color: value })} />
-          <ColorField label={t('widget-editor.cardinalColor', 'Cardinal Color')} value={tapeData.cardinal_tick_color} onChange={(value) => updateTape({ cardinal_tick_color: value })} />
+          <ColorField
+            label={t('widget-editor.tickColor', 'Tick Color')}
+            value={tapeData.tick_color}
+            onChange={(value) => updateTape({ tick_color: value })}
+          />
+          <ColorField
+            label={t('widget-editor.cardinalColor', 'Cardinal Color')}
+            value={tapeData.cardinal_tick_color}
+            onChange={(value) => updateTape({ cardinal_tick_color: value })}
+          />
         </div>
         <SelectField
           label={t('widget-editor.alignment', 'Alignment')}
           value={tapeData.tick_alignment}
           onValueChange={(value) => updateTape({ tick_alignment: value })}
-          options={ALIGNMENT_OPTIONS}
+          options={translateOptions(ALIGNMENT_OPTIONS, t)}
         />
       </div>
 
       <div className="space-y-4">
-        <SectionHeading icon={Type} title="Labels" />
+        <SectionHeading icon={Type} title={t('widget-editor.labels', 'Labels')} />
         <FontSelectField
           label={t('widget-editor.labelFont', 'Label Font')}
           value={tapeData.label_font}
@@ -154,7 +174,11 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.labelColor', 'Label Color')} value={tapeData.label_color} onChange={(value) => updateTape({ label_color: value })} />
+          <ColorField
+            label={t('widget-editor.labelColor', 'Label Color')}
+            value={tapeData.label_color}
+            onChange={(value) => updateTape({ label_color: value })}
+          />
           <ColorField
             label={t('widget-editor.cardinalColor', 'Cardinal Color')}
             value={tapeData.cardinal_label_color}
@@ -173,7 +197,7 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
             onCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
-            label="Offset"
+            label={t('widget-editor.offset', 'Offset')}
             value={tapeData.label_offset}
             min={0}
             max={20}
@@ -194,21 +218,25 @@ export default function HeadingTapeDisplaySection({ widget, updateWidgetData, up
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SelectField
-            label="Style"
+            label={t('widget-editor.style', 'Style')}
             value={tapeData.indicator_style}
             onValueChange={(value) => updateTape({ indicator_style: value })}
-            options={INDICATOR_STYLE_OPTIONS}
+            options={translateOptions(INDICATOR_STYLE_OPTIONS, t)}
           />
           <SelectField
-            label="Placement"
+            label={t('widget-editor.placement', 'Placement')}
             value={tapeData.indicator_placement}
             onValueChange={(value) => updateTape({ indicator_placement: value })}
-            options={INDICATOR_PLACEMENT_OPTIONS}
+            options={translateOptions(INDICATOR_PLACEMENT_OPTIONS, t)}
             disabled={!isChevronIndicator}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.indicatorColor', 'Indicator Color')} value={tapeData.indicator_color} onChange={(value) => updateTape({ indicator_color: value })} />
+          <ColorField
+            label={t('widget-editor.indicatorColor', 'Indicator Color')}
+            value={tapeData.indicator_color}
+            onChange={(value) => updateTape({ indicator_color: value })}
+          />
           <SizeSlider
             label={t('widget-editor.indicatorSize', 'Indicator Size')}
             value={tapeData.indicator_size}

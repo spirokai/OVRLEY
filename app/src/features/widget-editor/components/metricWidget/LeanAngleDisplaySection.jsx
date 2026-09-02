@@ -38,7 +38,7 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
         <SectionHeading icon={SlidersHorizontal} title={t('widget-editor.angleTrack', 'Angle Track')} />
         <div className="grid grid-cols-2 gap-4">
           <SizeSlider
-            label="Size"
+            label={t('widget-editor.size', 'Size')}
             value={diameter}
             min={30}
             max={600}
@@ -48,7 +48,7 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             onCommit={() => commitWidgetSize(widget.id)}
           />
           <SliderField
-            label="Thickness"
+            label={t('widget-editor.thickness', 'Thickness')}
             value={leanVariant.track_thickness}
             min={1}
             max={trackThicknessMax}
@@ -60,7 +60,11 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.emptyColor', 'Empty Color')} value={leanVariant.track_empty_color} onChange={(track_empty_color) => updateLean({ track_empty_color })} />
+          <ColorField
+            label={t('widget-editor.emptyColor', 'Empty Color')}
+            value={leanVariant.track_empty_color}
+            onChange={(track_empty_color) => updateLean({ track_empty_color })}
+          />
           <SliderField
             label={t('widget-editor.emptyOpacity', 'Empty Opacity')}
             value={leanVariant.track_empty_opacity}
@@ -94,7 +98,7 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
             onChange={(track_border_color) => updateLean({ track_border_color })}
           />
           <SliderField
-            label="Border"
+            label={t('widget-editor.border', 'Border')}
             value={leanVariant.track_border_thickness}
             min={0}
             max={borderThicknessMax}
@@ -107,7 +111,7 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
         </div>
       </div>
       <div className="space-y-4">
-        <SectionHeading icon={Type} title="Label" />
+        <SectionHeading icon={Type} title={t('widget-editor.label', 'Label')} />
         <div className="grid grid-cols-2 gap-4">
           <FontSelectField
             label={t('widget-editor.labelFont', 'Label Font')}
@@ -129,8 +133,16 @@ export default function LeanAngleDisplaySection({ widget, updateWidgetData, upda
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.labelColor', 'Label Color')} value={widget.data.color} onChange={(color) => updateWidgetData(widget.id, { color })} />
-          <ColorField label={t('widget-editor.unitColor', 'Unit Color')} value={widget.data.unit_color} onChange={(unit_color) => updateWidgetData(widget.id, { unit_color })} />
+          <ColorField
+            label={t('widget-editor.labelColor', 'Label Color')}
+            value={widget.data.color}
+            onChange={(color) => updateWidgetData(widget.id, { color })}
+          />
+          <ColorField
+            label={t('widget-editor.unitColor', 'Unit Color')}
+            value={widget.data.unit_color}
+            onChange={(unit_color) => updateWidgetData(widget.id, { unit_color })}
+          />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField

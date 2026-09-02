@@ -3,6 +3,7 @@
  */
 
 import { Map, Mountain, Palette } from 'lucide-react'
+import { useMemo } from 'react'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { ColorField, NumberField, SelectField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection } from './widgetEditorSections'
@@ -12,9 +13,9 @@ import { convertAltitudeInputValue } from '@/lib/widget/altitude'
 import { useTranslation } from 'react-i18next'
 
 const MARKER_VARIANT_OPTIONS = [
-  { value: 'single', label: 'Single Circle' },
-  { value: 'ring', label: 'Concentric Ring' },
-  { value: 'halo', label: 'Solid Halo' },
+  { value: 'single', labelKey: 'widget-editor.singleCircle', defaultLabel: 'Single Circle' },
+  { value: 'ring', labelKey: 'widget-editor.concentricRing', defaultLabel: 'Concentric Ring' },
+  { value: 'halo', labelKey: 'widget-editor.solidHalo', defaultLabel: 'Solid Halo' },
 ]
 
 const ALTITUDE_UNIT_OPTIONS = [
@@ -34,6 +35,10 @@ const ALTITUDE_UNIT_OPTIONS = [
  */
 export default function ElevationWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField, sceneFontSize }) {
   const { t } = useTranslation()
+  const markerVariantOptions = useMemo(
+    () => MARKER_VARIANT_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })),
+    [t],
+  )
   const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
   const remainingLineOpacity = widget.data.remaining_line_opacity
   const completedAreaOpacity = widget.data.area_completed_opacity
@@ -47,14 +52,15 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
   const markerVariantDiameter = widget.data.marker_variant_diameter
   const labelFontSize = widget.data.point_label?.font_size ?? sceneFontSize ?? 12.5
   const showVariantDiameter = markerVariant !== 'single'
-  const variantDiameterLabel = markerVariant === 'ring' ? 'Ring Diameter' : 'Halo Diameter'
+  const variantDiameterLabel =
+    markerVariant === 'ring' ? t('widget-editor.ringDiameter', 'Ring Diameter') : t('widget-editor.haloDiameter', 'Halo Diameter')
   return (
     <>
       <DimensionsSection widget={widget} setNumericField={setNumericField} />
       <div className="space-y-4">
         <SectionHeading icon={Palette} title={t('widget-editor.lineStyling', 'Line Styling')} />
         <SliderField
-          label="Thickness"
+          label={t('widget-editor.thickness', 'Thickness')}
           value={lineWidth}
           min={0}
           max={20}
@@ -72,7 +78,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
 
         <div className="grid grid-cols-2 gap-4">
           <SliderField
-            label="Smoothing"
+            label={t('widget-editor.smoothing', 'Smoothing')}
             value={simplifyTolerance}
             min={0}
             max={4}
@@ -154,7 +160,9 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
           />
 
           <div className="flex items-center justify-between gap-2 px-1 pt-6">
-            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.showFullActivity', 'Show Full Activity')}</Label>
+            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
+              {t('widget-editor.showFullActivity', 'Show Full Activity')}
+            </Label>
             <ToggleField
               checked={widget.data.show_full_activity}
               onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_activity: checked })}
@@ -198,16 +206,16 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
         </div>
       </div>
       <div className="space-y-4">
-        <SectionHeading icon={Map} title="Marker" />
+        <SectionHeading icon={Map} title={t('widget-editor.marker', 'Marker')} />
         <div className="grid grid-cols-2 gap-4">
           <SelectField
             label={t('widget-editor.markerType', 'Marker Type')}
             value={markerVariant}
-            options={MARKER_VARIANT_OPTIONS}
+            options={markerVariantOptions}
             onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
           />
           <SizeSlider
-            label="Size"
+            label={t('widget-editor.size', 'Size')}
             value={markerSize}
             min={0}
             max={50}
@@ -219,12 +227,12 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
         </div>
         <div className="grid grid-cols-2 gap-4">
           <ColorField
-            label="Color"
+            label={t('widget-editor.color', 'Color')}
             value={widget.data.marker_color || getThemeColor('aqua')}
             onChange={(value) => updateWidgetData(widget.id, { marker_color: value })}
           />
           <SliderField
-            label="Opacity"
+            label={t('widget-editor.opacity', 'Opacity')}
             value={markerOpacity}
             min={0}
             max={100}
@@ -250,7 +258,7 @@ export default function ElevationWidgetEditor({ widget, updateWidgetData, update
       </div>
 
       <div className="space-y-4">
-        <SectionHeading icon={Mountain} title="Labels" />
+        <SectionHeading icon={Mountain} title={t('widget-editor.labels', 'Labels')} />
         <SizeSlider
           label={t('widget-editor.labelSize', 'Label Size')}
           value={labelFontSize}

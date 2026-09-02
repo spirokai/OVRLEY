@@ -3,6 +3,7 @@
  */
 
 import { Map, Palette } from 'lucide-react'
+import { useMemo } from 'react'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { ColorField, SelectField, SizeSlider, SliderField, ToggleField } from './widgetFormControls'
 import { DimensionsSection } from './widgetEditorSections'
@@ -11,9 +12,9 @@ import { Label } from '@/components/ui/label'
 import { useTranslation } from 'react-i18next'
 
 const MARKER_VARIANT_OPTIONS = [
-  { value: 'single', label: 'Single Circle' },
-  { value: 'ring', label: 'Concentric Ring' },
-  { value: 'halo', label: 'Solid Halo' },
+  { value: 'single', labelKey: 'widget-editor.singleCircle', defaultLabel: 'Single Circle' },
+  { value: 'ring', labelKey: 'widget-editor.concentricRing', defaultLabel: 'Concentric Ring' },
+  { value: 'halo', labelKey: 'widget-editor.solidHalo', defaultLabel: 'Solid Halo' },
 ]
 
 /**
@@ -27,6 +28,10 @@ const MARKER_VARIANT_OPTIONS = [
  */
 export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
   const { t } = useTranslation()
+  const markerVariantOptions = useMemo(
+    () => MARKER_VARIANT_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })),
+    [t],
+  )
   const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
   const completedLineOpacity = widget.data.completed_line_opacity
   const remainingLineOpacity = widget.data.remaining_line_opacity
@@ -38,7 +43,8 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
   const simplifyTolerance = widget.data.simplify_tolerance_px
   const targetDensity = widget.data.target_density
   const showVariantDiameter = markerVariant !== 'single'
-  const variantDiameterLabel = markerVariant === 'ring' ? 'Ring Diameter' : 'Halo Diameter'
+  const variantDiameterLabel =
+    markerVariant === 'ring' ? t('widget-editor.ringDiameter', 'Ring Diameter') : t('widget-editor.haloDiameter', 'Halo Diameter')
 
   return (
     <>
@@ -58,7 +64,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
       <div className="space-y-4">
         <SectionHeading icon={Palette} title={t('widget-editor.lineStyling', 'Line Styling')} />
         <SliderField
-          label="Thickness"
+          label={t('widget-editor.thickness', 'Thickness')}
           value={lineWidth}
           min={0}
           max={20}
@@ -75,7 +81,7 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
         />
         <div className="grid grid-cols-2 gap-4">
           <SliderField
-            label="Smoothing"
+            label={t('widget-editor.smoothing', 'Smoothing')}
             value={simplifyTolerance}
             min={0}
             max={4}
@@ -142,7 +148,9 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center justify-between gap-2 pl-1 pt-2 pb-2">
-            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">{t('widget-editor.showFullActivity', 'Show Full Activity')}</Label>
+            <Label className="p-0 text-[9px] text-muted-foreground uppercase font-bold">
+              {t('widget-editor.showFullActivity', 'Show Full Activity')}
+            </Label>
             <ToggleField
               checked={widget.data.show_full_activity}
               onCheckedChange={(checked) => updateWidgetData(widget.id, { show_full_activity: checked })}
@@ -151,16 +159,16 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
         </div>
       </div>
       <div className="space-y-4">
-        <SectionHeading icon={Map} title="Marker" />
+        <SectionHeading icon={Map} title={t('widget-editor.marker', 'Marker')} />
         <div className="grid grid-cols-2 gap-4">
           <SelectField
-            label="Type"
+            label={t('widget-editor.type', 'Type')}
             value={markerVariant}
-            options={MARKER_VARIANT_OPTIONS}
+            options={markerVariantOptions}
             onValueChange={(value) => updateWidgetData(widget.id, { marker_variant: value })}
           />
           <SizeSlider
-            label={t('widget-editor.size', ' Size')}
+            label={t('widget-editor.size', 'Size')}
             value={markerSize}
             min={0}
             max={50}
@@ -172,12 +180,12 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
         </div>
         <div className="grid grid-cols-2 gap-4">
           <ColorField
-            label="Color"
+            label={t('widget-editor.color', 'Color')}
             value={widget.data.marker_color || getThemeColor('aqua')}
             onChange={(value) => updateWidgetData(widget.id, { marker_color: value })}
           />
           <SliderField
-            label="Opacity"
+            label={t('widget-editor.opacity', 'Opacity')}
             value={markerOpacity}
             min={0}
             max={100}

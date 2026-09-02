@@ -28,7 +28,7 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
       <div className="space-y-4">
         <SectionHeading icon={CircleGauge} title={t('widget-editor.gforcePlot', 'G-Force Plot')} />
         <SizeSlider
-          label="Size"
+          label={t('widget-editor.size', 'Size')}
           value={data.diameter}
           min={20}
           max={600}
@@ -37,7 +37,11 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
           onCommit={() => commitWidgetSize(widget.id)}
         />
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.fillColor', 'Fill Color')} value={data.fill_color} onChange={(fill_color) => updateGForce({ fill_color })} />
+          <ColorField
+            label={t('widget-editor.fillColor', 'Fill Color')}
+            value={data.fill_color}
+            onChange={(fill_color) => updateGForce({ fill_color })}
+          />
           <SliderField
             label={t('widget-editor.fillOpacity', 'Fill Opacity')}
             value={data.fill_opacity}
@@ -49,7 +53,11 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.borderColor', 'Border Color')} value={data.border_color} onChange={(border_color) => updateGForce({ border_color })} />
+          <ColorField
+            label={t('widget-editor.borderColor', 'Border Color')}
+            value={data.border_color}
+            onChange={(border_color) => updateGForce({ border_color })}
+          />
           <SliderField
             label={t('widget-editor.borderThickness', 'Border Thickness')}
             value={data.border_thickness}
@@ -62,7 +70,11 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.markerColor', 'Marker Color')} value={data.marker_color} onChange={(marker_color) => updateGForce({ marker_color })} />
+          <ColorField
+            label={t('widget-editor.markerColor', 'Marker Color')}
+            value={data.marker_color}
+            onChange={(marker_color) => updateGForce({ marker_color })}
+          />
           <SizeSlider
             label={t('widget-editor.markerSize', 'Marker Size')}
             value={data.marker_size}
@@ -96,7 +108,7 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
       </div>
 
       <div className="space-y-4">
-        <SectionHeading icon={Type} title="Label" />
+        <SectionHeading icon={Type} title={t('widget-editor.label', 'Label')} />
         <div className="grid grid-cols-2 gap-4">
           <FontSelectField
             label={t('widget-editor.labelFont', 'Label Font')}
@@ -118,8 +130,16 @@ export default function GForceDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.labelColor', 'Label Color')} value={data.label_color} onChange={(label_color) => updateGForce({ label_color })} />
-          <ColorField label={t('widget-editor.unitColor', 'Unit Color')} value={data.label_unit_color} onChange={(label_unit_color) => updateGForce({ label_unit_color })} />
+          <ColorField
+            label={t('widget-editor.labelColor', 'Label Color')}
+            value={data.label_color}
+            onChange={(label_color) => updateGForce({ label_color })}
+          />
+          <ColorField
+            label={t('widget-editor.unitColor', 'Unit Color')}
+            value={data.label_unit_color}
+            onChange={(label_unit_color) => updateGForce({ label_unit_color })}
+          />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <SliderField

@@ -8,10 +8,15 @@ import { ColorField, NumberField, SelectField, SliderField } from './widgetFormC
 import { useTranslation } from 'react-i18next'
 
 const RECTANGLE_CORNERS = [
-  { key: 'round_top_left', label: 'Round top left corner', className: 'rounded-tl-md' },
-  { key: 'round_top_right', label: 'Round top right corner', className: 'rounded-tr-md' },
-  { key: 'round_bottom_left', label: 'Round bottom left corner', className: 'rounded-bl-md' },
-  { key: 'round_bottom_right', label: 'Round bottom right corner', className: 'rounded-br-md' },
+  { key: 'round_top_left', labelKey: 'widget-editor.roundTopLeftCorner', defaultLabel: 'Round top left corner', className: 'rounded-tl-md' },
+  { key: 'round_top_right', labelKey: 'widget-editor.roundTopRightCorner', defaultLabel: 'Round top right corner', className: 'rounded-tr-md' },
+  { key: 'round_bottom_left', labelKey: 'widget-editor.roundBottomLeftCorner', defaultLabel: 'Round bottom left corner', className: 'rounded-bl-md' },
+  {
+    key: 'round_bottom_right',
+    labelKey: 'widget-editor.roundBottomRightCorner',
+    defaultLabel: 'Round bottom right corner',
+    className: 'rounded-br-md',
+  },
 ]
 
 function maxBorderThickness(data) {
@@ -24,14 +29,18 @@ function maxBorderThickness(data) {
 function CornerGrid({ rectangleData, onToggle }) {
   const { t } = useTranslation()
   return (
-    <div className="grid h-32 w-32 grid-cols-2 grid-rows-2 gap-2 py-3 pr-3 pl-1" aria-label={t('widget-editor.roundedCorners', 'Rounded corners')} data-testid="corner-grid">
+    <div
+      className="grid h-32 w-32 grid-cols-2 grid-rows-2 gap-2 py-3 pr-3 pl-1"
+      aria-label={t('widget-editor.roundedCorners', 'Rounded corners')}
+      data-testid="corner-grid"
+    >
       {RECTANGLE_CORNERS.map((corner) => {
         const active = Boolean(rectangleData[corner.key])
         return (
           <button
             key={corner.key}
             type="button"
-            aria-label={corner.label}
+            aria-label={t(corner.labelKey, corner.defaultLabel)}
             aria-pressed={active}
             onClick={() => onToggle(corner.key, !active)}
             className={`relative min-h-0 min-w-0 border transition-colors cursor-pointer ${corner.className} ${
@@ -98,7 +107,7 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
       return (
         <div className="grid grid-cols-2 gap-4">
           <NumberField
-            label="Diameter"
+            label={t('widget-editor.diameter', 'Diameter')}
             value={activeData.diameter}
             min={1}
             onChange={(rawValue) => updateActiveVariant({ diameter: parseInteger(rawValue, activeData.diameter ?? 1) })}
@@ -110,13 +119,13 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
     return (
       <div className="grid grid-cols-2 gap-4">
         <NumberField
-          label="Width"
+          label={t('widget-editor.width', 'Width')}
           value={activeData.width}
           min={1}
           onChange={(rawValue) => updateRectangleSize({ width: parseInteger(rawValue, activeData.width ?? 1) })}
         />
         <NumberField
-          label="Height"
+          label={t('widget-editor.height', 'Height')}
           value={activeData.height}
           min={1}
           onChange={(rawValue) => updateRectangleSize({ height: parseInteger(rawValue, activeData.height ?? 1) })}
@@ -185,14 +194,23 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
   return (
     <>
       <div className="space-y-4">
-        <SelectField label={t('widget-editor.displayType', 'Display Type')} value={displayType} onValueChange={handleDisplayTypeChange} options={displayOptions} />
+        <SelectField
+          label={t('widget-editor.displayType', 'Display Type')}
+          value={displayType}
+          onValueChange={handleDisplayTypeChange}
+          options={displayOptions}
+        />
         {renderSizeControls()}
       </div>
 
       <div className="space-y-4">
         <SectionHeading icon={Palette} title={t('widget-editor.backdropStyle', 'Backdrop Style')} />
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.fillColor', 'Fill Color')} value={widget.data.fill_color} onChange={(value) => updateWidgetData(widget.id, { fill_color: value })} />
+          <ColorField
+            label={t('widget-editor.fillColor', 'Fill Color')}
+            value={widget.data.fill_color}
+            onChange={(value) => updateWidgetData(widget.id, { fill_color: value })}
+          />
           <ColorField
             label={t('widget-editor.borderColor', 'Border Color')}
             value={widget.data.border_color}
@@ -235,7 +253,7 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
       </div>
       {displayType === 'rectangle' ? (
         <div className="space-y-4">
-          <SectionHeading icon={Shapes} title="Shape" />
+          <SectionHeading icon={Shapes} title={t('widget-editor.shape', 'Shape')} />
           {renderShapeControls()}
         </div>
       ) : null}

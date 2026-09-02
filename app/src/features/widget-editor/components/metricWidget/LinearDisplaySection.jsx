@@ -46,7 +46,10 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
     () => ORIENTATION_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })),
     [t],
   )
-  const positionOptions = useMemo(() => POSITION_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })), [t])
+  const positionOptions = useMemo(
+    () => POSITION_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })),
+    [t],
+  )
   const cornerRadiusMax = getLinearTrackCornerRadiusMax(linearData)
   const updateOrientation = (orientation) => {
     if (orientation === linearData.orientation) return
@@ -91,7 +94,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
         <SectionHeading icon={SlidersHorizontal} title={t('widget-editor.gaugeTrack', 'Gauge Track')} />
         <div className="grid grid-cols-2 gap-4">
           <SizeSlider
-            label="Width"
+            label={t('widget-editor.width', 'Width')}
             value={linearData.width}
             min={widthSliderBounds.min}
             max={widthSliderBounds.max}
@@ -106,7 +109,7 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
             onCommit={() => commitWidgetSize(widget.id)}
           />
           <SizeSlider
-            label="Height"
+            label={t('widget-editor.height', 'Height')}
             value={linearData.height}
             min={heightSliderBounds.min}
             max={heightSliderBounds.max}
@@ -122,7 +125,12 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4 pt-2">
-          <SelectField label={t('widget-editor.orientation', 'Orientation')} value={linearData.orientation} onValueChange={updateOrientation} options={orientationOptions} />
+          <SelectField
+            label={t('widget-editor.orientation', 'Orientation')}
+            value={linearData.orientation}
+            onValueChange={updateOrientation}
+            options={orientationOptions}
+          />
           <BarFillStyleField data={linearData} suggestBarGeometry={getSuggestedLinearBarGeometry} updateVariant={updateLinear} />
           <BarFillStyleDetails
             data={linearData}
@@ -146,9 +154,13 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.borderColor', 'Border Color')} value={linearData.track_border_color} onChange={(value) => updateLinear({ track_border_color: value })} />
+          <ColorField
+            label={t('widget-editor.borderColor', 'Border Color')}
+            value={linearData.track_border_color}
+            onChange={(value) => updateLinear({ track_border_color: value })}
+          />
           <SliderField
-            label="Border"
+            label={t('widget-editor.border', 'Border')}
             value={linearData.track_border_thickness}
             min={0}
             max={6}
@@ -161,7 +173,11 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.emptyColor', 'Empty Color')} value={linearData.track_empty_color} onChange={(value) => updateLinear({ track_empty_color: value })} />
+          <ColorField
+            label={t('widget-editor.emptyColor', 'Empty Color')}
+            value={linearData.track_empty_color}
+            onChange={(value) => updateLinear({ track_empty_color: value })}
+          />
           <SliderField
             label={t('widget-editor.emptyOpacity', 'Empty Opacity')}
             value={linearData.track_empty_opacity}
@@ -173,7 +189,11 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.filledColor', 'Filled Color')} value={linearData.track_filled_color} onChange={(value) => updateLinear({ track_filled_color: value })} />
+          <ColorField
+            label={t('widget-editor.filledColor', 'Filled Color')}
+            value={linearData.track_filled_color}
+            onChange={(value) => updateLinear({ track_filled_color: value })}
+          />
           <SliderField
             label={t('widget-editor.filledOpacity', 'Filled Opacity')}
             value={linearData.track_filled_opacity}

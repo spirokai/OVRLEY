@@ -10,6 +10,18 @@ import { useTranslation } from 'react-i18next'
 const LAP_TIMER_MODES_BY_VALUE = Object.fromEntries(LAP_TIMER_MODES.map((mode) => [mode.value, mode]))
 
 /**
+ * Translation keys for LAP_TIMER_MODES labels, keyed by mode value.
+ * The modes come from the shared manifest consumed by the backend and must
+ * stay unchanged, so its English labels are only used as fallback defaults.
+ */
+const LAP_TIMER_MODE_LABEL_KEYS = {
+  current_lap: 'widgets.lapTimerModes.currentLap',
+  best_lap: 'widgets.lapTimerModes.bestLap',
+  delta: 'widgets.lapTimerModes.delta',
+  lap_log: 'widgets.lapTimerModes.lapLog',
+}
+
+/**
  * Renders lap timer configuration controls.
  *
  * @param {object} props
@@ -26,7 +38,7 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
   return (
     <>
       <SelectField
-        label="Readout"
+        label={t('widget-editor.readout', 'Readout')}
         value={widget.data.lap_timer_mode}
         onValueChange={(mode) => {
           const selectedMode = LAP_TIMER_MODES_BY_VALUE[mode]
@@ -38,12 +50,12 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
             label_font_size: selectedMode.label_font_size,
           })
         }}
-        options={LAP_TIMER_MODES}
+        options={LAP_TIMER_MODES.map(({ value, label }) => ({ value, label: t(LAP_TIMER_MODE_LABEL_KEYS[value], label) }))}
       />
       <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
       <div className="space-y-4">
         <div className="flex w-full items-center gap-3">
-          <SectionHeading icon={Type} title="Label" />
+          <SectionHeading icon={Type} title={t('widget-editor.label', 'Label')} />
           {widget.data.lap_timer_mode !== 'lap_log' ? (
             <div className="shrink-0 pt-1">
               <ToggleField checked={widget.data.show_label} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_label: checked })} />
@@ -51,7 +63,11 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
           ) : null}
         </div>
         {widget.data.lap_timer_mode !== 'lap_log' ? (
-          <TextField label="Label" value={widget.data.label} onChange={(label) => updateWidgetData(widget.id, { label })} />
+          <TextField
+            label={t('widget-editor.label', 'Label')}
+            value={widget.data.label}
+            onChange={(label) => updateWidgetData(widget.id, { label })}
+          />
         ) : null}
         <SizeSlider
           label={t('widget-editor.labelFontSize', 'Label Font Size')}
@@ -73,7 +89,11 @@ export default function LapTimerDisplaySection({ widget, updateWidgetData, updat
             triggerClassName="h-9 border-border/70 bg-surface text-xs"
             labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
           />
-          <ColorField label={t('widget-editor.labelColor', 'Label Color')} value={widget.data.label_color} onChange={(label_color) => updateWidgetData(widget.id, { label_color })} />
+          <ColorField
+            label={t('widget-editor.labelColor', 'Label Color')}
+            value={widget.data.label_color}
+            onChange={(label_color) => updateWidgetData(widget.id, { label_color })}
+          />
         </div>
       </div>
       {widget.data.lap_timer_mode === 'delta' || widget.data.lap_timer_mode === 'lap_log' ? (
