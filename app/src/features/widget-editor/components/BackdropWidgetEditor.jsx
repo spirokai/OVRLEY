@@ -246,8 +246,8 @@ export default function BackdropWidgetEditor({ widget, updateWidgetData, updateW
             step={1}
             integerDisplay
             valueDisplay={`${widget.data.border_thickness ?? 0}px`}
-            onChange={(value) => updateWidgetSize(widget.id, { border_thickness: value })}
-            onCommit={() => commitWidgetSize(widget.id)}
+            onSliderChange={(value) => updateWidgetSize(widget.id, { border_thickness: value })}
+            onSliderCommit={() => commitWidgetSize(widget.id)}
           />
         ) : null}
       </div>

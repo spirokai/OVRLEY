@@ -345,8 +345,8 @@
     "calculated": "Vypočteno"
   },
   "undo-redo": {
-    "redoCtrlcmdshiftz": "Znovu (Ctrl/Cmd+Shift+Z)",
-    "undoCtrlcmdz": "Zpět (Ctrl/Cmd+Z)"
+    "redoCtrlcmdshiftz": "Znovu",
+    "undoCtrlcmdz": "Zpět"
   },
   "video-preview": {
     "aborterror": "AbortError",
