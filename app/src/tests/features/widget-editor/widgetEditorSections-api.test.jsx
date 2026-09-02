@@ -76,4 +76,10 @@ describe('UnitsControlRow settled API', () => {
 
     expect(getByText('Custom Unit')).toBeTruthy()
   })
+
+  test('uses the translated default section heading when title is absent', () => {
+    const { getByText } = render(<UnitsControlRow checked={true} onCheckedChange={vi.fn()} />)
+
+    expect(getByText('Unit')).toBeTruthy()
+  })
 })

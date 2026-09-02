@@ -6,6 +6,7 @@ import { ColorField, SizeSlider, SliderField, ToggleField, SelectField } from '.
 import useDisplayVariantUpdater from '../../hooks/useDisplayVariantUpdater'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { translateOptions } from '@/i18n'
 
 const ALIGNMENT_OPTIONS = [
   { value: 'below', labelKey: 'widget-editor.alignmentBelow', defaultLabel: 'Below' },
@@ -22,18 +23,6 @@ const INDICATOR_PLACEMENT_OPTIONS = [
   { value: 'bottom', labelKey: 'widget-editor.bottom', defaultLabel: 'Bottom' },
   { value: 'both', labelKey: 'widget-editor.both', defaultLabel: 'Both' },
 ]
-
-/**
- * Maps option constants using the {value, labelKey, defaultLabel} shape into
- * translated {value, label} options.
- *
- * @param {Array<{value: string, labelKey: string, defaultLabel: string}>} options - Option constants.
- * @param {import('i18next').TFunction} translate - Translation function.
- * @returns {Array<{value: string, label: string}>} Translated options.
- */
-function translateOptions(options, translate) {
-  return options.map(({ value, labelKey, defaultLabel }) => ({ value, label: translate(labelKey, defaultLabel) }))
-}
 
 /**
  * Renders heading tape display controls: tape scale, ticks, labels, indicator.

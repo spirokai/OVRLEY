@@ -12,33 +12,7 @@ import { createFontSelection } from '@/lib/fonts'
 import { getWidgetFont } from '../utils/widgetUtils'
 import { getThemeColor } from '@/lib/theme'
 import { useTranslation } from 'react-i18next'
-
-/**
- * Translation keys for TIME_FORMATS labels, keyed by format value.
- * TIME_FORMATS itself is consumed by the backend and must stay unchanged,
- * so its English labels are only used as fallback defaults at render time.
- */
-const TIME_FORMAT_LABEL_KEYS = {
-  'date-dd-mm-yyyy': 'widget-editor.dateFormatDdMmYyyy',
-  'date-mm-dd-yyyy': 'widget-editor.dateFormatMmDdYyyy',
-  'date-yyyy-mm-dd': 'widget-editor.dateFormatYyyyMmDd',
-  'date-dd-mmm-yyyy': 'widget-editor.dateFormatDdMmmYyyy',
-  'date-mmm-dd-yyyy': 'widget-editor.dateFormatMmmDdYyyy',
-  'date-dd-mmmm-yyyy': 'widget-editor.dateFormatDdMmmmYyyy',
-  'date-mmmm-dd-yyyy': 'widget-editor.dateFormatMmmmDdYyyy',
-  'time-24': 'widget-editor.timeFormat24h',
-  'time-24s': 'widget-editor.timeFormat24hWithSeconds',
-  'time-12': 'widget-editor.timeFormat12h',
-  'time-12s': 'widget-editor.timeFormat12hWithSeconds',
-  'date-time-24': 'widget-editor.dateTimeFormat24h',
-  'date-time-24s': 'widget-editor.dateTimeFormat24hWithSeconds',
-  'date-time-12': 'widget-editor.dateTimeFormat12h',
-  'date-time-12s': 'widget-editor.dateTimeFormat12hWithSeconds',
-  'date-mmm-time-24': 'widget-editor.dateTimeFormatDdMmm24h',
-  'date-mmm-time-12': 'widget-editor.dateTimeFormatDdMmm12h',
-  'date-mmmm-time-24': 'widget-editor.dateTimeFormatDdMmmm24h',
-  'date-mmmm-time-12': 'widget-editor.dateTimeFormatDdMmmm12h',
-}
+import { translateOptions } from '@/i18n'
 
 /**
  * Renders the position section component.
@@ -146,7 +120,7 @@ export function FontSection({
 
   return (
     <div className="space-y-4">
-      <SectionHeading icon={Type} title={title ?? t('widget-editor.typography', 'Typography')} />
+      <SectionHeading icon={Type} title={title} titleKey="widget-editor.typography" defaultTitle="Typography" />
 
       {showTextInput ? (
         <TextField
@@ -161,7 +135,7 @@ export function FontSection({
           label={t('widget-editor.format', 'Format')}
           value={widget.data.format}
           onValueChange={(value) => updateWidgetData(widget.id, { format: value })}
-          options={TIME_FORMATS.map(({ value, label }) => ({ value, label: t(TIME_FORMAT_LABEL_KEYS[value], label) }))}
+          options={translateOptions(TIME_FORMATS, t)}
         />
       ) : null}
 
@@ -186,7 +160,9 @@ export function FontSection({
           labelClassName="text-[9px] text-muted-foreground uppercase font-bold"
         />
         <ColorField
-          label={colorLabel ?? t('widget-editor.fontColor', 'Font Color')}
+          label={colorLabel}
+          labelKey="widget-editor.fontColor"
+          defaultLabel="Font Color"
           value={widget.data.color || getThemeColor('ice')}
           onChange={(value) => updateWidgetData(widget.id, { color: value })}
         />
@@ -224,14 +200,13 @@ export function IconSection({
   return (
     <div className="space-y-4">
       <div className="flex w-full items-center gap-3">
-        <SectionHeading icon={Palette} title={title ?? t('widget-editor.icon', 'Icon')} />
+        <SectionHeading icon={Palette} title={title} titleKey="widget-editor.icon" defaultTitle="Icon" />
         <div className="shrink-0 pt-1">
           <ToggleField checked={widget.data.show_icon} onCheckedChange={(checked) => updateWidgetData(widget.id, { show_icon: checked })} />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <ColorField
-          label={t('widget-editor.color', 'Color')}
           disabled={!widget.data.show_icon}
           value={widget.data.icon_color || getThemeColor('aqua')}
           onChange={(value) => updateWidgetData(widget.id, { icon_color: value })}
@@ -317,7 +292,7 @@ export function UnitsControlRow({
   return (
     <div className="space-y-2 pt-2">
       <div className="flex w-full items-center gap-3">
-        <SectionHeading icon={Ruler} title={title ?? t('widget-editor.unit', 'Unit')} />
+        <SectionHeading icon={Ruler} title={title} titleKey="widget-editor.unit" defaultTitle="Unit" />
         {showToggle ? (
           <div className="shrink-0 pt-1">
             <ToggleField checked={checked} onCheckedChange={onCheckedChange} />
@@ -326,14 +301,7 @@ export function UnitsControlRow({
       </div>
       {showSelect || showColor ? (
         <div className="grid grid-cols-2 gap-4 items-start">
-          {showColor ? (
-            <ColorField
-              label={colorLabel ?? t('widget-editor.color', 'Color')}
-              value={colorValue}
-              onChange={onColorChange}
-              disabled={controlsDisabled}
-            />
-          ) : null}
+          {showColor ? <ColorField label={colorLabel} value={colorValue} onChange={onColorChange} disabled={controlsDisabled} /> : null}
           {showSelect ? (
             <SelectField
               label={selectLabel ?? t('widget-editor.unit', 'Unit')}

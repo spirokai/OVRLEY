@@ -21,7 +21,7 @@ import {
 } from '@/lib/widget/standard-metrics'
 import { isTextDisplayType, isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
 import { METRIC_ICON_SVGS } from '@/lib/widget/widget-icons'
-import i18next from '@/i18n'
+import i18next, { translateOptions } from '@/i18n'
 
 describe('standard metric widget catalog', () => {
   test('covers the existing and Wave 1 shared standard metric widgets', () => {
@@ -97,10 +97,20 @@ describe('standard metric widget catalog', () => {
     expect(getStandardMetricDefinition('gps_coordinates')).toMatchObject({
       formatter: 'coordinates',
       defaultDisplayUnit: 'both',
-      supportedDisplayUnits: [{ value: 'latitude' }, { value: 'longitude' }, { value: 'both' }],
+      supportedDisplayUnits: [
+        { value: 'latitude', labelKey: 'widget-editor.latitude', defaultLabel: 'Latitude' },
+        { value: 'longitude', labelKey: 'widget-editor.longitude', defaultLabel: 'Longitude' },
+        { value: 'both', labelKey: 'widget-editor.both', defaultLabel: 'Both' },
+      ],
       showUnitsByDefault: false,
       category: 'general',
     })
+
+    expect(translateOptions(getStandardMetricDefinition('gps_coordinates').supportedDisplayUnits, i18next.t)).toEqual([
+      { value: 'latitude', label: 'Latitude' },
+      { value: 'longitude', label: 'Longitude' },
+      { value: 'both', label: 'Both' },
+    ])
     expect(getStandardMetricDefinition('distance_to_home')).toMatchObject({
       formatter: 'distance',
       defaultDisplayUnit: 'm',
@@ -242,13 +252,13 @@ describe('standard metric widget catalog', () => {
 })
 
 describe('display type definitions', () => {
-  test('each display type has a formal definition with label and layoutMode', () => {
-    expect(DISPLAY_TYPE_DEFINITIONS.text).toMatchObject({ label: 'Text', layoutMode: 'intrinsic' })
-    expect(DISPLAY_TYPE_DEFINITIONS.linear).toMatchObject({ label: 'Linear Bar', layoutMode: 'boxed' })
-    expect(DISPLAY_TYPE_DEFINITIONS.arc).toMatchObject({ label: 'Arc Gauge', layoutMode: 'boxed' })
-    expect(DISPLAY_TYPE_DEFINITIONS.corner).toMatchObject({ label: 'Corner Gauge', layoutMode: 'boxed' })
-    expect(DISPLAY_TYPE_DEFINITIONS.heading_tape).toMatchObject({ label: 'Heading Tape', layoutMode: 'boxed' })
-    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).toMatchObject({ label: 'Lean Angle', layoutMode: 'boxed' })
+  test('each display type has a formal definition with labelKey and layoutMode', () => {
+    expect(DISPLAY_TYPE_DEFINITIONS.text).toMatchObject({ labelKey: 'widgets.displayTypes.text', layoutMode: 'intrinsic' })
+    expect(DISPLAY_TYPE_DEFINITIONS.linear).toMatchObject({ labelKey: 'widgets.displayTypes.linear', layoutMode: 'boxed' })
+    expect(DISPLAY_TYPE_DEFINITIONS.arc).toMatchObject({ labelKey: 'widgets.displayTypes.arc', layoutMode: 'boxed' })
+    expect(DISPLAY_TYPE_DEFINITIONS.corner).toMatchObject({ labelKey: 'widgets.displayTypes.corner', layoutMode: 'boxed' })
+    expect(DISPLAY_TYPE_DEFINITIONS.heading_tape).toMatchObject({ labelKey: 'widgets.displayTypes.headingTape', layoutMode: 'boxed' })
+    expect(DISPLAY_TYPE_DEFINITIONS.lean_angle).toMatchObject({ labelKey: 'widgets.displayTypes.leanAngle', layoutMode: 'boxed' })
   })
 
   test('boxed display types use explicit or derived geometry contracts', () => {

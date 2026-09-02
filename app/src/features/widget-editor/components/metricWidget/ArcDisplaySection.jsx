@@ -19,6 +19,7 @@ import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { useTranslation } from 'react-i18next'
+import { translateOptions } from '@/i18n'
 
 const ARC_MIN_ANGLE = 30
 const ARC_MAX_ANGLE = 360
@@ -26,18 +27,6 @@ const CORNER_ORIENTATION_OPTIONS = [
   { value: 'bottom-left', labelKey: 'widget-editor.bottomLeft', defaultLabel: 'Bottom Left' },
   { value: 'bottom-right', labelKey: 'widget-editor.bottomRight', defaultLabel: 'Bottom Right' },
 ]
-
-/**
- * Maps option constants using the {value, labelKey, defaultLabel} shape into
- * translated {value, label} options.
- *
- * @param {Array<{value: string, labelKey: string, defaultLabel: string}>} options - Option constants.
- * @param {import('i18next').TFunction} translate - Translation function.
- * @returns {Array<{value: string, label: string}>} Translated options.
- */
-function translateOptions(options, translate) {
-  return options.map(({ value, labelKey, defaultLabel }) => ({ value, label: translate(labelKey, defaultLabel) }))
-}
 
 function suggestArcBarGeometry(data) {
   const isCorner = data.corner_orientation != null

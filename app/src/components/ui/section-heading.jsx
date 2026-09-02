@@ -1,5 +1,6 @@
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
+import { useTranslation } from 'react-i18next'
 
 const VARIANT_STYLES = {
   compact: {
@@ -23,20 +24,24 @@ const VARIANT_STYLES = {
  *
  * @param {object} props - Component props.
  * @param {*} props.icon - Heading icon component.
- * @param {string} props.title - Heading text.
+ * @param {string} [props.title] - Explicit heading text.
+ * @param {string} [props.titleKey] - Translation key used when title is absent.
+ * @param {string} [props.defaultTitle] - Default translation used when title is absent.
  * @param {React.ReactNode} [props.trailing=null] - Optional trailing action.
  * @param {'compact'|'drawer'} [props.variant='compact'] - Canonical heading density.
  * @returns {JSX.Element} Rendered section heading.
  */
-export function SectionHeading({ icon: Icon, title, trailing = null, variant = 'compact' }) {
+export function SectionHeading({ icon: Icon, title, titleKey, defaultTitle, trailing = null, variant = 'compact' }) {
+  const { t } = useTranslation()
   const styles = VARIANT_STYLES[variant]
   const Heading = styles.tag
+  const resolvedTitle = title ?? t(titleKey, defaultTitle)
 
   return (
     <div className={cn('flex w-full items-center', styles.root)}>
       <div className={cn('flex min-w-0 flex-1 items-center', styles.content)}>
         <Icon className={cn('text-primary', styles.icon)} />
-        <Heading className={cn('font-bold uppercase text-muted-foreground', styles.heading)}>{title}</Heading>
+        <Heading className={cn('font-bold uppercase text-muted-foreground', styles.heading)}>{resolvedTitle}</Heading>
         <Separator className="flex-1" />
       </div>
       {trailing ? <div className="shrink-0">{trailing}</div> : null}

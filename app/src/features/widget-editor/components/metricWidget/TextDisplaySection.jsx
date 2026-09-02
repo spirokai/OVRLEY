@@ -10,23 +10,12 @@ import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { useTranslation } from 'react-i18next'
+import { translateOptions } from '@/i18n'
 
 const COORDINATE_FORMAT_OPTIONS = [
   { value: 'dms', labelKey: 'widget-editor.coordinateFormatDms', defaultLabel: 'Deg / Min / Sec' },
   { value: 'ddm', labelKey: 'widget-editor.coordinateFormatDdm', defaultLabel: 'Deg / Dec Min' },
 ]
-
-/**
- * Maps option constants using the {value, labelKey, defaultLabel} shape into
- * translated {value, label} options.
- *
- * @param {Array<{value: string, labelKey: string, defaultLabel: string}>} options - Option constants.
- * @param {import('i18next').TFunction} translate - Translation function.
- * @returns {Array<{value: string, label: string}>} Translated options.
- */
-function translateOptions(options, translate) {
-  return options.map(({ value, labelKey, defaultLabel }) => ({ value, label: translate(labelKey, defaultLabel) }))
-}
 
 /**
  * Renders text-specific display controls: font, decimals/balance, icon, units.
@@ -106,7 +95,7 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
             label={t('widget-editor.format', 'Format')}
             value={getStandardMetricDisplayUnit(widget.type, widget.data)}
             onValueChange={(value) => updateWidgetData(widget.id, { display_unit: value })}
-            options={unitOptions}
+            options={translateOptions(unitOptions, t)}
           />
           <SelectField
             label={t('widget-editor.coordinates', 'Coordinates')}

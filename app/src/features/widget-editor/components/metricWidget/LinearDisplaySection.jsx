@@ -8,6 +8,7 @@ import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts
 import { BarFillStyleDetails, BarFillStyleField } from './BarFillStyleControls'
 import { getLinearBarGapMax, getLinearTrackCornerRadiusMax, getSuggestedLinearBarGeometry } from '@/features/widget-preview/shared/gaugeBarGeometry'
 import { useTranslation } from 'react-i18next'
+import { translateOptions } from '@/i18n'
 
 const ORIENTATION_OPTIONS = [
   { value: 'horizontal', labelKey: 'widget-editor.horizontal', defaultLabel: 'Horizontal' },
@@ -42,14 +43,8 @@ export default function LinearDisplaySection({ widget, updateWidgetData, updateW
   const updateLinear = useDisplayVariantUpdater(widget, 'linear', linearData, updateWidgetData)
   const updateLinearSize = useDisplayVariantUpdater(widget, 'linear', linearData, updateWidgetSize)
   const availableFonts = useAvailableFonts()
-  const orientationOptions = useMemo(
-    () => ORIENTATION_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })),
-    [t],
-  )
-  const positionOptions = useMemo(
-    () => POSITION_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })),
-    [t],
-  )
+  const orientationOptions = useMemo(() => translateOptions(ORIENTATION_OPTIONS, t), [t])
+  const positionOptions = useMemo(() => translateOptions(POSITION_OPTIONS, t), [t])
   const cornerRadiusMax = getLinearTrackCornerRadiusMax(linearData)
   const updateOrientation = (orientation) => {
     if (orientation === linearData.orientation) return

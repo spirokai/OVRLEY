@@ -10,6 +10,7 @@ import { DimensionsSection } from './widgetEditorSections'
 import { getThemeColor } from '@/lib/theme'
 import { Label } from '@/components/ui/label'
 import { useTranslation } from 'react-i18next'
+import { translateOptions } from '@/i18n'
 
 const MARKER_VARIANT_OPTIONS = [
   { value: 'single', labelKey: 'widget-editor.singleCircle', defaultLabel: 'Single Circle' },
@@ -28,10 +29,7 @@ const MARKER_VARIANT_OPTIONS = [
  */
 export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize, setNumericField }) {
   const { t } = useTranslation()
-  const markerVariantOptions = useMemo(
-    () => MARKER_VARIANT_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) })),
-    [t],
-  )
+  const markerVariantOptions = useMemo(() => translateOptions(MARKER_VARIANT_OPTIONS, t), [t])
   const lineWidth = widget.data.completed_line_width ?? widget.data.remaining_line_width
   const completedLineOpacity = widget.data.completed_line_opacity
   const remainingLineOpacity = widget.data.remaining_line_opacity
@@ -180,7 +178,6 @@ export default function RouteMapWidgetEditor({ widget, updateWidgetData, updateW
         </div>
         <div className="grid grid-cols-2 gap-4">
           <ColorField
-            label={t('widget-editor.color', 'Color')}
             value={widget.data.marker_color || getThemeColor('aqua')}
             onChange={(value) => updateWidgetData(widget.id, { marker_color: value })}
           />

@@ -27,4 +27,15 @@ i18n.use(initReactI18next).init({
   },
 })
 
+/**
+ * Translates canonical select-option definitions for presentation.
+ *
+ * @param {Array<{value: string, labelKey: string, defaultLabel: string}>} options - Canonical option definitions.
+ * @param {import('i18next').TFunction} translate - Translation function.
+ * @returns {Array<{value: string, label: string}>} Translated select options.
+ */
+export function translateOptions(options, translate) {
+  return options.map(({ value, labelKey, defaultLabel }) => ({ value, label: translate(labelKey, defaultLabel) }))
+}
+
 export default i18n

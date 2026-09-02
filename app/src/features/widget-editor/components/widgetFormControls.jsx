@@ -17,25 +17,25 @@ import { RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 export const TIME_FORMATS = [
-  { value: 'date-dd-mm-yyyy', label: 'Date only (DD-MM-YYYY)' },
-  { value: 'date-mm-dd-yyyy', label: 'Date only (MM-DD-YYYY)' },
-  { value: 'date-yyyy-mm-dd', label: 'Date only (YYYY-MM-DD)' },
-  { value: 'date-dd-mmm-yyyy', label: 'Date only (DD MMM YYYY)' },
-  { value: 'date-mmm-dd-yyyy', label: 'Date only (MMM DD YYYY)' },
-  { value: 'date-dd-mmmm-yyyy', label: 'Date only (DD MMMM YYYY)' },
-  { value: 'date-mmmm-dd-yyyy', label: 'Date only (MMMM DD YYYY)' },
-  { value: 'time-24', label: 'Time only (24h)' },
-  { value: 'time-24s', label: 'Time only (24h with seconds)' },
-  { value: 'time-12', label: 'Time only (12h)' },
-  { value: 'time-12s', label: 'Time only (12h with seconds)' },
-  { value: 'date-time-24', label: 'Date + time (24h)' },
-  { value: 'date-time-24s', label: 'Date + time (24h with seconds)' },
-  { value: 'date-time-12', label: 'Date + time (12h)' },
-  { value: 'date-time-12s', label: 'Date + time (12h with seconds)' },
-  { value: 'date-mmm-time-24', label: 'Date + time (DD MMM, 24h)' },
-  { value: 'date-mmm-time-12', label: 'Date + time (DD MMM, 12h)' },
-  { value: 'date-mmmm-time-24', label: 'Date + time (DD MMMM, 24h)' },
-  { value: 'date-mmmm-time-12', label: 'Date + time (DD MMMM, 12h)' },
+  { value: 'date-dd-mm-yyyy', labelKey: 'widget-editor.dateFormatDdMmYyyy', defaultLabel: 'Date only (DD-MM-YYYY)' },
+  { value: 'date-mm-dd-yyyy', labelKey: 'widget-editor.dateFormatMmDdYyyy', defaultLabel: 'Date only (MM-DD-YYYY)' },
+  { value: 'date-yyyy-mm-dd', labelKey: 'widget-editor.dateFormatYyyyMmDd', defaultLabel: 'Date only (YYYY-MM-DD)' },
+  { value: 'date-dd-mmm-yyyy', labelKey: 'widget-editor.dateFormatDdMmmYyyy', defaultLabel: 'Date only (DD MMM YYYY)' },
+  { value: 'date-mmm-dd-yyyy', labelKey: 'widget-editor.dateFormatMmmDdYyyy', defaultLabel: 'Date only (MMM DD YYYY)' },
+  { value: 'date-dd-mmmm-yyyy', labelKey: 'widget-editor.dateFormatDdMmmmYyyy', defaultLabel: 'Date only (DD MMMM YYYY)' },
+  { value: 'date-mmmm-dd-yyyy', labelKey: 'widget-editor.dateFormatMmmmDdYyyy', defaultLabel: 'Date only (MMMM DD YYYY)' },
+  { value: 'time-24', labelKey: 'widget-editor.timeFormat24h', defaultLabel: 'Time only (24h)' },
+  { value: 'time-24s', labelKey: 'widget-editor.timeFormat24hWithSeconds', defaultLabel: 'Time only (24h with seconds)' },
+  { value: 'time-12', labelKey: 'widget-editor.timeFormat12h', defaultLabel: 'Time only (12h)' },
+  { value: 'time-12s', labelKey: 'widget-editor.timeFormat12hWithSeconds', defaultLabel: 'Time only (12h with seconds)' },
+  { value: 'date-time-24', labelKey: 'widget-editor.dateTimeFormat24h', defaultLabel: 'Date + time (24h)' },
+  { value: 'date-time-24s', labelKey: 'widget-editor.dateTimeFormat24hWithSeconds', defaultLabel: 'Date + time (24h with seconds)' },
+  { value: 'date-time-12', labelKey: 'widget-editor.dateTimeFormat12h', defaultLabel: 'Date + time (12h)' },
+  { value: 'date-time-12s', labelKey: 'widget-editor.dateTimeFormat12hWithSeconds', defaultLabel: 'Date + time (12h with seconds)' },
+  { value: 'date-mmm-time-24', labelKey: 'widget-editor.dateTimeFormatDdMmm24h', defaultLabel: 'Date + time (DD MMM, 24h)' },
+  { value: 'date-mmm-time-12', labelKey: 'widget-editor.dateTimeFormatDdMmm12h', defaultLabel: 'Date + time (DD MMM, 12h)' },
+  { value: 'date-mmmm-time-24', labelKey: 'widget-editor.dateTimeFormatDdMmmm24h', defaultLabel: 'Date + time (DD MMMM, 24h)' },
+  { value: 'date-mmmm-time-12', labelKey: 'widget-editor.dateTimeFormatDdMmmm12h', defaultLabel: 'Date + time (DD MMMM, 12h)' },
 ]
 
 export const SPEED_UNITS = [
@@ -182,16 +182,21 @@ export function NumberField({ label, value, onChange, min, max, disabled = false
  * Renders the color field component.
  *
  * @param {object} props - Component props.
- * @param {*} props.label - Field or UI label text.
+ * @param {string} [props.label] - Explicit field label.
+ * @param {string} [props.labelKey='widget-editor.color'] - Translation key used when label is absent.
+ * @param {string} [props.defaultLabel='Color'] - Default translation used when label is absent.
  * @param {*} props.value - Input value processed by the helper.
  * @param {*} props.onChange - Callback invoked to change.
  * @returns {JSX.Element} Rendered component output.
  */
-export function ColorField({ label, value, onChange, disabled = false }) {
+export function ColorField({ label, labelKey = 'widget-editor.color', defaultLabel = 'Color', value, onChange, disabled = false }) {
+  const { t } = useTranslation()
+  const resolvedLabel = label ?? t(labelKey, defaultLabel)
+
   return (
     <div className="space-y-1">
       <Label className={FIELD_LABEL_CLASS} disabled={disabled}>
-        {label}
+        {resolvedLabel}
       </Label>
       <HexColorPicker value={value} onChange={onChange} disabled={disabled} triggerClassName="justify-start" />
     </div>

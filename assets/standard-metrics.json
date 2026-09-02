@@ -400,15 +400,18 @@
       "supportedDisplayUnits": [
         {
           "value": "latitude",
-          "label": "Latitude"
+          "labelKey": "widget-editor.latitude",
+          "defaultLabel": "Latitude"
         },
         {
           "value": "longitude",
-          "label": "Longitude"
+          "labelKey": "widget-editor.longitude",
+          "defaultLabel": "Longitude"
         },
         {
           "value": "both",
-          "label": "Both"
+          "labelKey": "widget-editor.both",
+          "defaultLabel": "Both"
         }
       ],
       "showUnitsByDefault": false,
