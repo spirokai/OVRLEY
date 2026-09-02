@@ -25,7 +25,8 @@
     "newTemplate": "New Template",
     "overlays": "Overlays",
     "resetZoom": "Reset zoom",
-    "saveProject": "Save Project",
+    "save": "Save",
+      "saveProject": "Save Project",
     "saveProjectAs": "Save Project As",
     "saveTemplate": "Save Template",
     "selectTemplate": "Select Template...",
@@ -288,7 +289,10 @@
     "videoCouldNotBeSyncedWithActivity": "Video could not be synced with activity"
   },
   "template-manager": {
+    "cancel": "Cancel",
     "createNewTemplate": "Create New Template",
+    "newTemplate": "New Template",
+    "save": "Save",
     "saveTemplate": "Save Template",
     "unsavedChanges": "Your template has unsaved changes. Save them or discard them."
   },

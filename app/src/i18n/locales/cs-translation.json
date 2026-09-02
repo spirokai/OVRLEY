@@ -25,7 +25,8 @@
     "newTemplate": "Nová šablona",
     "overlays": "Grafika",
     "resetZoom": "Obnovit přiblížení",
-    "saveProject": "Uložit projekt",
+    "save": "Uložit",
+      "saveProject": "Uložit projekt",
     "saveProjectAs": "Uložit projekt jako",
     "saveTemplate": "Uložit šablonu",
     "selectTemplate": "Vybrat šablonu...",
@@ -288,7 +289,10 @@
     "videoCouldNotBeSyncedWithActivity": "Video se nepodařilo synchronizovat s aktivitou"
   },
   "template-manager": {
+    "cancel": "Zrušit",
     "createNewTemplate": "Vytvořit novou šablonu",
+    "newTemplate": "Nová šablona",
+    "save": "Uložit",
     "saveTemplate": "Uložit šablonu",
     "unsavedChanges": "Šablona obsahuje neuložené změny. Uložte je, nebo je zahoďte."
   },

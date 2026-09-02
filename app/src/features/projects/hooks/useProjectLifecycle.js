@@ -189,7 +189,11 @@ export default function useProjectLifecycle({
           'Your project has unsaved changes. Do you want to save the changes or close OVRLEY without saving?',
         )
       : i18next.t('projects.unsavedChanges', 'Your project has unsaved changes. Save them or discard them.'),
-    discardLabel: closingApplication ? i18next.t('projects.closeWithoutSaving', 'Close Without Saving') : 'New Project',
+    cancelLabel: i18next.t('projects.cancel', 'Cancel'),
+    saveLabel: i18next.t('projects.save', 'Save'),
+    discardLabel: closingApplication
+      ? i18next.t('projects.closeWithoutSaving', 'Close Without Saving')
+      : i18next.t('projects.newProject', 'New Project'),
     onCancel: () => answerProjectConfirm('cancel'),
     onSave: () => answerProjectConfirm('save'),
     onDiscard: () => answerProjectConfirm('discard'),
