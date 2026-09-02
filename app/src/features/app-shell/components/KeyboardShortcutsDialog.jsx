@@ -8,8 +8,9 @@ import { Keyboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Kbd } from '@/components/ui/kbd'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { locales } from '@/i18n/locales'
+// Restore these imports when the language selector is made public again.
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+// import { locales } from '@/i18n/locales'
 import { getKeyboardShortcutGroups } from '../utils/keyboardShortcutGroups'
 import { useTranslation } from 'react-i18next'
 
@@ -18,12 +19,10 @@ import { useTranslation } from 'react-i18next'
  *
  * @param {object} props - Component props.
  * @param {boolean} props.open - Whether the dialog is open.
- * @param {string} props.locale - Active locale code.
- * @param {(locale: string) => void} props.onLocaleChange - Callback invoked when the selected locale changes.
  * @param {Function} props.onClose - Callback invoked to close the dialog.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function KeyboardShortcutsDialog({ open, locale, onLocaleChange, onClose }) {
+export default function KeyboardShortcutsDialog({ open, onClose }) {
   const { t } = useTranslation()
   const shortcutGroups = useMemo(() => getKeyboardShortcutGroups(t), [t])
   return (
@@ -47,18 +46,26 @@ export default function KeyboardShortcutsDialog({ open, locale, onLocaleChange, 
               {t('app-shell.keyboardShortcuts', 'Keyboard Shortcuts')}
             </DialogTitle>
           </div>
-          <Select value={locale} onValueChange={onLocaleChange}>
-            <SelectTrigger className="h-8 w-44 shrink-0 bg-surface text-xs" aria-label={t('app-shell.language', 'Language')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              {locales.map(({ value, label }) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/*
+            Temporarily hidden for the next release. Restore this block and the
+            locale/onLocaleChange props when language selection is public again.
+
+            <Select value={locale} onValueChange={onLocaleChange}>
+              <SelectTrigger
+                className="h-8 w-44 shrink-0 bg-surface text-xs"
+                aria-label={t('app-shell.language', 'Language')}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end">
+                {locales.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          */}
         </div>
         <p className="pt-6 pb-3 normal-case font-light text-[0.9rem] px-6">
           {t('app-shell.keyboardShortcutsDescription', 'You can use the following keyboard shortcuts to improve your workflow within OVRLEY:')}

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { VerticalToolbar } from './VerticalToolbar'
 
-const DRAWER_WIDTH = '21rem'
+const DRAWER_WIDTH = '22rem'
 const TOOLBAR_WIDTH = '3rem'
 
 /**
