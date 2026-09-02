@@ -113,8 +113,8 @@
     "loadAnyway": "Load Anyway",
     "locate": "Locate",
     "missingSourceDescription": "The {{sourceRole}} file does not seem to exist. Locate the moved file or cancel without changing the current session.",
-    "openAProject": "Open a project",
     "newProject": "New Project",
+    "openAProject": "Open a project",
     "openProject": "open project",
     "saveProject": "save project",
     "sourceNotFound": "{{sourceRole}} source not found",
@@ -310,8 +310,8 @@
     "deleteVideo": "Delete video",
     "detected": "Detected",
     "details": "Details",
-    "distance": "Distance",
     "decreaseSyncOffset": "Decrease sync offset",
+    "distance": "Distance",
     "dropActivityFile": "Drop activity file",
     "dropVideoFile": "Drop video file",
     "duration": "Duration",
@@ -368,6 +368,9 @@
     "videoPreviewLoadingWasAborted": "Video preview loading was aborted."
   },
   "widgets": {
+    "activityAttributes": {
+      "barometric_altitude": "Barometric Altitude"
+    },
     "backdropTypes": {
       "circle": "Circle",
       "rectangle": "Rectangle"
@@ -539,11 +542,9 @@
     "showIndicator": "Show Indicator",
     "showSign": "Show sign",
     "size": "Size",
-    "segmentedBars": "Segmented Bars",
     "tapeScale": "Tape Scale",
     "tickColor": "Tick Color",
     "trackStyle": "Track Style",
-    "top": "Top",
     "unitColor": "Unit Color",
     "valueOffset": "Value Offset",
     "verticalOffset": "Vertical Offset",
@@ -583,6 +584,8 @@
     "icon": "Icon",
     "left": "Left",
     "right": "Right",
+    "segmentedBars": "Segmented Bars",
+    "top": "Top",
     "indicator": "Indicator",
     "indicatorStyleChevron": "Chevron",
     "indicatorStyleHighlightBar": "Highlight Bar",
