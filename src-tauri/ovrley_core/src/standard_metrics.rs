@@ -89,7 +89,12 @@ pub enum MetricIconAssetKey {
 #[serde(rename_all = "camelCase")]
 pub struct StandardMetricUnitOption {
     pub value: String,
-    pub label: String,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub label_key: Option<String>,
+    #[serde(default)]
+    pub default_label: Option<String>,
     #[serde(default)]
     pub render_label: Option<String>,
 }
@@ -427,7 +432,9 @@ pub fn standard_metric_unit_label(kind: MetricKind, display_unit: Option<&str>) 
             option
                 .render_label
                 .as_deref()
-                .unwrap_or(option.label.as_str())
+                .or(option.label.as_deref())
+                .or(option.default_label.as_deref())
+                .unwrap_or("")
         })
         .unwrap_or("")
 }
