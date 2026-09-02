@@ -77,7 +77,10 @@
     "installCodecForSystem": "",
     "microsoftStoreHevcCodec": "",
     "onUbuntu": "",
-    "overlayCanvasReady": ""
+    "overlayCanvasReady": "",
+    "statusModified": "Modificado",
+    "statusSaved": "Guardado",
+    "statusUnsaved": "Sin guardar"
   },
   "player": {
     "activity": "",

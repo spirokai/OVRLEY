@@ -78,7 +78,10 @@
     "installCodecForSystem": "Install the correct package for your system.",
     "microsoftStoreHevcCodec": "You can get the HEVC codec from the Microsoft Store.",
     "onUbuntu": "On Ubuntu:",
-    "overlayCanvasReady": "Overlay canvas ready"
+    "overlayCanvasReady": "Overlay canvas ready",
+    "statusModified": "Modified",
+    "statusSaved": "Saved",
+    "statusUnsaved": "Unsaved"
   },
   "player": {
     "activity": "Activity",

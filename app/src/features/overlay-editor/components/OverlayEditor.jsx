@@ -29,6 +29,12 @@ import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
 import { useTranslation } from 'react-i18next'
 import { getWidgetTypeName } from '@/lib/widget/widget-icons'
 
+const PROJECT_STATUS_TRANSLATIONS = {
+  Unsaved: { key: 'overlay-editor.statusUnsaved', defaultLabel: 'Unsaved' },
+  Saved: { key: 'overlay-editor.statusSaved', defaultLabel: 'Saved' },
+  Modified: { key: 'overlay-editor.statusModified', defaultLabel: 'Modified' },
+}
+
 function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels, selectedWidgetIds, widgets }) {
   const { t } = useTranslation()
   const visibleWidgets = useMemo(() => {
@@ -64,6 +70,10 @@ function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels,
 }
 
 function CanvasStatusBadges({ height, showProjectStatus, status, width }) {
+  const { t } = useTranslation()
+  const statusTranslation = PROJECT_STATUS_TRANSLATIONS[status]
+  if (!statusTranslation) throw new Error(`Unknown project status: ${status}`)
+
   return (
     <div data-testid="canvas-status-badges" className="pointer-events-none absolute right-8 top-4 z-50 flex items-center gap-2">
       {showProjectStatus ? (
@@ -71,7 +81,7 @@ function CanvasStatusBadges({ height, showProjectStatus, status, width }) {
           variant={status === 'Modified' ? 'secondary' : 'outline'}
           className={`h-6 rounded-xs text-[10px] shadow-lg backdrop-blur-sm ${status === 'Modified' ? 'border-accent-border bg-surface-accent-soft/20 text-primary' : 'bg-card/85'}`}
         >
-          {status}
+          {t(statusTranslation.key, statusTranslation.defaultLabel)}
         </Badge>
       ) : null}
       <div className="rounded-xs border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">

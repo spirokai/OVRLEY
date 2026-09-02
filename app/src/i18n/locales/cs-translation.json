@@ -78,7 +78,10 @@
     "installCodecForSystem": "Nainstalujte správný balíček pro váš systém.",
     "microsoftStoreHevcCodec": "Kodek HEVC můžete získat v Microsoft Storu.",
     "onUbuntu": "V Ubuntu:",
-    "overlayCanvasReady": "Plátno grafiky je připraveno"
+    "overlayCanvasReady": "Plátno grafiky je připraveno",
+    "statusModified": "Změněno",
+    "statusSaved": "Uloženo",
+    "statusUnsaved": "Neuloženo"
   },
   "player": {
     "activity": "Aktivita",
@@ -414,7 +417,7 @@
       "gps_coordinates": { "name": "GPS souřadnice", "shortName": "Poloha" },
       "gradient": { "name": "Sklon", "shortName": "Sklon" },
       "ground_contact_time": { "name": "Doba kontaktu se zemí", "shortName": "Kontakt" },
-      "heading": { "name": "Směr", "shortName": "Směr" },
+      "heading": { "name": "Kurz", "shortName": "Kurz" },
       "heartrate": { "name": "Tepová frekvence", "shortName": "Tep" },
       "iso": { "name": "ISO", "shortName": "ISO" },
       "label": { "name": "Text", "shortName": "Text" },
