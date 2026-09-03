@@ -1,7 +1,7 @@
 # Strava Activity Provider Integration Specification
 
 Status: Ready for implementation planning  
-Last updated: 2026-07-16
+Last updated: 2026-09-03
 
 ## 1. Summary
 
@@ -27,7 +27,7 @@ Cloudflare Worker at api.ovrley.cc
 Strava API
 ```
 
-The Cloudflare Worker is a permanent, purpose-built API proxy. The Strava client secret and all Strava access and refresh tokens remain server-side. React never performs provider network requests and never receives any credential.
+The Cloudflare Worker is a permanent, purpose-built API proxy and Strava webhook receiver. The Strava client secret and all Strava access and refresh tokens remain server-side. React never performs provider network requests and never receives any credential. The Worker origin and routes are public and discoverable; authentication, fixed operations, strict validation, quotas, and rate limits protect them rather than endpoint secrecy.
 
 ## 2. Goals
 
@@ -38,7 +38,9 @@ The Cloudflare Worker is a permanent, purpose-built API proxy. The Strava client
 - Include private and `Only You` activities through the read-only `activity:read_all` scope.
 - Show manual, summary-only activities in the list while marking them unavailable for import.
 - Download every currently documented Strava activity stream at high resolution when an activity is selected.
-- Cache downloaded stream responses locally for 30 days while always deriving list membership from a fresh or in-memory-cached Strava list response.
+- Cache downloaded stream responses locally for at most seven days in a connection-scoped cache while always deriving list membership from a fresh or in-memory-cached Strava list response.
+- Reconcile a successfully fetched complete month against that connection's cache and delete cached activities no longer present in the authoritative month.
+- Receive Strava activity-deletion and athlete-deauthorization webhooks at the Worker and deliver bounded deletion/revocation notices to connected desktop sessions without consuming Strava read quota.
 - Convert provider data once through a strict Strava adapter into OVRLEY's canonical `RawActivity`, then use the existing shared finalizer and activation path.
 - Replace the active activity atomically so failures never clear or partially replace a working activity.
 - Establish provider-neutral frontend, Rust orchestration, cache, error, source-identity, and presentation contracts for future activity providers.
@@ -47,7 +49,7 @@ The Cloudflare Worker is a permanent, purpose-built API proxy. The Strava client
 
 - Uploading activities or files to Strava.
 - Editing, deleting, creating, or otherwise mutating Strava activities.
-- Comments, kudos, clubs, segments, routes, athlete statistics, webhooks, or social features.
+- Comments, kudos, clubs, segments, routes, athlete statistics, activity-change synchronization beyond deletion/revocation notices, or social features.
 - Fetching Strava activity-detail responses in addition to streams.
 - Persisting activity-list responses across OVRLEY processes.
 - Restoring the previously active Strava activity after OVRLEY restarts.
@@ -198,6 +200,8 @@ Components render these states but do not infer them from error-message text.
 - Desktop builds always use this production origin. There is no runtime endpoint override.
 - Tests use injected/mocked transports rather than redirecting release binaries to arbitrary origins.
 - The Worker does not enable a generic CORS API for WebView clients; the native Rust client is the API consumer.
+- The origin and route names are public and discoverable. CORS, obscurity, an embedded shared API key, client certificates, or request-signing secrets in the desktop are not security boundaries.
+- Authenticated session checks, exact fixed routes, strict request schemas, bounded work, per-session quotas, application-wide Strava quota protection, and Cloudflare abuse controls are the security boundary.
 
 ### 6.2 Purpose-built API
 
@@ -208,11 +212,15 @@ The v1 API must support the following logical operations:
 - Create a browser authorization attempt.
 - Observe and exchange a browser authorization attempt.
 - Validate an authenticated OVRLEY session and return minimal account identity.
+- Return pending deletion/revocation notices for an authenticated OVRLEY session without calling Strava.
 - Disconnect the current OS-profile session.
 - Return one complete activity-local calendar month of canonical activity summaries.
 - Return all requested streams for one activity ID.
+- Receive Strava subscription verification and supported webhook events on a dedicated non-desktop callback route.
 
 Routes should use fixed path names. Activity IDs should be supplied in request bodies where practical so default URL logs do not retain them. The Worker may trust the authenticated client's requested activity ID and rely on Strava's authorization checks; signed activity capabilities and activity-detail ownership calls are not required.
+
+The desktop cannot provide an upstream origin, URL, path, HTTP method, scope, authorization header, or arbitrary Strava query parameters. Except for the OAuth-attempt and webhook callbacks, every operation requires an opaque OVRLEY session credential. The Worker constructs each upstream request from fixed code only after validating the operation's bounded canonical request body.
 
 ### 6.3 OAuth flow
 
@@ -257,12 +265,13 @@ D1 stores only authorization/account state:
 - Access-token expiry and refresh coordination state.
 - Application-encrypted Strava access and refresh tokens.
 - Session creation, last-used, and retention timestamps.
+- Minimal, bounded activity-deletion notices and per-session acknowledgement state needed to purge connected desktop caches.
 
 Strava tokens are encrypted using authenticated encryption through the Worker Web Crypto API. The encryption key is a Worker secret, not a D1 value. Stored ciphertext includes a key identifier and unique nonce so encryption keys can be rotated without placing plaintext tokens in migrations or logs.
 
 D1 also coordinates token refresh so concurrent requests cannot use and invalidate the same rotating refresh token. A short conditional refresh lease or equivalent transaction-safe mechanism ensures one refresh owner. Successful refresh responses atomically replace both the access token and the latest returned refresh token.
 
-D1 does not store activity summaries, activity IDs for authorization, or stream payloads.
+D1 does not store activity summaries, activity IDs for authorization, or stream payloads. Activity IDs may exist only in bounded deletion notices and are removed after all active sessions acknowledge them or their delivery retention expires.
 
 ### 6.6 Strava token lifecycle
 
@@ -327,12 +336,30 @@ Cloudflare Workers Rate Limiting bindings provide approximate abuse controls wit
 | --------------------- | -------------- | ------------- |
 | Start OAuth           | Client IP      | 10/minute     |
 | Poll OAuth status     | Attempt ID     | 40/minute     |
+| Sync deletion notices | OVRLEY session | 30/minute     |
 | Monthly activity list | OVRLEY session | 30/minute     |
 | Stream download       | OVRLEY session | 15/minute     |
 
 Strava's application-wide read quota remains authoritative. A Strava 429 is handled through the typed rate-limit behavior above.
 
-### 6.10 Worker observability
+The Worker tracks Strava's application-wide quota headers and applies a global read-budget circuit breaker. Per-session limits alone must not allow one authenticated client to consume capacity needed by every other user.
+
+### 6.10 Strava webhooks and desktop deletion sync
+
+Strava sends webhooks to a dedicated HTTPS callback on the Cloudflare Worker. Webhooks never arrive directly at OVRLEY: a desktop process has no stable public callback and may be closed, offline, or behind NAT.
+
+The Worker supports only Strava subscription verification and these event effects:
+
+- An athlete deauthorization event invalidates every OVRLEY session for that athlete and deletes the associated encrypted Strava tokens.
+- An activity deletion event creates a bounded deletion notice for each active session associated with that athlete.
+
+The callback validates the fixed subscription, strict payload shape, known athlete association, supported event type, and reasonable event age; it deduplicates repeated deliveries and acknowledges within Strava's required deadline before performing asynchronous state changes. Because Strava's webhook POST contract does not provide a cryptographic signature, the callback also uses an unguessable deployment-only path and Cloudflare abuse controls. Webhook input can only invalidate existing data; it can never authenticate a desktop, grant access, call a user-selected upstream operation, or return private data.
+
+Rust uses an authenticated, Worker-only sync operation to receive pending activity IDs and definitive revocation state. This operation does not call the Strava API and therefore consumes no Strava read quota. Rust deletes matching cache entries and clears a matching active activity before acknowledging deletion notices. A stored session syncs once at startup and at least once every 24 hours while OVRLEY remains running; it also syncs before cached provider data is exposed after an earlier sync failure.
+
+Monthly reconciliation remains the authoritative fallback: after a complete month is successfully fetched, cached entries for the same connection and month that are absent from the returned list are deleted. Failed or partial month operations never delete cache entries.
+
+### 6.11 Worker observability
 
 Worker logs may contain only redacted operational metadata:
 
@@ -373,6 +400,7 @@ The first release supports all currently released desktop platforms. Linux syste
 The native provider layer exposes narrow provider operations through Tauri IPC. The conceptual operations are:
 
 - Get provider connection status.
+- Synchronize pending deletion and revocation notices without calling Strava.
 - Start, poll, and cancel provider authorization.
 - Disconnect a provider.
 - List one provider month.
@@ -436,16 +464,16 @@ Any download, cache-read validation, adaptation, or finalization failure leaves 
 
 The raw provider response remains a valid cache entry if provider validation succeeds but downstream OVRLEY finalization fails. A cache write failure does not block activation and is not surfaced in the initial UI; the activity simply remains uncached.
 
-Disconnecting Strava or replacing its account does not clear an already active activity from the editor.
+Disconnecting Strava, definitive revocation, account replacement, or a confirmed upstream activity deletion clears an active editor activity belonging to the affected connection or activity. It does not clear an unrelated local-file or provider activity.
 
 ## 8. Local Stream Cache
 
 ### 8.1 Location and privacy
 
-Strava stream caches are plaintext JSON under:
+Strava stream caches are plaintext JSON under a connection-scoped path:
 
 ```text
-<OVRLEY documents directory>/activities/strava/
+<OVRLEY documents directory>/activities/strava/<connection-id>/<yyyy-mm>/
 ```
 
 The current runtime-path owner determines the platform-specific `<OVRLEY documents directory>`. Cache files are protected only by normal OS user permissions. They are deliberately not encrypted.
@@ -453,10 +481,10 @@ The current runtime-path owner determines the platform-specific `<OVRLEY documen
 The provider-neutral cache manager uses:
 
 ```text
-<OVRLEY documents directory>/activities/<provider-id>/<provider-activity-id>.json
+<OVRLEY documents directory>/activities/<provider-id>/<connection-id>/<yyyy-mm>/<provider-activity-id>.json
 ```
 
-Provider activity IDs must be validated before path construction and must never be accepted as path fragments.
+Provider, connection, month, and activity identifiers must be validated before path construction and must never be accepted as raw path fragments.
 
 ### 8.2 Envelope
 
@@ -466,6 +494,8 @@ Each file is one versioned JSON envelope:
 {
   "cacheSchemaVersion": 1,
   "providerId": "strava",
+  "connectionId": "connection-id",
+  "activityMonth": "2026-07",
   "providerActivityId": "123456789",
   "fetchedAt": "2026-07-15T12:00:00Z",
   "response": {}
@@ -478,21 +508,22 @@ Writes use a temporary file in the destination directory followed by atomic repl
 
 ### 8.3 TTL and cleanup
 
-- An entry is fresh for exactly 30 days from `fetchedAt`.
+- An entry is fresh for at most seven days from `fetchedAt`.
 - Reading a cache entry does not extend its lifetime.
 - Forced re-download resets `fetchedAt` only after a successful validated response replaces the entry.
 - Expired entries are deleted during every OVRLEY startup, even if the Strava drawer is never opened.
 - Expired entries are never used for import.
 - There is no sliding expiration or persistent activity-list index.
-- Stream caches remain until expiry after Disconnect, session revocation, or account replacement.
+- Disconnect, definitive session revocation, and account replacement delete all stream caches for the affected connection regardless of remaining TTL.
+- A delivered activity-deletion notice deletes the matching cache entry before acknowledgement.
 
 ### 8.4 Cache and list independence
 
 The monthly activity list is always based exclusively on the Worker's current or TanStack Query-cached Strava list response. OVRLEY never enumerates stream cache files to create activities in the drawer.
 
-After receiving a monthly list, Rust checks cache envelopes for those returned activity IDs and reports transient cache status. Successful download updates that status locally without requiring a list refetch.
+After successfully receiving and validating every page of a monthly list, Rust treats the response as authoritative for that connection and activity-local month. It deletes cache entries in that connection/month whose activity IDs are absent from the response, then checks the remaining envelopes for returned IDs and reports transient cache status. A failed or partial monthly operation never triggers deletion. Successful download updates cache status locally without requiring a list refetch.
 
-Old cache files from another connected account remain invisible unless the current Strava response independently contains the same globally identified activity.
+Cache entries from another connection are isolated by path and can never satisfy the current connection. Successful account replacement purges the replaced connection's namespace.
 
 ### 8.5 Corruption
 
@@ -541,9 +572,9 @@ Monthly list behavior:
 - Duplicate requests for the same month are coalesced by TanStack Query.
 - A failed stale refresh retains and displays the previous successful response with an explicit refresh error. With no previous response, only the error state is shown.
 
-Connection status is checked lazily when the provider drawer first opens, not during normal OVRLEY startup. Once loaded, connection state is retained for the process and invalidated by login, replacement, disconnect, or definitive server revocation.
+When a credential exists, Rust performs the lightweight Worker-only deletion/revocation sync at startup and at least once every 24 hours while OVRLEY remains running. This makes no Strava read request and does not block local-file workflows on failure. Connection validation and activity-list fetching remain lazy until the provider drawer opens.
 
-If the Worker definitively reports that a session is invalid, Rust deletes the local credential and the frontend removes that provider connection and all monthly queries. Stream cache files remain until normal expiry. Ordinary network failures retain the credential and report temporary unavailability.
+If the Worker definitively reports that a session is invalid, Rust deletes the local credential, connection-scoped stream cache, and matching active activity; the frontend removes that provider connection and all monthly queries. Ordinary network failures retain this state and report temporary unavailability, but cached provider data is not newly exposed until deletion sync succeeds.
 
 Activity import and forced re-download use TanStack Query mutations. The mutation delegates all cache/network/adaptation/finalization behavior to Rust; TanStack Query does not hold stream payloads.
 
@@ -583,9 +614,10 @@ If multiple providers later share one provider drawer, provider selection is sep
 ### 9.4 Restart behavior
 
 - Provider credentials persist in the OS credential store.
-- Stream caches persist according to their 30-day TTL.
+- Stream caches persist according to their seven-day maximum TTL and are isolated by connection and activity-local month.
 - Monthly list queries do not persist.
 - The active imported activity does not persist or restore.
+- A stored credential triggers a Worker-only deletion/revocation sync before provider cache is exposed; this does not call Strava's read API.
 - Opening the provider drawer after restart validates the session and fetches the current month.
 - Selecting a listed activity may then reuse its fresh disk cache.
 
@@ -596,13 +628,16 @@ If multiple providers later share one provider drawer, provider selection is sep
 - The desktop holds only an opaque OVRLEY session credential in the OS credential store.
 - JavaScript receives no credential, authorization code, proof verifier, Strava token, or arbitrary Worker URL.
 - The Worker requests no write scopes and exposes no mutating Strava endpoints.
+- The Worker origin and route names are public. No protection depends on endpoint secrecy, CORS, an embedded shared API key, client certificate, or desktop-held signing secret.
+- Every desktop data operation requires an opaque authenticated session and accepts only a fixed, strictly validated, bounded request body. The client cannot select an upstream origin, URL, path, method, scope, header, or arbitrary Strava parameter.
+- Per-session limits and a global Strava read-budget circuit breaker protect the shared application quota.
 - Browser URLs contain only short-lived attempt/state values, never access, refresh, or session tokens.
 - Worker request bodies and responses containing private activity data are not logged or cached at Cloudflare.
 - Authenticated responses use no-store cache headers.
 - IPC commands validate provider IDs, activity IDs, month values, force flags, and canonical DTOs.
-- Cache paths are constructed from validated canonical IDs and never from raw user paths.
+- Cache paths are constructed from validated provider, connection, month, and activity IDs and never from raw user paths.
 - Activity-list and stream payloads are bounded and validated before use.
-- Desktop debug builds retain the existing activity-finalizer diagnostic behavior, including possible writes under `debug/activities`; this is an explicit accepted exception to the managed cache location.
+- Strava-derived debug diagnostics follow the same connection purge and seven-day maximum retention as the managed cache; debug output must not become an unmanaged secondary store.
 
 ## 11. Failure Semantics
 
@@ -611,10 +646,12 @@ If multiple providers later share one provider drawer, provider selection is sep
 | OS credential store unavailable          | Block Strava connection; do not downgrade storage                                     |
 | OAuth denied, expired, or missing scope  | Preserve any existing session; report typed authorization state                       |
 | Worker network failure                   | Keep credential; report temporary unavailability                                      |
-| Worker reports session revoked           | Delete credential, clear connection/list queries, retain stream caches                |
+| Worker reports session revoked           | Delete credential, connection cache, matching active activity, and connection queries |
+| Worker reports deleted activity          | Delete matching cache and active activity before acknowledging the notice              |
 | Monthly refresh fails with prior data    | Keep stale response and report refresh failure                                        |
 | Monthly request fails without prior data | Show no list and report failure                                                       |
 | Any monthly page is malformed/fails      | Reject the complete new month; never show a partial response                          |
+| Complete month omits a cached activity   | Delete that connection/month cache entry during authoritative reconciliation           |
 | Manual activity selected                 | Do not call streams; report unavailable                                               |
 | Streams absent or malformed              | Do not cache or activate; keep current activity                                       |
 | Valid streams but finalization fails     | Keep valid raw cache; keep current activity; report finalization failure              |
@@ -641,6 +678,8 @@ If multiple providers later share one provider drawer, provider selection is sep
 - Fixed stream key/resolution parameters and no detail request.
 - Retry, Strava 401 refresh, 429 translation, and no-store headers.
 - Cloudflare rate-limit keys and route-specific bindings.
+- Subscription verification, webhook validation/deduplication, deauthorization cleanup, bounded activity-deletion notices, per-session acknowledgement, and prompt webhook responses.
+- Public-endpoint tests proving unknown routes, arbitrary upstream parameters, unauthenticated data operations, oversized bodies, and exhausted per-session/global quotas are rejected.
 - Log redaction tests that ensure credentials and activity data are absent.
 
 ### 12.2 Rust/Tauri
@@ -648,8 +687,8 @@ If multiple providers later share one provider drawer, provider selection is sep
 - Mock credential-store success, locked/unavailable state, replacement, deletion, and no plaintext fallback.
 - Mock HTTP client request origin/path allowlisting, retry, timeout, and 64 MiB limit.
 - Provider registry rejects unknown IDs.
-- Cache envelope round-trip, TTL, startup cleanup, atomic replacement, forced-refresh failure, and corruption deletion-after-reporting.
-- Disconnect/session-revocation behavior retains stream files and active activity.
+- Connection/month-scoped cache envelope round-trip, seven-day TTL, startup cleanup, complete-list reconciliation, no deletion after failed/partial lists, webhook-notice cleanup, connection-wide purge, atomic replacement, forced-refresh failure, and corruption deletion-after-reporting.
+- Disconnect/session-revocation behavior deletes connection stream files and a matching active activity while preserving unrelated activity state.
 - Strava fixtures covering every documented stream, optional stream absence, manual/empty streams, non-finite values, misalignment, invalid coordinates, and malformed metadata.
 - Exact Strava-to-`RawActivity` unit and field mapping.
 - Canonical boolean `moving` alignment and synthetic idle behavior.
@@ -664,6 +703,7 @@ If multiple providers later share one provider drawer, provider selection is sep
 - Manual visible-month refresh.
 - Stale list retained on refresh failure.
 - Definitive session revocation clears provider queries; transient network errors do not.
+- Lightweight startup/24-hour deletion sync consumes no Strava read request and applies deletion notices before cached data is exposed.
 - Cache status augments only Worker-returned list items.
 - Manual activities remain visible and unavailable.
 - Import mutation prevents concurrent selection.
@@ -681,11 +721,13 @@ If multiple providers later share one provider drawer, provider selection is sep
 6. Selecting an uncached activity makes one purpose-built stream operation, requests every documented high-resolution stream, validates it, caches the raw response, finalizes it, and activates it atomically.
 7. Selecting a fresh cached activity makes no stream API request and finalizes from the validated cached response.
 8. Forced re-download bypasses a fresh cache and cannot destroy the old cache or active activity when it fails.
-9. Cache files expire 30 days after download and are cleaned on app startup; list membership never comes from those files.
-10. Disconnect revokes the current token chain and clears credentials/lists without deleting stream caches or the currently active editor activity.
-11. No Worker operation persists or logs activity summaries, routes, or metrics.
-12. No failure path activates partial telemetry or clears the previous working activity.
-13. Shared frontend and native infrastructure refers to canonical providers, not Strava response fields, and a future provider can supply its own Worker/API and `RawActivity` adapter without duplicating query, cache, drawer, source, or activation infrastructure.
+9. Cache files expire no later than seven days after download, are isolated by connection/month, and are cleaned on startup; a complete month deletes absent cached IDs while a failed or partial month deletes nothing.
+10. Disconnect, definitive revocation, and account replacement revoke/delete credentials and clear affected lists, cache files, and active Strava activity without changing unrelated local or provider activity.
+11. Strava sends activity-deletion and athlete-deauthorization webhooks to the Worker; authenticated desktop sync delivers and acknowledges their effects without consuming Strava read quota.
+12. The public Worker API rejects unauthenticated data operations and arbitrary upstream requests, enforces bounded fixed contracts, and protects both per-session and global quota.
+13. No Worker operation persists or logs activity summaries, routes, stream payloads, or health metrics; only bounded deletion notices may temporarily retain activity IDs.
+14. No failure path activates partial telemetry or clears the previous working activity except a confirmed deletion, revocation, disconnect, or account replacement that requires affected Strava data removal.
+15. Shared frontend and native infrastructure refers to canonical providers, not Strava response fields, and a future provider can supply its own Worker/API and `RawActivity` adapter without duplicating query, cache, drawer, source, or activation infrastructure.
 
 ## 14. External Prerequisites
 
@@ -693,6 +735,7 @@ If multiple providers later share one provider drawer, provider selection is sep
 - Store the Strava client ID, client secret, and token-encryption key in Cloudflare Worker secrets.
 - Provision D1 and apply the Worker migrations.
 - Configure the dedicated `api.ovrley.cc` Worker route.
-- Configure the four Cloudflare Rate Limiting bindings.
+- Register the Worker's dedicated HTTPS callback as Strava's single webhook subscription and store its verification secret in Worker configuration.
+- Configure the Worker rate-limiting bindings and application-wide Strava quota circuit breaker.
 - Complete Strava's application review before broad production availability. New applications begin in Single Player Mode and have limited athlete capacity and shared read quotas.
 - Satisfy Strava attribution and brand-guideline requirements when final UI styling is implemented; visual details are outside this specification.

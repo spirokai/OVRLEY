@@ -1,4 +1,5 @@
 Status: ready-for-agent
+Last updated: 2026-09-03
 
 # Strava Activity Provider Integration
 
@@ -12,9 +13,9 @@ The implementation also needs to establish a reusable activity-provider foundati
 
 ## Solution
 
-Add a read-only activity-provider drawer to OVRLEY. A user connects Strava in their system browser, after which OVRLEY lists activities one activity-local calendar month at a time. Selecting an importable activity downloads every documented high-resolution Strava stream, caches the raw response locally for 30 days, converts it into OVRLEY's canonical activity model, and activates it in the editor.
+Add a read-only activity-provider drawer to OVRLEY. A user connects Strava in their system browser, after which OVRLEY lists activities one activity-local calendar month at a time. Selecting an importable activity downloads every documented high-resolution Strava stream, caches the raw response locally for at most seven days, converts it into OVRLEY's canonical activity model, and activates it in the editor. A complete refreshed monthly list is authoritative for that account and month: cached activities missing from it are deleted.
 
-A purpose-built Cloudflare Worker remains between OVRLEY and Strava. It owns the Strava client secret, encrypted Strava access and refresh tokens, OAuth state, session lifecycle, read-only endpoint enforcement, and upstream token refresh. The desktop stores only an opaque OVRLEY session credential in the operating system credential store. React receives no credential and performs no provider network requests.
+A purpose-built Cloudflare Worker remains between OVRLEY and Strava. It owns the Strava client secret, encrypted Strava access and refresh tokens, OAuth state, session lifecycle, read-only endpoint enforcement, upstream token refresh, and the Strava webhook receiver. The Worker API is public and discoverable; its security comes from authenticated sessions, fixed operations, strict validation, bounded resources, quotas, and rate limits rather than a hidden URL or embedded desktop secret. The desktop stores only an opaque OVRLEY session credential in the operating system credential store. React receives no credential and performs no provider network requests.
 
 TanStack Query owns provider connection and monthly-list server state in the frontend. Rust owns native networking, secure credential access, local stream caching, strict provider validation, adaptation to `RawActivity`, and atomic finalization. The active editor state continues to use one canonical activity model and is extended with a provider-neutral source descriptor rather than Strava-specific state or fabricated filenames.
 
@@ -41,7 +42,7 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 19. As a macOS user, I want the session stored in Keychain, so that it follows native credential-security behavior.
 20. As a Linux desktop user, I want the session stored through Secret Service when available, so that Linux receives the same security boundary as other platforms.
 21. As a Linux user without Secret Service, I want an explicit unavailable state, so that OVRLEY does not pretend persistence is secure.
-22. As an OVRLEY user who does not use Strava during a session, I want the app to avoid connection checks at startup, so that the existing local workflow remains unaffected by network availability.
+22. As an OVRLEY user who does not use Strava, I want the existing local workflow to remain available regardless of network status; when a stored Strava session exists, a lightweight Worker-only startup sync may process revocation and deletion notices without calling the Strava read API.
 23. As a connected user, I want connection validation to happen when I open the activity-provider drawer, so that Strava data loads only when requested.
 24. As a connected user, I want the current calendar month to load when the drawer opens, so that my newest activities are immediately available.
 25. As a connected user, I want to navigate one month at a time, so that I can find older activities predictably.
@@ -74,14 +75,14 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 52. As an OVRLEY user with an activity already loaded, I want every provider import to finish successfully before replacing it, so that a failure never clears my working editor state.
 53. As an OVRLEY user, I want imported provider activities to use the same finalization, synchronization, preview, and rendering pipeline as local activity files, so that provider origin does not change overlay behavior.
 54. As an OVRLEY user, I want the active activity to retain its real provider identity and display name, so that Strava data is not disguised as a fake FIT or GPX file.
-55. As an OVRLEY user, I want disconnecting or replacing Strava to leave the currently active editor activity intact, so that account management does not destroy current work.
+55. As a privacy-conscious user, I want disconnecting, revoking, or replacing Strava to clear any active activity and local cache belonging to the removed connection, so that OVRLEY does not retain or display that account's Strava data.
 56. As a returning user, I do not want OVRLEY to restore the prior active Strava activity automatically, so that restart behavior remains consistent with the current session-only editor model.
-57. As an OVRLEY user, I want downloaded stream responses cached for 30 days, so that repeatedly using the same activity does not consume Strava quota or require another download.
+57. As an OVRLEY user, I want downloaded stream responses cached for at most seven days, so that repeatedly using the same activity does not consume Strava quota while the cache remains within Strava's permitted retention period.
 58. As an OVRLEY user, I want a cached activity marked in the current Strava-derived list, so that I know which imports are available locally.
 59. As an OVRLEY user, I want selecting a fresh cached activity to avoid the stream API entirely, so that loading is faster and works without spending upstream quota.
-60. As an OVRLEY user, I want cache use not to extend the 30-day lifetime, so that frequently used telemetry is eventually refreshed.
+60. As an OVRLEY user, I want cache use not to extend the seven-day lifetime, so that frequently used telemetry is eventually refreshed.
 61. As an OVRLEY user, I want expired stream caches removed at application startup, so that files do not remain indefinitely merely because I stop opening the provider drawer.
-62. As an OVRLEY user, I want cached streams retained until expiry after disconnect or account replacement, so that the agreed local retention policy remains independent of account state.
+62. As a privacy-conscious user, I want all cache data for a connection deleted on disconnect, definitive revocation, or account replacement, regardless of its remaining TTL.
 63. As a privacy-conscious user, I want local stream caches stored only under OVRLEY's activity/provider directory, so that I can locate and manage the plaintext telemetry files.
 64. As an OVRLEY user, I want local cache contents never to create entries in the activity list, so that the list reflects only the current Strava response.
 65. As an OVRLEY user, I want a valid provider response retained in cache even if the current OVRLEY finalizer fails, so that retrying a local bug does not waste another Strava request.
@@ -95,7 +96,7 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 73. As a connected user, I want temporary Worker or Strava failures retried once, so that brief network interruptions can recover without repeated quota consumption.
 74. As a connected user, I want rate-limit failures to show when retry may be possible, so that I do not repeatedly submit requests that Strava will reject.
 75. As a connected user, I want OVRLEY not to retry rate-limit failures automatically, so that it does not consume the next quota window without my action.
-76. As a connected user, I want definitive session revocation to clear the unusable local credential and in-memory lists, so that OVRLEY returns to a truthful disconnected state.
+76. As a connected user, I want definitive session revocation to clear the unusable local credential, in-memory lists, active Strava activity, and connection-scoped stream cache, so that OVRLEY returns to a truthful disconnected state.
 77. As a connected user, I want ordinary network failure to retain my credential, so that an outage is not mistaken for account revocation.
 78. As a privacy-conscious user, I want Strava client and token secrets to remain on the Worker, so that extracting the portable desktop binary does not reveal them.
 79. As a privacy-conscious user, I want the Worker to avoid persisting or edge-caching activity summaries and streams, so that my route and health data are not retained in Cloudflare storage.
@@ -120,7 +121,7 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 ### Module boundaries
 
 - The implementation is divided into five major modules: the Cloudflare Worker service, the native provider platform, the pure Strava adapter, the reusable frontend provider feature, and canonical activity-source/layout integration.
-- The Cloudflare Worker service lives with the existing website infrastructure and owns deployment configuration, D1 migrations, secrets, OAuth, Worker sessions, Strava token lifecycle, monthly-list aggregation, stream proxying, rate limits, and redacted observability.
+- The Cloudflare Worker service lives with the existing website infrastructure and owns deployment configuration, D1 migrations, secrets, OAuth, Worker sessions, Strava token lifecycle, Strava webhook receipt, deletion/revocation notices, monthly-list aggregation, stream proxying, rate limits, and redacted observability.
 - The native provider platform owns OS credential access, the pinned Worker HTTP client, authorization-attempt orchestration, typed provider operations, local stream-cache mechanics, resource limits, and narrow Tauri IPC.
 - The pure Strava adapter owns strict stream-response validation and conversion into canonical `RawActivity`; it remains independent of Tauri, keyrings, Cloudflare, and React.
 - The reusable frontend provider feature owns TanStack Query keys and lifecycle, connection and month orchestration, import mutations, and prop-driven provider presentation.
@@ -152,16 +153,18 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 - Strava's `moving` stream becomes a canonical aligned boolean activity series even though no current widget renders it.
 - Import is an atomic replacement. The complete response is resolved, validated, adapted, and finalized before one store transition activates it.
 - Every failure before activation preserves the prior active activity, source, summary, editor timing, and scene configuration.
-- Disconnect and account replacement do not clear an activity already active in the editor.
+- Disconnect, definitive revocation, account replacement, or a confirmed upstream activity deletion clears active editor data belonging to the affected connection or activity. Unrelated local-file and provider activities remain unchanged.
 - Active activity restoration after application restart remains out of scope.
 
 ### Worker security and API
 
 - The production API is versioned under the dedicated `api.ovrley.cc` origin. Desktop builds use only the compiled production origin; runtime endpoint overrides are not supported.
 - OVRLEY is treated as a public desktop client. No shared Worker API secret is embedded in the application.
-- The Worker remains in the data path for all Strava operations and exposes only purpose-built authorization, session, monthly-list, and stream operations.
+- The Worker origin and routes are public and discoverable. Security does not rely on hiding them, CORS, or any credential embedded in the desktop.
+- The Worker remains in the data path for all Strava operations and exposes only purpose-built authorization, session, deletion-sync, monthly-list, and stream operations. All data operations require an opaque authenticated OVRLEY session.
+- The desktop cannot supply an upstream origin, URL, path, method, scope, authorization header, or arbitrary Strava parameters. The Worker constructs every upstream request from fixed code after strict body validation and resource-limit checks.
 - The Worker requests only `activity:read_all`. Missing required scope rejects the new authorization and preserves an existing session.
-- The Worker makes no upload, edit, delete, comment, kudos, route, club, segment, webhook, or generic proxy operation available.
+- The Worker makes no upload, edit, delete, comment, kudos, route, club, segment, or generic proxy operation available. Its separate Strava webhook callback accepts only subscription verification and supported event payloads; it is never exposed as a desktop operation.
 - Activity streams are fetched by one stream request; no activity-detail request is added.
 - The Worker may trust the authenticated session's requested activity ID and rely on Strava's access control. Signed activity capabilities are not required.
 - Activity data receives no-store response headers and is not persisted or edge-cached by Cloudflare.
@@ -183,13 +186,22 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 
 ### Worker persistence and token refresh
 
-- D1 stores short-lived authorization attempts, hashed session/profile associations, minimal athlete ID/display name, granted scopes, encrypted Strava tokens, token expiry/refresh coordination, and session timestamps.
-- D1 does not store activity summaries, activity authorization lists, or stream responses.
+- D1 stores short-lived authorization attempts, hashed session/profile associations, minimal athlete ID/display name, granted scopes, encrypted Strava tokens, token expiry/refresh coordination, session timestamps, and the minimal bounded deletion notices needed to synchronize active desktop sessions.
+- D1 does not store activity summaries, activity authorization lists, or stream responses. Activity deletion notices are removed after all active sessions acknowledge them or their bounded delivery retention expires.
 - Strava access and refresh tokens use authenticated application-level encryption with a Worker-secret key, per-record nonces, and key identifiers for rotation.
 - Token refresh is serialized with a transaction-safe D1 lease or equivalent mechanism.
 - The latest refresh token returned by Strava always replaces the prior token atomically.
 - Access tokens refresh automatically before expiry. An unexpected Strava 401 permits one coordinated refresh and one retry.
 - Definitive refresh or revocation failure invalidates the OVRLEY session.
+
+### Strava webhooks and deletion synchronization
+
+- Strava sends subscription verification, activity-deletion, and athlete-deauthorization webhooks to a dedicated HTTPS route on the Cloudflare Worker, never directly to a desktop client.
+- The Worker validates the fixed subscription, strict event shape, known athlete association, event age, and supported event type, deduplicates deliveries, responds within Strava's deadline, and performs state changes asynchronously.
+- An athlete-deauthorization event invalidates every OVRLEY session for that athlete and deletes its stored Strava tokens. Each desktop removes its local credential, queries, connection-scoped cache, and active Strava activity when it next synchronizes.
+- An activity-deletion event creates a bounded per-session deletion notice. A lightweight authenticated sync returns pending deleted activity IDs without making a Strava API request; Rust deletes matching cache entries and clears a matching active activity before acknowledging the notices.
+- Because Strava's webhook POST contract does not provide a cryptographic signature, the callback uses an unguessable deployment-only path in addition to strict validation and Cloudflare abuse controls. Webhook events are treated only as destructive invalidation hints and never grant access or return data.
+- A stored session performs the lightweight Worker sync at startup and at least once every 24 hours while OVRLEY remains running. Network failure does not block local-file workflows; pending notices are applied before cached provider data is next exposed.
 
 ### Monthly list contract
 
@@ -221,12 +233,13 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 
 ### Local stream cache
 
-- Provider stream caches use the existing OVRLEY documents root, namespaced by provider and validated provider activity ID.
+- Provider stream caches use the existing OVRLEY documents root, namespaced by provider, connection identity, activity-local month, and validated provider activity ID.
 - Strava cache files are plaintext JSON protected by normal OS user permissions; local encryption is not required.
-- Each cache file is one versioned JSON envelope containing schema version, provider identity, provider activity identity, UTC fetch timestamp, and the unchanged provider response.
-- Files are fresh for exactly 30 days from download. Reads do not extend expiry.
+- Each cache file is one versioned JSON envelope containing schema version, provider identity, connection identity, activity-local month, provider activity identity, UTC fetch timestamp, and the unchanged provider response.
+- Files are fresh for at most seven days from download. Reads do not extend expiry.
 - Expired entries are removed during every OVRLEY startup, even when the provider drawer is never opened.
-- Cache files remain until expiry after disconnect, revocation, or account replacement.
+- Disconnect, definitive revocation, and account replacement delete every cache entry for the affected connection.
+- After a complete monthly list validates successfully, Rust atomically reconciles that account/month: it deletes cached activity IDs absent from the authoritative response, then augments returned items with cache status. Failed or partial list operations never trigger reconciliation.
 - Successful list responses are augmented with local cache status only after the list has been received.
 - Cache writes use temporary files and atomic replacement. Failed or interrupted writes preserve a previous valid entry.
 - A corrupt present entry fails the current import, reports a typed error, and is then deleted. It does not silently become a network request during that same action.
@@ -247,8 +260,8 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 - Window-focus refetch, reconnect refetch, polling, and TanStack's own automatic retries are disabled for monthly lists.
 - Manual refresh invalidates only the visible month.
 - A failed stale refresh retains previous data and exposes the refresh error.
-- Connection state is checked lazily on first provider-drawer open and invalidated after login, replacement, disconnect, or definitive revocation.
-- A definitive invalid session removes the local credential and provider queries. Temporary network failure preserves both.
+- A stored connection performs a lightweight Worker-only deletion/revocation sync at startup and at most once per 24 hours while the process remains open. Connection validation and Strava list fetching remain lazy until the provider drawer opens.
+- A definitive invalid session removes the local credential, provider queries, connection-scoped cache, and matching active provider activity. Temporary network failure preserves them and does not block local workflows.
 - Activity import and force-download are TanStack Query mutations that delegate stream data and disk-cache ownership to Rust.
 - Only one import mutation may be active. Successful activation closes the drawer; failures leave it open.
 
@@ -268,7 +281,8 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 - The Worker retries a Strava transport or retryable Strava 5xx once and returns a typed terminal upstream error if that retry fails.
 - Rate-limit responses are not retried automatically and include a retry time when it can be determined.
 - Cloudflare Workers Rate Limiting bindings provide configuration-only abuse controls without D1 request counters.
-- Initial development limits are 10 OAuth starts per IP per minute, 40 authorization polls per attempt per minute, 30 monthly lists per session per minute, and 15 stream downloads per session per minute.
+- Initial development limits are 10 OAuth starts per IP per minute, 40 authorization polls per attempt per minute, 30 deletion syncs per session per minute, 30 monthly lists per session per minute, and 15 stream downloads per session per minute.
+- The Worker tracks Strava's application-wide quota headers and applies a global read-budget circuit breaker so one session cannot exhaust capacity needed by all users.
 - Strava's shared application quota remains authoritative. Binding values are expected to change after application approval and production telemetry.
 
 ## Testing Decisions
@@ -282,15 +296,16 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 - Worker session tests cover keyed credential hashing, one-session-per-profile replacement, independent profiles, one-year inactivity cleanup, token-specific disconnect, and definitive revocation.
 - Worker token tests cover authenticated encryption, key identifiers, concurrent refresh serialization, latest-refresh-token persistence, pre-expiry refresh, unexpected 401 recovery, and terminal refresh failure.
 - Worker API tests cover complete activity-local month pagination, widened timezone intervals, no partial list, canonical summary mapping, fixed all-stream request parameters, no activity-detail request, no-store headers, one-retry ownership, 429 translation, and rate-limit keys.
+- Worker webhook tests cover subscription verification, strict event validation, deduplication, unknown athletes, bounded deletion notices, deauthorization cleanup, prompt acknowledgement, and absence of any data-returning webhook behavior.
 - Worker observability tests capture emitted records and prove that authorization values, tokens, athlete identity, activity identity, names, list bodies, coordinates, and telemetry are absent.
 - Native credential tests use an injected fake keyring to cover success, persistence, lock/unavailable behavior, replacement, disconnect, and prohibition of plaintext fallback.
 - Native HTTP tests use an injected fake transport to cover pinned origin/path behavior, canonical request construction, one-retry limits, timeouts, typed errors, and the 64 MiB response ceiling.
-- Native cache tests cover versioned envelope round trips, exact TTL, startup cleanup, cache-status lookup, atomic writes, retained old cache after failed force-download, non-fatal write failure, valid cache after finalization failure, and corruption report-then-delete behavior.
+- Native cache tests cover account/month namespacing, versioned envelope round trips, seven-day TTL, startup cleanup, authoritative complete-list reconciliation, no reconciliation after failed/partial lists, deletion-notice cleanup, connection-wide purge, cache-status lookup, atomic writes, retained old cache after failed force-download, non-fatal write failure, valid cache after finalization failure, and corruption report-then-delete behavior.
 - Pure Strava adapter tests cover strict ingress validation, every field/unit mapping, optional absence, aligned boolean moving state, provider source identity, shared idle processing, and finalization through the canonical pipeline.
 - Atomic activation tests prove that network, provider validation, cache-read, adaptation, and finalization failures leave all existing editor/media state unchanged.
 - Source migration tests cover local file, provider, and video-telemetry source variants and prove that render/preview consumers no longer require fabricated filenames or source aliases.
 - Frontend TanStack Query tests use an isolated QueryClient and mocked IPC to cover provider/connection/month key isolation, 10-minute stale behavior, process-only retention, no prefetch, no focus/reconnect polling, visible-month invalidation, request coalescing, stale-data preservation, and no compounded retries.
-- Frontend connection tests cover lazy validation, successful login replacement, required-scope error state, temporary network failure, definitive revocation cleanup, and disconnect without stream-cache or active-activity removal.
+- Frontend connection tests cover lightweight startup sync, lazy Strava validation, successful login replacement, required-scope error state, temporary network failure, definitive revocation cleanup, and disconnect with connection-scoped cache and active-activity removal.
 - Frontend import tests cover manual activity unavailability, one active mutation, cached versus uncached behavior, force-download dispatch, successful drawer closure, failed drawer retention, and preservation of current editor state.
 - Frontend layout tests cover mutual exclusion between Widgets and activity-provider drawers.
 - Reusable presentation tests use canonical summaries from more than one synthetic provider identity so accidental Strava-field coupling is detectable before a second real provider exists.
@@ -303,7 +318,7 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 - Uploading files or activities to Strava.
 - Creating, editing, deleting, commenting on, or giving kudos to Strava activities.
 - Clubs, routes, segments, athlete statistics, social data, activity zones, laps, and activity-detail requests.
-- Strava webhooks or background synchronization.
+- Background activity-list or stream synchronization beyond lightweight webhook deletion/revocation delivery.
 - Worker-side or Cloudflare edge caching of private activity lists or streams.
 - Persisting monthly activity lists across OVRLEY restarts.
 - Automatically restoring the previously active provider activity after restart.
@@ -328,6 +343,6 @@ TanStack Query owns provider connection and monthly-list server state in the fro
 - Worker source and deployment live in the separate OVRLEY website repository, while desktop/provider infrastructure and the Strava adapter live with the OVRLEY desktop codebase.
 - Broad production availability depends on Strava application approval. New Strava applications begin with limited athlete capacity and shared read quotas.
 - Final UI work must satisfy Strava attribution and brand guidelines, but visual decisions are intentionally deferred from this PRD.
-- Local Strava stream caches are intentionally plaintext under OVRLEY's documents activity directory. Existing debug-build activity diagnostics may also contain finalized Strava telemetry outside the managed 30-day cache; retaining current debug behavior is an accepted decision.
+- Local Strava stream caches are intentionally plaintext under an account-scoped OVRLEY documents activity directory and retained for no more than seven days. Strava-derived debug diagnostics must follow the same connection purge and seven-day retention rules rather than becoming an unmanaged secondary cache.
 - Rate-limit binding values are initial development configuration, not permanent product limits.
 - Future providers may use different Workers, authorization flows, response contracts, and adapters. They should still reuse canonical summaries, query lifecycle, keyring abstraction, cache mechanics, source identity, atomic activation, drawer behavior, and presentation where those contracts apply.
