@@ -190,7 +190,7 @@ export default function useProjectLifecycle({
         )
       : i18next.t('projects.unsavedChanges', 'Your project has unsaved changes. Save them or discard them.'),
     cancelLabel: i18next.t('projects.cancel', 'Cancel'),
-    saveLabel: i18next.t('projects.save', 'Save'),
+    saveLabel: i18next.t('app-shell.save', 'Save'),
     discardLabel: closingApplication
       ? i18next.t('projects.closeWithoutSaving', 'Close Without Saving')
       : i18next.t('projects.newProject', 'New Project'),

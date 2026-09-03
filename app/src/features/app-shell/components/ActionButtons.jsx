@@ -84,7 +84,7 @@ export default function ActionButtons({
           aria-keyshortcuts="Mod+E"
         >
           <Play className="mr-2 h-4 w-4" />
-          {renderingVideo ? 'Rendering...' : 'Render'}
+          {renderingVideo ? t('render-video.renderingFrames', 'Rendering frames...') : t('render-video.startRender', 'Start Render')}
         </Button>
       </SimpleTooltip>
       <WindowControls />
