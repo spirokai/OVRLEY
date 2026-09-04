@@ -78,8 +78,8 @@ pub use metric_presentation::draw_metric_presentation;
 pub(crate) use route::draw_route_widget;
 pub use types::{MetricPresentationReport, PreparedRenderAssets, WidgetRenderReport};
 pub(crate) use value::{
-    draw_metric_value_widget_with_config, draw_static_metric_icon_for_value_validated,
-    has_static_metric_icon_validated,
+    draw_metric_value_widget_with_config, draw_static_metric_parts_for_value,
+    static_metric_parts_for_value, StaticMetricParts,
 };
 
 // White-box widget tests exercise internal geometry and reduction contracts

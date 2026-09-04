@@ -23,6 +23,26 @@ function makeWidget(type, data = {}) {
   }
 }
 
+describe('MetricWidgetEditor content alignment', () => {
+  test('commits one canonical alignment and does not clear the active selection', async () => {
+    const user = userEvent.setup()
+    const updateWidgetData = vi.fn()
+    render(
+      <MetricWidgetEditor
+        widget={makeWidget('speed', { content_alignment: 'left', display_type: 'text', display_unit: 'kmh' })}
+        updateWidgetData={updateWidgetData}
+        setNumericField={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('radio', { name: 'Align left' }))
+    expect(updateWidgetData).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('radio', { name: 'Align right' }))
+    expect(updateWidgetData).toHaveBeenCalledWith('value-0', { content_alignment: 'right' })
+  })
+})
+
 describe('MetricWidgetEditor decimal control', () => {
   test('shows a 0/1 decimal slider for speed', () => {
     render(<MetricWidgetEditor widget={makeWidget('speed', { display_unit: 'kmh' })} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)

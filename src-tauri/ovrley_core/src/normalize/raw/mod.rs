@@ -263,6 +263,8 @@ pub struct ValueConfig {
     #[serde(default)]
     pub display_type: DisplayType,
     #[serde(default)]
+    pub content_alignment: Option<String>,
+    #[serde(default)]
     pub lap_timer_mode: Option<String>,
     #[serde(default)]
     pub show_label: Option<bool>,

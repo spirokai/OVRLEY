@@ -164,7 +164,7 @@ const OverlayCanvasWidget = memo(
           width: renderGeometry.width,
           height: renderGeometry.height,
           transform: renderGeometry.transform,
-          transformOrigin: 'top left',
+          transformOrigin: renderGeometry.transformOrigin,
         }}
         onMouseDown={(event) => {
           handleWidgetMouseDown(event, widget.id)

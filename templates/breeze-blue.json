@@ -43,7 +43,8 @@
         "show_units": true,
         "display_unit": "w",
         "id": "widget-1",
-        "value": "power"
+        "value": "power",
+        "content_alignment": "left"
       },
       {
         "x": 98,
@@ -65,7 +66,8 @@
         "show_units": false,
         "id": "widget-2",
         "value": "time",
-        "format": "time-12"
+        "format": "time-12",
+        "content_alignment": "left"
       },
       {
         "x": 548,
@@ -87,7 +89,8 @@
         "show_units": false,
         "display_unit": "fahrenheit",
         "id": "widget-3",
-        "value": "temperature"
+        "value": "temperature",
+        "content_alignment": "left"
       },
       {
         "x": 73,
@@ -136,7 +139,8 @@
         "show_units": true,
         "display_unit": "mph",
         "id": "widget-5",
-        "value": "speed"
+        "value": "speed",
+        "content_alignment": "left"
       },
       {
         "x": 2094,
@@ -158,7 +162,8 @@
         "show_units": true,
         "display_unit": "ftmin",
         "id": "widget-6",
-        "value": "vertical_speed"
+        "value": "vertical_speed",
+        "content_alignment": "left"
       }
     ],
     "plots": []

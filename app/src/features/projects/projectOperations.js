@@ -1,5 +1,6 @@
 import * as backend from '@/api/backend'
 import { replaceEditorDocument } from '@/features/undo-redo/undoHistory'
+import { createDurableEditorState } from '@/lib/widget/editor-state'
 import useStore from '@/store/useStore'
 import { applyNewProjectState, applyPreparedProjectState } from './utils/projectHydration'
 import { createProjectSnapshot, stringifyProject } from './utils/projectSnapshot'
@@ -11,7 +12,11 @@ import { createProjectSnapshot, stringifyProject } from './utils/projectSnapshot
  * @returns {Promise<object|null>} Loaded project, or null when source recovery is cancelled.
  */
 export async function loadProject({ path, resolveProjectSources, prepareActivityPath, prepareVideoPath, onSetBackgroundMode }) {
-  const { project, resolvedSources } = await backend.readProjectFile(path)
+  const { project: loadedProject, resolvedSources } = await backend.readProjectFile(path)
+  const project = {
+    ...loadedProject,
+    editor: createDurableEditorState(loadedProject.editor),
+  }
   const sources = await resolveProjectSources(resolvedSources)
   if (!sources) return null
 

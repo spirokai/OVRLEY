@@ -5,16 +5,16 @@
     "fps": 30,
     "start": 0,
     "end": 10,
-    "scale": 1.0,
+    "scale": 1,
     "shadow_color": "#000000",
-    "shadow_strength": 0.0,
-    "shadow_distance": 0.0,
+    "shadow_strength": 0,
+    "shadow_distance": 0,
     "border_color": "#000000",
-    "border_thickness": 0.0,
+    "border_thickness": 0,
     "update_rate": 1,
     "custom_export_range_active": false,
-    "composite_sync_offset": 0.0,
-    "composite_video_trim_start": 0.0,
+    "composite_sync_offset": 0,
+    "composite_video_trim_start": 0,
     "composite_widget_update_rate": 1,
     "ffmpeg": {}
   },
@@ -51,7 +51,8 @@
       "show_units": true,
       "display_unit": "rpm",
       "id": "widget-2",
-      "value": "cadence"
+      "value": "cadence",
+      "content_alignment": "left"
     },
     {
       "x": 113,
@@ -73,7 +74,8 @@
       "show_units": true,
       "display_unit": "celsius",
       "id": "widget-3",
-      "value": "temperature"
+      "value": "temperature",
+      "content_alignment": "left"
     },
     {
       "x": 123,
@@ -95,7 +97,8 @@
       "show_units": true,
       "display_unit": "bpm",
       "id": "widget-4",
-      "value": "heartrate"
+      "value": "heartrate",
+      "content_alignment": "left"
     },
     {
       "x": 117,
@@ -117,7 +120,8 @@
       "show_units": true,
       "display_unit": "w",
       "id": "widget-5",
-      "value": "power"
+      "value": "power",
+      "content_alignment": "left"
     },
     {
       "x": 129,
@@ -139,7 +143,8 @@
       "show_units": true,
       "display_unit": "kmh",
       "id": "widget-6",
-      "value": "speed"
+      "value": "speed",
+      "content_alignment": "left"
     },
     {
       "x": 127,
@@ -188,7 +193,8 @@
       "show_units": false,
       "id": "widget-8",
       "value": "time",
-      "format": "time-24"
+      "format": "time-24",
+      "content_alignment": "left"
     }
   ],
   "plots": [

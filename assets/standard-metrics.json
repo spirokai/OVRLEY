@@ -12,6 +12,7 @@
           "suffix": "",
           "decimals": 0,
           "display_type": "text",
+          "content_alignment": "left",
           "unit_color": "#ffffff",
           "show_icon": true,
           "icon_size": 45,

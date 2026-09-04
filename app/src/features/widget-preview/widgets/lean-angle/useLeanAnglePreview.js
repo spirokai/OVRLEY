@@ -39,6 +39,7 @@ export function useLeanAnglePreview({ widget, activity, previewSecond, globalOpa
       showIcon: false,
       showUnits: Boolean(unitText),
       iconSize: 0,
+      contentAlignment: 'left',
     })
     const degreeUnitOffset = unitText ? widget.data.font_size * DEGREE_UNIT_CENTERING_OFFSET_RATIO : 0
     const textOriginX = layout.centerX + widget.data.value_offset_x + degreeUnitOffset - textLayout.width / 2

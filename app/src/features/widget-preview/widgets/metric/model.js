@@ -19,6 +19,7 @@ import { formatStandardMetricDisplay, formatTimeValue } from './format'
 import {
   getMetricWidgetLayout,
   getMetricWidgetVisualBounds,
+  getContentAlignmentOrigin,
   getPreviewFontFamily,
   getPreviewTextBaseline,
   getPreviewVerticalMetrics,
@@ -147,13 +148,25 @@ function buildCoordinateLayout({ widget, formatted, fontFamily }) {
   const rowHeight = Math.max(widget.data.show_icon ? iconSize : 0, totalTextHeight)
   const textGroupLeft = widget.data.show_icon ? iconSize + 8 + Math.max(widget.data.font_size * 0.08, 8) : 0
   const textTop = (rowHeight - totalTextHeight) / 2
+  const width = textGroupLeft + textWidth
+  const rowOriginX = getContentAlignmentOrigin(widget.data.content_alignment, 0, width)
 
   return {
     fontSize: lineFontSize,
-    icon: widget.data.show_icon ? { left: 0, top: (rowHeight - iconSize) / 2, size: iconSize } : null,
-    lines: buildPositionedCoordinateLines(lines, textGroupLeft, textTop, lineHeight, lineGap, directionColumnWidth, valueColumnWidth, directionGap),
-    width: textGroupLeft + textWidth,
+    icon: widget.data.show_icon ? { left: rowOriginX, top: (rowHeight - iconSize) / 2, size: iconSize } : null,
+    lines: buildPositionedCoordinateLines(
+      lines,
+      rowOriginX + textGroupLeft,
+      textTop,
+      lineHeight,
+      lineGap,
+      directionColumnWidth,
+      valueColumnWidth,
+      directionGap,
+    ),
+    width,
     height: rowHeight,
+    rowOriginX,
   }
 }
 
@@ -172,9 +185,12 @@ function buildPositionedCoordinateLines(lines, textGroupLeft, textTop, lineHeigh
 }
 
 function getCoordinateVisualBounds(layout, widgetData) {
-  const minX = Math.min(0, layout.icon ? layout.icon.left + widgetData.icon_offset_x : 0)
+  const minX = Math.min(layout.rowOriginX, layout.icon ? layout.icon.left + widgetData.icon_offset_x : layout.rowOriginX)
   const minY = Math.min(0, layout.icon ? layout.icon.top + widgetData.icon_offset_y : 0)
-  const maxX = Math.max(layout.width, layout.icon ? layout.icon.left + widgetData.icon_offset_x + layout.icon.size : 0)
+  const maxX = Math.max(
+    layout.rowOriginX + layout.width,
+    layout.icon ? layout.icon.left + widgetData.icon_offset_x + layout.icon.size : layout.rowOriginX,
+  )
   const maxY = Math.max(layout.height, layout.icon ? layout.icon.top + widgetData.icon_offset_y + layout.icon.size : 0)
   return {
     minX,
@@ -295,6 +311,7 @@ export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond 
     showIcon: widget.data.show_icon,
     showUnits: widget.data.show_units,
     iconSize: widget.data.icon_size,
+    contentAlignment: widget.data.content_alignment,
   })
 
   return {

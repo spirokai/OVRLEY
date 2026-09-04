@@ -47,6 +47,9 @@ describe('useScaleHandlers', () => {
     })
 
     handlers.onScaleStart({ dragStart: { set: vi.fn() }, target })
+    handlers.onScale({ scale: [1.25, 1.25], drag: { beforeTranslate: [0, 0] }, target })
+    expect(draftWidgetsRef.current[widget.id].data.x).toBe(100)
+
     handlers.onScale({ scale: [1.5, 1.5], drag: { beforeTranslate: [10, 15] }, target })
 
     expect(draftWidgetsRef.current[widget.id]).toEqual({
@@ -55,7 +58,7 @@ describe('useScaleHandlers', () => {
         icon_size: 30,
         icon_offset_x: 3,
         icon_offset_y: -6,
-        x: 112.5,
+        x: 110,
         y: 216.5,
       },
       layout: {
@@ -68,6 +71,7 @@ describe('useScaleHandlers', () => {
         globalScale: 1,
         translateX: 10,
         translateY: 15,
+        transformOriginX: 5,
         rotation: 0,
       },
     })
@@ -78,7 +82,7 @@ describe('useScaleHandlers', () => {
     handlers.onScaleEnd()
 
     expect(commitWidgetUpdate).toHaveBeenCalledWith(widget.id, {
-      x: 113,
+      x: 110,
       y: 217,
       font_size: 60,
       icon_size: 30,

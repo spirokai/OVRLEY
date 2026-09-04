@@ -28,7 +28,7 @@ fn value_config_json(value_type: &str, overrides: &[(&str, &str)]) -> String {
         "\"value\": \"{}\", \"x\": 100, \"y\": 100, \"font\": \"Arial.ttf\", \"font_size\": 32.0, \
          \"color\": \"#ffffff\", \"opacity\": 1.0, \"show_icon\": true, \"icon_color\": \"#40e0d0\", \
          \"icon_size\": 28.0, \"icon_offset_x\": 0.0, \"icon_offset_y\": 0.0, \
-         \"unit_color\": \"#ffffff\", \"prefix\": \"\", \"suffix\": \"\"",
+         \"unit_color\": \"#ffffff\", \"prefix\": \"\", \"suffix\": \"\", \"content_alignment\": \"left\"",
         value_type
     );
     for (key, val) in overrides {

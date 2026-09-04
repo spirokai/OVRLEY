@@ -183,6 +183,7 @@ fn full_speed_text_config(x: i32, y: i32) -> serde_json::Value {
         "x": x,
         "y": y,
         "display_type": "text",
+        "content_alignment": "left",
         "font": "Arial.ttf",
         "font_size": 32.0,
         "color": "#ffffff",

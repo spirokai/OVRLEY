@@ -7,6 +7,7 @@
 
 use super::helpers::{require_bool, require_f32, require_str, require_string, rgba_from_hex};
 use super::raw::ValueConfig;
+use super::value::validate_content_alignment;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::ValidatedSceneConfig;
 use crate::normalize::{ValidatedValueFormatting, ValidatedValueWidget};
@@ -52,6 +53,8 @@ pub fn validate_time_value(
     }
 
     let font_name = require_string(value.font, &p("font"))?;
+    let content_alignment =
+        validate_content_alignment(value.content_alignment, &p("content_alignment"))?;
     let opacity = require_f32(value.opacity, &p("opacity"))?;
     if !(0.0..=1.0).contains(&opacity) {
         return Err(CoreError::Config(format!(
@@ -107,6 +110,7 @@ pub fn validate_time_value(
             x: value.x,
             y: value.y,
             display_type: value.display_type,
+            content_alignment,
             font_name,
             font_size,
             color,

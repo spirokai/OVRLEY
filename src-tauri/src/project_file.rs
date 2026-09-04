@@ -1,7 +1,8 @@
 //! Strict `.oly` project archive boundary.
 //!
-//! `project.json` is validated here before any frontend orchestration sees it.
-//! Archive and platform-path details do not leak into application state.
+//! The project envelope is validated here before frontend orchestration sees it.
+//! Widget config normalization belongs to the frontend project-load seam, while
+//! archive and platform-path details do not leak into application state.
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use chrono::DateTime;
@@ -320,19 +321,11 @@ fn validate_project(project: &ProjectDocument) -> Result<(), String> {
     if project.timeline.view_start >= project.timeline.view_end {
         return Err("Timeline viewport requires viewStart < viewEnd".into());
     }
-    validate_editor(
-        &project.editor,
-        project.render.fps,
-        project.render.widget_update_rate,
-    )?;
+    validate_editor(&project.editor)?;
     Ok(())
 }
 
-fn validate_editor(
-    editor: &ProjectEditor,
-    render_fps: f64,
-    widget_update_rate: u32,
-) -> Result<(), String> {
+fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
     let globals = &editor.global_defaults;
     for (label, value) in [
         (
@@ -379,43 +372,11 @@ fn validate_editor(
         }
     }
 
-    let mut config = editor.config.clone();
-    let scene = config
-        .get_mut("scene")
-        .and_then(Value::as_object_mut)
+    editor
+        .config
+        .get("scene")
+        .and_then(Value::as_object)
         .ok_or_else(|| "editor.config.scene must be an object".to_string())?;
-    scene.insert("start".into(), Value::from(0.0));
-    scene.insert("end".into(), Value::from(1.0));
-    scene.insert("fps".into(), Value::from(render_fps));
-    scene.remove("updateRate");
-    scene.insert("update_rate".into(), Value::from(widget_update_rate));
-    scene.entry("scale").or_insert(Value::from(globals.scale));
-    scene
-        .entry("font")
-        .or_insert(Value::from(globals.font_values.clone()));
-    scene
-        .entry("font_size")
-        .or_insert(Value::from(globals.font_size));
-    scene
-        .entry("opacity")
-        .or_insert(Value::from(globals.opacity));
-    scene
-        .entry("shadow_color")
-        .or_insert(Value::from(globals.shadow_color.clone()));
-    scene
-        .entry("shadow_strength")
-        .or_insert(Value::from(globals.shadow_strength));
-    scene
-        .entry("shadow_distance")
-        .or_insert(Value::from(globals.shadow_distance));
-    scene
-        .entry("border_color")
-        .or_insert(Value::from(globals.border_color.clone()));
-    scene
-        .entry("border_thickness")
-        .or_insert(Value::from(globals.border_thickness));
-    ovrley_core::commands::validate_config_value(&config)
-        .map_err(|error| format!("Invalid editor widget config: {error}"))?;
     Ok(())
 }
 
@@ -812,6 +773,17 @@ mod tests {
         project["editor"]["globalDefaults"]["opacity"] = Value::from(2.0);
 
         assert!(parse_project(&project.to_string()).is_err());
+    }
+
+    #[test]
+    fn legacy_widget_config_reaches_frontend_normalization() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["editor"]["config"]["values"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("content_alignment");
+
+        assert!(parse_project(&project.to_string()).is_ok());
     }
 
     #[test]

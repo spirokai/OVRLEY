@@ -59,6 +59,7 @@ fn formats_metric_parts_for_speed() {
         "show_units": true,
         "unit_color": "#ffffff",
         "display_unit": "kmh",
+        "content_alignment": "left",
         "triangle_width": 0.0,
         "display_type": "text"
     }));
@@ -92,6 +93,7 @@ fn formats_metric_parts_for_temperature_with_degree_units() {
         "show_units": true,
         "unit_color": "#ffffff",
         "display_unit": "fahrenheit",
+        "content_alignment": "left",
         "triangle_width": 0.0,
         "display_type": "text"
     }));
@@ -125,6 +127,7 @@ fn formats_metric_parts_for_pace() {
         "show_units": true,
         "unit_color": "#ffffff",
         "display_unit": "min_per_km",
+        "content_alignment": "left",
         "balance_format": "plain",
         "triangle_width": 0.0,
         "display_type": "text"
@@ -159,6 +162,7 @@ fn formats_metric_parts_for_left_right_balance() {
         "show_units": false,
         "unit_color": "#ffffff",
         "display_unit": "percent",
+        "content_alignment": "left",
         "balance_format": "plain",
         "triangle_width": 0.0,
         "display_type": "text"
@@ -193,6 +197,7 @@ fn formats_metric_parts_for_heading() {
         "show_units": false,
         "unit_color": "#ffffff",
         "display_unit": "degrees",
+        "content_alignment": "left",
         "triangle_width": 0.0,
         "display_type": "text"
     }));
@@ -227,6 +232,7 @@ fn formats_metric_parts_for_distance_with_fixed_decimals() {
         "show_full_distance": true,
         "unit_color": "#ffffff",
         "display_unit": "km",
+        "content_alignment": "left",
         "triangle_width": 0.0,
         "display_type": "text"
     }));
@@ -262,6 +268,7 @@ fn formats_metric_parts_for_total_ascent_with_full_total() {
         "show_full_ascent": true,
         "unit_color": "#ffffff",
         "display_unit": "m",
+        "content_alignment": "left",
         "triangle_width": 0.0,
         "display_type": "text"
     }));
@@ -295,6 +302,7 @@ fn formats_metric_parts_for_both_gps_coordinates_as_two_colored_lines() {
         "show_units": false,
         "unit_color": "#ff0000",
         "display_unit": "both",
+        "content_alignment": "left",
         "coordinate_format": "dms",
         "triangle_width": 0.0,
         "display_type": "text"

@@ -9,7 +9,9 @@ mod common;
 
 use ovrley_core::commands::{parse_and_validate_config, validate_template_contents};
 use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, CompositeCodecId};
+use ovrley_core::normalize::ContentAlignment;
 use ovrley_core::normalize::TEMPLATE_FILE_VERSION;
+use ovrley_core::render::widgets::types::PreparedValue;
 use serde_json::json;
 
 #[test]
@@ -172,13 +174,79 @@ fn validated_standard_metric_display_unit_survives_seam() {
             "suffix": "",
             "decimals": 0,
             "triangle_width": 0.0,
-            "display_type": "text"
+            "display_type": "text",
+            "content_alignment": "left"
         }],
         "plots": []
     }));
 
     let value = common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
     assert_eq!(value.display_unit, "mph");
+}
+
+#[test]
+fn validates_the_canonical_text_alignment_contract() {
+    for (raw, expected) in [
+        ("left", ContentAlignment::Left),
+        ("center", ContentAlignment::Center),
+        ("right", ContentAlignment::Right),
+    ] {
+        let mut speed = common::builders::speed_value_json();
+        speed["content_alignment"] = json!(raw);
+        let config = common::seam::validated_config_from_value(json!({
+            "scene": common::seam::explicit_scene_json(),
+            "labels": [],
+            "values": [speed],
+            "plots": []
+        }));
+        let value =
+            common::seam::expect_standard_value(config.values.into_iter().next().unwrap(), 0);
+        assert_eq!(value.content_alignment, expected);
+    }
+
+    for alignment in [None, Some("justify")] {
+        let mut speed = common::builders::speed_value_json();
+        match alignment {
+            Some(value) => speed["content_alignment"] = json!(value),
+            None => {
+                speed.as_object_mut().unwrap().remove("content_alignment");
+            }
+        }
+        let result = ovrley_core::commands::validate_config_value(&json!({
+            "scene": common::seam::explicit_scene_json(),
+            "labels": [],
+            "values": [speed],
+            "plots": []
+        }));
+        let error = match result {
+            Ok(_) => panic!("invalid alignment should fail validation"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("content_alignment"));
+    }
+}
+
+#[test]
+fn time_uses_the_same_text_alignment_contract() {
+    let mut time = common::builders::speed_value_json();
+    time["value"] = json!("time");
+    time["content_alignment"] = json!("center");
+    time["show_units"] = json!(false);
+    time["display_unit"] = json!("");
+    time["format"] = json!("time-24");
+
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [time],
+        "plots": []
+    }));
+    match config.values.into_iter().next().unwrap() {
+        PreparedValue::TimeText(value) => {
+            assert_eq!(value.base.content_alignment, ContentAlignment::Center)
+        }
+        other => panic!("expected time text value, got {other:?}"),
+    }
 }
 
 #[test]

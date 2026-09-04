@@ -99,6 +99,7 @@ export function applyLiveWidgetStyles(target, layout, globalScale) {
   target.style.width = `${layout.width}px`
   target.style.height = `${layout.height}px`
   target.style.transform = getLiveWidgetTransform(layout, globalScale)
+  target.style.transformOrigin = layout.mode === 'scale' ? `${layout.transformOriginX}px 0px` : 'top left'
 
   if (layout.mode === 'frame' && target.firstElementChild) {
     target.firstElementChild.style.width = '100%'

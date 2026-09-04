@@ -20,7 +20,7 @@ describe('render config preparation', () => {
         end: 50,
       },
       labels: [],
-      values: [{ id: 'value-1', value: 'speed', x: 10, y: 20 }],
+      values: [{ id: 'value-1', value: 'speed', x: 10, y: 20, content_alignment: 'right' }],
       plots: [],
     }
     const renderConfig = createRenderEffectiveConfig({
@@ -46,6 +46,7 @@ describe('render config preparation', () => {
     expect(renderConfig.scene.end).toBe(15.75)
     expect(renderConfig.scene.custom_export_range_active).toBe(true)
     expect(renderConfig.values[0].color).toBe('#ffffff')
+    expect(renderConfig.values[0].content_alignment).toBe('right')
   })
 
   test('removes lean-angle ephemeral frame dimensions from the backend payload', () => {

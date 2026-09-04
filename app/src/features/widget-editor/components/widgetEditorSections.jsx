@@ -26,13 +26,19 @@ import { translateOptions } from '@/i18n'
 export function PositionSection({ widget, setNumericField, updateWidgetData, headerAction = null }) {
   const { t } = useTranslation()
   const opacity = Math.round(widget.data.opacity * 100)
+  const usesHorizontalAnchor =
+    widget.category === 'values' && widget.data.display_type === 'text' && widget.type !== 'gradient' && widget.type !== 'lap_timer'
 
   return (
     <div className="space-y-4">
       <SectionHeading icon={Move} title={t('widget-editor.general', 'General')} trailing={headerAction} />
       <div className="grid grid-cols-2 gap-4 pt-2">
         <NumberField
-          label={t('widget-editor.horizontalPosition', 'Horizontal Position')}
+          label={
+            usesHorizontalAnchor
+              ? t('widget-editor.horizontalAnchor', 'Horizontal Anchor')
+              : t('widget-editor.horizontalPosition', 'Horizontal Position')
+          }
           value={widget.data.x}
           onChange={(rawValue) => setNumericField(widget.id, 'x', rawValue)}
         />

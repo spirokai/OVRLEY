@@ -1,7 +1,54 @@
 import { describe, expect, test } from 'vitest'
 
 import { buildMetricWidgetPreviewModel } from '@/features/widget-preview'
-import { getMetricWidgetVisualBounds } from '@/features/widget-preview/shared/textMeasurement'
+import { getContentAlignmentOrigin, getMetricWidgetLayout, getMetricWidgetVisualBounds } from '@/features/widget-preview/shared/textMeasurement'
+import { TEXT_DEFAULTS } from '@/lib/widget/standard-widgets'
+
+describe('metric content alignment', () => {
+  test.each([
+    ['left', 300],
+    ['center', 240],
+    ['right', 180],
+  ])('resolves the %s point anchor', (alignment, expectedOrigin) => {
+    expect(getContentAlignmentOrigin(alignment, 300, 120)).toBe(expectedOrigin)
+  })
+
+  test('keeps a right-aligned unit fixed while value width changes', () => {
+    const common = {
+      fontSize: 100,
+      fontFamily: 'Arial',
+      unitText: 'KM/H',
+      showIcon: true,
+      showUnits: true,
+      iconSize: 45,
+      contentAlignment: 'right',
+    }
+    const narrow = getMetricWidgetLayout({ ...common, valueText: '9' })
+    const wide = getMetricWidgetLayout({ ...common, valueText: '999' })
+
+    expect(narrow.units.left).toBeCloseTo(wide.units.left)
+    const unitWidth = 20
+    const narrowNaturalUnitX = 87
+    const wideNaturalUnitX = 177
+    expect(getContentAlignmentOrigin('right', 0, narrowNaturalUnitX + unitWidth) + narrowNaturalUnitX).toBe(-unitWidth)
+    expect(getContentAlignmentOrigin('right', 0, wideNaturalUnitX + unitWidth) + wideNaturalUnitX).toBe(-unitWidth)
+  })
+
+  test('centers the complete natural row on the anchor', () => {
+    const layout = getMetricWidgetLayout({
+      fontSize: 100,
+      fontFamily: 'Arial',
+      valueText: '42',
+      unitText: 'KM/H',
+      showIcon: true,
+      showUnits: true,
+      iconSize: 45,
+      contentAlignment: 'center',
+    })
+
+    expect(layout.rowOriginX).toBeCloseTo(-layout.width / 2)
+  })
+})
 
 describe('metric widget visual bounds', () => {
   test('uses text ink height while including units and icon extents', () => {
@@ -9,6 +56,7 @@ describe('metric widget visual bounds', () => {
       {
         width: 100,
         height: 60,
+        rowOriginX: 0,
         icon: { left: 0, top: 25, size: 20 },
         value: { baseline: 35, ascent: 20, descent: 5 },
         units: { baseline: 18, ascent: 10, descent: 4 },
@@ -36,6 +84,7 @@ describe('core_temperature widget preview', () => {
         category: 'values',
         type: 'core_temperature',
         data: {
+          content_alignment: 'left',
           display_unit: 'celsius',
           show_units: true,
           show_icon: false,
@@ -59,6 +108,7 @@ describe('core_temperature widget preview', () => {
         category: 'values',
         type: 'core_temperature',
         data: {
+          content_alignment: 'left',
           display_unit: 'fahrenheit',
           show_units: true,
           show_icon: false,
@@ -82,6 +132,7 @@ describe('core_temperature widget preview', () => {
         category: 'values',
         type: 'core_temperature',
         data: {
+          content_alignment: 'left',
           display_unit: 'celsius',
           show_units: true,
           show_icon: false,
@@ -99,12 +150,62 @@ describe('core_temperature widget preview', () => {
 })
 
 describe('metric widget preview model standard metric units', () => {
+  test.each(['center', 'right'])('applies %s point alignment to time through the standard intrinsic layout', (contentAlignment) => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'time',
+        data: {
+          ...TEXT_DEFAULTS,
+          content_alignment: contentAlignment,
+          format: 'time-24',
+          show_icon: true,
+        },
+      },
+      activity: {
+        trim_end_seconds: 20,
+        sample_elapsed_seconds: [0],
+        time: ['2026-09-04T12:34:00Z'],
+      },
+      previewSecond: 0,
+    })
+
+    const expectedOrigin = contentAlignment === 'center' ? -model.metricLayout.width / 2 : -model.metricLayout.width
+    expect(model.metricLayout.rowOriginX).toBeCloseTo(expectedOrigin)
+  })
+
+  test('applies point alignment to the separate GPS coordinate layout', () => {
+    const model = buildMetricWidgetPreviewModel({
+      widget: {
+        category: 'values',
+        type: 'gps_coordinates',
+        data: {
+          ...TEXT_DEFAULTS,
+          content_alignment: 'right',
+          display_unit: 'both',
+          coordinate_format: 'dms',
+          show_icon: true,
+        },
+      },
+      activity: {
+        trim_end_seconds: 20,
+        sample_elapsed_seconds: [0],
+        course: [[46.9, 7.4]],
+      },
+      previewSecond: 0,
+    })
+
+    expect(model.metricLayout.rowOriginX).toBeCloseTo(-model.metricLayout.width)
+    expect(model.visualBounds.maxX).toBeCloseTo(0)
+  })
+
   test('formats speed widgets from display_unit', () => {
     const model = buildMetricWidgetPreviewModel({
       widget: {
         category: 'values',
         type: 'speed',
         data: {
+          content_alignment: 'left',
           display_unit: 'mph',
           show_units: true,
           show_icon: false,
@@ -128,6 +229,7 @@ describe('metric widget preview model standard metric units', () => {
         category: 'values',
         type: 'distance',
         data: {
+          content_alignment: 'left',
           display_unit: 'km',
           decimals: 1,
           show_units: true,
@@ -153,6 +255,7 @@ describe('metric widget preview model standard metric units', () => {
         category: 'values',
         type: 'distance',
         data: {
+          content_alignment: 'left',
           display_unit: 'mi',
           decimals: 2,
           show_units: true,
@@ -179,6 +282,7 @@ describe('metric widget preview model standard metric units', () => {
         category: 'values',
         type: 'altitude',
         data: {
+          content_alignment: 'left',
           display_unit: 'ft',
           starting_altitude: 492,
           decimals: 0,
@@ -205,6 +309,7 @@ describe('metric widget preview model standard metric units', () => {
         category: 'values',
         type: 'calories',
         data: {
+          content_alignment: 'left',
           display_unit: 'kcal',
           decimals: 0,
           show_units: true,
@@ -229,6 +334,7 @@ describe('metric widget preview model standard metric units', () => {
         category: 'values',
         type: 'distance',
         data: {
+          content_alignment: 'left',
           display_unit: 'km',
           decimals: 2,
           show_units: true,
@@ -254,6 +360,7 @@ describe('metric widget preview model standard metric units', () => {
         category: 'values',
         type: 'temperature',
         data: {
+          content_alignment: 'left',
           display_unit: 'fahrenheit',
           show_units: true,
           show_icon: false,
@@ -277,6 +384,7 @@ describe('metric widget preview model standard metric units', () => {
         category: 'values',
         type: 'pace',
         data: {
+          content_alignment: 'left',
           display_unit: 'min_per_km',
           show_units: true,
           show_icon: false,
@@ -300,6 +408,7 @@ describe('metric widget preview model standard metric units', () => {
         category: 'values',
         type: 'vertical_speed',
         data: {
+          content_alignment: 'left',
           display_unit: 'mps',
           decimals: 1,
           show_units: true,
@@ -324,6 +433,7 @@ describe('metric widget preview model standard metric units', () => {
         category: 'values',
         type: 'gear_position',
         data: {
+          content_alignment: 'left',
           display_unit: 'gear',
           show_units: true,
           show_icon: false,
@@ -347,6 +457,7 @@ describe('metric widget preview model standard metric units', () => {
         category: 'values',
         type: 'gear_position',
         data: {
+          content_alignment: 'left',
           display_unit: 'gear',
           show_units: true,
           show_icon: false,
@@ -370,6 +481,7 @@ describe('metric widget preview model standard metric units', () => {
         category: 'values',
         type: 'heading',
         data: {
+          content_alignment: 'left',
           show_icon: true,
         },
       },

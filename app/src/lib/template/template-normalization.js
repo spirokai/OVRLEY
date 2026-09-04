@@ -210,6 +210,10 @@ function normalizeValue(value = {}, globalDefaults) {
   const keys = [...VALUE_SHARED_KEYS, ...extraKeys, ...(type === 'lap_timer' ? LAP_TIMER_KEYS : [])]
   const lapTimerDefaults = type === 'lap_timer' ? LAP_TIMER_DEFAULTS : {}
   const withDefaults = { ...TEXT_DEFAULTS, ...TYPE_DEFAULTS[type], ...lapTimerDefaults, ...value }
+  const supportsContentAlignment = withDefaults.display_type === 'text' && type !== 'gradient' && type !== 'lap_timer'
+  if (supportsContentAlignment && !['left', 'center', 'right'].includes(withDefaults.content_alignment)) {
+    throw new Error(`Invalid content_alignment: ${String(withDefaults.content_alignment)}`)
+  }
   if (type === 'lap_timer') {
     const mode = LAP_TIMER_MODES.find((candidate) => candidate.value === value.lap_timer_mode)
     if (value.label_font === undefined) withDefaults.label_font = globalDefaults?.font_text || LAP_TIMER_DEFAULTS.label_font
@@ -217,6 +221,7 @@ function normalizeValue(value = {}, globalDefaults) {
     if (value.label_color === undefined) withDefaults.label_color = globalDefaults?.color_text || LAP_TIMER_DEFAULTS.label_color
   }
   const pickedValue = pickDefined(withDefaults, keys)
+  if (!supportsContentAlignment) delete pickedValue.content_alignment
   if (typeof pickedValue.display_unit !== 'string') {
     delete pickedValue.display_unit
   }

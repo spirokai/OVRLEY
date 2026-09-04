@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createDurableTemplateState } from '@/lib/template/template-state'
 import { createDurableEditorState } from '@/lib/widget/editor-state'
+import { loadProject } from '@/features/projects/projectOperations'
 import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlice'
 import useStore from '@/store/useStore'
 
@@ -39,6 +40,42 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     useStore.temporal.getState().clear()
     boundaries.clearPreviewVideo.mockResolvedValue(null)
     boundaries.registerPreviewVideo.mockResolvedValue({ importId: 'owner-import-id', previewUrl: 'http://preview/video' })
+  })
+
+  test('normalizes legacy widget alignment at the frontend project-load seam', async () => {
+    const initialState = useStore.getState()
+    const editor = createDurableEditorState({
+      config: {
+        ...initialState.config,
+        values: [{ id: 'legacy-speed', value: 'speed', x: 300, y: 100 }],
+      },
+      globalDefaults: initialState.globalDefaults,
+    })
+    delete editor.config.values[0].content_alignment
+    const project = {
+      format: 'ovrley-project',
+      version: 1,
+      savedAt: '2026-08-27T12:00:00.000Z',
+      editor,
+      sources: { activity: null, video: null },
+      sync: { videoOffsetSeconds: 0, videoTimezoneMode: null },
+      render: { ...DEFAULT_RENDER_SETTINGS, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
+    }
+    boundaries.readProjectFile.mockResolvedValue({
+      project,
+      resolvedSources: { activityPath: null, videoPath: null },
+    })
+
+    const loaded = await loadProject({
+      path: 'C:\\Events\\Legacy.oly',
+      resolveProjectSources: vi.fn().mockResolvedValue({ activityPath: null, videoPath: null }),
+      prepareActivityPath: vi.fn(),
+      prepareVideoPath: vi.fn(),
+    })
+
+    expect(loaded.editor.config.values[0].content_alignment).toBe('left')
+    expect(useStore.getState().config.values[0].content_alignment).toBe('left')
   })
 
   test('delegates source population to each owner before restoring project settings', async () => {

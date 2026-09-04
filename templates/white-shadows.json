@@ -32,7 +32,8 @@
         "show_units": true,
         "display_unit": "w",
         "id": "widget-1",
-        "value": "power"
+        "value": "power",
+        "content_alignment": "left"
       },
       {
         "x": 2340,
@@ -54,7 +55,8 @@
         "show_units": true,
         "display_unit": "kmh",
         "id": "widget-2",
-        "value": "speed"
+        "value": "speed",
+        "content_alignment": "left"
       },
       {
         "x": 94,
@@ -76,7 +78,8 @@
         "show_units": true,
         "display_unit": "celsius",
         "id": "widget-3",
-        "value": "temperature"
+        "value": "temperature",
+        "content_alignment": "left"
       },
       {
         "x": 3366,
@@ -98,7 +101,8 @@
         "show_units": true,
         "display_unit": "nm",
         "id": "widget-4",
-        "value": "torque"
+        "value": "torque",
+        "content_alignment": "left"
       }
     ],
     "plots": [

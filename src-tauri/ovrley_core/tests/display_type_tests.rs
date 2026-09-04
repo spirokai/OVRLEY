@@ -93,7 +93,8 @@ fn text_display_type_passes_standard_metric_validation() {
             "suffix": "",
             "decimals": 0,
             "triangle_width": 0.0,
-            "display_type": "text"
+            "display_type": "text",
+            "content_alignment": "left"
         }],
         "plots": []
     }));

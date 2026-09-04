@@ -65,7 +65,9 @@ pub use linear_gauge::{
 pub use route::{validate_route_plot, ValidatedRoutePlot};
 pub use scene::{validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig};
 pub use time::{validate_time_value, ValidatedTimeFormatting, ValidatedTimeValue};
-pub use value::{validate_value_widget, ValidatedValueFormatting, ValidatedValueWidget};
+pub use value::{
+    validate_value_widget, ContentAlignment, ValidatedValueFormatting, ValidatedValueWidget,
+};
 
 /// Telemetry series needed by a template.
 ///

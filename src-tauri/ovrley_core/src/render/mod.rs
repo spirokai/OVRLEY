@@ -8,7 +8,7 @@
 
 /// Value formatting and metric display helpers.
 pub mod format;
-/// Shared static label/icon caching and base-layer preparation helpers.
+/// Shared static label/metric-part caching and base-layer preparation helpers.
 mod static_layer;
 /// Skia surface allocation and PNG output helpers.
 pub mod surface;
@@ -24,7 +24,7 @@ use crate::normalize::ValidatedRenderConfig;
 use crate::normalize::ValidatedSceneConfig;
 use crate::paths::AppPaths;
 use crate::render::format::frame_index_for_second;
-use crate::render::static_layer::{cached_labels_image, config_has_static_metric_icons};
+use crate::render::static_layer::{cached_labels_image, config_has_static_metric_parts};
 use crate::render::surface::{create_surface, wrap_native_surface, write_surface_png};
 use crate::render::text::{
     validated_gradient_style, validated_lap_timer_style, validated_time_style,
@@ -34,8 +34,8 @@ use crate::render::widgets::types::PreparedValue;
 use crate::render::widgets::value::MetricWidgetRequest;
 use crate::render::widgets::{
     draw_elevation_widget, draw_metric_presentation, draw_metric_value_widget_with_config,
-    draw_route_widget, has_static_metric_icon_validated, prepare_render_assets,
-    MetricPresentationReport, PreparedRenderAssets, WidgetRenderReport,
+    draw_route_widget, prepare_render_assets, static_metric_parts_for_value,
+    MetricPresentationReport, PreparedRenderAssets, StaticMetricParts, WidgetRenderReport,
 };
 use crate::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
 use skia_safe::Canvas;
@@ -50,7 +50,7 @@ pub use self::static_layer::prepare_base_rgba;
 #[derive(Clone, Copy, Debug, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LabelCacheStatus {
-    /// No static labels or static icons were present.
+    /// No static labels or static metric parts were present.
     None,
     /// A previously rendered static label image was reused.
     Hit,
@@ -84,7 +84,7 @@ pub struct PreviewRenderReport {
 /// Assets prepared once and reused by preview/video frame rendering.
 #[derive(Clone)]
 pub struct PreparedPreviewAssets {
-    /// Cached static label/icon layer for preview surfaces.
+    /// Cached static label/metric-part layer for preview surfaces.
     pub(crate) labels_image: Option<Image>,
     /// Widget caches and optional base RGBA bytes.
     pub(crate) prepared_assets: PreparedRenderAssets,
@@ -551,7 +551,7 @@ fn render_frame_to_surface(
         });
     }
 
-    let static_metric_icons_rendered = config_has_static_metric_icons(&prepared_assets.values)
+    let static_metric_parts_rendered = config_has_static_metric_parts(&prepared_assets.values)
         && (labels_image.is_some() || base_layer_restored);
 
     // Phase 1: Intrinsic text rendering (gradient + text display types).
@@ -570,8 +570,11 @@ fn render_frame_to_surface(
                 PreparedValue::StandardText(prepared) => {
                     let validated = &prepared.validated;
                     let style = validated_value_style(validated, &prepared_assets.scene, scale);
-                    let static_icon_rendered_for_value =
-                        static_metric_icons_rendered && has_static_metric_icon_validated(validated);
+                    let static_parts = if static_metric_parts_rendered {
+                        static_metric_parts_for_value(validated)
+                    } else {
+                        StaticMetricParts::default()
+                    };
                     draw_metric_value_widget_with_config(MetricWidgetRequest {
                         canvas,
                         metric_kind: validated.metric,
@@ -581,7 +584,7 @@ fn render_frame_to_surface(
                         frame_index,
                         scale,
                         font_dirs: &paths.font_dirs,
-                        static_icon_rendered: static_icon_rendered_for_value,
+                        static_parts,
                         validated: Some(validated),
                         validated_gradient: None,
                         validated_time: None,
@@ -591,8 +594,11 @@ fn render_frame_to_surface(
                 }
                 PreparedValue::TimeText(validated) => {
                     let style = validated_time_style(validated, &prepared_assets.scene, scale);
-                    let static_icon_rendered_for_value = static_metric_icons_rendered
-                        && has_static_metric_icon_validated(&validated.base);
+                    let static_parts = if static_metric_parts_rendered {
+                        static_metric_parts_for_value(&validated.base)
+                    } else {
+                        StaticMetricParts::default()
+                    };
                     draw_metric_value_widget_with_config(MetricWidgetRequest {
                         canvas,
                         metric_kind: crate::MetricKind::Time,
@@ -602,7 +608,7 @@ fn render_frame_to_surface(
                         frame_index,
                         scale,
                         font_dirs: &paths.font_dirs,
-                        static_icon_rendered: static_icon_rendered_for_value,
+                        static_parts,
                         validated: None,
                         validated_gradient: None,
                         validated_time: Some(validated),
@@ -621,7 +627,7 @@ fn render_frame_to_surface(
                         frame_index,
                         scale,
                         font_dirs: &paths.font_dirs,
-                        static_icon_rendered: false,
+                        static_parts: StaticMetricParts::default(),
                         validated: None,
                         validated_gradient: Some(validated),
                         validated_time: None,

@@ -6,7 +6,7 @@
 //! Rust renderer visually matches the editor.
 //!
 //! Module ownership:
-//! - `layout` — text positioning, icon/unit row layout, static icon cache logic.
+//! - `layout` — text positioning, icon/unit row layout, static-part cache logic.
 //! - `gradient` — slope triangle rendering and triangle height math.
 //! - `icons` — icon kind mapping, SVG cache, paint creation, primitives drawing.
 //! - `svg` — lightweight SVG parser, path tokenizer, and Skia path conversion.
@@ -40,8 +40,8 @@ pub(crate) use layout::{
 };
 
 pub(crate) use layout::{
-    draw_metric_parts, draw_static_metric_icon_for_value_validated,
-    has_static_metric_icon_validated,
+    draw_metric_parts, draw_static_metric_parts_for_value, static_metric_parts_for_value,
+    StaticMetricParts,
 };
 
 /// Bundled parameters for drawing a metric value widget.
@@ -54,7 +54,7 @@ pub(crate) struct MetricWidgetRequest<'a> {
     pub frame_index: usize,
     pub scale: f32,
     pub font_dirs: &'a [PathBuf],
-    pub static_icon_rendered: bool,
+    pub static_parts: StaticMetricParts,
     /// Pre-validated value widget. When present, the validated path is used
     /// instead of reading from `value` — zero backend-owned defaults.
     pub validated: Option<&'a ValidatedValueWidget>,
@@ -115,7 +115,7 @@ pub(crate) fn draw_metric_value_widget_with_config(
             &parts,
             request.scale,
             request.font_dirs,
-            request.static_icon_rendered,
+            request.static_parts,
             &validated_time.base,
         )?;
         return Ok(true);
@@ -143,7 +143,7 @@ pub(crate) fn draw_metric_value_widget_with_config(
         &parts,
         request.scale,
         request.font_dirs,
-        request.static_icon_rendered,
+        request.static_parts,
         validated,
     )?;
     Ok(true)
@@ -261,7 +261,7 @@ mod tests {
                     frame_index: 0,
                     scale: 1.0,
                     font_dirs: &[],
-                    static_icon_rendered: false,
+                    static_parts: StaticMetricParts::default(),
                     validated: None,
                     validated_gradient: None,
                     validated_time: None,
@@ -354,6 +354,7 @@ mod tests {
             x: 10.0,
             y: 20.0,
             display_type: DisplayType::Text,
+            content_alignment: crate::normalize::ContentAlignment::Left,
             font_name: "Arial.ttf".to_string(),
             font_size: 32.0,
             color: [0xff, 0xff, 0xff, 0xff],
@@ -387,7 +388,7 @@ mod tests {
                 frame_index: 0,
                 scale: 1.0,
                 font_dirs: &[],
-                static_icon_rendered: false,
+                static_parts: StaticMetricParts::default(),
                 validated: Some(&validated),
                 validated_gradient: None,
                 validated_time: None,
@@ -415,7 +416,7 @@ mod tests {
                 frame_index: 0,
                 scale: 1.0,
                 font_dirs: &[],
-                static_icon_rendered: false,
+                static_parts: StaticMetricParts::default(),
                 validated: Some(&validated),
                 validated_gradient: None,
                 validated_time: None,

@@ -39,7 +39,8 @@
       "suffix": "",
       "decimals": 0,
       "triangle_width": 0.0,
-      "display_type": "text"
+      "display_type": "text",
+      "content_alignment": "left"
     },
     "heading_tape": {
       "value": "heading",

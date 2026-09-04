@@ -10,9 +10,9 @@ mod common;
 use ovrley_core::activity::schema::DenseActivityReport;
 use serde_json::json;
 
-const SPEED_VALUE: &str = r##"{"value":"speed","x":0,"y":0,"display_unit":"kmh","decimals":0,"show_units":true,"font":"Arial.ttf","font_size":32.0,"color":"#ffffff","opacity":1.0,"show_icon":true,"icon_color":"#40e0d0","icon_size":28.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"unit_color":"#ffffff","prefix":"","suffix":""}"##;
-const TORQUE_VALUE: &str = r##"{"value":"torque","x":0,"y":0,"display_unit":"nm","decimals":0,"show_units":true,"font":"Arial.ttf","font_size":32.0,"color":"#ffffff","opacity":1.0,"show_icon":true,"icon_color":"#40e0d0","icon_size":28.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"unit_color":"#ffffff","prefix":"","suffix":""}"##;
-const ENGINE_POWER_VALUE: &str = r##"{"value":"engine_power","x":0,"y":0,"display_unit":"w","decimals":0,"show_units":true,"font":"Arial.ttf","font_size":32.0,"color":"#ffffff","opacity":1.0,"show_icon":true,"icon_color":"#40e0d0","icon_size":28.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"unit_color":"#ffffff","prefix":"","suffix":""}"##;
+const SPEED_VALUE: &str = r##"{"value":"speed","x":0,"y":0,"display_unit":"kmh","decimals":0,"show_units":true,"font":"Arial.ttf","font_size":32.0,"color":"#ffffff","opacity":1.0,"show_icon":true,"icon_color":"#40e0d0","icon_size":28.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"unit_color":"#ffffff","prefix":"","suffix":"","content_alignment":"left"}"##;
+const TORQUE_VALUE: &str = r##"{"value":"torque","x":0,"y":0,"display_unit":"nm","decimals":0,"show_units":true,"font":"Arial.ttf","font_size":32.0,"color":"#ffffff","opacity":1.0,"show_icon":true,"icon_color":"#40e0d0","icon_size":28.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"unit_color":"#ffffff","prefix":"","suffix":"","content_alignment":"left"}"##;
+const ENGINE_POWER_VALUE: &str = r##"{"value":"engine_power","x":0,"y":0,"display_unit":"w","decimals":0,"show_units":true,"font":"Arial.ttf","font_size":32.0,"color":"#ffffff","opacity":1.0,"show_icon":true,"icon_color":"#40e0d0","icon_size":28.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"unit_color":"#ffffff","prefix":"","suffix":"","content_alignment":"left"}"##;
 
 fn config_json(values_json: &str) -> ovrley_core::normalize::ValidatedRenderConfig {
     common::seam::validated_config_from_value(json!({

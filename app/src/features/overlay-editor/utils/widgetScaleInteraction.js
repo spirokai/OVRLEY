@@ -10,7 +10,7 @@ import { buildLiveResizeUpdate, buildResizeUpdate, buildScaleDraft, captureResiz
 
 function buildIntrinsicScaleUpdate(origin, scaleFactor, globalScale, translateX, translateY, round = false) {
   const gradientYOffset = origin.widget.type === 'gradient' ? Math.min(0, -origin.data.value_offset) : 0
-  const x = origin.x + translateX + origin.renderedMinX * (1 - scaleFactor) * globalScale
+  const x = origin.x + translateX
   const y = origin.y + translateY + (origin.renderedMinY * globalScale + gradientYOffset) * (1 - scaleFactor)
 
   return {
@@ -118,6 +118,8 @@ export function buildScaleInteractionDraft(origin, scaleFactor, drag, globalScal
       scaleFactor,
       translateX,
       translateY,
+      transformOriginX: -origin.renderedMinX,
+      left: origin.x + origin.renderedMinX,
     }),
   }
 }

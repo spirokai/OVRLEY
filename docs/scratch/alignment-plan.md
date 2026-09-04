@@ -270,11 +270,11 @@ Separately replace the `static_icon_rendered: bool` request/layout parameter wit
 
 Use this eligibility matrix:
 
-| Alignment | Icon | Unit |
-| --- | --- | --- |
-| Left | Static when visible and supported | Dynamic |
-| Center | Dynamic | Dynamic |
-| Right | Dynamic | Static when visible and non-empty |
+| Alignment | Icon                              | Unit                              |
+| --------- | --------------------------------- | --------------------------------- |
+| Left      | Static when visible and supported | Dynamic                           |
+| Center    | Dynamic                           | Dynamic                           |
+| Right     | Dynamic                           | Static when visible and non-empty |
 
 Additional rules:
 
@@ -413,3 +413,4 @@ The feature is complete when:
 - Existing templates retain left-aligned rendering.
 - Malformed present configuration fails at ingress.
 - Frontend lint and the focused frontend and Rust tests pass.
+  q

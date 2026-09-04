@@ -1,4 +1,4 @@
-//! Shared static label and icon rendering for preview and video paths.
+//! Shared static label and metric-part rendering for preview and video paths.
 //!
 //! This module owns the reusable static overlay layer that is drawn before any
 //! per-frame metric values or plot widgets. It keeps the label-image cache
@@ -14,8 +14,7 @@ use crate::render::surface::{create_surface, wrap_native_surface};
 use crate::render::text::{draw_text, validated_label_style, validated_value_style};
 use crate::render::widgets::types::PreparedValue;
 use crate::render::widgets::{
-    draw_backdrops_static_layer, draw_static_metric_icon_for_value_validated,
-    has_static_metric_icon_validated,
+    draw_backdrops_static_layer, draw_static_metric_parts_for_value, static_metric_parts_for_value,
 };
 use skia_safe::Image;
 use std::collections::HashMap;
@@ -23,7 +22,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
-/// Returns a cached static label/icon image or renders and caches a new one.
+/// Returns a cached static label/metric-part image or renders and caches a new one.
 ///
 /// The cache key covers every config input that can change static pixels, so
 /// different render configurations cannot reuse stale images across renders.
@@ -38,7 +37,7 @@ pub(super) fn cached_labels_image(
     let width = scene.width;
     let height = scene.height;
     let scale = scene.scale;
-    if backdrops.is_empty() && labels.is_empty() && !config_has_static_metric_icons(values) {
+    if backdrops.is_empty() && labels.is_empty() && !config_has_static_metric_parts(values) {
         return Ok((None, LabelCacheStatus::None));
     }
 
@@ -82,7 +81,7 @@ pub(super) fn cached_labels_image(
     Ok((Some(image), LabelCacheStatus::Miss))
 }
 
-/// Pre-renders static labels and icons into a reusable RGBA base buffer.
+/// Pre-renders static labels and metric parts into a reusable RGBA base buffer.
 ///
 /// Video rendering restores this buffer into each frame before drawing dynamic
 /// values so the hot path does not have to redraw static content repeatedly.
@@ -99,7 +98,7 @@ pub fn prepare_base_rgba(
     let scale = scene.scale;
     let row_bytes = (width as usize) * 4;
     let mut pixels = vec![0u8; row_bytes * (height as usize)];
-    if backdrops.is_empty() && labels.is_empty() && !config_has_static_metric_icons(values) {
+    if backdrops.is_empty() && labels.is_empty() && !config_has_static_metric_parts(values) {
         return Ok(Some(pixels));
     }
 
@@ -121,15 +120,16 @@ pub fn prepare_base_rgba(
     Ok(Some(pixels))
 }
 
-/// Returns whether any configured metric widget contributes a static icon.
-pub(super) fn config_has_static_metric_icons(values: &[PreparedValue]) -> bool {
+/// Returns whether any configured metric widget contributes a static part.
+pub(super) fn config_has_static_metric_parts(values: &[PreparedValue]) -> bool {
     values
         .iter()
         .filter_map(text_value)
-        .any(has_static_metric_icon_validated)
+        .map(static_metric_parts_for_value)
+        .any(|parts| parts.icon || parts.unit)
 }
 
-/// Draws the full static text-and-icon layer shared by preview and video prep.
+/// Draws the full static text-and-metric-part layer shared by preview and video prep.
 ///
 /// This shared loop is the single source of truth for static overlay content so
 /// cached preview images and copied RGBA base buffers cannot drift apart.
@@ -147,11 +147,11 @@ fn draw_static_backdrops_text_and_icons(
         let style = validated_label_style(validated, scene, scale);
         draw_text(canvas, &validated.text, &style, &paths.font_dirs)?;
     }
-    draw_static_metric_icons(canvas, paths, values, scene, scale)?;
+    draw_static_metric_parts(canvas, paths, values, scene, scale)?;
     Ok(())
 }
 
-/// Computes the cache key for the shared static label/icon layer.
+/// Computes the cache key for the shared static label/metric-part layer.
 fn labels_cache_key(
     backdrops: &[ValidatedBackdrop],
     labels: &[ValidatedLabel],
@@ -172,11 +172,11 @@ fn labels_cache_key(
     hasher.finish()
 }
 
-/// Draws all metric icons whose pixels do not depend on the current frame.
+/// Draws all metric parts whose pixels do not depend on the current frame.
 ///
 /// Validates standard metric text widgets upfront so validated icons use
 /// zero backend-owned defaults.
-fn draw_static_metric_icons(
+fn draw_static_metric_parts(
     canvas: &skia_safe::Canvas,
     paths: &AppPaths,
     values: &[PreparedValue],
@@ -184,17 +184,12 @@ fn draw_static_metric_icons(
     scale: f32,
 ) -> CoreResult<()> {
     for validated in values.iter().filter_map(text_value) {
-        if !has_static_metric_icon_validated(validated) {
+        let parts = static_metric_parts_for_value(validated);
+        if !parts.icon && !parts.unit {
             continue;
         }
         let style = validated_value_style(validated, scene, scale);
-        draw_static_metric_icon_for_value_validated(
-            canvas,
-            validated,
-            &style,
-            scale,
-            &paths.font_dirs,
-        )?;
+        draw_static_metric_parts_for_value(canvas, validated, &style, scale, &paths.font_dirs)?;
     }
     Ok(())
 }

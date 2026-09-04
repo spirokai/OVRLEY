@@ -73,7 +73,8 @@
         "show_units": false,
         "display_unit": "w",
         "id": "widget-1",
-        "value": "power"
+        "value": "power",
+        "content_alignment": "left"
       },
       {
         "x": 355,
@@ -95,7 +96,8 @@
         "show_units": false,
         "display_unit": "kmh",
         "id": "widget-3",
-        "value": "speed"
+        "value": "speed",
+        "content_alignment": "left"
       },
       {
         "x": 354,
@@ -117,7 +119,8 @@
         "show_units": false,
         "display_unit": "rpm",
         "id": "widget-5",
-        "value": "cadence"
+        "value": "cadence",
+        "content_alignment": "left"
       },
       {
         "x": 352,
@@ -139,7 +142,8 @@
         "show_units": false,
         "display_unit": "bpm",
         "id": "widget-7",
-        "value": "heartrate"
+        "value": "heartrate",
+        "content_alignment": "left"
       },
       {
         "x": 89,

@@ -157,22 +157,35 @@ export function getPreviewTextBaseline({ top = 0, lineHeight, ascent, glyphHeigh
 }
 
 /**
- * Computes the full metric widget layout — icon, value text, and units text positions.
+ * Resolves the natural-width row origin from its alignment and x anchor.
  *
- * Calculates positions, baselines, and dimensions for all three visual elements
- * (icon, value, units) based on font metrics and widget configuration.
+ * @param {'left'|'center'|'right'} contentAlignment
+ * @param {number} anchorX
+ * @param {number} contentWidth
+ * @returns {number}
+ */
+export function getContentAlignmentOrigin(contentAlignment, anchorX, contentWidth) {
+  if (contentAlignment === 'left') return anchorX
+  if (contentAlignment === 'center') return anchorX - contentWidth / 2
+  if (contentAlignment === 'right') return anchorX - contentWidth
+  throw new Error(`Unsupported content alignment: ${String(contentAlignment)}`)
+}
+
+/**
+ * Lays out an intrinsic metric row around its x anchor.
  *
  * @param {object} params
- * @param {number} params.fontSize - Value font size in pixels.
- * @param {string} params.fontFamily - Font family.
- * @param {string} params.valueText - Value text string.
- * @param {string} params.unitText - Units text string.
- * @param {boolean} params.showIcon - Whether to include an icon element.
- * @param {boolean} params.showUnits - Whether to include units text.
- * @param {number} params.iconSize - Icon size in pixels.
- * @returns {{ icon: object|null, value: object, units: object|null, width: number, height: number, unitsFontSize: number }} Layout positions and dimensions.
+ * @param {number} params.fontSize
+ * @param {string} params.fontFamily
+ * @param {string} params.valueText
+ * @param {string} params.unitText
+ * @param {boolean} params.showIcon
+ * @param {boolean} params.showUnits
+ * @param {number} params.iconSize
+ * @param {'left'|'center'|'right'} params.contentAlignment
+ * @returns {{ icon: object|null, value: object, units: object|null, width: number, height: number, unitsFontSize: number, rowOriginX: number }}
  */
-export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitText, showIcon, showUnits, iconSize }) {
+export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitText, showIcon, showUnits, iconSize, contentAlignment }) {
   // Font metrics — compute line heights and measure both value and units text using canvas measurement
   const valueLineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const unitsFontSize = Math.max(fontSize * 0.28, 12)
@@ -204,18 +217,19 @@ export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitTex
   const unitsTop = textGroupBottom - (unitsLineHeight + unitsVerticalMetrics.glyphHeight) / 2
   const unitsLeft = textGroupLeft + valueMeasure.width + METRIC_WIDGET_UNITS_GAP_PX
   const width = showUnitText ? unitsLeft + unitsMeasure.width : textGroupLeft + valueMeasure.width
+  const rowOriginX = getContentAlignmentOrigin(contentAlignment, 0, width)
   const valueGlyphCenterY = valueBaseline + (valueVerticalMetrics.descent - valueVerticalMetrics.ascent) * 0.5
 
   return {
     icon: showIcon
       ? {
-          left: 0,
+          left: rowOriginX,
           top: valueGlyphCenterY - iconSize * 0.5,
           size: iconSize,
         }
       : null,
     value: {
-      left: textGroupLeft,
+      left: rowOriginX + textGroupLeft,
       top: valueTop,
       baseline: valueBaseline,
       width: valueMeasure.width,
@@ -227,7 +241,7 @@ export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitTex
     },
     units: showUnitText
       ? {
-          left: unitsLeft,
+          left: rowOriginX + unitsLeft,
           top: unitsTop,
           baseline: getPreviewTextBaseline({
             top: unitsTop,
@@ -247,6 +261,7 @@ export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitTex
       : null,
     width,
     height: rowHeight,
+    rowOriginX,
     unitsFontSize,
   }
 }
@@ -266,12 +281,13 @@ export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitTex
 export function getMetricWidgetVisualBounds(layout, { iconOffsetX = 0, iconOffsetY = 0 } = {}) {
   // Use horizontal layout advances rather than ink bounds. Ink widths vary by
   // glyph, even for fixed-width fonts, and would make the selection target wobble.
-  const iconLeft = layout.icon ? layout.icon.left + iconOffsetX : 0
+  const iconLeft = layout.icon ? layout.icon.left + iconOffsetX : layout.rowOriginX
   const iconTop = layout.icon ? layout.icon.top + iconOffsetY : 0
   const iconRight = layout.icon ? iconLeft + layout.icon.size : 0
   const iconBottom = layout.icon ? iconTop + layout.icon.size : 0
-  const minX = layout.icon ? Math.min(0, iconLeft) : 0
-  const maxX = layout.icon ? Math.max(layout.width, iconRight) : layout.width
+  const rowRight = layout.rowOriginX + layout.width
+  const minX = layout.icon ? Math.min(layout.rowOriginX, iconLeft) : layout.rowOriginX
+  const maxX = layout.icon ? Math.max(rowRight, iconRight) : rowRight
   let minY = layout.value.baseline - layout.value.ascent
   let maxY = layout.value.baseline + layout.value.descent
   if (layout.units) {
