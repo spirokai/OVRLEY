@@ -46,7 +46,9 @@ export default function useRenderWorkflow({ backendStatus }) {
   const renderDisabled = !canRender || renderingVideo || backendStatus !== 'connected'
   const renderTooltipContent = useMemo(() => {
     if (!config) {
-      return hasParsedActivity ? i18next.t('render-video.loadATemplateFirst', 'Load a template first') : i18next.t('render-video.loadATemplateAndGpxfitActivityFirst', 'Load a template and GPX/FIT activity first')
+      return hasParsedActivity
+        ? i18next.t('render-video.loadATemplateFirst', 'Load a template first')
+        : i18next.t('render-video.loadATemplateAndGpxfitActivityFirst', 'Load a template and GPX/FIT activity first')
     }
     if (!hasParsedActivity) {
       return i18next.t('render-video.loadAGpxfitActivityFirst', 'Load a GPX/FIT activity first')

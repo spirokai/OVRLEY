@@ -59,7 +59,9 @@ export default function TemplateSection({
             <Sparkles className="h-3 w-3 shrink-0 text-primary" />
             <SelectValue
               placeholder={
-                loadedTemplateSource?.kind === 'file' ? loadedTemplateSource.path.split(/[/\\]/).at(-1) || 'Imported Template' : t('app-shell.selectTemplate', 'Select Template...')
+                loadedTemplateSource?.kind === 'file'
+                  ? loadedTemplateSource.path.split(/[/\\]/).at(-1) || 'Imported Template'
+                  : t('app-shell.selectTemplate', 'Select Template...')
               }
             />
           </div>

@@ -37,7 +37,11 @@ export default function UpdatePromptDialog({ open, phase, version, progress, pro
         <div className="flex items-center gap-3">
           <Download className="h-4 w-4 text-primary" />
           <DialogTitle className="text-sm font-semibold text-foreground">
-            {failed ? t('app-update.updateFailed', 'Update failed') : downloading ? t('app-update.downloadingUpdate', 'Downloading update') : t('app-update.updateAvailable', 'Update available')}
+            {failed
+              ? t('app-update.updateFailed', 'Update failed')
+              : downloading
+                ? t('app-update.downloadingUpdate', 'Downloading update')
+                : t('app-update.updateAvailable', 'Update available')}
           </DialogTitle>
         </div>
         <DialogDescription className="mt-6 normal-case text-[0.9rem] font-light leading-5 text-muted-foreground">
@@ -61,7 +65,9 @@ export default function UpdatePromptDialog({ open, phase, version, progress, pro
 
         {downloading ? (
           <div className="mt-3 space-y-2">
-            <p className="text-end text-xs text-muted-foreground tabular-nums">{determinate ? progressLabel : t('app-update.downloadingUpdate', 'Downloading update...')}</p>
+            <p className="text-end text-xs text-muted-foreground tabular-nums">
+              {determinate ? progressLabel : t('app-update.downloadingUpdate', 'Downloading update...')}
+            </p>
             {determinate ? (
               <Progress value={progressPercent} aria-label={t('app-update.updateDownloadProgress', 'Update download progress')} />
             ) : (

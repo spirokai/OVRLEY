@@ -1021,7 +1021,9 @@ function ColorPickerSwatch(props) {
     }
   }, [color])
 
-  const ariaLabel = !color ? t('components.noColorSelected', 'No color selected') : t('components.currentColorVal', 'Current color: {{val}}', { val: colorToString(color, format) })
+  const ariaLabel = !color
+    ? t('components.noColorSelected', 'No color selected')
+    : t('components.currentColorVal', 'Current color: {{val}}', { val: colorToString(color, format) })
 
   const SwatchPrimitive = asChild ? SlotPrimitive.Slot : 'div'
 

@@ -307,7 +307,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
   })
 
   test('New Project keeps the session when the user cancels the confirmation', async () => {
-    const initialState = useStore.getState()
     useStore.setState({ activitySource: { kind: 'file', path: 'C:\\Media\\ride.fit' }, parsedActivity: { samples: [] } })
 
     const clearImportedVideo = vi.fn()

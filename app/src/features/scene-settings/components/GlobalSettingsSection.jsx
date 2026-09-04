@@ -28,7 +28,9 @@ export default function GlobalSettingsSection({ globalDefaults, onGlobalDefaultC
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3 flex-1">
           <Palette className="h-4 w-4 text-primary" />
-          <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('scene-settings.globalSettings', 'Global Settings')}</h4>
+          <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+            {t('scene-settings.globalSettings', 'Global Settings')}
+          </h4>
           <Separator className="flex-1" />
         </div>
         <Button
