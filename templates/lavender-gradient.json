@@ -110,6 +110,7 @@
         "id": "widget-13",
         "value": "time",
         "format": "time-12",
+        "hours_offset": 0,
         "content_alignment": "left"
       },
       {

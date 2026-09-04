@@ -41,7 +41,7 @@ export function SectionHeading({ icon: Icon, title, titleKey, defaultTitle, trai
     <div className={cn('flex w-full items-center', styles.root)}>
       <div className={cn('flex min-w-0 flex-1 items-center', styles.content)}>
         <Icon className={cn('text-primary', styles.icon)} />
-        <Heading className={cn('font-bold uppercase text-muted-foreground', styles.heading)}>{resolvedTitle}</Heading>
+        <Heading className={cn('font-bold uppercase text-muted-foreground/70', styles.heading)}>{resolvedTitle}</Heading>
         <Separator className="flex-1" />
       </div>
       {trailing ? <div className="shrink-0">{trailing}</div> : null}

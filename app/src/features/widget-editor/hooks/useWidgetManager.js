@@ -17,6 +17,12 @@ import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
 import { updateLiveWidgetDraft } from '@/features/overlay-editor/utils/widgetDomHelpers'
 import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
 
+const CONTENT_ALIGNMENT_FACTORS = {
+  left: 0,
+  center: 0.5,
+  right: 1,
+}
+
 /**
  * Container hook for SidebarWidgetsTab that owns all store access,
  * derived state, and CRUD operations.
@@ -59,7 +65,22 @@ export function useWidgetManager({ widgetLiveEdits }) {
 
   // Update handler — applies partial updates to a widget via config utility
   const updateWidgetData = (id, updates) => {
-    setConfig(updateWidgetInConfig(config, id, updates))
+    const widget = widgets.find((item) => item.id === id)
+    let nextUpdates = updates
+
+    if (Object.hasOwn(updates, 'content_alignment') && updates.content_alignment !== widget?.data.content_alignment) {
+      const renderedContentWidth = Number(liveEdits.getWidgetNode(id)?.dataset.widgetContentWidth)
+      const currentAlignmentFactor = CONTENT_ALIGNMENT_FACTORS[widget.data.content_alignment]
+      const nextAlignmentFactor = CONTENT_ALIGNMENT_FACTORS[updates.content_alignment]
+      if (currentAlignmentFactor === undefined || nextAlignmentFactor === undefined) throw new Error('Unsupported content alignment')
+      if (!Number.isFinite(renderedContentWidth) || renderedContentWidth < 0) throw new Error('Alignment change requires rendered content width')
+      nextUpdates = {
+        ...updates,
+        x: widget.data.x + (nextAlignmentFactor - currentAlignmentFactor) * renderedContentWidth,
+      }
+    }
+
+    setConfig(updateWidgetInConfig(config, id, nextUpdates))
   }
 
   const updateWidgetSize = (id, updates) => {

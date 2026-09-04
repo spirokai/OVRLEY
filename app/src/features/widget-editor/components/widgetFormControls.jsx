@@ -10,10 +10,11 @@ import { BlurInput } from '@/components/ui/blur-input'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Button } from '@/components/ui/button'
 import HexColorPicker from '@/components/ui/hex-color-picker'
 import { cn } from '@/lib/utils'
-import { RotateCcw } from 'lucide-react'
+import { AlignCenter, AlignLeft, AlignRight, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 export const TIME_FORMATS = [
@@ -50,8 +51,52 @@ export const TEMPERATURE_UNITS = [
   { value: 'fahrenheit', label: '\u00B0F' },
 ]
 
+const CONTENT_ALIGNMENT_OPTIONS = [
+  { value: 'left', labelKey: 'widget-editor.alignLeft', defaultLabel: 'Align left', icon: AlignLeft },
+  { value: 'center', labelKey: 'widget-editor.alignCenter', defaultLabel: 'Align center', icon: AlignCenter },
+  { value: 'right', labelKey: 'widget-editor.alignRight', defaultLabel: 'Align right', icon: AlignRight },
+]
+
 export const CONTROL_CLASS = 'h-9 border-border/70 bg-surface text-xs'
 const FIELD_LABEL_CLASS = 'h-3 text-[9px] text-muted-foreground uppercase font-bold'
+
+/**
+ * Renders the alignment selector for intrinsic value widgets.
+ *
+ * @param {object} props
+ * @param {'left'|'center'|'right'} props.value - Current alignment.
+ * @param {Function} props.onValueChange - Commits a non-empty alignment selection.
+ * @returns {JSX.Element}
+ */
+export function ContentAlignmentControl({ value, onValueChange }) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        {t('widget-editor.contentAlignment', 'Content Alignment')}
+      </span>
+      <ToggleGroup
+        type="single"
+        value={value}
+        aria-label={t('widget-editor.contentAlignment', 'Content Alignment')}
+        onValueChange={(nextValue) => {
+          if (nextValue) onValueChange(nextValue)
+        }}
+      >
+        {CONTENT_ALIGNMENT_OPTIONS.map((option) => {
+          const Icon = option.icon
+          const label = t(option.labelKey, option.defaultLabel)
+          return (
+            <ToggleGroupItem key={option.value} value={option.value} aria-label={label} title={label}>
+              <Icon />
+            </ToggleGroupItem>
+          )
+        })}
+      </ToggleGroup>
+    </div>
+  )
+}
 
 /**
  * Renders the field block component.

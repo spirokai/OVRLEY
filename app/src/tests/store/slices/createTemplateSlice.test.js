@@ -9,7 +9,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { DEFAULT_GLOBAL_DEFAULTS } from '@/lib/template/template-constants'
-import { createEditorEffectiveConfig } from '@/lib/template/template-state'
+import { createDurableTemplateState, createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { DEFAULT_CONFIG } from '@/store/store-utils'
 
 /**
@@ -154,35 +154,19 @@ describe('createTemplateSlice — pure state actions', () => {
     expect(useStore.getState().loadedTemplateSource).toEqual(source)
   })
 
-  test('setCommunityTemplateFilename is a pure setter — no network I/O or UI side effects', () => {
-    const state = useStore.getState()
-    const fetchSpy = vi.spyOn(globalThis, 'fetch')
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
-
-    expect(state.SelectCommunityTemplateFilename).toBeUndefined()
-    expect(state.setCommunityTemplateFilename).toBeTypeOf('function')
-
-    state.setCommunityTemplateFilename('demo-template.json')
-
-    expect(useStore.getState().communityTemplateFilename).toBe('demo-template.json')
-    expect(fetchSpy).not.toHaveBeenCalled()
-    expect(alertSpy).not.toHaveBeenCalled()
-  })
-
-  test('hydrateTemplateState is pure — hydrates durable template state and keeps editor-effective values materializable', () => {
+  test('hydrateTemplateState installs canonical durable state without normalizing it again', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const templateConfig = {
       ...DEFAULT_CONFIG,
       scene: { ...DEFAULT_CONFIG.scene, start: 10, end: 120 },
     }
 
-    useStore.getState().hydrateTemplateState(
-      {
-        config: templateConfig,
-        settings: { globalDefaults: { color_text: '#abcdef' } },
-      },
-      { source: { kind: 'file', path: 'C:\\templates\\imported.json' } },
-    )
+    const templateState = createDurableTemplateState({
+      config: templateConfig,
+      globalDefaults: { color_text: '#abcdef' },
+    })
+
+    useStore.getState().hydrateTemplateState(templateState, { source: { kind: 'file', path: 'C:\\templates\\imported.json' } })
 
     const state = useStore.getState()
     const effectiveConfig = createEditorEffectiveConfig({
@@ -200,6 +184,7 @@ describe('createTemplateSlice — pure state actions', () => {
     expect(state.startSecond).toBe(0)
     expect(state.endSecond).toBe(73)
     expect(state.loadedTemplateSource).toEqual({ kind: 'file', path: 'C:\\templates\\imported.json' })
+    expect(state.config).toBe(templateState.config)
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 })

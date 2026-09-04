@@ -3,6 +3,7 @@
  */
 
 import { FontSection, IconSection } from './widgetEditorSections'
+import { ContentAlignmentControl } from './widgetFormControls'
 
 /**
  * Renders the time widget editor component.
@@ -22,6 +23,10 @@ export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidge
         updateWidgetSize={updateWidgetSize}
         commitWidgetSize={commitWidgetSize}
         showFormatSelect
+      />
+      <ContentAlignmentControl
+        value={widget.data.content_alignment}
+        onValueChange={(value) => updateWidgetData(widget.id, { content_alignment: value })}
       />
       <IconSection
         widget={widget}

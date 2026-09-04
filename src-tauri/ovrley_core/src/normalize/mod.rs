@@ -190,7 +190,7 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
                 });
             }
             if value.value == MetricKind::Time && value.display_type == DisplayType::Text {
-                return validate_time_value(value, idx, &scene).map(PreparedValue::TimeText);
+                return validate_time_value(value, idx).map(PreparedValue::TimeText);
             }
             if value.display_type == DisplayType::Linear {
                 let value = value.with_promoted_display_variant("linear")?;

@@ -516,7 +516,6 @@ where
     let adjusted = value + Duration::hours(validated.hours_offset);
     match &validated.formatting {
         ValidatedTimeFormatting::Preset(format_key) => format_time_key(format_key, adjusted),
-        ValidatedTimeFormatting::Strftime(strftime) => adjusted.format(strftime).to_string(),
     }
 }
 
@@ -526,8 +525,8 @@ where
 /// `"date-mm-dd-yyyy"`, `"date-yyyy-mm-dd"`, `"date-dd-mmm-yyyy"`,
 /// `"date-mmm-dd-yyyy"`, `"date-dd-mmmm-yyyy"`, `"date-mmmm-dd-yyyy"`,
 /// `"date-time-24"`, `"date-time-12"`, `"date-mmm-time-24"`, `"date-mmm-time-12"`,
-/// `"date-mmmm-time-24"`, `"date-mmmm-time-12"`. Unrecognized keys
-/// fall back to `HH:MM` (24-hour time without seconds).
+/// `"date-mmmm-time-24"`, `"date-mmmm-time-12"`. Keys are validated before
+/// rendering, so an unrecognized value indicates a broken internal contract.
 pub fn format_time_key<Tz>(format_key: &str, value: DateTime<Tz>) -> String
 // test seam
 where
@@ -557,6 +556,7 @@ where
         "date-mmm-dd-yyyy" => format!("{short_month} {day} {year}"),
         "date-dd-mmmm-yyyy" => format!("{day} {long_month} {year}"),
         "date-mmmm-dd-yyyy" => format!("{long_month} {day} {year}"),
+        "time-24" => format!("{hour24}:{minutes}"),
         "time-24s" => format!("{hour24}:{minutes}:{seconds}"),
         "time-12" => format!("{hour12}:{minutes} {suffix}"),
         "time-12s" => format!("{hour12}:{minutes}:{seconds} {suffix}"),
@@ -568,7 +568,7 @@ where
         "date-mmm-time-12" => format!("{day} {short_month} {hour12}:{minutes} {suffix}"),
         "date-mmmm-time-24" => format!("{day} {long_month} {hour24}:{minutes}"),
         "date-mmmm-time-12" => format!("{day} {long_month} {hour12}:{minutes} {suffix}"),
-        _ => format!("{hour24}:{minutes}"),
+        _ => unreachable!("time format key was validated at ingress: {format_key}"),
     }
 }
 

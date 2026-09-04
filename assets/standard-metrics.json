@@ -34,7 +34,8 @@
         },
         "metricTypeOverrides": {
           "time": {
-            "format": "time-24"
+            "format": "time-24",
+            "hours_offset": 0
           },
           "distance": {
             "decimals": 1,

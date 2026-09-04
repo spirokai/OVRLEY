@@ -151,6 +151,7 @@ const OverlayCanvasWidget = memo(
         data-widget-bounds-top={visualBounds?.minY ?? 0}
         data-widget-bounds-right={visualBounds?.maxX ?? 0}
         data-widget-bounds-bottom={visualBounds?.maxY ?? 0}
+        data-widget-content-width={metricPreviewModel ? metricPreviewModel.metricLayout.width * globalScale : undefined}
         className={cn(
           'group absolute cursor-move select-none rounded-xl outline-1 outline-transparent transition-shadow',
           widget.category === 'backdrops' && 'z-1',

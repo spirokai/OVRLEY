@@ -9,7 +9,7 @@
 
 import { normalizeColorFields, isColorFieldKey } from '../../lib/color-utils'
 import { DEFAULT_GLOBAL_DEFAULTS } from '../../lib/template/template-constants'
-import { createDurableTemplateState, syncGlobalDefaultsToConfig } from '../../lib/template/template-state'
+import { syncGlobalDefaultsToConfig } from '../../lib/template/template-state'
 import { normalizeGlobalDefaults } from '../../lib/template/template-normalization'
 import { cloneSerializable, DEFAULT_CONFIG, syncSceneTimingFromConfig, updateConfigPersistence } from '../store-utils'
 
@@ -25,7 +25,6 @@ const initialAspectRatio = '16:9'
  */
 export function createTemplateSlice(set, get) {
   return {
-    communityTemplateFilename: null,
     loadedTemplateSource: null,
     templates: [],
     globalDefaults: initialGlobalDefaults,
@@ -35,11 +34,6 @@ export function createTemplateSlice(set, get) {
     setTemplates: (templates) =>
       set((state) => {
         state.templates = templates
-      }),
-
-    setCommunityTemplateFilename: (filename) =>
-      set((state) => {
-        state.communityTemplateFilename = filename
       }),
 
     setLastSavedTemplateState: (templateState) =>
@@ -82,7 +76,6 @@ export function createTemplateSlice(set, get) {
       const nextAspectRatio = '16:9'
 
       set((state) => {
-        state.communityTemplateFilename = null
         state.config = nextConfig
         state.globalDefaults = nextGlobalDefaults
         state.aspectRatio = nextAspectRatio
@@ -106,22 +99,16 @@ export function createTemplateSlice(set, get) {
 
     setLoadedTemplateSource: (source) =>
       set((state) => {
-        state.communityTemplateFilename = null
         state.loadedTemplateSource = source
       }),
 
     hydrateTemplateState: (templateState, options = {}) => {
       const { source = null } = options
-      const durableTemplateState = createDurableTemplateState({
-        config: templateState?.config || DEFAULT_CONFIG,
-        globalDefaults: templateState?.settings?.globalDefaults,
-      })
-      const nextConfig = durableTemplateState.config
-      const nextGlobalDefaults = durableTemplateState.settings.globalDefaults
+      const nextConfig = templateState.config
+      const nextGlobalDefaults = templateState.settings.globalDefaults
       const nextAspectRatio = get().aspectRatio || '16:9'
 
       set((state) => {
-        state.communityTemplateFilename = null
         state.config = nextConfig
         state.globalDefaults = nextGlobalDefaults
         state.aspectRatio = nextAspectRatio

@@ -6,23 +6,15 @@ import {
 } from '@/lib/widget/standard-metrics'
 import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/widgets/metric/format'
 import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
-import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
+import { ContentAlignmentControl, SelectField, SliderField, ToggleField } from '../widgetFormControls'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { useTranslation } from 'react-i18next'
 import { translateOptions } from '@/i18n'
-import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 const COORDINATE_FORMAT_OPTIONS = [
   { value: 'dms', labelKey: 'widget-editor.coordinateFormatDms', defaultLabel: 'Deg / Min / Sec' },
   { value: 'ddm', labelKey: 'widget-editor.coordinateFormatDdm', defaultLabel: 'Deg / Dec Min' },
-]
-
-const CONTENT_ALIGNMENT_OPTIONS = [
-  { value: 'left', labelKey: 'widget-editor.alignLeft', defaultLabel: 'Align left', icon: AlignLeft },
-  { value: 'center', labelKey: 'widget-editor.alignCenter', defaultLabel: 'Align center', icon: AlignCenter },
-  { value: 'right', labelKey: 'widget-editor.alignRight', defaultLabel: 'Align right', icon: AlignRight },
 ]
 
 /**
@@ -60,29 +52,10 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
     <>
       <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
 
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          {t('widget-editor.contentAlignment', 'Content Alignment')}
-        </span>
-        <ToggleGroup
-          type="single"
-          value={widget.data.content_alignment}
-          aria-label={t('widget-editor.contentAlignment', 'Content Alignment')}
-          onValueChange={(value) => {
-            if (value) updateWidgetData(widget.id, { content_alignment: value })
-          }}
-        >
-          {CONTENT_ALIGNMENT_OPTIONS.map((option) => {
-            const Icon = option.icon
-            const label = t(option.labelKey, option.defaultLabel)
-            return (
-              <ToggleGroupItem key={option.value} value={option.value} aria-label={label} title={label}>
-                <Icon />
-              </ToggleGroupItem>
-            )
-          })}
-        </ToggleGroup>
-      </div>
+      <ContentAlignmentControl
+        value={widget.data.content_alignment}
+        onValueChange={(value) => updateWidgetData(widget.id, { content_alignment: value })}
+      />
 
       {hasDecimalControl ? (
         <div className="grid grid-cols-2 gap-4">

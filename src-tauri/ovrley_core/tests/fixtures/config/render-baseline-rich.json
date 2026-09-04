@@ -194,6 +194,7 @@
       "id": "widget-8",
       "value": "time",
       "format": "time-24",
+      "hours_offset": 0,
       "content_alignment": "left"
     }
   ],

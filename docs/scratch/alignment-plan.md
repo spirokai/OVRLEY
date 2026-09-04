@@ -8,7 +8,7 @@ The implementation must preserve these invariants:
 
 - Widget `x` is the horizontal alignment anchor: left edge for left alignment, center for center alignment, and right edge for right alignment.
 - Widget `y` retains the existing vertical origin semantics.
-- Changing alignment does not rewrite `x`; content moves around the existing anchor.
+- Changing alignment compensates `x` from the current rendered row width so the row stays visually stationary while the selected anchor point changes.
 - JSX preview and Rust rendering use the same layout inputs, constants, and alignment formulas.
 - Existing templates render as they do today by defaulting to left alignment.
 - Left-aligned icons remain eligible for the static layer.
@@ -207,8 +207,8 @@ Update `app/src/features/widget-editor/components/metricWidget/TextDisplaySectio
 - Use Lucide `AlignLeft`, `AlignCenter`, and `AlignRight` icons in the three `ToggleGroupItem`s.
 - Provide an accessible label for the group and an `aria-label`/tooltip for each icon-only item.
 - Prevent the single-selection control from committing an empty value when the active item is clicked; one of the three canonical alignments must always remain selected.
-- Commit only `{ content_alignment: value }`.
-- Do not compensate `x` when alignment changes. The row moves around the existing horizontal anchor.
+- The control requests only `{ content_alignment: value }`; the container adds the compensated `x` at the state-update seam.
+- Compensate `x` from the current rendered row width when alignment changes so the row stays visually stationary while the selected anchor point changes.
 - Present the metric widget's x coordinate as “Horizontal Anchor” or add equivalent help text so it is not described as the visual left edge for center/right alignment.
 
 No alignment-specific change is needed in `resetCurrentDisplayConfig()`. Its existing `...TEXT_DEFAULTS` merge restores `content_alignment: "left"` once that default is added to the manifest.
@@ -335,7 +335,7 @@ Add only these focused regressions beyond the helper:
 - Verify an old widget normalizes to left.
 - Verify a time widget normalizes to left and applies center/right point-anchor layout through the standard intrinsic path.
 - Verify the single-selection Toggle Group commits only the selected canonical alignment and cannot clear the selection.
-- Verify changing alignment keeps `x` unchanged and moves the current row around it.
+- Verify changing alignment compensates `x` and keeps the current row visually stationary.
 - Verify dragging updates the stored anchor by the drag delta rather than committing the current visual left edge.
 - Verify scaling a center/right widget leaves `x` unchanged without drag translation and applies only the anchor translation when dragged.
 
@@ -386,7 +386,7 @@ Perform a manual editor/render check with one speed widget containing an icon an
 4. Confirm left keeps the icon fixed.
 5. Confirm center keeps the current row centered on `x`.
 6. Confirm right keeps the unit's right edge fixed.
-7. Switch alignment and confirm `x` remains unchanged while the content moves around it.
+7. Switch alignment and confirm `x` is compensated while the content remains visually stationary.
 8. Drag the widget and confirm the horizontal anchor moves by the drag delta.
 
 ## Recommended implementation order
@@ -405,7 +405,7 @@ The feature is complete when:
 
 - Every intrinsic text metric accepts and persists one canonical alignment value.
 - Left, center, and right alignment attach the corresponding horizontal point of the current row to `x`.
-- Changing alignment leaves `x` unchanged and moves content around that anchor.
+- Changing alignment compensates `x` so content remains visually stationary around the newly selected anchor.
 - Dragging and scaling preserve the anchor semantics in editor state.
 - Selection bounds intentionally follow current content while the stored anchor remains stable.
 - JSX and Rust use mirrored formulas for standard, time, and coordinate layouts.

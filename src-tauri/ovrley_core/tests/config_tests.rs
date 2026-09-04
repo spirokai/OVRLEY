@@ -234,6 +234,7 @@ fn time_uses_the_same_text_alignment_contract() {
     time["show_units"] = json!(false);
     time["display_unit"] = json!("");
     time["format"] = json!("time-24");
+    time["hours_offset"] = json!(0);
 
     let config = common::seam::validated_config_from_value(json!({
         "scene": common::seam::explicit_scene_json(),
@@ -247,6 +248,68 @@ fn time_uses_the_same_text_alignment_contract() {
         }
         other => panic!("expected time text value, got {other:?}"),
     }
+}
+
+#[test]
+fn time_requires_canonical_offset_and_format_fields() {
+    for missing_field in ["hours_offset", "format"] {
+        let mut time = common::builders::speed_value_json();
+        time["value"] = json!("time");
+        time["show_units"] = json!(false);
+        time["display_unit"] = json!("");
+        time["format"] = json!("time-24");
+        time["hours_offset"] = json!(0);
+        time.as_object_mut().unwrap().remove(missing_field);
+
+        let result = ovrley_core::commands::validate_config_value(&json!({
+            "scene": common::seam::explicit_scene_json(),
+            "labels": [],
+            "values": [time],
+            "plots": []
+        }));
+        let error = match result {
+            Ok(_) => panic!("missing canonical time field should fail validation"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains(missing_field));
+    }
+
+    let mut time = common::builders::speed_value_json();
+    time["value"] = json!("time");
+    time["show_units"] = json!(false);
+    time["display_unit"] = json!("");
+    time["format"] = json!("legacy-custom-format");
+    time["hours_offset"] = json!(0);
+    let result = ovrley_core::commands::validate_config_value(&json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [time],
+        "plots": []
+    }));
+    let error = match result {
+        Ok(_) => panic!("legacy time format should fail validation"),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("unsupported time format"));
+
+    let mut time = common::builders::speed_value_json();
+    time["value"] = json!("time");
+    time["show_units"] = json!(false);
+    time["display_unit"] = json!("");
+    time["format"] = json!("time-24");
+    time["hours_offset"] = json!(0);
+    time["time_format"] = json!("%H:%M");
+    let result = ovrley_core::commands::validate_config_value(&json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [time],
+        "plots": []
+    }));
+    let error = match result {
+        Ok(_) => panic!("legacy time_format field should fail validation"),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("legacy field"));
 }
 
 #[test]

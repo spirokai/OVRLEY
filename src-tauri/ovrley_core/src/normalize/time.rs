@@ -9,7 +9,6 @@ use super::helpers::{require_bool, require_f32, require_str, require_string, rgb
 use super::raw::ValueConfig;
 use super::value::validate_content_alignment;
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::ValidatedSceneConfig;
 use crate::normalize::{ValidatedValueFormatting, ValidatedValueWidget};
 use crate::types::DisplayType;
 use crate::MetricKind;
@@ -18,7 +17,6 @@ use crate::MetricKind;
 #[derive(Clone, Debug)]
 pub enum ValidatedTimeFormatting {
     Preset(String),
-    Strftime(String),
 }
 
 /// Every output-affecting field for a time text widget is explicit.
@@ -29,11 +27,7 @@ pub struct ValidatedTimeValue {
     pub formatting: ValidatedTimeFormatting,
 }
 
-pub fn validate_time_value(
-    value: ValueConfig,
-    index: usize,
-    scene: &ValidatedSceneConfig,
-) -> CoreResult<ValidatedTimeValue> {
+pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<ValidatedTimeValue> {
     let p = |field: &str| format!("values[{index}].{field}");
 
     if value.value != MetricKind::Time {
@@ -95,14 +89,20 @@ pub fn validate_time_value(
 
     let prefix = require_string(value.prefix, &p("prefix"))?;
     let suffix = require_string(value.suffix, &p("suffix"))?;
-    let hours_offset = i64::from(value.hours_offset.unwrap_or(0));
-    let formatting = if let Some(format_key) = value.format {
-        ValidatedTimeFormatting::Preset(format_key)
-    } else if let Some(time_format) = value.time_format.or_else(|| scene.time_format.clone()) {
-        ValidatedTimeFormatting::Strftime(time_format)
-    } else {
-        ValidatedTimeFormatting::Preset("time-24".to_string())
-    };
+    if value.time_format.is_some() {
+        return Err(CoreError::Config(format!(
+            "{}: legacy field is not supported; use format",
+            p("time_format")
+        )));
+    }
+    let hours_offset = i64::from(
+        value
+            .hours_offset
+            .ok_or_else(|| CoreError::Config(format!("{}: required", p("hours_offset"))))?,
+    );
+    let format_key = require_string(value.format, &p("format"))?;
+    validate_time_format_key(&format_key, &p("format"))?;
+    let formatting = ValidatedTimeFormatting::Preset(format_key);
 
     Ok(ValidatedTimeValue {
         base: ValidatedValueWidget {
@@ -136,4 +136,17 @@ pub fn validate_time_value(
         hours_offset,
         formatting,
     })
+}
+
+fn validate_time_format_key(format_key: &str, field: &str) -> CoreResult<()> {
+    match format_key {
+        "time-24" | "time-24s" | "time-12" | "time-12s" | "date-dd-mm-yyyy" | "date-mm-dd-yyyy"
+        | "date-yyyy-mm-dd" | "date-dd-mmm-yyyy" | "date-mmm-dd-yyyy" | "date-dd-mmmm-yyyy"
+        | "date-mmmm-dd-yyyy" | "date-time-24" | "date-time-24s" | "date-time-12"
+        | "date-time-12s" | "date-mmm-time-24" | "date-mmm-time-12" | "date-mmmm-time-24"
+        | "date-mmmm-time-12" => Ok(()),
+        _ => Err(CoreError::Config(format!(
+            "{field}: unsupported time format '{format_key}'"
+        ))),
+    }
 }
