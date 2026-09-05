@@ -181,7 +181,7 @@ OVRLEY needs a new matcher designed for:
 Conceptually mirror Gyroflow:
 
 ```text
-visual_sync/
+synchronization/
     optical_flow/
         opencv_pyrlk.rs
     motion_estimation/
@@ -199,4 +199,11 @@ The first implementation should focus on:
 
 **sparse PyrLK optical flow â†’ global camera-motion estimation â†’ ~1 Hz visual fingerprint â†’ whole-activity search against GPS turn-rate / speed-change fingerprints â†’ multi-signal confidence score**
 
-Bitrate / frame-size analysis should not be part of the initial implementation; it is much less directly related to physical motion and is strongly affected by scene complexity and encoder behavior.
+Bitrate / frame-size analysis should not be part of the implementation; it is much less directly related to physical motion and is strongly affected by scene complexity and encoder behavior.
+
+## Front-end / UI considerations
+
+- A new drawer in toolbar feature that contains a 'sync doctor' button
+- clicking the button runs the video analysis and matching process
+- clear loader overlay while the video is being analyzed and matched
+- list of candidate buttons with confidence scores, clicking a candidate automatically applies the offset
