@@ -413,6 +413,7 @@
       "distance": { "name": "Dystans", "shortName": "Dyst." },
       "distance_to_home": { "name": "Dystans do domu", "shortName": "Dom" },
       "elevation": { "name": "Profil wysokości", "shortName": "Profil" },
+      "engine_load": { "name": "Obciążenie silnika", "shortName": "Obciążenie" },
       "engine_power": { "name": "Moc silnika", "shortName": "Moc siln." },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "Ogniskowa", "shortName": "Ogniskowa" },

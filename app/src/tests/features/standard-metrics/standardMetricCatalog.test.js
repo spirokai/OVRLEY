@@ -36,6 +36,7 @@ describe('standard metric widget catalog', () => {
       'cadence',
       'power',
       'engine_power',
+      'engine_load',
       'temperature',
       'pace',
       'g_force',
@@ -204,7 +205,7 @@ describe('standard metric widget catalog', () => {
   })
 
   test('registers vehicle metrics and their shared preview icons', () => {
-    const vehicleTypes = ['rpm', 'throttle_position', 'brake_position', 'lean_angle']
+    const vehicleTypes = ['rpm', 'throttle_position', 'brake_position', 'lean_angle', 'engine_load']
     for (const type of vehicleTypes) {
       expect(isStandardMetricWidgetType(type)).toBe(true)
       expect(METRIC_ICON_SVGS[type].innerMarkup).not.toBe('')

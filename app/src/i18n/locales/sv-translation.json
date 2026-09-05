@@ -413,6 +413,7 @@
       "distance": { "name": "Avstånd", "shortName": "Avst." },
       "distance_to_home": { "name": "Avstånd hem", "shortName": "Hem" },
       "elevation": { "name": "Höjdprofil", "shortName": "Profil" },
+      "engine_load": { "name": "Motorlast", "shortName": "Motorlast" },
       "engine_power": { "name": "Motoreffekt", "shortName": "Motoreffekt" },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "Brännvidd", "shortName": "Brännvidd" },

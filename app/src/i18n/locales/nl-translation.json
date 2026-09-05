@@ -413,6 +413,7 @@
       "distance": { "name": "Afstand", "shortName": "Afstand" },
       "distance_to_home": { "name": "Afstand tot huis", "shortName": "Thuis" },
       "elevation": { "name": "Hoogteprofiel", "shortName": "Profiel" },
+      "engine_load": { "name": "Motorbelasting", "shortName": "Motorlast" },
       "engine_power": { "name": "Motorvermogen", "shortName": "Motorverm." },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "Brandpuntsafstand", "shortName": "Brandpunt" },

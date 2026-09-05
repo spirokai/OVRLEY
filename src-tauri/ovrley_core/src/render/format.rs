@@ -52,6 +52,7 @@ pub enum MetricIconKind {
     Rpm,
     ThrottlePosition,
     BrakePosition,
+    EngineLoad,
     LeanAngle,
     House,
     Satellite,

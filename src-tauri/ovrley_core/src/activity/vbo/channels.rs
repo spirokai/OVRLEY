@@ -96,6 +96,8 @@ pub(super) struct ChannelLayout {
     pub(super) throttle_position: Option<usize>,
     /// Source index of brake position.
     pub(super) brake_position: Option<usize>,
+    /// Source index of engine load.
+    pub(super) engine_load: Option<usize>,
     /// Source index of lean angle.
     pub(super) lean_angle: Option<usize>,
     /// Source index of gear position.
@@ -157,6 +159,8 @@ enum Metric {
     ThrottlePosition,
     /// Brake position.
     BrakePosition,
+    /// Engine load as a percentage from zero to one hundred.
+    EngineLoad,
     /// Vehicle lean angle.
     LeanAngle,
     /// Gear position.
@@ -210,6 +214,7 @@ impl Metric {
                 "throttle_position",
             ],
             Self::BrakePosition => &["brake_pos", "brake_position"],
+            Self::EngineLoad => &["engine_load", "engine load"],
             Self::LeanAngle => &["lean_angle"],
             Self::GearPosition => &["gear", "gear_position"],
         }
@@ -236,7 +241,11 @@ impl Metric {
                     4
                 }
             }
-            Self::Rpm | Self::ThrottlePosition | Self::BrakePosition | Self::GearPosition => {
+            Self::Rpm
+            | Self::ThrottlePosition
+            | Self::BrakePosition
+            | Self::EngineLoad
+            | Self::GearPosition => {
                 if has("canbus") {
                     0
                 } else if has("obd") {
@@ -273,6 +282,7 @@ impl Metric {
                 | Self::Rpm
                 | Self::ThrottlePosition
                 | Self::BrakePosition
+                | Self::EngineLoad
                 | Self::GearPosition
         )
     }
@@ -334,6 +344,7 @@ pub(super) fn resolve(header: &[String], identifiers: &[String]) -> CoreResult<C
     let rpm = resolve_metric(&channels, Metric::Rpm);
     let throttle_position = resolve_metric(&channels, Metric::ThrottlePosition);
     let brake_position = resolve_metric(&channels, Metric::BrakePosition);
+    let engine_load = resolve_metric(&channels, Metric::EngineLoad);
     let lean_angle = resolve_metric(&channels, Metric::LeanAngle);
     let gear_position = resolve_metric(&channels, Metric::GearPosition);
     let mut metric_owners = BTreeMap::new();
@@ -355,6 +366,7 @@ pub(super) fn resolve(header: &[String], identifiers: &[String]) -> CoreResult<C
         ("rpm", rpm),
         ("throttle_position", throttle_position),
         ("brake_position", brake_position),
+        ("engine_load", engine_load),
         ("lean_angle", lean_angle),
         ("gear_position", gear_position),
     ] {
@@ -383,6 +395,7 @@ pub(super) fn resolve(header: &[String], identifiers: &[String]) -> CoreResult<C
         rpm,
         throttle_position,
         brake_position,
+        engine_load,
         lean_angle,
         gear_position,
     ]
@@ -414,6 +427,7 @@ pub(super) fn resolve(header: &[String], identifiers: &[String]) -> CoreResult<C
         rpm,
         throttle_position,
         brake_position,
+        engine_load,
         lean_angle,
         gear_position,
         speed_unit: speed

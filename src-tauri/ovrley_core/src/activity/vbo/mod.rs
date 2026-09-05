@@ -393,6 +393,7 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         rpm: series(layout.rpm, identity),
         throttle_position: series(layout.throttle_position, identity),
         brake_position: series(layout.brake_position, identity),
+        engine_load: series(layout.engine_load, identity),
         lean_angle,
         vertical_speed: selected_series(&sections.data, layout.vertical_speed, |value| {
             layout.vertical_speed_to_meters_per_second(value)

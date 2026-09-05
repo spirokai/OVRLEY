@@ -169,6 +169,7 @@ pub fn build_activity_columns(
         cadence: none(),
         power: none(),
         engine_power: none(),
+        engine_load: none(),
         temperature: none(),
         calories: none(),
         gradient: none(),

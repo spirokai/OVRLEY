@@ -209,8 +209,10 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
                 Unit::Watts | Unit::Kilowatts | Unit::MetricHorsepower | Unit::MechanicalHorsepower
             )
         }
+        Metric::EngineLoad | Metric::ThrottlePosition | Metric::BrakePosition => {
+            matches!(unit, Unit::Percent)
+        }
         Metric::Torque => matches!(unit, Unit::NewtonMetres | Unit::FootPounds),
-        Metric::ThrottlePosition | Metric::BrakePosition => matches!(unit, Unit::Percent),
         Metric::LeanAngle => matches!(unit, Unit::Degrees),
         Metric::GearPosition => matches!(unit, Unit::Raw),
         Metric::CompanionDate | Metric::GpsCoordinate | Metric::LapNumber => {
@@ -258,8 +260,8 @@ fn default_unit(metric: Metric) -> Unit {
         Metric::GForce | Metric::GForceX | Metric::GForceY | Metric::GForceZ => Unit::G,
         Metric::Rpm => Unit::RevolutionsPerMinute,
         Metric::EnginePower => Unit::Watts,
+        Metric::EngineLoad | Metric::ThrottlePosition | Metric::BrakePosition => Unit::Percent,
         Metric::Torque => Unit::NewtonMetres,
-        Metric::ThrottlePosition | Metric::BrakePosition => Unit::Percent,
         Metric::LeanAngle => Unit::Degrees,
         Metric::GearPosition => Unit::Raw,
         Metric::CompanionDate | Metric::GpsCoordinate | Metric::LapNumber => Unit::Raw,

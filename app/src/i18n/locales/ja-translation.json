@@ -413,6 +413,7 @@
       "distance": { "name": "距離", "shortName": "距離" },
       "distance_to_home": { "name": "自宅までの距離", "shortName": "自宅" },
       "elevation": { "name": "標高", "shortName": "標高" },
+      "engine_load": { "name": "エンジン負荷", "shortName": "エンジン負荷" },
       "engine_power": { "name": "エンジン出力", "shortName": "エンジン出力" },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "焦点距離", "shortName": "焦点距離" },

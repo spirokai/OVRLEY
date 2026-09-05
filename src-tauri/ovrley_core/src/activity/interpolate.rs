@@ -501,6 +501,13 @@ pub fn densify_activity(
                 requirements.engine_power,
                 crate::MetricKind::EnginePower,
             ),
+            engine_load: densify(
+                &trimmed.sample_elapsed_seconds,
+                &trimmed.engine_load,
+                &frame_elapsed_seconds,
+                requirements.engine_load,
+                crate::MetricKind::EngineLoad,
+            ),
             temperature: densify(
                 &trimmed.sample_elapsed_seconds,
                 &trimmed.temperature,

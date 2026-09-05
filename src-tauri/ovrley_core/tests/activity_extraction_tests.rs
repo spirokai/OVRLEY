@@ -139,6 +139,7 @@ fn extract_activity_from_telemetry_fixtures() {
         assert_absent_metric(&activity.stride_length, stem, "stride_length");
         assert_absent_metric(&activity.stroke_rate, stem, "stroke_rate");
         assert_absent_metric(&activity.torque, stem, "torque");
+        assert_absent_metric(&activity.engine_load, stem, "engine_load");
         assert_absent_metric(&activity.gear_position, stem, "gear_position");
 
         // Sync time: assert only for known fixtures

@@ -413,6 +413,7 @@
       "distance": { "name": "Расстояние", "shortName": "Расст." },
       "distance_to_home": { "name": "Расстояние до дома", "shortName": "Дом" },
       "elevation": { "name": "Профиль высот", "shortName": "Профиль" },
+      "engine_load": { "name": "Нагрузка двигателя", "shortName": "Нагрузка" },
       "engine_power": { "name": "Мощность двигателя", "shortName": "Мощн. двиг." },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "Фокусное расстояние", "shortName": "Фокус" },

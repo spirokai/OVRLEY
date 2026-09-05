@@ -413,6 +413,7 @@
       "distance": { "name": "Distanza", "shortName": "Dist." },
       "distance_to_home": { "name": "Distanza da casa", "shortName": "Casa" },
       "elevation": { "name": "Profilo altimetrico", "shortName": "Profilo" },
+      "engine_load": { "name": "Carico motore", "shortName": "Carico mot." },
       "engine_power": { "name": "Potenza motore", "shortName": "Pot. motore" },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "Lunghezza focale", "shortName": "Focale" },

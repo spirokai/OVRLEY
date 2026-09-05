@@ -413,6 +413,7 @@
       "distance": { "name": "Distância", "shortName": "Dist." },
       "distance_to_home": { "name": "Distância até casa", "shortName": "Casa" },
       "elevation": { "name": "Elevação", "shortName": "Elevação" },
+      "engine_load": { "name": "Carga do motor", "shortName": "Carga mot." },
       "engine_power": { "name": "Potência do motor", "shortName": "Pot. motor" },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "Distância focal", "shortName": "Dist. focal" },

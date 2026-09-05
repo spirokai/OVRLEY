@@ -16,8 +16,9 @@
 //! - Per-metric override regressions
 
 use ovrley_core::standard_metrics::{
-    default_frame_dimensions, display_type_definition, display_type_label_key, is_boxed_display_type,
-    is_display_type_supported, supported_display_types, DisplayTypeLayoutMode,
+    default_frame_dimensions, display_type_definition, display_type_label_key,
+    is_boxed_display_type, is_display_type_supported, supported_display_types,
+    DisplayTypeLayoutMode,
 };
 use ovrley_core::MetricKind;
 

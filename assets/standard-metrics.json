@@ -601,6 +601,28 @@
       "category": "motosports"
     },
     {
+      "type": "engine_load",
+      "current": true,
+      "nameKey": "widgets.types.engine_load.name",
+      "shortNameKey": "widgets.types.engine_load.shortName",
+      "defaultDisplayUnit": "percent",
+      "supportedDisplayUnits": [
+        {
+          "value": "percent",
+          "label": "%"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-engine-load.svg"
+      },
+      "category": "motosports"
+    },
+    {
       "type": "temperature",
       "current": true,
       "nameKey": "widgets.types.temperature.name",

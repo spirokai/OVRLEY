@@ -47,6 +47,7 @@ import displayTypeCornerSvg from '../../../../assets/widget-icons/display-type-c
 import displayTypeCircleSvg from '../../../../assets/widget-icons/display-type-circle.svg?raw'
 import displayTypeRectangleSvg from '../../../../assets/widget-icons/display-type-rectangle.svg?raw'
 import displayTypeGForceSvg from '../../../../assets/widget-icons/display-type-g-force.svg?raw'
+import engineLoadIconSvg from '../../../../assets/widget-icons/widget-engine-load.svg?raw'
 
 const iconAssetModules = import.meta.glob('../../../../assets/widget-icons/*.svg', {
   eager: true,
@@ -101,6 +102,7 @@ export const METRIC_ICON_SVGS = {
   pace: parseMetricIconSvg(paceIconSvg),
   power: parseMetricIconSvg(powerIconSvg),
   engine_power: parseMetricIconSvg(powerIconSvg),
+  engine_load: parseMetricIconSvg(engineLoadIconSvg),
   speed: parseMetricIconSvg(speedIconSvg),
   stride_length: parseMetricIconSvg(strideLengthIconSvg),
   stroke_rate: parseMetricIconSvg(strokeRateIconSvg),

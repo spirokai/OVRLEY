@@ -413,6 +413,7 @@
       "distance": { "name": "Entfernung", "shortName": "Entf." },
       "distance_to_home": { "name": "Entfernung bis nach Hause", "shortName": "Zuhause" },
       "elevation": { "name": "Höhenprofil", "shortName": "Profil" },
+      "engine_load": { "name": "Motorlast", "shortName": "Motorlast" },
       "engine_power": { "name": "Motorleistung", "shortName": "Motorleist." },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "Brennweite", "shortName": "Brennweite" },
