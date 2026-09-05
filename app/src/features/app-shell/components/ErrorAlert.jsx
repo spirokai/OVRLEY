@@ -32,7 +32,7 @@ function ErrorAlert() {
       <Alert variant="destructive" className="relative pr-12 shadow-lg border-2">
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>{t('app-shell.errorRenderingVideo', 'Error Rendering Video')}</AlertTitle>
-        <AlertDescription className="text-sm opacity-90">{errorMessage}</AlertDescription>
+        <AlertDescription className="text-sm opacity-90 select-text whitespace-pre-wrap">{errorMessage}</AlertDescription>
         <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 hover:bg-destructive-foreground/10" onClick={clearError}>
           <X className="h-4 w-4" />
         </Button>
