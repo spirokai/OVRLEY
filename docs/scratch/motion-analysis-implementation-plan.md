@@ -57,7 +57,7 @@ Offset sign is already established by preview: `video_time = selected_activity_s
 
 ### Fingerprint the existing parsed activity
 
-`activity_fingerprint.rs` consumes the full existing parsed activity and produces temporary matching features. It does not reopen the activity file, rerun a format parser, repeat activity finalization, or mutate the parsed activity. Speed trends, circular heading changes, event detection and matching-rate aggregation are fingerprint computations on this shared input, independent of file format.
+The activity preparation functions in `fingerprint.rs` consume the full existing parsed activity and produce temporary matching features. They do not reopen the activity file, rerun a format parser, repeat activity finalization, or mutate the parsed activity. Speed trends, circular heading changes, event detection and matching-rate aggregation are fingerprint computations on this shared input, independent of file format.
 
 The shared finalizer's `build_course_series` preserves missing coordinates; it does not interpolate GPS into every activity row. Frame-aligned GPS interpolation happens later for rendering, and those dense render arrays are not the fingerprint input. For 40 Hz rows with GPS present once per second, select valid `course` pairs with their corresponding `sample_elapsed_seconds` to recover the available GPS cadence. The MP4 path anchors its activity timeline to GPS timestamps when GPS exists, selecting IMU/camera values onto that timeline.
 
@@ -71,28 +71,35 @@ Malformed user analysis settings fail at ingress. Fingerprint preparation handle
 
 ## 4. Backend structure and ownership
 
+Keep `optical_flow/` and `motion_estimation/` as distinct algorithm boundaries, following Gyroflow's useful separation. Consolidate the surrounding pipeline into four top-level Rust files. Keep types beside the code that owns them and shared fingerprint preparation together.
+
 ```text
 ovrley_core/src/synchronization/
-    mod.rs                    public analysis entry point
-    types.rs                  validated requests, fingerprints, outcomes
-    config.rs                 versioned algorithm settings and validation
-    decode.rs                 ffmpeg frames + presentation timestamps
+    mod.rs             public API, settings validation and job orchestration
+    decode.rs          ffmpeg process, timestamped grayscale frame stream
     optical_flow/
-        mod.rs                frame-pair types and quality
-        opencv_pyrlk.rs        extracted tracking implementation
+        mod.rs         tracked point pairs, quality and tracking interface
+        opencv_pyrlk.rs extracted Gyroflow feature detection and tracking
     motion_estimation/
-        mod.rs                motion/quality contract
-        homography.rs         extracted fit + image-space proxies
-    video_fingerprint.rs      intervals -> visual channels
-    activity_fingerprint.rs   existing ParsedActivity -> activity channels
-    resample.rs               time-weighted filtering/binning and masks
-    matcher.rs                whole-activity search + candidate refinement
-    confidence.rs             uniqueness, validation and acceptance
-    autosync.rs               one job owns pipeline and cancellation
-    UPSTREAM.md               extraction provenance
+        mod.rs         motion interval types and estimation interface
+        homography.rs  homography fitting, motion proxies and fit quality
+    fingerprint.rs     activity/video features, shared filtering and binning
+    matcher.rs         search, refinement, confidence and candidate outcomes
+    UPSTREAM.md        extraction provenance
 ```
 
-Keep pure matching and confidence independent of OpenCV, Tauri, rendering, and decoding. One job owns the decoder child, bounded frame queue, workers and compact results. Keep only frames needed for current pairs and boundary overlap between chunks. Join workers and kill/reap the child on cancellation, errors and shutdown; a cancellation flag alone cannot unblock a pipe read. Drain stdout/stderr concurrently so diagnostic output cannot stall decoding. OpenCV errors are errors; insufficient trackable scene content is a quality outcome.
+| Owner | Responsibility and boundary |
+| --- | --- |
+| `mod.rs` | Own the analysis request, validated settings, progress contract and job lifecycle. Coordinate decoding, tracking, fingerprint preparation and matching through explicit calls. Re-export public results from their owning module. Keep numerical algorithms in the modules below. |
+| `decode.rs` | Own the FFmpeg child and pipe readers, frame timestamps, seek/preroll handling and process cleanup. Expose a bounded stream of frames plus explicit stop/join behavior. No matching logic or OpenCV dependency. |
+| `optical_flow/` | `mod.rs` owns tracked point pairs, tracking quality and the tracking interface. `opencv_pyrlk.rs` contains the extracted implementation, kept recognizable for upstream comparisons. No job state or activity knowledge. |
+| `motion_estimation/` | `mod.rs` owns the estimation interface and timestamped motion interval types using plain numeric data. `homography.rs` consumes point pairs and keeps extracted fitting and conversion to image-motion proxies together. Downstream consumers do not depend on OpenCV types. |
+| `fingerprint.rs` | Own the canonical fingerprint/channel types. Prepare activity features from `ParsedActivity` and video features from motion intervals; share time-based filtering, binning, support masks and rate selection here. Separate functions handle each input, without duplicate resampling implementations. No file I/O or format parsing. |
+| `matcher.rs` | Own candidate/result types, whole-activity search, refinement, subsegment agreement and confidence decisions. These functions operate on prepared fingerprints and remain independent of OpenCV, Tauri, rendering and decoding. Keep scoring and the criteria that accept its results together. |
+
+One job in `mod.rs` owns the decoder handle, bounded frame queue, workers and compact results. The decoder handle encapsulates child-process resources; the job coordinates shutdown through that owner. Keep only frames needed for current pairs and boundary overlap between chunks. Join workers and stop/join the decoder on cancellation, errors and shutdown; a cancellation flag alone cannot unblock a pipe read. The decoder must kill/reap the child and drain stdout/stderr concurrently so diagnostic output cannot stall decoding. OpenCV errors are errors; insufficient trackable scene content is a quality outcome.
+
+Do not pre-create separate top-level `types.rs`, `config.rs`, `confidence.rs`, `resample.rs` or `autosync.rs`: those responsibilities stay with their owners above. Split further only when the actual implementation warrants it. Keep the two algorithm directories' interfaces small, with one concrete implementation each initially. DIS/AKAZE implementations can later join `optical_flow/`, and additional pose estimators can join `motion_estimation/`; method selection is added when those alternatives are implemented. No unused dispatch variants or placeholder algorithms are needed now.
 
 Use `opencv` with default features disabled and only the required modules, initially `imgproc`, `video`, and `calib3d` plus their required dependencies. Do not bring in rust-cv, Qt, or Gyroflow's decoder. Rust OpenCV bindings require native OpenCV and binding-generation tooling; pin an OpenCV/crate/toolchain combination proven on the actual repository toolchain, rather than assuming the newest crate works. See the [opencv-rust installation guidance](https://github.com/twistedfall/opencv-rust#quickstart).
 
