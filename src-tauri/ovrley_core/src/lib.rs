@@ -7,6 +7,7 @@
 //!
 //! Public modules are intentionally grouped by responsibility so the Tauri
 //! command layer can stay thin while the testable business logic remains here.
+#![recursion_limit = "256"]
 
 /// Activity JSON contracts plus trim and interpolation utilities.
 pub mod activity;
@@ -40,6 +41,8 @@ pub mod render;
 pub mod standard_metrics;
 /// Shared standard-widget definitions.
 pub mod standard_widgets;
+/// Timestamped video motion extraction for activity alignment.
+pub mod synchronization;
 /// Cross-cutting domain types (MetricKind, etc.) shared by config, render, and activity.
 pub mod types;
 
