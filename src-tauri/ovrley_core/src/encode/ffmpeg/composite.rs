@@ -54,9 +54,9 @@ pub struct CompositeProfile {
 /// output path if its process-spawning architecture owns destination handling.
 ///
 /// Composite mode currently uses three inputs:
-/// - input 0: unseeked source video for frame-accurate filter-side video trim
+/// - input 0: coarsely seeked source video for frame-accurate filter-side video trim
 /// - input 1: raw RGBA overlay frames from stdin (`pipe:0`)
-/// - input 2: untrimmed source media for filtered audio encoding
+/// - input 2: coarsely seeked source media for filtered audio encoding
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompositeFfmpegSettings {
     pub codec_id: CompositeCodecId,
@@ -65,6 +65,27 @@ pub struct CompositeFfmpegSettings {
     pub input_2_args: Vec<String>,
     pub filter_complex: String,
     pub output_args: Vec<String>,
+}
+
+/// Keeps a small source-local preroll after the input seek so the filter graph
+/// remains responsible for the exact export boundary.
+///
+/// The input seek is intentionally an implementation detail derived from the
+/// already validated `trim_start`; it is not part of the render config.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct CompositeInputWindow {
+    seek_start: f64,
+    filter_start: f64,
+}
+
+const COMPOSITE_INPUT_SEEK_PREROLL_SECONDS: f64 = 5.0;
+
+fn derive_composite_input_window(trim_start: f64) -> CompositeInputWindow {
+    let seek_start = (trim_start - COMPOSITE_INPUT_SEEK_PREROLL_SECONDS).max(0.0);
+    CompositeInputWindow {
+        seek_start,
+        filter_start: trim_start - seek_start,
+    }
 }
 
 impl CompositeFfmpegSettings {
@@ -83,15 +104,15 @@ impl CompositeFfmpegSettings {
 
 /// Builds FFmpeg argument groups from the canonical composite render plan.
 ///
-/// Input 0 keeps the original source video unseeked so the filter graph can
-/// apply frame-accurate video trimming. Input 1 is the raw RGBA overlay stream
-/// on `pipe:0`, and input 2 is a separately trimmed source-media input used for
-/// copying audio without re-encoding it.
+/// Input 0 uses a coarse input seek followed by frame-accurate filter-side
+/// video trimming. Input 1 is the raw RGBA overlay stream on `pipe:0`, and
+/// input 2 uses the same derived source window for filtered audio encoding.
 ///
 /// The function consumes the validated render plan, selects and configures an encoder profile,
 /// then assembles four argument groups that callers concatenate in order: HW
-/// init args, input 0 (unseeked video), input 1 (overlay pipe), input 2 (trimmed
-/// audio source), filter_complex, and output args.
+/// init args, input 0 (seeked and filter-trimmed video), input 1 (overlay pipe),
+/// input 2 (seeked and filter-trimmed audio source), filter_complex, and output
+/// args.
 pub fn build_composite_ffmpeg_settings(
     render: &CompositeRenderPlan,
     frame_size: FrameSize,
@@ -145,8 +166,9 @@ pub fn build_composite_ffmpeg_settings(
     let qsv_full_overlay = matches!(filter_stack_kind, CompositeFilterStackKind::QsvFullOverlay);
     let qsv_overlay_cpu_rotation_filter =
         qsv_overlay_cpu_rotation_filter(source_rotation_degrees, filter_stack_kind);
+    let input_window = derive_composite_input_window(render.trim_start);
 
-    // ── PHASE 3: BUILD INPUT 0 ARGS (unseeked source video for filter-side trim) ──
+    // ── PHASE 3: BUILD INPUT 0 ARGS (coarse seek plus filter-side trim) ──
     let mut input_0_args = if matches!(
         selected_profile.codec_id.metadata().filter_stack_kind,
         CompositeFilterStackKind::QsvFullOverlay
@@ -159,6 +181,12 @@ pub fn build_composite_ffmpeg_settings(
             .map(|arg| (*arg).to_string())
             .collect()
     };
+    if input_window.seek_start > 0.0 {
+        input_0_args.extend([
+            "-ss".to_string(),
+            format_seconds_arg(input_window.seek_start),
+        ]);
+    }
     // QSV-full must retain coded main-video surfaces for zero-copy compositing.
     // Other profiles keep their existing behavior: disable FFmpeg autorotation
     // only when the selected graph physically applies a rotation filter.
@@ -190,9 +218,15 @@ pub fn build_composite_ffmpeg_settings(
         "pipe:0".to_string(),
     ];
 
-    // ── PHASE 5: BUILD INPUT 2 ARGS (untrimmed source for filtered audio) ──
+    // ── PHASE 5: BUILD INPUT 2 ARGS (coarse seek plus filter-side audio trim) ──
     let mut input_2_args = Vec::new();
     if include_audio {
+        if input_window.seek_start > 0.0 {
+            input_2_args.extend([
+                "-ss".to_string(),
+                format_seconds_arg(input_window.seek_start),
+            ]);
+        }
         input_2_args.extend(["-i".to_string(), video_path]);
     }
 
@@ -200,7 +234,7 @@ pub fn build_composite_ffmpeg_settings(
     let mut filter_complex = composite_filter_complex(
         width,
         height,
-        render.trim_start,
+        input_window.filter_start,
         render.render_duration,
         selected_profile,
         source_rotation_degrees,
@@ -210,7 +244,7 @@ pub fn build_composite_ffmpeg_settings(
     if include_audio {
         filter_complex.push_str(&format!(
             ";[2:a]atrim=start={}:duration={},asetpts=N/SR/TB[aout]",
-            format_seconds_arg(render.trim_start),
+            format_seconds_arg(input_window.filter_start),
             format_seconds_arg(render.render_duration),
         ));
     }
