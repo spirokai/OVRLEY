@@ -1,9 +1,8 @@
 /**
- * Zustand store — combines all feature slices with undo history and development tooling.
+ * Zustand store — combines all feature slices with undo history.
  */
 
 import { create } from 'zustand'
-import { devtools } from 'zustand/middleware'
 import { createEditorSlice } from './slices/createEditorSlice'
 import { createMediaSlice } from './slices/createMediaSlice'
 import { createTemplateSlice } from './slices/createTemplateSlice'
@@ -23,22 +22,9 @@ function createStoreState(set, get) {
   }
 }
 
-function shouldEnableStoreDevtools() {
-  return import.meta.env.DEV && typeof window !== 'undefined'
-}
-
 const storeInitializer = withEditorHistory(createStoreState)
 
-const useStore = create(
-  shouldEnableStoreDevtools()
-    ? devtools(storeInitializer, {
-        name: 'OVRLEYStore',
-        serialize: {
-          replacer: (key, value) => (key === 'editor' ? '<<MonacoEditor>>' : value),
-        },
-      })
-    : storeInitializer,
-)
+const useStore = create(storeInitializer)
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   window.__OVRLEY_STORE__ = useStore
