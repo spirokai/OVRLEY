@@ -65,8 +65,10 @@ export function clampVideoTime(video, second) {
  */
 export function syncVideoCurrentTime(video, second, epsilonSeconds = 0.001) {
   const safeSecond = clampVideoTime(video, second)
+  const duration = Number(video.duration)
+  const needsDrawableEndFrame = Number.isFinite(duration) && duration > 0 && Number(second) >= duration && video.currentTime >= duration
 
-  if (Math.abs(video.currentTime - safeSecond) <= epsilonSeconds) {
+  if (!needsDrawableEndFrame && Math.abs(video.currentTime - safeSecond) <= epsilonSeconds) {
     return
   }
 

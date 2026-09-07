@@ -37,10 +37,11 @@ function resolvePreviewClockMode() {
  * @param {React.RefObject<HTMLVideoElement>} options.videoRef Ref to preview video.
  * @param {boolean} options.isActive Whether video-clock playback is active.
  * @param {number} options.videoSyncOffsetSeconds Timeline offset for the video.
- * @param {(second: number) => void} options.onPreviewSecond Callback receiving timeline time.
+ * @param {(second: number) => void} options.onPreviewSecond Callback receiving timeline time while the video owns playback.
+ * @param {() => void} options.onPlaybackEnded Callback transferring playback to the timeline at the video-end boundary.
  * @returns {void}
  */
-export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSeconds, onPreviewSecond }) {
+export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSeconds, onPreviewSecond, onPlaybackEnded }) {
   // Store selectors — picks scene FPS, update rate, and imported video FPS from Zustand
   const sceneFps = useStore((state) => state.renderSettings.fps)
   const updateRate = useStore((state) => state.renderSettings.widgetUpdateRate)
@@ -51,6 +52,7 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSecon
   const callbackIdRef = useRef(null)
   const callbackTypeRef = useRef(null)
   const publishedFrameRef = useRef(-1)
+  const lastPresentedMediaTimeRef = useRef(null)
   const lastVideoSourceRef = useRef('')
 
   // Derived state — computes effective preview FPS from scene FPS / update rate and resolves the clock mode
@@ -107,7 +109,12 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSecon
     const publishPreviewSecond = (mediaTime = video.currentTime) => {
       incrementPreviewPerfCounter(previewPerfCounterName('video frame callbacks'))
 
-      const previewSecond = mediaTime + videoSyncOffsetSeconds
+      const presentedMediaTime = Number(mediaTime)
+      if (Number.isFinite(presentedMediaTime) && presentedMediaTime >= 0) {
+        lastPresentedMediaTimeRef.current = presentedMediaTime
+      }
+
+      const previewSecond = presentedMediaTime + videoSyncOffsetSeconds
       const nextFrame = Math.floor(previewSecond * effectivePreviewFps)
 
       if (nextFrame === publishedFrameRef.current) {
@@ -118,16 +125,16 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSecon
       onPreviewSecond(previewSecond)
     }
 
-    /** Publishes the final timeline second when the video ends (one frame past the end to signal completion). */
-    const publishVideoEndSecond = () => {
+    /** Restores the last frame reported by the presentation clock. */
+    const freezeLastPresentedFrame = () => {
       incrementPreviewPerfCounter(previewPerfCounterName('video frame callbacks'))
 
-      const safeDuration = Number(video.duration)
-      const finalVideoSecond = Number.isFinite(safeDuration) ? safeDuration : video.currentTime
-      const previewSecond = finalVideoSecond + videoSyncOffsetSeconds + 1 / effectivePreviewFps
+      const lastPresentedMediaTime = lastPresentedMediaTimeRef.current
+      if (lastPresentedMediaTime !== null) {
+        video.currentTime = lastPresentedMediaTime
+      }
 
       publishedFrameRef.current = -1
-      onPreviewSecond(previewSecond)
     }
 
     /** Resets the frame dedup counter when the video source URL changes. */
@@ -139,6 +146,7 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSecon
 
       lastVideoSourceRef.current = currentSource
       publishedFrameRef.current = -1
+      lastPresentedMediaTimeRef.current = null
     }
 
     /** Schedules the next frame callback — prefers requestVideoFrameCallback, falls back to requestAnimationFrame. */
@@ -179,8 +187,9 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSecon
     }
 
     const handlePlaybackEnded = () => {
-      publishVideoEndSecond()
       cancelScheduledFrame()
+      freezeLastPresentedFrame()
+      onPlaybackEnded()
     }
 
     const handleSourceChange = () => {
@@ -212,6 +221,7 @@ export function useVideoPlaybackClock({ videoRef, isActive, videoSyncOffsetSecon
       video.removeEventListener('loadedmetadata', handleSourceChange)
       cancelScheduledFrame()
       publishedFrameRef.current = -1
+      lastPresentedMediaTimeRef.current = null
     }
-  }, [effectivePreviewFps, isActive, onPreviewSecond, shouldForceAnimationClock, videoRef, videoSyncOffsetSeconds])
+  }, [effectivePreviewFps, isActive, onPlaybackEnded, onPreviewSecond, shouldForceAnimationClock, videoRef, videoSyncOffsetSeconds])
 }

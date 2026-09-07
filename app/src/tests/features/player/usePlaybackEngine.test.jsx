@@ -114,7 +114,7 @@ describe('usePlaybackEngine', () => {
     })
   })
 
-  test('hands playback back to the timeline when the playhead leaves the imported video range', () => {
+  test('leaves the video-to-timeline handoff to the video ended command', () => {
     const options = createOptions({
       backgroundMode: 'video',
       previewPlaybackSource: 'video',
@@ -126,10 +126,7 @@ describe('usePlaybackEngine', () => {
       initialProps: options,
     })
 
-    expect(options.startPreviewPlayback).toHaveBeenCalledWith({
-      source: 'timeline',
-      second: 6,
-    })
+    expect(options.startPreviewPlayback).not.toHaveBeenCalled()
   })
 
   test('advances timeline playback on animation frames and pauses at the exact end', () => {

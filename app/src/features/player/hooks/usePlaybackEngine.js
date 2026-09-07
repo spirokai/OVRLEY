@@ -57,6 +57,8 @@ export default function usePlaybackEngine({
 }) {
   // Imperative playback refs - RAF reads these without forcing React renders every frame.
   const playbackAnchorRef = useRef({ startedAtMs: 0, startedSecond: 0 })
+  const playbackAnchorSourceRef = useRef(previewPlaybackSource)
+  const playbackSecondRef = useRef(selectedSecond)
   const previousVideoPathRef = useRef(null)
   const scrubFrameRef = useRef(null)
   const latestScrubSecondRef = useRef(null)
@@ -82,6 +84,7 @@ export default function usePlaybackEngine({
   const isTimelinePlaybackActive = previewPlaybackState === 'playing' && previewPlaybackSource === 'timeline'
   const timelineMinimum = getTimelineMinimum({ hasVideo: Boolean(importedVideoPath), videoSyncOffsetSeconds })
   const clampedPlayhead = clamp(selectedSecond, timelineMinimum, totalDuration)
+  playbackSecondRef.current = clampedPlayhead
   const effectivePreviewFps = useMemo(() => getContainerFps(sceneFps, updateRate), [sceneFps, updateRate])
 
   const cancelScrub = useCallback(() => {
@@ -127,6 +130,7 @@ export default function usePlaybackEngine({
       second,
       nowMs: performance.now(),
     })
+    playbackAnchorSourceRef.current = source
   }, [])
 
   // Pause commands all anchor to the video clock because timeline wall-clock progression should stop.
@@ -158,6 +162,7 @@ export default function usePlaybackEngine({
   useEffect(() => {
     if (!hasActivity) {
       playbackAnchorRef.current = { startedAtMs: 0, startedSecond: timelineMinimum }
+      playbackAnchorSourceRef.current = 'video'
       return
     }
     if (clampedPlayhead !== selectedSecond) {
@@ -175,9 +180,9 @@ export default function usePlaybackEngine({
     pausePreviewPlayback(clampedPlayhead)
   }, [clampedPlayhead, pausePreviewPlayback, previewPlaybackSource, resetPlaybackOrchestration, setPlaybackAnchor, shouldUseVideoPlayback])
 
-  // Clock handoff - while playing in video mode, switch between video and timeline clocks at video boundaries.
+  // Clock handoff - timeline playback enters the video region; the video clock owns its ended handoff back to the timeline.
   useEffect(() => {
-    if (!isPlaying || !shouldUseVideoPlayback) {
+    if (!isPlaying || !shouldUseVideoPlayback || previewPlaybackSource !== 'timeline') {
       return
     }
     const nextSource = resolvePlaybackSource({
@@ -186,7 +191,7 @@ export default function usePlaybackEngine({
       videoSyncOffsetSeconds,
       importedVideoDuration,
     })
-    if (nextSource === previewPlaybackSource) {
+    if (nextSource !== 'video') {
       return
     }
     resetPlaybackOrchestration()
@@ -212,6 +217,9 @@ export default function usePlaybackEngine({
     if (!isTimelinePlaybackActive || !hasActivity) {
       return undefined
     }
+    if (playbackAnchorSourceRef.current !== 'timeline') {
+      setPlaybackAnchor('timeline', playbackSecondRef.current)
+    }
     let animationFrameId = 0
     const tick = (now) => {
       const timelineSecond = getTimelinePlaybackSecond({
@@ -226,19 +234,21 @@ export default function usePlaybackEngine({
           second: safeDuration,
           nowMs: now,
         })
+        playbackAnchorSourceRef.current = 'video'
         previewFrameRef.current = -1
         return
       }
       const frameIndex = Math.floor((timelineSecond - timelineMinimum) * effectivePreviewFps)
       if (frameIndex !== previewFrameRef.current) {
         previewFrameRef.current = frameIndex
-        setSelectedSecond(clamp(timelineMinimum + frameIndex / effectivePreviewFps, timelineMinimum, safeDuration))
+        const frameSecond = Math.max(playbackAnchorRef.current.startedSecond, timelineMinimum + frameIndex / effectivePreviewFps)
+        setSelectedSecond(clamp(frameSecond, timelineMinimum, safeDuration))
       }
       animationFrameId = window.requestAnimationFrame(tick)
     }
     animationFrameId = window.requestAnimationFrame(tick)
     return () => window.cancelAnimationFrame(animationFrameId)
-  }, [effectivePreviewFps, hasActivity, isTimelinePlaybackActive, pausePreviewPlayback, setSelectedSecond, timelineMinimum])
+  }, [effectivePreviewFps, hasActivity, isTimelinePlaybackActive, pausePreviewPlayback, setPlaybackAnchor, setSelectedSecond, timelineMinimum])
 
   // Play command - restart from the timeline start at the end and otherwise resume the current playhead.
   const play = useCallback(() => {
