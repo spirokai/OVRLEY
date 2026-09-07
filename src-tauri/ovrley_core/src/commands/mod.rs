@@ -9,6 +9,10 @@
 pub mod elevation_geometry;
 pub mod route_geometry;
 
+pub use crate::synchronization::jobs::{
+    backend_cancel_visual_sync, backend_start_visual_sync, backend_visual_sync_status,
+};
+
 use crate::activity::finalize::FinalizeActivityResponse;
 use crate::activity::schema::ParsedActivity;
 use crate::activity::{

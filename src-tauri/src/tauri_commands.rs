@@ -27,6 +27,46 @@ use tauri::AppHandle;
 
 const WINDOWS_HEVC_EXTENSION_URL: &str = "https://apps.microsoft.com/detail/9nmzlz57r3t7";
 
+#[tauri::command]
+pub(crate) async fn backend_start_visual_sync(
+    app: AppHandle,
+    state: tauri::State<'_, BackendState>,
+    request: ovrley_core::synchronization::jobs::StartRequest,
+) -> Result<String, String> {
+    use tauri::Emitter;
+    let paths = runtime_paths::app_paths(&app)?;
+    let emit = std::sync::Arc::new(move |snapshot| {
+        if let Err(error) = app.emit("visual-sync-progress", snapshot) {
+            log::warn!("Visual sync event delivery failed: {error}");
+        }
+    });
+    call_and_serialize(commands::backend_start_visual_sync(
+        &paths,
+        &state.analysis_jobs,
+        request,
+        emit,
+    ))
+}
+
+#[tauri::command]
+pub(crate) async fn backend_visual_sync_status(
+    state: tauri::State<'_, BackendState>,
+    job_id: String,
+) -> Result<String, String> {
+    call_and_serialize(commands::backend_visual_sync_status(
+        &state.analysis_jobs,
+        &job_id,
+    ))
+}
+
+#[tauri::command]
+pub(crate) async fn backend_cancel_visual_sync(
+    state: tauri::State<'_, BackendState>,
+    job_id: String,
+) -> Result<(), String> {
+    commands::backend_cancel_visual_sync(&state.analysis_jobs, &job_id)
+}
+
 /// Serializes a `Serialize` value into a JSON string or maps an error to a
 /// `String`, consolidating the repeated `.map_err(|e| e.to_string())?;
 /// serde_json::to_string(...).map_err(...)` pattern used by most commands.

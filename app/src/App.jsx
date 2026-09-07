@@ -18,7 +18,9 @@ import {
   VideoDrawerContent,
   useVideoSyncControls,
 } from '@/features/toolbar'
-import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
+import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_TOOL, WIDGETS_TOOL, SYNC_DOCTOR_TOOL } from '@/store/slices/createLayoutSlice'
+import { useVisualSync } from '@/features/toolbar/hooks/useVisualSync'
+import { SyncDoctorDrawerContent } from '@/features/toolbar/components/SyncDoctorDrawerContent'
 import { MissingSourceDialog, StartupProjectsDialog } from '@/features/projects'
 import { UpdatePromptDialog } from '@/features/app-update'
 import {
@@ -81,6 +83,7 @@ function AppShell() {
   } = useAppShellComposition()
   const toolbarDrawer = useToolbarDrawer(layout)
   const videoSync = useVideoSyncControls()
+  const visualSync = useVisualSync()
   const { config, globalDefaults, importingVideo, isProcessing, setConfig } = appShell
   let drawerContent = null
 
@@ -122,6 +125,8 @@ function AppShell() {
           videoSync={videoSync}
         />
       )
+    } else if (toolbarDrawer.activeTool === SYNC_DOCTOR_TOOL) {
+      drawerContent = <SyncDoctorDrawerContent sync={visualSync} />
     } else if (toolbarDrawer.activeTool === WIDGETS_TOOL) {
       drawerContent = <WidgetDrawerContent widgetLiveEdits={widgetLiveEdits} />
     }

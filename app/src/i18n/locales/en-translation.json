@@ -1,4 +1,37 @@
 {
+  "syncDoctor": {
+    "description": "Find where this video fits in the activity using turning motion. Alignment changes only when you apply a candidate.",
+    "inputsRequired": "Import an activity and a video to begin.",
+    "analyze": "Analyze motion",
+    "cancel": "Cancel analysis",
+    "analyzedSeconds": "Analyzed through video second {{seconds}}",
+    "manualGuidance": "Use a clip longer than two minutes with distinctive turns throughout. The whole clip must fit within the activity. Manual alignment remains available in the Video drawer.",
+    "apply": "Apply offset {{seconds}} s",
+    "applied": "Applied offset {{seconds}} s",
+    "diagnostic": "Diagnostic offset {{seconds}} s - cannot apply",
+    "evidence": "Turning correlation {{correlation}} | nomination {{nomination}} | margin {{margin}}",
+    "support": "Observed {{seconds}} s ({{fraction}}% of clip) | {{retained}}% of eligible video observations paired",
+    "unavailable": "No distinctive evidence",
+    "section": "{{start}}-{{end}} s | {{role}} | correlation {{correlation}} | {{agreement}}",
+    "heldOut": "verification",
+    "nomination": "nomination",
+    "agrees": "agrees",
+    "disagrees": "does not agree",
+    "status": {
+      "analyzing": "Analyzing video motion...",
+      "matching": "Searching the activity...",
+      "matched": "Match found. Select a candidate to apply its offset.",
+      "no_match": "No reliable match found.",
+      "cancelled": "Analysis cancelled."
+    },
+    "reasons": {
+      "insufficient_observed_duration": "Too few observed seconds or too little retained video evidence.",
+      "weak_turning_agreement": "Turning correlation is too low.",
+      "ambiguous_offset": "Another offset has comparable or stronger evidence.",
+      "inconsistent_nomination_sections": "The first two video sections do not confirm the same offset.",
+      "held_out_section_disagrees": "The verification section does not confirm this offset."
+    }
+  },
   "app": {
     "importingYourVideo": "Importing your video...",
     "loadingProject": "Loading project...",
@@ -297,6 +330,7 @@
     "unsavedChanges": "Your template has unsaved changes. Save them or discard them."
   },
   "toolbar": {
+    "syncDoctor": "Sync Doctor",
     "activity": "Activity",
     "activityType": "Activity type",
     "applyTimezone": "Apply Timezone",

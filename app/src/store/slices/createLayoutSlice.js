@@ -2,6 +2,7 @@ export const ACTIVITY_TOOL = 'activity'
 export const VIDEO_TOOL = 'video'
 export const WIDGETS_TOOL = 'widgets'
 export const PROJECTS_TOOL = 'projects'
+export const SYNC_DOCTOR_TOOL = 'syncDoctor'
 
 /**
  * Creates the layout slice Zustand slice used by the application store.

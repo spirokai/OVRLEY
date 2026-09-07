@@ -1,8 +1,8 @@
-import { Activity, Blocks, Film, FolderKanban } from 'lucide-react'
+import { Activity, Blocks, Film, FolderKanban, ScanSearch } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { useTranslation } from 'react-i18next'
-import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
+import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_TOOL, WIDGETS_TOOL, SYNC_DOCTOR_TOOL } from '@/store/slices/createLayoutSlice'
 
 /**
  * Canonical toolbar tool definitions. Components resolve `labelKey` through
@@ -12,6 +12,7 @@ const TOOL_DEFINITIONS = [
   { id: PROJECTS_TOOL, labelKey: 'toolbar.projects', icon: FolderKanban },
   { id: ACTIVITY_TOOL, labelKey: 'toolbar.activity', icon: Activity },
   { id: VIDEO_TOOL, labelKey: 'toolbar.video', icon: Film },
+  { id: SYNC_DOCTOR_TOOL, labelKey: 'toolbar.syncDoctor', icon: ScanSearch },
   { id: WIDGETS_TOOL, labelKey: 'toolbar.widgets', icon: Blocks },
 ]
 

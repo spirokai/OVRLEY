@@ -4,6 +4,28 @@
 
 import { formatFontLabel, setBundledRecommendedFonts } from '@/lib/fonts'
 
+/** @param {object} request - Canonical analysis request. @returns {Promise<object>} Initial job snapshot. */
+export async function startVisualSync(request) {
+  return apiCall('backend_start_visual_sync', { request })
+}
+
+/** @param {string} jobId - Backend job identity. @returns {Promise<object>} Current snapshot. */
+export async function getVisualSyncStatus(jobId) {
+  return apiCall('backend_visual_sync_status', { jobId })
+}
+
+/** @param {string} jobId - Backend job identity. @returns {Promise<void>} Cancellation acknowledgement. */
+export async function cancelVisualSync(jobId) {
+  await invokeCommand('backend_cancel_visual_sync', { jobId })
+}
+
+/** @param {function} handler - Canonical job snapshot receiver. @returns {Promise<function>} Unsubscribe. */
+export async function subscribeVisualSync(handler) {
+  await requireInvoke()
+  const { listen } = await import('@tauri-apps/api/event')
+  return listen('visual-sync-progress', ({ payload }) => handler(payload))
+}
+
 /**
  * Shared Tauri runtime detection.
  * Returns true when running inside a Tauri desktop shell (IPC available).

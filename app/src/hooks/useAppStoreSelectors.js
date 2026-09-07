@@ -1,6 +1,20 @@
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 
+/** @returns {object} Visual sync inputs and the canonical offset action. */
+export function useVisualSyncStore() {
+  return useStore(
+    useShallow((state) => ({
+      parsedActivity: state.parsedActivity,
+      activitySource: state.activitySource,
+      parsedActivitySource: state.parsedActivitySource,
+      importedVideoPath: state.importedVideoPath,
+      importedVideoImportId: state.importedVideoImportId,
+      setVideoSyncOffset: state.setVideoSyncOffset,
+    })),
+  )
+}
+
 export function useLayoutStore() {
   return useStore(
     useShallow((state) => ({

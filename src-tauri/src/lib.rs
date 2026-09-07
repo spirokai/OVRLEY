@@ -44,6 +44,7 @@ use tauri::Manager;
 
 pub(crate) struct BackendState {
     pub(crate) render_controller: RenderController,
+    pub(crate) analysis_jobs: ovrley_core::synchronization::jobs::AnalysisJobs,
 }
 
 /// Builds and runs the Tauri application.
@@ -64,6 +65,9 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             tauri_commands::backend_health,
+            tauri_commands::backend_start_visual_sync,
+            tauri_commands::backend_visual_sync_status,
+            tauri_commands::backend_cancel_visual_sync,
             tauri_commands::backend_current_os,
             tauri_commands::backend_distribution_kind,
             tauri_commands::backend_open_hevc_support,
@@ -117,6 +121,7 @@ pub fn run() {
             // any command can be invoked: the frontend subscribes to
             // `render-progress` events instead of polling `backend_progress`.
             app.manage(BackendState {
+                analysis_jobs: Default::default(),
                 render_controller: RenderController::with_sink(Arc::new(
                     progress_sink::TauriProgressSink::new(app.handle().clone()),
                 )),
@@ -133,6 +138,11 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while initializing tauri application")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                app.state::<BackendState>().analysis_jobs.shutdown();
+            }
+        });
 }
