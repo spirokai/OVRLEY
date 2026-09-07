@@ -35,6 +35,9 @@ describe('MetricWidgetEditor content alignment', () => {
       />,
     )
 
+    const typographyHeading = screen.getByText('Typography').closest('div')?.parentElement
+    expect(typographyHeading).toContainElement(screen.getByRole('radio', { name: 'Align right' }))
+
     await user.click(screen.getByRole('radio', { name: 'Align left' }))
     expect(updateWidgetData).not.toHaveBeenCalled()
 

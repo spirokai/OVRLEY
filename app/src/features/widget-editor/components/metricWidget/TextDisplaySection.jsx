@@ -6,7 +6,7 @@ import {
 } from '@/lib/widget/standard-metrics'
 import { BALANCE_FORMAT_OPTIONS } from '@/features/widget-preview/widgets/metric/format'
 import { FontSection, IconSection, UnitsControlRow } from '../widgetEditorSections'
-import { ContentAlignmentControl, SelectField, SliderField, ToggleField } from '../widgetFormControls'
+import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { useTranslation } from 'react-i18next'
@@ -50,11 +50,12 @@ export default function TextDisplaySection({ widget, updateWidgetData, updateWid
 
   return (
     <>
-      <FontSection widget={widget} updateWidgetData={updateWidgetData} updateWidgetSize={updateWidgetSize} commitWidgetSize={commitWidgetSize} />
-
-      <ContentAlignmentControl
-        value={widget.data.content_alignment}
-        onValueChange={(value) => updateWidgetData(widget.id, { content_alignment: value })}
+      <FontSection
+        widget={widget}
+        updateWidgetData={updateWidgetData}
+        updateWidgetSize={updateWidgetSize}
+        commitWidgetSize={commitWidgetSize}
+        showContentAlignment
       />
 
       {hasDecimalControl ? (

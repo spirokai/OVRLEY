@@ -5,7 +5,17 @@
 
 import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { ColorField, NumberField, SelectField, SizeSlider, SliderField, TextField, TIME_FORMATS, ToggleField } from './widgetFormControls'
+import {
+  ColorField,
+  ContentAlignmentControl,
+  NumberField,
+  SelectField,
+  SizeSlider,
+  SliderField,
+  TextField,
+  TIME_FORMATS,
+  ToggleField,
+} from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { createFontSelection } from '@/lib/fonts'
@@ -105,6 +115,7 @@ export function DimensionsSection({ widget, setNumericField }) {
  * @param {number} [props.sizeMax=200] - Maximum font size.
  * @param {string} [props.colorLabel] - Label for the font color picker. Defaults to the translated "Font Color".
  * @param {boolean} [props.showFormatSelect=false] - Whether to show the format select.
+ * @param {boolean} [props.showContentAlignment=false] - Whether to show the content alignment control in the section heading.
  * @returns {JSX.Element} Rendered component output.
  */
 export function FontSection({
@@ -119,6 +130,7 @@ export function FontSection({
   sizeMax = 200,
   colorLabel,
   showFormatSelect = false,
+  showContentAlignment = false,
 }) {
   const { t } = useTranslation()
   const fontSize = widget.data.font_size
@@ -126,7 +138,20 @@ export function FontSection({
 
   return (
     <div className="space-y-4">
-      <SectionHeading icon={Type} title={title} titleKey="widget-editor.typography" defaultTitle="Typography" />
+      <SectionHeading
+        icon={Type}
+        title={title}
+        titleKey="widget-editor.typography"
+        defaultTitle="Typography"
+        trailing={
+          showContentAlignment ? (
+            <ContentAlignmentControl
+              value={widget.data.content_alignment}
+              onValueChange={(value) => updateWidgetData(widget.id, { content_alignment: value })}
+            />
+          ) : null
+        }
+      />
 
       {showTextInput ? (
         <TextField

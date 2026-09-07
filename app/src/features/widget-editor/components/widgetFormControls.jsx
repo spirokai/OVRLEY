@@ -72,11 +72,9 @@ export function ContentAlignmentControl({ value, onValueChange }) {
   const { t } = useTranslation()
 
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-        {t('widget-editor.contentAlignment', 'Content Alignment')}
-      </span>
+    <div className="flex items-center">
       <ToggleGroup
+        size="compact"
         type="single"
         value={value}
         aria-label={t('widget-editor.contentAlignment', 'Content Alignment')}
@@ -88,7 +86,7 @@ export function ContentAlignmentControl({ value, onValueChange }) {
           const Icon = option.icon
           const label = t(option.labelKey, option.defaultLabel)
           return (
-            <ToggleGroupItem key={option.value} value={option.value} aria-label={label} title={label}>
+            <ToggleGroupItem key={option.value} value={option.value} size="compact" aria-label={label} title={label}>
               <Icon />
             </ToggleGroupItem>
           )

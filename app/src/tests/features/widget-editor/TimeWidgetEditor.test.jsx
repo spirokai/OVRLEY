@@ -27,6 +27,9 @@ describe('TimeWidgetEditor', () => {
 
     render(<TimeWidgetEditor widget={widget} updateWidgetData={updateWidgetData} setNumericField={vi.fn()} />)
 
+    const typographyHeading = screen.getByText('Typography').closest('div')?.parentElement
+    expect(typographyHeading).toContainElement(screen.getByRole('radio', { name: 'Align right' }))
+
     await user.click(screen.getByRole('radio', { name: 'Align right' }))
     expect(updateWidgetData).toHaveBeenCalledWith('time-0', { content_alignment: 'right' })
   })
