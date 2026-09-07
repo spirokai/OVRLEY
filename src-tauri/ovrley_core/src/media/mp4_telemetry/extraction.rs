@@ -422,102 +422,161 @@ fn append_imu_samples(result: &mut Vec<NativeSample>, sample: &SampleInfo, accel
                 return;
             };
             for (index, vec) in vectors.iter().enumerate() {
-                let ts = imu_sample_timestamp_ms(sample, index, vectors.len(), stmp_us);
-                let g = compute_g_force_components(
+                append_imu_vector_sample(
+                    result,
+                    sample,
+                    index,
+                    vectors.len(),
+                    stmp_us,
                     vec.x as f64 / scale,
                     vec.y as f64 / scale,
                     vec.z as f64 / scale,
                     accel_map,
                 );
-                if let Some(g) = g {
-                    result.push(NativeSample {
-                        timestamp_ms: ts,
-                        g_force: Some(g),
-                        ..NativeSample::default()
-                    });
-                }
             }
         }
         TagValue::Vec_Vector3_f32(values) => {
             let vectors = values.get();
             for (index, vec) in vectors.iter().enumerate() {
-                let ts = imu_sample_timestamp_ms(sample, index, vectors.len(), stmp_us);
-                let g =
-                    compute_g_force_components(vec.x as f64, vec.y as f64, vec.z as f64, accel_map);
-                if let Some(g) = g {
-                    result.push(NativeSample {
-                        timestamp_ms: ts,
-                        g_force: Some(g),
-                        ..NativeSample::default()
-                    });
-                }
+                append_imu_vector_sample(
+                    result,
+                    sample,
+                    index,
+                    vectors.len(),
+                    stmp_us,
+                    vec.x as f64,
+                    vec.y as f64,
+                    vec.z as f64,
+                    accel_map,
+                );
             }
         }
         TagValue::Vec_Vector3_f64(values) => {
             let vectors = values.get();
             for (index, vec) in vectors.iter().enumerate() {
-                let ts = imu_sample_timestamp_ms(sample, index, vectors.len(), stmp_us);
-                let g = compute_g_force_components(vec.x, vec.y, vec.z, accel_map);
-                if let Some(g) = g {
-                    result.push(NativeSample {
-                        timestamp_ms: ts,
-                        g_force: Some(g),
-                        ..NativeSample::default()
-                    });
-                }
+                append_imu_vector_sample(
+                    result,
+                    sample,
+                    index,
+                    vectors.len(),
+                    stmp_us,
+                    vec.x,
+                    vec.y,
+                    vec.z,
+                    accel_map,
+                );
+            }
+        }
+        TagValue::Vec_TimeVector3_f32(values) => {
+            let vectors = values.get();
+            for (index, vec) in vectors.iter().enumerate() {
+                append_imu_vector_sample(
+                    result,
+                    sample,
+                    index,
+                    vectors.len(),
+                    stmp_us,
+                    vec.x as f64,
+                    vec.y as f64,
+                    vec.z as f64,
+                    accel_map,
+                );
+            }
+        }
+        TagValue::Vec_TimeVector3_f64(values) => {
+            let vectors = values.get();
+            for (index, vec) in vectors.iter().enumerate() {
+                append_imu_vector_sample(
+                    result,
+                    sample,
+                    index,
+                    vectors.len(),
+                    stmp_us,
+                    vec.x,
+                    vec.y,
+                    vec.z,
+                    accel_map,
+                );
             }
         }
         _ => {
-            if let Some(g) = extract_g_force(accel_map) {
-                result.push(NativeSample {
-                    timestamp_ms: sample.timestamp_ms,
-                    g_force: Some(g),
-                    ..NativeSample::default()
-                });
+            if let Some((x, y, z)) = extract_last_acceleration_components(accel_map) {
+                append_imu_vector_sample(result, sample, 0, 1, stmp_us, x, y, z, accel_map);
             }
         }
     }
 }
 
+/// Appends one converted IMU vector, retaining both scalar and axis-specific
+/// values. Axis values remain available even if scalar magnitude calculation
+/// rejects an overflowed result.
+fn append_imu_vector_sample(
+    result: &mut Vec<NativeSample>,
+    sample: &SampleInfo,
+    index: usize,
+    count: usize,
+    stmp_us: Option<u64>,
+    x: f64,
+    y: f64,
+    z: f64,
+    accel_map: &TagMap,
+) {
+    let Some((x, y, z)) = acceleration_components_to_g(x, y, z, accel_map) else {
+        return;
+    };
+
+    result.push(NativeSample {
+        timestamp_ms: imu_sample_timestamp_ms(sample, index, count, stmp_us),
+        g_force: g_force_from_components(x, y, z),
+        g_force_x: Some(x),
+        g_force_y: Some(y),
+        g_force_z: Some(z),
+        ..NativeSample::default()
+    });
+}
+
 /// Fallback IMU extractor: takes the last vector for unknown accelerator types.
-fn extract_g_force(map: &TagMap) -> Option<f64> {
+fn extract_last_acceleration_components(map: &TagMap) -> Option<(f64, f64, f64)> {
     let tag = map.get(&TagId::Data)?;
     match &tag.value {
         TagValue::Vec_Vector3_i16(values) => {
             let value = values.get().last()?;
             let scale = extract_tag_f64(map, &TagId::Scale).filter(|scale| *scale != 0.0)?;
-            compute_g_force_components(
+            Some((
                 value.x as f64 / scale,
                 value.y as f64 / scale,
                 value.z as f64 / scale,
-                map,
-            )
+            ))
         }
-        TagValue::Vec_Vector3_f32(values) => values.get().last().and_then(|value| {
-            compute_g_force_components(value.x as f64, value.y as f64, value.z as f64, map)
-        }),
-        TagValue::Vec_Vector3_f64(values) => values
+        TagValue::Vec_Vector3_f32(values) => values
             .get()
             .last()
-            .and_then(|value| compute_g_force_components(value.x, value.y, value.z, map)),
-        TagValue::Vec_TimeVector3_f32(values) => values.get().last().and_then(|value| {
-            compute_g_force_components(value.x as f64, value.y as f64, value.z as f64, map)
-        }),
-        TagValue::Vec_TimeVector3_f64(values) => values
+            .map(|value| (value.x as f64, value.y as f64, value.z as f64)),
+        TagValue::Vec_Vector3_f64(values) => {
+            values.get().last().map(|value| (value.x, value.y, value.z))
+        }
+        TagValue::Vec_TimeVector3_f32(values) => values
             .get()
             .last()
-            .and_then(|value| compute_g_force_components(value.x, value.y, value.z, map)),
+            .map(|value| (value.x as f64, value.y as f64, value.z as f64)),
+        TagValue::Vec_TimeVector3_f64(values) => {
+            values.get().last().map(|value| (value.x, value.y, value.z))
+        }
         _ => None,
     }
 }
 
-/// Converts acceleration vectors into dynamic load relative to resting gravity.
-fn compute_g_force_components(x: f64, y: f64, z: f64, map: &TagMap) -> Option<f64> {
+/// Converts acceleration vectors into g units while retaining each axis.
+fn acceleration_components_to_g(x: f64, y: f64, z: f64, map: &TagMap) -> Option<(f64, f64, f64)> {
     let unit_factor = match extract_tag_string(map, &TagId::Unit).as_deref() {
         Some("m/s\u{00b2}") | Some("m/s^2") | Some("m/s2") => 1.0 / 9.80665,
         _ => 1.0,
     };
-    g_force_from_components(x * unit_factor, y * unit_factor, z * unit_factor)
+    Some((
+        finite_f64(x * unit_factor)?,
+        finite_f64(y * unit_factor)?,
+        finite_f64(z * unit_factor)?,
+    ))
 }
 
 /// Computes a per-vector IMU sample timestamp using the accelerometer's STMP.

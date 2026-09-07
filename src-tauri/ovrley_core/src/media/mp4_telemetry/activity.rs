@@ -36,7 +36,7 @@ pub fn build_activity_columns(
         .iter()
         .filter(|sample| sample.gps_coordinates().is_some())
         .collect();
-    let imu: Vec<&NativeSample> = samples.iter().filter(|s| s.g_force.is_some()).collect();
+    let imu: Vec<&NativeSample> = samples.iter().filter(|s| s.has_imu_payload()).collect();
     let cam: Vec<&NativeSample> = samples.iter().filter(|s| s.has_camera_payload()).collect();
     let has_gps = !gps.is_empty();
 
@@ -61,6 +61,9 @@ pub fn build_activity_columns(
     let mut speed = vec![None; n];
     let mut heading = vec![None; n];
     let mut g_force = vec![None; n];
+    let mut g_force_x = vec![None; n];
+    let mut g_force_y = vec![None; n];
+    let mut g_force_z = vec![None; n];
     let mut iso = vec![None; n];
     let mut aperture = vec![None; n];
     let mut shutter_speed = vec![None; n];
@@ -86,7 +89,12 @@ pub fn build_activity_columns(
     let mut imu_idx = 0usize;
     for (index, &anchor) in anchor_ms.iter().enumerate() {
         advance_to_closest(&imu, &mut imu_idx, anchor);
-        g_force[index] = imu.get(imu_idx).and_then(|sample| sample.g_force);
+        if let Some(sample) = imu.get(imu_idx) {
+            g_force[index] = sample.g_force;
+            g_force_x[index] = sample.g_force_x;
+            g_force_y[index] = sample.g_force_y;
+            g_force_z[index] = sample.g_force_z;
+        }
     }
 
     let mut last_iso: Option<f64> = None;
@@ -177,9 +185,9 @@ pub fn build_activity_columns(
         distance: none(),
         distance_to_home: none(),
         g_force,
-        g_force_x: none(),
-        g_force_y: none(),
-        g_force_z: none(),
+        g_force_x,
+        g_force_y,
+        g_force_z,
         rpm: none(),
         throttle_position: none(),
         brake_position: none(),

@@ -327,7 +327,7 @@ fn count_series(samples: &[NativeSample]) -> TelemetrySeriesCounts {
             .count(),
         imu: samples
             .iter()
-            .filter(|sample| sample.g_force.is_some())
+            .filter(|sample| sample.has_imu_payload())
             .count(),
         camera: samples
             .iter()
