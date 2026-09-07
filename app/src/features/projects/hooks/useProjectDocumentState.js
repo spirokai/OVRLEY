@@ -25,8 +25,6 @@ export default function useProjectDocumentState() {
       isProcessing: state.isProcessing,
       renderSettings: state.renderSettings,
       renderingVideo: state.renderingVideo,
-      selectedSecond: state.selectedSecond,
-      timelineViewport: state.timelineViewport,
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
       videoSyncTimezoneMode: state.videoSyncTimezoneMode,
     })),
@@ -37,7 +35,7 @@ export default function useProjectDocumentState() {
   const conflictingOperation = projectOwnedState.isProcessing || projectOwnedState.importingVideo || projectOwnedState.renderingVideo
   const status = useMemo(() => {
     if (!lastSavedProjectState) return 'Unsaved'
-    const current = currentDirtyProjection(projectOwnedState, loadedProjectPath)
+    const current = currentDirtyProjection({ ...useStore.getState(), ...projectOwnedState }, loadedProjectPath)
     return current && deepEqual(current, lastSavedProjectState) ? 'Saved' : 'Modified'
   }, [lastSavedProjectState, loadedProjectPath, projectOwnedState])
 

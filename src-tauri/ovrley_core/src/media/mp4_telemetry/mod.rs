@@ -224,11 +224,9 @@ fn resolve_telemetry(repo_root: &Path, path: &Path) -> CoreResult<Option<Resolve
 
     let resolved = match input.samples {
         Some(ref parser_samples) if !parser_samples.is_empty() => {
-            let has_gps_group = parser_samples.iter().any(|s| {
-                s.tag_map
-                    .as_ref()
-                    .is_some_and(|m| m.contains_key(&GroupId::GPS))
-            });
+            let has_gps_group = parser_samples
+                .iter()
+                .any(|s| s.tag_map.as_ref().is_some_and(extraction::has_gps_source));
 
             let extracted = extraction::extract_native_samples(parser_samples);
 
