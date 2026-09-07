@@ -41,8 +41,6 @@ pub mod render;
 pub mod standard_metrics;
 /// Shared standard-widget definitions.
 pub mod standard_widgets;
-/// Timestamped video motion extraction for activity alignment.
-pub mod synchronization;
 /// Cross-cutting domain types (MetricKind, etc.) shared by config, render, and activity.
 pub mod types;
 
