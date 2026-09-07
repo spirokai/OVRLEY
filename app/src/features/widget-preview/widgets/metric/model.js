@@ -264,9 +264,10 @@ export function buildArcGaugeInnerWidgetModel({ widget, presentationValue }) {
 /**
  * Builds the formatted layout model for an intrinsic metric widget preview.
  * @param {object} params - Widget and current activity preview state.
+ * @param {number} params.globalScale - Global scale applied when the SVG is rendered.
  * @returns {object|null} Metric presentation model, or null for unsupported presentations.
  */
-export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond }) {
+export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond, globalScale }) {
   // Guard — skip non-value widgets and gradient type (handled separately).
   if (widget.category !== 'values' || widget.type === 'gradient') return null
   // Boxed display types use their own presentation-specific preview path.
@@ -312,6 +313,7 @@ export function buildMetricWidgetPreviewModel({ widget, activity, previewSecond 
     showUnits: widget.data.show_units,
     iconSize: widget.data.icon_size,
     contentAlignment: widget.data.content_alignment,
+    globalScale,
   })
 
   return {

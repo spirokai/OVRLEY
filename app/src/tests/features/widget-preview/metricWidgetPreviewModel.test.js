@@ -22,6 +22,7 @@ describe('metric content alignment', () => {
       showUnits: true,
       iconSize: 45,
       contentAlignment: 'right',
+      globalScale: 1,
     }
     const narrow = getMetricWidgetLayout({ ...common, valueText: '9' })
     const wide = getMetricWidgetLayout({ ...common, valueText: '999' })
@@ -44,6 +45,7 @@ describe('metric content alignment', () => {
       showUnits: true,
       iconSize: 45,
       contentAlignment: 'center',
+      globalScale: 1,
     })
 
     expect(layout.rowOriginX).toBeCloseTo(-layout.width / 2)
@@ -168,6 +170,7 @@ describe('metric widget preview model standard metric units', () => {
         time: ['2026-09-04T12:34:00Z'],
       },
       previewSecond: 0,
+      globalScale: 1,
     })
 
     const expectedOrigin = contentAlignment === 'center' ? -model.metricLayout.width / 2 : -model.metricLayout.width

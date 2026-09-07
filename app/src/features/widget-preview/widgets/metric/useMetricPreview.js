@@ -108,6 +108,7 @@ export function useMetricPreviewPresentation({ widget, activity, previewSecond, 
           widget,
           activity,
           previewSecond,
+          globalScale,
         }))
 
     let valueText
@@ -128,7 +129,7 @@ export function useMetricPreviewPresentation({ widget, activity, previewSecond, 
           gradientValue: currentGradientValue,
           triangleWidth: widget.data.triangle_width,
           showTriangle: widget.data.show_triangle,
-          scale: globalScale ?? 1,
+          scale: globalScale,
         })
       : null
 

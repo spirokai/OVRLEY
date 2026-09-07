@@ -161,6 +161,7 @@ function OverlayEditorContent({
   const activity = overlayState.activity
   const { metricPreviewModels, textPreviewModels } = useOverlayPreviewModels({
     activity,
+    globalScale: overlayState.globalScale,
     previewSecond: overlayState.previewSecond,
     renderedWidgets: overlayState.canvasWidgets,
   })

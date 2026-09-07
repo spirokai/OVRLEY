@@ -8,7 +8,7 @@ import { useFontMetrics } from '@/features/widget-preview/shared/useFontMetrics'
 
 const EMPTY_PREVIEW_MODELS = {}
 
-function buildPreviewModels({ renderedWidgets, category, activity, previewSecond, lapLogPreparations }) {
+function buildPreviewModels({ renderedWidgets, category, activity, previewSecond, lapLogPreparations, globalScale }) {
   const models = {}
 
   for (const widget of renderedWidgets) {
@@ -18,7 +18,7 @@ function buildPreviewModels({ renderedWidgets, category, activity, previewSecond
       category === 'values'
         ? widget.data.display_type === 'lap_timer'
           ? buildLapTimerPreviewModel({ widget, activity, previewSecond, lapLogPreparation: lapLogPreparations[widget.id] })
-          : buildMetricWidgetPreviewModel({ widget, activity, previewSecond })
+          : buildMetricWidgetPreviewModel({ widget, activity, previewSecond, globalScale })
         : buildTextWidgetPreviewModel({ widget })
 
     if (model) models[widget.id] = model
@@ -54,9 +54,10 @@ function buildFontRequests(renderedWidgets) {
  * @param {object[]} params.renderedWidgets - Effective widgets currently shown by the editor.
  * @param {object|null} params.activity - Parsed activity used by metric models.
  * @param {number} params.previewSecond - Canonical preview timestamp.
+ * @param {number} params.globalScale - Scale applied to intrinsic widget previews.
  * @returns {{ metricPreviewModels: object, textPreviewModels: object }} Models keyed by widget id.
  */
-export default function useOverlayPreviewModels({ renderedWidgets, activity, previewSecond }) {
+export default function useOverlayPreviewModels({ renderedWidgets, activity, previewSecond, globalScale }) {
   const fontRequests = useMemo(() => buildFontRequests(renderedWidgets), [renderedWidgets])
   const fontMetricsVersion = useFontMetrics(fontRequests)
   const lapLogPreparations = useMemo(
@@ -67,10 +68,10 @@ export default function useOverlayPreviewModels({ renderedWidgets, activity, pre
   )
 
   const metricPreviewModels = useMemo(
-    () => buildPreviewModels({ renderedWidgets, category: 'values', activity, previewSecond, lapLogPreparations }),
+    () => buildPreviewModels({ renderedWidgets, category: 'values', activity, previewSecond, lapLogPreparations, globalScale }),
     // Font readiness changes canvas measurements without changing the model inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activity, fontMetricsVersion, lapLogPreparations, previewSecond, renderedWidgets],
+    [activity, fontMetricsVersion, globalScale, lapLogPreparations, previewSecond, renderedWidgets],
   )
 
   const textPreviewModels = useMemo(

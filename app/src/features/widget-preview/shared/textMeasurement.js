@@ -183,9 +183,20 @@ export function getContentAlignmentOrigin(contentAlignment, anchorX, contentWidt
  * @param {boolean} params.showUnits
  * @param {number} params.iconSize
  * @param {'left'|'center'|'right'} params.contentAlignment
+ * @param {number} params.globalScale - Global scale applied when the SVG is rendered.
  * @returns {{ icon: object|null, value: object, units: object|null, width: number, height: number, unitsFontSize: number, rowOriginX: number }}
  */
-export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitText, showIcon, showUnits, iconSize, contentAlignment }) {
+export function getMetricWidgetLayout({
+  fontSize,
+  fontFamily,
+  valueText,
+  unitText,
+  showIcon,
+  showUnits,
+  iconSize,
+  contentAlignment,
+  globalScale,
+}) {
   // Font metrics — compute line heights and measure both value and units text using canvas measurement
   const valueLineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const unitsFontSize = Math.max(fontSize * 0.28, 12)
@@ -215,8 +226,10 @@ export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitTex
     glyphHeight: valueVerticalMetrics.glyphHeight,
   })
   const unitsTop = textGroupBottom - (unitsLineHeight + unitsVerticalMetrics.glyphHeight) / 2
-  const unitsLeft = textGroupLeft + valueMeasure.width + METRIC_WIDGET_UNITS_GAP_PX
-  const width = showUnitText ? unitsLeft + unitsMeasure.width : textGroupLeft + valueMeasure.width
+  // Keep right-aligned text on a stable raster phase as its digit count changes.
+  const valueLayoutWidth = contentAlignment === 'right' ? Math.round(valueMeasure.width * globalScale) / globalScale : valueMeasure.width
+  const unitsLeft = textGroupLeft + valueLayoutWidth + METRIC_WIDGET_UNITS_GAP_PX
+  const width = showUnitText ? unitsLeft + unitsMeasure.width : textGroupLeft + valueLayoutWidth
   const rowOriginX = getContentAlignmentOrigin(contentAlignment, 0, width)
   const valueGlyphCenterY = valueBaseline + (valueVerticalMetrics.descent - valueVerticalMetrics.ascent) * 0.5
 
