@@ -200,6 +200,18 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(clearHistory).toHaveBeenCalled()
     expect(result.current.status).toBe('Saved')
 
+    act(() => useStore.getState().setSelectedSecond(31))
+    expect(result.current.status).toBe('Modified')
+
+    act(() => useStore.getState().setSelectedSecond(30))
+    expect(result.current.status).toBe('Saved')
+
+    act(() => useStore.getState().setTimelineViewport({ viewStart: 21, viewEnd: 60 }))
+    expect(result.current.status).toBe('Modified')
+
+    act(() => useStore.getState().setTimelineViewport({ viewStart: 20, viewEnd: 60 }))
+    expect(result.current.status).toBe('Saved')
+
     act(() => useStore.getState().setLoadedTemplateSource({ kind: 'bundled', templateId: 'another-template.json' }))
     expect(result.current.status).toBe('Saved')
 
