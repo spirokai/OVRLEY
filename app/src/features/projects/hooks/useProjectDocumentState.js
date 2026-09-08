@@ -3,11 +3,11 @@ import { useShallow } from 'zustand/react/shallow'
 import { deepEqual } from '@/store/store-utils'
 import useStore from '@/store/useStore'
 import { filenameFromSelectedPath } from '@/lib/utils'
-import { createProjectDirtyProjection, createProjectSnapshot } from '../utils/projectSnapshot'
+import { createProjectContentSnapshot, createProjectDirtyState } from '../utils/projectSnapshot'
 
-function currentDirtyProjection(state, projectPath) {
+function getCurrentProjectContent(state, projectPath) {
   if (!projectPath) return null
-  return createProjectDirtyProjection(createProjectSnapshot(state, projectPath))
+  return createProjectContentSnapshot(state, projectPath)
 }
 
 /**
@@ -25,25 +25,41 @@ export default function useProjectDocumentState() {
       isProcessing: state.isProcessing,
       renderSettings: state.renderSettings,
       renderingVideo: state.renderingVideo,
-      selectedSecond: state.selectedSecond,
-      timelineViewport: state.timelineViewport,
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
       videoSyncTimezoneMode: state.videoSyncTimezoneMode,
     })),
   )
   const [loadedProjectPath, setLoadedProjectPath] = useState(null)
   const [lastSavedProjectState, setLastSavedProjectState] = useState(null)
+  const savedTimeline = lastSavedProjectState?.timeline ?? null
+  const timelineIsModified = useStore(
+    useCallback(
+      (state) => {
+        if (!savedTimeline) return false
+
+        return (
+          state.selectedSecond !== savedTimeline.playheadSecond ||
+          state.timelineViewport.viewStart !== savedTimeline.viewStart ||
+          state.timelineViewport.viewEnd !== savedTimeline.viewEnd
+        )
+      },
+      [savedTimeline],
+    ),
+  )
 
   const conflictingOperation = projectOwnedState.isProcessing || projectOwnedState.importingVideo || projectOwnedState.renderingVideo
   const status = useMemo(() => {
     if (!lastSavedProjectState) return 'Unsaved'
-    const current = currentDirtyProjection(projectOwnedState, loadedProjectPath)
-    return current && deepEqual(current, lastSavedProjectState) ? 'Saved' : 'Modified'
-  }, [lastSavedProjectState, loadedProjectPath, projectOwnedState])
+    const current = getCurrentProjectContent(projectOwnedState, loadedProjectPath)
+    if (!current) return 'Modified'
+
+    const contentIsModified = !deepEqual(current, lastSavedProjectState.content)
+    return !contentIsModified && !timelineIsModified ? 'Saved' : 'Modified'
+  }, [lastSavedProjectState, loadedProjectPath, projectOwnedState, timelineIsModified])
 
   const markSaved = useCallback((path, project) => {
     setLoadedProjectPath(path)
-    setLastSavedProjectState(createProjectDirtyProjection(project))
+    setLastSavedProjectState(createProjectDirtyState(project))
   }, [])
 
   const markNew = useCallback(() => {

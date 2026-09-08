@@ -13,7 +13,7 @@
 //!
 //! ## Regressions guarded
 //! - Rational FPS values rounded to integers in ffmpeg args
-//! - Composite trim using `-ss` on video input instead of filter-side
+//! - Composite trim using coarse input seeking with an exact filter-side boundary
 //! - Filter graph labels breaking output mapping
 //! - Hardware encoder fallback paths silently degrading
 //! - Bitrate overrides ignored for specific profiles
@@ -169,23 +169,42 @@ fn test_2_3_sync_offset_is_not_used_as_seek_argument() {
 }
 
 #[test]
-fn test_2_4_video_trim_uses_filter_side_cut_and_filtered_audio_input() {
+fn test_2_4_video_trim_uses_coarse_seek_and_filter_side_cut_for_video_and_audio() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
         10.0,
     );
 
+    assert_argument_pair(&built.input_0_args, "-ss", "5");
     assert_argument_pair(&built.input_0_args, "-i", "test.mp4");
+    assert_argument_pair(&built.input_2_args, "-ss", "5");
     assert_argument_pair(&built.input_2_args, "-i", "test.mp4");
-    assert!(!has_argument_pair(&built.input_2_args, "-ss", "10"));
     assert!(!has_argument_pair(&built.input_2_args, "-t", "10"));
     assert!(built
         .filter_complex
-        .contains("trim=start=10:end=20,setpts=PTS-STARTPTS,"));
+        .contains("trim=start=5:end=15,setpts=PTS-STARTPTS,"));
     assert!(built
         .filter_complex
-        .contains("[2:a]atrim=start=10:duration=10,asetpts=N/SR/TB[aout]"));
+        .contains("[2:a]atrim=start=5:duration=10,asetpts=N/SR/TB[aout]"));
+}
+
+#[test]
+fn test_2_4a_short_trim_keeps_zero_input_seek_and_exact_filter_offset() {
+    let built = settings(
+        Fps::new(30000, 1001).unwrap(),
+        Fps::new(30000, 1001).unwrap(),
+        3.0,
+    );
+
+    assert!(!built.input_0_args.iter().any(|arg| arg == "-ss"));
+    assert!(!built.input_2_args.iter().any(|arg| arg == "-ss"));
+    assert!(built
+        .filter_complex
+        .contains("trim=start=3:end=13,setpts=PTS-STARTPTS,"));
+    assert!(built
+        .filter_complex
+        .contains("[2:a]atrim=start=3:duration=10,asetpts=N/SR/TB[aout]"));
 }
 
 #[test]

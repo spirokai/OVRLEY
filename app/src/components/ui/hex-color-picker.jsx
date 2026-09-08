@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/color-picker'
 import { cn } from '@/lib/utils'
 import { normalizeHexColor } from '@/lib/color-utils'
+import { useTranslation } from 'react-i18next'
 
 const DEFAULT_PRESET_COLORS = ['#ffffff', '#afeeee', '#40e0d0', '#005b5b', '#c65102', '#000000']
 const AREA_COMMIT_DEBOUNCE_MS = 0
@@ -46,6 +47,7 @@ export default function HexColorPicker({
   showValue = true,
   disabled = false,
 }) {
+  const { t } = useTranslation()
   const normalizedValue = normalizeHexColor(value)
   const [open, setOpen] = useState(false)
   const [draftValue, setDraftValue] = useState(normalizedValue)
@@ -163,7 +165,7 @@ export default function HexColorPicker({
             </div>
 
             <div className="space-y-2">
-              <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-muted-foreground">Presets</p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-muted-foreground">{t('components.presets', 'Presets')}</p>
               <div className="grid grid-cols-6 gap-2">
                 {presetColors.map((presetColor) => (
                   <button

@@ -313,6 +313,13 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             None,
         ),
         "torque" | "estimated torque" => (Metric::Torque, SourcePriority::Direct, None, None, None),
+        "engine load" | "engine load absolute" | "absolute engine load" => (
+            Metric::EngineLoad,
+            SourcePriority::Direct,
+            None,
+            Some(ControlKind::Percentage),
+            None,
+        ),
         "accelerator position" | "accelerator pedal position" => (
             Metric::ThrottlePosition,
             SourcePriority::Pedal,
@@ -408,7 +415,7 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
     if matches!(
         (metric, declared_unit),
         (
-            Metric::ThrottlePosition | Metric::BrakePosition,
+            Metric::ThrottlePosition | Metric::BrakePosition | Metric::EngineLoad,
             DeclaredUnit::Supported(Unit::Percent)
         )
     ) {
@@ -437,7 +444,11 @@ fn parse_header(index: usize, value: &str) -> Option<HeaderColumn> {
             Some(SourceQualifier::Obd | SourceQualifier::Vehicle | SourceQualifier::Logger),
         ) if alias_priority == SourcePriority::Pedal => SourcePriority::Preferred,
         (
-            Metric::GearPosition | Metric::Rpm | Metric::ThrottlePosition | Metric::BrakePosition,
+            Metric::GearPosition
+            | Metric::Rpm
+            | Metric::ThrottlePosition
+            | Metric::BrakePosition
+            | Metric::EngineLoad,
             Some(SourceQualifier::Obd | SourceQualifier::Vehicle | SourceQualifier::Logger),
         ) => SourcePriority::VehicleState,
         (

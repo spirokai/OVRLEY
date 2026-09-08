@@ -3,6 +3,7 @@
  */
 
 import { FontSection } from './widgetEditorSections'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Renders the text widget editor component.
@@ -13,6 +14,7 @@ import { FontSection } from './widgetEditorSections'
  * @returns {JSX.Element} Rendered component output.
  */
 export default function TextWidgetEditor({ widget, updateWidgetData, updateWidgetSize, commitWidgetSize }) {
+  const { t } = useTranslation()
   return (
     <>
       <FontSection
@@ -20,9 +22,9 @@ export default function TextWidgetEditor({ widget, updateWidgetData, updateWidge
         updateWidgetData={updateWidgetData}
         updateWidgetSize={updateWidgetSize}
         commitWidgetSize={commitWidgetSize}
-        title="Typography"
+        title={t('widget-editor.typography', 'Typography')}
         showTextInput
-        colorLabel="Color"
+        colorLabel={t('widget-editor.color', 'Color')}
       />
     </>
   )

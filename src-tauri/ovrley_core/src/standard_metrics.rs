@@ -78,6 +78,7 @@ pub enum MetricIconAssetKey {
     Rpm,
     ThrottlePosition,
     BrakePosition,
+    EngineLoad,
     LeanAngle,
     House,
     Satellite,
@@ -89,7 +90,12 @@ pub enum MetricIconAssetKey {
 #[serde(rename_all = "camelCase")]
 pub struct StandardMetricUnitOption {
     pub value: String,
-    pub label: String,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub label_key: Option<String>,
+    #[serde(default)]
+    pub default_label: Option<String>,
     #[serde(default)]
     pub render_label: Option<String>,
 }
@@ -280,6 +286,7 @@ fn metric_kind_from_key(key: &str) -> Option<MetricKind> {
         "rpm" => Some(MetricKind::Rpm),
         "throttle_position" => Some(MetricKind::ThrottlePosition),
         "brake_position" => Some(MetricKind::BrakePosition),
+        "engine_load" => Some(MetricKind::EngineLoad),
         "lean_angle" => Some(MetricKind::LeanAngle),
         "gps_coordinates" => Some(MetricKind::GpsCoordinates),
         "distance_to_home" => Some(MetricKind::DistanceToHome),
@@ -326,6 +333,7 @@ fn metric_kind_to_key(kind: MetricKind) -> &'static str {
         MetricKind::Rpm => "rpm",
         MetricKind::ThrottlePosition => "throttle_position",
         MetricKind::BrakePosition => "brake_position",
+        MetricKind::EngineLoad => "engine_load",
         MetricKind::LeanAngle => "lean_angle",
         MetricKind::GpsCoordinates => "gps_coordinates",
         MetricKind::DistanceToHome => "distance_to_home",
@@ -403,6 +411,7 @@ pub fn metric_icon_asset_key(kind: MetricKind) -> Option<MetricIconAssetKey> {
         "widget-rpm.svg" => Some(MetricIconAssetKey::Rpm),
         "widget-throttle-position.svg" => Some(MetricIconAssetKey::ThrottlePosition),
         "widget-brake-position.svg" => Some(MetricIconAssetKey::BrakePosition),
+        "widget-engine-load.svg" => Some(MetricIconAssetKey::EngineLoad),
         "widget-lean-angle.svg" => Some(MetricIconAssetKey::LeanAngle),
         "widget-house.svg" => Some(MetricIconAssetKey::House),
         "widget-satellite.svg" => Some(MetricIconAssetKey::Satellite),
@@ -427,7 +436,9 @@ pub fn standard_metric_unit_label(kind: MetricKind, display_unit: Option<&str>) 
             option
                 .render_label
                 .as_deref()
-                .unwrap_or(option.label.as_str())
+                .or(option.label.as_deref())
+                .or(option.default_label.as_deref())
+                .unwrap_or("")
         })
         .unwrap_or("")
 }

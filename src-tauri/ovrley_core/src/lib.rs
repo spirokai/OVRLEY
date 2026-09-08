@@ -7,6 +7,7 @@
 //!
 //! Public modules are intentionally grouped by responsibility so the Tauri
 //! command layer can stay thin while the testable business logic remains here.
+#![recursion_limit = "256"]
 
 /// Activity JSON contracts plus trim and interpolation utilities.
 pub mod activity;

@@ -32,7 +32,8 @@
         "show_units": true,
         "display_unit": "w",
         "id": "widget-1",
-        "value": "power"
+        "value": "power",
+        "content_alignment": "left"
       },
       {
         "x": 3237,
@@ -54,7 +55,8 @@
         "show_units": true,
         "display_unit": "kmh",
         "id": "widget-2",
-        "value": "speed"
+        "value": "speed",
+        "content_alignment": "left"
       },
       {
         "x": 3569,

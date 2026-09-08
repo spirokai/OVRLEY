@@ -72,5 +72,5 @@ export function isVideoPreviewOutOfRange({ selectedSecond, videoDuration, videoS
   const safeOffset = Number(videoSyncOffsetSeconds) || 0
   const safeDuration = Number(videoDuration) || 0
 
-  return safeSelectedSecond < safeOffset || safeSelectedSecond > safeOffset + safeDuration
+  return safeSelectedSecond < safeOffset || safeSelectedSecond >= safeOffset + safeDuration
 }

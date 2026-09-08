@@ -48,7 +48,13 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
 
   let subMessage = t('render-video.renderingFrames', 'Rendering frames...')
   if (isFinalizing) {
-    subMessage = encoded && total > 0 ? t('render-video.encodingValVal2Frames', 'Encoding: {{val}} / {{val2}} frames', { val: encoded.toLocaleString(), val2: total.toLocaleString() }) : t('render-video.encodingOutputFile', 'Encoding output file...')
+    subMessage =
+      encoded && total > 0
+        ? t('render-video.encodingValVal2Frames', 'Encoding: {{val}} / {{val2}} frames', {
+            val: encoded.toLocaleString(),
+            val2: total.toLocaleString(),
+          })
+        : t('render-video.encodingOutputFile', 'Encoding output file...')
   }
 
   return (
@@ -127,7 +133,9 @@ function RenderProgressPanel({ renderProgress, renderSummaryItems = [], onCancel
         </Button>
       </div>
 
-      <p className="text-center text-[10px] italic text-muted-foreground/50">{t('render-video.keepAppOpen', 'Please keep the application open during rendering')}</p>
+      <p className="text-center text-[10px] italic text-muted-foreground/50">
+        {t('render-video.keepAppOpen', 'Please keep the application open during rendering')}
+      </p>
     </div>
   )
 }

@@ -22,6 +22,7 @@ export default function TimeWidgetEditor({ widget, updateWidgetData, updateWidge
         updateWidgetSize={updateWidgetSize}
         commitWidgetSize={commitWidgetSize}
         showFormatSelect
+        showContentAlignment
       />
       <IconSection
         widget={widget}

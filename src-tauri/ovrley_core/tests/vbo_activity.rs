@@ -131,10 +131,10 @@ velocity kmh\n\
 #[test]
 fn vbo_reader_maps_supported_racechrono_custom_channels() {
     let vbo = "[column names]\n\
-time lat long rc_lateral_acc_1-canbus longitudinal_acc_1_canbus combined-acc-calculated z-acc_1-acc gear-position-1-canbus engine-rpm-1-obd throttle-position_1-canbus brake-pos_1-canbus lean-angle-calc\n\
+ time lat long rc_lateral_acc_1-canbus longitudinal_acc_1_canbus combined-acc-calculated z-acc_1-acc gear-position-1-canbus engine-rpm-1-obd throttle-position_1-canbus brake-pos_1-canbus engine-load-1-canbus lean-angle-calc\n\
 [data]\n\
-120000 2820 -4920 0.3 0.4 0.7 0.1 3 4200 55 20 -12.5\n\
-120001 2821 -4921 0.6 0.8 1.1 0.2 4 4300 60 25 8.0\n";
+120000 2820 -4920 0.3 0.4 0.7 0.1 3 4200 55 20 65 -12.5\n\
+120001 2821 -4921 0.6 0.8 1.1 0.2 4 4300 60 25 70 8.0\n";
 
     let activity = parse_vbo_activity_reader(Cursor::new(vbo), "racechrono.vbo", None)
         .unwrap()
@@ -151,6 +151,7 @@ time lat long rc_lateral_acc_1-canbus longitudinal_acc_1_canbus combined-acc-cal
     assert_eq!(activity.rpm, vec![Some(4200.0), Some(4300.0)]);
     assert_eq!(activity.throttle_position, vec![Some(55.0), Some(60.0)]);
     assert_eq!(activity.brake_position, vec![Some(20.0), Some(25.0)]);
+    assert_eq!(activity.engine_load, vec![Some(65.0), Some(70.0)]);
     assert_eq!(activity.lean_angle, vec![Some(-12.5), Some(8.0)]);
 }
 
@@ -292,6 +293,7 @@ fn racechrono_vbo_fixture_resolves_standard_and_suffixed_channels() {
     assert_close(activity.g_force_y[0], 0.003);
     assert_close(activity.rpm[0], 646.0);
     assert_close(activity.throttle_position[0], 0.0);
+    assert_close(activity.engine_load[0], 47.0);
     assert_eq!(activity.gear_position[0].as_deref(), Some("1"));
     assert_close(activity.lean_angle[0], -0.351);
 }

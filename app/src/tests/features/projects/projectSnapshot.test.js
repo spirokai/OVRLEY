@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createProjectDirtyProjection, createProjectSnapshot } from '@/features/projects/utils/projectSnapshot'
+import { createProjectDirtyState, createProjectSnapshot } from '@/features/projects/utils/projectSnapshot'
 import { createPathLocator } from '@/features/projects/utils/projectPaths'
 import useStore from '@/store/useStore'
 
@@ -51,8 +51,10 @@ describe('project snapshot contract', () => {
       expect(serialized).not.toContain(forbidden)
     }
 
-    expect(createProjectDirtyProjection(project)).not.toHaveProperty('savedAt')
-    expect(createProjectDirtyProjection(project).editor).toEqual(project.editor)
+    const dirtyState = createProjectDirtyState(project)
+    expect(dirtyState).not.toHaveProperty('savedAt')
+    expect(dirtyState.content.editor).toEqual(project.editor)
+    expect(dirtyState.timeline).toEqual(project.timeline)
   })
 
   test('creates child-relative and external absolute locators', () => {

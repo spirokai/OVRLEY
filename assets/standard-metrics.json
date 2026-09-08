@@ -12,6 +12,7 @@
           "suffix": "",
           "decimals": 0,
           "display_type": "text",
+          "content_alignment": "left",
           "unit_color": "#ffffff",
           "show_icon": true,
           "icon_size": 45,
@@ -33,7 +34,8 @@
         },
         "metricTypeOverrides": {
           "time": {
-            "format": "time-24"
+            "format": "time-24",
+            "hours_offset": 0
           },
           "distance": {
             "decimals": 1,
@@ -400,15 +402,18 @@
       "supportedDisplayUnits": [
         {
           "value": "latitude",
-          "label": "Latitude"
+          "labelKey": "widget-editor.latitude",
+          "defaultLabel": "Latitude"
         },
         {
           "value": "longitude",
-          "label": "Longitude"
+          "labelKey": "widget-editor.longitude",
+          "defaultLabel": "Longitude"
         },
         {
           "value": "both",
-          "label": "Both"
+          "labelKey": "widget-editor.both",
+          "defaultLabel": "Both"
         }
       ],
       "showUnitsByDefault": false,
@@ -592,6 +597,28 @@
       "icon": {
         "source": "shared",
         "assetFile": "widget-power.svg"
+      },
+      "category": "motosports"
+    },
+    {
+      "type": "engine_load",
+      "current": true,
+      "nameKey": "widgets.types.engine_load.name",
+      "shortNameKey": "widgets.types.engine_load.shortName",
+      "defaultDisplayUnit": "percent",
+      "supportedDisplayUnits": [
+        {
+          "value": "percent",
+          "label": "%"
+        }
+      ],
+      "showUnitsByDefault": true,
+      "formatter": "integer",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-engine-load.svg"
       },
       "category": "motosports"
     },

@@ -7,7 +7,7 @@
     "end": 10,
     "composite_video_path": "test.mp4",
     "composite_bitrate": "60M",
-    "composite_sync_offset": 300.0,
+    "composite_sync_offset": 300,
     "composite_widget_update_rate": 2
   },
   "labels": [],
@@ -32,7 +32,8 @@
       "show_units": true,
       "display_unit": "kmh",
       "id": "widget-1",
-      "value": "speed"
+      "value": "speed",
+      "content_alignment": "left"
     }
   ],
   "plots": []

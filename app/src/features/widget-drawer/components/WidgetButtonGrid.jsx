@@ -20,7 +20,7 @@ function WidgetButton({ item, onClick, isAvailable }) {
         <span aria-hidden="true" className="absolute top-0 right-0 h-1.5 w-1.5 bg-success" style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }} />
       )}
       <Icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-      <span className="text-[0.65rem] leading-tight text-foreground text-center px-0.5 group-hover:text-primary">{t(item.shortNameKey)}</span>
+      <span className="text-[0.70rem] leading-tight text-foreground text-center px-0.5 group-hover:text-primary">{t(item.shortNameKey)}</span>
     </button>
   )
 

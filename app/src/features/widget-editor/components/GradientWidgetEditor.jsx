@@ -31,9 +31,9 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
         updateWidgetData={updateWidgetData}
         updateWidgetSize={updateWidgetSize}
         commitWidgetSize={commitWidgetSize}
-        title="Typography"
-        fontSizeLabel="Font Size"
-        colorLabel="Value Color"
+        title={t('widget-editor.typography', 'Typography')}
+        fontSizeLabel={t('widget-editor.fontSize', 'Font Size')}
+        colorLabel={t('widget-editor.valueColor', 'Value Color')}
       />
 
       <SliderField
@@ -49,7 +49,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
       />
       <div className="grid grid-cols-2 gap-4">
         <SliderField
-          label="Decimals"
+          label={t('widget-editor.decimals', 'Decimals')}
           value={decimals}
           min={0}
           max={2}
@@ -85,7 +85,7 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
         </div>
 
         <SizeSlider
-          label="Width"
+          label={t('widget-editor.width', 'Width')}
           disabled={!widget.data.show_triangle}
           value={triangleWidth}
           min={0}
@@ -98,9 +98,9 @@ export default function GradientWidgetEditor({ widget, updateWidgetData, updateW
         <UnitsControlRow
           widget={widget}
           updateWidgetData={updateWidgetData}
-          title="Unit"
+          title={t('widget-editor.unit', 'Unit')}
           showToggle={false}
-          colorLabel="Percent Color"
+          colorLabel={t('widget-editor.percentColor', 'Percent Color')}
           colorValue={widget.data.unit_color}
           onColorChange={(value) => updateWidgetData(widget.id, { unit_color: value })}
         />

@@ -138,7 +138,7 @@ export function getStandardMetricUnitOptions(type) {
 
 /**
  * Get the rendered label for a given display unit in a metric type.
- * Falls back through `renderLabel` → `label` → empty string.
+ * Falls back through `renderLabel` → `label` → `defaultLabel` → empty string.
  * @param {string} type — metric type string
  * @param {string} [displayUnit] — the unit to look up; if falsy, uses the definition's default
  * @returns {string} the display label (e.g. "KM/H", "BPM", "°C")
@@ -147,7 +147,7 @@ export function getStandardMetricUnitLabel(type, displayUnit) {
   const definition = getStandardMetricDefinition(type)
   const resolvedUnit = displayUnit || definition?.defaultDisplayUnit
   const option = definition?.supportedDisplayUnits.find((candidate) => candidate.value === resolvedUnit)
-  return option?.renderLabel ?? option?.label ?? ''
+  return option?.renderLabel ?? option?.label ?? option?.defaultLabel ?? ''
 }
 
 /**

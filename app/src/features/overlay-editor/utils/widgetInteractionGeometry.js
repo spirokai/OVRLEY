@@ -80,10 +80,13 @@ export function buildFrameInteractionLayout(originLayout, { width, height, trans
  * @param {object} options - Scale layout values.
  * @returns {object} Live scale layout.
  */
-export function buildScaleInteractionLayout(originLayout, { scaleFactor, globalScale, translateX = 0, translateY = 0, rotation = 0 }) {
+export function buildScaleInteractionLayout(
+  originLayout,
+  { scaleFactor, globalScale, translateX = 0, translateY = 0, rotation = 0, transformOriginX = 0, left = originLayout.left },
+) {
   return {
     mode: 'scale',
-    left: originLayout.left,
+    left,
     top: originLayout.top,
     width: originLayout.width,
     height: originLayout.height,
@@ -91,6 +94,7 @@ export function buildScaleInteractionLayout(originLayout, { scaleFactor, globalS
     globalScale,
     translateX,
     translateY,
+    transformOriginX,
     rotation,
   }
 }

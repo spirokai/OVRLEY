@@ -2,9 +2,9 @@
 /// vertical-metrics helpers.
 ///
 /// The metric row is manually laid out so icon, value, and units can each use
-/// their own size while sharing one top-left anchor.
+/// their own size while sharing one configurable point anchor.
 use crate::error::CoreResult;
-use crate::normalize::ValidatedValueWidget;
+use crate::normalize::{ContentAlignment, ValidatedValueWidget};
 use crate::render::text::{
     draw_text_with_vertical_metrics_text, measure_text, parse_color, ResolvedTextStyle,
 };
@@ -22,6 +22,50 @@ pub(crate) const METRIC_WIDGET_UNIT_RATIO: f32 = 0.28;
 pub const NUMERIC_VERTICAL_METRICS_TEXT: &str = "0123456789-:.%";
 const COORDINATE_VERTICAL_METRICS_TEXT: &str = "NSEW88\u{00B0}88.888\u{2032}88\u{2033}";
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct StaticMetricParts {
+    pub icon: bool,
+    pub unit: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct MetricHorizontalLayout {
+    content_width: f32,
+    row_origin_x: f32,
+    icon_x: Option<f32>,
+    value_x: f32,
+    unit_x: Option<f32>,
+}
+
+fn metric_row_origin_x(alignment: ContentAlignment, anchor_x: f32, content_width: f32) -> f32 {
+    match alignment {
+        ContentAlignment::Left => anchor_x,
+        ContentAlignment::Center => anchor_x - content_width * 0.5,
+        ContentAlignment::Right => anchor_x - content_width,
+    }
+}
+
+fn metric_horizontal_layout(
+    alignment: ContentAlignment,
+    anchor_x: f32,
+    icon_slot_width: Option<f32>,
+    value_width: f32,
+    unit_width: Option<f32>,
+    unit_gap: f32,
+) -> MetricHorizontalLayout {
+    let icon_width = icon_slot_width.unwrap_or(0.0);
+    let trailing_width = unit_width.map_or(0.0, |width| unit_gap + width);
+    let content_width = icon_width + value_width + trailing_width;
+    let row_origin_x = metric_row_origin_x(alignment, anchor_x, content_width);
+    MetricHorizontalLayout {
+        content_width,
+        row_origin_x,
+        icon_x: icon_slot_width.map(|_| row_origin_x),
+        value_x: row_origin_x + icon_width,
+        unit_x: unit_width.map(|_| row_origin_x + icon_width + value_width + unit_gap),
+    }
+}
+
 /// Draws the icon, value text, and optional unit text for a metric widget.
 ///
 /// All output-affecting fields are read from the pre-validated type — zero
@@ -32,7 +76,7 @@ pub(crate) fn draw_metric_parts(
     parts: &crate::render::format::MetricDisplayParts,
     scale: f32,
     font_dirs: &[PathBuf],
-    static_icon_rendered: bool,
+    static_parts: StaticMetricParts,
     validated: &ValidatedValueWidget,
 ) -> CoreResult<()> {
     let (value_text, unit_text) = match &parts.content {
@@ -43,7 +87,7 @@ pub(crate) fn draw_metric_parts(
                 coordinate,
                 scale,
                 font_dirs,
-                static_icon_rendered,
+                static_parts,
                 parts.icon_kind,
                 validated,
             )
@@ -92,6 +136,14 @@ pub(crate) fn draw_metric_parts(
     } else {
         0.0
     };
+    let horizontal_layout = metric_horizontal_layout(
+        validated.content_alignment,
+        base_style.x,
+        show_icon.then_some(text_group_left),
+        value_measure.width,
+        units_measure.as_ref().map(|measure| measure.width),
+        METRIC_WIDGET_UNITS_GAP_PX * scale,
+    );
     let text_group_top = base_style.y + ((row_height - text_group_height) * 0.5);
     let text_group_bottom = text_group_top + text_group_height;
     let value_glyph_height =
@@ -99,11 +151,11 @@ pub(crate) fn draw_metric_parts(
     let value_top = text_group_bottom - (value_line_height + value_glyph_height) * 0.5;
 
     let mut value_style = base_style.clone();
-    value_style.x = base_style.x + text_group_left;
+    value_style.x = horizontal_layout.value_x;
     value_style.y = value_top;
     value_style.line_height = value_line_height;
 
-    if show_icon && !static_icon_rendered {
+    if show_icon && !static_parts.icon {
         super::icons::draw_metric_icon(
             canvas,
             parts.icon_kind,
@@ -112,7 +164,10 @@ pub(crate) fn draw_metric_parts(
             base_style.shadow_color,
             base_style.shadow_strength,
             base_style.shadow_distance,
-            base_style.x + validated.icon_offset_x * scale,
+            horizontal_layout
+                .icon_x
+                .expect("visible icon must have a horizontal position")
+                + validated.icon_offset_x * scale,
             metric_icon_top_from_value_layout(
                 text_group_bottom,
                 value_line_height,
@@ -134,7 +189,9 @@ pub(crate) fn draw_metric_parts(
     if let (Some(unit_text), Some(unit_measure)) = (unit_text, units_measure) {
         let mut units_style = units_style;
         units_style.color = parse_color(&unit_color_hex, base_style.opacity);
-        units_style.x = value_style.x + value_measure.width + (METRIC_WIDGET_UNITS_GAP_PX * scale);
+        units_style.x = horizontal_layout
+            .unit_x
+            .expect("visible unit must have a horizontal position");
         let unit_vertical_metrics_text = if unit_text == "\u{00B0}" {
             "\u{00B0}C"
         } else {
@@ -148,13 +205,15 @@ pub(crate) fn draw_metric_parts(
         let units_glyph_height =
             (unit_vertical_measure.bounds_bottom - unit_vertical_measure.bounds_top).abs();
         units_style.y = text_group_bottom - (units_line_height + units_glyph_height) * 0.5;
-        draw_text_with_vertical_metrics_text(
-            canvas,
-            unit_text,
-            unit_vertical_metrics_text,
-            &units_style,
-            font_dirs,
-        )?;
+        if !static_parts.unit {
+            draw_text_with_vertical_metrics_text(
+                canvas,
+                unit_text,
+                unit_vertical_metrics_text,
+                &units_style,
+                font_dirs,
+            )?;
+        }
     }
     Ok(())
 }
@@ -167,7 +226,7 @@ fn draw_coordinate_parts(
     coordinate: &crate::render::format::MetricCoordinateDisplay,
     scale: f32,
     font_dirs: &[PathBuf],
-    static_icon_rendered: bool,
+    static_parts: StaticMetricParts,
     icon_kind: Option<crate::render::format::MetricIconKind>,
     validated: &ValidatedValueWidget,
 ) -> CoreResult<()> {
@@ -219,10 +278,24 @@ fn draw_coordinate_parts(
     } else {
         0.0
     };
+    let text_width = value_column_width
+        + if direction_column_width > 0.0 {
+            direction_column_width + direction_gap
+        } else {
+            0.0
+        };
+    let horizontal_layout = metric_horizontal_layout(
+        validated.content_alignment,
+        base_style.x,
+        show_icon.then_some(text_group_left),
+        text_width,
+        None,
+        0.0,
+    );
     let row_height = total_height.max(if show_icon { icon_size } else { 0.0 });
     let text_top = base_style.y + (row_height - total_height) * 0.5;
 
-    if show_icon && !static_icon_rendered {
+    if show_icon && !static_parts.icon {
         super::icons::draw_metric_icon(
             canvas,
             icon_kind,
@@ -231,7 +304,10 @@ fn draw_coordinate_parts(
             base_style.shadow_color,
             base_style.shadow_strength,
             base_style.shadow_distance,
-            base_style.x + validated.icon_offset_x * scale,
+            horizontal_layout
+                .icon_x
+                .expect("visible icon must have a horizontal position")
+                + validated.icon_offset_x * scale,
             base_style.y + (row_height - icon_size) * 0.5 + validated.icon_offset_y * scale,
             icon_size,
         );
@@ -240,7 +316,7 @@ fn draw_coordinate_parts(
     for (index, line) in coordinate.lines.iter().enumerate() {
         let line_y = text_top + index as f32 * (line_height + line_gap);
         let (_, value_width) = line_measurements[index];
-        let line_x = base_style.x + text_group_left;
+        let line_x = horizontal_layout.value_x;
         let line_vertical_metrics_text = super::metric_vertical_metrics_text(&line.value_text);
         if let Some(direction) = line.direction.as_deref() {
             let mut direction_style = value_style.clone();
@@ -288,35 +364,53 @@ impl ColorHexSlice {
     }
 }
 
-/// Returns whether a validated value contributes an icon that can be cached.
-pub(crate) fn has_static_metric_icon_validated(validated: &ValidatedValueWidget) -> bool {
+/// Returns the independently cacheable parts contributed by a validated value.
+pub(crate) fn static_metric_parts_for_value(validated: &ValidatedValueWidget) -> StaticMetricParts {
     if validated.display_type != DisplayType::Text {
-        return false;
+        return StaticMetricParts::default();
     }
-    validated.show_icon && super::icons::metric_icon_kind_for_value(validated.metric).is_some()
+
+    let icon = validated.content_alignment == ContentAlignment::Left
+        && validated.show_icon
+        && validated.icon_size > 0.0
+        && super::icons::metric_icon_kind_for_value(validated.metric).is_some();
+    let unit = validated.content_alignment == ContentAlignment::Right
+        && validated.metric != crate::MetricKind::GpsCoordinates
+        && validated.show_units
+        && !crate::standard_metrics::standard_metric_unit_label(
+            validated.metric,
+            Some(&validated.display_unit),
+        )
+        .is_empty();
+
+    StaticMetricParts { icon, unit }
 }
 
-/// Draws a static metric icon from a validated value — zero backend defaults.
-pub(crate) fn draw_static_metric_icon_for_value_validated(
+/// Draws static metric parts from a validated value — zero backend defaults.
+pub(crate) fn draw_static_metric_parts_for_value(
     canvas: &Canvas,
     validated: &ValidatedValueWidget,
     base_style: &ResolvedTextStyle,
     scale: f32,
     font_dirs: &[PathBuf],
-) -> CoreResult<bool> {
-    if validated.display_type != DisplayType::Text {
-        return Ok(false);
+) -> CoreResult<StaticMetricParts> {
+    let static_parts = static_metric_parts_for_value(validated);
+    if !static_parts.icon {
+        if static_parts.unit {
+            draw_static_metric_unit(canvas, validated, base_style, scale, font_dirs)?;
+        }
+        return Ok(static_parts);
     }
     let Some(icon_kind) = super::icons::metric_icon_kind_for_value(validated.metric) else {
-        return Ok(false);
+        return Ok(static_parts);
     };
     if !validated.show_icon {
-        return Ok(false);
+        return Ok(static_parts);
     }
 
     let icon_size = validated.icon_size * scale;
     if icon_size <= 0.0 {
-        return Ok(false);
+        return Ok(static_parts);
     }
 
     let icon_color_hex = ColorHexSlice(validated.icon_color).to_hex_string();
@@ -340,9 +434,16 @@ pub(crate) fn draw_static_metric_icon_for_value_validated(
         base_style.y + (row_height - icon_size) * 0.5
     } else {
         let value_line_height = base_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
-        let row_height = icon_size.max(value_line_height);
-        let text_group_top = base_style.y + ((row_height - value_line_height) * 0.5);
-        let text_group_bottom = text_group_top + value_line_height;
+        let units_font_size =
+            (base_style.font_size * METRIC_WIDGET_UNIT_RATIO).max(MIN_UNITS_FONT_SIZE * scale);
+        let text_group_height = if validated.show_units {
+            value_line_height.max(units_font_size * METRIC_WIDGET_LINE_HEIGHT)
+        } else {
+            value_line_height
+        };
+        let row_height = icon_size.max(text_group_height);
+        let text_group_top = base_style.y + ((row_height - text_group_height) * 0.5);
+        let text_group_bottom = text_group_top + text_group_height;
         let value_vertical_measure =
             measure_text(NUMERIC_VERTICAL_METRICS_TEXT, base_style, font_dirs)?;
         metric_icon_top_from_value_layout(
@@ -360,11 +461,73 @@ pub(crate) fn draw_static_metric_icon_for_value_validated(
         base_style.shadow_color,
         base_style.shadow_strength,
         base_style.shadow_distance,
-        base_style.x + validated.icon_offset_x * scale,
+        metric_row_origin_x(validated.content_alignment, base_style.x, 0.0)
+            + validated.icon_offset_x * scale,
         icon_top + validated.icon_offset_y * scale,
         icon_size,
     );
-    Ok(true)
+    Ok(static_parts)
+}
+
+fn draw_static_metric_unit(
+    canvas: &Canvas,
+    validated: &ValidatedValueWidget,
+    base_style: &ResolvedTextStyle,
+    scale: f32,
+    font_dirs: &[PathBuf],
+) -> CoreResult<()> {
+    let unit_text = crate::standard_metrics::standard_metric_unit_label(
+        validated.metric,
+        Some(&validated.display_unit),
+    );
+    let mut unit_style = base_style.clone();
+    unit_style.font_size =
+        (base_style.font_size * METRIC_WIDGET_UNIT_RATIO).max(MIN_UNITS_FONT_SIZE * scale);
+    unit_style.line_height = unit_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
+    unit_style.color = parse_color(
+        &ColorHexSlice(validated.unit_color).to_hex_string(),
+        base_style.opacity,
+    );
+    let unit_measure = measure_text(unit_text, &unit_style, font_dirs)?;
+    let horizontal_layout = metric_horizontal_layout(
+        validated.content_alignment,
+        base_style.x,
+        None,
+        0.0,
+        Some(unit_measure.width),
+        0.0,
+    );
+    unit_style.x = horizontal_layout
+        .unit_x
+        .expect("static unit must have a horizontal position");
+
+    let value_line_height = base_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
+    let text_group_height = value_line_height.max(unit_style.line_height);
+    let show_icon = validated.show_icon
+        && validated.icon_size > 0.0
+        && super::icons::metric_icon_kind_for_value(validated.metric).is_some();
+    let row_height = if show_icon {
+        (validated.icon_size * scale).max(text_group_height)
+    } else {
+        text_group_height
+    };
+    let text_group_bottom =
+        base_style.y + (row_height - text_group_height) * 0.5 + text_group_height;
+    let unit_vertical_metrics_text = if unit_text == "\u{00B0}" {
+        "\u{00B0}C"
+    } else {
+        unit_text
+    };
+    let vertical_measure = measure_text(unit_vertical_metrics_text, &unit_style, font_dirs)?;
+    let glyph_height = (vertical_measure.bounds_bottom - vertical_measure.bounds_top).abs();
+    unit_style.y = text_group_bottom - (unit_style.line_height + glyph_height) * 0.5;
+    draw_text_with_vertical_metrics_text(
+        canvas,
+        unit_text,
+        unit_vertical_metrics_text,
+        &unit_style,
+        font_dirs,
+    )
 }
 
 /// Returns the text used for vertical alignment measurements.
@@ -401,4 +564,115 @@ pub fn metric_icon_top_from_value_layout(
     let value_glyph_height = (value_measure.bounds_bottom - value_measure.bounds_top).abs();
     let value_top = text_group_bottom - (value_line_height + value_glyph_height) * 0.5;
     value_top + (value_line_height * 0.5) - (icon_size * 0.5)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::normalize::ValidatedValueFormatting;
+    use crate::MetricKind;
+
+    fn value_widget(alignment: ContentAlignment) -> ValidatedValueWidget {
+        ValidatedValueWidget {
+            metric: MetricKind::Speed,
+            x: 300.0,
+            y: 0.0,
+            display_type: DisplayType::Text,
+            content_alignment: alignment,
+            font_name: "Arial.ttf".to_string(),
+            font_size: 100.0,
+            color: [255; 4],
+            opacity: 1.0,
+            show_icon: true,
+            icon_color: [255; 4],
+            icon_size: 45.0,
+            icon_offset_x: 0.0,
+            icon_offset_y: 0.0,
+            show_units: true,
+            show_full_distance: None,
+            show_full_ascent: None,
+            coordinate_format: None,
+            unit_color: [255; 4],
+            display_unit: "kmh".to_string(),
+            starting_altitude_m: None,
+            prefix: String::new(),
+            suffix: String::new(),
+            formatting: ValidatedValueFormatting::DecimalPlaces { decimals: 0 },
+            hours_offset: None,
+            format: None,
+        }
+    }
+
+    #[test]
+    fn point_anchor_origins_follow_the_canonical_formula() {
+        for (alignment, expected) in [
+            (ContentAlignment::Left, 300.0),
+            (ContentAlignment::Center, 240.0),
+            (ContentAlignment::Right, 180.0),
+        ] {
+            let layout =
+                metric_horizontal_layout(alignment, 300.0, Some(20.0), 60.0, Some(20.0), 20.0);
+            assert_eq!(layout.content_width, 120.0);
+            assert_eq!(layout.row_origin_x, expected);
+            assert_eq!(layout.icon_x, Some(expected));
+            assert_eq!(layout.value_x, expected + 20.0);
+            assert_eq!(layout.unit_x, Some(expected + 100.0));
+        }
+    }
+
+    #[test]
+    fn static_metric_parts_follow_alignment_and_visibility() {
+        let mut widget = value_widget(ContentAlignment::Left);
+        assert_eq!(
+            static_metric_parts_for_value(&widget),
+            StaticMetricParts {
+                icon: true,
+                unit: false
+            }
+        );
+
+        widget.content_alignment = ContentAlignment::Center;
+        assert_eq!(
+            static_metric_parts_for_value(&widget),
+            StaticMetricParts::default()
+        );
+
+        widget.content_alignment = ContentAlignment::Right;
+        assert_eq!(
+            static_metric_parts_for_value(&widget),
+            StaticMetricParts {
+                icon: false,
+                unit: true
+            }
+        );
+
+        widget.metric = MetricKind::Time;
+        widget.show_units = false;
+        assert_eq!(
+            static_metric_parts_for_value(&widget),
+            StaticMetricParts::default()
+        );
+        widget.content_alignment = ContentAlignment::Left;
+        assert!(static_metric_parts_for_value(&widget).icon);
+
+        widget.metric = MetricKind::Speed;
+        widget.show_icon = false;
+        widget.show_units = false;
+        assert_eq!(
+            static_metric_parts_for_value(&widget),
+            StaticMetricParts::default()
+        );
+    }
+
+    #[test]
+    fn static_eligibility_remains_per_widget() {
+        let cached = value_widget(ContentAlignment::Left);
+        let dynamic = value_widget(ContentAlignment::Center);
+
+        assert!(static_metric_parts_for_value(&cached).icon);
+        assert_eq!(
+            static_metric_parts_for_value(&dynamic),
+            StaticMetricParts::default()
+        );
+    }
 }

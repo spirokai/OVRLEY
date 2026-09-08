@@ -39,11 +39,11 @@ jobs:
         with:
           # Pulls the dynamic tag discovered in the step above
           tag: ${{ steps.get_tag.outputs.tag }}
-          fileName: "OVRLEY-win-${{ steps.get_tag.outputs.tag }}.zip"
+          fileName: "OVRLEY-win-${{ steps.get_tag.outputs.tag }}-portable.zip"
 
       - name: Extract Binaries
         shell: powershell
-        run: Expand-Archive -Path "OVRLEY-win-${{ steps.get_tag.outputs.tag }}.zip" -DestinationPath ".\app-source" -Force
+        run: Expand-Archive -Path "OVRLEY-win-${{ steps.get_tag.outputs.tag }}-portable.zip" -DestinationPath ".\app-source" -Force
 
       # --- STEP B: Initialize winapp CLI ---
       - name: Setup WinApp CLI
@@ -61,34 +61,36 @@ jobs:
           $version = ($parts[0..3] -join ".")
 
           # 2. Call winapp to generate a pristine manifest with your exact store identities
-          winapp manifest generate `
-            --executable ".\app-source\OVRLEY.exe" `
-            --name "OVRLEY.OVRLEY" `
-            --publisher "CN=34DCDC1F-5913-4057-998F-50A45C98AD23" `
-            --version "$version" `
-            --output-directory ".\app-source"
+          winapp manifest generate ".\app-source\OVRLEY" `
+            --executable ".\app-source\OVRLEY\OVRLEY.exe" `
+            --package-name "OVRLEY.OVRLEY" `
+            --publisher-name "CN=34DCDC1F-5913-4057-998F-50A45C98AD23" `
+            --version "$version"
 
           # 3. Inject the C++ dependency using the CLI's native command
           winapp manifest add-dependency `
-            --manifest ".\app-source\Package.appxmanifest" `
+            --manifest ".\app-source\OVRLEY\Package.appxmanifest" `
             --name "Microsoft.VCLibs.140.00.UWPDesktop" `
             --min-version "14.0.30704.0" `
             --publisher "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
             
           # 4. Rename the manifest to match the expected name for MSIX packaging
-          Rename-Item ".\app-source\Package.appxmanifest" "AppxManifest.xml" -Force
+          Rename-Item ".\app-source\OVRLEY\Package.appxmanifest" "AppxManifest.xml" -Force
+
+      # --- STEP D: Check for .ovrley-portable flag ---
+
+      - name: Disable updater for Microsoft Store
+        shell: powershell
+        run: New-Item -Path ".\app-source\OVRLEY\.ovrley-portable" -ItemType File -Force
 
       # --- STEP D: Package into MSIX and rename ---
       - name: Pack MSIX
         shell: powershell
         run: |
-          winapp pack ".\app-source" --output-appx-directory ".\dist"
-
-          $package = Get-ChildItem ".\dist" -Filter *.msix | Select-Object -First 1
           $newName = "OVRLEY-${{ steps.get_tag.outputs.tag }}.msix"
+          New-Item -Path ".\dist" -ItemType Directory -Force | Out-Null
           $newPath = Join-Path ".\dist" $newName
-
-          Rename-Item $package.FullName $newPath -Force
+          winapp pack ".\app-source\OVRLEY" --output "$newPath"
 
       # --- STEP E: Authenticate & Deploy to Microsoft Store ---
       - name: Setup MSStore CLI

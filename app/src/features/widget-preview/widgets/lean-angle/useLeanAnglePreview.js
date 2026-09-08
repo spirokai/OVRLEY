@@ -10,10 +10,10 @@ const DEGREE_UNIT_CENTERING_OFFSET_RATIO = 0.1
 
 /**
  * Builds the lean-angle preview presentation for the current activity frame.
- * @param {{widget: object, activity: object|null, previewSecond: number, globalOpacity: number, sceneStyle: object|null}} params
+ * @param {{widget: object, activity: object|null, previewSecond: number, globalOpacity: number, globalScale: number, sceneStyle: object|null}} params
  * @returns {object} Presentation model consumed by the lean-angle renderer.
  */
-export function useLeanAnglePreview({ widget, activity, previewSecond, globalOpacity, sceneStyle }) {
+export function useLeanAnglePreview({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle }) {
   const maskId = useId()
   const fontFamily = getPreviewFontFamily(widget.data.font)
   useFontMetrics([{ fontFamily, fontSize: widget.data.font_size }])
@@ -39,6 +39,8 @@ export function useLeanAnglePreview({ widget, activity, previewSecond, globalOpa
       showIcon: false,
       showUnits: Boolean(unitText),
       iconSize: 0,
+      contentAlignment: 'left',
+      globalScale,
     })
     const degreeUnitOffset = unitText ? widget.data.font_size * DEGREE_UNIT_CENTERING_OFFSET_RATIO : 0
     const textOriginX = layout.centerX + widget.data.value_offset_x + degreeUnitOffset - textLayout.width / 2
@@ -64,5 +66,5 @@ export function useLeanAnglePreview({ widget, activity, previewSecond, globalOpa
       textOriginX,
       textOriginY,
     }
-  }, [activity, fontFamily, globalOpacity, maskId, previewSecond, sceneStyle, widget])
+  }, [activity, fontFamily, globalOpacity, globalScale, maskId, previewSecond, sceneStyle, widget])
 }

@@ -71,18 +71,21 @@ describe('useVideoPreview', () => {
     expect(video.play).not.toHaveBeenCalled()
   })
 
-  test('requests a frozen final frame after the playhead reaches the video end', () => {
+  test('does not seek or restart the ended video while timeline playback continues', () => {
     useStore.setState({
       importedVideoDuration: 30,
+      previewPlaybackSource: 'timeline',
+      previewPlaybackState: 'playing',
       selectedSecond: 35,
       videoSyncOffsetSeconds: 5,
     })
 
-    const video = createVideoStub()
+    const video = createVideoStub({ currentTime: 30 })
     const videoRef = { current: video }
-    const { result } = renderHook(() => useVideoPreview(videoRef, true))
+    renderHook(() => useVideoPreview(videoRef, true))
 
-    expect(result.current.frozenFrameSecond).toBe(30)
+    expect(video.play).not.toHaveBeenCalled()
+    expect(video.currentTime).toBe(30)
   })
 
   test('pauses playback when the active video rejects the play request', async () => {

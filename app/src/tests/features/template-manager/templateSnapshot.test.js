@@ -361,4 +361,21 @@ describe('template snapshot standard metric schema', () => {
       }),
     ).toThrow(`Unsupported template file version: ${TEMPLATE_FILE_VERSION - 1}. Expected ${TEMPLATE_FILE_VERSION}.`)
   })
+
+  test.each([
+    ['config', 'invalid', { globalDefaults: {} }, 'Template config must be an object.'],
+    ['config array', [], { globalDefaults: {} }, 'Template config must be an object.'],
+    ['settings', {}, 'invalid', 'Template settings must be an object.'],
+    ['settings array', {}, [], 'Template settings must be an object.'],
+    ['global defaults', {}, { globalDefaults: 'invalid' }, 'Template settings.globalDefaults must be an object.'],
+  ])('rejects malformed %s envelope fields', (_case, config, settings, expectedMessage) => {
+    expect(() =>
+      normalizeTemplateFilePayload({
+        format: TEMPLATE_FILE_FORMAT,
+        version: TEMPLATE_FILE_VERSION,
+        config,
+        settings,
+      }),
+    ).toThrow(expectedMessage)
+  })
 })

@@ -61,6 +61,7 @@ describe('useVideoPlaybackClock', () => {
       useVideoPlaybackClock({
         videoRef: { current: null },
         isActive: false,
+        onPlaybackEnded: vi.fn(),
         onPreviewSecond: vi.fn(),
         videoSyncOffsetSeconds: 0,
       }),
@@ -77,6 +78,7 @@ describe('useVideoPlaybackClock', () => {
       useVideoPlaybackClock({
         videoRef: { current: null },
         isActive: false,
+        onPlaybackEnded: vi.fn(),
         onPreviewSecond: vi.fn(),
         videoSyncOffsetSeconds: 0,
       }),

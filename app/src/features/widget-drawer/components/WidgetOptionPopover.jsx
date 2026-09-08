@@ -18,7 +18,7 @@ export function WidgetOptionPopover({ options, onSelect, children }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent side="right" align="start" sideOffset={6.8} className="z-70 -ml-2 mt-6 w-48 rounded-none p-[0.2rem]">
+      <PopoverContent side="right" align="start" sideOffset={6.8} className="z-70 -ml-2 mt-6 w-52 rounded-none p-[0.2rem]">
         <div className="flex flex-col gap-[0.11rem]">
           {options.map((option) => {
             const Icon = option.icon

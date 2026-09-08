@@ -58,10 +58,11 @@ AccordionTrigger.displayName = AccordionPrimitive.Trigger.displayName
  * @param {React.Ref<*>} ref - Forwarded React ref.
  * @returns {JSX.Element} Rendered component output.
  */
-const AccordionContent = React.forwardRef(({ className, children, ...props }, ref) => (
+const AccordionContent = React.forwardRef(({ className, children, style, ...props }, ref) => (
   <AccordionPrimitive.Content
     ref={ref}
-    className="overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
+    className="overflow-hidden text-sm duration-150 data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
+    style={{ animationDuration: '160ms', ...style }}
     {...props}
   >
     <div className={cn('pb-4 pt-0', className)}>{children}</div>

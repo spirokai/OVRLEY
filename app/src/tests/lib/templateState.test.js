@@ -167,6 +167,18 @@ describe('normalizeTemplateConfig', () => {
 
     expect(result.values[0].value).toBe('speed')
     expect(result.values[0].show_units).toBe(true)
+    expect(result.values[0].content_alignment).toBe('left')
+    expect(result.values[0].x).toBe(100)
+  })
+
+  test('normalizes old time widgets to left alignment and rejects malformed alignment', () => {
+    const result = normalizeTemplateConfig({ values: [{ id: 'time-1', value: 'time', x: 50, y: 60 }] })
+
+    expect(result.values[0].content_alignment).toBe('left')
+    expect(result.values[0].x).toBe(50)
+    expect(() => normalizeTemplateConfig({ values: [{ id: 'value-1', value: 'speed', content_alignment: 'justify' }] })).toThrow(
+      'Invalid content_alignment: justify',
+    )
   })
 
   test('rejects value widgets whose type is not in the standard metric manifest', () => {

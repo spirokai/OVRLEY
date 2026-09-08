@@ -65,16 +65,32 @@ export function createTemplateFilePayload(state, meta = {}) {
  * @returns {object} Normalized durable template state plus optional name.
  */
 export function normalizeTemplateFilePayload(rawTemplate) {
-  if (!rawTemplate || typeof rawTemplate !== 'object') {
+  if (!rawTemplate || typeof rawTemplate !== 'object' || Array.isArray(rawTemplate)) {
     throw new Error('Template file is empty or invalid.')
   }
 
-  if (rawTemplate.format !== TEMPLATE_FILE_FORMAT || !rawTemplate.config || !rawTemplate.settings) {
+  if (rawTemplate.format !== TEMPLATE_FILE_FORMAT) {
     throw new Error('Unsupported template file format.')
   }
 
   if (rawTemplate.version !== TEMPLATE_FILE_VERSION) {
     throw new Error(`Unsupported template file version: ${rawTemplate.version}. Expected ${TEMPLATE_FILE_VERSION}.`)
+  }
+
+  if (!rawTemplate.config || typeof rawTemplate.config !== 'object' || Array.isArray(rawTemplate.config)) {
+    throw new Error('Template config must be an object.')
+  }
+
+  if (!rawTemplate.settings || typeof rawTemplate.settings !== 'object' || Array.isArray(rawTemplate.settings)) {
+    throw new Error('Template settings must be an object.')
+  }
+
+  if (
+    !rawTemplate.settings.globalDefaults ||
+    typeof rawTemplate.settings.globalDefaults !== 'object' ||
+    Array.isArray(rawTemplate.settings.globalDefaults)
+  ) {
+    throw new Error('Template settings.globalDefaults must be an object.')
   }
 
   const normalizedState = createDurableTemplateState({

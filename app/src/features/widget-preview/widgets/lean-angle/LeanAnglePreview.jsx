@@ -3,7 +3,7 @@ import { PreviewSvgShadowBlurFilter, PreviewSvgText } from '../../shared/Preview
 
 /** Renders the lean-angle track, dynamic signed fill, and centred value. */
 export function OverlayLeanAngleWidget({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle }) {
-  const presentation = useLeanAnglePreview({ widget, activity, previewSecond, globalOpacity, sceneStyle })
+  const presentation = useLeanAnglePreview({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle })
   const { layout, textLayout } = presentation
 
   return (

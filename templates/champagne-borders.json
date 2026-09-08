@@ -43,7 +43,8 @@
         "show_units": true,
         "display_unit": "w",
         "id": "widget-1",
-        "value": "power"
+        "value": "power",
+        "content_alignment": "left"
       },
       {
         "x": 3306,
@@ -65,7 +66,8 @@
         "show_units": true,
         "display_unit": "kmh",
         "id": "widget-2",
-        "value": "speed"
+        "value": "speed",
+        "content_alignment": "left"
       },
       {
         "x": 3306,
@@ -87,7 +89,8 @@
         "show_units": true,
         "display_unit": "bpm",
         "id": "widget-7",
-        "value": "heartrate"
+        "value": "heartrate",
+        "content_alignment": "left"
       }
     ],
     "plots": [

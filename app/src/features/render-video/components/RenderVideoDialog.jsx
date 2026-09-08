@@ -74,7 +74,7 @@ export default function RenderVideoDialog(props) {
     >
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
-        className="w-full max-w-lg rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
+        className="w-full max-w-xl rounded-sm border border-accent-border/80 bg-card/95 p-6 shadow-2xl shadow-background/50"
         aria-describedby={undefined}
         onEscapeKeyDown={(event) => {
           if (ctx.isProgress || ctx.submissionPending) {
@@ -98,10 +98,10 @@ export default function RenderVideoDialog(props) {
             <div className="space-y-8">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-10 w-10 shrink-0 text-red-500" />
-                <p className="pl-2 font-bold text-sm leading-relaxed text-red-500">
+                <p className="pl-2 font-bold text-sm leading-normal pt-1 text-red-500">
                   {t(
                     'render-video.videoResolutionMismatchMessage',
-                    'Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}}).',
+                    'Overlay resolution ({{overlayResolution}}) must match imported video ({{videoResolution}}).',
                     {
                       overlayResolution: `${ctx.config?.scene?.width}x${ctx.config?.scene?.height}`,
                       videoResolution: `${ctx.importedVideoResolution?.width}x${ctx.importedVideoResolution?.height}`,
@@ -109,7 +109,7 @@ export default function RenderVideoDialog(props) {
                   )}
                 </p>
               </div>
-              <p className="text-sm leading-6 text-muted-foreground text-justify">
+              <p className="text-sm leading-4 text-muted-foreground text-justify">
                 {t(
                   'render-video.resolutionMismatchInstructions',
                   'This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different template.',

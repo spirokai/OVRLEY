@@ -28,7 +28,8 @@
       "show_units": true,
       "display_unit": "kmh",
       "id": "widget-1",
-      "value": "speed"
+      "value": "speed",
+      "content_alignment": "left"
     }
   ],
   "plots": []

@@ -24,7 +24,7 @@
 
 use std::collections::BTreeMap;
 
-use telemetry_parser::tags_impl::{GroupId, TagId, TagMap, TagValue};
+use telemetry_parser::tags_impl::{GroupId, Scalar, TagId, TagMap, TagValue};
 use telemetry_parser::util::SampleInfo;
 
 use crate::media::native_sample::NativeSample;
@@ -43,6 +43,8 @@ use super::vendor::{
     extract_insta360_shutter,
 };
 
+const GOPRO_GPS9_TAG: u32 = 0x4750_5339;
+
 /// Converts telemetry-parser's grouped tag maps into the narrow raw-sample
 /// shape consumed by the importer.
 pub(crate) fn extract_native_samples(samples: &[SampleInfo]) -> Vec<NativeSample> {
@@ -58,9 +60,7 @@ pub(crate) fn extract_native_samples(samples: &[SampleInfo]) -> Vec<NativeSample
             ..NativeSample::default()
         };
 
-        if let Some(gps_map) = tag_map.get(&GroupId::GPS) {
-            append_gps_samples(&mut result, &base, sample, gps_map);
-        }
+        append_gps_samples(&mut result, &base, sample, tag_map);
 
         append_camera_samples(&mut result, sample, tag_map);
 
@@ -72,6 +72,11 @@ pub(crate) fn extract_native_samples(samples: &[SampleInfo]) -> Vec<NativeSample
     result
 }
 
+/// Reports whether a sample contains one of the GPS groups handled below.
+pub(crate) fn has_gps_source(tag_map: &BTreeMap<GroupId, TagMap>) -> bool {
+    tag_map.contains_key(&GroupId::GPS) || tag_map.contains_key(&GroupId::Custom("GPS9".into()))
+}
+
 // ---------------------------------------------------------------------------
 // GPS
 // ---------------------------------------------------------------------------
@@ -81,50 +86,98 @@ fn append_gps_samples(
     result: &mut Vec<NativeSample>,
     base: &NativeSample,
     sample: &SampleInfo,
-    gps_map: &TagMap,
+    tag_map: &BTreeMap<GroupId, TagMap>,
 ) {
-    let Some(tag) = gps_map.get(&TagId::Data) else {
-        return;
-    };
-
-    match &tag.value {
-        TagValue::Vec_GpsData(gps_values) => {
-            let values = gps_values.get();
-            for (index, gps) in values.iter().enumerate() {
-                if !gps.is_acquired {
-                    continue;
-                }
-
-                let mut native = base.clone();
-                native.timestamp_ms = sub_sample_timestamp_ms(sample, index, values.len());
-                native.latitude = finite_f64(gps.lat);
-                native.longitude = finite_f64(gps.lon);
-                native.altitude = finite_f64(gps.altitude);
-                native.speed = finite_f64(gps.speed / 3.6);
-                native.heading = finite_f64(gps.track);
-                native.timestamp = Some(unix_seconds_to_rfc3339(gps.unix_timestamp));
-
-                if native.has_payload() {
-                    result.push(native);
-                }
-            }
+    if let Some(gps_map) = tag_map.get(&GroupId::GPS) {
+        if append_gps_group_samples(result, base, sample, gps_map) {
+            return;
         }
-        TagValue::Vec_Vec_i32(rows) => {
-            append_scaled_gps_rows(result, base, sample, gps_map, rows.get())
-        }
-        _ => {}
+    }
+    if let Some(gps9_map) = tag_map.get(&GroupId::Custom("GPS9".into())) {
+        append_gps_group_samples(result, base, sample, gps9_map);
     }
 }
 
-/// Normalizes GoPro-style GPS5 integer rows using parser-provided scale tags.
+/// Appends whichever supported GPS representation is present in one group.
+fn append_gps_group_samples(
+    result: &mut Vec<NativeSample>,
+    base: &NativeSample,
+    sample: &SampleInfo,
+    gps_map: &TagMap,
+) -> bool {
+    if let Some(tag) = gps_map.get(&TagId::Data) {
+        match &tag.value {
+            TagValue::Vec_GpsData(gps_values) => {
+                let values = gps_values.get();
+                for (index, gps) in values.iter().enumerate() {
+                    if !gps.is_acquired {
+                        continue;
+                    }
+
+                    let mut native = base.clone();
+                    native.timestamp_ms = sub_sample_timestamp_ms(sample, index, values.len());
+                    native.latitude = finite_f64(gps.lat);
+                    native.longitude = finite_f64(gps.lon);
+                    native.altitude = finite_f64(gps.altitude);
+                    native.speed = finite_f64(gps.speed / 3.6);
+                    native.heading = finite_f64(gps.track);
+                    native.timestamp = Some(unix_seconds_to_rfc3339(gps.unix_timestamp));
+
+                    if native.has_payload() {
+                        result.push(native);
+                    }
+                }
+                return true;
+            }
+            TagValue::Vec_Vec_i32(rows) => {
+                let values = rows.get();
+                append_scaled_gps_rows(
+                    result,
+                    base,
+                    sample,
+                    gps_map,
+                    values.len(),
+                    values.iter().enumerate().map(|(index, row)| {
+                        (index, Some(row.iter().map(|value| *value as f64).collect()))
+                    }),
+                );
+                return true;
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(tag) = gps_map.get(&TagId::Unknown(GOPRO_GPS9_TAG)) {
+        if let TagValue::Vec_Vec_Scalar(rows) = &tag.value {
+            let values = rows.get();
+            append_scaled_gps_rows(
+                result,
+                base,
+                sample,
+                gps_map,
+                values.len(),
+                values
+                    .iter()
+                    .enumerate()
+                    .map(|(index, row)| (index, row.iter().map(scalar_to_f64).collect())),
+            );
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Normalizes scaled GoPro GPS rows regardless of their parser scalar type.
 fn append_scaled_gps_rows(
     result: &mut Vec<NativeSample>,
     base: &NativeSample,
     sample: &SampleInfo,
     gps_map: &TagMap,
-    rows: &[Vec<i32>],
+    row_count: usize,
+    rows: impl Iterator<Item = (usize, Option<Vec<f64>>)>,
 ) {
-    if rows.is_empty() {
+    if row_count == 0 {
         return;
     }
     if !gps5_fix_is_usable(gps_map) {
@@ -141,43 +194,86 @@ fn append_scaled_gps_rows(
         .map(|stmp| stmp as f64 / 1000.0)
         .unwrap_or(sample.timestamp_ms);
 
-    for (index, row) in rows.iter().enumerate() {
-        if row.len() < 5 {
+    for (index, numeric_row) in rows {
+        let Some(numeric_row) = numeric_row else {
             continue;
-        }
-
-        let latitude = row[0] as f64 / scales[0] as f64;
-        let longitude = row[1] as f64 / scales[1] as f64;
-        if latitude == 0.0 && longitude == 0.0 {
-            continue;
-        }
-
-        let mut native = base.clone();
-
-        native.timestamp_ms = if let Some(stmp) = stmp_us {
-            let stmp_ms = stmp as f64 / 1000.0;
-            if index == 0 || rows.len() <= 1 {
-                stmp_ms
-            } else {
-                stmp_ms + sample.duration_ms * index as f64 / rows.len() as f64
-            }
-        } else {
-            sub_sample_timestamp_ms(sample, index, rows.len())
         };
+        append_scaled_gps_row(
+            result,
+            base,
+            sample,
+            &numeric_row,
+            scales,
+            index,
+            row_count,
+            stmp_us,
+            first_row_ms,
+            unix_ms,
+        );
+    }
+}
 
-        native.latitude = finite_f64(latitude);
-        native.longitude = finite_f64(longitude);
-        native.altitude = finite_f64(row[2] as f64 / scales[2] as f64);
-        native.speed = finite_f64(row[3] as f64 / scales[3] as f64);
+fn append_scaled_gps_row(
+    result: &mut Vec<NativeSample>,
+    base: &NativeSample,
+    sample: &SampleInfo,
+    row: &[f64],
+    scales: &[i32],
+    index: usize,
+    row_count: usize,
+    stmp_us: Option<u64>,
+    first_row_ms: f64,
+    unix_ms: Option<u64>,
+) {
+    if row.len() < 5 {
+        return;
+    }
 
-        if let Some(unix_ms) = unix_ms {
-            let offset_ms = native.timestamp_ms - first_row_ms;
-            native.timestamp = Some(unix_millis_plus_offset_ms_to_rfc3339(unix_ms, offset_ms));
+    let latitude = row[0] / scales[0] as f64;
+    let longitude = row[1] / scales[1] as f64;
+    if latitude == 0.0 && longitude == 0.0 {
+        return;
+    }
+
+    let mut native = base.clone();
+    native.timestamp_ms = if let Some(stmp) = stmp_us {
+        let stmp_ms = stmp as f64 / 1000.0;
+        if index == 0 || row_count <= 1 {
+            stmp_ms
+        } else {
+            stmp_ms + sample.duration_ms * index as f64 / row_count as f64
         }
+    } else {
+        sub_sample_timestamp_ms(sample, index, row_count)
+    };
+    native.latitude = finite_f64(latitude);
+    native.longitude = finite_f64(longitude);
+    native.altitude = finite_f64(row[2] / scales[2] as f64);
+    native.speed = finite_f64(row[3] / scales[3] as f64);
 
-        if native.has_payload() {
-            result.push(native);
-        }
+    if let Some(unix_ms) = unix_ms {
+        let offset_ms = native.timestamp_ms - first_row_ms;
+        native.timestamp = Some(unix_millis_plus_offset_ms_to_rfc3339(unix_ms, offset_ms));
+    }
+
+    if native.has_payload() {
+        result.push(native);
+    }
+}
+
+fn scalar_to_f64(value: &Scalar) -> Option<f64> {
+    match value {
+        Scalar::u8(value) => finite_f64(*value as f64),
+        Scalar::i8(value) => finite_f64(*value as f64),
+        Scalar::u16(value) => finite_f64(*value as f64),
+        Scalar::i16(value) => finite_f64(*value as f64),
+        Scalar::u32(value) => finite_f64(*value as f64),
+        Scalar::i32(value) => finite_f64(*value as f64),
+        Scalar::u64(value) => finite_f64(*value as f64),
+        Scalar::i64(value) => finite_f64(*value as f64),
+        Scalar::f32(value) => finite_f64(*value as f64),
+        Scalar::f64(value) => finite_f64(*value),
+        Scalar::String(_) | Scalar::bool(_) => None,
     }
 }
 
@@ -326,102 +422,161 @@ fn append_imu_samples(result: &mut Vec<NativeSample>, sample: &SampleInfo, accel
                 return;
             };
             for (index, vec) in vectors.iter().enumerate() {
-                let ts = imu_sample_timestamp_ms(sample, index, vectors.len(), stmp_us);
-                let g = compute_g_force_components(
+                append_imu_vector_sample(
+                    result,
+                    sample,
+                    index,
+                    vectors.len(),
+                    stmp_us,
                     vec.x as f64 / scale,
                     vec.y as f64 / scale,
                     vec.z as f64 / scale,
                     accel_map,
                 );
-                if let Some(g) = g {
-                    result.push(NativeSample {
-                        timestamp_ms: ts,
-                        g_force: Some(g),
-                        ..NativeSample::default()
-                    });
-                }
             }
         }
         TagValue::Vec_Vector3_f32(values) => {
             let vectors = values.get();
             for (index, vec) in vectors.iter().enumerate() {
-                let ts = imu_sample_timestamp_ms(sample, index, vectors.len(), stmp_us);
-                let g =
-                    compute_g_force_components(vec.x as f64, vec.y as f64, vec.z as f64, accel_map);
-                if let Some(g) = g {
-                    result.push(NativeSample {
-                        timestamp_ms: ts,
-                        g_force: Some(g),
-                        ..NativeSample::default()
-                    });
-                }
+                append_imu_vector_sample(
+                    result,
+                    sample,
+                    index,
+                    vectors.len(),
+                    stmp_us,
+                    vec.x as f64,
+                    vec.y as f64,
+                    vec.z as f64,
+                    accel_map,
+                );
             }
         }
         TagValue::Vec_Vector3_f64(values) => {
             let vectors = values.get();
             for (index, vec) in vectors.iter().enumerate() {
-                let ts = imu_sample_timestamp_ms(sample, index, vectors.len(), stmp_us);
-                let g = compute_g_force_components(vec.x, vec.y, vec.z, accel_map);
-                if let Some(g) = g {
-                    result.push(NativeSample {
-                        timestamp_ms: ts,
-                        g_force: Some(g),
-                        ..NativeSample::default()
-                    });
-                }
+                append_imu_vector_sample(
+                    result,
+                    sample,
+                    index,
+                    vectors.len(),
+                    stmp_us,
+                    vec.x,
+                    vec.y,
+                    vec.z,
+                    accel_map,
+                );
+            }
+        }
+        TagValue::Vec_TimeVector3_f32(values) => {
+            let vectors = values.get();
+            for (index, vec) in vectors.iter().enumerate() {
+                append_imu_vector_sample(
+                    result,
+                    sample,
+                    index,
+                    vectors.len(),
+                    stmp_us,
+                    vec.x as f64,
+                    vec.y as f64,
+                    vec.z as f64,
+                    accel_map,
+                );
+            }
+        }
+        TagValue::Vec_TimeVector3_f64(values) => {
+            let vectors = values.get();
+            for (index, vec) in vectors.iter().enumerate() {
+                append_imu_vector_sample(
+                    result,
+                    sample,
+                    index,
+                    vectors.len(),
+                    stmp_us,
+                    vec.x,
+                    vec.y,
+                    vec.z,
+                    accel_map,
+                );
             }
         }
         _ => {
-            if let Some(g) = extract_g_force(accel_map) {
-                result.push(NativeSample {
-                    timestamp_ms: sample.timestamp_ms,
-                    g_force: Some(g),
-                    ..NativeSample::default()
-                });
+            if let Some((x, y, z)) = extract_last_acceleration_components(accel_map) {
+                append_imu_vector_sample(result, sample, 0, 1, stmp_us, x, y, z, accel_map);
             }
         }
     }
 }
 
+/// Appends one converted IMU vector, retaining both scalar and axis-specific
+/// values. Axis values remain available even if scalar magnitude calculation
+/// rejects an overflowed result.
+fn append_imu_vector_sample(
+    result: &mut Vec<NativeSample>,
+    sample: &SampleInfo,
+    index: usize,
+    count: usize,
+    stmp_us: Option<u64>,
+    x: f64,
+    y: f64,
+    z: f64,
+    accel_map: &TagMap,
+) {
+    let Some((x, y, z)) = acceleration_components_to_g(x, y, z, accel_map) else {
+        return;
+    };
+
+    result.push(NativeSample {
+        timestamp_ms: imu_sample_timestamp_ms(sample, index, count, stmp_us),
+        g_force: g_force_from_components(x, y, z),
+        g_force_x: Some(x),
+        g_force_y: Some(y),
+        g_force_z: Some(z),
+        ..NativeSample::default()
+    });
+}
+
 /// Fallback IMU extractor: takes the last vector for unknown accelerator types.
-fn extract_g_force(map: &TagMap) -> Option<f64> {
+fn extract_last_acceleration_components(map: &TagMap) -> Option<(f64, f64, f64)> {
     let tag = map.get(&TagId::Data)?;
     match &tag.value {
         TagValue::Vec_Vector3_i16(values) => {
             let value = values.get().last()?;
             let scale = extract_tag_f64(map, &TagId::Scale).filter(|scale| *scale != 0.0)?;
-            compute_g_force_components(
+            Some((
                 value.x as f64 / scale,
                 value.y as f64 / scale,
                 value.z as f64 / scale,
-                map,
-            )
+            ))
         }
-        TagValue::Vec_Vector3_f32(values) => values.get().last().and_then(|value| {
-            compute_g_force_components(value.x as f64, value.y as f64, value.z as f64, map)
-        }),
-        TagValue::Vec_Vector3_f64(values) => values
+        TagValue::Vec_Vector3_f32(values) => values
             .get()
             .last()
-            .and_then(|value| compute_g_force_components(value.x, value.y, value.z, map)),
-        TagValue::Vec_TimeVector3_f32(values) => values.get().last().and_then(|value| {
-            compute_g_force_components(value.x as f64, value.y as f64, value.z as f64, map)
-        }),
-        TagValue::Vec_TimeVector3_f64(values) => values
+            .map(|value| (value.x as f64, value.y as f64, value.z as f64)),
+        TagValue::Vec_Vector3_f64(values) => {
+            values.get().last().map(|value| (value.x, value.y, value.z))
+        }
+        TagValue::Vec_TimeVector3_f32(values) => values
             .get()
             .last()
-            .and_then(|value| compute_g_force_components(value.x, value.y, value.z, map)),
+            .map(|value| (value.x as f64, value.y as f64, value.z as f64)),
+        TagValue::Vec_TimeVector3_f64(values) => {
+            values.get().last().map(|value| (value.x, value.y, value.z))
+        }
         _ => None,
     }
 }
 
-/// Converts acceleration vectors into dynamic load relative to resting gravity.
-fn compute_g_force_components(x: f64, y: f64, z: f64, map: &TagMap) -> Option<f64> {
+/// Converts acceleration vectors into g units while retaining each axis.
+fn acceleration_components_to_g(x: f64, y: f64, z: f64, map: &TagMap) -> Option<(f64, f64, f64)> {
     let unit_factor = match extract_tag_string(map, &TagId::Unit).as_deref() {
         Some("m/s\u{00b2}") | Some("m/s^2") | Some("m/s2") => 1.0 / 9.80665,
         _ => 1.0,
     };
-    g_force_from_components(x * unit_factor, y * unit_factor, z * unit_factor)
+    Some((
+        finite_f64(x * unit_factor)?,
+        finite_f64(y * unit_factor)?,
+        finite_f64(z * unit_factor)?,
+    ))
 }
 
 /// Computes a per-vector IMU sample timestamp using the accelerometer's STMP.

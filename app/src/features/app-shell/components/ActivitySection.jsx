@@ -87,7 +87,7 @@ export default function ActivitySection({
             {t('app-shell.file', 'File')}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" sideOffset={6} className="w-50 p-1">
+        <PopoverContent align="start" sideOffset={6} className="w-55 p-1">
           <div className="flex flex-col">
             <MenuItem icon={FilePlus2} label={t('app-shell.newProject', 'New Project')} shortcut="Mod+N" onClick={() => run(onNewProject)} />
             <MenuItem icon={FolderOpen} label={t('app-shell.loadProject', 'Load Project')} shortcut="Mod+O" onClick={() => run(onLoadProject)} />

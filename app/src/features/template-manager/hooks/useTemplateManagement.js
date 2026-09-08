@@ -102,9 +102,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         }
         if (!descriptor) throw new Error(`Unknown template: ${filename}`)
         const data = await backend.getTemplate(filename)
-        const normalizedTemplate = normalizeTemplateFilePayload(data, {
-          globalDefaults,
-        })
+        const normalizedTemplate = normalizeTemplateFilePayload(data)
         const { name: _templateName, ...templateState } = normalizedTemplate
 
         loadTemplateState(
@@ -121,7 +119,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         setProcessing(false)
       }
     },
-    [fetchTemplates, globalDefaults, loadTemplateState, setErrorMessage, setProcessing],
+    [fetchTemplates, loadTemplateState, setErrorMessage, setProcessing],
   )
 
   // Save template handler — serializes current state and triggers save dialog or download
@@ -203,16 +201,14 @@ export default function useTemplateManagement({ onTemplateCreated }) {
 
       const rawText = await file.text()
       const parsedTemplate = JSON.parse(rawText)
-      const normalizedTemplate = normalizeTemplateFilePayload(parsedTemplate, {
-        globalDefaults,
-      })
+      const normalizedTemplate = normalizeTemplateFilePayload(parsedTemplate)
       const { name: _templateName, ...templateState } = normalizedTemplate
       loadTemplateState(templateState, selectedPath ? { kind: 'file', path: selectedPath } : null)
     } catch (error) {
       console.error('Failed to import template:', error)
       setErrorMessage(`Failed to import template: ${getErrorMessage(error, 'Unknown error')}`)
     }
-  }, [globalDefaults, loadTemplateState, setErrorMessage])
+  }, [loadTemplateState, setErrorMessage])
 
   // Confirm create new — executes the new template action after the confirmation is answered
   const confirmCreateNewTemplate = useCallback(() => {
@@ -241,7 +237,9 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     open: isNewTemplateConfirmOpen,
     title: i18next.t('template-manager.createNewTemplate', 'Create New Template'),
     description: i18next.t('template-manager.unsavedChanges', 'Your template has unsaved changes. Save them or discard them.'),
-    discardLabel: 'New Template',
+    cancelLabel: i18next.t('template-manager.cancel', 'Cancel'),
+    saveLabel: i18next.t('template-manager.save', 'Save'),
+    discardLabel: i18next.t('template-manager.newTemplate', 'New Template'),
     onCancel: () => answerConfirm('cancel'),
     onSave: () => answerConfirm('save'),
     onDiscard: () => answerConfirm('discard'),

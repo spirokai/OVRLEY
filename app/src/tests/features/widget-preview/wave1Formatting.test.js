@@ -9,6 +9,7 @@ function makeMetricWidget(type, data = {}) {
     type,
     data: {
       display_type: 'text',
+      content_alignment: 'left',
       font: 'Arial.ttf',
       font_size: 60,
       decimals: 0,

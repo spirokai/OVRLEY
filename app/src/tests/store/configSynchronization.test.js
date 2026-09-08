@@ -10,6 +10,7 @@
  */
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { createDurableTemplateState } from '@/lib/template/template-state'
 import { cloneSerializable, DEFAULT_CONFIG } from '@/store/store-utils'
 
 /**
@@ -57,13 +58,12 @@ describe('config/timeline synchronization', () => {
     templateConfig.scene.start = 12
     templateConfig.scene.end = 144
 
-    useStore.getState().hydrateTemplateState(
-      {
-        config: templateConfig,
-        settings: { globalDefaults: { color_text: '#abcdef' } },
-      },
-      { filename: 'template.json', source: 'file' },
-    )
+    const templateState = createDurableTemplateState({
+      config: templateConfig,
+      globalDefaults: { color_text: '#abcdef' },
+    })
+
+    useStore.getState().hydrateTemplateState(templateState, { source: { kind: 'file', path: 'template.json' } })
 
     expect(useStore.getState().config.scene).not.toHaveProperty('start')
     expect(useStore.getState().config.scene).not.toHaveProperty('end')

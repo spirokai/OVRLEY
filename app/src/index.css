@@ -122,6 +122,22 @@ body {
     @apply bg-background text-foreground;
   }
 
+  /* Native-app feel: disable text selection globally so click-dragging never
+     triggers the browser's blue text-highlight. Re-enable it for text inputs,
+     textareas, and contenteditable regions where selecting text is required.
+     Read-only text can opt back in per-element via the `select-text` class. */
+  * {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable] {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
   input[type='number'] {
     appearance: textfield;
     -moz-appearance: textfield;

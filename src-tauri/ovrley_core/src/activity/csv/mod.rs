@@ -62,6 +62,8 @@ enum Metric {
     Rpm,
     /// Engine power in watts.
     EnginePower,
+    /// Engine load as a percentage from zero to one hundred.
+    EngineLoad,
     /// Engine torque in newton-metres.
     Torque,
     /// Throttle position as a percentage from zero to one hundred.

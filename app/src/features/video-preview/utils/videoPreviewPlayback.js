@@ -65,8 +65,10 @@ export function clampVideoTime(video, second) {
  */
 export function syncVideoCurrentTime(video, second, epsilonSeconds = 0.001) {
   const safeSecond = clampVideoTime(video, second)
+  const duration = Number(video.duration)
+  const needsDrawableEndFrame = Number.isFinite(duration) && duration > 0 && Number(second) >= duration && video.currentTime >= duration
 
-  if (Math.abs(video.currentTime - safeSecond) <= epsilonSeconds) {
+  if (!needsDrawableEndFrame && Math.abs(video.currentTime - safeSecond) <= epsilonSeconds) {
     return
   }
 
@@ -109,9 +111,15 @@ export function describeMediaError(error) {
     case MediaError.MEDIA_ERR_ABORTED:
       return i18next.t('video-preview.videoPreviewLoadingWasAborted', 'Video preview loading was aborted.')
     case MediaError.MEDIA_ERR_NETWORK:
-      return i18next.t('video-preview.errors.fileUnavailable', 'The local preview server could not read the video file. The file may have been moved, deleted, or become unavailable.')
+      return i18next.t(
+        'video-preview.errors.fileUnavailable',
+        'The local preview server could not read the video file. The file may have been moved, deleted, or become unavailable.',
+      )
     case MediaError.MEDIA_ERR_DECODE:
-      return i18next.t('video-preview.errors.decodeFailed', 'The video could not be decoded by the system video player. This may happen with some HEVC, 10-bit, or 4:2:2 files.')
+      return i18next.t(
+        'video-preview.errors.decodeFailed',
+        'The video could not be decoded by the system video player. This may happen with some HEVC, 10-bit, or 4:2:2 files.',
+      )
     case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
       return i18next.t('video-preview.errors.unsupportedFormat', 'This video format is not supported by the system video player.')
     default:

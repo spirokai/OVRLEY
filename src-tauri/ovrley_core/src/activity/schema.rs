@@ -188,6 +188,7 @@ pub struct ActivityColumns {
     pub cadence: NumericSeries,
     pub power: NumericSeries,
     pub engine_power: NumericSeries,
+    pub engine_load: NumericSeries,
     pub temperature: NumericSeries,
     pub gradient: NumericSeries,
     pub pace: NumericSeries,
@@ -284,6 +285,9 @@ pub struct RawSample {
     /// Engine power in watts.
     #[serde(default)]
     pub engine_power: Option<f64>,
+    /// Engine load as a percentage from zero to one hundred.
+    #[serde(default)]
+    pub engine_load: Option<f64>,
     /// Ambient/device temperature in Celsius.
     #[serde(default)]
     pub temperature: Option<f64>,
@@ -440,6 +444,9 @@ pub struct ParsedActivity {
     /// Engine power in watts.
     #[serde(default)]
     pub engine_power: NumericSeries,
+    /// Engine load as a percentage from zero to one hundred.
+    #[serde(default)]
+    pub engine_load: NumericSeries,
     /// Temperature in degrees Celsius.
     #[serde(default)]
     pub temperature: NumericSeries,
@@ -618,6 +625,8 @@ pub struct DenseSeriesReport {
     pub power: Vec<Option<f64>>,
     /// Engine power in watts.
     pub engine_power: Vec<Option<f64>>,
+    /// Engine load as a percentage from zero to one hundred.
+    pub engine_load: Vec<Option<f64>>,
     /// Temperature in degrees Celsius.
     pub temperature: Vec<Option<f64>>,
     /// Pace in seconds per kilometer.
@@ -709,6 +718,7 @@ impl DenseSeriesReport {
             MetricKind::Cadence => Some(&self.cadence),
             MetricKind::Power => Some(&self.power),
             MetricKind::EnginePower => Some(&self.engine_power),
+            MetricKind::EngineLoad => Some(&self.engine_load),
             MetricKind::Temperature => Some(&self.temperature),
             MetricKind::Calories => Some(&self.calories),
             MetricKind::Pace => Some(&self.pace),
@@ -787,6 +797,8 @@ pub struct TrimmedActivity {
     pub power: NumericSeries,
     /// Trimmed engine-power samples in watts.
     pub engine_power: NumericSeries,
+    /// Trimmed engine load samples as percent.
+    pub engine_load: NumericSeries,
     /// Trimmed temperature samples in Celsius.
     pub temperature: NumericSeries,
     /// Trimmed pace samples in seconds per kilometer.

@@ -32,7 +32,8 @@
         "show_units": true,
         "display_unit": "mph",
         "id": "widget-1",
-        "value": "speed"
+        "value": "speed",
+        "content_alignment": "left"
       },
       {
         "x": 3270,
@@ -54,7 +55,8 @@
         "show_units": true,
         "display_unit": "bpm",
         "id": "widget-3",
-        "value": "heartrate"
+        "value": "heartrate",
+        "content_alignment": "left"
       },
       {
         "x": 3247,
@@ -77,7 +79,8 @@
         "display_unit": "percent",
         "id": "widget-4",
         "value": "left_right_balance",
-        "balance_format": "l_prefix"
+        "balance_format": "l_prefix",
+        "content_alignment": "left"
       },
       {
         "x": 2432,
@@ -99,7 +102,8 @@
         "show_units": true,
         "display_unit": "rpm",
         "id": "widget-5",
-        "value": "cadence"
+        "value": "cadence",
+        "content_alignment": "left"
       }
     ],
     "plots": [

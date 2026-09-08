@@ -14,10 +14,35 @@ use crate::error::{CoreError, CoreResult};
 use crate::standard_metrics::is_standard_metric;
 use crate::types::DisplayType;
 use crate::MetricKind;
+use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
 // ValidatedValueWidget — zero backend-side defaults
 // ---------------------------------------------------------------------------
+
+/// Horizontal point of an intrinsic metric row attached to the configured x coordinate.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContentAlignment {
+    Left,
+    Center,
+    Right,
+}
+
+pub(super) fn validate_content_alignment(
+    content_alignment: Option<String>,
+    path: &str,
+) -> CoreResult<ContentAlignment> {
+    match content_alignment.as_deref() {
+        Some("left") => Ok(ContentAlignment::Left),
+        Some("center") => Ok(ContentAlignment::Center),
+        Some("right") => Ok(ContentAlignment::Right),
+        Some(value) => Err(CoreError::Config(format!(
+            "{path}: expected 'left', 'center', or 'right', got '{value}'"
+        ))),
+        None => Err(CoreError::Config(format!("{path}: required"))),
+    }
+}
 
 /// Explicit formatting contract for the standard-metric text/value slice.
 #[derive(Clone, Debug)]
@@ -57,6 +82,7 @@ pub struct ValidatedValueWidget {
     pub x: f32,
     pub y: f32,
     pub display_type: DisplayType,
+    pub content_alignment: ContentAlignment,
     pub font_name: String,
     pub font_size: f32,
     pub color: [u8; 4],
@@ -128,7 +154,7 @@ pub fn validate_value_widget(value: ValueConfig, index: usize) -> CoreResult<Val
         )));
     }
 
-    validate_value_widget_fields(value, index, true)
+    validate_value_widget_fields(value, index, true, true)
 }
 
 /// Validates the text fields used inside a boxed arc gauge.
@@ -140,13 +166,14 @@ pub(super) fn validate_arc_inner_value_widget(
     value: ValueConfig,
     index: usize,
 ) -> CoreResult<ValidatedValueWidget> {
-    validate_value_widget_fields(value, index, false)
+    validate_value_widget_fields(value, index, false, false)
 }
 
 fn validate_value_widget_fields(
     value: ValueConfig,
     index: usize,
     require_icon_fields: bool,
+    require_alignment: bool,
 ) -> CoreResult<ValidatedValueWidget> {
     let p = |f: &str| format!("values[{index}].{f}");
 
@@ -165,6 +192,11 @@ fn validate_value_widget_fields(
     }
 
     let font_name = require_string(value.font, &p("font"))?;
+    let content_alignment = if require_alignment {
+        validate_content_alignment(value.content_alignment, &p("content_alignment"))?
+    } else {
+        ContentAlignment::Left
+    };
 
     // -- opacity ----------------------------------------------------------
     let opacity = require_f32(value.opacity, &p("opacity"))?;
@@ -378,6 +410,7 @@ fn validate_value_widget_fields(
         x: value.x,
         y: value.y,
         display_type: value.display_type,
+        content_alignment,
         font_name,
         font_size,
         color,

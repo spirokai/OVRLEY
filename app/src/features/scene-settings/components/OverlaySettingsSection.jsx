@@ -154,7 +154,9 @@ export default function OverlaySettingsSection({
       {videoResolutionMismatch && (
         <div className="flex gap-2 items-center rounded-sm bg-amber-500/15 p-2 pl-4 text-amber-400">
           <Bell className="h-3 w-3 shrink-0" />
-          <p className="text-[0.65rem] font-semibold leading-tight">{t('scene-settings.resolutionMismatch', 'Overlay and video resolutions do not match')}</p>
+          <p className="text-[0.65rem] font-semibold leading-tight">
+            {t('scene-settings.resolutionMismatch', 'Overlay and video resolutions do not match')}
+          </p>
         </div>
       )}
 

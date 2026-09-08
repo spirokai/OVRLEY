@@ -19,12 +19,13 @@ import { getArcBarGapMax, getArcTrackCornerRadiusMax, getSuggestedArcBarGeometry
 import { buildMetricUnitUpdate } from '@/lib/widget/altitude'
 import { TYPE_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { useTranslation } from 'react-i18next'
+import { translateOptions } from '@/i18n'
 
 const ARC_MIN_ANGLE = 30
 const ARC_MAX_ANGLE = 360
 const CORNER_ORIENTATION_OPTIONS = [
-  { value: 'bottom-left', label: 'Bottom Left' },
-  { value: 'bottom-right', label: 'Bottom Right' },
+  { value: 'bottom-left', labelKey: 'widget-editor.bottomLeft', defaultLabel: 'Bottom Left' },
+  { value: 'bottom-right', labelKey: 'widget-editor.bottomRight', defaultLabel: 'Bottom Right' },
 ]
 
 function suggestArcBarGeometry(data) {
@@ -83,10 +84,13 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
   return (
     <>
       <div className="space-y-4">
-        <SectionHeading icon={SlidersHorizontal} title={isCornerGauge ? t('widget-editor.cornerTrack', 'Corner Track') : t('widget-editor.arcTrack', 'Arc Track')} />
+        <SectionHeading
+          icon={SlidersHorizontal}
+          title={isCornerGauge ? t('widget-editor.cornerTrack', 'Corner Track') : t('widget-editor.arcTrack', 'Arc Track')}
+        />
         <div className="grid grid-cols-1 gap-4">
           <SizeSlider
-            label="Size"
+            label={t('widget-editor.size', 'Size')}
             value={size}
             min={30}
             max={600}
@@ -102,7 +106,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
               label={t('widget-editor.cornerOrientation', 'Corner Orientation')}
               value={arcData.corner_orientation}
               onValueChange={(corner_orientation) => updateArc({ corner_orientation })}
-              options={CORNER_ORIENTATION_OPTIONS}
+              options={translateOptions(CORNER_ORIENTATION_OPTIONS, t)}
             />
           ) : (
             <SliderField
@@ -117,7 +121,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
             />
           )}
           <SliderField
-            label="Thickness"
+            label={t('widget-editor.thickness', 'Thickness')}
             value={arcData.track_thickness}
             min={1}
             max={100}
@@ -157,9 +161,13 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.borderColor', 'Border Color')} value={arcData.track_border_color} onChange={(track_border_color) => updateArc({ track_border_color })} />
+          <ColorField
+            label={t('widget-editor.borderColor', 'Border Color')}
+            value={arcData.track_border_color}
+            onChange={(track_border_color) => updateArc({ track_border_color })}
+          />
           <SliderField
-            label="Border"
+            label={t('widget-editor.border', 'Border')}
             value={arcData.track_border_thickness}
             min={0}
             max={6}
@@ -171,7 +179,11 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.emptyColor', 'Empty Color')} value={arcData.track_empty_color} onChange={(track_empty_color) => updateArc({ track_empty_color })} />
+          <ColorField
+            label={t('widget-editor.emptyColor', 'Empty Color')}
+            value={arcData.track_empty_color}
+            onChange={(track_empty_color) => updateArc({ track_empty_color })}
+          />
           <SliderField
             label={t('widget-editor.emptyOpacity', 'Empty Opacity')}
             value={arcData.track_empty_opacity}
@@ -183,7 +195,11 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ColorField label={t('widget-editor.filledColor', 'Filled Color')} value={arcData.track_filled_color} onChange={(track_filled_color) => updateArc({ track_filled_color })} />
+          <ColorField
+            label={t('widget-editor.filledColor', 'Filled Color')}
+            value={arcData.track_filled_color}
+            onChange={(track_filled_color) => updateArc({ track_filled_color })}
+          />
           <SliderField
             label={t('widget-editor.filledOpacity', 'Filled Opacity')}
             value={arcData.track_filled_opacity}
@@ -201,8 +217,8 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
         updateWidgetData={updateWidgetData}
         updateWidgetSize={updateWidgetSize}
         commitWidgetSize={commitWidgetSize}
-        title="Label"
-        fontSizeLabel="Font Size"
+        title={t('widget-editor.label', 'Label')}
+        fontSizeLabel={t('widget-editor.fontSize', 'Font Size')}
       />
       <div className="grid grid-cols-2 gap-4">
         <SliderField
@@ -231,7 +247,7 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
       {hasDecimalControl ? (
         <div className="grid grid-cols-2 gap-4">
           <SliderField
-            label="Decimals"
+            label={t('widget-editor.decimals', 'Decimals')}
             value={decimals}
             min={0}
             max={maxDecimals}
@@ -244,12 +260,12 @@ export default function ArcDisplaySection({ widget, updateWidgetData, updateWidg
 
       {unitsMode !== 'hidden' ? (
         <UnitsControlRow
-          title="Unit"
+          title={t('widget-editor.unit', 'Unit')}
           checked={widget.data.show_units ?? definition?.showUnitsByDefault ?? false}
           onCheckedChange={(show_units) => updateWidgetData(widget.id, { show_units })}
           colorValue={widget.data.unit_color}
           onColorChange={(unit_color) => updateWidgetData(widget.id, { unit_color })}
-          selectLabel="Unit"
+          selectLabel={t('widget-editor.unit', 'Unit')}
           value={getStandardMetricDisplayUnit(widget.type, widget.data)}
           onValueChange={(displayUnit) =>
             updateWidgetData(

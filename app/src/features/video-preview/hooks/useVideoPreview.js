@@ -19,7 +19,7 @@ import i18next from 'i18next'
  *
  * @param {React.RefObject<HTMLVideoElement>} videoRef - Ref to the video element.
  * @param {boolean} isActive - Whether the imported video preview is currently visible.
- * @returns {{ videoSrc: string, importId: string|null, frozenFrameSecond: number|null, isOutOfRange: boolean, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
+ * @returns {{ videoSrc: string, importId: string|null, isOutOfRange: boolean, openVideoPreviewHelp: Function, videoPreviewHelpAvailable: boolean, videoPreviewMessages: string[] }}
  */
 export function useVideoPreview(videoRef, isActive = true) {
   // Store selectors - subscribes to video import state, playhead position, playback mode, and sync offset.
@@ -36,12 +36,17 @@ export function useVideoPreview(videoRef, isActive = true) {
   const previewPlaybackSource = useStore((state) => state.previewPlaybackSource)
   const pausePreviewPlayback = useStore((state) => state.pausePreviewPlayback)
   const setSelectedSecond = useStore((state) => state.setSelectedSecond)
+  const startPreviewPlayback = useStore((state) => state.startPreviewPlayback)
   const videoDuration = useStore((state) => state.importedVideoDuration || 0)
   const effectiveVideoSyncOffsetSeconds = videoSyncOffsetPreviewSeconds ?? videoSyncOffsetSeconds
 
   // Derived state - determines whether the video should play and which source URL to load.
+  const videoEndSecond = videoSyncOffsetSeconds + videoDuration
   const isVideoPlaybackMode =
-    isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video' && videoSyncOffsetPreviewSeconds === null
+    isActive &&
+    previewPlaybackState === 'playing' &&
+    previewPlaybackSource === 'video' &&
+    videoSyncOffsetPreviewSeconds === null
   const videoSrc = useMemo(
     () =>
       resolveVideoPreviewSource({
@@ -65,12 +70,20 @@ export function useVideoPreview(videoRef, isActive = true) {
     })
   }, [])
 
+  const handoffVideoPlaybackToTimeline = useCallback(
+    () => {
+      startPreviewPlayback({ source: 'timeline', second: videoEndSecond })
+    },
+    [startPreviewPlayback, videoEndSecond],
+  )
+
   // Video playback clock - publishes preview time from the video element while playing.
   useVideoPlaybackClock({
     videoRef,
     isActive: Boolean(videoSrc) && isVideoPlaybackMode,
     videoSyncOffsetSeconds,
     onPreviewSecond: setSelectedSecond,
+    onPlaybackEnded: handoffVideoPlaybackToTimeline,
   })
 
   const scrubSchedulerRef = useRef(null)
@@ -175,6 +188,12 @@ export function useVideoPreview(videoRef, isActive = true) {
         video.pause()
       }
 
+      if (previewPlaybackState === 'playing') {
+        // Timeline-owned playback leaves the frame restored by the video clock untouched.
+        scrubSchedulerRef.current?.clear()
+        return
+      }
+
       if (previewPlaybackState === 'scrubbing') {
         scrubSchedulerRef.current?.schedule(desiredVideoSecond)
         return
@@ -213,8 +232,6 @@ export function useVideoPreview(videoRef, isActive = true) {
     videoDuration,
     videoSyncOffsetSeconds: effectiveVideoSyncOffsetSeconds,
   })
-  const videoEndSecond = effectiveVideoSyncOffsetSeconds + videoDuration
-  const frozenFrameSecond = videoSrc && videoDuration > 0 && selectedSecond >= videoEndSecond ? videoDuration : null
   const videoPreviewHelpAvailable = Boolean(hevcPlaybackWarning) && platformOs === 'windows'
   const videoPreviewMessages = [hevcPlaybackWarning, ...importedVideoPreviewWarnings, metadataStatusMessage, seekWarning, nativeVideoError].filter(
     Boolean,
@@ -223,7 +240,6 @@ export function useVideoPreview(videoRef, isActive = true) {
   return {
     videoSrc,
     importId: importedVideoImportId,
-    frozenFrameSecond,
     isOutOfRange,
     hevcPlaybackWarning,
     openVideoPreviewHelp,

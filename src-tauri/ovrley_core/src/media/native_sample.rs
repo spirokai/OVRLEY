@@ -32,6 +32,9 @@ pub struct NativeSample {
     pub ev: Option<f64>,
     pub color_temperature: Option<f64>,
     pub g_force: Option<f64>,
+    pub g_force_x: Option<f64>,
+    pub g_force_y: Option<f64>,
+    pub g_force_z: Option<f64>,
 }
 
 impl NativeSample {
@@ -50,7 +53,15 @@ impl NativeSample {
 
     /// True when at least one telemetry domain has data.
     pub fn has_payload(&self) -> bool {
-        self.has_gps_payload() || self.has_camera_payload() || self.g_force.is_some()
+        self.has_gps_payload() || self.has_camera_payload() || self.has_imu_payload()
+    }
+
+    /// True when any scalar or axis-specific IMU field is populated.
+    pub fn has_imu_payload(&self) -> bool {
+        self.g_force.is_some()
+            || self.g_force_x.is_some()
+            || self.g_force_y.is_some()
+            || self.g_force_z.is_some()
     }
 
     /// True when any GPS-derived field is populated.

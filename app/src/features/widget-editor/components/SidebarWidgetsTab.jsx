@@ -17,7 +17,9 @@ import MetricWidgetEditor from './metricWidget/MetricWidgetEditor'
 import RouteMapWidgetEditor from './RouteMapWidgetEditor'
 import TextWidgetEditor from './TextWidgetEditor'
 import TimeWidgetEditor from './TimeWidgetEditor'
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useAccordionAutoscroll } from '../hooks/useAccordionAutoscroll'
 
 /**
  * Widget type → editor component dispatch map.
@@ -82,6 +84,8 @@ function renderWidgetEditor(widget, updateWidgetData, updateWidgetSize, commitWi
  */
 export default function SidebarWidgetsTab({ widgetLiveEdits }) {
   const { t } = useTranslation()
+  const accordionItemsRef = useRef(new Map())
+  const accordionAutoscroll = useAccordionAutoscroll()
   const {
     config,
     widgets,
@@ -94,6 +98,16 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
     resetWidget,
     setSelectedWidgetId,
   } = useWidgetManager({ widgetLiveEdits })
+
+  const handleAccordionAnimation = (widgetId, phase, event) => {
+    if (event.target !== event.currentTarget) return
+
+    if (phase === 'start' && event.currentTarget.dataset.state === 'open') {
+      const item = accordionItemsRef.current.get(widgetId)
+      if (item) accordionAutoscroll.start(widgetId, item)
+    }
+    if (phase === 'end') accordionAutoscroll.stop(widgetId)
+  }
 
   if (!config) return null
 
@@ -118,6 +132,10 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
               return (
                 <div key={widget.id}>
                   <AccordionItem
+                    ref={(node) => {
+                      if (node) accordionItemsRef.current.set(widget.id, node)
+                      else accordionItemsRef.current.delete(widget.id)
+                    }}
                     value={widget.id}
                     className="overflow-hidden border border-transparent border-b-none transition-all data-[state=open]:border-accent-border"
                   >
@@ -147,7 +165,11 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
                       </div>
                     </div>
 
-                    <AccordionContent className="px-4 pb-6 pt-1.5 bg-surface/60 ">
+                    <AccordionContent
+                      className="px-4 pb-6 pt-1.5 bg-surface/60"
+                      onAnimationStart={(event) => handleAccordionAnimation(widget.id, 'start', event)}
+                      onAnimationEnd={(event) => handleAccordionAnimation(widget.id, 'end', event)}
+                    >
                       <div className="space-y-6">
                         <PositionSection
                           widget={widget}

@@ -1222,6 +1222,7 @@ fn torque_pro_gps_time_is_parsed_as_an_absolute_timestamp() {
     assert!(activity.power.is_empty());
     assert_close(activity.speed[6], 0.0);
     assert_close(activity.throttle_position[0], 8.23529412);
+    assert_close(activity.engine_load[0], 23.52941176);
 }
 
 #[test]
@@ -1237,6 +1238,19 @@ Wed Aug 05 18:57:57 GMT+01:00 2026,12.5,1.5\n";
     assert_eq!(activity.throttle_position, vec![Some(8.25), Some(12.5)]);
     assert_eq!(activity.distance, vec![Some(0.0), Some(1500.0)]);
     assert_eq!(activity.metadata["total_distance_m"], 1500.0);
+}
+
+#[test]
+fn engine_load_header_variants_map_to_percent() {
+    let csv = "Time,Engine Load(%),Engine Load(Absolute)(%)\n\
+0,23.5,-\n\
+1,45,50\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "engine-load.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.engine_load, vec![Some(23.5), Some(45.0)]);
 }
 
 #[test]

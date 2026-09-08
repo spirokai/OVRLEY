@@ -65,7 +65,9 @@ pub use linear_gauge::{
 pub use route::{validate_route_plot, ValidatedRoutePlot};
 pub use scene::{validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig};
 pub use time::{validate_time_value, ValidatedTimeFormatting, ValidatedTimeValue};
-pub use value::{validate_value_widget, ValidatedValueFormatting, ValidatedValueWidget};
+pub use value::{
+    validate_value_widget, ContentAlignment, ValidatedValueFormatting, ValidatedValueWidget,
+};
 
 /// Telemetry series needed by a template.
 ///
@@ -85,6 +87,7 @@ pub struct RenderDataRequirements {
     pub cadence: bool,
     pub power: bool,
     pub engine_power: bool,
+    pub engine_load: bool,
     pub temperature: bool,
     pub pace: bool,
     pub g_force: bool,
@@ -188,7 +191,7 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
                 });
             }
             if value.value == MetricKind::Time && value.display_type == DisplayType::Text {
-                return validate_time_value(value, idx, &scene).map(PreparedValue::TimeText);
+                return validate_time_value(value, idx).map(PreparedValue::TimeText);
             }
             if value.display_type == DisplayType::Linear {
                 let value = value.with_promoted_display_variant("linear")?;
@@ -337,6 +340,7 @@ impl ValidatedRenderConfig {
                 MetricKind::Cadence => requirements.cadence = true,
                 MetricKind::Power => requirements.power = true,
                 MetricKind::EnginePower => requirements.engine_power = true,
+                MetricKind::EngineLoad => requirements.engine_load = true,
                 MetricKind::Temperature => requirements.temperature = true,
                 MetricKind::Pace => requirements.pace = true,
                 MetricKind::GForce => requirements.g_force = true,

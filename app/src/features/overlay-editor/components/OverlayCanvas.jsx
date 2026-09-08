@@ -9,7 +9,6 @@ import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { WidgetPreview } from '@/features/widget-preview'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
-import { syncVideoCurrentTime } from '@/features/video-preview/utils/videoPreviewPlayback'
 import useStore from '@/store/useStore'
 import HevcPlaybackPlaceholder from './HevcPlaybackPlaceholder'
 
@@ -75,52 +74,6 @@ const CanvasGrid = memo(function CanvasGrid({ displayScale, sceneSize }) {
   )
 })
 
-function FrozenVideoFrame({ className, importId, second, src }) {
-  const videoRef = useRef(null)
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video || !src || second === null) {
-      return undefined
-    }
-
-    const syncFrozenFrame = () => {
-      const duration = Number(video.duration)
-      if (!Number.isFinite(duration) || duration <= 0) {
-        return
-      }
-
-      if (!video.paused) {
-        video.pause()
-      }
-
-      syncVideoCurrentTime(video, second)
-    }
-
-    syncFrozenFrame()
-    video.addEventListener('loadedmetadata', syncFrozenFrame)
-    video.addEventListener('canplay', syncFrozenFrame)
-
-    return () => {
-      video.removeEventListener('loadedmetadata', syncFrozenFrame)
-      video.removeEventListener('canplay', syncFrozenFrame)
-    }
-  }, [second, src])
-
-  return (
-    <video
-      key={`${importId ?? 'no-video'}-frozen`}
-      ref={videoRef}
-      src={src}
-      className={className}
-      preload="auto"
-      playsInline
-      muted
-      aria-hidden="true"
-    />
-  )
-}
-
 const OverlayCanvasWidget = memo(
   function OverlayCanvasWidget({
     widget,
@@ -151,6 +104,7 @@ const OverlayCanvasWidget = memo(
         data-widget-bounds-top={visualBounds?.minY ?? 0}
         data-widget-bounds-right={visualBounds?.maxX ?? 0}
         data-widget-bounds-bottom={visualBounds?.maxY ?? 0}
+        data-widget-content-width={metricPreviewModel ? metricPreviewModel.metricLayout.width * globalScale : undefined}
         className={cn(
           'group absolute cursor-move select-none rounded-xl outline-1 outline-transparent transition-shadow',
           widget.category === 'backdrops' && 'z-1',
@@ -164,7 +118,7 @@ const OverlayCanvasWidget = memo(
           width: renderGeometry.width,
           height: renderGeometry.height,
           transform: renderGeometry.transform,
-          transformOrigin: 'top left',
+          transformOrigin: renderGeometry.transformOrigin,
         }}
         onMouseDown={(event) => {
           handleWidgetMouseDown(event, widget.id)
@@ -232,8 +186,10 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const isVideoMuted = useStore((state) => state.isVideoMuted)
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
   const platformOs = useStore((state) => state.platformOs)
-  const { videoSrc, importId, frozenFrameSecond, isOutOfRange, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } =
-    useVideoPreview(videoRef, backgroundMode === 'video')
+  const { videoSrc, importId, isOutOfRange, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } = useVideoPreview(
+    videoRef,
+    backgroundMode === 'video',
+  )
   const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
   const hasTransparentBackground = backgroundMode === 'transparent'
   const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
@@ -271,9 +227,6 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           muted={isVideoMuted}
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
         />
-      ) : null}
-      {backgroundMode === 'video' && videoSrc && frozenFrameSecond !== null && !hasHevcPlaybackError ? (
-        <FrozenVideoFrame className={videoBackgroundClassName} importId={importId} second={frozenFrameSecond} src={videoSrc} />
       ) : null}
       {backgroundMode === 'image' && backgroundImageSrc ? (
         <img src={backgroundImageSrc} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" draggable="false" />

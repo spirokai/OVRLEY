@@ -86,7 +86,7 @@ describe('videoPreviewSource helpers', () => {
         videoDuration: 6,
         videoSyncOffsetSeconds: 5,
       }),
-    ).toBe(false)
+    ).toBe(true)
 
     expect(
       isVideoPreviewOutOfRange({

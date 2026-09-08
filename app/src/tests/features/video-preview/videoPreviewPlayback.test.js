@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { clampVideoTime, getLastDrawableVideoSecond, primeVideoFirstFrame } from '@/features/video-preview/utils/videoPreviewPlayback'
+import {
+  clampVideoTime,
+  getLastDrawableVideoSecond,
+  primeVideoFirstFrame,
+  syncVideoCurrentTime,
+} from '@/features/video-preview/utils/videoPreviewPlayback'
 
 function createVideoStub(overrides = {}) {
   return {
@@ -16,6 +21,14 @@ describe('videoPreviewPlayback helpers', () => {
 
     expect(clampVideoTime(video, 30)).toBe(29.999)
     expect(clampVideoTime(video, 31)).toBe(29.999)
+  })
+
+  test('restores an ended video to its last drawable frame despite the seek epsilon', () => {
+    const video = createVideoStub({ currentTime: 30, duration: 30 })
+
+    syncVideoCurrentTime(video, 30)
+
+    expect(video.currentTime).toBe(29.999)
   })
 
   test('uses zero as the last drawable frame for extremely short videos', () => {

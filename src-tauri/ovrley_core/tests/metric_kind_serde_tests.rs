@@ -27,6 +27,7 @@ fn metric_kind_round_trip_all_variants() {
         (MetricKind::Cadence, r#""cadence""#),
         (MetricKind::Power, r#""power""#),
         (MetricKind::EnginePower, r#""engine_power""#),
+        (MetricKind::EngineLoad, r#""engine_load""#),
         (MetricKind::Temperature, r#""temperature""#),
         (MetricKind::Pace, r#""pace""#),
         (MetricKind::GForce, r#""g_force""#),

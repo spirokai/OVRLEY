@@ -1,5 +1,6 @@
 import { SelectField, SliderField, ToggleField } from '../widgetFormControls'
 import { useTranslation } from 'react-i18next'
+import { translateOptions } from '@/i18n'
 
 const BAR_COUNT_MAX = 64
 
@@ -34,7 +35,7 @@ export function BarFillStyleField({ data, suggestBarGeometry, updateVariant }) {
       label={t('widget-editor.trackStyle', 'Track Style')}
       value={data.track_fill_style ?? 'fill'}
       onValueChange={(track_fill_style) => updateVariant(buildFillStyleUpdate(data, track_fill_style, suggestBarGeometry))}
-      options={FILL_STYLE_OPTIONS.map(({ value, labelKey, defaultLabel }) => ({ value, label: t(labelKey, defaultLabel) }))}
+      options={translateOptions(FILL_STYLE_OPTIONS, t)}
       contentProps={{ position: 'popper', side: 'bottom', align: 'start' }}
     />
   )
