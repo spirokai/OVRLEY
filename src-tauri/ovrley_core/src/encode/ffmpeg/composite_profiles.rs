@@ -98,6 +98,8 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
             "true",
             "-temporal-aq",
             "true",
+            "-tag:v",
+            "hvc1",
         ],
     },
     CompositeProfile {
@@ -150,6 +152,8 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
             "true",
             "-temporal-aq",
             "true",
+            "-tag:v",
+            "hvc1",
         ],
     },
     CompositeProfile {
@@ -164,7 +168,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
-        output_args: &["-mbbrc", "1"],
+        output_args: &["-mbbrc", "1", "-tag:v", "hvc1"],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::QsvFullH264,
@@ -178,7 +182,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(QSV_FULL_FILTER),
-        output_args: &["-mbbrc", "1"],
+        output_args: &["-mbbrc", "1", "-tag:v", "hvc1"],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::MacH264,
@@ -192,7 +196,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 0,
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
-        output_args: &[],
+        output_args: &["-tag:v", "hvc1"],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::VaapiH264,
@@ -206,7 +210,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 4,
         input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
         filter_complex: Some(VAAPI_FILTER),
-        output_args: &["-rc_mode", "VBR"],
+        output_args: &["-rc_mode", "VBR", "-tag:v", "hvc1"],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::AmfH264,
@@ -220,7 +224,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 4,
         input_args: AMF_D3D11_INPUT_ARGS,
         filter_complex: Some(AMF_D3D11_FILTER),
-        output_args: &["-rc", "vbr_peak"],
+        output_args: &["-rc", "vbr_peak", "-tag:v", "hvc1"],
     },
 ];
 
