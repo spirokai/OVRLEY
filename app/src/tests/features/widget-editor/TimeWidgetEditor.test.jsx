@@ -16,6 +16,28 @@ beforeAll(() => {
 })
 
 describe('TimeWidgetEditor', () => {
+  test('shows elapsed controls with activity and export origins', () => {
+    const widget = {
+      id: 'time-0',
+      type: 'time',
+      data: {
+        content_alignment: 'left',
+        font: 'Arial.ttf',
+        font_size: 72,
+        time_mode: 'elapsed',
+        elapsed_origin: 'activity',
+        show_hundredths: false,
+      },
+    }
+
+    render(<TimeWidgetEditor widget={widget} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
+
+    expect(screen.queryByText('Format')).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Activity Start' })).toBeEnabled()
+    expect(screen.getByRole('radio', { name: 'Export Start' })).toBeEnabled()
+    expect(screen.getByText('Hundredths')).toBeInTheDocument()
+  })
+
   test('renders the shared alignment control and commits a canonical selection', async () => {
     const user = userEvent.setup()
     const updateWidgetData = vi.fn()

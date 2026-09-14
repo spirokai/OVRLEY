@@ -15,7 +15,7 @@
  * @param {number} props.previewSecond - Current preview time in seconds.
  * @param {number} props.globalOpacity - Global opacity multiplier.
  * @param {number} props.globalScale - Global scale multiplier.
- * @param {object|null} props.metricPreviewModel - Precomputed preview model (optional).
+ * @param {object|null} props.metricPreviewModel - Container-owned preview model, required for non-gradient widgets.
  * @param {object} props.sceneStyle - Scene style object (shadow, border).
  * @returns {JSX.Element|null} SVG or div element with metric widget preview, or null.
  */

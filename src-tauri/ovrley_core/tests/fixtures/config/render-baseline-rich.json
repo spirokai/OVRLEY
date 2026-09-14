@@ -193,8 +193,11 @@
       "show_units": false,
       "id": "widget-8",
       "value": "time",
+      "time_mode": "daytime",
       "format": "time-24",
       "hours_offset": 0,
+      "elapsed_origin": "activity",
+      "show_hundredths": false,
       "content_alignment": "left"
     }
   ],

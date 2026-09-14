@@ -152,6 +152,31 @@ describe('core_temperature widget preview', () => {
 })
 
 describe('metric widget preview model standard metric units', () => {
+  test('formats signed, unbounded activity-relative and export-relative elapsed time', () => {
+    const widget = {
+      category: 'values',
+      type: 'time',
+      data: {
+        ...TEXT_DEFAULTS,
+        time_mode: 'elapsed',
+        elapsed_origin: 'export',
+        show_hundredths: true,
+      },
+    }
+    const activity = { trim_end_seconds: 100000, sample_elapsed_seconds: [0, 100000] }
+
+    const exportRelative = buildMetricWidgetPreviewModel({ widget, activity, previewSecond: 5.37, exportStartSecond: 10, globalScale: 1 })
+    const unbounded = buildMetricWidgetPreviewModel({
+      widget: { ...widget, data: { ...widget.data, elapsed_origin: 'activity', show_hundredths: false } },
+      activity,
+      previewSecond: 90061,
+      globalScale: 1,
+    })
+
+    expect(exportRelative.valueText).toBe('-0:00:04.63')
+    expect(unbounded.valueText).toBe('25:01:01')
+  })
+
   test.each(['center', 'right'])('applies %s point alignment to time through the standard intrinsic layout', (contentAlignment) => {
     const model = buildMetricWidgetPreviewModel({
       widget: {

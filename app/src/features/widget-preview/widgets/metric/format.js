@@ -414,6 +414,25 @@ export function formatTimeValue(format, timestamp, timezone) {
 }
 
 /**
+ * Formats a signed, unbounded elapsed duration.
+ * @param {number} elapsedSeconds - Signed elapsed duration in seconds.
+ * @param {boolean} showHundredths - Whether to append two fractional digits.
+ * @returns {string} Duration formatted as H:MM:SS or H:MM:SS.xx.
+ */
+export function formatElapsedTimeValue(elapsedSeconds, showHundredths) {
+  const unitsPerSecond = showHundredths ? 100 : 1
+  const totalUnits = showHundredths ? Math.round(Math.abs(elapsedSeconds) * unitsPerSecond) : Math.floor(Math.abs(elapsedSeconds))
+  const totalSeconds = Math.floor(totalUnits / unitsPerSecond)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const sign = elapsedSeconds < 0 && totalUnits > 0 ? '-' : ''
+  const fraction = showHundredths ? `.${String(totalUnits % unitsPerSecond).padStart(2, '0')}` : ''
+
+  return `${sign}${hours}:${padNumber(minutes)}:${padNumber(seconds)}${fraction}`
+}
+
+/**
  * Formats a gradient value as a signed percentage string.
  *
  * @param {object} widget - Widget configuration containing decimal precision and sign display settings.

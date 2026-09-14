@@ -7,8 +7,8 @@
 
 use crate::activity::schema::DenseActivityReport;
 use crate::normalize::{
-    ValidatedGradientWidget, ValidatedTimeFormatting, ValidatedTimeValue, ValidatedValueFormatting,
-    ValidatedValueWidget,
+    ElapsedTimeOrigin, ValidatedGradientWidget, ValidatedTimeFormatting, ValidatedTimeValue,
+    ValidatedValueFormatting, ValidatedValueWidget,
 };
 use crate::standard_metrics::{
     standard_metric_formatter, standard_metric_interpolation, standard_metric_unit_label,
@@ -310,9 +310,22 @@ pub fn format_validated_gradient(validated: &ValidatedGradientWidget, raw: Optio
 pub fn format_validated_time_parts(
     validated: &ValidatedTimeValue,
     raw: Option<&str>,
+    elapsed_time: ElapsedTimeValues,
     timezone: Option<Tz>,
 ) -> MetricDisplayParts {
-    let mut value_text = format_validated_time_text(validated, raw, timezone);
+    let mut value_text = match &validated.formatting {
+        ValidatedTimeFormatting::Daytime(_) => format_validated_time_text(validated, raw, timezone),
+        ValidatedTimeFormatting::Elapsed {
+            origin,
+            show_hundredths,
+        } => {
+            let elapsed = match origin {
+                ElapsedTimeOrigin::Activity => elapsed_time.activity_seconds,
+                ElapsedTimeOrigin::Export => elapsed_time.export_seconds,
+            };
+            format_elapsed_time(elapsed, *show_hundredths)
+        }
+    };
     if !validated.base.prefix.is_empty() {
         value_text = format!("{}{value_text}", validated.base.prefix);
     }
@@ -328,6 +341,12 @@ pub fn format_validated_time_parts(
         show_icon: validated.base.show_icon,
         icon_kind: super::widgets::value::metric_icon_kind_for_value(MetricKind::Time),
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ElapsedTimeValues {
+    pub activity_seconds: f64,
+    pub export_seconds: f64,
 }
 
 fn format_validated_standard_metric_parts<'a>(
@@ -516,7 +535,37 @@ where
 {
     let adjusted = value + Duration::hours(validated.hours_offset);
     match &validated.formatting {
-        ValidatedTimeFormatting::Preset(format_key) => format_time_key(format_key, adjusted),
+        ValidatedTimeFormatting::Daytime(format_key) => format_time_key(format_key, adjusted),
+        ValidatedTimeFormatting::Elapsed { .. } => {
+            unreachable!("elapsed time is formatted without an absolute timestamp")
+        }
+    }
+}
+
+pub fn format_elapsed_time(elapsed_seconds: f64, show_hundredths: bool) -> String {
+    let units_per_second = if show_hundredths { 100 } else { 1 };
+    let total_units = if show_hundredths {
+        (elapsed_seconds.abs() * units_per_second as f64).round() as u64
+    } else {
+        elapsed_seconds.abs().floor() as u64
+    };
+    let total_seconds = total_units / units_per_second;
+    let hours = total_seconds / 3600;
+    let minutes = total_seconds % 3600 / 60;
+    let seconds = total_seconds % 60;
+    let sign = if elapsed_seconds < 0.0 && total_units > 0 {
+        "-"
+    } else {
+        ""
+    };
+
+    if show_hundredths {
+        format!(
+            "{sign}{hours}:{minutes:02}:{seconds:02}.{:02}",
+            total_units % units_per_second
+        )
+    } else {
+        format!("{sign}{hours}:{minutes:02}:{seconds:02}")
     }
 }
 

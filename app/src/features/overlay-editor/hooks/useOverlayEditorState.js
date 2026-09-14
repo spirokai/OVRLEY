@@ -94,6 +94,7 @@ export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onC
       to: videoSyncOffsetSeconds + importedVideoDuration,
     }
   }, [exportRange, importedVideoDuration, importedVideoPath, videoSyncOffsetSeconds])
+  const previewExportStartSecond = previewExportRange.from
 
   useEffect(() => {
     incrementPreviewPerfCounter(previewPerfCounterName('React preview updates'))
@@ -150,6 +151,7 @@ export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onC
     onConfigChange,
     orderedWidgetIds,
     previewExportRange,
+    previewExportStartSecond,
     previewSecond: selectedSecond,
     renderedWidgetMap,
     renderedWidgets,

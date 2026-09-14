@@ -176,6 +176,10 @@ describe('normalizeTemplateConfig', () => {
 
     expect(result.values[0].content_alignment).toBe('left')
     expect(result.values[0].x).toBe(50)
+    expect(result.values[0]).toMatchObject({ time_mode: 'daytime', elapsed_origin: 'activity', show_hundredths: false })
+    expect(() => normalizeTemplateConfig({ values: [{ value: 'time', time_mode: 'clock' }] })).toThrow('Invalid time_mode: clock')
+    expect(() => normalizeTemplateConfig({ values: [{ value: 'time', elapsed_origin: 'video' }] })).toThrow('Invalid elapsed_origin: video')
+    expect(() => normalizeTemplateConfig({ values: [{ value: 'time', show_hundredths: 'false' }] })).toThrow('Invalid show_hundredths: false')
     expect(() => normalizeTemplateConfig({ values: [{ id: 'value-1', value: 'speed', content_alignment: 'justify' }] })).toThrow(
       'Invalid content_alignment: justify',
     )

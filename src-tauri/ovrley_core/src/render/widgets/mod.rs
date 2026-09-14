@@ -100,12 +100,22 @@ pub fn prepare_render_assets(
     prepare_profiler: &mut RenderProfiler,
 ) -> CoreResult<PreparedRenderAssets> {
     let scene = config.scene.clone();
+    let export_start_seconds = if scene.composite_video_path.is_some() {
+        scene.composite_sync_offset.ok_or_else(|| {
+            crate::error::CoreError::Config(
+                "scene.composite_sync_offset required when a composite video is configured".into(),
+            )
+        })?
+    } else {
+        scene.start
+    };
     let backdrops = config.backdrops.clone();
     let labels = config.labels.clone();
     let values = config.values.clone();
 
     let mut assets = PreparedRenderAssets {
         scene,
+        export_start_seconds,
         timezone: activity.timezone.clone(),
         backdrops,
         labels,
