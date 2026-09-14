@@ -463,10 +463,10 @@ fn extract_sync_time_from_samples(samples: &[SampleInfo]) -> Option<String> {
                 if gps5_fix_is_usable(gps_map) {
                     if let Some(unix_ms) = extract_tag_u64(gps_map, &TagId::Unknown(GOPRO_GPSU_TAG))
                     {
-                        let first_row_ms = extract_tag_u64(gps_map, &TagId::TimestampUs)
-                            .map(|stmp| stmp as f64 / 1000.0)
-                            .unwrap_or(sample.timestamp_ms);
-                        return Some(gpsu_millis_to_video_start_rfc3339(unix_ms, first_row_ms));
+                        return Some(gpsu_millis_to_video_start_rfc3339(
+                            unix_ms,
+                            sample.timestamp_ms,
+                        ));
                     }
                 }
             }

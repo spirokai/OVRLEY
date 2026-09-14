@@ -122,9 +122,10 @@ pub fn build_activity_columns(
         color_temperature[index] = last_color_temp;
     }
 
+    let elapsed_origin_ms = anchor_ms.first().copied().unwrap_or(0.0);
     let elapsed_seconds = anchor_ms
         .iter()
-        .map(|timestamp_ms| Some(timestamp_ms / 1000.0))
+        .map(|timestamp_ms| Some((timestamp_ms - elapsed_origin_ms) / 1000.0))
         .collect();
     let none = || vec![None; n];
     let metadata = json!({
@@ -233,14 +234,14 @@ mod tests {
     fn mp4_columns_keep_existing_telemetry_and_leave_csv_metrics_absent() {
         let samples = vec![
             NativeSample {
-                timestamp_ms: 0.0,
+                timestamp_ms: 80.0,
                 latitude: Some(47.0),
                 longitude: Some(8.0),
                 speed: Some(5.0),
                 ..NativeSample::default()
             },
             NativeSample {
-                timestamp_ms: 1000.0,
+                timestamp_ms: 1080.0,
                 latitude: Some(47.0001),
                 longitude: Some(8.0001),
                 speed: Some(6.0),
