@@ -7,6 +7,9 @@ import { useFontMetrics } from '../../shared/useFontMetrics'
 import { getLeanAngleFillPath, getLeanAngleFillSweep, getLeanAngleInnerTrackPath, getLeanAngleLayout, getLeanAngleOuterTrackPath } from './geometry'
 
 const DEGREE_UNIT_CENTERING_OFFSET_RATIO = 0.1
+const GUIDE_DEFAULT_THICKNESS_PX = 1
+const GUIDE_REFERENCE_DIAMETER_PX = 200
+const GUIDE_OPACITY = 0.4
 
 /**
  * Builds the lean-angle preview presentation for the current activity frame.
@@ -58,6 +61,9 @@ export function useLeanAnglePreview({ widget, activity, previewSecond, globalOpa
       innerTrackPath: getLeanAngleInnerTrackPath(layout, widget.data.track_border_thickness),
       fillPath: getLeanAngleFillPath(layout, raw, widget.data.track_border_thickness),
       fillSweep: getLeanAngleFillSweep(raw),
+      guideColor: widget.data.track_filled_color,
+      guideOpacity: GUIDE_OPACITY,
+      guideThickness: GUIDE_DEFAULT_THICKNESS_PX * (widget.data.diameter / GUIDE_REFERENCE_DIAMETER_PX),
       opacity: widget.data.opacity * globalOpacity,
       valueText: formatted.value,
       unitText,

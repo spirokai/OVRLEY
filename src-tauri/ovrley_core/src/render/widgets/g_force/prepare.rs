@@ -6,7 +6,14 @@ use crate::render::surface::create_surface;
 use crate::render::text::parse_color;
 use crate::render::widgets::common::{normalize_shadow_style_validated, static_layer_padding};
 use crate::render::widgets::types::GForceWidgetCache;
-use skia_safe::{image_filters, BlendMode, Paint, PathBuilder, PathFillType, Point};
+use skia_safe::{
+    image_filters, paint::Style, BlendMode, ClipOp, Paint, PathBuilder, PathFillType, Point,
+};
+
+const GUIDE_DEFAULT_THICKNESS_PX: f32 = 2.0;
+const GUIDE_REFERENCE_DIAMETER_PX: f32 = 400.0;
+const GUIDE_OPACITY: f32 = 0.4;
+const GUIDE_RING_RADIUS_RATIOS: [f32; 2] = [0.33, 0.66];
 
 fn activity_axis(activity: &ParsedActivity, axis: GForceAxis) -> &NumericSeries {
     match axis {
@@ -73,6 +80,8 @@ pub fn prepare_g_force_cache(
         let height = (widget.height as f32 * scale).round().max(1.0) as u32;
         let radius = widget.diameter * scale * 0.5;
         let border_thickness = widget.border_thickness * scale;
+        let guide_thickness =
+            GUIDE_DEFAULT_THICKNESS_PX * (widget.diameter / GUIDE_REFERENCE_DIAMETER_PX) * scale;
         let center_x = width as f32 * 0.5;
         let center_y = height as f32 * 0.5;
         let shadow = normalize_shadow_style_validated(
@@ -143,6 +152,32 @@ pub fn prepare_g_force_cache(
             radius - border_thickness,
             &fill_paint,
         );
+
+        let mut guide_paint = Paint::default();
+        guide_paint.set_anti_alias(true);
+        guide_paint.set_style(Style::Stroke);
+        guide_paint.set_stroke_width(guide_thickness);
+        guide_paint.set_color(parse_color(&widget.marker_color, 1.0));
+        let mut guide_clip = PathBuilder::new();
+        guide_clip.add_circle(
+            Point::new(center_x, center_y),
+            radius - border_thickness,
+            None,
+        );
+        canvas.save();
+        canvas.clip_path(&guide_clip.detach(), ClipOp::Intersect, true);
+        canvas.save_layer_alpha_f(None, GUIDE_OPACITY * widget.opacity);
+        let mut guide_path = PathBuilder::new();
+        guide_path.move_to(Point::new(center_x - radius, center_y));
+        guide_path.line_to(Point::new(center_x + radius, center_y));
+        guide_path.move_to(Point::new(center_x, center_y - radius));
+        guide_path.line_to(Point::new(center_x, center_y + radius));
+        for ratio in GUIDE_RING_RADIUS_RATIOS {
+            guide_path.add_circle(Point::new(center_x, center_y), radius * ratio, None);
+        }
+        canvas.draw_path(&guide_path.detach(), &guide_paint);
+        canvas.restore();
+        canvas.restore();
 
         Ok(GForceWidgetCache {
             parent_circle_image: surface.image_snapshot(),

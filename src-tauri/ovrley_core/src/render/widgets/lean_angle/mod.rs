@@ -30,6 +30,9 @@ use std::path::PathBuf;
 
 const CENTER_ANGLE: f32 = 270.0;
 const DEGREE_UNIT_CENTERING_OFFSET_RATIO: f32 = 0.1;
+const GUIDE_DEFAULT_THICKNESS_PX: f32 = 1.0;
+const GUIDE_REFERENCE_DIAMETER_PX: f32 = 200.0;
+const GUIDE_OPACITY: f32 = 0.4;
 
 #[derive(Clone, Copy)]
 struct LeanAngleGeometry {
@@ -94,6 +97,8 @@ pub fn prepare_lean_angle_cache(
         let height = layout.height.ceil().max(1.0) as u32;
         let track_thickness = widget.track_thickness * scale;
         let border_thickness = widget.track_border_thickness * scale;
+        let guide_thickness =
+            GUIDE_DEFAULT_THICKNESS_PX * (widget.diameter / GUIDE_REFERENCE_DIAMETER_PX) * scale;
         let geometry = geometry_from_layout(layout);
 
         let outer_path = annular_sector_path(geometry);
@@ -157,6 +162,22 @@ pub fn prepare_lean_angle_cache(
             widget.track_empty_opacity * widget.opacity,
         ));
         canvas.draw_path(&inner_path, &empty_paint);
+
+        let mut guide_paint = Paint::default();
+        guide_paint.set_anti_alias(true);
+        guide_paint.set_style(Style::Stroke);
+        guide_paint.set_stroke_width(guide_thickness);
+        guide_paint.set_color(parse_color(&widget.track_filled_color, 1.0));
+        canvas.save();
+        canvas.clip_path(&inner_path, ClipOp::Intersect, true);
+        canvas.save_layer_alpha_f(None, GUIDE_OPACITY * widget.opacity);
+        canvas.draw_line(
+            Point::new(geometry.center_x, geometry.center_y - geometry.outer_radius),
+            Point::new(geometry.center_x, geometry.center_y - geometry.inner_radius),
+            &guide_paint,
+        );
+        canvas.restore();
+        canvas.restore();
 
         Ok(LeanAngleCache {
             static_image: surface.image_snapshot(),
