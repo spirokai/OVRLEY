@@ -11,8 +11,8 @@ This version supports one video clip. Multiple clips, clock drift, playback-rate
 - **Video-local time**: seconds from the start of the imported video.
 - **Timeline time**: seconds on the activity/editor timeline.
 - **Video offset**: the timeline time at which video-local second zero begins.
-- **Video landmark**: a user-created stop, turn, or location mark tied to a video frame.
-- **Detected event**: a stop or turn derived from activity telemetry.
+- **Video landmark**: a user-created stop, left-turn, right-turn, or location mark tied to a video frame.
+- **Detected event**: a stop, left turn, or right turn derived from activity telemetry.
 - **Resolved location landmark**: a location landmark containing both a video-local time and an activity/course time. The current UI cannot create one, but the matching framework must support it.
 - **Candidate**: a proposed value for the single canonical video offset.
 
@@ -72,7 +72,7 @@ Place the existing video-sync controls from `VideoDrawerContent` at the top. Cop
 Canonical colors:
 
 - stop: red;
-- turn: green;
+- left turn and right turn: green, with distinct direction icons and text;
 - location: purple.
 
 ### Section 3 — Detection and Candidates
@@ -91,7 +91,7 @@ Persist the physical thresholds, not an arbitrary 0–100 sensitivity value. Sho
 
 The two-column **Landmark Sync** button runs matching. It is disabled while calculation is pending.
 
-Current enablement requires at least two stop/turn landmarks whose corresponding activity telemetry is usable. A video-only location landmark neither enables sync nor participates in matching. The dormant resolved-location framework has separate behavior described below.
+Current enablement requires at least two stop/left-turn/right-turn landmarks whose corresponding activity telemetry is usable. A video-only location landmark neither enables sync nor participates in matching. The dormant resolved-location framework has separate behavior described below.
 
 Candidate cards:
 
@@ -110,7 +110,7 @@ All landmarks contain:
 
 ```text
 id: stable project-local identifier
-type: "stop" | "turn" | "location"
+type: "stop" | "leftTurn" | "rightTurn" | "location"
 videoSecond: finite seconds from video start
 ```
 
@@ -124,17 +124,18 @@ activitySecond: finite activity/course time | null
 
 `null` is documented optional absence: the user has marked a video location but has not selected the corresponding point on the course. The current feature always creates location landmarks with `activitySecond: null`. A missing field or malformed present value is invalid version-2 project data and must fail at project ingress.
 
-Stop and turn landmarks must not carry location-only fields. Use one canonical discriminated shape; do not add aliases or compatibility variants.
+Stop and directional-turn landmarks must not carry location-only fields. A generic `turn` landmark is invalid version-2 project data: direction is required for matching and cannot be inferred from the video timestamp. Use one canonical discriminated shape; do not add aliases or compatibility variants.
 
 ## Creating and Editing Landmarks
 
-Show three controls in the lower-left corner of the actual video preview:
+Show four controls in the lower-left corner of the actual video preview:
 
 - **Mark Stop**;
-- **Mark Turn**;
+- **Mark Left Turn**;
+- **Mark Right Turn**;
 - **Mark Location**.
 
-All three controls are enabled when the playhead resolves to a frame inside the video and the applicable landmark limit permits creation. They remain visible but disabled outside the video range.
+All four controls are enabled when the playhead resolves to a frame inside the video and the applicable landmark limit permits creation. They remain visible but disabled outside the video range.
 
 Creating a landmark stores the current video-local time. A location landmark is usable now for testing creation, dragging, persistence, scrubbing from the list, and deletion even though it has no activity-side course point.
 
@@ -184,9 +185,11 @@ Initial tunable values:
 
 Unwrap heading circularly and find a coherent signed heading change that reaches the configured minimum angle within the maximum duration. A gradual change such as 180 degrees over two minutes is not a turn.
 
+Use compass heading's clockwise-positive convention: a positive unwrapped heading change is a right turn, and a negative change is a left turn. Classify each detected turn as `rightTurn` or `leftTurn` from that signed change; do not discard the sign or treat absolute angle as sufficient for matching.
+
 - Do not derive turns while the detector is in the near-stop state because low-speed GPS heading is unreliable.
-- Merge overlapping or adjacent qualifying windows into one detected turn interval.
-- Retain start, end, signed change, and representative time in the detected event model.
+- Merge overlapping or adjacent qualifying windows of the same direction into one detected turn interval. A meaningful direction reversal starts a separate event rather than combining left and right turns.
+- Retain type (`leftTurn` or `rightTurn`), start, end, signed change, and representative time in the detected event model.
 - A video turn landmark may refer to any moment inside the detected interval; it is not forced to the center.
 
 ## Candidate Generation — Interval Consensus
@@ -196,13 +199,13 @@ Use deterministic interval-consensus matching. Do not bin the timeline, use samp
 For each eligible video landmark and each compatible activity event, derive the video offsets that could align them:
 
 - stop: detected stop time minus video-local landmark time, with ±2 seconds of user timing tolerance;
-- turn: the detected turn interval minus video-local landmark time, expanded by ±2 seconds.
+- left/right turn: only a detected turn of the same direction contributes its interval minus video-local landmark time, expanded by ±2 seconds.
 
 Overlapping offset support from different landmarks forms a candidate hypothesis. Refine each hypothesis to the shared offset that maximizes its joint match likelihood.
 
 Rules:
 
-- Respect landmark type.
+- Respect landmark type and turn direction. A left-turn landmark cannot match a right-turn event, or vice versa; a wrong-direction event contributes no offset support or matched evidence.
 - Use one shared offset across all evidence.
 - Use a one-to-one assignment; one detected activity event cannot explain multiple video landmarks.
 - With exactly two eligible landmarks, both must match.
@@ -211,7 +214,7 @@ Rules:
 - Merge near-identical offset hypotheses using a named, tunable merge tolerance.
 - Keep at most five distinct candidates after map-only pinning and score ordering.
 
-This handles the important minimum case of one stop plus one turn by testing type-compatible activity stop/turn pairs and selecting the shared offset that aligns the stop most precisely while placing the video turn within the detected turn interval.
+This handles the important minimum case of one stop plus one directional turn by testing type-compatible activity stop/turn pairs and selecting the shared offset that aligns the stop most precisely while placing the video turn within a same-direction detected turn interval.
 
 ## Match Score
 
@@ -220,7 +223,7 @@ The score is an absolute normalized likelihood, not a probability that the candi
 For a matched landmark, define residual `r` as:
 
 - stop: absolute distance from the detected stop time;
-- turn: zero while the aligned mark is inside the detected turn interval, otherwise distance to the nearest interval boundary.
+- left/right turn: zero while the aligned mark is inside a same-direction detected turn interval, otherwise distance to its nearest boundary.
 
 Use 2 seconds as the timing-error scale. For `m` matched landmarks out of `n` eligible landmarks:
 
@@ -317,10 +320,10 @@ Compute robust activity-wide vertical scales once when activity data changes. Ve
 
 ### Event and Landmark Overlays
 
-- Show detected stop and turn intervals as translucent vertical bands in their type colors.
+- Show detected stop and directional-turn intervals as translucent vertical bands in their type colors. Distinguish left and right bands with direction icons or labels, not color alone.
 - Expand stop visualization by ±2 seconds around its event time.
 - Show a turn's detected interval, expanded by the same ±2-second user tolerance.
-- Show video landmarks as type-colored vertical lines with a rectangular icon handle at the top.
+- Show video landmarks as type-colored vertical lines with a rectangular icon handle at the top; left and right turns use distinct direction icons.
 - In-view landmark lines span the ruler, graph, and timeline lanes similarly to the playhead.
 - In-view handles are draggable.
 
@@ -396,13 +399,15 @@ Target inputs of 5,000–10,000 samples and sampling rates from 1–40 Hz. Detec
 - threshold-crossing time interpolation;
 - heading wraparound at 0/360 degrees;
 - sharp qualifying turns and gradual non-qualifying direction changes;
+- clockwise-positive right turns and counterclockwise left turns, including heading wraparound and direction reversals;
 - turns suppressed during near-stop state;
 - missing telemetry gaps split detection.
 
 ### Matching and scoring
 
-- one stop plus one turn finds the correct shared offset;
+- one stop plus one directional turn finds the correct shared offset;
 - turn marks at start, middle, and end of a detected turn interval;
+- left-turn marks never match right-turn events and right-turn marks never match left-turn events, even when timing overlaps;
 - type mismatches are never assigned;
 - one activity event cannot satisfy two video landmarks;
 - exactly two landmarks require both matches;
@@ -417,7 +422,7 @@ Target inputs of 5,000–10,000 samples and sampling rates from 1–40 Hz. Detec
 ### State and interaction
 
 - maximum five total landmarks and one location landmark;
-- mark controls disabled outside video range;
+- all four mark controls disabled outside video range;
 - landmark timeline position derives from video-local time plus offset;
 - dragging a landmark changes only video-local time;
 - moving the video moves all landmark timeline positions without rewriting them;
@@ -432,6 +437,7 @@ Target inputs of 5,000–10,000 samples and sampling rates from 1–40 Hz. Detec
 ### Persistence
 
 - strict v2 round trip for landmarks and physical sensitivity thresholds;
+- directional-turn types persist exactly, while generic `turn`, missing type, and unknown directional types fail at v2 ingress;
 - candidates and detected events are absent from saved projects;
 - valid v1 project migrates in memory to empty landmarks and default thresholds;
 - migrated project writes v2 only on normal save;

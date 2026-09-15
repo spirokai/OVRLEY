@@ -68,7 +68,7 @@ None. This is the foundation for every later phase.
 
 Create `videoSyncConstants.js` containing named, exported values for:
 
-- landmark types: `stop`, `turn`, and `location`;
+- landmark types: `stop`, `leftTurn`, `rightTurn`, and `location`;
 - maximum five landmarks;
 - maximum one location landmark;
 - default/range near-stop threshold: 5 km/h, 1–10 km/h;
@@ -133,13 +133,13 @@ Enforce limits and finite ranges in the owning actions. UI disablement is not th
 Use strict variants:
 
 ```text
-stop/turn: { id, type, videoSecond }
+stop/leftTurn/rightTurn: { id, type, videoSecond }
 location:  { id, type: "location", videoSecond, activitySecond }
 ```
 
 For a location, `activitySecond` is a required key whose value is either a finite activity second or `null`. Current UI creation always sets it to `null`.
 
-Do not allow stop/turn landmarks to carry `activitySecond`, and do not accept missing `activitySecond` for a version-2 location landmark.
+Do not allow stop/directional-turn landmarks to carry `activitySecond`, and do not accept missing `activitySecond` for a version-2 location landmark. Reject a generic `turn` type at v2 ingress; the video's turn direction is a required user observation and cannot be reconstructed from its timestamp.
 
 ### 1.4 Extend the project archive schema
 
@@ -173,7 +173,7 @@ At Rust ingress:
 3. Strictly deserialize version 2 into its v2 DTO.
 4. Convert either DTO exactly once into the canonical v2 `ProjectDocument` returned to the frontend.
 5. For v1 only, create empty landmarks and the documented default thresholds.
-6. Reject unknown versions, unknown fields, missing v2 fields, duplicate landmark IDs, invalid types, non-finite numbers, out-of-range thresholds, excess landmarks, multiple locations, and invalid location variants.
+6. Reject unknown versions, unknown fields, missing v2 fields, duplicate landmark IDs, invalid types (including generic `turn`), non-finite numbers, out-of-range thresholds, excess landmarks, multiple locations, and invalid location variants.
 7. Continue writing only canonical v2 documents.
 
 Migration occurs in memory. Reading a v1 archive does not rewrite it; its next normal save writes v2.
@@ -202,6 +202,7 @@ Do not persist candidates, detected events, calculation status, errors, or graph
 - Rust project-file tests for strict v2 read/write.
 - Rust migration tests for a valid v1 archive.
 - Rust rejection tests for malformed variants, missing required keys, duplicate IDs, limits, and invalid thresholds.
+- Round-trip and strict-ingress tests for `leftTurn` and `rightTurn`; generic `turn` fails rather than receiving an inferred direction.
 - Project hydration test for landmark time beyond loaded video duration.
 
 ### Phase 1 exit criteria
@@ -265,11 +266,13 @@ Derive a signed heading-change-rate series for both detection and graph presenta
 
 Detect coherent signed changes that reach the configured minimum angle within at most ten seconds:
 
+Apply compass heading's clockwise-positive convention after circular unwrapping: positive signed change yields `rightTurn`, negative yields `leftTurn`. Keep the signed change and the canonical directional type on each event.
+
 - reset accumulation across significant gaps;
 - stop or restart an event when a meaningful direction reversal breaks coherence;
 - suppress accumulation while the near-stop state is active;
-- merge overlapping or immediately adjacent qualifying windows;
-- retain start, end, signed change, and representative time.
+- merge overlapping or immediately adjacent qualifying windows only when their direction agrees; split at meaningful reversals;
+- retain type (`leftTurn` or `rightTurn`), start, end, signed change, and representative time.
 
 All window traversal must use timestamps, not fixed sample counts.
 
@@ -297,7 +300,8 @@ Missing external channels produce empty corresponding event arrays with explicit
 - Downward crossing interpolation uses timestamps correctly.
 - Heading 359→1 degrees produces a small change, not a spike.
 - A 90-degree sharp turn qualifies at the default; a 180-degree/two-minute bend does not.
-- Signed left/right turns retain direction.
+- Signed left/right turns receive the correct canonical event type, including across heading wraparound.
+- A direction reversal produces separate left/right events, not one merged interval.
 - Heading changes during near-stop state do not produce turns.
 - Significant gaps split state and cannot create synthetic events.
 - Missing speed or heading yields explicit availability without throwing.
@@ -326,9 +330,9 @@ Phases 1 and 2. No React or store dependency.
 For every compatible landmark/event pair, derive supported offset intervals:
 
 - stop support centers on `stop.time - landmark.videoSecond` and extends by ±2 seconds;
-- turn support runs from `turn.start - landmark.videoSecond` through `turn.end - landmark.videoSecond`, expanded by ±2 seconds.
+- directional-turn support runs from `turn.start - landmark.videoSecond` through `turn.end - landmark.videoSecond`, expanded by ±2 seconds, only when event and landmark types are the same (`leftTurn` with `leftTurn`, `rightTurn` with `rightTurn`).
 
-Represent support with the landmark ID, event ID, type, interval bounds, and the residual function needed for scoring.
+Represent support with the landmark ID, event ID, canonical type, interval bounds, and the residual function needed for scoring. An opposite-direction event produces no support interval.
 
 ### 3.2 Discover consensus hypotheses
 
@@ -342,14 +346,14 @@ For each region:
 4. allow partial matches for three to five landmarks;
 5. reject candidates with fewer than two matched landmarks.
 
-Because landmarks and events are time-ordered, implement one-to-one assignment as an ordered dynamic program per type rather than a general combinatorial search. It must support skipping unmatched landmarks/events while preventing event reuse.
+Because landmarks and events are time-ordered, implement one-to-one assignment as an ordered dynamic program per canonical type (`stop`, `leftTurn`, `rightTurn`) rather than a general combinatorial search. It must support skipping unmatched landmarks/events while preventing event reuse.
 
 ### 3.3 Compute the absolute score
 
 For each chosen assignment:
 
 - stop residual is distance to the stop point;
-- turn residual is zero inside the detected interval and distance to its nearest edge outside it;
+- directional-turn residual is zero inside a same-direction detected interval and distance to its nearest edge outside it;
 - only assignments inside the ±2-second supported interval count as matched.
 
 Calculate:
@@ -385,8 +389,9 @@ An unresolved location with `activitySecond: null` must take no matching branch 
 
 ### Phase 3 tests
 
-- One stop plus one turn selects their most precise shared alignment.
+- One stop plus one directional turn selects their most precise shared alignment.
 - Turn marks anywhere inside the interval have zero turn residual.
+- Left-turn marks reject right-turn events and right-turn marks reject left-turn events, even when support intervals would otherwise overlap.
 - Type mismatches cannot contribute support.
 - One activity event cannot satisfy two video landmarks.
 - Exactly two eligible landmarks require two matches.
@@ -437,12 +442,12 @@ Derive explicit eligibility from:
 
 - landmark types;
 - detector metric availability;
-- count of usable stop/turn landmarks;
+- count of usable stop/left-turn/right-turn landmarks;
 - resolved map availability.
 
 Rules:
 
-- Current UI requires two usable stop/turn landmarks.
+- Current UI requires two usable stop/left-turn/right-turn landmarks. Directional turns require heading availability for eligibility. An absent same-direction event is a matching/no-candidate result, not a reason to disable the first search.
 - Unsupported video observations remain stored and visible but do not silently count or incur score penalties.
 - A future resolved location may enable map-only sync by itself.
 
@@ -553,6 +558,7 @@ Section 1:
 Section 2:
 
 - render sorted presentational landmark cards;
+- show explicit Left Turn and Right Turn text and distinct direction icons while retaining the shared turn color;
 - implement clear, delete, and card-to-scrub callbacks in the container hook;
 - keep colors and icon selection in data/view-model preparation;
 - expose disabled explanations when total or location-specific limits are reached.
@@ -569,11 +575,12 @@ Section 3:
 
 ### 5.4 Build preview mark controls
 
-Render Mark Stop, Mark Turn, and Mark Location through `VideoSyncMarkControls` in sync mode.
+Render Mark Stop, Mark Left Turn, Mark Right Turn, and Mark Location through `VideoSyncMarkControls` in sync mode.
 
 - All remain visible.
 - Enable only when current timeline time resolves inside the video and the corresponding limit permits creation.
 - Convert timeline time to video-local time once in the workspace hook.
+- Store `leftTurn` or `rightTurn` directly from the chosen mark action; do not infer direction from activity data.
 - Location creation stores `activitySecond: null`.
 - Creating a mark makes prior candidates stale.
 
@@ -585,7 +592,7 @@ Render Mark Stop, Mark Turn, and Mark Location through `VideoSyncMarkControls` i
 - Slider transient movement does not commit; slider commit does.
 - Candidate state variants and disabled behavior.
 - Landmark sorting, card scrubbing, limits, clear, and deletion.
-- All three mark buttons, including enabled location creation.
+- All four mark buttons, including distinct left/right creation and enabled location creation.
 - Mark buttons disabled outside video range.
 
 ### Phase 5 exit criteria
@@ -655,7 +662,7 @@ Render:
 - speed path in stop red;
 - signed turning path in turn green;
 - stop bands at event time ±2 seconds;
-- turn bands over the detected interval expanded by ±2 seconds.
+- left/right turn bands over each detected interval expanded by ±2 seconds, with direction labels or icons in addition to the shared green color.
 
 Extend the existing absolute overlay layer with video landmark lines that span ruler, graph, and lanes. Preserve current playhead/export-marker stacking and pointer behavior.
 
@@ -697,6 +704,7 @@ For idle offscreen landmarks:
 - Output point count bounded by viewport width.
 - No graph calculation on playhead-only changes.
 - Bands use detected intervals and tolerance expansion.
+- Left/right event bands and landmark handles preserve direction through view-model preparation.
 - Landmark lines follow committed and preview video offsets.
 - Drag preview/commit, video-bound clamping, and candidate invalidation timing.
 - Offscreen indicators are rendered at edges and remain pointer-inert.
@@ -790,7 +798,7 @@ Phases 1–7.
 
 Test the full workflows:
 
-1. Load activity and video, enter sync mode, mark one stop and one turn, run sync, and apply a candidate.
+1. Load activity and video, enter sync mode, mark one stop and one left or right turn, run sync, and apply a same-direction candidate.
 2. Drag a landmark, observe stale disabled candidates, rerun, and apply a new result.
 3. Change sensitivity, observe bands update and prior search rerun.
 4. Save, close, reload, and reproduce landmarks/sensitivities without persisted candidates.
@@ -798,6 +806,7 @@ Test the full workflows:
 6. Create, drag, persist, and delete a video-only location landmark with no map candidate.
 7. Inject a resolved location fixture and exercise map-only, compatible, and conflict candidates.
 8. Replace activity and video independently and verify their distinct lifecycle behavior.
+9. Mark a turn opposite to the detected activity turn at the same time, verify it gives no match, then mark the correct direction and verify candidate matching succeeds.
 
 ### 8.2 Add explicit error and empty states
 
@@ -809,6 +818,7 @@ Cover:
 - missing speed;
 - missing heading;
 - no detected events for one or both marked types;
+- detected turns present but none in a marked turn's direction;
 - no two-landmark consensus;
 - calculation failure;
 - calculation superseded by newer inputs;
@@ -825,6 +835,7 @@ Do not collapse these into one generic empty state when the user can take a diff
 - Ensure stale/error messages are announced appropriately without repeatedly announcing playhead-driven diagnostics.
 - Preserve keyboard focus when candidate data refreshes where the same logical card remains.
 - Ensure color is not the only type/status signal; icons and text carry the same meaning.
+- Localize and label Left Turn and Right Turn separately in mark controls, landmark cards, event bands, and candidate evidence.
 
 ### 8.4 Performance validation
 
@@ -893,7 +904,7 @@ Phases 6 and 7 are independent after their shared prerequisites and can be imple
 Keep reviewable commits aligned with behavior rather than file type:
 
 1. Project v2 contract, v1 migration, and manual-sync store state.
-2. Timestamp-based stop/turn detection with tests.
+2. Timestamp-based stop and directional-turn detection with tests.
 3. Interval-consensus matching and likelihood scoring with tests.
 4. Calculation lifecycle, media invalidation, and atomic candidate application.
 5. Toolbar registration, workspace mode, drawer, and marking controls.
@@ -905,4 +916,4 @@ Do not combine unrelated cleanup or refactoring with these commits.
 
 ## Completion Definition
 
-The feature is complete when a user can mark video-local stop/turn/location landmarks, detect sampling-rate-independent stop/turn activity events, obtain and compare globally aligned offset candidates, apply one candidate while retaining the viewed video frame, and save/reload only the durable manual inputs. The dedicated workspace must remain isolated from project widgets, version-1 projects must continue to open through a strict ingress migration, and timeline navigation must remain responsive at the target activity size.
+The feature is complete when a user can mark video-local stop/left-turn/right-turn/location landmarks, detect sampling-rate-independent stop and directional-turn activity events, obtain and compare globally aligned offset candidates that reject opposite-direction turn matches, apply one candidate while retaining the viewed video frame, and save/reload only the durable manual inputs. The dedicated workspace must remain isolated from project widgets, version-1 projects must continue to open through a strict ingress migration, and timeline navigation must remain responsive at the target activity size.
