@@ -189,10 +189,6 @@ fn append_scaled_gps_rows(
         return;
     };
     let unix_ms = extract_tag_u64(gps_map, &TagId::Unknown(GOPRO_GPSU_TAG));
-    let stmp_us = extract_tag_u64(gps_map, &TagId::TimestampUs);
-    let first_row_ms = stmp_us
-        .map(|stmp| stmp as f64 / 1000.0)
-        .unwrap_or(sample.timestamp_ms);
 
     for (index, numeric_row) in rows {
         let Some(numeric_row) = numeric_row else {
@@ -206,8 +202,6 @@ fn append_scaled_gps_rows(
             scales,
             index,
             row_count,
-            stmp_us,
-            first_row_ms,
             unix_ms,
         );
     }
@@ -221,8 +215,6 @@ fn append_scaled_gps_row(
     scales: &[i32],
     index: usize,
     row_count: usize,
-    stmp_us: Option<u64>,
-    first_row_ms: f64,
     unix_ms: Option<u64>,
 ) {
     if row.len() < 5 {
@@ -236,23 +228,14 @@ fn append_scaled_gps_row(
     }
 
     let mut native = base.clone();
-    native.timestamp_ms = if let Some(stmp) = stmp_us {
-        let stmp_ms = stmp as f64 / 1000.0;
-        if index == 0 || row_count <= 1 {
-            stmp_ms
-        } else {
-            stmp_ms + sample.duration_ms * index as f64 / row_count as f64
-        }
-    } else {
-        sub_sample_timestamp_ms(sample, index, row_count)
-    };
+    native.timestamp_ms = sub_sample_timestamp_ms(sample, index, row_count);
     native.latitude = finite_f64(latitude);
     native.longitude = finite_f64(longitude);
     native.altitude = finite_f64(row[2] / scales[2] as f64);
     native.speed = finite_f64(row[3] / scales[3] as f64);
 
     if let Some(unix_ms) = unix_ms {
-        let offset_ms = native.timestamp_ms - first_row_ms;
+        let offset_ms = native.timestamp_ms - sample.timestamp_ms;
         native.timestamp = Some(unix_millis_plus_offset_ms_to_rfc3339(unix_ms, offset_ms));
     }
 
@@ -412,8 +395,6 @@ fn append_imu_samples(result: &mut Vec<NativeSample>, sample: &SampleInfo, accel
     let Some(tag) = accel_map.get(&TagId::Data) else {
         return;
     };
-    let stmp_us = extract_tag_u64(accel_map, &TagId::TimestampUs);
-
     match &tag.value {
         TagValue::Vec_Vector3_i16(values) => {
             let vectors = values.get();
@@ -427,7 +408,6 @@ fn append_imu_samples(result: &mut Vec<NativeSample>, sample: &SampleInfo, accel
                     sample,
                     index,
                     vectors.len(),
-                    stmp_us,
                     vec.x as f64 / scale,
                     vec.y as f64 / scale,
                     vec.z as f64 / scale,
@@ -443,7 +423,6 @@ fn append_imu_samples(result: &mut Vec<NativeSample>, sample: &SampleInfo, accel
                     sample,
                     index,
                     vectors.len(),
-                    stmp_us,
                     vec.x as f64,
                     vec.y as f64,
                     vec.z as f64,
@@ -459,7 +438,6 @@ fn append_imu_samples(result: &mut Vec<NativeSample>, sample: &SampleInfo, accel
                     sample,
                     index,
                     vectors.len(),
-                    stmp_us,
                     vec.x,
                     vec.y,
                     vec.z,
@@ -475,7 +453,6 @@ fn append_imu_samples(result: &mut Vec<NativeSample>, sample: &SampleInfo, accel
                     sample,
                     index,
                     vectors.len(),
-                    stmp_us,
                     vec.x as f64,
                     vec.y as f64,
                     vec.z as f64,
@@ -491,7 +468,6 @@ fn append_imu_samples(result: &mut Vec<NativeSample>, sample: &SampleInfo, accel
                     sample,
                     index,
                     vectors.len(),
-                    stmp_us,
                     vec.x,
                     vec.y,
                     vec.z,
@@ -501,7 +477,7 @@ fn append_imu_samples(result: &mut Vec<NativeSample>, sample: &SampleInfo, accel
         }
         _ => {
             if let Some((x, y, z)) = extract_last_acceleration_components(accel_map) {
-                append_imu_vector_sample(result, sample, 0, 1, stmp_us, x, y, z, accel_map);
+                append_imu_vector_sample(result, sample, 0, 1, x, y, z, accel_map);
             }
         }
     }
@@ -515,7 +491,6 @@ fn append_imu_vector_sample(
     sample: &SampleInfo,
     index: usize,
     count: usize,
-    stmp_us: Option<u64>,
     x: f64,
     y: f64,
     z: f64,
@@ -526,7 +501,7 @@ fn append_imu_vector_sample(
     };
 
     result.push(NativeSample {
-        timestamp_ms: imu_sample_timestamp_ms(sample, index, count, stmp_us),
+        timestamp_ms: sub_sample_timestamp_ms(sample, index, count),
         g_force: g_force_from_components(x, y, z),
         g_force_x: Some(x),
         g_force_y: Some(y),
@@ -577,23 +552,4 @@ fn acceleration_components_to_g(x: f64, y: f64, z: f64, map: &TagMap) -> Option<
         finite_f64(y * unit_factor)?,
         finite_f64(z * unit_factor)?,
     ))
-}
-
-/// Computes a per-vector IMU sample timestamp using the accelerometer's STMP.
-fn imu_sample_timestamp_ms(
-    sample: &SampleInfo,
-    index: usize,
-    count: usize,
-    stmp_us: Option<u64>,
-) -> f64 {
-    if let Some(stmp) = stmp_us {
-        let base_ms = stmp as f64 / 1000.0;
-        if index == 0 || count <= 1 {
-            base_ms
-        } else {
-            base_ms + sample.duration_ms * index as f64 / count as f64
-        }
-    } else {
-        sub_sample_timestamp_ms(sample, index, count)
-    }
 }

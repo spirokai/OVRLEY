@@ -5,24 +5,13 @@
 
 import { Move, Palette, Ruler, TrendingUp, Type } from 'lucide-react'
 import { SectionHeading } from '@/components/ui/section-heading'
-import {
-  ColorField,
-  ContentAlignmentControl,
-  NumberField,
-  SelectField,
-  SizeSlider,
-  SliderField,
-  TextField,
-  TIME_FORMATS,
-  ToggleField,
-} from './widgetFormControls'
+import { ColorField, ContentAlignmentControl, NumberField, SelectField, SizeSlider, SliderField, TextField, ToggleField } from './widgetFormControls'
 import FontSelectField from '@/components/ui/font-select-field'
 import useAvailableFonts from '@/features/scene-settings/hooks/useAvailableFonts'
 import { createFontSelection } from '@/lib/fonts'
 import { getWidgetFont } from '../utils/widgetUtils'
 import { getThemeColor } from '@/lib/theme'
 import { useTranslation } from 'react-i18next'
-import { translateOptions } from '@/i18n'
 
 /**
  * Renders the position section component.
@@ -114,7 +103,6 @@ export function DimensionsSection({ widget, setNumericField }) {
  * @param {number} [props.sizeMin=20] - Minimum font size.
  * @param {number} [props.sizeMax=200] - Maximum font size.
  * @param {string} [props.colorLabel] - Label for the font color picker. Defaults to the translated "Font Color".
- * @param {boolean} [props.showFormatSelect=false] - Whether to show the format select.
  * @param {boolean} [props.showContentAlignment=false] - Whether to show the content alignment control in the section heading.
  * @returns {JSX.Element} Rendered component output.
  */
@@ -129,7 +117,6 @@ export function FontSection({
   sizeMin = 20,
   sizeMax = 200,
   colorLabel,
-  showFormatSelect = false,
   showContentAlignment = false,
 }) {
   const { t } = useTranslation()
@@ -158,15 +145,6 @@ export function FontSection({
           label={t('widget-editor.text', 'Text')}
           value={widget.data.text || ''}
           onChange={(value) => updateWidgetData(widget.id, { text: value })}
-        />
-      ) : null}
-
-      {showFormatSelect ? (
-        <SelectField
-          label={t('widget-editor.format', 'Format')}
-          value={widget.data.format}
-          onValueChange={(value) => updateWidgetData(widget.id, { format: value })}
-          options={translateOptions(TIME_FORMATS, t)}
         />
       ) : null}
 
