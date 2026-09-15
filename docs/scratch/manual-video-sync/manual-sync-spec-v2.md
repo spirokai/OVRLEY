@@ -388,69 +388,40 @@ Run detection, candidate generation, scoring, and graph preparation as frontend 
 
 Target inputs of 5,000–10,000 samples and sampling rates from 1–40 Hz. Detection should remain linear in activity samples. Candidate hypothesis generation should remain proportional to eligible landmarks × compatible detected events; do not enumerate every multi-landmark event combination.
 
-## Required Tests
+## Essential Verification
+
+Use representative fixtures and a few complete workflows. A behavior already covered at its owning contract does not need duplicate tests at every consuming layer.
 
 ### Detection utilities
 
-- equivalent events at 1 Hz, irregular cadence, and 40 Hz;
-- near-stop sensor drift that never reaches zero;
-- dwell and hysteresis around the threshold;
-- activity beginning stationary;
-- threshold-crossing time interpolation;
-- heading wraparound at 0/360 degrees;
-- sharp qualifying turns and gradual non-qualifying direction changes;
-- clockwise-positive right turns and counterclockwise left turns, including heading wraparound and direction reversals;
-- turns suppressed during near-stop state;
-- missing telemetry gaps split detection.
+- representative stop and left/right turn events agree at 1 Hz and 40 Hz;
+- stop dwell/hysteresis, stationary start, heading wraparound/reversal, and gradual bend behave as specified;
+- missing channels and significant gaps never fabricate events.
 
 ### Matching and scoring
 
-- one stop plus one directional turn finds the correct shared offset;
-- turn marks at start, middle, and end of a detected turn interval;
-- left-turn marks never match right-turn events and right-turn marks never match left-turn events, even when timing overlaps;
-- type mismatches are never assigned;
-- one activity event cannot satisfy two video landmarks;
-- exactly two landmarks require both matches;
-- three to five landmarks allow penalized partial consensus;
-- likelihood score is absolute and stable across candidate sets;
-- near-identical offsets merge deterministically;
-- maximum five candidates;
-- unresolved location landmark has no matching effect;
-- resolved map-only candidate is pinned and unscored;
-- map-compatible and map-conflicting candidate classification.
+- one stop and one same-direction turn find a shared offset; an opposite-direction turn cannot match;
+- overlapping events obey one-to-one assignment, the two-landmark minimum, and penalized partial coverage;
+- absolute scoring, deterministic merging/order, and five-candidate limit hold for a representative candidate set;
+- unresolved location is inert; a resolved location produces map-only and conflict candidates.
 
 ### State and interaction
 
-- maximum five total landmarks and one location landmark;
-- all four mark controls disabled outside video range;
-- landmark timeline position derives from video-local time plus offset;
-- dragging a landmark changes only video-local time;
-- moving the video moves all landmark timeline positions without rewriting them;
-- landmark edits retain but invalidate candidate cards;
-- sensitivity commit reruns an existing search;
-- stale candidates cannot be applied;
-- applying a candidate updates the canonical offset and compensates the playhead by the same delta;
-- offscreen indicators remain noninteractive;
-- video replacement clears landmarks;
-- activity replacement preserves landmarks but clears derived results.
+- typed mark actions respect video bounds and landmark limits;
+- landmark editing invalidates candidates, sensitivity commit reruns an existing search, and stale candidates cannot be applied;
+- candidate application updates the canonical offset and playhead atomically; video/activity replacement follows its distinct reset rule;
+- timeline dragging changes video-local time only, and offscreen indicators are pointer-inert.
 
 ### Persistence
 
-- strict v2 round trip for landmarks and physical sensitivity thresholds;
-- directional-turn types persist exactly, while generic `turn`, missing type, and unknown directional types fail at v2 ingress;
-- candidates and detected events are absent from saved projects;
-- valid v1 project migrates in memory to empty landmarks and default thresholds;
-- migrated project writes v2 only on normal save;
-- malformed present manual-sync fields fail at ingress.
+- canonical v2 data round-trips directional landmarks and thresholds without derived candidates;
+- representative malformed v2 data, including generic `turn` and missing required fields, fails at ingress;
+- valid v1 data migrates in memory and writes v2 on normal save.
 
 ### Graph performance and geometry
 
-- min/max pixel bucketing preserves brief extrema;
-- zoomed-in ranges retain all visible samples when decimation is unnecessary;
-- vertical scales remain unchanged across zoom and pan;
-- output point count remains bounded by viewport width;
-- graph geometry does not recompute when only the playhead moves;
-- representative 10,000-point zoom and pan remain within the UI frame budget.
+- graph alignment and fixed vertical scales hold during zoom/pan; decimation retains brief extrema;
+- a representative 10,000-point activity remains within the agreed UI frame budget.
 
 ## Explicit Non-goals
 

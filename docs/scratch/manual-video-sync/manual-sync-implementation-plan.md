@@ -50,7 +50,7 @@ Add a dedicated Zustand slice:
 app/src/store/slices/createManualVideoSyncSlice.js
 ```
 
-Place tests under the existing test tree, grouped by utility, state, project persistence, timeline interaction, and component behavior.
+Add focused tests at the contract boundaries and a few complete workflows. Avoid repeating the same behavior in utility, hook, store, and component tests unless each layer has a distinct failure mode.
 
 ---
 
@@ -195,15 +195,10 @@ Do not persist candidates, detected events, calculation status, errors, or graph
 
 ### Phase 1 tests
 
-- Store action tests for valid creation/move/delete/clear and all limits.
-- Store tests proving malformed action arguments fail instead of being coerced.
-- Frontend snapshot and hydration tests for canonical v2 state.
-- Dirty-state tests for landmarks and sensitivity changes.
-- Rust project-file tests for strict v2 read/write.
-- Rust migration tests for a valid v1 archive.
-- Rust rejection tests for malformed variants, missing required keys, duplicate IDs, limits, and invalid thresholds.
-- Round-trip and strict-ingress tests for `leftTurn` and `rightTurn`; generic `turn` fails rather than receiving an inferred direction.
-- Project hydration test for landmark time beyond loaded video duration.
+- Focused store tests cover typed creation, limits, movement, deletion, and malformed action input.
+- A frontend project test covers snapshot, hydration, and dirty tracking of durable state.
+- Rust project-file tests cover canonical v2 round-trip, v1 migration, and rejection of representative malformed v2 input, including generic `turn` and missing required fields.
+- A hydration test rejects a saved landmark beyond the loaded video's duration.
 
 ### Phase 1 exit criteria
 
@@ -293,18 +288,10 @@ Missing external channels produce empty corresponding event arrays with explicit
 
 ### Phase 2 tests
 
-- Equivalent synthetic motion sampled at 1 Hz, irregular cadence, and 40 Hz yields equivalent events within the declared time tolerance.
-- Near-stop speed drift that never reaches zero still produces one event.
-- Threshold chatter produces no duplicate stop events.
-- Starting stationary produces no stop.
-- Downward crossing interpolation uses timestamps correctly.
-- Heading 359→1 degrees produces a small change, not a spike.
-- A 90-degree sharp turn qualifies at the default; a 180-degree/two-minute bend does not.
-- Signed left/right turns receive the correct canonical event type, including across heading wraparound.
-- A direction reversal produces separate left/right events, not one merged interval.
-- Heading changes during near-stop state do not produce turns.
-- Significant gaps split state and cannot create synthetic events.
-- Missing speed or heading yields explicit availability without throwing.
+- A representative stop and left/right turn fixture produces equivalent event times at 1 Hz and 40 Hz.
+- Stop dwell/hysteresis yields one event for near-zero speed drift and none when the activity begins stationary.
+- Heading wraparound, a meaningful reversal, and a gradual bend verify directional classification and the ten-second limit.
+- One gap/missing-channel fixture verifies no fabricated event and explicit metric availability.
 
 ### Phase 2 exit criteria
 
@@ -389,20 +376,10 @@ An unresolved location with `activitySecond: null` must take no matching branch 
 
 ### Phase 3 tests
 
-- One stop plus one directional turn selects their most precise shared alignment.
-- Turn marks anywhere inside the interval have zero turn residual.
-- Left-turn marks reject right-turn events and right-turn marks reject left-turn events, even when support intervals would otherwise overlap.
-- Type mismatches cannot contribute support.
-- One activity event cannot satisfy two video landmarks.
-- Exactly two eligible landmarks require two matches.
-- Larger sets allow partial consensus and apply the coverage penalty.
-- Score values match the formula and remain stable when unrelated candidates are added.
-- Equal-score candidates use deterministic tie-breakers.
-- Near-identical hypotheses merge.
-- No-match and maximum-five behavior.
-- Unresolved location is inert.
-- Resolved map-only, map-compatible, and map-conflict variants.
-- Long activities with many events do not trigger combinatorial growth.
+- One stop plus one same-direction turn finds a shared offset; an opposite-direction turn at the same time produces no candidate.
+- An overlapping-event fixture verifies one-to-one assignment, the two-landmark minimum, and penalized partial coverage for larger sets.
+- A scoring fixture verifies the absolute score, deterministic ordering/merging, and the five-candidate limit.
+- One location fixture verifies unresolved locations are inert and resolved locations produce the map-only and conflict variants.
 
 ### Phase 3 exit criteria
 
@@ -500,15 +477,9 @@ Candidate application:
 
 ### Phase 4 tests
 
-- Calculation status transitions and input-revision result rejection.
-- First search never starts from a sensitivity edit alone.
-- Existing search reruns after sensitivity commit.
-- Landmark edits retain cards but make them stale and disabled.
-- Missing metrics produce the correct eligibility explanation.
-- Unsupported landmark types do not count or reduce coverage.
-- Video replacement clears landmarks; activity replacement preserves them.
-- Candidate application validates before mutation and updates offset/playhead atomically.
-- Candidate application compensates an inside-video and outside-video playhead.
+- Calculation tests cover first-search gating, sensitivity-triggered rerun, and rejection of results from an outdated input revision.
+- A state test covers stale candidate blocking and the distinct video/activity replacement resets.
+- Candidate application test verifies atomic offset/playhead compensation, including a playhead outside the video.
 
 ### Phase 4 exit criteria
 
@@ -586,20 +557,14 @@ Render Mark Stop, Mark Left Turn, Mark Right Turn, and Mark Location through `Vi
 
 ### Phase 5 tests
 
-- Toolbar selection and drawer visibility activate/deactivate sync mode correctly, including close transitions.
-- Drawer preference accepts the new canonical tool.
-- Project widgets are not changed by entering/leaving the tool.
-- Slider transient movement does not commit; slider commit does.
-- Candidate state variants and disabled behavior.
-- Landmark sorting, card scrubbing, limits, clear, and deletion.
-- All four mark buttons, including distinct left/right creation and enabled location creation.
-- Mark buttons disabled outside video range.
+- A workspace test covers toolbar activation/close and confirms project widgets remain untouched.
+- A drawer/preview interaction test covers slider commit, card scrubbing, and the four typed mark actions with video-range disablement.
 
 ### Phase 5 exit criteria
 
 - The complete non-timeline workflow is reachable through one toolbar tool.
 - Entering the tool produces a dedicated mode without mutating project widgets.
-- Every drawer state is explicit and test-covered.
+- The drawer has clear prerequisite, calculation, stale, and candidate behavior.
 - Location tagging can be exercised even though course-point selection is absent.
 
 ---
@@ -697,17 +662,8 @@ For idle offscreen landmarks:
 
 ### Phase 6 tests
 
-- Time-to-x alignment with ruler, lanes, and playhead across zoom/pan.
-- Fixed vertical scales across multiple viewport changes.
-- Min/max decimation preserves a one-sample stop dip and sharp turn extrema.
-- Missing-data path breaks.
-- Output point count bounded by viewport width.
-- No graph calculation on playhead-only changes.
-- Bands use detected intervals and tolerance expansion.
-- Left/right event bands and landmark handles preserve direction through view-model preparation.
-- Landmark lines follow committed and preview video offsets.
-- Drag preview/commit, video-bound clamping, and candidate invalidation timing.
-- Offscreen indicators are rendered at edges and remain pointer-inert.
+- A geometry test covers shared time-to-x alignment, fixed vertical scales, and decimation that preserves a brief stop/turn extrema.
+- A timeline interaction test covers landmark drag commit, video-offset movement, and pointer-inert offscreen indicators.
 
 ### Phase 6 exit criteria
 
@@ -767,14 +723,8 @@ Reuse existing pure geometry/interpolation utilities where their contracts fit. 
 
 ### Phase 7 tests
 
-- Normal mode still renders project widgets and editing affordances.
-- Sync mode hides them without mutating configuration or selection state.
-- Sync mode forces video presentation without persisting a background-mode change.
-- Speed diagnostic updates from timeline activity time.
-- Route marker updates from timeline activity time.
-- Applying a candidate changes the activity state shown over the compensated video frame.
-- Missing speed/course produces explicit unavailable presentation.
-- Diagnostic components never appear in project snapshots or render configuration.
+- A mode test verifies sync diagnostics replace visible project widgets without changing saved widget or background state.
+- A diagnostic test verifies speed/route sample timeline time and show unavailable data during a telemetry gap.
 
 ### Phase 7 exit criteria
 
@@ -796,66 +746,36 @@ Phases 1–7.
 
 ### 8.1 Complete integration scenarios
 
-Test the full workflows:
+Add a small number of end-to-end checks for behavior that crosses feature boundaries:
 
-1. Load activity and video, enter sync mode, mark one stop and one left or right turn, run sync, and apply a same-direction candidate.
-2. Drag a landmark, observe stale disabled candidates, rerun, and apply a new result.
-3. Change sensitivity, observe bands update and prior search rerun.
-4. Save, close, reload, and reproduce landmarks/sensitivities without persisted candidates.
-5. Load v1, observe empty/default manual state, then save as v2.
-6. Create, drag, persist, and delete a video-only location landmark with no map candidate.
-7. Inject a resolved location fixture and exercise map-only, compatible, and conflict candidates.
-8. Replace activity and video independently and verify their distinct lifecycle behavior.
-9. Mark a turn opposite to the detected activity turn at the same time, verify it gives no match, then mark the correct direction and verify candidate matching succeeds.
+1. Mark a stop and a directional turn, run sync, and apply a candidate; an opposite-direction mark must not produce that match.
+2. Edit a landmark or sensitivity after a search and verify the documented stale/rerun behavior.
+3. Save and reload a project with directional landmarks and thresholds; derived candidates are absent.
 
-### 8.2 Add explicit error and empty states
+### 8.2 Define prerequisite, no-match, and failure behavior
 
-Cover:
+These states refer to the Video Sync drawer, mark controls, candidate list, and preview diagnostics. They do not each require an error message:
 
-- no video;
-- no activity;
-- insufficient usable landmarks;
-- missing speed;
-- missing heading;
-- no detected events for one or both marked types;
-- detected turns present but none in a marked turn's direction;
-- no two-landmark consensus;
-- calculation failure;
-- calculation superseded by newer inputs;
-- stale candidates;
-- diagnostic telemetry gap at playhead.
+- Without a video, disable mark actions and Landmark Sync. In the current UI, no activity or fewer than two usable stop/directional-turn landmarks also disables Landmark Sync. The existing media/landmark controls show what is missing; do not add error cards or banners for these prerequisites. The dormant resolved-location map-only path retains its separate enablement rule.
+- Missing speed or heading in external activity data makes only the corresponding landmarks unusable for sync. Disable Landmark Sync if the usable count falls below two. A speed or route diagnostic may display its ordinary **Unavailable** value when that metric is missing or gapped at the playhead; this is local diagnostic content, not a feature error.
+- After an ordinary stop/turn search with no qualifying events, no same-direction turns, or no two-landmark consensus, show the single candidate-list result **No candidate aligns at least two landmarks**. These are normal no-match outcomes, not calculation failures; a resolved-location map-only result follows its separate rule.
+- A real detection or matching exception sets calculation status to `error` and shows one actionable failure message in the candidate area. An outdated calculation result is discarded silently. Landmark edits keep existing candidates visible but disabled with the existing stale notice.
 
-Do not collapse these into one generic empty state when the user can take a different corrective action.
+Only an actual calculation failure uses an error presentation. Do not introduce separate empty/error components or announcements for every absent prerequisite or no-match cause.
 
 ### 8.3 Localization and accessibility
 
 - Add all user-facing strings to existing locale resources following current fallback conventions.
 - Give toolbar, mark, clear, delete, candidate, slider, and landmark-drag controls accessible names.
 - Expose slider effective values and orientation semantics to assistive technology.
-- Ensure stale/error messages are announced appropriately without repeatedly announcing playhead-driven diagnostics.
+- Announce calculation failure and stale-candidate status appropriately without repeatedly announcing playhead-driven diagnostics.
 - Preserve keyboard focus when candidate data refreshes where the same logical card remains.
 - Ensure color is not the only type/status signal; icons and text carry the same meaning.
 - Localize and label Left Turn and Right Turn separately in mark controls, landmark cards, event bands, and candidate evidence.
 
 ### 8.4 Performance validation
 
-Create representative fixtures or deterministic generators for:
-
-- 5,000 and 10,000 samples;
-- 1 Hz, irregular, and 40 Hz cadence;
-- event-sparse and event-dense activities;
-- missing-data gaps.
-
-Measure in development tooling/tests:
-
-- detector runtime;
-- candidate runtime with five landmarks;
-- graph preparation per viewport frame;
-- SVG path point count;
-- React commit behavior during zoom/pan;
-- absence of detector/matcher work during playhead movement.
-
-Target graph preparation below approximately 8 ms per frame on representative desktop hardware. If it fails, profile before changing architecture. Optimize local allocations/caching first; use Canvas or a worker only from measured evidence.
+Use one representative 10,000-sample activity to check detector/matcher runtime and graph preparation during zoom/pan. Check that graph preparation stays near the approximately 8 ms frame target and that playhead movement does not rerun detection or matching. Profile a measured failure before changing the architecture.
 
 ### 8.5 Run verification without a production build
 
