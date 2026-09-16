@@ -32,12 +32,12 @@ function getMarkerClassName(marker) {
 /**
  * Composes store selection, playback, viewport, export range, gestures, clips, and keyboard commands.
  *
- * @param {{ activeKeyboardWorkspace: string, backgroundMode: string }} options Overlay player inputs.
+ * @param {{ activeKeyboardWorkspace: string, backgroundMode: string, videoSyncMode?: boolean }} options Overlay player inputs.
  * @param {string} options.activeKeyboardWorkspace Active keyboard command workspace.
  * @param {string} options.backgroundMode Active preview background mode.
  * @returns {object} Presentational view model for the overlay player.
  */
-export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMode }) {
+export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMode, videoSyncMode = false }) {
   // Store selector - gathers the entire player-facing store contract in one subscription.
   const playerStore = useStore(
     useShallow((state) => ({
@@ -412,6 +412,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       ticks: viewport.ticks,
       viewport: viewport.viewport,
       widthPx: viewport.widthPx,
+      videoSyncMode,
     },
     toolbar: {
       exportRange: {

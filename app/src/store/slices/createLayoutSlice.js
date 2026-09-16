@@ -1,5 +1,6 @@
 export const ACTIVITY_TOOL = 'activity'
 export const VIDEO_TOOL = 'video'
+export const VIDEO_SYNC_TOOL = 'videoSync'
 export const WIDGETS_TOOL = 'widgets'
 export const PROJECTS_TOOL = 'projects'
 

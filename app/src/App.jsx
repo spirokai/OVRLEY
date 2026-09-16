@@ -18,7 +18,8 @@ import {
   VideoDrawerContent,
   useVideoSyncControls,
 } from '@/features/toolbar'
-import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
+import { VideoSyncDrawerContent, useVideoSyncWorkspace } from '@/features/video-sync'
+import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_SYNC_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
 import { MissingSourceDialog, StartupProjectsDialog } from '@/features/projects'
 import { UpdatePromptDialog } from '@/features/app-update'
 import {
@@ -81,6 +82,11 @@ function AppShell() {
   } = useAppShellComposition()
   const toolbarDrawer = useToolbarDrawer(layout)
   const videoSync = useVideoSyncControls()
+  const videoSyncWorkspace = useVideoSyncWorkspace({
+    toolbarDrawer,
+    videoSummary: videoControls.videoSummary,
+    videoSync,
+  })
   const { config, globalDefaults, importingVideo, isProcessing, setConfig } = appShell
   let drawerContent = null
 
@@ -122,6 +128,8 @@ function AppShell() {
           videoSync={videoSync}
         />
       )
+    } else if (toolbarDrawer.activeTool === VIDEO_SYNC_TOOL) {
+      drawerContent = <VideoSyncDrawerContent {...videoSyncWorkspace.drawer} />
     } else if (toolbarDrawer.activeTool === WIDGETS_TOOL) {
       drawerContent = <WidgetDrawerContent widgetLiveEdits={widgetLiveEdits} />
     }
@@ -215,6 +223,8 @@ function AppShell() {
                   undoRedoControls={undoRedoControls}
                   showProjectStatus={projectLifecycle.status !== 'Saved'}
                   projectStatus={projectLifecycle.status}
+                  videoSyncMode={videoSyncWorkspace.videoSyncMode}
+                  videoSyncPreview={videoSyncWorkspace.markControls}
                   widgetLiveEdits={widgetLiveEdits}
                 />
               </div>
@@ -222,6 +232,7 @@ function AppShell() {
                 activeKeyboardWorkspace={editorShell.activeKeyboardWorkspace}
                 backgroundMode={editorShell.editorBackgroundMode}
                 onActivateKeyboardWorkspace={() => editorShell.setActiveKeyboardWorkspace('player')}
+                videoSyncMode={videoSyncWorkspace.videoSyncMode}
               />
             </>
           }

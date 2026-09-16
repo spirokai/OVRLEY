@@ -255,6 +255,7 @@ export function ColorField({ label, labelKey = 'widget-editor.color', defaultLab
  * @param {*} props.min - Lower bound used by the calculation.
  * @param {*} props.max - Upper bound used by the calculation.
  * @param {*} props.step - Value for step.
+ * @param {'ltr'|'rtl'} [props.dir='ltr'] - Slider direction.
  * @param {boolean} props.integerDisplay - Whether to round the displayed value.
  * @param {*} props.onSliderChange - Callback invoked to slider change.
  * @param {*} props.onSliderCommit - Callback invoked when slider interaction ends.
@@ -267,6 +268,7 @@ export function SliderField({
   min,
   max,
   step = 1,
+  dir = 'ltr',
   disabled = false,
   onSliderChange,
   onSliderCommit,
@@ -285,6 +287,7 @@ export function SliderField({
       </div>
       <div className="flex items-center gap-3 px-1">
         <Slider
+          dir={dir}
           min={min}
           max={max}
           step={step}

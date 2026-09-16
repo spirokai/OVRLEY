@@ -28,6 +28,7 @@ import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from 
 import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
 import { useTranslation } from 'react-i18next'
 import { getWidgetTypeName } from '@/lib/widget/widget-icons'
+import { VideoSyncMarkControls } from '@/features/video-sync'
 
 const PROJECT_STATUS_TRANSLATIONS = {
   Unsaved: { key: 'overlay-editor.statusUnsaved', defaultLabel: 'Unsaved' },
@@ -144,6 +145,8 @@ function OverlayEditorContent({
   importedVideoFilename,
   showProjectStatus,
   projectStatus,
+  videoSyncMode = false,
+  videoSyncPreview = null,
   undoRedoControls,
   widgetLiveEdits,
 }) {
@@ -349,8 +352,14 @@ function OverlayEditorContent({
     [globalDefaults?.font_text, globalDefaults?.font_size, overlayState.sceneStyle, valueFont, overlayState.sceneSize],
   )
   const canvasDisplayProps = useMemo(
-    () => ({ displayScale, globalScale: overlayState.globalScale, globalOpacity: overlayState.globalOpacity, backgroundMode, gridVisible }),
-    [displayScale, overlayState.globalScale, overlayState.globalOpacity, backgroundMode, gridVisible],
+    () => ({
+      displayScale,
+      globalScale: overlayState.globalScale,
+      globalOpacity: overlayState.globalOpacity,
+      backgroundMode,
+      gridVisible,
+    }),
+    [backgroundMode, displayScale, gridVisible, overlayState.globalOpacity, overlayState.globalScale],
   )
   const canvasDataProps = useMemo(
     () => ({
@@ -451,6 +460,7 @@ function OverlayEditorContent({
               selectedWidgetIds={selection.selectedWidgetIds}
               widgets={overlayState.canvasWidgets}
             />
+            {videoSyncMode && videoSyncPreview ? <VideoSyncMarkControls {...videoSyncPreview} /> : null}
           </div>
           {selectionRect ? (
             <div

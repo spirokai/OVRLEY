@@ -9,10 +9,10 @@ import TimelineSurface from './TimelineSurface'
 /**
  * Renders the overlay player portion of the application interface.
  *
- * @param {{ activeKeyboardWorkspace: string, backgroundMode: string, onActivateKeyboardWorkspace: Function }} props
+ * @param {{ activeKeyboardWorkspace: string, backgroundMode: string, onActivateKeyboardWorkspace: Function, videoSyncMode?: boolean }} props
  */
-export default function OverlayPlayer({ activeKeyboardWorkspace, backgroundMode, onActivateKeyboardWorkspace }) {
-  const player = useOverlayPlayer({ activeKeyboardWorkspace, backgroundMode })
+export default function OverlayPlayer({ activeKeyboardWorkspace, backgroundMode, onActivateKeyboardWorkspace, videoSyncMode = false }) {
+  const player = useOverlayPlayer({ activeKeyboardWorkspace, backgroundMode, videoSyncMode })
 
   if (!player.isVisible) {
     return null
