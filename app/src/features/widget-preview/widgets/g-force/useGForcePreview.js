@@ -12,6 +12,11 @@ import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
 import { useFontMetrics } from '../../shared/useFontMetrics'
 import { buildGForceFrameState, prepareGForcePreview } from './model'
 
+const GUIDE_DEFAULT_THICKNESS_PX = 2
+const GUIDE_REFERENCE_DIAMETER_PX = 400
+const GUIDE_OPACITY = 0.4
+const GUIDE_RING_RADIUS_RATIOS = [0.33, 0.66]
+
 /** Builds the complete SVG presentation model for the current G-force frame. */
 export function useGForcePreviewModel({ widget, activity, previewSecond, globalOpacity, globalScale, sceneStyle }) {
   const fontFamily = getPreviewFontFamily(widget.data.label_font)
@@ -54,6 +59,10 @@ export function useGForcePreviewModel({ widget, activity, previewSecond, globalO
       radius,
       borderRadius: radius - config.border_thickness / 2,
       innerRadius: radius - config.border_thickness,
+      guideColor: config.marker_color,
+      guideOpacity: GUIDE_OPACITY,
+      guideThickness: GUIDE_DEFAULT_THICKNESS_PX * (config.diameter / GUIDE_REFERENCE_DIAMETER_PX),
+      guideRadii: GUIDE_RING_RADIUS_RATIOS.map((ratio) => radius * ratio),
       markerRadius: config.marker_size / 2,
       opacity: getWidgetOpacity(config, globalOpacity),
       fontFamily,
@@ -67,6 +76,7 @@ export function useGForcePreviewModel({ widget, activity, previewSecond, globalO
       shadow: getTextShadowParts(sceneStyle),
       borderShadowFilterId: sanitizeSvgId(`${widget.id}-g-force-border-shadow`),
       labelShadowFilterId: sanitizeSvgId(`${widget.id}-g-force-label-shadow`),
+      guideClipId: sanitizeSvgId(`${widget.id}-g-force-guide-clip`),
     }
   }, [activity, config, fontFamily, fontMetricsVersion, globalOpacity, globalScale, prepared, previewSecond, sceneStyle, widget.id])
 }

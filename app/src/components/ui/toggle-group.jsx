@@ -20,11 +20,11 @@ const toggleGroupVariants = cva('inline-flex w-fit items-center rounded-sm borde
 })
 
 const toggleGroupItemVariants = cva(
-  'inline-flex cursor-pointer items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-foreground data-[state=on]:text-surface',
+  'h-7 uppercase font-semibold inline-flex cursor-pointer items-center justify-center rounded-xs text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-foreground data-[state=on]:text-surface',
   {
     variants: {
       size: {
-        default: 'size-8 [&_svg]:size-4',
+        default: 'size-7 [&_svg]:size-4',
         compact: 'size-[1.8rem] [&_svg]:size-[0.9rem]',
       },
     },

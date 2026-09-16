@@ -12,8 +12,10 @@ use serde_json::json;
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
 use ovrley_core::normalize::ValidatedValueWidget;
 use ovrley_core::render::format::{
-    format_time_key, format_validated_metric_parts, MetricDisplayContent, MetricIconKind,
+    format_elapsed_time, format_time_key, format_validated_metric_parts,
+    format_validated_time_parts, ElapsedTimeValues, MetricDisplayContent, MetricIconKind,
 };
+use ovrley_core::render::widgets::types::PreparedValue;
 
 #[test]
 fn formats_time_key_variants() {
@@ -36,6 +38,41 @@ fn formats_time_key_variants() {
         format_time_key("date-dd-mmm-yyyy", timestamp),
         "21 APR 2025"
     );
+}
+
+#[test]
+fn formats_signed_export_relative_elapsed_time() {
+    let mut time = common::builders::speed_value_json();
+    time["value"] = json!("time");
+    time["show_units"] = json!(false);
+    time["display_unit"] = json!("");
+    time["time_mode"] = json!("elapsed");
+    time["format"] = json!("time-24");
+    time["hours_offset"] = json!(0);
+    time["elapsed_origin"] = json!("export");
+    time["show_hundredths"] = json!(true);
+    let config = common::seam::validated_config_from_value(json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [],
+        "values": [time],
+        "plots": []
+    }));
+    let PreparedValue::TimeText(validated) = config.values.into_iter().next().unwrap() else {
+        panic!("expected validated time widget");
+    };
+
+    let export_relative = format_validated_time_parts(
+        &validated,
+        None,
+        ElapsedTimeValues {
+            activity_seconds: 5.37,
+            export_seconds: -4.63,
+        },
+        None,
+    );
+
+    assert_eq!(export_relative.standard_text().0, "-0:00:04.63");
+    assert_eq!(format_elapsed_time(90_061.0, false), "25:01:01");
 }
 
 #[test]

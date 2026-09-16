@@ -45,6 +45,8 @@ import {
   GRADIENT_DEFAULTS,
   LAP_TIMER_DEFAULTS,
   LAP_TIMER_MODES,
+  ELAPSED_TIME_ORIGINS,
+  TIME_WIDGET_MODES,
 } from '../widget/standard-widgets'
 
 function cloneSerializable(value) {
@@ -210,6 +212,17 @@ function normalizeValue(value = {}, globalDefaults) {
   const keys = [...VALUE_SHARED_KEYS, ...extraKeys, ...(type === 'lap_timer' ? LAP_TIMER_KEYS : [])]
   const lapTimerDefaults = type === 'lap_timer' ? LAP_TIMER_DEFAULTS : {}
   const withDefaults = { ...TEXT_DEFAULTS, ...TYPE_DEFAULTS[type], ...lapTimerDefaults, ...value }
+  if (type === 'time') {
+    if (!TIME_WIDGET_MODES.some((mode) => mode.value === withDefaults.time_mode)) {
+      throw new Error(`Invalid time_mode: ${String(withDefaults.time_mode)}`)
+    }
+    if (!ELAPSED_TIME_ORIGINS.some((origin) => origin.value === withDefaults.elapsed_origin)) {
+      throw new Error(`Invalid elapsed_origin: ${String(withDefaults.elapsed_origin)}`)
+    }
+    if (typeof withDefaults.show_hundredths !== 'boolean') {
+      throw new Error(`Invalid show_hundredths: ${String(withDefaults.show_hundredths)}`)
+    }
+  }
   const supportsContentAlignment = withDefaults.display_type === 'text' && type !== 'gradient' && type !== 'lap_timer'
   if (supportsContentAlignment && !['left', 'center', 'right'].includes(withDefaults.content_alignment)) {
     throw new Error(`Invalid content_alignment: ${String(withDefaults.content_alignment)}`)

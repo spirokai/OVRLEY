@@ -3,7 +3,6 @@ import { getInterpolatedActivityValue } from '@/features/overlay-editor/utils/ov
 import { GRADIENT_ZERO_LINE_WIDTH_PX } from '@/features/overlay-editor/data/overlayEditorConstants'
 import { METRIC_ICON_SVGS } from '@/lib/widget/widget-icon-data'
 import { buildGradientTrianglePath, formatGradientValue, getGradientWidgetLayout } from './format'
-import { buildMetricWidgetPreviewModel } from './model'
 import { getPreviewFontFamily, getWidgetOpacity, measurePreviewText } from '../../shared/textMeasurement'
 import { getTextShadowParts } from '../../shared/shadow'
 import { sanitizeSvgId } from '../../shared/svgPreviewUtils'
@@ -87,7 +86,7 @@ function buildMetricTextRuns({ widget, content, visualBounds, shadowFilterIds })
  * @param {number} params.previewSecond - Current preview timestamp in seconds.
  * @param {number} params.globalOpacity - Global opacity multiplier.
  * @param {number} params.globalScale - Scene/global scale applied to the preview.
- * @param {object|null} params.metricPreviewModel - Optional precomputed metric preview model.
+ * @param {object|null} params.metricPreviewModel - Container-owned metric preview model.
  * @param {object} params.sceneStyle - Scene style object.
  * @returns {object} Presentation model consumed by the metric preview renderer.
  */
@@ -95,21 +94,12 @@ export function useMetricPreviewPresentation({ widget, activity, previewSecond, 
   // Typography: ensure font metrics are loaded before layout-dependent rendering.
   const fontFamily = getPreviewFontFamily(widget.data.font)
   useFontMetrics([{ fontFamily, fontSize: widget.data.font_size }])
-
   return useMemo(() => {
     // Shared presentation: these values apply to both metric and gradient modes.
     const widgetOpacity = getWidgetOpacity(widget.data, globalOpacity)
     const shadow = getTextShadowParts(sceneStyle)
     const isGradient = widget.type === 'gradient'
-    const previewModel = isGradient
-      ? null
-      : (metricPreviewModel ??
-        buildMetricWidgetPreviewModel({
-          widget,
-          activity,
-          previewSecond,
-          globalScale,
-        }))
+    if (!isGradient && !metricPreviewModel) throw new Error(`Metric preview model is required for widget: ${widget.id}`)
 
     let valueText
     const currentGradientValue = getInterpolatedActivityValue(activity, 'gradient', previewSecond) ?? 0
@@ -135,9 +125,9 @@ export function useMetricPreviewPresentation({ widget, activity, previewSecond, 
 
     if (!isGradient) {
       // Standard metric mode: icon/value/unit layout comes from the preview model.
-      const { content } = previewModel
+      const { content } = metricPreviewModel
       const metricLayout = content.layout
-      const visualBounds = previewModel.visualBounds
+      const visualBounds = metricPreviewModel.visualBounds
       const shadowFilterIds = {
         value: sanitizeSvgId(`${widget.id}-value-shadow`),
         units: sanitizeSvgId(`${widget.id}-units-shadow`),

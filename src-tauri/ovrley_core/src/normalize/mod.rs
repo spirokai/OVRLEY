@@ -64,7 +64,9 @@ pub use linear_gauge::{
 };
 pub use route::{validate_route_plot, ValidatedRoutePlot};
 pub use scene::{validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig};
-pub use time::{validate_time_value, ValidatedTimeFormatting, ValidatedTimeValue};
+pub use time::{
+    validate_time_value, ElapsedTimeOrigin, ValidatedTimeFormatting, ValidatedTimeValue,
+};
 pub use value::{
     validate_value_widget, ContentAlignment, ValidatedValueFormatting, ValidatedValueWidget,
 };
@@ -293,6 +295,11 @@ impl ValidatedRenderConfig {
         let mut requirements = RenderDataRequirements::default();
 
         for value in &self.values {
+            if let PreparedValue::TimeText(widget) = value {
+                requirements.time |=
+                    matches!(&widget.formatting, ValidatedTimeFormatting::Daytime(_));
+                continue;
+            }
             if let PreparedValue::GForce(widget) = value {
                 for axis in [
                     widget.validated.axis_horizontal,
@@ -370,7 +377,7 @@ impl ValidatedRenderConfig {
                 MetricKind::VerticalOscillation => requirements.vertical_oscillation = true,
                 MetricKind::CoreTemperature => requirements.core_temperature = true,
                 MetricKind::Heading => requirements.heading = true,
-                MetricKind::Time => requirements.time = true,
+                MetricKind::Time => unreachable!("time must use dedicated validation"),
                 MetricKind::Calories => requirements.calories = true,
                 MetricKind::LapTimer => unreachable!("lap_timer must use dedicated validation"),
             }

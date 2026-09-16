@@ -163,6 +163,7 @@ function OverlayEditorContent({
     activity,
     globalScale: overlayState.globalScale,
     previewSecond: overlayState.previewSecond,
+    exportStartSecond: overlayState.previewExportStartSecond,
     renderedWidgets: overlayState.canvasWidgets,
   })
 

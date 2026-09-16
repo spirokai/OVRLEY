@@ -49,6 +49,17 @@ export function OverlayLeanAngleWidget({ widget, activity, previewSecond, global
           opacity={presentation.opacity}
         />
       ) : null}
+      <line
+        data-testid="lean-angle-zero-guide"
+        x1={layout.centerX}
+        y1={layout.centerY - layout.outerRadius}
+        x2={layout.centerX}
+        y2={layout.centerY - layout.innerRadius}
+        stroke={presentation.guideColor}
+        strokeWidth={presentation.guideThickness}
+        opacity={presentation.guideOpacity * presentation.opacity}
+        clipPath={`url(#${presentation.innerTrackClipId})`}
+      />
       {presentation.fillPath ? (
         <path
           data-testid="lean-angle-filled-track"

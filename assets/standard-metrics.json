@@ -34,8 +34,11 @@
         },
         "metricTypeOverrides": {
           "time": {
+            "time_mode": "daytime",
             "format": "time-24",
-            "hours_offset": 0
+            "hours_offset": 0,
+            "elapsed_origin": "activity",
+            "show_hundredths": false
           },
           "distance": {
             "decimals": 1,

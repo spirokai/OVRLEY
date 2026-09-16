@@ -33,7 +33,7 @@ export function useElevationPreview({ widget, activity, previewSecond, globalSca
   if (!geometry) return null
 
   const labelOffset = getAltitudeCorrectionMeters(
-    getElevationProfileSeries(activity),
+    getElevationProfileSeries(activity) ?? [],
     widget.data.starting_altitude,
     widget.data.starting_altitude_unit,
   )

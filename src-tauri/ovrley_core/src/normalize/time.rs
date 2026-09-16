@@ -16,7 +16,17 @@ use crate::MetricKind;
 /// Explicit formatting mode for a validated time value.
 #[derive(Clone, Debug)]
 pub enum ValidatedTimeFormatting {
-    Preset(String),
+    Daytime(String),
+    Elapsed {
+        origin: ElapsedTimeOrigin,
+        show_hundredths: bool,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ElapsedTimeOrigin {
+    Activity,
+    Export,
 }
 
 /// Every output-affecting field for a time text widget is explicit.
@@ -102,7 +112,32 @@ pub fn validate_time_value(value: ValueConfig, index: usize) -> CoreResult<Valid
     );
     let format_key = require_string(value.format, &p("format"))?;
     validate_time_format_key(&format_key, &p("format"))?;
-    let formatting = ValidatedTimeFormatting::Preset(format_key);
+    let time_mode = require_string(value.time_mode, &p("time_mode"))?;
+    let elapsed_origin = require_string(value.elapsed_origin, &p("elapsed_origin"))?;
+    let elapsed_origin = match elapsed_origin.as_str() {
+        "activity" => ElapsedTimeOrigin::Activity,
+        "export" => ElapsedTimeOrigin::Export,
+        value => {
+            return Err(CoreError::Config(format!(
+                "{}: expected 'activity' or 'export', got '{value}'",
+                p("elapsed_origin")
+            )))
+        }
+    };
+    let show_hundredths = require_bool(value.show_hundredths, &p("show_hundredths"))?;
+    let formatting = match time_mode.as_str() {
+        "daytime" => ValidatedTimeFormatting::Daytime(format_key),
+        "elapsed" => ValidatedTimeFormatting::Elapsed {
+            origin: elapsed_origin,
+            show_hundredths,
+        },
+        value => {
+            return Err(CoreError::Config(format!(
+                "{}: expected 'daytime' or 'elapsed', got '{value}'",
+                p("time_mode")
+            )))
+        }
+    };
 
     Ok(ValidatedTimeValue {
         base: ValidatedValueWidget {

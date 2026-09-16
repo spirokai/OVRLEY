@@ -11,7 +11,31 @@
     "type": "time",
     "nameKey": "widgets.types.time.name",
     "shortNameKey": "widgets.types.time.shortName",
-    "category": "general"
+    "category": "general",
+    "modes": [
+      {
+        "value": "daytime",
+        "labelKey": "widget-editor.daytime",
+        "defaultLabel": "Daytime"
+      },
+      {
+        "value": "elapsed",
+        "labelKey": "widget-editor.elapsedTime",
+        "defaultLabel": "Elapsed Time"
+      }
+    ],
+    "elapsedOrigins": [
+      {
+        "value": "activity",
+        "labelKey": "widget-editor.activityStart",
+        "defaultLabel": "Activity Start"
+      },
+      {
+        "value": "export",
+        "labelKey": "widget-editor.exportStart",
+        "defaultLabel": "Export Start"
+      }
+    ]
   },
   "plot": {
     "definitions": {
@@ -161,7 +185,10 @@
       "rectangle": {
         "label": "Rectangle",
         "labelKey": "widgets.backdropTypes.rectangle",
-        "icon": { "source": "shared", "assetFile": "display-type-rectangle.svg" },
+        "icon": {
+          "source": "shared",
+          "assetFile": "display-type-rectangle.svg"
+        },
         "defaults": {
           "display_type": "rectangle",
           "x": 100,

@@ -88,6 +88,11 @@ export function OverlayGForceWidget({ widget, activity, previewSecond, globalOpa
           strokeOpacity={config.border_opacity * model.opacity}
         />
       ) : null}
+      <defs>
+        <clipPath id={model.guideClipId}>
+          <circle cx={model.centerX} cy={model.centerY} r={model.innerRadius} />
+        </clipPath>
+      </defs>
       <circle
         data-testid="g-force-parent-circle"
         cx={model.centerX}
@@ -96,6 +101,38 @@ export function OverlayGForceWidget({ widget, activity, previewSecond, globalOpa
         fill={config.fill_color}
         fillOpacity={config.fill_opacity * model.opacity}
       />
+      <g data-testid="g-force-static-guides" clipPath={`url(#${model.guideClipId})`} opacity={model.guideOpacity * model.opacity}>
+        <line
+          data-testid="g-force-horizontal-guide"
+          x1={model.centerX - model.radius}
+          y1={model.centerY}
+          x2={model.centerX + model.radius}
+          y2={model.centerY}
+          stroke={model.guideColor}
+          strokeWidth={model.guideThickness}
+        />
+        <line
+          data-testid="g-force-vertical-guide"
+          x1={model.centerX}
+          y1={model.centerY - model.radius}
+          x2={model.centerX}
+          y2={model.centerY + model.radius}
+          stroke={model.guideColor}
+          strokeWidth={model.guideThickness}
+        />
+        {model.guideRadii.map((guideRadius) => (
+          <circle
+            key={guideRadius}
+            data-testid={`g-force-guide-circle-${guideRadius}`}
+            cx={model.centerX}
+            cy={model.centerY}
+            r={guideRadius}
+            fill="none"
+            stroke={model.guideColor}
+            strokeWidth={model.guideThickness}
+          />
+        ))}
+      </g>
       <circle
         data-testid="g-force-marker"
         cx={model.markerX}

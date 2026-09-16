@@ -11,6 +11,12 @@
 import standardWidgetsManifest from '../../../../assets/standard-widgets.json'
 import standardMetricsManifest from '../../../../assets/standard-metrics.json'
 
+/** Supported content modes for time widgets. */
+export const TIME_WIDGET_MODES = Object.freeze(standardWidgetsManifest.time.modes.map((mode) => Object.freeze(mode)))
+
+/** Supported zero-point choices for elapsed time widgets. */
+export const ELAPSED_TIME_ORIGINS = Object.freeze(standardWidgetsManifest.time.elapsedOrigins.map((origin) => Object.freeze(origin)))
+
 // ---------------------------------------------------------------------------
 // Plot widget defaults (assets/standard-widgets.json)
 // ---------------------------------------------------------------------------

@@ -205,6 +205,12 @@ pub struct ValueConfig {
     #[serde(default)]
     pub format: Option<String>,
     #[serde(default)]
+    pub time_mode: Option<String>,
+    #[serde(default)]
+    pub elapsed_origin: Option<String>,
+    #[serde(default)]
+    pub show_hundredths: Option<bool>,
+    #[serde(default)]
     pub decimal_rounding: Option<i32>,
     #[serde(default)]
     pub decimals: Option<usize>,
