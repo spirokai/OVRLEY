@@ -20,7 +20,11 @@ test('project restoration changes only project-owned settings', () => {
       config: { ...useStore.getState().config, scene: { ...useStore.getState().config.scene, width: 1280 } },
       globalDefaults: { ...useStore.getState().globalDefaults, color_text: '#123456' },
     },
-    sync: { videoOffsetSeconds: 20, videoTimezoneMode: 'utc' },
+    sync: {
+      videoOffsetSeconds: 20,
+      videoTimezoneMode: 'utc',
+      manual: { landmarks: [], speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+    },
     render: {
       fps: 60,
       widgetUpdateRate: 2,
@@ -46,4 +50,36 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.selectedSecond).toBe(50)
   expect(state.timelineViewport).toEqual({ viewStart: 25, viewEnd: 75 })
   expect(state.previewPlaybackState).toBe('paused')
+})
+
+test('project hydration rejects a landmark beyond the staged video duration', () => {
+  useStore.setState(useStore.getInitialState(), true)
+  useStore.setState({ importedVideoPath: 'C:\\video.mp4', importedVideoDuration: 30 })
+
+  expect(() =>
+    applyProjectOwnedState(useStore, {
+      editor: {
+        config: useStore.getState().config,
+        globalDefaults: useStore.getState().globalDefaults,
+      },
+      sync: {
+        videoOffsetSeconds: 0,
+        videoTimezoneMode: null,
+        manual: {
+          landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 31 }],
+          speedThresholdKmh: 5,
+          turnThresholdDegrees: 90,
+        },
+      },
+      render: {
+        fps: 30,
+        widgetUpdateRate: 1,
+        exportMode: 'composite',
+        codec: 'libx264',
+        bitrateMbps: null,
+        range: { type: 'all', from: 0, to: 0 },
+      },
+      timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 30 },
+    }),
+  ).toThrow(/within the imported video duration/)
 })

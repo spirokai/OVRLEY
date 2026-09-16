@@ -87,4 +87,33 @@ describe('project snapshot contract', () => {
     expect(project.sources.video).toBeNull()
     expect(project.render.exportMode).toBe('transparent')
   })
+
+  test('round-trips only durable manual video-sync state', () => {
+    useStore.setState(useStore.getInitialState(), true)
+    useStore.getState().hydrateVideoSyncState({
+      landmarks: [
+        { id: 'stop-1', type: 'stop', videoSecond: 4 },
+        { id: 'left-1', type: 'leftTurn', videoSecond: 8 },
+        { id: 'location-1', type: 'location', videoSecond: 12, activitySecond: null },
+      ],
+      speedThresholdKmh: 7,
+      turnThresholdDegrees: 120,
+    })
+    const revision = useStore.getState().beginVideoSyncCalculation()
+    useStore.getState().completeVideoSyncCalculation(revision, { detection: {}, candidates: [{ offset: 4 }] })
+
+    const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
+
+    expect(project.version).toBe(2)
+    expect(project.sync.manual).toEqual({
+      landmarks: [
+        { id: 'stop-1', type: 'stop', videoSecond: 4 },
+        { id: 'left-1', type: 'leftTurn', videoSecond: 8 },
+        { id: 'location-1', type: 'location', videoSecond: 12, activitySecond: null },
+      ],
+      speedThresholdKmh: 7,
+      turnThresholdDegrees: 120,
+    })
+    expect(JSON.stringify(project)).not.toContain('manualVideoSyncCandidates')
+  })
 })

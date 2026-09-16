@@ -2,6 +2,8 @@ import { detectCodecs } from '@/api/backend'
 import { formatVideoCreationTime, parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { createCachedPromise } from '@/lib/cached-promise'
 import { videoOverlapsActivity } from '@/lib/video-timing'
+import { clamp } from '@/lib/utils'
+import { getTimelineMinimum, getTotalPlaybackDuration } from '@/features/player/utils/playerTiming'
 import i18next from 'i18next'
 
 /**
@@ -139,6 +141,7 @@ export const createVideoImportSlice = (set, get) => ({
 
   setImportedVideo: (metadata) => {
     const importedVideoState = createImportedVideoState(metadata)
+    get().clearVideoSyncForVideo()
     set(importedVideoState)
 
     get().syncVideoMetadata()
@@ -146,7 +149,9 @@ export const createVideoImportSlice = (set, get) => ({
     return importedVideoState.importedVideoResolution
   },
 
-  setImportedBackgroundImage: (path) =>
+  setImportedBackgroundImage: (path) => {
+    get().clearVideoSyncForVideo()
+    get().clearVideoTelemetry()
     set({
       importedVideoPath: null,
       importedVideoDuration: null,
@@ -171,9 +176,11 @@ export const createVideoImportSlice = (set, get) => ({
       importedVideoBitRate: null,
       importedVideoCameraType: null,
       importedVideoCameraModel: null,
-    }),
+    })
+  },
 
   clearImportedVideo: () => {
+    get().clearVideoSyncForVideo()
     get().clearVideoTelemetry()
     set({
       importedVideoPath: null,
@@ -202,10 +209,33 @@ export const createVideoImportSlice = (set, get) => ({
     })
   },
 
-  setVideoSyncOffset: (seconds) => {
+  setVideoSyncOffset: (seconds, { compensatePlayhead = false } = {}) => {
     validateVideoSyncOffset(seconds, get().importedVideoDuration)
-    set({
+    if (!compensatePlayhead) {
+      set({
+        videoSyncOffsetSeconds: seconds,
+      })
+      return
+    }
+
+    const state = get()
+    const offsetDelta = seconds - state.videoSyncOffsetSeconds
+    const timelineMinimum = getTimelineMinimum({
+      hasVideo: state.importedVideoPath !== null,
       videoSyncOffsetSeconds: seconds,
+    })
+    const totalDuration = getTotalPlaybackDuration({
+      activityDurationSeconds: state.activitySummary?.durationSeconds,
+      fallbackDurationSeconds: state.fallbackDurationSeconds,
+      importedVideoDuration: state.importedVideoDuration,
+      importedVideoPath: state.importedVideoPath,
+      videoSyncOffsetSeconds: seconds,
+    })
+
+    set((draft) => {
+      draft.videoSyncOffsetSeconds = seconds
+      draft.selectedSecond = clamp(state.selectedSecond + offsetDelta, timelineMinimum, totalDuration)
+      draft.videoSyncOffsetPreviewSeconds = null
     })
   },
 

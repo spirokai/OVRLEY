@@ -1,0 +1,8 @@
+export { createActivitySyncInput } from './utils/activitySyncInput'
+export { detectActivityEvents } from './utils/detectActivityEvents'
+export { detectStops } from './utils/detectStops'
+export { detectTurns, deriveTurningSeries } from './utils/detectTurns'
+export { calculateMatchScore } from './utils/matchScore'
+export { matchVideoSyncCandidates } from './utils/intervalConsensus'
+export { getVideoSyncEligibility } from './utils/landmarkTiming'
+export { default as useVideoSyncCalculation } from './hooks/useVideoSyncCalculation'

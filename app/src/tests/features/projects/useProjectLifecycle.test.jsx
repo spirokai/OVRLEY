@@ -54,11 +54,11 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     delete editor.config.values[0].content_alignment
     const project = {
       format: 'ovrley-project',
-      version: 1,
+      version: 2,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor,
       sources: { activity: null, video: null },
-      sync: { videoOffsetSeconds: 0, videoTimezoneMode: null },
+      sync: { videoOffsetSeconds: 0, videoTimezoneMode: null, manual: { landmarks: [], speedThresholdKmh: 5, turnThresholdDegrees: 90 } },
       render: { ...DEFAULT_RENDER_SETTINGS, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
@@ -85,7 +85,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const initialState = useStore.getState()
     const project = {
       format: 'ovrley-project',
-      version: 1,
+      version: 2,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({
         config: { ...initialState.config, scene: { ...initialState.config.scene, width: 1280 } },
@@ -95,7 +95,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         activity: { path: { kind: 'project-relative', value: 'ride.fit' } },
         video: { path: { kind: 'project-relative', value: 'ride.mp4' } },
       },
-      sync: { videoOffsetSeconds: 12, videoTimezoneMode: 'utc' },
+      sync: { videoOffsetSeconds: 12, videoTimezoneMode: 'utc', manual: { landmarks: [], speedThresholdKmh: 5, turnThresholdDegrees: 90 } },
       render: {
         fps: 60,
         widgetUpdateRate: 2,
@@ -389,14 +389,14 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const initialState = useStore.getState()
     const project = {
       format: 'ovrley-project',
-      version: 1,
+      version: 2,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: {
         activity: { path: { kind: 'project-relative', value: 'missing.fit' } },
         video: null,
       },
-      sync: { videoOffsetSeconds: 0, videoTimezoneMode: null },
+      sync: { videoOffsetSeconds: 0, videoTimezoneMode: null, manual: { landmarks: [], speedThresholdKmh: 5, turnThresholdDegrees: 90 } },
       render: { ...DEFAULT_RENDER_SETTINGS, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
@@ -445,14 +445,14 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const projectPath = 'C:\\Events\\Broken.oly'
     const project = {
       format: 'ovrley-project',
-      version: 1,
+      version: 2,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: {
         activity: { path: { kind: 'project-relative', value: 'broken.fit' } },
         video: { path: { kind: 'project-relative', value: 'ride.mp4' } },
       },
-      sync: { videoOffsetSeconds: 0, videoTimezoneMode: null },
+      sync: { videoOffsetSeconds: 0, videoTimezoneMode: null, manual: { landmarks: [], speedThresholdKmh: 5, turnThresholdDegrees: 90 } },
       render: { ...DEFAULT_RENDER_SETTINGS, range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
@@ -493,11 +493,11 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const projectPath = 'C:\\Events\\Empty.oly'
     const project = {
       format: 'ovrley-project',
-      version: 1,
+      version: 2,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: { activity: null, video: null },
-      sync: { videoOffsetSeconds: 0, videoTimezoneMode: null },
+      sync: { videoOffsetSeconds: 0, videoTimezoneMode: null, manual: { landmarks: [], speedThresholdKmh: 5, turnThresholdDegrees: 90 } },
       render: { ...DEFAULT_RENDER_SETTINGS, exportMode: 'transparent', range: { ...DEFAULT_RENDER_SETTINGS.range } },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
