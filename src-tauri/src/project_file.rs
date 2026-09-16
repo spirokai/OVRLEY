@@ -240,30 +240,19 @@ enum ProjectLandmark {
         id: String,
         #[serde(rename = "videoSecond")]
         video_second: f64,
-        #[serde(rename = "activitySecond")]
-        activity_second: RequiredActivitySecond,
+        #[serde(
+            rename = "activitySecond",
+            deserialize_with = "deserialize_required_activity_second"
+        )]
+        activity_second: Option<f64>,
     },
 }
 
-#[derive(Debug, Clone)]
-struct RequiredActivitySecond(Option<f64>);
-
-impl Serialize for RequiredActivitySecond {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.0.serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for RequiredActivitySecond {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        Option::<f64>::deserialize(deserializer).map(Self)
-    }
+fn deserialize_required_activity_second<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<f64>::deserialize(deserializer)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -411,6 +400,9 @@ fn validate_project(project: &ProjectDocument) -> Result<(), String> {
     if project.timeline.view_start >= project.timeline.view_end {
         return Err("Timeline viewport requires viewStart < viewEnd".into());
     }
+    if !project.sync.manual.landmarks.is_empty() && project.sources.video.is_none() {
+        return Err("sync.manual.landmarks require a video source".into());
+    }
     validate_manual_video_sync(&project.sync.manual)?;
     validate_editor(&project.editor)?;
     Ok(())
@@ -458,7 +450,7 @@ fn validate_manual_video_sync(manual: &ProjectManualVideoSync) -> Result<(), Str
                 activity_second,
             } => {
                 location_count += 1;
-                (id, *video_second, activity_second.0)
+                (id, *video_second, *activity_second)
             }
         };
         if id.trim().is_empty() {
@@ -919,6 +911,9 @@ mod tests {
     #[test]
     fn v2_manual_sync_round_trip_preserves_directional_landmarks_and_thresholds() {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["sources"]["video"] = serde_json::json!({
+            "path": { "kind": "project-relative", "value": "media/video.mp4" }
+        });
         project["sync"]["manual"] = serde_json::json!({
             "landmarks": [
                 { "id": "stop-1", "type": "stop", "videoSecond": 4.0 },
@@ -1041,8 +1036,23 @@ mod tests {
             { "id": "same", "type": "leftTurn", "videoSecond": 2.0 }
         ]);
 
-        for invalid in [generic_turn, missing_location_activity, duplicate_ids] {
-            assert!(parse_project(&invalid.to_string()).is_err());
+        let mut landmark_without_video: Value =
+            serde_json::from_str(&valid_project_json()).unwrap();
+        landmark_without_video["sources"]["video"] = Value::Null;
+        landmark_without_video["sync"]["manual"]["landmarks"] = serde_json::json!([
+            { "id": "stop", "type": "stop", "videoSecond": 1.0 }
+        ]);
+
+        for (label, invalid) in [
+            ("generic turn", generic_turn),
+            ("missing location activitySecond", missing_location_activity),
+            ("duplicate landmark ids", duplicate_ids),
+            ("landmark without video source", landmark_without_video),
+        ] {
+            assert!(
+                parse_project(&invalid.to_string()).is_err(),
+                "accepted invalid contract: {label}"
+            );
         }
     }
 

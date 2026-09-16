@@ -3,12 +3,11 @@ import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES } from '../data/videoSyncConstants'
 import { createActivitySyncInput } from '../utils/activitySyncInput'
-import { detectActivityEvents } from '../utils/detectActivityEvents'
+import { detectActivityEventsFromInput } from '../utils/detectActivityEvents'
 import { getVideoSyncEligibility } from '../utils/landmarkTiming'
 import { matchVideoSyncCandidates } from '../utils/intervalConsensus'
 
 function scheduleVideoSyncCalculation({
-  activity,
   beginCalculation,
   canCalculate,
   canUseMapOnly,
@@ -16,12 +15,14 @@ function scheduleVideoSyncCalculation({
   completeDetection,
   failCalculation,
   failDetection,
+  hasActivity,
+  input,
   landmarks,
   searchCandidates,
   settings,
 }) {
   if (searchCandidates && !canCalculate) return Promise.resolve(false)
-  if (!searchCandidates && activity === null && !canUseMapOnly) return Promise.resolve(false)
+  if (!searchCandidates && !hasActivity && !canUseMapOnly) return Promise.resolve(false)
 
   const revision = beginCalculation()
   if (revision === null) return Promise.resolve(false)
@@ -29,7 +30,7 @@ function scheduleVideoSyncCalculation({
   return new Promise((resolve) => {
     const run = () => {
       try {
-        const detection = detectActivityEvents(activity, settings)
+        const detection = detectActivityEventsFromInput(input, settings)
         if (!searchCandidates) {
           resolve(completeDetection(revision, detection))
           return
@@ -111,7 +112,6 @@ export default function useVideoSyncCalculation() {
   const runCalculation = useCallback(
     (searchCandidates) =>
       scheduleVideoSyncCalculation({
-        activity: parsedActivity,
         beginCalculation: beginVideoSyncCalculation,
         canCalculate: eligibility.canCalculate,
         canUseMapOnly: eligibility.canUseMapOnly,
@@ -119,6 +119,8 @@ export default function useVideoSyncCalculation() {
         completeDetection: completeVideoSyncDetection,
         failCalculation: failVideoSyncCalculation,
         failDetection: failVideoSyncDetection,
+        hasActivity: parsedActivity !== null,
+        input: detectorInput,
         landmarks,
         searchCandidates,
         settings,
@@ -131,6 +133,7 @@ export default function useVideoSyncCalculation() {
       eligibility.canUseMapOnly,
       failVideoSyncCalculation,
       failVideoSyncDetection,
+      detectorInput,
       landmarks,
       parsedActivity,
       settings,

@@ -1,5 +1,5 @@
 export { createActivitySyncInput } from './utils/activitySyncInput'
-export { detectActivityEvents } from './utils/detectActivityEvents'
+export { detectActivityEvents, detectActivityEventsFromInput } from './utils/detectActivityEvents'
 export { detectStops } from './utils/detectStops'
 export { detectTurns, deriveTurningSeries } from './utils/detectTurns'
 export { calculateMatchScore } from './utils/matchScore'

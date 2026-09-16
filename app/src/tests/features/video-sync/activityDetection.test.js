@@ -114,6 +114,28 @@ describe('manual video-sync activity detection', () => {
     expect(result.turns).toEqual([])
   })
 
+  test('finds a qualifying turn in a sliding time window and ends it with the heading change', () => {
+    const makeDelayedTurn = (sampleRate) =>
+      makeActivity({
+        sampleRate,
+        durationSeconds: 20,
+        headingAt: (time) => {
+          if (time < 8) return time
+          if (time < 11) return 8 + (time - 8) * 40
+          return 128
+        },
+      })
+
+    const oneHz = detectActivityEvents(makeDelayedTurn(1), SETTINGS)
+    const fortyHz = detectActivityEvents(makeDelayedTurn(40), SETTINGS)
+
+    expect(oneHz.turns).toHaveLength(1)
+    expect(fortyHz.turns).toHaveLength(1)
+    expect(oneHz.turns[0].type).toBe('rightTurn')
+    expect(oneHz.turns[0].end).toBeLessThan(14)
+    expect(fortyHz.turns[0].end).toBeLessThan(14)
+  })
+
   test('does not bridge a significant gap and reports missing channel availability', () => {
     const activity = makeActivity({ sampleRate: 1, durationSeconds: 8, course: false })
     activity.sample_elapsed_seconds = [0, 1, 2, 3, 4, 14, 15, 16]

@@ -189,114 +189,110 @@ function createSuppressionChecker(nearStopIntervals) {
 }
 
 /**
- * Creates an unqualified directional turn accumulation.
+ * Creates a direction-coherent sliding accumulation.
+ *
+ * `intervals` and `windowChange` retain only the latest maximum-duration
+ * window. Overlapping qualifying windows extend one event; once the window no
+ * longer qualifies, same-direction drift cannot extend that event forever.
  *
  * @param {'rightTurn'|'leftTurn'} direction Turn direction.
- * @param {number} startTime Accumulation start timestamp.
- * @returns {{direction: 'rightTurn'|'leftTurn', startTime: number, signedChange: number, event: object|null}} Turn accumulation state.
+ * @returns {{direction: 'rightTurn'|'leftTurn', intervals: {start: number, end: number, change: number}[], firstIntervalIndex: number, windowChange: number, totalChange: number, eventChangeAtEnd: number, event: object|null}} Turn accumulation state.
  */
-function createTurnRun(direction, startTime) {
+function createTurnRun(direction) {
   return {
     direction,
-    startTime,
-    signedChange: 0,
+    intervals: [],
+    firstIntervalIndex: 0,
+    windowChange: 0,
+    totalChange: 0,
+    eventChangeAtEnd: 0,
     event: null,
   }
 }
 
 /**
- * Closes a qualified turn accumulation at a boundary.
+ * Trims an unqualified accumulation to the configured elapsed-time window.
+ * The oldest interval may be retained fractionally so irregular sampling does
+ * not move the effective duration boundary to a sample timestamp.
  *
- * @param {{startTime: number, signedChange: number, event: object|null}|null} run Turn accumulation state.
- * @param {number} endTime Boundary timestamp.
+ * @param {ReturnType<typeof createTurnRun>} run Directional accumulation.
+ * @param {number} currentTime Current interval end.
  * @returns {void}
  */
-function finalizeTurnRun(run, endTime) {
-  if (run === null || run.event === null) return
-  run.event.end = Math.max(run.startTime, endTime)
-  run.event.signedChange = run.signedChange
-  run.event.representativeTime = (run.event.start + run.event.end) / 2
+function trimTurnWindow(run, currentTime) {
+  const windowStart = currentTime - VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS
+  while (run.firstIntervalIndex < run.intervals.length && run.intervals[run.firstIntervalIndex].end <= windowStart) {
+    run.windowChange -= run.intervals[run.firstIntervalIndex].change
+    run.firstIntervalIndex += 1
+  }
+
+  const first = run.intervals[run.firstIntervalIndex]
+  if (first === undefined || first.start >= windowStart) return
+
+  const retainedRatio = (first.end - windowStart) / (first.end - first.start)
+  const retainedChange = first.change * retainedRatio
+  run.windowChange += retainedChange - first.change
+  run.intervals[run.firstIntervalIndex] = { start: windowStart, end: first.end, change: retainedChange }
 }
 
 /**
- * Determines whether the next rate sample needs a new accumulation.
+ * Locates the latest start that contributes exactly the qualifying angle.
+ * Using the tight supporting interval keeps a long, low-amplitude drift before
+ * a real turn out of the event geometry and makes its timing cadence-stable.
  *
- * @param {{direction: string, startTime: number}|null} run Current accumulation.
- * @param {'rightTurn'|'leftTurn'} direction Current sample direction.
- * @param {number} currentTime Current sample timestamp.
- * @returns {boolean} Whether a new accumulation must start.
- */
-function shouldStartNewTurnRun(run, direction, currentTime) {
-  return run === null || run.direction !== direction || currentTime - run.startTime > VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS
-}
-
-/**
- * Adds one signed angular delta and creates an event when the threshold crosses.
- *
- * @param {{direction: 'rightTurn'|'leftTurn', startTime: number, signedChange: number, event: object|null}} run Turn accumulation state.
- * @param {number} delta Signed angular delta for the current interval.
- * @param {number} previousTime Previous sample timestamp.
- * @param {number} currentTime Current sample timestamp.
+ * @param {ReturnType<typeof createTurnRun>} run Qualified directional accumulation.
  * @param {number} turnThresholdDegrees Required accumulated magnitude.
+ * @returns {number} Interpolated event start time.
+ */
+function findQualifyingStart(run, turnThresholdDegrees) {
+  let remaining = turnThresholdDegrees
+  for (let index = run.intervals.length - 1; index >= run.firstIntervalIndex; index -= 1) {
+    const interval = run.intervals[index]
+    const magnitude = Math.abs(interval.change)
+    if (magnitude >= remaining) {
+      return interval.end - (remaining / magnitude) * (interval.end - interval.start)
+    }
+    remaining -= magnitude
+  }
+  throw new Error('Qualified manual video sync turn is missing its supporting interval')
+}
+
+/**
+ * Adds one interval to a coherent run and emits or extends its turn event.
+ *
+ * @param {ReturnType<typeof createTurnRun>} run Directional accumulation.
+ * @param {{start: number, end: number, change: number}} interval Signed heading change interval.
+ * @param {number} turnThresholdDegrees Required accumulated turn magnitude.
  * @param {object[]} events Output event list.
  * @returns {void}
  */
-function qualifyTurnRun(run, delta, previousTime, currentTime, turnThresholdDegrees, events) {
-  const previousMagnitude = Math.abs(run.signedChange)
-  run.signedChange += delta
+function addTurnInterval(run, interval, turnThresholdDegrees, events) {
+  run.intervals.push(interval)
+  run.windowChange += interval.change
+  run.totalChange += interval.change
+  trimTurnWindow(run, interval.end)
+  if (Math.abs(run.windowChange) < turnThresholdDegrees) return
 
-  if (run.event !== null || Math.abs(run.signedChange) < turnThresholdDegrees) return
+  const start = findQualifyingStart(run, turnThresholdDegrees)
+  if (run.event !== null && start <= run.event.end) {
+    run.event.end = interval.end
+    run.event.signedChange += run.totalChange - run.eventChangeAtEnd
+    run.event.representativeTime = (run.event.start + run.event.end) / 2
+    run.eventChangeAtEnd = run.totalChange
+    return
+  }
 
-  const remainingAngle = turnThresholdDegrees - previousMagnitude
-  const crossingRatio = Math.max(0, Math.min(1, remainingAngle / Math.abs(delta)))
-  const crossingTime = previousTime + crossingRatio * (currentTime - previousTime)
-  if (crossingTime - run.startTime > VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS) return
-
-  run.event = {
+  const signedThreshold = run.direction === 'rightTurn' ? turnThresholdDegrees : -turnThresholdDegrees
+  const event = {
     type: run.direction,
-    start: run.startTime,
-    end: currentTime,
-    signedChange: run.signedChange,
-    representativeTime: (run.startTime + currentTime) / 2,
+    start,
+    end: interval.end,
+    signedChange: signedThreshold,
+    representativeTime: (start + interval.end) / 2,
   }
-  events.push(run.event)
-}
-
-/**
- * Extends an already-qualified event through the current sample.
- *
- * @param {{startTime: number, signedChange: number, event: object|null}|null} run Turn accumulation state.
- * @param {number} currentTime Current sample timestamp.
- * @returns {void}
- */
-function extendQualifiedTurnRun(run, currentTime) {
-  if (run === null || run.event === null) return
-  run.event.end = currentTime
-  run.event.signedChange = run.signedChange
-  run.event.representativeTime = (run.event.start + run.event.end) / 2
-}
-
-/**
- * Merges adjacent or overlapping events that share a direction.
- *
- * @param {object[]} events Chronologically emitted turn events.
- * @returns {object[]} Merged events with stable directional identifiers.
- */
-function mergeTurnEvents(events) {
-  const merged = []
-
-  for (const event of events) {
-    const previous = merged.at(-1)
-    if (previous && previous.type === event.type && event.start <= previous.end) {
-      previous.end = Math.max(previous.end, event.end)
-      previous.signedChange += event.signedChange
-      previous.representativeTime = (previous.start + previous.end) / 2
-      continue
-    }
-    merged.push({ ...event })
-  }
-
-  return merged.map((event, index) => ({ ...event, id: `${event.type}-${index}` }))
+  run.event = event
+  run.eventChangeAtEnd = run.totalChange
+  events.push(event)
 }
 
 /**
@@ -321,31 +317,20 @@ function detectTurnsFromSeries(input, turningSeries, turnThresholdDegrees, nearS
       const currentTime = input.elapsedSeconds[sampleIndex]
 
       if (rate === null || isSuppressed(previousTime, currentTime)) {
-        finalizeTurnRun(run, previousTime)
         run = null
         continue
       }
 
       const delta = rate * (currentTime - previousTime)
-      if (delta === 0) {
-        extendQualifiedTurnRun(run, currentTime)
-        continue
-      }
+      if (delta === 0) continue
 
       const direction = delta > 0 ? 'rightTurn' : 'leftTurn'
-      if (shouldStartNewTurnRun(run, direction, currentTime)) {
-        finalizeTurnRun(run, previousTime)
-        run = createTurnRun(direction, previousTime)
-      }
-
-      qualifyTurnRun(run, delta, previousTime, currentTime, turnThresholdDegrees, events)
-      extendQualifiedTurnRun(run, currentTime)
+      if (run === null || run.direction !== direction) run = createTurnRun(direction)
+      addTurnInterval(run, { start: previousTime, end: currentTime, change: delta }, turnThresholdDegrees, events)
     }
-
-    finalizeTurnRun(run, input.elapsedSeconds[segment.endIndex - 1])
   }
 
-  return mergeTurnEvents(events)
+  return events.map((event, index) => ({ ...event, id: `${event.type}-${index}` }))
 }
 
 /**

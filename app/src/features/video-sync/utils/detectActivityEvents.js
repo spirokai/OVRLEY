@@ -12,6 +12,20 @@ import { deriveTurningSeries, detectTurnsFromDerivedSeries } from './detectTurns
  */
 export function detectActivityEvents(parsedActivity, settings) {
   const input = createActivitySyncInput(parsedActivity)
+  return detectActivityEventsFromInput(input, settings)
+}
+
+/**
+ * Detects events from the canonical feature ingress projection.
+ *
+ * Callers that also need availability or graph input can project the activity
+ * once and reuse that immutable input for eligibility and calculation.
+ *
+ * @param {object} input Detector input produced by createActivitySyncInput.
+ * @param {{speedThresholdKmh: number, turnThresholdDegrees: number}} settings Physical detector thresholds.
+ * @returns {{availability: {speed: boolean, heading: boolean, course: boolean}, stops: object[], turns: object[], graphSeries: {speed: {time: number, value: number|null}[], turning: {time: number, value: number|null}[]}}} Detector result.
+ */
+export function detectActivityEventsFromInput(input, settings) {
   const stopState = detectStopState(input, settings)
   const turning = deriveTurningSeries(input)
   const turns = detectTurnsFromDerivedSeries(input, turning, {

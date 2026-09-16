@@ -52,34 +52,38 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.previewPlaybackState).toBe('paused')
 })
 
-test('project hydration rejects a landmark beyond the staged video duration', () => {
+test('project hydration rejects landmarks without matching staged video bounds', () => {
   useStore.setState(useStore.getInitialState(), true)
   useStore.setState({ importedVideoPath: 'C:\\video.mp4', importedVideoDuration: 30 })
 
-  expect(() =>
-    applyProjectOwnedState(useStore, {
-      editor: {
-        config: useStore.getState().config,
-        globalDefaults: useStore.getState().globalDefaults,
+  const project = {
+    editor: {
+      config: useStore.getState().config,
+      globalDefaults: useStore.getState().globalDefaults,
+    },
+    sync: {
+      videoOffsetSeconds: 0,
+      videoTimezoneMode: null,
+      manual: {
+        landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 31 }],
+        speedThresholdKmh: 5,
+        turnThresholdDegrees: 90,
       },
-      sync: {
-        videoOffsetSeconds: 0,
-        videoTimezoneMode: null,
-        manual: {
-          landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 31 }],
-          speedThresholdKmh: 5,
-          turnThresholdDegrees: 90,
-        },
-      },
-      render: {
-        fps: 30,
-        widgetUpdateRate: 1,
-        exportMode: 'composite',
-        codec: 'libx264',
-        bitrateMbps: null,
-        range: { type: 'all', from: 0, to: 0 },
-      },
-      timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 30 },
-    }),
-  ).toThrow(/within the imported video duration/)
+    },
+    render: {
+      fps: 30,
+      widgetUpdateRate: 1,
+      exportMode: 'composite',
+      codec: 'libx264',
+      bitrateMbps: null,
+      range: { type: 'all', from: 0, to: 0 },
+    },
+    timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 30 },
+  }
+
+  expect(() => applyProjectOwnedState(useStore, project)).toThrow(/within the imported video duration/)
+
+  useStore.setState({ importedVideoPath: null, importedVideoDuration: null })
+  project.sync.manual.landmarks[0].videoSecond = 1
+  expect(() => applyProjectOwnedState(useStore, project)).toThrow(/require an imported video/)
 })
