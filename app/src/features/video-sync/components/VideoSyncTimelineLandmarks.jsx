@@ -18,7 +18,7 @@ export default function VideoSyncTimelineLandmarks({ landmarks }) {
         const Icon = landmark.Icon
         const handle = (
           <div
-            className={`absolute z-25 -translate-x-1/2 ${landmark.isInteractive ? 'pointer-events-auto' : 'pointer-events-none'}`}
+            className={`absolute top-4 z-25 -translate-x-1/2 ${landmark.isInteractive ? 'pointer-events-auto' : 'pointer-events-none'}`}
             style={landmark.handleStyle}
           >
             {landmark.isInteractive ? (
