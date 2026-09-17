@@ -4,6 +4,8 @@
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import '@fontsource-variable/figtree/wght.css'
+import '@fontsource-variable/fira-code/wght.css'
 import './i18n/index.js'
 import { hydrateLanguagePreference } from './i18n/language-preference.js'
 import './index.css'

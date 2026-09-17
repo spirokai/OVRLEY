@@ -19,8 +19,7 @@
 :root,
 .radix-themes {
   font-family:
-    Figtree,
-    Ubuntu,
+    'Figtree Variable',
     system-ui,
     -apple-system,
     'Segoe UI',
@@ -32,6 +31,7 @@
   text-transform: uppercase;
   font-optical-sizing: auto;
   letter-spacing: 0.03em;
+  --font-mono: 'Fira Code Variable', monospace;
 
   color-scheme: dark;
   color: #afeeee;
