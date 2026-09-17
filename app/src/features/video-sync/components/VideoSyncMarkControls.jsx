@@ -1,4 +1,4 @@
-import { CircleStop, CornerUpLeft, CornerUpRight, MapPin } from 'lucide-react'
+import { CornerUpLeft, CornerUpRight, MapPin, OctagonMinus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 
@@ -29,7 +29,7 @@ export function VideoSyncMarkControls({
   const { t } = useTranslation()
   const controls = [
     {
-      Icon: CircleStop,
+      Icon: OctagonMinus,
       colorClassName:
         'border-video-sync-stop/70 text-video-sync-stop hover:bg-surface-elevated hover:text-video-sync-stop focus-visible:ring-video-sync-stop/50',
       disabled: !canMark,

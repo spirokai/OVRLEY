@@ -109,8 +109,5 @@ describe('useVideoSyncWorkspace', () => {
 
     act(() => result.current.drawer.onTurnThresholdCommit(360))
     expect(useStore.getState().manualVideoSync.turnThresholdDegrees).toBe(360)
-
-    act(() => result.current.drawer.onScrubLandmark({ videoSecond: 4 }))
-    expect(useStore.getState().selectedSecond).toBe(6)
   })
 })

@@ -25,13 +25,14 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
     clearVideoSyncLandmarks,
     importedVideoDuration,
     landmarks,
+    manualVideoSyncDetection,
     manualVideoSyncCandidateStatus,
     manualVideoSyncCandidates,
     manualVideoSyncError,
     manualVideoSyncHasSearched,
     removeVideoSyncLandmark,
     selectedSecond,
-    setSelectedSecond,
+    setVideoSyncLandmarkType,
     setVideoSyncSpeedThreshold,
     setVideoSyncTurnThreshold,
     speedThresholdKmh,
@@ -44,13 +45,14 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       clearVideoSyncLandmarks: state.clearVideoSyncLandmarks,
       importedVideoDuration: state.importedVideoDuration,
       landmarks: state.manualVideoSync.landmarks,
+      manualVideoSyncDetection: state.manualVideoSyncDetection,
       manualVideoSyncCandidateStatus: state.manualVideoSyncCandidateStatus,
       manualVideoSyncCandidates: state.manualVideoSyncCandidates,
       manualVideoSyncError: state.manualVideoSyncError,
       manualVideoSyncHasSearched: state.manualVideoSyncHasSearched,
       removeVideoSyncLandmark: state.removeVideoSyncLandmark,
       selectedSecond: state.selectedSecond,
-      setSelectedSecond: state.setSelectedSecond,
+      setVideoSyncLandmarkType: state.setVideoSyncLandmarkType,
       setVideoSyncSpeedThreshold: state.setVideoSyncSpeedThreshold,
       setVideoSyncTurnThreshold: state.setVideoSyncTurnThreshold,
       speedThresholdKmh: state.manualVideoSync.speedThresholdKmh,
@@ -93,11 +95,8 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
   )
   const markLocation = useCallback(() => addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.LOCATION, videoSecond), [addVideoSyncLandmark, videoSecond])
 
-  const scrubLandmark = useCallback(
-    (landmark) => setSelectedSecond(videoSyncOffsetSeconds + landmark.videoSecond),
-    [setSelectedSecond, videoSyncOffsetSeconds],
-  )
   const deleteLandmark = useCallback((id) => removeVideoSyncLandmark(id), [removeVideoSyncLandmark])
+  const changeLandmarkType = useCallback((id, type) => setVideoSyncLandmarkType(id, type), [setVideoSyncLandmarkType])
   const applyCandidate = useCallback((candidate) => applyVideoSyncCandidate(candidate), [applyVideoSyncCandidate])
 
   return {
@@ -110,11 +109,12 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       error: manualVideoSyncError,
       hasSearched: manualVideoSyncHasSearched,
       landmarks,
+      detection: manualVideoSyncDetection,
       onApplyCandidate: applyCandidate,
       onCalculate: calculation.calculate,
       onClearLandmarks: clearVideoSyncLandmarks,
+      onChangeLandmarkType: changeLandmarkType,
       onDeleteLandmark: deleteLandmark,
-      onScrubLandmark: scrubLandmark,
       onSpeedThresholdChange: setSpeedThresholdDraftKmh,
       onSpeedThresholdCommit: setVideoSyncSpeedThreshold,
       onTurnThresholdChange: setTurnThresholdDraftDegrees,

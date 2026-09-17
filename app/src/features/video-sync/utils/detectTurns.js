@@ -1,4 +1,8 @@
-import { VIDEO_SYNC_HEADING_SMOOTHING_WINDOW_SECONDS, VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS } from '../data/videoSyncConstants'
+import {
+  VIDEO_SYNC_HEADING_SMOOTHING_WINDOW_SECONDS,
+  VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS,
+  VIDEO_SYNC_TURN_REVERSAL_TOLERANCE_DEGREES,
+} from '../data/videoSyncConstants'
 
 /**
  * Validates the user-owned turn threshold at the detector boundary.
@@ -44,16 +48,16 @@ function signedHeadingDelta(current, previous) {
  * Missing headings terminate a run so smoothing and turning rates never bridge
  * unavailable data.
  *
- * @param {{heading: (number|null)[]}} input Detector input.
+ * @param {(number|null)[]} heading Heading series.
  * @param {{startIndex: number, endIndex: number}} segment Timestamp segment.
  * @returns {{startIndex: number, endIndex: number}[]} Contiguous heading runs.
  */
-function findHeadingRuns(input, segment) {
+function findHeadingRuns(heading, segment) {
   const runs = []
   let startIndex = null
 
   for (let index = segment.startIndex; index < segment.endIndex; index += 1) {
-    if (input.heading[index] === null) {
+    if (heading[index] === null) {
       if (startIndex !== null) runs.push({ startIndex, endIndex: index })
       startIndex = null
     } else if (startIndex === null) {
@@ -71,15 +75,15 @@ function findHeadingRuns(input, segment) {
  * The prefix sums contain elapsed-time-weighted unit heading vectors. The
  * reader interpolates the final partial interval for a requested timestamp.
  *
- * @param {{elapsedSeconds: number[], heading: (number|null)[]}} input Detector input.
+ * @param {{elapsedSeconds: number[]}} input Detector input.
+ * @param {(number|null)[]} heading Heading series.
  * @param {{startIndex: number, endIndex: number}} run Contiguous heading run.
  * @param {number[]} cosinePrefix Prefix sums of weighted cosine components.
  * @param {number[]} sinePrefix Prefix sums of weighted sine components.
  * @returns {(targetTime: number) => {cosine: number, sine: number}} Integral reader.
  */
-function createHeadingIntegralReader(input, run, cosinePrefix, sinePrefix) {
+function createHeadingIntegralReader(input, heading, run, cosinePrefix, sinePrefix) {
   const times = input.elapsedSeconds
-  const headings = input.heading
   const startTime = times[run.startIndex]
   const endTime = times[run.endIndex - 1]
   const lastIntervalIndex = run.endIndex - run.startIndex - 1
@@ -94,7 +98,7 @@ function createHeadingIntegralReader(input, run, cosinePrefix, sinePrefix) {
     while (intervalIndex < lastIntervalIndex && times[run.startIndex + intervalIndex + 1] <= targetTime) intervalIndex += 1
 
     const sampleIndex = run.startIndex + intervalIndex
-    const radians = (normalizeHeading(headings[sampleIndex]) * Math.PI) / 180
+    const radians = (normalizeHeading(heading[sampleIndex]) * Math.PI) / 180
     const elapsed = targetTime - times[sampleIndex]
     return {
       cosine: cosinePrefix[intervalIndex] + Math.cos(radians) * elapsed,
@@ -106,14 +110,14 @@ function createHeadingIntegralReader(input, run, cosinePrefix, sinePrefix) {
 /**
  * Smooths one heading run with an elapsed-time circular one-second window.
  *
- * @param {{elapsedSeconds: number[], heading: (number|null)[]}} input Detector input.
+ * @param {{elapsedSeconds: number[]}} input Detector input.
+ * @param {(number|null)[]} heading Heading series.
  * @param {{startIndex: number, endIndex: number}} run Contiguous heading run.
  * @returns {number[]} Smoothed headings aligned to the run's local indices.
  */
-function smoothHeadingRun(input, run) {
+function smoothHeadingRun(input, heading, run) {
   const localLength = run.endIndex - run.startIndex
   const times = input.elapsedSeconds
-  const headings = input.heading
   const startTime = times[run.startIndex]
   const endTime = times[run.endIndex - 1]
   const halfWindow = VIDEO_SYNC_HEADING_SMOOTHING_WINDOW_SECONDS / 2
@@ -123,13 +127,13 @@ function smoothHeadingRun(input, run) {
   for (let localIndex = 0; localIndex < localLength - 1; localIndex += 1) {
     const sampleIndex = run.startIndex + localIndex
     const elapsed = times[sampleIndex + 1] - times[sampleIndex]
-    const radians = (normalizeHeading(headings[sampleIndex]) * Math.PI) / 180
+    const radians = (normalizeHeading(heading[sampleIndex]) * Math.PI) / 180
     cosinePrefix.push(cosinePrefix[localIndex] + Math.cos(radians) * elapsed)
     sinePrefix.push(sinePrefix[localIndex] + Math.sin(radians) * elapsed)
   }
 
-  const integrateFromStart = createHeadingIntegralReader(input, run, cosinePrefix, sinePrefix)
-  const integrateFromEnd = createHeadingIntegralReader(input, run, cosinePrefix, sinePrefix)
+  const integrateFromStart = createHeadingIntegralReader(input, heading, run, cosinePrefix, sinePrefix)
+  const integrateFromEnd = createHeadingIntegralReader(input, heading, run, cosinePrefix, sinePrefix)
 
   return Array.from({ length: localLength }, (_, localIndex) => {
     const sampleTime = times[run.startIndex + localIndex]
@@ -140,7 +144,7 @@ function smoothHeadingRun(input, run) {
     const cosine = endIntegral.cosine - startIntegral.cosine
     const sine = endIntegral.sine - startIntegral.sine
 
-    if (Math.hypot(cosine, sine) === 0) return normalizeHeading(headings[run.startIndex + localIndex])
+    if (Math.hypot(cosine, sine) === 0) return normalizeHeading(heading[run.startIndex + localIndex])
     return normalizeHeading((Math.atan2(sine, cosine) * 180) / Math.PI)
   })
 }
@@ -155,10 +159,11 @@ function smoothHeadingRun(input, run) {
  */
 export function deriveTurningSeries(input) {
   const series = input.elapsedSeconds.map((time) => ({ time, value: null }))
+  const heading = input.heading
 
   for (const segment of input.segments) {
-    for (const run of findHeadingRuns(input, segment)) {
-      const smoothedHeadings = smoothHeadingRun(input, run)
+    for (const run of findHeadingRuns(heading, segment)) {
+      const smoothedHeadings = smoothHeadingRun(input, heading, run)
       for (let localIndex = 1; localIndex < smoothedHeadings.length; localIndex += 1) {
         const sampleIndex = run.startIndex + localIndex
         const previousIndex = sampleIndex - 1
@@ -196,7 +201,7 @@ function createSuppressionChecker(nearStopIntervals) {
  * longer qualifies, same-direction drift cannot extend that event forever.
  *
  * @param {'rightTurn'|'leftTurn'} direction Turn direction.
- * @returns {{direction: 'rightTurn'|'leftTurn', intervals: {start: number, end: number, change: number}[], firstIntervalIndex: number, windowChange: number, totalChange: number, eventChangeAtEnd: number, event: object|null}} Turn accumulation state.
+ * @returns {{direction: 'rightTurn'|'leftTurn', intervals: {start: number, end: number, change: number}[], firstIntervalIndex: number, windowChange: number, totalChange: number, reversalChange: number, eventChangeAtEnd: number, event: object|null, eventClosed: boolean}} Turn accumulation state.
  */
 function createTurnRun(direction) {
   return {
@@ -205,9 +210,23 @@ function createTurnRun(direction) {
     firstIntervalIndex: 0,
     windowChange: 0,
     totalChange: 0,
+    reversalChange: 0,
     eventChangeAtEnd: 0,
     event: null,
+    eventClosed: false,
   }
+}
+
+/**
+ * Converts a signed heading change into the run's directional coordinate.
+ * Positive values continue the run; negative values are reversals.
+ *
+ * @param {'rightTurn'|'leftTurn'} direction Turn accumulation direction.
+ * @param {number} change Signed heading change in degrees.
+ * @returns {number} Heading change relative to the run direction.
+ */
+function getDirectionalChange(direction, change) {
+  return direction === 'rightTurn' ? change : -change
 }
 
 /**
@@ -222,7 +241,7 @@ function createTurnRun(direction) {
 function trimTurnWindow(run, currentTime) {
   const windowStart = currentTime - VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS
   while (run.firstIntervalIndex < run.intervals.length && run.intervals[run.firstIntervalIndex].end <= windowStart) {
-    run.windowChange -= run.intervals[run.firstIntervalIndex].change
+    run.windowChange -= getDirectionalChange(run.direction, run.intervals[run.firstIntervalIndex].change)
     run.firstIntervalIndex += 1
   }
 
@@ -231,7 +250,7 @@ function trimTurnWindow(run, currentTime) {
 
   const retainedRatio = (first.end - windowStart) / (first.end - first.start)
   const retainedChange = first.change * retainedRatio
-  run.windowChange += retainedChange - first.change
+  run.windowChange += getDirectionalChange(run.direction, retainedChange) - getDirectionalChange(run.direction, first.change)
   run.intervals[run.firstIntervalIndex] = { start: windowStart, end: first.end, change: retainedChange }
 }
 
@@ -248,7 +267,8 @@ function findQualifyingStart(run, turnThresholdDegrees) {
   let remaining = turnThresholdDegrees
   for (let index = run.intervals.length - 1; index >= run.firstIntervalIndex; index -= 1) {
     const interval = run.intervals[index]
-    const magnitude = Math.abs(interval.change)
+    const magnitude = getDirectionalChange(run.direction, interval.change)
+    if (magnitude <= 0) continue
     if (magnitude >= remaining) {
       return interval.end - (remaining / magnitude) * (interval.end - interval.start)
     }
@@ -268,19 +288,21 @@ function findQualifyingStart(run, turnThresholdDegrees) {
  */
 function addTurnInterval(run, interval, turnThresholdDegrees, events) {
   run.intervals.push(interval)
-  run.windowChange += interval.change
+  run.windowChange += getDirectionalChange(run.direction, interval.change)
   run.totalChange += interval.change
+  run.reversalChange = 0
   trimTurnWindow(run, interval.end)
   if (Math.abs(run.windowChange) < turnThresholdDegrees) return
 
   const start = findQualifyingStart(run, turnThresholdDegrees)
-  if (run.event !== null && start <= run.event.end) {
+  if (run.event !== null && !run.eventClosed && start <= run.event.end) {
     run.event.end = interval.end
     run.event.signedChange += run.totalChange - run.eventChangeAtEnd
     run.event.representativeTime = (run.event.start + run.event.end) / 2
     run.eventChangeAtEnd = run.totalChange
     return
   }
+  if (run.event !== null && run.eventClosed) return
 
   const signedThreshold = run.direction === 'rightTurn' ? turnThresholdDegrees : -turnThresholdDegrees
   const event = {
@@ -293,6 +315,31 @@ function addTurnInterval(run, interval, turnThresholdDegrees, events) {
   run.event = event
   run.eventChangeAtEnd = run.totalChange
   events.push(event)
+}
+
+/**
+ * Retains a run through a small opposite-direction correction. The correction
+ * participates in the ten-second net accumulation but does not erase a turn
+ * that has already crossed the threshold.
+ *
+ * @param {ReturnType<typeof createTurnRun>} run Directional accumulation.
+ * @param {{start: number, end: number, change: number}} interval Signed reversal interval.
+ * @param {number} currentTime Current interval end.
+ * @param {number} reversalToleranceDegrees Maximum tolerated reversal.
+ * @returns {boolean} Whether the run remains coherent.
+ */
+function addMinorReversal(run, interval, currentTime, reversalToleranceDegrees) {
+  const directionalChange = getDirectionalChange(run.direction, interval.change)
+  const reversalMagnitude = -directionalChange
+  if (reversalMagnitude <= 0 || run.reversalChange + reversalMagnitude > reversalToleranceDegrees) return false
+
+  run.intervals.push(interval)
+  run.windowChange += directionalChange
+  run.totalChange += interval.change
+  run.reversalChange += reversalMagnitude
+  if (run.event !== null) run.eventClosed = true
+  trimTurnWindow(run, currentTime)
+  return true
 }
 
 /**
@@ -325,8 +372,14 @@ function detectTurnsFromSeries(input, turningSeries, turnThresholdDegrees, nearS
       if (delta === 0) continue
 
       const direction = delta > 0 ? 'rightTurn' : 'leftTurn'
-      if (run === null || run.direction !== direction) run = createTurnRun(direction)
-      addTurnInterval(run, { start: previousTime, end: currentTime, change: delta }, turnThresholdDegrees, events)
+      const interval = { start: previousTime, end: currentTime, change: delta }
+      if (run === null) {
+        run = createTurnRun(direction)
+      } else if (run.direction !== direction) {
+        if (!addMinorReversal(run, interval, currentTime, VIDEO_SYNC_TURN_REVERSAL_TOLERANCE_DEGREES)) run = createTurnRun(direction)
+        else continue
+      }
+      addTurnInterval(run, interval, turnThresholdDegrees, events)
     }
   }
 

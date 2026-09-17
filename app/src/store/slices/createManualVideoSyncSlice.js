@@ -115,6 +115,32 @@ export function createManualVideoSyncSlice(set, get) {
       })
     },
 
+    setVideoSyncLandmarkType: (id, type) => {
+      validateLandmarkId(id)
+      const state = get()
+      const landmark = state.manualVideoSync.landmarks.find((item) => item.id === id)
+      if (!landmark) throw new Error(`Manual video sync landmark was not found: ${id}`)
+
+      const nextLandmark = { ...landmark, type }
+      if (type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) nextLandmark.activitySecond = null
+      else delete nextLandmark.activitySecond
+      validateLandmark(nextLandmark, state.importedVideoDuration)
+
+      if (
+        type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION &&
+        state.manualVideoSync.landmarks.some((item) => item.id !== id && item.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION)
+      ) {
+        throw new Error(`Manual video sync supports at most ${VIDEO_SYNC_MAX_LOCATION_LANDMARKS} location landmark`)
+      }
+
+      if (landmark.type === type) return
+
+      set((draft) => {
+        draft.manualVideoSync.landmarks = draft.manualVideoSync.landmarks.map((item) => (item.id === id ? nextLandmark : item))
+        invalidateDerivedState(draft)
+      })
+    },
+
     removeVideoSyncLandmark: (id) => {
       validateLandmarkId(id)
       const state = get()

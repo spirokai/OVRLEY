@@ -830,7 +830,7 @@ fn apply_metric_smoothing(
 
         match option.method.as_str() {
             "circular_ema" if metric_name == "heading" => {
-                *series = circular_ema(series);
+                *series = circular_ema(series, elapsed_series, option.window_seconds);
             }
             "zero_phase_ma" if zero_phase_metrics.contains(metric_name.as_str()) => {
                 let window =

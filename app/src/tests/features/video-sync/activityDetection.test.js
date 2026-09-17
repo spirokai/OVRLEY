@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { createActivitySyncInput } from '@/features/video-sync/utils/activitySyncInput'
 import { detectActivityEvents } from '@/features/video-sync/utils/detectActivityEvents'
 import { detectStops } from '@/features/video-sync/utils/detectStops'
-import { detectTurns, deriveTurningSeries } from '@/features/video-sync/utils/detectTurns'
+import { detectTurns, detectTurnsFromDerivedSeries, deriveTurningSeries } from '@/features/video-sync/utils/detectTurns'
 
 const SETTINGS = { speedThresholdKmh: 5, turnThresholdDegrees: 90 }
 
@@ -99,6 +99,26 @@ describe('manual video-sync activity detection', () => {
 
     expect(wraparound.turns.map((event) => event.type)).toContain('rightTurn')
     expect(reversal.turns.map((event) => event.type)).toEqual(['rightTurn', 'leftTurn'])
+  })
+
+  test('keeps a turn candidate through a minor opposite-direction correction', () => {
+    const input = {
+      elapsedSeconds: [0, 1, 2, 3, 4, 5],
+      segments: [{ startIndex: 0, endIndex: 6 }],
+    }
+    const turningSeries = [
+      { time: 0, value: null },
+      { time: 1, value: 40 },
+      { time: 2, value: 40 },
+      { time: 3, value: -15 },
+      { time: 4, value: 25 },
+      { time: 5, value: 0 },
+    ]
+
+    const derivedResult = detectTurnsFromDerivedSeries(input, turningSeries, { ...SETTINGS, nearStopIntervals: [] })
+
+    expect(derivedResult).toHaveLength(1)
+    expect(derivedResult[0].type).toBe('rightTurn')
   })
 
   test('rejects a gradual bend that exceeds the ten-second qualifying duration', () => {

@@ -238,7 +238,8 @@ pub struct SmoothingOption {
     pub enabled: bool,
     /// Algorithm identifier chosen by the parser for this metric.
     pub method: String,
-    /// Time horizon used by windowed algorithms; circular EMA ignores it.
+    /// Time horizon used by windowed algorithms, including the circular EMA
+    /// time constant for heading.
     pub window_seconds: f64,
 }
 

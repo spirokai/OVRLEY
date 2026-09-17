@@ -50,6 +50,28 @@ describe('manual video sync store contract', () => {
     expect(useStore.getState().manualVideoSync.landmarks).toEqual([])
   })
 
+  test('changes landmark types while preserving canonical shapes and location limits', () => {
+    const state = useStore.getState()
+    const landmarkId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
+
+    state.setVideoSyncLandmarkType(landmarkId, VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN)
+    expect(useStore.getState().manualVideoSync.landmarks[0]).toEqual({ id: landmarkId, type: 'leftTurn', videoSecond: 4 })
+
+    state.setVideoSyncLandmarkType(landmarkId, VIDEO_SYNC_LANDMARK_TYPES.LOCATION)
+    expect(useStore.getState().manualVideoSync.landmarks[0]).toEqual({
+      id: landmarkId,
+      type: 'location',
+      videoSecond: 4,
+      activitySecond: null,
+    })
+
+    const secondId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 8)
+    expect(() => state.setVideoSyncLandmarkType(secondId, VIDEO_SYNC_LANDMARK_TYPES.LOCATION)).toThrow(/at most 1 location/)
+
+    state.setVideoSyncLandmarkType(landmarkId, VIDEO_SYNC_LANDMARK_TYPES.STOP)
+    expect(useStore.getState().manualVideoSync.landmarks[0]).toEqual({ id: landmarkId, type: 'stop', videoSecond: 4 })
+  })
+
   test('rejects malformed action input at the store boundary', () => {
     const state = useStore.getState()
 

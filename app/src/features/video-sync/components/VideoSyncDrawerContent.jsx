@@ -1,4 +1,4 @@
-import { Activity, Bell, ChevronDown, ChevronUp, Clock3, RotateCcw } from 'lucide-react'
+import { Activity, Bell, ChevronDown, ChevronUp, Clock3, CornerUpLeft, CornerUpRight, OctagonMinus, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { BlurInput } from '@/components/ui/blur-input'
@@ -10,6 +10,7 @@ import { SliderField } from '@/features/widget-editor/components/widgetFormContr
 import { VIDEO_SYNC_SPEED_THRESHOLD_RANGE_KMH, VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES } from '../data/videoSyncConstants'
 import { VideoSyncCandidateList } from './VideoSyncCandidateList'
 import { VideoSyncLandmarkList } from './VideoSyncLandmarkList'
+import { getVideoSyncDetectionCounts } from '../utils/detectionSummary'
 
 function VideoSyncControls({
   activitySummary,
@@ -148,14 +149,15 @@ export function VideoSyncDrawerContent({
   candidates,
   candidateStatus,
   calculation,
+  detection = null,
   error,
   hasSearched,
   landmarks,
   onApplyCandidate,
   onCalculate,
+  onChangeLandmarkType,
   onClearLandmarks,
   onDeleteLandmark,
-  onScrubLandmark,
   onSpeedThresholdChange,
   onSpeedThresholdCommit,
   onTurnThresholdChange,
@@ -170,6 +172,7 @@ export function VideoSyncDrawerContent({
   const canCalculate = calculation.eligibility.canCalculate
   const speedValueLabel = `${speedThresholdDraftKmh.toFixed(1)}km/h`
   const turnValueLabel = `${turnThresholdDraftDegrees.toFixed(1)}°`
+  const detectionCounts = getVideoSyncDetectionCounts(detection)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-4 thin-scrollbar">
@@ -180,34 +183,69 @@ export function VideoSyncDrawerContent({
       ) : null}
 
       <div className="space-y-8 pt-6">
-        <VideoSyncLandmarkList landmarks={landmarks} onClear={onClearLandmarks} onDelete={onDeleteLandmark} onScrub={onScrubLandmark} />
+        <VideoSyncLandmarkList landmarks={landmarks} onChangeType={onChangeLandmarkType} onClear={onClearLandmarks} onDelete={onDeleteLandmark} />
 
-        <section className="space-y-4" aria-label={t('videoSync.detection', 'Detection and candidates')}>
-          <SectionHeading icon={Activity} title={t('videoSync.detection', 'Detection and candidates')} variant="drawer" />
+        <section className="space-y-4" aria-label={t('videoSync.detection', 'Detection senstivity')}>
+          <SectionHeading icon={Activity} title={t('videoSync.detection', 'Detection sensitivity')} variant="drawer" />
 
           <div className="space-y-4">
-            <SliderField
-              label={t('videoSync.speedSensitivity', 'Speed sensitivity')}
-              value={speedThresholdDraftKmh}
-              min={VIDEO_SYNC_SPEED_THRESHOLD_RANGE_KMH.min}
-              max={VIDEO_SYNC_SPEED_THRESHOLD_RANGE_KMH.max}
-              step={0.1}
-              valueDisplay={speedValueLabel}
-              onSliderChange={onSpeedThresholdChange}
-              onSliderCommit={onSpeedThresholdCommit}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <SliderField
+                label={t('videoSync.speedSensitivity', 'Speed')}
+                value={speedThresholdDraftKmh}
+                min={VIDEO_SYNC_SPEED_THRESHOLD_RANGE_KMH.min}
+                max={VIDEO_SYNC_SPEED_THRESHOLD_RANGE_KMH.max}
+                step={0.5}
+                valueDisplay={speedValueLabel}
+                onSliderChange={onSpeedThresholdChange}
+                onSliderCommit={onSpeedThresholdCommit}
+              />
 
-            <SliderField
-              label={t('videoSync.turnSensitivity', 'Turn sensitivity')}
-              value={turnThresholdDraftDegrees}
-              dir="rtl"
-              min={VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES.min}
-              max={VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES.max}
-              step={1}
-              valueDisplay={turnValueLabel}
-              onSliderChange={onTurnThresholdChange}
-              onSliderCommit={onTurnThresholdCommit}
-            />
+              <SliderField
+                label={t('videoSync.turnSensitivity', 'Turning')}
+                value={turnThresholdDraftDegrees}
+                min={VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES.min}
+                max={VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES.max}
+                step={5}
+                valueDisplay={turnValueLabel}
+                onSliderChange={onTurnThresholdChange}
+                onSliderCommit={onTurnThresholdCommit}
+              />
+            </div>
+
+            <div
+              className="grid grid-cols-3 py-2 divide-x divide-border/50 text-[0.8rem] text-muted-foreground"
+              aria-label={t('videoSync.detectedEvents', 'Detected events')}
+              role="list"
+            >
+              <div
+                className="flex items-center justify-center gap-1 text-video-sync-turn"
+                role="listitem"
+                aria-label={`${detectionCounts.leftTurns} ${t('videoSync.leftTurns', 'Left Turns')}`}
+                title={t('videoSync.leftTurns', 'Left Turns')}
+              >
+                <span className="font-semibold tabular-nums">{detectionCounts.leftTurns}</span>
+                <CornerUpLeft className="size-4" strokeWidth={2.5} aria-hidden="true" />
+              </div>
+              <div
+                className="flex items-center justify-center gap-1 text-video-sync-stop"
+                role="listitem"
+                aria-label={`${detectionCounts.stops} ${t('videoSync.stops', 'Stops')}`}
+                title={t('videoSync.stops', 'Stops')}
+              >
+                <span className="font-semibold tabular-nums">{detectionCounts.stops}</span>
+                <OctagonMinus className="size-4" strokeWidth={2.5} aria-hidden="true" />
+              </div>
+              <div
+                className="flex items-center justify-center gap-1 text-video-sync-turn"
+                role="listitem"
+                aria-label={`${detectionCounts.rightTurns} ${t('videoSync.rightTurns', 'Right Turns')}`}
+                title={t('videoSync.rightTurns', 'Right Turns')}
+              >
+                <span className="font-semibold tabular-nums">{detectionCounts.rightTurns}</span>
+                <CornerUpRight className="size-4" strokeWidth={2.5} aria-hidden="true" />
+              </div>
+            </div>
 
             <Button
               type="button"

@@ -249,7 +249,7 @@ fn finalizes_raw_activity_with_circular_ema_without_heading_wrap_glitch() {
             "heading should stay near north across wrap, got {heading}"
         );
     }
-    assert!(activity.heading[2].unwrap() > 350.0);
+    assert!(activity.heading[2].unwrap() <= 20.0);
 }
 
 #[test]
