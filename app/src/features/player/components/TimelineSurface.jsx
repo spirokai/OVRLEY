@@ -1,4 +1,6 @@
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import VideoSyncTimelineGraph from '@/features/video-sync/components/VideoSyncTimelineGraph'
+import VideoSyncTimelineLandmarks from '@/features/video-sync/components/VideoSyncTimelineLandmarks'
 import { GripVertical } from 'lucide-react'
 import TimelineLane from './TimelineLane'
 import { useTranslation } from 'react-i18next'
@@ -31,6 +33,8 @@ export default function TimelineSurface({ timeline }) {
         ))}
       </div>
 
+      {timeline.videoSyncMode && timeline.graph ? <VideoSyncTimelineGraph graph={timeline.graph} /> : null}
+
       <div
         aria-label={t('player.timelineLaneBackground', 'Timeline lane background')}
         className="relative w-full cursor-e-resize select-none bg-foreground/10 active:cursor-e-resize border border-border/40 space-y-0.5 py-1"
@@ -50,6 +54,7 @@ export default function TimelineSurface({ timeline }) {
       </div>
 
       <div className="pointer-events-none absolute inset-0">
+        {timeline.videoSyncMode ? <VideoSyncTimelineLandmarks landmarks={timeline.landmarks} /> : null}
         <div className="pointer-events-none absolute bottom-0 top-0 z-30 w-px -translate-x-1/2 bg-primary" style={timeline.playhead.lineStyle} />
         <div
           className="pointer-events-auto absolute -top-1 z-40 -translate-x-1/2 cursor-grab p-1 active:cursor-grabbing"

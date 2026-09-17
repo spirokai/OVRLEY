@@ -1,40 +1,9 @@
-import { CircleStop, CornerUpLeft, CornerUpRight, MapPin, Trash2 } from 'lucide-react'
+import { MapPin, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { formatClockDuration } from '@/lib/time-format'
-import { VIDEO_SYNC_LANDMARK_TYPES } from '../data/videoSyncConstants'
-
-const LANDMARK_PRESENTATION = {
-  [VIDEO_SYNC_LANDMARK_TYPES.STOP]: {
-    Icon: CircleStop,
-    labelKey: 'videoSync.stop',
-    defaultLabel: 'Stop',
-    className: 'text-video-sync-stop',
-    stripe: 'bg-video-sync-stop',
-  },
-  [VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN]: {
-    Icon: CornerUpLeft,
-    labelKey: 'videoSync.leftTurn',
-    defaultLabel: 'Left Turn',
-    className: 'text-video-sync-turn',
-    stripe: 'bg-video-sync-turn',
-  },
-  [VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN]: {
-    Icon: CornerUpRight,
-    labelKey: 'videoSync.rightTurn',
-    defaultLabel: 'Right Turn',
-    className: 'text-video-sync-turn',
-    stripe: 'bg-video-sync-turn',
-  },
-  [VIDEO_SYNC_LANDMARK_TYPES.LOCATION]: {
-    Icon: MapPin,
-    labelKey: 'videoSync.location',
-    defaultLabel: 'Location',
-    className: 'text-video-sync-location',
-    stripe: 'bg-video-sync-location',
-  },
-}
+import { VIDEO_SYNC_LANDMARK_PRESENTATION } from '../data/videoSyncConstants'
 
 /**
  * Renders the sorted manual landmark cards.
@@ -73,7 +42,7 @@ export function VideoSyncLandmarkList({ landmarks, onClear, onDelete, onScrub })
       {sortedLandmarks.length > 0 ? (
         <div className="space-y-1.5" role="list" aria-label={t('videoSync.videoLandmarks', 'Video landmarks')}>
           {sortedLandmarks.map((landmark) => {
-            const presentation = LANDMARK_PRESENTATION[landmark.type]
+            const presentation = VIDEO_SYNC_LANDMARK_PRESENTATION[landmark.type]
             const Icon = presentation.Icon
             const videoTimeLabel = formatClockDuration(landmark.videoSecond)
             return (

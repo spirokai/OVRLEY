@@ -17,6 +17,7 @@ import usePlaybackEngine from './usePlaybackEngine'
 import useTimelineClips from './useTimelineClips'
 import useTimelineGestures from './useTimelineGestures'
 import useTimelineViewport from './useTimelineViewport'
+import useVideoSyncTimeline from '@/features/video-sync/hooks/useVideoSyncTimeline'
 
 function getDevicePixelRatio() {
   if (typeof window === 'undefined') return 1
@@ -50,6 +51,9 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       importedVideoFps: state.importedVideoFps,
       importedVideoImportId: state.importedVideoImportId,
       importedVideoPath: state.importedVideoPath,
+      manualVideoSyncDetection: state.manualVideoSyncDetection,
+      manualVideoSyncLandmarks: state.manualVideoSync.landmarks,
+      moveVideoSyncLandmark: state.moveVideoSyncLandmark,
       pausePreviewPlayback: state.pausePreviewPlayback,
       toggleVideoMute: state.toggleVideoMute,
       isVideoMuted: state.isVideoMuted,
@@ -157,6 +161,26 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
   })
   const { displayedFitTargetId, fitTarget, fitTargets: viewportFitTargets, viewport: timelineViewport, widthPx } = viewport
+
+  // Sync timeline - the feature hook receives the already-owned player viewport
+  // and returns only render-ready graph and landmark geometry.
+  const videoSyncTimeline = useVideoSyncTimeline({
+    containerElement: viewport.containerElement,
+    detection: playerStore.manualVideoSyncDetection,
+    enabled: videoSyncMode,
+    followSecond: viewport.followSecond,
+    landmarks: playerStore.manualVideoSyncLandmarks,
+    moveLandmark: playerStore.moveVideoSyncLandmark,
+    scrubTo: playback.scrubTo,
+    timelineMinimum: viewport.timelineMinimum,
+    totalDuration: playback.totalDuration,
+    videoDuration: playback.importedVideoDuration,
+    videoSyncOffsetPreviewSeconds: timelineVideoSyncOffsetSeconds,
+    videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
+    viewEnd: viewport.viewport.viewEnd,
+    viewStart: viewport.viewport.viewStart,
+    widthPx: viewport.widthPx,
+  })
 
   // Gesture metrics sync - pointer math uses the latest measured element and viewport without re-rendering on every move.
   useEffect(() => {
@@ -401,7 +425,9 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
         ref: viewport.containerRef,
       },
       exportMarkers,
+      graph: videoSyncTimeline.graph,
       lanes,
+      landmarks: videoSyncTimeline.landmarks,
       panSurfaceProps: gestures.panSurfaceProps,
       playhead: {
         handleProps: gestures.playheadProps,
