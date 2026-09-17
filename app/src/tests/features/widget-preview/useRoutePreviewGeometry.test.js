@@ -9,6 +9,19 @@ vi.mock('@/api/backend', () => ({
 }))
 
 // Mock the Zustand store — the hook reads config from here
+const existingCoursePlot = {
+  value: 'course',
+  x: 0,
+  y: 0,
+  width: 240,
+  height: 240,
+  simplify_tolerance_px: 1,
+  target_density: 1,
+  show_full_activity: true,
+  remaining_line_width: 2,
+  completed_line_width: 2,
+  marker_size: 6,
+}
 const mockConfig = {
   scene: {
     width: 240,
@@ -28,21 +41,7 @@ const mockConfig = {
   },
   values: [],
   labels: [],
-  plots: [
-    {
-      value: 'course',
-      x: 0,
-      y: 0,
-      width: 240,
-      height: 240,
-      simplify_tolerance_px: 1,
-      target_density: 1,
-      show_full_activity: true,
-      remaining_line_width: 2,
-      completed_line_width: 2,
-      marker_size: 6,
-    },
-  ],
+  plots: [existingCoursePlot],
 }
 const mockGlobalDefaults = {}
 
@@ -132,6 +131,7 @@ const GEOMETRY_RESPONSE = {
 describe('useRoutePreviewGeometry', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockConfig.plots = [existingCoursePlot]
     mockBuildRouteGeometry.mockResolvedValue(GEOMETRY_RESPONSE)
   })
 
@@ -188,6 +188,29 @@ describe('useRoutePreviewGeometry', () => {
     expect(geometry.markerPoint).toHaveLength(2)
     expect(typeof geometry.remainingSvgPoints).toBe('string')
     expect(geometry.remainingSvgPoints.length).toBeGreaterThan(0)
+  })
+
+  test('uses an ephemeral route config without mutating project plots', async () => {
+    mockConfig.plots = []
+    const data = { ...makeData(), id: 'video-sync-diagnostic-route', value: 'course' }
+
+    renderHook(() =>
+      useRoutePreviewGeometry({
+        activity: makeActivity(),
+        data,
+        exportRange: null,
+        previewSecond: 15,
+        style: makeStyle(),
+      }),
+    )
+
+    await waitFor(() => {
+      expect(mockBuildRouteGeometry).toHaveBeenCalledTimes(1)
+    })
+
+    const [geometryConfig] = mockBuildRouteGeometry.mock.calls[0]
+    expect(geometryConfig.plots).toEqual([expect.objectContaining({ id: 'video-sync-diagnostic-route', value: 'course' })])
+    expect(mockConfig.plots).toEqual([])
   })
 
   test('reuses static route geometry when only previewSecond changes', async () => {

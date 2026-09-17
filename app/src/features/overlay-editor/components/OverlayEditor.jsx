@@ -28,7 +28,7 @@ import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from 
 import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
 import { useTranslation } from 'react-i18next'
 import { getWidgetTypeName } from '@/lib/widget/widget-icons'
-import { VideoSyncMarkControls } from '@/features/video-sync'
+import { useVideoSyncDiagnostics, VideoSyncMarkControls } from '@/features/video-sync'
 
 const PROJECT_STATUS_TRANSLATIONS = {
   Unsaved: { key: 'overlay-editor.statusUnsaved', defaultLabel: 'Unsaved' },
@@ -162,6 +162,15 @@ function OverlayEditorContent({
   // Derived state hook — widgets, scene, preview, drafts
   const overlayState = useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onConfigChange }, widgetLiveEdits)
   const activity = overlayState.activity
+  const videoSyncDiagnostics = useVideoSyncDiagnostics({
+    activity,
+    timelineSecond: overlayState.previewSecond,
+    markControls: videoSyncPreview,
+    globalScale: overlayState.globalScale,
+    exportStartSecond: overlayState.previewExportStartSecond,
+    sceneSize: overlayState.sceneSize,
+    enabled: videoSyncMode,
+  })
   const { metricPreviewModels, textPreviewModels } = useOverlayPreviewModels({
     activity,
     globalScale: overlayState.globalScale,
@@ -391,6 +400,10 @@ function OverlayEditorContent({
     [overlayState.setSceneElement, handleWidgetMouseDown, overlayState.widgetRefCallbacks],
   )
 
+  if (videoSyncMode && videoSyncPreview === null) {
+    throw new Error('Video sync editor requires mark controls')
+  }
+
   if (!config) return <EmptyOverlayState />
 
   return (
@@ -412,7 +425,7 @@ function OverlayEditorContent({
           ref={setStageElement}
           data-testid="overlay-editor-stage"
           className="relative grid min-h-full min-w-full w-max place-items-center overflow-visible p-4"
-          onMouseDown={handleSceneMouseDown}
+          onMouseDown={videoSyncMode ? undefined : handleSceneMouseDown}
         >
           <div
             className="relative shrink-0"
@@ -432,37 +445,43 @@ function OverlayEditorContent({
                 displayProps={canvasDisplayProps}
                 dataProps={canvasDataProps}
                 callbacks={canvasCallbacks}
+                videoSyncMode={videoSyncMode}
+                videoSyncDiagnostics={videoSyncDiagnostics}
               />
-              <OverlayMoveable
-                moveableRef={overlayState.moveableRef}
-                selectedTarget={selection.selectedTarget}
-                selectedTargets={selection.selectedTargets}
-                geometryVersion={selectedRenderedGeometryVersion}
-                isGroupDragActive={isGroupDragActive}
-                sceneElement={overlayState.sceneElement}
-                displayScale={displayScale}
-                canResizeSelected={canResizeSelected}
-                canScaleSelected={canScaleSelected}
-                canRotateSelected={canRotateSelected}
-                maintainAspectRatio={maintainAspectRatio}
-                showEdgeResizeHandles={showEdgeResizeHandles}
-                elementGuidelines={selection.elementGuidelines}
-                sceneSize={overlayState.sceneSize}
-                snapToGrid={snapToGrid}
-                handlers={handlers}
-                interactionType={overlayState.activeWidgetInteraction?.type ?? null}
-              />
+              {!videoSyncMode ? (
+                <OverlayMoveable
+                  moveableRef={overlayState.moveableRef}
+                  selectedTarget={selection.selectedTarget}
+                  selectedTargets={selection.selectedTargets}
+                  geometryVersion={selectedRenderedGeometryVersion}
+                  isGroupDragActive={isGroupDragActive}
+                  sceneElement={overlayState.sceneElement}
+                  displayScale={displayScale}
+                  canResizeSelected={canResizeSelected}
+                  canScaleSelected={canScaleSelected}
+                  canRotateSelected={canRotateSelected}
+                  maintainAspectRatio={maintainAspectRatio}
+                  showEdgeResizeHandles={showEdgeResizeHandles}
+                  elementGuidelines={selection.elementGuidelines}
+                  sceneSize={overlayState.sceneSize}
+                  snapToGrid={snapToGrid}
+                  handlers={handlers}
+                  interactionType={overlayState.activeWidgetInteraction?.type ?? null}
+                />
+              ) : null}
             </div>
-            <WidgetBadgeLayer
-              displayScale={displayScale}
-              hoveredWidgetId={hoveredWidgetId}
-              renderGeometryModels={renderGeometryModels}
-              selectedWidgetIds={selection.selectedWidgetIds}
-              widgets={overlayState.canvasWidgets}
-            />
-            {videoSyncMode && videoSyncPreview ? <VideoSyncMarkControls {...videoSyncPreview} /> : null}
+            {!videoSyncMode ? (
+              <WidgetBadgeLayer
+                displayScale={displayScale}
+                hoveredWidgetId={hoveredWidgetId}
+                renderGeometryModels={renderGeometryModels}
+                selectedWidgetIds={selection.selectedWidgetIds}
+                widgets={overlayState.canvasWidgets}
+              />
+            ) : null}
+            {videoSyncMode ? <VideoSyncMarkControls {...videoSyncDiagnostics.markControls} /> : null}
           </div>
-          {selectionRect ? (
+          {!videoSyncMode && selectionRect ? (
             <div
               data-testid="selection-rect"
               className="pointer-events-none absolute z-40 border border-primary/70 bg-primary/10"

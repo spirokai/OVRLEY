@@ -34,9 +34,9 @@ function getPlotGeometrySignature(data, plotType) {
   )
 }
 
-function replaceGeometryPlot(config, plotType, plotData) {
+function withGeometryPlot(config, plotType, plotData) {
   const plotIndex = config.plots.findIndex((plot) => plot.id === plotData.id || plot.value === plotType)
-  if (plotIndex === -1) return config
+  if (plotIndex === -1) return { ...config, plots: [...config.plots, plotData] }
 
   const plots = [...config.plots]
   plots[plotIndex] = { ...plots[plotIndex], ...plotData }
@@ -48,7 +48,7 @@ function buildPlotGeometryConfig({ config, globalDefaults, activity, exportWindo
 
   const duration = activity.trim_end_seconds
   const { start, end, updateRate: _updateRate, ...sceneRest } = config.scene
-  const geometryConfig = replaceGeometryPlot(config, plotType, normalizePlotDimensions(plotData))
+  const geometryConfig = withGeometryPlot(config, plotType, normalizePlotDimensions(plotData))
 
   return {
     ...geometryConfig,

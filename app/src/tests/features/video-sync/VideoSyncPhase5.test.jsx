@@ -41,4 +41,28 @@ describe('manual video-sync Phase 5 controls', () => {
 
     expect(onDelete).toHaveBeenCalledWith('late')
   })
+
+  test('orders mark controls left, stop, location, and right in one row', () => {
+    render(
+      <VideoSyncMarkControls
+        canMark
+        canMarkLocation
+        locationDisabledReason={null}
+        markDisabledReason={null}
+        onMarkLeftTurn={vi.fn()}
+        onMarkLocation={vi.fn()}
+        onMarkRightTurn={vi.fn()}
+        onMarkStop={vi.fn()}
+      />,
+    )
+
+    const controls = screen.getByTestId('video-sync-mark-controls')
+    expect(controls.className).toContain('flex-row')
+    expect([...controls.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Mark Left Turn',
+      'Mark Stop',
+      'Mark Location',
+      'Mark Right Turn',
+    ])
+  })
 })

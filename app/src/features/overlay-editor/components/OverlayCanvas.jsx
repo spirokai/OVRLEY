@@ -11,6 +11,7 @@ import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
 import { useVideoPreview } from '@/features/video-preview'
 import useStore from '@/store/useStore'
 import HevcPlaybackPlaceholder from './HevcPlaybackPlaceholder'
+import { VideoSyncCanvasDiagnostics } from '@/features/video-sync'
 
 /**
  * Canvas overlay grid — draws a teal-colored grid on an HTML canvas element
@@ -177,25 +178,32 @@ const OverlayCanvasWidget = memo(
  * @param {object} props.displayProps - { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible }
  * @param {object} props.dataProps - { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange }
  * @param {object} props.callbacks - { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks }
+ * @param {boolean} [props.videoSyncMode=false] Whether the dedicated sync canvas is active.
+ * @param {object|null} [props.videoSyncDiagnostics=null] Fixed diagnostic widget models.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks }) {
+export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks, videoSyncMode = false, videoSyncDiagnostics = null }) {
   const { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize } = sceneProps
   const { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible } = displayProps
   const { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange } = dataProps
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
+  const effectiveBackgroundMode = videoSyncMode ? 'video' : backgroundMode
   const videoRef = useRef(null)
   const isVideoMuted = useStore((state) => state.isVideoMuted)
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
   const platformOs = useStore((state) => state.platformOs)
   const { videoSrc, importId, isOutOfRange, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } = useVideoPreview(
     videoRef,
-    backgroundMode === 'video',
+    effectiveBackgroundMode === 'video',
   )
   const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
-  const hasTransparentBackground = backgroundMode === 'transparent'
+  const hasTransparentBackground = effectiveBackgroundMode === 'transparent'
   const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
   const videoBackgroundClassName = cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')
+
+  if (videoSyncMode && videoSyncDiagnostics === null) {
+    throw new Error('Video sync canvas requires diagnostics')
+  }
 
   return (
     <div
@@ -211,14 +219,14 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
         <div
           className={cn(
             'pointer-events-none absolute inset-0 rounded-sm shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)] border border-border/50',
-            backgroundMode === 'checker' && !gridVisible && 'bg-overlay-grid-muted',
+            effectiveBackgroundMode === 'checker' && !gridVisible && 'bg-overlay-grid-muted',
           )}
           style={{
-            backgroundColor: CANVAS_BACKGROUND_COLORS[backgroundMode] || CANVAS_BACKGROUND_COLORS.black,
+            backgroundColor: CANVAS_BACKGROUND_COLORS[effectiveBackgroundMode] || CANVAS_BACKGROUND_COLORS.black,
           }}
         />
       ) : null}
-      {backgroundMode === 'video' && videoSrc && !hasHevcPlaybackError ? (
+      {effectiveBackgroundMode === 'video' && videoSrc && !hasHevcPlaybackError ? (
         <video
           key={importId ?? 'no-video'}
           ref={videoRef}
@@ -230,36 +238,47 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
         />
       ) : null}
-      {backgroundMode === 'image' && backgroundImageSrc ? (
+      {effectiveBackgroundMode === 'image' && backgroundImageSrc ? (
         <img src={backgroundImageSrc} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" draggable="false" />
       ) : null}
       {gridVisible ? <CanvasGrid displayScale={displayScale} sceneSize={sceneSize} /> : null}
       <div data-testid="widget-layer" className="absolute inset-0 overflow-visible">
-        {widgets.map((widget) => {
-          return (
-            <OverlayCanvasWidget
-              key={widget.id}
-              widget={widget}
-              globalScale={globalScale}
-              globalOpacity={globalOpacity}
-              activity={activity}
-              previewSecond={previewSecond}
-              metricPreviewModel={metricPreviewModels[widget.id] ?? null}
-              textPreviewModel={textPreviewModels[widget.id] ?? null}
-              renderGeometryModel={renderGeometryModels[widget.id]}
-              sceneFont={sceneFont}
-              sceneFontSize={sceneFontSize}
-              sceneStyle={sceneStyle}
-              valueFont={valueFont}
-              exportRange={exportRange}
-              registerNode={widgetRefCallbacks[widget.id]}
-              handleWidgetMouseDown={handleWidgetMouseDown}
-              setHoveredWidgetId={setHoveredWidgetId}
-            />
-          )
-        })}
+        {!videoSyncMode &&
+          widgets.map((widget) => {
+            return (
+              <OverlayCanvasWidget
+                key={widget.id}
+                widget={widget}
+                globalScale={globalScale}
+                globalOpacity={globalOpacity}
+                activity={activity}
+                previewSecond={previewSecond}
+                metricPreviewModel={metricPreviewModels[widget.id] ?? null}
+                textPreviewModel={textPreviewModels[widget.id] ?? null}
+                renderGeometryModel={renderGeometryModels[widget.id]}
+                sceneFont={sceneFont}
+                sceneFontSize={sceneFontSize}
+                sceneStyle={sceneStyle}
+                valueFont={valueFont}
+                exportRange={exportRange}
+                registerNode={widgetRefCallbacks[widget.id]}
+                handleWidgetMouseDown={handleWidgetMouseDown}
+                setHoveredWidgetId={setHoveredWidgetId}
+              />
+            )
+          })}
       </div>
-      {backgroundMode === 'video' && videoSrc && hasHevcPlaybackError ? (
+      {videoSyncMode ? (
+        <VideoSyncCanvasDiagnostics
+          {...videoSyncDiagnostics}
+          activity={activity}
+          exportRange={exportRange}
+          globalScale={globalScale}
+          previewSecond={previewSecond}
+          sceneStyle={sceneStyle}
+        />
+      ) : null}
+      {effectiveBackgroundMode === 'video' && videoSrc && hasHevcPlaybackError ? (
         <HevcPlaybackPlaceholder
           displayScale={displayScale}
           importId={importId}
