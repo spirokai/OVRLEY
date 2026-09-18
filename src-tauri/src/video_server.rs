@@ -34,6 +34,8 @@ use std::time::Duration;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 use uuid::Uuid;
 
+use crate::map_tile_service::{parse_tile_path, MapTileService};
+
 const CHUNK_SIZE: usize = 512 * 1024;
 const WORKER_COUNT: usize = 4;
 
@@ -126,6 +128,17 @@ impl VideoServerHandle {
     /// response cannot block a later range request. Calling this more than once
     /// on the same shared handle is a no-op after the first successful start.
     pub fn start(&self) -> Result<(), String> {
+        self.start_server(None)
+    }
+
+    pub(crate) fn start_with_map_tile_service(
+        &self,
+        map_tile_service: MapTileService,
+    ) -> Result<(), String> {
+        self.start_server(Some(Arc::new(map_tile_service)))
+    }
+
+    fn start_server(&self, map_tile_service: Option<Arc<MapTileService>>) -> Result<(), String> {
         {
             let guard = self.inner.lock().map_err(|error| error.to_string())?;
             if guard.started {
@@ -150,9 +163,12 @@ impl VideoServerHandle {
         for _ in 0..WORKER_COUNT {
             let server = Arc::clone(&server);
             let inner = Arc::clone(&self.inner);
+            let map_tile_service = map_tile_service.clone();
             thread::spawn(move || loop {
                 match server.recv_timeout(Duration::from_millis(200)) {
-                    Ok(Some(request)) => handle_request(&inner, request),
+                    Ok(Some(request)) => {
+                        handle_request(&inner, map_tile_service.as_deref(), request)
+                    }
                     Ok(None) => {}
                     Err(error) => {
                         log::warn!(
@@ -170,6 +186,11 @@ impl VideoServerHandle {
         }
 
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn port(&self) -> Option<u16> {
+        self.inner.lock().ok()?.port
     }
 
     /// Registers a video file as the only file the preview server may serve.
@@ -247,8 +268,12 @@ impl VideoServerHandle {
 ///
 /// Request-specific errors are not propagated to the server loop because a
 /// failed client request should not terminate the preview server thread.
-fn handle_request(inner: &Arc<Mutex<VideoServerInner>>, request: Request) {
-    if let Err(error) = respond_to_request(inner, request) {
+fn handle_request(
+    inner: &Arc<Mutex<VideoServerInner>>,
+    map_tile_service: Option<&MapTileService>,
+    request: Request,
+) {
+    if let Err(error) = respond_to_request(inner, map_tile_service, request) {
         log::warn!("Video preview request failed: {error}");
     }
 }
@@ -260,6 +285,7 @@ fn handle_request(inner: &Arc<Mutex<VideoServerInner>>, request: Request) {
 /// absent registrations all return `404`.
 fn respond_to_request(
     inner: &Arc<Mutex<VideoServerInner>>,
+    map_tile_service: Option<&MapTileService>,
     request: Request,
 ) -> Result<(), String> {
     let method = request.method().clone();
@@ -267,6 +293,25 @@ fn respond_to_request(
 
     if url == "/health" {
         return respond_text(request, StatusCode(200), "ok");
+    }
+
+    if url.starts_with("/tiles/") {
+        if method != Method::Get {
+            return respond_empty(request, StatusCode(405), common_headers(None, None));
+        }
+        let Some(coordinates) = parse_tile_path(&url) else {
+            return respond_empty(request, StatusCode(400), common_headers(None, None));
+        };
+        let Some(map_tile_service) = map_tile_service else {
+            return respond_empty(request, StatusCode(404), common_headers(None, None));
+        };
+        return match map_tile_service.resolve(coordinates) {
+            Ok(payload) => respond_tile(request, payload),
+            Err(error) => {
+                log::warn!("Tile request failed: {error}");
+                respond_empty(request, StatusCode(502), common_headers(None, None))
+            }
+        };
     }
 
     if method != Method::Get && method != Method::Head {
@@ -305,6 +350,24 @@ fn respond_to_request(
         }
         ParsedRange::Ignore => respond_video_full(request, current, is_head),
     }
+}
+
+fn respond_tile(request: Request, payload: Vec<u8>) -> Result<(), String> {
+    let content_length = payload.len();
+    let mut headers = common_headers(Some("image/png".to_string()), None);
+    headers.push(header("Content-Length", content_length.to_string())?);
+    request
+        .respond(
+            Response::new(
+                StatusCode(200),
+                headers,
+                std::io::Cursor::new(payload),
+                Some(content_length),
+                None,
+            )
+            .with_chunked_threshold(usize::MAX),
+        )
+        .map_err(|error| error.to_string())
 }
 
 /// Streams the entire registered video file as a `200 OK` response.
