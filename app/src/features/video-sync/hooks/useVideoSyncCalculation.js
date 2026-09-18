@@ -96,10 +96,7 @@ export default function useVideoSyncCalculation() {
     if (!hasVideo) {
       explanation = 'A video is required for Landmark Sync'
     } else if (!domainEligibility.canUseMapOnly && !domainEligibility.canMatchLandmarks) {
-      explanation =
-        parsedActivity === null
-          ? 'Activity telemetry is required for Landmark Sync'
-          : 'At least two usable stop or directional turn landmarks are required'
+      explanation = parsedActivity === null ? 'Activity telemetry is required for Landmark Sync' : 'At least two stop or turn landmarks are required'
     }
 
     return {

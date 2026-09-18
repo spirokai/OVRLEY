@@ -41,7 +41,7 @@ export function VideoSyncCandidateList({ appliedOffset, candidates, error, hasSe
   if (status === 'stale') {
     return (
       <div className="space-y-2">
-        <p className="text-xs font-medium text-amber-400">{t('videoSync.staleCandidates', 'Landmarks changed—run Landmark Sync again')}</p>
+        <p className="text-xs font-medium text-amber-400">{t('videoSync.staleCandidates', 'Landmarks changed. Rerun the Sync again')}</p>
         {candidates.length > 0 ? <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled onApply={onApply} /> : null}
       </div>
     )

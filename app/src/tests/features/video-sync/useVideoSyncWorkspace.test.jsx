@@ -13,7 +13,7 @@ vi.mock('@/features/video-sync/hooks/useVideoSyncCalculation', () => ({
       canCalculate: false,
       canMatchLandmarks: false,
       canUseMapOnly: false,
-      explanation: 'At least two usable landmarks are required',
+      explanation: 'At least two landmarks are required',
     },
     isCalculating: false,
   }),
