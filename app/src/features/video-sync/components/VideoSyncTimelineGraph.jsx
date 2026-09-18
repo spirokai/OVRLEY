@@ -10,7 +10,7 @@ function getBandClassName(tone) {
 }
 
 function getPathClassName(series) {
-  return series === 'speed' ? 'text-video-sync-stop/50' : 'text-video-sync-turn/40'
+  return series === 'speed' ? 'text-video-sync-stop/40' : 'text-video-sync-turn/30'
 }
 
 /**

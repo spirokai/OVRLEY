@@ -1,412 +1,244 @@
 import {
-  VIDEO_SYNC_HEADING_SMOOTHING_WINDOW_SECONDS,
+  VIDEO_SYNC_TURN_BOUNDARY_RATE_DEGREES_PER_SECOND,
+  VIDEO_SYNC_TURN_ENTRY_RATE_DEGREES_PER_SECOND,
+  VIDEO_SYNC_TURN_EXIT_DWELL_SECONDS,
   VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS,
   VIDEO_SYNC_TURN_REVERSAL_TOLERANCE_DEGREES,
+  VIDEO_SYNC_TURN_STATIONARY_SPEED_METERS_PER_SECOND,
+  VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES,
 } from '../data/videoSyncConstants'
 
-/**
- * Validates the user-owned turn threshold at the detector boundary.
- *
- * @param {number} turnThresholdDegrees Configured turn threshold in degrees.
- * @returns {void}
- * @throws {Error} When the threshold is not finite.
- */
+/** Validates the user-owned angle threshold once at the detector boundary. */
 function requireTurnThreshold(turnThresholdDegrees) {
-  if (!Number.isFinite(turnThresholdDegrees)) {
-    throw new Error('Manual video sync turn threshold must be finite')
+  const { min, max } = VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES
+  if (!Number.isFinite(turnThresholdDegrees) || turnThresholdDegrees < min || turnThresholdDegrees > max) {
+    throw new Error(`Manual video sync turn threshold must be between ${min} and ${max} degrees`)
   }
 }
 
-/**
- * Normalizes a heading to the canonical [0, 360) degree range.
- *
- * @param {number} degrees Heading in degrees.
- * @returns {number} Normalized heading.
- */
-function normalizeHeading(degrees) {
-  const normalized = degrees % 360
-  return normalized < 0 ? normalized + 360 : normalized
-}
-
-/**
- * Calculates the shortest signed angular change between two headings.
- *
- * @param {number} current Current heading in degrees.
- * @param {number} previous Previous heading in degrees.
- * @returns {number} Signed change in the range (-180, 180] degrees.
- */
+/** Returns the shortest signed heading change in (-180, 180] degrees. */
 function signedHeadingDelta(current, previous) {
-  let delta = current - previous
-  while (delta > 180) delta -= 360
-  while (delta <= -180) delta += 360
-  return delta
+  const delta = (((current - previous + 180) % 360) + 360) % 360
+  return delta === 0 ? 180 : delta - 180
 }
 
 /**
- * Finds contiguous heading runs within a timestamp segment.
+ * Derives interval-average turn rates from finalized, already-smoothed heading.
+ * Each value describes the interval ending at its timestamp. Missing headings
+ * and timestamp segments break the series; no additional smoothing shifts it.
  *
- * Missing headings terminate a run so smoothing and turning rates never bridge
- * unavailable data.
- *
- * @param {(number|null)[]} heading Heading series.
- * @param {{startIndex: number, endIndex: number}} segment Timestamp segment.
- * @returns {{startIndex: number, endIndex: number}[]} Contiguous heading runs.
- */
-function findHeadingRuns(heading, segment) {
-  const runs = []
-  let startIndex = null
-
-  for (let index = segment.startIndex; index < segment.endIndex; index += 1) {
-    if (heading[index] === null) {
-      if (startIndex !== null) runs.push({ startIndex, endIndex: index })
-      startIndex = null
-    } else if (startIndex === null) {
-      startIndex = index
-    }
-  }
-
-  if (startIndex !== null) runs.push({ startIndex, endIndex: segment.endIndex })
-  return runs
-}
-
-/**
- * Creates a monotonic integral reader for one heading run.
- *
- * The prefix sums contain elapsed-time-weighted unit heading vectors. The
- * reader interpolates the final partial interval for a requested timestamp.
- *
- * @param {{elapsedSeconds: number[]}} input Detector input.
- * @param {(number|null)[]} heading Heading series.
- * @param {{startIndex: number, endIndex: number}} run Contiguous heading run.
- * @param {number[]} cosinePrefix Prefix sums of weighted cosine components.
- * @param {number[]} sinePrefix Prefix sums of weighted sine components.
- * @returns {(targetTime: number) => {cosine: number, sine: number}} Integral reader.
- */
-function createHeadingIntegralReader(input, heading, run, cosinePrefix, sinePrefix) {
-  const times = input.elapsedSeconds
-  const startTime = times[run.startIndex]
-  const endTime = times[run.endIndex - 1]
-  const lastIntervalIndex = run.endIndex - run.startIndex - 1
-  let intervalIndex = 0
-
-  return (targetTime) => {
-    if (targetTime <= startTime) return { cosine: 0, sine: 0 }
-    if (targetTime >= endTime) {
-      return { cosine: cosinePrefix[lastIntervalIndex], sine: sinePrefix[lastIntervalIndex] }
-    }
-
-    while (intervalIndex < lastIntervalIndex && times[run.startIndex + intervalIndex + 1] <= targetTime) intervalIndex += 1
-
-    const sampleIndex = run.startIndex + intervalIndex
-    const radians = (normalizeHeading(heading[sampleIndex]) * Math.PI) / 180
-    const elapsed = targetTime - times[sampleIndex]
-    return {
-      cosine: cosinePrefix[intervalIndex] + Math.cos(radians) * elapsed,
-      sine: sinePrefix[intervalIndex] + Math.sin(radians) * elapsed,
-    }
-  }
-}
-
-/**
- * Smooths one heading run with an elapsed-time circular one-second window.
- *
- * @param {{elapsedSeconds: number[]}} input Detector input.
- * @param {(number|null)[]} heading Heading series.
- * @param {{startIndex: number, endIndex: number}} run Contiguous heading run.
- * @returns {number[]} Smoothed headings aligned to the run's local indices.
- */
-function smoothHeadingRun(input, heading, run) {
-  const localLength = run.endIndex - run.startIndex
-  const times = input.elapsedSeconds
-  const startTime = times[run.startIndex]
-  const endTime = times[run.endIndex - 1]
-  const halfWindow = VIDEO_SYNC_HEADING_SMOOTHING_WINDOW_SECONDS / 2
-  const cosinePrefix = [0]
-  const sinePrefix = [0]
-
-  for (let localIndex = 0; localIndex < localLength - 1; localIndex += 1) {
-    const sampleIndex = run.startIndex + localIndex
-    const elapsed = times[sampleIndex + 1] - times[sampleIndex]
-    const radians = (normalizeHeading(heading[sampleIndex]) * Math.PI) / 180
-    cosinePrefix.push(cosinePrefix[localIndex] + Math.cos(radians) * elapsed)
-    sinePrefix.push(sinePrefix[localIndex] + Math.sin(radians) * elapsed)
-  }
-
-  const integrateFromStart = createHeadingIntegralReader(input, heading, run, cosinePrefix, sinePrefix)
-  const integrateFromEnd = createHeadingIntegralReader(input, heading, run, cosinePrefix, sinePrefix)
-
-  return Array.from({ length: localLength }, (_, localIndex) => {
-    const sampleTime = times[run.startIndex + localIndex]
-    const windowStart = Math.max(startTime, sampleTime - halfWindow)
-    const windowEnd = Math.min(endTime, sampleTime + halfWindow)
-    const startIntegral = integrateFromStart(windowStart)
-    const endIntegral = integrateFromEnd(windowEnd)
-    const cosine = endIntegral.cosine - startIntegral.cosine
-    const sine = endIntegral.sine - startIntegral.sine
-
-    if (Math.hypot(cosine, sine) === 0) return normalizeHeading(heading[run.startIndex + localIndex])
-    return normalizeHeading((Math.atan2(sine, cosine) * 180) / Math.PI)
-  })
-}
-
-/**
- * Derives the one elapsed-time signed turning series used by both detection
- * and the future timeline graph. Values are degrees per second; missing or
- * first-in-run values are null and never bridge a gap.
- *
- * @param {object} input Detector input produced by createActivitySyncInput.
- * @returns {{time: number, value: number|null}[]} Timestamped signed turning rate.
+ * @param {object} input Canonical input from createActivitySyncInput.
+ * @returns {{time: number, value: number|null}[]} Signed rates in degrees/second.
  */
 export function deriveTurningSeries(input) {
   const series = input.elapsedSeconds.map((time) => ({ time, value: null }))
-  const heading = input.heading
-
   for (const segment of input.segments) {
-    for (const run of findHeadingRuns(heading, segment)) {
-      const smoothedHeadings = smoothHeadingRun(input, heading, run)
-      for (let localIndex = 1; localIndex < smoothedHeadings.length; localIndex += 1) {
-        const sampleIndex = run.startIndex + localIndex
-        const previousIndex = sampleIndex - 1
-        const elapsed = input.elapsedSeconds[sampleIndex] - input.elapsedSeconds[previousIndex]
-        const change = signedHeadingDelta(smoothedHeadings[localIndex], smoothedHeadings[localIndex - 1])
-        series[sampleIndex].value = change / elapsed
-      }
+    for (let index = segment.startIndex + 1; index < segment.endIndex; index += 1) {
+      const previous = input.heading[index - 1]
+      const current = input.heading[index]
+      if (previous === null || current === null) continue
+      const elapsed = input.elapsedSeconds[index] - input.elapsedSeconds[index - 1]
+      series[index].value = signedHeadingDelta(current, previous) / elapsed
     }
   }
-
   return series
 }
 
 /**
- * Creates a monotonic overlap checker for near-stop suppression intervals.
- *
- * @param {{start: number, end: number}[]} nearStopIntervals Sorted suppression intervals.
- * @returns {(startTime: number, endTime: number) => boolean} Overlap predicate.
+ * Suppresses heading only near standstill, independently of stop-landmark tuning.
+ * Speed crossings are linearly interpolated. Missing speed cannot establish
+ * standstill, and neither missing samples nor timestamp gaps are bridged.
  */
-function createSuppressionChecker(nearStopIntervals) {
-  let intervalIndex = 0
+function deriveNearStopIntervals(input) {
+  const intervals = []
+  const threshold = VIDEO_SYNC_TURN_STATIONARY_SPEED_METERS_PER_SECOND
+  for (const segment of input.segments) {
+    for (let index = segment.startIndex + 1; index < segment.endIndex; index += 1) {
+      const previousSpeed = input.speed[index - 1]
+      const speed = input.speed[index]
+      if (previousSpeed === null || speed === null || (previousSpeed > threshold && speed > threshold)) continue
 
-  return (startTime, endTime) => {
-    while (intervalIndex < nearStopIntervals.length && nearStopIntervals[intervalIndex].end <= startTime) intervalIndex += 1
-    const interval = nearStopIntervals[intervalIndex]
-    return interval !== undefined && startTime < interval.end && endTime > interval.start
-  }
-}
-
-/**
- * Creates a direction-coherent sliding accumulation.
- *
- * `intervals` and `windowChange` retain only the latest maximum-duration
- * window. Overlapping qualifying windows extend one event; once the window no
- * longer qualifies, same-direction drift cannot extend that event forever.
- *
- * @param {'rightTurn'|'leftTurn'} direction Turn direction.
- * @returns {{direction: 'rightTurn'|'leftTurn', intervals: {start: number, end: number, change: number}[], firstIntervalIndex: number, windowChange: number, totalChange: number, reversalChange: number, eventChangeAtEnd: number, event: object|null, eventClosed: boolean}} Turn accumulation state.
- */
-function createTurnRun(direction) {
-  return {
-    direction,
-    intervals: [],
-    firstIntervalIndex: 0,
-    windowChange: 0,
-    totalChange: 0,
-    reversalChange: 0,
-    eventChangeAtEnd: 0,
-    event: null,
-    eventClosed: false,
-  }
-}
-
-/**
- * Converts a signed heading change into the run's directional coordinate.
- * Positive values continue the run; negative values are reversals.
- *
- * @param {'rightTurn'|'leftTurn'} direction Turn accumulation direction.
- * @param {number} change Signed heading change in degrees.
- * @returns {number} Heading change relative to the run direction.
- */
-function getDirectionalChange(direction, change) {
-  return direction === 'rightTurn' ? change : -change
-}
-
-/**
- * Trims an unqualified accumulation to the configured elapsed-time window.
- * The oldest interval may be retained fractionally so irregular sampling does
- * not move the effective duration boundary to a sample timestamp.
- *
- * @param {ReturnType<typeof createTurnRun>} run Directional accumulation.
- * @param {number} currentTime Current interval end.
- * @returns {void}
- */
-function trimTurnWindow(run, currentTime) {
-  const windowStart = currentTime - VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS
-  while (run.firstIntervalIndex < run.intervals.length && run.intervals[run.firstIntervalIndex].end <= windowStart) {
-    run.windowChange -= getDirectionalChange(run.direction, run.intervals[run.firstIntervalIndex].change)
-    run.firstIntervalIndex += 1
-  }
-
-  const first = run.intervals[run.firstIntervalIndex]
-  if (first === undefined || first.start >= windowStart) return
-
-  const retainedRatio = (first.end - windowStart) / (first.end - first.start)
-  const retainedChange = first.change * retainedRatio
-  run.windowChange += getDirectionalChange(run.direction, retainedChange) - getDirectionalChange(run.direction, first.change)
-  run.intervals[run.firstIntervalIndex] = { start: windowStart, end: first.end, change: retainedChange }
-}
-
-/**
- * Locates the latest start that contributes exactly the qualifying angle.
- * Using the tight supporting interval keeps a long, low-amplitude drift before
- * a real turn out of the event geometry and makes its timing cadence-stable.
- *
- * @param {ReturnType<typeof createTurnRun>} run Qualified directional accumulation.
- * @param {number} turnThresholdDegrees Required accumulated magnitude.
- * @returns {number} Interpolated event start time.
- */
-function findQualifyingStart(run, turnThresholdDegrees) {
-  let remaining = turnThresholdDegrees
-  for (let index = run.intervals.length - 1; index >= run.firstIntervalIndex; index -= 1) {
-    const interval = run.intervals[index]
-    const magnitude = getDirectionalChange(run.direction, interval.change)
-    if (magnitude <= 0) continue
-    if (magnitude >= remaining) {
-      return interval.end - (remaining / magnitude) * (interval.end - interval.start)
+      const previousTime = input.elapsedSeconds[index - 1]
+      const time = input.elapsedSeconds[index]
+      let start = previousTime
+      let end = time
+      if (previousSpeed > threshold || speed > threshold) {
+        const crossing = previousTime + ((threshold - previousSpeed) / (speed - previousSpeed)) * (time - previousTime)
+        if (previousSpeed > threshold) start = crossing
+        else end = crossing
+      }
+      if (start === end) continue
+      const previousInterval = intervals[intervals.length - 1]
+      if (previousInterval !== undefined && previousInterval.end === start) previousInterval.end = end
+      else intervals.push({ start, end })
     }
-    remaining -= magnitude
   }
-  throw new Error('Qualified manual video sync turn is missing its supporting interval')
+  return intervals
 }
 
 /**
- * Adds one interval to a coherent run and emits or extends its turn event.
- *
- * @param {ReturnType<typeof createTurnRun>} run Directional accumulation.
- * @param {{start: number, end: number, change: number}} interval Signed heading change interval.
- * @param {number} turnThresholdDegrees Required accumulated turn magnitude.
- * @param {object[]} events Output event list.
- * @returns {void}
+ * Splits sample intervals at sorted suppression boundaries. Null-rate pieces
+ * close episodes; usable fractions retain their original interval-average rate.
  */
-function addTurnInterval(run, interval, turnThresholdDegrees, events) {
-  run.intervals.push(interval)
-  run.windowChange += getDirectionalChange(run.direction, interval.change)
-  run.totalChange += interval.change
-  run.reversalChange = 0
-  trimTurnWindow(run, interval.end)
-  if (Math.abs(run.windowChange) < turnThresholdDegrees) return
+function createIntervalReader(nearStopIntervals) {
+  let index = 0
+  return function* readIntervals(start, end, rate) {
+    while (index < nearStopIntervals.length && nearStopIntervals[index].end <= start) index += 1
+    while (index < nearStopIntervals.length && nearStopIntervals[index].start < end) {
+      const suppressed = nearStopIntervals[index]
+      if (start < suppressed.start) yield { start, end: suppressed.start, rate }
+      const suppressedEnd = Math.min(end, suppressed.end)
+      yield { start: Math.max(start, suppressed.start), end: suppressedEnd, rate: null }
+      start = suppressedEnd
+      if (suppressed.end > end) break
+      index += 1
+    }
+    if (start < end) yield { start, end, rate }
+  }
+}
 
-  const start = findQualifyingStart(run, turnThresholdDegrees)
-  if (run.event !== null && !run.eventClosed && start <= run.event.end) {
-    run.event.end = interval.end
-    run.event.signedChange += run.totalChange - run.eventChangeAtEnd
-    run.event.representativeTime = (run.event.start + run.event.end) / 2
-    run.eventChangeAtEnd = run.totalChange
+/**
+ * Qualifies one complete directional episode. Boundaries use the lower rate;
+ * qualification requires the higher rate, actual net angle, and bounded duration.
+ * Short internal quiet periods and minor corrections contribute their signed angle.
+ */
+function emitTurn(intervals, first, end, direction, turnThresholdDegrees, events) {
+  const boundaryRate = VIDEO_SYNC_TURN_BOUNDARY_RATE_DEGREES_PER_SECOND
+  while (first < end && Math.abs(intervals[first].rate) < boundaryRate) first += 1
+  while (end > first && Math.abs(intervals[end - 1].rate) < boundaryRate) end -= 1
+  if (first === end) return
+
+  let signedChange = 0
+  let peakRate = 0
+  for (let index = first; index < end; index += 1) {
+    const interval = intervals[index]
+    signedChange += interval.rate * (interval.end - interval.start)
+    peakRate = Math.max(peakRate, direction * interval.rate)
+  }
+  const startTime = intervals[first].start
+  const endTime = intervals[end - 1].end
+  if (
+    peakRate < VIDEO_SYNC_TURN_ENTRY_RATE_DEGREES_PER_SECOND ||
+    direction * signedChange < turnThresholdDegrees ||
+    endTime - startTime > VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS
+  ) {
     return
   }
-  if (run.event !== null && run.eventClosed) return
 
-  const signedThreshold = run.direction === 'rightTurn' ? turnThresholdDegrees : -turnThresholdDegrees
-  const event = {
-    type: run.direction,
-    start,
-    end: interval.end,
-    signedChange: signedThreshold,
-    representativeTime: (start + interval.end) / 2,
-  }
-  run.event = event
-  run.eventChangeAtEnd = run.totalChange
-  events.push(event)
+  const type = direction > 0 ? 'rightTurn' : 'leftTurn'
+  events.push({
+    id: `${type}-${events.length}`,
+    type,
+    start: startTime,
+    end: endTime,
+    signedChange,
+    representativeTime: (startTime + endTime) / 2,
+  })
 }
 
 /**
- * Retains a run through a small opposite-direction correction. The correction
- * participates in the ten-second net accumulation but does not erase a turn
- * that has already crossed the threshold.
- *
- * @param {ReturnType<typeof createTurnRun>} run Directional accumulation.
- * @param {{start: number, end: number, change: number}} interval Signed reversal interval.
- * @param {number} currentTime Current interval end.
- * @param {number} reversalToleranceDegrees Maximum tolerated reversal.
- * @returns {boolean} Whether the run remains coherent.
+ * Splits an episode at confirmed heading reversals. The running heading extremum
+ * anchors a pending reversal, so small same-direction samples do not erase it.
+ * On confirmation the new candidate includes every interval after that extremum.
  */
-function addMinorReversal(run, interval, currentTime, reversalToleranceDegrees) {
-  const directionalChange = getDirectionalChange(run.direction, interval.change)
-  const reversalMagnitude = -directionalChange
-  if (reversalMagnitude <= 0 || run.reversalChange + reversalMagnitude > reversalToleranceDegrees) return false
+function finishEpisode(intervals, turnThresholdDegrees, events) {
+  if (intervals.length === 0) return
+  let first = 0
+  let direction = Math.sign(intervals[0].rate)
+  let headingChange = 0
+  let extremeChange = 0
+  let extremeEnd = 0
 
-  run.intervals.push(interval)
-  run.windowChange += directionalChange
-  run.totalChange += interval.change
-  run.reversalChange += reversalMagnitude
-  if (run.event !== null) run.eventClosed = true
-  trimTurnWindow(run, currentTime)
-  return true
-}
-
-/**
- * Detects turns from a previously derived signed turning-rate series.
- *
- * @param {{elapsedSeconds: number[], segments: {startIndex: number, endIndex: number}[]}} input Detector input.
- * @param {{time: number, value: number|null}[]} turningSeries Signed turning-rate series.
- * @param {number} turnThresholdDegrees Required accumulated turn magnitude.
- * @param {{start: number, end: number}[]} nearStopIntervals Intervals that suppress turn accumulation.
- * @returns {object[]} Detected directional turn events.
- */
-function detectTurnsFromSeries(input, turningSeries, turnThresholdDegrees, nearStopIntervals) {
-  const events = []
-  const isSuppressed = createSuppressionChecker(nearStopIntervals)
-
-  for (const segment of input.segments) {
-    let run = null
-
-    for (let sampleIndex = segment.startIndex + 1; sampleIndex < segment.endIndex; sampleIndex += 1) {
-      const rate = turningSeries[sampleIndex].value
-      const previousTime = input.elapsedSeconds[sampleIndex - 1]
-      const currentTime = input.elapsedSeconds[sampleIndex]
-
-      if (rate === null || isSuppressed(previousTime, currentTime)) {
-        run = null
-        continue
-      }
-
-      const delta = rate * (currentTime - previousTime)
-      if (delta === 0) continue
-
-      const direction = delta > 0 ? 'rightTurn' : 'leftTurn'
-      const interval = { start: previousTime, end: currentTime, change: delta }
-      if (run === null) {
-        run = createTurnRun(direction)
-      } else if (run.direction !== direction) {
-        if (!addMinorReversal(run, interval, currentTime, VIDEO_SYNC_TURN_REVERSAL_TOLERANCE_DEGREES)) run = createTurnRun(direction)
-        else continue
-      }
-      addTurnInterval(run, interval, turnThresholdDegrees, events)
+  for (let index = 0; index < intervals.length; index += 1) {
+    const interval = intervals[index]
+    headingChange += interval.rate * (interval.end - interval.start)
+    if (direction * (headingChange - extremeChange) >= 0) {
+      extremeChange = headingChange
+      extremeEnd = index + 1
+    } else if (direction * (extremeChange - headingChange) > VIDEO_SYNC_TURN_REVERSAL_TOLERANCE_DEGREES) {
+      emitTurn(intervals, first, extremeEnd, direction, turnThresholdDegrees, events)
+      first = extremeEnd
+      direction = -direction
+      extremeChange = headingChange
+      extremeEnd = index + 1
     }
   }
-
-  return events.map((event, index) => ({ ...event, id: `${event.type}-${index}` }))
+  emitTurn(intervals, first, intervals.length, direction, turnThresholdDegrees, events)
 }
 
 /**
- * Detects directional turns from the shared signed turning series.
- *
- * @param {object} input Detector input produced by createActivitySyncInput.
- * @param {{turnThresholdDegrees: number, nearStopIntervals?: {start: number, end: number}[]}} settings Direction threshold and near-stop intervals.
- * @returns {object[]} Detected directional turn events.
+ * Collects episodes with elapsed-time exit dwell. Quiet intervals are provisional:
+ * a short dip is included if turning resumes, while sustained quiet closes at
+ * the last active boundary, without including the dwell or an EMA's low-rate tail.
  */
-export function detectTurns(input, { turnThresholdDegrees, nearStopIntervals = [] }) {
-  requireTurnThreshold(turnThresholdDegrees)
-  return detectTurnsFromSeries(input, deriveTurningSeries(input), turnThresholdDegrees, nearStopIntervals)
+function createEpisodeCollector(turnThresholdDegrees, events) {
+  let intervals = []
+  let quietIntervals = []
+
+  function finish() {
+    finishEpisode(intervals, turnThresholdDegrees, events)
+    intervals = []
+    quietIntervals = []
+  }
+
+  function add(interval) {
+    if (interval.rate === null) {
+      finish()
+      return
+    }
+    if (Math.abs(interval.rate) < VIDEO_SYNC_TURN_BOUNDARY_RATE_DEGREES_PER_SECOND) {
+      if (intervals.length === 0) return
+      quietIntervals.push(interval)
+      if (interval.end - quietIntervals[0].start >= VIDEO_SYNC_TURN_EXIT_DWELL_SECONDS) finish()
+      return
+    }
+    for (const quiet of quietIntervals) intervals.push(quiet)
+    quietIntervals = []
+    intervals.push(interval)
+  }
+
+  return { add, finish }
+}
+
+/** Processes contiguous sample intervals without connecting across missing data. */
+function detectTurnsFromSeries(input, turningSeries, turnThresholdDegrees, nearStopIntervals) {
+  const events = []
+  const collector = createEpisodeCollector(turnThresholdDegrees, events)
+  const readIntervals = createIntervalReader(nearStopIntervals)
+  for (const segment of input.segments) {
+    for (let index = segment.startIndex + 1; index < segment.endIndex; index += 1) {
+      const start = input.elapsedSeconds[index - 1]
+      const end = input.elapsedSeconds[index]
+      for (const interval of readIntervals(start, end, turningSeries[index].value)) collector.add(interval)
+    }
+    collector.finish()
+  }
+  return events
 }
 
 /**
- * Detects turns while reusing a caller-provided derived series.
+ * Detects turns from finalized heading using rate hysteresis and net turn angle.
+ * Optional suppression intervals override the default standstill speed gate.
  *
- * @param {object} input Detector input produced by createActivitySyncInput.
+ * @param {object} input Canonical input from createActivitySyncInput.
+ * @param {{turnThresholdDegrees: number, nearStopIntervals?: {start: number, end: number}[]}} settings Detection settings.
+ * @returns {object[]} Directional events with physical interval boundaries.
+ */
+export function detectTurns(input, settings) {
+  return detectTurnsFromDerivedSeries(input, deriveTurningSeries(input), settings)
+}
+
+/**
+ * Detects turns using the same interval-average rates displayed by the graph.
+ * Optional suppression intervals must be sorted and non-overlapping; absent
+ * intervals are derived from the canonical speed channel at the standstill gate.
+ *
+ * @param {object} input Canonical input from createActivitySyncInput.
  * @param {{time: number, value: number|null}[]} turningSeries Shared turning series.
  * @param {{turnThresholdDegrees: number, nearStopIntervals?: {start: number, end: number}[]}} settings Detection settings.
- * @returns {object[]} Detected directional turn events.
+ * @returns {object[]} Directional events with net signed angle and midpoint time.
  */
-export function detectTurnsFromDerivedSeries(input, turningSeries, { turnThresholdDegrees, nearStopIntervals = [] }) {
+export function detectTurnsFromDerivedSeries(input, turningSeries, { turnThresholdDegrees, nearStopIntervals = deriveNearStopIntervals(input) }) {
   requireTurnThreshold(turnThresholdDegrees)
   return detectTurnsFromSeries(input, turningSeries, turnThresholdDegrees, nearStopIntervals)
 }

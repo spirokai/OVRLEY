@@ -30,7 +30,6 @@ export function detectActivityEventsFromInput(input, settings) {
   const turning = deriveTurningSeries(input)
   const turns = detectTurnsFromDerivedSeries(input, turning, {
     turnThresholdDegrees: settings.turnThresholdDegrees,
-    nearStopIntervals: stopState.nearStopIntervals,
   })
 
   return {

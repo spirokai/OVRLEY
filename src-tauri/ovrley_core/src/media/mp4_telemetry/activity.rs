@@ -159,7 +159,7 @@ pub fn build_activity_columns(
                     SmoothingOption {
                         enabled: true,
                         method: "circular_ema".to_string(),
-                        window_seconds: 0.0,
+                        window_seconds: 1.0,
                     },
                 ),
             ]

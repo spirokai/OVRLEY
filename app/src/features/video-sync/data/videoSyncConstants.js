@@ -20,8 +20,15 @@ export const VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES = { min: 70, max: 180 }
 export const VIDEO_SYNC_STOP_ENTRY_DWELL_SECONDS = 2
 export const VIDEO_SYNC_STOP_EXIT_DWELL_SECONDS = 2
 export const VIDEO_SYNC_STOP_EXIT_HYSTERESIS_KMH = 2
-export const VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS = 10
+export const VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS = 15
 export const VIDEO_SYNC_TURN_REVERSAL_TOLERANCE_DEGREES = 20
+// Rate hysteresis defines episode boundaries independently of the angle threshold.
+export const VIDEO_SYNC_TURN_ENTRY_RATE_DEGREES_PER_SECOND = 10
+export const VIDEO_SYNC_TURN_BOUNDARY_RATE_DEGREES_PER_SECOND = 2
+export const VIDEO_SYNC_TURN_EXIT_DWELL_SECONDS = 1
+// Heading becomes unreliable near standstill; this is independent of stop landmarks.
+export const VIDEO_SYNC_TURN_STATIONARY_SPEED_METERS_PER_SECOND = 0.5
+// Retained for the archived detector only.
 export const VIDEO_SYNC_HEADING_SMOOTHING_WINDOW_SECONDS = 1
 export const VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS = 2
 export const VIDEO_SYNC_SIGNIFICANT_GAP_BASE_SECONDS = 3
