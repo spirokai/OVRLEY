@@ -189,8 +189,8 @@ pub struct PreparedRenderAssets {
     pub(crate) backdrops: Vec<ValidatedBackdrop>,
     pub(crate) labels: Vec<ValidatedLabel>,
     pub(crate) values: Vec<PreparedValue>,
-    pub(crate) route_cache: Option<RouteWidgetCache>,
-    pub(crate) elevation_cache: Option<ElevationWidgetCache>,
+    pub(crate) route_caches: Vec<RouteWidgetCache>,
+    pub(crate) elevation_caches: Vec<ElevationWidgetCache>,
     pub(crate) base_rgba: Option<Vec<u8>>,
 }
 
@@ -206,7 +206,7 @@ impl PreparedRenderAssets {
     /// `[[x,y], ...]` arrays and progressValues as a flat `f32` array.
     /// Returns `None` when no elevation widget is configured.
     pub fn elevation_geometry_json(&self) -> Option<serde_json::Value> {
-        let cache = self.elevation_cache.as_ref()?;
+        let cache = self.elevation_caches.first()?;
         let geom = &cache.geometry;
         Some(serde_json::json!({
             "points": geom.points.iter().map(|(x, y)| [x, y]).collect::<Vec<_>>(),
@@ -225,7 +225,7 @@ impl PreparedRenderAssets {
     /// `[[x,y], ...]` arrays and progressValues as a flat `f32` array.
     /// Returns `None` when no route widget is configured.
     pub fn route_geometry_json(&self) -> Option<serde_json::Value> {
-        let cache = self.route_cache.as_ref()?;
+        let cache = self.route_caches.first()?;
         let geom = &cache.geometry;
         Some(serde_json::json!({
             "points": geom.points.iter().map(|(x, y)| [x, y]).collect::<Vec<_>>(),

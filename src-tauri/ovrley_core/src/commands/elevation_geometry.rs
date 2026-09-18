@@ -50,7 +50,8 @@ pub fn build_elevation_geometry_command(
     let activity = parse_activity_json(parsed_activity_json)?;
 
     let elevation_plot = validated
-        .elevation_plot
+        .elevation_plots
+        .first()
         .ok_or_else(|| CoreError::Config("Config has no elevation_plot widget".into()))?;
 
     let show_full_activity = elevation_plot.show_full_activity;
@@ -62,7 +63,7 @@ pub fn build_elevation_geometry_command(
     )?;
 
     let normalized = crate::render::widgets::elevation::normalize::normalize_elevation_plot(
-        &elevation_plot,
+        elevation_plot,
         &validated.scene,
     );
 

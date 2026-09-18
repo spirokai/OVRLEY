@@ -31,7 +31,7 @@ use crate::types::{DisplayType, MetricKind};
 use raw::RenderConfig;
 
 pub use raw::{
-    find_plot_value, parse_config_json, parse_config_value, parse_template_json,
+    find_plot_value, find_plot_values, parse_config_json, parse_config_value, parse_template_json,
     parse_template_value, BackdropConfig, CoursePlotConfig, ElevationPlotConfig,
     HeadingWidgetConfig, LabelConfig, SceneConfig, ValueConfig, TEMPLATE_FILE_FORMAT,
     TEMPLATE_FILE_VERSION,
@@ -133,8 +133,8 @@ pub struct ValidatedRenderConfig {
     pub backdrops: Vec<ValidatedBackdrop>,
     pub labels: Vec<ValidatedLabel>,
     pub values: Vec<PreparedValue>,
-    pub course_plot: Option<ValidatedRoutePlot>,
-    pub elevation_plot: Option<ValidatedElevationPlot>,
+    pub course_plots: Vec<ValidatedRoutePlot>,
+    pub elevation_plots: Vec<ValidatedElevationPlot>,
 }
 
 /// Validates every value widget and label in the config. Returns the first
@@ -241,31 +241,31 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
         .map(|(i, l)| validate_label(l, i))
         .collect::<CoreResult<Vec<_>>>()?;
 
-    let course_plot = raw::find_plot_value(&raw.plots, "course")
-        .map(|v| {
+    let course_plots = raw::find_plot_values(&raw.plots, "course")
+        .into_iter()
+        .map(|(index, v)| {
             serde_json::from_value::<raw::CoursePlotConfig>(v.clone())
                 .map_err(|e| CoreError::Config(format!("course plot config: {e}")))
+                .and_then(|plot| validate_route_plot(&plot, index))
         })
-        .transpose()?
-        .map(|p| validate_route_plot(&p, 0))
-        .transpose()?;
+        .collect::<CoreResult<Vec<_>>>()?;
 
-    let elevation_plot = raw::find_plot_value(&raw.plots, "elevation")
-        .map(|v| {
+    let elevation_plots = raw::find_plot_values(&raw.plots, "elevation")
+        .into_iter()
+        .map(|(index, v)| {
             serde_json::from_value::<raw::ElevationPlotConfig>(v.clone())
                 .map_err(|e| CoreError::Config(format!("elevation plot config: {e}")))
+                .and_then(|plot| validate_elevation_plot(&plot, index, &scene))
         })
-        .transpose()?
-        .map(|p| validate_elevation_plot(&p, 0, &scene))
-        .transpose()?;
+        .collect::<CoreResult<Vec<_>>>()?;
 
     Ok(ValidatedRenderConfig {
         scene,
         backdrops,
         labels,
         values,
-        course_plot,
-        elevation_plot,
+        course_plots,
+        elevation_plots,
     })
 }
 
@@ -383,11 +383,11 @@ impl ValidatedRenderConfig {
             }
         }
 
-        if self.course_plot.is_some() {
+        if !self.course_plots.is_empty() {
             requirements.distance_progress = true;
         }
 
-        if self.elevation_plot.is_some() {
+        if !self.elevation_plots.is_empty() {
             requirements.elevation = true;
             requirements.barometric_altitude = true;
             requirements.distance_progress = true;

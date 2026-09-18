@@ -120,13 +120,13 @@ pub fn prepare_render_assets(
         backdrops,
         labels,
         values,
-        route_cache: None,
-        elevation_cache: None,
+        route_caches: Vec::new(),
+        elevation_caches: Vec::new(),
         base_rgba: None,
     };
 
-    if let Some(validated) = &config.course_plot {
-        assets.route_cache = Some(route::prepare_route_cache(
+    for validated in &config.course_plots {
+        assets.route_caches.push(route::prepare_route_cache(
             activity,
             dense_activity,
             validated,
@@ -135,14 +135,16 @@ pub fn prepare_render_assets(
         )?);
     }
 
-    if let Some(validated) = &config.elevation_plot {
-        assets.elevation_cache = Some(elevation::prepare_elevation_cache(
-            activity,
-            dense_activity,
-            validated,
-            &assets.scene,
-            prepare_profiler,
-        )?);
+    for validated in &config.elevation_plots {
+        assets
+            .elevation_caches
+            .push(elevation::prepare_elevation_cache(
+                activity,
+                dense_activity,
+                validated,
+                &assets.scene,
+                prepare_profiler,
+            )?);
     }
 
     let altitude_series =

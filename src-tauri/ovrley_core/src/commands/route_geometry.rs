@@ -46,7 +46,8 @@ pub fn build_route_geometry_command(
     let activity = parse_activity_json(parsed_activity_json)?;
 
     let course_plot = validated
-        .course_plot
+        .course_plots
+        .first()
         .ok_or_else(|| CoreError::Config("Config has no course_plot widget".into()))?;
 
     let show_full_activity = course_plot.show_full_activity;
@@ -58,13 +59,13 @@ pub fn build_route_geometry_command(
     )?;
 
     let normalized = crate::render::widgets::route::normalize::normalize_route_plot(
-        &course_plot,
+        course_plot,
         &validated.scene,
     );
 
     let geometry = crate::render::widgets::route::prepare::build_route_geometry(
         &normalized,
-        &course_plot,
+        course_plot,
         &route_samples,
     )?;
 

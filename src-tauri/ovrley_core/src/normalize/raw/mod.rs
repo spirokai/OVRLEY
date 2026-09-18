@@ -734,6 +734,21 @@ pub fn find_plot_value<'a>(plots: &'a Value, value_key: &str) -> Option<&'a Valu
     }
 }
 
+/// Finds every plot config with the requested value key, preserving array order.
+pub fn find_plot_values<'a>(plots: &'a Value, value_key: &str) -> Vec<(usize, &'a Value)> {
+    match plots {
+        Value::Array(items) => items
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| item.get("value").and_then(Value::as_str) == Some(value_key))
+            .collect(),
+        Value::Object(_) => find_plot_value(plots, value_key)
+            .map(|plot| vec![(0, plot)])
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    }
+}
+
 /// Removes all `null` values from a JSON object tree so that `#[serde(default)]`
 /// attributes on struct fields can take effect during deserialization.
 pub fn strip_json_nulls(value: &mut Value) {
