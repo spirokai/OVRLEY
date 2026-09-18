@@ -6,11 +6,11 @@ import { useTranslation } from 'react-i18next'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 function getBandClassName(tone) {
-  return tone === 'stop' ? 'bg-video-sync-stop/80' : 'bg-video-sync-turn/60'
+  return tone === 'stop' ? 'bg-video-sync-stop/80' : 'bg-video-sync-turn/70'
 }
 
 function getPathClassName(series) {
-  return series === 'speed' ? 'text-video-sync-stop/40' : 'text-video-sync-turn/30'
+  return series === 'speed' ? 'text-video-sync-stop/40' : 'text-video-sync-turn/40'
 }
 
 /**

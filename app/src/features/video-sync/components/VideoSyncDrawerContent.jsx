@@ -248,7 +248,7 @@ export function VideoSyncDrawerContent({
             </div>
 
             <Button type="button" className="w-full h-9" disabled={!canCalculate || isCalculating} onClick={onCalculate}>
-              {t('videoSync.syncLandmarks', 'Sync Landmarks')}
+              {t('videoSync.syncLandmarks', 'Sync Using Landmarks')}
             </Button>
             {!canCalculate && calculation.eligibility.explanation ? (
               <p className="text-[10px] text-muted-foreground">{calculation.eligibility.explanation}</p>
