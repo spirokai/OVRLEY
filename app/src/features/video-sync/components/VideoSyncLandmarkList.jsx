@@ -25,7 +25,7 @@ export function VideoSyncLandmarkList({ landmarks, onClear, onChangeType, onDele
     <section className="space-y-3" aria-label={t('videoSync.landmarks', 'Landmarks')}>
       <SectionHeading
         icon={MapPin}
-        title={t('videoSync.landmarks', 'Your Landmarks')}
+        title={t('videoSync.yourLandmarks', 'Your Landmarks')}
         variant="drawer"
         trailing={
           <Button
@@ -95,7 +95,7 @@ export function VideoSyncLandmarkList({ landmarks, onClear, onChangeType, onDele
           })}
         </div>
       ) : (
-        <p className="px-1 text-xs text-muted-foreground">{t('videoSync.noLandmarks', 'No landmarks marked yet.')}</p>
+        <p className="px-1 text-xs text-muted-foreground/50">{t('videoSync.noLandmarks', 'No landmarks marked yet.')}</p>
       )}
     </section>
   )

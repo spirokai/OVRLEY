@@ -1,3 +1,4 @@
+import i18next from 'i18next'
 import {
   VIDEO_SYNC_TURN_BOUNDARY_RATE_DEGREES_PER_SECOND,
   VIDEO_SYNC_TURN_ENTRY_RATE_DEGREES_PER_SECOND,
@@ -12,7 +13,12 @@ import {
 function requireTurnThreshold(turnThresholdDegrees) {
   const { min, max } = VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES
   if (!Number.isFinite(turnThresholdDegrees) || turnThresholdDegrees < min || turnThresholdDegrees > max) {
-    throw new Error(`Manual video sync turn threshold must be between ${min} and ${max} degrees`)
+    throw new Error(
+      i18next.t('videoSync.invalidTurnThreshold', 'Manual video sync turn threshold must be between {{min}} and {{max}} degrees', {
+        max,
+        min,
+      }),
+    )
   }
 }
 

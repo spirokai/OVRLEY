@@ -1,3 +1,4 @@
+import i18next from 'i18next'
 import {
   VIDEO_SYNC_KMH_TO_METERS_PER_SECOND,
   VIDEO_SYNC_STOP_ENTRY_DWELL_SECONDS,
@@ -14,7 +15,7 @@ import {
  */
 function requireSpeedThreshold(speedThresholdKmh) {
   if (!Number.isFinite(speedThresholdKmh)) {
-    throw new Error('Manual video sync speed threshold must be finite')
+    throw new Error(i18next.t('videoSync.invalidSpeedThreshold', 'Manual video sync speed threshold must be finite'))
   }
 }
 
@@ -248,7 +249,7 @@ function advanceState(state, { previousTime, previousSpeed, time, speed, thresho
         return nextState
 
       default:
-        throw new Error(`Unknown manual video sync stop phase: ${nextState.phase}`)
+        throw new Error(i18next.t('videoSync.unknownStopPhase', 'Unknown manual video sync stop phase: {{phase}}', { phase: nextState.phase }))
     }
   }
 }

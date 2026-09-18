@@ -203,7 +203,7 @@ export function buildGraphGeometry({
   }
 }
 
-function createBand({ id, type, label, startSecond, endSecond, viewStart, viewEnd, widthPx }) {
+function createBand({ id, type, labelKey, startSecond, endSecond, viewStart, viewEnd, widthPx }) {
   const visibleStart = Math.max(startSecond, viewStart)
   const visibleEnd = Math.min(endSecond, viewEnd)
   if (widthPx <= 0 || visibleEnd <= visibleStart) return null
@@ -211,10 +211,9 @@ function createBand({ id, type, label, startSecond, endSecond, viewStart, viewEn
   const left = secondsToViewPx({ second: visibleStart, viewStart, viewEnd, widthPx })
   const right = secondsToViewPx({ second: visibleEnd, viewStart, viewEnd, widthPx })
   return {
-    ariaLabel: `${label} event from ${startSecond.toFixed(1)} to ${endSecond.toFixed(1)} seconds`,
     endSecond,
     id,
-    label,
+    labelKey,
     startSecond,
     style: { left, width: right - left },
     tone: type === 'stop' ? 'stop' : 'turn',
@@ -237,7 +236,7 @@ export function buildEventBands({ detection, viewStart, viewEnd, widthPx, tolera
       createBand({
         endSecond: event.time + toleranceSeconds,
         id: event.id,
-        label: 'Stop',
+        labelKey: 'videoSync.stop',
         startSecond: event.time - toleranceSeconds,
         type: event.type,
         viewEnd,
@@ -250,7 +249,7 @@ export function buildEventBands({ detection, viewStart, viewEnd, widthPx, tolera
         createBand({
           endSecond: event.end + toleranceSeconds,
           id: event.id,
-          label: event.type === 'leftTurn' ? 'Left turn' : 'Right turn',
+          labelKey: event.type === 'leftTurn' ? 'videoSync.leftTurn' : 'videoSync.rightTurn',
           startSecond: event.start - toleranceSeconds,
           type: event.type,
           viewEnd,

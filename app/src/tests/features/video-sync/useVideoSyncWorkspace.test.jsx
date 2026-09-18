@@ -114,7 +114,7 @@ describe('useVideoSyncWorkspace', () => {
     act(() => result.current.drawer.onSpeedThresholdCommit(10))
     expect(useStore.getState().manualVideoSync.speedThresholdKmh).toBe(10)
 
-    act(() => result.current.drawer.onTurnThresholdCommit(360))
-    expect(useStore.getState().manualVideoSync.turnThresholdDegrees).toBe(360)
+    act(() => result.current.drawer.onTurnThresholdCommit(180))
+    expect(useStore.getState().manualVideoSync.turnThresholdDegrees).toBe(180)
   })
 })

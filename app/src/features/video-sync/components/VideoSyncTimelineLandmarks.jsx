@@ -2,6 +2,7 @@
  * Presentational landmark line and handle layer for the player timeline.
  */
 
+import { useTranslation } from 'react-i18next'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 /**
@@ -12,20 +13,24 @@ import { SimpleTooltip } from '@/components/ui/simple-tooltip'
  * @returns {JSX.Element} Landmark overlay layer.
  */
 export default function VideoSyncTimelineLandmarks({ landmarks }) {
+  const { t } = useTranslation()
+
   return (
     <>
       {landmarks.map((landmark) => {
         const Icon = landmark.Icon
+        const label = t(landmark.labelKey, landmark.defaultLabel)
+        const timing = { label, seconds: landmark.videoSecond.toFixed(1) }
         const handle = (
           <div
             className={`absolute top-4 z-25 -translate-x-1/2 ${landmark.isInteractive ? 'pointer-events-auto' : 'pointer-events-none'}`}
             style={landmark.handleStyle}
           >
             {landmark.isInteractive ? (
-              <SimpleTooltip content={`${landmark.label} - ${landmark.videoSecond.toFixed(1)}s`}>
+              <SimpleTooltip content={t('videoSync.landmarkTooltip', '{{label}} - {{seconds}}s', timing)}>
                 <button
                   type="button"
-                  aria-label={`${landmark.label} landmark at ${landmark.videoSecond.toFixed(1)} seconds`}
+                  aria-label={t('videoSync.landmarkAriaLabel', '{{label}} landmark at {{seconds}} seconds', timing)}
                   className={`flex h-6 w-6 cursor-grab items-center justify-center rounded-sm border border-background p-0 text-background shadow-sm outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-primary/70 ${landmark.lineClassName}`}
                   {...landmark.handleProps}
                 >

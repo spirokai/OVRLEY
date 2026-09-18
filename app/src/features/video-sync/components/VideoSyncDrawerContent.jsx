@@ -185,7 +185,7 @@ export function VideoSyncDrawerContent({
       <div className="space-y-8 pt-6">
         <VideoSyncLandmarkList landmarks={landmarks} onChangeType={onChangeLandmarkType} onClear={onClearLandmarks} onDelete={onDeleteLandmark} />
 
-        <section className="space-y-4" aria-label={t('videoSync.detection', 'Detection senstivity')}>
+        <section className="space-y-4" aria-label={t('videoSync.detection', 'Detection sensitivity')}>
           <SectionHeading icon={Activity} title={t('videoSync.detection', 'Detection sensitivity')} variant="drawer" />
 
           <div className="space-y-4">

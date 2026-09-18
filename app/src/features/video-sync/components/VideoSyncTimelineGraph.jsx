@@ -48,13 +48,25 @@ export default function VideoSyncTimelineGraph({ graph }) {
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      {graph.eventBands.map((band) => (
-        <div key={band.id} className="pointer-events-auto absolute bottom-0 top-0" style={band.style}>
-          <SimpleTooltip side="top" content={`detected ${band.label}`} className="h-full w-full">
-            <div aria-label={band.ariaLabel} className={`h-full w-full border-none ${getBandClassName(band.tone)}`} />
-          </SimpleTooltip>
-        </div>
-      ))}
+      {graph.eventBands.map((band) => {
+        const label = t(band.labelKey)
+        const timing = {
+          end: band.endSecond.toFixed(1),
+          label,
+          start: band.startSecond.toFixed(1),
+        }
+
+        return (
+          <div key={band.id} className="pointer-events-auto absolute bottom-0 top-0" style={band.style}>
+            <SimpleTooltip side="top" content={t('videoSync.detectedEvent', 'detected {{label}}', timing)} className="h-full w-full">
+              <div
+                aria-label={t('videoSync.detectedEventRange', '{{label}} event from {{start}} to {{end}} seconds', timing)}
+                className={`h-full w-full border-none ${getBandClassName(band.tone)}`}
+              />
+            </SimpleTooltip>
+          </div>
+        )
+      })}
       <div className="pointer-events-none absolute bottom-0 left-1 flex gap-2 bg-background/50 px-1 py-0.5 text-[0.60rem] font-semibold uppercase leading-none">
         <span className="text-video-sync-stop">{t('videoSync.speed', 'Speed')}</span>
         <span className="text-video-sync-turn">{t('videoSync.turning', 'Turning')}</span>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES } from '../data/videoSyncConstants'
@@ -57,6 +58,7 @@ function scheduleVideoSyncCalculation({
  * @returns {{calculate: () => Promise<boolean>, eligibility: object, isCalculating: boolean}} Calculation view model.
  */
 export default function useVideoSyncCalculation() {
+  const { t } = useTranslation()
   const {
     beginVideoSyncCalculation,
     completeVideoSyncCalculation,
@@ -94,9 +96,12 @@ export default function useVideoSyncCalculation() {
   const eligibility = useMemo(() => {
     let explanation = null
     if (!hasVideo) {
-      explanation = 'A video is required for Landmark Sync'
+      explanation = t('videoSync.videoRequiredForSync', 'A video is required for Landmark Sync')
     } else if (!domainEligibility.canUseMapOnly && !domainEligibility.canMatchLandmarks) {
-      explanation = parsedActivity === null ? 'Activity telemetry is required for Landmark Sync' : 'At least two stop or turn landmarks are required'
+      explanation =
+        parsedActivity === null
+          ? t('videoSync.activityRequiredForSync', 'Activity telemetry is required for Landmark Sync')
+          : t('videoSync.minimumLandmarksForSync', 'At least two stop or turn landmarks are required')
     }
 
     return {
@@ -104,7 +109,7 @@ export default function useVideoSyncCalculation() {
       canCalculate: hasVideo && (domainEligibility.canMatchLandmarks || domainEligibility.canUseMapOnly),
       explanation,
     }
-  }, [domainEligibility, hasVideo, parsedActivity])
+  }, [domainEligibility, hasVideo, parsedActivity, t])
 
   const runCalculation = useCallback(
     (searchCandidates) =>
