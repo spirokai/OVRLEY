@@ -74,8 +74,12 @@ describe('useVideoSyncWorkspace', () => {
     expect(useStore.getState().config).toBe(configBefore)
   })
 
-  test('marks typed observations at the current video-local time and disables them outside the video', () => {
-    const { result } = renderHook(() => useVideoSyncWorkspace({ toolbarDrawer: createToolbarDrawer(), videoSummary, videoSync }))
+  test('marks typed observations at the latest video-local time without subscribing to playhead updates', () => {
+    let renderCount = 0
+    const { result } = renderHook(() => {
+      renderCount += 1
+      return useVideoSyncWorkspace({ toolbarDrawer: createToolbarDrawer(), videoSummary, videoSync })
+    })
 
     act(() => {
       result.current.markControls.onMarkStop()
@@ -91,11 +95,14 @@ describe('useVideoSyncWorkspace', () => {
       { id: 'landmark-4', type: VIDEO_SYNC_LANDMARK_TYPES.LOCATION, videoSecond: 6, activitySecond: null },
     ])
 
-    act(() => useStore.getState().setSelectedSecond(1))
+    const markStop = result.current.markControls.onMarkStop
+    act(() => useStore.getState().clearVideoSyncLandmarks())
+    const renderCountBeforePlayback = renderCount
+    act(() => useStore.getState().setSelectedSecond(9))
 
-    expect(result.current.markControls.canMark).toBe(false)
-    expect(result.current.markControls.canMarkLocation).toBe(false)
-    expect(result.current.markControls.markDisabledReason).toBe('Move the playhead inside the video to mark a landmark')
+    expect(renderCount).toBe(renderCountBeforePlayback)
+    act(() => markStop())
+    expect(useStore.getState().manualVideoSync.landmarks).toEqual([{ id: 'landmark-1', type: VIDEO_SYNC_LANDMARK_TYPES.STOP, videoSecond: 7 }])
   })
 
   test('keeps sensitivity drafts local until commit and scrubs landmarks through the applied offset', () => {

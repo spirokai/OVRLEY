@@ -249,12 +249,11 @@ export function VideoSyncDrawerContent({
 
             <Button
               type="button"
-              className="grid h-9 w-full grid-cols-2 gap-2 text-xs font-semibold"
+              className="grid h-9 w-full gap-2 text-xs font-semibold"
               disabled={!canCalculate || isCalculating}
               onClick={onCalculate}
             >
-              <span>{t('videoSync.landmark', 'Landmark')}</span>
-              <span>{t('videoSync.sync', 'Sync')}</span>
+              {t('videoSync.syncLandmarks', 'Sync Landmarks')}
             </Button>
             {!canCalculate && calculation.eligibility.explanation ? (
               <p className="text-[10px] text-muted-foreground">{calculation.eligibility.explanation}</p>

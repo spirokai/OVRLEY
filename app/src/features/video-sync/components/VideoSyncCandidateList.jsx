@@ -22,7 +22,6 @@ export function VideoSyncCandidateList({ appliedOffset, candidates, error, hasSe
   if (status === 'calculating') {
     return (
       <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">{t('videoSync.calculating', 'Calculating landmark matches…')}</p>
         {candidates.length > 0 ? <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled onApply={onApply} /> : null}
       </div>
     )

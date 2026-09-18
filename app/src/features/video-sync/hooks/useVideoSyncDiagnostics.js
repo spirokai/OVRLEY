@@ -83,11 +83,37 @@ export default function useVideoSyncDiagnostics({ activity, timelineSecond, mark
         : null,
     [enabled, sceneSize.height, sceneSize.width],
   )
+  const resolvedMarkControls = useMemo(() => {
+    if (!enabled || markControls === null) return null
+
+    const videoSecond = timelineSecond - markControls.videoSyncOffsetSeconds
+    const hasVideo = markControls.importedVideoDuration !== null
+    const isInsideVideo = hasVideo && videoSecond >= 0 && videoSecond < markControls.importedVideoDuration
+    const canMark = isInsideVideo && markControls.hasLandmarkCapacity
+    const markDisabledReason = !hasVideo
+      ? markControls.videoRequiredReason
+      : !isInsideVideo
+        ? markControls.playheadOutsideVideoReason
+        : !markControls.hasLandmarkCapacity
+          ? markControls.landmarkLimitReason
+          : null
+
+    return {
+      canMark,
+      canMarkLocation: canMark && !markControls.hasLocationLandmark,
+      locationDisabledReason: markControls.hasLocationLandmark ? markControls.locationLimitReason : markDisabledReason,
+      markDisabledReason,
+      onMarkLeftTurn: markControls.onMarkLeftTurn,
+      onMarkLocation: markControls.onMarkLocation,
+      onMarkRightTurn: markControls.onMarkRightTurn,
+      onMarkStop: markControls.onMarkStop,
+    }
+  }, [enabled, markControls, timelineSecond])
 
   if (!enabled) return null
 
   return {
-    markControls,
+    markControls: resolvedMarkControls,
     speed: {
       available: availability.speed,
       previewModel: speedPreviewModel,

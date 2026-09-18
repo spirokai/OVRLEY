@@ -33,7 +33,20 @@ function renderDiagnostics(activity, timelineSecond = 0.5, markControls = null) 
 
 describe('useVideoSyncDiagnostics', () => {
   test('uses fixed ephemeral widgets and the existing speed preview model', () => {
-    const markControls = { canMark: true }
+    const markControls = {
+      hasLandmarkCapacity: true,
+      hasLocationLandmark: false,
+      importedVideoDuration: 10,
+      landmarkLimitReason: 'Landmark limit',
+      locationLimitReason: 'Location limit',
+      onMarkLeftTurn: () => {},
+      onMarkLocation: () => {},
+      onMarkRightTurn: () => {},
+      onMarkStop: () => {},
+      playheadOutsideVideoReason: 'Outside video',
+      videoRequiredReason: 'Video required',
+      videoSyncOffsetSeconds: 0,
+    }
     const { result } = renderDiagnostics(makeActivity(), 0.5, markControls)
 
     expect(result.current.speed.available).toBe(true)
@@ -50,7 +63,7 @@ describe('useVideoSyncDiagnostics', () => {
       width: 806,
       height: 594,
     })
-    expect(result.current.markControls).toBe(markControls)
+    expect(result.current.markControls).toMatchObject({ canMark: true, canMarkLocation: true, markDisabledReason: null })
   })
 
   test('reports unavailable diagnostics when the source channels are absent', () => {

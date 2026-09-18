@@ -20,7 +20,6 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
   const { t } = useTranslation()
   const calculation = useVideoSyncCalculation()
   const {
-    addVideoSyncLandmark,
     applyVideoSyncCandidate,
     clearVideoSyncLandmarks,
     importedVideoDuration,
@@ -31,7 +30,6 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
     manualVideoSyncError,
     manualVideoSyncHasSearched,
     removeVideoSyncLandmark,
-    selectedSecond,
     setVideoSyncLandmarkType,
     setVideoSyncSpeedThreshold,
     setVideoSyncTurnThreshold,
@@ -40,7 +38,6 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
     videoSyncOffsetSeconds,
   } = useStore(
     useShallow((state) => ({
-      addVideoSyncLandmark: state.addVideoSyncLandmark,
       applyVideoSyncCandidate: state.applyVideoSyncCandidate,
       clearVideoSyncLandmarks: state.clearVideoSyncLandmarks,
       importedVideoDuration: state.importedVideoDuration,
@@ -51,7 +48,6 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       manualVideoSyncError: state.manualVideoSyncError,
       manualVideoSyncHasSearched: state.manualVideoSyncHasSearched,
       removeVideoSyncLandmark: state.removeVideoSyncLandmark,
-      selectedSecond: state.selectedSecond,
       setVideoSyncLandmarkType: state.setVideoSyncLandmarkType,
       setVideoSyncSpeedThreshold: state.setVideoSyncSpeedThreshold,
       setVideoSyncTurnThreshold: state.setVideoSyncTurnThreshold,
@@ -72,28 +68,17 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
     setTurnThresholdDraftDegrees(turnThresholdDegrees)
   }, [turnThresholdDegrees])
 
-  const videoSecond = selectedSecond - videoSyncOffsetSeconds
-  const hasVideo = importedVideoDuration !== null
-  const isInsideVideo = hasVideo && videoSecond >= 0 && videoSecond < importedVideoDuration
   const hasLocationLandmark = landmarks.some((landmark) => landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION)
   const hasLandmarkCapacity = landmarks.length < VIDEO_SYNC_MAX_LANDMARKS
-  const canMark = isInsideVideo && hasLandmarkCapacity
-  const markDisabledReason = !hasVideo
-    ? t('videoSync.videoRequired', 'A video is required to mark a landmark')
-    : !isInsideVideo
-      ? t('videoSync.playheadInsideVideo', 'Move the playhead inside the video to mark a landmark')
-      : !hasLandmarkCapacity
-        ? t('videoSync.landmarkLimit', 'The maximum of five landmarks has been reached')
-        : null
-  const locationDisabledReason = hasLocationLandmark ? t('videoSync.locationLimit', 'Only one location landmark is allowed') : markDisabledReason
+  const addLandmarkAtPlayhead = useCallback((type) => {
+    const state = useStore.getState()
+    state.addVideoSyncLandmark(type, state.selectedSecond - state.videoSyncOffsetSeconds)
+  }, [])
 
-  const markStop = useCallback(() => addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, videoSecond), [addVideoSyncLandmark, videoSecond])
-  const markLeftTurn = useCallback(() => addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN, videoSecond), [addVideoSyncLandmark, videoSecond])
-  const markRightTurn = useCallback(
-    () => addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, videoSecond),
-    [addVideoSyncLandmark, videoSecond],
-  )
-  const markLocation = useCallback(() => addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.LOCATION, videoSecond), [addVideoSyncLandmark, videoSecond])
+  const markStop = useCallback(() => addLandmarkAtPlayhead(VIDEO_SYNC_LANDMARK_TYPES.STOP), [addLandmarkAtPlayhead])
+  const markLeftTurn = useCallback(() => addLandmarkAtPlayhead(VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN), [addLandmarkAtPlayhead])
+  const markRightTurn = useCallback(() => addLandmarkAtPlayhead(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN), [addLandmarkAtPlayhead])
+  const markLocation = useCallback(() => addLandmarkAtPlayhead(VIDEO_SYNC_LANDMARK_TYPES.LOCATION), [addLandmarkAtPlayhead])
 
   const deleteLandmark = useCallback((id) => removeVideoSyncLandmark(id), [removeVideoSyncLandmark])
   const changeLandmarkType = useCallback((id, type) => setVideoSyncLandmarkType(id, type), [setVideoSyncLandmarkType])
@@ -127,14 +112,18 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       videoSync,
     },
     markControls: {
-      canMark,
-      canMarkLocation: canMark && !hasLocationLandmark,
-      locationDisabledReason,
-      markDisabledReason,
+      hasLandmarkCapacity,
+      hasLocationLandmark,
+      importedVideoDuration,
+      landmarkLimitReason: t('videoSync.landmarkLimit', 'The maximum of five landmarks has been reached'),
+      locationLimitReason: t('videoSync.locationLimit', 'Only one location landmark is allowed'),
       onMarkLeftTurn: markLeftTurn,
       onMarkLocation: markLocation,
       onMarkRightTurn: markRightTurn,
       onMarkStop: markStop,
+      playheadOutsideVideoReason: t('videoSync.playheadInsideVideo', 'Move the playhead inside the video to mark a landmark'),
+      videoRequiredReason: t('videoSync.videoRequired', 'A video is required to mark a landmark'),
+      videoSyncOffsetSeconds,
     },
   }
 }
