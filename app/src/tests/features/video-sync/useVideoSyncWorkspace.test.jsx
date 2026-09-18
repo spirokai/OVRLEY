@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { VIDEO_SYNC_TOOL } from '@/store/slices/createLayoutSlice'
 import { VIDEO_SYNC_LANDMARK_TYPES } from '@/features/video-sync/data/videoSyncConstants'
-import useVideoSyncWorkspace from '@/features/video-sync/hooks/useVideoSyncWorkspace'
+import useVideoSyncWorkspace, { resolveVideoSyncMarkControls } from '@/features/video-sync/hooks/useVideoSyncWorkspace'
 
 vi.mock('@/features/video-sync/hooks/useVideoSyncCalculation', () => ({
   default: () => ({
@@ -116,5 +116,33 @@ describe('useVideoSyncWorkspace', () => {
 
     act(() => result.current.drawer.onTurnThresholdCommit(180))
     expect(useStore.getState().manualVideoSync.turnThresholdDegrees).toBe(180)
+  })
+
+  test('resolves mark controls for the current playhead', () => {
+    const markControls = {
+      hasLandmarkCapacity: true,
+      hasLocationLandmark: false,
+      importedVideoDuration: 10,
+      landmarkLimitReason: 'Landmark limit',
+      locationLimitReason: 'Location limit',
+      onMarkLeftTurn: vi.fn(),
+      onMarkLocation: vi.fn(),
+      onMarkRightTurn: vi.fn(),
+      onMarkStop: vi.fn(),
+      playheadOutsideVideoReason: 'Outside video',
+      videoRequiredReason: 'Video required',
+      videoSyncOffsetSeconds: 0,
+    }
+
+    expect(resolveVideoSyncMarkControls(markControls, 0.5, true)).toMatchObject({
+      canMark: true,
+      canMarkLocation: true,
+      markDisabledReason: null,
+    })
+    expect(resolveVideoSyncMarkControls({ ...markControls, importedVideoDuration: null }, 0.5, true)).toMatchObject({
+      canMark: false,
+      markDisabledReason: 'Video required',
+    })
+    expect(resolveVideoSyncMarkControls(markControls, 0.5, false)).toBeNull()
   })
 })

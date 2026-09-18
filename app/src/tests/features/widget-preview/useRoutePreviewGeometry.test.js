@@ -190,29 +190,6 @@ describe('useRoutePreviewGeometry', () => {
     expect(geometry.remainingSvgPoints.length).toBeGreaterThan(0)
   })
 
-  test('uses an ephemeral route config without mutating project plots', async () => {
-    mockConfig.plots = []
-    const data = { ...makeData(), id: 'video-sync-diagnostic-route', value: 'course' }
-
-    renderHook(() =>
-      useRoutePreviewGeometry({
-        activity: makeActivity(),
-        data,
-        exportRange: null,
-        previewSecond: 15,
-        style: makeStyle(),
-      }),
-    )
-
-    await waitFor(() => {
-      expect(mockBuildRouteGeometry).toHaveBeenCalledTimes(1)
-    })
-
-    const [geometryConfig] = mockBuildRouteGeometry.mock.calls[0]
-    expect(geometryConfig.plots).toEqual([expect.objectContaining({ id: 'video-sync-diagnostic-route', value: 'course' })])
-    expect(mockConfig.plots).toEqual([])
-  })
-
   test('reuses static route geometry when only previewSecond changes', async () => {
     const activity = { ...makeActivity(), trim_end_seconds: 30 }
     const data = makeData()

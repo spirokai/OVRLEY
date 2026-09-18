@@ -1,4 +1,4 @@
-import { Activity, RotateCwClock, Bell, ChevronDown, ChevronUp, Clock3, CornerUpLeft, CornerUpRight, OctagonMinus, RotateCcw } from 'lucide-react'
+import { Activity, Bell, ChevronDown, ChevronUp, Clock3, CornerUpLeft, CornerUpRight, OctagonMinus, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { BlurInput } from '@/components/ui/blur-input'
@@ -253,7 +253,7 @@ export function VideoSyncDrawerContent({
             {!canCalculate && calculation.eligibility.explanation ? (
               <p className="text-[10px] text-muted-foreground">{calculation.eligibility.explanation}</p>
             ) : null}
-            <SectionHeading icon={RotateCwClock} title={t('videoSync.syncCandidates', 'Sync Candidates')} variant="drawer" />
+
             <VideoSyncCandidateList
               appliedOffset={appliedOffset}
               candidates={candidates}

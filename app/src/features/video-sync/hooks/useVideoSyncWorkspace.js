@@ -7,6 +7,41 @@ import { VIDEO_SYNC_LANDMARK_TYPES, VIDEO_SYNC_MAX_LANDMARKS } from '../data/vid
 import useVideoSyncCalculation from './useVideoSyncCalculation'
 
 /**
+ * Resolves the landmark controls for the current activity playhead.
+ *
+ * @param {object|null} markControls Workspace-owned mark action state.
+ * @param {number} timelineSecond Current activity timeline second.
+ * @param {boolean} enabled Whether the sync workspace is active.
+ * @returns {object|null} Resolved mark controls, or null when sync mode is inactive.
+ */
+export function resolveVideoSyncMarkControls(markControls, timelineSecond, enabled) {
+  if (!enabled || markControls === null) return null
+
+  const videoSecond = timelineSecond - markControls.videoSyncOffsetSeconds
+  const hasVideo = markControls.importedVideoDuration !== null
+  const isInsideVideo = hasVideo && videoSecond >= 0 && videoSecond < markControls.importedVideoDuration
+  const canMark = isInsideVideo && markControls.hasLandmarkCapacity
+  const markDisabledReason = !hasVideo
+    ? markControls.videoRequiredReason
+    : !isInsideVideo
+      ? markControls.playheadOutsideVideoReason
+      : !markControls.hasLandmarkCapacity
+        ? markControls.landmarkLimitReason
+        : null
+
+  return {
+    canMark,
+    canMarkLocation: canMark && !markControls.hasLocationLandmark,
+    locationDisabledReason: markControls.hasLocationLandmark ? markControls.locationLimitReason : markDisabledReason,
+    markDisabledReason,
+    onMarkLeftTurn: markControls.onMarkLeftTurn,
+    onMarkLocation: markControls.onMarkLocation,
+    onMarkRightTurn: markControls.onMarkRightTurn,
+    onMarkStop: markControls.onMarkStop,
+  }
+}
+
+/**
  * Owns the manual video-sync workspace mode, transient sensitivity controls,
  * and typed landmark actions used by the drawer and preview.
  *

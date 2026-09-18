@@ -224,7 +224,7 @@ function AppShell() {
                   showProjectStatus={projectLifecycle.status !== 'Saved'}
                   projectStatus={projectLifecycle.status}
                   videoSyncMode={videoSyncWorkspace.videoSyncMode}
-                  videoSyncPreview={videoSyncWorkspace.markControls}
+                  videoSyncMarkControls={videoSyncWorkspace.markControls}
                   widgetLiveEdits={widgetLiveEdits}
                 />
               </div>

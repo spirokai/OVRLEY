@@ -133,17 +133,7 @@ describe('OverlayCanvas background modes', () => {
     }
 
     render(
-      <OverlayCanvas
-        sceneProps={defaultSceneProps}
-        displayProps={displayProps}
-        dataProps={dataProps}
-        callbacks={defaultCallbacks}
-        videoSyncMode
-        videoSyncDiagnostics={{
-          speed: { available: false },
-          route: { available: false, widget: { data: { width: 806, height: 594 } } },
-        }}
-      />,
+      <OverlayCanvas sceneProps={defaultSceneProps} displayProps={displayProps} dataProps={dataProps} callbacks={defaultCallbacks} videoSyncMode />,
     )
 
     expect(useVideoPreview).toHaveBeenLastCalledWith(expect.any(Object), true)
@@ -151,5 +141,30 @@ describe('OverlayCanvas background modes', () => {
     expect(screen.getByTestId('video-sync-canvas-diagnostics')).toBeInTheDocument()
     expect(displayProps.backgroundMode).toBe('checker')
     expect(dataProps.widgets).toHaveLength(1)
+  })
+
+  test('renders the current speed directly on the sync canvas', () => {
+    const dataProps = {
+      ...defaultDataProps,
+      activity: {
+        trim_end_seconds: 1,
+        sample_elapsed_seconds: [0, 1],
+        speed: [4, 6],
+      },
+      previewSecond: 0.5,
+    }
+
+    render(
+      <OverlayCanvas
+        sceneProps={defaultSceneProps}
+        displayProps={defaultDisplayProps('video')}
+        dataProps={dataProps}
+        callbacks={defaultCallbacks}
+        videoSyncMode
+      />,
+    )
+
+    expect(screen.getByTestId('video-sync-speed-diagnostic')).toHaveTextContent('18.0')
+    expect(screen.getByTestId('video-sync-speed-diagnostic')).toHaveTextContent('KM/H')
   })
 })

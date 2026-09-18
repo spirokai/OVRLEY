@@ -179,10 +179,9 @@ const OverlayCanvasWidget = memo(
  * @param {object} props.dataProps - { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange }
  * @param {object} props.callbacks - { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks }
  * @param {boolean} [props.videoSyncMode=false] Whether the dedicated sync canvas is active.
- * @param {object|null} [props.videoSyncDiagnostics=null] Fixed diagnostic widget models.
  * @returns {JSX.Element} Rendered component output.
  */
-export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks, videoSyncMode = false, videoSyncDiagnostics = null }) {
+export default function OverlayCanvas({ sceneProps, displayProps, dataProps, callbacks, videoSyncMode = false }) {
   const { sceneFont, sceneFontSize, sceneStyle, valueFont, sceneSize } = sceneProps
   const { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible } = displayProps
   const { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange } = dataProps
@@ -200,10 +199,6 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const hasTransparentBackground = effectiveBackgroundMode === 'transparent'
   const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
   const videoBackgroundClassName = cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')
-
-  if (videoSyncMode && videoSyncDiagnostics === null) {
-    throw new Error('Video sync canvas requires diagnostics')
-  }
 
   return (
     <div
@@ -268,16 +263,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
             )
           })}
       </div>
-      {videoSyncMode ? (
-        <VideoSyncCanvasDiagnostics
-          {...videoSyncDiagnostics}
-          activity={activity}
-          exportRange={exportRange}
-          globalScale={globalScale}
-          previewSecond={previewSecond}
-          sceneStyle={sceneStyle}
-        />
-      ) : null}
+      {videoSyncMode ? <VideoSyncCanvasDiagnostics activity={activity} previewSecond={previewSecond} /> : null}
       {effectiveBackgroundMode === 'video' && videoSrc && hasHevcPlaybackError ? (
         <HevcPlaybackPlaceholder
           displayScale={displayScale}

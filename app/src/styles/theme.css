@@ -56,6 +56,6 @@
   --color-support-foreground: var(--support-foreground);
   --color-grid-line: var(--grid-line);
   --color-video-sync-stop: #ef4444;
-  --color-video-sync-turn: #2c75f2;
+  --color-video-sync-turn: #2c99f2;
   --color-video-sync-location: #a855f7;
 }

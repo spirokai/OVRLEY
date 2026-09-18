@@ -28,7 +28,7 @@ import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from 
 import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
 import { useTranslation } from 'react-i18next'
 import { getWidgetTypeName } from '@/lib/widget/widget-icons'
-import { useVideoSyncDiagnostics, VideoSyncMarkControls } from '@/features/video-sync'
+import { resolveVideoSyncMarkControls, VideoSyncMarkControls } from '@/features/video-sync'
 
 const PROJECT_STATUS_TRANSLATIONS = {
   Unsaved: { key: 'overlay-editor.statusUnsaved', defaultLabel: 'Unsaved' },
@@ -146,7 +146,7 @@ function OverlayEditorContent({
   showProjectStatus,
   projectStatus,
   videoSyncMode = false,
-  videoSyncPreview = null,
+  videoSyncMarkControls = null,
   undoRedoControls,
   widgetLiveEdits,
 }) {
@@ -162,15 +162,7 @@ function OverlayEditorContent({
   // Derived state hook — widgets, scene, preview, drafts
   const overlayState = useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onConfigChange }, widgetLiveEdits)
   const activity = overlayState.activity
-  const videoSyncDiagnostics = useVideoSyncDiagnostics({
-    activity,
-    timelineSecond: overlayState.previewSecond,
-    markControls: videoSyncPreview,
-    globalScale: overlayState.globalScale,
-    exportStartSecond: overlayState.previewExportStartSecond,
-    sceneSize: overlayState.sceneSize,
-    enabled: videoSyncMode,
-  })
+  const resolvedVideoSyncMarkControls = resolveVideoSyncMarkControls(videoSyncMarkControls, overlayState.previewSecond, videoSyncMode)
   const { metricPreviewModels, textPreviewModels } = useOverlayPreviewModels({
     activity,
     globalScale: overlayState.globalScale,
@@ -400,7 +392,7 @@ function OverlayEditorContent({
     [overlayState.setSceneElement, handleWidgetMouseDown, overlayState.widgetRefCallbacks],
   )
 
-  if (videoSyncMode && videoSyncPreview === null) {
+  if (videoSyncMode && resolvedVideoSyncMarkControls === null) {
     throw new Error('Video sync editor requires mark controls')
   }
 
@@ -446,7 +438,6 @@ function OverlayEditorContent({
                 dataProps={canvasDataProps}
                 callbacks={canvasCallbacks}
                 videoSyncMode={videoSyncMode}
-                videoSyncDiagnostics={videoSyncDiagnostics}
               />
               {!videoSyncMode ? (
                 <OverlayMoveable
@@ -479,7 +470,7 @@ function OverlayEditorContent({
                 widgets={overlayState.canvasWidgets}
               />
             ) : null}
-            {videoSyncMode ? <VideoSyncMarkControls {...videoSyncDiagnostics.markControls} /> : null}
+            {videoSyncMode ? <VideoSyncMarkControls {...resolvedVideoSyncMarkControls} /> : null}
           </div>
           {!videoSyncMode && selectionRect ? (
             <div
