@@ -24,7 +24,7 @@ export default function OverlayPlayer({ activeKeyboardWorkspace, backgroundMode,
       onFocusCapture={onActivateKeyboardWorkspace}
       onPointerDownCapture={onActivateKeyboardWorkspace}
     >
-      <PlayerToolbar toolbar={player.toolbar} />
+      <PlayerToolbar toolbar={player.toolbar} videoSyncMode={videoSyncMode} />
       <TimelineSurface timeline={player.timeline} />
     </div>
   )

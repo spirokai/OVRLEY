@@ -329,7 +329,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     activitySummary: playerStore.activitySummary,
     canSelect: canSelectClip,
     commitClipNudge,
-    exportHighlightRange: exportTimeline.highlightRange,
+    exportHighlightRange: videoSyncMode ? null : exportTimeline.highlightRange,
     getLaneDragProps,
     hasActivity: playback.hasActivity,
     hasVideo,
@@ -369,39 +369,39 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
         )
 
   // Export marker models - hide markers outside the viewport and attach gesture props to visible handles.
-  const exportMarkers = useMemo(
-    () =>
-      exportTimeline.markers
-        .map((marker) => {
-          const isVisible =
-            marker.second >= timelineViewport.viewStart &&
-            marker.second <= timelineViewport.viewEnd &&
-            widthPx > 0 &&
-            timelineViewport.viewEnd > timelineViewport.viewStart
+  const exportMarkers = useMemo(() => {
+    if (videoSyncMode) return []
 
-          if (!isVisible) return null
+    return exportTimeline.markers
+      .map((marker) => {
+        const isVisible =
+          marker.second >= timelineViewport.viewStart &&
+          marker.second <= timelineViewport.viewEnd &&
+          widthPx > 0 &&
+          timelineViewport.viewEnd > timelineViewport.viewStart
 
-          const left = roundToDevicePixel(
-            secondsToViewPx({
-              second: marker.second,
-              viewStart: timelineViewport.viewStart,
-              viewEnd: timelineViewport.viewEnd,
-              widthPx,
-            }),
-            pixelRatio,
-          )
+        if (!isVisible) return null
 
-          return {
-            ...marker,
-            handleClassName: getMarkerClassName(marker.marker),
-            lineStyle: { left },
-            markerProps: getExportMarkerProps(marker.marker),
-            style: { left },
-          }
-        })
-        .filter(Boolean),
-    [exportTimeline.markers, getExportMarkerProps, pixelRatio, timelineViewport.viewEnd, timelineViewport.viewStart, widthPx],
-  )
+        const left = roundToDevicePixel(
+          secondsToViewPx({
+            second: marker.second,
+            viewStart: timelineViewport.viewStart,
+            viewEnd: timelineViewport.viewEnd,
+            widthPx,
+          }),
+          pixelRatio,
+        )
+
+        return {
+          ...marker,
+          handleClassName: getMarkerClassName(marker.marker),
+          lineStyle: { left },
+          markerProps: getExportMarkerProps(marker.marker),
+          style: { left },
+        }
+      })
+      .filter(Boolean)
+  }, [exportTimeline.markers, getExportMarkerProps, pixelRatio, timelineViewport.viewEnd, timelineViewport.viewStart, videoSyncMode, widthPx])
 
   // Fit target commands - presentational tabs only need active state, labels, and a command callback.
   const fitTargets = useMemo(

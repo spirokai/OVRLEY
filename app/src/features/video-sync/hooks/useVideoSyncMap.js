@@ -1,31 +1,47 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LngLatBounds, Map, Marker, NavigationControl } from 'maplibre-gl'
 import { getMapStyleUrlTemplate } from '@/api/backend'
-import { VIDEO_SYNC_DEFAULT_MAP_STYLE } from '../data/videoSyncConstants'
+import { getPreference, setPreference } from '@/lib/preferences-store'
+import {
+  VIDEO_SYNC_DEFAULT_MAP_STYLE,
+  VIDEO_SYNC_MAP_INITIAL_CENTER,
+  VIDEO_SYNC_MAP_INITIAL_ZOOM,
+  VIDEO_SYNC_MAP_RESIZE_SETTLE_DELAY_MS,
+  VIDEO_SYNC_MAP_STYLES,
+  VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY,
+} from '../data/videoSyncConstants'
 import { buildActivityCourseSegments } from '../utils/activitySyncInput'
 import { createCourseGeoJson, getCoursePositionAtActivitySecond, getSnappedCoursePosition } from '../utils/mapPreviewGeometry'
 
-const ZURICH_POSITION = [8.5417, 47.3769]
-const DEFAULT_ZOOM = 13
 const COURSE_SOURCE_ID = 'activity-course'
 const COURSE_LAYER_ID = 'activity-course-line'
 const EMPTY_STYLE = { version: 8, sources: {}, layers: [] }
+
+function requireMapStyle(value) {
+  if (!VIDEO_SYNC_MAP_STYLES.includes(value)) {
+    throw new Error(`Preference "${VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY}" must be a supported map style`)
+  }
+  return value
+}
 
 class VideoSyncMapController {
   constructor(onActionPointChange, onError) {
     this.onActionPointChange = onActionPointChange
     this.onError = onError
     this.courseSegments = []
+    this.canvasContainer = null
     this.detection = null
     this.detectedLocationMarker = null
     this.map = null
     this.hoverMarker = null
     this.actionLocation = null
+    this.hasFittedCourse = false
     this.style = VIDEO_SYNC_DEFAULT_MAP_STYLE
     this.styleUrlTemplate = null
     this.styleLoaded = false
     this.styleLoadPending = false
     this.resizeObserver = null
+    this.resizeTimeout = null
 
     this.handleClick = this.handleClick.bind(this)
     this.handleMouseMove = this.handleMouseMove.bind(this)
@@ -39,10 +55,11 @@ class VideoSyncMapController {
     this.map = new Map({
       container,
       style: EMPTY_STYLE,
-      center: ZURICH_POSITION,
-      zoom: DEFAULT_ZOOM,
+      center: VIDEO_SYNC_MAP_INITIAL_CENTER,
+      zoom: VIDEO_SYNC_MAP_INITIAL_ZOOM,
       attributionControl: true,
     })
+    this.canvasContainer = this.map.getCanvasContainer()
     this.map.addControl(new NavigationControl({ showCompass: false }), 'top-right')
     this.map.on('click', this.handleClick)
     this.map.on('mousemove', this.handleMouseMove)
@@ -69,10 +86,12 @@ class VideoSyncMapController {
   dispose() {
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
-    this.hoverMarker?.remove()
-    this.hoverMarker = null
+    if (this.resizeTimeout !== null) window.clearTimeout(this.resizeTimeout)
+    this.resizeTimeout = null
+    this.syncHoverTarget(null)
     this.detectedLocationMarker?.remove()
     this.detectedLocationMarker = null
+    this.canvasContainer = null
     this.map?.remove()
     this.map = null
   }
@@ -107,11 +126,14 @@ class VideoSyncMapController {
   resize() {
     if (!this.map) return
     this.map.resize()
-    this.fitCourse()
   }
 
   handleResize() {
-    this.resize()
+    if (this.resizeTimeout !== null) window.clearTimeout(this.resizeTimeout)
+    this.resizeTimeout = window.setTimeout(() => {
+      this.resizeTimeout = null
+      this.resize()
+    }, VIDEO_SYNC_MAP_RESIZE_SETTLE_DELAY_MS)
   }
 
   handleStyleLoad() {
@@ -140,36 +162,36 @@ class VideoSyncMapController {
   }
 
   fitCourse() {
-    if (this.courseSegments.length === 0) return
+    if (this.hasFittedCourse || this.courseSegments.length === 0) return
     const bounds = new LngLatBounds()
     for (const segment of this.courseSegments) {
       for (const point of segment) bounds.extend(point.coordinate)
     }
     this.map.fitBounds(bounds, { animate: false, maxZoom: 17, padding: 64 })
+    this.hasFittedCourse = true
   }
 
   handleMouseMove(event) {
-    const location = getSnappedCoursePosition(this.map, event.point, this.courseSegments)
-    if (!location) {
-      this.removeMarker()
-      return
-    }
-    if (!this.hoverMarker) {
+    this.syncHoverTarget(getSnappedCoursePosition(this.map, event.point, this.courseSegments))
+  }
+
+  handleMouseOut() {
+    this.syncHoverTarget(null)
+  }
+
+  syncHoverTarget(location) {
+    this.canvasContainer.style.cursor = location === null ? '' : 'crosshair'
+
+    if (location === null) {
+      this.hoverMarker?.remove()
+      this.hoverMarker = null
+    } else if (this.hoverMarker === null) {
       const element = document.createElement('div')
-      element.className = 'size-4 rounded-full border border-white bg-video-sync-location'
+      element.className = 'pointer-events-none size-4 rounded-full border border-white bg-video-sync-location'
       this.hoverMarker = new Marker({ element }).setLngLat(location.position).addTo(this.map)
     } else {
       this.hoverMarker.setLngLat(location.position)
     }
-  }
-
-  handleMouseOut() {
-    this.removeMarker()
-  }
-
-  removeMarker() {
-    this.hoverMarker?.remove()
-    this.hoverMarker = null
   }
 
   syncDetectedLocationMarker() {
@@ -231,6 +253,33 @@ export default function useVideoSyncMap({ activity, detection, onSetCourseLocati
   const courseSegments = useMemo(() => buildActivityCourseSegments(activity), [activity])
 
   useEffect(() => {
+    let mounted = true
+
+    async function hydrateStyle() {
+      let storedStyle
+      try {
+        storedStyle = await getPreference(VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY)
+      } catch {
+        storedStyle = undefined
+      }
+      if (!mounted || storedStyle === undefined || storedStyle === null) return
+
+      try {
+        const nextStyle = requireMapStyle(storedStyle)
+        setStyle(nextStyle)
+        controllerRef.current?.setStyle(nextStyle)
+      } catch (preferenceError) {
+        setError(preferenceError)
+      }
+    }
+
+    void hydrateStyle()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  useEffect(() => {
     const controller = new VideoSyncMapController(setActionPoint, setError)
     controllerRef.current = controller
     controller.mount(containerRef.current)
@@ -249,8 +298,10 @@ export default function useVideoSyncMap({ activity, detection, onSetCourseLocati
   }, [detection])
 
   const onStyleChange = useCallback((nextStyle) => {
-    setStyle(nextStyle)
-    controllerRef.current.setStyle(nextStyle)
+    const validatedStyle = requireMapStyle(nextStyle)
+    setStyle(validatedStyle)
+    controllerRef.current.setStyle(validatedStyle)
+    void setPreference(VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY, validatedStyle).catch(setError)
   }, [])
 
   const onConfirmActionPoint = useCallback(() => {

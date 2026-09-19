@@ -40,6 +40,28 @@ function pointerEvent(clientX, currentTarget = {}) {
 }
 
 describe('useVideoSyncTimeline', () => {
+  test('builds populated graph paths on the initial enabled render', () => {
+    const detection = {
+      graphSeries: {
+        speed: [
+          { time: 0, value: 1 },
+          { time: 10, value: 2 },
+        ],
+        turning: [
+          { time: 0, value: 0 },
+          { time: 10, value: 30 },
+        ],
+      },
+      location: null,
+      stops: [],
+      turns: [],
+    }
+    const { result } = renderHook(() => useVideoSyncTimeline({ ...baseProps, detection }))
+
+    expect(result.current.graph.paths.speed).not.toBe('')
+    expect(result.current.graph.paths.turning).not.toBe('')
+  })
+
   test('commits one video-local landmark move and never changes the video offset', () => {
     const moveLandmark = vi.fn()
     const { result } = renderHook((props) => useVideoSyncTimeline(props), { initialProps: { ...baseProps, moveLandmark } })

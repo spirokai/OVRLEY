@@ -2,20 +2,13 @@
  * Owns manual video-sync timeline graph geometry and landmark drag state.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { secondsToViewPx } from '@/features/player/utils/timelineGeometry'
 import { VIDEO_SYNC_LANDMARK_PRESENTATION } from '../data/videoSyncConstants'
 import { buildEventBands, buildGraphGeometry, buildGraphScales } from '../utils/graphGeometry'
 import useVideoSyncLandmarkDrag from './useVideoSyncLandmarkDrag'
 
 const EMPTY_GRAPH_SERIES = Object.freeze({ speed: [], turning: [] })
-const EMPTY_GRAPH_GEOMETRY = Object.freeze({
-  heightPx: 0,
-  paths: Object.freeze({ speed: '', turning: '' }),
-  scales: null,
-  widthPx: 0,
-})
-
 /**
  * Creates the timeline graph and landmark presentation model for sync mode.
  *
@@ -54,53 +47,11 @@ export default function useVideoSyncTimeline({
   moveLandmark,
   followSecond,
 }) {
-  const graphFrameRef = useRef(null)
-  const graphInputsRef = useRef(null)
-
   const graphSeries = detection?.graphSeries ?? EMPTY_GRAPH_SERIES
   const graphScales = useMemo(() => buildGraphScales(graphSeries), [graphSeries])
-  const [graphGeometry, setGraphGeometry] = useState(() =>
-    enabled ? buildGraphGeometry({ graphSeries, scales: graphScales, viewStart, viewEnd, widthPx }) : EMPTY_GRAPH_GEOMETRY,
-  )
-
-  useEffect(() => {
-    graphInputsRef.current = { graphSeries, scales: graphScales, viewStart, viewEnd, widthPx }
-  }, [graphScales, graphSeries, viewEnd, viewStart, widthPx])
-
-  const replaceGraphGeometry = useCallback(() => {
-    if (graphFrameRef.current !== null) return
-
-    const update = () => {
-      graphFrameRef.current = null
-      const inputs = graphInputsRef.current
-      if (!inputs) return
-      setGraphGeometry(buildGraphGeometry(inputs))
-    }
-
-    if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
-      queueMicrotask(update)
-      return
-    }
-    graphFrameRef.current = window.requestAnimationFrame(update)
-  }, [])
-
-  useEffect(() => {
-    if (!enabled) {
-      if (graphFrameRef.current !== null) window.cancelAnimationFrame?.(graphFrameRef.current)
-      graphFrameRef.current = null
-      setGraphGeometry(EMPTY_GRAPH_GEOMETRY)
-      return undefined
-    }
-
-    replaceGraphGeometry()
-    return undefined
-  }, [enabled, graphSeries, graphScales, replaceGraphGeometry, viewEnd, viewStart, widthPx])
-
-  useEffect(
-    () => () => {
-      if (graphFrameRef.current !== null) window.cancelAnimationFrame?.(graphFrameRef.current)
-    },
-    [],
+  const graphGeometry = useMemo(
+    () => buildGraphGeometry({ graphSeries, scales: graphScales, viewStart, viewEnd, widthPx }),
+    [graphScales, graphSeries, viewEnd, viewStart, widthPx],
   )
 
   const displayedVideoOffset = videoSyncOffsetPreviewSeconds ?? videoSyncOffsetSeconds

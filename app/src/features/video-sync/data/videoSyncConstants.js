@@ -47,6 +47,11 @@ export const VIDEO_SYNC_GRAPH_HEIGHT_PX = 64
 
 export const VIDEO_SYNC_MAP_STYLES = ['positron', 'bright', 'liberty', 'dark', 'fiord']
 export const VIDEO_SYNC_DEFAULT_MAP_STYLE = 'liberty'
+export const VIDEO_SYNC_MAP_STYLE_PREFERENCE_KEY = 'sync-map-style'
+export const VIDEO_SYNC_MAP_INITIAL_CENTER = [8.5417, 47.3769]
+export const VIDEO_SYNC_MAP_INITIAL_ZOOM = 13
+export const VIDEO_SYNC_MAP_SNAP_DISTANCE_PIXELS = 20
+export const VIDEO_SYNC_MAP_RESIZE_SETTLE_DELAY_MS = 100
 
 export const VIDEO_SYNC_LANDMARK_PRESENTATION = {
   [VIDEO_SYNC_LANDMARK_TYPES.STOP]: {

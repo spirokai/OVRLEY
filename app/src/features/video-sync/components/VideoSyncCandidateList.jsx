@@ -1,4 +1,4 @@
-import { Check, MapPin, RotateCwClock } from 'lucide-react'
+import { Check, RotateCwClock } from 'lucide-react'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -82,16 +82,15 @@ function CandidateCards({ appliedOffset, candidates, disabled = false, onApply }
                 })}
                 onClick={() => onApply(candidate)}
               >
-                <div className="flex min-w-0 flex-1">
+                <div className="flex min-w-0 flex-1 uppercase">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      {isMapOnly || isMapConflict ? <MapPin className="size-3.5 shrink-0 text-video-sync-location" aria-hidden="true" /> : null}
                       <span className={`text-base font-bold tabular-nums ${isApplied ? 'text-primary-foreground' : 'text-foreground'}`}>
                         {formatClockDuration(candidate.offset)}
                       </span>
                     </div>
                     <div
-                      className={`mt-0.5 text-[10px] text-muted-foreground ${isApplied ? 'text-primary-foreground/60' : 'text-muted-foreground/60'}`}
+                      className={`mt-0.5 text-[0.75rem] font-bold text-muted-foreground ${isApplied ? 'text-primary-foreground/60' : 'text-muted-foreground/50'}`}
                     >
                       {isMapOnly ? (
                         <span>{t('videoSync.mapOnly', 'Map only')}</span>
@@ -105,9 +104,7 @@ function CandidateCards({ appliedOffset, candidates, disabled = false, onApply }
                       )}
                     </div>
                     {isMapConflict ? (
-                      <div className="text-video-sync-location mt-1 text-[10px] font-medium">
-                        {t('videoSync.mapConflict', 'Map landmark excluded—conflicts with this candidate')}
-                      </div>
+                      <div className=" mt-1 text-[10px] font-semibold">{t('videoSync.mapConflict', 'Conflict. Map landmark excluded.')}</div>
                     ) : null}
                   </div>
                   {candidate.matchScore === null ? null : (

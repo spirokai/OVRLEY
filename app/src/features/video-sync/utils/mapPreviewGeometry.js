@@ -1,4 +1,4 @@
-const COURSE_SNAP_DISTANCE_PIXELS = 40
+import { VIDEO_SYNC_MAP_SNAP_DISTANCE_PIXELS } from '../data/videoSyncConstants'
 
 /**
  * Converts canonical course segments into the GeoJSON shape consumed by MapLibre.
@@ -46,7 +46,7 @@ export function getSnappedCoursePosition(map, cursorPoint, courseSegments) {
       }
     }
   }
-  if (!closest || closest.distanceSquared > COURSE_SNAP_DISTANCE_PIXELS ** 2) return null
+  if (!closest || closest.distanceSquared > VIDEO_SYNC_MAP_SNAP_DISTANCE_PIXELS ** 2) return null
   return { position: map.unproject(closest.point), activitySecond: closest.activitySecond }
 }
 

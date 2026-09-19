@@ -7,6 +7,10 @@ const mapOptions = vi.hoisted(() => vi.fn())
 const markerOptions = vi.hoisted(() => vi.fn())
 const eventHandlers = vi.hoisted(() => new Map())
 const source = vi.hoisted(() => ({ setData: vi.fn() }))
+const getPreference = vi.hoisted(() => vi.fn())
+const setPreference = vi.hoisted(() => vi.fn())
+const resizeObserver = vi.hoisted(() => ({ callback: null }))
+const canvasContainer = vi.hoisted(() => ({ style: { cursor: '' } }))
 const map = vi.hoisted(() => {
   let hasCourseSource = false
   return {
@@ -16,6 +20,7 @@ const map = vi.hoisted(() => {
       hasCourseSource = true
     }),
     fitBounds: vi.fn(),
+    getCanvasContainer: vi.fn(() => canvasContainer),
     getSource: vi.fn(() => (hasCourseSource ? source : null)),
     off: vi.fn((name) => eventHandlers.delete(name)),
     on: vi.fn((name, handler) => eventHandlers.set(name, handler)),
@@ -34,6 +39,7 @@ const map = vi.hoisted(() => {
 const marker = vi.hoisted(() => ({ addTo: vi.fn(), remove: vi.fn(), setLngLat: vi.fn() }))
 
 vi.mock('@/api/backend', () => ({ getMapStyleUrlTemplate }))
+vi.mock('@/lib/preferences-store', () => ({ getPreference, setPreference }))
 
 vi.mock('maplibre-gl', () => ({
   LngLatBounds: class {
@@ -63,6 +69,9 @@ import VideoSyncPreviewScreens from '@/features/video-sync/components/VideoSyncP
 describe('VideoSyncPreviewScreens', () => {
   beforeAll(() => {
     globalThis.ResizeObserver = class ResizeObserver {
+      constructor(callback) {
+        resizeObserver.callback = callback
+      }
       observe() {}
       disconnect() {}
     }
@@ -75,6 +84,12 @@ describe('VideoSyncPreviewScreens', () => {
   beforeEach(() => {
     getMapStyleUrlTemplate.mockReset()
     getMapStyleUrlTemplate.mockResolvedValue('http://127.0.0.1:3210/styles/{style}')
+    getPreference.mockReset()
+    getPreference.mockResolvedValue(undefined)
+    setPreference.mockReset()
+    setPreference.mockResolvedValue(undefined)
+    resizeObserver.callback = null
+    canvasContainer.style.cursor = ''
     mapOptions.mockClear()
     markerOptions.mockClear()
     eventHandlers.clear()
@@ -186,5 +201,60 @@ describe('VideoSyncPreviewScreens', () => {
     await user.click(screen.getByRole('combobox', { name: 'Map style' }))
     await user.click(screen.getByRole('option', { name: 'Fiord' }))
     await waitFor(() => expect(map.setStyle).toHaveBeenCalledWith('http://127.0.0.1:3210/styles/fiord'))
+    expect(setPreference).toHaveBeenCalledWith('sync-map-style', 'fiord')
+  })
+
+  test('loads the persisted map style when the preview starts', async () => {
+    getPreference.mockResolvedValue('dark')
+
+    render(
+      <VideoSyncPreviewScreens
+        activity={null}
+        detection={null}
+        displayScale={1}
+        previewSecond={0}
+        sceneSize={{ width: 100, height: 100 }}
+        setSceneElement={() => {}}
+      />,
+    )
+
+    await waitFor(() => expect(getPreference).toHaveBeenCalledWith('sync-map-style'))
+    await waitFor(() => expect(map.setStyle).toHaveBeenCalledWith('http://127.0.0.1:3210/styles/dark'))
+    expect(screen.getByRole('combobox', { name: 'Map style' })).toHaveTextContent('Dark')
+  })
+
+  test('resizes the mounted map once while preserving its fitted camera', async () => {
+    render(
+      <VideoSyncPreviewScreens
+        activity={{
+          trim_end_seconds: 1,
+          sample_elapsed_seconds: [0, 1],
+          sample_course_points: [
+            [47.37, 8.53],
+            [47.38, 8.54],
+          ],
+          speed: [4, 5],
+        }}
+        detection={null}
+        displayScale={1}
+        previewSecond={0}
+        sceneSize={{ width: 100, height: 100 }}
+        setSceneElement={() => {}}
+      />,
+    )
+
+    await waitFor(() => expect(map.setStyle).toHaveBeenCalled())
+    act(() => eventHandlers.get('style.load')())
+    const fitCount = map.fitBounds.mock.calls.length
+
+    act(() => {
+      resizeObserver.callback([])
+      resizeObserver.callback([])
+      resizeObserver.callback([])
+    })
+
+    await waitFor(() => expect(map.resize).toHaveBeenCalledOnce())
+    expect(map.fitBounds).toHaveBeenCalledTimes(fitCount)
+    expect(map.remove).not.toHaveBeenCalled()
   })
 })

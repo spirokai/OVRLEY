@@ -9,12 +9,12 @@ import { VIDEO_SYNC_MAP_STYLES, VIDEO_SYNC_PREVIEW_SCREEN_GAP } from '../data/vi
 
 function CourseLocationAction({ actionPoint, onConfirm }) {
   const { t } = useTranslation()
-  const buttonLabel = t('videoSync.setLocationInMap', 'Set location in map')
+  const buttonLabel = t('videoSync.setLocationInMap', 'Set location')
 
   if (!actionPoint) return null
   return (
     <div
-      className="absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+8px)]"
+      className="absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+8px)] bg-surface rounded-sm shadow-md"
       style={{ left: actionPoint.x, top: actionPoint.y }}
       onClick={(event) => event.stopPropagation()}
     >
@@ -23,7 +23,7 @@ function CourseLocationAction({ actionPoint, onConfirm }) {
         onClick={onConfirm}
         variant="ghost"
         size="sm"
-        className="h-7 w-auto justify-center border border-video-sync-location/70 bg-surface px-2 text-[10px] font-semibold text-video-sync-location hover:bg-surface-elevated hover:text-video-sync-location focus-visible:ring-video-sync-location/50"
+        className="h-7 w-auto uppercase justify-center border border-video-sync-location bg-surface px-2 text-[0.75rem] font-semibold text-video-sync-location hover:text-video-sync-location hover:bg-video-sync-location/20 focus-visible:ring-video-sync-location/50"
       >
         <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
         <span>{buttonLabel}</span>
@@ -77,7 +77,15 @@ function VideoSyncMapPreview({ activity, detection, onSetCourseLocation }) {
  * @param {(element: HTMLElement|null) => void} props.setSceneElement Registers the scaled content for zoom anchoring.
  * @returns {JSX.Element} Video-sync preview pair.
  */
-export default function VideoSyncPreviewScreens({ activity, detection, displayScale, onSetCourseLocation = null, previewSecond, sceneSize, setSceneElement }) {
+export default function VideoSyncPreviewScreens({
+  activity,
+  detection,
+  displayScale,
+  onSetCourseLocation = null,
+  previewSecond,
+  sceneSize,
+  setSceneElement,
+}) {
   const screenWidth = sceneSize.width * displayScale
   const screenHeight = sceneSize.height * displayScale
   const screenGap = VIDEO_SYNC_PREVIEW_SCREEN_GAP * displayScale

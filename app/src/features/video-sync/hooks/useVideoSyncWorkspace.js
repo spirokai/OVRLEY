@@ -124,7 +124,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
   const applyCandidate = useCallback((candidate) => applyVideoSyncCandidate(candidate), [applyVideoSyncCandidate])
 
   return {
-    videoSyncMode: toolbarDrawer.visible && toolbarDrawer.activeTool === VIDEO_SYNC_TOOL,
+    videoSyncMode: toolbarDrawer.activeTool === VIDEO_SYNC_TOOL,
     drawer: {
       appliedOffset: videoSyncOffsetSeconds,
       candidates: manualVideoSyncCandidates,

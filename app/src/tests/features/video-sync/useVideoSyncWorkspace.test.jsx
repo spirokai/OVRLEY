@@ -51,7 +51,7 @@ describe('useVideoSyncWorkspace', () => {
     vi.unstubAllGlobals()
   })
 
-  test('derives mode from toolbar activation and close while keeping project widgets untouched', () => {
+  test('preserves the selected workspace when its unpinned drawer closes', () => {
     const configBefore = useStore.getState().config
     const { result } = renderHook(() => {
       const toolbarDrawer = useStore(
@@ -70,7 +70,7 @@ describe('useVideoSyncWorkspace', () => {
 
     act(() => useStore.getState().selectLeftDrawerTool(VIDEO_SYNC_TOOL))
 
-    expect(result.current.videoSyncMode).toBe(false)
+    expect(result.current.videoSyncMode).toBe(true)
     expect(useStore.getState().config).toBe(configBefore)
   })
 

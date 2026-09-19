@@ -31,7 +31,7 @@ export function VideoSyncMarkControls({
     {
       Icon: CornerUpLeft,
       colorClassName:
-        'border-video-sync-turn/70 text-video-sync-turn hover:bg-surface-elevated hover:text-video-sync-turn focus-visible:ring-video-sync-turn/50',
+        'border-video-sync-turn/70 text-video-sync-turn hover:bg-video-sync-turn/20 hover:text-video-sync-turn focus-visible:ring-video-sync-turn/50',
       disabled: !canMark,
       disabledReason: markDisabledReason,
       label: t('videoSync.markLeftTurn', 'Mark Left Turn'),
@@ -40,7 +40,7 @@ export function VideoSyncMarkControls({
     {
       Icon: OctagonMinus,
       colorClassName:
-        'border-video-sync-stop/70 text-video-sync-stop hover:bg-surface-elevated hover:text-video-sync-stop focus-visible:ring-video-sync-stop/50',
+        'border-video-sync-stop/70 text-video-sync-stop hover:bg-video-sync-stop/20 hover:text-video-sync-stop focus-visible:ring-video-sync-stop/50',
       disabled: !canMark,
       disabledReason: markDisabledReason,
       label: t('videoSync.markStop', 'Mark Stop'),
@@ -49,7 +49,7 @@ export function VideoSyncMarkControls({
     {
       Icon: MapPin,
       colorClassName:
-        'border-video-sync-location/70 text-video-sync-location hover:bg-surface-elevated hover:text-video-sync-location focus-visible:ring-video-sync-location/50',
+        'border-video-sync-location/70 text-video-sync-location hover:bg-video-sync-location/20 hover:text-video-sync-location focus-visible:ring-video-sync-location/50',
       disabled: !canMarkLocation,
       disabledReason: locationDisabledReason,
       label: t('videoSync.markLocation', 'Mark Location'),
@@ -58,7 +58,7 @@ export function VideoSyncMarkControls({
     {
       Icon: CornerUpRight,
       colorClassName:
-        'border-video-sync-turn/70 text-video-sync-turn hover:bg-surface-elevated hover:text-video-sync-turn focus-visible:ring-video-sync-turn/50',
+        'border-video-sync-turn/70 text-video-sync-turn hover:bg-video-sync-turn/20 hover:text-video-sync-turn focus-visible:ring-video-sync-turn/50',
       disabled: !canMark,
       disabledReason: markDisabledReason,
       label: t('videoSync.markRightTurn', 'Mark Right Turn'),
@@ -69,24 +69,24 @@ export function VideoSyncMarkControls({
   return (
     <div
       data-testid="video-sync-mark-controls"
-      className="pointer-events-auto absolute bottom-4 left-1/2 z-50 flex w-max max-w-full -translate-x-1/2 flex-row gap-1 rounded-xs border border-border/70 bg-card p-1 shadow-lg"
+      className="pointer-events-auto absolute bottom-4 left-1/2 z-50 flex w-max max-w-full -translate-x-1/2 flex-row gap-1 "
       aria-label={t('videoSync.markControls', 'Video sync landmark controls')}
     >
       {controls.map(({ Icon, colorClassName, disabled, disabledReason, label, onClick }) => (
-        <Button
-          key={label}
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={`h-7 uppercase w-auto justify-center border bg-surface px-2 text-[10px] font-semibold ${colorClassName}`}
-          disabled={disabled}
-          title={disabledReason ?? label}
-          aria-label={label}
-          onClick={onClick}
-        >
-          <Icon className="size-3.5 shrink-0" />
-          <span>{label}</span>
-        </Button>
+        <div key={label} className="flex flex-1 rounded-sm bg-surface shadow-md">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-7 uppercase w-auto justify-center border bg-surface px-2 text-[0.75rem] font-semibold ${colorClassName}`}
+            disabled={disabled}
+            title={disabledReason ?? label}
+            aria-label={label}
+            onClick={onClick}
+          >
+            <Icon className="size-3.5 shrink-0" />
+            <span>{label}</span>
+          </Button>
+        </div>
       ))}
     </div>
   )
