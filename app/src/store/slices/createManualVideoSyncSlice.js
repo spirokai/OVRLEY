@@ -129,6 +129,15 @@ export function createManualVideoSyncSlice(set, get) {
       })
     },
 
+    clearVideoSyncDetectedLocation: () => {
+      const detection = get().manualVideoSyncDetection
+      if (detection === null || detection.location === null) return
+      set((draft) => {
+        draft.manualVideoSyncDetection.location = null
+        invalidateDerivedState(draft)
+      })
+    },
+
     setVideoSyncLandmarkType: (id, type) => {
       validateLandmarkId(id)
       const state = get()

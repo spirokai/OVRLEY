@@ -439,6 +439,7 @@ function OverlayEditorContent({
                 activity={activity}
                 detection={resolvedVideoSyncMarkControls.detection}
                 displayScale={displayScale}
+                onDeleteCourseLocation={resolvedVideoSyncMarkControls.onDeleteCourseLocation}
                 onSetCourseLocation={resolvedVideoSyncMarkControls.onSetCourseLocation}
                 previewSecond={overlayState.previewSecond}
                 sceneSize={overlayState.sceneSize}

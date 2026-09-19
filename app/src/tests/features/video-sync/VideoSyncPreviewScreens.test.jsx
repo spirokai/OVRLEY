@@ -6,6 +6,7 @@ const getMapStyleUrlTemplate = vi.hoisted(() => vi.fn())
 const mapOptions = vi.hoisted(() => vi.fn())
 const markerOptions = vi.hoisted(() => vi.fn())
 const eventHandlers = vi.hoisted(() => new Map())
+const markerEventHandlers = vi.hoisted(() => new Map())
 const source = vi.hoisted(() => ({ setData: vi.fn() }))
 const getPreference = vi.hoisted(() => vi.fn())
 const setPreference = vi.hoisted(() => vi.fn())
@@ -36,7 +37,10 @@ const map = vi.hoisted(() => {
     },
   }
 })
-const marker = vi.hoisted(() => ({ addTo: vi.fn(), remove: vi.fn(), setLngLat: vi.fn() }))
+const markerElement = vi.hoisted(() => ({ addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+const marker = vi.hoisted(() => ({ addTo: vi.fn(), getElement: vi.fn(), remove: vi.fn(), setLngLat: vi.fn() }))
+const popup = vi.hoisted(() => ({ getElement: vi.fn(), on: vi.fn(), setDOMContent: vi.fn() }))
+const popupContent = vi.hoisted(() => ({ addEventListener: vi.fn(), click: vi.fn() }))
 
 vi.mock('@/api/backend', () => ({ getMapStyleUrlTemplate }))
 vi.mock('@/lib/preferences-store', () => ({ getPreference, setPreference }))
@@ -55,7 +59,19 @@ vi.mock('maplibre-gl', () => ({
     markerOptions(options)
     marker.setLngLat.mockReturnValue(marker)
     marker.addTo.mockReturnValue(marker)
+    marker.setPopup.mockReturnValue(marker)
+    marker.on.mockImplementation((name, handler) => markerEventHandlers.set(name, handler))
+    marker.off.mockImplementation((name) => markerEventHandlers.delete(name))
+    marker.getLngLat.mockReturnValue({ lng: 8.535, lat: 47.375 })
+    marker.getElement.mockReturnValue(markerElement)
     return marker
+  }),
+  Popup: vi.fn(function Popup() {
+    popup.setDOMContent.mockImplementation((content) => {
+      popupContent.content = content
+      return popup
+    })
+    return popup
   }),
   NavigationControl: vi.fn(function NavigationControl() {}),
 }))
@@ -93,10 +109,22 @@ describe('VideoSyncPreviewScreens', () => {
     mapOptions.mockClear()
     markerOptions.mockClear()
     eventHandlers.clear()
+    markerEventHandlers.clear()
     source.setData.mockClear()
     marker.addTo.mockClear()
     marker.remove.mockClear()
     marker.setLngLat.mockClear()
+    marker.setPopup = vi.fn()
+    marker.on = vi.fn()
+    marker.off = vi.fn()
+    marker.getLngLat = vi.fn()
+    marker.getElement = vi.fn(() => markerElement)
+    markerElement.addEventListener.mockClear()
+    markerElement.removeEventListener.mockClear()
+    popup.setDOMContent.mockClear()
+    popup.getElement.mockClear()
+    popup.on.mockClear()
+    popupContent.content = null
     map.reset()
     for (const value of Object.values(map)) {
       if (typeof value?.mockClear === 'function') value.mockClear()
@@ -106,6 +134,7 @@ describe('VideoSyncPreviewScreens', () => {
   test('renders an equal-size MapLibre preview with the activity route and cursor picker', async () => {
     const user = userEvent.setup()
     const onSetCourseLocation = vi.fn()
+    const onDeleteCourseLocation = vi.fn()
     render(
       <VideoSyncPreviewScreens
         activity={{
@@ -129,6 +158,7 @@ describe('VideoSyncPreviewScreens', () => {
         }}
         displayScale={0.5}
         onSetCourseLocation={onSetCourseLocation}
+        onDeleteCourseLocation={onDeleteCourseLocation}
         previewSecond={0.5}
         sceneSize={{ width: 1920, height: 1080 }}
         setSceneElement={() => {}}
@@ -143,7 +173,13 @@ describe('VideoSyncPreviewScreens', () => {
     expect(mapScreen).toHaveStyle({ width: '960px', height: '540px' })
     expect(video.nextElementSibling).toBe(mapScreen)
     expect(screen.getByTestId('video-sync-speed-diagnostic')).toHaveTextContent('18.0')
-    await waitFor(() => expect(markerOptions).toHaveBeenCalledWith({ color: '#a855f7', scale: 1.5 }))
+    await waitFor(() => expect(markerOptions).toHaveBeenCalledWith({ color: 'var(--color-video-sync-location)', scale: 1, draggable: true }))
+
+    act(() => markerEventHandlers.get('dragend')())
+    expect(onSetCourseLocation).toHaveBeenCalledWith(0.5)
+
+    act(() => popupContent.content.click())
+    expect(onDeleteCourseLocation).toHaveBeenCalledOnce()
 
     await waitFor(() => expect(map.setStyle).toHaveBeenCalledWith('http://127.0.0.1:3210/styles/liberty'))
     act(() => eventHandlers.get('style.load')())
@@ -171,11 +207,11 @@ describe('VideoSyncPreviewScreens', () => {
     act(() => eventHandlers.get('mousemove')({ point: { x: 85.35, y: 473.75 } }))
     expect(marker.addTo).toHaveBeenCalledWith(map)
     act(() => eventHandlers.get('click')({ point: { x: 85.35, y: 473.75 } }))
-    const setLocationButton = screen.getByRole('button', { name: 'Set location in map' })
+    const setLocationButton = screen.getByRole('button', { name: 'Set location' })
     expect(setLocationButton).toHaveClass('text-video-sync-location')
     await user.click(setLocationButton)
     expect(onSetCourseLocation).toHaveBeenCalledWith(0.5)
-    expect(screen.queryByRole('button', { name: 'Set location in map' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Set location' })).not.toBeInTheDocument()
   })
 
   test('starts in Zurich, loads cached styles, and switches among all OpenFreeMap styles', async () => {

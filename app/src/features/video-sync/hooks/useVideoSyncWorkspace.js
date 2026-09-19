@@ -39,6 +39,7 @@ export function resolveVideoSyncMarkControls(markControls, timelineSecond, enabl
     onMarkRightTurn: markControls.onMarkRightTurn,
     onMarkStop: markControls.onMarkStop,
     detection: markControls.detection,
+    onDeleteCourseLocation: markControls.onDeleteCourseLocation,
     onSetCourseLocation: markControls.onSetCourseLocation,
   }
 }
@@ -59,6 +60,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
   const {
     applyVideoSyncCandidate,
     clearVideoSyncLandmarks,
+    clearVideoSyncDetectedLocation,
     importedVideoDuration,
     landmarks,
     manualVideoSyncDetection,
@@ -78,6 +80,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
     useShallow((state) => ({
       applyVideoSyncCandidate: state.applyVideoSyncCandidate,
       clearVideoSyncLandmarks: state.clearVideoSyncLandmarks,
+      clearVideoSyncDetectedLocation: state.clearVideoSyncDetectedLocation,
       importedVideoDuration: state.importedVideoDuration,
       landmarks: state.manualVideoSync.landmarks,
       manualVideoSyncDetection: state.manualVideoSyncDetection,
@@ -120,6 +123,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
   const markLocation = useCallback(() => addLandmarkAtPlayhead(VIDEO_SYNC_LANDMARK_TYPES.LOCATION), [addLandmarkAtPlayhead])
 
   const deleteLandmark = useCallback((id) => removeVideoSyncLandmark(id), [removeVideoSyncLandmark])
+  const deleteDetectedLocation = useCallback(() => clearVideoSyncDetectedLocation(), [clearVideoSyncDetectedLocation])
   const changeLandmarkType = useCallback((id, type) => setVideoSyncLandmarkType(id, type), [setVideoSyncLandmarkType])
   const applyCandidate = useCallback((candidate) => applyVideoSyncCandidate(candidate), [applyVideoSyncCandidate])
 
@@ -162,6 +166,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       onMarkRightTurn: markRightTurn,
       onMarkStop: markStop,
       onSetCourseLocation: setVideoSyncDetectedLocation,
+      onDeleteCourseLocation: deleteDetectedLocation,
       playheadOutsideVideoReason: t('videoSync.playheadInsideVideo', 'Move the playhead inside the video to mark a landmark'),
       videoRequiredReason: t('videoSync.videoRequired', 'A video is required to mark a landmark'),
       videoSyncOffsetSeconds,

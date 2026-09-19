@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { LngLatBounds, Map, Marker, NavigationControl } from 'maplibre-gl'
+import { LngLatBounds, Map, Marker, NavigationControl, Popup } from 'maplibre-gl'
 import { getMapStyleUrlTemplate } from '@/api/backend'
 import { getPreference, setPreference } from '@/lib/preferences-store'
 import {
@@ -25,9 +25,11 @@ function requireMapStyle(value) {
 }
 
 class VideoSyncMapController {
-  constructor(onActionPointChange, onError) {
+  constructor(onActionPointChange, onError, onSetCourseLocation, onDeleteCourseLocation) {
     this.onActionPointChange = onActionPointChange
     this.onError = onError
+    this.onSetCourseLocation = onSetCourseLocation
+    this.onDeleteCourseLocation = onDeleteCourseLocation
     this.courseSegments = []
     this.canvasContainer = null
     this.detection = null
@@ -47,6 +49,8 @@ class VideoSyncMapController {
     this.handleMouseMove = this.handleMouseMove.bind(this)
     this.handleMouseOut = this.handleMouseOut.bind(this)
     this.handleMove = this.handleMove.bind(this)
+    this.handleDetectedLocationDragEnd = this.handleDetectedLocationDragEnd.bind(this)
+    this.handleDeleteDetectedLocation = this.handleDeleteDetectedLocation.bind(this)
     this.handleResize = this.handleResize.bind(this)
     this.handleStyleLoad = this.handleStyleLoad.bind(this)
   }
@@ -89,8 +93,7 @@ class VideoSyncMapController {
     if (this.resizeTimeout !== null) window.clearTimeout(this.resizeTimeout)
     this.resizeTimeout = null
     this.syncHoverTarget(null)
-    this.detectedLocationMarker?.remove()
-    this.detectedLocationMarker = null
+    this.removeDetectedLocationMarker()
     this.canvasContainer = null
     this.map?.remove()
     this.map = null
@@ -198,20 +201,65 @@ class VideoSyncMapController {
     const location = this.detection?.location ?? null
     const coordinate = location === null ? null : getCoursePositionAtActivitySecond(this.courseSegments, location.time)
     if (coordinate === null) {
-      this.detectedLocationMarker?.remove()
-      this.detectedLocationMarker = null
+      this.removeDetectedLocationMarker()
       return
     }
 
     if (this.detectedLocationMarker === null) {
-      this.detectedLocationMarker = new Marker({ color: 'var(--color-video-sync-location)', scale: 1 }).setLngLat(coordinate).addTo(this.map)
+      const popupContent = document.createElement('button')
+      popupContent.type = 'button'
+      popupContent.className =
+        'flex size-5 items-center justify-center rounded-full border-2 border-red-400 bg-white text-sm leading-none font-bold text-red-600 shadow-sm hover:bg-red-100'
+      popupContent.setAttribute('aria-label', 'Delete location marker')
+      popupContent.textContent = '×'
+      popupContent.addEventListener('click', this.handleDeleteDetectedLocation)
+
+      const popup = new Popup({ anchor: 'bottom-left', className: 'video-sync-location-popup', closeButton: false, offset: [6, -20] }).setDOMContent(
+        popupContent,
+      )
+      this.detectedLocationMarker = new Marker({ color: 'var(--color-video-sync-location)', scale: 1, draggable: true })
+        .setLngLat(coordinate)
+        .setPopup(popup)
+        .addTo(this.map)
+      this.detectedLocationMarker.on('dragend', this.handleDetectedLocationDragEnd)
       return
     }
 
     this.detectedLocationMarker.setLngLat(coordinate)
   }
 
+  removeDetectedLocationMarker() {
+    if (this.detectedLocationMarker === null) return
+    this.detectedLocationMarker.off('dragend', this.handleDetectedLocationDragEnd)
+    this.detectedLocationMarker.remove()
+    this.detectedLocationMarker = null
+  }
+
+  handleDetectedLocationDragEnd() {
+    const marker = this.detectedLocationMarker
+    const location = marker === null ? null : getSnappedCoursePosition(this.map, this.map.project(marker.getLngLat()), this.courseSegments)
+    if (location === null) {
+      const currentCoordinate =
+        this.detection === null || this.detection.location === null
+          ? null
+          : getCoursePositionAtActivitySecond(this.courseSegments, this.detection.location.time)
+      if (currentCoordinate !== null) marker?.setLngLat(currentCoordinate)
+      return
+    }
+    marker.setLngLat(location.position)
+    this.onSetCourseLocation(location.activitySecond)
+  }
+
+  handleDeleteDetectedLocation(event) {
+    event.stopPropagation()
+    this.onDeleteCourseLocation()
+  }
+
   handleClick(event) {
+    const clickedElement = event.originalEvent?.target
+    const markerElement = this.detectedLocationMarker?.getElement()
+    if (clickedElement && markerElement?.contains(clickedElement)) return
+
     this.actionLocation = getSnappedCoursePosition(this.map, event.point, this.courseSegments)
     this.updateActionPoint()
   }
@@ -242,9 +290,10 @@ class VideoSyncMapController {
  * @param {object|null} options.activity Canonical parsed activity.
  * @param {object|null} options.detection Canonical detected-event model.
  * @param {(activitySecond: number) => void} options.onSetCourseLocation Stores the selected activity-side location.
+ * @param {() => void} options.onDeleteCourseLocation Clears the selected activity-side location.
  * @returns {{containerRef: React.RefObject, style: string, onStyleChange: (style: string) => void, actionPoint: {x: number, y: number, activitySecond: number}|null, onConfirmActionPoint: () => void}}
  */
-export default function useVideoSyncMap({ activity, detection, onSetCourseLocation }) {
+export default function useVideoSyncMap({ activity, detection, onSetCourseLocation, onDeleteCourseLocation }) {
   const containerRef = useRef(null)
   const controllerRef = useRef(null)
   const [style, setStyle] = useState(VIDEO_SYNC_DEFAULT_MAP_STYLE)
@@ -280,14 +329,14 @@ export default function useVideoSyncMap({ activity, detection, onSetCourseLocati
   }, [])
 
   useEffect(() => {
-    const controller = new VideoSyncMapController(setActionPoint, setError)
+    const controller = new VideoSyncMapController(setActionPoint, setError, onSetCourseLocation, onDeleteCourseLocation)
     controllerRef.current = controller
     controller.mount(containerRef.current)
     return () => {
       controller.dispose()
       controllerRef.current = null
     }
-  }, [])
+  }, [onDeleteCourseLocation, onSetCourseLocation])
 
   useEffect(() => {
     controllerRef.current.setCourseSegments(courseSegments)

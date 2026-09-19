@@ -52,8 +52,13 @@ function MapStyleSelector({ style, onStyleChange }) {
   )
 }
 
-function VideoSyncMapPreview({ activity, detection, onSetCourseLocation }) {
-  const { containerRef, style, onStyleChange, actionPoint, onConfirmActionPoint } = useVideoSyncMap({ activity, detection, onSetCourseLocation })
+function VideoSyncMapPreview({ activity, detection, onSetCourseLocation, onDeleteCourseLocation }) {
+  const { containerRef, style, onStyleChange, actionPoint, onConfirmActionPoint } = useVideoSyncMap({
+    activity,
+    detection,
+    onSetCourseLocation,
+    onDeleteCourseLocation,
+  })
 
   return (
     <div className="relative isolate h-full w-full bg-surface-elevated" data-testid="maplibre-map">
@@ -73,6 +78,7 @@ function VideoSyncMapPreview({ activity, detection, onSetCourseLocation }) {
  * @param {number} props.displayScale Shared scale applied to the complete pair.
  * @param {number} props.previewSecond Current activity preview second.
  * @param {((activitySecond: number) => void)|null} props.onSetCourseLocation Resolves the video location landmark to a course time.
+ * @param {(() => void)|null} props.onDeleteCourseLocation Clears the selected course location.
  * @param {{width: number, height: number}} props.sceneSize Canonical screen dimensions.
  * @param {(element: HTMLElement|null) => void} props.setSceneElement Registers the scaled content for zoom anchoring.
  * @returns {JSX.Element} Video-sync preview pair.
@@ -82,6 +88,7 @@ export default function VideoSyncPreviewScreens({
   detection,
   displayScale,
   onSetCourseLocation = null,
+  onDeleteCourseLocation = null,
   previewSecond,
   sceneSize,
   setSceneElement,
@@ -112,7 +119,12 @@ export default function VideoSyncPreviewScreens({
         className="relative shrink-0 overflow-hidden rounded-sm border border-border/50 bg-surface-elevated shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)]"
         style={screenStyle}
       >
-        <VideoSyncMapPreview activity={activity} detection={detection} onSetCourseLocation={onSetCourseLocation} />
+        <VideoSyncMapPreview
+          activity={activity}
+          detection={detection}
+          onSetCourseLocation={onSetCourseLocation}
+          onDeleteCourseLocation={onDeleteCourseLocation}
+        />
       </div>
     </div>
   )

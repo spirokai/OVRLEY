@@ -61,6 +61,15 @@ describe('manual video sync store contract', () => {
     expect(useStore.getState().manualVideoSync.landmarks).toEqual([])
   })
 
+  test('clears the detected course location without clearing the detection model', () => {
+    const state = useStore.getState()
+    state.setVideoSyncDetectedLocation(30)
+
+    state.clearVideoSyncDetectedLocation()
+
+    expect(useStore.getState().manualVideoSyncDetection.location).toBeNull()
+  })
+
   test('changes landmark types while preserving canonical shapes and location limits', () => {
     const state = useStore.getState()
     const landmarkId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)

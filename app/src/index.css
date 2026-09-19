@@ -114,6 +114,16 @@ body {
   height: 100vh;
 }
 
+.maplibregl-popup.video-sync-location-popup .maplibregl-popup-content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.maplibregl-popup.video-sync-location-popup .maplibregl-popup-tip {
+  display: none;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
