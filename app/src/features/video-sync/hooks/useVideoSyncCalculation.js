@@ -14,6 +14,7 @@ function scheduleVideoSyncCalculation({
   canUseMapOnly,
   completeCalculation,
   completeDetection,
+  currentDetection,
   failCalculation,
   failDetection,
   hasActivity,
@@ -31,7 +32,7 @@ function scheduleVideoSyncCalculation({
   return new Promise((resolve) => {
     const run = () => {
       try {
-        const detection = detectActivityEventsFromInput(input, settings)
+        const detection = detectActivityEventsFromInput(input, settings, currentDetection?.location ?? null)
         if (!searchCandidates) {
           resolve(completeDetection(revision, detection))
           return
@@ -68,6 +69,7 @@ export default function useVideoSyncCalculation() {
     importedVideoDuration,
     landmarks,
     manualVideoSyncCandidateStatus,
+    manualVideoSyncDetection,
     manualVideoSyncHasSearched,
     parsedActivity,
     speedThresholdKmh,
@@ -82,6 +84,7 @@ export default function useVideoSyncCalculation() {
       importedVideoDuration: state.importedVideoDuration,
       landmarks: state.manualVideoSync.landmarks,
       manualVideoSyncCandidateStatus: state.manualVideoSyncCandidateStatus,
+      manualVideoSyncDetection: state.manualVideoSyncDetection,
       manualVideoSyncHasSearched: state.manualVideoSyncHasSearched,
       parsedActivity: state.parsedActivity,
       speedThresholdKmh: state.manualVideoSync.speedThresholdKmh,
@@ -91,7 +94,7 @@ export default function useVideoSyncCalculation() {
 
   const settings = useMemo(() => ({ speedThresholdKmh, turnThresholdDegrees }), [speedThresholdKmh, turnThresholdDegrees])
   const detectorInput = useMemo(() => createActivitySyncInput(parsedActivity), [parsedActivity])
-  const domainEligibility = useMemo(() => getVideoSyncEligibility(landmarks, detectorInput.availability), [detectorInput.availability, landmarks])
+  const domainEligibility = useMemo(() => getVideoSyncEligibility(landmarks, manualVideoSyncDetection), [landmarks, manualVideoSyncDetection])
   const hasVideo = importedVideoDuration !== null
   const eligibility = useMemo(() => {
     let explanation = null
@@ -119,6 +122,7 @@ export default function useVideoSyncCalculation() {
         canUseMapOnly: eligibility.canUseMapOnly,
         completeCalculation: completeVideoSyncCalculation,
         completeDetection: completeVideoSyncDetection,
+        currentDetection: manualVideoSyncDetection,
         failCalculation: failVideoSyncCalculation,
         failDetection: failVideoSyncDetection,
         hasActivity: parsedActivity !== null,
@@ -137,6 +141,7 @@ export default function useVideoSyncCalculation() {
       failVideoSyncDetection,
       detectorInput,
       landmarks,
+      manualVideoSyncDetection,
       parsedActivity,
       settings,
     ],

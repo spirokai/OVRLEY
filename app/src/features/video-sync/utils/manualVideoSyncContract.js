@@ -112,6 +112,19 @@ export function validateVideoSecond(videoSecond, videoDurationSeconds = null) {
 }
 
 /**
+ * Validates an activity-side course location time.
+ * @param {number} activitySecond Activity-local second.
+ * @returns {number} The validated activity second.
+ */
+export function validateActivitySecond(activitySecond) {
+  requireFiniteNumber(activitySecond, 'Manual video sync detected location activitySecond')
+  if (activitySecond < 0) {
+    throw new Error('Manual video sync detected location activitySecond must not be negative')
+  }
+  return activitySecond
+}
+
+/**
  * Validates one canonical manual-sync landmark.
  * @param {object} landmark Landmark value at a feature boundary.
  * @param {number|null} videoDurationSeconds Loaded video duration, if available.

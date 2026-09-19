@@ -28,7 +28,7 @@ import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from 
 import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
 import { useTranslation } from 'react-i18next'
 import { getWidgetTypeName } from '@/lib/widget/widget-icons'
-import { resolveVideoSyncMarkControls, VideoSyncMarkControls } from '@/features/video-sync'
+import { resolveVideoSyncMarkControls, VIDEO_SYNC_PREVIEW_SCREEN_GAP, VideoSyncMarkControls, VideoSyncPreviewScreens } from '@/features/video-sync'
 
 const PROJECT_STATUS_TRANSLATIONS = {
   Unsaved: { key: 'overlay-editor.statusUnsaved', defaultLabel: 'Unsaved' },
@@ -193,7 +193,18 @@ function OverlayEditorContent({
   })
 
   // Viewport tracking
+  const viewportContentSize = useMemo(
+    () =>
+      videoSyncMode
+        ? {
+            width: overlayState.sceneSize.width * 2 + VIDEO_SYNC_PREVIEW_SCREEN_GAP,
+            height: overlayState.sceneSize.height,
+          }
+        : overlayState.sceneSize,
+    [overlayState.sceneSize, videoSyncMode],
+  )
   const { displayScale, handleWheel, scrollViewportRef, viewportRef } = useEditorViewport({
+    contentSize: viewportContentSize,
     onZoomLevelChange,
     sceneElement: overlayState.sceneElement,
     sceneSize: overlayState.sceneSize,
@@ -421,25 +432,34 @@ function OverlayEditorContent({
         >
           <div
             className="relative shrink-0"
-            style={{ width: overlayState.sceneSize.width * displayScale, height: overlayState.sceneSize.height * displayScale }}
+            style={{ width: viewportContentSize.width * displayScale, height: viewportContentSize.height * displayScale }}
           >
-            <div
-              className="absolute left-0 top-0"
-              style={{
-                width: overlayState.sceneSize.width,
-                height: overlayState.sceneSize.height,
-                transform: `scale(${displayScale})`,
-                transformOrigin: 'top left',
-              }}
-            >
-              <OverlayCanvas
-                sceneProps={canvasSceneProps}
-                displayProps={canvasDisplayProps}
-                dataProps={canvasDataProps}
-                callbacks={canvasCallbacks}
-                videoSyncMode={videoSyncMode}
+            {videoSyncMode ? (
+              <VideoSyncPreviewScreens
+                activity={activity}
+                detection={resolvedVideoSyncMarkControls.detection}
+                displayScale={displayScale}
+                onSetCourseLocation={resolvedVideoSyncMarkControls.onSetCourseLocation}
+                previewSecond={overlayState.previewSecond}
+                sceneSize={overlayState.sceneSize}
+                setSceneElement={overlayState.setSceneElement}
               />
-              {!videoSyncMode ? (
+            ) : (
+              <div
+                className="absolute left-0 top-0"
+                style={{
+                  width: overlayState.sceneSize.width,
+                  height: overlayState.sceneSize.height,
+                  transform: `scale(${displayScale})`,
+                  transformOrigin: 'top left',
+                }}
+              >
+                <OverlayCanvas
+                  sceneProps={canvasSceneProps}
+                  displayProps={canvasDisplayProps}
+                  dataProps={canvasDataProps}
+                  callbacks={canvasCallbacks}
+                />
                 <OverlayMoveable
                   moveableRef={overlayState.moveableRef}
                   selectedTarget={selection.selectedTarget}
@@ -459,8 +479,8 @@ function OverlayEditorContent({
                   handlers={handlers}
                   interactionType={overlayState.activeWidgetInteraction?.type ?? null}
                 />
-              ) : null}
-            </div>
+              </div>
+            )}
             {!videoSyncMode ? (
               <WidgetBadgeLayer
                 displayScale={displayScale}
@@ -470,7 +490,14 @@ function OverlayEditorContent({
                 widgets={overlayState.canvasWidgets}
               />
             ) : null}
-            {videoSyncMode ? <VideoSyncMarkControls {...resolvedVideoSyncMarkControls} /> : null}
+            {videoSyncMode ? (
+              <div
+                className="pointer-events-none absolute left-0 top-0"
+                style={{ width: overlayState.sceneSize.width * displayScale, height: '100%' }}
+              >
+                <VideoSyncMarkControls {...resolvedVideoSyncMarkControls} />
+              </div>
+            ) : null}
           </div>
           {!videoSyncMode && selectionRect ? (
             <div

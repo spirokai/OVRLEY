@@ -1,8 +1,8 @@
 import {
   VIDEO_SYNC_CANDIDATE_MERGE_TOLERANCE_SECONDS,
   VIDEO_SYNC_LANDMARK_TYPES,
+  VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
   VIDEO_SYNC_MAX_CANDIDATES,
-  VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS,
 } from '../data/videoSyncConstants'
 import { calculateMatchScore, compareCandidateStrength } from './matchScore'
 import { createVideoSyncOffsetSupports, MATCHABLE_LANDMARK_TYPES, offsetIsSupported, serializeOffsetSupport } from './landmarkTiming'
@@ -75,8 +75,10 @@ function buildAssignmentGroups(landmarks, supports) {
     return {
       landmarks: landmarks.filter((landmark) => landmark.type === type),
       events: [...events.values()].sort((left, right) => {
-        const leftSecond = left.type === VIDEO_SYNC_LANDMARK_TYPES.STOP ? left.time : left.start
-        const rightSecond = right.type === VIDEO_SYNC_LANDMARK_TYPES.STOP ? right.time : right.start
+        const leftSecond =
+          left.type === VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN || left.type === VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN ? left.start : left.time
+        const rightSecond =
+          right.type === VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN || right.type === VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN ? right.start : right.time
         return leftSecond - rightSecond || left.id.localeCompare(right.id)
       }),
       supportLookup,
@@ -148,7 +150,7 @@ function findBestAssignment(offset, groups, eligibleCount) {
 }
 
 function refinementAnchor(support, offset) {
-  if (support.type === VIDEO_SYNC_LANDMARK_TYPES.STOP) return support.preferredOffsets[0]
+  if (support.type === VIDEO_SYNC_LANDMARK_TYPES.STOP || support.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) return support.preferredOffsets[0]
   const [start, end] = support.preferredOffsets
   if (offset < start) return start
   if (offset > end) return end
@@ -220,7 +222,7 @@ function mergeCandidateRecords(records) {
 }
 
 function classifyCandidateWithMap(record, mapLandmark, mapOffset) {
-  const agrees = Math.abs(record.candidate.offset - mapOffset) <= VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS
+  const agrees = Math.abs(record.candidate.offset - mapOffset) <= VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS
   return {
     ...record,
     candidate: {
@@ -252,7 +254,7 @@ function createMapOnlyCandidate(mapLandmark, mapOffset, eligibleCount) {
  * Finds deterministic, globally aligned manual video-sync candidates.
  *
  * @param {object[]} landmarks Canonical video landmarks.
- * @param {{availability: {speed: boolean, heading: boolean}, stops: object[], turns: object[]}} detection Canonical detected activity events.
+ * @param {{availability: {speed: boolean, heading: boolean}, stops: object[], turns: object[], location: object|null}} detection Canonical detected activity events.
  * @returns {{candidates: object[], diagnostics: {eligibleLandmarkIds: string[], offsetSupports: object[], hypotheses: object[]}}} Presentation candidates and development diagnostics.
  */
 export function matchVideoSyncCandidates(landmarks, detection) {
@@ -266,8 +268,8 @@ export function matchVideoSyncCandidates(landmarks, detection) {
   }
 
   const merged = mergeCandidateRecords(records)
-  const mapLandmark = landmarks.find((landmark) => landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION && landmark.activitySecond !== null)
-  const mapOffset = mapLandmark === undefined ? null : mapLandmark.activitySecond - mapLandmark.videoSecond
+  const mapLandmark = detection.location === null ? undefined : landmarks.find((landmark) => landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION)
+  const mapOffset = mapLandmark === undefined ? null : detection.location.time - mapLandmark.videoSecond
   const classified = mapLandmark === undefined ? merged : merged.map((record) => classifyCandidateWithMap(record, mapLandmark, mapOffset))
   const candidateLimit = mapLandmark === undefined ? VIDEO_SYNC_MAX_CANDIDATES : VIDEO_SYNC_MAX_CANDIDATES - 1
   const candidates = classified.slice(0, candidateLimit).map((record) => record.candidate)

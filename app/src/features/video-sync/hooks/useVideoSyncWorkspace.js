@@ -38,6 +38,8 @@ export function resolveVideoSyncMarkControls(markControls, timelineSecond, enabl
     onMarkLocation: markControls.onMarkLocation,
     onMarkRightTurn: markControls.onMarkRightTurn,
     onMarkStop: markControls.onMarkStop,
+    detection: markControls.detection,
+    onSetCourseLocation: markControls.onSetCourseLocation,
   }
 }
 
@@ -65,6 +67,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
     manualVideoSyncError,
     manualVideoSyncHasSearched,
     removeVideoSyncLandmark,
+    setVideoSyncDetectedLocation,
     setVideoSyncLandmarkType,
     setVideoSyncSpeedThreshold,
     setVideoSyncTurnThreshold,
@@ -83,6 +86,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       manualVideoSyncError: state.manualVideoSyncError,
       manualVideoSyncHasSearched: state.manualVideoSyncHasSearched,
       removeVideoSyncLandmark: state.removeVideoSyncLandmark,
+      setVideoSyncDetectedLocation: state.setVideoSyncDetectedLocation,
       setVideoSyncLandmarkType: state.setVideoSyncLandmarkType,
       setVideoSyncSpeedThreshold: state.setVideoSyncSpeedThreshold,
       setVideoSyncTurnThreshold: state.setVideoSyncTurnThreshold,
@@ -147,6 +151,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       videoSync,
     },
     markControls: {
+      detection: manualVideoSyncDetection,
       hasLandmarkCapacity,
       hasLocationLandmark,
       importedVideoDuration,
@@ -156,6 +161,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       onMarkLocation: markLocation,
       onMarkRightTurn: markRightTurn,
       onMarkStop: markStop,
+      onSetCourseLocation: setVideoSyncDetectedLocation,
       playheadOutsideVideoReason: t('videoSync.playheadInsideVideo', 'Move the playhead inside the video to mark a landmark'),
       videoRequiredReason: t('videoSync.videoRequired', 'A video is required to mark a landmark'),
       videoSyncOffsetSeconds,

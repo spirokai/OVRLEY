@@ -4,9 +4,10 @@ import { matchVideoSyncCandidates } from '@/features/video-sync/utils/intervalCo
 
 const ALL_METRICS = { speed: true, heading: true, course: true }
 
-function detection({ stops = [], turns = [] } = {}) {
+function detection({ location = null, stops = [], turns = [] } = {}) {
   return {
     availability: ALL_METRICS,
+    location,
     stops,
     turns,
   }
@@ -81,7 +82,7 @@ describe('manual video-sync interval consensus', () => {
     expect(first.candidates).toEqual([...first.candidates].sort((left, right) => right.matchScore - left.matchScore || left.offset - right.offset))
   })
 
-  test('ignores unresolved locations and exposes resolved map-only and conflict variants', () => {
+  test('ignores unresolved locations and uses a resolved location in map-only, combined, and conflict candidates', () => {
     const ordinaryLandmarks = [
       { id: 'video-stop-1', type: 'stop', videoSecond: 10 },
       { id: 'video-stop-2', type: 'stop', videoSecond: 20 },
@@ -94,13 +95,21 @@ describe('manual video-sync interval consensus', () => {
     expect(unresolved.diagnostics.eligibleLandmarkIds).toEqual(['video-stop-1', 'video-stop-2'])
 
     const resolved = matchVideoSyncCandidates(
-      [...ordinaryLandmarks, { id: 'video-location', type: 'location', videoSecond: 0, activitySecond: 0 }],
-      detection({ stops: [stop('activity-stop-1', 20), stop('activity-stop-2', 30)] }),
+      [...ordinaryLandmarks, { id: 'video-location', type: 'location', videoSecond: 0, activitySecond: null }],
+      detection({ location: { id: 'map-location', type: 'location', time: 0 }, stops: [stop('activity-stop-1', 20), stop('activity-stop-2', 30)] }),
     )
     expect(resolved.candidates[0]).toMatchObject({ variant: 'mapOnly', offset: 0, matchScore: null, mapClassification: 'authoritative' })
-    expect(resolved.candidates[1]).toMatchObject({
+    expect(resolved.candidates[1]).toMatchObject({ variant: 'ordinary', offset: 0, matchedCount: 2, eligibleCount: 3, mapClassification: 'agrees' })
+    expect(resolved.candidates[1].evidence.map((item) => item.type)).toEqual(['stop', 'location'])
+    expect(resolved.diagnostics.eligibleLandmarkIds).toContain('video-location')
+
+    const conflicting = matchVideoSyncCandidates(
+      [...ordinaryLandmarks, { id: 'video-location', type: 'location', videoSecond: 0, activitySecond: null }],
+      detection({ location: { id: 'map-location', type: 'location', time: 0 }, stops: [stop('activity-stop-1', 30), stop('activity-stop-2', 40)] }),
+    )
+    expect(conflicting.candidates.find((candidate) => candidate.variant === 'mapConflict')).toMatchObject({
       variant: 'mapConflict',
-      offset: 10,
+      offset: 20,
       mapClassification: 'conflict',
       excludedLandmarkIds: ['video-location'],
     })

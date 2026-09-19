@@ -56,6 +56,32 @@ function buildSegments(elapsedSeconds) {
 }
 
 /**
+ * Splits the canonical geographic course at missing coordinate pairs.
+ * Single-point fragments are omitted because they cannot form a polyline.
+ *
+ * @param {object|null} parsedActivity Finalized canonical activity data.
+ * @returns {{coordinate: number[], activitySecond: number}[][]} Contiguous timed course segments.
+ */
+export function buildActivityCourseSegments(parsedActivity) {
+  if (parsedActivity === null) return []
+
+  const segments = []
+  let currentSegment = []
+
+  parsedActivity.sample_course_points.forEach(([latitude, longitude], index) => {
+    if (latitude === null || longitude === null) {
+      if (currentSegment.length > 1) segments.push(currentSegment)
+      currentSegment = []
+    } else {
+      currentSegment.push({ coordinate: [longitude, latitude], activitySecond: parsedActivity.sample_elapsed_seconds[index] })
+    }
+  })
+
+  if (currentSegment.length > 1) segments.push(currentSegment)
+  return segments
+}
+
+/**
  * Projects canonical parsed activity data into the one detector input shape.
  *
  * Missing speed, heading, and course values remain explicit nulls. The

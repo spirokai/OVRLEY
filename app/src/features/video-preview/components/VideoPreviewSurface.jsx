@@ -1,7 +1,11 @@
+import { useRef } from 'react'
 import { AlertTriangle, ExternalLink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { cn } from '@/lib/utils'
+import useStore from '@/store/useStore'
+import { useVideoPreview } from '../hooks/useVideoPreview'
 
-export default function HevcPlaybackPlaceholder({ displayScale, importId, openVideoPreviewHelp, platformOs, videoPreviewHelpAvailable }) {
+function HevcPlaybackPlaceholder({ displayScale, importId, openVideoPreviewHelp, platformOs, videoPreviewHelpAvailable }) {
   const { t } = useTranslation()
   const isWindows = platformOs === 'windows'
   const isLinux = platformOs === 'linux'
@@ -49,5 +53,52 @@ export default function HevcPlaybackPlaceholder({ displayScale, importId, openVi
         ) : null}
       </div>
     </div>
+  )
+}
+
+/**
+ * Renders the shared video preview surface used by the editor and video-sync workspace.
+ *
+ * @param {object} props Component props.
+ * @param {React.ReactNode} [props.children] Optional diagnostic layer.
+ * @param {number} props.displayScale Current display scale.
+ * @param {boolean} props.isActive Whether video playback synchronization is active.
+ * @returns {JSX.Element} Video preview surface.
+ */
+export default function VideoPreviewSurface({ children, displayScale, isActive }) {
+  const videoRef = useRef(null)
+  const isVideoMuted = useStore((state) => state.isVideoMuted)
+  const platformOs = useStore((state) => state.platformOs)
+  const { videoSrc, importId, isOutOfRange, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } = useVideoPreview(
+    videoRef,
+    isActive,
+  )
+  const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
+
+  return (
+    <>
+      {videoSrc && !hasHevcPlaybackError ? (
+        <video
+          key={importId ?? 'no-video'}
+          ref={videoRef}
+          src={videoSrc}
+          className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')}
+          preload="metadata"
+          playsInline
+          muted={isVideoMuted}
+          onError={(event) => console.error('[VideoPreviewSurface] Video Error:', event)}
+        />
+      ) : null}
+      {children}
+      {videoSrc && hasHevcPlaybackError ? (
+        <HevcPlaybackPlaceholder
+          displayScale={displayScale}
+          importId={importId}
+          openVideoPreviewHelp={openVideoPreviewHelp}
+          platformOs={platformOs}
+          videoPreviewHelpAvailable={videoPreviewHelpAvailable}
+        />
+      ) : null}
+    </>
   )
 }

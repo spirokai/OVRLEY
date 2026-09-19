@@ -25,7 +25,7 @@ export function VideoSyncLandmarkList({ landmarks, onClear, onChangeType, onDele
     <section className="space-y-3" aria-label={t('videoSync.landmarks', 'Landmarks')}>
       <SectionHeading
         icon={MapPin}
-        title={t('videoSync.yourLandmarks', 'Your Landmarks')}
+        title={t('videoSync.yourLandmarks', 'Video Landmarks')}
         variant="drawer"
         trailing={
           <Button

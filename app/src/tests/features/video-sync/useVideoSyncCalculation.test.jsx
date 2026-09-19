@@ -37,6 +37,16 @@ async function waitForDetection(result) {
 }
 
 describe('manual video-sync calculation orchestration', () => {
+  test('preserves the location event when automatic detection refreshes the canonical detection model', async () => {
+    resetStore()
+    useStore.getState().setVideoSyncDetectedLocation(2)
+    const { result } = renderHook(() => useVideoSyncCalculation())
+
+    await waitForDetection(result)
+
+    expect(useStore.getState().manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 2 })
+  })
+
   test('gates the first candidate search on usable landmark telemetry', async () => {
     resetStore(createActivity([null, null, null, null, null]))
     const { result } = renderHook(() => useVideoSyncCalculation())

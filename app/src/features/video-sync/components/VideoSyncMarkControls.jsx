@@ -78,7 +78,7 @@ export function VideoSyncMarkControls({
           type="button"
           variant="ghost"
           size="sm"
-          className={`h-7 w-auto justify-center border bg-surface px-2 text-[10px] font-semibold ${colorClassName}`}
+          className={`h-7 uppercase w-auto justify-center border bg-surface px-2 text-[10px] font-semibold ${colorClassName}`}
           disabled={disabled}
           title={disabledReason ?? label}
           aria-label={label}

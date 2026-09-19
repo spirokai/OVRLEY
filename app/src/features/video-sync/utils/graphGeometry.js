@@ -6,6 +6,7 @@ import {
   VIDEO_SYNC_GRAPH_HEIGHT_PX,
   VIDEO_SYNC_GRAPH_MIN_SCALE_VALUE,
   VIDEO_SYNC_GRAPH_ROBUST_PERCENTILE,
+  VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
   VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS,
 } from '../data/videoSyncConstants'
 import { secondsToViewPx } from '@/features/player/utils/timelineGeometry'
@@ -216,7 +217,7 @@ function createBand({ id, type, labelKey, startSecond, endSecond, viewStart, vie
     labelKey,
     startSecond,
     style: { left, width: right - left },
-    tone: type === 'stop' ? 'stop' : 'turn',
+    tone: type,
     type,
   }
 }
@@ -225,11 +226,11 @@ function createBand({ id, type, labelKey, startSecond, endSecond, viewStart, vie
  * Converts detected events to visible graph bands using the shared timing
  * tolerance and the existing timeline time-to-pixel transform.
  *
- * @param {{detection: {stops: object[], turns: object[]}|null, viewStart: number, viewEnd: number, widthPx: number, toleranceSeconds?: number}} options Event-band inputs.
+ * @param {{detection: {stops: object[], turns: object[], location: object|null}|null, viewStart: number, viewEnd: number, widthPx: number, toleranceSeconds?: number}} options Event-band inputs.
  * @returns {object[]} Render-ready event bands.
  */
 export function buildEventBands({ detection, viewStart, viewEnd, widthPx, toleranceSeconds = VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS }) {
-  if (!detection || widthPx <= 0 || viewEnd <= viewStart) return []
+  if (detection === null || widthPx <= 0 || viewEnd <= viewStart) return []
 
   const bands = detection.stops
     .map((event) =>
@@ -243,6 +244,22 @@ export function buildEventBands({ detection, viewStart, viewEnd, widthPx, tolera
         viewStart,
         widthPx,
       }),
+    )
+    .concat(
+      detection.location === null
+        ? []
+        : [
+            createBand({
+              endSecond: detection.location.time + VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
+              id: detection.location.id,
+              labelKey: 'videoSync.location',
+              startSecond: detection.location.time - VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
+              type: detection.location.type,
+              viewEnd,
+              viewStart,
+              widthPx,
+            }),
+          ],
     )
     .concat(
       detection.turns.map((event) =>

@@ -406,7 +406,7 @@
     "videoLandmarks": "Video landmarks",
     "videoRequired": "A video is required to mark a landmark",
     "videoRequiredForSync": "A video is required for Landmark Sync",
-    "yourLandmarks": "Your Landmarks"
+    "yourLandmarks": "Video Landmarks"
   },
   "video-preview": {
     "aborterror": "AbortError",

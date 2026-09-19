@@ -1,23 +1,35 @@
-import { VIDEO_SYNC_LANDMARK_TYPES, VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS } from '../data/videoSyncConstants'
+import {
+  VIDEO_SYNC_LANDMARK_TYPES,
+  VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
+  VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS,
+} from '../data/videoSyncConstants'
 
-const MATCHABLE_LANDMARK_TYPES = [VIDEO_SYNC_LANDMARK_TYPES.STOP, VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN, VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN]
+const MATCHABLE_LANDMARK_TYPES = [
+  VIDEO_SYNC_LANDMARK_TYPES.STOP,
+  VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN,
+  VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN,
+  VIDEO_SYNC_LANDMARK_TYPES.LOCATION,
+]
+const UNAVAILABLE_METRICS = Object.freeze({ speed: false, heading: false, course: false })
 
 /**
  * Derives the landmarks that can participate in ordinary matching from the
  * canonical detector availability.
  *
  * @param {object[]} landmarks Canonical video landmarks.
- * @param {{speed: boolean, heading: boolean, course: boolean}} availability Detector metric availability.
+ * @param {{availability: {speed: boolean, heading: boolean, course: boolean}, location: object|null}|null} detection Canonical detected-event model.
  * @returns {{eligibleLandmarks: object[], eligibleLandmarkIds: string[], unsupportedLandmarks: {id: string, type: string, metric: string}[], resolvedLocationLandmark: object|null, canMatchLandmarks: boolean, canUseMapOnly: boolean}} Eligibility model.
  */
-export function getVideoSyncEligibility(landmarks, availability) {
+export function getVideoSyncEligibility(landmarks, detection) {
   const eligibleLandmarks = []
   const unsupportedLandmarks = []
   let resolvedLocationLandmark = null
+  const availability = detection?.availability ?? UNAVAILABLE_METRICS
+  const location = detection?.location ?? null
 
   for (const landmark of landmarks) {
     if (landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) {
-      if (landmark.activitySecond !== null) resolvedLocationLandmark = landmark
+      if (location !== null) resolvedLocationLandmark = landmark
       continue
     }
 
@@ -49,6 +61,20 @@ export function getVideoSyncEligibility(landmarks, availability) {
  * @returns {{landmarkId: string, eventId: string, type: string, event: object, startOffset: number, endOffset: number, residualAt: (offset: number) => number, preferredOffsets: number[]}} Typed offset support.
  */
 function createOffsetSupport(landmark, event) {
+  if (landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) {
+    const center = event.time - landmark.videoSecond
+    return {
+      landmarkId: landmark.id,
+      eventId: event.id,
+      type: landmark.type,
+      event,
+      startOffset: center - VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
+      endOffset: center + VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
+      residualAt: (offset) => Math.abs(offset - center),
+      preferredOffsets: [center],
+    }
+  }
+
   if (landmark.type === VIDEO_SYNC_LANDMARK_TYPES.STOP) {
     const center = event.time - landmark.videoSecond
     return {
@@ -94,11 +120,10 @@ function sortByTime(left, right, timeOf) {
 }
 
 /**
- * Builds all typed offset supports and the landmarks eligible for ordinary
- * stop/turn matching. Location landmarks are intentionally excluded here.
+ * Builds all typed offset supports and the landmarks eligible for matching.
  *
  * @param {object[]} landmarks Canonical video landmarks.
- * @param {{availability: {speed: boolean, heading: boolean}, stops: object[], turns: object[]}} detection Canonical detector result.
+ * @param {{availability: {speed: boolean, heading: boolean}, stops: object[], turns: object[], location: object|null}} detection Canonical detector result.
  * @returns {{eligibleLandmarks: object[], supports: object[]}} Eligible landmarks and typed supports.
  */
 export function createVideoSyncOffsetSupports(landmarks, detection) {
@@ -112,14 +137,20 @@ export function createVideoSyncOffsetSupports(landmarks, detection) {
       .sort((left, right) => sortByTime(left, right, (event) => event.start)),
   }
 
-  const { eligibleLandmarks } = getVideoSyncEligibility(landmarks, detection.availability)
+  const { eligibleLandmarks, resolvedLocationLandmark } = getVideoSyncEligibility(landmarks, detection)
+  const matchableLandmarks = resolvedLocationLandmark === null ? eligibleLandmarks : [...eligibleLandmarks, resolvedLocationLandmark]
+  matchableLandmarks.sort((left, right) => sortByTime(left, right, (landmark) => landmark.videoSecond))
 
   const supports = []
-  for (const landmark of eligibleLandmarks) {
+  for (const landmark of matchableLandmarks) {
+    if (landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) {
+      supports.push(createOffsetSupport(landmark, detection.location))
+      continue
+    }
     for (const event of eventsByType[landmark.type]) supports.push(createOffsetSupport(landmark, event))
   }
 
-  return { eligibleLandmarks, supports }
+  return { eligibleLandmarks: matchableLandmarks, supports }
 }
 
 /**

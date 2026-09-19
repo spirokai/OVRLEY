@@ -1,6 +1,7 @@
 import {
   MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES,
   VIDEO_SYNC_LANDMARK_TYPES,
+  VIDEO_SYNC_DETECTED_LOCATION_ID,
   VIDEO_SYNC_MAX_LANDMARKS,
   VIDEO_SYNC_MAX_LOCATION_LANDMARKS,
   VIDEO_SYNC_SPEED_THRESHOLD_RANGE_KMH,
@@ -9,11 +10,13 @@ import {
 import {
   cloneManualState,
   createDefaultManualState,
+  validateActivitySecond,
   validateLandmarkId,
   validateLandmark,
   validateThreshold,
   validateVideoSecond,
 } from '@/features/video-sync/utils/manualVideoSyncContract'
+import { createEmptyVideoSyncDetection } from '@/features/video-sync/utils/detectActivityEvents'
 
 function createLandmarkId() {
   const randomUUID = globalThis.crypto?.randomUUID
@@ -111,6 +114,17 @@ export function createManualVideoSyncSlice(set, get) {
       set((draft) => {
         const target = draft.manualVideoSync.landmarks.find((item) => item.id === id)
         target.videoSecond = videoSecond
+        invalidateDerivedState(draft)
+      })
+    },
+
+    setVideoSyncDetectedLocation: (activitySecond) => {
+      validateActivitySecond(activitySecond)
+      const detectedLocation = { id: VIDEO_SYNC_DETECTED_LOCATION_ID, type: VIDEO_SYNC_LANDMARK_TYPES.LOCATION, time: activitySecond }
+      if (get().manualVideoSyncDetection?.location?.time === activitySecond) return
+      set((draft) => {
+        if (draft.manualVideoSyncDetection === null) draft.manualVideoSyncDetection = createEmptyVideoSyncDetection()
+        draft.manualVideoSyncDetection.location = detectedLocation
         invalidateDerivedState(draft)
       })
     },

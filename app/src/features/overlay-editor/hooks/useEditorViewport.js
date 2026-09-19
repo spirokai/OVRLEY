@@ -47,17 +47,19 @@ function getNextZoomLevel(zoomLevel, deltaY) {
  * Owns viewport measurement, scrolling, panning, and cursor-anchored zoom.
  *
  * @param {object} options
+ * @param {{ width: number, height: number }} [options.contentSize] Full unscaled viewport content dimensions.
  * @param {Function} options.onZoomLevelChange - Updates the canonical editor zoom level.
  * @param {HTMLElement|null} options.sceneElement - Rendered scene element used for cursor anchoring.
  * @param {{ width: number, height: number }} options.sceneSize - Scene dimensions.
  * @param {number} options.zoomLevel - Canonical editor zoom level.
  * @returns {{ displayScale: number, handleWheel: Function, scrollViewportRef: React.RefObject, viewportRef: React.RefObject }}
  */
-export function useEditorViewport({ onZoomLevelChange, sceneElement, sceneSize, zoomLevel }) {
+export function useEditorViewport({ contentSize, onZoomLevelChange, sceneElement, sceneSize, zoomLevel }) {
   const viewportRef = useRef(null)
   const scrollViewportRef = useRef(null)
   const zoomAnchorRef = useRef(null)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
+  const viewportContentSize = contentSize ?? sceneSize
 
   useEffect(() => {
     const viewportNode = viewportRef.current
@@ -76,8 +78,8 @@ export function useEditorViewport({ onZoomLevelChange, sceneElement, sceneSize, 
   const fitScale = useMemo(() => {
     const safeWidth = Math.max(viewportSize.width - VIEWPORT_PADDING, 1)
     const safeHeight = Math.max(viewportSize.height - VIEWPORT_PADDING, 1)
-    return Math.min(safeWidth / sceneSize.width, safeHeight / sceneSize.height, 1)
-  }, [viewportSize, sceneSize])
+    return Math.min(safeWidth / viewportContentSize.width, safeHeight / viewportContentSize.height, 1)
+  }, [viewportContentSize, viewportSize])
   const displayScale = fitScale * zoomLevel
 
   const handleWheel = useCallback(

@@ -224,6 +224,23 @@ export async function getPlatformInfo() {
 }
 
 /**
+ * Returns the Rust-owned loopback URL template for cached OpenFreeMap styles.
+ * The null browser result is intentional: the map service only exists in the
+ * desktop runtime.
+ *
+ * @returns {Promise<string|null>} MapLibre style URL template, or null outside Tauri.
+ */
+export async function getMapStyleUrlTemplate() {
+  if (!hasTauriRuntime()) return null
+
+  const urlTemplate = await invokeCommand('backend_get_map_style_url_template')
+  if (typeof urlTemplate !== 'string' || !/^http:\/\/127\.0\.0\.1:\d+\/styles\/\{style\}$/.test(urlTemplate)) {
+    throw new Error('Invalid map style URL template returned by backend')
+  }
+  return urlTemplate
+}
+
+/**
  * Returns the Rust-owned application distribution kind.
  * @returns {Promise<'installed'|'portable'>} Promise resolving to the canonical distribution kind.
  */

@@ -50,6 +50,17 @@ describe('manual video sync store contract', () => {
     expect(useStore.getState().manualVideoSync.landmarks).toEqual([])
   })
 
+  test('sets and overwrites the detected course location without a video or video landmark', () => {
+    useStore.setState({ importedVideoDuration: null })
+    const state = useStore.getState()
+
+    state.setVideoSyncDetectedLocation(30)
+    state.setVideoSyncDetectedLocation(45)
+
+    expect(useStore.getState().manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 45 })
+    expect(useStore.getState().manualVideoSync.landmarks).toEqual([])
+  })
+
   test('changes landmark types while preserving canonical shapes and location limits', () => {
     const state = useStore.getState()
     const landmarkId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
@@ -81,6 +92,7 @@ describe('manual video sync store contract', () => {
     expect(() => state.setVideoSyncSpeedThreshold(0)).toThrow(/between 1 and 10/)
     expect(() => state.setVideoSyncTurnThreshold(361)).toThrow(/between 90 and 360/)
     expect(() => state.moveVideoSyncLandmark('missing-id', 4)).toThrow(/was not found/)
+    expect(() => state.setVideoSyncDetectedLocation(Number.NaN)).toThrow(/finite number/)
   })
 
   test('discards calculation results after the input revision changes', () => {

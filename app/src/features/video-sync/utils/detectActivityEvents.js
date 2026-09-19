@@ -8,11 +8,22 @@ import { deriveTurningSeries, detectTurnsFromDerivedSeries } from './detectTurns
  *
  * @param {object|null} parsedActivity Finalized canonical activity data.
  * @param {{speedThresholdKmh: number, turnThresholdDegrees: number}} settings Physical detector thresholds.
- * @returns {{availability: {speed: boolean, heading: boolean, course: boolean}, stops: object[], turns: object[], graphSeries: {speed: {time: number, value: number|null}[], turning: {time: number, value: number|null}[]}}} Detector result.
+ * @returns {{availability: {speed: boolean, heading: boolean, course: boolean}, stops: object[], turns: object[], location: object|null, graphSeries: {speed: {time: number, value: number|null}[], turning: {time: number, value: number|null}[]}}} Detector result.
  */
 export function detectActivityEvents(parsedActivity, settings) {
   const input = createActivitySyncInput(parsedActivity)
-  return detectActivityEventsFromInput(input, settings)
+  return detectActivityEventsFromInput(input, settings, null)
+}
+
+/** @returns {object} Empty canonical detected-event model. */
+export function createEmptyVideoSyncDetection() {
+  return {
+    availability: { speed: false, heading: false, course: false },
+    stops: [],
+    turns: [],
+    location: null,
+    graphSeries: { speed: [], turning: [] },
+  }
 }
 
 /**
@@ -23,9 +34,10 @@ export function detectActivityEvents(parsedActivity, settings) {
  *
  * @param {object} input Detector input produced by createActivitySyncInput.
  * @param {{speedThresholdKmh: number, turnThresholdDegrees: number}} settings Physical detector thresholds.
- * @returns {{availability: {speed: boolean, heading: boolean, course: boolean}, stops: object[], turns: object[], graphSeries: {speed: {time: number, value: number|null}[], turning: {time: number, value: number|null}[]}}} Detector result.
+ * @param {object|null} location Existing user-selected location event to preserve across automatic detection.
+ * @returns {{availability: {speed: boolean, heading: boolean, course: boolean}, stops: object[], turns: object[], location: object|null, graphSeries: {speed: {time: number, value: number|null}[], turning: {time: number, value: number|null}[]}}} Detector result.
  */
-export function detectActivityEventsFromInput(input, settings) {
+export function detectActivityEventsFromInput(input, settings, location) {
   const stopState = detectStopState(input, settings)
   const turning = deriveTurningSeries(input)
   const turns = detectTurnsFromDerivedSeries(input, turning, {
@@ -36,6 +48,7 @@ export function detectActivityEventsFromInput(input, settings) {
     availability: input.availability,
     stops: stopState.stops,
     turns,
+    location,
     graphSeries: {
       speed: input.elapsedSeconds.map((time, index) => ({ time, value: input.speed[index] })),
       turning,

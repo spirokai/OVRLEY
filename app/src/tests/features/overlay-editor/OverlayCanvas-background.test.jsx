@@ -4,15 +4,13 @@
  * Verifies the correct visual elements render for each backgroundMode value.
  */
 
-import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
-
-const useVideoPreview = vi.hoisted(() => vi.fn())
+import { render } from '@testing-library/react'
+import { describe, expect, test, vi } from 'vitest'
 
 vi.mock('@tauri-apps/api/core', () => ({ convertFileSrc: (path) => path }))
 
 vi.mock('@/features/video-preview', () => ({
-  useVideoPreview,
+  VideoPreviewSurface: () => <div data-testid="video-preview-surface" />,
 }))
 
 vi.mock('@/features/widget-preview', () => ({
@@ -51,11 +49,6 @@ const defaultCallbacks = {
 }
 
 describe('OverlayCanvas background modes', () => {
-  beforeEach(() => {
-    useVideoPreview.mockReset()
-    useVideoPreview.mockReturnValue({ videoSrc: '', importId: null, isOutOfRange: false, videoPreviewMessages: [] })
-  })
-
   test('checker mode renders checkered background', () => {
     const { container } = render(
       <OverlayCanvas
@@ -120,51 +113,5 @@ describe('OverlayCanvas background modes', () => {
     )
 
     expect(container.querySelector('[data-testid="overlay-scene"]')).toBeTruthy()
-  })
-
-  test('sync mode forces video and replaces project widgets with diagnostics without mutating display state', () => {
-    const displayProps = defaultDisplayProps('checker')
-    const dataProps = {
-      ...defaultDataProps,
-      widgets: [{ id: 'saved-widget', category: 'values', type: 'speed' }],
-      renderGeometryModels: {
-        'saved-widget': { visualBounds: null, renderGeometry: { left: 0, top: 0, width: 20, height: 20, transform: '', transformOrigin: '' } },
-      },
-    }
-
-    render(
-      <OverlayCanvas sceneProps={defaultSceneProps} displayProps={displayProps} dataProps={dataProps} callbacks={defaultCallbacks} videoSyncMode />,
-    )
-
-    expect(useVideoPreview).toHaveBeenLastCalledWith(expect.any(Object), true)
-    expect(screen.queryByTestId('widget-preview')).not.toBeInTheDocument()
-    expect(screen.getByTestId('video-sync-canvas-diagnostics')).toBeInTheDocument()
-    expect(displayProps.backgroundMode).toBe('checker')
-    expect(dataProps.widgets).toHaveLength(1)
-  })
-
-  test('renders the current speed directly on the sync canvas', () => {
-    const dataProps = {
-      ...defaultDataProps,
-      activity: {
-        trim_end_seconds: 1,
-        sample_elapsed_seconds: [0, 1],
-        speed: [4, 6],
-      },
-      previewSecond: 0.5,
-    }
-
-    render(
-      <OverlayCanvas
-        sceneProps={defaultSceneProps}
-        displayProps={defaultDisplayProps('video')}
-        dataProps={dataProps}
-        callbacks={defaultCallbacks}
-        videoSyncMode
-      />,
-    )
-
-    expect(screen.getByTestId('video-sync-speed-diagnostic')).toHaveTextContent('18.0')
-    expect(screen.getByTestId('video-sync-speed-diagnostic')).toHaveTextContent('KM/H')
   })
 })

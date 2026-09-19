@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { buildGraphGeometry, buildGraphScales, decimateGraphSamples } from '@/features/video-sync/utils/graphGeometry'
+import { buildEventBands, buildGraphGeometry, buildGraphScales, decimateGraphSamples } from '@/features/video-sync/utils/graphGeometry'
 
 function points(values, start = 0) {
   return values.map((value, index) => ({ time: start + index, value }))
@@ -45,5 +45,16 @@ describe('manual video-sync timeline graph geometry', () => {
     expect(graph.paths.speed).toContain('L 100')
     expect(graph.paths.speed).toContain('M 300')
     expect(graph.paths.speed).not.toContain('L 300')
+  })
+
+  test('renders a resolved location as a ten-second tolerance band', () => {
+    const bands = buildEventBands({
+      detection: { stops: [], turns: [], location: { id: 'map', type: 'location', time: 50 } },
+      viewStart: 0,
+      viewEnd: 100,
+      widthPx: 500,
+    })
+
+    expect(bands).toEqual([expect.objectContaining({ id: 'map', type: 'location', tone: 'location', startSecond: 40, endSecond: 60 })])
   })
 })
