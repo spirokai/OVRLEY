@@ -93,6 +93,7 @@ pub fn run() {
             tauri_commands::backend_extract_video_telemetry,
             tauri_commands::backend_clear_preview_video,
             tauri_commands::backend_get_video_state,
+            tauri_commands::backend_get_map_style_url_template,
             tauri_commands::backend_detect_codecs,
             tauri_commands::backend_build_elevation_geometry,
             tauri_commands::backend_build_route_geometry,

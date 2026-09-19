@@ -449,6 +449,14 @@ pub(crate) async fn backend_get_video_state(
     serialize_command_result(&state.current_state())
 }
 
+/// Returns the loopback URL template used by MapLibre to request cached map styles.
+#[tauri::command]
+pub(crate) async fn backend_get_map_style_url_template(
+    state: tauri::State<'_, VideoServerHandle>,
+) -> Result<String, String> {
+    state.map_style_url_template()
+}
+
 /// Detects available ffmpeg encoders and hardware acceleration paths.
 #[tauri::command]
 pub(crate) async fn backend_detect_codecs(app: AppHandle) -> Result<String, String> {

@@ -2,8 +2,8 @@
 //!
 //! Owns: the `VideoServerHandle` / `PreviewVideoState` lifecycle, the tiny_http
 //!       request workers, byte-range parsing (`parse_range`), and all
-//!       preview-video HTTP serving logic. The server binds to a random loopback
-//!       port at startup and serves video files to the frontend for in-app preview.
+//!       preview-video and map-tile HTTP serving logic. The server binds to a
+//!       random loopback port at startup and serves local preview resources.
 //! Does not own: core rendering, video encoding, or activity parsing — those live
 //!       in `ovrley_core`. This module is Tauri-shell infrastructure.
 //!
@@ -34,7 +34,7 @@ use std::time::Duration;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 use uuid::Uuid;
 
-use crate::map_tile_service::{parse_tile_path, MapTileService};
+use crate::map_tile_service::{parse_style_path, parse_tile_path, MapTileService, TilePayload};
 
 const CHUNK_SIZE: usize = 512 * 1024;
 const WORKER_COUNT: usize = 4;
@@ -252,6 +252,30 @@ impl VideoServerHandle {
         })
     }
 
+    /// Builds the MapLibre URL template for cached OpenFreeMap styles.
+    pub fn map_style_url_template(&self) -> Result<String, String> {
+        let port = self
+            .inner
+            .lock()
+            .map_err(|error| error.to_string())?
+            .port
+            .ok_or_else(|| "Video preview server is not running".to_string())?;
+        Ok(format!("http://127.0.0.1:{port}/styles/{{style}}"))
+    }
+
+    /// Builds the MapLibre URL template for vector tiles served by this process.
+    pub fn tile_url_template(&self) -> Result<String, String> {
+        let port = self
+            .inner
+            .lock()
+            .map_err(|error| error.to_string())?
+            .port
+            .ok_or_else(|| "Video preview server is not running".to_string())?;
+        Ok(format!(
+            "http://127.0.0.1:{port}/tiles/{{z}}/{{x}}/{{y}}.pbf"
+        ))
+    }
+
     /// Builds the HTTP preview URL for an import ID using the bound server port.
     fn url_for_import(&self, import_id: &str) -> Result<String, String> {
         let port = self
@@ -280,9 +304,9 @@ fn handle_request(
 
 /// Routes and validates an incoming HTTP request.
 ///
-/// Only `/health` and `/video/<import_id>` are supported. Video requests must
-/// match the current import ID and source file; stale IDs, missing files, and
-/// absent registrations all return `404`.
+/// Supports `/health`, `/styles/<style>`, `/tiles/<z>/<x>/<y>.pbf`, and `/video/<import_id>`.
+/// Video requests must match the current import ID and source file; stale IDs,
+/// missing files, and absent registrations all return `404`.
 fn respond_to_request(
     inner: &Arc<Mutex<VideoServerInner>>,
     map_tile_service: Option<&MapTileService>,
@@ -293,6 +317,33 @@ fn respond_to_request(
 
     if url == "/health" {
         return respond_text(request, StatusCode(200), "ok");
+    }
+
+    if url.starts_with("/styles/") {
+        if method != Method::Get {
+            return respond_empty(request, StatusCode(405), common_headers(None, None));
+        }
+        let Some(style) = parse_style_path(&url) else {
+            return respond_empty(request, StatusCode(400), common_headers(None, None));
+        };
+        let Some(map_tile_service) = map_tile_service else {
+            return respond_empty(request, StatusCode(404), common_headers(None, None));
+        };
+        let tile_url_template = {
+            let port = inner
+                .lock()
+                .map_err(|error| error.to_string())?
+                .port
+                .ok_or_else(|| "Video preview server is not running".to_string())?;
+            format!("http://127.0.0.1:{port}/tiles/{{z}}/{{x}}/{{y}}.pbf")
+        };
+        return match map_tile_service.resolve_style(style, &tile_url_template) {
+            Ok(payload) => respond_map_resource(request, payload, "application/json"),
+            Err(error) => {
+                log::warn!("Map style request failed: {error}");
+                respond_empty(request, StatusCode(502), common_headers(None, None))
+            }
+        };
     }
 
     if url.starts_with("/tiles/") {
@@ -306,7 +357,9 @@ fn respond_to_request(
             return respond_empty(request, StatusCode(404), common_headers(None, None));
         };
         return match map_tile_service.resolve(coordinates) {
-            Ok(payload) => respond_tile(request, payload),
+            Ok(payload) => {
+                respond_map_resource(request, payload, "application/vnd.mapbox-vector-tile")
+            }
             Err(error) => {
                 log::warn!("Tile request failed: {error}");
                 respond_empty(request, StatusCode(502), common_headers(None, None))
@@ -352,16 +405,25 @@ fn respond_to_request(
     }
 }
 
-fn respond_tile(request: Request, payload: Vec<u8>) -> Result<(), String> {
-    let content_length = payload.len();
-    let mut headers = common_headers(Some("image/png".to_string()), None);
+fn respond_map_resource(
+    request: Request,
+    payload: TilePayload,
+    content_type: &str,
+) -> Result<(), String> {
+    let content_length = payload.bytes.len();
+    let mut headers = common_headers(Some(content_type.to_string()), None);
+    headers.push(header("Access-Control-Allow-Origin", "*")?);
     headers.push(header("Content-Length", content_length.to_string())?);
+    headers.push(header(
+        "X-OVRLEY-Cache",
+        payload.cache_status.as_header_value(),
+    )?);
     request
         .respond(
             Response::new(
                 StatusCode(200),
                 headers,
-                std::io::Cursor::new(payload),
+                std::io::Cursor::new(payload.bytes),
                 Some(content_length),
                 None,
             )
