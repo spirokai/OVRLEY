@@ -63,6 +63,9 @@ class VideoSyncMapController {
       style: EMPTY_STYLE,
       center: VIDEO_SYNC_MAP_INITIAL_CENTER,
       zoom: VIDEO_SYNC_MAP_INITIAL_ZOOM,
+      pitch: 0,
+      maxPitch: 0,
+      touchPitch: false,
       attributionControl: true,
     })
     this.canvasContainer = this.map.getCanvasContainer()
