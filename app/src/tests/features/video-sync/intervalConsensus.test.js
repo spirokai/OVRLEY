@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
-import { calculateMatchScore } from '@/features/video-sync/utils/matchScore'
+import { calculateMatchScore, calculateTimingQuality } from '@/features/video-sync/utils/matchScore'
 import { matchVideoSyncCandidates } from '@/features/video-sync/utils/intervalConsensus'
 
 const ALL_METRICS = { speed: true, heading: true, course: true }
@@ -37,7 +37,7 @@ describe('manual video-sync interval consensus', () => {
       scope: VIDEO_SYNC_MATCH_SCOPES.ALL,
     })
 
-    expect(result.candidates[0]).toMatchObject({ offset: 100, matchScore: 100, matchedCount: 2, eligibleCount: 2 })
+    expect(result.candidates[0]).toMatchObject({ offset: 101, matchScore: 100, matchedCount: 2, eligibleCount: 2 })
     expect(result.candidates[0].evidence.map((item) => item.eventId)).toEqual(['activity-stop', 'activity-right'])
     expect(result.diagnostics.offsetSupports).not.toContainEqual(expect.objectContaining({ eventId: 'activity-left' }))
   })
@@ -66,11 +66,22 @@ describe('manual video-sync interval consensus', () => {
     expect(partialResult.candidates[0]).toMatchObject({ matchedCount: 2, eligibleCount: 3, matchScore: 67 })
   })
 
-  test('uses absolute score and deterministic ordering, merging, and limit', () => {
-    expect(calculateMatchScore([0.25, 0.25], 2)).toMatchObject({
-      chiSquare: 0.03125,
+  test('scores interval misses continuously and preserves deterministic ordering, merging, and limit', () => {
+    expect(calculateTimingQuality(0, 2)).toBe(1)
+    expect(calculateTimingQuality(2, 2)).toBe(0.5)
+    expect(calculateTimingQuality(4, 2)).toBe(0.2)
+    expect(
+      calculateMatchScore(
+        [
+          { residual: 0, quality: 1 },
+          { residual: 2, quality: 0.5 },
+        ],
+        2,
+      ),
+    ).toMatchObject({
+      totalQuality: 1.5,
       coverage: 1,
-      matchScore: 99,
+      matchScore: 75,
     })
 
     const landmarks = [
@@ -84,6 +95,33 @@ describe('manual video-sync interval consensus', () => {
     expect(first).toEqual(second)
     expect(first.candidates).toHaveLength(5)
     expect(first.candidates).toEqual([...first.candidates].sort((left, right) => right.matchScore - left.matchScore || left.offset - right.offset))
+  })
+
+  test('treats detected periods as flat and retains nearby non-overlapping evidence', () => {
+    const flat = matchVideoSyncCandidates({
+      landmarks: [
+        { id: 'video-stop-1', type: 'stop', videoSecond: 0 },
+        { id: 'video-stop-2', type: 'stop', videoSecond: 10 },
+      ],
+      detection: detection({ stops: [stop('activity-stop-1', 100), stop('activity-stop-2', 110)] }),
+      scope: VIDEO_SYNC_MATCH_SCOPES.ALL,
+    })
+    expect(flat.candidates[0]).toMatchObject({ offset: 101, matchScore: 100, matchedCount: 2 })
+    expect(flat.diagnostics.offsetSupports[0]).toMatchObject({ startOffset: 100, endOffset: 102 })
+
+    const nearMiss = matchVideoSyncCandidates({
+      landmarks: [
+        { id: 'video-stop', type: 'stop', videoSecond: 0 },
+        { id: 'video-turn', type: 'rightTurn', videoSecond: 10 },
+      ],
+      detection: detection({
+        stops: [stop('activity-stop', 100)],
+        turns: [turn('activity-turn', 'rightTurn', 116, 118)],
+      }),
+      scope: VIDEO_SYNC_MATCH_SCOPES.ALL,
+    })
+    expect(nearMiss.candidates[0]).toMatchObject({ offset: 104, matchScore: 50, matchedCount: 2 })
+    expect(nearMiss.candidates[0].evidence.map(({ residualSeconds }) => residualSeconds)).toEqual([2, 2])
   })
 
   test('keeps location-only matching independent from combined and conflict candidates', () => {
@@ -134,7 +172,7 @@ describe('manual video-sync interval consensus', () => {
     })
     expect(conflicting.candidates.find((candidate) => candidate.variant === 'locationConflict')).toMatchObject({
       variant: 'locationConflict',
-      offset: 20,
+      offset: 21,
       locationClassification: 'conflict',
       excludedLandmarkIds: ['video-location'],
     })

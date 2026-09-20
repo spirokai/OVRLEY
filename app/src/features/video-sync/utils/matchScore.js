@@ -1,25 +1,42 @@
+export const VIDEO_SYNC_MIN_MEANINGFUL_QUALITY = 0.2
+
 /**
- * Calculates the absolute normalized likelihood for one landmark assignment.
+ * Calculates a bounded robust quality for the distance outside an event's
+ * ideal offset interval. The Cauchy kernel gives the interval a flat maximum
+ * and lets near misses decline continuously without allowing distant outliers
+ * to dominate the fit.
  *
- * @param {number[]} residuals Matched landmark timing residuals in seconds.
- * @param {number} eligibleCount Number of eligible video landmarks.
- * @returns {{matchedCount: number, eligibleCount: number, chiSquare: number, timingLikelihood: number, coverage: number, matchScore: number, totalResidualSeconds: number}} Score diagnostics.
+ * @param {number} residualSeconds Distance outside the ideal interval.
+ * @param {number} timingScaleSeconds Timing uncertainty for this landmark type.
+ * @returns {number} Match quality from zero to one.
  */
-export function calculateMatchScore(residuals, eligibleCount) {
-  const matchedCount = residuals.length
-  const chiSquare = residuals.reduce((total, residual) => total + (residual / 2) ** 2, 0)
-  const timingLikelihood = matchedCount === 0 ? 0 : Math.exp(-chiSquare / (2 * matchedCount))
+export function calculateTimingQuality(residualSeconds, timingScaleSeconds) {
+  const normalizedResidual = residualSeconds / timingScaleSeconds
+  return 1 / (1 + normalizedResidual ** 2)
+}
+
+/**
+ * Calculates the normalized robust score for one complete assignment.
+ * Unassigned landmarks contribute zero through the eligible-count denominator.
+ *
+ * @param {{residual: number, quality: number}[]} matches Assigned landmark/event pairs.
+ * @param {number} eligibleCount Number of eligible video landmarks.
+ * @returns {{matchedCount: number, eligibleCount: number, totalQuality: number, coverage: number, matchScore: number, totalResidualSeconds: number}} Score diagnostics.
+ */
+export function calculateMatchScore(matches, eligibleCount) {
+  const meaningfulMatches = matches.filter(({ quality }) => quality >= VIDEO_SYNC_MIN_MEANINGFUL_QUALITY)
+  const matchedCount = meaningfulMatches.length
+  const totalQuality = matches.reduce((total, { quality }) => total + quality, 0)
   const coverage = eligibleCount === 0 ? 0 : matchedCount / eligibleCount
-  const matchScore = Math.round(100 * coverage * timingLikelihood)
+  const matchScore = eligibleCount === 0 ? 0 : Math.round((100 * totalQuality) / eligibleCount)
 
   return {
     matchedCount,
     eligibleCount,
-    chiSquare,
-    timingLikelihood,
+    totalQuality,
     coverage,
     matchScore,
-    totalResidualSeconds: residuals.reduce((total, residual) => total + residual, 0),
+    totalResidualSeconds: meaningfulMatches.reduce((total, { residual }) => total + residual, 0),
   }
 }
 

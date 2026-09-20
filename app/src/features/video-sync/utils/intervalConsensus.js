@@ -5,59 +5,66 @@ import {
   VIDEO_SYNC_MATCH_SCOPES,
   VIDEO_SYNC_MAX_CANDIDATES,
 } from '../data/videoSyncConstants'
-import { calculateMatchScore, compareCandidateStrength } from './matchScore'
-import { createVideoSyncOffsetSupports, MATCHABLE_LANDMARK_TYPES, offsetIsSupported, serializeOffsetSupport } from './landmarkTiming'
+import { calculateMatchScore, calculateTimingQuality, compareCandidateStrength, VIDEO_SYNC_MIN_MEANINGFUL_QUALITY } from './matchScore'
+import { createVideoSyncOffsetSupports, MATCHABLE_LANDMARK_TYPES, serializeOffsetSupport } from './landmarkTiming'
 
-function findConsensusRegions(supports) {
-  const boundaries = new Map()
-  for (const support of supports) {
-    const start = boundaries.get(support.startOffset) ?? { starts: [], ends: [] }
-    start.starts.push(support)
-    boundaries.set(support.startOffset, start)
+const MAX_PROPOSAL_NORMALIZED_MISS = Math.sqrt(1 / VIDEO_SYNC_MIN_MEANINGFUL_QUALITY - 1)
 
-    const end = boundaries.get(support.endOffset) ?? { starts: [], ends: [] }
-    end.ends.push(support)
-    boundaries.set(support.endOffset, end)
+function compareAssignments(candidate, current) {
+  if (candidate === null) return 1
+  if (current === null) return -1
+  if (candidate.totalQuality !== current.totalQuality) return current.totalQuality - candidate.totalQuality
+  if (candidate.totalResidualSeconds !== current.totalResidualSeconds) {
+    return candidate.totalResidualSeconds - current.totalResidualSeconds
   }
-
-  const offsets = [...boundaries.keys()].sort((left, right) => left - right)
-  const activeCounts = new Map()
-  const regions = []
-
-  for (let index = 0; index < offsets.length; index += 1) {
-    const start = offsets[index]
-    const boundary = boundaries.get(start)
-    for (const support of boundary.starts) {
-      activeCounts.set(support.landmarkId, (activeCounts.get(support.landmarkId) ?? 0) + 1)
-    }
-    if (activeCounts.size >= 2) regions.push({ start, end: start })
-
-    for (const support of boundary.ends) {
-      const nextCount = activeCounts.get(support.landmarkId) - 1
-      if (nextCount === 0) activeCounts.delete(support.landmarkId)
-      else activeCounts.set(support.landmarkId, nextCount)
-    }
-    const end = offsets[index + 1]
-    if (end !== undefined && activeCounts.size >= 2) regions.push({ start, end })
-  }
-
-  return regions
-}
-
-function keepStrongerAssignment(assignments, matchCount, candidate) {
-  const current = assignments.get(matchCount)
-  if (current === undefined) {
-    assignments.set(matchCount, candidate)
-    return
-  }
-
-  const candidateError = candidate.residuals.reduce((total, residual) => total + residual ** 2, 0)
-  const currentError = current.residuals.reduce((total, residual) => total + residual ** 2, 0)
   const candidateKey = candidate.matches.map(({ support }) => `${support.landmarkId}:${support.eventId}`).join('|')
   const currentKey = current.matches.map(({ support }) => `${support.landmarkId}:${support.eventId}`).join('|')
-  if (candidateError < currentError || (candidateError === currentError && candidateKey.localeCompare(currentKey) < 0)) {
-    assignments.set(matchCount, candidate)
+  return candidateKey.localeCompare(currentKey)
+}
+
+function keepStrongerAssignment(current, candidate) {
+  return compareAssignments(candidate, current) < 0 ? candidate : current
+}
+
+function proposedOffset(left, right) {
+  if (left.type === right.type && (left.eventId === right.eventId || left.eventSecond >= right.eventSecond)) return null
+
+  const overlapStart = Math.max(left.startOffset, right.startOffset)
+  const overlapEnd = Math.min(left.endOffset, right.endOffset)
+  if (overlapStart <= overlapEnd) return (overlapStart + overlapEnd) / 2
+
+  const earlier = left.endOffset < right.startOffset ? left : right
+  const later = earlier === left ? right : left
+  const gap = later.startOffset - earlier.endOffset
+  const combinedScale = earlier.timingScaleSeconds + later.timingScaleSeconds
+  if (gap > MAX_PROPOSAL_NORMALIZED_MISS * combinedScale) return null
+
+  return (earlier.endOffset * later.timingScaleSeconds + later.startOffset * earlier.timingScaleSeconds) / combinedScale
+}
+
+function createOffsetHypotheses(landmarks, supports) {
+  const supportsByLandmark = new Map(landmarks.map((landmark) => [landmark.id, []]))
+  for (const support of supports) supportsByLandmark.get(support.landmarkId).push(support)
+
+  const hypotheses = new Map()
+  for (let leftIndex = 0; leftIndex < landmarks.length; leftIndex += 1) {
+    const leftSupports = supportsByLandmark.get(landmarks[leftIndex].id)
+    for (let rightIndex = leftIndex + 1; rightIndex < landmarks.length; rightIndex += 1) {
+      const rightSupports = supportsByLandmark.get(landmarks[rightIndex].id)
+      for (const left of leftSupports) {
+        for (const right of rightSupports) {
+          const maximumGap = MAX_PROPOSAL_NORMALIZED_MISS * (left.timingScaleSeconds + right.timingScaleSeconds)
+          if (right.endOffset < left.startOffset - maximumGap) continue
+          if (right.startOffset > left.endOffset + maximumGap) break
+
+          const offset = proposedOffset(left, right)
+          if (offset !== null) hypotheses.set(offset.toFixed(6), offset)
+        }
+      }
+    }
   }
+
+  return [...hypotheses.values()].sort((left, right) => left - right)
 }
 
 function buildAssignmentGroups(landmarks, supports) {
@@ -77,9 +84,17 @@ function buildAssignmentGroups(landmarks, supports) {
       landmarks: landmarks.filter((landmark) => landmark.type === type),
       events: [...events.values()].sort((left, right) => {
         const leftSecond =
-          left.type === VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN || left.type === VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN ? left.start : left.time
+          left.type === VIDEO_SYNC_LANDMARK_TYPES.STOP
+            ? left.lowSpeedInterval.start
+            : left.type === VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN || left.type === VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN
+              ? left.start
+              : left.time
         const rightSecond =
-          right.type === VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN || right.type === VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN ? right.start : right.time
+          right.type === VIDEO_SYNC_LANDMARK_TYPES.STOP
+            ? right.lowSpeedInterval.start
+            : right.type === VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN || right.type === VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN
+              ? right.start
+              : right.time
         return leftSecond - rightSecond || left.id.localeCompare(right.id)
       }),
       supportLookup,
@@ -88,38 +103,35 @@ function buildAssignmentGroups(landmarks, supports) {
 }
 
 function assignGroupAtOffset({ landmarks, events, supportLookup }, offset) {
-  const table = Array.from({ length: landmarks.length + 1 }, () => Array.from({ length: events.length + 1 }, () => new Map()))
-  table[0][0].set(0, { residuals: [], matches: [] })
+  const table = Array.from({ length: landmarks.length + 1 }, () => Array.from({ length: events.length + 1 }, () => null))
+  table[0][0] = { totalQuality: 0, totalResidualSeconds: 0, matches: [] }
 
   for (let landmarkIndex = 0; landmarkIndex <= landmarks.length; landmarkIndex += 1) {
     for (let eventIndex = 0; eventIndex <= events.length; eventIndex += 1) {
       if (landmarkIndex === 0 && eventIndex === 0) continue
-      const assignments = table[landmarkIndex][eventIndex]
+      let assignment = null
 
-      if (landmarkIndex > 0) {
-        for (const [count, assignment] of table[landmarkIndex - 1][eventIndex]) {
-          keepStrongerAssignment(assignments, count, assignment)
-        }
+      if (landmarkIndex > 0) assignment = keepStrongerAssignment(assignment, table[landmarkIndex - 1][eventIndex])
+      if (eventIndex > 0) assignment = keepStrongerAssignment(assignment, table[landmarkIndex][eventIndex - 1])
+      if (landmarkIndex === 0 || eventIndex === 0) {
+        table[landmarkIndex][eventIndex] = assignment
+        continue
       }
-      if (eventIndex > 0) {
-        for (const [count, assignment] of table[landmarkIndex][eventIndex - 1]) {
-          keepStrongerAssignment(assignments, count, assignment)
-        }
-      }
-      if (landmarkIndex === 0 || eventIndex === 0) continue
 
       const landmark = landmarks[landmarkIndex - 1]
       const event = events[eventIndex - 1]
       const support = supportLookup.get(landmark.id)?.get(event.id)
-      if (support === undefined || !offsetIsSupported(support, offset)) continue
-
-      const residual = support.residualAt(offset)
-      for (const [count, assignment] of table[landmarkIndex - 1][eventIndex - 1]) {
-        keepStrongerAssignment(assignments, count + 1, {
-          residuals: [...assignment.residuals, residual],
-          matches: [...assignment.matches, { support, residual }],
+      if (support !== undefined) {
+        const previous = table[landmarkIndex - 1][eventIndex - 1]
+        const residual = support.residualAt(offset)
+        const quality = calculateTimingQuality(residual, support.timingScaleSeconds)
+        assignment = keepStrongerAssignment(assignment, {
+          totalQuality: previous.totalQuality + quality,
+          totalResidualSeconds: previous.totalResidualSeconds + residual,
+          matches: [...previous.matches, { support, residual, quality }],
         })
       }
+      table[landmarkIndex][eventIndex] = assignment
     }
   }
 
@@ -127,66 +139,29 @@ function assignGroupAtOffset({ landmarks, events, supportLookup }, offset) {
 }
 
 function findBestAssignment(offset, groups, eligibleCount) {
-  let combined = new Map([[0, { residuals: [], matches: [] }]])
+  const assignment = { totalQuality: 0, totalResidualSeconds: 0, matches: [] }
 
   for (const group of groups) {
-    const next = new Map()
-    for (const [combinedCount, combinedAssignment] of combined) {
-      for (const [groupCount, groupAssignment] of assignGroupAtOffset(group, offset)) {
-        keepStrongerAssignment(next, combinedCount + groupCount, {
-          residuals: [...combinedAssignment.residuals, ...groupAssignment.residuals],
-          matches: [...combinedAssignment.matches, ...groupAssignment.matches],
-        })
-      }
-    }
-    combined = next
+    const groupAssignment = assignGroupAtOffset(group, offset)
+    assignment.totalQuality += groupAssignment.totalQuality
+    assignment.totalResidualSeconds += groupAssignment.totalResidualSeconds
+    assignment.matches.push(...groupAssignment.matches)
   }
 
-  const qualifying = [...combined.entries()]
-    .filter(([matchCount]) => matchCount >= 2 && (eligibleCount !== 2 || matchCount === 2))
-    .map(([, assignment]) => ({ ...assignment, score: calculateMatchScore(assignment.residuals, eligibleCount) }))
-    .sort((left, right) => compareCandidateStrength({ ...left.score, offset }, { ...right.score, offset }))
-
-  return qualifying[0] ?? null
+  assignment.score = calculateMatchScore(assignment.matches, eligibleCount)
+  return assignment.score.matchedCount >= 2 ? assignment : null
 }
 
-function refinementAnchor(support, offset) {
-  if (support.type === VIDEO_SYNC_LANDMARK_TYPES.STOP || support.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) return support.preferredOffsets[0]
-  const [start, end] = support.preferredOffsets
-  if (offset < start) return start
-  if (offset > end) return end
-  return null
-}
-
-function refineRegion(region, groups, eligibleCount) {
-  let offset = (region.start + region.end) / 2
-  let assignment = findBestAssignment(offset, groups, eligibleCount)
-  if (assignment === null || region.start === region.end) return assignment === null ? null : { offset, assignment }
-
-  for (let iteration = 0; iteration <= eligibleCount; iteration += 1) {
-    const anchors = assignment.matches.map(({ support }) => refinementAnchor(support, offset)).filter((anchor) => anchor !== null)
-    if (anchors.length === 0) break
-
-    const average = anchors.reduce((total, anchor) => total + anchor, 0) / anchors.length
-    const refinedOffset = Math.max(region.start, Math.min(region.end, average))
-    if (refinedOffset === offset) break
-
-    const refinedAssignment = findBestAssignment(refinedOffset, groups, eligibleCount)
-    if (refinedAssignment === null) break
-    offset = refinedOffset
-    assignment = refinedAssignment
-  }
-
-  return { offset, assignment }
-}
-
-function createCandidateRecord({ offset, assignment }, eligibleCount) {
-  const evidence = assignment.matches.map(({ support, residual }) => ({
-    landmarkId: support.landmarkId,
-    eventId: support.eventId,
-    type: support.type,
-    residualSeconds: residual,
-  }))
+function createCandidateRecord(offset, assignment, eligibleCount) {
+  const evidence = assignment.matches
+    .filter(({ quality }) => quality >= VIDEO_SYNC_MIN_MEANINGFUL_QUALITY)
+    .map(({ support, residual, quality }) => ({
+      landmarkId: support.landmarkId,
+      eventId: support.eventId,
+      type: support.type,
+      residualSeconds: residual,
+      quality,
+    }))
 
   return {
     candidate: {
@@ -242,9 +217,9 @@ function matchAllLandmarks(landmarks, detection) {
   const groups = buildAssignmentGroups(eligibleLandmarks, supports)
   const records = []
 
-  for (const region of findConsensusRegions(supports)) {
-    const refined = refineRegion(region, groups, eligibleLandmarks.length)
-    if (refined !== null) records.push(createCandidateRecord(refined, eligibleLandmarks.length))
+  for (const offset of createOffsetHypotheses(eligibleLandmarks, supports)) {
+    const assignment = findBestAssignment(offset, groups, eligibleLandmarks.length)
+    if (assignment !== null) records.push(createCandidateRecord(offset, assignment, eligibleLandmarks.length))
   }
 
   const merged = mergeCandidateRecords(records)
@@ -287,6 +262,7 @@ function matchLocation(landmarks, detection) {
         eventId: detection.location.id,
         type: VIDEO_SYNC_LANDMARK_TYPES.LOCATION,
         residualSeconds: 0,
+        quality: 1,
       },
     ],
   }
@@ -300,8 +276,9 @@ function matchLocation(landmarks, detection) {
           landmarkId: locationLandmark.id,
           eventId: detection.location.id,
           type: VIDEO_SYNC_LANDMARK_TYPES.LOCATION,
-          startOffset: offset - VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
-          endOffset: offset + VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
+          startOffset: offset,
+          endOffset: offset,
+          timingScaleSeconds: VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
         },
       ],
       hypotheses: [{ offset, evidence: candidate.evidence }],

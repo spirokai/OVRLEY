@@ -58,7 +58,7 @@ vi.mock('maplibre-gl', () => ({
   }),
   Marker: vi.fn(function Marker(options) {
     markerOptions(options)
-    const markerInstance = options?.element?.className.includes('border-2') ? playbackMarker : marker
+    const markerInstance = options?.element?.className.includes('bg-[#EF6C15]') ? playbackMarker : marker
     markerInstance.setLngLat.mockReturnValue(markerInstance)
     markerInstance.addTo.mockReturnValue(markerInstance)
     if (markerInstance === playbackMarker) return markerInstance
@@ -244,9 +244,10 @@ describe('VideoSyncPreviewScreens', () => {
     const { rerender } = render(renderPreview(0))
 
     await waitFor(() => expect(playbackMarker.setLngLat).toHaveBeenCalledWith([8.53, 47.37]))
-    const playbackMarkerElement = markerOptions.mock.calls.find(([options]) => options?.element?.className.includes('border-2'))[0].element
+    const playbackMarkerElement = markerOptions.mock.calls.find(([options]) => options?.element?.className.includes('bg-[#EF6C15]'))[0].element
     expect(playbackMarkerElement.className).toContain('bg-[#EF6C15]')
-    expect(playbackMarkerElement.className).toContain('shadow-[0_0_0_4px_rgba(239,108,21,0.35)]')
+    expect(playbackMarkerElement.className).toContain('border-1')
+    expect(playbackMarkerElement.className).toContain('shadow-[0_0_0_8px_rgba(239,108,21,0.35)]')
     await waitFor(() => expect(map.setStyle).toHaveBeenCalled())
     act(() => eventHandlers.get('style.load')())
     playbackMarker.setLngLat.mockClear()

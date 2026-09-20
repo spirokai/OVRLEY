@@ -73,7 +73,7 @@ function CandidateCards({ appliedOffset, candidates, disabled = false, onApply, 
         {candidates.map((candidate) => {
           const isApplied = candidate.offset === appliedOffset
           const isLocationOnly = candidate.variant === 'locationOnly'
-          const hasLocationConflict = candidate.variant === 'locationConflict'
+
           const scoreColor = getVideoSyncMatchScoreColor(candidate.matchScore)
           return (
             <div key={`${candidate.variant}-${candidate.offset}`} role="listitem">
@@ -110,11 +110,6 @@ function CandidateCards({ appliedOffset, candidates, disabled = false, onApply, 
                         </span>
                       )}
                     </div>
-                    {hasLocationConflict ? (
-                      <div className="mt-1 text-[10px] font-semibold">
-                        {t('videoSync.locationConflict', 'Location landmark excluded—conflicts with this candidate')}
-                      </div>
-                    ) : null}
                   </div>
                   {candidate.matchScore === null ? null : (
                     <span className="absolute right-3 top-2 text-sm font-semibold tabular-nums" style={{ color: scoreColor }}>

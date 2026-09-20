@@ -57,56 +57,36 @@ export function getVideoSyncEligibility(landmarks, detection) {
 }
 
 /**
- * Creates the residual function for one typed landmark/event support interval.
+ * Creates one typed landmark/event offset interval. Detected event periods are
+ * equally good throughout their full width; timing uncertainty is represented
+ * by the scale used outside that interval.
  *
  * @param {object} landmark Canonical video landmark.
  * @param {object} event Canonical detected activity event.
- * @returns {{landmarkId: string, eventId: string, type: string, event: object, startOffset: number, endOffset: number, residualAt: (offset: number) => number, preferredOffsets: number[]}} Typed offset support.
+ * @returns {{landmarkId: string, eventId: string, type: string, event: object, eventSecond: number, startOffset: number, endOffset: number, timingScaleSeconds: number, residualAt: (offset: number) => number}} Typed offset support.
  */
 function createOffsetSupport(landmark, event) {
-  if (landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) {
-    const center = event.time - landmark.videoSecond
-    return {
-      landmarkId: landmark.id,
-      eventId: event.id,
-      type: landmark.type,
-      event,
-      startOffset: center - VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
-      endOffset: center + VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
-      residualAt: (offset) => Math.abs(offset - center),
-      preferredOffsets: [center],
-    }
-  }
+  const isLocation = landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION
+  const isStop = landmark.type === VIDEO_SYNC_LANDMARK_TYPES.STOP
+  const eventStart = isLocation ? event.time : isStop ? event.lowSpeedInterval.start : event.start
+  const eventEnd = isLocation ? event.time : isStop ? event.lowSpeedInterval.end : event.end
+  const startOffset = eventStart - landmark.videoSecond
+  const endOffset = eventEnd - landmark.videoSecond
 
-  if (landmark.type === VIDEO_SYNC_LANDMARK_TYPES.STOP) {
-    const center = event.time - landmark.videoSecond
-    return {
-      landmarkId: landmark.id,
-      eventId: event.id,
-      type: landmark.type,
-      event,
-      startOffset: center - VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS,
-      endOffset: center + VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS,
-      residualAt: (offset) => Math.abs(offset - center),
-      preferredOffsets: [center],
-    }
-  }
-
-  const start = event.start - landmark.videoSecond
-  const end = event.end - landmark.videoSecond
   return {
     landmarkId: landmark.id,
     eventId: event.id,
     type: landmark.type,
     event,
-    startOffset: start - VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS,
-    endOffset: end + VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS,
+    eventSecond: eventStart,
+    startOffset,
+    endOffset,
+    timingScaleSeconds: isLocation ? VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS : VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS,
     residualAt: (offset) => {
-      if (offset < start) return start - offset
-      if (offset > end) return offset - end
+      if (offset < startOffset) return startOffset - offset
+      if (offset > endOffset) return offset - endOffset
       return 0
     },
-    preferredOffsets: [start, end],
   }
 }
 
@@ -131,7 +111,7 @@ function sortByTime(left, right, timeOf) {
  */
 export function createVideoSyncOffsetSupports(landmarks, detection) {
   const eventsByType = {
-    [VIDEO_SYNC_LANDMARK_TYPES.STOP]: [...detection.stops].sort((left, right) => sortByTime(left, right, (event) => event.time)),
+    [VIDEO_SYNC_LANDMARK_TYPES.STOP]: [...detection.stops].sort((left, right) => sortByTime(left, right, (event) => event.lowSpeedInterval.start)),
     [VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN]: [...detection.turns]
       .filter((event) => event.type === VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN)
       .sort((left, right) => sortByTime(left, right, (event) => event.start)),
@@ -155,21 +135,10 @@ export function createVideoSyncOffsetSupports(landmarks, detection) {
 }
 
 /**
- * Returns whether a support interval contains an offset, including its bounds.
- *
- * @param {{startOffset: number, endOffset: number}} support Typed offset support.
- * @param {number} offset Proposed video offset.
- * @returns {boolean} Whether the offset is supported.
- */
-export function offsetIsSupported(support, offset) {
-  return offset >= support.startOffset && offset <= support.endOffset
-}
-
-/**
  * Returns the public, serializable representation of one offset support.
  *
- * @param {{landmarkId: string, eventId: string, type: string, startOffset: number, endOffset: number}} support Typed offset support.
- * @returns {{landmarkId: string, eventId: string, type: string, startOffset: number, endOffset: number}} Support diagnostic.
+ * @param {{landmarkId: string, eventId: string, type: string, startOffset: number, endOffset: number, timingScaleSeconds: number}} support Typed offset support.
+ * @returns {{landmarkId: string, eventId: string, type: string, startOffset: number, endOffset: number, timingScaleSeconds: number}} Support diagnostic.
  */
 export function serializeOffsetSupport(support) {
   return {
@@ -178,6 +147,7 @@ export function serializeOffsetSupport(support) {
     type: support.type,
     startOffset: support.startOffset,
     endOffset: support.endOffset,
+    timingScaleSeconds: support.timingScaleSeconds,
   }
 }
 
