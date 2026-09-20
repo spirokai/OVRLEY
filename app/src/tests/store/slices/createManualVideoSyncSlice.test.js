@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { VIDEO_SYNC_LANDMARK_TYPES } from '@/features/video-sync/data/videoSyncConstants'
+import { VIDEO_SYNC_LANDMARK_TYPES, VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
 import useStore from '@/store/useStore'
 
 describe('manual video sync store contract', () => {
@@ -99,19 +99,25 @@ describe('manual video sync store contract', () => {
     expect(() => state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, Number.NaN)).toThrow(/finite number/)
     expect(() => state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 61)).toThrow(/within the imported video duration/)
     expect(() => state.setVideoSyncSpeedThreshold(0)).toThrow(/between 1 and 10/)
-    expect(() => state.setVideoSyncTurnThreshold(361)).toThrow(/between 90 and 360/)
+    expect(() => state.setVideoSyncTurnThreshold(361)).toThrow(/between 70 and 180/)
     expect(() => state.moveVideoSyncLandmark('missing-id', 4)).toThrow(/was not found/)
     expect(() => state.setVideoSyncDetectedLocation(Number.NaN)).toThrow(/finite number/)
   })
 
   test('discards calculation results after the input revision changes', () => {
     const state = useStore.getState()
-    const revision = state.beginVideoSyncCalculation()
+    const revision = state.beginVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
     state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
 
-    expect(state.completeVideoSyncCalculation(revision, { detection: {}, candidates: [] })).toBe(false)
-    expect(useStore.getState().manualVideoSyncCandidateStatus).toBe('idle')
-    expect(useStore.getState().manualVideoSyncCandidates).toEqual([])
+    expect(state.completeVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL, revision, { detection: {}, candidates: [] })).toBe(false)
+    expect(useStore.getState().manualVideoSyncResults.all).toMatchObject({ candidates: [], status: 'idle' })
+  })
+
+  test('requires an explicit canonical calculation scope', () => {
+    const state = useStore.getState()
+
+    expect(() => state.beginVideoSyncCalculation()).toThrow(/Unsupported video sync match scope/)
+    expect(() => state.beginVideoSyncCalculation('mapOnly')).toThrow(/Unsupported video sync match scope/)
   })
 
   test('keeps activity-owned manual state but clears its derived calculation state', () => {
@@ -121,8 +127,8 @@ describe('manual video sync store contract', () => {
       speedThresholdKmh: 7,
       turnThresholdDegrees: 120,
     })
-    const revision = state.beginVideoSyncCalculation()
-    state.completeVideoSyncCalculation(revision, { detection: { stops: ['old'] }, candidates: [{ offset: 4 }] })
+    const revision = state.beginVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
+    state.completeVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL, revision, { detection: { stops: ['old'] }, candidates: [{ offset: 4 }] })
 
     state.clearVideoSyncForActivity()
 
@@ -133,8 +139,8 @@ describe('manual video sync store contract', () => {
       turnThresholdDegrees: 120,
     })
     expect(afterActivityReset.manualVideoSyncDetection).toBeNull()
-    expect(afterActivityReset.manualVideoSyncCandidates).toEqual([])
-    expect(afterActivityReset.manualVideoSyncCandidateStatus).toBe('idle')
+    expect(afterActivityReset.manualVideoSyncResults.all).toMatchObject({ candidates: [], status: 'idle' })
+    expect(afterActivityReset.manualVideoSyncResults.location).toMatchObject({ candidates: [], status: 'idle' })
 
     afterActivityReset.clearVideoSyncForVideo()
 
@@ -151,15 +157,17 @@ describe('manual video sync store contract', () => {
       importedVideoDuration: 20,
       selectedSecond: 80,
       videoSyncOffsetSeconds: 0,
-      manualVideoSyncCandidateStatus: 'fresh',
-      manualVideoSyncCandidates: [{ offset: 10 }],
+      manualVideoSyncResults: {
+        ...useStore.getState().manualVideoSyncResults,
+        all: { candidates: [{ offset: 10 }], error: null, hasSearched: true, revision: 0, status: 'fresh' },
+      },
     })
 
     let updateCount = 0
     const unsubscribe = useStore.subscribe(() => {
       updateCount += 1
     })
-    useStore.getState().applyVideoSyncCandidate({ offset: 10 })
+    useStore.getState().applyVideoSyncCandidate(VIDEO_SYNC_MATCH_SCOPES.ALL, { offset: 10 })
     unsubscribe()
 
     expect(updateCount).toBe(1)
@@ -167,11 +175,14 @@ describe('manual video sync store contract', () => {
     expect(useStore.getState().selectedSecond).toBe(90)
 
     useStore.setState({
-      manualVideoSyncCandidateStatus: 'stale',
+      manualVideoSyncResults: {
+        ...useStore.getState().manualVideoSyncResults,
+        all: { ...useStore.getState().manualVideoSyncResults.all, status: 'stale' },
+      },
       videoSyncOffsetSeconds: 0,
       selectedSecond: 80,
     })
-    expect(() => useStore.getState().applyVideoSyncCandidate({ offset: 10 })).toThrow(/stale/)
+    expect(() => useStore.getState().applyVideoSyncCandidate(VIDEO_SYNC_MATCH_SCOPES.ALL, { offset: 10 })).toThrow(/stale/)
     expect(useStore.getState().videoSyncOffsetSeconds).toBe(0)
     expect(useStore.getState().selectedSecond).toBe(80)
   })

@@ -21,6 +21,7 @@ export { default as VideoSyncCanvasDiagnostics } from './components/VideoSyncCan
 export { default as VideoSyncPreviewScreens } from './components/VideoSyncPreviewScreens'
 export { VIDEO_SYNC_PREVIEW_SCREEN_GAP } from './data/videoSyncConstants'
 export { VideoSyncCandidateList } from './components/VideoSyncCandidateList'
+export { VideoSyncControls } from './components/VideoSyncControls'
 export { VideoSyncDrawerContent } from './components/VideoSyncDrawerContent'
 export { VideoSyncLandmarkList } from './components/VideoSyncLandmarkList'
 export { VideoSyncMarkControls } from './components/VideoSyncMarkControls'

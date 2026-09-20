@@ -52,16 +52,15 @@ describe('manual video-sync calculation orchestration', () => {
     const { result } = renderHook(() => useVideoSyncCalculation())
 
     await waitForDetection(result)
-    expect(result.current.eligibility.canCalculate).toBe(false)
+    expect(result.current.eligibility.canCalculateAll).toBe(false)
 
     let calculated
     await act(async () => {
-      calculated = await result.current.calculate()
+      calculated = await result.current.calculateAll()
     })
 
     expect(calculated).toBe(false)
-    expect(useStore.getState().manualVideoSyncHasSearched).toBe(false)
-    expect(useStore.getState().manualVideoSyncCandidateStatus).toBe('idle')
+    expect(useStore.getState().manualVideoSyncResults.all).toMatchObject({ hasSearched: false, status: 'idle' })
   })
 
   test('reruns detection and matching after a committed sensitivity change', async () => {
@@ -70,18 +69,17 @@ describe('manual video-sync calculation orchestration', () => {
 
     await waitForDetection(result)
     await act(async () => {
-      expect(await result.current.calculate()).toBe(true)
+      expect(await result.current.calculateAll()).toBe(true)
     })
-    expect(useStore.getState().manualVideoSyncHasSearched).toBe(true)
+    expect(useStore.getState().manualVideoSyncResults.all.hasSearched).toBe(true)
 
-    const previousRevision = useStore.getState().manualVideoSyncInputRevision
+    const previousRevision = useStore.getState().manualVideoSyncResults.all.revision
     act(() => useStore.getState().setVideoSyncSpeedThreshold(6))
 
     await waitFor(() => {
-      expect(useStore.getState().manualVideoSyncInputRevision).toBe(previousRevision + 1)
-      expect(useStore.getState().manualVideoSyncCandidateStatus).toBe('fresh')
+      expect(useStore.getState().manualVideoSyncResults.all).toMatchObject({ revision: previousRevision + 1, status: 'fresh' })
     })
-    expect(useStore.getState().manualVideoSyncHasSearched).toBe(true)
+    expect(useStore.getState().manualVideoSyncResults.all.hasSearched).toBe(true)
   })
 
   test('discards a result when a landmark changes while calculation is pending', async () => {
@@ -90,13 +88,13 @@ describe('manual video-sync calculation orchestration', () => {
 
     await waitForDetection(result)
     await act(async () => {
-      expect(await result.current.calculate()).toBe(true)
+      expect(await result.current.calculateAll()).toBe(true)
     })
 
     const previousDetection = useStore.getState().manualVideoSyncDetection
     let pendingCalculation
     act(() => {
-      pendingCalculation = result.current.calculate()
+      pendingCalculation = result.current.calculateAll()
       useStore.getState().moveVideoSyncLandmark('video-stop-2', 13)
     })
 
@@ -104,7 +102,30 @@ describe('manual video-sync calculation orchestration', () => {
       expect(await pendingCalculation).toBe(false)
     })
 
-    expect(useStore.getState().manualVideoSyncCandidateStatus).toBe('stale')
+    expect(useStore.getState().manualVideoSyncResults.all.status).toBe('stale')
     expect(useStore.getState().manualVideoSyncDetection).toBe(previousDetection)
+  })
+
+  test('stores and applies a location-only result through the canonical candidate workflow', async () => {
+    resetStore()
+    useStore.setState((state) => ({
+      manualVideoSync: {
+        ...state.manualVideoSync,
+        landmarks: [{ id: 'video-location', type: 'location', videoSecond: 4, activitySecond: null }],
+      },
+    }))
+    useStore.getState().setVideoSyncDetectedLocation(12)
+    const { result } = renderHook(() => useVideoSyncCalculation())
+
+    await waitForDetection(result)
+    await act(async () => {
+      expect(await result.current.calculateLocation()).toBe(true)
+    })
+
+    const candidate = useStore.getState().manualVideoSyncResults.location.candidates[0]
+    expect(candidate).toMatchObject({ variant: 'locationOnly', offset: 8, matchedCount: 1, eligibleCount: 1 })
+
+    act(() => useStore.getState().applyVideoSyncCandidate('location', candidate))
+    expect(useStore.getState().videoSyncOffsetSeconds).toBe(8)
   })
 })

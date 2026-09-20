@@ -15,35 +15,42 @@ import { getVideoSyncMatchScoreColor } from '../utils/candidatePresentation'
  * @param {boolean} props.hasSearched Whether a candidate search has run.
  * @param {number} props.appliedOffset Current canonical applied offset.
  * @param {(candidate: object) => void} props.onApply Applies one candidate.
+ * @param {string} props.title Result section title.
  * @returns {JSX.Element|null} Candidate state or cards.
  */
-export function VideoSyncCandidateList({ appliedOffset, candidates, error, hasSearched, onApply, status }) {
+export function VideoSyncCandidateList({ appliedOffset, candidates, error, hasSearched, onApply, status, title }) {
   const { t } = useTranslation()
 
   if (status === 'calculating') {
     return (
-      <div className="space-y-2">
-        {candidates.length > 0 ? <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled onApply={onApply} /> : null}
+      <div className="space-y-4">
+        {candidates.length > 0 ? (
+          <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled onApply={onApply} title={title} />
+        ) : null}
       </div>
     )
   }
 
   if (status === 'error') {
     return (
-      <div className="space-y-2">
-        <p role="alert" className="rounded-sm bg-destructive/10 p-2 text-xs font-medium text-destructive">
+      <div className="space-y-4">
+        <p role="alert" className="rounded-sm bg-destructive/10 p-4 text-xs font-medium text-destructive">
           {error}
         </p>
-        {candidates.length > 0 ? <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled onApply={onApply} /> : null}
+        {candidates.length > 0 ? (
+          <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled onApply={onApply} title={title} />
+        ) : null}
       </div>
     )
   }
 
   if (status === 'stale') {
     return (
-      <div className="space-y-2">
+      <div className="space-y-4">
         <p className="text-xs font-medium text-amber-400">{t('videoSync.staleCandidates', 'Landmarks changed. Rerun the Sync again')}</p>
-        {candidates.length > 0 ? <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled onApply={onApply} /> : null}
+        {candidates.length > 0 ? (
+          <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled onApply={onApply} title={title} />
+        ) : null}
       </div>
     )
   }
@@ -53,20 +60,20 @@ export function VideoSyncCandidateList({ appliedOffset, candidates, error, hasSe
     return <p className="text-xs text-muted-foreground">{t('videoSync.noCandidate', 'No candidate aligns at least two landmarks')}</p>
   }
 
-  return <CandidateCards appliedOffset={appliedOffset} candidates={candidates} onApply={onApply} />
+  return <CandidateCards appliedOffset={appliedOffset} candidates={candidates} onApply={onApply} title={title} />
 }
 
-function CandidateCards({ appliedOffset, candidates, disabled = false, onApply }) {
+function CandidateCards({ appliedOffset, candidates, disabled = false, onApply, title }) {
   const { t } = useTranslation()
 
   return (
     <>
-      <SectionHeading icon={RotateCwClock} title={t('videoSync.syncCandidates', 'Sync Candidates')} variant="drawer" />
+      <SectionHeading icon={RotateCwClock} title={title} variant="drawer" />
       <div className="space-y-1.5" role="list" aria-label={t('videoSync.candidates', 'Sync candidates')}>
         {candidates.map((candidate) => {
           const isApplied = candidate.offset === appliedOffset
-          const isMapOnly = candidate.variant === 'mapOnly'
-          const isMapConflict = candidate.variant === 'mapConflict'
+          const isLocationOnly = candidate.variant === 'locationOnly'
+          const hasLocationConflict = candidate.variant === 'locationConflict'
           const scoreColor = getVideoSyncMatchScoreColor(candidate.matchScore)
           return (
             <div key={`${candidate.variant}-${candidate.offset}`} role="listitem">
@@ -92,8 +99,8 @@ function CandidateCards({ appliedOffset, candidates, disabled = false, onApply }
                     <div
                       className={`mt-0.5 text-[0.75rem] font-bold text-muted-foreground ${isApplied ? 'text-primary-foreground/60' : 'text-muted-foreground/50'}`}
                     >
-                      {isMapOnly ? (
-                        <span>{t('videoSync.mapOnly', 'Map only')}</span>
+                      {isLocationOnly ? (
+                        <span>{t('videoSync.locationOnly', 'Location only')}</span>
                       ) : (
                         <span>
                           {t('videoSync.landmarksMatched', '{{matched}} / {{eligible}} landmarks matched', {
@@ -103,8 +110,10 @@ function CandidateCards({ appliedOffset, candidates, disabled = false, onApply }
                         </span>
                       )}
                     </div>
-                    {isMapConflict ? (
-                      <div className=" mt-1 text-[10px] font-semibold">{t('videoSync.mapConflict', 'Conflict. Map landmark excluded.')}</div>
+                    {hasLocationConflict ? (
+                      <div className="mt-1 text-[10px] font-semibold">
+                        {t('videoSync.locationConflict', 'Location landmark excluded—conflicts with this candidate')}
+                      </div>
                     ) : null}
                   </div>
                   {candidate.matchScore === null ? null : (

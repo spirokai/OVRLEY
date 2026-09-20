@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { createProjectDirtyState, createProjectSnapshot } from '@/features/projects/utils/projectSnapshot'
 import { createPathLocator } from '@/features/projects/utils/projectPaths'
+import { VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
 import useStore from '@/store/useStore'
 
 describe('project snapshot contract', () => {
@@ -99,8 +100,8 @@ describe('project snapshot contract', () => {
       speedThresholdKmh: 7,
       turnThresholdDegrees: 120,
     })
-    const revision = useStore.getState().beginVideoSyncCalculation()
-    useStore.getState().completeVideoSyncCalculation(revision, { detection: {}, candidates: [{ offset: 4 }] })
+    const revision = useStore.getState().beginVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
+    useStore.getState().completeVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL, revision, { detection: {}, candidates: [{ offset: 4 }] })
 
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
@@ -114,6 +115,6 @@ describe('project snapshot contract', () => {
       speedThresholdKmh: 7,
       turnThresholdDegrees: 120,
     })
-    expect(JSON.stringify(project)).not.toContain('manualVideoSyncCandidates')
+    expect(JSON.stringify(project)).not.toContain('manualVideoSyncResults')
   })
 })

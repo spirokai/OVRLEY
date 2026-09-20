@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { VIDEO_SYNC_TOOL } from '@/store/slices/createLayoutSlice'
-import { VIDEO_SYNC_LANDMARK_TYPES, VIDEO_SYNC_MAX_LANDMARKS } from '../data/videoSyncConstants'
+import { VIDEO_SYNC_LANDMARK_TYPES, VIDEO_SYNC_MATCH_SCOPES, VIDEO_SYNC_MAX_LANDMARKS } from '../data/videoSyncConstants'
 import useVideoSyncCalculation from './useVideoSyncCalculation'
 
 /**
@@ -64,18 +64,17 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
     importedVideoDuration,
     landmarks,
     manualVideoSyncDetection,
-    manualVideoSyncCandidateStatus,
-    manualVideoSyncCandidates,
-    manualVideoSyncError,
-    manualVideoSyncHasSearched,
+    manualVideoSyncResults,
     removeVideoSyncLandmark,
     setVideoSyncDetectedLocation,
     setVideoSyncLandmarkType,
     setVideoSyncSpeedThreshold,
     setVideoSyncTurnThreshold,
+    setVideoSyncDrawerTab,
     speedThresholdKmh,
     turnThresholdDegrees,
     videoSyncOffsetSeconds,
+    videoSyncDrawerTab,
   } = useStore(
     useShallow((state) => ({
       applyVideoSyncCandidate: state.applyVideoSyncCandidate,
@@ -84,18 +83,17 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       importedVideoDuration: state.importedVideoDuration,
       landmarks: state.manualVideoSync.landmarks,
       manualVideoSyncDetection: state.manualVideoSyncDetection,
-      manualVideoSyncCandidateStatus: state.manualVideoSyncCandidateStatus,
-      manualVideoSyncCandidates: state.manualVideoSyncCandidates,
-      manualVideoSyncError: state.manualVideoSyncError,
-      manualVideoSyncHasSearched: state.manualVideoSyncHasSearched,
+      manualVideoSyncResults: state.manualVideoSyncResults,
       removeVideoSyncLandmark: state.removeVideoSyncLandmark,
       setVideoSyncDetectedLocation: state.setVideoSyncDetectedLocation,
       setVideoSyncLandmarkType: state.setVideoSyncLandmarkType,
       setVideoSyncSpeedThreshold: state.setVideoSyncSpeedThreshold,
       setVideoSyncTurnThreshold: state.setVideoSyncTurnThreshold,
+      setVideoSyncDrawerTab: state.setVideoSyncDrawerTab,
       speedThresholdKmh: state.manualVideoSync.speedThresholdKmh,
       turnThresholdDegrees: state.manualVideoSync.turnThresholdDegrees,
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+      videoSyncDrawerTab: state.videoSyncDrawerTab,
     })),
   )
 
@@ -125,21 +123,27 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
   const deleteLandmark = useCallback((id) => removeVideoSyncLandmark(id), [removeVideoSyncLandmark])
   const deleteDetectedLocation = useCallback(() => clearVideoSyncDetectedLocation(), [clearVideoSyncDetectedLocation])
   const changeLandmarkType = useCallback((id, type) => setVideoSyncLandmarkType(id, type), [setVideoSyncLandmarkType])
-  const applyCandidate = useCallback((candidate) => applyVideoSyncCandidate(candidate), [applyVideoSyncCandidate])
+  const applyAllCandidate = useCallback((candidate) => applyVideoSyncCandidate(VIDEO_SYNC_MATCH_SCOPES.ALL, candidate), [applyVideoSyncCandidate])
+  const applyLocationCandidate = useCallback(
+    (candidate) => applyVideoSyncCandidate(VIDEO_SYNC_MATCH_SCOPES.LOCATION, candidate),
+    [applyVideoSyncCandidate],
+  )
 
   return {
     videoSyncMode: toolbarDrawer.activeTool === VIDEO_SYNC_TOOL,
     drawer: {
+      activeTab: videoSyncDrawerTab,
       appliedOffset: videoSyncOffsetSeconds,
-      candidates: manualVideoSyncCandidates,
-      candidateStatus: manualVideoSyncCandidateStatus,
+      allResult: manualVideoSyncResults[VIDEO_SYNC_MATCH_SCOPES.ALL],
       calculation,
-      error: manualVideoSyncError,
-      hasSearched: manualVideoSyncHasSearched,
       landmarks,
+      locationResult: manualVideoSyncResults[VIDEO_SYNC_MATCH_SCOPES.LOCATION],
       detection: manualVideoSyncDetection,
-      onApplyCandidate: applyCandidate,
-      onCalculate: calculation.calculate,
+      onApplyAllCandidate: applyAllCandidate,
+      onApplyLocationCandidate: applyLocationCandidate,
+      onTabChange: setVideoSyncDrawerTab,
+      onCalculate: calculation.calculateAll,
+      onCalculateLocation: calculation.calculateLocation,
       onClearLandmarks: clearVideoSyncLandmarks,
       onChangeLandmarkType: changeLandmarkType,
       onDeleteLandmark: deleteLandmark,
@@ -148,9 +152,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       onTurnThresholdChange: setTurnThresholdDraftDegrees,
       onTurnThresholdCommit: setVideoSyncTurnThreshold,
       speedThresholdDraftKmh,
-      speedThresholdKmh,
       turnThresholdDraftDegrees,
-      turnThresholdDegrees,
       videoSummary,
       videoSync,
     },

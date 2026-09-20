@@ -2,6 +2,7 @@ import {
   VIDEO_SYNC_CANDIDATE_MERGE_TOLERANCE_SECONDS,
   VIDEO_SYNC_LANDMARK_TYPES,
   VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
+  VIDEO_SYNC_MATCH_SCOPES,
   VIDEO_SYNC_MAX_CANDIDATES,
 } from '../data/videoSyncConstants'
 import { calculateMatchScore, compareCandidateStrength } from './matchScore'
@@ -195,7 +196,7 @@ function createCandidateRecord({ offset, assignment }, eligibleCount) {
       matchedCount: evidence.length,
       eligibleCount,
       evidence,
-      mapClassification: 'none',
+      locationClassification: 'none',
     },
     score: assignment.score,
   }
@@ -221,43 +222,22 @@ function mergeCandidateRecords(records) {
   return merged.sort(compareCandidateRecords)
 }
 
-function classifyCandidateWithMap(record, mapLandmark, mapOffset) {
-  const agrees = Math.abs(record.candidate.offset - mapOffset) <= VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS
+function classifyCandidateWithLocation(record, locationLandmark, locationOffset) {
+  const agrees = Math.abs(record.candidate.offset - locationOffset) <= VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS
   return {
     ...record,
     candidate: {
       ...record.candidate,
-      variant: agrees ? 'ordinary' : 'mapConflict',
-      mapLandmarkId: mapLandmark.id,
-      mapOffset,
-      mapClassification: agrees ? 'agrees' : 'conflict',
-      ...(agrees ? {} : { excludedLandmarkIds: [mapLandmark.id] }),
+      variant: agrees ? 'ordinary' : 'locationConflict',
+      locationLandmarkId: locationLandmark.id,
+      locationOffset,
+      locationClassification: agrees ? 'agrees' : 'conflict',
+      ...(agrees ? {} : { excludedLandmarkIds: [locationLandmark.id] }),
     },
   }
 }
 
-function createMapOnlyCandidate(mapLandmark, mapOffset, eligibleCount) {
-  return {
-    variant: 'mapOnly',
-    offset: mapOffset,
-    matchScore: null,
-    matchedCount: 0,
-    eligibleCount,
-    evidence: [],
-    mapLandmarkId: mapLandmark.id,
-    mapOffset,
-    mapClassification: 'authoritative',
-  }
-}
-
-/**
- * Finds deterministic, globally aligned manual video-sync candidates.
- *
- * @param {object[]} landmarks Canonical video landmarks.
- * @param {{availability: {speed: boolean, heading: boolean}, stops: object[], turns: object[], location: object|null}} detection Canonical detected activity events.
- * @returns {{candidates: object[], diagnostics: {eligibleLandmarkIds: string[], offsetSupports: object[], hypotheses: object[]}}} Presentation candidates and development diagnostics.
- */
-export function matchVideoSyncCandidates(landmarks, detection) {
+function matchAllLandmarks(landmarks, detection) {
   const { eligibleLandmarks, supports } = createVideoSyncOffsetSupports(landmarks, detection)
   const groups = buildAssignmentGroups(eligibleLandmarks, supports)
   const records = []
@@ -268,15 +248,12 @@ export function matchVideoSyncCandidates(landmarks, detection) {
   }
 
   const merged = mergeCandidateRecords(records)
-  const mapLandmark = detection.location === null ? undefined : landmarks.find((landmark) => landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION)
-  const mapOffset = mapLandmark === undefined ? null : detection.location.time - mapLandmark.videoSecond
-  const classified = mapLandmark === undefined ? merged : merged.map((record) => classifyCandidateWithMap(record, mapLandmark, mapOffset))
-  const candidateLimit = mapLandmark === undefined ? VIDEO_SYNC_MAX_CANDIDATES : VIDEO_SYNC_MAX_CANDIDATES - 1
-  const candidates = classified.slice(0, candidateLimit).map((record) => record.candidate)
-
-  if (mapLandmark !== undefined) {
-    candidates.unshift(createMapOnlyCandidate(mapLandmark, mapOffset, eligibleLandmarks.length))
-  }
+  const locationLandmark =
+    detection.location === null ? undefined : landmarks.find((landmark) => landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION)
+  const locationOffset = locationLandmark === undefined ? null : detection.location.time - locationLandmark.videoSecond
+  const classified =
+    locationLandmark === undefined ? merged : merged.map((record) => classifyCandidateWithLocation(record, locationLandmark, locationOffset))
+  const candidates = classified.slice(0, VIDEO_SYNC_MAX_CANDIDATES).map((record) => record.candidate)
 
   return {
     candidates,
@@ -290,4 +267,61 @@ export function matchVideoSyncCandidates(landmarks, detection) {
       })),
     },
   }
+}
+
+function matchLocation(landmarks, detection) {
+  const locationLandmark = landmarks.find((landmark) => landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION)
+  if (locationLandmark === undefined) throw new Error('Location-only sync requires a video location landmark')
+  if (detection.location === null) throw new Error('Location-only sync requires a detected activity location')
+
+  const offset = detection.location.time - locationLandmark.videoSecond
+  const candidate = {
+    variant: 'locationOnly',
+    offset,
+    matchScore: null,
+    matchedCount: 1,
+    eligibleCount: 1,
+    evidence: [
+      {
+        landmarkId: locationLandmark.id,
+        eventId: detection.location.id,
+        type: VIDEO_SYNC_LANDMARK_TYPES.LOCATION,
+        residualSeconds: 0,
+      },
+    ],
+  }
+
+  return {
+    candidates: [candidate],
+    diagnostics: {
+      eligibleLandmarkIds: [locationLandmark.id],
+      offsetSupports: [
+        {
+          landmarkId: locationLandmark.id,
+          eventId: detection.location.id,
+          type: VIDEO_SYNC_LANDMARK_TYPES.LOCATION,
+          startOffset: offset - VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
+          endOffset: offset + VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
+        },
+      ],
+      hypotheses: [{ offset, evidence: candidate.evidence }],
+    },
+  }
+}
+
+/**
+ * Finds deterministic video-sync candidates for one explicit matching scope.
+ * All-landmark matching includes a resolved location as ordinary evidence;
+ * location-only matching returns its single exact alignment.
+ *
+ * @param {object} input Canonical matching input.
+ * @param {object[]} input.landmarks Canonical video landmarks.
+ * @param {{availability: {speed: boolean, heading: boolean}, stops: object[], turns: object[], location: object|null}} input.detection Canonical detected activity events.
+ * @param {'all'|'location'} input.scope Matching scope.
+ * @returns {{candidates: object[], diagnostics: {eligibleLandmarkIds: string[], offsetSupports: object[], hypotheses: object[]}}} Presentation candidates and development diagnostics.
+ */
+export function matchVideoSyncCandidates({ landmarks, detection, scope }) {
+  if (scope === VIDEO_SYNC_MATCH_SCOPES.ALL) return matchAllLandmarks(landmarks, detection)
+  if (scope === VIDEO_SYNC_MATCH_SCOPES.LOCATION) return matchLocation(landmarks, detection)
+  throw new Error(`Unsupported video sync match scope: ${String(scope)}`)
 }

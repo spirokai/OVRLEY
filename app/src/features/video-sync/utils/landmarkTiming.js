@@ -13,23 +13,26 @@ const MATCHABLE_LANDMARK_TYPES = [
 const UNAVAILABLE_METRICS = Object.freeze({ speed: false, heading: false, course: false })
 
 /**
- * Derives the landmarks that can participate in ordinary matching from the
- * canonical detector availability.
+ * Derives the landmarks that can participate in matching from the canonical
+ * detector availability.
  *
  * @param {object[]} landmarks Canonical video landmarks.
  * @param {{availability: {speed: boolean, heading: boolean, course: boolean}, location: object|null}|null} detection Canonical detected-event model.
- * @returns {{eligibleLandmarks: object[], eligibleLandmarkIds: string[], unsupportedLandmarks: {id: string, type: string, metric: string}[], resolvedLocationLandmark: object|null, canMatchLandmarks: boolean, canUseMapOnly: boolean}} Eligibility model.
+ * @returns {{eligibleLandmarks: object[], eligibleLandmarkIds: string[], unsupportedLandmarks: {id: string, type: string, metric: string}[], locationLandmark: object|null, canMatchAll: boolean, canMatchLocation: boolean}} Eligibility model.
  */
 export function getVideoSyncEligibility(landmarks, detection) {
   const eligibleLandmarks = []
   const unsupportedLandmarks = []
-  let resolvedLocationLandmark = null
+  let locationLandmark = null
   const availability = detection?.availability ?? UNAVAILABLE_METRICS
   const location = detection?.location ?? null
 
   for (const landmark of landmarks) {
     if (landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) {
-      if (location !== null) resolvedLocationLandmark = landmark
+      if (location !== null) {
+        locationLandmark = landmark
+        eligibleLandmarks.push(landmark)
+      }
       continue
     }
 
@@ -47,9 +50,9 @@ export function getVideoSyncEligibility(landmarks, detection) {
     eligibleLandmarks,
     eligibleLandmarkIds: eligibleLandmarks.map((landmark) => landmark.id),
     unsupportedLandmarks,
-    resolvedLocationLandmark,
-    canMatchLandmarks: eligibleLandmarks.length >= 2,
-    canUseMapOnly: resolvedLocationLandmark !== null,
+    locationLandmark,
+    canMatchAll: eligibleLandmarks.length >= 2,
+    canMatchLocation: locationLandmark !== null,
   }
 }
 
@@ -137,12 +140,10 @@ export function createVideoSyncOffsetSupports(landmarks, detection) {
       .sort((left, right) => sortByTime(left, right, (event) => event.start)),
   }
 
-  const { eligibleLandmarks, resolvedLocationLandmark } = getVideoSyncEligibility(landmarks, detection)
-  const matchableLandmarks = resolvedLocationLandmark === null ? eligibleLandmarks : [...eligibleLandmarks, resolvedLocationLandmark]
-  matchableLandmarks.sort((left, right) => sortByTime(left, right, (landmark) => landmark.videoSecond))
+  const { eligibleLandmarks } = getVideoSyncEligibility(landmarks, detection)
 
   const supports = []
-  for (const landmark of matchableLandmarks) {
+  for (const landmark of eligibleLandmarks) {
     if (landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) {
       supports.push(createOffsetSupport(landmark, detection.location))
       continue
@@ -150,7 +151,7 @@ export function createVideoSyncOffsetSupports(landmarks, detection) {
     for (const event of eventsByType[landmark.type]) supports.push(createOffsetSupport(landmark, event))
   }
 
-  return { eligibleLandmarks: matchableLandmarks, supports }
+  return { eligibleLandmarks, supports }
 }
 
 /**

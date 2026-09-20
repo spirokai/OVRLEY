@@ -4,6 +4,7 @@ import {
   VIDEO_SYNC_DETECTED_LOCATION_ID,
   VIDEO_SYNC_MAX_LANDMARKS,
   VIDEO_SYNC_MAX_LOCATION_LANDMARKS,
+  VIDEO_SYNC_MATCH_SCOPES,
   VIDEO_SYNC_SPEED_THRESHOLD_RANGE_KMH,
   VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES,
 } from '@/features/video-sync/data/videoSyncConstants'
@@ -32,19 +33,45 @@ function requireRevision(revision) {
   }
 }
 
-function invalidateDerivedState(draft, { clearCandidates = false } = {}) {
-  draft.manualVideoSyncInputRevision += 1
-  if (clearCandidates) {
-    draft.manualVideoSyncCandidates = []
-    draft.manualVideoSyncDetection = null
-    draft.manualVideoSyncHasSearched = false
-    draft.manualVideoSyncCandidateStatus = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.IDLE
-  } else if (draft.manualVideoSyncHasSearched) {
-    draft.manualVideoSyncCandidateStatus = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.STALE
-  } else if (draft.manualVideoSyncCandidateStatus === MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING) {
-    draft.manualVideoSyncCandidateStatus = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.IDLE
+function requireMatchScope(scope) {
+  if (!Object.values(VIDEO_SYNC_MATCH_SCOPES).includes(scope)) {
+    throw new Error(`Unsupported video sync match scope: ${String(scope)}`)
   }
-  draft.manualVideoSyncError = null
+}
+
+function createCandidateResult() {
+  return {
+    candidates: [],
+    error: null,
+    hasSearched: false,
+    revision: 0,
+    status: MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.IDLE,
+  }
+}
+
+function createCandidateResults() {
+  return {
+    [VIDEO_SYNC_MATCH_SCOPES.ALL]: createCandidateResult(),
+    [VIDEO_SYNC_MATCH_SCOPES.LOCATION]: createCandidateResult(),
+  }
+}
+
+function invalidateResult(draft, scope) {
+  const result = draft.manualVideoSyncResults[scope]
+  result.revision += 1
+  result.error = null
+  if (result.hasSearched) result.status = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.STALE
+  else result.status = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.IDLE
+}
+
+function invalidateAllResults(draft) {
+  invalidateResult(draft, VIDEO_SYNC_MATCH_SCOPES.ALL)
+  invalidateResult(draft, VIDEO_SYNC_MATCH_SCOPES.LOCATION)
+}
+
+function resetDerivedState(draft) {
+  draft.manualVideoSyncDetection = null
+  draft.manualVideoSyncResults = createCandidateResults()
 }
 
 function requireCalculationResult(result) {
@@ -69,11 +96,7 @@ export function createManualVideoSyncSlice(set, get) {
   return {
     manualVideoSync: createDefaultManualState(),
     manualVideoSyncDetection: null,
-    manualVideoSyncCandidates: [],
-    manualVideoSyncCandidateStatus: MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.IDLE,
-    manualVideoSyncError: null,
-    manualVideoSyncInputRevision: 0,
-    manualVideoSyncHasSearched: false,
+    manualVideoSyncResults: createCandidateResults(),
 
     addVideoSyncLandmark: (type, videoSecond) => {
       const state = get()
@@ -99,7 +122,8 @@ export function createManualVideoSyncSlice(set, get) {
 
       set((draft) => {
         draft.manualVideoSync.landmarks.push(landmark)
-        invalidateDerivedState(draft)
+        if (type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) invalidateAllResults(draft)
+        else invalidateResult(draft, VIDEO_SYNC_MATCH_SCOPES.ALL)
       })
       return id
     },
@@ -114,7 +138,8 @@ export function createManualVideoSyncSlice(set, get) {
       set((draft) => {
         const target = draft.manualVideoSync.landmarks.find((item) => item.id === id)
         target.videoSecond = videoSecond
-        invalidateDerivedState(draft)
+        if (landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) invalidateAllResults(draft)
+        else invalidateResult(draft, VIDEO_SYNC_MATCH_SCOPES.ALL)
       })
     },
 
@@ -125,7 +150,7 @@ export function createManualVideoSyncSlice(set, get) {
       set((draft) => {
         if (draft.manualVideoSyncDetection === null) draft.manualVideoSyncDetection = createEmptyVideoSyncDetection()
         draft.manualVideoSyncDetection.location = detectedLocation
-        invalidateDerivedState(draft)
+        invalidateAllResults(draft)
       })
     },
 
@@ -134,7 +159,7 @@ export function createManualVideoSyncSlice(set, get) {
       if (detection === null || detection.location === null) return
       set((draft) => {
         draft.manualVideoSyncDetection.location = null
-        invalidateDerivedState(draft)
+        invalidateAllResults(draft)
       })
     },
 
@@ -160,20 +185,24 @@ export function createManualVideoSyncSlice(set, get) {
 
       set((draft) => {
         draft.manualVideoSync.landmarks = draft.manualVideoSync.landmarks.map((item) => (item.id === id ? nextLandmark : item))
-        invalidateDerivedState(draft)
+        if (landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION || nextLandmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) {
+          invalidateAllResults(draft)
+        } else {
+          invalidateResult(draft, VIDEO_SYNC_MATCH_SCOPES.ALL)
+        }
       })
     },
 
     removeVideoSyncLandmark: (id) => {
       validateLandmarkId(id)
       const state = get()
-      if (!state.manualVideoSync.landmarks.some((landmark) => landmark.id === id)) {
-        throw new Error(`Manual video sync landmark was not found: ${id}`)
-      }
+      const landmark = state.manualVideoSync.landmarks.find((item) => item.id === id)
+      if (!landmark) throw new Error(`Manual video sync landmark was not found: ${id}`)
 
       set((draft) => {
-        draft.manualVideoSync.landmarks = draft.manualVideoSync.landmarks.filter((landmark) => landmark.id !== id)
-        invalidateDerivedState(draft)
+        draft.manualVideoSync.landmarks = draft.manualVideoSync.landmarks.filter((item) => item.id !== id)
+        if (landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION) invalidateAllResults(draft)
+        else invalidateResult(draft, VIDEO_SYNC_MATCH_SCOPES.ALL)
       })
     },
 
@@ -181,7 +210,7 @@ export function createManualVideoSyncSlice(set, get) {
       if (!get().manualVideoSync.landmarks.length) return
       set((draft) => {
         draft.manualVideoSync.landmarks = []
-        invalidateDerivedState(draft)
+        invalidateAllResults(draft)
       })
     },
 
@@ -191,7 +220,7 @@ export function createManualVideoSyncSlice(set, get) {
       if (state.manualVideoSync.speedThresholdKmh === value) return
       set((draft) => {
         draft.manualVideoSync.speedThresholdKmh = value
-        invalidateDerivedState(draft)
+        invalidateResult(draft, VIDEO_SYNC_MATCH_SCOPES.ALL)
       })
     },
 
@@ -201,113 +230,114 @@ export function createManualVideoSyncSlice(set, get) {
       if (state.manualVideoSync.turnThresholdDegrees === value) return
       set((draft) => {
         draft.manualVideoSync.turnThresholdDegrees = value
-        invalidateDerivedState(draft)
+        invalidateResult(draft, VIDEO_SYNC_MATCH_SCOPES.ALL)
       })
     },
 
-    applyVideoSyncCandidate: (candidate) => {
+    applyVideoSyncCandidate: (scope, candidate) => {
+      requireMatchScope(scope)
       const state = get()
-      if (state.manualVideoSyncCandidateStatus !== MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.FRESH) {
+      const result = state.manualVideoSyncResults[scope]
+      if (result.status !== MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.FRESH) {
         throw new Error('Cannot apply a stale manual video sync candidate')
       }
       if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate) || !Object.hasOwn(candidate, 'offset')) {
         throw new Error('Manual video sync candidate must include an offset')
       }
-      if (!state.manualVideoSyncCandidates.some((item) => item.offset === candidate.offset)) {
+      if (!result.candidates.some((item) => item.offset === candidate.offset)) {
         throw new Error('Manual video sync candidate is not part of the current result')
       }
 
       state.setVideoSyncOffset(candidate.offset, { compensatePlayhead: true })
     },
 
-    beginVideoSyncCalculation: () => {
-      if (get().manualVideoSyncCandidateStatus === MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING) return null
-      const revision = get().manualVideoSyncInputRevision
+    beginVideoSyncCalculation: (scope) => {
+      requireMatchScope(scope)
+      const state = get()
+      if (Object.values(state.manualVideoSyncResults).some((result) => result.status === MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING)) {
+        return null
+      }
+      const revision = state.manualVideoSyncResults[scope].revision
       set((draft) => {
-        draft.manualVideoSyncCandidateStatus = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING
-        draft.manualVideoSyncError = null
+        const result = draft.manualVideoSyncResults[scope]
+        result.status = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING
+        result.error = null
       })
       return revision
     },
 
-    completeVideoSyncCalculation: (revision, result) => {
+    completeVideoSyncCalculation: (scope, revision, calculation) => {
+      requireMatchScope(scope)
       requireRevision(revision)
-      requireCalculationResult(result)
-      if (get().manualVideoSyncInputRevision !== revision) return false
+      requireCalculationResult(calculation)
+      const currentResult = get().manualVideoSyncResults[scope]
+      if (currentResult.revision !== revision || currentResult.status !== MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING) return false
       set((draft) => {
-        draft.manualVideoSyncDetection = structuredClone(result.detection)
-        draft.manualVideoSyncCandidates = structuredClone(result.candidates)
-        draft.manualVideoSyncCandidateStatus = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.FRESH
-        draft.manualVideoSyncError = null
-        draft.manualVideoSyncHasSearched = true
+        const result = draft.manualVideoSyncResults[scope]
+        draft.manualVideoSyncDetection = structuredClone(calculation.detection)
+        result.candidates = structuredClone(calculation.candidates)
+        result.status = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.FRESH
+        result.error = null
+        result.hasSearched = true
       })
       return true
     },
 
-    completeVideoSyncDetection: (revision, detection) => {
-      requireRevision(revision)
-      if (get().manualVideoSyncInputRevision !== revision) return false
+    completeVideoSyncDetection: (detection) => {
       set((draft) => {
         draft.manualVideoSyncDetection = structuredClone(detection)
-        draft.manualVideoSyncCandidateStatus = draft.manualVideoSyncHasSearched
-          ? MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.STALE
-          : MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.IDLE
-        draft.manualVideoSyncError = null
       })
       return true
     },
 
-    failVideoSyncCalculation: (revision, message) => {
+    failVideoSyncCalculation: (scope, revision, message) => {
+      requireMatchScope(scope)
       requireRevision(revision)
       requireCalculationError(message)
-      if (get().manualVideoSyncInputRevision !== revision) return false
+      const currentResult = get().manualVideoSyncResults[scope]
+      if (currentResult.revision !== revision || currentResult.status !== MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING) return false
       set((draft) => {
-        draft.manualVideoSyncCandidateStatus = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.ERROR
-        draft.manualVideoSyncError = message
-        draft.manualVideoSyncHasSearched = true
+        const result = draft.manualVideoSyncResults[scope]
+        result.status = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.ERROR
+        result.error = message
+        result.hasSearched = true
       })
       return true
     },
 
-    failVideoSyncDetection: (revision, message) => {
-      requireRevision(revision)
+    failVideoSyncDetection: (message) => {
       requireCalculationError(message)
-      if (get().manualVideoSyncInputRevision !== revision) return false
       set((draft) => {
-        draft.manualVideoSyncCandidateStatus = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.ERROR
-        draft.manualVideoSyncError = message
+        const result = draft.manualVideoSyncResults[VIDEO_SYNC_MATCH_SCOPES.ALL]
+        result.status = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.ERROR
+        result.error = message
       })
       return true
     },
-
-    invalidateVideoSyncCalculation: () =>
-      set((draft) => {
-        invalidateDerivedState(draft)
-      }),
 
     clearVideoSyncForVideo: () =>
       set((draft) => {
         draft.manualVideoSync.landmarks = []
-        invalidateDerivedState(draft, { clearCandidates: true })
+        resetDerivedState(draft)
       }),
 
     clearVideoSyncForActivity: () =>
       set((draft) => {
-        invalidateDerivedState(draft, { clearCandidates: true })
+        resetDerivedState(draft)
       }),
 
     // Project data is validated once by Rust before this canonical state reaches the store.
     hydrateVideoSyncState: (manualState) => {
       set((draft) => {
         draft.manualVideoSync = cloneManualState(manualState)
-        invalidateDerivedState(draft, { clearCandidates: true })
+        resetDerivedState(draft)
       })
     },
 
     resetVideoSyncState: () => {
       set((draft) => {
         draft.manualVideoSync = createDefaultManualState()
-        invalidateDerivedState(draft, { clearCandidates: true })
+        resetDerivedState(draft)
       })
     },
   }

@@ -91,3 +91,8 @@ export const MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES = {
   STALE: 'stale',
   ERROR: 'error',
 }
+
+export const VIDEO_SYNC_MATCH_SCOPES = {
+  ALL: 'all',
+  LOCATION: 'location',
+}

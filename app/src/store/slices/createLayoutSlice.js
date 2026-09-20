@@ -21,6 +21,7 @@ export function createLayoutSlice(set, _get) {
     leftDrawerVisible: false,
     leftDrawerPinned: false,
     activeLeftDrawerTool: WIDGETS_TOOL,
+    videoSyncDrawerTab: 'autodetect',
 
     /**
      * Establishes canonical drawer state from a normalized preference.
@@ -56,6 +57,30 @@ export function createLayoutSlice(set, _get) {
         state.activeLeftDrawerTool = tool
         state.leftDrawerVisible = true
       }),
+
+    /**
+     * Opens Sync Doctor directly on its manual-sync tab.
+     */
+    openManualVideoSync: () =>
+      set((state) => {
+        state.activeLeftDrawerTool = VIDEO_SYNC_TOOL
+        state.leftDrawerVisible = true
+        state.videoSyncDrawerTab = 'manual'
+      }),
+
+    /**
+     * Selects the active Sync Doctor drawer tab.
+     *
+     * @param {string} tab - Canonical Sync Doctor tab identifier.
+     */
+    setVideoSyncDrawerTab: (tab) => {
+      if (tab !== 'autodetect' && tab !== 'manual') {
+        throw new Error(`Unsupported video sync drawer tab: ${String(tab)}`)
+      }
+      set((state) => {
+        state.videoSyncDrawerTab = tab
+      })
+    },
 
     /**
      * Dismisses the drawer only while it is a temporary workspace overlay.

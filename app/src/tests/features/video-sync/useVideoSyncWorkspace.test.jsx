@@ -8,12 +8,13 @@ import useVideoSyncWorkspace, { resolveVideoSyncMarkControls } from '@/features/
 
 vi.mock('@/features/video-sync/hooks/useVideoSyncCalculation', () => ({
   default: () => ({
-    calculate: vi.fn(),
+    calculateAll: vi.fn(),
+    calculateLocation: vi.fn(),
     eligibility: {
-      canCalculate: false,
-      canMatchLandmarks: false,
-      canUseMapOnly: false,
-      explanation: 'At least two landmarks are required',
+      canCalculateAll: false,
+      canMatchAll: false,
+      canCalculateLocation: false,
+      allExplanation: 'At least two landmarks are required',
     },
     isCalculating: false,
   }),

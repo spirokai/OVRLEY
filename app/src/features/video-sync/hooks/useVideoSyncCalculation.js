@@ -2,7 +2,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
-import { MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES } from '../data/videoSyncConstants'
+import { MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES, VIDEO_SYNC_MATCH_SCOPES } from '../data/videoSyncConstants'
 import { createActivitySyncInput } from '../utils/activitySyncInput'
 import { detectActivityEventsFromInput } from '../utils/detectActivityEvents'
 import { getVideoSyncEligibility } from '../utils/landmarkTiming'
@@ -10,8 +10,7 @@ import { matchVideoSyncCandidates } from '../utils/intervalConsensus'
 
 function scheduleVideoSyncCalculation({
   beginCalculation,
-  canCalculate,
-  canUseMapOnly,
+  eligibility,
   completeCalculation,
   completeDetection,
   currentDetection,
@@ -19,28 +18,37 @@ function scheduleVideoSyncCalculation({
   failDetection,
   hasActivity,
   input,
+  isCurrent,
   landmarks,
-  searchCandidates,
+  matchScope,
   settings,
 }) {
-  if (searchCandidates && !canCalculate) return Promise.resolve(false)
-  if (!searchCandidates && !hasActivity && !canUseMapOnly) return Promise.resolve(false)
+  if (matchScope === VIDEO_SYNC_MATCH_SCOPES.ALL && !eligibility.canCalculateAll) return Promise.resolve(false)
+  if (matchScope === VIDEO_SYNC_MATCH_SCOPES.LOCATION && !eligibility.canCalculateLocation) return Promise.resolve(false)
+  if (matchScope === null && !hasActivity) return Promise.resolve(false)
 
-  const revision = beginCalculation()
-  if (revision === null) return Promise.resolve(false)
+  const revision = matchScope === null ? null : beginCalculation(matchScope)
+  if (matchScope !== null && revision === null) return Promise.resolve(false)
 
   return new Promise((resolve) => {
     const run = () => {
+      if (isCurrent !== null && !isCurrent()) {
+        resolve(false)
+        return
+      }
       try {
-        const detection = detectActivityEventsFromInput(input, settings, currentDetection?.location ?? null)
-        if (!searchCandidates) {
-          resolve(completeDetection(revision, detection))
+        const detection =
+          matchScope === VIDEO_SYNC_MATCH_SCOPES.LOCATION
+            ? currentDetection
+            : detectActivityEventsFromInput(input, settings, currentDetection?.location ?? null)
+        if (matchScope === null) {
+          resolve(completeDetection(detection))
           return
         }
 
-        resolve(completeCalculation(revision, { detection, ...matchVideoSyncCandidates(landmarks, detection) }))
+        resolve(completeCalculation(matchScope, revision, { detection, ...matchVideoSyncCandidates({ landmarks, detection, scope: matchScope }) }))
       } catch (error) {
-        resolve(searchCandidates ? failCalculation(revision, error.message) : failDetection(revision, error.message))
+        resolve(matchScope === null ? failDetection(error.message) : failCalculation(matchScope, revision, error.message))
       }
     }
 
@@ -56,36 +64,36 @@ function scheduleVideoSyncCalculation({
  * or sensitivity changes. Candidate calculations are started explicitly, or
  * rerun automatically after a sensitivity commit when a search already ran.
  *
- * @returns {{calculate: () => Promise<boolean>, eligibility: object, isCalculating: boolean}} Calculation view model.
+ * @returns {{calculateAll: () => Promise<boolean>, calculateLocation: () => Promise<boolean>, eligibility: object, isCalculating: boolean}} Calculation view model.
  */
 export default function useVideoSyncCalculation() {
   const { t } = useTranslation()
   const {
     beginVideoSyncCalculation,
+    allHasSearched,
     completeVideoSyncCalculation,
     completeVideoSyncDetection,
     failVideoSyncCalculation,
     failVideoSyncDetection,
     importedVideoDuration,
+    isCalculating,
     landmarks,
-    manualVideoSyncCandidateStatus,
     manualVideoSyncDetection,
-    manualVideoSyncHasSearched,
     parsedActivity,
     speedThresholdKmh,
     turnThresholdDegrees,
   } = useStore(
     useShallow((state) => ({
       beginVideoSyncCalculation: state.beginVideoSyncCalculation,
+      allHasSearched: state.manualVideoSyncResults[VIDEO_SYNC_MATCH_SCOPES.ALL].hasSearched,
       completeVideoSyncCalculation: state.completeVideoSyncCalculation,
       completeVideoSyncDetection: state.completeVideoSyncDetection,
       failVideoSyncCalculation: state.failVideoSyncCalculation,
       failVideoSyncDetection: state.failVideoSyncDetection,
       importedVideoDuration: state.importedVideoDuration,
+      isCalculating: Object.values(state.manualVideoSyncResults).some((result) => result.status === MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING),
       landmarks: state.manualVideoSync.landmarks,
-      manualVideoSyncCandidateStatus: state.manualVideoSyncCandidateStatus,
       manualVideoSyncDetection: state.manualVideoSyncDetection,
-      manualVideoSyncHasSearched: state.manualVideoSyncHasSearched,
       parsedActivity: state.parsedActivity,
       speedThresholdKmh: state.manualVideoSync.speedThresholdKmh,
       turnThresholdDegrees: state.manualVideoSync.turnThresholdDegrees,
@@ -96,30 +104,39 @@ export default function useVideoSyncCalculation() {
   const detectorInput = useMemo(() => createActivitySyncInput(parsedActivity), [parsedActivity])
   const domainEligibility = useMemo(() => getVideoSyncEligibility(landmarks, manualVideoSyncDetection), [landmarks, manualVideoSyncDetection])
   const hasVideo = importedVideoDuration !== null
+  const latestDetectionRequest = useRef(null)
   const eligibility = useMemo(() => {
-    let explanation = null
+    let allExplanation = null
     if (!hasVideo) {
-      explanation = t('videoSync.videoRequiredForSync', 'A video is required for Landmark Sync')
-    } else if (!domainEligibility.canUseMapOnly && !domainEligibility.canMatchLandmarks) {
-      explanation =
+      allExplanation = t('videoSync.videoRequiredForSync', 'A video is required for Landmark Sync')
+    } else if (!domainEligibility.canMatchAll) {
+      allExplanation =
         parsedActivity === null
           ? t('videoSync.activityRequiredForSync', 'Activity telemetry is required for Landmark Sync')
-          : t('videoSync.minimumLandmarksForSync', 'At least two stop or turn landmarks are required')
+          : t('videoSync.minimumLandmarksForSync', 'At least two landmarks are required')
     }
 
     return {
       ...domainEligibility,
-      canCalculate: hasVideo && (domainEligibility.canMatchLandmarks || domainEligibility.canUseMapOnly),
-      explanation,
+      canCalculateAll: hasVideo && domainEligibility.canMatchAll,
+      canCalculateLocation: hasVideo && domainEligibility.canMatchLocation,
+      allExplanation,
     }
   }, [domainEligibility, hasVideo, parsedActivity, t])
 
   const runCalculation = useCallback(
-    (searchCandidates) =>
-      scheduleVideoSyncCalculation({
+    (matchScope) => {
+      let detectionRequest = null
+      if (matchScope === null) {
+        detectionRequest = {}
+        latestDetectionRequest.current = detectionRequest
+      } else if (matchScope === VIDEO_SYNC_MATCH_SCOPES.ALL) {
+        latestDetectionRequest.current = null
+      }
+
+      return scheduleVideoSyncCalculation({
         beginCalculation: beginVideoSyncCalculation,
-        canCalculate: eligibility.canCalculate,
-        canUseMapOnly: eligibility.canUseMapOnly,
+        eligibility,
         completeCalculation: completeVideoSyncCalculation,
         completeDetection: completeVideoSyncDetection,
         currentDetection: manualVideoSyncDetection,
@@ -127,16 +144,17 @@ export default function useVideoSyncCalculation() {
         failDetection: failVideoSyncDetection,
         hasActivity: parsedActivity !== null,
         input: detectorInput,
+        isCurrent: detectionRequest === null ? null : () => latestDetectionRequest.current === detectionRequest,
         landmarks,
-        searchCandidates,
+        matchScope,
         settings,
-      }),
+      })
+    },
     [
       beginVideoSyncCalculation,
       completeVideoSyncCalculation,
       completeVideoSyncDetection,
-      eligibility.canCalculate,
-      eligibility.canUseMapOnly,
+      eligibility,
       failVideoSyncCalculation,
       failVideoSyncDetection,
       detectorInput,
@@ -147,16 +165,36 @@ export default function useVideoSyncCalculation() {
     ],
   )
 
-  const calculate = useCallback(() => runCalculation(true), [runCalculation])
+  const calculateAll = useCallback(() => runCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL), [runCalculation])
+  const calculateLocation = useCallback(() => runCalculation(VIDEO_SYNC_MATCH_SCOPES.LOCATION), [runCalculation])
 
   const scheduleCalculation = useEffectEvent(runCalculation)
+  useEffect(
+    () => () => {
+      latestDetectionRequest.current = null
+    },
+    [],
+  )
+
   const previousActivity = useRef(undefined)
   useEffect(() => {
     const activityChanged = previousActivity.current !== parsedActivity
     previousActivity.current = parsedActivity
-    if (!activityChanged || parsedActivity === null) return
-    void scheduleCalculation(false)
+    if (!activityChanged) return
+    if (parsedActivity === null) {
+      latestDetectionRequest.current = null
+      return
+    }
+    void scheduleCalculation(null)
   }, [parsedActivity])
+
+  const locationSecond = manualVideoSyncDetection?.location?.time ?? null
+  const previousLocationSecond = useRef(locationSecond)
+  useEffect(() => {
+    if (previousLocationSecond.current === locationSecond) return
+    previousLocationSecond.current = locationSecond
+    if (parsedActivity !== null) void scheduleCalculation(null)
+  }, [locationSecond, parsedActivity])
 
   const previousSettings = useRef(null)
   useEffect(() => {
@@ -168,12 +206,17 @@ export default function useVideoSyncCalculation() {
     previousSettings.current = nextSettings
     if (!settingsChanged) return
 
-    void scheduleCalculation(manualVideoSyncHasSearched && eligibility.canCalculate)
-  }, [eligibility.canCalculate, manualVideoSyncHasSearched, speedThresholdKmh, turnThresholdDegrees])
+    if (allHasSearched && eligibility.canCalculateAll) {
+      void scheduleCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
+    } else {
+      void scheduleCalculation(null)
+    }
+  }, [allHasSearched, eligibility.canCalculateAll, speedThresholdKmh, turnThresholdDegrees])
 
   return {
-    calculate,
+    calculateAll,
+    calculateLocation,
     eligibility,
-    isCalculating: manualVideoSyncCandidateStatus === MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING,
+    isCalculating,
   }
 }
