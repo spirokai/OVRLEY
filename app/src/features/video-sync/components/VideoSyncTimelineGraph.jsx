@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 function getBandClassName(tone) {
-  if (tone === 'stop') return 'bg-video-sync-stop/80'
-  if (tone === 'location') return 'bg-video-sync-location/70'
+  if (tone === 'stop') return 'bg-video-sync-stop/60'
+  if (tone === 'location') return 'bg-video-sync-location/40'
   return 'bg-video-sync-turn/70'
 }
 

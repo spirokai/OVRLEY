@@ -57,4 +57,34 @@ describe('manual video-sync timeline graph geometry', () => {
 
     expect(bands).toEqual([expect.objectContaining({ id: 'map', type: 'location', tone: 'location', startSecond: 40, endSecond: 60 })])
   })
+
+  test('renders a stop using its detected low-speed duration', () => {
+    const bands = buildEventBands({
+      detection: {
+        stops: [{ id: 'stop-0', type: 'stop', time: 20, lowSpeedInterval: { start: 20, end: 37 } }],
+        turns: [],
+        location: null,
+      },
+      viewStart: 0,
+      viewEnd: 100,
+      widthPx: 500,
+    })
+
+    expect(bands).toEqual([expect.objectContaining({ id: 'stop-0', startSecond: 20, endSecond: 37 })])
+  })
+
+  test('renders a turn using its detected interval', () => {
+    const bands = buildEventBands({
+      detection: {
+        stops: [],
+        turns: [{ id: 'turn-0', type: 'rightTurn', start: 20, end: 24 }],
+        location: null,
+      },
+      viewStart: 0,
+      viewEnd: 100,
+      widthPx: 500,
+    })
+
+    expect(bands).toEqual([expect.objectContaining({ id: 'turn-0', startSecond: 20, endSecond: 24 })])
+  })
 })

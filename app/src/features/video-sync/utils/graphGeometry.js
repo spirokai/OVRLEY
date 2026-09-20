@@ -7,7 +7,6 @@ import {
   VIDEO_SYNC_GRAPH_MIN_SCALE_VALUE,
   VIDEO_SYNC_GRAPH_ROBUST_PERCENTILE,
   VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
-  VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS,
 } from '../data/videoSyncConstants'
 import { secondsToViewPx } from '@/features/player/utils/timelineGeometry'
 
@@ -223,22 +222,22 @@ function createBand({ id, type, labelKey, startSecond, endSecond, viewStart, vie
 }
 
 /**
- * Converts detected events to visible graph bands using the shared timing
- * tolerance and the existing timeline time-to-pixel transform.
+ * Converts detected event intervals to visible graph bands using the existing
+ * timeline time-to-pixel transform. Location remains a point with tolerance.
  *
- * @param {{detection: {stops: object[], turns: object[], location: object|null}|null, viewStart: number, viewEnd: number, widthPx: number, toleranceSeconds?: number}} options Event-band inputs.
+ * @param {{detection: {stops: object[], turns: object[], location: object|null}|null, viewStart: number, viewEnd: number, widthPx: number}} options Event-band inputs.
  * @returns {object[]} Render-ready event bands.
  */
-export function buildEventBands({ detection, viewStart, viewEnd, widthPx, toleranceSeconds = VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS }) {
+export function buildEventBands({ detection, viewStart, viewEnd, widthPx }) {
   if (detection === null || widthPx <= 0 || viewEnd <= viewStart) return []
 
   const bands = detection.stops
     .map((event) =>
       createBand({
-        endSecond: event.time + toleranceSeconds,
+        endSecond: event.lowSpeedInterval.end,
         id: event.id,
         labelKey: 'videoSync.stop',
-        startSecond: event.time - toleranceSeconds,
+        startSecond: event.lowSpeedInterval.start,
         type: event.type,
         viewEnd,
         viewStart,
@@ -264,10 +263,10 @@ export function buildEventBands({ detection, viewStart, viewEnd, widthPx, tolera
     .concat(
       detection.turns.map((event) =>
         createBand({
-          endSecond: event.end + toleranceSeconds,
+          endSecond: event.end,
           id: event.id,
           labelKey: event.type === 'leftTurn' ? 'videoSync.leftTurn' : 'videoSync.rightTurn',
-          startSecond: event.start - toleranceSeconds,
+          startSecond: event.start,
           type: event.type,
           viewEnd,
           viewStart,

@@ -76,6 +76,43 @@ describe('manual video-sync activity detection', () => {
     expect(stationaryStart).toEqual([])
   })
 
+  test('ends a stop interval when speed crosses above the threshold', () => {
+    const stops = detectStops(
+      createActivitySyncInput(
+        makeActivity({
+          sampleRate: 1,
+          durationSeconds: 16,
+          speedAt: (time) => {
+            if (time < 4) return 3
+            if (time < 10) return 0.5
+            return 1.6
+          },
+        }),
+      ),
+      SETTINGS,
+    )
+
+    expect(stops).toHaveLength(1)
+    expect(stops[0].lowSpeedInterval.end).toBeGreaterThan(9)
+    expect(stops[0].lowSpeedInterval.end).toBeLessThan(10)
+  })
+
+  test('caps a detected stop interval at thirty seconds', () => {
+    const stops = detectStops(
+      createActivitySyncInput(
+        makeActivity({
+          sampleRate: 1,
+          durationSeconds: 50,
+          speedAt: (time) => (time < 4 ? 3 : 0.5),
+        }),
+      ),
+      SETTINGS,
+    )
+
+    expect(stops).toHaveLength(1)
+    expect(stops[0].lowSpeedInterval.end - stops[0].lowSpeedInterval.start).toBeCloseTo(30)
+  })
+
   test('classifies wraparound and meaningful direction reversal', () => {
     const wraparound = detectActivityEvents(
       makeActivity({

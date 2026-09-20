@@ -22,6 +22,7 @@ export const VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES = { min: 70, max: 180 }
 export const VIDEO_SYNC_STOP_ENTRY_DWELL_SECONDS = 2
 export const VIDEO_SYNC_STOP_EXIT_DWELL_SECONDS = 2
 export const VIDEO_SYNC_STOP_EXIT_HYSTERESIS_KMH = 2
+export const VIDEO_SYNC_STOP_MAXIMUM_DURATION_SECONDS = 30
 export const VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS = 15
 export const VIDEO_SYNC_TURN_REVERSAL_TOLERANCE_DEGREES = 20
 // Rate hysteresis defines episode boundaries independently of the angle threshold.

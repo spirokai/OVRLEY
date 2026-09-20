@@ -4,6 +4,7 @@ import {
   VIDEO_SYNC_STOP_ENTRY_DWELL_SECONDS,
   VIDEO_SYNC_STOP_EXIT_DWELL_SECONDS,
   VIDEO_SYNC_STOP_EXIT_HYSTERESIS_KMH,
+  VIDEO_SYNC_STOP_MAXIMUM_DURATION_SECONDS,
 } from '../data/videoSyncConstants'
 
 /**
@@ -63,8 +64,8 @@ const STOP_PHASES = Object.freeze({
  * Creates a complete stop-detector state with explicit nullable transition fields.
  *
  * @param {string} phase Current state-machine phase.
- * @param {{movementStartedAt?: number|null, nearStopStartedAt?: number|null, stopCandidateStartedAt?: number|null, exitStartedAt?: number|null, stopEvent?: object|null}} [values] Phase-specific values.
- * @returns {{phase: string, movementStartedAt: number|null, nearStopStartedAt: number|null, stopCandidateStartedAt: number|null, exitStartedAt: number|null, stopEvent: object|null}} Stop-detector state.
+ * @param {{movementStartedAt?: number|null, nearStopStartedAt?: number|null, stopCandidateStartedAt?: number|null, exitStartedAt?: number|null, stopEvent?: object|null, stopIntervalOpen?: boolean}} [values] Phase-specific values.
+ * @returns {{phase: string, movementStartedAt: number|null, nearStopStartedAt: number|null, stopCandidateStartedAt: number|null, exitStartedAt: number|null, stopEvent: object|null, stopIntervalOpen: boolean}} Stop-detector state.
  */
 function createState(phase, values = {}) {
   return {
@@ -74,7 +75,23 @@ function createState(phase, values = {}) {
     stopCandidateStartedAt: values.stopCandidateStartedAt ?? null,
     exitStartedAt: values.exitStartedAt ?? null,
     stopEvent: values.stopEvent ?? null,
+    stopIntervalOpen: values.stopIntervalOpen ?? false,
   }
+}
+
+/**
+ * Advances a detected stop's supporting low-speed interval without allowing it
+ * to exceed its maximum duration.
+ *
+ * @param {{stopEvent: object|null, stopIntervalOpen: boolean}} state Current stop state.
+ * @param {number} endTime Latest time that still satisfies the speed requirement.
+ * @returns {void}
+ */
+function extendStopInterval(state, endTime) {
+  if (state.stopEvent === null || !state.stopIntervalOpen) return
+  const interval = state.stopEvent.lowSpeedInterval
+  interval.end = Math.min(endTime, interval.start + VIDEO_SYNC_STOP_MAXIMUM_DURATION_SECONDS)
+  if (interval.end === interval.start + VIDEO_SYNC_STOP_MAXIMUM_DURATION_SECONDS) state.stopIntervalOpen = false
 }
 
 /**
@@ -87,9 +104,8 @@ function createState(phase, values = {}) {
  */
 function closeNearStop(state, endTime, nearStopIntervals) {
   closeNearStopInterval(nearStopIntervals, state.nearStopStartedAt, endTime)
-  if (state.stopEvent !== null) {
-    state.stopEvent.lowSpeedInterval.end = Math.max(state.stopEvent.lowSpeedInterval.start, endTime)
-  }
+  extendStopInterval(state, endTime)
+  state.stopIntervalOpen = false
 }
 
 /**
@@ -105,6 +121,7 @@ function enterStopped(previousState, nearStopStartedAt, stopCandidateStartedAt =
     nearStopStartedAt,
     stopCandidateStartedAt,
     stopEvent: previousState.stopEvent,
+    stopIntervalOpen: previousState.stopIntervalOpen,
   })
 }
 
@@ -127,6 +144,7 @@ function establishStopEvent(state, time, stops) {
   return createState(STOP_PHASES.STOPPED, {
     nearStopStartedAt: state.nearStopStartedAt,
     stopEvent: stop,
+    stopIntervalOpen: true,
   })
 }
 
@@ -221,6 +239,12 @@ function advanceState(state, { previousTime, previousSpeed, time, speed, thresho
         return nextState
 
       case STOP_PHASES.STOPPED:
+        if (nextState.stopIntervalOpen && previousSpeed <= threshold && speed > threshold) {
+          extendStopInterval(nextState, interpolateCrossingTime(previousTime, previousSpeed, time, speed, threshold))
+          nextState.stopIntervalOpen = false
+        } else if (speed <= threshold) {
+          extendStopInterval(nextState, time)
+        }
         if (speed > movementThreshold) {
           const exitStartedAt =
             previousSpeed <= movementThreshold ? interpolateCrossingTime(previousTime, previousSpeed, time, speed, movementThreshold) : previousTime
@@ -228,9 +252,9 @@ function advanceState(state, { previousTime, previousSpeed, time, speed, thresho
             nearStopStartedAt: nextState.nearStopStartedAt,
             exitStartedAt,
             stopEvent: nextState.stopEvent,
+            stopIntervalOpen: nextState.stopIntervalOpen,
           })
         }
-        if (nextState.stopEvent !== null) nextState.stopEvent.lowSpeedInterval.end = time
         return nextState
 
       case STOP_PHASES.EXITING_STOP:
@@ -240,10 +264,10 @@ function advanceState(state, { previousTime, previousSpeed, time, speed, thresho
           return createState(STOP_PHASES.MOVING, { movementStartedAt: exitTime })
         }
         if (speed <= movementThreshold) {
-          if (nextState.stopEvent !== null) nextState.stopEvent.lowSpeedInterval.end = time
           return createState(STOP_PHASES.STOPPED, {
             nearStopStartedAt: nextState.nearStopStartedAt,
             stopEvent: nextState.stopEvent,
+            stopIntervalOpen: nextState.stopIntervalOpen,
           })
         }
         return nextState
