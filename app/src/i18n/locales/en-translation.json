@@ -380,7 +380,7 @@
     "location": "Location",
     "locations": "Locations",
     "locationLimit": "Only one location landmark is allowed",
-    "locationSyncCandidates": "Location Sync Candidate",
+    "locationSyncCandidates": "Location Sync",
     "locationConflict": "Location landmark excluded—conflicts with this candidate",
     "locationOnly": "Location only",
     "markControls": "Video sync landmark controls",

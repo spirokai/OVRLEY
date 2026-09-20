@@ -7,8 +7,8 @@ import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 function getBandClassName(tone) {
   if (tone === 'stop') return 'bg-video-sync-stop/60'
-  if (tone === 'location') return 'bg-video-sync-location/40'
-  return 'bg-video-sync-turn/70'
+  if (tone === 'location') return 'bg-video-sync-location/60'
+  return 'bg-video-sync-turn/60'
 }
 
 function getPathClassName(series) {

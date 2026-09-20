@@ -249,6 +249,7 @@ export function createManualVideoSyncSlice(set, get) {
       }
 
       state.setVideoSyncOffset(candidate.offset, { compensatePlayhead: true })
+      state.setVideoSyncWarning(null)
     },
 
     beginVideoSyncCalculation: (scope) => {
