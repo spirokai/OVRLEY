@@ -34,6 +34,8 @@ class VideoSyncMapController {
     this.canvasContainer = null
     this.detection = null
     this.detectedLocationMarker = null
+    this.playbackMarker = null
+    this.previewSecond = null
     this.map = null
     this.hoverMarker = null
     this.actionLocation = null
@@ -94,6 +96,7 @@ class VideoSyncMapController {
     this.resizeTimeout = null
     this.syncHoverTarget(null)
     this.removeDetectedLocationMarker()
+    this.removePlaybackMarker()
     this.canvasContainer = null
     this.map?.remove()
     this.map = null
@@ -119,11 +122,17 @@ class VideoSyncMapController {
     this.courseSegments = courseSegments
     if (this.styleLoaded) this.syncCourse()
     this.syncDetectedLocationMarker()
+    this.syncPlaybackMarker()
   }
 
   setDetection(detection) {
     this.detection = detection
     this.syncDetectedLocationMarker()
+  }
+
+  setPreviewSecond(previewSecond) {
+    this.previewSecond = previewSecond
+    this.syncPlaybackMarker()
   }
 
   resize() {
@@ -235,6 +244,28 @@ class VideoSyncMapController {
     this.detectedLocationMarker = null
   }
 
+  syncPlaybackMarker() {
+    const coordinate = this.previewSecond === null ? null : getCoursePositionAtActivitySecond(this.courseSegments, this.previewSecond)
+    if (coordinate === null) {
+      this.removePlaybackMarker()
+      return
+    }
+
+    if (this.playbackMarker === null) {
+      const element = document.createElement('div')
+      element.className = 'pointer-events-none size-4 rounded-full border-1 border-white bg-[#EF6C15] shadow-[0_0_0_8px_rgba(239,108,21,0.35)]'
+      this.playbackMarker = new Marker({ element }).setLngLat(coordinate).addTo(this.map)
+      return
+    }
+
+    this.playbackMarker.setLngLat(coordinate)
+  }
+
+  removePlaybackMarker() {
+    this.playbackMarker?.remove()
+    this.playbackMarker = null
+  }
+
   handleDetectedLocationDragEnd() {
     const marker = this.detectedLocationMarker
     const location = marker === null ? null : getSnappedCoursePosition(this.map, this.map.project(marker.getLngLat()), this.courseSegments)
@@ -289,11 +320,12 @@ class VideoSyncMapController {
  * @param {object} options Map preview inputs.
  * @param {object|null} options.activity Canonical parsed activity.
  * @param {object|null} options.detection Canonical detected-event model.
+ * @param {number} options.previewSecond Current activity preview second.
  * @param {(activitySecond: number) => void} options.onSetCourseLocation Stores the selected activity-side location.
  * @param {() => void} options.onDeleteCourseLocation Clears the selected activity-side location.
  * @returns {{containerRef: React.RefObject, style: string, onStyleChange: (style: string) => void, actionPoint: {x: number, y: number, activitySecond: number}|null, onConfirmActionPoint: () => void}}
  */
-export default function useVideoSyncMap({ activity, detection, onSetCourseLocation, onDeleteCourseLocation }) {
+export default function useVideoSyncMap({ activity, detection, onSetCourseLocation, onDeleteCourseLocation, previewSecond }) {
   const containerRef = useRef(null)
   const controllerRef = useRef(null)
   const [style, setStyle] = useState(VIDEO_SYNC_DEFAULT_MAP_STYLE)
@@ -345,6 +377,10 @@ export default function useVideoSyncMap({ activity, detection, onSetCourseLocati
   useEffect(() => {
     controllerRef.current.setDetection(detection)
   }, [detection])
+
+  useEffect(() => {
+    controllerRef.current.setPreviewSecond(previewSecond)
+  }, [previewSecond])
 
   const onStyleChange = useCallback((nextStyle) => {
     const validatedStyle = requireMapStyle(nextStyle)

@@ -52,12 +52,13 @@ function MapStyleSelector({ style, onStyleChange }) {
   )
 }
 
-function VideoSyncMapPreview({ activity, detection, onSetCourseLocation, onDeleteCourseLocation }) {
+function VideoSyncMapPreview({ activity, detection, onSetCourseLocation, onDeleteCourseLocation, previewSecond }) {
   const { containerRef, style, onStyleChange, actionPoint, onConfirmActionPoint } = useVideoSyncMap({
     activity,
     detection,
     onSetCourseLocation,
     onDeleteCourseLocation,
+    previewSecond,
   })
 
   return (
@@ -124,6 +125,7 @@ export default function VideoSyncPreviewScreens({
           detection={detection}
           onSetCourseLocation={onSetCourseLocation}
           onDeleteCourseLocation={onDeleteCourseLocation}
+          previewSecond={previewSecond}
         />
       </div>
     </div>

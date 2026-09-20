@@ -39,6 +39,7 @@ const map = vi.hoisted(() => {
 })
 const markerElement = vi.hoisted(() => ({ addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 const marker = vi.hoisted(() => ({ addTo: vi.fn(), getElement: vi.fn(), remove: vi.fn(), setLngLat: vi.fn() }))
+const playbackMarker = vi.hoisted(() => ({ addTo: vi.fn(), remove: vi.fn(), setLngLat: vi.fn() }))
 const popup = vi.hoisted(() => ({ getElement: vi.fn(), on: vi.fn(), setDOMContent: vi.fn() }))
 const popupContent = vi.hoisted(() => ({ addEventListener: vi.fn(), click: vi.fn() }))
 
@@ -57,8 +58,11 @@ vi.mock('maplibre-gl', () => ({
   }),
   Marker: vi.fn(function Marker(options) {
     markerOptions(options)
-    marker.setLngLat.mockReturnValue(marker)
-    marker.addTo.mockReturnValue(marker)
+    const markerInstance = options?.element?.className.includes('border-2') ? playbackMarker : marker
+    markerInstance.setLngLat.mockReturnValue(markerInstance)
+    markerInstance.addTo.mockReturnValue(markerInstance)
+    if (markerInstance === playbackMarker) return markerInstance
+
     marker.setPopup.mockReturnValue(marker)
     marker.on.mockImplementation((name, handler) => markerEventHandlers.set(name, handler))
     marker.off.mockImplementation((name) => markerEventHandlers.delete(name))
@@ -119,6 +123,9 @@ describe('VideoSyncPreviewScreens', () => {
     marker.off = vi.fn()
     marker.getLngLat = vi.fn()
     marker.getElement = vi.fn(() => markerElement)
+    playbackMarker.addTo.mockClear()
+    playbackMarker.remove.mockClear()
+    playbackMarker.setLngLat.mockClear()
     markerElement.addEventListener.mockClear()
     markerElement.removeEventListener.mockClear()
     popup.setDOMContent.mockClear()
@@ -212,6 +219,45 @@ describe('VideoSyncPreviewScreens', () => {
     await user.click(setLocationButton)
     expect(onSetCourseLocation).toHaveBeenCalledWith(0.5)
     expect(screen.queryByRole('button', { name: 'Set location' })).not.toBeInTheDocument()
+  })
+
+  test('moves the playback marker without recreating the map or course', async () => {
+    const activity = {
+      trim_end_seconds: 1,
+      sample_elapsed_seconds: [0, 1],
+      sample_course_points: [
+        [47.37, 8.53],
+        [47.38, 8.54],
+      ],
+      speed: [4, 5],
+    }
+    const renderPreview = (previewSecond) => (
+      <VideoSyncPreviewScreens
+        activity={activity}
+        detection={null}
+        displayScale={1}
+        previewSecond={previewSecond}
+        sceneSize={{ width: 100, height: 100 }}
+        setSceneElement={() => {}}
+      />
+    )
+    const { rerender } = render(renderPreview(0))
+
+    await waitFor(() => expect(playbackMarker.setLngLat).toHaveBeenCalledWith([8.53, 47.37]))
+    const playbackMarkerElement = markerOptions.mock.calls.find(([options]) => options?.element?.className.includes('border-2'))[0].element
+    expect(playbackMarkerElement.className).toContain('bg-[#EF6C15]')
+    expect(playbackMarkerElement.className).toContain('shadow-[0_0_0_4px_rgba(239,108,21,0.35)]')
+    await waitFor(() => expect(map.setStyle).toHaveBeenCalled())
+    act(() => eventHandlers.get('style.load')())
+    playbackMarker.setLngLat.mockClear()
+
+    rerender(renderPreview(0.5))
+
+    expect(playbackMarker.setLngLat).toHaveBeenCalledOnce()
+    expect(playbackMarker.setLngLat).toHaveBeenCalledWith([8.535, 47.375])
+    expect(mapOptions).toHaveBeenCalledOnce()
+    expect(map.addSource).toHaveBeenCalledOnce()
+    expect(source.setData).not.toHaveBeenCalled()
   })
 
   test('starts in Zurich, loads cached styles, and switches among all OpenFreeMap styles', async () => {
