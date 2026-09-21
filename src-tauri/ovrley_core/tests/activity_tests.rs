@@ -133,6 +133,52 @@ fn finalizes_raw_activity_with_idle_gap_debug_payload() {
 }
 
 #[test]
+fn finalizes_raw_activity_axis_g_force_and_lean_angle_samples() {
+    let raw_activity = serde_json::json!({
+        "file_name": "session.gpx",
+        "file_format": "gpx",
+        "raw_samples": [
+            {
+                "elapsed_seconds": 0.0,
+                "distance": 0.0,
+                "lap_number": 1,
+                "g_force_x": 0.1,
+                "g_force_y": -0.2,
+                "g_force_z": 0.3,
+                "lean_angle": 4.5
+            },
+            {
+                "elapsed_seconds": 1.0,
+                "distance": 12.5,
+                "lap_number": 2,
+                "g_force_x": -0.4,
+                "g_force_y": 0.5,
+                "g_force_z": -0.6,
+                "lean_angle": -7.25
+            }
+        ],
+        "options": {
+            "skip_idle_gap_fill": true,
+            "smoothing": {}
+        }
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.distance, vec![Some(0.0), Some(12.5)]);
+    assert_eq!(activity.lap_number, vec![0, 1]);
+    assert_eq!(activity.lap_time_seconds, vec![Some(0.0), Some(0.0)]);
+    assert_eq!(activity.lap_start_elapsed_seconds, vec![0.0, 1.0]);
+    assert_eq!(activity.lap_durations_seconds, vec![1.0]);
+    assert_eq!(activity.g_force_x, vec![Some(0.1), Some(-0.4)]);
+    assert_eq!(activity.g_force_y, vec![Some(-0.2), Some(0.5)]);
+    assert_eq!(activity.g_force_z, vec![Some(0.3), Some(-0.6)]);
+    assert_eq!(activity.lean_angle, vec![Some(4.5), Some(-7.25)]);
+}
+
+#[test]
 fn finalizes_raw_activity_without_smoothing_when_map_is_empty() {
     let raw_activity = serde_json::json!({
         "file_name": "raw-no-smoothing.srt",
