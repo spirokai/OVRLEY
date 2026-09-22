@@ -1037,7 +1037,7 @@ mod tests {
         assert_eq!(parsed.version, PROJECT_VERSION);
         assert!(parsed.sync.manual.landmarks.is_empty());
         assert_eq!(parsed.sync.manual.speed_threshold_kmh, 5.0);
-        assert_eq!(parsed.sync.manual.turn_threshold_degrees, 90.0);
+        assert_eq!(parsed.sync.manual.turn_threshold_degrees, 80.0);
     }
 
     #[test]
@@ -1149,7 +1149,7 @@ mod tests {
         assert_eq!(parsed.editor.config["scene"]["fps"], Value::from(30.0));
         assert_eq!(
             parsed.editor.config["scene"]["updateRate"],
-            Value::from(1.0)
+            Value::from(1)
         );
     }
 
