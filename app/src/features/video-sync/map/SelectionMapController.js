@@ -42,6 +42,9 @@ export default class SelectionMapController extends CourseMapController {
   }
 
   onCourseChange() {
+    this.hasFittedCourse = false
+    this.syncHoverTarget(null)
+    this.clearActionLocation()
     this.syncDetectedLocationMarker()
     this.syncPlaybackMarker()
   }

@@ -4,12 +4,12 @@ import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { VIDEO_SYNC_TOOL } from '@/store/slices/createLayoutSlice'
 import { VIDEO_SYNC_LANDMARK_TYPES } from '@/features/video-sync/data/videoSyncConstants'
-import useVideoSyncWorkspace, { resolveVideoSyncMarkControls } from '@/features/video-sync/hooks/useVideoSyncWorkspace'
+import useVideoSyncWorkspace from '@/features/video-sync/hooks/useVideoSyncWorkspace'
+import { resolveVideoSyncMarkControls } from '@/features/video-sync/utils/videoSyncPresentation'
 
 vi.mock('@/features/video-sync/hooks/useVideoSyncCalculation', () => ({
   default: () => ({
-    calculateAll: vi.fn(),
-    calculateLocation: vi.fn(),
+    calculate: vi.fn(),
     eligibility: {
       canCalculateAll: false,
       canMatchAll: false,
@@ -41,6 +41,7 @@ describe('useVideoSyncWorkspace', () => {
       videoSyncOffsetSeconds: 2,
       manualVideoSync: {
         landmarks: [],
+        detectedLocationSecond: null,
         speedThresholdKmh: 5,
         turnThresholdDegrees: 180,
       },

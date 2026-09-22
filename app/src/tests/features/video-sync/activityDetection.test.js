@@ -1,10 +1,18 @@
 import { describe, expect, test } from 'vitest'
 import { createActivitySyncInput } from '@/features/video-sync/utils/activitySyncInput'
-import { detectActivityEvents } from '@/features/video-sync/utils/detectActivityEvents'
+import { detectActivityEventsFromInput } from '@/features/video-sync/utils/detectActivityEvents'
 import { detectStops } from '@/features/video-sync/utils/detectStops'
-import { detectTurns, detectTurnsFromDerivedSeries, deriveTurningSeries } from '@/features/video-sync/utils/detectTurns'
+import { detectTurnsFromDerivedSeries, deriveTurningSeries } from '@/features/video-sync/utils/detectTurns'
 
 const SETTINGS = { speedThresholdKmh: 5, turnThresholdDegrees: 90 }
+
+function detectActivityEvents(activity, settings) {
+  return detectActivityEventsFromInput(createActivitySyncInput(activity), settings, null)
+}
+
+function detectTurns(input, settings) {
+  return detectTurnsFromDerivedSeries(input, deriveTurningSeries(input), settings)
+}
 
 function makeActivity({ sampleRate = 1, durationSeconds, speedAt = () => 3, headingAt = () => 0, course = true }) {
   const sampleCount = Math.round(durationSeconds * sampleRate)
@@ -142,6 +150,7 @@ describe('manual video-sync activity detection', () => {
     const input = {
       elapsedSeconds: [0, 1, 2, 3, 4, 5],
       segments: [{ startIndex: 0, endIndex: 6 }],
+      speed: [3, 3, 3, 3, 3, 3],
     }
     const turningSeries = [
       { time: 0, value: null },
@@ -152,7 +161,7 @@ describe('manual video-sync activity detection', () => {
       { time: 5, value: 0 },
     ]
 
-    const derivedResult = detectTurnsFromDerivedSeries(input, turningSeries, { ...SETTINGS, nearStopIntervals: [] })
+    const derivedResult = detectTurnsFromDerivedSeries(input, turningSeries, SETTINGS)
 
     expect(derivedResult).toHaveLength(1)
     expect(derivedResult[0].type).toBe('rightTurn')
@@ -217,7 +226,7 @@ describe('manual video-sync activity detection', () => {
     const input = createActivitySyncInput(activity)
     const directSeries = deriveTurningSeries(input)
     const combined = detectActivityEvents(activity, SETTINGS)
-    const directTurns = detectTurns(input, { ...SETTINGS, nearStopIntervals: [] })
+    const directTurns = detectTurns(input, SETTINGS)
 
     expect(combined.graphSeries.turning).toEqual(directSeries)
     expect(combined.turns).toEqual(directTurns)

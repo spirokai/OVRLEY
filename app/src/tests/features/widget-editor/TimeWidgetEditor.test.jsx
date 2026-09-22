@@ -33,8 +33,8 @@ describe('TimeWidgetEditor', () => {
     render(<TimeWidgetEditor widget={widget} updateWidgetData={vi.fn()} setNumericField={vi.fn()} />)
 
     expect(screen.queryByText('Format')).not.toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: 'Activity Start' })).toBeEnabled()
-    expect(screen.getByRole('radio', { name: 'Export Start' })).toBeEnabled()
+    expect(screen.getByRole('radio', { name: 'Activity' })).toBeEnabled()
+    expect(screen.getByRole('radio', { name: 'Export' })).toBeEnabled()
     expect(screen.getByText('Hundredths')).toBeInTheDocument()
   })
 

@@ -76,7 +76,6 @@ export function useVideoSyncControls() {
       setOffsetInput(formatOffsetInput(videoSyncOffsetSeconds ?? 0))
       return
     }
-    setVideoSyncWarning(null)
     setOffsetInput(Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1))
   }
 
@@ -89,7 +88,6 @@ export function useVideoSyncControls() {
       setVideoSyncWarning(error.message)
       return
     }
-    setVideoSyncWarning(null)
     setOffsetInput(Number.isInteger(newOffset) ? newOffset.toString() : newOffset.toFixed(1))
   }
 

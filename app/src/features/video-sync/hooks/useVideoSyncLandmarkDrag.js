@@ -6,16 +6,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { clamp } from '@/lib/utils'
 import { pointerToSecond } from '@/features/player/utils/timelineGeometry'
 
-function isPrimaryButton(event) {
-  return event.button === undefined || event.button === 0
-}
-
-function getContainerRect(metrics, event) {
-  return metrics.containerElement?.getBoundingClientRect?.() ?? event.currentTarget.getBoundingClientRect()
-}
-
 function getLandmarkVideoSecond({ event, metrics, videoSyncOffsetSeconds, videoDuration }) {
-  const rect = getContainerRect(metrics, event)
+  const rect = metrics.containerElement.getBoundingClientRect()
   const timelineSecond = pointerToSecond({
     clientX: event.clientX,
     rect,
@@ -72,9 +64,8 @@ export default function useVideoSyncLandmarkDrag({
   const followPointerAtEdge = useCallback(
     (clientX) => {
       const metrics = metricsRef.current
-      const rect = metrics.containerElement?.getBoundingClientRect?.()
-      const right = rect?.right ?? (rect?.left ?? 0) + (rect?.width ?? 0)
-      if (!rect || rect.width <= 0 || (clientX >= (rect.left ?? 0) && clientX <= right)) return
+      const rect = metrics.containerElement.getBoundingClientRect()
+      if (rect.width <= 0 || (clientX >= rect.left && clientX <= rect.right)) return
 
       const pointerSecond = pointerToSecond({
         clientX,
@@ -118,7 +109,7 @@ export default function useVideoSyncLandmarkDrag({
       const drag = dragRef.current
       if (!drag || drag.pointerId !== event.pointerId) return
       event.stopPropagation()
-      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
       completedDragMovedRef.current = drag.moved
       dragRef.current = null
       setDragPreview(null)
@@ -132,8 +123,8 @@ export default function useVideoSyncLandmarkDrag({
       const onPointerDown = (event) => {
         event.stopPropagation()
         event.preventDefault()
-        if (!enabled || !isPrimaryButton(event) || videoDuration === null) return
-        event.currentTarget.setPointerCapture?.(event.pointerId)
+        if (!enabled || event.button !== 0 || videoDuration === null) return
+        event.currentTarget.setPointerCapture(event.pointerId)
         dragRef.current = {
           id: landmark.id,
           moved: false,

@@ -59,7 +59,7 @@ function buildSegments(elapsedSeconds) {
  * Splits the canonical geographic course at missing coordinate pairs.
  * Single-point fragments are omitted because they cannot form a polyline.
  *
- * @param {object|null} parsedActivity Finalized canonical activity data.
+ * @param {object} parsedActivity Finalized canonical activity data.
  * @returns {{coordinate: number[], activitySecond: number}[][]} Contiguous timed course segments.
  */
 export function buildActivityCourseSegments(parsedActivity) {
@@ -92,17 +92,6 @@ export function buildActivityCourseSegments(parsedActivity) {
  * @returns {{elapsedSeconds: number[], speed: (number|null)[], heading: (number|null)[], course: ([number|null, number|null]|null)[], availability: {speed: boolean, heading: boolean, course: boolean}, segments: {startIndex: number, endIndex: number}[]}}
  */
 export function createActivitySyncInput(parsedActivity) {
-  if (parsedActivity === null || parsedActivity === undefined) {
-    return {
-      elapsedSeconds: [],
-      speed: [],
-      heading: [],
-      course: [],
-      availability: { speed: false, heading: false, course: false },
-      segments: [],
-    }
-  }
-
   const elapsedSeconds = parsedActivity.sample_elapsed_seconds
   const speed = projectAlignedSeries(parsedActivity.speed, elapsedSeconds.length)
   const heading = projectAlignedSeries(parsedActivity.heading, elapsedSeconds.length)

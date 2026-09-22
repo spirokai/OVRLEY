@@ -2,79 +2,56 @@ import { Check, RotateCwClock } from 'lucide-react'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { formatClockDuration } from '@/lib/time-format'
-import { getVideoSyncMatchScoreColor } from '../utils/candidatePresentation'
+import { MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES } from '../data/videoSyncConstants'
+import { buildVideoSyncCandidateCards } from '../utils/videoSyncPresentation'
 
 /**
  * Renders calculated candidates and their calculation lifecycle states.
  *
  * @param {object} props Candidate state and callbacks.
- * @param {object[]} props.candidates Canonical derived candidates.
- * @param {string} props.status Candidate calculation status.
- * @param {string|null} props.error Calculation error.
- * @param {boolean} props.hasSearched Whether a candidate search has run.
+ * @param {object} props.result Canonical candidate result for one scope.
  * @param {number} props.appliedOffset Current canonical applied offset.
- * @param {(candidate: object) => void} props.onApply Applies one candidate.
+ * @param {(scope: string, candidate: object) => void} props.onApply Applies one candidate.
+ * @param {string} props.scope Candidate match scope.
  * @param {string} props.title Result section title.
  * @returns {JSX.Element|null} Candidate state or cards.
  */
-export function VideoSyncCandidateList({ appliedOffset, candidates, error, hasSearched, onApply, status, title }) {
+export function VideoSyncCandidateList({ appliedOffset, result, onApply, scope, title }) {
   const { t } = useTranslation()
+  const { candidates, error, hasSearched, status } = result
 
-  if (status === 'calculating') {
-    return (
-      <div className="space-y-4">
-        {candidates.length > 0 ? (
-          <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled onApply={onApply} title={title} />
-        ) : null}
-      </div>
-    )
-  }
+  if (!hasSearched && status === MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.IDLE) return null
 
-  if (status === 'error') {
-    return (
-      <div className="space-y-4">
+  const disabled = status !== MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.FRESH
+  return (
+    <div className="space-y-4">
+      {status === MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.ERROR ? (
         <p role="alert" className="rounded-sm bg-destructive/10 p-4 text-xs font-medium text-destructive">
           {error}
         </p>
-        {candidates.length > 0 ? (
-          <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled onApply={onApply} title={title} />
-        ) : null}
-      </div>
-    )
-  }
-
-  if (status === 'stale') {
-    return (
-      <div className="space-y-4">
+      ) : null}
+      {status === MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.STALE ? (
         <p className="text-xs font-medium text-amber-400">{t('videoSync.staleCandidates', 'Landmarks changed. Rerun the Sync again')}</p>
-        {candidates.length > 0 ? (
-          <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled onApply={onApply} title={title} />
-        ) : null}
-      </div>
-    )
-  }
-
-  if (!hasSearched) return null
-  if (candidates.length === 0) {
-    return <p className="text-xs text-muted-foreground">{t('videoSync.noCandidate', 'No candidate aligns at least two landmarks')}</p>
-  }
-
-  return <CandidateCards appliedOffset={appliedOffset} candidates={candidates} onApply={onApply} title={title} />
+      ) : null}
+      {candidates.length > 0 ? (
+        <CandidateCards appliedOffset={appliedOffset} candidates={candidates} disabled={disabled} onApply={onApply} scope={scope} title={title} />
+      ) : null}
+      {hasSearched && status === MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.FRESH && candidates.length === 0 ? (
+        <p className="text-xs text-muted-foreground">{t('videoSync.noCandidate', 'No candidate aligns at least two landmarks')}</p>
+      ) : null}
+    </div>
+  )
 }
 
-function CandidateCards({ appliedOffset, candidates, disabled = false, onApply, title }) {
+function CandidateCards({ appliedOffset, candidates, disabled = false, onApply, scope, title }) {
   const { t } = useTranslation()
+  const cards = buildVideoSyncCandidateCards(candidates, appliedOffset)
 
   return (
     <>
       <SectionHeading icon={RotateCwClock} title={title} variant="drawer" />
       <div className="space-y-1.5" role="list" aria-label={t('videoSync.candidates', 'Sync candidates')}>
-        {candidates.map((candidate) => {
-          const isApplied = candidate.offset === appliedOffset
-          const isLocationOnly = candidate.variant === 'locationOnly'
-
-          const scoreColor = getVideoSyncMatchScoreColor(candidate.matchScore)
+        {cards.map(({ candidate, formattedOffset, isApplied, isLocationOnly, scoreColor }) => {
           return (
             <div key={`${candidate.variant}-${candidate.offset}`} role="listitem">
               <Button
@@ -85,15 +62,15 @@ function CandidateCards({ appliedOffset, candidates, disabled = false, onApply, 
                 }`}
                 disabled={disabled}
                 aria-label={t('videoSync.applyCandidate', 'Apply offset {{offset}} seconds', {
-                  offset: formatClockDuration(candidate.offset),
+                  offset: formattedOffset,
                 })}
-                onClick={() => onApply(candidate)}
+                onClick={() => onApply(scope, candidate)}
               >
                 <div className="flex min-w-0 flex-1 uppercase">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className={`text-base font-bold tabular-nums ${isApplied ? 'text-primary-foreground' : 'text-foreground'}`}>
-                        {formatClockDuration(candidate.offset)}
+                        {formattedOffset}
                       </span>
                     </div>
                     <div

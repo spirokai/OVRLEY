@@ -4,11 +4,10 @@ import { Button } from '@/components/ui/button'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SliderField } from '@/features/widget-editor/components/widgetFormControls'
-import { VIDEO_SYNC_SPEED_THRESHOLD_RANGE_KMH, VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES } from '../data/videoSyncConstants'
+import { VIDEO_SYNC_MATCH_SCOPES, VIDEO_SYNC_SPEED_THRESHOLD_RANGE_KMH, VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES } from '../data/videoSyncConstants'
 import { VideoSyncCandidateList } from './VideoSyncCandidateList'
 import { VideoSyncControls } from './VideoSyncControls'
 import { VideoSyncLandmarkList } from './VideoSyncLandmarkList'
-import { getVideoSyncDetectionCounts } from '../utils/detectionSummary'
 
 /**
  * Renders the dedicated manual video-sync drawer.
@@ -19,15 +18,12 @@ import { getVideoSyncDetectionCounts } from '../utils/detectionSummary'
 export function VideoSyncDrawerContent({
   activeTab,
   appliedOffset,
-  allResult,
   calculation,
-  detection = null,
-  landmarks,
-  locationResult,
-  onApplyAllCandidate,
-  onApplyLocationCandidate,
-  onCalculate,
-  onCalculateLocation,
+  detectionCounts,
+  hasLocationLandmark,
+  landmarkCards,
+  results,
+  onApplyCandidate,
   onChangeLandmarkType,
   onClearLandmarks,
   onDeleteLandmark,
@@ -37,7 +33,9 @@ export function VideoSyncDrawerContent({
   onTurnThresholdChange,
   onTurnThresholdCommit,
   speedThresholdDraftKmh,
+  speedValueLabel,
   turnThresholdDraftDegrees,
+  turnValueLabel,
   videoSummary,
   videoSync,
 }) {
@@ -45,9 +43,6 @@ export function VideoSyncDrawerContent({
   const isCalculating = calculation.isCalculating
   const canCalculate = calculation.eligibility.canCalculateAll
   const canCalculateLocation = calculation.eligibility.canCalculateLocation
-  const speedValueLabel = `${speedThresholdDraftKmh.toFixed(1)}km/h`
-  const turnValueLabel = `${turnThresholdDraftDegrees.toFixed(1)}°`
-  const detectionCounts = getVideoSyncDetectionCounts(detection)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-card">
@@ -71,7 +66,8 @@ export function VideoSyncDrawerContent({
           <TabsContent value="manual" className="outline-none">
             <div className="space-y-8 pt-6">
               <VideoSyncLandmarkList
-                landmarks={landmarks}
+                hasLocationLandmark={hasLocationLandmark}
+                landmarkCards={landmarkCards}
                 onChangeType={onChangeLandmarkType}
                 onClear={onClearLandmarks}
                 onDelete={onDeleteLandmark}
@@ -149,10 +145,20 @@ export function VideoSyncDrawerContent({
                   </div>
 
                   <div className="space-y-2">
-                    <Button type="button" className="w-full h-9" disabled={!canCalculate || isCalculating} onClick={onCalculate}>
+                    <Button
+                      type="button"
+                      className="w-full h-9"
+                      disabled={!canCalculate || isCalculating}
+                      onClick={() => calculation.calculate(VIDEO_SYNC_MATCH_SCOPES.ALL)}
+                    >
                       {t('videoSync.syncLandmarks', 'Sync All Landmarks')}
                     </Button>
-                    <Button type="button" className="w-full h-9" disabled={!canCalculateLocation || isCalculating} onClick={onCalculateLocation}>
+                    <Button
+                      type="button"
+                      className="w-full h-9"
+                      disabled={!canCalculateLocation || isCalculating}
+                      onClick={() => calculation.calculate(VIDEO_SYNC_MATCH_SCOPES.LOCATION)}
+                    >
                       {t('videoSync.syncLocation', 'Match Locations Only')}
                     </Button>
                   </div>
@@ -162,21 +168,17 @@ export function VideoSyncDrawerContent({
 
                   <VideoSyncCandidateList
                     appliedOffset={appliedOffset}
-                    candidates={locationResult.candidates}
-                    error={locationResult.error}
-                    hasSearched={locationResult.hasSearched}
-                    onApply={onApplyLocationCandidate}
-                    status={locationResult.status}
+                    result={results[VIDEO_SYNC_MATCH_SCOPES.LOCATION]}
+                    onApply={onApplyCandidate}
+                    scope={VIDEO_SYNC_MATCH_SCOPES.LOCATION}
                     title={t('videoSync.locationSyncCandidates', 'LOCATION SYNC CANDIDATE')}
                   />
 
                   <VideoSyncCandidateList
                     appliedOffset={appliedOffset}
-                    candidates={allResult.candidates}
-                    error={allResult.error}
-                    hasSearched={allResult.hasSearched}
-                    onApply={onApplyAllCandidate}
-                    status={allResult.status}
+                    result={results[VIDEO_SYNC_MATCH_SCOPES.ALL]}
+                    onApply={onApplyCandidate}
+                    scope={VIDEO_SYNC_MATCH_SCOPES.ALL}
                     title={t('videoSync.syncCandidates', 'SYNC CANDIDATES')}
                   />
                 </div>

@@ -91,12 +91,17 @@ describe('project snapshot contract', () => {
 
   test('round-trips only durable manual video-sync state', () => {
     useStore.setState(useStore.getInitialState(), true)
+    useStore.setState({
+      activitySource: { kind: 'file', path: 'C:\\Events\\ride.fit' },
+      importedVideoPath: 'C:\\Events\\video.mp4',
+    })
     useStore.getState().hydrateVideoSyncState({
       landmarks: [
         { id: 'stop-1', type: 'stop', videoSecond: 4 },
         { id: 'left-1', type: 'leftTurn', videoSecond: 8 },
         { id: 'location-1', type: 'location', videoSecond: 12, activitySecond: null },
       ],
+      detectedLocationSecond: 33.5,
       speedThresholdKmh: 7,
       turnThresholdDegrees: 120,
     })
@@ -112,6 +117,7 @@ describe('project snapshot contract', () => {
         { id: 'left-1', type: 'leftTurn', videoSecond: 8 },
         { id: 'location-1', type: 'location', videoSecond: 12, activitySecond: null },
       ],
+      detectedLocationSecond: 33.5,
       speedThresholdKmh: 7,
       turnThresholdDegrees: 120,
     })

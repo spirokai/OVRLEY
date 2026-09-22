@@ -1,4 +1,3 @@
-import i18next from 'i18next'
 import {
   VIDEO_SYNC_KMH_TO_METERS_PER_SECOND,
   VIDEO_SYNC_STOP_ENTRY_DWELL_SECONDS,
@@ -7,48 +6,12 @@ import {
   VIDEO_SYNC_STOP_MAXIMUM_DURATION_SECONDS,
 } from '../data/videoSyncConstants'
 
-/**
- * Validates the user-owned speed threshold at the detector boundary.
- *
- * @param {number} speedThresholdKmh Configured near-stop threshold in km/h.
- * @returns {void}
- * @throws {Error} When the threshold is not finite.
- */
-function requireSpeedThreshold(speedThresholdKmh) {
-  if (!Number.isFinite(speedThresholdKmh)) {
-    throw new Error(i18next.t('videoSync.invalidSpeedThreshold', 'Manual video sync speed threshold must be finite'))
-  }
-}
-
-/**
- * Interpolates the timestamp at which a sampled value crosses a threshold.
- *
- * @param {number} previousTime Previous sample timestamp.
- * @param {number} previousValue Previous sample value.
- * @param {number} currentTime Current sample timestamp.
- * @param {number} currentValue Current sample value.
- * @param {number} threshold Crossing threshold.
- * @returns {number} Interpolated crossing timestamp.
- */
 function interpolateCrossingTime(previousTime, previousValue, currentTime, currentValue, threshold) {
   const valueDelta = currentValue - previousValue
   if (valueDelta === 0) return previousTime
 
   const ratio = (threshold - previousValue) / valueDelta
   return previousTime + ratio * (currentTime - previousTime)
-}
-
-/**
- * Closes an open near-stop suppression interval at a segment boundary.
- *
- * @param {{start: number, end: number}[]} nearStopIntervals Output interval list.
- * @param {number|null} nearStopStart Open interval start, if any.
- * @param {number} endTime Segment or movement end timestamp.
- * @returns {void}
- */
-function closeNearStopInterval(nearStopIntervals, nearStopStart, endTime) {
-  if (nearStopStart === null) return
-  nearStopIntervals.push({ start: nearStopStart, end: Math.max(nearStopStart, endTime) })
 }
 
 const STOP_PHASES = Object.freeze({
@@ -60,13 +23,6 @@ const STOP_PHASES = Object.freeze({
   EXITING_STOP: 'exitingStop',
 })
 
-/**
- * Creates a complete stop-detector state with explicit nullable transition fields.
- *
- * @param {string} phase Current state-machine phase.
- * @param {{movementStartedAt?: number|null, nearStopStartedAt?: number|null, stopCandidateStartedAt?: number|null, exitStartedAt?: number|null, stopEvent?: object|null, stopIntervalOpen?: boolean}} [values] Phase-specific values.
- * @returns {{phase: string, movementStartedAt: number|null, nearStopStartedAt: number|null, stopCandidateStartedAt: number|null, exitStartedAt: number|null, stopEvent: object|null, stopIntervalOpen: boolean}} Stop-detector state.
- */
 function createState(phase, values = {}) {
   return {
     phase,
@@ -79,14 +35,6 @@ function createState(phase, values = {}) {
   }
 }
 
-/**
- * Advances a detected stop's supporting low-speed interval without allowing it
- * to exceed its maximum duration.
- *
- * @param {{stopEvent: object|null, stopIntervalOpen: boolean}} state Current stop state.
- * @param {number} endTime Latest time that still satisfies the speed requirement.
- * @returns {void}
- */
 function extendStopInterval(state, endTime) {
   if (state.stopEvent === null || !state.stopIntervalOpen) return
   const interval = state.stopEvent.lowSpeedInterval
@@ -94,28 +42,6 @@ function extendStopInterval(state, endTime) {
   if (interval.end === interval.start + VIDEO_SYNC_STOP_MAXIMUM_DURATION_SECONDS) state.stopIntervalOpen = false
 }
 
-/**
- * Closes the state's near-stop interval and any established stop's low-speed interval.
- *
- * @param {{nearStopStartedAt: number|null, stopEvent: object|null}} state Current stop state.
- * @param {number} endTime Interval end timestamp.
- * @param {{start: number, end: number}[]} nearStopIntervals Output interval list.
- * @returns {void}
- */
-function closeNearStop(state, endTime, nearStopIntervals) {
-  closeNearStopInterval(nearStopIntervals, state.nearStopStartedAt, endTime)
-  extendStopInterval(state, endTime)
-  state.stopIntervalOpen = false
-}
-
-/**
- * Enters the stopped phase while carrying forward an established stop event.
- *
- * @param {{stopEvent: object|null}} previousState State being left.
- * @param {number} nearStopStartedAt Timestamp at which the near-stop interval began.
- * @param {number|null} [stopCandidateStartedAt] Candidate event timestamp.
- * @returns {object} New stopped-phase state.
- */
 function enterStopped(previousState, nearStopStartedAt, stopCandidateStartedAt = null) {
   return createState(STOP_PHASES.STOPPED, {
     nearStopStartedAt,
@@ -125,14 +51,6 @@ function enterStopped(previousState, nearStopStartedAt, stopCandidateStartedAt =
   })
 }
 
-/**
- * Records a confirmed stop transition and returns the corresponding stopped state.
- *
- * @param {{nearStopStartedAt: number|null, stopCandidateStartedAt: number|null, stopEvent: object|null}} state Candidate stop state.
- * @param {number} time Confirmation timestamp.
- * @param {object[]} stops Output stop-event list.
- * @returns {object} Stopped-phase state containing the new event.
- */
 function establishStopEvent(state, time, stops) {
   const stop = {
     id: `stop-${stops.length}`,
@@ -148,46 +66,14 @@ function establishStopEvent(state, time, stops) {
   })
 }
 
-/**
- * Finalizes an unfinished segment without creating a stop transition.
- *
- * @param {{nearStopStartedAt: number|null, stopEvent: object|null}} state Current stop state.
- * @param {number} endTime Segment end timestamp.
- * @param {{start: number, end: number}[]} nearStopIntervals Output interval list.
- * @returns {void}
- */
-function finishSegmentState(state, endTime, nearStopIntervals) {
-  if (state.nearStopStartedAt !== null) closeNearStop(state, endTime, nearStopIntervals)
-}
-
-/**
- * Seeds the state machine from the first valid speed sample in a segment.
- *
- * @param {number} speed First speed sample in m/s.
- * @param {number} time First sample timestamp.
- * @param {number} threshold Near-stop threshold in m/s.
- * @param {number} movementThreshold Exit/movement threshold in m/s.
- * @returns {object} Initial stop-detector state.
- */
 function stateForFirstSample(speed, time, threshold, movementThreshold) {
   if (speed <= threshold) return enterStopped(createState(STOP_PHASES.UNESTABLISHED), time)
   if (speed > movementThreshold) return createState(STOP_PHASES.ESTABLISHING_MOVEMENT, { movementStartedAt: time })
   return createState(STOP_PHASES.UNESTABLISHED)
 }
 
-/**
- * Advances the stop state machine across one pair of valid speed samples.
- *
- * The transition loop allows one sample to complete a phase and immediately
- * enter the next phase, while each returned state owns the next comparison.
- *
- * @param {object} state Current stop-detector state.
- * @param {{previousTime: number, previousSpeed: number, time: number, speed: number, threshold: number, movementThreshold: number}} sample Current sample pair and thresholds.
- * @param {object[]} stops Output stop-event list.
- * @param {{start: number, end: number}[]} nearStopIntervals Output suppression interval list.
- * @returns {object} Updated stop-detector state.
- */
-function advanceState(state, { previousTime, previousSpeed, time, speed, threshold, movementThreshold }, stops, nearStopIntervals) {
+// A sample may finish one phase and enter the next in the same transition.
+function advanceState(state, { previousTime, previousSpeed, time, speed, threshold, movementThreshold }, stops) {
   let nextState = state
 
   while (true) {
@@ -260,7 +146,7 @@ function advanceState(state, { previousTime, previousSpeed, time, speed, thresho
       case STOP_PHASES.EXITING_STOP:
         if (speed > movementThreshold && time - nextState.exitStartedAt >= VIDEO_SYNC_STOP_EXIT_DWELL_SECONDS) {
           const exitTime = nextState.exitStartedAt
-          closeNearStop(nextState, exitTime, nearStopIntervals)
+          extendStopInterval(nextState, exitTime)
           return createState(STOP_PHASES.MOVING, { movementStartedAt: exitTime })
         }
         if (speed <= movementThreshold) {
@@ -273,42 +159,31 @@ function advanceState(state, { previousTime, previousSpeed, time, speed, thresho
         return nextState
 
       default:
-        throw new Error(i18next.t('videoSync.unknownStopPhase', 'Unknown manual video sync stop phase: {{phase}}', { phase: nextState.phase }))
+        throw new Error(`Unknown manual video sync stop phase: ${nextState.phase}`)
     }
   }
 }
 
 /**
- * Runs the near-stop state machine and retains its suppression intervals for
- * the directional-turn detector. The intervals include stationary starts,
- * while `stops` only contains transitions from established movement.
+ * Detects stop transitions from established movement.
  *
  * @param {{elapsedSeconds: number[], speed: (number|null)[], segments: {startIndex: number, endIndex: number}[]}} input Detector input produced by createActivitySyncInput.
  * @param {{speedThresholdKmh: number}} settings Physical near-stop threshold.
- * @returns {{stops: object[], nearStopIntervals: {start: number, end: number}[]}}
+ * @returns {object[]} Stop events with their low-speed intervals.
  */
-export function detectStopState(input, { speedThresholdKmh }) {
-  requireSpeedThreshold(speedThresholdKmh)
-
+export function detectStops(input, { speedThresholdKmh }) {
   const threshold = speedThresholdKmh * VIDEO_SYNC_KMH_TO_METERS_PER_SECOND
   const movementThreshold = (speedThresholdKmh + VIDEO_SYNC_STOP_EXIT_HYSTERESIS_KMH) * VIDEO_SYNC_KMH_TO_METERS_PER_SECOND
   const stops = []
-  const nearStopIntervals = []
 
   for (const segment of input.segments) {
     let state = createState(STOP_PHASES.UNESTABLISHED)
     let previousIndex = null
 
-    const finishSegment = () => {
-      if (previousIndex === null) return
-      const endTime = input.elapsedSeconds[previousIndex]
-      finishSegmentState(state, endTime, nearStopIntervals)
-    }
-
     for (let index = segment.startIndex; index < segment.endIndex; index += 1) {
       const speed = input.speed[index]
       if (speed === null) {
-        finishSegment()
+        if (previousIndex !== null) extendStopInterval(state, input.elapsedSeconds[previousIndex])
         state = createState(STOP_PHASES.UNESTABLISHED)
         previousIndex = null
         continue
@@ -323,23 +198,12 @@ export function detectStopState(input, { speedThresholdKmh }) {
 
       const previousTime = input.elapsedSeconds[previousIndex]
       const previousSpeed = input.speed[previousIndex]
-      state = advanceState(state, { previousTime, previousSpeed, time, speed, threshold, movementThreshold }, stops, nearStopIntervals)
+      state = advanceState(state, { previousTime, previousSpeed, time, speed, threshold, movementThreshold }, stops)
       previousIndex = index
     }
 
-    finishSegment()
+    if (previousIndex !== null) extendStopInterval(state, input.elapsedSeconds[previousIndex])
   }
 
-  return { stops, nearStopIntervals }
-}
-
-/**
- * Detects typed near-stop events from timestamped canonical activity data.
- *
- * @param {object} input Detector input produced by createActivitySyncInput.
- * @param {{speedThresholdKmh: number}} settings Physical near-stop threshold.
- * @returns {object[]} Detected stop events.
- */
-export function detectStops(input, settings) {
-  return detectStopState(input, settings).stops
+  return stops
 }

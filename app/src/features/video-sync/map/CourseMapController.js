@@ -46,8 +46,8 @@ export default class CourseMapController {
 
   setCourseSegments(courseSegments) {
     this.courseSegments = courseSegments
-    if (this.styleLoaded) this.syncCourse()
     this.onCourseChange()
+    if (this.styleLoaded) this.syncCourse()
   }
 
   handleStyleLoad() {

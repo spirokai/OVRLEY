@@ -8,6 +8,7 @@ import {
   VIDEO_SYNC_NAVIGATION_MAP_PITCH,
 } from '../data/videoSyncConstants'
 import { buildActivityCourseSegments } from '../utils/activitySyncInput'
+import { buildVideoSyncScreenLayout, getVideoSyncPreviewSpeed } from '../utils/videoSyncPresentation'
 import NavigationMapController from '../map/NavigationMapController'
 import SelectionMapController from '../map/SelectionMapController'
 
@@ -19,12 +20,20 @@ function requireMapStyle(value) {
 }
 
 /**
- * Owns both video-sync maps, their shared course, and the selected map style.
+ * Owns the map pair and the speed readout for the video-sync preview.
  *
  * @param {object} options Preview inputs and course-location actions.
  * @returns {object} Map container refs and presentation actions.
  */
-export default function useVideoSyncMaps({ activity, detection, onSetCourseLocation, onDeleteCourseLocation, previewSecond }) {
+export default function useVideoSyncPreview({
+  activity,
+  detection,
+  displayScale,
+  onSetCourseLocation,
+  onDeleteCourseLocation,
+  previewSecond,
+  sceneSize,
+}) {
   const selectionMapRef = useRef(null)
   const navigationMapRef = useRef(null)
   const selectionControllerRef = useRef(null)
@@ -35,7 +44,9 @@ export default function useVideoSyncMaps({ activity, detection, onSetCourseLocat
   const [style, setStyle] = useState(VIDEO_SYNC_DEFAULT_MAP_STYLE)
   const [styleUrlTemplate, setStyleUrlTemplate] = useState(null)
   const [error, setError] = useState(null)
+  const screenLayout = buildVideoSyncScreenLayout(sceneSize, displayScale)
   const courseSegments = useMemo(() => buildActivityCourseSegments(activity), [activity])
+  const speed = useMemo(() => getVideoSyncPreviewSpeed(activity, previewSecond), [activity, previewSecond])
   const styleUrl = styleUrlTemplate === null ? null : styleUrlTemplate.replace('{style}', style)
 
   useEffect(() => {
@@ -114,5 +125,5 @@ export default function useVideoSyncMaps({ activity, detection, onSetCourseLocat
   }, [actionPoint, onSetCourseLocation])
 
   if (error) throw error
-  return { selectionMapRef, navigationMapRef, actionPoint, onConfirmActionPoint, pitch, onPitchChange, style, onStyleChange }
+  return { selectionMapRef, navigationMapRef, actionPoint, onConfirmActionPoint, pitch, onPitchChange, screenLayout, speed, style, onStyleChange }
 }

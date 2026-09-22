@@ -3,46 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { VIDEO_SYNC_TOOL } from '@/store/slices/createLayoutSlice'
-import { VIDEO_SYNC_LANDMARK_TYPES, VIDEO_SYNC_MATCH_SCOPES, VIDEO_SYNC_MAX_LANDMARKS } from '../data/videoSyncConstants'
+import { VIDEO_SYNC_LANDMARK_TYPES, VIDEO_SYNC_MAX_LANDMARKS } from '../data/videoSyncConstants'
+import { buildVideoSyncDrawerPresentation } from '../utils/videoSyncPresentation'
 import useVideoSyncCalculation from './useVideoSyncCalculation'
-
-/**
- * Resolves the landmark controls for the current activity playhead.
- *
- * @param {object|null} markControls Workspace-owned mark action state.
- * @param {number} timelineSecond Current activity timeline second.
- * @param {boolean} enabled Whether the sync workspace is active.
- * @returns {object|null} Resolved mark controls, or null when sync mode is inactive.
- */
-export function resolveVideoSyncMarkControls(markControls, timelineSecond, enabled) {
-  if (!enabled || markControls === null) return null
-
-  const videoSecond = timelineSecond - markControls.videoSyncOffsetSeconds
-  const hasVideo = markControls.importedVideoDuration !== null
-  const isInsideVideo = hasVideo && videoSecond >= 0 && videoSecond < markControls.importedVideoDuration
-  const canMark = isInsideVideo && markControls.hasLandmarkCapacity
-  const markDisabledReason = !hasVideo
-    ? markControls.videoRequiredReason
-    : !isInsideVideo
-      ? markControls.playheadOutsideVideoReason
-      : !markControls.hasLandmarkCapacity
-        ? markControls.landmarkLimitReason
-        : null
-
-  return {
-    canMark,
-    canMarkLocation: canMark && !markControls.hasLocationLandmark,
-    locationDisabledReason: markControls.hasLocationLandmark ? markControls.locationLimitReason : markDisabledReason,
-    markDisabledReason,
-    onMarkLeftTurn: markControls.onMarkLeftTurn,
-    onMarkLocation: markControls.onMarkLocation,
-    onMarkRightTurn: markControls.onMarkRightTurn,
-    onMarkStop: markControls.onMarkStop,
-    detection: markControls.detection,
-    onDeleteCourseLocation: markControls.onDeleteCourseLocation,
-    onSetCourseLocation: markControls.onSetCourseLocation,
-  }
-}
 
 /**
  * Owns the manual video-sync workspace mode, transient sensitivity controls,
@@ -110,6 +73,10 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
 
   const hasLocationLandmark = landmarks.some((landmark) => landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION)
   const hasLandmarkCapacity = landmarks.length < VIDEO_SYNC_MAX_LANDMARKS
+  const drawerPresentation = buildVideoSyncDrawerPresentation(landmarks, manualVideoSyncDetection, {
+    speedThresholdDraftKmh,
+    turnThresholdDraftDegrees,
+  })
   const addLandmarkAtPlayhead = useCallback((type) => {
     const state = useStore.getState()
     state.addVideoSyncLandmark(type, state.selectedSecond - state.videoSyncOffsetSeconds)
@@ -120,39 +87,29 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
   const markRightTurn = useCallback(() => addLandmarkAtPlayhead(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN), [addLandmarkAtPlayhead])
   const markLocation = useCallback(() => addLandmarkAtPlayhead(VIDEO_SYNC_LANDMARK_TYPES.LOCATION), [addLandmarkAtPlayhead])
 
-  const deleteLandmark = useCallback((id) => removeVideoSyncLandmark(id), [removeVideoSyncLandmark])
-  const deleteDetectedLocation = useCallback(() => clearVideoSyncDetectedLocation(), [clearVideoSyncDetectedLocation])
-  const changeLandmarkType = useCallback((id, type) => setVideoSyncLandmarkType(id, type), [setVideoSyncLandmarkType])
-  const applyAllCandidate = useCallback((candidate) => applyVideoSyncCandidate(VIDEO_SYNC_MATCH_SCOPES.ALL, candidate), [applyVideoSyncCandidate])
-  const applyLocationCandidate = useCallback(
-    (candidate) => applyVideoSyncCandidate(VIDEO_SYNC_MATCH_SCOPES.LOCATION, candidate),
-    [applyVideoSyncCandidate],
-  )
-
   return {
     videoSyncMode: toolbarDrawer.activeTool === VIDEO_SYNC_TOOL,
     drawer: {
       activeTab: videoSyncDrawerTab,
       appliedOffset: videoSyncOffsetSeconds,
-      allResult: manualVideoSyncResults[VIDEO_SYNC_MATCH_SCOPES.ALL],
       calculation,
-      landmarks,
-      locationResult: manualVideoSyncResults[VIDEO_SYNC_MATCH_SCOPES.LOCATION],
-      detection: manualVideoSyncDetection,
-      onApplyAllCandidate: applyAllCandidate,
-      onApplyLocationCandidate: applyLocationCandidate,
+      detectionCounts: drawerPresentation.detectionCounts,
+      hasLocationLandmark,
+      landmarkCards: drawerPresentation.landmarkCards,
+      results: manualVideoSyncResults,
+      onApplyCandidate: applyVideoSyncCandidate,
       onTabChange: setVideoSyncDrawerTab,
-      onCalculate: calculation.calculateAll,
-      onCalculateLocation: calculation.calculateLocation,
       onClearLandmarks: clearVideoSyncLandmarks,
-      onChangeLandmarkType: changeLandmarkType,
-      onDeleteLandmark: deleteLandmark,
+      onChangeLandmarkType: setVideoSyncLandmarkType,
+      onDeleteLandmark: removeVideoSyncLandmark,
       onSpeedThresholdChange: setSpeedThresholdDraftKmh,
       onSpeedThresholdCommit: setVideoSyncSpeedThreshold,
       onTurnThresholdChange: setTurnThresholdDraftDegrees,
       onTurnThresholdCommit: setVideoSyncTurnThreshold,
       speedThresholdDraftKmh,
+      speedValueLabel: drawerPresentation.speedValueLabel,
       turnThresholdDraftDegrees,
+      turnValueLabel: drawerPresentation.turnValueLabel,
       videoSummary,
       videoSync,
     },
@@ -168,7 +125,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       onMarkRightTurn: markRightTurn,
       onMarkStop: markStop,
       onSetCourseLocation: setVideoSyncDetectedLocation,
-      onDeleteCourseLocation: deleteDetectedLocation,
+      onDeleteCourseLocation: clearVideoSyncDetectedLocation,
       playheadOutsideVideoReason: t('videoSync.playheadInsideVideo', 'Move the playhead inside the video to mark a landmark'),
       videoRequiredReason: t('videoSync.videoRequired', 'A video is required to mark a landmark'),
       videoSyncOffsetSeconds,

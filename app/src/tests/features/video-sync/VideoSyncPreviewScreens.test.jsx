@@ -250,7 +250,7 @@ describe('VideoSyncPreviewScreens', () => {
     expect(navigationMap.jumpTo).toHaveBeenCalledWith(
       expect.objectContaining({
         center: [8.535, 47.375],
-        pitch: 50,
+        pitch: 40,
         padding: { top: 144, right: 0, bottom: 0, left: 0 },
       }),
     )

@@ -18,11 +18,10 @@ const UNAVAILABLE_METRICS = Object.freeze({ speed: false, heading: false, course
  *
  * @param {object[]} landmarks Canonical video landmarks.
  * @param {{availability: {speed: boolean, heading: boolean, course: boolean}, location: object|null}|null} detection Canonical detected-event model.
- * @returns {{eligibleLandmarks: object[], eligibleLandmarkIds: string[], unsupportedLandmarks: {id: string, type: string, metric: string}[], locationLandmark: object|null, canMatchAll: boolean, canMatchLocation: boolean}} Eligibility model.
+ * @returns {{eligibleLandmarks: object[], canMatchAll: boolean, canMatchLocation: boolean}} Eligibility model.
  */
 export function getVideoSyncEligibility(landmarks, detection) {
   const eligibleLandmarks = []
-  const unsupportedLandmarks = []
   let locationLandmark = null
   const availability = detection?.availability ?? UNAVAILABLE_METRICS
   const location = detection?.location ?? null
@@ -37,20 +36,13 @@ export function getVideoSyncEligibility(landmarks, detection) {
     }
 
     const metric = landmark.type === VIDEO_SYNC_LANDMARK_TYPES.STOP ? 'speed' : 'heading'
-    if (availability[metric]) {
-      eligibleLandmarks.push(landmark)
-    } else {
-      unsupportedLandmarks.push({ id: landmark.id, type: landmark.type, metric })
-    }
+    if (availability[metric]) eligibleLandmarks.push(landmark)
   }
 
   eligibleLandmarks.sort((left, right) => sortByTime(left, right, (landmark) => landmark.videoSecond))
 
   return {
     eligibleLandmarks,
-    eligibleLandmarkIds: eligibleLandmarks.map((landmark) => landmark.id),
-    unsupportedLandmarks,
-    locationLandmark,
     canMatchAll: eligibleLandmarks.length >= 2,
     canMatchLocation: locationLandmark !== null,
   }
@@ -63,7 +55,7 @@ export function getVideoSyncEligibility(landmarks, detection) {
  *
  * @param {object} landmark Canonical video landmark.
  * @param {object} event Canonical detected activity event.
- * @returns {{landmarkId: string, eventId: string, type: string, event: object, eventSecond: number, startOffset: number, endOffset: number, timingScaleSeconds: number, residualAt: (offset: number) => number}} Typed offset support.
+ * @returns {{landmarkId: string, eventId: string, type: string, event: object, eventSecond: number, startOffset: number, endOffset: number, timingScaleSeconds: number}} Typed offset support.
  */
 function createOffsetSupport(landmark, event) {
   const isLocation = landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION
@@ -82,12 +74,14 @@ function createOffsetSupport(landmark, event) {
     startOffset,
     endOffset,
     timingScaleSeconds: isLocation ? VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS : VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS,
-    residualAt: (offset) => {
-      if (offset < startOffset) return startOffset - offset
-      if (offset > endOffset) return offset - endOffset
-      return 0
-    },
   }
+}
+
+/** @param {object} support Offset interval. @param {number} offset Proposed offset. @returns {number} Distance outside the interval. */
+export function calculateOffsetResidual(support, offset) {
+  if (offset < support.startOffset) return support.startOffset - offset
+  if (offset > support.endOffset) return offset - support.endOffset
+  return 0
 }
 
 /**
@@ -132,23 +126,6 @@ export function createVideoSyncOffsetSupports(landmarks, detection) {
   }
 
   return { eligibleLandmarks, supports }
-}
-
-/**
- * Returns the public, serializable representation of one offset support.
- *
- * @param {{landmarkId: string, eventId: string, type: string, startOffset: number, endOffset: number, timingScaleSeconds: number}} support Typed offset support.
- * @returns {{landmarkId: string, eventId: string, type: string, startOffset: number, endOffset: number, timingScaleSeconds: number}} Support diagnostic.
- */
-export function serializeOffsetSupport(support) {
-  return {
-    landmarkId: support.landmarkId,
-    eventId: support.eventId,
-    type: support.type,
-    startOffset: support.startOffset,
-    endOffset: support.endOffset,
-    timingScaleSeconds: support.timingScaleSeconds,
-  }
 }
 
 export { MATCHABLE_LANDMARK_TYPES }

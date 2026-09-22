@@ -214,6 +214,7 @@ export const createVideoImportSlice = (set, get) => ({
     if (!compensatePlayhead) {
       set({
         videoSyncOffsetSeconds: seconds,
+        videoSyncWarning: null,
       })
       return
     }
@@ -234,6 +235,7 @@ export const createVideoImportSlice = (set, get) => ({
 
     set((draft) => {
       draft.videoSyncOffsetSeconds = seconds
+      draft.videoSyncWarning = null
       draft.selectedSecond = clamp(state.selectedSecond + offsetDelta, timelineMinimum, totalDuration)
       draft.videoSyncOffsetPreviewSeconds = null
     })

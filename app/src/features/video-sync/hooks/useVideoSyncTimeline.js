@@ -4,7 +4,7 @@
 
 import { useMemo } from 'react'
 import { secondsToViewPx } from '@/features/player/utils/timelineGeometry'
-import { VIDEO_SYNC_LANDMARK_PRESENTATION } from '../data/videoSyncConstants'
+import { VIDEO_SYNC_LANDMARK_PRESENTATION } from '../utils/videoSyncPresentation'
 import { buildEventBands, buildGraphGeometry, buildGraphScales } from '../utils/graphGeometry'
 import useVideoSyncLandmarkDrag from './useVideoSyncLandmarkDrag'
 

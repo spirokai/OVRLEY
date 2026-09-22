@@ -1,19 +1,5 @@
-import { createActivitySyncInput } from './activitySyncInput'
-import { detectStopState } from './detectStops'
+import { detectStops } from './detectStops'
 import { deriveTurningSeries, detectTurnsFromDerivedSeries } from './detectTurns'
-
-/**
- * Detects all manual video-sync activity events from one canonical activity
- * projection. The turning series is derived once and returned for graph use.
- *
- * @param {object|null} parsedActivity Finalized canonical activity data.
- * @param {{speedThresholdKmh: number, turnThresholdDegrees: number}} settings Physical detector thresholds.
- * @returns {{availability: {speed: boolean, heading: boolean, course: boolean}, stops: object[], turns: object[], location: object|null, graphSeries: {speed: {time: number, value: number|null}[], turning: {time: number, value: number|null}[]}}} Detector result.
- */
-export function detectActivityEvents(parsedActivity, settings) {
-  const input = createActivitySyncInput(parsedActivity)
-  return detectActivityEventsFromInput(input, settings, null)
-}
 
 /** @returns {object} Empty canonical detected-event model. */
 export function createEmptyVideoSyncDetection() {
@@ -38,7 +24,7 @@ export function createEmptyVideoSyncDetection() {
  * @returns {{availability: {speed: boolean, heading: boolean, course: boolean}, stops: object[], turns: object[], location: object|null, graphSeries: {speed: {time: number, value: number|null}[], turning: {time: number, value: number|null}[]}}} Detector result.
  */
 export function detectActivityEventsFromInput(input, settings, location) {
-  const stopState = detectStopState(input, settings)
+  const stops = detectStops(input, settings)
   const turning = deriveTurningSeries(input)
   const turns = detectTurnsFromDerivedSeries(input, turning, {
     turnThresholdDegrees: settings.turnThresholdDegrees,
@@ -46,7 +32,7 @@ export function detectActivityEventsFromInput(input, settings, location) {
 
   return {
     availability: input.availability,
-    stops: stopState.stops,
+    stops,
     turns,
     location,
     graphSeries: {

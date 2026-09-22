@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 import { VideoSyncLandmarkList } from '@/features/video-sync/components/VideoSyncLandmarkList'
 import { VideoSyncMarkControls } from '@/features/video-sync/components/VideoSyncMarkControls'
+import { buildVideoSyncDrawerPresentation } from '@/features/video-sync/utils/videoSyncPresentation'
 
 const landmarks = [
   { id: 'late', type: 'stop', videoSecond: 12 },
@@ -30,7 +31,16 @@ describe('manual video-sync Phase 5 controls', () => {
 
   test('sorts landmark cards and routes delete actions', () => {
     const onDelete = vi.fn()
-    render(<VideoSyncLandmarkList landmarks={landmarks} onChangeType={vi.fn()} onClear={vi.fn()} onDelete={onDelete} />)
+    const { landmarkCards } = buildVideoSyncDrawerPresentation(landmarks, null, { speedThresholdDraftKmh: 5, turnThresholdDraftDegrees: 90 })
+    render(
+      <VideoSyncLandmarkList
+        hasLocationLandmark={false}
+        landmarkCards={landmarkCards}
+        onChangeType={vi.fn()}
+        onClear={vi.fn()}
+        onDelete={onDelete}
+      />,
+    )
 
     const listItems = screen.getAllByRole('listitem')
     expect(listItems[0]).toHaveTextContent('Left Turn')

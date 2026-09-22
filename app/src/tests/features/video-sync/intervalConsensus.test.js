@@ -39,7 +39,6 @@ describe('manual video-sync interval consensus', () => {
 
     expect(result.candidates[0]).toMatchObject({ offset: 101, matchScore: 100, matchedCount: 2, eligibleCount: 2 })
     expect(result.candidates[0].evidence.map((item) => item.eventId)).toEqual(['activity-stop', 'activity-right'])
-    expect(result.diagnostics.offsetSupports).not.toContainEqual(expect.objectContaining({ eventId: 'activity-left' }))
   })
 
   test('prevents one activity event from explaining two landmarks and penalizes partial coverage', () => {
@@ -107,7 +106,6 @@ describe('manual video-sync interval consensus', () => {
       scope: VIDEO_SYNC_MATCH_SCOPES.ALL,
     })
     expect(flat.candidates[0]).toMatchObject({ offset: 101, matchScore: 100, matchedCount: 2 })
-    expect(flat.diagnostics.offsetSupports[0]).toMatchObject({ startOffset: 100, endOffset: 102 })
 
     const nearMiss = matchVideoSyncCandidates({
       landmarks: [
@@ -135,7 +133,6 @@ describe('manual video-sync interval consensus', () => {
       scope: VIDEO_SYNC_MATCH_SCOPES.ALL,
     })
     expect(unresolved.candidates).toEqual([])
-    expect(unresolved.diagnostics.eligibleLandmarkIds).toEqual(['video-stop-1', 'video-stop-2'])
 
     const resolved = matchVideoSyncCandidates({
       landmarks: [...ordinaryLandmarks, { id: 'video-location', type: 'location', videoSecond: 0, activitySecond: null }],
@@ -160,7 +157,6 @@ describe('manual video-sync interval consensus', () => {
       variant: 'ordinary',
       locationClassification: 'agrees',
     })
-    expect(resolved.diagnostics.eligibleLandmarkIds).toContain('video-location')
 
     const conflicting = matchVideoSyncCandidates({
       landmarks: [...ordinaryLandmarks, { id: 'video-location', type: 'location', videoSecond: 0, activitySecond: null }],

@@ -56,6 +56,7 @@ export default class NavigationMapController extends CourseMapController {
   }
 
   onCourseChange() {
+    this.lastBearing = 0
     this.syncCamera()
   }
 

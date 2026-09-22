@@ -210,6 +210,8 @@ struct ProjectSyncV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectManualVideoSync {
     landmarks: Vec<ProjectLandmark>,
+    #[serde(default)]
+    detected_location_second: Option<f64>,
     speed_threshold_kmh: f64,
     turn_threshold_degrees: f64,
 }
@@ -403,12 +405,24 @@ fn validate_project(project: &ProjectDocument) -> Result<(), String> {
     if !project.sync.manual.landmarks.is_empty() && project.sources.video.is_none() {
         return Err("sync.manual.landmarks require a video source".into());
     }
+    if project.sync.manual.detected_location_second.is_some() && project.sources.activity.is_none()
+    {
+        return Err("sync.manual.detectedLocationSecond requires an activity source".into());
+    }
     validate_manual_video_sync(&project.sync.manual)?;
     validate_editor(&project.editor)?;
     Ok(())
 }
 
 fn validate_manual_video_sync(manual: &ProjectManualVideoSync) -> Result<(), String> {
+    if let Some(activity_second) = manual.detected_location_second {
+        if !activity_second.is_finite() || activity_second < 0.0 {
+            return Err(
+                "sync.manual.detectedLocationSecond must be a finite non-negative number or null"
+                    .into(),
+            );
+        }
+    }
     if manual.landmarks.len() > MAX_MANUAL_LANDMARKS {
         return Err(format!(
             "sync.manual.landmarks must contain at most {MAX_MANUAL_LANDMARKS} landmarks"
@@ -548,6 +562,7 @@ fn migrate_v1_project(project: ProjectDocumentV1) -> ProjectDocument {
             video_timezone_mode: project.sync.video_timezone_mode,
             manual: ProjectManualVideoSync {
                 landmarks: Vec::new(),
+                detected_location_second: None,
                 speed_threshold_kmh: DEFAULT_MANUAL_SPEED_THRESHOLD_KMH,
                 turn_threshold_degrees: DEFAULT_MANUAL_TURN_THRESHOLD_DEGREES,
             },
@@ -873,6 +888,7 @@ mod tests {
                 "videoTimezoneMode": null,
                 "manual": {
                     "landmarks": [],
+                    "detectedLocationSecond": null,
                     "speedThresholdKmh": 5.0,
                     "turnThresholdDegrees": 90.0
                 }
@@ -909,7 +925,7 @@ mod tests {
     }
 
     #[test]
-    fn v2_manual_sync_round_trip_preserves_directional_landmarks_and_thresholds() {
+    fn v2_manual_sync_round_trip_preserves_landmarks_location_and_thresholds() {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
         project["sources"]["video"] = serde_json::json!({
             "path": { "kind": "project-relative", "value": "media/video.mp4" }
@@ -921,6 +937,7 @@ mod tests {
                 { "id": "right-1", "type": "rightTurn", "videoSecond": 12.0 },
                 { "id": "location-1", "type": "location", "videoSecond": 16.0, "activitySecond": null }
             ],
+            "detectedLocationSecond": 42.5,
             "speedThresholdKmh": 7.0,
             "turnThresholdDegrees": 120.0
         });
@@ -928,6 +945,29 @@ mod tests {
         let parsed = parse_project(&project.to_string()).unwrap();
         let serialized = serde_json::to_value(parsed).unwrap();
         assert_eq!(serialized["sync"]["manual"], project["sync"]["manual"]);
+    }
+
+    #[test]
+    fn older_v2_manual_sync_without_detected_location_loads_as_none() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["sync"]["manual"]
+            .as_object_mut()
+            .unwrap()
+            .remove("detectedLocationSecond");
+
+        let parsed = parse_project(&project.to_string()).unwrap();
+        assert_eq!(parsed.sync.manual.detected_location_second, None);
+    }
+
+    #[test]
+    fn rejects_invalid_or_unowned_detected_location() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["sync"]["manual"]["detectedLocationSecond"] = Value::from(-1.0);
+        assert!(parse_project(&project.to_string()).is_err());
+
+        project["sync"]["manual"]["detectedLocationSecond"] = Value::from(42.5);
+        project["sources"]["activity"] = Value::Null;
+        assert!(parse_project(&project.to_string()).is_err());
     }
 
     #[test]

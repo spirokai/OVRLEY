@@ -24,6 +24,7 @@ function resetStore(activity = createActivity()) {
     importedVideoDuration: 30,
     manualVideoSync: {
       landmarks: structuredClone(LANDMARKS),
+      detectedLocationSecond: null,
       speedThresholdKmh: 5,
       turnThresholdDegrees: 90,
     },
@@ -56,7 +57,7 @@ describe('manual video-sync calculation orchestration', () => {
 
     let calculated
     await act(async () => {
-      calculated = await result.current.calculateAll()
+      calculated = await result.current.calculate('all')
     })
 
     expect(calculated).toBe(false)
@@ -69,7 +70,7 @@ describe('manual video-sync calculation orchestration', () => {
 
     await waitForDetection(result)
     await act(async () => {
-      expect(await result.current.calculateAll()).toBe(true)
+      expect(await result.current.calculate('all')).toBe(true)
     })
     expect(useStore.getState().manualVideoSyncResults.all.hasSearched).toBe(true)
 
@@ -88,13 +89,13 @@ describe('manual video-sync calculation orchestration', () => {
 
     await waitForDetection(result)
     await act(async () => {
-      expect(await result.current.calculateAll()).toBe(true)
+      expect(await result.current.calculate('all')).toBe(true)
     })
 
     const previousDetection = useStore.getState().manualVideoSyncDetection
     let pendingCalculation
     act(() => {
-      pendingCalculation = result.current.calculateAll()
+      pendingCalculation = result.current.calculate('all')
       useStore.getState().moveVideoSyncLandmark('video-stop-2', 13)
     })
 
@@ -119,7 +120,7 @@ describe('manual video-sync calculation orchestration', () => {
 
     await waitForDetection(result)
     await act(async () => {
-      expect(await result.current.calculateLocation()).toBe(true)
+      expect(await result.current.calculate('location')).toBe(true)
     })
 
     const candidate = useStore.getState().manualVideoSyncResults.location.candidates[0]

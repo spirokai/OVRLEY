@@ -39,20 +39,22 @@ function requireMatchScope(scope) {
   }
 }
 
-function createCandidateResult() {
+function createCandidateResult(revision = 0) {
   return {
     candidates: [],
     error: null,
     hasSearched: false,
-    revision: 0,
+    revision,
     status: MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.IDLE,
   }
 }
 
-function createCandidateResults() {
+function createCandidateResults(previousResults = null) {
   return {
-    [VIDEO_SYNC_MATCH_SCOPES.ALL]: createCandidateResult(),
-    [VIDEO_SYNC_MATCH_SCOPES.LOCATION]: createCandidateResult(),
+    [VIDEO_SYNC_MATCH_SCOPES.ALL]: createCandidateResult(previousResults === null ? 0 : previousResults[VIDEO_SYNC_MATCH_SCOPES.ALL].revision + 1),
+    [VIDEO_SYNC_MATCH_SCOPES.LOCATION]: createCandidateResult(
+      previousResults === null ? 0 : previousResults[VIDEO_SYNC_MATCH_SCOPES.LOCATION].revision + 1,
+    ),
   }
 }
 
@@ -69,9 +71,20 @@ function invalidateAllResults(draft) {
   invalidateResult(draft, VIDEO_SYNC_MATCH_SCOPES.LOCATION)
 }
 
+function createDetectedLocation(activitySecond) {
+  return { id: VIDEO_SYNC_DETECTED_LOCATION_ID, type: VIDEO_SYNC_LANDMARK_TYPES.LOCATION, time: activitySecond }
+}
+
+function detectionWithSavedLocation(detection, activitySecond) {
+  const result = structuredClone(detection)
+  result.location = activitySecond === null ? null : createDetectedLocation(activitySecond)
+  return result
+}
+
 function resetDerivedState(draft) {
-  draft.manualVideoSyncDetection = null
-  draft.manualVideoSyncResults = createCandidateResults()
+  const activitySecond = draft.manualVideoSync.detectedLocationSecond
+  draft.manualVideoSyncDetection = activitySecond === null ? null : detectionWithSavedLocation(createEmptyVideoSyncDetection(), activitySecond)
+  draft.manualVideoSyncResults = createCandidateResults(draft.manualVideoSyncResults)
 }
 
 function requireCalculationResult(result) {
@@ -145,19 +158,19 @@ export function createManualVideoSyncSlice(set, get) {
 
     setVideoSyncDetectedLocation: (activitySecond) => {
       validateActivitySecond(activitySecond)
-      const detectedLocation = { id: VIDEO_SYNC_DETECTED_LOCATION_ID, type: VIDEO_SYNC_LANDMARK_TYPES.LOCATION, time: activitySecond }
-      if (get().manualVideoSyncDetection?.location?.time === activitySecond) return
+      if (get().manualVideoSync.detectedLocationSecond === activitySecond) return
       set((draft) => {
+        draft.manualVideoSync.detectedLocationSecond = activitySecond
         if (draft.manualVideoSyncDetection === null) draft.manualVideoSyncDetection = createEmptyVideoSyncDetection()
-        draft.manualVideoSyncDetection.location = detectedLocation
+        draft.manualVideoSyncDetection.location = createDetectedLocation(activitySecond)
         invalidateAllResults(draft)
       })
     },
 
     clearVideoSyncDetectedLocation: () => {
-      const detection = get().manualVideoSyncDetection
-      if (detection === null || detection.location === null) return
+      if (get().manualVideoSync.detectedLocationSecond === null) return
       set((draft) => {
+        draft.manualVideoSync.detectedLocationSecond = null
         draft.manualVideoSyncDetection.location = null
         invalidateAllResults(draft)
       })
@@ -249,7 +262,6 @@ export function createManualVideoSyncSlice(set, get) {
       }
 
       state.setVideoSyncOffset(candidate.offset, { compensatePlayhead: true })
-      state.setVideoSyncWarning(null)
     },
 
     beginVideoSyncCalculation: (scope) => {
@@ -275,7 +287,7 @@ export function createManualVideoSyncSlice(set, get) {
       if (currentResult.revision !== revision || currentResult.status !== MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING) return false
       set((draft) => {
         const result = draft.manualVideoSyncResults[scope]
-        draft.manualVideoSyncDetection = structuredClone(calculation.detection)
+        draft.manualVideoSyncDetection = detectionWithSavedLocation(calculation.detection, draft.manualVideoSync.detectedLocationSecond)
         result.candidates = structuredClone(calculation.candidates)
         result.status = MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.FRESH
         result.error = null
@@ -286,7 +298,7 @@ export function createManualVideoSyncSlice(set, get) {
 
     completeVideoSyncDetection: (detection) => {
       set((draft) => {
-        draft.manualVideoSyncDetection = structuredClone(detection)
+        draft.manualVideoSyncDetection = detectionWithSavedLocation(detection, draft.manualVideoSync.detectedLocationSecond)
       })
       return true
     },
@@ -324,6 +336,7 @@ export function createManualVideoSyncSlice(set, get) {
 
     clearVideoSyncForActivity: () =>
       set((draft) => {
+        draft.manualVideoSync.detectedLocationSecond = null
         resetDerivedState(draft)
       }),
 

@@ -23,7 +23,7 @@ test('project restoration changes only project-owned settings', () => {
     sync: {
       videoOffsetSeconds: 20,
       videoTimezoneMode: 'utc',
-      manual: { landmarks: [], speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+      manual: { landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
     },
     render: {
       fps: 60,
@@ -46,6 +46,8 @@ test('project restoration changes only project-owned settings', () => {
   expect(state.importedVideoImportId).toBe('canonical-import')
   expect(state.videoSyncOffsetSeconds).toBe(20)
   expect(state.videoSyncTimezoneMode).toBe('utc')
+  expect(state.manualVideoSync.detectedLocationSecond).toBe(30)
+  expect(state.manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 30 })
   expect(state.renderSettings).toMatchObject({ fps: 60, codec: 'libx264' })
   expect(state.selectedSecond).toBe(50)
   expect(state.timelineViewport).toEqual({ viewStart: 25, viewEnd: 75 })
@@ -66,6 +68,7 @@ test('project hydration rejects landmarks without matching staged video bounds',
       videoTimezoneMode: null,
       manual: {
         landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 31 }],
+        detectedLocationSecond: null,
         speedThresholdKmh: 5,
         turnThresholdDegrees: 90,
       },

@@ -43,10 +43,7 @@ export function useVideoPreview(videoRef, isActive = true) {
   // Derived state - determines whether the video should play and which source URL to load.
   const videoEndSecond = videoSyncOffsetSeconds + videoDuration
   const isVideoPlaybackMode =
-    isActive &&
-    previewPlaybackState === 'playing' &&
-    previewPlaybackSource === 'video' &&
-    videoSyncOffsetPreviewSeconds === null
+    isActive && previewPlaybackState === 'playing' && previewPlaybackSource === 'video' && videoSyncOffsetPreviewSeconds === null
   const videoSrc = useMemo(
     () =>
       resolveVideoPreviewSource({
@@ -70,12 +67,9 @@ export function useVideoPreview(videoRef, isActive = true) {
     })
   }, [])
 
-  const handoffVideoPlaybackToTimeline = useCallback(
-    () => {
-      startPreviewPlayback({ source: 'timeline', second: videoEndSecond })
-    },
-    [startPreviewPlayback, videoEndSecond],
-  )
+  const handoffVideoPlaybackToTimeline = useCallback(() => {
+    startPreviewPlayback({ source: 'timeline', second: videoEndSecond })
+  }, [startPreviewPlayback, videoEndSecond])
 
   // Video playback clock - publishes preview time from the video element while playing.
   useVideoPlaybackClock({

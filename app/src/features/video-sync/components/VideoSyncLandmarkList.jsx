@@ -3,23 +3,21 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SectionHeading } from '@/components/ui/section-heading'
-import { formatClockDuration } from '@/lib/time-format'
-import { VIDEO_SYNC_LANDMARK_PRESENTATION, VIDEO_SYNC_LANDMARK_TYPES } from '../data/videoSyncConstants'
+import { VIDEO_SYNC_LANDMARK_TYPES } from '../data/videoSyncConstants'
+import { VIDEO_SYNC_LANDMARK_PRESENTATION } from '../utils/videoSyncPresentation'
 
 /**
  * Renders the sorted manual landmark cards.
  *
  * @param {object} props Landmark state and callbacks.
- * @param {object[]} props.landmarks Canonical video landmarks.
+ * @param {object[]} props.landmarkCards Prepared landmark presentation.
  * @param {() => void} props.onClear Clears all landmarks.
  * @param {(id: string, type: string) => void} props.onChangeType Changes one landmark type.
  * @param {(id: string) => void} props.onDelete Deletes one landmark.
  * @returns {JSX.Element} Rendered landmark list.
  */
-export function VideoSyncLandmarkList({ landmarks, onClear, onChangeType, onDelete }) {
+export function VideoSyncLandmarkList({ hasLocationLandmark, landmarkCards, onClear, onChangeType, onDelete }) {
   const { t } = useTranslation()
-  const sortedLandmarks = [...landmarks].sort((left, right) => left.videoSecond - right.videoSecond || left.id.localeCompare(right.id))
-  const hasLocationLandmark = landmarks.some((landmark) => landmark.type === VIDEO_SYNC_LANDMARK_TYPES.LOCATION)
 
   return (
     <section className="space-y-3" aria-label={t('videoSync.landmarks', 'Landmarks')}>
@@ -33,7 +31,7 @@ export function VideoSyncLandmarkList({ landmarks, onClear, onChangeType, onDele
             variant="ghost"
             size="sm"
             className="h-6 px-2 text-[10px] text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
-            disabled={landmarks.length === 0}
+            disabled={landmarkCards.length === 0}
             onClick={onClear}
           >
             {t('videoSync.clearLandmarks', 'Clear')}
@@ -41,11 +39,9 @@ export function VideoSyncLandmarkList({ landmarks, onClear, onChangeType, onDele
         }
       />
 
-      {sortedLandmarks.length > 0 ? (
+      {landmarkCards.length > 0 ? (
         <div className="space-y-1.5" role="list" aria-label={t('videoSync.videoLandmarks', 'Video landmarks')}>
-          {sortedLandmarks.map((landmark) => {
-            const presentation = VIDEO_SYNC_LANDMARK_PRESENTATION[landmark.type]
-            const videoTimeLabel = formatClockDuration(landmark.videoSecond)
+          {landmarkCards.map(({ landmark, presentation, videoTimeLabel }) => {
             return (
               <div
                 key={landmark.id}

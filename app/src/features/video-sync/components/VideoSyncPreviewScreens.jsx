@@ -4,14 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { VideoPreviewSurface } from '@/features/video-preview'
-import VideoSyncCanvasDiagnostics from './VideoSyncCanvasDiagnostics'
-import useVideoSyncMaps from '../hooks/useVideoSyncMaps'
-import {
-  VIDEO_SYNC_MAP_STYLES,
-  VIDEO_SYNC_NAVIGATION_MAP_MAX_PITCH,
-  VIDEO_SYNC_NAVIGATION_MAP_MIN_PITCH,
-  VIDEO_SYNC_PREVIEW_SCREEN_GAP,
-} from '../data/videoSyncConstants'
+import useVideoSyncPreview from '../hooks/useVideoSyncPreview'
+import { VIDEO_SYNC_MAP_STYLES, VIDEO_SYNC_NAVIGATION_MAP_MAX_PITCH, VIDEO_SYNC_NAVIGATION_MAP_MIN_PITCH } from '../data/videoSyncConstants'
 
 function CourseLocationAction({ actionPoint, onConfirm }) {
   const { t } = useTranslation()
@@ -100,8 +94,8 @@ function VideoSyncNavigationMap({ containerRef, pitch, onPitchChange }) {
  * @param {object|null} props.detection Canonical detected-event model.
  * @param {number} props.displayScale Shared scale applied to the complete pair.
  * @param {number} props.previewSecond Current activity preview second.
- * @param {((activitySecond: number) => void)|null} props.onSetCourseLocation Resolves the video location landmark to a course time.
- * @param {(() => void)|null} props.onDeleteCourseLocation Clears the selected course location.
+ * @param {(activitySecond: number) => void} props.onSetCourseLocation Resolves the video location landmark to a course time.
+ * @param {() => void} props.onDeleteCourseLocation Clears the selected course location.
  * @param {{width: number, height: number}} props.sceneSize Canonical screen dimensions.
  * @param {(element: HTMLElement|null) => void} props.setSceneElement Registers the scaled content for zoom anchoring.
  * @returns {JSX.Element} Video-sync preview pair.
@@ -110,45 +104,48 @@ export default function VideoSyncPreviewScreens({
   activity,
   detection,
   displayScale,
-  onSetCourseLocation = null,
-  onDeleteCourseLocation = null,
+  onSetCourseLocation,
+  onDeleteCourseLocation,
   previewSecond,
   sceneSize,
   setSceneElement,
 }) {
-  const { selectionMapRef, navigationMapRef, actionPoint, onConfirmActionPoint, pitch, onPitchChange, style, onStyleChange } = useVideoSyncMaps({
-    activity,
-    detection,
-    onSetCourseLocation,
-    onDeleteCourseLocation,
-    previewSecond,
-  })
-  const screenWidth = sceneSize.width * displayScale
-  const screenHeight = sceneSize.height * displayScale
-  const screenGap = VIDEO_SYNC_PREVIEW_SCREEN_GAP * displayScale
-  const screenStyle = { width: screenWidth, height: screenHeight }
+  const { selectionMapRef, navigationMapRef, actionPoint, onConfirmActionPoint, pitch, onPitchChange, screenLayout, speed, style, onStyleChange } =
+    useVideoSyncPreview({
+      activity,
+      detection,
+      displayScale,
+      onSetCourseLocation,
+      onDeleteCourseLocation,
+      previewSecond,
+      sceneSize,
+    })
 
   return (
-    <div
-      ref={setSceneElement}
-      data-testid="video-sync-preview-screens"
-      className="grid shrink-0"
-      style={{ gridTemplateColumns: `repeat(2, ${screenWidth}px)`, width: screenWidth * 2 + screenGap, height: screenHeight, gap: screenGap }}
-    >
+    <div ref={setSceneElement} data-testid="video-sync-preview-screens" className="grid shrink-0" style={screenLayout.pairStyle}>
       <div
         data-testid="video-sync-video-screen"
         className="relative z-0 isolate shrink-0 overflow-hidden rounded-sm border border-border/50 bg-black shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)]"
-        style={screenStyle}
+        style={screenLayout.screenStyle}
       >
         <VideoPreviewSurface displayScale={1} isActive>
-          <VideoSyncCanvasDiagnostics activity={activity} displayScale={displayScale} previewSecond={previewSecond} />
+          <div data-testid="video-sync-canvas-diagnostics" className="pointer-events-none absolute inset-0 z-40">
+            <div data-testid="video-sync-speed-diagnostic" className="absolute top-[6%] left-[4%] whitespace-nowrap">
+              {speed ? (
+                <div className="flex items-baseline text-white" style={{ fontFamily: 'JetBrains Mono', gap: 8 * displayScale }}>
+                  <span style={{ fontSize: 126 * displayScale, lineHeight: 1 }}>{speed.value}</span>
+                  <span style={{ fontSize: 37 * displayScale, lineHeight: 1 }}>{speed.units}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </VideoPreviewSurface>
         <VideoSyncNavigationMap containerRef={navigationMapRef} pitch={pitch} onPitchChange={onPitchChange} />
       </div>
       <div
         data-testid="video-sync-map-screen"
         className="relative shrink-0 overflow-hidden rounded-sm border border-border/50 bg-surface-elevated shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)]"
-        style={screenStyle}
+        style={screenLayout.screenStyle}
       >
         <VideoSyncMapPreview
           containerRef={selectionMapRef}

@@ -6,7 +6,7 @@ import {
   VIDEO_SYNC_MAX_CANDIDATES,
 } from '../data/videoSyncConstants'
 import { calculateMatchScore, calculateTimingQuality, compareCandidateStrength, VIDEO_SYNC_MIN_MEANINGFUL_QUALITY } from './matchScore'
-import { createVideoSyncOffsetSupports, MATCHABLE_LANDMARK_TYPES, serializeOffsetSupport } from './landmarkTiming'
+import { calculateOffsetResidual, createVideoSyncOffsetSupports, MATCHABLE_LANDMARK_TYPES } from './landmarkTiming'
 
 const MAX_PROPOSAL_NORMALIZED_MISS = Math.sqrt(1 / VIDEO_SYNC_MIN_MEANINGFUL_QUALITY - 1)
 
@@ -82,21 +82,7 @@ function buildAssignmentGroups(landmarks, supports) {
 
     return {
       landmarks: landmarks.filter((landmark) => landmark.type === type),
-      events: [...events.values()].sort((left, right) => {
-        const leftSecond =
-          left.type === VIDEO_SYNC_LANDMARK_TYPES.STOP
-            ? left.lowSpeedInterval.start
-            : left.type === VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN || left.type === VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN
-              ? left.start
-              : left.time
-        const rightSecond =
-          right.type === VIDEO_SYNC_LANDMARK_TYPES.STOP
-            ? right.lowSpeedInterval.start
-            : right.type === VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN || right.type === VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN
-              ? right.start
-              : right.time
-        return leftSecond - rightSecond || left.id.localeCompare(right.id)
-      }),
+      events: [...events.values()],
       supportLookup,
     }
   })
@@ -123,7 +109,7 @@ function assignGroupAtOffset({ landmarks, events, supportLookup }, offset) {
       const support = supportLookup.get(landmark.id)?.get(event.id)
       if (support !== undefined) {
         const previous = table[landmarkIndex - 1][eventIndex - 1]
-        const residual = support.residualAt(offset)
+        const residual = calculateOffsetResidual(support, offset)
         const quality = calculateTimingQuality(residual, support.timingScaleSeconds)
         assignment = keepStrongerAssignment(assignment, {
           totalQuality: previous.totalQuality + quality,
@@ -232,15 +218,6 @@ function matchAllLandmarks(landmarks, detection) {
 
   return {
     candidates,
-    diagnostics: {
-      eligibleLandmarkIds: eligibleLandmarks.map((landmark) => landmark.id),
-      offsetSupports: supports.map(serializeOffsetSupport),
-      hypotheses: merged.map((record) => ({
-        offset: record.candidate.offset,
-        ...record.score,
-        evidence: record.candidate.evidence,
-      })),
-    },
   }
 }
 
@@ -269,20 +246,6 @@ function matchLocation(landmarks, detection) {
 
   return {
     candidates: [candidate],
-    diagnostics: {
-      eligibleLandmarkIds: [locationLandmark.id],
-      offsetSupports: [
-        {
-          landmarkId: locationLandmark.id,
-          eventId: detection.location.id,
-          type: VIDEO_SYNC_LANDMARK_TYPES.LOCATION,
-          startOffset: offset,
-          endOffset: offset,
-          timingScaleSeconds: VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS,
-        },
-      ],
-      hypotheses: [{ offset, evidence: candidate.evidence }],
-    },
   }
 }
 
@@ -295,7 +258,7 @@ function matchLocation(landmarks, detection) {
  * @param {object[]} input.landmarks Canonical video landmarks.
  * @param {{availability: {speed: boolean, heading: boolean}, stops: object[], turns: object[], location: object|null}} input.detection Canonical detected activity events.
  * @param {'all'|'location'} input.scope Matching scope.
- * @returns {{candidates: object[], diagnostics: {eligibleLandmarkIds: string[], offsetSupports: object[], hypotheses: object[]}}} Presentation candidates and development diagnostics.
+ * @returns {{candidates: object[]}} Matching candidates.
  */
 export function matchVideoSyncCandidates({ landmarks, detection, scope }) {
   if (scope === VIDEO_SYNC_MATCH_SCOPES.ALL) return matchAllLandmarks(landmarks, detection)

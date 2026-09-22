@@ -58,6 +58,7 @@ describe('manual video sync store contract', () => {
     state.setVideoSyncDetectedLocation(45)
 
     expect(useStore.getState().manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 45 })
+    expect(useStore.getState().manualVideoSync.detectedLocationSecond).toBe(45)
     expect(useStore.getState().manualVideoSync.landmarks).toEqual([])
   })
 
@@ -67,7 +68,22 @@ describe('manual video sync store contract', () => {
 
     state.clearVideoSyncDetectedLocation()
 
+    expect(useStore.getState().manualVideoSync.detectedLocationSecond).toBeNull()
     expect(useStore.getState().manualVideoSyncDetection.location).toBeNull()
+  })
+
+  test('restores a saved map location and keeps it when only the video is cleared', () => {
+    const state = useStore.getState()
+    state.hydrateVideoSyncState({ landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 80 })
+
+    expect(useStore.getState().manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 30 })
+    state.clearVideoSyncForVideo()
+    expect(useStore.getState().manualVideoSync.detectedLocationSecond).toBe(30)
+    expect(useStore.getState().manualVideoSyncDetection.location.time).toBe(30)
+
+    state.clearVideoSyncForActivity()
+    expect(useStore.getState().manualVideoSync.detectedLocationSecond).toBeNull()
+    expect(useStore.getState().manualVideoSyncDetection).toBeNull()
   })
 
   test('changes landmark types while preserving canonical shapes and location limits', () => {
@@ -113,6 +129,17 @@ describe('manual video sync store contract', () => {
     expect(useStore.getState().manualVideoSyncResults.all).toMatchObject({ candidates: [], status: 'idle' })
   })
 
+  test('does not accept an old result after derived state resets and a new calculation starts', () => {
+    const state = useStore.getState()
+    const oldRevision = state.beginVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
+    state.clearVideoSyncForActivity()
+    const newRevision = state.beginVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
+
+    expect(newRevision).toBeGreaterThan(oldRevision)
+    expect(state.completeVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL, oldRevision, { detection: {}, candidates: [] })).toBe(false)
+    expect(state.completeVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL, newRevision, { detection: {}, candidates: [] })).toBe(true)
+  })
+
   test('requires an explicit canonical calculation scope', () => {
     const state = useStore.getState()
 
@@ -124,6 +151,7 @@ describe('manual video sync store contract', () => {
     const state = useStore.getState()
     state.hydrateVideoSyncState({
       landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
+      detectedLocationSecond: null,
       speedThresholdKmh: 7,
       turnThresholdDegrees: 120,
     })
@@ -135,6 +163,7 @@ describe('manual video sync store contract', () => {
     const afterActivityReset = useStore.getState()
     expect(afterActivityReset.manualVideoSync).toEqual({
       landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
+      detectedLocationSecond: null,
       speedThresholdKmh: 7,
       turnThresholdDegrees: 120,
     })

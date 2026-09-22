@@ -1,5 +1,3 @@
-import { CornerUpLeft, CornerUpRight, MapPin, OctagonMinus } from 'lucide-react'
-
 export const VIDEO_SYNC_LANDMARK_TYPES = {
   STOP: 'stop',
   LEFT_TURN: 'leftTurn',
@@ -31,8 +29,6 @@ export const VIDEO_SYNC_TURN_BOUNDARY_RATE_DEGREES_PER_SECOND = 2
 export const VIDEO_SYNC_TURN_EXIT_DWELL_SECONDS = 1
 // Heading becomes unreliable near standstill; this is independent of stop landmarks.
 export const VIDEO_SYNC_TURN_STATIONARY_SPEED_METERS_PER_SECOND = 0.5
-// Retained for the archived detector only.
-export const VIDEO_SYNC_HEADING_SMOOTHING_WINDOW_SECONDS = 1
 export const VIDEO_SYNC_USER_TIMING_TOLERANCE_SECONDS = 2
 export const VIDEO_SYNC_LOCATION_TIMING_TOLERANCE_SECONDS = 10
 export const VIDEO_SYNC_SIGNIFICANT_GAP_BASE_SECONDS = 3
@@ -59,37 +55,6 @@ export const VIDEO_SYNC_NAVIGATION_MAP_MIN_PITCH = 0
 export const VIDEO_SYNC_NAVIGATION_MAP_MAX_PITCH = 60
 export const VIDEO_SYNC_NAVIGATION_MAP_LOOKAHEAD_METERS = 15
 export const VIDEO_SYNC_NAVIGATION_MAP_TOP_PADDING_RATIO = 0.45
-
-export const VIDEO_SYNC_LANDMARK_PRESENTATION = {
-  [VIDEO_SYNC_LANDMARK_TYPES.STOP]: {
-    Icon: OctagonMinus,
-    className: 'text-video-sync-stop',
-    defaultLabel: 'Stop',
-    labelKey: 'videoSync.stop',
-    stripe: 'bg-video-sync-stop',
-  },
-  [VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN]: {
-    Icon: CornerUpLeft,
-    className: 'text-video-sync-turn',
-    defaultLabel: 'Left Turn',
-    labelKey: 'videoSync.leftTurn',
-    stripe: 'bg-video-sync-turn',
-  },
-  [VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN]: {
-    Icon: CornerUpRight,
-    className: 'text-video-sync-turn',
-    defaultLabel: 'Right Turn',
-    labelKey: 'videoSync.rightTurn',
-    stripe: 'bg-video-sync-turn',
-  },
-  [VIDEO_SYNC_LANDMARK_TYPES.LOCATION]: {
-    Icon: MapPin,
-    className: 'text-video-sync-location',
-    defaultLabel: 'Location',
-    labelKey: 'videoSync.location',
-    stripe: 'bg-video-sync-location',
-  },
-}
 
 export const MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES = {
   IDLE: 'idle',

@@ -1,4 +1,3 @@
-import i18next from 'i18next'
 import {
   VIDEO_SYNC_TURN_BOUNDARY_RATE_DEGREES_PER_SECOND,
   VIDEO_SYNC_TURN_ENTRY_RATE_DEGREES_PER_SECOND,
@@ -6,21 +5,7 @@ import {
   VIDEO_SYNC_TURN_MAXIMUM_DURATION_SECONDS,
   VIDEO_SYNC_TURN_REVERSAL_TOLERANCE_DEGREES,
   VIDEO_SYNC_TURN_STATIONARY_SPEED_METERS_PER_SECOND,
-  VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES,
 } from '../data/videoSyncConstants'
-
-/** Validates the user-owned angle threshold once at the detector boundary. */
-function requireTurnThreshold(turnThresholdDegrees) {
-  const { min, max } = VIDEO_SYNC_TURN_THRESHOLD_RANGE_DEGREES
-  if (!Number.isFinite(turnThresholdDegrees) || turnThresholdDegrees < min || turnThresholdDegrees > max) {
-    throw new Error(
-      i18next.t('videoSync.invalidTurnThreshold', 'Manual video sync turn threshold must be between {{min}} and {{max}} degrees', {
-        max,
-        min,
-      }),
-    )
-  }
-}
 
 /** Returns the shortest signed heading change in (-180, 180] degrees. */
 function signedHeadingDelta(current, previous) {
@@ -223,28 +208,14 @@ function detectTurnsFromSeries(input, turningSeries, turnThresholdDegrees, nearS
 }
 
 /**
- * Detects turns from finalized heading using rate hysteresis and net turn angle.
- * Optional suppression intervals override the default standstill speed gate.
- *
- * @param {object} input Canonical input from createActivitySyncInput.
- * @param {{turnThresholdDegrees: number, nearStopIntervals?: {start: number, end: number}[]}} settings Detection settings.
- * @returns {object[]} Directional events with physical interval boundaries.
- */
-export function detectTurns(input, settings) {
-  return detectTurnsFromDerivedSeries(input, deriveTurningSeries(input), settings)
-}
-
-/**
  * Detects turns using the same interval-average rates displayed by the graph.
- * Optional suppression intervals must be sorted and non-overlapping; absent
- * intervals are derived from the canonical speed channel at the standstill gate.
+ * Standstill intervals are derived from the canonical speed channel.
  *
  * @param {object} input Canonical input from createActivitySyncInput.
  * @param {{time: number, value: number|null}[]} turningSeries Shared turning series.
- * @param {{turnThresholdDegrees: number, nearStopIntervals?: {start: number, end: number}[]}} settings Detection settings.
+ * @param {{turnThresholdDegrees: number}} settings Detection settings.
  * @returns {object[]} Directional events with net signed angle and midpoint time.
  */
-export function detectTurnsFromDerivedSeries(input, turningSeries, { turnThresholdDegrees, nearStopIntervals = deriveNearStopIntervals(input) }) {
-  requireTurnThreshold(turnThresholdDegrees)
-  return detectTurnsFromSeries(input, turningSeries, turnThresholdDegrees, nearStopIntervals)
+export function detectTurnsFromDerivedSeries(input, turningSeries, { turnThresholdDegrees }) {
+  return detectTurnsFromSeries(input, turningSeries, turnThresholdDegrees, deriveNearStopIntervals(input))
 }
