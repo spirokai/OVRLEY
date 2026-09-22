@@ -4,5 +4,11 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[workspace]
+
+[profile.wasm-preview]
+inherits = "release"
+panic = "abort"
+
 [dependencies]
-skia-safe = { version = "=0.97.2", features = ["binary-cache"] }
+skia-safe = { git = "https://github.com/rust-skia/rust-skia", rev = "1a80f6716b5ba787f6583443f7b62fa5f60e7084", version = "=0.153.4", features = ["binary-cache"] }

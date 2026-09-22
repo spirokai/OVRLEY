@@ -1,4 +1,4 @@
-use skia_safe::{font::Edging, surfaces, Color, ColorType, Font, FontHinting, FontMgr, ImageInfo, Paint, Rect, Typeface};
+use skia_safe::{font::Edging, surfaces, Color, ColorType, Data, Font, FontHinting, FontMgr, ImageInfo, Paint, Rect, Typeface};
 use std::cell::RefCell;
 use std::sync::OnceLock;
 
@@ -19,7 +19,7 @@ const BACKGROUND_COLOR: Color = Color::from_argb(255, 12, 14, 18);
 const PANEL_COLOR: Color = Color::from_argb(255, 24, 28, 36);
 const ACCENT_COLOR: Color = Color::from_argb(255, 64, 196, 255);
 const MARKER_COLOR: Color = Color::from_argb(255, 238, 242, 246);
-const VALUE_TEXT_COLOR: Color = Color::from_argb(255, 238, 242, 246);
+const VALUE_TEXT_COLOR: Color = Color::from_argb(255, 0, 242, 0);
 const UNIT_TEXT_COLOR: Color = Color::from_argb(255, 150, 160, 170);
 
 const ACCENT_RECT: (f32, f32, f32, f32) = (48.0, 48.0, 96.0, 384.0);
@@ -61,7 +61,7 @@ pub unsafe fn load_font_from_bytes(ptr: *const u8, len: usize) -> i32 {
 
     let bytes = std::slice::from_raw_parts(ptr, len);
     let font_mgr = font_mgr();
-    match font_mgr.new_from_data(bytes, None) {
+    match font_mgr.new_from_data(Data::new_copy(bytes), None) {
         Some(typeface) => {
             let _ = FONT.set(typeface);
             RENDER_OK

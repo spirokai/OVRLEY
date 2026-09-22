@@ -1,0 +1,160 @@
+name: Build Wasm preview
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Branch, tag, or commit to build
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit to build
+        required: false
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+env:
+  EMSDK_VERSION: '6.0.9'
+  RUST_VERSION: '1.98.1'
+  RUST_SKIA_REV: '1a80f6716b5ba787f6583443f7b62fa5f60e7084'
+
+jobs:
+  wasm-preview:
+    name: Build Wasm preview on Linux
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: wasm32-unknown-emscripten
+
+      - name: Restore Cargo and build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: wasm-cargo-${{ runner.os }}-rust-${{ env.RUST_VERSION }}-emsdk-${{ env.EMSDK_VERSION }}-skia-${{ env.RUST_SKIA_REV }}-${{ hashFiles('src-tauri/wasm_preview_poc/Cargo.lock') }}
+          restore-keys: |
+            wasm-cargo-${{ runner.os }}-rust-${{ env.RUST_VERSION }}-emsdk-${{ env.EMSDK_VERSION }}-skia-${{ env.RUST_SKIA_REV }}-
+
+      - name: Install host build tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            clang \
+            libclang-dev \
+            llvm-dev \
+            ninja-build \
+            python3
+
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
+
+      - name: Restore Emscripten cache
+        uses: actions/cache@v4
+        with:
+          path: .ci/emsdk
+          key: wasm-emsdk-${{ runner.os }}-${{ env.EMSDK_VERSION }}
+
+      - name: Install and activate Emscripten
+        shell: bash
+        env:
+          EMSDK_DIR: ${{ github.workspace }}/.ci/emsdk
+        run: |
+          if [[ ! -f "$EMSDK_DIR/emsdk" ]]; then
+            mkdir -p "$(dirname "$EMSDK_DIR")"
+            git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$EMSDK_DIR"
+          fi
+
+          "$EMSDK_DIR/emsdk" install "$EMSDK_VERSION"
+          "$EMSDK_DIR/emsdk" activate "$EMSDK_VERSION"
+
+          # emsdk_env.sh exports additional variables used by emcc. Persist the
+          # relevant ones because each GitHub Actions step gets a fresh shell.
+          source "$EMSDK_DIR/emsdk_env.sh"
+          for variable in EMSDK EMSCRIPTEN EM_CONFIG EMSDK_NODE LLVM_ROOT BINARYEN_ROOT; do
+            if [[ -n "${!variable:-}" ]]; then
+              echo "$variable=${!variable}" >> "$GITHUB_ENV"
+            fi
+          done
+
+          {
+            echo "$EMSDK_DIR/upstream/emscripten"
+            echo "$EMSDK_DIR/upstream/bin"
+          } >> "$GITHUB_PATH"
+
+      - name: Restore rust-skia source cache
+        uses: actions/cache@v4
+        with:
+          path: .ci/rust-skia
+          key: wasm-rust-skia-${{ env.RUST_SKIA_REV }}
+
+      - name: Prepare rust-skia and Skia dependencies
+        shell: bash
+        env:
+          SKIA_CHECKOUT: ${{ github.workspace }}/.ci/rust-skia
+        run: |
+          if [[ ! -d "$SKIA_CHECKOUT/.git" ]]; then
+            mkdir -p "$(dirname "$SKIA_CHECKOUT")"
+            git clone --filter=blob:none --no-checkout \
+              https://github.com/rust-skia/rust-skia.git \
+              "$SKIA_CHECKOUT"
+          fi
+
+          git -C "$SKIA_CHECKOUT" fetch --depth=1 origin "$RUST_SKIA_REV"
+          git -C "$SKIA_CHECKOUT" checkout --detach "$RUST_SKIA_REV"
+          git -C "$SKIA_CHECKOUT" submodule update --init --recursive
+
+          SKIA_SOURCE="$SKIA_CHECKOUT/skia-bindings/skia"
+          if [[ ! -x "$SKIA_SOURCE/bin/gn" ]]; then
+            python3 "$SKIA_SOURCE/bin/fetch-gn"
+          fi
+
+          if [[ ! -f "$SKIA_SOURCE/third_party/externals/libpng/png.c" ]]; then
+            GIT_SYNC_DEPS_SKIP_EMSDK=1 \
+            GIT_SYNC_DEPS_PATH="$SKIA_SOURCE/DEPS" \
+              python3 "$SKIA_SOURCE/tools/git-sync-deps"
+          fi
+
+      - name: Build Wasm preview
+        shell: bash
+        env:
+          SKIA_SOURCE_DIR: ${{ github.workspace }}/.ci/rust-skia/skia-bindings/skia
+          SKIA_NINJA_COMMAND: ninja
+        run: pnpm wasm:preview:build
+
+      - name: Upload Wasm preview artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-preview
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            src-tauri/target/wasm32-unknown-emscripten/wasm-preview/wasm_preview_poc.js
+            src-tauri/target/wasm32-unknown-emscripten/wasm-preview/wasm_preview_poc.wasm

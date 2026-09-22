@@ -4,6 +4,8 @@
 
 import path from 'path'
 import fs from 'fs/promises'
+import { spawn } from 'node:child_process'
+import process from 'node:process'
 import { fileURLToPath } from 'url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -85,7 +87,10 @@ function parseDebugWritePlugin() {
  * @returns {object} Result produced by the helper.
  */
 function wasmPreviewArtifactPlugin() {
-  const artifactDir = path.resolve(__dirname, '..', 'src-tauri', 'target', 'wasm32-unknown-emscripten', 'wasm-preview')
+  const repoRoot = path.resolve(__dirname, '..')
+  const artifactDir = path.join(repoRoot, 'src-tauri', 'target', 'wasm32-unknown-emscripten', 'wasm-preview')
+  const pocDir = path.join(repoRoot, 'src-tauri', 'wasm_preview_poc')
+  const cargoConfig = path.join(pocDir, '.cargo', 'config.toml')
   const contentTypes = {
     '.js': 'text/javascript',
     '.wasm': 'application/wasm',
@@ -95,6 +100,58 @@ function wasmPreviewArtifactPlugin() {
     name: 'wasm-preview-artifact-plugin',
     apply: 'serve',
     configureServer(server) {
+      let timer
+      let running = false
+      let pending = false
+      let closed = false
+      let buildFailed = false
+
+      function runBuild() {
+        if (running || closed || !pending) return
+        pending = false
+        running = true
+        console.log('[wasm] source changed; rebuilding preview artifact')
+        const child = spawn(process.execPath, [path.join(repoRoot, 'scripts', 'build-wasm.mjs')], {
+          cwd: repoRoot,
+          stdio: 'inherit',
+        })
+        let errorMessage
+        child.once('error', (error) => {
+          errorMessage = error.message
+        })
+        child.once('close', (code) => {
+          running = false
+          if (closed) return
+          buildFailed = code !== 0 || Boolean(errorMessage)
+          if (buildFailed) {
+            const message = `Wasm preview rebuild failed${errorMessage ? `: ${errorMessage}` : ` (exit ${code})`}. See terminal output.`
+            console.error(`[wasm] ${message}`)
+            server.ws.send({ type: 'error', err: { message, stack: '', plugin: 'wasm-preview-artifact-plugin' } })
+          } else {
+            server.ws.send({ type: 'full-reload' })
+          }
+          runBuild()
+        })
+      }
+
+      function onSourceChange(file) {
+        const relative = path.relative(pocDir, path.resolve(file))
+        const isPocInput = relative && !relative.startsWith('..') && !path.isAbsolute(relative) && /\.(rs|toml|lock)$/.test(file)
+        if (!isPocInput && path.resolve(file) !== cargoConfig) return
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+          pending = true
+          runBuild()
+        }, 250)
+      }
+
+      server.watcher.add([pocDir, cargoConfig])
+      for (const event of ['add', 'change', 'unlink']) server.watcher.on(event, onSourceChange)
+      server.httpServer?.once('close', () => {
+        closed = true
+        clearTimeout(timer)
+      })
+
       server.middlewares.use('/debug/wasm-preview-artifacts', async (req, res) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') {
           res.statusCode = 405
@@ -112,6 +169,13 @@ function wasmPreviewArtifactPlugin() {
           res.statusCode = 404
           res.setHeader('Content-Type', 'application/json')
           res.end(JSON.stringify({ error: 'Unknown Wasm preview artifact' }))
+          return
+        }
+
+        if (buildFailed) {
+          res.statusCode = 503
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ error: 'Wasm preview rebuild failed. See the dev server terminal.' }))
           return
         }
 

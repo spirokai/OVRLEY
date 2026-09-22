@@ -16,6 +16,10 @@ const BACKEND_LABELS = {
 let modulePromise = null
 let fontLoaded = false
 
+function isWasmPreviewModuleReady(module) {
+  return module?.__ovrleyWasmPreviewReady === true
+}
+
 // Persistent per-frame buffers — allocated once, reused every frame.
 let persistentRgbaPtr = 0
 let persistentRgbaLen = 0
@@ -153,9 +157,20 @@ export function loadWasmPreviewModule() {
       return
     }
 
-    if (window.__ovrleyWasmPreviewModule?.calledRun) {
+    if (isWasmPreviewModuleReady(window.__ovrleyWasmPreviewModule)) {
       resolve(window.__ovrleyWasmPreviewModule)
       return
+    }
+
+    const markModuleReady = () => {
+      const module = window.Module
+      if (!module) {
+        reject(new Error('Emscripten initialized without a Module object.'))
+        return
+      }
+      module.__ovrleyWasmPreviewReady = true
+      window.__ovrleyWasmPreviewModule = module
+      resolve(module)
     }
 
     const moduleConfig = {
@@ -171,10 +186,7 @@ export function loadWasmPreviewModule() {
       onAbort(reason) {
         reject(new Error(`Wasm runtime aborted: ${reason}`))
       },
-      onRuntimeInitialized() {
-        window.__ovrleyWasmPreviewModule = window.Module
-        resolve(window.Module)
-      },
+      onRuntimeInitialized: markModuleReady,
     }
 
     window.Module = moduleConfig
@@ -184,9 +196,8 @@ export function loadWasmPreviewModule() {
     script.async = true
     script.dataset.ovrleyWasmPreview = 'true'
     script.onload = () => {
-      if (window.Module?.calledRun) {
-        window.__ovrleyWasmPreviewModule = window.Module
-        resolve(window.Module)
+      if (isWasmPreviewModuleReady(window.Module)) {
+        markModuleReady()
       }
     }
     script.onerror = () => {
@@ -250,7 +261,7 @@ export function renderDynamicTextWidgetSync(canvas, value, unit = '') {
 
   // Use the already-resolved module (synchronous fast path)
   const module = /** @type {any} */ (window.__ovrleyWasmPreviewModule)
-  if (!module?.calledRun) {
+  if (!isWasmPreviewModuleReady(module)) {
     throw new Error('Wasm module not initialized.')
   }
 

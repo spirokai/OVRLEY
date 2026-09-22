@@ -54,3 +54,4 @@ tmp/
 *.mov
 *.prof
 *.local
+.env.wasm.local

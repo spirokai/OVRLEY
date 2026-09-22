@@ -185,11 +185,26 @@ Expected responsibilities:
 
 - initialize and hold renderer-side state
 - accept font/resource bytes from JS
-- accept validated config and activity payloads or prepared equivalents
-- expose explicit prepare / invalidate / render frame entrypoints
+- bind to the activity data already owned by the Rust/Wasm render state; do not resend the full activity on every frame
+- accept widget configuration independently from the session-level activity state
+- expose explicit initialization, widget-configuration, invalidation, and render-frame entrypoints
 - expose buffer size and frame metadata needed by the frontend host
 
 This is where the current toy ABI grows into the real preview ABI.
+
+The state boundary must distinguish session-level data from widget-level data. Activity data and fonts should be initialized once and retained inside the Wasm renderer. A widget configuration should be sent only when that widget's settings, position, size, scale, theme, or other layout inputs change. The playhead/frame index is the normal per-frame input.
+
+A scene-level API such as `prepare(config, activity_data, fonts, canvas_size)` is too coarse for the eventual multi-widget renderer if `config` represents the entire scene. Changing one widget would then force all widget preparation to run again. Prefer a contract equivalent to:
+
+```text
+initialize_activity(activity_state, fonts)
+set_viewport(canvas_size)
+set_widget_config(widget_id, config)
+invalidate_widget(widget_id)
+render(frame_index, playhead_time)
+```
+
+The exact ABI may differ, but the ownership and invalidation rules should remain explicit. A shared canvas may still composite the scene again, but unchanged widgets should retain their prepared layout/static layers. A widget move or resize invalidates that widget and the affected old/new bounds; it does not invalidate every widget's configuration.
 
 ### 4. Migrate One Frontend Preview Surface to the Wasm Renderer
 
@@ -204,7 +219,9 @@ Goal:
 
 - keep the existing preview clock and frame scheduling in JS
 - replace only the drawing backend for one preview surface
-- route config, activity, and invalidation events into the Wasm adapter
+- route widget configuration, viewport changes, and invalidation events into the Wasm adapter
+- initialize fonts and bind the already Rust-owned activity state once per renderer/session
+- pass only the changing frame/playhead state through the hot render path
 
 This should not try to replace the full editor and all widget previews at once. The target consumer is the Tauri preview surface, not a generic browser runtime.
 
@@ -222,6 +239,8 @@ Goal:
 
 - keep frontend orchestration and selection/interaction logic where needed
 - remove frontend-side drawing responsibilities where the Wasm renderer now owns them
+- update Wasm configuration per widget instead of rebuilding a scene-wide preparation object when one widget changes
+- retain per-widget prepared/static state and invalidate only the changed widget and any affected canvas bounds
 - simplify route, elevation, metric, heading, and text preview paths so they become render-host plumbing rather than parallel rendering implementations
 
 This is the step where the current React/SVG preview stops being the renderer and becomes mainly a host/controller.
@@ -412,44 +431,84 @@ The landmine is misjudging what can be deleted versus what must be retained as t
 
 Primary code areas:
 
-- `src-tauri/.cargo/config.toml`
-- `src-tauri/wasm_preview_poc/tools/emcc-linker.bat`
+- `src-tauri/wasm_preview_poc/.cargo/config.toml`
+- `scripts/build-wasm.mjs`
+- `src-tauri/wasm_preview_poc/Cargo.toml`
+- `src-tauri/ovrley_core/Cargo.toml`
+- `.github/workflows/wasm-preview.yml`
 - `src-tauri/wasm_preview_poc/README.md`
 
 Why it is dangerous:
 
-- the current build relies on a specific Rust toolchain, Emscripten target, linker wrapper, and ABI workaround
-- this is not just a POC convenience; it is currently the only verified way the Skia Wasm build works in this repo
-- if the real renderer is moved into Wasm before this dependency is treated as a first-class build contract, upgrades and CI will become fragile
-- rust-skia PR #1275 shows a possible future `wasm32-unknown-unknown` path with WASI/WebGL shims, but it is open upstream and is not a drop-in replacement for the current `skia-safe = 0.75` Emscripten binary-cache path
+- the build still relies on a pinned Rust/Emscripten/rust-skia combination and a
+  prepared Skia source tree
+- the build contract is now a direct Emscripten link, not the old
+  `emcc-linker.py`/`SUPPORT_LONGJMP` workaround
+- the contract must be transferred selectively because the target branch may
+  already have modified Cargo manifests, lockfiles, Cargo configuration,
+  frontend Vite configuration, or release workflows
+- the POC currently uses `wasm32-unknown-emscripten`; switching to
+  `wasm32-unknown-unknown` would require a different Skia port/runtime and is
+  not a drop-in build change
 
-Follow-up spike findings:
+Current verified status:
 
-- The rust-skia `0.93.1...0.97.0` range contains real Emscripten build-support changes:
-  - Emscripten SDK discovery is routed through `skia_emsdk_dir`.
-  - newer Emscripten sysroot include paths are handled.
-  - Skia m148 wasm archive naming is handled by copying `*.wasm.a` archives to `*.a`.
-- A narrow POC upgrade cannot happen while `wasm_preview_poc` remains in the same Cargo workspace as `ovrley_core` on `skia-safe = 0.75`, because both versions pull a `skia-bindings` crate with `links = "skia"`.
-- Temporarily isolating the POC crate allowed `skia-safe = 0.97.0` to pass native `cargo check`.
-- The Emscripten binary-cache path for `skia-safe = 0.97.0` and `0.97.2` failed before final linking because the downloaded archive contained `libskia.a`, while the build script expected `libskia.wasm.a`.
-- Disabling default `skia-safe` features avoided that specific binary-cache archive, but then rust-skia fell back to a full Skia source build. On this Windows machine, that path failed while unpacking Skia m148 because creating symlinks requires privileges not available in the normal shell.
-- As an experiment only, manually duplicating the downloaded target artifact from `libskia.a` to `libskia.wasm.a` let `skia-safe = 0.97.2` proceed to final linking.
-- With Rust `1.85.0`, `skia-safe = 0.97.2`, Emscripten 6.0.0, the existing `-sSUPPORT_LONGJMP=emscripten` / initial-memory link args, and the temporary archive-name alias, the POC built successfully.
-- In that successful `0.97.2` / Rust `1.85.0` setup, Cargo also built successfully when the linker was overridden directly to `H:\tools\emsdk\upstream\emscripten\emcc.bat`, bypassing `emcc-linker.py`.
-- The same direct-upgrade experiment with latest stable Rust `1.94.1` reached final linking but failed with `__cpp_exception` symbols from Rust's precompiled Emscripten std, so the Rust toolchain version still matters.
+- Both workspace crates use rust-skia PR #1336 at
+  `1a80f6716b5ba787f6583443f7b62fa5f60e7084`:
+  - `skia-safe` `0.153.4`
+  - `skia-bindings` `0.153.3`
+- Rust `1.98.1` with the `wasm32-unknown-emscripten` target builds the POC.
+- Emscripten `6.0.9` builds and links it successfully with direct `em++` and
+  `emar`.
+- The build uses `FORCE_SKIA_BUILD=1` and
+  `EMCC_CFLAGS=-fwasm-exceptions`.
+- The strict build does not use `-sSUPPORT_LONGJMP=emscripten`, exception-flag
+  stripping, or `ERROR_ON_UNDEFINED_SYMBOLS=0`.
+- Skia is source-built with GN and Ninja. The successful local build used a
+  complete rust-skia checkout with the Skia submodule, GN, and synced DEPS.
+- No rust-skia source patch or local Cargo path override is required. On
+  Windows, `scripts/build-wasm.mjs` handles PR #1336's literal `emcc` probe and
+  passes the real `.exe` tool paths to GN.
+- Emscripten 6 does not expose `HEAPU8` or `calledRun` in the same way as the
+  older runtime used by the original frontend loader. The target config now
+  exports `HEAPU8`, and the frontend uses `onRuntimeInitialized` instead of
+  `calledRun`.
+- The generated Wasm contains no `emscripten_longjmp` references in the
+  verified build.
 
-Interpretation:
+Build and CI status:
 
-- The current `emcc-linker.py` wrapper is probably not a permanent requirement if the project moves to a newer rust-skia line and pins a compatible Rust/Emscripten toolchain.
-- The wrapper cannot be removed from the current `skia-safe = 0.75` path without replacing the verified build contract.
-- The immediate blocker for a clean `0.97.x` migration is not the wrapper itself; it is making the rust-skia Emscripten binary-cache/source-build path reproducible without manual target-directory artifact aliases or privileged Skia source unpacking.
-- A real migration should be treated as a coordinated toolchain issue:
-  - upgrade `ovrley_core` and `wasm_preview_poc` to one `skia-safe` version, or keep the POC outside the app workspace
-  - pin Rust `1.85.0` or another verified Emscripten-compatible toolchain
-  - resolve the `libskia.wasm.a` vs `libskia.a` cache mismatch through an upstream fix, local patched crate, or controlled binary cache
-  - only then replace `src-tauri/wasm_preview_poc/tools/emcc-linker.*` with direct `emcc.bat` linker configuration
+- `pnpm wasm:preview:build` invokes the source build and writes
+  `wasm_preview_poc.js` and `wasm_preview_poc.wasm` to the Wasm target
+  directory.
+- The Linux-only `.github/workflows/wasm-preview.yml` workflow installs or
+  restores Rust, Emscripten, LLVM/libclang, Python, Ninja, GN, and Skia DEPS.
+  It caches the Emscripten SDK, prepared rust-skia source, Cargo downloads, and
+  the Cargo target directory, then uploads the browser artifacts.
+- The normal native Windows/macOS release jobs do not need to source-build Skia
+  for this preview. The generated browser artifacts can be reused across
+  platforms if the preview is packaged later.
+- The local temporary checkout used to validate the build is not part of the
+  migration. A new branch must use the pinned rust-skia checkout and the CI
+  preparation steps described in `wasm_preview_poc/README.md`.
 
-This is a concrete migration landmine because the adapter layer cannot exist without a stable build path.
+Remaining migration risks:
+
+- The current build script expects `SKIA_SOURCE_DIR` to identify a prepared
+  Skia source tree. CI prepares and caches it; local developers must either
+  prepare it or provide an equivalent setup.
+- The root workspace `Cargo.lock` must be resolved on the target branch; the
+  nested POC lockfile is a stale `0.97.2` lockfile and must not be copied
+  unchanged.
+- The workflow is currently a separate artifact-producing workflow. If the
+  preview becomes part of native release packages, the release workflow must
+  explicitly download and package the Wasm artifact.
+- The frontend debug mount is still a benchmark host, not the production
+  widget adapter. Passing this build/runtime gate does not prove widget parity.
+
+This remains a concrete migration landmine because the renderer cannot be
+moved into production until the target branch has merged the build contract,
+verified the generated artifact, and passed the browser benchmark gate.
 
 ## Recommended Working Assumption
 

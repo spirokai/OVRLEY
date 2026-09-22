@@ -12,7 +12,13 @@ permissions:
   contents: write
 
 jobs:
+  wasm-preview:
+    uses: ./.github/workflows/wasm-preview.yml
+    with:
+      ref: ${{ inputs.tag }}
+
   build:
+    needs: wasm-preview
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -56,8 +62,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Download Wasm preview built from this tag
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-preview
+          path: src-tauri/target/wasm32-unknown-emscripten/wasm-preview
+
       - name: Build Tauri app
         env:
+          WASM_PREVIEW_PREBUILT: '1'
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
