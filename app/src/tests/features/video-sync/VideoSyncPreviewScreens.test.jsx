@@ -8,9 +8,10 @@ const markerOptions = vi.hoisted(() => vi.fn())
 const eventHandlers = vi.hoisted(() => new Map())
 const markerEventHandlers = vi.hoisted(() => new Map())
 const source = vi.hoisted(() => ({ setData: vi.fn() }))
+const navigationSource = vi.hoisted(() => ({ setData: vi.fn() }))
 const getPreference = vi.hoisted(() => vi.fn())
 const setPreference = vi.hoisted(() => vi.fn())
-const resizeObserver = vi.hoisted(() => ({ callback: null }))
+const resizeObserver = vi.hoisted(() => ({ callbacks: [] }))
 const canvasContainer = vi.hoisted(() => ({ style: { cursor: '' } }))
 const map = vi.hoisted(() => {
   let hasCourseSource = false
@@ -37,9 +38,37 @@ const map = vi.hoisted(() => {
     },
   }
 })
+const navigationEventHandlers = vi.hoisted(() => new Map())
+const navigationMap = vi.hoisted(() => {
+  let hasCourseSource = false
+  return {
+    addControl: vi.fn(),
+    addLayer: vi.fn(),
+    addSource: vi.fn(() => {
+      hasCourseSource = true
+    }),
+    getContainer: vi.fn(() => ({ clientHeight: 320 })),
+    getSource: vi.fn(() => (hasCourseSource ? navigationSource : null)),
+    isZooming: vi.fn(() => false),
+    jumpTo: vi.fn(),
+    on: vi.fn((name, handler) => navigationEventHandlers.set(name, handler)),
+    remove: vi.fn(),
+    resize: vi.fn(),
+    setStyle: vi.fn(() => {
+      hasCourseSource = false
+    }),
+    setTransformCameraUpdate: vi.fn(),
+    scrollZoom: { enable: vi.fn() },
+    touchZoomRotate: { disableRotation: vi.fn() },
+    reset() {
+      hasCourseSource = false
+    },
+  }
+})
 const markerElement = vi.hoisted(() => ({ addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 const marker = vi.hoisted(() => ({ addTo: vi.fn(), getElement: vi.fn(), remove: vi.fn(), setLngLat: vi.fn() }))
 const playbackMarker = vi.hoisted(() => ({ addTo: vi.fn(), remove: vi.fn(), setLngLat: vi.fn() }))
+const navigationMarker = vi.hoisted(() => ({ addTo: vi.fn(), getElement: vi.fn(), remove: vi.fn(), setLngLat: vi.fn() }))
 const popup = vi.hoisted(() => ({ getElement: vi.fn(), on: vi.fn(), setDOMContent: vi.fn() }))
 const popupContent = vi.hoisted(() => ({ addEventListener: vi.fn(), click: vi.fn() }))
 
@@ -47,6 +76,11 @@ vi.mock('@/api/backend', () => ({ getMapStyleUrlTemplate }))
 vi.mock('@/lib/preferences-store', () => ({ getPreference, setPreference }))
 
 vi.mock('maplibre-gl', () => ({
+  LngLat: class {
+    static convert([lng, lat]) {
+      return { lng, lat }
+    }
+  },
   LngLatBounds: class {
     extend() {
       return this
@@ -54,10 +88,16 @@ vi.mock('maplibre-gl', () => ({
   },
   Map: vi.fn(function Map(options) {
     mapOptions(options)
-    return map
+    return options.dragPan === false ? navigationMap : map
   }),
   Marker: vi.fn(function Marker(options) {
     markerOptions(options)
+    if (options?.element?.className.includes('video-sync-navigation-marker')) {
+      navigationMarker.setLngLat.mockReturnValue(navigationMarker)
+      navigationMarker.addTo.mockReturnValue(navigationMarker)
+      navigationMarker.getElement.mockReturnValue(options.element)
+      return navigationMarker
+    }
     const markerInstance = options?.element?.className.includes('bg-[#EF6C15]') ? playbackMarker : marker
     markerInstance.setLngLat.mockReturnValue(markerInstance)
     markerInstance.addTo.mockReturnValue(markerInstance)
@@ -90,9 +130,12 @@ describe('VideoSyncPreviewScreens', () => {
   beforeAll(() => {
     globalThis.ResizeObserver = class ResizeObserver {
       constructor(callback) {
-        resizeObserver.callback = callback
+        this.callback = callback
       }
-      observe() {}
+      observe() {
+        resizeObserver.callbacks.push(this.callback)
+      }
+      unobserve() {}
       disconnect() {}
     }
     HTMLElement.prototype.hasPointerCapture = vi.fn(() => false)
@@ -108,13 +151,14 @@ describe('VideoSyncPreviewScreens', () => {
     getPreference.mockResolvedValue(undefined)
     setPreference.mockReset()
     setPreference.mockResolvedValue(undefined)
-    resizeObserver.callback = null
+    resizeObserver.callbacks = []
     canvasContainer.style.cursor = ''
     mapOptions.mockClear()
     markerOptions.mockClear()
     eventHandlers.clear()
     markerEventHandlers.clear()
     source.setData.mockClear()
+    navigationSource.setData.mockClear()
     marker.addTo.mockClear()
     marker.remove.mockClear()
     marker.setLngLat.mockClear()
@@ -126,6 +170,10 @@ describe('VideoSyncPreviewScreens', () => {
     playbackMarker.addTo.mockClear()
     playbackMarker.remove.mockClear()
     playbackMarker.setLngLat.mockClear()
+    navigationMarker.addTo.mockClear()
+    navigationMarker.getElement.mockClear()
+    navigationMarker.remove.mockClear()
+    navigationMarker.setLngLat.mockClear()
     markerElement.addEventListener.mockClear()
     markerElement.removeEventListener.mockClear()
     popup.setDOMContent.mockClear()
@@ -133,9 +181,16 @@ describe('VideoSyncPreviewScreens', () => {
     popup.on.mockClear()
     popupContent.content = null
     map.reset()
+    navigationMap.reset()
+    navigationEventHandlers.clear()
     for (const value of Object.values(map)) {
       if (typeof value?.mockClear === 'function') value.mockClear()
     }
+    for (const value of Object.values(navigationMap)) {
+      if (typeof value?.mockClear === 'function') value.mockClear()
+    }
+    navigationMap.touchZoomRotate.disableRotation.mockClear()
+    navigationMap.scrollZoom.enable.mockClear()
   })
 
   test('renders an equal-size MapLibre preview with the activity route and cursor picker', async () => {
@@ -179,6 +234,7 @@ describe('VideoSyncPreviewScreens', () => {
     expect(video).toHaveStyle({ width: '960px', height: '540px' })
     expect(mapScreen).toHaveStyle({ width: '960px', height: '540px' })
     expect(video.nextElementSibling).toBe(mapScreen)
+    expect(screen.getByTestId('video-sync-navigation-map')).toHaveClass('aspect-square')
     expect(screen.getByTestId('video-sync-speed-diagnostic')).toHaveTextContent('18.0')
     await waitFor(() => expect(markerOptions).toHaveBeenCalledWith({ color: 'var(--color-video-sync-location)', scale: 1, draggable: true }))
 
@@ -189,6 +245,20 @@ describe('VideoSyncPreviewScreens', () => {
     expect(onDeleteCourseLocation).toHaveBeenCalledOnce()
 
     await waitFor(() => expect(map.setStyle).toHaveBeenCalledWith('http://127.0.0.1:3210/styles/liberty'))
+    await waitFor(() => expect(navigationMap.setStyle).toHaveBeenCalledWith('http://127.0.0.1:3210/styles/liberty'))
+    expect(navigationMap.touchZoomRotate.disableRotation).toHaveBeenCalledOnce()
+    expect(navigationMap.jumpTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        center: [8.535, 47.375],
+        pitch: 50,
+        padding: { top: 144, right: 0, bottom: 0, left: 0 },
+      }),
+    )
+    expect(navigationMap.setTransformCameraUpdate.mock.calls[0][0]()).toEqual({
+      center: { lng: 8.535, lat: 47.375 },
+      bearing: expect.any(Number),
+    })
+    expect(navigationMarker.setLngLat).toHaveBeenCalledWith([8.535, 47.375])
     act(() => eventHandlers.get('style.load')())
     expect(map.addSource).toHaveBeenCalledWith(
       'activity-course',
@@ -210,6 +280,8 @@ describe('VideoSyncPreviewScreens', () => {
         }),
       }),
     )
+    act(() => navigationEventHandlers.get('style.load')())
+    expect(navigationMap.addSource).toHaveBeenCalledWith('activity-course', expect.any(Object))
 
     act(() => eventHandlers.get('mousemove')({ point: { x: 85.35, y: 473.75 } }))
     expect(marker.addTo).toHaveBeenCalledWith(map)
@@ -244,7 +316,9 @@ describe('VideoSyncPreviewScreens', () => {
     const { rerender } = render(renderPreview(0))
 
     await waitFor(() => expect(playbackMarker.setLngLat).toHaveBeenCalledWith([8.53, 47.37]))
-    const playbackMarkerElement = markerOptions.mock.calls.find(([options]) => options?.element?.className.includes('bg-[#EF6C15]'))[0].element
+    const playbackMarkerElement = markerOptions.mock.calls.find(
+      ([options]) => options?.element?.className.includes('bg-[#EF6C15]') && !options.element.className.includes('video-sync-navigation-marker'),
+    )[0].element
     expect(playbackMarkerElement.className).toContain('bg-[#EF6C15]')
     expect(playbackMarkerElement.className).toContain('border-1')
     expect(playbackMarkerElement.className).toContain('shadow-[0_0_0_8px_rgba(239,108,21,0.35)]')
@@ -256,7 +330,7 @@ describe('VideoSyncPreviewScreens', () => {
 
     expect(playbackMarker.setLngLat).toHaveBeenCalledOnce()
     expect(playbackMarker.setLngLat).toHaveBeenCalledWith([8.535, 47.375])
-    expect(mapOptions).toHaveBeenCalledOnce()
+    expect(mapOptions).toHaveBeenCalledTimes(2)
     expect(map.addSource).toHaveBeenCalledOnce()
     expect(source.setData).not.toHaveBeenCalled()
   })
@@ -284,6 +358,7 @@ describe('VideoSyncPreviewScreens', () => {
     await user.click(screen.getByRole('combobox', { name: 'Map style' }))
     await user.click(screen.getByRole('option', { name: 'Fiord' }))
     await waitFor(() => expect(map.setStyle).toHaveBeenCalledWith('http://127.0.0.1:3210/styles/fiord'))
+    expect(navigationMap.setStyle).toHaveBeenCalledWith('http://127.0.0.1:3210/styles/fiord')
     expect(setPreference).toHaveBeenCalledWith('sync-map-style', 'fiord')
   })
 
@@ -331,9 +406,11 @@ describe('VideoSyncPreviewScreens', () => {
     const fitCount = map.fitBounds.mock.calls.length
 
     act(() => {
-      resizeObserver.callback([])
-      resizeObserver.callback([])
-      resizeObserver.callback([])
+      resizeObserver.callbacks.forEach((callback) => {
+        callback([])
+        callback([])
+        callback([])
+      })
     })
 
     await waitFor(() => expect(map.resize).toHaveBeenCalledOnce())

@@ -2,10 +2,16 @@ import { MapPin } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
 import { VideoPreviewSurface } from '@/features/video-preview'
 import VideoSyncCanvasDiagnostics from './VideoSyncCanvasDiagnostics'
-import useVideoSyncMap from '../hooks/useVideoSyncMap'
-import { VIDEO_SYNC_MAP_STYLES, VIDEO_SYNC_PREVIEW_SCREEN_GAP } from '../data/videoSyncConstants'
+import useVideoSyncMaps from '../hooks/useVideoSyncMaps'
+import {
+  VIDEO_SYNC_MAP_STYLES,
+  VIDEO_SYNC_NAVIGATION_MAP_MAX_PITCH,
+  VIDEO_SYNC_NAVIGATION_MAP_MIN_PITCH,
+  VIDEO_SYNC_PREVIEW_SCREEN_GAP,
+} from '../data/videoSyncConstants'
 
 function CourseLocationAction({ actionPoint, onConfirm }) {
   const { t } = useTranslation()
@@ -52,20 +58,36 @@ function MapStyleSelector({ style, onStyleChange }) {
   )
 }
 
-function VideoSyncMapPreview({ activity, detection, onSetCourseLocation, onDeleteCourseLocation, previewSecond }) {
-  const { containerRef, style, onStyleChange, actionPoint, onConfirmActionPoint } = useVideoSyncMap({
-    activity,
-    detection,
-    onSetCourseLocation,
-    onDeleteCourseLocation,
-    previewSecond,
-  })
-
+function VideoSyncMapPreview({ containerRef, actionPoint, onConfirmActionPoint, onStyleChange, style }) {
   return (
     <div className="relative isolate h-full w-full bg-surface-elevated" data-testid="maplibre-map">
       <div ref={containerRef} className="h-full w-full" />
       <MapStyleSelector style={style} onStyleChange={onStyleChange} />
       <CourseLocationAction actionPoint={actionPoint} onConfirm={onConfirmActionPoint} />
+    </div>
+  )
+}
+
+function VideoSyncNavigationMap({ containerRef, pitch, onPitchChange }) {
+  return (
+    <div
+      data-testid="video-sync-navigation-map"
+      className="absolute top-[3%] right-[2%] z-20 isolate aspect-square w-[25%] overflow-hidden rounded-sm border border-white/50 bg-surface-elevated shadow-lg"
+      onWheel={(event) => event.stopPropagation()}
+    >
+      <div ref={containerRef} className="h-full w-full" aria-label="Route navigation map" />
+      <div className="absolute top-1/2 left-[3%] z-10 flex h-[68%] -translate-y-1/2 flex-col items-center gap-1 rounded-full px-1.5 py-1.5 ">
+        <Slider
+          aria-label="Navigation map pitch"
+          className="h-full data-[orientation=vertical]:min-h-0"
+          max={VIDEO_SYNC_NAVIGATION_MAP_MAX_PITCH}
+          min={VIDEO_SYNC_NAVIGATION_MAP_MIN_PITCH}
+          onValueChange={([nextPitch]) => onPitchChange(nextPitch)}
+          orientation="vertical"
+          step={1}
+          value={[pitch]}
+        />
+      </div>
     </div>
   )
 }
@@ -94,6 +116,13 @@ export default function VideoSyncPreviewScreens({
   sceneSize,
   setSceneElement,
 }) {
+  const { selectionMapRef, navigationMapRef, actionPoint, onConfirmActionPoint, pitch, onPitchChange, style, onStyleChange } = useVideoSyncMaps({
+    activity,
+    detection,
+    onSetCourseLocation,
+    onDeleteCourseLocation,
+    previewSecond,
+  })
   const screenWidth = sceneSize.width * displayScale
   const screenHeight = sceneSize.height * displayScale
   const screenGap = VIDEO_SYNC_PREVIEW_SCREEN_GAP * displayScale
@@ -108,12 +137,13 @@ export default function VideoSyncPreviewScreens({
     >
       <div
         data-testid="video-sync-video-screen"
-        className="relative shrink-0 overflow-hidden rounded-sm border border-border/50 bg-black shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)]"
+        className="relative z-0 isolate shrink-0 overflow-hidden rounded-sm border border-border/50 bg-black shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)]"
         style={screenStyle}
       >
         <VideoPreviewSurface displayScale={1} isActive>
           <VideoSyncCanvasDiagnostics activity={activity} displayScale={displayScale} previewSecond={previewSecond} />
         </VideoPreviewSurface>
+        <VideoSyncNavigationMap containerRef={navigationMapRef} pitch={pitch} onPitchChange={onPitchChange} />
       </div>
       <div
         data-testid="video-sync-map-screen"
@@ -121,11 +151,11 @@ export default function VideoSyncPreviewScreens({
         style={screenStyle}
       >
         <VideoSyncMapPreview
-          activity={activity}
-          detection={detection}
-          onSetCourseLocation={onSetCourseLocation}
-          onDeleteCourseLocation={onDeleteCourseLocation}
-          previewSecond={previewSecond}
+          containerRef={selectionMapRef}
+          actionPoint={actionPoint}
+          onConfirmActionPoint={onConfirmActionPoint}
+          onStyleChange={onStyleChange}
+          style={style}
         />
       </div>
     </div>

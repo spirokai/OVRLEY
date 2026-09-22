@@ -22,7 +22,7 @@ export default function VideoSyncCanvasDiagnostics({ activity, displayScale, pre
 
   return (
     <div data-testid="video-sync-canvas-diagnostics" className="pointer-events-none absolute inset-0 z-40">
-      <div data-testid="video-sync-speed-diagnostic" className="absolute bottom-[6%] right-[4%] whitespace-nowrap">
+      <div data-testid="video-sync-speed-diagnostic" className="absolute top-[6%] left-[4%] whitespace-nowrap">
         {speed ? (
           <div className="flex items-baseline text-white" style={{ fontFamily: SPEED_FONT_FAMILY, gap: 8 * displayScale }}>
             <span style={{ fontSize: SPEED_FONT_SIZE * displayScale, lineHeight: 1 }}>{speed.value}</span>
