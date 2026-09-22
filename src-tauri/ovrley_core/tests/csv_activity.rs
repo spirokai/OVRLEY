@@ -31,7 +31,7 @@ fn trackaddict_gps_updates_preserve_sparse_gps_and_dense_acceleration() {
     );
     assert_eq!(activity.elevation, vec![Some(100.0), None, Some(110.0)]);
     assert_eq!(activity.speed, vec![Some(10.0), None, Some(20.0)]);
-    assert_eq!(activity.heading, vec![Some(90.0), None, Some(90.498)]);
+    assert_eq!(activity.heading, vec![Some(90.0), None, Some(100.0)]);
     assert_eq!(activity.g_force_x, vec![Some(0.1), Some(0.2), Some(0.3)]);
     assert_eq!(activity.sample_distance_progress, vec![0.0, 0.1, 1.0]);
 
@@ -52,7 +52,7 @@ fn trackaddict_gps_updates_preserve_sparse_gps_and_dense_acceleration() {
 
     assert_eq!(dense.series.speed[1], Some(15.0));
     assert_eq!(dense.series.elevation[1], Some(105.0));
-    assert_eq!(dense.series.heading[1], Some(90.249));
+    assert_eq!(dense.series.heading[1], Some(95.0));
     assert_eq!(dense.series.course_lat[1], Some(10.05));
     assert_eq!(dense.series.course_lon[1], Some(20.05));
     assert_eq!(dense.frame_distance_progress[1], Some(0.5));
@@ -531,7 +531,7 @@ fn malformed_metric_observations_become_missing_without_repairing_bounded_values
     assert_eq!(activity.rpm, vec![None, Some(1000.0)]);
     assert_eq!(activity.throttle_position, vec![None, Some(50.0)]);
     assert_eq!(activity.brake_position, vec![None, Some(25.0)]);
-    assert_eq!(activity.heading, vec![Some(359.0), Some(359.1)]);
+    assert_eq!(activity.heading, vec![Some(359.0), Some(0.264)]);
     assert_eq!(activity.speed, vec![None, Some(10.0)]);
 }
 
@@ -658,7 +658,7 @@ Time,GPS Latitude (deg),GPS Longitude (deg),GPS Speed (mph),GPS Altitude (ft),GP
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0]);
     assert_eq!(activity.speed, vec![Some(4.4704), Some(8.9408)]);
     assert_eq!(activity.elevation, vec![Some(30.48), Some(33.528)]);
-    assert_eq!(activity.heading, vec![Some(1.0), Some(0.9)]);
+    assert_eq!(activity.heading, vec![Some(1.0), Some(359.736)]);
 }
 
 #[test]
