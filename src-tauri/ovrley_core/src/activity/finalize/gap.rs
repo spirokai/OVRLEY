@@ -220,6 +220,10 @@ fn zero_filled_idle_sample(
     synthetic.stroke_rate = Some(0.0);
     synthetic.vertical_speed = Some(0.0);
     synthetic.g_force = Some(0.0);
+    synthetic.g_force_x = Some(0.0);
+    synthetic.g_force_y = Some(0.0);
+    synthetic.g_force_z = Some(0.0);
+    synthetic.lean_angle = Some(0.0);
     synthetic.gradient = Some(0.0);
     synthetic.pace = None;
     synthetic.torque = None;

@@ -82,9 +82,26 @@ describe('VideoDrawerContent', () => {
     expect(screen.getByText('59.94 fps')).toBeInTheDocument()
     expect(screen.getByText('1920×1080')).toBeInTheDocument()
     expect(screen.getByText('GoPro Hero 12')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Video Sync' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sync Doctor' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete video' }))
     expect(onDeleteVideo).toHaveBeenCalledOnce()
+  })
+
+  test('offers manual sync when automatic sync cannot find an offset', () => {
+    const openManualVideoSync = vi.fn()
+    render(
+      <VideoDrawerContent
+        videoSummary={videoSummary}
+        onBrowseVideo={vi.fn()}
+        onDeleteVideo={vi.fn()}
+        onDropVideoFiles={vi.fn()}
+        videoSync={{ ...videoSync, openManualVideoSync, videoSyncWarning: 'Video could not be synced with activity' }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Manual Sync' }))
+
+    expect(openManualVideoSync).toHaveBeenCalledOnce()
   })
 })

@@ -51,4 +51,24 @@ describe('createLayoutSlice', () => {
     state.dismissLeftDrawerOverlay()
     expect(state.leftDrawerVisible).toBe(false)
   })
+
+  test('opens Sync Doctor directly on manual sync', () => {
+    const state = createLayoutHarness()
+
+    state.openManualVideoSync()
+
+    expect(state).toMatchObject({
+      activeLeftDrawerTool: 'videoSync',
+      leftDrawerVisible: true,
+      videoSyncDrawerTab: 'manual',
+    })
+  })
+
+  test('accepts only canonical Sync Doctor tabs', () => {
+    const state = createLayoutHarness()
+
+    state.setVideoSyncDrawerTab('manual')
+    expect(state.videoSyncDrawerTab).toBe('manual')
+    expect(() => state.setVideoSyncDrawerTab('settings')).toThrow(/Unsupported video sync drawer tab/)
+  })
 })

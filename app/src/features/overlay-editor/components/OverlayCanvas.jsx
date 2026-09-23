@@ -8,9 +8,8 @@ import { cn } from '@/lib/utils'
 import { getEditorGridSize } from '../utils/overlayEditorUtils'
 import { WidgetPreview } from '@/features/widget-preview'
 import { CANVAS_BACKGROUND_COLORS } from '../data/overlayEditorConstants'
-import { useVideoPreview } from '@/features/video-preview'
+import { VideoPreviewSurface } from '@/features/video-preview'
 import useStore from '@/store/useStore'
-import HevcPlaybackPlaceholder from './HevcPlaybackPlaceholder'
 
 /**
  * Canvas overlay grid — draws a teal-colored grid on an HTML canvas element
@@ -184,18 +183,9 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
   const { displayScale, globalScale, globalOpacity, backgroundMode, gridVisible } = displayProps
   const { widgets, activity, previewSecond, metricPreviewModels, textPreviewModels, renderGeometryModels, exportRange } = dataProps
   const { setSceneElement, handleWidgetMouseDown, setHoveredWidgetId, widgetRefCallbacks } = callbacks
-  const videoRef = useRef(null)
-  const isVideoMuted = useStore((state) => state.isVideoMuted)
   const importedBackgroundImagePath = useStore((state) => state.importedBackgroundImagePath)
-  const platformOs = useStore((state) => state.platformOs)
-  const { videoSrc, importId, isOutOfRange, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } = useVideoPreview(
-    videoRef,
-    backgroundMode === 'video',
-  )
-  const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
   const hasTransparentBackground = backgroundMode === 'transparent'
   const backgroundImageSrc = importedBackgroundImagePath ? convertFileSrc(importedBackgroundImagePath) : ''
-  const videoBackgroundClassName = cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')
 
   return (
     <div
@@ -218,18 +208,7 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           }}
         />
       ) : null}
-      {backgroundMode === 'video' && videoSrc && !hasHevcPlaybackError ? (
-        <video
-          key={importId ?? 'no-video'}
-          ref={videoRef}
-          src={videoSrc}
-          className={videoBackgroundClassName}
-          preload="metadata"
-          playsInline
-          muted={isVideoMuted}
-          onError={(e) => console.error('[OverlayCanvas] Video Error:', e)}
-        />
-      ) : null}
+      {backgroundMode === 'video' ? <VideoPreviewSurface displayScale={displayScale} isActive /> : null}
       {backgroundMode === 'image' && backgroundImageSrc ? (
         <img src={backgroundImageSrc} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" draggable="false" />
       ) : null}
@@ -259,15 +238,6 @@ export default function OverlayCanvas({ sceneProps, displayProps, dataProps, cal
           )
         })}
       </div>
-      {backgroundMode === 'video' && videoSrc && hasHevcPlaybackError ? (
-        <HevcPlaybackPlaceholder
-          displayScale={displayScale}
-          importId={importId}
-          openVideoPreviewHelp={openVideoPreviewHelp}
-          platformOs={platformOs}
-          videoPreviewHelpAvailable={videoPreviewHelpAvailable}
-        />
-      ) : null}
     </div>
   )
 }

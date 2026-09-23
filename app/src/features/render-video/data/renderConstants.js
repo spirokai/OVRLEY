@@ -56,26 +56,26 @@ export const OUTPUT_FORMATS = [
 ]
 
 export const ACCELERATION_OPTIONS = [
-  { value: 'cpu', label: 'CPU' },
-  { value: 'nvidia', label: 'NVIDIA GPU', platform: ['windows', 'linux'] },
   {
     value: 'nvidia_cuda',
     label: 'NVIDIA GPU | CUDA ',
     platform: ['windows', 'linux'],
   },
+  { value: 'nvidia', label: 'NVIDIA GPU', platform: ['windows', 'linux'] },
   // { value: 'qsv', label: 'Intel Quick Sync', platform: ['windows', 'linux'] },
+  { value: 'amd', label: 'AMD GPU', platform: ['windows', 'linux'] },
   {
     value: 'qsv_full',
     label: 'Intel QSV',
     platform: ['windows', 'linux'],
   },
-  { value: 'amd', label: 'AMD GPU', platform: ['windows', 'linux'] },
   {
     value: 'videotoolbox',
     label: 'Apple VideoToolbox',
     platform: ['macos'],
   },
   { value: 'vaapi', label: 'VAAPI', platform: ['linux'] },
+  { value: 'cpu', label: 'CPU' },
   { value: 'vulkan_prores', label: 'Vulkan' },
 ]
 

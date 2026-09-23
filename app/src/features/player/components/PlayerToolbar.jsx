@@ -7,9 +7,9 @@ import { useTranslation } from 'react-i18next'
 /**
  * Presentational toolbar for zoom, fit target, transport, and time display controls.
  *
- * @param {{ toolbar: object }} props Toolbar view model.
+ * @param {{ toolbar: object, videoSyncMode: boolean }} props Toolbar view model and active workspace mode.
  */
-export default function PlayerToolbar({ toolbar }) {
+export default function PlayerToolbar({ toolbar, videoSyncMode }) {
   const { t } = useTranslation()
   return (
     <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
@@ -53,56 +53,58 @@ export default function PlayerToolbar({ toolbar }) {
             ))}
           </TabsList>
         </Tabs>
-        <div className="ml-2 flex items-center gap-1">
-          <SimpleTooltip side="top" content={t('player.setExportStartAtPlayhead', 'Set export start at playhead')}>
-            <Button
-              type="button"
-              aria-label={t('player.setExportStartAtPlayhead', 'Set export start at playhead')}
-              size="toolbar-icon"
-              variant="ghost"
-              disabled={toolbar.exportRange.isDisabled}
-              onClick={toolbar.exportRange.setStart}
-              aria-keyshortcuts="I"
-            >
-              <span aria-hidden="true" className="font-mono text-base font-normal">
-                [
-              </span>
-            </Button>
-          </SimpleTooltip>
-          <SimpleTooltip side="top" content={t('player.setExportEndAtPlayhead', 'Set export end at playhead')}>
-            <Button
-              type="button"
-              aria-label={t('player.setExportEndAtPlayhead', 'Set export end at playhead')}
-              size="toolbar-icon"
-              variant="ghost"
-              disabled={toolbar.exportRange.isDisabled}
-              onClick={toolbar.exportRange.setEnd}
-              aria-keyshortcuts="O"
-            >
-              <span aria-hidden="true" className="font-mono text-base font-normal">
-                ]
-              </span>
-            </Button>
-          </SimpleTooltip>
-          {toolbar.exportRange.isCustom ? (
-            <div className="ml-1 flex items-center gap-0.5 text-orange-400/90">
-              <span className="text-xs font-medium tabular-nums">{toolbar.exportRange.label}</span>
-              <SimpleTooltip side="top" content={t('player.clearCustomExportRange', 'Clear custom export range')}>
-                <Button
-                  type="button"
-                  aria-label={t('player.clearCustomExportRange', 'Clear custom export range')}
-                  size="toolbar-icon"
-                  variant="ghost"
-                  className="text-orange-400/90 hover:text-orange-300"
-                  onClick={toolbar.exportRange.clear}
-                  aria-keyshortcuts="Mod+X"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </SimpleTooltip>
-            </div>
-          ) : null}
-        </div>
+        {!videoSyncMode ? (
+          <div className="ml-2 flex items-center gap-1">
+            <SimpleTooltip side="top" content={t('player.setExportStartAtPlayhead', 'Set export start at playhead')}>
+              <Button
+                type="button"
+                aria-label={t('player.setExportStartAtPlayhead', 'Set export start at playhead')}
+                size="toolbar-icon"
+                variant="ghost"
+                disabled={toolbar.exportRange.isDisabled}
+                onClick={toolbar.exportRange.setStart}
+                aria-keyshortcuts="I"
+              >
+                <span aria-hidden="true" className="font-mono text-base font-normal">
+                  [
+                </span>
+              </Button>
+            </SimpleTooltip>
+            <SimpleTooltip side="top" content={t('player.setExportEndAtPlayhead', 'Set export end at playhead')}>
+              <Button
+                type="button"
+                aria-label={t('player.setExportEndAtPlayhead', 'Set export end at playhead')}
+                size="toolbar-icon"
+                variant="ghost"
+                disabled={toolbar.exportRange.isDisabled}
+                onClick={toolbar.exportRange.setEnd}
+                aria-keyshortcuts="O"
+              >
+                <span aria-hidden="true" className="font-mono text-base font-normal">
+                  ]
+                </span>
+              </Button>
+            </SimpleTooltip>
+            {toolbar.exportRange.isCustom ? (
+              <div className="ml-1 flex items-center gap-0.5 text-orange-400/90">
+                <span className="text-xs font-medium tabular-nums">{toolbar.exportRange.label}</span>
+                <SimpleTooltip side="top" content={t('player.clearCustomExportRange', 'Clear custom export range')}>
+                  <Button
+                    type="button"
+                    aria-label={t('player.clearCustomExportRange', 'Clear custom export range')}
+                    size="toolbar-icon"
+                    variant="ghost"
+                    className="text-orange-400/90 hover:text-orange-300"
+                    onClick={toolbar.exportRange.clear}
+                    aria-keyshortcuts="Mod+X"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </SimpleTooltip>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="flex items-center gap-1 rounded-xs border border-border/30 p-0.5 shadow-sm">

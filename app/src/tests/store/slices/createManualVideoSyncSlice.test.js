@@ -1,0 +1,218 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { VIDEO_SYNC_LANDMARK_TYPES, VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
+import useStore from '@/store/useStore'
+
+describe('manual video sync store contract', () => {
+  beforeEach(() => {
+    useStore.setState(useStore.getInitialState(), true)
+    useStore.setState({ importedVideoDuration: 60 })
+    let nextId = 0
+    vi.stubGlobal('crypto', {
+      randomUUID: vi.fn(() => `landmark-${++nextId}`),
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  test('creates typed landmarks and enforces total and location limits', () => {
+    const state = useStore.getState()
+    const stopId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
+    state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN, 8)
+    state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 12)
+    state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.LOCATION, 16)
+
+    expect(useStore.getState().manualVideoSync.landmarks).toEqual([
+      { id: stopId, type: 'stop', videoSecond: 4 },
+      { id: 'landmark-2', type: 'leftTurn', videoSecond: 8 },
+      { id: 'landmark-3', type: 'rightTurn', videoSecond: 12 },
+      { id: 'landmark-4', type: 'location', videoSecond: 16, activitySecond: null },
+    ])
+    expect(() => state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.LOCATION, 20)).toThrow(/at most 1 location/)
+    state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 20)
+    expect(() => state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 24)).toThrow(/at most 5 landmarks/)
+  })
+
+  test('moves, removes, and clears landmarks through domain actions', () => {
+    const state = useStore.getState()
+    const id = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
+
+    state.moveVideoSyncLandmark(id, 10)
+    expect(useStore.getState().manualVideoSync.landmarks[0].videoSecond).toBe(10)
+
+    state.removeVideoSyncLandmark(id)
+    expect(useStore.getState().manualVideoSync.landmarks).toEqual([])
+
+    const secondId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 20)
+    expect(secondId).toBe('landmark-2')
+    state.clearVideoSyncLandmarks()
+    expect(useStore.getState().manualVideoSync.landmarks).toEqual([])
+  })
+
+  test('sets and overwrites the detected course location without a video or video landmark', () => {
+    useStore.setState({ importedVideoDuration: null })
+    const state = useStore.getState()
+
+    state.setVideoSyncDetectedLocation(30)
+    state.setVideoSyncDetectedLocation(45)
+
+    expect(useStore.getState().manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 45 })
+    expect(useStore.getState().manualVideoSync.detectedLocationSecond).toBe(45)
+    expect(useStore.getState().manualVideoSync.landmarks).toEqual([])
+  })
+
+  test('clears the detected course location without clearing the detection model', () => {
+    const state = useStore.getState()
+    state.setVideoSyncDetectedLocation(30)
+
+    state.clearVideoSyncDetectedLocation()
+
+    expect(useStore.getState().manualVideoSync.detectedLocationSecond).toBeNull()
+    expect(useStore.getState().manualVideoSyncDetection.location).toBeNull()
+  })
+
+  test('restores a saved map location and keeps it when only the video is cleared', () => {
+    const state = useStore.getState()
+    state.hydrateVideoSyncState({ landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 80 })
+
+    expect(useStore.getState().manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 30 })
+    state.clearVideoSyncForVideo()
+    expect(useStore.getState().manualVideoSync.detectedLocationSecond).toBe(30)
+    expect(useStore.getState().manualVideoSyncDetection.location.time).toBe(30)
+
+    state.clearVideoSyncForActivity()
+    expect(useStore.getState().manualVideoSync.detectedLocationSecond).toBeNull()
+    expect(useStore.getState().manualVideoSyncDetection).toBeNull()
+  })
+
+  test('changes landmark types while preserving canonical shapes and location limits', () => {
+    const state = useStore.getState()
+    const landmarkId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
+
+    state.setVideoSyncLandmarkType(landmarkId, VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN)
+    expect(useStore.getState().manualVideoSync.landmarks[0]).toEqual({ id: landmarkId, type: 'leftTurn', videoSecond: 4 })
+
+    state.setVideoSyncLandmarkType(landmarkId, VIDEO_SYNC_LANDMARK_TYPES.LOCATION)
+    expect(useStore.getState().manualVideoSync.landmarks[0]).toEqual({
+      id: landmarkId,
+      type: 'location',
+      videoSecond: 4,
+      activitySecond: null,
+    })
+
+    const secondId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 8)
+    expect(() => state.setVideoSyncLandmarkType(secondId, VIDEO_SYNC_LANDMARK_TYPES.LOCATION)).toThrow(/at most 1 location/)
+
+    state.setVideoSyncLandmarkType(landmarkId, VIDEO_SYNC_LANDMARK_TYPES.STOP)
+    expect(useStore.getState().manualVideoSync.landmarks[0]).toEqual({ id: landmarkId, type: 'stop', videoSecond: 4 })
+  })
+
+  test('rejects malformed action input at the store boundary', () => {
+    const state = useStore.getState()
+
+    expect(() => state.addVideoSyncLandmark('turn', 4)).toThrow(/Unsupported manual video sync landmark type/)
+    expect(() => state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, Number.NaN)).toThrow(/finite number/)
+    expect(() => state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 61)).toThrow(/within the imported video duration/)
+    expect(() => state.setVideoSyncSpeedThreshold(0)).toThrow(/between 1 and 10/)
+    expect(() => state.setVideoSyncTurnThreshold(361)).toThrow(/between 70 and 180/)
+    expect(() => state.moveVideoSyncLandmark('missing-id', 4)).toThrow(/was not found/)
+    expect(() => state.setVideoSyncDetectedLocation(Number.NaN)).toThrow(/finite number/)
+  })
+
+  test('discards calculation results after the input revision changes', () => {
+    const state = useStore.getState()
+    const revision = state.beginVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
+    state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
+
+    expect(state.completeVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL, revision, { detection: {}, candidates: [] })).toBe(false)
+    expect(useStore.getState().manualVideoSyncResults.all).toMatchObject({ candidates: [], status: 'idle' })
+  })
+
+  test('does not accept an old result after derived state resets and a new calculation starts', () => {
+    const state = useStore.getState()
+    const oldRevision = state.beginVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
+    state.clearVideoSyncForActivity()
+    const newRevision = state.beginVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
+
+    expect(newRevision).toBeGreaterThan(oldRevision)
+    expect(state.completeVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL, oldRevision, { detection: {}, candidates: [] })).toBe(false)
+    expect(state.completeVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL, newRevision, { detection: {}, candidates: [] })).toBe(true)
+  })
+
+  test('requires an explicit canonical calculation scope', () => {
+    const state = useStore.getState()
+
+    expect(() => state.beginVideoSyncCalculation()).toThrow(/Unsupported video sync match scope/)
+    expect(() => state.beginVideoSyncCalculation('mapOnly')).toThrow(/Unsupported video sync match scope/)
+  })
+
+  test('keeps activity-owned manual state but clears its derived calculation state', () => {
+    const state = useStore.getState()
+    state.hydrateVideoSyncState({
+      landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
+      detectedLocationSecond: null,
+      speedThresholdKmh: 7,
+      turnThresholdDegrees: 120,
+    })
+    const revision = state.beginVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
+    state.completeVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL, revision, { detection: { stops: ['old'] }, candidates: [{ offset: 4 }] })
+
+    state.clearVideoSyncForActivity()
+
+    const afterActivityReset = useStore.getState()
+    expect(afterActivityReset.manualVideoSync).toEqual({
+      landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
+      detectedLocationSecond: null,
+      speedThresholdKmh: 7,
+      turnThresholdDegrees: 120,
+    })
+    expect(afterActivityReset.manualVideoSyncDetection).toBeNull()
+    expect(afterActivityReset.manualVideoSyncResults.all).toMatchObject({ candidates: [], status: 'idle' })
+    expect(afterActivityReset.manualVideoSyncResults.location).toMatchObject({ candidates: [], status: 'idle' })
+
+    afterActivityReset.clearVideoSyncForVideo()
+
+    const afterVideoReset = useStore.getState()
+    expect(afterVideoReset.manualVideoSync.landmarks).toEqual([])
+    expect(afterVideoReset.manualVideoSync.speedThresholdKmh).toBe(7)
+    expect(afterVideoReset.manualVideoSync.turnThresholdDegrees).toBe(120)
+  })
+
+  test('blocks stale candidates and compensates an out-of-video playhead atomically', () => {
+    useStore.setState({
+      activitySummary: { durationSeconds: 100 },
+      importedVideoPath: 'C:\\video.mp4',
+      importedVideoDuration: 20,
+      selectedSecond: 80,
+      videoSyncOffsetSeconds: 0,
+      manualVideoSyncResults: {
+        ...useStore.getState().manualVideoSyncResults,
+        all: { candidates: [{ offset: 10 }], error: null, hasSearched: true, revision: 0, status: 'fresh' },
+      },
+    })
+
+    let updateCount = 0
+    const unsubscribe = useStore.subscribe(() => {
+      updateCount += 1
+    })
+    useStore.getState().applyVideoSyncCandidate(VIDEO_SYNC_MATCH_SCOPES.ALL, { offset: 10 })
+    unsubscribe()
+
+    expect(updateCount).toBe(1)
+    expect(useStore.getState().videoSyncOffsetSeconds).toBe(10)
+    expect(useStore.getState().selectedSecond).toBe(90)
+
+    useStore.setState({
+      manualVideoSyncResults: {
+        ...useStore.getState().manualVideoSyncResults,
+        all: { ...useStore.getState().manualVideoSyncResults.all, status: 'stale' },
+      },
+      videoSyncOffsetSeconds: 0,
+      selectedSecond: 80,
+    })
+    expect(() => useStore.getState().applyVideoSyncCandidate(VIDEO_SYNC_MATCH_SCOPES.ALL, { offset: 10 })).toThrow(/stale/)
+    expect(useStore.getState().videoSyncOffsetSeconds).toBe(0)
+    expect(useStore.getState().selectedSecond).toBe(80)
+  })
+})

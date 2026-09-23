@@ -29,6 +29,7 @@ export function useVideoSyncControls() {
     computeVideoSync,
     importedVideoPath,
     importedVideoTimeSource,
+    openManualVideoSync,
     resetVideoCreationTime,
     setVideoCreationTimeFromFilename,
     setVideoSyncOffset,
@@ -43,6 +44,7 @@ export function useVideoSyncControls() {
       computeVideoSync: state.computeVideoSync,
       importedVideoPath: state.importedVideoPath,
       importedVideoTimeSource: state.importedVideoTimeSource,
+      openManualVideoSync: state.openManualVideoSync,
       resetVideoCreationTime: state.resetVideoCreationTime,
       setVideoCreationTimeFromFilename: state.setVideoCreationTimeFromFilename,
       setVideoSyncOffset: state.setVideoSyncOffset,
@@ -74,7 +76,6 @@ export function useVideoSyncControls() {
       setOffsetInput(formatOffsetInput(videoSyncOffsetSeconds ?? 0))
       return
     }
-    setVideoSyncWarning(null)
     setOffsetInput(Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1))
   }
 
@@ -87,7 +88,6 @@ export function useVideoSyncControls() {
       setVideoSyncWarning(error.message)
       return
     }
-    setVideoSyncWarning(null)
     setOffsetInput(Number.isInteger(newOffset) ? newOffset.toString() : newOffset.toFixed(1))
   }
 
@@ -101,6 +101,7 @@ export function useVideoSyncControls() {
     videoSyncWarning,
     computeVideoSync,
     incrementOffset,
+    openManualVideoSync,
     resetVideoCreationTime,
     setOffsetInput,
     setVideoCreationTimeFromFilename,

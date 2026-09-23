@@ -128,4 +128,18 @@ describe('useOverlayPlayer', () => {
     expect(useStore.getState().selectedSecond).toBe(50)
     expect(result.current.timeline.playhead.style.left).toBe(250)
   })
+
+  test('hides the complete export-range presentation in video-sync mode', () => {
+    resetStore({ importedVideoFps: 30 })
+    const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black', videoSyncMode: true }))
+
+    act(() => {
+      result.current.timeline.containerProps.ref(createTimelineElement(500))
+      result.current.toolbar.exportRange.setStart()
+    })
+
+    expect(result.current.toolbar.exportRange.isCustom).toBe(true)
+    expect(result.current.timeline.exportMarkers).toEqual([])
+    expect(result.current.timeline.lanes.every((lane) => lane.highlightStyle === null)).toBe(true)
+  })
 })

@@ -70,6 +70,22 @@ describe('OverlayPlayer', () => {
     expect(screen.queryByRole('group', { name: 'Timeline' })).not.toBeInTheDocument()
   })
 
+  test('hides export-range toolbar controls in video-sync mode', () => {
+    useStore.setState((state) => ({
+      renderSettings: {
+        ...state.renderSettings,
+        range: { type: 'custom', from: 10, to: 20 },
+      },
+    }))
+
+    render(<OverlayPlayer {...playerProps} videoSyncMode />)
+
+    expect(screen.queryByRole('button', { name: 'Set export start at playhead' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Set export end at playhead' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Clear custom export range' })).not.toBeInTheDocument()
+    expect(screen.queryByText('[00:00:10-00:00:20]')).not.toBeInTheDocument()
+  })
+
   test('measures and renders clip geometry when timeline mounts after initially hidden state', () => {
     clearResizeObserver()
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({

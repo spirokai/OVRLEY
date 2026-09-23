@@ -117,7 +117,7 @@ export default async function parseFitActivityFile(file) {
       skip_idle_gap_fill: false,
       smoothing: {
         pace: { enabled: true, method: 'zero_phase_ma', window_seconds: 5.0 },
-        heading: { enabled: true, method: 'circular_ema', window_seconds: 0.5 },
+        heading: { enabled: true, method: 'circular_ema', window_seconds: 3.0 },
       },
     },
   }

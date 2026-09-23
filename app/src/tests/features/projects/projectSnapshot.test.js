@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { createProjectDirtyState, createProjectSnapshot } from '@/features/projects/utils/projectSnapshot'
 import { createPathLocator } from '@/features/projects/utils/projectPaths'
+import { VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
 import useStore from '@/store/useStore'
 
 describe('project snapshot contract', () => {
@@ -86,5 +87,40 @@ describe('project snapshot contract', () => {
     expect(useStore.getState().renderSettings.exportMode).toBe('composite')
     expect(project.sources.video).toBeNull()
     expect(project.render.exportMode).toBe('transparent')
+  })
+
+  test('round-trips only durable manual video-sync state', () => {
+    useStore.setState(useStore.getInitialState(), true)
+    useStore.setState({
+      activitySource: { kind: 'file', path: 'C:\\Events\\ride.fit' },
+      importedVideoPath: 'C:\\Events\\video.mp4',
+    })
+    useStore.getState().hydrateVideoSyncState({
+      landmarks: [
+        { id: 'stop-1', type: 'stop', videoSecond: 4 },
+        { id: 'left-1', type: 'leftTurn', videoSecond: 8 },
+        { id: 'location-1', type: 'location', videoSecond: 12, activitySecond: null },
+      ],
+      detectedLocationSecond: 33.5,
+      speedThresholdKmh: 7,
+      turnThresholdDegrees: 120,
+    })
+    const revision = useStore.getState().beginVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
+    useStore.getState().completeVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL, revision, { detection: {}, candidates: [{ offset: 4 }] })
+
+    const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
+
+    expect(project.version).toBe(2)
+    expect(project.sync.manual).toEqual({
+      landmarks: [
+        { id: 'stop-1', type: 'stop', videoSecond: 4 },
+        { id: 'left-1', type: 'leftTurn', videoSecond: 8 },
+        { id: 'location-1', type: 'location', videoSecond: 12, activitySecond: null },
+      ],
+      detectedLocationSecond: 33.5,
+      speedThresholdKmh: 7,
+      turnThresholdDegrees: 120,
+    })
+    expect(JSON.stringify(project)).not.toContain('manualVideoSyncResults')
   })
 })

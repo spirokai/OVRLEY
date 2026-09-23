@@ -27,8 +27,13 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub mod video_server; // test seam
 
+mod map_tile_service;
+
 #[cfg(test)]
 mod video_server_tests;
+
+#[cfg(test)]
+mod map_tile_service_tests;
 
 mod distribution;
 mod file_ops;
@@ -88,6 +93,7 @@ pub fn run() {
             tauri_commands::backend_extract_video_telemetry,
             tauri_commands::backend_clear_preview_video,
             tauri_commands::backend_get_video_state,
+            tauri_commands::backend_get_map_style_url_template,
             tauri_commands::backend_detect_codecs,
             tauri_commands::backend_build_elevation_geometry,
             tauri_commands::backend_build_route_geometry,
@@ -122,7 +128,13 @@ pub fn run() {
                 )),
             });
 
-            app.state::<video_server::VideoServerHandle>().start()?;
+            let map_tile_service = map_tile_service::MapTileService::for_application_cache(
+                app.path()
+                    .app_cache_dir()
+                    .map_err(|error| error.to_string())?,
+            )?;
+            app.state::<video_server::VideoServerHandle>()
+                .start_with_map_tile_service(map_tile_service)?;
 
             #[cfg(not(target_os = "macos"))]
             {

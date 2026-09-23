@@ -173,6 +173,7 @@ export function createMediaSlice(set, get) {
         state.parsedActivity = activity
         state.parsedActivitySource = 'activity-file'
       })
+      get().clearVideoSyncForActivity()
       get().setActivitySummary(activity)
     },
 
@@ -183,6 +184,7 @@ export function createMediaSlice(set, get) {
           state.stashedVideoTelemetry = activity
         })
       } else {
+        get().clearVideoSyncForActivity()
         set((state) => {
           state.parsedActivity = activity
           state.parsedActivitySource = 'video-telemetry'
@@ -220,6 +222,7 @@ export function createMediaSlice(set, get) {
           state.videoSyncTimezoneMode = null
           applyParsedDataToScene(state, stashedVideoTelemetry)
         })
+        get().clearVideoSyncForActivity()
         get().setActivitySummary(get().parsedActivity, { computeVideoSync: false })
       } else {
         set((state) => {
@@ -227,6 +230,7 @@ export function createMediaSlice(set, get) {
           state.parsedActivitySource = null
           state.activitySummary = null
         })
+        get().clearVideoSyncForActivity()
       }
     },
 
@@ -243,6 +247,7 @@ export function createMediaSlice(set, get) {
           state.parsedActivitySource = null
           state.activitySummary = null
         })
+        get().clearVideoSyncForActivity()
       }
     },
 

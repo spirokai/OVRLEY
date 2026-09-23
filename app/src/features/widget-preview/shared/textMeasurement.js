@@ -186,17 +186,7 @@ export function getContentAlignmentOrigin(contentAlignment, anchorX, contentWidt
  * @param {number} params.globalScale - Global scale applied when the SVG is rendered.
  * @returns {{ icon: object|null, value: object, units: object|null, width: number, height: number, unitsFontSize: number, rowOriginX: number }}
  */
-export function getMetricWidgetLayout({
-  fontSize,
-  fontFamily,
-  valueText,
-  unitText,
-  showIcon,
-  showUnits,
-  iconSize,
-  contentAlignment,
-  globalScale,
-}) {
+export function getMetricWidgetLayout({ fontSize, fontFamily, valueText, unitText, showIcon, showUnits, iconSize, contentAlignment, globalScale }) {
   // Font metrics — compute line heights and measure both value and units text using canvas measurement
   const valueLineHeight = fontSize * METRIC_WIDGET_LINE_HEIGHT
   const unitsFontSize = Math.max(fontSize * 0.28, 12)

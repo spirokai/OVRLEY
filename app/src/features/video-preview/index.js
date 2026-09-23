@@ -6,3 +6,4 @@
 export { useVideoPreview } from './hooks/useVideoPreview'
 export { useVideoPlaybackClock } from './hooks/useVideoPlaybackClock'
 export { default as useVideoImport } from './hooks/useVideoImport'
+export { default as VideoPreviewSurface } from './components/VideoPreviewSurface'

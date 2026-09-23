@@ -73,8 +73,8 @@ pub struct PreviewRenderReport {
     pub value_count: usize,
     pub label_count: usize,
     pub label_cache_status: LabelCacheStatus,
-    pub route_widget: Option<WidgetRenderReport>,
-    pub elevation_widget: Option<WidgetRenderReport>,
+    pub route_widgets: Vec<WidgetRenderReport>,
+    pub elevation_widgets: Vec<WidgetRenderReport>,
     pub metric_presentations: Vec<MetricPresentationReport>,
     pub prepare_timings: BTreeMap<String, TimingBucket>,
     pub frame_timings: BTreeMap<String, TimingBucket>,
@@ -408,16 +408,17 @@ pub fn render_preview_with_prepared_assets(
     let total_started = Instant::now();
 
     // Phase 2: draw all overlay layers into a Skia surface.
-    let (mut surface, route_widget, elevation_widget, metric_presentations) = render_frame_surface(
-        request.paths,
-        request.dense_activity,
-        &request.prepared_preview_assets.prepared_assets,
-        frame_index,
-        scale,
-        request.prepared_preview_assets.labels_image.as_ref(),
-        &mut frame_profiler,
-        Some(&mut preview_profiler),
-    )?;
+    let (mut surface, route_widgets, elevation_widgets, metric_presentations) =
+        render_frame_surface(
+            request.paths,
+            request.dense_activity,
+            &request.prepared_preview_assets.prepared_assets,
+            frame_index,
+            scale,
+            request.prepared_preview_assets.labels_image.as_ref(),
+            &mut frame_profiler,
+            Some(&mut preview_profiler),
+        )?;
 
     // Phase 3: encode the surface snapshot as PNG to disk.
     preview_profiler.measure("preview.png_write", || {
@@ -465,8 +466,8 @@ pub fn render_preview_with_prepared_assets(
         value_count: request.prepared_preview_assets.prepared_assets.values.len(),
         label_count: request.prepared_preview_assets.prepared_assets.labels.len(),
         label_cache_status: request.label_cache_status,
-        route_widget,
-        elevation_widget,
+        route_widgets,
+        elevation_widgets,
         metric_presentations,
         prepare_timings: request.prepare_timings,
         frame_timings,
@@ -489,8 +490,8 @@ fn render_frame_surface(
     mut preview_profiler: Option<&mut RenderProfiler>,
 ) -> CoreResult<(
     skia_safe::Surface,
-    Option<WidgetRenderReport>,
-    Option<WidgetRenderReport>,
+    Vec<WidgetRenderReport>,
+    Vec<WidgetRenderReport>,
     Vec<MetricPresentationReport>,
 )> {
     // Preview rendering owns its surface and writes a PNG, while video rendering
@@ -540,8 +541,8 @@ fn render_frame_to_surface(
     base_layer_restored: bool,
     frame_profiler: &mut RenderProfiler,
 ) -> CoreResult<(
-    Option<WidgetRenderReport>,
-    Option<WidgetRenderReport>,
+    Vec<WidgetRenderReport>,
+    Vec<WidgetRenderReport>,
     Vec<MetricPresentationReport>,
 )> {
     let frame_started = Instant::now();
@@ -700,24 +701,26 @@ fn render_frame_to_surface(
         }
     }
 
-    let route_widget = prepared_assets
-        .route_cache
-        .as_ref()
-        .and_then(|cache| draw_route_widget(canvas, cache, frame_index, frame_profiler));
-    let elevation_widget = if let Some(cache) = &prepared_assets.elevation_cache {
-        draw_elevation_widget(
+    let route_widgets = prepared_assets
+        .route_caches
+        .iter()
+        .filter_map(|cache| draw_route_widget(canvas, cache, frame_index, frame_profiler))
+        .collect();
+    let mut elevation_widgets = Vec::new();
+    for cache in &prepared_assets.elevation_caches {
+        if let Some(report) = draw_elevation_widget(
             canvas,
             paths,
             cache,
             frame_index,
             &prepared_assets.scene,
             frame_profiler,
-        )?
-    } else {
-        None
-    };
+        )? {
+            elevation_widgets.push(report);
+        }
+    }
     frame_profiler.record_ms("frame.draw", frame_started.elapsed().as_secs_f64() * 1000.0);
-    Ok((route_widget, elevation_widget, metric_presentations))
+    Ok((route_widgets, elevation_widgets, metric_presentations))
 }
 
 // Adds legacy alternate names to timing buckets for compatibility with reports.

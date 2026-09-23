@@ -2,7 +2,7 @@
  * Orchestrates playback state, scrub state, and timeline-driven animation frames.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { getContainerFps } from '@/lib/update-rate'
 import { clamp } from '@/lib/utils'
 import {
@@ -84,8 +84,11 @@ export default function usePlaybackEngine({
   const isTimelinePlaybackActive = previewPlaybackState === 'playing' && previewPlaybackSource === 'timeline'
   const timelineMinimum = getTimelineMinimum({ hasVideo: Boolean(importedVideoPath), videoSyncOffsetSeconds })
   const clampedPlayhead = clamp(selectedSecond, timelineMinimum, totalDuration)
-  playbackSecondRef.current = clampedPlayhead
   const effectivePreviewFps = useMemo(() => getContainerFps(sceneFps, updateRate), [sceneFps, updateRate])
+
+  useLayoutEffect(() => {
+    playbackSecondRef.current = clampedPlayhead
+  }, [clampedPlayhead])
 
   const cancelScrub = useCallback(() => {
     latestScrubSecondRef.current = null

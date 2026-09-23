@@ -49,6 +49,14 @@ function parseStrictMetric(value, alias) {
   return numeric
 }
 
+function parseStrictLapNumber(value, alias) {
+  const numeric = safeNumber(value)
+  if (numeric === null || !Number.isSafeInteger(numeric)) {
+    throw new TypeError(`GPX extension ${alias} must be an integer when present`)
+  }
+  return numeric
+}
+
 export function parseGpxActivityFile(file, textContent) {
   const parser = new DOMParser()
   const documentNode = parser.parseFromString(textContent, 'application/xml')
@@ -92,9 +100,12 @@ export function parseGpxActivityFile(file, textContent) {
       calories: readTrackPointValue(extensionValues, ['calories', 'kcal', 'energy'], parseStrictMetric),
       cadence: readTrackPointMetric(extensionValues, ['cad', 'cadence']),
       core_temperature: readTrackPointMetric(extensionValues, ['core_temperature', 'coretemp', 'core_temp']),
-      distance: readTrackPointMetric(extensionValues, ['distance', 'distance_m', 'distancemeters']),
+      distance: readTrackPointMetric(extensionValues, ['distance', 'distance_m', 'distancemeters', 'travelled_distance', 'travelleddistance']),
       elevation,
       g_force: readTrackPointMetric(extensionValues, ['g_force', 'gforce']),
+      g_force_x: readTrackPointMetric(extensionValues, ['g_force_x', 'gforce_x', 'x_acceleration_g', 'xaccelerationg']),
+      g_force_y: readTrackPointMetric(extensionValues, ['g_force_y', 'gforce_y', 'y_acceleration_g', 'yaccelerationg']),
+      g_force_z: readTrackPointMetric(extensionValues, ['g_force_z', 'gforce_z', 'z_acceleration_g', 'zaccelerationg']),
       gear_position: readTrackPointValue(extensionValues, ['gear_position', 'gear', 'gear_ratio'], safeGearValue),
       gradient: readTrackPointMetric(extensionValues, ['gradient', 'grade', 'slope']),
       ground_contact_time: readTrackPointMetric(extensionValues, ['ground_contact_time', 'groundcontacttime', 'stance_time']),
@@ -102,10 +113,12 @@ export function parseGpxActivityFile(file, textContent) {
       heartrate: readTrackPointMetric(extensionValues, ['hr', 'heartrate', 'heart_rate']),
       latitude,
       left_right_balance: readTrackPointMetric(extensionValues, ['left_right_balance', 'leftrightbalance', 'balance']),
+      lap_number: readTrackPointValue(extensionValues, ['lap_number', 'lapnumber'], parseStrictLapNumber),
+      lean_angle: readTrackPointMetric(extensionValues, ['lean_angle', 'leanangle', 'lean']),
       longitude,
       pace: readTrackPointMetric(extensionValues, ['pace']),
       power: readTrackPointMetric(extensionValues, ['power', 'powerinwatts', 'watts']),
-      speed: readTrackPointMetric(extensionValues, ['speed', 'enhanced_speed']),
+      speed: readTrackPointMetric(extensionValues, ['speed', 'enhanced_speed', 'speed_mps', 'speedmps']),
       stride_length: readTrackPointMetric(extensionValues, ['stride_length', 'stridelength', 'step_length']),
       stroke_rate: readTrackPointMetric(extensionValues, ['stroke_rate', 'strokerate']),
       temperature: readTrackPointMetric(extensionValues, ['atemp', 'temperature', 'temp']),
@@ -128,7 +141,7 @@ export function parseGpxActivityFile(file, textContent) {
       skip_idle_gap_fill: false,
       smoothing: {
         pace: { enabled: true, method: 'zero_phase_ma', window_seconds: 5.0 },
-        heading: { enabled: true, method: 'circular_ema', window_seconds: 0.5 },
+        heading: { enabled: true, method: 'circular_ema', window_seconds: 3.0 },
       },
     },
   }

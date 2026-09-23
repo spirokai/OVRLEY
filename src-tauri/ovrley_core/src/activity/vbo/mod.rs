@@ -358,7 +358,7 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
                     SmoothingOption {
                         enabled: true,
                         method: "circular_ema".to_string(),
-                        window_seconds: 0.0,
+                        window_seconds: 1.0,
                     },
                 ),
             ]

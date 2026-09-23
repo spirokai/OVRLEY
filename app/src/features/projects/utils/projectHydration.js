@@ -4,6 +4,17 @@ import { getTimelineMinimum } from '@/features/player/utils/playerTiming'
 import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlice'
 import { activateParsedActivity } from '@/lib/activity/import-activity'
 
+function assertLandmarksFitVideo(landmarks, videoDurationSeconds) {
+  if (landmarks.length === 0) return
+  if (videoDurationSeconds === null) {
+    throw new Error('Manual video sync landmarks require an imported video')
+  }
+  const invalidLandmark = landmarks.find((landmark) => landmark.videoSecond > videoDurationSeconds)
+  if (invalidLandmark) {
+    throw new Error('Manual video sync landmark videoSecond must be within the imported video duration')
+  }
+}
+
 /**
  * Replaces project-owned session state for a new project.
  * @param {object} store Zustand application store.
@@ -41,6 +52,7 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
     }
     draft.errorMessage = null
   })
+  state.resetVideoSyncState()
 }
 
 /**
@@ -52,6 +64,8 @@ export function applyNewProjectState(store, { templateSource, templateState }) {
  */
 export function applyProjectOwnedState(store, project) {
   const state = store.getState()
+  assertLandmarksFitVideo(project.sync.manual.landmarks, state.importedVideoDuration)
+  state.hydrateVideoSyncState(project.sync.manual)
   const hasVideo = Boolean(state.importedVideoPath)
   const timelineMinimum = getTimelineMinimum({
     hasVideo,

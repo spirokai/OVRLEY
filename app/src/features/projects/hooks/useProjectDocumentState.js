@@ -27,6 +27,7 @@ export default function useProjectDocumentState() {
       renderingVideo: state.renderingVideo,
       videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
       videoSyncTimezoneMode: state.videoSyncTimezoneMode,
+      manualVideoSync: state.manualVideoSync,
     })),
   )
   const [loadedProjectPath, setLoadedProjectPath] = useState(null)

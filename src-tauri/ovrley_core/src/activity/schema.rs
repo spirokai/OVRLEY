@@ -238,7 +238,8 @@ pub struct SmoothingOption {
     pub enabled: bool,
     /// Algorithm identifier chosen by the parser for this metric.
     pub method: String,
-    /// Time horizon used by windowed algorithms; circular EMA ignores it.
+    /// Time horizon used by windowed algorithms, including the circular EMA
+    /// time constant for heading.
     pub window_seconds: f64,
 }
 
@@ -303,9 +304,24 @@ pub struct RawSample {
     /// Cumulative distance in meters.
     #[serde(default)]
     pub distance: Option<f64>,
+    /// Source lap label, when the format provides one.
+    #[serde(default)]
+    pub lap_number: Option<i64>,
     /// Dynamic acceleration in multiples of Earth gravity.
     #[serde(default)]
     pub g_force: Option<f64>,
+    /// Source X acceleration in multiples of Earth gravity.
+    #[serde(default)]
+    pub g_force_x: Option<f64>,
+    /// Source Y acceleration in multiples of Earth gravity.
+    #[serde(default)]
+    pub g_force_y: Option<f64>,
+    /// Source Z acceleration in multiples of Earth gravity.
+    #[serde(default)]
+    pub g_force_z: Option<f64>,
+    /// Signed vehicle lean angle in degrees.
+    #[serde(default)]
+    pub lean_angle: Option<f64>,
     /// Direct source vertical speed in meters per second.
     #[serde(default)]
     pub vertical_speed: Option<f64>,

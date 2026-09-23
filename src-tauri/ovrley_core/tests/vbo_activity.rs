@@ -21,7 +21,7 @@ time lat long velocity heading height vert-vel\n\
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 0.5, 1.5]);
     assert_eq!(activity.course[0], (Some(47.0), Some(82.0)));
     assert_eq!(activity.speed, vec![Some(10.0), Some(20.0), Some(25.0)]);
-    assert_eq!(activity.heading[1], Some(180.05));
+    assert_eq!(activity.heading[1], Some(180.393));
     assert_eq!(activity.elevation[2], Some(102.0));
     assert_eq!(activity.vertical_speed[0], Some(1.5 / 3.6));
     assert!(activity.distance.last().copied().flatten().unwrap() > 0.0);
@@ -178,7 +178,7 @@ time rc-latitude-1-gps rc_longitude_1_gps speed-2-canbus bearing-calc altitude-g
 
     assert_eq!(activity.course[0], (Some(47.0), Some(-82.0)));
     assert_eq!(activity.speed, vec![Some(4.4704), Some(8.9408)]);
-    assert_eq!(activity.heading, vec![Some(180.0), Some(180.05)]);
+    assert_eq!(activity.heading, vec![Some(180.0), Some(180.632)]);
     assert_eq!(activity.elevation, vec![Some(100.0), Some(101.0)]);
     assert_eq!(activity.vertical_speed, vec![Some(10.0), Some(20.0)]);
     assert_eq!(activity.distance, vec![Some(0.0), Some(10.0)]);

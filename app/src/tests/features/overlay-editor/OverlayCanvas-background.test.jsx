@@ -10,7 +10,7 @@ import { describe, expect, test, vi } from 'vitest'
 vi.mock('@tauri-apps/api/core', () => ({ convertFileSrc: (path) => path }))
 
 vi.mock('@/features/video-preview', () => ({
-  useVideoPreview: () => ({ videoSrc: '', importId: null, isOutOfRange: false, videoPreviewMessages: [] }),
+  VideoPreviewSurface: () => <div data-testid="video-preview-surface" />,
 }))
 
 vi.mock('@/features/widget-preview', () => ({

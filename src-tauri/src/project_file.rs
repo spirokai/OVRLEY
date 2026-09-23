@@ -18,7 +18,16 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 const PROJECT_FORMAT: &str = "ovrley-project";
-const PROJECT_VERSION: u32 = 1;
+const PROJECT_VERSION: u32 = 2;
+const PROJECT_VERSION_V1: u32 = 1;
+const MAX_MANUAL_LANDMARKS: usize = 5;
+const MAX_MANUAL_LOCATION_LANDMARKS: usize = 1;
+const DEFAULT_MANUAL_SPEED_THRESHOLD_KMH: f64 = 5.0;
+const MIN_MANUAL_SPEED_THRESHOLD_KMH: f64 = 1.0;
+const MAX_MANUAL_SPEED_THRESHOLD_KMH: f64 = 10.0;
+const DEFAULT_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 80.0;
+const MIN_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 70.0;
+const MAX_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 160.0;
 const PROJECT_JSON_ENTRY: &str = "project.json";
 const THUMBNAIL_ENTRY: &str = "thumbnail.png";
 const MAX_PROJECT_JSON_SIZE: u64 = 4 * 1024 * 1024;
@@ -120,6 +129,19 @@ pub(crate) struct ProjectDocument {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectDocumentV1 {
+    format: String,
+    version: u32,
+    saved_at: String,
+    editor: ProjectEditor,
+    sources: ProjectSources,
+    sync: ProjectSyncV1,
+    render: ProjectRender,
+    timeline: ProjectTimeline,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectEditor {
     config: Value,
     global_defaults: GlobalDefaults,
@@ -174,6 +196,65 @@ struct ProjectSource {
 struct ProjectSync {
     video_offset_seconds: f64,
     video_timezone_mode: Option<VideoTimezoneMode>,
+    manual: ProjectManualVideoSync,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectSyncV1 {
+    video_offset_seconds: f64,
+    video_timezone_mode: Option<VideoTimezoneMode>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectManualVideoSync {
+    landmarks: Vec<ProjectLandmark>,
+    #[serde(default)]
+    detected_location_second: Option<f64>,
+    speed_threshold_kmh: f64,
+    turn_threshold_degrees: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", deny_unknown_fields)]
+enum ProjectLandmark {
+    #[serde(rename = "stop")]
+    Stop {
+        id: String,
+        #[serde(rename = "videoSecond")]
+        video_second: f64,
+    },
+    #[serde(rename = "leftTurn")]
+    LeftTurn {
+        id: String,
+        #[serde(rename = "videoSecond")]
+        video_second: f64,
+    },
+    #[serde(rename = "rightTurn")]
+    RightTurn {
+        id: String,
+        #[serde(rename = "videoSecond")]
+        video_second: f64,
+    },
+    #[serde(rename = "location")]
+    Location {
+        id: String,
+        #[serde(rename = "videoSecond")]
+        video_second: f64,
+        #[serde(
+            rename = "activitySecond",
+            deserialize_with = "deserialize_required_activity_second"
+        )]
+        activity_second: Option<f64>,
+    },
+}
+
+fn deserialize_required_activity_second<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<f64>::deserialize(deserializer)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -321,7 +402,96 @@ fn validate_project(project: &ProjectDocument) -> Result<(), String> {
     if project.timeline.view_start >= project.timeline.view_end {
         return Err("Timeline viewport requires viewStart < viewEnd".into());
     }
+    if !project.sync.manual.landmarks.is_empty() && project.sources.video.is_none() {
+        return Err("sync.manual.landmarks require a video source".into());
+    }
+    if project.sync.manual.detected_location_second.is_some() && project.sources.activity.is_none()
+    {
+        return Err("sync.manual.detectedLocationSecond requires an activity source".into());
+    }
+    validate_manual_video_sync(&project.sync.manual)?;
     validate_editor(&project.editor)?;
+    Ok(())
+}
+
+fn validate_manual_video_sync(manual: &ProjectManualVideoSync) -> Result<(), String> {
+    if let Some(activity_second) = manual.detected_location_second {
+        if !activity_second.is_finite() || activity_second < 0.0 {
+            return Err(
+                "sync.manual.detectedLocationSecond must be a finite non-negative number or null"
+                    .into(),
+            );
+        }
+    }
+    if manual.landmarks.len() > MAX_MANUAL_LANDMARKS {
+        return Err(format!(
+            "sync.manual.landmarks must contain at most {MAX_MANUAL_LANDMARKS} landmarks"
+        ));
+    }
+    if !manual.speed_threshold_kmh.is_finite()
+        || !(MIN_MANUAL_SPEED_THRESHOLD_KMH..=MAX_MANUAL_SPEED_THRESHOLD_KMH)
+            .contains(&manual.speed_threshold_kmh)
+    {
+        return Err(format!(
+            "sync.manual.speedThresholdKmh must be finite and between {MIN_MANUAL_SPEED_THRESHOLD_KMH} and {MAX_MANUAL_SPEED_THRESHOLD_KMH}"
+        ));
+    }
+    if !manual.turn_threshold_degrees.is_finite()
+        || !(MIN_MANUAL_TURN_THRESHOLD_DEGREES..=MAX_MANUAL_TURN_THRESHOLD_DEGREES)
+            .contains(&manual.turn_threshold_degrees)
+    {
+        return Err(format!(
+            "sync.manual.turnThresholdDegrees must be finite and between {MIN_MANUAL_TURN_THRESHOLD_DEGREES} and {MAX_MANUAL_TURN_THRESHOLD_DEGREES}"
+        ));
+    }
+
+    let mut ids = Vec::with_capacity(manual.landmarks.len());
+    let mut location_count = 0;
+    for landmark in &manual.landmarks {
+        let (id, video_second, activity_second) = match landmark {
+            ProjectLandmark::Stop {
+                id, video_second, ..
+            }
+            | ProjectLandmark::LeftTurn {
+                id, video_second, ..
+            }
+            | ProjectLandmark::RightTurn {
+                id, video_second, ..
+            } => (id, *video_second, None),
+            ProjectLandmark::Location {
+                id,
+                video_second,
+                activity_second,
+            } => {
+                location_count += 1;
+                (id, *video_second, *activity_second)
+            }
+        };
+        if id.trim().is_empty() {
+            return Err("sync.manual.landmark id must not be empty".into());
+        }
+        if ids.iter().any(|existing| *existing == id) {
+            return Err(format!("sync.manual.landmark id is duplicated: {id}"));
+        }
+        ids.push(id);
+        if !video_second.is_finite() || video_second < 0.0 {
+            return Err(
+                "sync.manual.landmark videoSecond must be a finite non-negative number".into(),
+            );
+        }
+        if let Some(activity_second) = activity_second {
+            if !activity_second.is_finite() {
+                return Err(
+                    "sync.manual.location landmark activitySecond must be finite or null".into(),
+                );
+            }
+        }
+    }
+    if location_count > MAX_MANUAL_LOCATION_LANDMARKS {
+        return Err(format!(
+            "sync.manual.landmarks must contain at most {MAX_MANUAL_LOCATION_LANDMARKS} location landmark"
+        ));
+    }
     Ok(())
 }
 
@@ -380,9 +550,63 @@ fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
     Ok(())
 }
 
-fn parse_project(input: &str) -> Result<ProjectDocument, String> {
-    let mut project: ProjectDocument =
+fn migrate_v1_project(project: ProjectDocumentV1) -> ProjectDocument {
+    ProjectDocument {
+        format: project.format,
+        version: PROJECT_VERSION,
+        saved_at: project.saved_at,
+        editor: project.editor,
+        sources: project.sources,
+        sync: ProjectSync {
+            video_offset_seconds: project.sync.video_offset_seconds,
+            video_timezone_mode: project.sync.video_timezone_mode,
+            manual: ProjectManualVideoSync {
+                landmarks: Vec::new(),
+                detected_location_second: None,
+                speed_threshold_kmh: DEFAULT_MANUAL_SPEED_THRESHOLD_KMH,
+                turn_threshold_degrees: DEFAULT_MANUAL_TURN_THRESHOLD_DEGREES,
+            },
+        },
+        render: project.render,
+        timeline: project.timeline,
+    }
+}
+
+fn parse_project_header(input: &str) -> Result<(String, u32, Value), String> {
+    let value: Value =
         serde_json::from_str(input).map_err(|error| format!("Invalid project JSON: {error}"))?;
+    let object = value
+        .as_object()
+        .ok_or_else(|| "Project JSON root must be an object".to_string())?;
+    let format = object
+        .get("format")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "Project format must be a string".to_string())?
+        .to_string();
+    let version = object
+        .get("version")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| "Project version must be an unsigned integer".to_string())?;
+    let version = u32::try_from(version)
+        .map_err(|_| "Project version is outside the supported range".to_string())?;
+    Ok((format, version, value))
+}
+
+fn parse_project(input: &str) -> Result<ProjectDocument, String> {
+    let (format, version, value) = parse_project_header(input)?;
+    if format != PROJECT_FORMAT {
+        return Err(format!("Unsupported project format: {format}"));
+    }
+    let mut project = match version {
+        PROJECT_VERSION_V1 => {
+            let legacy: ProjectDocumentV1 = serde_json::from_value(value)
+                .map_err(|error| format!("Invalid version 1 project: {error}"))?;
+            migrate_v1_project(legacy)
+        }
+        PROJECT_VERSION => serde_json::from_value(value)
+            .map_err(|error| format!("Invalid version 2 project: {error}"))?,
+        other => return Err(format!("Unsupported project version: {other}")),
+    };
     validate_project(&project)?;
     let scene = project
         .editor
@@ -594,7 +818,9 @@ fn write_project_file_sync(
     ffmpeg: Option<&Path>,
 ) -> Result<String, String> {
     let project = parse_project(&project_json)?;
-    if project_json.len() as u64 > MAX_PROJECT_JSON_SIZE {
+    let canonical_json = serde_json::to_string(&project)
+        .map_err(|error| format!("Failed to serialize canonical project: {error}"))?;
+    if canonical_json.len() as u64 > MAX_PROJECT_JSON_SIZE {
         return Err("project.json exceeds the 4 MiB size limit".into());
     }
     let target = PathBuf::from(&path);
@@ -609,7 +835,7 @@ fn write_project_file_sync(
         .and_then(|source| resolve_locator(&target, &source.path).ok())
         .and_then(|video_path| ffmpeg.and_then(|ffmpeg| generate_thumbnail(ffmpeg, &video_path)));
     let temporary = parent.join(format!(".ovrley-project-{}.tmp", Uuid::new_v4()));
-    if let Err(error) = write_archive(&temporary, &project_json, thumbnail.as_deref()) {
+    if let Err(error) = write_archive(&temporary, &canonical_json, thumbnail.as_deref()) {
         let _ = fs::remove_file(&temporary);
         return Err(error);
     }
@@ -657,13 +883,29 @@ mod tests {
                 "activity": { "path": { "kind": "project-relative", "value": "media/session.fit" } },
                 "video": null
             },
-            "sync": { "videoOffsetSeconds": 0.0, "videoTimezoneMode": null },
+            "sync": {
+                "videoOffsetSeconds": 0.0,
+                "videoTimezoneMode": null,
+                "manual": {
+                    "landmarks": [],
+                    "detectedLocationSecond": null,
+                    "speedThresholdKmh": 5.0,
+                    "turnThresholdDegrees": 90.0
+                }
+            },
             "render": {
                 "fps": 30.0, "widgetUpdateRate": 1, "exportMode": "transparent", "codec": "prores_ks",
                 "bitrateMbps": null, "range": { "type": "all", "from": 0.0, "to": 0.0 }
             },
             "timeline": { "playheadSecond": 0.0, "viewStart": 0.0, "viewEnd": 73.0 }
         }).to_string()
+    }
+
+    fn valid_v1_project_json() -> String {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["version"] = Value::from(PROJECT_VERSION_V1);
+        project["sync"].as_object_mut().unwrap().remove("manual");
+        project.to_string()
     }
 
     #[test]
@@ -680,6 +922,52 @@ mod tests {
             Some(path_string(directory.join("media/session.fit")))
         );
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn v2_manual_sync_round_trip_preserves_landmarks_location_and_thresholds() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["sources"]["video"] = serde_json::json!({
+            "path": { "kind": "project-relative", "value": "media/video.mp4" }
+        });
+        project["sync"]["manual"] = serde_json::json!({
+            "landmarks": [
+                { "id": "stop-1", "type": "stop", "videoSecond": 4.0 },
+                { "id": "left-1", "type": "leftTurn", "videoSecond": 8.0 },
+                { "id": "right-1", "type": "rightTurn", "videoSecond": 12.0 },
+                { "id": "location-1", "type": "location", "videoSecond": 16.0, "activitySecond": null }
+            ],
+            "detectedLocationSecond": 42.5,
+            "speedThresholdKmh": 7.0,
+            "turnThresholdDegrees": 120.0
+        });
+
+        let parsed = parse_project(&project.to_string()).unwrap();
+        let serialized = serde_json::to_value(parsed).unwrap();
+        assert_eq!(serialized["sync"]["manual"], project["sync"]["manual"]);
+    }
+
+    #[test]
+    fn older_v2_manual_sync_without_detected_location_loads_as_none() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["sync"]["manual"]
+            .as_object_mut()
+            .unwrap()
+            .remove("detectedLocationSecond");
+
+        let parsed = parse_project(&project.to_string()).unwrap();
+        assert_eq!(parsed.sync.manual.detected_location_second, None);
+    }
+
+    #[test]
+    fn rejects_invalid_or_unowned_detected_location() {
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["sync"]["manual"]["detectedLocationSecond"] = Value::from(-1.0);
+        assert!(parse_project(&project.to_string()).is_err());
+
+        project["sync"]["manual"]["detectedLocationSecond"] = Value::from(42.5);
+        project["sources"]["activity"] = Value::Null;
+        assert!(parse_project(&project.to_string()).is_err());
     }
 
     #[test]
@@ -736,10 +1024,75 @@ mod tests {
         for invalid in [
             "not json".to_string(),
             valid_project_json().replace(PROJECT_FORMAT, "wrong-project"),
-            valid_project_json().replace("\"version\":1", "\"version\":99"),
+            valid_project_json().replace("\"version\":2", "\"version\":99"),
             valid_project_json().replace("\"fps\":30.0", "\"fps\":0.0"),
         ] {
             assert!(parse_project(&invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn migrates_v1_to_canonical_v2_without_rewriting_on_read() {
+        let parsed = parse_project(&valid_v1_project_json()).unwrap();
+        assert_eq!(parsed.version, PROJECT_VERSION);
+        assert!(parsed.sync.manual.landmarks.is_empty());
+        assert_eq!(parsed.sync.manual.speed_threshold_kmh, 5.0);
+        assert_eq!(parsed.sync.manual.turn_threshold_degrees, 80.0);
+    }
+
+    #[test]
+    fn saving_a_v1_document_writes_canonical_v2() {
+        let directory =
+            std::env::temp_dir().join(format!("ovrley-project-v1-save-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("Legacy.oly");
+        write_project_file_sync(path_string(path.clone()), valid_v1_project_json(), None).unwrap();
+        assert_eq!(
+            read_project_file(path_string(path))
+                .unwrap()
+                .project
+                .version,
+            PROJECT_VERSION
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn rejects_malformed_v2_manual_sync_contracts() {
+        let mut generic_turn: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        generic_turn["sync"]["manual"]["landmarks"] = serde_json::json!([
+            { "id": "turn", "type": "turn", "videoSecond": 4.0 }
+        ]);
+
+        let mut missing_location_activity: Value =
+            serde_json::from_str(&valid_project_json()).unwrap();
+        missing_location_activity["sync"]["manual"]["landmarks"] = serde_json::json!([
+            { "id": "location", "type": "location", "videoSecond": 4.0 }
+        ]);
+
+        let mut duplicate_ids: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        duplicate_ids["sync"]["manual"]["landmarks"] = serde_json::json!([
+            { "id": "same", "type": "stop", "videoSecond": 1.0 },
+            { "id": "same", "type": "leftTurn", "videoSecond": 2.0 }
+        ]);
+
+        let mut landmark_without_video: Value =
+            serde_json::from_str(&valid_project_json()).unwrap();
+        landmark_without_video["sources"]["video"] = Value::Null;
+        landmark_without_video["sync"]["manual"]["landmarks"] = serde_json::json!([
+            { "id": "stop", "type": "stop", "videoSecond": 1.0 }
+        ]);
+
+        for (label, invalid) in [
+            ("generic turn", generic_turn),
+            ("missing location activitySecond", missing_location_activity),
+            ("duplicate landmark ids", duplicate_ids),
+            ("landmark without video source", landmark_without_video),
+        ] {
+            assert!(
+                parse_project(&invalid.to_string()).is_err(),
+                "accepted invalid contract: {label}"
+            );
         }
     }
 
@@ -796,7 +1149,7 @@ mod tests {
         assert_eq!(parsed.editor.config["scene"]["fps"], Value::from(30.0));
         assert_eq!(
             parsed.editor.config["scene"]["updateRate"],
-            Value::from(1.0)
+            Value::from(1)
         );
     }
 
