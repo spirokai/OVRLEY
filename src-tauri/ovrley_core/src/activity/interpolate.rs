@@ -101,6 +101,15 @@ pub fn interpolate_time_series_value(
         })
         .collect::<Vec<_>>();
 
+    if numeric_points
+        .first()
+        .is_some_and(|(first, _)| target_x < *first)
+        || numeric_points
+            .last()
+            .is_some_and(|(last, _)| target_x > *last)
+    {
+        return None;
+    }
     interpolate_points(&numeric_points, target_x).map(|millis| {
         DateTime::<Utc>::from_timestamp_millis(millis.round() as i64)
             .unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
@@ -272,6 +281,11 @@ fn interpolate_time_series(
         return target_x_values
             .iter()
             .map(|target| {
+                if points.first().is_some_and(|(first, _)| *target < *first)
+                    || points.last().is_some_and(|(last, _)| *target > *last)
+                {
+                    return None;
+                }
                 interpolate_points(&points, *target).map(|millis| {
                     DateTime::<Utc>::from_timestamp_millis(millis.round() as i64)
                         .unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
@@ -402,12 +416,22 @@ pub fn densify_activity(
             if !enabled || y.is_empty() {
                 return Vec::new();
             }
-            match interpolation_strategy(kind) {
+            let mut dense = match interpolation_strategy(kind) {
                 InterpolationStrategy::Hold => densify_hold_series(x, y, target),
                 InterpolationStrategy::Numeric(policy) => {
                     interpolate_numeric_series(x, y, target, policy)
                 }
+            };
+            let first = y.iter().position(Option::is_some).map(|index| x[index]);
+            let last = y.iter().rposition(Option::is_some).map(|index| x[index]);
+            for (elapsed, value) in target.iter().zip(&mut dense) {
+                if first.is_some_and(|first| *elapsed < first)
+                    || last.is_some_and(|last| *elapsed > last)
+                {
+                    *value = None;
+                }
             }
+            dense
         };
 
     DenseActivityReport {

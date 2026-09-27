@@ -10,16 +10,17 @@ use std::iter;
 
 use serde_json::json;
 
-use crate::activity::schema::{ActivityColumns, RawActivityOptions, SmoothingOption};
+use crate::activity::schema::{
+    ActivityColumns, DirectMetricGapPolicy, RawActivityOptions, SmoothingOption,
+};
 use crate::media::native_sample::{NativeSample, TelemetrySeriesCounts};
 
 /// Builds aligned activity columns from pre-smoothed MP4 telemetry samples.
 ///
-/// GPS timestamps anchor the output timeline when GPS data exists; otherwise
-/// video FPS/duration provides a fallback timeline. IMU and camera values are
-/// selected by closest timestamp. Discrete camera fields hold their last known
-/// value independently because they represent step changes, not continuous
-/// signals.
+/// GPS packet timestamps anchor the output timeline when GPS data exists,
+/// including packets whose position was rejected. Video cadence covers any
+/// prefix before GPS packets and the video end. IMU uses the latest reading at
+/// or before each anchor; discrete camera settings hold their last known value.
 pub fn build_activity_columns(
     samples: &[NativeSample],
     fps: f64,
@@ -39,19 +40,59 @@ pub fn build_activity_columns(
     let imu: Vec<&NativeSample> = samples.iter().filter(|s| s.has_imu_payload()).collect();
     let cam: Vec<&NativeSample> = samples.iter().filter(|s| s.has_camera_payload()).collect();
     let has_gps = !gps.is_empty();
+    let elapsed_origin_ms = samples
+        .first()
+        .map(|sample| sample.timestamp_ms)
+        .unwrap_or(0.0);
+    let interval_ms = 1000.0 / fps.max(1.0);
+    let media_end_ms = if duration_s > 0.0 {
+        elapsed_origin_ms + duration_s * 1000.0
+    } else {
+        samples
+            .last()
+            .map(|sample| sample.timestamp_ms)
+            .unwrap_or(elapsed_origin_ms)
+    };
 
-    let (anchor_ms, anchor_gps_idx): (Vec<f64>, Vec<Option<usize>>) = if has_gps {
-        gps.iter()
-            .enumerate()
-            .map(|(index, sample)| (sample.timestamp_ms, Some(index)))
+    let (mut anchor_ms, mut anchor_gps_idx): (Vec<f64>, Vec<Option<usize>>) = if has_gps {
+        let first_packet_ms = samples
+            .iter()
+            .find(|sample| sample.gps_time_anchor || sample.gps_coordinates().is_some())
+            .map(|sample| sample.timestamp_ms.min(media_end_ms))
+            .unwrap_or(media_end_ms);
+        let prefix_count = ((first_packet_ms - elapsed_origin_ms) / interval_ms).ceil() as usize;
+        let prefix =
+            (0..prefix_count).map(|index| (elapsed_origin_ms + index as f64 * interval_ms, None));
+        let mut gps_index = 0;
+        prefix
+            .chain(
+                samples
+                    .iter()
+                    .filter(|sample| {
+                        (sample.gps_time_anchor || sample.gps_coordinates().is_some())
+                            && sample.timestamp_ms <= media_end_ms
+                    })
+                    .map(|sample| {
+                        let index = sample.gps_coordinates().map(|_| {
+                            let index = gps_index;
+                            gps_index += 1;
+                            index
+                        });
+                        (sample.timestamp_ms, index)
+                    }),
+            )
             .unzip()
     } else {
-        let interval_ms = 1000.0 / fps.max(1.0);
-        let max_t = duration_s * 1000.0;
-        let count = (max_t / interval_ms).ceil() as usize;
-        let timestamps: Vec<f64> = (0..count).map(|index| index as f64 * interval_ms).collect();
+        let count = ((media_end_ms - elapsed_origin_ms) / interval_ms).ceil() as usize;
+        let timestamps: Vec<f64> = (0..count)
+            .map(|index| elapsed_origin_ms + index as f64 * interval_ms)
+            .collect();
         (timestamps, iter::repeat(None).take(count).collect())
     };
+    if anchor_ms.last().is_none_or(|last| *last < media_end_ms) {
+        anchor_ms.push(media_end_ms);
+        anchor_gps_idx.push(None);
+    }
     let n = anchor_ms.len();
 
     let mut timestamp = vec![None; n];
@@ -71,12 +112,8 @@ pub fn build_activity_columns(
     let mut ev = vec![None; n];
     let mut color_temperature = vec![None; n];
 
-    let mut last_gps: Option<usize> = None;
     for (index, &gps_opt) in anchor_gps_idx.iter().enumerate() {
-        if let Some(gps_index) = gps_opt {
-            last_gps = Some(gps_index);
-        }
-        if let Some(gps_sample) = last_gps.and_then(|gps_index| gps.get(gps_index)) {
+        if let Some(gps_sample) = gps_opt.and_then(|gps_index| gps.get(gps_index)) {
             latitude[index] = gps_sample.latitude;
             longitude[index] = gps_sample.longitude;
             elevation[index] = gps_sample.altitude;
@@ -88,8 +125,10 @@ pub fn build_activity_columns(
 
     let mut imu_idx = 0usize;
     for (index, &anchor) in anchor_ms.iter().enumerate() {
-        advance_to_closest(&imu, &mut imu_idx, anchor);
-        if let Some(sample) = imu.get(imu_idx) {
+        while imu_idx < imu.len() && imu[imu_idx].timestamp_ms <= anchor {
+            imu_idx += 1;
+        }
+        if let Some(sample) = imu_idx.checked_sub(1).and_then(|index| imu.get(index)) {
             g_force[index] = sample.g_force;
             g_force_x[index] = sample.g_force_x;
             g_force_y[index] = sample.g_force_y;
@@ -105,14 +144,15 @@ pub fn build_activity_columns(
     let mut last_color_temp: Option<f64> = None;
     let mut cam_idx = 0usize;
     for (index, &anchor) in anchor_ms.iter().enumerate() {
-        advance_to_closest(&cam, &mut cam_idx, anchor);
-        if let Some(camera_sample) = cam.get(cam_idx) {
+        while cam_idx < cam.len() && cam[cam_idx].timestamp_ms <= anchor {
+            let camera_sample = cam[cam_idx];
             last_iso = camera_sample.iso.or(last_iso);
             last_aperture = camera_sample.aperture.or(last_aperture);
             last_shutter = camera_sample.shutter_speed.or(last_shutter);
             last_focal = camera_sample.focal_length.or(last_focal);
             last_ev = camera_sample.ev.or(last_ev);
             last_color_temp = camera_sample.color_temperature.or(last_color_temp);
+            cam_idx += 1;
         }
         iso[index] = last_iso;
         aperture[index] = last_aperture;
@@ -122,7 +162,6 @@ pub fn build_activity_columns(
         color_temperature[index] = last_color_temp;
     }
 
-    let elapsed_origin_ms = anchor_ms.first().copied().unwrap_or(0.0);
     let elapsed_seconds = anchor_ms
         .iter()
         .map(|timestamp_ms| Some((timestamp_ms - elapsed_origin_ms) / 1000.0))
@@ -165,7 +204,10 @@ pub fn build_activity_columns(
             ]
             .into(),
         },
-        preserve_direct_metric_gaps: Default::default(),
+        preserve_direct_metric_gaps: DirectMetricGapPolicy {
+            speed: true,
+            heading: true,
+        },
         timestamp,
         elapsed_seconds,
         latitude,
@@ -216,19 +258,82 @@ pub fn build_activity_columns(
     }
 }
 
-fn advance_to_closest(candidates: &[&NativeSample], idx: &mut usize, target_ms: f64) {
-    while *idx + 1 < candidates.len()
-        && (candidates[*idx + 1].timestamp_ms - target_ms).abs()
-            < (candidates[*idx].timestamp_ms - target_ms).abs()
-    {
-        *idx += 1;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::activity::finalize::finalize_activity_columns;
+
+    #[test]
+    fn invalid_gps_lead_in_keeps_time_and_independent_metrics() {
+        let samples = vec![
+            NativeSample {
+                timestamp_ms: 1000.0,
+                gps_time_anchor: true,
+                ..NativeSample::default()
+            },
+            NativeSample {
+                timestamp_ms: 1000.0,
+                g_force: Some(1.2),
+                shutter_speed: Some(0.005),
+                ..NativeSample::default()
+            },
+            NativeSample {
+                timestamp_ms: 2000.0,
+                gps_time_anchor: true,
+                ..NativeSample::default()
+            },
+            NativeSample {
+                timestamp_ms: 26_000.0,
+                gps_time_anchor: true,
+                latitude: Some(12.4198418),
+                longitude: Some(76.6687983),
+                speed: Some(5.823),
+                ..NativeSample::default()
+            },
+            NativeSample {
+                timestamp_ms: 27_000.0,
+                gps_time_anchor: true,
+                latitude: Some(12.4198500),
+                longitude: Some(76.6688000),
+                speed: Some(5.9),
+                ..NativeSample::default()
+            },
+        ];
+        let columns = build_activity_columns(
+            &samples,
+            30.0,
+            26.0,
+            None,
+            "GoPro",
+            None,
+            None,
+            "telemetry_parser",
+            "gps_anchored",
+            TelemetrySeriesCounts {
+                gps: 2,
+                imu: 1,
+                camera: 1,
+            },
+        );
+        let activity = finalize_activity_columns(&columns, None)
+            .unwrap()
+            .parsed_activity;
+
+        assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0, 25.0, 26.0]);
+        assert_eq!(activity.metadata["duration_seconds"], 26.0);
+        assert_eq!(activity.course[0], (None, None));
+        assert_eq!(activity.g_force[0], Some(1.2));
+        assert_eq!(activity.shutter_speed[0], Some(0.005));
+        assert_eq!(activity.course[2], (Some(12.4198418), Some(76.6687983)));
+        assert_eq!(
+            crate::activity::interpolate::interpolate_course_value(
+                &activity.sample_elapsed_seconds,
+                &activity.course,
+                0.0,
+            ),
+            (Some(12.4198418), Some(76.6687983)),
+        );
+    }
 
     #[test]
     fn mp4_columns_keep_existing_telemetry_and_leave_csv_metrics_absent() {

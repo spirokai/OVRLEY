@@ -344,7 +344,7 @@ pub fn insert_idle_gap_samples(raw_samples: &[RawSample]) -> (Vec<RawSample>, Ga
 /// Builds cumulative distance aligned to course samples.
 ///
 /// Direct distance values remain authoritative when present and monotonic; GPS
-/// segment distance fills the gaps so every sample has a usable progress base.
+/// segment distance fills interior gaps. Distance stays missing before the first observation.
 pub fn build_distance_series(
     course_points: &[(Option<f64>, Option<f64>)],
     direct_distance_series: &[Option<f64>],
@@ -394,9 +394,13 @@ pub fn build_distance_series(
         elapsed_seconds,
         &sparse_distance_series,
     );
+    let first_observation = points.first().map(|(elapsed, _)| *elapsed);
     elapsed_seconds
         .iter()
         .map(|elapsed| {
+            if first_observation.is_some_and(|first| *elapsed < first) {
+                return None;
+            }
             crate::interpolation::interpolate_points(&points, *elapsed)
                 .and_then(|distance| round_f64(distance, 3))
         })
