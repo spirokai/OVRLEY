@@ -6,7 +6,8 @@
     "start": 0,
     "end": 10,
     "composite_video_path": "test.mp4",
-    "composite_bitrate": "60M",
+    "qualityType": "bitrate",
+    "qualityValue": 60.0,
     "composite_sync_offset": 300,
     "composite_widget_update_rate": 2
   },

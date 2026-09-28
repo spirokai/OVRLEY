@@ -72,8 +72,6 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         input_args: &[],
         filter_complex: Some(SOFTWARE_H264_FILTER),
         output_args: &[
-            "-rc:v",
-            "vbr",
             "-bf:v",
             "3",
             "-profile:v",
@@ -90,8 +88,6 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         input_args: &[],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
         output_args: &[
-            "-rc:v",
-            "vbr",
             "-bf:v",
             "3",
             "-spatial-aq",
@@ -117,8 +113,6 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         ],
         filter_complex: Some(CUDA_H264_FILTER),
         output_args: &[
-            "-rc:v",
-            "vbr",
             "-bf:v",
             "3",
             "-profile:v",
@@ -144,8 +138,6 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         ],
         filter_complex: Some(CUDA_HEVC_FILTER),
         output_args: &[
-            "-rc:v",
-            "vbr",
             "-bf:v",
             "3",
             "-spatial-aq",
@@ -161,28 +153,28 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(SOFTWARE_H264_FILTER),
-        output_args: &["-mbbrc", "1"],
+        output_args: &[],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::QsvHevc,
         cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
-        output_args: &["-mbbrc", "1", "-tag:v", "hvc1"],
+        output_args: &["-tag:v", "hvc1"],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::QsvFullH264,
         cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(QSV_FULL_FILTER),
-        output_args: &["-mbbrc", "1"],
+        output_args: &[],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::QsvFullHevc,
         cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: Some(QSV_FULL_FILTER),
-        output_args: &["-mbbrc", "1", "-tag:v", "hvc1"],
+        output_args: &["-tag:v", "hvc1"],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::MacH264,
@@ -203,28 +195,28 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         cpu_cores_per_frame_worker: 4,
         input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
         filter_complex: Some(VAAPI_FILTER),
-        output_args: &["-rc_mode", "VBR"],
+        output_args: &[],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::VaapiHevc,
         cpu_cores_per_frame_worker: 4,
         input_args: &["-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"],
         filter_complex: Some(VAAPI_FILTER),
-        output_args: &["-rc_mode", "VBR", "-tag:v", "hvc1"],
+        output_args: &["-tag:v", "hvc1"],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::AmfH264,
         cpu_cores_per_frame_worker: 4,
         input_args: AMF_D3D11_INPUT_ARGS,
         filter_complex: Some(AMF_D3D11_FILTER),
-        output_args: &["-rc", "vbr_peak"],
+        output_args: &[],
     },
     CompositeProfile {
         codec_id: CompositeCodecId::AmfHevc,
         cpu_cores_per_frame_worker: 4,
         input_args: AMF_D3D11_INPUT_ARGS,
         filter_complex: Some(AMF_D3D11_FILTER),
-        output_args: &["-rc", "vbr_peak", "-tag:v", "hvc1"],
+        output_args: &["-tag:v", "hvc1"],
     },
 ];
 
@@ -274,35 +266,14 @@ mod tests {
     }
 
     #[test]
-    fn hardware_profiles_with_explicit_rate_control_use_vbr() {
+    fn nvidia_profiles_enable_temporal_aq() {
         for codec_id in [
             CompositeCodecId::NvgpuH264,
             CompositeCodecId::NvgpuHevc,
             CompositeCodecId::NnvgpuH264,
             CompositeCodecId::NnvgpuHevc,
         ] {
-            assert_output_arg_pair(codec_id, "-rc:v", "vbr");
             assert_output_arg_pair(codec_id, "-temporal-aq", "true");
-        }
-
-        for codec_id in [CompositeCodecId::VaapiH264, CompositeCodecId::VaapiHevc] {
-            assert_output_arg_pair(codec_id, "-rc_mode", "VBR");
-        }
-
-        for codec_id in [CompositeCodecId::AmfH264, CompositeCodecId::AmfHevc] {
-            assert_output_arg_pair(codec_id, "-rc", "vbr_peak");
-        }
-    }
-
-    #[test]
-    fn qsv_profiles_enable_macroblock_level_bitrate_control() {
-        for codec_id in [
-            CompositeCodecId::QsvH264,
-            CompositeCodecId::QsvHevc,
-            CompositeCodecId::QsvFullH264,
-            CompositeCodecId::QsvFullHevc,
-        ] {
-            assert_output_arg_pair(codec_id, "-mbbrc", "1");
         }
     }
 

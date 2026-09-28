@@ -69,7 +69,8 @@ struct CompositeDiagnostics<'a> {
     frame_render_mode: &'static str,
     frame_render_workers: usize,
     codec: &'static str,
-    bitrate: &'a str,
+    #[serde(flatten)]
+    quality: crate::encode::quality::EncodingQuality,
     source_fps: String,
     overlay_pipe_fps: String,
     render_duration: f64,
@@ -139,7 +140,7 @@ pub fn write_composite_timing_summary(
                 .codec_id
                 .metadata()
                 .profile_name,
-            bitrate: &plan.render.bitrate,
+            quality: plan.render.quality,
             source_fps: plan.render.source_fps.ffmpeg_arg(),
             overlay_pipe_fps: plan.render.overlay_pipe_fps.ffmpeg_arg(),
             render_duration: round3(plan.render.render_duration),

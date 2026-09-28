@@ -11,7 +11,7 @@ import { createEditorEffectiveConfig } from '@/lib/template/template-state'
 import { normalizeUpdateRateForFps, sanitizeIntegerFps } from '@/lib/update-rate'
 import { clamp } from '@/lib/utils'
 import { videoOverlapsActivity } from '@/lib/video-timing'
-import { formatCompositeBitrate, isCompositeCodec, isQsvFullCodec, resolveCompositeFps } from './render-execution'
+import { isCompositeCodec, isQsvFullCodec, resolveCompositeFps } from './render-execution'
 
 /**
  * Applies codec-specific FFmpeg defaults after the render codec is resolved.
@@ -51,7 +51,8 @@ function applyCompositeSceneFields(scene, options) {
     importedVideoFpsDen,
     importedVideoPath,
     importedVideoResolution,
-    exportBitrate,
+    qualityType,
+    qualityValue,
     videoSyncOffsetSeconds,
   } = options
   const sourceFps = resolveCompositeFps(importedVideoFpsNum, importedVideoFpsDen, importedVideoFps)
@@ -75,7 +76,8 @@ function applyCompositeSceneFields(scene, options) {
   scene.width = displayWidth
   scene.height = displayHeight
   scene.composite_video_path = importedVideoPath
-  scene.composite_bitrate = formatCompositeBitrate(exportBitrate)
+  scene.qualityType = qualityType
+  scene.qualityValue = qualityValue
   scene.composite_sync_offset = videoSyncOffsetSeconds
   scene.composite_video_fps_num = sourceFps.num
   scene.composite_video_fps_den = sourceFps.den
@@ -183,6 +185,8 @@ function applyTimelineSceneFields(scene, timelineStart, timelineEnd) {
  * @param {object|null|undefined} options.availableCodecs - Detected codec metadata from the backend.
  * @param {object} options.config - Committed template config.
  * @param {*} options.exportCodec - Requested export codec.
+ * @param {'quality'|'bitrate'} options.qualityType - Composite rate control mode.
+ * @param {number} options.qualityValue - CRF value (1–51) or bitrate in Mbps.
  * @param {'transparent'|'composite'|null|undefined} options.exportMode - Active export pipeline selection.
  * @param {object|null|undefined} options.exportRange - Export range settings.
  * @param {object|null|undefined} options.globalDefaults - Template global defaults.

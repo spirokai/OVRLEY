@@ -24,7 +24,7 @@ fn validated_transparent_config_preserves_absent_composite_fields() {
     }));
 
     assert_eq!(config.scene.composite_video_path, None);
-    assert_eq!(config.scene.composite_bitrate, None);
+    assert_eq!(config.scene.quality, None);
     assert_eq!(config.scene.composite_sync_offset, None);
     assert_eq!(config.scene.composite_video_fps_num, None);
     assert_eq!(config.scene.composite_video_fps_den, None);
@@ -43,7 +43,8 @@ fn validated_composite_config_preserves_fields() {
         "plots": []
     });
     config["scene"]["composite_video_path"] = json!("test.mp4");
-    config["scene"]["composite_bitrate"] = json!("60M");
+    config["scene"]["qualityType"] = json!("bitrate");
+    config["scene"]["qualityValue"] = json!(60.0);
     config["scene"]["composite_sync_offset"] = json!(300.0);
     config["scene"]["composite_video_fps_num"] = json!(30000);
     config["scene"]["composite_video_fps_den"] = json!(1001);
@@ -57,7 +58,10 @@ fn validated_composite_config_preserves_fields() {
         validated.scene.composite_video_path.as_deref(),
         Some("test.mp4")
     );
-    assert_eq!(validated.scene.composite_bitrate.as_deref(), Some("60M"));
+    assert_eq!(
+        validated.scene.quality,
+        Some(ovrley_core::encode::quality::EncodingQuality::Bitrate(60.0))
+    );
     assert_eq!(validated.scene.composite_sync_offset, Some(300.0));
     assert_eq!(validated.scene.composite_video_fps_num, Some(30000));
     assert_eq!(validated.scene.composite_video_fps_den, Some(1001));
@@ -569,4 +573,27 @@ fn durable_template_without_scene_timing_still_validates_for_save() {
 
 fn explicit_speed_value() -> serde_json::Value {
     common::builders::speed_value_json()
+}
+
+#[test]
+fn rejects_missing_and_malformed_composite_quality_at_ingress() {
+    let mut config = json!({
+        "scene": common::seam::explicit_scene_json(),
+        "labels": [], "values": [], "plots": []
+    });
+    config["scene"]["composite_video_path"] = json!("test.mp4");
+    for (quality_type, quality_value) in [
+        (json!("quality"), json!(null)),
+        (json!("unknown"), json!(18)),
+        (json!("quality"), json!("18")),
+        (json!("quality"), json!(52)),
+        (json!("bitrate"), json!(0)),
+    ] {
+        config["scene"]["qualityType"] = quality_type;
+        config["scene"]["qualityValue"] = quality_value;
+        assert!(
+            parse_and_validate_config(&config.to_string()).is_err(),
+            "{config}"
+        );
+    }
 }

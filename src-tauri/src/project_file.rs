@@ -6,6 +6,8 @@
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use chrono::DateTime;
+use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, EncoderId};
+use ovrley_core::encode::quality::{validate_quality, QualityType};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs::{self, File};
@@ -18,7 +20,8 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 const PROJECT_FORMAT: &str = "ovrley-project";
-const PROJECT_VERSION: u32 = 2;
+const PROJECT_VERSION: u32 = 3;
+const PROJECT_VERSION_V2: u32 = 2;
 const PROJECT_VERSION_V1: u32 = 1;
 const MAX_MANUAL_LANDMARKS: usize = 5;
 const MAX_MANUAL_LOCATION_LANDMARKS: usize = 1;
@@ -136,7 +139,20 @@ struct ProjectDocumentV1 {
     editor: ProjectEditor,
     sources: ProjectSources,
     sync: ProjectSyncV1,
-    render: ProjectRender,
+    render: LegacyProjectRender,
+    timeline: ProjectTimeline,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectDocumentV2 {
+    format: String,
+    version: u32,
+    saved_at: String,
+    editor: ProjectEditor,
+    sources: ProjectSources,
+    sync: ProjectSync,
+    render: LegacyProjectRender,
     timeline: ProjectTimeline,
 }
 
@@ -271,6 +287,18 @@ struct ProjectRender {
     widget_update_rate: u32,
     export_mode: ExportMode,
     codec: String,
+    quality_type: QualityType,
+    quality_value: f64,
+    range: ProjectRange,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LegacyProjectRender {
+    fps: f64,
+    widget_update_rate: u32,
+    export_mode: ExportMode,
+    codec: String,
     bitrate_mbps: Option<f64>,
     range: ProjectRange,
 }
@@ -381,11 +409,8 @@ fn validate_project(project: &ProjectDocument) -> Result<(), String> {
     if project.render.fps <= 0.0 || project.render.widget_update_rate == 0 {
         return Err("Render fps and widgetUpdateRate must be positive".into());
     }
-    if let Some(bitrate) = project.render.bitrate_mbps {
-        if !bitrate.is_finite() || bitrate <= 0.0 {
-            return Err("render.bitrateMbps must be a positive finite number or null".into());
-        }
-    }
+    validate_quality(project.render.quality_type, project.render.quality_value)
+        .map_err(|error| format!("render.{error}"))?;
     if project.render.codec.trim().is_empty() {
         return Err("render.codec must not be empty".into());
     }
@@ -550,8 +575,40 @@ fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
     Ok(())
 }
 
-fn migrate_v1_project(project: ProjectDocumentV1) -> ProjectDocument {
-    ProjectDocument {
+fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRender, String> {
+    if let Some(bitrate) = render.bitrate_mbps {
+        if !bitrate.is_finite() || bitrate <= 0.0 {
+            return Err("render.bitrateMbps must be a positive finite number or null".into());
+        }
+    }
+    let codec = CodecSelection::from_external_name(&render.codec)
+        .ok_or_else(|| format!("Unsupported render codec: {}", render.codec))?;
+    let is_hevc = match codec {
+        CodecSelection::Composite(codec) => matches!(
+            codec.metadata().encoder_id,
+            EncoderId::Libx265
+                | EncoderId::HevcNvenc
+                | EncoderId::HevcQsv
+                | EncoderId::HevcAmf
+                | EncoderId::HevcVideotoolbox
+                | EncoderId::HevcVaapi
+        ),
+        CodecSelection::Transparent(_) => false,
+    };
+    Ok(ProjectRender {
+        fps: render.fps,
+        widget_update_rate: render.widget_update_rate,
+        export_mode: render.export_mode,
+        codec: render.codec,
+        quality_type: QualityType::Quality,
+        // Fixed migration values keep v1/v2 loads independent of future UI defaults.
+        quality_value: if is_hevc { 20.0 } else { 18.0 },
+        range: render.range,
+    })
+}
+
+fn migrate_v1_project(project: ProjectDocumentV1) -> Result<ProjectDocument, String> {
+    Ok(ProjectDocument {
         format: project.format,
         version: PROJECT_VERSION,
         saved_at: project.saved_at,
@@ -567,9 +624,22 @@ fn migrate_v1_project(project: ProjectDocumentV1) -> ProjectDocument {
                 turn_threshold_degrees: DEFAULT_MANUAL_TURN_THRESHOLD_DEGREES,
             },
         },
-        render: project.render,
+        render: migrate_legacy_render(project.render)?,
         timeline: project.timeline,
-    }
+    })
+}
+
+fn migrate_v2_project(project: ProjectDocumentV2) -> Result<ProjectDocument, String> {
+    Ok(ProjectDocument {
+        format: project.format,
+        version: PROJECT_VERSION,
+        saved_at: project.saved_at,
+        editor: project.editor,
+        sources: project.sources,
+        sync: project.sync,
+        render: migrate_legacy_render(project.render)?,
+        timeline: project.timeline,
+    })
 }
 
 fn parse_project_header(input: &str) -> Result<(String, u32, Value), String> {
@@ -601,10 +671,15 @@ fn parse_project(input: &str) -> Result<ProjectDocument, String> {
         PROJECT_VERSION_V1 => {
             let legacy: ProjectDocumentV1 = serde_json::from_value(value)
                 .map_err(|error| format!("Invalid version 1 project: {error}"))?;
-            migrate_v1_project(legacy)
+            migrate_v1_project(legacy)?
+        }
+        PROJECT_VERSION_V2 => {
+            let legacy: ProjectDocumentV2 = serde_json::from_value(value)
+                .map_err(|error| format!("Invalid version 2 project: {error}"))?;
+            migrate_v2_project(legacy)?
         }
         PROJECT_VERSION => serde_json::from_value(value)
-            .map_err(|error| format!("Invalid version 2 project: {error}"))?,
+            .map_err(|error| format!("Invalid version 3 project: {error}"))?,
         other => return Err(format!("Unsupported project version: {other}")),
     };
     validate_project(&project)?;
@@ -895,14 +970,24 @@ mod tests {
             },
             "render": {
                 "fps": 30.0, "widgetUpdateRate": 1, "exportMode": "transparent", "codec": "prores_ks",
-                "bitrateMbps": null, "range": { "type": "all", "from": 0.0, "to": 0.0 }
+                "qualityType": "quality", "qualityValue": 18, "range": { "type": "all", "from": 0.0, "to": 0.0 }
             },
             "timeline": { "playheadSecond": 0.0, "viewStart": 0.0, "viewEnd": 73.0 }
         }).to_string()
     }
 
-    fn valid_v1_project_json() -> String {
+    fn valid_v2_project_json() -> String {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["version"] = Value::from(PROJECT_VERSION_V2);
+        let render = project["render"].as_object_mut().unwrap();
+        render.remove("qualityType");
+        render.remove("qualityValue");
+        render.insert("bitrateMbps".into(), Value::Null);
+        project.to_string()
+    }
+
+    fn valid_v1_project_json() -> String {
+        let mut project: Value = serde_json::from_str(&valid_v2_project_json()).unwrap();
         project["version"] = Value::from(PROJECT_VERSION_V1);
         project["sync"].as_object_mut().unwrap().remove("manual");
         project.to_string()
@@ -1024,24 +1109,29 @@ mod tests {
         for invalid in [
             "not json".to_string(),
             valid_project_json().replace(PROJECT_FORMAT, "wrong-project"),
-            valid_project_json().replace("\"version\":2", "\"version\":99"),
+            valid_project_json().replace("\"version\":3", "\"version\":99"),
             valid_project_json().replace("\"fps\":30.0", "\"fps\":0.0"),
+            valid_project_json().replace("\"qualityValue\":18", "\"qualityValue\":52"),
+            valid_project_json()
+                .replace("\"qualityType\":\"quality\"", "\"qualityType\":\"unknown\""),
         ] {
             assert!(parse_project(&invalid).is_err());
         }
     }
 
     #[test]
-    fn migrates_v1_to_canonical_v2_without_rewriting_on_read() {
+    fn migrates_v1_to_canonical_v3_without_rewriting_on_read() {
         let parsed = parse_project(&valid_v1_project_json()).unwrap();
         assert_eq!(parsed.version, PROJECT_VERSION);
         assert!(parsed.sync.manual.landmarks.is_empty());
         assert_eq!(parsed.sync.manual.speed_threshold_kmh, 5.0);
         assert_eq!(parsed.sync.manual.turn_threshold_degrees, 80.0);
+        assert_eq!(parsed.render.quality_type, QualityType::Quality);
+        assert_eq!(parsed.render.quality_value, 18.0);
     }
 
     #[test]
-    fn saving_a_v1_document_writes_canonical_v2() {
+    fn saving_a_v1_document_writes_canonical_v3() {
         let directory =
             std::env::temp_dir().join(format!("ovrley-project-v1-save-test-{}", Uuid::new_v4()));
         fs::create_dir_all(&directory).unwrap();
@@ -1055,6 +1145,23 @@ mod tests {
             PROJECT_VERSION
         );
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn migrates_legacy_projects_to_fixed_codec_quality_defaults() {
+        for legacy_json in [valid_v1_project_json(), valid_v2_project_json()] {
+            for (codec, expected) in [("libx264", 18.0), ("libx265", 20.0)] {
+                let mut project: Value = serde_json::from_str(&legacy_json).unwrap();
+                project["render"]["codec"] = Value::from(codec);
+                project["render"]["bitrateMbps"] = Value::from(60.0);
+                let parsed = parse_project(&project.to_string()).unwrap();
+                assert_eq!(parsed.version, PROJECT_VERSION);
+                assert_eq!(parsed.render.quality_type, QualityType::Quality);
+                assert_eq!(parsed.render.quality_value, expected);
+                project["render"]["bitrateMbps"] = Value::from(-1.0);
+                assert!(parse_project(&project.to_string()).is_err());
+            }
+        }
     }
 
     #[test]
@@ -1147,10 +1254,7 @@ mod tests {
 
         let parsed = parse_project(&project.to_string()).unwrap();
         assert_eq!(parsed.editor.config["scene"]["fps"], Value::from(30.0));
-        assert_eq!(
-            parsed.editor.config["scene"]["updateRate"],
-            Value::from(1)
-        );
+        assert_eq!(parsed.editor.config["scene"]["updateRate"], Value::from(1));
     }
 
     #[test]

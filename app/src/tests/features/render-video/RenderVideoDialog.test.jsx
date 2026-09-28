@@ -65,13 +65,25 @@ describe('RenderVideoDialog', () => {
           exportMode: 'composite',
           exportCodec: 'libx264',
           exportAcceleration: 'cpu',
-          exportBitrate: 20,
+          qualityType: 'quality',
+          qualityValue: 18,
           exportRange: { ...DEFAULT_EXPORT_RANGE },
         }}
       />,
     )
 
     expect(screen.getByText('Export Settings')).toBeInTheDocument()
+
+    const slider = screen.getByRole('slider', { name: 'Quality' })
+    expect(slider).toHaveAttribute('aria-valuenow', '27')
+    expect(slider).toHaveAttribute('aria-valuemin', '10')
+    expect(slider).toHaveAttribute('aria-valuemax', '35')
+    await user.click(screen.getByRole('tab', { name: 'Bitrate' }))
+    expect(screen.getByText('10 Mbps')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Quality' }))
+    await user.tab()
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByText('CRF 17')).toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: 'Transparent' }))
 
@@ -101,7 +113,8 @@ describe('RenderVideoDialog', () => {
           exportMode: 'composite',
           exportCodec: 'libx264',
           exportAcceleration: 'cpu',
-          exportBitrate: 20,
+          qualityType: 'quality',
+          qualityValue: 18,
           exportRange: {
             ...DEFAULT_EXPORT_RANGE,
             type: 'custom',

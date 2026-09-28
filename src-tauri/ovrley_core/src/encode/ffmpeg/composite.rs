@@ -25,6 +25,7 @@ use std::path::Path;
 
 use crate::encode::composite::CompositeRenderPlan;
 use crate::encode::ffmpeg::catalog::{CompositeCodecId, CompositeFilterStackKind};
+use crate::encode::quality::rate_control_args;
 use crate::error::{CoreError, CoreResult};
 use crate::render::FrameSize;
 
@@ -272,7 +273,7 @@ pub fn build_composite_ffmpeg_settings(
     {
         output_args.extend(["-bsf:v".to_string(), metadata_filter]);
     }
-    output_args.extend(["-b:v".to_string(), render.bitrate.clone()]);
+    output_args.extend(rate_control_args(selected_profile.codec_id, render.quality));
     if include_audio {
         output_args.extend([
             "-c:a".to_string(),
@@ -326,7 +327,7 @@ mod tests {
         ] {
             let render = CompositeRenderPlan {
                 video_path: "rotated-landscape.mp4".into(),
-                bitrate: "60M".to_string(),
+                quality: crate::encode::quality::EncodingQuality::Bitrate(60.0),
                 sync_offset: 0.0,
                 trim_start: 0.0,
                 render_duration: 1.0,

@@ -54,7 +54,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     delete editor.config.values[0].content_alignment
     const project = {
       format: 'ovrley-project',
-      version: 2,
+      version: 3,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor,
       sources: { activity: null, video: null },
@@ -89,7 +89,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const initialState = useStore.getState()
     const project = {
       format: 'ovrley-project',
-      version: 2,
+      version: 3,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({
         config: { ...initialState.config, scene: { ...initialState.config.scene, width: 1280 } },
@@ -109,7 +109,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         widgetUpdateRate: 2,
         exportMode: 'composite',
         codec: 'libx264',
-        bitrateMbps: 20,
+        qualityType: 'bitrate',
+        qualityValue: 20,
         range: { type: 'custom', from: 10, to: 80 },
       },
       timeline: { playheadSecond: 30, viewStart: 20, viewEnd: 60 },
@@ -403,7 +404,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const initialState = useStore.getState()
     const project = {
       format: 'ovrley-project',
-      version: 2,
+      version: 3,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: {
@@ -463,7 +464,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const projectPath = 'C:\\Events\\Broken.oly'
     const project = {
       format: 'ovrley-project',
-      version: 2,
+      version: 3,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: {
@@ -515,7 +516,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const projectPath = 'C:\\Events\\Empty.oly'
     const project = {
       format: 'ovrley-project',
-      version: 2,
+      version: 3,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: { activity: null, video: null },

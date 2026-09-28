@@ -11,6 +11,7 @@ use super::helpers::{
 };
 use super::raw::SceneConfig;
 use crate::encode::ffmpeg::catalog::{CodecSelection, CompositeCodecId, TransparentCodecId};
+use crate::encode::quality::{validate_quality, EncodingQuality};
 use crate::error::{CoreError, CoreResult};
 use serde_json::{Map, Value};
 use std::num::NonZeroU32;
@@ -142,7 +143,7 @@ pub struct ValidatedSceneConfig {
     pub ffmpeg: ValidatedFfmpegConfig,
     // ── Composite encoding ────────────────────────────────────────────
     pub composite_video_path: Option<String>,
-    pub composite_bitrate: Option<String>,
+    pub quality: Option<EncodingQuality>,
     pub composite_sync_offset: Option<f64>,
     pub composite_video_fps_num: Option<u32>,
     pub composite_video_fps_den: Option<u32>,
@@ -198,6 +199,21 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         CodecSelection::Transparent(TransparentCodecId::ProresKs)
     };
     let ffmpeg = validate_ffmpeg_config(raw.ffmpeg, default_codec)?;
+    // Rate control is optional for transparent exports and required for composites.
+    let quality = match (raw.quality_type, raw.quality_value) {
+        (None, None) if raw.composite_video_path.is_none() => None,
+        (None, _) => {
+            return Err(CoreError::Config(
+                "scene.qualityType required for composite render".into(),
+            ))
+        }
+        (_, None) => {
+            return Err(CoreError::Config(
+                "scene.qualityValue required for composite render".into(),
+            ))
+        }
+        (Some(quality_type), Some(value)) => Some(validate_quality(quality_type, value)?),
+    };
     let custom_export_range_active = raw.custom_export_range_active;
 
     Ok(ValidatedSceneConfig {
@@ -222,7 +238,7 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         overlay_filename: raw.overlay_filename,
         ffmpeg,
         composite_video_path: raw.composite_video_path,
-        composite_bitrate: raw.composite_bitrate,
+        quality,
         composite_sync_offset,
         composite_video_fps_num: raw.composite_video_fps_num,
         composite_video_fps_den: raw.composite_video_fps_den,

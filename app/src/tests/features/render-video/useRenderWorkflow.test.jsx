@@ -66,6 +66,23 @@ describe('useRenderWorkflow', () => {
     })
   })
 
+  test.each([
+    ['quality', 18],
+    ['bitrate', 35],
+  ])('passes and persists %s settings after a successful render', async (qualityType, qualityValue) => {
+    useStore.setState({ importedVideoPath: 'C:\\video.mp4' })
+    const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
+    await act(async () => result.current.openRenderDialog())
+    expect(result.current.renderSettingsDraft).toMatchObject({ qualityType: 'quality', qualityValue: 18 })
+    act(() => result.current.updateRenderSettingsDraft({ exportCodec: 'libx264', qualityType, qualityValue }))
+    await act(async () => result.current.handleRenderVideoConfirm())
+    expect(renderVideoMock).toHaveBeenCalledWith(expect.objectContaining({ qualityType, qualityValue }))
+    expect(useStore.getState().renderSettings).toMatchObject({ qualityType, qualityValue })
+    act(() => useStore.getState().clearRenderSession())
+    await act(async () => result.current.openRenderDialog())
+    expect(result.current.renderSettingsDraft).toMatchObject({ qualityType, qualityValue })
+  })
+
   test('keeps PNG preview enabled without rerendering as the playhead crosses activity boundaries', () => {
     let renderCount = 0
     const { result } = renderHook(() => {

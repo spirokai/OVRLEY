@@ -130,6 +130,8 @@ describe('normalizeTemplateConfig', () => {
         composite_video_path: '/path/to/video.mp4',
         composite_video_offset_start: 5,
         composite_bitrate: '8M',
+        qualityType: 'quality',
+        qualityValue: 18,
         composite_render_duration: 60,
       },
     }
@@ -144,6 +146,8 @@ describe('normalizeTemplateConfig', () => {
     expect(result.scene).not.toHaveProperty('scale')
     expect(result.scene).not.toHaveProperty('composite_video_path')
     expect(result.scene).not.toHaveProperty('composite_bitrate')
+    expect(result.scene).not.toHaveProperty('qualityType')
+    expect(result.scene).not.toHaveProperty('qualityValue')
     expect(result.scene).not.toHaveProperty('composite_render_duration')
   })
 

@@ -29,14 +29,11 @@ pub fn derive_composite_render_plan(
         .ok_or_else(|| {
             CoreError::Config("scene.composite_video_path required for composite render".into())
         })?;
-    let bitrate = scene
-        .composite_bitrate
-        .as_ref()
-        .filter(|value| !value.trim().is_empty())
-        .cloned()
-        .ok_or_else(|| {
-            CoreError::Config("scene.composite_bitrate required for composite render".into())
-        })?;
+    let quality = scene.quality.ok_or_else(|| {
+        CoreError::Config(
+            "scene.qualityType and scene.qualityValue required for composite render".into(),
+        )
+    })?;
     let fps_num = scene.composite_video_fps_num.ok_or_else(|| {
         CoreError::Config("scene.composite_video_fps_num required for composite render".into())
     })?;
@@ -146,7 +143,7 @@ pub fn derive_composite_render_plan(
 
     Ok(CompositeRenderPlan {
         video_path: PathBuf::from(video_path),
-        bitrate,
+        quality,
         sync_offset,
         trim_start,
         render_duration,

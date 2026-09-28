@@ -40,7 +40,7 @@ fn minimal_scene() -> ValidatedSceneConfig {
         overlay_filename: None,
         ffmpeg: crate::normalize::ValidatedFfmpegConfig::default(),
         composite_video_path: None,
-        composite_bitrate: None,
+        quality: None,
         composite_sync_offset: None,
         composite_video_fps_num: None,
         composite_video_fps_den: None,

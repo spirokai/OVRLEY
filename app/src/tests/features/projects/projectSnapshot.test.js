@@ -20,6 +20,8 @@ describe('project snapshot contract', () => {
         ...state.renderSettings,
         fps: 60,
         codec: 'h264_nvenc',
+        qualityType: 'bitrate',
+        qualityValue: 35,
       },
       selectedSecond: 12.5,
       timelineViewport: { viewStart: 10, viewEnd: 30 },
@@ -37,6 +39,8 @@ describe('project snapshot contract', () => {
       video: { path: { kind: 'absolute', value: 'D:\\video\\lap.mp4' } },
     })
     expect(project.render.fps).toBe(60)
+    expect(project.render).toMatchObject({ qualityType: 'bitrate', qualityValue: 35 })
+    expect(project.render).not.toHaveProperty('bitrateMbps')
     expect(project.timeline).toEqual({ playheadSecond: 12.5, viewStart: 10, viewEnd: 30 })
 
     const serialized = JSON.stringify(project)
@@ -110,7 +114,7 @@ describe('project snapshot contract', () => {
 
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
-    expect(project.version).toBe(2)
+    expect(project.version).toBe(3)
     expect(project.sync.manual).toEqual({
       landmarks: [
         { id: 'stop-1', type: 'stop', videoSecond: 4 },
