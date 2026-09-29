@@ -3,7 +3,7 @@
 use crate::encode::ffmpeg::catalog::{CompositeCodecId, CompositeFilterStackKind};
 use crate::error::{CoreError, CoreResult};
 
-use super::composite::CompositeProfile;
+use super::composite_profiles::CompositeProfile;
 
 const CUDA_FRAME_ALIGNMENT: u32 = 32;
 

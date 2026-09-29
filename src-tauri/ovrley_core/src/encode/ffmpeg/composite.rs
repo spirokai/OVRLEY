@@ -3,7 +3,7 @@
 //! This module is intentionally separate from the transparent-overlay FFmpeg
 //! builder so composite rendering can evolve as a parallel backend path.
 //!
-//! Owns: `CompositeProfile` (per-codec encoding profile), `CompositeFfmpegSettings`
+//! Owns: `CompositeFfmpegSettings`
 //!       (grouped FFmpeg arguments for 3-input composite encodes), and
 //!       `build_composite_ffmpeg_settings`
 //!       (the main argument construction function).
@@ -34,19 +34,6 @@ use super::composite_filters::{
     normalize_source_rotation, qsv_overlay_cpu_rotation_filter, source_rotation_filter,
 };
 use super::composite_profiles::composite_profile;
-
-/// Profile-specific FFmpeg settings for composite encoding.
-///
-/// Later phases can use this to describe hardware decoder, filter, and encoder
-/// variations without changing the software default builder surface.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CompositeProfile {
-    pub codec_id: CompositeCodecId,
-    pub cpu_cores_per_frame_worker: usize,
-    pub input_args: &'static [&'static str],
-    pub filter_complex: Option<&'static str>,
-    pub output_args: &'static [&'static str],
-}
 
 /// Grouped FFmpeg arguments needed to spawn a composite render.
 ///
@@ -273,7 +260,7 @@ pub fn build_composite_ffmpeg_settings(
     {
         output_args.extend(["-bsf:v".to_string(), metadata_filter]);
     }
-    output_args.extend(rate_control_args(selected_profile.codec_id, render.quality));
+    output_args.extend(rate_control_args(selected_profile, render.quality));
     if include_audio {
         output_args.extend([
             "-c:a".to_string(),

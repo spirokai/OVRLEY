@@ -108,7 +108,7 @@ fn render_plan(
     scene.composite_widget_update_rate =
         Some((source_fps.as_f64() / overlay_pipe_fps.as_f64()).round() as u32);
     let mut scene = validate_scene_config(scene).unwrap();
-    if codec == "qsv_full_h264" {
+    if matches!(codec, "qsv_full_h264" | "qsv_full_hevc") {
         scene.ffmpeg.qsv_full_init_args = vec![
             "-init_hw_device".to_string(),
             "dxva2=dx".to_string(),
@@ -412,13 +412,23 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
         "libx264",
         "libx265",
         "h264_nvenc",
+        "hevc_nvenc",
+        "nnvgpu_h264",
+        "nnvgpu_hevc",
         "h264_qsv",
+        "hevc_qsv",
+        "qsv_full_h264",
+        "qsv_full_hevc",
         "h264_amf",
+        "hevc_amf",
+        "h264_vaapi",
+        "hevc_vaapi",
         "h264_videotoolbox",
+        "hevc_videotoolbox",
     ] {
         let low = settings_for_codec(
             codec,
-            "10M",
+            "12.5M",
             Fps::new(30, 1).unwrap(),
             Fps::new(30, 1).unwrap(),
             0.0,
@@ -431,9 +441,9 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
             0.0,
         );
 
-        assert_argument_pair(&low.output_args, "-b:v", "10M");
-        assert_argument_pair(&low.output_args, "-maxrate", "15M");
-        assert_argument_pair(&low.output_args, "-bufsize", "20M");
+        assert_argument_pair(&low.output_args, "-b:v", "12.5M");
+        assert_argument_pair(&low.output_args, "-maxrate", "18.75M");
+        assert_argument_pair(&low.output_args, "-bufsize", "25M");
         assert_argument_pair(&high.output_args, "-b:v", "60M");
         assert_argument_pair(&high.output_args, "-maxrate", "90M");
         assert_argument_pair(&high.output_args, "-bufsize", "120M");
@@ -696,11 +706,19 @@ fn quality_mode_selects_encoder_specific_args() {
         ("libx264", "-crf", "18"),
         ("libx265", "-crf", "18"),
         ("h264_nvenc", "-cq:v", "18"),
+        ("hevc_nvenc", "-cq:v", "18"),
+        ("nnvgpu_h264", "-cq:v", "18"),
+        ("nnvgpu_hevc", "-cq:v", "18"),
+        ("h264_qsv", "-global_quality", "18"),
+        ("hevc_qsv", "-global_quality", "18"),
         ("qsv_full_h264", "-global_quality", "18"),
+        ("qsv_full_hevc", "-global_quality", "18"),
         ("h264_amf", "-qp_b", "18"),
         ("hevc_amf", "-qp_p", "18"),
         ("h264_vaapi", "-qp", "18"),
+        ("hevc_vaapi", "-qp", "18"),
         ("h264_videotoolbox", "-global_quality", "67"),
+        ("hevc_videotoolbox", "-global_quality", "67"),
     ] {
         let fps = Fps::new(30, 1).unwrap();
         let mut render = render_plan(codec, "60M", fps, fps, 0.0);
