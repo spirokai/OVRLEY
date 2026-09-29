@@ -139,6 +139,7 @@ pub(crate) async fn backend_list_system_fonts(app: AppHandle) -> Result<String, 
 pub(crate) async fn backend_render(
     app: AppHandle,
     state: tauri::State<'_, BackendState>,
+    raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
     config_json: String,
     parsed_activity_json: String,
     output_path: String,
@@ -153,6 +154,7 @@ pub(crate) async fn backend_render(
         &parsed_activity_json,
         &output_path,
         overwrite,
+        Some(&*raster_resources),
     )
     .map_err(BackendRenderError::from_core)?;
     serialize_command_result(&result).map_err(|message| BackendRenderError::RenderError { message })
@@ -198,6 +200,7 @@ pub(crate) async fn backend_parse_vbo_activity(
 #[tauri::command]
 pub(crate) async fn backend_render_preview_frame(
     app: AppHandle,
+    raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
     config_json: String,
     parsed_activity_json: String,
     second: f64,
@@ -209,6 +212,7 @@ pub(crate) async fn backend_render_preview_frame(
             &config_json,
             &parsed_activity_json,
             second,
+            Some(&*raster_resources),
         ));
     }
 
@@ -218,6 +222,7 @@ pub(crate) async fn backend_render_preview_frame(
         let _ = config_json;
         let _ = parsed_activity_json;
         let _ = second;
+        let _ = raster_resources;
         Err("Preview-frame rendering is only available in debug builds.".to_string())
     }
 }

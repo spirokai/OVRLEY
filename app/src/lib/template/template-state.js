@@ -109,6 +109,7 @@ export function createEditorEffectiveConfig({ config, globalDefaults }) {
     ...config,
     scene: buildEffectiveSceneData(config.scene, normalizedGlobals),
     backdrops: config.backdrops,
+    rasters: config.rasters,
     labels: config.labels,
     values: config.values,
     plots: config.plots,

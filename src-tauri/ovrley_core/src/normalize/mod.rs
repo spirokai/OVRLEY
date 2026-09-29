@@ -16,13 +16,14 @@ mod label;
 mod lap_timer;
 mod lean_angle;
 mod linear_gauge;
+mod raster;
 pub mod raw;
 mod route;
 mod scene;
 mod time;
 mod value;
 
-use crate::error::{CoreError, CoreResult};
+use crate::error::CoreResult;
 use crate::render::widgets::types::{
     PreparedArcGauge, PreparedGForce, PreparedHeadingTape, PreparedLapTimer, PreparedLeanAngle,
     PreparedLinearGauge, PreparedStandardText, PreparedValue,
@@ -48,7 +49,7 @@ pub(crate) use bar_geometry::{
     arc_track_radius, corner_track_cap_padding, corner_track_radius, resolve_bar_style_geometry,
     scale_bar_geometry, track_corner_radius_max,
 };
-pub use elevation::{validate_elevation_plot, ValidatedElevationPlot};
+pub use elevation::{validate_elevation_plot, validate_elevation_plots, ValidatedElevationPlot};
 pub use g_force::{validate_g_force, GForceAxis, ValidatedGForceWidget};
 pub use gradient::{validate_gradient_widget, ValidatedGradientWidget};
 pub use heading::{validate_heading, ValidatedHeading};
@@ -62,7 +63,9 @@ pub use linear_gauge::{
     validate_linear_gauge, ValidatedLinearGaugeLabelPosition, ValidatedLinearGaugeOrientation,
     ValidatedLinearGaugeWidget,
 };
-pub use route::{validate_route_plot, ValidatedRoutePlot};
+pub use raster::validate_template_rasters;
+pub use raster::{RasterGeometry, RasterSource, ValidatedRaster};
+pub use route::{validate_route_plot, validate_route_plots, ValidatedRoutePlot};
 pub use scene::{validate_scene_config, ValidatedFfmpegConfig, ValidatedSceneConfig};
 pub use time::{
     validate_time_value, ElapsedTimeOrigin, ValidatedTimeFormatting, ValidatedTimeValue,
@@ -131,6 +134,7 @@ pub struct RenderDataRequirements {
 pub struct ValidatedRenderConfig {
     pub scene: ValidatedSceneConfig,
     pub backdrops: Vec<ValidatedBackdrop>,
+    pub rasters: Vec<ValidatedRaster>,
     pub labels: Vec<ValidatedLabel>,
     pub values: Vec<PreparedValue>,
     pub course_plots: Vec<ValidatedRoutePlot>,
@@ -140,7 +144,23 @@ pub struct ValidatedRenderConfig {
 /// Validates every value widget and label in the config. Returns the first
 /// missing or invalid field as an error. Plots are pre-parsed and validated.
 pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderConfig> {
+    validate_render_config_with_resources(raw, None)
+}
+
+/// Resolves session images while validating submission, before any render job starts.
+pub fn validate_render_config_with_resources(
+    raw: RenderConfig,
+    resources: Option<&dyn crate::raster::RasterResourceResolver>,
+) -> CoreResult<ValidatedRenderConfig> {
     let scene = validate_scene_config(raw.scene)?;
+
+    raster::validate_unique_raster_ids(&raw.rasters)?;
+    let rasters = raw
+        .rasters
+        .iter()
+        .enumerate()
+        .map(|(index, raster)| raster::validate_raster(raster, index, resources))
+        .collect::<CoreResult<Vec<_>>>()?;
 
     let backdrops = raw
         .backdrops
@@ -241,27 +261,13 @@ pub fn validate_render_config(raw: RenderConfig) -> CoreResult<ValidatedRenderCo
         .map(|(i, l)| validate_label(l, i))
         .collect::<CoreResult<Vec<_>>>()?;
 
-    let course_plots = raw::find_plot_values(&raw.plots, "course")
-        .into_iter()
-        .map(|(index, v)| {
-            serde_json::from_value::<raw::CoursePlotConfig>(v.clone())
-                .map_err(|e| CoreError::Config(format!("course plot config: {e}")))
-                .and_then(|plot| validate_route_plot(&plot, index))
-        })
-        .collect::<CoreResult<Vec<_>>>()?;
-
-    let elevation_plots = raw::find_plot_values(&raw.plots, "elevation")
-        .into_iter()
-        .map(|(index, v)| {
-            serde_json::from_value::<raw::ElevationPlotConfig>(v.clone())
-                .map_err(|e| CoreError::Config(format!("elevation plot config: {e}")))
-                .and_then(|plot| validate_elevation_plot(&plot, index, &scene))
-        })
-        .collect::<CoreResult<Vec<_>>>()?;
+    let course_plots = validate_route_plots(&raw.plots)?;
+    let elevation_plots = validate_elevation_plots(&raw.plots, &scene)?;
 
     Ok(ValidatedRenderConfig {
         scene,
         backdrops,
+        rasters,
         labels,
         values,
         course_plots,

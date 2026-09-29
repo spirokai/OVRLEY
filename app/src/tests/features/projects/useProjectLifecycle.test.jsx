@@ -54,7 +54,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     delete editor.config.values[0].content_alignment
     const project = {
       format: 'ovrley-project',
-      version: 2,
+      version: 3,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor,
       sources: { activity: null, video: null },
@@ -69,6 +69,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.readProjectFile.mockResolvedValue({
       project,
       resolvedSources: { activityPath: null, videoPath: null },
+      rasterLoadResults: {},
     })
 
     const loaded = await loadProject({
@@ -89,7 +90,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const initialState = useStore.getState()
     const project = {
       format: 'ovrley-project',
-      version: 2,
+      version: 3,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({
         config: { ...initialState.config, scene: { ...initialState.config.scene, width: 1280 } },
@@ -122,6 +123,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.readProjectFile.mockResolvedValue({
       project,
       resolvedSources: { activityPath, videoPath },
+      rasterLoadResults: {},
     })
     boundaries.selectedPathIsFile.mockResolvedValue(true)
     let finishActivityPreparation
@@ -403,7 +405,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const initialState = useStore.getState()
     const project = {
       format: 'ovrley-project',
-      version: 2,
+      version: 3,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: {
@@ -429,6 +431,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.readProjectFile.mockResolvedValue({
       project,
       resolvedSources: { activityPath: missingActivityPath, videoPath: null },
+      rasterLoadResults: {},
     })
     boundaries.selectedPathIsFile.mockResolvedValue(false)
     const prepareActivityPath = vi.fn()
@@ -463,7 +466,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const projectPath = 'C:\\Events\\Broken.oly'
     const project = {
       format: 'ovrley-project',
-      version: 2,
+      version: 3,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: {
@@ -487,6 +490,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.readProjectFile.mockResolvedValue({
       project,
       resolvedSources: { activityPath: 'C:\\Events\\broken.fit', videoPath: 'C:\\Events\\ride.mp4' },
+      rasterLoadResults: {},
     })
     boundaries.selectedPathIsFile.mockResolvedValue(true)
     const prepareActivityPath = vi.fn().mockRejectedValue(new Error('invalid activity'))
@@ -515,7 +519,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const projectPath = 'C:\\Events\\Empty.oly'
     const project = {
       format: 'ovrley-project',
-      version: 2,
+      version: 3,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: { activity: null, video: null },
@@ -530,7 +534,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     useStore.setState({ importedBackgroundImagePath: 'C:\\Current\\background.png' })
     boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
     boundaries.openSinglePath.mockResolvedValue(projectPath)
-    boundaries.readProjectFile.mockResolvedValue({ project, resolvedSources: { activityPath: null, videoPath: null } })
+    boundaries.readProjectFile.mockResolvedValue({ project, resolvedSources: { activityPath: null, videoPath: null }, rasterLoadResults: {} })
     const { default: useProjectLifecycle } = await import('@/features/projects/hooks/useProjectLifecycle')
     const { result } = renderHook(() =>
       useProjectLifecycle({

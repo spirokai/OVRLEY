@@ -14,14 +14,21 @@ import useStore from '@/store/useStore'
 import useTemplateFetching from './useTemplateFetching'
 import {
   createTemplateFilePayload,
+  createTemplateState,
   downloadTemplateFile,
-  normalizeTemplateFilePayload,
+  prepareTemplateFilePayload,
   sanitizeTemplateFilename,
   stringifyTemplateFile,
 } from '../utils/templateSnapshot'
 import { useTemplateSaveStatus } from './useTemplateSaveStatus'
 import { selectBrowserTemplateFile, getFilenameFromPath, getFilenameFromTemplateId } from '../utils/templateFileUtils'
 import i18next from 'i18next'
+
+function applyLoadedTemplateState(templateState, source) {
+  const state = useStore.getState()
+  state.hydrateTemplateState(templateState, { source })
+  state.setLastSavedTemplateState(createTemplateState({ config: templateState.config, globalDefaults: templateState.settings.globalDefaults }))
+}
 
 function getErrorMessage(error, fallbackMessage) {
   if (error instanceof Error && error.message) {
@@ -52,7 +59,6 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     config,
     createNewTemplate,
     globalDefaults,
-    hydrateTemplateState,
     lastSavedTemplateState,
     loadedTemplateSource,
     setErrorMessage,
@@ -78,16 +84,6 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     lastSavedTemplateState,
   })
 
-  const loadTemplateState = useCallback(
-    (templateState, source) => {
-      replaceEditorDocument(useStore, () => {
-        hydrateTemplateState(templateState, { source })
-        setLastSavedTemplateState(templateState)
-      })
-    },
-    [hydrateTemplateState, setLastSavedTemplateState],
-  )
-
   // Template change handler — loads a template from the backend by filename
   const handleTemplateChange = useCallback(
     async (filename) => {
@@ -102,13 +98,11 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         }
         if (!descriptor) throw new Error(`Unknown template: ${filename}`)
         const data = await backend.getTemplate(filename)
-        const normalizedTemplate = normalizeTemplateFilePayload(data)
-        const { name: _templateName, ...templateState } = normalizedTemplate
+        const preparedTemplate = await prepareTemplateFilePayload(data)
+        const { name: _templateName, ...templateState } = preparedTemplate.templateState
 
-        loadTemplateState(
-          templateState,
-          descriptor.type === 'built-in' ? { kind: 'bundled', templateId: filename } : { kind: 'file', path: descriptor.path },
-        )
+        const source = descriptor.type === 'built-in' ? { kind: 'bundled', templateId: filename } : { kind: 'file', path: descriptor.path }
+        replaceEditorDocument(useStore, applyLoadedTemplateState, templateState, source)
         await setPreference('last-template', { source: 'backend', filename })
         return true
       } catch (error) {
@@ -119,7 +113,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         setProcessing(false)
       }
     },
-    [fetchTemplates, loadTemplateState, setErrorMessage, setProcessing],
+    [fetchTemplates, setErrorMessage, setProcessing],
   )
 
   // Save template handler — serializes current state and triggers save dialog or download
@@ -201,14 +195,15 @@ export default function useTemplateManagement({ onTemplateCreated }) {
 
       const rawText = await file.text()
       const parsedTemplate = JSON.parse(rawText)
-      const normalizedTemplate = normalizeTemplateFilePayload(parsedTemplate)
-      const { name: _templateName, ...templateState } = normalizedTemplate
-      loadTemplateState(templateState, selectedPath ? { kind: 'file', path: selectedPath } : null)
+      const preparedTemplate = await prepareTemplateFilePayload(parsedTemplate)
+      const { name: _templateName, ...templateState } = preparedTemplate.templateState
+      const source = selectedPath ? { kind: 'file', path: selectedPath } : null
+      replaceEditorDocument(useStore, applyLoadedTemplateState, templateState, source)
     } catch (error) {
       console.error('Failed to import template:', error)
       setErrorMessage(`Failed to import template: ${getErrorMessage(error, 'Unknown error')}`)
     }
-  }, [loadTemplateState, setErrorMessage])
+  }, [setErrorMessage])
 
   // Confirm create new — executes the new template action after the confirmation is answered
   const confirmCreateNewTemplate = useCallback(() => {
@@ -261,9 +256,9 @@ export default function useTemplateManagement({ onTemplateCreated }) {
         }
       } else if (saved?.source === 'file' && saved.path) {
         const file = await fileFromSelectedPath(saved.path)
-        const normalizedTemplate = normalizeTemplateFilePayload(JSON.parse(await file.text()))
-        const { name: _templateName, ...templateState } = normalizedTemplate
-        loadTemplateState(templateState, { kind: 'file', path: saved.path })
+        const preparedTemplate = await prepareTemplateFilePayload(JSON.parse(await file.text()))
+        const { name: _templateName, ...templateState } = preparedTemplate.templateState
+        replaceEditorDocument(useStore, applyLoadedTemplateState, templateState, { kind: 'file', path: saved.path })
       }
     } catch (error) {
       console.error('Failed to restore last template:', error)
@@ -271,7 +266,7 @@ export default function useTemplateManagement({ onTemplateCreated }) {
       replaceEditorDocument(useStore, createNewTemplate)
       await deletePreference('last-template')
     }
-  }, [createNewTemplate, loadTemplateState, setErrorMessage])
+  }, [createNewTemplate, setErrorMessage])
 
   return {
     handleCreateNewTemplate,
@@ -279,7 +274,6 @@ export default function useTemplateManagement({ onTemplateCreated }) {
     handleSaveTemplate,
     handleTemplateChange,
     loadedTemplateSource,
-    loadTemplateState,
     newTemplateConfirmDialog,
     openTemplateSelector,
     restoreLastLoadedTemplate,

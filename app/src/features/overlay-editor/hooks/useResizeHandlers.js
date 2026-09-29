@@ -4,7 +4,7 @@
 
 import { updateLiveWidgetDraft } from '../utils/widgetDomHelpers'
 import { buildFrameInteractionLayout, captureWidgetLayout, getWidgetInteractionPosition } from '../utils/widgetInteractionGeometry'
-import { buildLiveResizeUpdate, buildResizeUpdate, captureResizeOrigin } from '../utils/widgetResizeScaling'
+import { buildLiveResizeUpdate, buildResizeUpdate, captureResizeOrigin, constrainRasterResize } from '../utils/widgetResizeScaling'
 import { isFramedWidget } from '@/lib/widget/display-type-behavior'
 
 /**
@@ -35,7 +35,7 @@ export function useResizeHandlers({
 }) {
   // Resize handlers — captures origin dimensions, computes scaled size, commits on end
   return {
-    onResizeStart: ({ dragStart, target }) => {
+    onResizeStart: ({ dragStart, target, direction }) => {
       if (!selectedWidget) return
 
       if (dragStart) {
@@ -52,6 +52,7 @@ export function useResizeHandlers({
         y: position.y,
         type: 'resize',
         layout,
+        direction,
         ...resizeOrigin,
       }
       beginWidgetInteraction(selectedWidget.id, 'resize')
@@ -62,15 +63,15 @@ export function useResizeHandlers({
 
       const nextX = origin.x + drag.beforeTranslate[0]
       const nextY = origin.y + drag.beforeTranslate[1]
-      const dimensionScale = isFramedWidget(selectedWidget) ? Math.max(Number(globalScale) || 1, 0.1) : 1
-      const nextWidth = Math.max(width / dimensionScale, 8)
-      const nextHeight = Math.max(height / dimensionScale, 8)
-      const liveResizeUpdate = buildLiveResizeUpdate(origin, { x: nextX, y: nextY, width: nextWidth, height: nextHeight }, selectedWidget)
+      const frameScale = isFramedWidget(selectedWidget) ? globalScale : 1
+      const frame = { x: nextX, y: nextY, width: Math.max(width / frameScale, 8), height: Math.max(height / frameScale, 8) }
+      const resized = selectedWidget.type === 'raster' ? constrainRasterResize(origin, frame, frameScale) : frame
+      const liveResizeUpdate = buildLiveResizeUpdate(origin, resized, selectedWidget)
       const liveLayout = buildFrameInteractionLayout(origin.layout, {
-        width: nextWidth * (globalScale || 1),
-        height: nextHeight * (globalScale || 1),
-        translateX: drag.beforeTranslate[0],
-        translateY: drag.beforeTranslate[1],
+        width: resized.width * frameScale,
+        height: resized.height * frameScale,
+        translateX: resized.x - origin.x,
+        translateY: resized.y - origin.y,
       })
 
       updateLiveWidgetDraft({

@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "Soubory obrázků",
+    "selectImage": "Vybrat obrázek",
+    "replaceImage": "Nahradit obrázek",
+    "errors": {
+      "missingAsset": "V projektu chybí vložený obrázek. Vyberte náhradní.",
+      "corruptAsset": "Vložený obrázek je poškozený. Vyberte náhradní.",
+      "relativePath": "Vyberte obrázek pomocí absolutní cesty k souboru.",
+      "missing": "Soubor obrázku chybí. Vyberte jiný obrázek.",
+      "unreadable": "Soubor obrázku nelze číst. Zkontrolujte oprávnění nebo vyberte jiný.",
+      "unsupportedType": "Vyberte soubor PNG, JPEG, BMP nebo TIFF (.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "Soubor přesahuje 5 MiB. Vyberte menší soubor.",
+      "resolution": "Rozlišení přesahuje 25 megapixelů. Vyberte menší obrázek.",
+      "decode": "Obrázek nelze dekódovat. Vyberte jiný.",
+      "noImage": "Obrázek {{id}} nemá vybraný soubor. Před vykreslením jej vyberte.",
+      "renderUnavailable": "Obrázek {{id}} zatím nelze vykreslit.",
+      "invalidConfig": "Konfigurace obrázku je neplatná."
+    }
+  },
   "app": {
     "importingYourVideo": "Import videa...",
     "loadingProject": "Načítá se projekt...",
@@ -105,6 +124,10 @@
     "zoomOut": "Oddálit"
   },
   "projects": {
+    "archiveTooLarge": "Projekt překračuje limit archivu 40 MiB. Odeberte nebo nahraďte obrázek.",
+    "invalidArchive": "Archiv projektu je neplatný nebo poškozený. Vyberte jiný soubor projektu.",
+    "rasterUnavailable": "Obrázek není dostupný. Před uložením jej nahraďte.",
+    "saveFailed": "Projekt se nepodařilo uložit. Zkontrolujte umístění a zkuste to znovu.",
     "activity": "Aktivita",
     "cancel": "Zrušit",
     "closeWithoutSaving": "Zavřít bez uložení",
@@ -459,6 +482,7 @@
       "lapLog": "Přehled kol"
     },
     "types": {
+      "raster": { "name": "Obrázek", "shortName": "Obrázek" },
       "air_pressure": { "name": "Tlak vzduchu", "shortName": "Tlak" },
       "altitude": { "name": "Nadmořská výška", "shortName": "Výška" },
       "aperture": { "name": "Clona", "shortName": "Clona" },
@@ -571,6 +595,7 @@
     "majorThickness": "Tloušťka - hlavní",
     "majorTicks": "Hlavní dílky",
     "mapRotation": "Otočení mapy",
+    "rotation": "Otočení",
     "markerColor": "Barva značky",
     "markerOpacity": "Krytí značky",
     "markerSize": "Velikost značky",

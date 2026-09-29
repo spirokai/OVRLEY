@@ -1,6 +1,6 @@
 {
   "format": "ovrley-template",
-  "version": 2,
+  "version": 3,
   "name": "recent-template",
   "savedAt": "2026-05-09T20:22:47.194Z",
   "config": {
@@ -10,6 +10,7 @@
       "fps": 30,
       "updateRate": 1
     },
+    "rasters": [],
     "labels": [
       {
         "x": 1215,

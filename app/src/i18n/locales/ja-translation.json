@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "画像ファイル",
+    "selectImage": "画像を選択",
+    "replaceImage": "画像を置換",
+    "errors": {
+      "missingAsset": "このプロジェクトに埋め込まれた画像がありません。別の画像を選択してください。",
+      "corruptAsset": "埋め込まれた画像が破損しています。別の画像を選択してください。",
+      "relativePath": "絶対パスで画像を選択してください。",
+      "missing": "画像ファイルが見つかりません。別の画像を選択してください。",
+      "unreadable": "画像ファイルを読み取れません。権限を確認するか、別の画像を選択してください。",
+      "unsupportedType": "PNG、JPEG、BMP、TIFF ファイルを選択してください（.png、.jpeg、.jpg、.bmp、.tiff）。",
+      "encodedSize": "ファイルが 5 MiB を超えています。小さいファイルを選択してください。",
+      "resolution": "解像度が 25 メガピクセルを超えています。小さい画像を選択してください。",
+      "decode": "画像をデコードできません。別の画像を選択してください。",
+      "noImage": "画像 {{id}} が選択されていません。レンダリング前に選択してください。",
+      "renderUnavailable": "画像 {{id}} はまだレンダリングできません。",
+      "invalidConfig": "画像設定が無効です。"
+    }
+  },
   "app": {
     "importingYourVideo": "動画を読み込んでいます...",
     "loadingProject": "プロジェクトを読み込んでいます...",
@@ -105,6 +124,10 @@
     "zoomOut": "ズームアウト"
   },
   "projects": {
+    "archiveTooLarge": "プロジェクトが 40 MiB のアーカイブ制限を超えています。画像を削除または交換してください。",
+    "invalidArchive": "プロジェクトアーカイブが無効か破損しています。別のプロジェクトファイルを選択してください。",
+    "rasterUnavailable": "画像を使用できません。保存する前に交換してください。",
+    "saveFailed": "プロジェクトを保存できませんでした。保存先を確認して再試行してください。",
     "activity": "アクティビティ",
     "cancel": "キャンセル",
     "closeWithoutSaving": "保存せずに閉じる",
@@ -459,6 +482,7 @@
       "lapLog": "ラップログ"
     },
     "types": {
+      "raster": { "name": "画像", "shortName": "画像" },
       "air_pressure": { "name": "気圧", "shortName": "気圧" },
       "altitude": { "name": "高度", "shortName": "高度" },
       "aperture": { "name": "絞り", "shortName": "絞り" },
@@ -571,6 +595,7 @@
     "majorThickness": "主目盛の太さ",
     "majorTicks": "主目盛",
     "mapRotation": "マップの回転",
+    "rotation": "回転",
     "markerColor": "マーカーの色",
     "markerOpacity": "マーカーの不透明度",
     "markerSize": "マーカーサイズ",

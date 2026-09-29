@@ -33,6 +33,8 @@ pub mod normalize;
 pub mod output;
 /// Application path configuration and resolution.
 pub mod paths;
+/// Validation and oriented preview decoding for user-selected bitmap resources.
+pub mod raster;
 /// Shared Ramer-Douglas-Peucker line simplification.
 pub mod rdp;
 /// Skia-based overlay rendering.

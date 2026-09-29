@@ -29,5 +29,3 @@ export {
 export * from './data/overlayEditorConstants'
 
 export { FONT_FAMILY_MAP, WIDGET_ICONS, DEFAULT_ACTIVITY_PREVIEW } from './data/overlayEditorConfig'
-
-export { METRIC_ICON_SVGS } from '@/lib/widget/widget-icon-data'

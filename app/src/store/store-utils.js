@@ -21,6 +21,7 @@ export const DEFAULT_CONFIG = {
     font_size: 30,
   },
   backdrops: [],
+  rasters: [],
   labels: [],
   values: [],
   plots: [],

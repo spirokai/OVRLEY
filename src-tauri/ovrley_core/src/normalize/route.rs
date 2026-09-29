@@ -10,7 +10,7 @@ use super::helpers::{
     require_opacity, require_positive_f32,
 };
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::raw::CoursePlotConfig;
+use crate::normalize::raw::{find_plot_values, CoursePlotConfig};
 
 #[derive(Clone, Debug)]
 pub struct ValidatedRoutePlot {
@@ -33,6 +33,17 @@ pub struct ValidatedRoutePlot {
     pub marker_color: String,
     pub marker_opacity: f32,
     pub show_full_activity: bool,
+}
+
+pub fn validate_route_plots(plots: &serde_json::Value) -> CoreResult<Vec<ValidatedRoutePlot>> {
+    find_plot_values(plots, "course")
+        .into_iter()
+        .map(|(index, value)| {
+            serde_json::from_value::<CoursePlotConfig>(value.clone())
+                .map_err(|e| CoreError::Config(format!("course plot config: {e}")))
+                .and_then(|plot| validate_route_plot(&plot, index))
+        })
+        .collect()
 }
 
 pub fn validate_route_plot(

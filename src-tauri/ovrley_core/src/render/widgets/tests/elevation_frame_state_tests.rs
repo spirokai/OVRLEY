@@ -27,7 +27,7 @@ fn minimal_scene() -> ValidatedSceneConfig {
         scale: 1.0,
         font: None,
         font_size: None,
-        opacity: None,
+        opacity: 1.0,
         decimal_rounding: None,
         time_format: None,
         custom_export_range_active: Some(false),

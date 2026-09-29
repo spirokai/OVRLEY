@@ -6,11 +6,12 @@
 import { RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { TYPE_ICONS } from '@/lib/widget/widget-icons'
+import { WIDGET_ICONS } from '@/lib/widget/widget-icons'
 import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
 import { useWidgetManager } from '../hooks/useWidgetManager'
 import { PositionSection } from './widgetEditorSections'
 import BackdropWidgetEditor from './BackdropWidgetEditor'
+import RasterWidgetEditor from './RasterWidgetEditor'
 import ElevationWidgetEditor from './ElevationWidgetEditor'
 import GradientWidgetEditor from './GradientWidgetEditor'
 import MetricWidgetEditor from './metricWidget/MetricWidgetEditor'
@@ -31,6 +32,7 @@ import { useAccordionAutoscroll } from '../hooks/useAccordionAutoscroll'
  */
 const WIDGET_EDITOR_MAP = {
   backdrop: BackdropWidgetEditor,
+  raster: RasterWidgetEditor,
   label: TextWidgetEditor,
   time: TimeWidgetEditor,
   gradient: GradientWidgetEditor,
@@ -127,7 +129,7 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
             onValueChange={(value) => setSelectedWidgetId(value || null)}
           >
             {widgets.map((widget) => {
-              const Icon = TYPE_ICONS[widget.type] || TYPE_ICONS.label
+              const Icon = WIDGET_ICONS[widget.type]
 
               return (
                 <div key={widget.id}>

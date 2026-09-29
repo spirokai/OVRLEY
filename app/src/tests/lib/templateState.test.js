@@ -72,13 +72,14 @@ describe('normalizeGlobalDefaults', () => {
 
 describe('normalizeTemplateConfig', () => {
   test('treats a missing backdrops section as an empty list', () => {
-    const result = normalizeTemplateConfig({ scene: {} })
+    const result = normalizeTemplateConfig({ scene: {}, rasters: [] })
 
     expect(result.backdrops).toEqual([])
   })
 
   test('normalizes backdrops with shared fields and active rectangle geometry', () => {
     const config = {
+      rasters: [],
       backdrops: [
         {
           id: 'bd-abc',
@@ -119,6 +120,7 @@ describe('normalizeTemplateConfig', () => {
 
   test('strips derived and render-only keys from scene', () => {
     const config = {
+      rasters: [],
       scene: {
         width: 1920,
         height: 1080,
@@ -149,6 +151,7 @@ describe('normalizeTemplateConfig', () => {
 
   test('normalizes labels and strips unknown keys', () => {
     const config = {
+      rasters: [],
       labels: [{ id: 'label-1', text: 'Hello', x: 10, y: 20, extraField: 'remove' }],
     }
     const result = normalizeTemplateConfig(config)
@@ -161,6 +164,7 @@ describe('normalizeTemplateConfig', () => {
 
   test('normalizes values with type-specific keys', () => {
     const config = {
+      rasters: [],
       values: [{ id: 'value-1', value: 'speed', x: 100, y: 200, show_units: true }],
     }
     const result = normalizeTemplateConfig(config)
@@ -172,27 +176,32 @@ describe('normalizeTemplateConfig', () => {
   })
 
   test('normalizes old time widgets to left alignment and rejects malformed alignment', () => {
-    const result = normalizeTemplateConfig({ values: [{ id: 'time-1', value: 'time', x: 50, y: 60 }] })
+    const result = normalizeTemplateConfig({ rasters: [], values: [{ id: 'time-1', value: 'time', x: 50, y: 60 }] })
 
     expect(result.values[0].content_alignment).toBe('left')
     expect(result.values[0].x).toBe(50)
     expect(result.values[0]).toMatchObject({ time_mode: 'daytime', elapsed_origin: 'activity', show_hundredths: false })
-    expect(() => normalizeTemplateConfig({ values: [{ value: 'time', time_mode: 'clock' }] })).toThrow('Invalid time_mode: clock')
-    expect(() => normalizeTemplateConfig({ values: [{ value: 'time', elapsed_origin: 'video' }] })).toThrow('Invalid elapsed_origin: video')
-    expect(() => normalizeTemplateConfig({ values: [{ value: 'time', show_hundredths: 'false' }] })).toThrow('Invalid show_hundredths: false')
-    expect(() => normalizeTemplateConfig({ values: [{ id: 'value-1', value: 'speed', content_alignment: 'justify' }] })).toThrow(
+    expect(() => normalizeTemplateConfig({ rasters: [], values: [{ value: 'time', time_mode: 'clock' }] })).toThrow('Invalid time_mode: clock')
+    expect(() => normalizeTemplateConfig({ rasters: [], values: [{ value: 'time', elapsed_origin: 'video' }] })).toThrow(
+      'Invalid elapsed_origin: video',
+    )
+    expect(() => normalizeTemplateConfig({ rasters: [], values: [{ value: 'time', show_hundredths: 'false' }] })).toThrow(
+      'Invalid show_hundredths: false',
+    )
+    expect(() => normalizeTemplateConfig({ rasters: [], values: [{ id: 'value-1', value: 'speed', content_alignment: 'justify' }] })).toThrow(
       'Invalid content_alignment: justify',
     )
   })
 
   test('rejects value widgets whose type is not in the standard metric manifest', () => {
-    expect(() => normalizeTemplateConfig({ values: [{ id: 'value-1', value: 'unknown_metric' }] })).toThrow(
+    expect(() => normalizeTemplateConfig({ rasters: [], values: [{ id: 'value-1', value: 'unknown_metric' }] })).toThrow(
       'Unknown value widget type: unknown_metric',
     )
   })
 
   test('normalizes plots with fallback global defaults', () => {
     const config = {
+      rasters: [],
       plots: [{ id: 'plot-1', value: 'elevation', x: 30, y: 40, point_label: {} }],
     }
     const globalDefaults = { font_values: 'ElevFont.ttf', color_values: '#333333' }
@@ -204,6 +213,7 @@ describe('normalizeTemplateConfig', () => {
 
   test('normalizes heading value widget with display_variants', () => {
     const config = {
+      rasters: [],
       values: [
         {
           id: 'heading-1',
@@ -234,6 +244,7 @@ describe('normalizeTemplateConfig', () => {
 
   test('normalizes linear value widget with complete display defaults', () => {
     const config = {
+      rasters: [],
       values: [
         {
           id: 'linear-1',
@@ -272,6 +283,7 @@ describe('normalizeTemplateConfig', () => {
 describe('createDurableTemplateState', () => {
   test('materializes durable state from config and global defaults', () => {
     const config = {
+      rasters: [],
       scene: {
         width: 1920,
         height: 1080,
@@ -315,19 +327,16 @@ describe('createDurableTemplateState', () => {
     expect(durableState.config.scene).not.toHaveProperty('scale')
   })
 
-  test('handles empty config gracefully', () => {
-    const result = createDurableTemplateState({ config: {}, globalDefaults: { opacity: 1 } })
+  test('handles a template without widgets', () => {
+    const result = createDurableTemplateState({ config: { rasters: [] }, globalDefaults: { opacity: 1 } })
 
     expect(result.config).toBeDefined()
     expect(result.config.scene).toBeDefined()
     expect(result.settings.globalDefaults.opacity).toBe(1)
   })
 
-  test('handles null config gracefully', () => {
-    const result = createDurableTemplateState({ config: null, globalDefaults: { opacity: 1 } })
-
-    expect(result.config).toBeDefined()
-    expect(result.settings.globalDefaults.opacity).toBe(1)
+  test('rejects a missing config', () => {
+    expect(() => createDurableTemplateState({ config: null, globalDefaults: { opacity: 1 } })).toThrow('Template config must be an object')
   })
 })
 
@@ -392,6 +401,7 @@ describe('createEditorEffectiveConfig', () => {
 
   test('preserves left_right_balance balance_format seeded by normalization', () => {
     const config = {
+      rasters: [],
       values: [{ id: 'value-1', value: 'left_right_balance', x: 10, y: 10 }],
     }
     const normalizedConfig = normalizeTemplateConfig(config)

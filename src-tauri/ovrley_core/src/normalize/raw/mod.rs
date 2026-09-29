@@ -12,7 +12,7 @@ use crate::error::{CoreError, CoreResult};
 use crate::types::{BackdropType, DisplayType, MetricKind, TrackFillStyle};
 
 pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
-pub const TEMPLATE_FILE_VERSION: u32 = 2;
+pub const TEMPLATE_FILE_VERSION: u32 = 3;
 
 /// Global render settings shared by labels, metric values, plots, and ffmpeg.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -439,10 +439,54 @@ fn promote_variant_keys(raw: &mut serde_json::Value, variant_key: &str) {
 
 /// Complete template render configuration.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RasterConfig {
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub rotation: f64,
+    pub opacity: f64,
+    #[serde(deserialize_with = "deserialize_raster_path")]
+    pub path: Option<String>,
+    #[serde(
+        default,
+        rename = "resourceId",
+        deserialize_with = "deserialize_present_resource",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub resource_id: Option<String>,
+    #[serde(
+        default,
+        rename = "resourceErrorCode",
+        deserialize_with = "deserialize_present_resource",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub resource_error_code: Option<crate::raster::RasterError>,
+}
+
+fn deserialize_present_resource<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
+}
+
+fn deserialize_raster_path<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
+    Option::<String>::deserialize(deserializer)
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RenderConfig {
     pub scene: SceneConfig,
     #[serde(default)]
     pub backdrops: Vec<BackdropConfig>,
+    #[serde(default, deserialize_with = "deserialize_render_rasters")]
+    pub rasters: Vec<RasterConfig>,
     #[serde(default)]
     pub labels: Vec<LabelConfig>,
     #[serde(default)]
@@ -451,6 +495,17 @@ pub struct RenderConfig {
     pub plots: Value,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+fn deserialize_render_rasters<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<RasterConfig>, D::Error> {
+    use serde::de::Error;
+    Vec::<RasterConfig>::deserialize(deserializer).map_err(|error| {
+        D::Error::custom(format!(
+            "rasters: {error} [raster_error:invalid_config:configuration]"
+        ))
+    })
 }
 
 /// Shared polyline style fragment for plot widgets.
@@ -848,6 +903,10 @@ pub fn parse_template_value(value: &Value) -> CoreResult<RenderConfig> {
         .get("config")
         .cloned()
         .ok_or_else(|| CoreError::Config("template config missing".into()))?;
+    config_value
+        .get("rasters")
+        .and_then(Value::as_array)
+        .ok_or_else(|| CoreError::Config("template config.rasters must be an array".into()))?;
     materialize_template_scene_defaults(&mut config_value, value);
     let mut config = parse_config_value(&config_value)?;
     apply_template_global_defaults(&mut config, &value);

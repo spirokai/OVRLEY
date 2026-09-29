@@ -20,7 +20,7 @@ import {
   getDisplayTypeOptions,
 } from '@/lib/widget/standard-metrics'
 import { isTextDisplayType, isBoxedMetricWidget } from '@/lib/widget/display-type-behavior'
-import { METRIC_ICON_SVGS } from '@/lib/widget/widget-icons'
+import { WIDGET_ICON_SVGS } from '@/lib/widget/widget-icons'
 import i18next, { translateOptions } from '@/i18n'
 
 describe('standard metric widget catalog', () => {
@@ -208,7 +208,7 @@ describe('standard metric widget catalog', () => {
     const vehicleTypes = ['rpm', 'throttle_position', 'brake_position', 'lean_angle', 'engine_load']
     for (const type of vehicleTypes) {
       expect(isStandardMetricWidgetType(type)).toBe(true)
-      expect(METRIC_ICON_SVGS[type].innerMarkup).not.toBe('')
+      expect(WIDGET_ICON_SVGS[type].innerMarkup).not.toBe('')
       expect(getStandardMetricInterpolation(type)).toBe(type === 'rpm' ? 'preserve' : 'linear')
       expect(getStandardMetricUnitsMode(type)).toBe('selectable')
     }
@@ -218,7 +218,7 @@ describe('standard metric widget catalog', () => {
       name: 'CircleGauge',
       assetFile: 'widget-rpm.svg',
     })
-    expect(METRIC_ICON_SVGS.brake_position).toMatchObject({
+    expect(WIDGET_ICON_SVGS.brake_position).toMatchObject({
       fill: 'currentColor',
       stroke: 'none',
     })
@@ -226,7 +226,7 @@ describe('standard metric widget catalog', () => {
 
   test('registers shared icons for the new metric widgets', () => {
     for (const type of ['gps_coordinates', 'distance_to_home', 'total_ascent', 'calories']) {
-      expect(METRIC_ICON_SVGS[type].innerMarkup).not.toBe('')
+      expect(WIDGET_ICON_SVGS[type].innerMarkup).not.toBe('')
     }
   })
 

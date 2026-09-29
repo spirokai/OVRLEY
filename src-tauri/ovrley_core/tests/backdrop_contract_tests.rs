@@ -5,7 +5,7 @@ use ovrley_core::commands::validate_config_value;
 use ovrley_core::debug::RenderProfiler;
 use ovrley_core::normalize::parse_config_value;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::{prepare_base_rgba, prepare_preview_assets, LabelCacheStatus};
+use ovrley_core::render::{prepare_preview_assets, LabelCacheStatus, StaticLayer};
 use ovrley_core::standard_widgets::{
     backdrop_type_definition, backdrop_type_label, default_backdrop_display_types,
     gradient_widget_definition, is_backdrop_type_supported, label_widget_definition,
@@ -348,16 +348,16 @@ fn static_base_rgba_renders_rectangle_backdrop() {
     }))
     .unwrap();
     let mut profiler = RenderProfiler::default();
-    let pixels = prepare_base_rgba(
-        &test_paths(),
-        &validated.backdrops,
-        &validated.labels,
-        &validated.values,
-        &validated.scene,
-        &mut profiler,
-    )
+    let pixels = StaticLayer {
+        backdrops: &validated.backdrops,
+        rasters: &[],
+        labels: &validated.labels,
+        values: &validated.values,
+        scene: &validated.scene,
+    }
+    .prepare(&test_paths(), &mut profiler)
     .unwrap()
-    .unwrap();
+    .base_rgba;
 
     assert_eq!(rgba_at(&pixels, 32, 8, 8), [255, 0, 0, 255]);
     assert_eq!(rgba_at(&pixels, 32, 24, 20), [0, 0, 0, 0]);
@@ -377,16 +377,16 @@ fn static_base_rgba_renders_rectangle_fill_inside_border() {
     }))
     .unwrap();
     let mut profiler = RenderProfiler::default();
-    let pixels = prepare_base_rgba(
-        &test_paths(),
-        &validated.backdrops,
-        &validated.labels,
-        &validated.values,
-        &validated.scene,
-        &mut profiler,
-    )
+    let pixels = StaticLayer {
+        backdrops: &validated.backdrops,
+        rasters: &[],
+        labels: &validated.labels,
+        values: &validated.values,
+        scene: &validated.scene,
+    }
+    .prepare(&test_paths(), &mut profiler)
     .unwrap()
-    .unwrap();
+    .base_rgba;
 
     assert_eq!(rgba_at(&pixels, 32, 5, 8), [0, 0, 255, 255]);
     assert_eq!(rgba_at(&pixels, 32, 6, 8), [255, 0, 0, 255]);
@@ -406,16 +406,16 @@ fn static_base_rgba_applies_rectangle_fill_alpha_multipliers() {
     }))
     .unwrap();
     let mut profiler = RenderProfiler::default();
-    let pixels = prepare_base_rgba(
-        &test_paths(),
-        &validated.backdrops,
-        &validated.labels,
-        &validated.values,
-        &validated.scene,
-        &mut profiler,
-    )
+    let pixels = StaticLayer {
+        backdrops: &validated.backdrops,
+        rasters: &[],
+        labels: &validated.labels,
+        values: &validated.values,
+        scene: &validated.scene,
+    }
+    .prepare(&test_paths(), &mut profiler)
     .unwrap()
-    .unwrap();
+    .base_rgba;
 
     assert_eq!(rgba_at(&pixels, 32, 8, 8), [255, 0, 0, 32]);
 }
@@ -434,16 +434,16 @@ fn static_base_rgba_renders_circle_fill_inside_total_diameter_border() {
     }))
     .unwrap();
     let mut profiler = RenderProfiler::default();
-    let pixels = prepare_base_rgba(
-        &test_paths(),
-        &validated.backdrops,
-        &validated.labels,
-        &validated.values,
-        &validated.scene,
-        &mut profiler,
-    )
+    let pixels = StaticLayer {
+        backdrops: &validated.backdrops,
+        rasters: &[],
+        labels: &validated.labels,
+        values: &validated.values,
+        scene: &validated.scene,
+    }
+    .prepare(&test_paths(), &mut profiler)
     .unwrap()
-    .unwrap();
+    .base_rgba;
 
     assert_eq!(rgba_at(&pixels, 32, 10, 6), [0, 0, 255, 255]);
     assert_eq!(rgba_at(&pixels, 32, 10, 11), [255, 0, 0, 255]);
@@ -464,16 +464,16 @@ fn static_base_rgba_applies_circle_fill_alpha_multipliers() {
     }))
     .unwrap();
     let mut profiler = RenderProfiler::default();
-    let pixels = prepare_base_rgba(
-        &test_paths(),
-        &validated.backdrops,
-        &validated.labels,
-        &validated.values,
-        &validated.scene,
-        &mut profiler,
-    )
+    let pixels = StaticLayer {
+        backdrops: &validated.backdrops,
+        rasters: &[],
+        labels: &validated.labels,
+        values: &validated.values,
+        scene: &validated.scene,
+    }
+    .prepare(&test_paths(), &mut profiler)
     .unwrap()
-    .unwrap();
+    .base_rgba;
 
     assert_eq!(rgba_at(&pixels, 32, 10, 11), [255, 0, 0, 32]);
 }

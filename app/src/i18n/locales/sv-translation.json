@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "Bildfiler",
+    "selectImage": "Välj bild",
+    "replaceImage": "Byt bild",
+    "errors": {
+      "missingAsset": "Den inbäddade bilden saknas i projektet. Välj en ersättning.",
+      "corruptAsset": "Den inbäddade bilden är skadad. Välj en ersättning.",
+      "relativePath": "Välj en bild med en absolut filsökväg.",
+      "missing": "Bildfilen saknas. Välj en annan bild.",
+      "unreadable": "Bildfilen kan inte läsas. Kontrollera behörigheterna eller välj en annan bild.",
+      "unsupportedType": "Välj en PNG-, JPEG-, BMP- eller TIFF-fil (.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "Filen är större än 5 MiB. Välj en mindre fil.",
+      "resolution": "Upplösningen överstiger 25 megapixlar. Välj en mindre bild.",
+      "decode": "Bilden kunde inte avkodas. Välj en annan bild.",
+      "noImage": "Bild {{id}} saknar vald fil. Välj en före rendering.",
+      "renderUnavailable": "Bild {{id}} kan inte renderas ännu.",
+      "invalidConfig": "Bildkonfigurationen är ogiltig."
+    }
+  },
   "app": {
     "importingYourVideo": "Importerar videon...",
     "loadingProject": "Läser in projektet...",
@@ -105,6 +124,10 @@
     "zoomOut": "Zooma ut"
   },
   "projects": {
+    "archiveTooLarge": "Projektet överskrider arkivgränsen på 40 MiB. Ta bort eller ersätt en bild.",
+    "invalidArchive": "Projektarkivet är ogiltigt eller skadat. Välj en annan projektfil.",
+    "rasterUnavailable": "En bild är inte tillgänglig. Ersätt den innan du sparar.",
+    "saveFailed": "Projektet kunde inte sparas. Kontrollera målet och försök igen.",
     "activity": "Aktivitet",
     "cancel": "Avbryt",
     "closeWithoutSaving": "Stäng utan att spara",
@@ -459,6 +482,7 @@
       "lapLog": "Varvlogg"
     },
     "types": {
+      "raster": { "name": "Bild", "shortName": "Bild" },
       "air_pressure": { "name": "Lufttryck", "shortName": "Lufttryck" },
       "altitude": { "name": "Höjd", "shortName": "Höjd" },
       "aperture": { "name": "Bländare", "shortName": "Bländare" },
@@ -571,6 +595,7 @@
     "majorThickness": "Huvudtjocklek",
     "majorTicks": "Huvudmarkeringar",
     "mapRotation": "Kartrotation",
+    "rotation": "Rotation",
     "markerColor": "Markörfärg",
     "markerOpacity": "Marköropacitet",
     "markerSize": "Markörstorlek",

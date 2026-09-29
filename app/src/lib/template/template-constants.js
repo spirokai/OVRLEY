@@ -19,6 +19,7 @@ import {
   DISPLAY_TYPE_DEFINITIONS,
   BACKDROP_CIRCLE_DEFAULTS,
   BACKDROP_RECTANGLE_DEFAULTS,
+  RASTER_DEFAULTS,
 } from '../widget/standard-widgets'
 
 // ---------------------------------------------------------------------------
@@ -49,6 +50,9 @@ export const SCENE_DURABLE_KEYS = ['width', 'height', 'fps', 'updateRate']
 
 /** Keys preserved when normalizing a label widget. */
 export const LABEL_KEYS = [...Object.keys(TEXT_LABEL_DEFAULTS), 'id']
+
+/** Canonical raster widget fields. */
+export const RASTER_KEYS = ['id', ...Object.keys(RASTER_DEFAULTS)]
 
 /** Shared keys preserved when normalizing a backdrop widget. */
 export const BACKDROP_SHARED_KEYS = [

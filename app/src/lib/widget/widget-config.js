@@ -22,7 +22,7 @@ import { normalizeColorFields } from '../color-utils'
 const LEGACY_WIDGET_ID_PATTERN = /^(backdrop|label|value|plot)-\d+$/
 const GENERATED_WIDGET_ID_PATTERN = /^widget-(\d+)$/
 const WIDGET_ID_PREFIX = 'widget-'
-const WIDGET_CATEGORIES = ['backdrops', 'labels', 'values', 'plots']
+const WIDGET_CATEGORIES = ['backdrops', 'rasters', 'labels', 'values', 'plots']
 
 /**
  * Returns whether a widget id is durable enough to preserve across saves.
@@ -390,6 +390,7 @@ export function duplicateWidgetsInConfig(config, widgetsToDuplicate, options = {
   const nextConfig = {
     ...config,
     backdrops: [...(config.backdrops || [])],
+    rasters: [...(config.rasters || [])],
     labels: [...(config.labels || [])],
     values: [...(config.values || [])],
     plots: [...(config.plots || [])],

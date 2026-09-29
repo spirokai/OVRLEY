@@ -110,7 +110,7 @@ describe('project snapshot contract', () => {
 
     const project = createProjectSnapshot(useStore.getState(), 'C:\\Events\\Race.oly')
 
-    expect(project.version).toBe(2)
+    expect(project.version).toBe(3)
     expect(project.sync.manual).toEqual({
       landmarks: [
         { id: 'stop-1', type: 'stop', videoSecond: 4 },

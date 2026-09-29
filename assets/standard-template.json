@@ -16,7 +16,7 @@
     "scale": 1
   },
   "fileFormat": "ovrley-template",
-  "fileVersion": 2,
+  "fileVersion": 3,
   "exportRange": {
     "type": "all",
     "from": 0,

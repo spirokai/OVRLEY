@@ -7,10 +7,10 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
-import { getWidgetTypeName } from '@/lib/widget/widget-icons'
 import { deleteWidgetInConfig, ensureWidgetIdsInConfig, replaceWidgetInConfig, updateWidgetInConfig } from '@/lib/widget/widget-config'
-import { buildConfigWidgets, groupWidgetsForSidebar, withAltitudeEditorPresentation } from '@/lib/widget/widget-presentation'
+import { buildConfigWidgets, getWidgetTypeName, groupWidgetsForSidebar, withAltitudeEditorPresentation } from '@/lib/widget/widget-presentation'
 import { isStandardMetricWidgetType } from '@/lib/widget/standard-metrics'
+import { RASTER_DEFAULTS } from '@/lib/widget/standard-widgets'
 import { clamp } from '@/lib/utils'
 import { createBackdropDefaults, createLabelDefaults, createMetricValueDefaults, createPlotDefaults, parseInteger } from '../utils/widgetUtils'
 import { applyWidgetDrafts } from '@/lib/widget/widget-draft'
@@ -133,6 +133,9 @@ export function useWidgetManager({ widgetLiveEdits }) {
       if (!nextConfig.backdrops) nextConfig.backdrops = []
       nextConfig.backdrops.push(createBackdropDefaults(displayType))
       targetCategory = 'backdrops'
+    } else if (type === 'raster') {
+      nextConfig.rasters.push({ ...RASTER_DEFAULTS })
+      targetCategory = 'rasters'
     } else if (type === 'label') {
       if (!nextConfig.labels) nextConfig.labels = []
       nextConfig.labels.push(createLabelDefaults(globalDefaults))
@@ -181,6 +184,11 @@ export function useWidgetManager({ widgetLiveEdits }) {
 
     if (widget.type === 'backdrop') {
       setConfig(replaceWidgetInConfig(config, id, createBackdropDefaults()))
+      return
+    }
+
+    if (widget.type === 'raster') {
+      setConfig(replaceWidgetInConfig(config, id, { ...RASTER_DEFAULTS }))
       return
     }
 

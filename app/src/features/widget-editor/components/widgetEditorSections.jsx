@@ -68,7 +68,7 @@ export function PositionSection({ widget, setNumericField, updateWidgetData, hea
  * @param {*} props.setNumericField - Value for set numeric field.
  * @returns {JSX.Element} Rendered component output.
  */
-export function DimensionsSection({ widget, setNumericField }) {
+export function DimensionsSection({ widget, setNumericField, min = 0 }) {
   const { t } = useTranslation()
   return (
     <div className="space-y-3">
@@ -77,12 +77,12 @@ export function DimensionsSection({ widget, setNumericField }) {
         <NumberField
           label={t('widget-editor.width', 'Width')}
           value={widget.data.width}
-          onChange={(rawValue) => setNumericField(widget.id, 'width', rawValue, { min: 0 })}
+          onChange={(rawValue) => setNumericField(widget.id, 'width', rawValue, { min })}
         />
         <NumberField
           label={t('widget-editor.height', 'Height')}
           value={widget.data.height}
-          onChange={(rawValue) => setNumericField(widget.id, 'height', rawValue, { min: 0 })}
+          onChange={(rawValue) => setNumericField(widget.id, 'height', rawValue, { min })}
         />
       </div>
     </div>

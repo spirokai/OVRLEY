@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "图片文件",
+    "selectImage": "选择图片",
+    "replaceImage": "替换图片",
+    "errors": {
+      "missingAsset": "此项目缺少嵌入的图片。请选择替换图片。",
+      "corruptAsset": "嵌入的图片已损坏。请选择替换图片。",
+      "relativePath": "请通过绝对文件路径选择图片。",
+      "missing": "图片文件不存在。请选择其他图片。",
+      "unreadable": "无法读取图片文件。请检查权限或选择其他图片。",
+      "unsupportedType": "请选择 PNG、JPEG、BMP 或 TIFF 文件（.png、.jpeg、.jpg、.bmp、.tiff）。",
+      "encodedSize": "文件超过 5 MiB。请选择较小的文件。",
+      "resolution": "分辨率超过 2500 万像素。请选择较小的图片。",
+      "decode": "无法解码图片。请选择其他图片。",
+      "noImage": "图片 {{id}} 尚未选择文件。请在渲染前选择。",
+      "renderUnavailable": "图片 {{id}} 暂时无法渲染。",
+      "invalidConfig": "图片配置无效。"
+    }
+  },
   "app": {
     "importingYourVideo": "正在导入视频...",
     "loadingProject": "正在加载项目...",
@@ -105,6 +124,10 @@
     "zoomOut": "缩小"
   },
   "projects": {
+    "archiveTooLarge": "项目超过 40 MiB 归档大小限制。请移除或替换一张图片。",
+    "invalidArchive": "项目归档无效或已损坏。请选择其他项目文件。",
+    "rasterUnavailable": "有一张图片不可用。请在保存前替换它。",
+    "saveFailed": "无法保存项目。请检查目标位置后重试。",
     "activity": "活动",
     "cancel": "取消",
     "closeWithoutSaving": "不保存并关闭",
@@ -459,6 +482,7 @@
       "lapLog": "圈记录"
     },
     "types": {
+      "raster": { "name": "图片", "shortName": "图片" },
       "air_pressure": { "name": "气压", "shortName": "气压" },
       "altitude": { "name": "海拔高度", "shortName": "海拔" },
       "aperture": { "name": "光圈", "shortName": "光圈" },
@@ -571,6 +595,7 @@
     "majorThickness": "主刻度粗细",
     "majorTicks": "主刻度",
     "mapRotation": "地图旋转",
+    "rotation": "旋转",
     "markerColor": "标记颜色",
     "markerOpacity": "标记不透明度",
     "markerSize": "标记大小",

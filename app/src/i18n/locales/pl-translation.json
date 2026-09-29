@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "Pliki obrazów",
+    "selectImage": "Wybierz obraz",
+    "replaceImage": "Zastąp obraz",
+    "errors": {
+      "missingAsset": "W projekcie brakuje osadzonego obrazu. Wybierz zamiennik.",
+      "corruptAsset": "Osadzony obraz jest uszkodzony. Wybierz zamiennik.",
+      "relativePath": "Wybierz obraz z bezwzględnej ścieżki pliku.",
+      "missing": "Brak pliku obrazu. Wybierz inny obraz.",
+      "unreadable": "Nie można odczytać pliku obrazu. Sprawdź uprawnienia lub wybierz inny obraz.",
+      "unsupportedType": "Wybierz plik PNG, JPEG, BMP lub TIFF (.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "Plik przekracza 5 MiB. Wybierz mniejszy plik.",
+      "resolution": "Rozdzielczość przekracza 25 megapikseli. Wybierz mniejszy obraz.",
+      "decode": "Nie udało się zdekodować obrazu. Wybierz inny.",
+      "noImage": "Obraz {{id}} nie ma wybranego pliku. Wybierz go przed renderowaniem.",
+      "renderUnavailable": "Obrazu {{id}} nie można jeszcze renderować.",
+      "invalidConfig": "Konfiguracja obrazu jest nieprawidłowa."
+    }
+  },
   "app": {
     "importingYourVideo": "Importowanie wideo...",
     "loadingProject": "Wczytywanie projektu...",
@@ -105,6 +124,10 @@
     "zoomOut": "Pomniejsz"
   },
   "projects": {
+    "archiveTooLarge": "Projekt przekracza limit archiwum 40 MiB. Usuń lub zastąp obraz.",
+    "invalidArchive": "Archiwum projektu jest nieprawidłowe lub uszkodzone. Wybierz inny plik projektu.",
+    "rasterUnavailable": "Obraz jest niedostępny. Zastąp go przed zapisaniem.",
+    "saveFailed": "Nie udało się zapisać projektu. Sprawdź miejsce docelowe i spróbuj ponownie.",
     "activity": "Aktywność",
     "cancel": "Anuluj",
     "closeWithoutSaving": "Zamknij bez zapisywania",
@@ -459,6 +482,7 @@
       "lapLog": "Rejestr okrążeń"
     },
     "types": {
+      "raster": { "name": "Obraz", "shortName": "Obraz" },
       "air_pressure": { "name": "Ciśnienie powietrza", "shortName": "Ciśn." },
       "altitude": { "name": "Wysokość", "shortName": "Wysokość" },
       "aperture": { "name": "Przysłona", "shortName": "Przysłona" },
@@ -571,6 +595,7 @@
     "majorThickness": "Grubość główna",
     "majorTicks": "Główne podziałki",
     "mapRotation": "Obrót mapy",
+    "rotation": "Obrót",
     "markerColor": "Kolor znacznika",
     "markerOpacity": "Krycie znacznika",
     "markerSize": "Rozmiar znacznika",

@@ -79,6 +79,7 @@ fn default_render_config() -> RenderConfig {
     let config = RenderConfig {
         scene,
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![],
         plots: serde_json::Value::Object(serde_json::Map::new()),

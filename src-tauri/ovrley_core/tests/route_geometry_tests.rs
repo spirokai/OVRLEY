@@ -116,6 +116,7 @@ fn test_command_errors_when_no_course_plot() {
             "start": 0.0,
             "end": 60.0,
             "scale": 1.0,
+            "opacity": 1.0,
             "shadow_color": "#000000",
             "shadow_strength": 0.5,
             "shadow_distance": 2.0,
@@ -158,6 +159,7 @@ fn test_command_returns_geometry_for_valid_input() {
             "start": 0.0,
             "end": 10.0,
             "scale": 1.0,
+            "opacity": 1.0,
             "shadow_color": "#000000",
             "shadow_strength": 0.5,
             "shadow_distance": 2.0,
@@ -190,6 +192,10 @@ fn test_command_returns_geometry_for_valid_input() {
             "marker_size": 6.0,
             "marker_color": "#ffffff",
             "marker_opacity": 1.0
+        }],
+        "rasters": [{
+            "id": "widget-26", "path": std::env::current_dir().unwrap().join("image.png"), "resourceId": "session-image",
+            "x": 0.0, "y": 0.0, "width": 100.0, "height": 100.0, "rotation": 0.0, "opacity": 100.0
         }]
     });
     let activity = serde_json::json!({

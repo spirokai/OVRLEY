@@ -9,7 +9,7 @@ use super::helpers::{
     normalize_marker_variant, require_f32, require_hex_color, require_opacity, require_positive_f32,
 };
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::raw::ElevationPlotConfig;
+use crate::normalize::raw::{find_plot_values, ElevationPlotConfig};
 
 #[derive(Clone, Debug)]
 pub struct ValidatedElevationPlot {
@@ -48,6 +48,20 @@ pub struct ValidatedElevationPlot {
     pub label_font: Option<String>,
     pub label_font_size: f32,
     pub label_color: String,
+}
+
+pub fn validate_elevation_plots(
+    plots: &serde_json::Value,
+    scene: &crate::normalize::ValidatedSceneConfig,
+) -> CoreResult<Vec<ValidatedElevationPlot>> {
+    find_plot_values(plots, "elevation")
+        .into_iter()
+        .map(|(index, value)| {
+            serde_json::from_value::<ElevationPlotConfig>(value.clone())
+                .map_err(|e| CoreError::Config(format!("elevation plot config: {e}")))
+                .and_then(|plot| validate_elevation_plot(&plot, index, scene))
+        })
+        .collect()
 }
 
 pub fn validate_elevation_plot(

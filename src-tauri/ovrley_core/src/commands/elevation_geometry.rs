@@ -6,8 +6,8 @@
 //! layers, no frame states.
 
 use crate::activity::parse_activity_json;
-use crate::commands::parse_and_validate_config;
 use crate::error::{CoreError, CoreResult};
+use crate::normalize::{parse_config_json, validate_elevation_plots, validate_scene_config};
 use serde::Serialize;
 
 /// Serializable geometry model for the elevation widget, returned over IPC.
@@ -46,11 +46,12 @@ pub fn build_elevation_geometry_command(
     config_json: &str,
     parsed_activity_json: &str,
 ) -> CoreResult<ElevationGeometryResponse> {
-    let validated = parse_and_validate_config(config_json)?;
+    let config = parse_config_json(config_json)?;
+    let scene = validate_scene_config(config.scene)?;
+    let elevation_plots = validate_elevation_plots(&config.plots, &scene)?;
     let activity = parse_activity_json(parsed_activity_json)?;
 
-    let elevation_plot = validated
-        .elevation_plots
+    let elevation_plot = elevation_plots
         .first()
         .ok_or_else(|| CoreError::Config("Config has no elevation_plot widget".into()))?;
 
@@ -59,12 +60,12 @@ pub fn build_elevation_geometry_command(
     let raw_points = crate::render::widgets::elevation::prepare::build_elevation_source_points(
         &activity,
         show_full_activity,
-        &validated.scene,
+        &scene,
     )?;
 
     let normalized = crate::render::widgets::elevation::normalize::normalize_elevation_plot(
         elevation_plot,
-        &validated.scene,
+        &scene,
     );
 
     let geometry = crate::render::widgets::elevation::prepare::build_elevation_geometry(

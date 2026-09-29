@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "Archivos de imagen",
+    "selectImage": "Seleccionar imagen",
+    "replaceImage": "Reemplazar imagen",
+    "errors": {
+      "missingAsset": "Falta la imagen incrustada en este proyecto. Selecciona una de reemplazo.",
+      "corruptAsset": "La imagen incrustada está dañada. Selecciona una de reemplazo.",
+      "relativePath": "Selecciona una imagen mediante una ruta absoluta.",
+      "missing": "Falta el archivo de imagen. Selecciona otra imagen.",
+      "unreadable": "No se puede leer el archivo de imagen. Comprueba los permisos o selecciona otra imagen.",
+      "unsupportedType": "Elige un archivo PNG, JPEG, BMP o TIFF (.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "El archivo supera los 5 MiB. Elige uno más pequeño.",
+      "resolution": "La resolución supera los 25 megapíxeles. Elige una imagen más pequeña.",
+      "decode": "No se pudo decodificar la imagen. Elige otra.",
+      "noImage": "La imagen {{id}} no tiene archivo seleccionado. Selecciona uno antes de renderizar.",
+      "renderUnavailable": "La imagen {{id}} aún no se puede renderizar.",
+      "invalidConfig": "La configuración de la imagen no es válida."
+    }
+  },
   "app": {
     "importingYourVideo": "Importando tu vídeo...",
     "loadingProject": "Cargando proyecto...",
@@ -105,6 +124,10 @@
     "zoomOut": "Reducir"
   },
   "projects": {
+    "archiveTooLarge": "El proyecto supera el límite de archivo de 40 MiB. Elimina o sustituye una imagen.",
+    "invalidArchive": "El archivo del proyecto no es válido o está dañado. Elige otro archivo.",
+    "rasterUnavailable": "Una imagen no está disponible. Sustitúyela antes de guardar.",
+    "saveFailed": "No se pudo guardar el proyecto. Comprueba el destino e inténtalo de nuevo.",
     "activity": "Actividad",
     "cancel": "Cancelar",
     "closeWithoutSaving": "Cerrar sin guardar",
@@ -459,6 +482,7 @@
       "lapLog": "Registro de vueltas"
     },
     "types": {
+      "raster": { "name": "Imagen", "shortName": "Imagen" },
       "air_pressure": { "name": "Presión del aire", "shortName": "Presión aire" },
       "altitude": { "name": "Altitud", "shortName": "Altitud" },
       "aperture": { "name": "Apertura", "shortName": "Apertura" },
@@ -571,6 +595,7 @@
     "majorThickness": "Grosor mayor",
     "majorTicks": "Marcas mayores",
     "mapRotation": "Rotación del mapa",
+    "rotation": "Rotación",
     "markerColor": "Color marcador",
     "markerOpacity": "Opacidad marcador",
     "markerSize": "Tamaño marcador",

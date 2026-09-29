@@ -96,6 +96,7 @@ function makeActivity() {
 
 function makeData() {
   return {
+    value: 'course',
     x: 0,
     y: 0,
     width: 240,
@@ -135,7 +136,7 @@ describe('useRoutePreviewGeometry', () => {
     mockBuildRouteGeometry.mockResolvedValue(GEOMETRY_RESPONSE)
   })
 
-  test('calls buildRouteGeometry with store config and activity', async () => {
+  test('calls buildRouteGeometry with scene, target plot, and activity', async () => {
     const activity = makeActivity()
 
     renderHook(() =>
@@ -160,8 +161,8 @@ describe('useRoutePreviewGeometry', () => {
     // Should preserve the original scene dimensions
     expect(config.scene.width).toBe(240)
     expect(config.scene.height).toBe(240)
-    // Should contain the course plot
-    expect(config.plots).toEqual(expect.arrayContaining([expect.objectContaining({ value: 'course' })]))
+    expect(Object.keys(config)).toEqual(['plots', 'scene'])
+    expect(config.plots).toEqual([makeData()])
   })
 
   test('returns geometry with correct output shape after IPC resolves', async () => {

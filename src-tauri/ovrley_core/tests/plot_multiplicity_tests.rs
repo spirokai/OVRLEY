@@ -35,7 +35,7 @@ fn validation_preserves_multiple_route_and_elevation_plots() {
     let raw: RenderConfig = serde_json::from_value(serde_json::json!({
         "scene": {
             "width": 1920, "height": 1080, "fps": 30.0, "start": 0.0, "end": 10.0,
-            "scale": 1.0, "shadow_color": "#000000", "shadow_strength": 0.5,
+            "scale": 1.0, "opacity": 1.0, "shadow_color": "#000000", "shadow_strength": 0.5,
             "shadow_distance": 2.0, "border_color": "#000000", "border_thickness": 0.0,
             "update_rate": 1, "custom_export_range_active": false, "ffmpeg": {}
         },

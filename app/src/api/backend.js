@@ -3,6 +3,7 @@
  */
 
 import { formatFontLabel, setBundledRecommendedFonts } from '@/lib/fonts'
+import { rasterResourceIds } from '@/lib/widget/raster-resources'
 
 /**
  * Shared Tauri runtime detection.
@@ -462,6 +463,19 @@ export async function selectedPathIsFile(path) {
   return invokeCommand('selected_path_is_file', { path })
 }
 
+/** @param {string} path - Absolute path returned by the native raster picker.
+ * @returns {Promise<{width: number, height: number, resourceId: string}>} Validated Rust-owned image.
+ * @throws {Error} Raster failures include a code; bridge failures propagate without a raster code.
+ */
+export async function loadSelectedRaster(path) {
+  return invokeCommand('load_selected_raster', { path })
+}
+
+/** @param {string} resourceId - Rust-owned immutable image identity. @returns {Promise<string>} Oriented PNG bytes encoded as base64. */
+export async function rasterPreviewPng(resourceId) {
+  return invokeCommand('raster_preview_png', { resourceId })
+}
+
 /** @returns {Promise<string>} Absolute Documents/OVRLEY/projects directory. */
 export async function getDefaultProjectDirectory() {
   return invokeCommand('default_project_directory')
@@ -506,10 +520,11 @@ export async function readProjectFile(path) {
  * Validates and atomically writes an OVRLEY project archive.
  * @param {string} path - Absolute `.oly` path.
  * @param {string} projectJson - Canonical project JSON.
+ * @param {object} config - Current editor config containing Rust resource identities.
  * @returns {Promise<string>} Written path.
  */
-export async function writeProjectFile(path, projectJson) {
-  return invokeCommand('write_project_file', { path, projectJson })
+export async function writeProjectFile(path, projectJson, config) {
+  return invokeCommand('write_project_file', { path, projectJson, rasterResourceIds: rasterResourceIds(config) })
 }
 
 /**

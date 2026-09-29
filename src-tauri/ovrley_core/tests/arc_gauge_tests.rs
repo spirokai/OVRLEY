@@ -155,6 +155,7 @@ fn preview_render_reports_arc_gauge_without_text_or_icon_fallback() {
     let config = validate_render_config(RenderConfig {
         scene: serde_json::from_value(scene).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(full_arc_gauge_config(20, 30)).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -192,6 +193,7 @@ fn validate_single_arc(
     validate_render_config(RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(value).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),

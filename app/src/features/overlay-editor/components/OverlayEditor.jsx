@@ -7,7 +7,7 @@
  */
 
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { LayoutGrid, Tag } from 'lucide-react'
+import { LayoutGrid } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import EditorToolbar from '@/features/app-shell/components/EditorToolbar'
 import OverlayCanvas from './OverlayCanvas'
@@ -27,7 +27,7 @@ import { isBackdropWidget, isFramedWidget } from '@/lib/widget/display-type-beha
 import { buildRenderedGeometrySignature, buildWidgetRenderGeometryModels } from '../utils/widgetRenderGeometry'
 import { isUniformResizeDisplayType } from '../utils/widgetResizeScaling'
 import { useTranslation } from 'react-i18next'
-import { getWidgetTypeName } from '@/lib/widget/widget-icons'
+import { getWidgetTypeName } from '@/lib/widget/widget-presentation'
 import { resolveVideoSyncMarkControls, VIDEO_SYNC_PREVIEW_SCREEN_GAP, VideoSyncMarkControls, VideoSyncPreviewScreens } from '@/features/video-sync'
 
 const PROJECT_STATUS_TRANSLATIONS = {
@@ -49,7 +49,7 @@ function WidgetBadgeLayer({ displayScale, hoveredWidgetId, renderGeometryModels,
   return (
     <div data-testid="widget-badge-layer" className="pointer-events-none absolute inset-0 z-50 overflow-visible">
       {visibleWidgets.map((widget) => {
-        const Icon = WIDGET_ICONS[widget.type] || Tag
+        const Icon = WIDGET_ICONS[widget.type]
         const renderGeometryModel = renderGeometryModels[widget.id]
         const { renderGeometry } = renderGeometryModel
         const left = renderGeometry.badgeLeft * displayScale - 2
@@ -330,9 +330,11 @@ function OverlayEditorContent({
   const selectedDisplayType = selectedWidget?.data?.display_type
 
   const canResizeSelected = hasSingleSelection && isFramedSelected
-  const showEdgeResizeHandles = canResizeSelected && selectedWidget?.type === 'elevation' && !isUniformResizeDisplayType(selectedDisplayType)
+  const showEdgeResizeHandles =
+    canResizeSelected &&
+    (selectedWidget?.type === 'raster' || (selectedWidget?.type === 'elevation' && !isUniformResizeDisplayType(selectedDisplayType)))
   const canScaleSelected = hasSingleSelection && !isFramedSelected
-  const canRotateSelected = hasSingleSelection && selectedWidget?.type === 'course'
+  const canRotateSelected = hasSingleSelection && (selectedWidget?.type === 'course' || selectedWidget?.type === 'raster')
   const maintainAspectRatio =
     hasSingleSelection &&
     (isUniformResizeDisplayType(selectedDisplayType) ||

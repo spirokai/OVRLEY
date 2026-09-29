@@ -74,8 +74,8 @@ export function useOverlayEditorStateWithLiveEdits({ config, globalDefaults, onC
   const rawWidgets = useMemo(() => buildConfigWidgets(config), [config])
   const widgets = useMemo(() => materializeWidgets(rawWidgets, globalDefaults), [globalDefaults, rawWidgets])
   const sceneSize = useMemo(() => getSceneSize(config), [config])
-  const globalOpacity = globalDefaults?.opacity ?? 1
-  const globalScale = globalDefaults?.scale ?? 1
+  const globalOpacity = globalDefaults.opacity
+  const globalScale = globalDefaults.scale
   const sceneStyle = useMemo(
     () => ({
       border_color: globalDefaults?.border_color ?? config?.scene?.border_color,

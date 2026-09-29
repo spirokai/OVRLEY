@@ -17,6 +17,7 @@ pub fn explicit_scene_json() -> Value {
         "width": 1920,
         "height": 1080,
         "scale": 1.0,
+        "opacity": 1.0,
         "shadow_color": "#000000",
         "shadow_strength": 0.0,
         "shadow_distance": 0.0,

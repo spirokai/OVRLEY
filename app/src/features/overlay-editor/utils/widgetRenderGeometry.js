@@ -17,9 +17,8 @@ export function resolveWidgetRenderGeometry(widget, visualBounds, globalScale, p
   const hasDirectLayout = preview?.mode === 'frame' || preview?.mode === 'drag'
   const scaleFactor = preview?.scaleFactor
   const isScaling = Number.isFinite(scaleFactor)
-  const rotation = widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
+  const rotation = widget.type === 'raster' ? widget.data.rotation : widget.type === 'course' ? (widget.data.rotation ?? 0) : 0
   const resolvedData = widget.data
-  const displayScale = globalScale || 1
   const leanSelectionFrame =
     resolvedData.display_type === 'lean_angle'
       ? getLeanAngleSelectionFrame({
@@ -29,8 +28,8 @@ export function resolveWidgetRenderGeometry(widget, visualBounds, globalScale, p
           value_offset_y: resolvedData.value_offset_y,
         })
       : null
-  const frameWidth = (leanSelectionFrame?.width ?? resolvedData.width ?? 0) * displayScale
-  const frameHeight = (leanSelectionFrame?.height ?? resolvedData.height ?? 0) * displayScale
+  const frameWidth = (leanSelectionFrame?.width ?? resolvedData.width) * globalScale
+  const frameHeight = (leanSelectionFrame?.height ?? resolvedData.height) * globalScale
   const staticOrigin = getWidgetSceneOrigin(widget, null, visualBounds, {
     boundsScale: isFramed ? 1 : globalScale,
   })

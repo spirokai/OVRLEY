@@ -34,24 +34,14 @@ function getPlotGeometrySignature(data, plotType) {
   )
 }
 
-function replaceGeometryPlot(config, plotType, plotData) {
-  const plotIndex = config.plots.findIndex((plot) => plot.id === plotData.id || plot.value === plotType)
-  if (plotIndex === -1) return config
-
-  const plots = [...config.plots]
-  plots[plotIndex] = { ...plots[plotIndex], ...plotData }
-  return { ...config, plots }
-}
-
-function buildPlotGeometryConfig({ config, globalDefaults, activity, exportWindow, globalScale, plotType, plotData, widgetUpdateRate }) {
+function buildPlotGeometryConfig({ config, globalDefaults, activity, exportWindow, globalScale, plotData, widgetUpdateRate }) {
   if (!config || !activity || !hasTauriRuntime()) return null
 
   const duration = activity.trim_end_seconds
   const { start, end, updateRate: _updateRate, ...sceneRest } = config.scene
-  const geometryConfig = replaceGeometryPlot(config, plotType, normalizePlotDimensions(plotData))
 
   return {
-    ...geometryConfig,
+    plots: [normalizePlotDimensions(plotData)],
     scene: {
       ...globalDefaults,
       ...sceneRest,
@@ -101,10 +91,9 @@ export function usePlotPreviewGeometry({ activity, data, exportRange, style, plo
       exportWindow,
       globalDefaults,
       globalScale: style.globalScale,
-      plotType,
       widgetUpdateRate,
     }
-  }, [activity, config, data, exportWindow, globalDefaults, plotType, style.globalScale, widgetUpdateRate])
+  }, [activity, config, data, exportWindow, globalDefaults, style.globalScale, widgetUpdateRate])
 
   useEffect(() => {
     const geometryConfig = buildPlotGeometryConfig(latestInputsRef.current)

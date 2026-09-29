@@ -71,6 +71,7 @@ pub fn derive_fixture_composite_plan(
                 "start":0,
                 "end":10,
                 "scale":1.0,
+                "opacity":1.0,
                 "shadow_strength":0.0,
                 "shadow_distance":0.0,
                 "shadow_color":"#000000",

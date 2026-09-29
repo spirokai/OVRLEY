@@ -1,4 +1,23 @@
 {
+  "raster": {
+    "imageFiles": "이미지 파일",
+    "selectImage": "이미지 선택",
+    "replaceImage": "이미지 교체",
+    "errors": {
+      "missingAsset": "이 프로젝트에 포함된 이미지가 없습니다. 대체 이미지를 선택하세요.",
+      "corruptAsset": "포함된 이미지가 손상되었습니다. 대체 이미지를 선택하세요.",
+      "relativePath": "절대 파일 경로에서 이미지를 선택하세요.",
+      "missing": "이미지 파일이 없습니다. 다른 이미지를 선택하세요.",
+      "unreadable": "이미지 파일을 읽을 수 없습니다. 권한을 확인하거나 다른 이미지를 선택하세요.",
+      "unsupportedType": "PNG, JPEG, BMP 또는 TIFF 파일을 선택하세요(.png, .jpeg, .jpg, .bmp, .tiff).",
+      "encodedSize": "파일 크기가 5 MiB를 초과합니다. 더 작은 파일을 선택하세요.",
+      "resolution": "해상도가 25메가픽셀을 초과합니다. 더 작은 이미지를 선택하세요.",
+      "decode": "이미지를 디코딩할 수 없습니다. 다른 이미지를 선택하세요.",
+      "noImage": "이미지 {{id}}에 선택된 파일이 없습니다. 렌더링 전에 선택하세요.",
+      "renderUnavailable": "이미지 {{id}}는 아직 렌더링할 수 없습니다.",
+      "invalidConfig": "이미지 설정이 잘못되었습니다."
+    }
+  },
   "app": {
     "importingYourVideo": "동영상 가져오는 중...",
     "loadingProject": "프로젝트 로드 중...",
@@ -105,6 +124,10 @@
     "zoomOut": "축소"
   },
   "projects": {
+    "archiveTooLarge": "프로젝트가 40 MiB 압축 파일 제한을 초과합니다. 이미지를 제거하거나 교체하세요.",
+    "invalidArchive": "프로젝트 압축 파일이 올바르지 않거나 손상되었습니다. 다른 프로젝트 파일을 선택하세요.",
+    "rasterUnavailable": "이미지를 사용할 수 없습니다. 저장하기 전에 교체하세요.",
+    "saveFailed": "프로젝트를 저장할 수 없습니다. 저장 위치를 확인하고 다시 시도하세요.",
     "activity": "활동",
     "cancel": "취소",
     "closeWithoutSaving": "저장하지 않고 닫기",
@@ -459,6 +482,7 @@
       "lapLog": "랩 기록"
     },
     "types": {
+      "raster": { "name": "이미지", "shortName": "이미지" },
       "air_pressure": { "name": "기압", "shortName": "기압" },
       "altitude": { "name": "고도", "shortName": "고도" },
       "aperture": { "name": "조리개", "shortName": "조리개" },
@@ -571,6 +595,7 @@
     "majorThickness": "주요 두께",
     "majorTicks": "주요 눈금",
     "mapRotation": "지도 회전",
+    "rotation": "회전",
     "markerColor": "마커 색상",
     "markerOpacity": "마커 불투명도",
     "markerSize": "마커 크기",

@@ -39,9 +39,18 @@ use ovrley_core::encode::pipeline::composite_plan::derive_composite_render_plan;
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::error::CoreError;
 use ovrley_core::normalize::raw::parse_config_json;
-use ovrley_core::normalize::raw::RenderConfig;
+use ovrley_core::normalize::raw::{RasterConfig, RenderConfig};
 use ovrley_core::normalize::validate_render_config;
 use ovrley_core::paths::AppPaths;
+use ovrley_core::raster::{RasterResourceResolver, SelectedRaster};
+
+struct EmptyRasterResources;
+
+impl RasterResourceResolver for EmptyRasterResources {
+    fn resolve(&self, _: &str) -> Option<std::sync::Arc<SelectedRaster>> {
+        None
+    }
+}
 
 /// Verifies the transparent render branch does not alter dense activity
 /// timing. A transparent config with 5–15s window at 30 FPS should produce
@@ -59,6 +68,42 @@ fn test_3_1_transparent_render_branch_keeps_original_dense_timing() {
     assert_eq!(dense.frame_count, 300);
     assert_eq!(dense.series.speed.first().copied().flatten(), Some(5.0));
     assert_eq!(dense.frame_elapsed_seconds.first().copied(), Some(0.0));
+}
+
+#[test]
+fn app_render_rejects_a_raster_without_its_loaded_resource() {
+    let mut config = transparent_config(0.0, 1.0, 30.0);
+    config.rasters.push(RasterConfig {
+        id: "one".into(),
+        x: 0.0,
+        y: 0.0,
+        width: 1.0,
+        height: 1.0,
+        rotation: 0.0,
+        opacity: 1.0,
+        path: Some(
+            std::env::current_dir()
+                .unwrap()
+                .join("source.bmp")
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        resource_id: None,
+        resource_error_code: None,
+    });
+    let error = backend_render(
+        &AppPaths::from_repo_root(PathBuf::from(".")),
+        &RenderController::default(),
+        &serde_json::to_string(&config).unwrap(),
+        &synthetic_activity_json(),
+        &render_output_path("missing-raster"),
+        false,
+        Some(&EmptyRasterResources),
+    )
+    .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("raster_error:missing_resource:one"));
 }
 
 /// Verifies the composite branch gate: `backend_render` must
@@ -88,6 +133,7 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
         &synthetic_activity_json(),
         &render_output_path("branch"),
         false,
+        None,
     )
     .unwrap();
 
@@ -115,6 +161,7 @@ fn output_rejection_precedes_malformed_activity_processing() {
         "not json",
         output_path.to_str().unwrap(),
         false,
+        None,
     )
     .unwrap_err();
 
@@ -146,6 +193,7 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
         &short_fractional_activity_json(),
         &render_output_path("clamp"),
         false,
+        None,
     )
     .unwrap();
 
@@ -193,6 +241,7 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
         &synthetic_activity_json(),
         &render_output_path("pipeline"),
         false,
+        None,
     )
     .unwrap();
 

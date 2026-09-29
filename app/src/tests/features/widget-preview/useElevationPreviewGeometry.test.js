@@ -98,6 +98,7 @@ function makeActivity() {
 
 function makeData() {
   return {
+    value: 'elevation',
     x: 100,
     y: 200,
     width: 240,
@@ -161,7 +162,8 @@ describe('useElevationPreviewGeometry', () => {
     expect(config.scene.end).toBe(30)
     expect(config.scene.width).toBe(240)
     expect(config.scene.height).toBe(48)
-    expect(config.plots).toEqual(expect.arrayContaining([expect.objectContaining({ value: 'elevation' })]))
+    expect(Object.keys(config)).toEqual(['plots', 'scene'])
+    expect(config.plots).toEqual([makeData()])
   })
 
   test('returns geometry with correct output shape after IPC resolves', async () => {

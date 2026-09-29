@@ -532,7 +532,7 @@ fn durable_template_without_scene_timing_still_validates_for_save() {
     validate_template_contents(
         r##"{
             "format": "ovrley-template",
-            "version": 2,
+            "version": 3,
             "config": {
                 "scene": {
                     "width": 1920,
@@ -540,6 +540,7 @@ fn durable_template_without_scene_timing_still_validates_for_save() {
                     "fps": 30,
                     "updateRate": 1
                 },
+                "rasters": [],
                 "labels": [],
                 "values": [],
                 "plots": []
@@ -565,6 +566,32 @@ fn durable_template_without_scene_timing_still_validates_for_save() {
         }"##,
     )
     .expect("durable template save validation should not require scene.start/end");
+}
+
+#[test]
+fn template_save_accepts_editable_raster_placeholder() {
+    let template = json!({
+        "format": "ovrley-template",
+        "version": TEMPLATE_FILE_VERSION,
+        "config": {
+            "scene": common::seam::explicit_scene_json(),
+            "rasters": [{
+                "id": "raster-1",
+                "x": 10,
+                "y": 20,
+                "width": 100,
+                "height": 50,
+                "rotation": 0,
+                "opacity": 1,
+                "path": null
+            }],
+            "labels": [],
+            "values": [],
+            "plots": []
+        }
+    });
+    validate_template_contents(&template.to_string()).unwrap();
+    assert!(parse_and_validate_config(&template["config"].to_string()).is_err());
 }
 
 fn explicit_speed_value() -> serde_json::Value {

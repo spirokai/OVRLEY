@@ -6,9 +6,11 @@
 //!       those live in `ovrley_core::commands` and the render pipeline.
 //!
 //! Allowed dependencies: `std`, `tauri`, `runtime_paths`, `ovrley_core`
-//!       (for template write validation through the normalization seam).
+//!       (for template/image validation), `raster_resources` (session ownership).
 
+use crate::raster_resources::RasterResources;
 use crate::runtime_paths;
+use serde::Serialize;
 use std::path::PathBuf;
 use tauri::Manager;
 
@@ -70,4 +72,53 @@ pub(crate) fn read_selected_file_bytes(path: String) -> Result<Vec<u8>, String> 
 #[tauri::command]
 pub(crate) fn selected_path_is_file(path: String) -> bool {
     PathBuf::from(path).is_file()
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RasterSelection {
+    width: u32,
+    height: u32,
+    resource_id: String,
+}
+
+#[derive(Serialize)]
+pub(crate) struct RasterSelectionError {
+    code: &'static str,
+    message: String,
+}
+
+impl From<ovrley_core::raster::RasterError> for RasterSelectionError {
+    fn from(error: ovrley_core::raster::RasterError) -> Self {
+        Self {
+            code: error.code(),
+            message: error.to_string(),
+        }
+    }
+}
+
+/// Validates a user-selected bitmap and registers its immutable oriented preview in Rust.
+#[tauri::command]
+pub(crate) fn load_selected_raster(
+    resources: tauri::State<'_, RasterResources>,
+    path: String,
+) -> Result<RasterSelection, RasterSelectionError> {
+    let raster = ovrley_core::raster::load_selected_raster(PathBuf::from(path).as_path())
+        .map_err(RasterSelectionError::from)?;
+    let (width, height) = raster.dimensions();
+    let resource_id = resources.insert(raster);
+    Ok(RasterSelection {
+        width,
+        height,
+        resource_id,
+    })
+}
+
+/// Returns display bytes from the immutable Rust-owned image snapshot.
+#[tauri::command]
+pub(crate) fn raster_preview_png(
+    resources: tauri::State<'_, RasterResources>,
+    resource_id: String,
+) -> Result<String, String> {
+    resources.preview_png_base64(&resource_id)
 }

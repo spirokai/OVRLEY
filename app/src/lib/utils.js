@@ -4,6 +4,43 @@
 
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import i18n from '@/i18n'
+
+/**
+ * Formats tagged backend errors for display while leaving untagged messages unchanged.
+ * @param {string} message - Backend error or progress message.
+ * @returns {string} User-facing message.
+ */
+export function translateBackendError(message) {
+  const projectCode = message.match(/\[project_error:([a-z_]+)\]/)?.[1]
+  const projectKeys = {
+    archive_size: 'archiveTooLarge',
+    invalid_archive: 'invalidArchive',
+    raster_unavailable: 'rasterUnavailable',
+    save_failed: 'saveFailed',
+  }
+  if (projectCode && projectKeys[projectCode]) return i18n.t(`projects.${projectKeys[projectCode]}`)
+  const match = message.match(/\[raster_error:([a-z_]+):([^\]]+)\]/)
+  if (!match) return message
+  const keys = {
+    invalid_config: 'invalidConfig',
+    no_image: 'noImage',
+    missing_resource: 'renderUnavailable',
+    relative_path: 'relativePath',
+    missing: 'missing',
+    unreadable: 'unreadable',
+    unsupported_type: 'unsupportedType',
+    encoded_size: 'encodedSize',
+    resolution: 'resolution',
+    decode: 'decode',
+    missing_asset: 'missingAsset',
+    corrupt_asset: 'corruptAsset',
+  }
+  const key = keys[match[1]]
+  if (!key) return message
+  const translated = i18n.t(`raster.errors.${key}`, { id: match[2] })
+  return key === 'noImage' || key === 'renderUnavailable' || match[2] === 'configuration' ? translated : `${match[2]}: ${translated}`
+}
 
 /**
  * Merges class name inputs into a single Tailwind-safe class string.

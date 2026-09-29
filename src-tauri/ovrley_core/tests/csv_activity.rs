@@ -527,7 +527,7 @@ fn malformed_metric_observations_become_missing_without_repairing_bounded_values
         activity.course,
         vec![(None, None), (Some(45.0), Some(90.0))]
     );
-    assert_eq!(activity.distance, vec![Some(0.0), Some(0.0)]);
+    assert_eq!(activity.distance, vec![None, Some(0.0)]);
     assert_eq!(activity.rpm, vec![None, Some(1000.0)]);
     assert_eq!(activity.throttle_position, vec![None, Some(50.0)]);
     assert_eq!(activity.brake_position, vec![None, Some(25.0)]);

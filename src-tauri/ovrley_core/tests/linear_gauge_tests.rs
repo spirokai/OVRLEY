@@ -69,6 +69,7 @@ fn rejects_starting_altitude_on_non_altitude_linear_gauge() {
     let result = validate_render_config(RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(value).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -137,6 +138,7 @@ fn prepare_assets_builds_linear_gauge_cache_with_activity_range() {
     let config = validate_render_config(RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(full_linear_gauge_config(20, 30)).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -169,6 +171,7 @@ fn bars_style_resolves_configured_linear_geometry_into_the_cache() {
     let config = validate_render_config(RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(value).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
@@ -200,6 +203,7 @@ fn preview_render_reports_linear_gauge_without_text_fallback() {
     let config = validate_render_config(RenderConfig {
         scene: serde_json::from_value(scene).unwrap(),
         backdrops: vec![],
+        rasters: vec![],
         labels: vec![],
         values: vec![serde_json::from_value(full_linear_gauge_config(20, 30)).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),

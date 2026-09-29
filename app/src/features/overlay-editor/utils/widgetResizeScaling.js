@@ -34,6 +34,21 @@ export function isUniformResizeDisplayType(displayType) {
   return GAUGE_DISPLAY_TYPES.has(displayType) || displayType === G_FORCE_DISPLAY_TYPE
 }
 
+/** Preserve the frame ratio captured at the start of a corner drag. */
+export function constrainRasterResize(origin, frame, displayScale) {
+  if (!origin.direction?.[0] || !origin.direction?.[1]) return frame
+  const factor =
+    Math.abs(frame.width / origin.width - 1) >= Math.abs(frame.height / origin.height - 1) ? frame.width / origin.width : frame.height / origin.height
+  const width = Math.max(8, origin.width * factor)
+  const height = Math.max(8, origin.height * factor)
+  return {
+    x: origin.x + (origin.direction[0] < 0 ? (origin.width - width) * displayScale : 0),
+    y: origin.y + (origin.direction[1] < 0 ? (origin.height - height) * displayScale : 0),
+    width,
+    height,
+  }
+}
+
 function isGauge(widget) {
   return GAUGE_DISPLAY_TYPES.has(widget?.data?.display_type)
 }

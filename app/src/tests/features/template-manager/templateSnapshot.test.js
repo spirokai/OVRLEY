@@ -1,14 +1,24 @@
-import { describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 
+import { loadSelectedRaster } from '@/api/backend'
 import { TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION } from '@/lib/template/template-constants'
 import {
   createTemplateFilePayload,
   createTemplateState,
   normalizeTemplateConfig,
   normalizeTemplateFilePayload,
+  prepareTemplateFilePayload,
 } from '@/features/template-manager/utils/templateSnapshot'
 import { createMetricValueDefaults } from '@/features/widget-editor/utils/widgetUtils'
 import { deepEqual } from '@/store/store-utils'
+
+vi.mock('@/api/backend', () => ({
+  loadSelectedRaster: vi.fn(),
+}))
+
+beforeEach(() => {
+  vi.resetAllMocks()
+})
 
 describe('template snapshot standard metric schema', () => {
   test('creates standard metric defaults with display_unit as the canonical unit field', () => {
@@ -31,7 +41,7 @@ describe('template snapshot standard metric schema', () => {
   test('preserves the flat lap timer contract during durable normalization', () => {
     const lapTimer = createMetricValueDefaults('lap_timer', undefined, { lapTimerMode: 'best_lap' })
 
-    const normalized = normalizeTemplateConfig({ scene: {}, values: [lapTimer] })
+    const normalized = normalizeTemplateConfig({ scene: {}, rasters: [], values: [lapTimer] })
 
     expect(normalized.values[0]).toMatchObject({
       value: 'lap_timer',
@@ -54,7 +64,7 @@ describe('template snapshot standard metric schema', () => {
     delete lapTimer.label_font_size
     delete lapTimer.label_color
 
-    const normalized = normalizeTemplateConfig({ scene: {}, values: [lapTimer] }, { font_text: 'Teko.ttf', color_text: '#123456' })
+    const normalized = normalizeTemplateConfig({ scene: {}, rasters: [], values: [lapTimer] }, { font_text: 'Teko.ttf', color_text: '#123456' })
 
     expect(normalized.values[0]).toMatchObject({
       label_font: 'Teko.ttf',
@@ -142,6 +152,7 @@ describe('template snapshot standard metric schema', () => {
     expect(() =>
       normalizeTemplateConfig({
         scene: {},
+        rasters: [],
         labels: [],
         values: [{ ...leanAngle, display_variants: { lean_angle: missingDiameter } }],
         plots: [],
@@ -151,6 +162,7 @@ describe('template snapshot standard metric schema', () => {
     expect(() =>
       normalizeTemplateConfig({
         scene: {},
+        rasters: [],
         labels: [],
         values: [{ ...leanAngle, display_variants: { lean_angle: { ...leanAngle.display_variants.lean_angle, width: 180 } } }],
         plots: [],
@@ -172,6 +184,7 @@ describe('template snapshot standard metric schema', () => {
   test('normalizes standard metric widgets with display_unit and strips legacy unit fields', () => {
     const normalized = normalizeTemplateConfig({
       scene: {},
+      rasters: [],
       labels: [],
       values: [
         {
@@ -201,6 +214,7 @@ describe('template snapshot standard metric schema', () => {
     const state = createTemplateState({
       config: {
         scene: { width: 1920, height: 1080, fps: 30, updateRate: 1 },
+        rasters: [],
         labels: [],
         values: [
           { id: 'gradient-1', value: 'gradient', x: 10, y: 20 },
@@ -217,12 +231,100 @@ describe('template snapshot standard metric schema', () => {
 
   test('stamps new template payloads with the current template file version', () => {
     const payload = createTemplateFilePayload({
-      config: { scene: {}, labels: [], values: [], plots: [] },
+      config: { scene: {}, rasters: [], labels: [], values: [], plots: [] },
       globalDefaults: {},
     })
 
     expect(payload.format).toBe(TEMPLATE_FILE_FORMAT)
-    expect(payload.version).toBe(TEMPLATE_FILE_VERSION)
+    expect(payload.version).toBe(3)
+    expect(payload.config.rasters).toEqual([])
+  })
+
+  test('round-trips a standalone raster absolute path in template version 3', () => {
+    const raster = {
+      id: 'raster-1',
+      x: 10,
+      y: 20,
+      width: 640,
+      height: 480,
+      rotation: 15,
+      opacity: 0.8,
+      path: 'C:\\images\\finish-line.png',
+    }
+
+    const payload = createTemplateFilePayload({
+      config: { scene: {}, backdrops: [], rasters: [raster], labels: [], values: [], plots: [] },
+      globalDefaults: {},
+    })
+    const normalized = normalizeTemplateFilePayload(payload)
+
+    expect(payload.version).toBe(3)
+    expect(normalized.config.rasters).toEqual([raster])
+  })
+
+  test('explicitly migrates template version 2 to an empty raster collection', () => {
+    const normalized = normalizeTemplateFilePayload({
+      format: TEMPLATE_FILE_FORMAT,
+      version: 2,
+      config: { scene: {}, labels: [], values: [], plots: [] },
+      settings: { globalDefaults: {} },
+    })
+
+    expect(normalized.config.rasters).toEqual([])
+    expect(() =>
+      normalizeTemplateFilePayload({
+        format: TEMPLATE_FILE_FORMAT,
+        version: 2,
+        config: { scene: {}, rasters: [], labels: [], values: [], plots: [] },
+        settings: { globalDefaults: {} },
+      }),
+    ).toThrow('Version 2 template cannot contain rasters.')
+  })
+
+  test('does not repair a version 3 template that omits its raster collection', () => {
+    expect(() =>
+      normalizeTemplateFilePayload({
+        format: TEMPLATE_FILE_FORMAT,
+        version: 3,
+        config: { scene: {}, labels: [], values: [], plots: [] },
+        settings: { globalDefaults: {} },
+      }),
+    ).toThrow('Raster collection must be an array')
+  })
+
+  test('prepares valid raster snapshots while retaining broken rasters as recoverable resources', async () => {
+    vi.mocked(loadSelectedRaster)
+      .mockResolvedValueOnce({ width: 320, height: 180, resourceId: 'snapshot-1' })
+      .mockRejectedValueOnce(Object.assign(new Error('The image file is missing.'), { code: 'missing' }))
+
+    const prepared = await prepareTemplateFilePayload({
+      format: TEMPLATE_FILE_FORMAT,
+      version: 3,
+      config: {
+        scene: {},
+        backdrops: [],
+        rasters: [
+          { id: 'ready', x: 0, y: 0, width: 100, height: 50, rotation: 0, opacity: 1, path: 'C:\\images\\ready.png' },
+          { id: 'broken', x: 40, y: 50, width: 600, height: 400, rotation: 5, opacity: 0.7, path: 'C:\\images\\missing.png' },
+        ],
+        labels: [{ id: 'label-1', text: 'Still loads', x: 10, y: 10 }],
+        values: [],
+        plots: [],
+      },
+      settings: { globalDefaults: {} },
+    })
+
+    expect(loadSelectedRaster).toHaveBeenCalledTimes(2)
+    expect(prepared.templateState.config.rasters[1]).toMatchObject({ id: 'broken', x: 40, y: 50, width: 600, height: 400 })
+    expect(prepared.templateState.config.labels).toHaveLength(1)
+    expect(prepared.templateState.config.rasters[0].resourceId).toBe('snapshot-1')
+    expect(prepared.templateState.config.rasters[1].resourceErrorCode).toBe('missing')
+    expect(
+      createTemplateState({ config: prepared.templateState.config, globalDefaults: prepared.templateState.settings.globalDefaults }).config.rasters,
+    ).toEqual([
+      { id: 'ready', x: 0, y: 0, width: 100, height: 50, rotation: 0, opacity: 1, path: 'C:\\images\\ready.png' },
+      { id: 'broken', x: 40, y: 50, width: 600, height: 400, rotation: 5, opacity: 0.7, path: 'C:\\images\\missing.png' },
+    ])
   })
 
   test('saves only template-wide scene defaults and widget update rate', () => {
@@ -239,6 +341,7 @@ describe('template snapshot standard metric schema', () => {
           color: '#ffffff',
           ffmpeg: { codec: 'prores_ks' },
         },
+        rasters: [],
         labels: [],
         values: [],
         plots: [],
@@ -260,6 +363,7 @@ describe('template snapshot standard metric schema', () => {
       version: TEMPLATE_FILE_VERSION,
       config: {
         scene: { width: 1920, height: 1080, fps: 30, updateRate: 3, start: 5, end: 90 },
+        rasters: [],
         labels: [],
         values: [],
         plots: [],
@@ -279,6 +383,7 @@ describe('template snapshot standard metric schema', () => {
     const payload = createTemplateFilePayload({
       config: {
         scene: {},
+        rasters: [],
         labels: [{ id: 'widget-1', text: 'Label', x: 0, y: 0, color: '#ffffff' }],
         values: [
           { id: 'widget-2', value: 'speed', x: 10, y: 20 },
@@ -300,6 +405,7 @@ describe('template snapshot standard metric schema', () => {
       version: TEMPLATE_FILE_VERSION,
       config: {
         scene: {},
+        rasters: [],
         labels: [{ text: 'Legacy label', x: 0, y: 0 }],
         values: [
           { value: 'speed', x: 10, y: 20 },
@@ -351,15 +457,15 @@ describe('template snapshot standard metric schema', () => {
     expect(deepEqual(left, right)).toBe(false)
   })
 
-  test('rejects older template versions explicitly', () => {
+  test('rejects unsupported template versions explicitly', () => {
     expect(() =>
       normalizeTemplateFilePayload({
         format: TEMPLATE_FILE_FORMAT,
-        version: TEMPLATE_FILE_VERSION - 1,
+        version: 1,
         config: { scene: {}, labels: [], values: [], plots: [] },
         settings: { globalDefaults: {} },
       }),
-    ).toThrow(`Unsupported template file version: ${TEMPLATE_FILE_VERSION - 1}. Expected ${TEMPLATE_FILE_VERSION}.`)
+    ).toThrow(`Unsupported template file version: 1. Expected ${TEMPLATE_FILE_VERSION}.`)
   })
 
   test.each([
