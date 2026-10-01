@@ -79,11 +79,11 @@ describe('RenderVideoDialog', () => {
     expect(slider).toHaveAttribute('aria-valuemin', '10')
     expect(slider).toHaveAttribute('aria-valuemax', '35')
     await user.click(screen.getByRole('tab', { name: 'Bitrate' }))
-    expect(screen.getByText('10 Mbps')).toBeInTheDocument()
+    expect(screen.getByText('20 Mbps')).toBeInTheDocument()
     await user.click(screen.getByRole('tab', { name: 'Quality' }))
     await user.tab()
     await user.keyboard('{ArrowRight}')
-    expect(screen.getByText('CRF 17')).toBeInTheDocument()
+    expect(screen.getByText('CRF 20')).toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: 'Transparent' }))
 

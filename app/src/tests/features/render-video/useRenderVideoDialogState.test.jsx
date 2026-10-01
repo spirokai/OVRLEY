@@ -119,11 +119,11 @@ describe('useRenderVideoDialogState', () => {
     })
     expect(result.current.exportMode).toBe('composite')
     expect(result.current.settings.qualityType).toBe('quality')
-    expect(result.current.settings.qualityValue).toBe(18)
+    expect(result.current.settings.qualityValue).toBe(21)
     act(() => result.current.handleOutputFormatChange('hevc'))
-    expect(result.current.settings.qualityValue).toBe(20)
+    expect(result.current.settings.qualityValue).toBe(26)
     act(() => result.current.handleOutputFormatChange('h264'))
-    expect(result.current.settings.qualityValue).toBe(18)
+    expect(result.current.settings.qualityValue).toBe(21)
 
     act(() => {
       result.current.handleExportModeChange('transparent')

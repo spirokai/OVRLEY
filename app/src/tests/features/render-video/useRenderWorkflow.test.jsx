@@ -73,7 +73,7 @@ describe('useRenderWorkflow', () => {
     useStore.setState({ importedVideoPath: 'C:\\video.mp4' })
     const { result } = renderHook(() => useRenderWorkflow({ backendStatus: 'connected' }))
     await act(async () => result.current.openRenderDialog())
-    expect(result.current.renderSettingsDraft).toMatchObject({ qualityType: 'quality', qualityValue: 18 })
+    expect(result.current.renderSettingsDraft).toMatchObject({ qualityType: 'quality', qualityValue: 21 })
     act(() => result.current.updateRenderSettingsDraft({ exportCodec: 'libx264', qualityType, qualityValue }))
     await act(async () => result.current.handleRenderVideoConfirm())
     expect(renderVideoMock).toHaveBeenCalledWith(expect.objectContaining({ qualityType, qualityValue }))
