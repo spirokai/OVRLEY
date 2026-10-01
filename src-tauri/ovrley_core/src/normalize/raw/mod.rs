@@ -36,8 +36,10 @@ pub struct SceneConfig {
     pub update_rate: Option<u32>,
     #[serde(default, skip_serializing)]
     pub composite_video_path: Option<String>,
-    #[serde(default, skip_serializing)]
-    pub composite_bitrate: Option<String>,
+    #[serde(default, rename = "qualityType", skip_serializing)]
+    pub quality_type: Option<crate::encode::quality::QualityType>,
+    #[serde(default, rename = "qualityValue", skip_serializing)]
+    pub quality_value: Option<f64>,
     #[serde(default, skip_serializing)]
     pub composite_sync_offset: Option<f64>,
     #[serde(default, skip_serializing)]

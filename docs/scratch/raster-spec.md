@@ -156,10 +156,11 @@ There is no placeholder, silent omission, fallback image, fallback path, or cons
 
 ### Projects
 
-- Increment the `.oly` project format from version 1 to version 2.
-- Version 2 permits and defines per-widget raster asset entries in addition to project JSON and thumbnail data.
-- Loading version 1 explicitly migrates it with no embedded rasters.
-- New saves write version 2.
+- Increment the `.oly` project format from version 2 to version 3 once for both unreleased raster and export-quality changes.
+- Version 3 adds the canonical `rasters` collection and `rasterAssets` mapping, permits per-widget raster archive entries, and replaces `render.bitrateMbps` with `render.qualityType` and `render.qualityValue`.
+- Loading version 1 or 2 explicitly migrates it with empty raster state and fixed quality-mode defaults: 20 for HEVC codecs and 18 for other codecs. Legacy bitrate input is validated before migration.
+- Version 1 also receives the manual-sync state introduced in version 2; existing version 2 sync state is preserved.
+- New saves write the combined version 3 contract. Intermediate unreleased version 3 shapes are not supported.
 
 Migration is versioned and explicit; it must not be implemented as broad compatibility aliases or fallback parsing.
 
@@ -188,7 +189,7 @@ All new user-facing strings must be represented by translation keys and translat
 - Final preview/export never renders a placeholder and blocks on unresolved rasters.
 - Raster decoding/drawing is part of the Rust static cache preparation, not elapsed-frame work.
 - Standalone templates round-trip absolute paths using template v3.
-- Projects round-trip original image bytes without relying on external files using `.oly` v2.
+- Projects round-trip original image bytes without relying on external files using `.oly` v3, preserving export-quality settings in the same document.
 - A damaged/missing template or project raster does not prevent unrelated document content from opening.
 - Malformed submitted render config and unreadable submitted render resources fail loudly.
 - The 5 MiB, 25 MP, and total 40 MiB limits are covered at every applicable ingress/save boundary.

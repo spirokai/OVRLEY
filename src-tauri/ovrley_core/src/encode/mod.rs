@@ -28,3 +28,5 @@ pub mod fps;
 pub mod pipeline;
 /// Live render progress estimation helpers.
 pub mod progress;
+/// Composite quality/bitrate validation and FFmpeg arguments.
+pub mod quality;

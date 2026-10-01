@@ -120,7 +120,7 @@ fn test_3_2_composite_branch_activates_only_when_video_path_is_present() {
         &composite_config_json(
             r#"
                 "composite_video_path": "input.mp4",
-                "composite_bitrate": "60M",
+                "qualityType": "bitrate", "qualityValue": 60.0,
                 "composite_sync_offset": 0.0,
                 "composite_video_fps_num": 30000,
                 "composite_video_fps_den": 1001,
@@ -180,7 +180,7 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
         &composite_config_json(
             r#"
                 "composite_video_path": "input.mp4",
-                "composite_bitrate": "60M",
+                "qualityType": "bitrate", "qualityValue": 60.0,
                 "composite_sync_offset": 0.0,
                 "composite_video_fps_num": 30,
                 "composite_video_fps_den": 1,
@@ -227,7 +227,7 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
         &composite_config_json(&format!(
             r#"
                 "composite_video_path": "{}",
-                "composite_bitrate": "60M",
+                "qualityType": "bitrate", "qualityValue": 60.0,
                 "composite_sync_offset": 300.0,
                 "composite_video_fps_num": 30000,
                 "composite_video_fps_den": 1001,
@@ -257,10 +257,10 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
         .starts_with("ovrley-command-pipeline-"));
 }
 
-/// Plan derivation must reject composite configs that omit `composite_bitrate`.
+/// Config ingress must reject composite configs that omit quality settings.
 #[test]
-fn test_3_3_missing_bitrate_validation() {
-    let mut scene = composite_validated_scene(
+fn test_3_3_missing_quality_validation() {
+    let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
             "composite_sync_offset": 0.0,
@@ -271,11 +271,11 @@ fn test_3_3_missing_bitrate_validation() {
             "composite_widget_update_rate": 1
             "#,
     );
-    let error = derive_composite_render_plan(&mut scene, None).unwrap_err();
+    let error = ovrley_core::normalize::validate_scene_config(config.scene).unwrap_err();
 
     assert_eq!(
         error.to_string(),
-        "Invalid configuration: scene.composite_bitrate required for composite render"
+        "Invalid configuration: scene.qualityType required for composite render"
     );
 }
 
@@ -286,7 +286,7 @@ fn test_3_4_missing_fps_validation() {
     let mut missing_num = composite_validated_scene(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 0.0,
             "composite_video_fps_den": 1001,
             "composite_video_duration": 20.0,
@@ -297,7 +297,7 @@ fn test_3_4_missing_fps_validation() {
     let mut missing_den = composite_validated_scene(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 0.0,
             "composite_video_fps_num": 30000,
             "composite_video_duration": 20.0,
@@ -335,7 +335,7 @@ fn test_3_5_dense_report_timing_for_sync_offset() {
     let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 300.0,
             "composite_video_fps_num": 30000,
             "composite_video_fps_den": 1001,
@@ -370,7 +370,7 @@ fn test_3_6_dense_report_timing_for_lower_overlay_update_rate() {
     let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 0.0,
             "composite_video_fps_num": 60000,
             "composite_video_fps_den": 1001,
@@ -396,7 +396,7 @@ fn test_3_7_render_duration_defaults_to_remaining_video_after_trim() {
     let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 0.0,
             "composite_video_fps_num": 30000,
             "composite_video_fps_den": 1001,
@@ -419,7 +419,7 @@ fn test_3_8_rejects_impossible_trim() {
     let config = composite_config(
         r#"
             "composite_video_path": "input.mp4",
-            "composite_bitrate": "60M",
+            "qualityType": "bitrate", "qualityValue": 60.0,
             "composite_sync_offset": 0.0,
             "composite_video_fps_num": 30000,
             "composite_video_fps_den": 1001,

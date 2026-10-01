@@ -93,7 +93,8 @@ pub fn derive_fixture_composite_plan(
     let paths = AppPaths::from_repo_root(PathBuf::from("."));
 
     config.scene.composite_video_path = Some("input.mp4".to_string());
-    config.scene.composite_bitrate = Some("60M".to_string());
+    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_value = Some(60.0);
     config.scene.composite_video_fps_num = Some(fps_num);
     config.scene.composite_video_fps_den = Some(fps_den);
     config.scene.composite_video_duration = Some(video_duration);
@@ -238,7 +239,8 @@ pub fn render_fixture_composite_with_paths(
     config.scene.end = sync_offset + render_duration;
     config.scene.fps = overlay_fps.as_f64();
     config.scene.composite_video_path = Some(absolute_video_path.clone());
-    config.scene.composite_bitrate = Some("20M".to_string());
+    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_value = Some(20.0);
     config.scene.composite_sync_offset = Some(sync_offset);
     config.scene.composite_video_fps_num = Some(fps_num);
     config.scene.composite_video_fps_den = Some(fps_den);
@@ -382,7 +384,8 @@ pub fn composite_test_config(
 ) -> ValidatedRenderConfig {
     let mut config = mutable_composite_test_config(render_duration);
     config.scene.composite_video_path = Some(video_path.to_string());
-    config.scene.composite_bitrate = Some("10M".to_string());
+    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_value = Some(10.0);
     config.scene.composite_video_fps_num = Some(30000);
     config.scene.composite_video_fps_den = Some(1001);
     config.scene.composite_video_duration = Some(35.0);

@@ -41,12 +41,12 @@ export default async function renderVideo(overrides = {}) {
   const activeUpdateRate = overrides.updateRate ?? updateRate
   const activeExportMode = overrides.exportMode
   const activeExportCodec = overrides.exportCodec ?? exportCodec
-  const activeExportBitrate = overrides.exportBitrate
 
   const config = createRenderEffectiveConfig({
     availableCodecs,
     config: activeConfig,
-    exportBitrate: activeExportBitrate,
+    qualityType: overrides.qualityType,
+    qualityValue: overrides.qualityValue,
     exportCodec: activeExportCodec,
     exportMode: activeExportMode,
     exportRange: overrides.exportRange ?? exportRange,

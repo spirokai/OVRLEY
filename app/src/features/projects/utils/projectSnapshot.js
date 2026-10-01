@@ -33,7 +33,8 @@ export function createProjectContentSnapshot(state, projectPath) {
       widgetUpdateRate: state.renderSettings.widgetUpdateRate,
       exportMode: state.importedVideoPath ? state.renderSettings.exportMode : 'transparent',
       codec: state.renderSettings.codec,
-      bitrateMbps: state.renderSettings.bitrateMbps,
+      qualityType: state.renderSettings.qualityType,
+      qualityValue: state.renderSettings.qualityValue,
       range: { ...state.renderSettings.range },
     },
   }

@@ -7,6 +7,8 @@
 use crate::raster_resources::RasterResources;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use chrono::DateTime;
+use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, EncoderId};
+use ovrley_core::encode::quality::{validate_quality, QualityType};
 use ovrley_core::normalize::{raw::RasterConfig, validate_template_rasters};
 use ovrley_core::raster::{
     is_canonical_extension, load_embedded_raster, RasterError, SelectedRaster, MAX_ENCODED_BYTES,
@@ -146,7 +148,7 @@ struct ProjectDocumentV2 {
     editor: ProjectEditor,
     sources: ProjectSources,
     sync: ProjectSync,
-    render: ProjectRender,
+    render: LegacyProjectRender,
     timeline: ProjectTimeline,
 }
 
@@ -159,7 +161,7 @@ struct ProjectDocumentV1 {
     editor: ProjectEditor,
     sources: ProjectSources,
     sync: ProjectSyncV1,
-    render: ProjectRender,
+    render: LegacyProjectRender,
     timeline: ProjectTimeline,
 }
 
@@ -290,6 +292,18 @@ enum VideoTimezoneMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectRender {
+    fps: f64,
+    widget_update_rate: u32,
+    export_mode: ExportMode,
+    codec: String,
+    quality_type: QualityType,
+    quality_value: f64,
+    range: ProjectRange,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LegacyProjectRender {
     fps: f64,
     widget_update_rate: u32,
     export_mode: ExportMode,
@@ -470,11 +484,8 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
     if project.render.fps <= 0.0 || project.render.widget_update_rate == 0 {
         return Err("Render fps and widgetUpdateRate must be positive".into());
     }
-    if let Some(bitrate) = project.render.bitrate_mbps {
-        if !bitrate.is_finite() || bitrate <= 0.0 {
-            return Err("render.bitrateMbps must be a positive finite number or null".into());
-        }
-    }
+    validate_quality(project.render.quality_type, project.render.quality_value)
+        .map_err(|error| format!("render.{error}"))?;
     if project.render.codec.trim().is_empty() {
         return Err("render.codec must not be empty".into());
     }
@@ -716,9 +727,41 @@ fn migrate_project(version: u32, value: Value) -> Result<ProjectDocument, String
         editor: legacy.editor,
         sources: legacy.sources,
         sync: legacy.sync,
-        render: legacy.render,
+        render: migrate_legacy_render(legacy.render)?,
         timeline: legacy.timeline,
         raster_assets: BTreeMap::new(),
+    })
+}
+
+fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRender, String> {
+    if let Some(bitrate) = render.bitrate_mbps {
+        if !bitrate.is_finite() || bitrate <= 0.0 {
+            return Err("render.bitrateMbps must be a positive finite number or null".into());
+        }
+    }
+    let codec = CodecSelection::from_external_name(&render.codec)
+        .ok_or_else(|| format!("Unsupported render codec: {}", render.codec))?;
+    let is_hevc = match codec {
+        CodecSelection::Composite(codec) => matches!(
+            codec.metadata().encoder_id,
+            EncoderId::Libx265
+                | EncoderId::HevcNvenc
+                | EncoderId::HevcQsv
+                | EncoderId::HevcAmf
+                | EncoderId::HevcVideotoolbox
+                | EncoderId::HevcVaapi
+        ),
+        CodecSelection::Transparent(_) => false,
+    };
+    Ok(ProjectRender {
+        fps: render.fps,
+        widget_update_rate: render.widget_update_rate,
+        export_mode: render.export_mode,
+        codec: render.codec,
+        quality_type: QualityType::Quality,
+        // Fixed migration values keep v1/v2 loads independent of future UI defaults.
+        quality_value: if is_hevc { 20.0 } else { 18.0 },
+        range: render.range,
     })
 }
 
@@ -1258,7 +1301,7 @@ mod tests {
             },
             "render": {
                 "fps": 30.0, "widgetUpdateRate": 1, "exportMode": "transparent", "codec": "prores_ks",
-                "bitrateMbps": null, "range": { "type": "all", "from": 0.0, "to": 0.0 }
+                "qualityType": "quality", "qualityValue": 18, "range": { "type": "all", "from": 0.0, "to": 0.0 }
             },
             "timeline": { "playheadSecond": 0.0, "viewStart": 0.0, "viewEnd": 73.0 },
             "rasterAssets": {}
@@ -1280,6 +1323,10 @@ mod tests {
             .unwrap()
             .remove("rasters");
         project.as_object_mut().unwrap().remove("rasterAssets");
+        let render = project["render"].as_object_mut().unwrap();
+        render.remove("qualityType");
+        render.remove("qualityValue");
+        render.insert("bitrateMbps".into(), Value::Null);
         project.to_string()
     }
 
@@ -1372,6 +1419,72 @@ mod tests {
     }
 
     #[test]
+    fn v3_archives_preserve_rasters_and_both_quality_modes() {
+        let directory =
+            std::env::temp_dir().join(format!("ovrley-raster-quality-project-{}", Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let source = directory.join("missing-source.bmp");
+        let path = directory.join("project.oly");
+        let original = bmp([0, 0, 255]);
+        let image = Arc::new(load_embedded_raster("bmp", original.clone()).unwrap());
+        let resources = RasterResources::default();
+
+        for (quality_type, quality_value) in
+            [(QualityType::Quality, 27.0), (QualityType::Bitrate, 37.5)]
+        {
+            let mut project: Value =
+                serde_json::from_str(&raster_project(serde_json::json!([raster(
+                    "image", &source
+                )])))
+                .unwrap();
+            project["sources"]["video"] = serde_json::json!({
+                "path": { "kind": "project-relative", "value": "video.mp4" }
+            });
+            project["render"]["exportMode"] = Value::from("composite");
+            project["render"]["codec"] = Value::from("libx265");
+            project["render"]["qualityType"] = serde_json::to_value(quality_type).unwrap();
+            project["render"]["qualityValue"] = Value::from(quality_value);
+            write_project_file_sync(
+                path_string(path.clone()),
+                project.to_string(),
+                None,
+                HashMap::from([("image".into(), Arc::clone(&image))]),
+            )
+            .unwrap();
+
+            let loaded = read_project_file_sync(&resources, path_string(path.clone())).unwrap();
+            assert_eq!(loaded.project.version, 3);
+            assert_eq!(loaded.project.render.quality_type, quality_type);
+            assert_eq!(loaded.project.render.quality_value, quality_value);
+            assert_eq!(
+                loaded.project.editor.config["rasters"],
+                project["editor"]["config"]["rasters"]
+            );
+            assert_eq!(loaded.project.raster_assets["image"], "rasters/image.bmp");
+            let RasterLoadResult::Ready { resource_id } = &loaded.raster_load_results["image"]
+            else {
+                panic!("expected embedded raster to load without its original source");
+            };
+            assert_eq!(
+                resources.resolve(resource_id).unwrap().encoded_bytes(),
+                original
+            );
+
+            let mut archive = ZipArchive::new(File::open(&path).unwrap()).unwrap();
+            let stored: Value =
+                serde_json::from_reader(archive.by_name(PROJECT_JSON_ENTRY).unwrap()).unwrap();
+            assert_eq!(stored["version"], 3);
+            assert_eq!(
+                stored["render"]["qualityType"],
+                project["render"]["qualityType"]
+            );
+            assert_eq!(stored["render"]["qualityValue"], quality_value);
+            assert!(stored["render"].get("bitrateMbps").is_none());
+        }
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn archive_limit_does_not_replace_an_existing_project() {
         let directory =
             std::env::temp_dir().join(format!("ovrley-raster-limit-{}", Uuid::new_v4()));
@@ -1422,7 +1535,7 @@ mod tests {
 
     #[test]
     fn v2_manual_sync_round_trip_preserves_landmarks_location_and_thresholds() {
-        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        let mut project: Value = serde_json::from_str(&valid_v2_project_json()).unwrap();
         project["sources"]["video"] = serde_json::json!({
             "path": { "kind": "project-relative", "value": "media/video.mp4" }
         });
@@ -1440,12 +1553,18 @@ mod tests {
 
         let parsed = parse_project(&project.to_string()).unwrap().document;
         let serialized = serde_json::to_value(parsed).unwrap();
+        assert_eq!(serialized["version"], 3);
         assert_eq!(serialized["sync"]["manual"], project["sync"]["manual"]);
+        assert_eq!(serialized["render"]["qualityType"], "quality");
+        assert_eq!(
+            serialized["editor"]["config"]["rasters"],
+            serde_json::json!([])
+        );
     }
 
     #[test]
     fn older_v2_manual_sync_without_detected_location_loads_as_none() {
-        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        let mut project: Value = serde_json::from_str(&valid_v2_project_json()).unwrap();
         project["sync"]["manual"]
             .as_object_mut()
             .unwrap()
@@ -1531,6 +1650,9 @@ mod tests {
             valid_project_json().replace(PROJECT_FORMAT, "wrong-project"),
             valid_project_json().replace("\"version\":3", "\"version\":99"),
             valid_project_json().replace("\"fps\":30.0", "\"fps\":0.0"),
+            valid_project_json().replace("\"qualityValue\":18", "\"qualityValue\":52"),
+            valid_project_json()
+                .replace("\"qualityType\":\"quality\"", "\"qualityType\":\"unknown\""),
         ] {
             assert!(parse_project(&invalid).is_err());
         }
@@ -1543,39 +1665,103 @@ mod tests {
         assert!(parsed.sync.manual.landmarks.is_empty());
         assert_eq!(parsed.sync.manual.speed_threshold_kmh, 5.0);
         assert_eq!(parsed.sync.manual.turn_threshold_degrees, 80.0);
+        assert_eq!(parsed.render.quality_type, QualityType::Quality);
+        assert_eq!(parsed.render.quality_value, 18.0);
+        assert!(parsed.editor.config["rasters"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert!(parsed.raster_assets.is_empty());
         let migrated = parse_project(&valid_v2_project_json()).unwrap().document;
+        assert_eq!(migrated.version, PROJECT_VERSION);
         assert!(migrated.editor.config["rasters"]
             .as_array()
             .unwrap()
             .is_empty());
         assert!(migrated.raster_assets.is_empty());
         assert_eq!(migrated.sync.manual.speed_threshold_kmh, 5.0);
+        assert_eq!(migrated.sync.manual.turn_threshold_degrees, 90.0);
+        assert_eq!(migrated.render.quality_type, QualityType::Quality);
+        assert_eq!(migrated.render.quality_value, 18.0);
         let mut malformed: Value = serde_json::from_str(&valid_v2_project_json()).unwrap();
         malformed["editor"]["config"]["rasters"] = serde_json::json!([]);
         assert!(parse_project(&malformed.to_string()).is_err());
     }
 
     #[test]
-    fn saving_a_v1_document_writes_canonical_v3() {
-        let directory =
-            std::env::temp_dir().join(format!("ovrley-project-v1-save-test-{}", Uuid::new_v4()));
+    fn legacy_archives_migrate_on_read_and_write_both_v3_features_on_save() {
+        let directory = std::env::temp_dir().join(format!(
+            "ovrley-project-legacy-save-test-{}",
+            Uuid::new_v4()
+        ));
         fs::create_dir_all(&directory).unwrap();
         let path = directory.join("Legacy.oly");
-        write_project_file_sync(
-            path_string(path.clone()),
-            valid_v1_project_json(),
-            None,
-            HashMap::new(),
-        )
-        .unwrap();
-        assert_eq!(
-            read_project_file_sync(&RasterResources::default(), path_string(path))
-                .unwrap()
-                .project
-                .version,
-            PROJECT_VERSION
-        );
+        for legacy_json in [valid_v1_project_json(), valid_v2_project_json()] {
+            write_archive(&path, &legacy_json, None, &BTreeMap::new()).unwrap();
+            let previous = fs::read(&path).unwrap();
+            let loaded =
+                read_project_file_sync(&RasterResources::default(), path_string(path.clone()))
+                    .unwrap();
+            assert_eq!(loaded.project.version, 3);
+            assert!(loaded.raster_load_results.is_empty());
+            assert_eq!(fs::read(&path).unwrap(), previous);
+
+            write_project_file_sync(
+                path_string(path.clone()),
+                serde_json::to_string(&loaded.project).unwrap(),
+                None,
+                HashMap::new(),
+            )
+            .unwrap();
+            let mut archive = ZipArchive::new(File::open(&path).unwrap()).unwrap();
+            let stored: Value =
+                serde_json::from_reader(archive.by_name(PROJECT_JSON_ENTRY).unwrap()).unwrap();
+            assert_eq!(stored["version"], 3);
+            assert_eq!(stored["editor"]["config"]["rasters"], serde_json::json!([]));
+            assert_eq!(stored["rasterAssets"], serde_json::json!({}));
+            assert_eq!(stored["render"]["qualityType"], "quality");
+            assert_eq!(stored["render"]["qualityValue"], 18.0);
+            assert!(stored["render"].get("bitrateMbps").is_none());
+        }
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn v3_requires_the_combined_raster_and_quality_contract() {
+        for field in ["qualityType", "qualityValue"] {
+            let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+            project["render"].as_object_mut().unwrap().remove(field);
+            assert!(parse_project(&project.to_string()).is_err());
+        }
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["render"]["bitrateMbps"] = Value::Null;
+        assert!(parse_project(&project.to_string()).is_err());
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project["editor"]["config"]
+            .as_object_mut()
+            .unwrap()
+            .remove("rasters");
+        assert!(parse_project(&project.to_string()).is_err());
+        let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
+        project.as_object_mut().unwrap().remove("rasterAssets");
+        assert!(parse_project(&project.to_string()).is_err());
+    }
+
+    #[test]
+    fn migrates_legacy_projects_to_fixed_codec_quality_defaults() {
+        for legacy_json in [valid_v1_project_json(), valid_v2_project_json()] {
+            for (codec, expected) in [("libx264", 18.0), ("libx265", 20.0)] {
+                let mut project: Value = serde_json::from_str(&legacy_json).unwrap();
+                project["render"]["codec"] = Value::from(codec);
+                project["render"]["bitrateMbps"] = Value::from(60.0);
+                let parsed = parse_project(&project.to_string()).unwrap().document;
+                assert_eq!(parsed.version, PROJECT_VERSION);
+                assert_eq!(parsed.render.quality_type, QualityType::Quality);
+                assert_eq!(parsed.render.quality_value, expected);
+                project["render"]["bitrateMbps"] = Value::from(-1.0);
+                assert!(parse_project(&project.to_string()).is_err());
+            }
+        }
     }
 
     #[test]

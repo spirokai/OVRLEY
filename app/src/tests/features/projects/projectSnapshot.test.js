@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { createProjectDirtyState, createProjectSnapshot } from '@/features/projects/utils/projectSnapshot'
 import { createPathLocator } from '@/features/projects/utils/projectPaths'
 import { VIDEO_SYNC_MATCH_SCOPES } from '@/features/video-sync/data/videoSyncConstants'
+import { createRenderEffectiveConfig } from '@/features/render-video/utils/renderConfig'
 import useStore from '@/store/useStore'
 
 describe('project snapshot contract', () => {
@@ -20,6 +21,8 @@ describe('project snapshot contract', () => {
         ...state.renderSettings,
         fps: 60,
         codec: 'h264_nvenc',
+        qualityType: 'bitrate',
+        qualityValue: 35,
       },
       selectedSecond: 12.5,
       timelineViewport: { viewStart: 10, viewEnd: 30 },
@@ -37,6 +40,8 @@ describe('project snapshot contract', () => {
       video: { path: { kind: 'absolute', value: 'D:\\video\\lap.mp4' } },
     })
     expect(project.render.fps).toBe(60)
+    expect(project.render).toMatchObject({ qualityType: 'bitrate', qualityValue: 35 })
+    expect(project.render).not.toHaveProperty('bitrateMbps')
     expect(project.timeline).toEqual({ playheadSecond: 12.5, viewStart: 10, viewEnd: 30 })
 
     const serialized = JSON.stringify(project)
@@ -56,6 +61,58 @@ describe('project snapshot contract', () => {
     expect(dirtyState).not.toHaveProperty('savedAt')
     expect(dirtyState.content.editor).toEqual(project.editor)
     expect(dirtyState.timeline).toEqual(project.timeline)
+  })
+
+  test.each([
+    ['quality', 27],
+    ['bitrate', 37.5],
+  ])('preserves rasters and %s settings across project and render snapshots', (qualityType, qualityValue) => {
+    useStore.setState(useStore.getInitialState(), true)
+    const raster = {
+      id: 'raster-image',
+      x: 10,
+      y: 20,
+      width: 320,
+      height: 240,
+      rotation: 15,
+      opacity: 0.75,
+      path: 'C:\\Events\\logo.png',
+    }
+    const resourceId = 'session-image-resource'
+    useStore.setState((state) => ({
+      config: { ...state.config, rasters: [{ ...raster, resourceId }] },
+      importedVideoPath: 'C:\\Events\\video.mp4',
+      renderSettings: { ...state.renderSettings, codec: 'libx265', qualityType, qualityValue },
+    }))
+    const state = useStore.getState()
+    const project = createProjectSnapshot(state, 'C:\\Events\\Race.oly')
+    expect(project.version).toBe(3)
+    expect(project.editor.config.rasters).toEqual([raster])
+    expect(project.rasterAssets).toEqual({})
+    expect(project.render).toMatchObject({ qualityType, qualityValue })
+    expect(project.render).not.toHaveProperty('bitrateMbps')
+    expect(project.editor.config.scene).not.toHaveProperty('qualityType')
+    expect(project.editor.config.scene).not.toHaveProperty('qualityValue')
+
+    const renderConfig = createRenderEffectiveConfig({
+      config: state.config,
+      globalDefaults: state.globalDefaults,
+      updateRate: state.renderSettings.widgetUpdateRate,
+      exportMode: 'composite',
+      exportCodec: state.renderSettings.codec,
+      qualityType,
+      qualityValue,
+      importedVideoPath: state.importedVideoPath,
+      importedVideoDuration: 30,
+      importedVideoFpsNum: 30,
+      importedVideoFpsDen: 1,
+      importedVideoResolution: { width: 1920, height: 1080 },
+      videoSyncOffsetSeconds: 0,
+      timelineStart: 0,
+      timelineEnd: 30,
+    })
+    expect(renderConfig.rasters).toEqual([{ ...raster, resourceId }])
+    expect(renderConfig.scene).toMatchObject({ qualityType, qualityValue, ffmpeg: { codec: 'libx265' } })
   })
 
   test('creates child-relative and external absolute locators', () => {
